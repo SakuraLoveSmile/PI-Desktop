@@ -22,6 +22,17 @@ pub const GITHUB_BACKUP_CHANNEL_CATALOG_URL: &str =
 pub const MIRROR_MARKET_CATALOG_URL: &str =
     "https://cnb.cool/aixk/pi-desktop-plugins/-/git/raw/main/catalog.json";
 
+/// Curated channel: the maintainer-reviewed distribution repository.
+///
+/// Every version it lists was approved by a maintainer for that exact
+/// `(pluginId, version, shasum)`, and the approvals are what generate its
+/// catalog. It is deliberately absent from `is_trusted_channel`: a curated
+/// catalog cannot promote itself to the `verified` tier, which stays reserved
+/// for the project's own catalogs. Its review label comes from the per-version
+/// review metadata instead.
+pub const PLUS_CURATED_CHANNEL_CATALOG_URL: &str =
+    "https://raw.githubusercontent.com/SakuraLoveSmile/Pi-Desktop-Plus-Plugins/main/catalog.json";
+
 /// The catalog source a user chose.
 ///
 /// `official` keeps its meaning — "the official one" — and the official one is
@@ -35,6 +46,8 @@ pub enum MarketChannel {
     Github,
     /// The CNB backup.
     Mirror,
+    /// The maintainer-reviewed curated catalog.
+    Plus,
     /// A catalog URL the user typed.
     Custom,
 }
@@ -46,6 +59,7 @@ impl MarketChannel {
             MarketChannel::Official => "official",
             MarketChannel::Github => "github",
             MarketChannel::Mirror => "mirror",
+            MarketChannel::Plus => "plus",
             MarketChannel::Custom => "custom",
         }
     }
@@ -59,6 +73,7 @@ impl MarketChannel {
         match value.map(str::trim) {
             Some("github") => MarketChannel::Github,
             Some("mirror") => MarketChannel::Mirror,
+            Some("plus") => MarketChannel::Plus,
             Some("custom") => MarketChannel::Custom,
             _ => MarketChannel::Official,
         }
@@ -70,6 +85,7 @@ impl MarketChannel {
             MarketChannel::Official => Some(OFFICIAL_CHANNEL_CATALOG_URL),
             MarketChannel::Github => Some(GITHUB_BACKUP_CHANNEL_CATALOG_URL),
             MarketChannel::Mirror => Some(MIRROR_MARKET_CATALOG_URL),
+            MarketChannel::Plus => Some(PLUS_CURATED_CHANNEL_CATALOG_URL),
             MarketChannel::Custom => None,
         }
     }
@@ -360,11 +376,26 @@ impl PluginManager {
         if self.cached_catalog_matches_source(&self.market_source_url()) {
             if let Ok(raw) = fs::read_to_string(self.catalog_path()) {
                 if let Ok(catalog) = serde_json::from_str::<MarketCatalogFile>(&raw) {
-                    if !catalog.plugins.is_empty() {
+                    if !catalog.plugins.is_empty() || self.market_channel == MarketChannel::Plus {
                         return Ok(catalog);
                     }
                 }
             }
+        }
+
+        if self.market_channel == MarketChannel::Plus {
+            return Ok(MarketCatalogFile {
+                schema_version: 2,
+                provider_id: "pi-desktop-plus-curated".into(),
+                catalog_id: Some("pi-desktop-plus-curated".into()),
+                name: Some("Pi-Desktop Plus Curated Plugins".into()),
+                homepage: Some("https://github.com/SakuraLoveSmile/Pi-Desktop-Plus-Plugins".into()),
+                updated_at: Some(Utc::now().to_rfc3339()),
+                generated_at: Some(Utc::now().to_rfc3339()),
+                policy_version: Some("plus-curated-v1".into()),
+                artifact_base_url: None,
+                plugins: Vec::new(),
+            });
         }
 
         let catalog = built_in_catalog_at(&self.data_dir);
@@ -457,12 +488,13 @@ impl PluginManager {
         &self,
         plugin_id: &str,
         version: Option<&str>,
+        expected_marketplace: Option<&ExpectedMarketplace>,
     ) -> Result<MarketDownloadInfo> {
         // Keep the public download-info seam on the same freshness boundary as
         // `market.install`; callers must not receive a URL/checksum pair from
         // an old catalog when the marketplace is reachable.
         let catalog = self.load_catalog_for_install()?;
-        self.market_download_info_from_catalog(&catalog, plugin_id, version)
+        self.market_download_info_from_catalog(&catalog, plugin_id, version, expected_marketplace)
     }
 
     pub(crate) fn market_download_info_from_catalog(
@@ -470,6 +502,7 @@ impl PluginManager {
         catalog: &MarketCatalogFile,
         plugin_id: &str,
         version: Option<&str>,
+        expected_marketplace: Option<&ExpectedMarketplace>,
     ) -> Result<MarketDownloadInfo> {
         let entry = catalog
             .plugins
@@ -515,6 +548,60 @@ impl PluginManager {
                 crate::state::HOST_VERSION
             );
         }
+        if self.channel() == MarketChannel::Plus {
+            let Some(review) = &selected.review else {
+                bail!(
+                    "PLUGIN_MARKET_CHANGED: curated version {} has no maintainer review",
+                    selected.version
+                );
+            };
+            let decision_ok = review
+                .decision
+                .as_deref()
+                .map(str::trim)
+                .map(str::to_ascii_lowercase)
+                == Some("approved".to_string());
+            let policy_ok = review
+                .policy_version
+                .as_deref()
+                .map(str::trim)
+                .is_some_and(|p| p.starts_with("plus-curated-v1"));
+            let reviewed_at_ok = review
+                .reviewed_at
+                .as_deref()
+                .map(str::trim)
+                .is_some_and(|s| !s.is_empty());
+            if !decision_ok || !policy_ok || !reviewed_at_ok {
+                bail!("PLUGIN_MARKET_CHANGED: curated version {} does not have a valid approval verdict", selected.version);
+            }
+            if expected_marketplace.is_none() {
+                bail!("PLUGIN_MARKET_CHANGED: missing required expected marketplace assertion for plus source");
+            }
+        }
+
+        if let Some(exp) = expected_marketplace {
+            let exp_source = exp.source.trim();
+            let exp_url = exp.catalog_url.trim();
+            let exp_version = exp.version.trim();
+            let exp_shasum = exp.shasum.trim().to_ascii_lowercase();
+
+            let effective_source = self.channel().as_str();
+            let effective_url = self.market_source_url();
+            let actual_shasum = selected.shasum.trim().to_ascii_lowercase();
+
+            if exp_source != effective_source
+                || exp_url != effective_url
+                || exp_version != selected.version
+                || exp_shasum != actual_shasum
+            {
+                bail!(
+                    "PLUGIN_MARKET_CHANGED: marketplace pin mismatch: expected ({}, {}, {}, {}) != actual ({}, {}, {}, {})",
+                    exp_source, exp_url, exp_version, exp_shasum,
+                    effective_source, effective_url, selected.version, actual_shasum
+                );
+            }
+        }
+
         Ok(MarketDownloadInfo {
             plugin_id: plugin_id.to_string(),
             version: selected.version,
@@ -529,6 +616,7 @@ impl PluginManager {
             provenance: selected.provenance,
             trust: Some(self.resolve_trust(entry)),
             publisher_id: entry.publisher_id.clone(),
+            review: selected.review,
         })
     }
 
@@ -546,7 +634,25 @@ impl PluginManager {
             self.load_cached_catalog()?
         };
         let mut updates = Vec::new();
+        let effective_is_plus = self.market_channel == MarketChannel::Plus;
         for plugin in self.runtime.iter_mut() {
+            // The curated channel pins updates to its own reviewed versions: an
+            // install that came from it is never updated by another source, and
+            // it never adopts an install that came from another source. Without
+            // this, switching source would silently replace reviewed bytes and
+            // relabel the row. The four original channels keep their behaviour.
+            let installed_from_plus = plugin
+                .marketplace
+                .as_ref()
+                .is_some_and(|meta| meta.provider_id == MarketChannel::Plus.as_str());
+            if installed_from_plus != effective_is_plus {
+                plugin.update_available = None;
+                if !installed_from_plus {
+                    // A row from another source keeps no curated notice either.
+                    plugin.yanked = None;
+                }
+                continue;
+            }
             let Some(entry) = catalog.plugins.iter().find(|p| p.id == plugin.id) else {
                 plugin.update_available = None;
                 plugin.yanked = None;
@@ -636,10 +742,27 @@ impl PluginManager {
             // An install the host would refuse must not be offered. That
             // covers an announced-but-unpublished version, a version pinned to
             // a newer app, and a package URL on a host the host will not fetch.
+            latest_shasum: latest_version.map(|v| v.shasum.clone()),
             installable: latest_version
                 .map(|version| {
                     has_package_metadata(version)
                         && host_supports_version(version)
+                        && (self.channel() != MarketChannel::Plus
+                            || version.review.as_ref().is_some_and(|r| {
+                                r.decision
+                                    .as_deref()
+                                    .map(str::trim)
+                                    .map(str::to_ascii_lowercase)
+                                    == Some("approved".to_string())
+                                    && r.policy_version
+                                        .as_deref()
+                                        .map(str::trim)
+                                        .is_some_and(|p| p.starts_with("plus-curated-v1"))
+                                    && r.reviewed_at
+                                        .as_deref()
+                                        .map(str::trim)
+                                        .is_some_and(|s| !s.is_empty())
+                            }))
                         && (is_local_package_url(&version.url)
                             || package_host_allowed(&version.url, &catalog_url).is_ok())
                 })
@@ -683,7 +806,9 @@ impl PluginManager {
 
     /// Whether the catalog in effect is one this project issues.
     ///
-    /// The three channels are the project's own catalogs; a URL somebody typed
+    /// The three channels are the project's own catalogs. The curated channel
+    /// is deliberately not one of them: it carries review metadata, not a
+    /// publisher verification. A URL somebody typed
     /// into `custom` may describe its own plugins but cannot assert a tier. The
     /// comparison stays on the effective URL rather than on the setting, so a
     /// catalog reached through `PI_DESKTOP_PLUGIN_MARKET_URL` counts only when

@@ -4,6 +4,7 @@ import {
   GOAL_REPORT_MAX_EVIDENCE_SUMMARY_BYTES,
   GOAL_REPORT_MAX_JSON_BYTES,
   GOAL_REPORT_MAX_METRICS,
+  GOAL_REPORT_MAX_SCREENSHOTS,
   GOAL_REPORT_SCHEMA_VERSION,
   type GoalReport,
   type SubmitGoalReportDraftInput,
@@ -234,6 +235,143 @@ describe("Goal Completion Report v1 Contract & Validation", () => {
     expect(res.ok).toBe(false);
     if (!res.ok) {
       expect(res.error).toContain("exceeds maximum limit");
+    }
+  });
+});
+
+describe("Goal report additive fields (v4 contract)", () => {
+  const baseDraft = { summary: "Delivered the reviewed change.", verdict: "met" as const };
+
+  it("rejects host-owned facts submitted as a draft", () => {
+    for (const reserved of [
+      "evidenceResolution",
+      "checkObservations",
+      "verificationSource",
+      "reportSha256",
+      "assets",
+    ]) {
+      const res = validateGoalReportDraft({ ...baseDraft, [reserved]: [] });
+      expect(res.ok).toBe(false);
+      if (!res.ok) expect(res.error).toContain("host-owned");
+    }
+  });
+
+  it("accepts model-authored presentation fields", () => {
+    const res = validateGoalReportDraft({
+      ...baseDraft,
+      conclusion: "Shipped and verified.",
+      deliveryContext: {
+        sourceLabel: "docs/spec/00-baseline.md",
+        targetVersion: "0.15.6",
+        evidenceRefs: ["ev-1"],
+      },
+      metrics: [{ label: "Checks", value: "6/6", evidenceRefs: ["ev-1"] }],
+      files: [{ path: "a.ts", changeType: "modified", attribution: "direct", group: "renderer" }],
+      checks: [{ id: "c1", command: "pnpm test", result: "passed", label: "Unit tests" }],
+      screenshots: [{ id: "s1", evidenceRef: "ev-shot", caption: "Report tab" }],
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.value.conclusion).toBe("Shipped and verified.");
+    expect(res.value.deliveryContext?.targetVersion).toBe("0.15.6");
+    expect(res.value.metrics?.[0].evidenceRefs).toEqual(["ev-1"]);
+    expect(res.value.files?.[0].group).toBe("renderer");
+    expect(res.value.checks?.[0].label).toBe("Unit tests");
+    expect(res.value.screenshots?.[0].evidenceRef).toBe("ev-shot");
+  });
+
+  it("requires a check that never ran to be inconclusive and explained", () => {
+    const claimingPass = validateGoalReportDraft({
+      ...baseDraft,
+      checks: [{ id: "c1", command: "pnpm e2e", result: "passed", disposition: "not_run" }],
+    });
+    expect(claimingPass.ok).toBe(false);
+    if (!claimingPass.ok) expect(claimingPass.error).toContain("inconclusive");
+
+    const honest = validateGoalReportDraft({
+      ...baseDraft,
+      checks: [
+        {
+          id: "c1",
+          command: "pnpm e2e",
+          result: "inconclusive",
+          disposition: "blocked",
+          detail: "Needs an attached display.",
+        },
+      ],
+    });
+    expect(honest.ok).toBe(true);
+    if (honest.ok) expect(honest.value.checks?.[0].disposition).toBe("blocked");
+  });
+
+  it("bounds and de-duplicates the screenshot gallery", () => {
+    const tooMany = Array.from({ length: GOAL_REPORT_MAX_SCREENSHOTS + 1 }, (_, index) => ({
+      id: `s${index}`,
+      evidenceRef: "ev-1",
+      caption: "shot",
+    }));
+    const oversized = validateGoalReportDraft({ ...baseDraft, screenshots: tooMany });
+    expect(oversized.ok).toBe(false);
+    if (!oversized.ok) expect(oversized.error).toContain("exceeds maximum");
+
+    const duplicated = validateGoalReportDraft({
+      ...baseDraft,
+      screenshots: [
+        { id: "s1", evidenceRef: "ev-1", caption: "a" },
+        { id: "s1", evidenceRef: "ev-2", caption: "b" },
+      ],
+    });
+    expect(duplicated.ok).toBe(false);
+    if (!duplicated.ok) expect(duplicated.error).toContain("repeats id");
+  });
+
+  it("preserves host-owned fields on read and keeps old reports readable", () => {
+    const snapshot = {
+      schemaVersion: GOAL_REPORT_SCHEMA_VERSION,
+      reportId: "r1",
+      sessionId: "s1",
+      executionId: "e1",
+      proposalId: "p1",
+      goal: { title: "T", markdown: "# T" },
+      execution: { startedAt: 1, completedAt: 2, status: "completed", durableSeq: 7, timingSource: "turn" },
+      integrity: { kind: "structured" },
+      verdict: "met",
+      summary: "done",
+      metrics: [],
+      criteria: [],
+      steps: [],
+      files: [],
+      checks: [],
+      limitations: [],
+      nextSteps: [],
+      evidences: [],
+      evidenceResolution: [
+        { evidenceId: "ev-1", state: "recorded" },
+        { evidenceId: "ev-2", state: "unresolved", detail: "no durable record" },
+      ],
+      checkObservations: [
+        { checkId: "c1", result: "failed", command: "pnpm test", exitCode: 1, evidenceIds: ["ev-1"] },
+      ],
+    };
+
+    const res = validateGoalReport(snapshot);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.value.execution.timingSource).toBe("turn");
+    expect(res.value.evidenceResolution?.[1].state).toBe("unresolved");
+    expect(res.value.checkObservations?.[0].exitCode).toBe(1);
+
+    const legacy = validateGoalReport({
+      ...snapshot,
+      execution: { startedAt: 1, completedAt: 2, status: "completed" },
+      evidenceResolution: undefined,
+      checkObservations: undefined,
+    });
+    expect(legacy.ok).toBe(true);
+    if (legacy.ok) {
+      expect(legacy.value.execution.timingSource).toBeUndefined();
+      expect(legacy.value.evidenceResolution).toBeUndefined();
+      expect(legacy.value.checkObservations).toBeUndefined();
     }
   });
 });

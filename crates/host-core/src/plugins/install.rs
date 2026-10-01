@@ -40,6 +40,33 @@ impl PluginManager {
             };
 
             let manifest = Self::read_manifest(&extracted_root)?;
+            if let Some(expected_id) = &opts.expected_plugin_id {
+                if &manifest.id != expected_id {
+                    bail!(
+                        "PLUGIN_MARKET_CHANGED: package manifest id ({}) does not match expected ({})",
+                        manifest.id,
+                        expected_id
+                    );
+                }
+            }
+            if let Some(expected_version) = &opts.expected_version {
+                if &manifest.version != expected_version {
+                    bail!(
+                        "PLUGIN_MARKET_CHANGED: package manifest version ({}) does not match expected ({})",
+                        manifest.version,
+                        expected_version
+                    );
+                }
+            }
+            if let Some(expected_market) = &opts.expected_marketplace {
+                if manifest.version != expected_market.version {
+                    bail!(
+                        "PLUGIN_MARKET_CHANGED: package manifest version ({}) does not match expected ({})",
+                        manifest.version,
+                        expected_market.version
+                    );
+                }
+            }
             let existing = self.get(&manifest.id);
             let upgraded = existing
                 .as_ref()
@@ -164,6 +191,7 @@ impl PluginManager {
         enable: bool,
         auto_update: bool,
         granted_permissions: Option<Vec<String>>,
+        expected_marketplace: Option<&ExpectedMarketplace>,
     ) -> Result<InstallResult> {
         let mut observer = NoProgress;
         self.install_from_market_observed(
@@ -172,6 +200,7 @@ impl PluginManager {
             enable,
             auto_update,
             granted_permissions,
+            expected_marketplace,
             &mut observer,
         )
     }
@@ -188,9 +217,10 @@ impl PluginManager {
         enable: bool,
         auto_update: bool,
         granted_permissions: Option<Vec<String>>,
+        expected_marketplace: Option<&ExpectedMarketplace>,
         observer: &mut dyn InstallObserver,
     ) -> Result<InstallResult> {
-        let info = self.market_download_info(plugin_id, version)?;
+        let info = self.market_download_info(plugin_id, version, expected_marketplace)?;
         let mut report = DownloadReport::new(observer, &info.plugin_id, &info.version);
         let (package_path, shasum) = self.fetch_market_package(&info, &mut report)?;
         let marketplace = PluginMarketplaceMeta {
@@ -208,6 +238,7 @@ impl PluginManager {
             ),
             trust: info.trust.clone(),
             provenance: info.provenance.clone(),
+            review: info.review.clone(),
         };
         // The last safe point: after this the package is being written into the
         // plugin directory, and stopping half way is worse than finishing.
@@ -222,6 +253,9 @@ impl PluginManager {
                 enable,
                 marketplace: Some(marketplace),
                 expected_shasum: Some(shasum),
+                expected_plugin_id: Some(plugin_id.to_string()),
+                expected_version: Some(info.version.clone()),
+                expected_marketplace: expected_marketplace.cloned(),
                 auto_update,
                 granted_permissions,
             },
@@ -272,12 +306,24 @@ impl PluginManager {
                     granted.push(perm.clone());
                 }
             }
+            let is_plus = self.channel() == MarketChannel::Plus;
+            let expected = if is_plus {
+                Some(ExpectedMarketplace {
+                    source: "plus".into(),
+                    catalog_url: self.market_source_url(),
+                    version: update.version.clone(),
+                    shasum: update.shasum.clone(),
+                })
+            } else {
+                None
+            };
             let installed = self.install_from_market(
                 &id,
                 Some(&update.version),
                 true,
                 auto_update,
                 Some(granted),
+                expected.as_ref(),
             )?;
             results.push(installed);
         }
@@ -728,6 +774,12 @@ pub(crate) fn download_url_observed(
     report: &mut DownloadReport<'_>,
 ) -> Result<Vec<u8>> {
     if let Some(path) = url.strip_prefix("file://") {
+        if package_guard.is_none()
+            && !super::validation::is_valid_fixture_file_url(url)
+            && !cfg!(test)
+        {
+            bail!("PLUGIN_MARKET_INVALID: file:// catalog urls are not permitted outside fixture lane");
+        }
         let bytes = fs::read(path).with_context(|| format!("read local url {path}"))?;
         report.bytes(bytes.len() as u64, total_bytes.max(bytes.len() as u64));
         return Ok(bytes);

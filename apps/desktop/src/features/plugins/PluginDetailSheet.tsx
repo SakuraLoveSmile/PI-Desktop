@@ -25,6 +25,8 @@ import type { PluginsPageModel } from "./usePluginsPage";
 export function PluginDetailSheet({
   t,
   locale,
+  settings,
+  marketSource,
   selectedId,
   closeDetail,
   detail,
@@ -139,6 +141,14 @@ export function PluginDetailSheet({
                           name: detail.name,
                           version: installTarget,
                           permissions: detailPermissions,
+                          expectedMarketplace: activeVersion?.shasum
+                            ? {
+                                source: settings?.pluginMarketSource ?? "official",
+                                catalogUrl: marketSource,
+                                version: activeVersion.version,
+                                shasum: activeVersion.shasum,
+                              }
+                            : undefined,
                         })
                       }
                     >

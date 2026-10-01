@@ -28,6 +28,7 @@ import type {
   AskToolResolution,
   AgentInstructionFile,
   AppSettings,
+  ExpectedMarketplace,
   CommandShellCatalog,
   AppVersionInfo,
   BrowserAction,
@@ -1293,6 +1294,7 @@ export const api = {
     enable?: boolean;
     autoUpdate?: boolean;
     grantedPermissions?: string[];
+    expectedMarketplace?: ExpectedMarketplace;
   }) =>
     invoke<{ result: PluginInstallResult }>(IPC.invoke.marketInstall, input),
   marketCheckUpdates: (refreshRemote = true) =>
