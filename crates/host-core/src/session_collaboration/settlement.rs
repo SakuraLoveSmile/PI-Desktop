@@ -33,7 +33,11 @@ pub fn begin_turn(
         ));
     }
     super::permissions::check_target(db, session_id, &message.permission_ceiling)?;
-    let turn = sessions::begin_turn(db, session_id, provider, model)?;
+    let turn = if message.kind == "message" && message.plugin_id.starts_with("team:") {
+        sessions::begin_turn_for_team_mail(db, session_id, message_id, provider, model)?
+    } else {
+        sessions::begin_turn(db, session_id, provider, model)?
+    };
     let claimed = db.conn().execute("UPDATE session_collaboration_messages SET status='running',turn_id=?2,updated_at=?3 WHERE id=?1 AND status='queued'",
         params![message_id,turn,now_ms()])?;
     if claimed == 0 {

@@ -148,6 +148,20 @@ pub fn send_team_message(db: &Database, params: SendMessageParams<'_>) -> Result
     }
 
     validate_team_participant(db, team_session_id, &target_session_id)?;
+    if target_session_id != team_session_id {
+        super::review::require_approved_member(db, team_session_id, &target_session_id)?;
+    }
+    if caller_session_id != team_session_id {
+        if let Err(error) =
+            super::review::require_approved_member(db, team_session_id, caller_session_id)
+        {
+            let historical_report = target_session_id == team_session_id
+                && super::review::is_live_team_mail_turn(db, team_session_id, caller_session_id)?;
+            if !historical_report {
+                return Err(error);
+            }
+        }
+    }
     let permission_ceiling =
         validate_participant_permissions(db, caller_session_id, &target_session_id)?;
 

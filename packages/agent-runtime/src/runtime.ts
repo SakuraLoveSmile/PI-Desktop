@@ -118,6 +118,7 @@ import {
   type ExecutionProfile,
   normalizeExecutionProfile,
   isTeamTool,
+  DECLARE_TEAM_STRATEGY_TOOL_NAME,
   type ProposalKind,
   type SubagentPermission,
 } from "@pi-desktop/shared";
@@ -1873,15 +1874,7 @@ export class DesktopAgentRuntime {
       // proactive half of the Task tool's own description: models delegate
       // when the system prompt names the situations, and keep doing everything
       // inline when it only says "you may".
-      ...(this.executionProfile === "team"
-        ? [
-            teamSystemPrompt({
-              isLead: this.teamContext?.isLead ?? false,
-              memberName: this.teamContext?.memberName,
-              teamSessionId: this.teamContext?.teamSessionId ?? "",
-            }),
-          ]
-        : this.subagents.length
+      ...(this.executionProfile !== "team" && this.subagents.length
         ? [
             `## Delegation
 Work splits into independent pieces — delegate, and keep your context for the synthesis. Subagents run in their own context and report back through TaskWait.
@@ -2211,6 +2204,15 @@ Delegation rules:
       [
         this.baseSystemPrompt,
         ...(this.customSystemPrompt?.append ? [this.customSystemPrompt.append] : []),
+        ...(this.mode === "agent" && this.executionProfile === "team"
+          ? [
+              teamSystemPrompt({
+                isLead: this.teamContext?.isLead ?? false,
+                memberName: this.teamContext?.memberName,
+                teamSessionId: this.teamContext?.teamSessionId ?? "",
+              }),
+            ]
+          : []),
         ...(optionalToolsPrompt ? [optionalToolsPrompt] : []),
         ...(projectPrompt ? [projectPrompt] : []),
         ...(memoryPrompt ? [memoryPrompt] : []),
@@ -3539,12 +3541,13 @@ Delegation rules:
             this.buildSubagentStopTool(),
           ]
         : [];
-    const teamTools = isTeam
+    const teamTools = isTeam && this.mode === "agent"
       ? createTeamTools({
           teamSessionId: this.teamContext?.teamSessionId ?? "",
           callerSessionId: this.teamContext?.callerSessionId ?? this.sessionId,
           isLead: this.teamContext?.isLead ?? false,
           host: this.host,
+          getTurnId: () => this.turnId,
           abortActiveTurn: this.teamContext?.abortActiveTurn,
         })
       : [];
@@ -3660,6 +3663,7 @@ Delegation rules:
       name === SUBAGENT_LIST_TOOL_NAME ||
       name === SUBAGENT_STOP_TOOL_NAME ||
       name === SUBMIT_GOAL_REPORT_TOOL_NAME ||
+      name === DECLARE_TEAM_STRATEGY_TOOL_NAME ||
       isTeamTool(name) ||
       (this.mode === "agent"
         ? AGENT_CORE_TOOL_NAMES.has(name)

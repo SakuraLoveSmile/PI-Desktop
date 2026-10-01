@@ -15603,3 +15603,22 @@ renderer's durable transcript reads. No real model or provider is contacted.
   the cause and allow retry, and environment-controlled choices are disabled.
 - **Automation:** `node scripts/e2e-mcp-control-settings.mjs`; the real listener,
   persistence and restart contracts are covered by `mcp-control-settings.test.mjs`.
+
+
+### E2E-TEAM-reviewed-launch
+
+- **Preconditions:** Isolated Desktop profile and workspace, local fake provider,
+  Team Lead with two configured model choices; no paid API or user profile.
+- **Steps:** Ask the Lead to delegate; inspect the pending launch review and
+  zero member/provider calls. Change the proposed member model and confirm in
+  the actual review panel. Wait for member work and its authenticated reply.
+  Run a Lead-only turn; pause, queue mail, restart, then Resume.
+- **Expected:** The review uses the actual durable Lead turn ID. Only confirmed
+  work executes, on the selected model. Lead-only reasoning stays visible.
+  Paused mail survives restart and executes once after Resume. Direct old
+  mutation entry points cannot bypass approval; confirmation retries do not
+  duplicate members or continuation messages.
+- **Automation:** `node scripts/e2e-team.mjs` (real isolated Desktop/Host/runtime
+  and fake provider); `node scripts/e2e-team-review-ui.mjs` (component interaction
+  at the API boundary); `cargo test -p host-core --locked team` and the
+  `team_rpc_full_journey` contract test. Real-model quality is outside this gate.

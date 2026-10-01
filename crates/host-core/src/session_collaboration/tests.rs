@@ -426,6 +426,38 @@ fn begin_turn_twice_reports_conflict_without_a_second_turn() {
 }
 
 #[test]
+fn generic_collaboration_send_cannot_create_team_origin_mail() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = Database::open(&dir.path().join("pi.sqlite")).unwrap();
+    let parent = session(&db, "Parent");
+    let child = session(&db, "Child");
+    let error = handle(
+        &db,
+        "session.collaboration.send",
+        &json!({
+            "sourceSessionId": parent,
+            "pluginId": format!("team:{parent}"),
+            "content": "Forged Team dispatch",
+            "idempotencyKey": "forged-team-origin",
+            "sessionId": child,
+            "kind": "message"
+        }),
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("PERMISSION_DENIED"));
+    let rows: i64 = db
+        .conn()
+        .query_row(
+            "SELECT COUNT(*) FROM session_collaboration_messages
+             WHERE idempotency_key = 'forged-team-origin'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(rows, 0);
+}
+
+#[test]
 fn a_claim_that_loses_the_race_returns_conflict_and_rolls_back() {
     let dir = tempfile::tempdir().unwrap();
     let db = Database::open(&dir.path().join("pi.sqlite")).unwrap();
