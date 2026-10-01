@@ -187,10 +187,36 @@ export type GoalReport = {
   /** Gallery entries; each one points at an existing evidence id. */
   screenshots?: GoalReportScreenshot[];
 
+  /** Host-owned: manifest of resolved screenshot assets stored for this report. */
+  assets?: GoalReportAsset[];
   /** Host-owned: what could be resolved for each referenced evidence id. */
   evidenceResolution?: GoalReportEvidenceResolution[];
   /** Host-owned: what the recorded results say about each check. */
   checkObservations?: GoalReportCheckObservation[];
+};
+
+export type GoalReportAsset = {
+  screenshotId: string;
+  assetId: string;
+  evidenceId: string;
+  relativePath: string;
+  mimeType: string;
+  bytes: number;
+  sha256: string;
+};
+
+export type GoalReportAssetChunk = {
+  state: "ready" | "unavailable" | "not_found" | "corrupt";
+  assetId?: string;
+  mimeType?: string;
+  totalBytes?: number;
+  offset?: number;
+  length?: number;
+  sha256?: string;
+  dataBase64?: string;
+  eof?: boolean;
+  sessionId?: string;
+  detail?: string;
 };
 
 /**
@@ -621,6 +647,32 @@ function parseCheckObservations(value: unknown): GoalReportCheckObservation[] | 
   }
   return out;
 }
+function parseAssets(value: unknown): GoalReportAsset[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const out: GoalReportAsset[] = [];
+  for (const item of value) {
+    if (!isRecord(item)) continue;
+    if (
+      typeof item.screenshotId !== "string" ||
+      typeof item.assetId !== "string" ||
+      typeof item.evidenceId !== "string" ||
+      typeof item.relativePath !== "string" ||
+      typeof item.mimeType !== "string" ||
+      typeof item.bytes !== "number" ||
+      typeof item.sha256 !== "string"
+    ) continue;
+    out.push({
+      screenshotId: item.screenshotId.trim(),
+      assetId: item.assetId.trim(),
+      evidenceId: item.evidenceId.trim(),
+      relativePath: item.relativePath.trim(),
+      mimeType: item.mimeType.trim(),
+      bytes: item.bytes,
+      sha256: item.sha256.trim(),
+    });
+  }
+  return out;
+}
 
 /** A header context line; dropped entirely when it carries nothing. */
 function parseDeliveryContext(value: unknown): GoalReportDeliveryContext | undefined {
@@ -727,6 +779,7 @@ export function validateGoalReport(input: unknown): ValidationResult<GoalReport>
       ...(validated.deliveryContext ? { deliveryContext: validated.deliveryContext } : {}),
       ...(validated.conclusion ? { conclusion: validated.conclusion } : {}),
       ...(validated.screenshots ? { screenshots: validated.screenshots } : {}),
+      ...(input.assets ? { assets: parseAssets(input.assets) } : {}),
       evidenceResolution: parseEvidenceResolution(input.evidenceResolution),
       checkObservations: parseCheckObservations(input.checkObservations),
     },

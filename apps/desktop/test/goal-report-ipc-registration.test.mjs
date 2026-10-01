@@ -9,7 +9,7 @@ const read = (relativePath) =>
 const registration = read("../electron/main/ipc/register.ts");
 const handler = read("../electron/main/ipc/goal-report-ipc.ts");
 
-test("Goal report get, list, and retry handlers are registered with Electron IPC", () => {
+test("Goal report get, list, retry, and getAsset handlers are registered with Electron IPC", () => {
   assert.equal(
     [...registration.matchAll(/registerGoalReportIpc\(/g)].length,
     1,
@@ -18,5 +18,7 @@ test("Goal report get, list, and retry handlers are registered with Electron IPC
   assert.match(handler, /handle\(IPC\.invoke\.goalReportGet/);
   assert.match(handler, /handle\(IPC\.invoke\.goalReportList/);
   assert.match(handler, /handle\(IPC\.invoke\.goalReportRetry/);
+  assert.match(handler, /handle\(\s*IPC\.invoke\.goalReportGetAsset/);
   assert.match(handler, /host\.call\("goalReports\.retry"/);
+  assert.match(handler, /host\.call\("goalReports\.getAsset"/);
 });
