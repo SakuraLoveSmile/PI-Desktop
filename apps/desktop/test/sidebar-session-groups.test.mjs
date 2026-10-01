@@ -6,6 +6,7 @@ import {
   groupSidebarSessionsByTime,
   groupSidebarSessionGroupsByTime,
   groupTeamSessions,
+  teamMemberRowTitle,
   normalizeProjectPath,
   partitionPinnedSidebarSessionGroups,
   projectPathsForNewSessions,
@@ -242,4 +243,12 @@ test("keeps a team together across date buckets and dissolves to reachable rows 
   assert.equal(afterLeadRemoval[0].kind, "session");
   assert.equal(afterLeadRemoval[0].session.id, "member");
   assert.equal(afterLeadRemoval[0].parentSessionId, "lead");
+});
+
+test("grouped member labels spend row width on role and display name without replacing a custom title", () => {
+  const member = { title: 'Teammate: researcher', team: { role: 'member', memberName: 'researcher', teamSessionId: 'lead' } };
+  assert.equal(teamMemberRowTitle(member, 'Researcher Alex'), 'Researcher Alex');
+  assert.equal(teamMemberRowTitle({ ...member, title: 'My review notes' }, 'Researcher Alex'), 'My review notes');
+  assert.equal(teamMemberRowTitle(member), 'Teammate: researcher');
+  assert.equal(teamMemberRowTitle({ ...member, team: { role: 'lead' } }, 'Lead Alex'), 'Teammate: researcher');
 });

@@ -2728,6 +2728,11 @@ transcripts remain in the existing detail views. Only pending tasks with
 unresolved prerequisites display as waiting for dependencies. Task status does
 not stand in for member activity.
 
+Sidebar members fold beneath their Lead. A generated `Teammate: <handle>`
+label is presented as the member's role and display name instead of spending
+row width on a repeated routing handle. Custom session titles remain the
+primary label and retain the Team identity context; no stored title changes.
+
 A paused Team exposes Resume; successful resume releases held Team messages.
 Each member row can open that member's durable session. Loading, empty, refresh,
 and error states remain visible and localized. The panel does not claim a

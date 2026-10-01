@@ -730,6 +730,7 @@ try {
   assert.equal(await evaluate(`document.querySelectorAll('[data-sidebar-session-row="${member.memberSessionId}"]').length`), 1, "Team member should appear exactly once under its Lead");
   assert.equal(await evaluate(`document.querySelector(${JSON.stringify(teamGroupSelector)})?.querySelectorAll('.sidebar-team-session-members [data-sidebar-session-row]').length`), 5, "all five member sessions should appear under one Lead");
   assert.match(await evaluate(`document.querySelector(${JSON.stringify(teamGroupSelector)})?.querySelector('.sidebar-team-session-members')?.innerText ?? ''`), /Researcher Alex/);
+  assert.equal(await evaluate(`document.querySelector('[data-sidebar-session-row="${member.memberSessionId}"] .thread-item-title')?.innerText`), 'Researcher Alex', "generated member label should show the full role/name instead of repeating its routing title");
   console.log("PASS Sidebar grouping: member expands under Lead with its presentation identity");
 
   await evaluate(`Array.from(document.querySelectorAll('[data-testid="team-panel"] .team-panel-actions button'))[0]?.click()`);
