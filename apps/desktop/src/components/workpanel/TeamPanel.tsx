@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { TeamMemberRecord, TeamTaskRecord, UiMessage } from "@pi-desktop/shared";
+import type {
+  TeamExecutionDecision,
+  TeamLaunchReview,
+  TeamMemberRecord,
+  TeamTaskRecord,
+  UiMessage,
+} from "@pi-desktop/shared";
 import { api } from "../../lib/api";
+import { TeamLaunchReviewPanel } from "./TeamLaunchReviewPanel";
 import {
   IconChevronLeft,
   IconCircleAlert,
@@ -42,8 +49,12 @@ type TeamBoardSnapshot = {
   scopeOverlaps: TeamScopeOverlap[];
 };
 
-type TeamPanelSnapshot = { roster: TeamRosterSnapshot; board: TeamBoardSnapshot };
-
+type TeamPanelSnapshot = {
+  roster: TeamRosterSnapshot;
+  board: TeamBoardSnapshot;
+  review?: TeamLaunchReview | null;
+  decision?: TeamExecutionDecision | null;
+};
 type TeamDetailView =
   | { kind: "aggregate" }
   | { kind: "member"; memberSessionId: string }
@@ -68,11 +79,14 @@ export function TeamPanel({ teamSessionId, onSelectSession }: TeamPanelProps) {
     if (!teamSessionId) return;
     const requestId = ++requestSequenceRef.current;
     try {
-      const [roster, board] = await Promise.all([
+      const [roster, board, reviewRes] = await Promise.all([
         api.getTeamRoster(teamSessionId) as unknown as Promise<TeamRosterSnapshot>,
         api.getTeamBoard(teamSessionId) as unknown as Promise<TeamBoardSnapshot>,
+        api.getTeamLaunchReview(teamSessionId),
       ]);
-      // A refresh can finish after Resume or after a newer poll. Only commit a
+      const review = reviewRes?.review ?? null;
+      const decRes = await api.getTeamExecutionDecision(teamSessionId);
+      const decision: TeamExecutionDecision | null = decRes?.decision ?? null;
       // complete pair from the current team and revision.
       if (
         requestId !== requestSequenceRef.current ||
@@ -82,8 +96,8 @@ export function TeamPanel({ teamSessionId, onSelectSession }: TeamPanelProps) {
       if (roster.revision !== board.revision) {
         throw new Error(t("team.snapshotChanged"));
       }
-      setSnapshot({ roster, board });
       setError(null);
+      setSnapshot({ roster, board, review, decision });
     } catch (err) {
       if (requestId === requestSequenceRef.current) {
         setError(err instanceof Error ? err.message : String(err));
@@ -95,6 +109,9 @@ export function TeamPanel({ teamSessionId, onSelectSession }: TeamPanelProps) {
 
   useEffect(() => {
     setLoading(true);
+    setResuming(false);
+    setSnapshot(null);
+    setError(null);
     setView({ kind: "aggregate" });
     void loadData();
     const timer = setInterval(() => void loadData(), 3000);
@@ -107,19 +124,34 @@ export function TeamPanel({ teamSessionId, onSelectSession }: TeamPanelProps) {
   const handleResume = async () => {
     if (!teamSessionId || resuming) return;
     const requestId = ++requestSequenceRef.current;
+    let resumed = false;
     setResuming(true);
     try {
       await api.teamResume(teamSessionId);
-      if (requestId === requestSequenceRef.current) await loadData();
+      if (requestId === requestSequenceRef.current) {
+        resumed = true;
+        setResuming(false);
+        await loadData();
+      }
     } catch (err) {
       if (requestId === requestSequenceRef.current) {
         setError(err instanceof Error ? err.message : String(err));
       }
     } finally {
-      setResuming(false);
+      if (!resumed && requestId === requestSequenceRef.current) setResuming(false);
     }
   };
 
+  if (snapshot && snapshot.roster.teamSessionId !== teamSessionId) {
+    return (
+      <div className="team-panel">
+        <div className="team-loading-state">
+          <IconRefresh className="animate-spin" size={20} />
+          <span>{t("common.loading")}</span>
+        </div>
+      </div>
+    );
+  }
   if (loading && !snapshot) {
     return (
       <div className="team-panel">
@@ -153,7 +185,7 @@ export function TeamPanel({ teamSessionId, onSelectSession }: TeamPanelProps) {
   if (view.kind === "panorama" && snapshot) {
     const rootNode: PanoramaNode = {
       id: snapshot.roster.teamSessionId,
-      name: t("team.lead", { defaultValue: "Team Lead" }),
+      name: t("team.lead"),
       task: t("team.membersCount", { count: roster.length }),
       status: isPaused ? "paused" : "running",
       avatarIcon: "users",
@@ -188,7 +220,7 @@ export function TeamPanel({ teamSessionId, onSelectSession }: TeamPanelProps) {
 
     return (
       <AgentPanorama
-        title={t("team.panoramaTitle", { defaultValue: "Agent Panorama" })}
+        title={t("team.panoramaTitle")}
         rootNode={rootNode}
         childNodes={childNodes}
         onBack={() => setView({ kind: "aggregate" })}
@@ -256,8 +288,8 @@ export function TeamPanel({ teamSessionId, onSelectSession }: TeamPanelProps) {
           <TooltipButton
             type="button"
             className="icon-btn icon-btn-square"
-            tooltip={t("team.viewPanorama", { defaultValue: "View panorama" })}
-            ariaLabel={t("team.viewPanorama", { defaultValue: "View panorama" })}
+            tooltip={t("team.viewPanorama")}
+            ariaLabel={t("team.viewPanorama")}
             onClick={() => setView({ kind: "panorama" })}
           >
             <IconWorkflow size={14} />
@@ -289,6 +321,34 @@ export function TeamPanel({ teamSessionId, onSelectSession }: TeamPanelProps) {
             </div>
           ))}
         </aside>
+      )}
+      {snapshot?.review && (
+        <TeamLaunchReviewPanel
+          key={`${teamSessionId}:${snapshot.review.reviewId}`}
+          teamSessionId={teamSessionId}
+          review={snapshot.review}
+          decision={snapshot.decision}
+          onReviewChanged={() => void loadData()}
+        />
+      )}
+      {snapshot?.decision?.strategy === "lead_only" && snapshot.decision.reason && (
+        <section className="team-launch-review team-launch-review-decision" data-testid="team-lead-decision">
+          <div className="team-launch-review-reason">
+            <span className="team-launch-review-reason-label">
+              {t("team.review.leadOnlyReason")}
+            </span>
+            <p className="team-launch-review-reason-text">{snapshot.decision.reason}</p>
+          </div>
+        </section>
+      )}
+      {error && (
+        <div className="team-error-state" role="alert">
+          <IconCircleAlert size={18} />
+          <span>{error}</span>
+          <Button type="button" size="sm" onClick={() => void loadData()}>
+            {t("team.retry")}
+          </Button>
+        </div>
       )}
 
       <section className="team-section">

@@ -35,6 +35,11 @@ pub(super) fn string<'a>(input: &'a Value, key: &str, limit: usize) -> Result<&'
 fn send_record(db: &Database, input: &Value, target: &str, kind: &str) -> Result<Message> {
     let source = string(input, "sourceSessionId", 256)?;
     let plugin = string(input, "pluginId", 256)?;
+    if plugin.starts_with("team:") {
+        return Err(anyhow!(
+            "PERMISSION_DENIED: Team-origin mail can only be written through the Host Team mailbox"
+        ));
+    }
     let content = string(input, "content", 65_536)?;
     let key = string(input, "idempotencyKey", 256)?;
     let notify = input
@@ -108,6 +113,11 @@ fn send_record(db: &Database, input: &Value, target: &str, kind: &str) -> Result
 fn spawn(db: &Database, input: &Value) -> Result<Value> {
     let source = string(input, "sourceSessionId", 256)?;
     let plugin = string(input, "pluginId", 256)?;
+    if plugin.starts_with("team:") {
+        return Err(anyhow!(
+            "PERMISSION_DENIED: Team-origin mail can only be written through the Host Team mailbox"
+        ));
+    }
     let key = string(input, "idempotencyKey", 256)?;
     let content = string(input, "content", 65_536)?;
     if let Some(existing) = repository::existing(db, plugin, source, key)? {
