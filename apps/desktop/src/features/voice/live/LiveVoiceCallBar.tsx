@@ -39,7 +39,11 @@ export function LiveVoiceCallBar({
   // reported through the global toast together with their allow-listed code.
   // Only call states that outlive a toast stay in the bar: the playback hint and
   // the quarantine that still has to confirm the microphone was released.
-  const issueStaysInline = !issue || issue.warning || issue.code === "LIVE_MEDIA_RELEASE_UNCONFIRMED";
+  const issueStaysInline =
+    !issue ||
+    issue.warning ||
+    issue.code === "LIVE_MEDIA_RELEASE_UNCONFIRMED" ||
+    issue.code === "LIVE_NETWORK_ERROR";
   const showToast = useAppStore((state) => state.showToast);
   const reportedIssue = useRef<string | null>(null);
   const previousActionPending = useRef(actionPending);
