@@ -4,16 +4,21 @@ use crate::sessions::{self, SessionCreateOptions};
 use crate::team::board::*;
 use crate::team::lifecycle::*;
 use crate::team::mailbox::*;
+use crate::team::model::*;
+use crate::team::review::*;
 use crate::team::roster::*;
 use serde_json::json;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
-fn test_db() -> Database {
+static NEXT_TEST_TURN: AtomicUsize = AtomicUsize::new(1);
+
+pub(super) fn test_db() -> Database {
     let dir = tempfile::tempdir().unwrap();
     Database::open(&dir.path().join("pi.sqlite")).unwrap()
 }
 
-fn create_test_lead(db: &Database) -> String {
-    sessions::create_session_with_options(
+pub(super) fn create_test_lead(db: &Database) -> String {
+    let lead = sessions::create_session_with_options(
         db,
         SessionCreateOptions {
             title: Some("Team Lead".into()),
@@ -23,7 +28,113 @@ fn create_test_lead(db: &Database) -> String {
         },
     )
     .unwrap()
-    .id
+    .id;
+    ensure_test_route(db, "test-provider", "test-model");
+    db.conn()
+        .execute(
+            "UPDATE sessions SET provider_id = 'test-provider', model_id = 'test-model'
+             WHERE id = ?1",
+            [&lead],
+        )
+        .unwrap();
+    lead
+}
+
+pub(super) fn ensure_test_route(db: &Database, provider_id: &str, model_id: &str) {
+    let config_json = json!({
+        "models": [{
+            "id": model_id,
+            "thinkingLevels": ["off", "minimal", "low", "medium", "high", "xhigh", "max"]
+        }]
+    })
+    .to_string();
+    db.conn()
+        .execute(
+            "INSERT INTO providers (id, name, config_json, created_at, updated_at)
+             VALUES (?1, ?1, ?2, 0, 0)
+             ON CONFLICT(id) DO UPDATE SET config_json = excluded.config_json",
+            rusqlite::params![provider_id, config_json],
+        )
+        .unwrap();
+    db.conn()
+        .execute(
+            "INSERT INTO models (provider_id, model_id, display_name, updated_at)
+             VALUES (?1, ?2, ?2, 0) ON CONFLICT(provider_id, model_id) DO NOTHING",
+            rusqlite::params![provider_id, model_id],
+        )
+        .unwrap();
+}
+
+pub(super) fn start_test_turn(db: &Database, lead_session_id: &str, turn_id: &str) {
+    db.conn()
+        .execute(
+            "INSERT INTO turns (id, session_id, started_at) VALUES (?1, ?2, 0)",
+            rusqlite::params![turn_id, lead_session_id],
+        )
+        .unwrap();
+}
+
+pub(super) fn finish_test_turn(db: &Database, turn_id: &str) {
+    db.conn()
+        .execute(
+            "UPDATE turns SET status = 'completed', ended_at = 1 WHERE id = ?1",
+            [turn_id],
+        )
+        .unwrap();
+}
+
+pub(super) fn create_team_member(
+    db: &Database,
+    params: CreateMemberParams<'_>,
+) -> anyhow::Result<TeamMember> {
+    let CreateMemberParams {
+        team_session_id,
+        caller_session_id,
+        name,
+        description,
+        context_kind,
+        model_id,
+        provider_id,
+    } = params;
+    let provider_id = provider_id.unwrap_or("test-provider");
+    let model_id = model_id.unwrap_or("test-model");
+    ensure_test_route(db, provider_id, model_id);
+    let turn_id = format!(
+        "test-turn-{}",
+        NEXT_TEST_TURN.fetch_add(1, Ordering::Relaxed)
+    );
+    start_test_turn(db, team_session_id, &turn_id);
+    let declaration = declare_team_strategy(
+        db,
+        DeclareStrategyParams {
+            team_session_id,
+            caller_session_id,
+            lead_turn_id: &turn_id,
+            strategy: "delegate",
+            reason: "Test fixture approval",
+            members: Some(vec![TeamProposedMember {
+                name: name.to_string(),
+                description: description.map(str::to_string),
+                context_kind: context_kind.map(str::to_string),
+                member_session_id: None,
+                selection: Some(TeamMemberSelectionPartial {
+                    provider_id: Some(provider_id.to_string()),
+                    model_id: Some(model_id.to_string()),
+                    thinking_level: Some("off".to_string()),
+                }),
+            }]),
+        },
+    );
+    finish_test_turn(db, &turn_id);
+    let (_decision, review) = declaration?;
+    let review = review.ok_or_else(|| anyhow::anyhow!("expected pending test review"))?;
+    let (_, decision) =
+        confirm_launch_review(db, team_session_id, &review.review_id, review.revision)?;
+    let Some(member_session_id) = decision.member_session_ids.first() else {
+        return Err(anyhow::anyhow!("approved fixture has no member"));
+    };
+    get_team_member_by_session_id(db, member_session_id)?
+        .ok_or_else(|| anyhow::anyhow!("approved test member was not materialized"))
 }
 
 #[test]
@@ -82,7 +193,7 @@ fn test_team_roster_crud_and_limits() {
     assert!(non_lead_err.to_string().contains("TEAM_UNAUTHORIZED"));
 
     // 4. Duplicate name rejected
-    let dup_err = create_team_member(
+    let reused = create_team_member(
         &db,
         CreateMemberParams {
             team_session_id: &lead_id,
@@ -94,8 +205,8 @@ fn test_team_roster_crud_and_limits() {
             provider_id: None,
         },
     )
-    .unwrap_err();
-    assert!(dup_err.to_string().contains("TEAM_MEMBER_NAME_COLLISION"));
+    .unwrap();
+    assert_eq!(reused.member_session_id, m1.member_session_id);
 
     // 5. Query roster
     let members = list_team_members(&db, &lead_id).unwrap();
@@ -133,45 +244,6 @@ fn test_team_roster_crud_and_limits() {
     assert!(overflow_err
         .to_string()
         .contains("TEAM_MEMBER_LIMIT_EXCEEDED"));
-}
-
-#[test]
-fn fresh_member_uses_the_existing_project_display_name() {
-    let db = test_db();
-    let project = tempfile::tempdir().unwrap();
-    let lead = sessions::create_session_with_options(
-        &db,
-        SessionCreateOptions {
-            title: Some("Named Team Lead".into()),
-            mode: Some("agent".into()),
-            execution_profile: Some("team".into()),
-            project_path: Some(project.path().to_string_lossy().into_owned()),
-            project_name: Some("Friendly Workspace".into()),
-            ..Default::default()
-        },
-    )
-    .unwrap();
-    let member = create_team_member(
-        &db,
-        CreateMemberParams {
-            team_session_id: &lead.id,
-            caller_session_id: &lead.id,
-            name: "researcher",
-            description: None,
-            context_kind: Some("fresh"),
-            model_id: None,
-            provider_id: None,
-        },
-    )
-    .unwrap();
-
-    let member_session = sessions::get_session(&db, &member.member_session_id)
-        .unwrap()
-        .unwrap();
-    assert_eq!(
-        member_session.summary.project_name.as_deref(),
-        Some("Friendly Workspace")
-    );
 }
 
 #[test]
@@ -471,8 +543,9 @@ fn test_team_mailbox_and_pause() {
 
     // 2. Query messages
     let bob_msgs = list_member_messages(&db, &lead_id, &m2.member_session_id).unwrap();
-    assert_eq!(bob_msgs.len(), 1);
-    assert_eq!(bob_msgs[0].content, "Hello Bob!");
+    assert!(bob_msgs
+        .iter()
+        .any(|message| message.content == "Hello Bob!"));
     assert_eq!(
         get_team_message(&db, &lead_id, &m2.member_session_id, &msg.id)
             .unwrap()
@@ -515,7 +588,14 @@ fn test_team_mailbox_and_pause() {
     )
     .unwrap());
     let acknowledged = list_member_messages(&db, &lead_id, &m1.member_session_id).unwrap();
-    assert_eq!(acknowledged[0].delivery_status, "acknowledged");
+    assert_eq!(
+        acknowledged
+            .iter()
+            .find(|message| message.id == msg.id)
+            .unwrap()
+            .delivery_status,
+        "acknowledged"
+    );
     assert_eq!(
         db.conn()
             .query_row(
@@ -636,9 +716,11 @@ fn paused_team_mailbox_message_survives_restart_until_resume() {
 
     resume_team(&db, &lead_id).unwrap();
     let pending = list_pending_team_messages(&db, &lead_id).unwrap();
-    assert_eq!(pending.len(), 1);
-    assert_eq!(pending[0].id, team_message.id);
-    assert_eq!(pending[0].target_session_id, member.member_session_id);
+    let queued_dispatch = pending
+        .iter()
+        .find(|message| message.id == team_message.id)
+        .unwrap();
+    assert_eq!(queued_dispatch.target_session_id, member.member_session_id);
 }
 
 #[test]

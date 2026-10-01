@@ -6,7 +6,10 @@ describe("sidecar host proxy allowlist", () => {
     expect([
       "team.createMember",
       "team.createTask",
+      "team.declareStrategy",
       "team.getBoard",
+      "team.getExecutionDecision",
+      "team.getLaunchReview",
       "team.getRoster",
       "team.interruptMember",
       "team.listMessages",
@@ -23,6 +26,9 @@ describe("sidecar host proxy allowlist", () => {
     expect(isHostProxyAllowed("session.delete")).toBe(false);
     expect(isHostProxyAllowed("team.pause")).toBe(false);
     expect(isHostProxyAllowed("team.ackMessage")).toBe(false);
+    expect(isHostProxyAllowed("team.updateLaunchReview")).toBe(false);
+    expect(isHostProxyAllowed("team.confirmLaunchReview")).toBe(false);
+    expect(isHostProxyAllowed("team.cancelLaunchReview")).toBe(false);
     expect(isHostProxyAllowed("goalReports.get")).toBe(false);
     expect(isHostProxyAllowed("goalReports.retry")).toBe(false);
   });

@@ -129,6 +129,9 @@ import type {
   GoalReportSummary,
   TeamMemberRecord,
   TeamProjection,
+  TeamLaunchReview,
+  TeamExecutionDecision,
+  TeamLaunchReviewSelectionUpdate,
 } from "@pi-desktop/shared";
 import {
   defaultCommandShellForPlatform,
@@ -612,6 +615,44 @@ export const api = {
     invoke<{ team: { teamSessionId: string; paused: boolean } }>(
       IPC.invoke.teamResume,
       { teamSessionId },
+    ),
+  getTeamExecutionDecision: (teamSessionId: string, leadTurnId?: string) =>
+    invoke<{ decision: TeamExecutionDecision | null }>(
+      IPC.invoke.teamGetExecutionDecision,
+      { teamSessionId, leadTurnId },
+    ),
+  getTeamLaunchReview: (teamSessionId: string, reviewId?: string) =>
+    invoke<{ review: TeamLaunchReview | null }>(
+      IPC.invoke.teamGetLaunchReview,
+      { teamSessionId, reviewId },
+    ),
+  updateTeamLaunchReview: (
+    teamSessionId: string,
+    reviewId: string,
+    expectedRevision: number,
+    selections: TeamLaunchReviewSelectionUpdate[],
+  ) =>
+    invoke<{ review: TeamLaunchReview }>(
+      IPC.invoke.teamUpdateLaunchReview,
+      { teamSessionId, reviewId, expectedRevision, selections },
+    ),
+  confirmTeamLaunchReview: (
+    teamSessionId: string,
+    reviewId: string,
+    expectedRevision: number,
+  ) =>
+    invoke<{ review: TeamLaunchReview; decision: TeamExecutionDecision }>(
+      IPC.invoke.teamConfirmLaunchReview,
+      { teamSessionId, reviewId, expectedRevision },
+    ),
+  cancelTeamLaunchReview: (
+    teamSessionId: string,
+    reviewId: string,
+    expectedRevision: number,
+  ) =>
+    invoke<{ review: TeamLaunchReview }>(
+      IPC.invoke.teamCancelLaunchReview,
+      { teamSessionId, reviewId, expectedRevision },
     ),
   openSessionScratchPath: (sessionId: string) =>
     invoke<{ ok: boolean; path: string }>(IPC.invoke.sessionOpenScratchPath, {

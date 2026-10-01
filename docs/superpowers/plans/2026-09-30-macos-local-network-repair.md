@@ -1,11 +1,25 @@
 # Pi-Desktop-Plus macOS Local Network Repair Plan
 
-Revision: 2026-09-30.1. Planning only; no implementation or runtime acceptance.
+Revision: 2026-10-01.3. Integrated closeout contract; historical records retained below.
 Repository policy requires English repository documents; the user-facing summary is Chinese.
+
+## Current integration and acceptance state — 2026-10-01
+
+The source implementation was merged to `main` in PR #22, now at `12cfb84134fdfac58ba148c023e81f864a2f1e19`. This document preserves the earlier execution records as historical evidence; their unsigned-candidate prompt and HTTP observations do not establish native acceptance for the current integrated source or a final signed artifact. No native macOS permission or LAN acceptance was performed during this documentation integration. Do not mark native acceptance or the repair **已验收** from those historical observations; only explicit user confirmation establishes **已验收**.
+
+Source checks at this base show the timestamp policy helper and per-slice UUID parsing are present. Their existence is not a substitute for the behavioral closeout gates below. Re-run the focused checks against the exact candidate before updating status. The Developer ID/notarization release lane remains a separate qualification.
+
+### Closeout contracts
+
+- **Timestamp policy:** local signing may use `mac.timestamp=none` only when no secure timestamp is required. Require secure timestamps for `PI_MAC_SECURE_TIMESTAMP=1`, effective `mac.notarize=true`, or configured notarization credentials when `mac.notarize` is not explicitly false. Respect effective `-c`/`--config` option precedence, preserve explicit authority URLs, reject a conflicting `timestamp=none` before assembly or packaging, and emit one effective choice. The release workflow must declare secure mode; do not inspect or log credential values. Keep the no-timestamp local default and Windows/Linux behavior.
+- **Mach-O identity:** compare every candidate architecture slice with a matching architecture in each required input/reference. Normalize architecture aliases and UUID case; reject missing, malformed, duplicate, or unreadable slices and unverifiable counterpart architectures. A valid primary slice cannot mask a secondary collision. Keep thin packaging supported, preserve existing CLI/exit/report compatibility, and include per-slice identity and architecture in reports. Pre-sign and post-package checks must share the same comparison rules and inspect the actual packaged output; shared library UUIDs remain informational.
+- **Native acceptance:** tie evidence to one frozen signed artifact by hash and all main-executable UUIDs. A fresh GUI permission state must exercise Fetch list, the human Allow decision, the named Plus settings entry, HTTP 200 and visible fixture models, then Deny, manual re-enable, and restart persistence. Keep the official app and its data untouched. An unsigned observation, mock, 401, or terminal request cannot satisfy this gate. If the clean GUI state or authorized LAN fixture is unavailable, record T3 as **实现中**; Developer ID/notarization and x64 device evidence remain separately qualified.
+
+The timestamp and per-slice contracts above refine the existing T1 execution history; they do not erase it. Existing T1/T2 source fixes merged by PR #22 remain in the source of truth. Any remaining gap must be established by current source and focused tests, not inferred from older planning text.
 
 ## Outcome and execution boundary
 
-T1 gives Plus a qualified, independent macOS executable identity. T2 adds a contextual Local Network trigger to the existing **Fetch list** action. T3 proves the signed candidate's native prompt, independent settings entry, and HTTP connectivity. Status after the 2026-10-01 implementation turn: T1 **实现中 → 身份目标已达成** (the relinked main executable is packaged and the pre-sign gate passes; the full source-build route remains unavailable on this host), T2 **实现中** (implemented, green, and its native effect now observed), T3 **原生证据已取得** (prompt shown, `Pi-Desktop-Plus` listed in Local Network settings, LAN request reached the gateway), with the signed Developer-ID lane still outside this host's reach. The repair as a whole is **待体验**: the applicable validation ran and passed, and **已验收** needs explicit user confirmation. See the two implementation execution records at the end of this document.
+T1 qualifies Plus's independent macOS executable identity. T2 triggers Local Network authorization from the existing **Fetch list** action. T3 verifies the signed candidate's native prompt, independent settings entry, and HTTP connectivity. The source implementation is merged by PR #22. The status statements in the 2026-10-01 execution records below describe those historical runs; this revision does not claim native acceptance for the integrated source or a final signed artifact. Overall status remains **实现中** until the closeout contracts above are verified on the applicable candidate. **已验收** requires explicit user confirmation.
 
 This request authorizes saving this plan only. A later implementation instruction authorizes the source changes and isolated local verification described below. It does not automatically authorize committing, pushing, publishing, notarization submissions, replacing `/Applications` apps, creating OS users, changing system privacy settings, using the user's running instance, or accessing a real provider. Obtain only the missing authorization for a concrete dependent operation; continue independent authorized work.
 

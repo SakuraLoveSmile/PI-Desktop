@@ -44,20 +44,28 @@ const providerServer = createServer(async (req, res) => {
     let finalText;
 
     if (userText.includes("Please spawn one teammate")) {
-      if (!priorToolNames.includes("spawn_teammate")) {
-        assert.ok(toolNames.includes("spawn_teammate"), "Lead runtime lacks spawn_teammate");
+      if (!priorToolNames.includes("declare_team_strategy")) {
+        assert.ok(toolNames.includes("declare_team_strategy"), "Lead runtime lacks strategy declaration");
         toolCall = {
-          name: "spawn_teammate",
+          name: "declare_team_strategy",
           args: {
-            name: "researcher",
-            description: "Reports a fixed result to the Lead.",
-            contextKind: "fresh",
-            prompt: "Send the exact message TEAM_RESULT to Lead using send_message.",
+            strategy: "delegate", reason: "A researcher can verify the result.",
+            members: [{name: "researcher", description: "Reports a fixed result to the Lead.", contextKind: "fresh"}],
           },
         };
       } else {
-        finalText = "The teammate is running.";
+        finalText = "The proposed teammate is waiting for launch approval.";
       }
+    } else if (userText.includes("Team review") && userText.includes("confirmed")) {
+      if (!priorToolNames.includes("send_message")) {
+        toolCall = { name: "send_message", args: {
+          targetMemberName: "researcher", content: "Send the exact message TEAM_RESULT to Lead using send_message."
+        }};
+      } else { finalText = "Approved work dispatched."; }
+    } else if (userText.includes("Handle this without specialists")) {
+      if (!priorToolNames.includes("declare_team_strategy") || !messages.some(message => message.role === "tool" && String(message.content).includes("lead_only"))) {
+        toolCall = { name: "declare_team_strategy", args: { strategy: "lead_only", reason: "This short task needs no specialist." }};
+      } else { finalText = "Handled by Lead only."; }
     } else if (userText.includes("Send the exact message TEAM_RESULT")) {
       if (!priorToolNames.includes("send_message")) {
         assert.ok(toolNames.includes("send_message"), "member runtime lacks send_message");
@@ -85,7 +93,7 @@ const providerServer = createServer(async (req, res) => {
     } else {
       throw new Error(`Unexpected fake-model prompt: ${userText.slice(0, 240)}`);
     }
-    calls.push({ userText, tool: toolCall?.name ?? null });
+    calls.push({ userText, tool: toolCall?.name ?? null, model: request.model });
 
     res.writeHead(200, {
       "content-type": "text/event-stream",
@@ -284,6 +292,7 @@ try {
     authKind: "none",
     defaultModelId: "team-fixture",
     apiStyle: "chat_completions",
+    models: [{ id: "team-fixture" }, { id: "team-approved" }],
   });
   await host.call("settings.set", {
     language: "en",
@@ -314,6 +323,34 @@ try {
     viewingSessionId: lead.id,
     content: "Please spawn one teammate, let the teammate report back, and then summarize the result.",
   });
+
+  await waitFor(async () => (await invoke("teamGetLaunchReview", {teamSessionId: lead.id})).review?.status === "pending", "pending launch review");
+  const pendingReview = (await invoke("teamGetLaunchReview", {teamSessionId: lead.id})).review;
+  assert.equal((await invoke("teamGetRoster", {teamSessionId: lead.id})).members.length, 0);
+  assert.equal(calls.filter(call => call.userText.includes("Send the exact message TEAM_RESULT")).length, 0);
+  assert.ok(pendingReview.leadTurnId && !pendingReview.leadTurnId.startsWith("turn-"), "review did not bind a real Host turn id");
+  await waitFor(async () => { const result = await invoke("agentGetStatus", lead.id); assert.equal(typeof result.status?.isRunning, "boolean"); return result.status.isRunning === false; }, "Lead settled before confirmation");
+  await openTeamPanel(sendCdp, evaluate);
+  await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-launch-review"]')`), "launch review UI");
+  assert.equal(await evaluate(`(() => {
+    const card = document.querySelector('[data-testid="launch-review-member-researcher"]');
+    const bounds = card.getBoundingClientRect();
+    return Array.from(card.querySelectorAll('select')).every(select => {
+      const rect = select.getBoundingClientRect();
+      return rect.left >= bounds.left && rect.right <= bounds.right;
+    }) && card.scrollWidth <= card.clientWidth;
+  })()`), true, "review controls must fit the narrow Team panel");
+  const pendingImage = await sendCdp("Page.captureScreenshot", {format: "png"});
+  await writeFile(join(tempRoot, "team-launch-review-pending.png"), Buffer.from(pendingImage.data, "base64"));
+  await evaluate(`(() => {const selects=document.querySelectorAll('[data-testid="launch-review-member-researcher"] select'); const model=selects[1]; model.value='team-approved'; model.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+  await waitFor(async () => {
+    const response = await invoke("teamGetLaunchReview", {teamSessionId: lead.id});
+    return response.review?.members[0]?.selection.modelId === "team-approved" && response.review.revision > pendingReview.revision;
+  }, "edited approval binding");
+  await waitFor(() => evaluate(`Array.from(document.querySelectorAll('[data-testid="team-launch-review"] button')).some(button => /confirm/i.test(button.innerText) && !button.disabled)`), "review confirmation enabled");
+  await evaluate(`Array.from(document.querySelectorAll('[data-testid="team-launch-review"] button')).find(button => /confirm/i.test(button.innerText))?.click()`);
+  await waitFor(async () => (await invoke("teamGetLaunchReview", {teamSessionId: lead.id})).review?.status === "confirmed", "confirmed launch review");
+  console.log("PASS Team approval: durable declaration, zero expert calls before approval, edited selection and UI confirmation");
 
   let roster;
   let member;
@@ -346,9 +383,21 @@ try {
 
   await evaluate(`document.querySelector('[data-testid="team-panel"] .team-member-card button')?.click()`);
   await waitFor(() => evaluate(`!!document.querySelector('[data-sidebar-session-row="${member.memberSessionId}"].active')`), "member transcript navigation");
-  console.log("PASS Team runtime: Lead -> fresh teammate -> peer message -> Lead reply");
+  const memberRequests = calls.filter(call => call.userText.includes("Send the exact message TEAM_RESULT"));
+  assert.ok(memberRequests.length > 0);
+  assert.ok(memberRequests.every(call => call.model === "team-approved"), "approved model was not used by member runtime");
+  console.log("PASS Team runtime: approved route -> fresh teammate -> peer message -> Lead reply");
   console.log("PASS Team UI: roster and member session navigation");
   console.log(`Evidence image: ${screenshotPath}`);
+
+  await evaluate(`document.querySelector('[data-sidebar-session-row="${lead.id}"] button.thread-item-main')?.click()`);
+  await waitFor(async () => { const result = await invoke("agentGetStatus", lead.id); assert.equal(typeof result.status?.isRunning, "boolean"); return result.status.isRunning === false; }, "Lead idle for lead-only turn");
+  await invoke("agentPrompt", {sessionId: lead.id, viewingSessionId: lead.id, content: "Handle this without specialists."});
+  await waitFor(async () => (await invoke("teamGetExecutionDecision", {teamSessionId: lead.id})).decision?.strategy === "lead_only", "latest lead-only decision");
+  await openTeamPanel(sendCdp, evaluate);
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="team-panel"]')?.innerText.includes('This short task needs no specialist.')`), "lead-only reason visible");
+  assert.equal((await invoke("teamGetRoster", {teamSessionId: lead.id})).members.length, 1);
+  console.log("PASS Team strategy: Lead-only decision and reason visible without an extra expert");
 
   socket.close();
   socket = null;

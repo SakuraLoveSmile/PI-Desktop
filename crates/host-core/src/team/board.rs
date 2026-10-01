@@ -111,6 +111,9 @@ pub fn create_team_task(db: &Database, params: CreateTaskParams<'_>) -> Result<T
 
     let caller_name = validate_team_participant(db, team_session_id, caller_session_id)?;
     let is_lead = caller_session_id == team_session_id;
+    if !is_lead {
+        super::review::require_approved_member(db, team_session_id, caller_session_id)?;
+    }
     let (owner_session_id, owner_member_name) = if let Some(owner_id) = owner_session_id {
         let owner_name = validate_team_participant(db, team_session_id, owner_id)?;
         if let Some(requested_name) = owner_member_name {
@@ -140,6 +143,9 @@ pub fn create_team_task(db: &Database, params: CreateTaskParams<'_>) -> Result<T
     } else {
         (Some(caller_session_id.to_string()), Some(caller_name))
     };
+    if let Some(owner_id) = owner_session_id.as_deref() {
+        super::review::require_approved_member(db, team_session_id, owner_id)?;
+    }
 
     let subject = subject.trim();
     if subject.is_empty() {
@@ -273,6 +279,9 @@ pub fn update_team_task(db: &Database, params: UpdateTaskParams<'_>) -> Result<T
         .ok_or_else(|| anyhow!("TEAM_TASK_NOT_FOUND: task '{task_id}' not found"))?;
     let caller_name = validate_team_participant(db, team_session_id, caller_session_id)?;
     let is_lead = caller_session_id == team_session_id;
+    if !is_lead {
+        super::review::require_approved_member(db, team_session_id, caller_session_id)?;
+    }
     if !is_lead && current.owner_session_id.as_deref() != Some(caller_session_id) {
         return Err(anyhow!(
             "TEAM_UNAUTHORIZED: members can only update their own tasks"
@@ -360,6 +369,9 @@ pub fn update_team_task(db: &Database, params: UpdateTaskParams<'_>) -> Result<T
         } else {
             (None, None)
         };
+    if let Some(owner_id) = final_owner_session_id.as_deref() {
+        super::review::require_approved_member(db, team_session_id, owner_id)?;
+    }
 
     let final_blocked_by = blocked_by.unwrap_or(current.blocked_by.clone());
     let final_write_scopes = write_scopes.unwrap_or(current.write_scopes.clone());

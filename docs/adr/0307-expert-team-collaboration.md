@@ -100,3 +100,20 @@ ledger to team peers:
 - Storage schema upgrades safely to version 21 with additive migrations.
 - Desktop UI gains clear two-axis Composer controls (`Agent` / `Expert Team` profile
   and `None` / `Plan` / `Goal` contract).
+
+## Launch approval amendment (2026-10-01)
+
+The Team Lead declares a strategy using its current Host-owned turn identity.
+A delegation proposal creates a pending review only. Trusted Desktop review
+operations select provider/model/thinking bindings and atomically confirm the
+batch before new expert sessions, execution assignments or work messages can
+be admitted. The nine existing Team tools remain available, but their Host
+entry points reject unapproved work with `TEAM_APPROVAL_REQUIRED`.
+
+Review revision checks apply on the Host, including retries. Confirmation
+persists the selected effective bindings, approved member identities and one
+idempotent Lead continuation together; it makes no provider call. Existing
+pre-upgrade durable mailbox entries keep their original recovery semantics.
+The sidecar proxy exposes declaration and reads, never the trusted UI's review
+update/confirm/cancel operations. No process ownership, database schema or
+Plugin SDK contract changes are introduced.

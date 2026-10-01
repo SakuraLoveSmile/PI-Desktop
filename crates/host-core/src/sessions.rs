@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -14,6 +14,108 @@ use crate::transcripts::{self, CompactionRecord, MessageRecord, RevisionRecord};
 mod fork_files;
 
 pub const MODES: [&str; 3] = ["plan", "goal", "agent"];
+
+pub(crate) fn with_savepoint<T>(
+    conn: &Connection,
+    name: &'static str,
+    operation: impl FnOnce(&Connection) -> Result<T>,
+) -> Result<T> {
+    if !matches!(
+        name,
+        "create_session" | "fork_session" | "team_roster" | "team_selection"
+    ) {
+        return Err(anyhow!("invalid internal savepoint name"));
+    }
+    conn.execute_batch(&format!("SAVEPOINT {name}"))?;
+    match operation(conn) {
+        Ok(value) => match conn.execute_batch(&format!("RELEASE SAVEPOINT {name}")) {
+            Ok(()) => Ok(value),
+            Err(error) => {
+                let rollback = conn.execute_batch(&format!(
+                    "ROLLBACK TO SAVEPOINT {name}; RELEASE SAVEPOINT {name}"
+                ));
+                match rollback {
+                    Ok(()) => Err(error.into()),
+                    Err(rollback_error) => Err(anyhow!(
+                        "{error}; savepoint rollback failed: {rollback_error}"
+                    )),
+                }
+            }
+        },
+        Err(error) => {
+            if let Err(rollback_error) = conn.execute_batch(&format!(
+                "ROLLBACK TO SAVEPOINT {name}; RELEASE SAVEPOINT {name}"
+            )) {
+                return Err(anyhow!(
+                    "{error}; savepoint rollback failed: {rollback_error}"
+                ));
+            }
+            Err(error)
+        }
+    }
+}
+
+fn fork_staging_marker(db: &Database, session_id: &str) -> Result<std::path::PathBuf> {
+    let mut path = transcripts::transcript_path(db.data_dir(), session_id)?;
+    path.set_extension("team-fork-pending");
+    Ok(path)
+}
+
+fn write_fork_staging_marker(db: &Database, session_id: &str) -> Result<()> {
+    use std::io::Write;
+    let path = fork_staging_marker(db, session_id)?;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)?;
+    let result = (|| -> Result<()> {
+        file.write_all(b"pi-team-fork-v1\n")?;
+        file.sync_data()?;
+        Ok(())
+    })();
+    if let Err(error) = result {
+        drop(file);
+        if let Err(cleanup_error) = remove_fork_staging_marker(db, session_id) {
+            return Err(anyhow!("{error}; marker cleanup failed: {cleanup_error}"));
+        }
+        return Err(error);
+    }
+    Ok(())
+}
+
+fn remove_fork_staging_marker(db: &Database, session_id: &str) -> Result<()> {
+    match std::fs::remove_file(fork_staging_marker(db, session_id)?) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error.into()),
+    }
+}
+
+pub(crate) fn commit_team_fork_staging_marker(db: &Database, session_id: &str) {
+    if let Err(error) = remove_fork_staging_marker(db, session_id) {
+        tracing::warn!(%session_id, %error, "team fork staging marker cleanup failed");
+    }
+}
+
+pub(crate) fn cleanup_uncommitted_team_session_files(
+    db: &Database,
+    session_id: &str,
+) -> Result<()> {
+    invalidate_transcript_layout(session_id);
+    transcripts::remove_session_files(db.data_dir(), session_id);
+    remove_fork_staging_marker(db, session_id)?;
+    if let Some(path) = crate::scratch::session_dir(db.data_dir(), session_id) {
+        match std::fs::remove_dir_all(path) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+        }
+    }
+    Ok(())
+}
 
 /// Maximum number of Unicode scalar values accepted for a user-defined title.
 pub const MAX_SESSION_TITLE_CHARS: usize = 80;
@@ -130,7 +232,7 @@ pub fn normalize_dispatch_title(raw: &str) -> Result<String> {
     Ok(collapsed)
 }
 
-fn validate_thinking_level(level: &str) -> Result<()> {
+pub(crate) fn validate_thinking_level(level: &str) -> Result<()> {
     if is_valid_thinking_level(level) {
         Ok(())
     } else {
@@ -1111,6 +1213,21 @@ fn insert_recovered_session_row(
 /// JSONL transcript. Returns true when a row was inserted (D318).
 pub fn restore_orphaned_session(db: &Database, session_id: &str) -> Result<bool> {
     if session_created_at(db, session_id).is_ok() {
+        if db.conn().is_autocommit() && fork_staging_marker(db, session_id)?.exists() {
+            commit_team_fork_staging_marker(db, session_id);
+        }
+        return Ok(false);
+    }
+    let marker = fork_staging_marker(db, session_id)?;
+    if marker.exists() {
+        let marker_contents = std::fs::read_to_string(&marker)?;
+        if marker_contents.trim() != "pi-team-fork-v1" {
+            return Err(anyhow!("invalid team fork staging marker"));
+        }
+        tracing::warn!(
+            %session_id,
+            "skipping orphaned transcript from an uncommitted Team fork"
+        );
         return Ok(false);
     }
     let path = transcripts::transcript_path(db.data_dir(), session_id)?;
@@ -1444,30 +1561,31 @@ pub fn create_session_with_options(
         None => None,
     };
 
-    let tx = db.conn().unchecked_transaction()?;
-    tx.prepare_cached(
-        "INSERT INTO sessions (
-            id, title, project_id, provider_id, model_id, mode, thinking_level,
-            permission_mode, execution_profile, created_at, updated_at
-         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)",
-    )?
-    .execute(params![
-        id,
-        title,
-        project_id,
-        provider_id,
-        model_id,
-        mode,
-        thinking_level,
-        permission_mode,
-        execution_profile,
-        now
-    ])?;
-    if let (Some(name), Some(path)) = (effective_name.as_deref(), canonical_path.as_deref()) {
-        tx.prepare_cached("UPDATE projects SET name = ?1 WHERE path = ?2")?
-            .execute(params![name, path])?;
-    }
-    tx.commit()?;
+    with_savepoint(db.conn(), "create_session", |conn| {
+        conn.prepare_cached(
+            "INSERT INTO sessions (
+                id, title, project_id, provider_id, model_id, mode, thinking_level,
+                permission_mode, execution_profile, created_at, updated_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)",
+        )?
+        .execute(params![
+            id,
+            title,
+            project_id,
+            provider_id,
+            model_id,
+            mode,
+            thinking_level,
+            permission_mode,
+            execution_profile,
+            now
+        ])?;
+        if let (Some(name), Some(path)) = (effective_name.as_deref(), canonical_path.as_deref()) {
+            conn.prepare_cached("UPDATE projects SET name = ?1 WHERE path = ?2")?
+                .execute(params![name, path])?;
+        }
+        Ok(())
+    })?;
 
     Ok(SessionSummary {
         id,
@@ -1820,13 +1938,25 @@ pub fn fork_session_through(
         .filter_map(|record| clone_compaction_for_fork(record, &message_ids, &tool_call_ids))
         .collect();
     let id = Uuid::new_v4().to_string();
-    let files = fork_files::preserve(
+    let staged_in_outer_transaction = !db.conn().is_autocommit();
+    if staged_in_outer_transaction {
+        write_fork_staging_marker(db, &id)?;
+    }
+    let files = match fork_files::preserve(
         db.data_dir(),
         source_id,
         &id,
         &mut records,
         &mut compactions,
-    )?;
+    ) {
+        Ok(files) => files,
+        Err(error) => {
+            if staged_in_outer_transaction {
+                remove_fork_staging_marker(db, &id)?;
+            }
+            return Err(error);
+        }
+    };
     let texts = records.iter().map(record_index_text).collect::<Vec<_>>();
     let now = now_ms();
     let created_at = ms_to_ts(now);
@@ -1844,11 +1974,13 @@ pub fn fork_session_through(
         &compactions,
     ) {
         transcripts::remove_session_files(db.data_dir(), &id);
+        if staged_in_outer_transaction {
+            remove_fork_staging_marker(db, &id)?;
+        }
         return Err(error);
     }
-    let indexed = (|| -> Result<()> {
-        let tx = db.conn().unchecked_transaction()?;
-        let inserted = tx
+    let indexed = with_savepoint(db.conn(), "fork_session", |conn| {
+        let inserted = conn
             .prepare_cached(
                 "INSERT INTO sessions (
                     id, title, project_id, provider_id, model_id, mode, thinking_level,
@@ -1863,14 +1995,16 @@ pub fn fork_session_through(
             return Err(anyhow!("session not found: {source_id}"));
         }
         for (seq, record) in records.iter().enumerate() {
-            insert_index_row(&tx, &id, seq as i64, None, record, texts[seq].as_deref())?;
+            insert_index_row(conn, &id, seq as i64, None, record, texts[seq].as_deref())?;
         }
-        tx.commit()?;
         Ok(())
-    })();
+    });
     if let Err(error) = indexed {
         invalidate_transcript_layout(&id);
         transcripts::remove_session_files(db.data_dir(), &id);
+        if staged_in_outer_transaction {
+            remove_fork_staging_marker(db, &id)?;
+        }
         return Err(error);
     }
     files.commit();
@@ -1963,6 +2097,16 @@ pub fn configure_session_with_profile(
     if let Some(profile) = execution_profile {
         validate_execution_profile(profile)?;
     }
+    crate::team::gate_session_configure(
+        db,
+        id,
+        &mode,
+        provider_id,
+        model_id,
+        thinking_level,
+        permission_mode,
+        execution_profile,
+    )?;
     crate::plans::gate_session_configure(
         db,
         id,
@@ -1972,10 +2116,10 @@ pub fn configure_session_with_profile(
         thinking_level,
         permission_mode,
     )?;
-    let changed = db
-        .conn()
-        .prepare_cached(
-            "UPDATE sessions
+    let changed = with_savepoint(db.conn(), "team_selection", |conn| {
+        let changed = conn
+            .prepare_cached(
+                "UPDATE sessions
              SET mode = ?2, provider_id = COALESCE(?3, provider_id),
                  model_id = COALESCE(?4, model_id),
                  thinking_level = COALESCE(?5, thinking_level),
@@ -1983,21 +2127,63 @@ pub fn configure_session_with_profile(
                  execution_profile = COALESCE(?7, execution_profile),
                  updated_at = ?8
              WHERE id = ?1",
-        )?
-        .execute(params![
-            id,
-            mode,
-            provider_id,
-            model_id,
-            thinking_level,
-            permission_mode,
-            execution_profile,
-            now_ms()
-        ])?;
+            )?
+            .execute(params![
+                id,
+                mode,
+                provider_id,
+                model_id,
+                thinking_level,
+                permission_mode,
+                execution_profile,
+                now_ms()
+            ])?;
+        if changed > 0 {
+            conn.execute(
+                "UPDATE team_members
+                 SET provider_id = (SELECT provider_id FROM sessions WHERE id = ?1),
+                     model_id = (SELECT model_id FROM sessions WHERE id = ?1),
+                     updated_at = ?2
+                 WHERE member_session_id = ?1",
+                params![id, now_ms()],
+            )?;
+        }
+        Ok(changed)
+    })?;
     if changed == 0 {
         return Ok(None);
     }
     Ok(get_session(db, id)?.map(|detail| detail.summary))
+}
+
+pub(crate) fn configure_approved_team_member_selection(
+    db: &Database,
+    id: &str,
+    provider_id: &str,
+    model_id: &str,
+    thinking_level: &str,
+) -> Result<()> {
+    validate_thinking_level(thinking_level)?;
+    crate::team::review::validate_member_route(db, provider_id, model_id, thinking_level)?;
+    with_savepoint(db.conn(), "team_selection", |conn| {
+        let changed = conn.execute(
+            "UPDATE sessions
+             SET mode = 'agent', provider_id = ?2, model_id = ?3,
+                 thinking_level = ?4, execution_profile = 'team', updated_at = ?5
+             WHERE id = ?1",
+            params![id, provider_id, model_id, thinking_level, now_ms()],
+        )?;
+        if changed == 0 {
+            return Err(anyhow!("TEAM_NOT_FOUND: member session not found"));
+        }
+        conn.execute(
+            "UPDATE team_members
+             SET provider_id = ?2, model_id = ?3, updated_at = ?4
+             WHERE member_session_id = ?1",
+            params![id, provider_id, model_id, now_ms()],
+        )?;
+        Ok(())
+    })
 }
 
 pub fn delete_session(db: &Database, id: &str) -> Result<bool> {
@@ -3648,6 +3834,58 @@ pub fn get_turn_state(db: &Database, session_id: &str, turn_id: &str) -> Result<
 // ---- turns ------------------------------------------------------------------
 
 pub fn begin_turn(
+    db: &Database,
+    session_id: &str,
+    provider_id: Option<&str>,
+    model_id: Option<&str>,
+) -> Result<String> {
+    crate::team::review::gate_team_member_turn(db, session_id, provider_id, model_id)?;
+    begin_turn_inner(db, session_id, provider_id, model_id)
+}
+
+pub(crate) fn begin_turn_for_team_mail(
+    db: &Database,
+    session_id: &str,
+    message_id: &str,
+    provider_id: Option<&str>,
+    model_id: Option<&str>,
+) -> Result<String> {
+    let (plugin_id, kind, status, target_session_id): (String, String, String, String) = db
+        .conn()
+        .query_row(
+            "SELECT plugin_id, kind, status, target_session_id
+             FROM session_collaboration_messages WHERE id = ?1",
+            params![message_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        )
+        .optional()?
+        .ok_or_else(|| anyhow!("TEAM_MAIL_NOT_FOUND: durable message not found"))?;
+    let team_session_id = plugin_id
+        .strip_prefix("team:")
+        .filter(|team_session_id| !team_session_id.is_empty())
+        .ok_or_else(|| anyhow!("TEAM_MAIL_INVALID: message is not Team-origin mail"))?;
+    if kind != "message" || status != "queued" || target_session_id != session_id {
+        return Err(anyhow!(
+            "TEAM_MAIL_INVALID: message must be queued Team mail for this session"
+        ));
+    }
+    crate::team::validate_team_participant(db, team_session_id, session_id)?;
+    if crate::team::get_team_member_by_session_id(db, session_id)?.is_some() {
+        let member = get_session(db, session_id)?
+            .ok_or_else(|| anyhow!("TEAM_NOT_FOUND: member session not found"))?;
+        if provider_id
+            .is_some_and(|provider| member.summary.provider_id.as_deref() != Some(provider))
+            || model_id.is_some_and(|model| member.summary.model_id.as_deref() != Some(model))
+        {
+            return Err(anyhow!(
+                "TEAM_APPROVAL_REQUIRED: Team mail turn route must match the member session"
+            ));
+        }
+    }
+    begin_turn_inner(db, session_id, provider_id, model_id)
+}
+
+fn begin_turn_inner(
     db: &Database,
     session_id: &str,
     provider_id: Option<&str>,
