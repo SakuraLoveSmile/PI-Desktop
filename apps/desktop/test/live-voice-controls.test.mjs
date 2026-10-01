@@ -144,7 +144,7 @@ test("Live Voice separates idle entry and compact call presentation", async (t) 
     // travel through the main window's toast is named in place, with its
     // verbatim allow-listed code next to it.
     const html = renderBar(failed);
-    assert.match(html, /role="alert"/);
+    assert.match(html, /role="status"/);
     assert.match(html, /errors\.NETWORK_ERROR/);
     assert.match(html, /LIVE_NETWORK_ERROR/);
     // A failure only the owner frame can see — a refused action — reaches the
