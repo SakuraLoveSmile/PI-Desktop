@@ -1,0 +1,61 @@
+/* Planning reference: put each block in its owning existing feature stylesheet. */
+.team-pixel-avatar { flex: 0 0 auto; border-radius: var(--radius-xs); image-rendering: pixelated; }
+.team-person { display: flex; min-width: 0; align-items: center; gap: 6px; color: var(--ds-text-secondary); font-size: var(--text-sm); }
+.team-person-name { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.team-progress, .team-compact-board { min-width: 0; max-width: 100%; }
+.team-progress-header { display: flex; min-width: 0; align-items: center; gap: 8px; padding: 0 0 8px; }
+.team-progress-disclosure.btn { display: inline-flex; min-width: 0; align-items: center; gap: 6px; padding: 0; font-size: var(--text-base); }
+.team-progress-count { font-size: var(--text-xs); color: var(--ds-text-muted); font-variant-numeric: tabular-nums; }
+.team-progress-panorama { display: inline-flex; min-width: 0; align-items: center; gap: 4px; margin-left: auto; padding: 4px; color: var(--ds-text-secondary); font-size: var(--text-sm); }
+.team-progress-panorama > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-progress-panorama > svg { flex-shrink: 0; }
+.team-progress-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.team-progress-rows[hidden], .composer-queue-body[hidden], .sidebar-team-children[hidden] { display: none; }
+.team-progress-row.btn { display: grid; width: 100%; min-width: 0; grid-template-columns: 20px minmax(0,1fr); align-items: start; gap: 10px; padding: 8px 4px; text-align: left; border-radius: var(--radius-xs); }
+.team-progress-copy { display: grid; min-width: 0; gap: 6px; }
+.team-progress-task { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-base); line-height: var(--leading-body); font-weight: var(--font-weight-medium); }
+.team-task-state { display: inline-flex; width: 18px; height: 18px; align-items: center; justify-content: center; margin-top: 2px; border: 1px solid var(--ds-border-strong); border-radius: var(--radius-full); color: var(--ds-text-muted); }
+.team-task-state-completed { border-color: transparent; background: var(--ds-success); color: var(--ds-bg-primary); }
+.team-task-state-in_progress { color: var(--ds-success); border-color: transparent; }
+.team-task-state-blocked { color: var(--ds-warning); border-color: var(--ds-warning); }
+.team-task-state-failed { color: var(--ds-error); border-color: var(--ds-error); }
+.team-task-spinner { animation: team-spin 1.2s linear infinite; }
+@keyframes team-spin { to { transform: rotate(360deg); } }
+
+/* AgentPanorama keeps the absolute coordinates and real Lead-to-child edges. */
+.team-panorama-person.btn { display: flex; flex-direction: column; width: 304px; height: 140px; padding: 0; border: 1px solid var(--ds-border-strong); border-radius: var(--radius-xs); background: var(--ds-bg-secondary); text-align: left; overflow: hidden; }
+.team-panorama-person-head { display: flex; align-items: flex-start; flex: 1; min-width: 0; gap: 12px; padding: 16px 16px 12px; }
+.team-panorama-person-copy { flex: 1; min-width: 0; }
+.team-panorama-person-name { display: block; margin-bottom: 4px; font-size: var(--text-sm-plus); line-height: var(--leading-body); font-weight: var(--font-weight-normal); color: var(--ds-text-secondary); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.team-panorama-person-task { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; font-size: var(--text-base-plus); font-weight: var(--font-weight-semibold); line-height: var(--leading-body); color: var(--ds-text-primary); }
+.team-panorama-person-footer { display: flex; height: 37px; flex: 0 0 37px; align-items: center; gap: 8px; padding: 0 16px; border-top: 1px solid var(--ds-border-default); font-size: var(--text-sm); color: var(--ds-text-secondary); }
+.team-panorama-person-completed .team-panorama-person-footer { color: var(--ds-success); }
+.team-panorama-person-running .team-panorama-person-footer { color: var(--ds-success); }
+.team-panorama-person-failed .team-panorama-person-footer { color: var(--ds-error); }
+.team-panorama-person-footer small { margin-left: auto; color: var(--ds-text-muted); font-size: var(--text-xs); }
+.agent-panorama-stage { transition: none; }
+
+.team-board-filters { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+.team-board-filter-buttons { display: flex; min-width: 0; flex-wrap: wrap; gap: 4px; }
+.team-board-filter-buttons [aria-pressed="true"] { background: var(--ds-bg-hover); }
+.team-board-filters input { width: 148px; max-width: 100%; min-width: 0; margin-left: auto; }
+.team-board-rows { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.team-board-row.btn { display: grid; grid-template-columns: 20px minmax(0,1fr) auto; width: 100%; min-width: 0; column-gap: 10px; row-gap: 6px; padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--ds-border-default); border-radius: var(--radius-xs); }
+.team-board-task { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: var(--text-base); line-height: var(--leading-body); }
+.team-board-owner { grid-column: 2; min-width: 0; }
+.team-empty-copy { font-size: var(--text-sm); color: var(--ds-text-muted); }
+.composer-queue-heading.btn { display: flex; width: 100%; min-width: 0; align-items: center; gap: 8px; padding: 7px 10px; background: var(--ds-bg-composer); text-align: left; font-size: var(--text-sm); }
+.composer-queue-next { min-width: 0; max-width: 55%; margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ds-text-secondary); }
+.composer-queue-body { max-height: 168px; overflow-y: auto; overflow-x: clip; padding-top: 6px; }
+.sidebar-team-parent { display: flex; min-width: 0; align-items: center; gap: 2px; }
+.sidebar-team-chevron { display: inline-flex; width: 24px; height: 24px; align-items: center; justify-content: center; flex-shrink: 0; }
+.sidebar-team-parent-row { flex: 1; min-width: 0; }
+.sidebar-team-count { color: var(--ds-text-muted); font-size: var(--text-xs); flex-shrink: 0; }
+.sidebar-team-children { margin-left: 13px; padding-left: 12px; border-left: 1px solid var(--ds-border-default); }
+
+/* Diagnose intrinsic width before adding containment. Preserve tabs, code,
+   and tables' own horizontal scrolling; do not clip the whole application. */
+.team-panel, .work-panel-overview, .work-panel-main { min-width: 0; max-width: 100%; }
+.team-panel, .work-panel-overview-scroll { overflow-y: auto; overflow-x: clip; }
+.team-task-description, .team-member-description { min-width: 0; overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) { .team-task-spinner { animation: none; } }
