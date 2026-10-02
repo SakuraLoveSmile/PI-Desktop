@@ -50,7 +50,10 @@ they do not become alternate persistence owners.
 - Every actionable request is scoped by proposal/session/turn/tool-call/version.
 - A changed model affects the next revision only; it cannot mutate an approved
   execution snapshot.
-- Schema v21 to v22 is additive and creates a readable migration backup.
+- Execution bindings, revision intent, and schedules are stored by Plus schema
+  step P3, which is additive. An existing database that is behind on the Plus
+  track gets a readable backup before the step runs
+  (ADR plus-schema-version-track).
 - Remote backends that only support the legacy approve/reject path must reject
   revision and scheduling explicitly rather than pretending to support them.
 - Candidate validation must cover stale responses, retry, separate Goal

@@ -102,10 +102,13 @@ Linux 打包的 host-core 在 Ubuntu 22.04 上构建，需要 glibc 2.35 或更�
 另有两种启动结果会被明确命名，而不是笼统地当作服务不可用（D380）：
 
 - **降级安装。** 当数据目录的 SQLite schema 比当前构建支持的更新时，host-core
-  会拒绝打开（stderr 输出 `database schema version N is newer than supported
-  M`）。Electron 从退出前的最后一段 stderr 解析该行，首次失败即停止重启循环，
-  并推送 `message: "DB_SCHEMA_TOO_NEW"` 且带有两个版本号的 `hostStatus`。横幅
-  提示用户安装上次打开这些数据的更新版 PI-Desktop。不会向下迁移数据。
+  会拒绝打开，两条 schema 轨道皆然：共享的 `user_version` 链在 stderr 输出
+  `database schema version N is newer than supported M`，Plus 轨道（存储规格第
+  7.1 节）输出 `Plus schema version N is newer than supported M`。Electron 从
+  退出前的最后一段 stderr 解析该行，首次失败即停止重启循环，并推送
+  `message: "DB_SCHEMA_TOO_NEW"` 且带有两个版本号（取自拒绝的那条轨道）的
+  `hostStatus`。横幅提示用户安装上次打开这些数据的更新版 PI-Desktop。不会向下
+  迁移数据。
 - **非原生构建。** 启动时 Electron 比较 `process.arch` 与实际 CPU（macOS 通过
   `sysctl.proc_translated` 判断，仅在 Rosetta 2 下为 `1`；其他平台用
   `os.machine()`）。不匹配时即使启动成功，也会随启动 `hostStatus` 附带

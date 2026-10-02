@@ -20,7 +20,7 @@ requirement unchanged, and the existing approval, immutable artifact hash,
 permission, containment, and no-replay startup boundaries. Resolve approval
 against the stored proposal kind rather than the session's current mode.
 Persist an explicit `artifact_workspace_kind` column (`project` | `scratch`)
-on `plan_approvals` (schema version 20) so the contract's origin remains durable
+on `plan_approvals` (Plus schema step P1) so the contract's origin remains durable
 even if the session is subsequently moved to a project or enters Agent mode.
 Artifact previews resolve the proposal's own session root, never the currently
 visible workspace. Existing project previews preserve their established UI.
@@ -37,7 +37,7 @@ submission terminates the negotiation turn and awaits explicit approval.
 
 Temporary Goals can be negotiated, approved and executed without binding a
 project, and their outputs survive restart. Persisting the workspace origin
-requires Host database schema version 20 (`artifact_workspace_kind`), with safe
+requires Plus schema step P1 (`artifact_workspace_kind`), with safe
 migration defaulting historical rows to `'project'`. No public RPC protocol
 version bump or Plugin SDK change is necessary. Goal data now has the lifetime
 of its owning session, so users must retain that session to retain its outputs.
