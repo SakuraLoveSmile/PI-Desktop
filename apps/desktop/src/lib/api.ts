@@ -134,6 +134,8 @@ import type {
   TeamLaunchReviewSelectionUpdate,
   TeamSnapshot,
   TeamChangedEvent,
+  GoalProgressSnapshot,
+  GoalProgressChangedEvent,
   SessionRenameGuard,
 } from "@pi-desktop/shared";
 import {
@@ -1054,6 +1056,8 @@ export const api = {
     invoke<{ reports: GoalReportSummary[] }>(IPC.invoke.goalReportList, params),
   retryGoalReport: (params: { sessionId: string; executionId: string }) =>
     invoke<{ report: GoalReportSummary }>(IPC.invoke.goalReportRetry, params),
+  getGoalProgress: (params: { sessionId?: string; executionId: string }) =>
+    invoke<{ progress: GoalProgressSnapshot | null }>(IPC.invoke.goalProgressGet, params),
   getGoalReportAsset: (params: {
     sessionId: string;
     executionId: string;
@@ -1602,6 +1606,12 @@ export const api = {
     if (!window.piDesktop?.on) return () => undefined;
     return window.piDesktop.on(IPC.event.teamChanged, (payload) =>
       listener(payload as TeamChangedEvent),
+    );
+  },
+  onGoalProgressChanged: (listener: (event: GoalProgressChangedEvent) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.goalProgressChanged, (payload) =>
+      listener(payload as GoalProgressChangedEvent),
     );
   },
   onGoalReportChanged: (listener: (event: any) => void) => {

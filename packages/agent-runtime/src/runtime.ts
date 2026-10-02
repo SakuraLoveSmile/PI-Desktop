@@ -9,6 +9,10 @@ import {
   persistGoalReportFailure,
   SUBMIT_GOAL_REPORT_TOOL_NAME,
 } from "./goal-report-tool.js";
+import {
+  GoalProgressManager,
+  UPDATE_GOAL_PROGRESS_TOOL_NAME,
+} from "./goal-progress-tool.js";
 import { randomUUID } from "node:crypto";
 import {
   settledDelegationMessage,
@@ -56,6 +60,7 @@ import {
 import {
   DEFAULT_COMMAND_TIMEOUT_MS,
   OAUTH_AUTH_KIND,
+  validateGoalProgressSnapshot,
   type TrustedExtensionCommand,
   type TrustedExtensionDiagnostic,
   type TrustedExtensionSpec,
@@ -1804,6 +1809,7 @@ export class DesktopAgentRuntime {
   private hostCloseUnsubscribe?: () => void;
   private turnSubagentUsage?: MessageUsage;
   private goalReportDraftManager?: GoalReportDraftManager;
+  private goalProgressManager?: GoalProgressManager;
 
   constructor(opts: AgentRuntimeOptions) {
     this.sessionId = opts.sessionId;
@@ -2114,6 +2120,22 @@ Delegation rules:
     process.stderr.write(
       `[agent-runtime] event handler failed (session=${this.sessionId} turn=${this.turnId} event=${event.type}): ${detail}\n`,
     );
+  }
+
+  private logGoalProgressTokenFailure(executionId: string, error: unknown): void {
+    const detail = error instanceof Error
+      ? `${error.name}: ${error.message}`
+      : String(error);
+    process.stderr.write(
+      `[agent-runtime] goal progress unavailable (session=${this.sessionId} execution=${executionId}): ${detail}\n`,
+    );
+  }
+
+  private clearGoalProgressTool(): void {
+    if (!this.goalProgressManager) return;
+    this.goalProgressManager = undefined;
+    this.rebuildToolCatalog();
+    this.setAgentTools(this.activeTools());
   }
 
   /** Update the opt-in retry policy without rebuilding an idle runtime. */
@@ -3563,6 +3585,9 @@ Delegation rules:
     const goalReportTools = this.goalReportDraftManager
       ? [this.goalReportDraftManager.buildTool()]
       : [];
+    const goalProgressTools = this.goalProgressManager
+      ? [this.goalProgressManager.buildTool()]
+      : [];
     return [
       ...builtins,
       askTool,
@@ -3574,6 +3599,7 @@ Delegation rules:
       ...contextTools,
       ...extensionTools,
       ...goalReportTools,
+      ...goalProgressTools,
     ];
   }
 
@@ -3663,6 +3689,7 @@ Delegation rules:
       name === SUBAGENT_LIST_TOOL_NAME ||
       name === SUBAGENT_STOP_TOOL_NAME ||
       name === SUBMIT_GOAL_REPORT_TOOL_NAME ||
+      name === UPDATE_GOAL_PROGRESS_TOOL_NAME ||
       name === DECLARE_TEAM_STRATEGY_TOOL_NAME ||
       isTeamTool(name) ||
       (this.mode === "agent"
@@ -7817,6 +7844,10 @@ Delegation rules:
           this.acceptingSteering = false;
           this.retainPendingSteering();
           this.autonomousExecution = false;
+          this.goalReportDraftManager = undefined;
+          this.goalProgressManager = undefined;
+          this.rebuildToolCatalog();
+          this.setAgentTools(this.activeTools());
           this.clearAgentActivity();
           if (outcome.status === "error") {
             this.reportSubmissionTermination(outcome);
@@ -7841,9 +7872,11 @@ Delegation rules:
         this.acceptingSteering = false;
         this.retainPendingSteering();
         this.autonomousExecution = false;
-        if (this.goalReportDraftManager) {
+        if (this.goalReportDraftManager || this.goalProgressManager) {
           this.goalReportDraftManager = undefined;
+          this.goalProgressManager = undefined;
           this.rebuildToolCatalog();
+          this.setAgentTools(this.activeTools());
         }
         this.clearAgentActivity();
         this.reportMutationTermination();
@@ -8035,6 +8068,16 @@ Delegation rules:
     this.runCancelled = false;
     this.resetRunRecoveryState();
     this.turnEpoch += 1;
+    const executionTurnEpoch = this.turnEpoch;
+    const ensureExecutionIsCurrent = () => {
+      if (
+        this.disposed ||
+        this.runCancelled ||
+        this.turnEpoch !== executionTurnEpoch
+      ) {
+        throw turnAbortedError("Approved execution was stopped before startup");
+      }
+    };
     this.abortDelegationsFromPreviousTurns();
     this.currentAssistant = undefined;
     this.requestStartedAt = Date.now();
@@ -8079,11 +8122,67 @@ Delegation rules:
           );
         },
       });
+      let tokenRes: unknown;
+      let tokenRequestFailed = false;
+      try {
+        tokenRes = await this.host.call<unknown>("goalProgress.issueToken", {
+          sessionId: execution.sessionId,
+          executionId: execution.id,
+          turnId: durableTurnId,
+        });
+      } catch (error: unknown) {
+        ensureExecutionIsCurrent();
+        tokenRequestFailed = true;
+        this.logGoalProgressTokenFailure(execution.id, error);
+      }
+      ensureExecutionIsCurrent();
+      if (!tokenRequestFailed) {
+        const writeToken =
+          tokenRes !== null && typeof tokenRes === "object" && !Array.isArray(tokenRes)
+            ? (tokenRes as Record<string, unknown>).writeToken
+            : undefined;
+        if (typeof writeToken === "string" && writeToken.trim()) {
+          this.goalProgressManager = new GoalProgressManager({
+            sessionId: execution.sessionId,
+            executionId: execution.id,
+            writeToken,
+            onUpdate: async (items) => {
+              const res = await this.host.call<unknown>("goalProgress.update", {
+                sessionId: execution.sessionId,
+                executionId: execution.id,
+                writeToken,
+                items,
+              });
+              const snapshot =
+                res !== null && typeof res === "object" && !Array.isArray(res)
+                  ? (res as Record<string, unknown>).progress
+                  : undefined;
+              if (
+                !validateGoalProgressSnapshot(snapshot) ||
+                snapshot.sessionId !== execution.sessionId ||
+                snapshot.executionId !== execution.id
+              ) {
+                throw new Error("Host returned an invalid goal progress snapshot");
+              }
+              return snapshot;
+            },
+          });
+        } else {
+          this.logGoalProgressTokenFailure(
+            execution.id,
+            new Error("Host returned no valid write token"),
+          );
+        }
+      }
+      ensureExecutionIsCurrent();
       this.rebuildToolCatalog();
+      this.setAgentTools(this.activeTools());
     } else {
-      if (this.goalReportDraftManager) {
+      if (this.goalReportDraftManager || this.goalProgressManager) {
         this.goalReportDraftManager = undefined;
+        this.goalProgressManager = undefined;
         this.rebuildToolCatalog();
+        this.setAgentTools(this.activeTools());
       }
     }
     const instruction =
@@ -8154,6 +8253,7 @@ Delegation rules:
       });
       return { turnId: this.turnId };
     }
+    ensureExecutionIsCurrent();
     await this.agent.continue();
     await this.waitForIdleAndSteering();
     // Same recovery contract as a user prompt: a plan execution that overflows,
@@ -8194,8 +8294,9 @@ Delegation rules:
     this.pendingUserMessageId = userMessageId;
     this.resetRunRecoveryState();
     this.autonomousExecution = false;
-    if (this.goalReportDraftManager) {
+    if (this.goalReportDraftManager || this.goalProgressManager) {
       this.goalReportDraftManager = undefined;
+      this.goalProgressManager = undefined;
       this.rebuildToolCatalog();
     }
     // Main resolves this provenance from the Host ledger. Never infer it from
@@ -8455,6 +8556,7 @@ Delegation rules:
     this.acceptingSteering = false;
     this.gracefulStopRequested = false;
     this.runCancelled = true;
+    this.clearGoalProgressTool();
     this.steeringWaitAbort?.abort();
     this.extensionRunner?.cancelPending();
     this.resolvePendingAskTools();
@@ -8499,6 +8601,10 @@ Delegation rules:
     this.extensionRunner = undefined;
     const closingExtensions = typeof runner?.dispose === "function" ? runner.dispose() : undefined;
     this.streamSink.dispose();
+    this.goalProgressManager = undefined;
+    this.goalReportDraftManager = undefined;
+    this.rebuildToolCatalog();
+    this.setAgentTools(this.activeTools());
     this.disposed = true;
     this.acceptingSteering = false;
     this.runCancelled = true;

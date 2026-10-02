@@ -596,6 +596,8 @@ export const zhCN = {
     artifactScratchUnavailable: "临时会话目录不可用。",
   },
   goal: {
+    progressInitializing: "准备中…",
+    progressFailed: "进度读取失败",
     planning: "正在明确目标",
     approvalRegion: "目标审批",
     readyAnnouncement: "目标契约已就绪，已在工作面板中打开。",
@@ -1780,6 +1782,11 @@ sklm: {
     close: "关闭挂件",
   },
   team: {
+    viewMemberDetail: "查看成员 {{name}}",
+    memberDetailUnavailable: "成员详情不可用",
+    dispatchCardsLabel: "专家任务分派",
+    untitledTask: "未命名任务",
+
     title: "专家团队",
     roster: "团队花名册",
     board: "任务看板",
@@ -1852,6 +1859,7 @@ sklm: {
     openTaskWithStatus: "打开任务：{{subject}}（{{status}}）",
     viewAllTasks: "查看全部 {{count}} 项任务",
     roles: {
+      expert: "专家",
       researcher: "调研员",
       executor: "执行者",
       reviewer: "审阅者",
@@ -2039,6 +2047,8 @@ sklm: {
     piSkillsRefresh: "刷新 pi CLI 技能",
     piSkillsEmpty: "未找到 pi CLI npm 技能包。",
     piSkillsLoading: "正在查找 pi CLI 技能…",
+    piSkillsDismiss: "关闭 pi CLI 技能发现",
+    piSkillsReveal: "显示 pi CLI 技能",
     importExtension: "导入 pi 扩展",
     importExtensionDone: "已导入为插件 {{id}}",
     importExtensionDepsFailed: "已导入为插件 {{id}}，但依赖安装失败：{{error}}",

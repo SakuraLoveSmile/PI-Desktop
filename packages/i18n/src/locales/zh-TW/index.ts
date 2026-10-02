@@ -596,6 +596,8 @@ export const zhTW = {
     artifactScratchUnavailable: "暫存對話目錄不可用。",
   },
   goal: {
+    progressInitializing: "準備中…",
+    progressFailed: "進度讀取失敗",
     planning: "正在明確目標",
     approvalRegion: "目標審批",
     readyAnnouncement: "目標契約已就緒，已在工作面板中開啟。",
@@ -1780,6 +1782,11 @@ sklm: {
     close: "關閉小工具",
   },
   team: {
+    viewMemberDetail: "查看成員 {{name}}",
+    memberDetailUnavailable: "成員詳情無法使用",
+    dispatchCardsLabel: "專家任務分派",
+    untitledTask: "未命名任務",
+
     title: "專家團隊",
     roster: "團隊成員名單",
     board: "任務看板",
@@ -1852,6 +1859,7 @@ sklm: {
     openTaskWithStatus: "開啟任務：{{subject}}（{{status}}）",
     viewAllTasks: "查看全部 {{count}} 項任務",
     roles: {
+      expert: "專家",
       researcher: "調研員",
       executor: "執行者",
       reviewer: "審閱者",
@@ -2013,6 +2021,8 @@ sklm: {
     piSkillsRefresh: "重新整理 pi CLI 技能",
     piSkillsEmpty: "找不到 pi CLI npm 技能套件。",
     piSkillsLoading: "正在尋找 pi CLI 技能…",
+    piSkillsDismiss: "關閉 pi CLI 技能探索",
+    piSkillsReveal: "顯示 pi CLI 技能",
     importExtension: "匯入 pi 擴充",
     importExtensionDone: "已匯入為外掛 {{id}}",
     importExtensionDepsFailed: "已匯入為外掛 {{id}}，但相依套件安裝失敗：{{error}}",

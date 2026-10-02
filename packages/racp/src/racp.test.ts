@@ -288,6 +288,36 @@ describe("RACP-WS reconnect", () => {
 });
 
 describe("RACP-WS remote-host profile", () => {
+  it("serves Goal Progress snapshots as a viewer-only read", async () => {
+    const calls: Array<{ sessionId: string; executionId: string }> = [];
+    const snapshot = {
+      schemaVersion: 1,
+      sessionId: "s1",
+      proposalId: "proposal-1",
+      executionId: "execution-1",
+      revision: 2,
+      items: [{ id: "build", label: "Build", status: "completed" }],
+      updatedAt: 1,
+    };
+    const h = await harness({ operations: {
+      goalProgress: {
+        async get(input) {
+          calls.push(input);
+          return { progress: snapshot };
+        },
+      },
+    } });
+    const viewer = await h.connect(VIEWER_TOKEN);
+    const read = await viewer.client.request<{ progress: typeof snapshot }>("goalProgress/get", {
+      sessionId: "s1",
+      executionId: "execution-1",
+    });
+    expect(read.progress).toEqual(snapshot);
+    expect(calls).toEqual([{ sessionId: "s1", executionId: "execution-1" }]);
+    await expect(viewer.client.request("goalProgress/get", { sessionId: "s1" })).rejects.toMatchObject({ code: "INVALID_ARGUMENT" });
+    await expect(viewer.client.request("goalProgress/update", { sessionId: "s1", executionId: "execution-1" })).rejects.toMatchObject({ code: "METHOD_NOT_FOUND" });
+  });
+
   it("serves Goal Reports through viewer reads and controller-only Retry", async () => {
     const calls: Array<{ operation: string; sessionId: string }> = [];
     const h = await harness({

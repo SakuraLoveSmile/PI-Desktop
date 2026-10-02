@@ -228,6 +228,12 @@ export function createRemoteEventBridge(options: RemoteEventBridgeOptions): Remo
             sessionId: remoteSessionId,
           });
         }
+        if (isRecord(payload) && isRecord(payload.goalProgress)) {
+          emit(IPC.event.goalProgressChanged, {
+            ...payload.goalProgress,
+            sessionId: remoteSessionId,
+          });
+        }
         return;
       }
       case "approval.requested": {

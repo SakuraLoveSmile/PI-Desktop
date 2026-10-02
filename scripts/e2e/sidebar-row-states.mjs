@@ -7,6 +7,11 @@ export async function checkSidebarRowStates({ cdp, check, waitFor, seed }) {
   const header = (key) => `${group(key)} .sidebar-session-group-header`;
   const transparent = "rgba(0, 0, 0, 0)";
   const originalTheme = await cdp.evaluate("document.documentElement.dataset.theme");
+  const originalSidebarWidth = await cdp.evaluate(`(() => {
+    const sidebar = document.querySelector('.sidebar');
+    if (!sidebar) throw new Error('Missing sidebar');
+    return sidebar.style.width;
+  })()`);
 
   const paint = (selector) => cdp.evaluate(`(() => {
     const element = document.querySelector(${JSON.stringify(selector)});
@@ -87,12 +92,77 @@ export async function checkSidebarRowStates({ cdp, check, waitFor, seed }) {
   };
 
   try {
+    const titleStarts = await cdp.evaluate(`(() => {
+      const sidebar = document.querySelector('.sidebar');
+      const projectSessionTitle = document.querySelector(
+        ${JSON.stringify(row(seed.alphaSessionIds[0]) + ' .thread-item-title')},
+      );
+      const pinnedTitle = document.querySelector(
+        ${JSON.stringify(row(seed.pinnedSessionIds[0]) + ' .thread-item-title')},
+      );
+      const standaloneTitle = document.querySelector(
+        ${JSON.stringify(row('e2e-state-standalone') + ' .thread-item-title')},
+      );
+      const pin = document.querySelector(
+        ${JSON.stringify(row(seed.pinnedSessionIds[0]) + ' .thread-item-pin')},
+      );
+      if (!sidebar || !projectSessionTitle || !pinnedTitle || !standaloneTitle || !pin) {
+        throw new Error('Missing sidebar title geometry target');
+      }
+      sidebar.style.width = '220px';
+      const left = (element) => {
+        element.scrollIntoView({ block: 'nearest' });
+        return element.getBoundingClientRect().left;
+      };
+      const statusRow = projectSessionTitle.closest('[data-sidebar-session-row]');
+      const statusStarts = {};
+      const statusClasses = ['running', 'permission', 'selected', 'completed', 'failed'];
+      const existingStatus = statusRow.querySelector('.thread-item-status');
+      for (const status of statusClasses) {
+        const marker = document.createElement('span');
+        marker.className = 'thread-item-status ' + status;
+        statusRow.prepend(marker);
+        statusStarts[status] = left(projectSessionTitle);
+        marker.remove();
+      }
+      if (existingStatus && !existingStatus.isConnected) statusRow.prepend(existingStatus);
+      return {
+        nested: left(projectSessionTitle),
+        pinned: left(pinnedTitle),
+        standalone: left(standaloneTitle),
+        statusStarts,
+        pinTrailing: pin.getBoundingClientRect().left >= pinnedTitle.getBoundingClientRect().right,
+      };
+    })()`);
+    const titleDeltas = [
+      Math.abs(titleStarts.pinned - titleStarts.standalone),
+      ...Object.values(titleStarts.statusStarts).map((left) => Math.abs(left - titleStarts.nested)),
+    ];
+    const titleDelta = Math.max(...titleDeltas);
+    check(
+      titleDelta <= 1 && titleStarts.pinTrailing,
+      'narrow sidebar aligns titles within each group level and keeps the pin badge trailing',
+      JSON.stringify({ titleDelta, ...titleStarts }),
+    );
+
     await cdp.evaluate("window.dispatchEvent(new Event('focus'))");
     for (const theme of ["dark", "light"]) {
       await cdp.evaluate(`document.documentElement.dataset.theme = ${JSON.stringify(theme)}`);
       const id = seed.alphaSessionIds[0];
       await waitFor(() => cdp.evaluate(`!!document.querySelector(${JSON.stringify(row(id))})`), "seed session rendered");
       await select(id);
+      const selectedTitleLeft = await cdp.evaluate(`(() => {
+        const element = document.querySelector(
+          ${JSON.stringify(row(id) + ' .thread-item-title')},
+        );
+        if (!element) throw new Error('Missing selected title geometry target');
+        return element.getBoundingClientRect().left;
+      })()`);
+      check(
+        Math.abs(selectedTitleLeft - titleStarts.nested) <= 1,
+        `${theme} selected title start stays aligned within 1px`,
+        JSON.stringify({ selected: selectedTitleLeft, nested: titleStarts.nested }),
+      );
       const selectedRest = await paint(row(id));
       const groupRest = await paint(header(seed.paths.alpha));
       const context = await paint(group(seed.paths.alpha));
@@ -261,6 +331,8 @@ export async function checkSidebarRowStates({ cdp, check, waitFor, seed }) {
     await cdp.send("Emulation.setEmulatedMedia", { features: [] });
     await cdp.evaluate(`(() => {
       document.documentElement.dataset.theme = ${JSON.stringify(originalTheme)};
+      const sidebar = document.querySelector('.sidebar');
+      if (sidebar) sidebar.style.width = ${JSON.stringify(originalSidebarWidth)};
       document.querySelectorAll('.project-group.is-drop-target').forEach(el => el.classList.remove('is-drop-target'));
       window.dispatchEvent(new Event('focus'));
     })()`);

@@ -374,6 +374,12 @@ fn test_submit_draft_rejects_terminal_reports_without_mutation() {
         "verdict": "met"
     });
     submit_draft(&db, ready_execution_id, &original_draft).unwrap();
+    db.conn()
+        .execute(
+            "UPDATE plan_approvals SET execution_state = 'completed' WHERE execution_id = ?1",
+            params![ready_execution_id],
+        )
+        .unwrap();
     finalize_report(&db, ready_execution_id, 1, Some("completed"), None).unwrap();
     mark_failed(
         &db,
@@ -461,6 +467,12 @@ fn test_invalidate_draft_triggers_fallback() {
     assert_eq!(status_after, "pending");
 
     // Finalize report - must fall back
+    db.conn()
+        .execute(
+            "UPDATE plan_approvals SET execution_state = 'completed' WHERE execution_id = ?1",
+            params![execution_id],
+        )
+        .unwrap();
     let summary = finalize_report(&db, execution_id, 1, Some("completed"), None).unwrap();
     assert_eq!(summary.status, "ready");
     assert_eq!(summary.integrity, "fallback");
@@ -484,6 +496,12 @@ fn structured_draft() -> Value {
 }
 
 fn ready_structured_file(db: &Database, session_id: &str, execution_id: &str) {
+    db.conn()
+        .execute(
+            "UPDATE plan_approvals SET execution_state = 'completed' WHERE execution_id = ?1",
+            params![execution_id],
+        )
+        .unwrap();
     submit_draft(db, execution_id, &structured_draft()).unwrap();
     finalize_report(db, execution_id, 7, Some("completed"), None).unwrap();
     let _ = session_id;
@@ -515,6 +533,12 @@ fn read_report_states_are_distinct_and_never_conflated() {
     assert!(draft.report.is_none());
 
     // Finalized -> ready + structured, with a recomputed hash.
+    db.conn()
+        .execute(
+            "UPDATE plan_approvals SET execution_state = 'completed' WHERE execution_id = ?1",
+            params![execution_id],
+        )
+        .unwrap();
     finalize_report(&db, execution_id, 3, Some("completed"), None).unwrap();
     let ready = read_report(&db, session_id, execution_id).unwrap();
     assert_eq!(ready.state, REPORT_STATE_READY);
@@ -670,6 +694,12 @@ fn test_assets_save_and_chunk_read() {
     });
 
     submit_draft(&db, execution_id, &draft).unwrap();
+    db.conn()
+        .execute(
+            "UPDATE plan_approvals SET execution_state = 'completed' WHERE execution_id = ?1",
+            params![execution_id],
+        )
+        .unwrap();
     let summary = finalize_report(&db, execution_id, 10, Some("completed"), None).unwrap();
     assert_eq!(summary.status, "ready");
 
@@ -850,6 +880,12 @@ fn test_evidence_resolution_and_check_observations() {
     });
 
     submit_draft(&db, execution_id, &draft).unwrap();
+    db.conn()
+        .execute(
+            "UPDATE plan_approvals SET execution_state = 'completed' WHERE execution_id = ?1",
+            params![execution_id],
+        )
+        .unwrap();
     let summary = finalize_report(&db, execution_id, 10, Some("completed"), None).unwrap();
     assert_eq!(summary.status, "ready");
 
@@ -904,4 +940,44 @@ fn test_evidence_resolution_and_check_observations() {
         Some("passed")
     );
     assert_eq!(chk_obs[0].get("exitCode").and_then(Value::as_i64), Some(0));
+}
+
+#[test]
+fn test_finalize_rejects_non_terminal_execution() {
+    let (_dir, db) = create_test_db();
+    let session_id = "sess-non-terminal";
+    let execution_id = "exec-non-terminal-1";
+    seed_goal_execution(&db, session_id, execution_id);
+
+    // Initial state is 'running'
+    let err = finalize_report(&db, execution_id, 1, None, None).unwrap_err();
+    assert!(err.to_string().contains("GOAL_EXECUTION_NOT_TERMINAL"));
+
+    // Also rejects even if override says completed but db says running
+    let err2 = finalize_report(&db, execution_id, 1, Some("completed"), None).unwrap_err();
+    assert!(err2.to_string().contains("GOAL_EXECUTION_NOT_TERMINAL"));
+
+    // Set to queued
+    db.conn()
+        .execute(
+            "UPDATE plan_approvals SET execution_state = 'queued' WHERE execution_id = ?1",
+            params![execution_id],
+        )
+        .unwrap();
+    let err3 = finalize_report(&db, execution_id, 1, None, None).unwrap_err();
+    assert!(err3.to_string().contains("GOAL_EXECUTION_NOT_TERMINAL"));
+
+    // Missing execution_state (NULL)
+    db.conn()
+        .execute(
+            "UPDATE plan_approvals SET execution_state = NULL WHERE execution_id = ?1",
+            params![execution_id],
+        )
+        .unwrap();
+    let err4 = finalize_report(&db, execution_id, 1, None, None).unwrap_err();
+    assert!(err4.to_string().contains("GOAL_EXECUTION_NOT_TERMINAL"));
+
+    // Verify report file was not written and status is not ready
+    let report_path = report_file_path(db.data_dir(), session_id, execution_id);
+    assert!(!report_path.exists());
 }

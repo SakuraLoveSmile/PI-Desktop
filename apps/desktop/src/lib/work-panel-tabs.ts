@@ -8,6 +8,12 @@ export type WorkPanelTabKind =
   | "goalReport"
   | "team";
 
+export type TeamWorkPanelTarget = {
+  kind: "aggregate" | "board" | "panorama" | "task" | "member";
+  taskId?: string;
+  memberSessionId?: string;
+};
+
 export type WorkPanelTab = {
   id: string;
   /** Display name captured at open time, used by labels that have no resource. */
@@ -18,7 +24,7 @@ export type WorkPanelTab = {
   location?: string;
   /** Stored attachment mimeType for extension-less `attachments/<sha256>` images. */
   mimeType?: string;
-  teamTarget?: { kind: "aggregate" | "board" | "panorama" | "task"; taskId?: string };
+  teamTarget?: TeamWorkPanelTarget;
   teamNavigationSeq?: number;
 };
 
@@ -75,7 +81,7 @@ export function switchWorkPanelContextState(
 }
 
 
-export function teamWorkPanelTab(teamSessionId: string, teamTarget?: WorkPanelTab["teamTarget"]): WorkPanelTab {
+export function teamWorkPanelTab(teamSessionId: string, teamTarget?: TeamWorkPanelTarget): WorkPanelTab {
   return { id: `team:${teamSessionId}`, kind: "team", resource: teamSessionId, ...(teamTarget ? { teamTarget, teamNavigationSeq: ++teamNavigationSequence } : {}) };
 }
 

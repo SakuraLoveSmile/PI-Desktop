@@ -238,6 +238,12 @@
   gap: 4px;
 }
 
+.composer-contract-chip[data-mode="goal"] {
+  color: var(--ds-goal);
+  background: var(--ds-goal-soft);
+  border-color: color-mix(in oklab, var(--ds-goal) 30%, transparent);
+}
+
 .composer-contract-chip {
   width: auto !important;
   min-width: 0 !important;

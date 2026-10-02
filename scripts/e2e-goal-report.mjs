@@ -75,6 +75,26 @@ async function scenarioStructuredReport(binary, tempRoot) {
     });
     assert(bindRes.ok === true, shortJson(bindRes));
 
+    // Exercise real progress writes through the Host boundary, before settlement.
+    const { writeToken } = await ctx.host.call("goalProgress.issueToken", {
+      sessionId: session.id, executionId, turnId,
+    });
+    const items = [
+      { id: "build", label: "Build", status: "completed" },
+      { id: "check", label: "Check", status: "failed" },
+    ];
+    const progressResult = await ctx.host.call("goalProgress.update", {
+      sessionId: session.id, executionId, writeToken, expectedRevision: 0, items,
+    });
+    assert(progressResult.progress?.revision === 1, shortJson(progressResult));
+    assert(progressResult.progress?.items[1]?.status === "failed", shortJson(progressResult));
+    await expectRpcError(() => ctx.host.call("goalProgress.update", {
+      sessionId: session.id, executionId, writeToken, expectedRevision: 0, items,
+    }), ["CONFLICT"]);
+    await expectRpcError(() => ctx.host.call("goalProgress.get", {
+      sessionId: "different-session", executionId,
+    }), ["UNAUTHORIZED"]);
+
     // Submit structured draft matching SubmitGoalReport schema
     const draft = {
       verdict: "met",
@@ -111,6 +131,23 @@ async function scenarioStructuredReport(binary, tempRoot) {
       draft,
     });
     assert(submitDraftRes.ok === true, shortJson(submitDraftRes));
+
+    // Attempting to finalize while execution is running must be rejected
+    await expectRpcError(
+      () => ctx.host.call("goalReports.finalizeReport", { executionId, status: "completed" }),
+      ["GOAL_EXECUTION_NOT_TERMINAL"]
+    );
+
+    // Settle execution to terminal state
+    await ctx.host.call("plans.finishExecution", { executionId, status: "completed" });
+
+    await expectRpcError(() => ctx.host.call("goalProgress.update", {
+      sessionId: session.id, executionId, writeToken, items,
+    }), ["GOAL_PROGRESS_NOT_RUNNING"]);
+    const settledProgress = await ctx.host.call("goalProgress.get", {
+      sessionId: session.id, executionId,
+    });
+    assert(settledProgress.progress?.revision === 1, "settlement must retain readable progress");
 
     // Finalize report
     const finalizeRes = await ctx.host.call("goalReports.finalizeReport", {
@@ -181,7 +218,12 @@ async function scenarioStructuredReport(binary, tempRoot) {
     assert(await readFile(reportFilePath, "utf8") === fileBytes, "late draft changed the report file");
 
     await endTurn(ctx.host, turnId);
-    return `reportId=${report.reportId} integrity=structured verdict=met fileExists=true`;
+    await ctx.host.call("session.delete", { id: session.id });
+    const deletedProgress = await ctx.host.call("goalProgress.get", {
+      sessionId: session.id, executionId,
+    });
+    assert(deletedProgress.progress === null, "session deletion must remove its progress");
+    return `reportId=${report.reportId} integrity=structured verdict=met fileExists=true progressLifecycle=true`;
   }, binary, tempRoot);
 }
 
@@ -213,6 +255,9 @@ async function scenarioFallbackReport(binary, tempRoot) {
       executionId,
     });
     assert(invalidateRes.ok === true, shortJson(invalidateRes));
+
+    // Settle execution to interrupted terminal state
+    await ctx.host.call("plans.finishExecution", { executionId, status: "interrupted", errorCode: "USER_CANCELLED" });
 
     // Finalize report with interrupted status
     const finalizeRes = await ctx.host.call("goalReports.finalizeReport", {
@@ -246,6 +291,7 @@ async function scenarioSessionIsolation(binary, tempRoot) {
       true,
     );
     await ctx.host.call("goalReports.bindExecutionTurn", { executionId: execA, turnId: turnA });
+    await ctx.host.call("plans.finishExecution", { executionId: execA, status: "completed" });
     await ctx.host.call("goalReports.finalizeReport", { executionId: execA, status: "completed" });
 
     const { session: sessionB, turnId: turnB, executionId: execB } = await approvedGoalExecution(
@@ -254,6 +300,7 @@ async function scenarioSessionIsolation(binary, tempRoot) {
       true,
     );
     await ctx.host.call("goalReports.bindExecutionTurn", { executionId: execB, turnId: turnB });
+    await ctx.host.call("plans.finishExecution", { executionId: execB, status: "completed" });
     await ctx.host.call("goalReports.finalizeReport", { executionId: execB, status: "completed" });
 
     // Verify isolation
@@ -313,6 +360,7 @@ async function scenarioRestartRecovery(binary, tempRoot) {
       evidences: [],
     };
     await ctx.host.call("goalReports.submitDraft", { executionId, draft });
+    await ctx.host.call("plans.finishExecution", { executionId, status: "completed" });
     const finalized = await ctx.host.call("goalReports.finalizeReport", {
       executionId,
       status: "completed",

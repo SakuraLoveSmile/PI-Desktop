@@ -605,6 +605,23 @@ contract is being negotiated.
 - `plans.abort` — marks pending approval work interrupted; it never replays or
   changes an already-approved session back to its contract mode
 
+### Goal reports and real-time progress
+
+- `goalReports.get` / `goalReports.list` / `goalReports.submitDraft` / `goalReports.invalidateDraft` /
+  `goalReports.finalizeReport` / `goalReports.markFailed` / `goalReports.getAsset`
+  - `goalReports.finalizeReport` requires a terminal execution (`completed` or `interrupted`).
+    Attempting to finalize an execution that is in `queued`, `running`, or missing terminal state
+    is rejected with `GOAL_EXECUTION_NOT_TERMINAL`, without writing report files or broadcasting ready.
+- `goalProgress.get` — `{ executionId, sessionId? }` returns `{ progress: GoalProgressSnapshot | null }`.
+- `goalProgress.issueToken` — `{ executionId, sessionId, turnId }` generates and returns `{ writeToken }`
+  bound to the running turn recorded in `goal_reports.turn_id` and the effective Goal execution
+  (`COALESCE(execution_kind, kind) = goal`), not the earlier planning turn.
+- `goalProgress.update` — `{ executionId, sessionId, writeToken, expectedRevision?, items }` verifies
+  session identity, active running turn, running execution, and token validity. Updates increment `revision`
+  and broadcast `goalProgress.changed({ sessionId, executionId, revision })`.
+  Errors: `UNAUTHORIZED` (invalid or expired write token), `GOAL_PROGRESS_NOT_RUNNING` (execution or turn not running),
+  `CONFLICT` (optimistic concurrency mismatch on expectedRevision), `INVALID_PARAMS`.
+
 ### Scheduled tasks
 
 - `scheduled.list` / `scheduled.create` / `scheduled.update` /

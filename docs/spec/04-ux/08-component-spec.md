@@ -1377,6 +1377,16 @@ near-zero duration. A folded group keeps its rows mounted, `aria-hidden`, and
   the anchor's right without flipping to the left. Their surface width is
   capped for narrow viewports. This includes the Sessions sort menu,
   session/project overflow menus, and section create menus.
+- Title start alignment: Within the same group level, session titles across
+  ordinary sessions, team lead sessions (both expanded and folded), running,
+  permission-wait, error, selected rows, and pinned or native sessions share an
+  identical horizontal start coordinate (`rect.left`, within 1px). Status
+  indicators and team disclosure chevrons occupy fixed dedicated leading slots
+  and never overlap titles or displace their start position. Pinned (`IconPin`)
+  and Native badges are placed after the session title in a trailing slot,
+  ensuring leading badges do not shift title alignment. Team member sessions
+  maintain a distinct deeper indentation (+22px). Long titles truncate with an
+  ellipsis without crowding trailing row actions.
 - Keyboard: arrow up/down, Enter to select
 - Rename: row menu or project-archive task action
 - Delete: row menu
@@ -2671,7 +2681,11 @@ was met.
 ### 10B.2 Content and states
 
 The transcript card identifies the Goal and verdict and opens its report in the
-Work Panel. A ready report presents the Goal snapshot, execution status,
+Work Panel. The transcript presents a Goal completion card only when the execution
+has reached a terminal state (`completed` or `interrupted`) and the report has settled
+as `ready` (or terminal `failed` with Retry available). In-flight drafts and pending
+executions are strictly suppressed from transcript card rendering and automatic Work Panel opening.
+A ready report presents the Goal snapshot, execution status,
 structured or fallback integrity, supported criteria and checks, evidence,
 changed files, limitations, and next steps. Fallback reports identify missing
 or incomplete evidence and do not present unknown checks as passed.
@@ -2690,6 +2704,48 @@ Report reads and retry remain scoped to the owning session.
 - The report tab exposes headings and evidence in reading order.
 - Retry uses the shared Button primitive, is disabled while the request is in
   flight, and keeps readable foreground contrast in both themes.
+
+## 10B.4 GoalProgressBar and Active Goal Capsule
+
+### Purpose
+
+Provide real-time granular task progress feedback above the Composer during active
+Goal execution, alongside a collapsible active goal bar that shows goal summary and
+item checklist.
+
+### Visual and Interaction Specification
+
+- **Goal Capsule:** Rendered centrally stacked directly above the Composer input shell.
+  Height 30–32px with 10px border radius, containing an SVG circular ring progress indicator
+  and count label (e.g. `3/5`) styled in `--ds-success` / `--color-goal`.
+- **Collapsible Goal Bar:** Presents active execution status, single-line truncated goal title,
+  and expand/collapse toggle. When expanded, reveals the full goal description and live item checklist
+  with a maximum 144px internal scroll area. Folding preference is remembered per session.
+- **Terminal Removal:** The active goal bar is automatically dismissed as soon as the goal execution
+  is terminal (`completed` or `interrupted`) and its completion report is `ready`.
+- **Status Fallback:** If progress items are uninitialized or in an error state, display descriptive
+  state text (e.g. `Initializing…` or `Execution failed`) without rendering misleading `0/0` or `0%` counters.
+- **Narrow Width:** Designed with fluid responsive layout adapting down to 450px without horizontal scrolling.
+
+## 10B.5 TeamDispatchCard (Chat Transcript Integration)
+
+### Purpose
+
+Present persistent, always-visible task dispatch cards in the chat transcript whenever
+the Lead assigns tasks to specialized teammates via `task_create` and `task_update`.
+
+### Visual and Interaction Specification
+
+- **Persistent Slot:** Located outside the collapsible `TurnProcess` accordion in `AssistantTurn`,
+  ensuring constant visibility in both Compact mode and collapsed process turns.
+- **Card Styling:** Single-layer border card featuring teammate `PixelAvatar`, role name,
+  real-time task status badge, L-shaped connector line, and bold task title.
+- **Deduplication & Anchoring:** Cards are indexed across transcript messages by `{teamSessionId, taskId}`
+  anchored to the initial `task_create` message ID; subsequent `task_update` events update the
+  card state in place without duplicating cards.
+- **Navigation Wiring:** Clicking a task title invokes `teamWorkPanelTab(teamSessionId, { kind: "task", taskId })`
+  to open task details in the Work Panel; clicking teammate identity/avatar switches the Work Panel
+  to board view without navigating away from the active chat session.
 
 ## 10C. Expert Team Work Panel
 
@@ -3053,7 +3109,12 @@ transcript and Overview history.
   live discovery updates them in the background without replacing a configured
   alias with the wire ID or a second visible name.
 - The combined model × reasoning menu opens at `bottom: calc(100% + 8px)` with
-  `role="menu"`. Its root has exactly two `role="menuitem"` entries and, when
+  `role="menu"`. In dark mode, `.composer-model-thinking-menu` uses an anti-bleed
+  surface with 96% opacity (`color-mix(in oklab, var(--ds-bg-elevated-opaque) 96%, transparent)`)
+  and `backdrop-filter: blur(40px)`, falling back to solid `--ds-bg-elevated-opaque`
+  where `backdrop-filter` is unsupported; light mode maintains a solid background so
+  underlying transcript text is completely obscured while menu text and slider labels
+  remain sharp and legible. Its root has exactly two `role="menuitem"` entries and, when
   the menu lists more than one level, a drag slider with one labeled stop per
   level directly beneath the Reasoning level entry (D458). The slider shows a
   rail with one track dot per stop and a label under each stop; every label

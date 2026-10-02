@@ -1131,8 +1131,24 @@ fn boot_interrupts_pending_and_queued_plan_work_without_replaying_it() {
                     [],
                 )
                 .unwrap();
+        db.conn().execute(
+            "INSERT INTO kv (ns, key, value_json, updated_at) VALUES (?1, 'running-execution', '{}', 1)",
+            params![crate::goal_progress::GOAL_PROGRESS_AUTH_KV_NAMESPACE],
+        ).unwrap();
     }
     let db = Database::open(&path).unwrap();
+    let tokens: i64 = db
+        .conn()
+        .query_row(
+            "SELECT COUNT(*) FROM kv WHERE ns = ?1",
+            params![crate::goal_progress::GOAL_PROGRESS_AUTH_KV_NAMESPACE],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(
+        tokens, 0,
+        "restart must discard transient progress authorization"
+    );
     let running: (String, Option<String>) = db
         .conn()
         .query_row(

@@ -98,6 +98,10 @@ const GoalReportGetAssetParams = Type.Object({
   offset: Type.Optional(Type.Integer({ minimum: 0 })),
   length: Type.Optional(Type.Integer({ minimum: 1, maximum: 262144 })),
 });
+const GoalProgressGetParams = Type.Object({
+  sessionId: Type.String({ minLength: 1 }),
+  executionId: Type.String({ minLength: 1 }),
+});
 const TerminalOpenParams = Type.Object({
   sessionId: Type.String({ minLength: 1 }),
   cols: Type.Optional(Type.Integer({ minimum: 1, maximum: 1000 })),
@@ -365,6 +369,12 @@ export function createOperations(): Map<RacpOperation, OperationHandler> {
     const access = context.operations.goalReports;
     if (!access?.getAsset) throw new RacpError("CAPABILITY_UNAVAILABLE", "Goal Report assets are not offered by this Host");
     return access.getAsset(input);
+  });
+  handlers.set("goalProgress/get", async (context, params) => {
+    const input = check(GoalProgressGetParams, params);
+    const access = context.operations.goalProgress;
+    if (!access) throw new RacpError("CAPABILITY_UNAVAILABLE", "Goal Progress is not offered by this Host");
+    return access.get(input);
   });
 
   handlers.set("terminal/open", async (context, params) => {

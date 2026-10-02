@@ -2,6 +2,16 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const deEntries: ChangelogEntry[] = [
   {
+    "version": "0.15.7",
+    "date": "2026-10-02",
+    "highlights": [
+      "Verfolgen Sie den Live-Fortschritt genehmigter Ziele und sehen Sie sich Abschlussberichte an.",
+      "Erfolgreich verteilte Aufgaben bleiben in Expertenkarten sichtbar und sind mit den Aufgabendetails verknüpft.",
+      "Verbesserungen für angeheftete Sitzungstitel, Modellmenüs und die optionale Skill-Suche.",
+    ],
+  },
+
+  {
     "version": "0.15.6",
     "date": "2026-09-23",
     "highlights": [

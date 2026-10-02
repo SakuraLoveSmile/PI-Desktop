@@ -66,6 +66,10 @@ const HOST_PROXY_ALLOWED = new Set([
   "goalReports.submitDraft",
   "goalReports.invalidateDraft",
   "goalReports.markFailed",
+  // Progress write capabilities are issued only for the approved execution
+  // currently bound to this sidecar turn. Reads remain Main/RACP-only.
+  "goalProgress.issueToken",
+  "goalProgress.update",
   "project.instructions.resolve",
   "provider.resolveAuth",
   "provider.resolveSubagentModel",

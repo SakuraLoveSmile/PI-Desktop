@@ -229,6 +229,19 @@ imported, including when disabled; manage them in Plugins. Unregistered leftover
 directories do not block retry. If host registration succeeds but runtime loading
 fails, the error remains visible and the panel refreshes the registered state;
 recovery uses Plugins reload or app restart. No second persisted enablement registry exists.
+The discovery panel header includes a dismiss button (`TooltipButton` with
+`IconX` and localized tooltip/`aria-label`). Dismissing hides the candidates list,
+details, diagnostics, and refresh controls, leaving a single-line secondary action
+"Show pi CLI skills" (`piSkillsReveal`) in place. While dismissed, no background
+requests or auto-imports are initiated; if a discovery request is in flight when
+dismissed, its late response is ignored and does not reopen the panel or trigger
+imports. Clicking the reveal button triggers a fresh read-only discovery request
+and displays the loading state. Dismiss and refresh controls are disabled while an
+import is in progress (busy state), re-enabling once import completes, fails, or is
+cancelled. Panel dismissal state is strictly local in component memory; navigating
+away from the Skills page and returning (component remount) restores the default
+expanded state.
+
 No schema or host RPC version changes. General CLI configuration discovery and
 source-update synchronization remain outside scope. See ADR pi-npm-skill-discovery.
 

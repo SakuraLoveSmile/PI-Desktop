@@ -36,6 +36,17 @@ test("Team task links reuse one tab but each explicit navigation gets a fresh re
   assert.ok(reopened.teamNavigationSeq > first.teamNavigationSeq);
 });
 
+test("Team member links carry the real member session into detail navigation", () => {
+  const tab = teamWorkPanelTab("team-1", {
+    kind: "member",
+    memberSessionId: "member-session-1",
+  });
+  assert.deepEqual(tab.teamTarget, {
+    kind: "member",
+    memberSessionId: "member-session-1",
+  });
+});
+
 test("work panel tabs open on demand and deduplicate by resource", () => {
   const empty = { tabs: [], activeTabId: null };
   const review = openWorkPanelTabState(empty, toolWorkPanelTab("review"));

@@ -14,7 +14,7 @@ import {
   listPendingToolRequests,
 } from "@pi-desktop/host-runtime";
 import { DeviceTokenAuthenticator, RacpServer, bindRacpWebSocket, type RacpHostOperations, type WsBinding } from "@pi-desktop/racp";
-import { APP_VERSION, type AgentEventEnvelope } from "@pi-desktop/shared";
+import { APP_VERSION, type AgentEventEnvelope, type GoalProgressChangedEvent } from "@pi-desktop/shared";
 
 import type { PiHostConfig } from "./config.js";
 import { FileCredentialStore, loadOrCreateHostId } from "./credentials.js";
@@ -37,6 +37,14 @@ export type PiHostApp = {
 
 const APPROVAL_REQUEST_TIMEOUT_MS = 30 * 60 * 1000;
 
+function isGoalProgressChangedEvent(value: unknown): value is GoalProgressChangedEvent {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const event = value as Record<string, unknown>;
+  return typeof event.sessionId === "string" && Boolean(event.sessionId.trim()) &&
+    typeof event.executionId === "string" && Boolean(event.executionId.trim()) &&
+    typeof event.revision === "number" && Number.isInteger(event.revision) && event.revision > 0;
+}
+
 /**
  * Compose the headless Host: host-core and the sidecar under the shared
  * supervisor, the runtime service as the module's runtime port, the Agent
@@ -51,7 +59,7 @@ export async function startPiHost(config: PiHostConfig, options: { log?: HostLog
   const store = new FileCredentialStore(config.dataDir);
   const authenticator = new DeviceTokenAuthenticator(store);
 
-  const state: { host: HostProcess | null; sidecar: AgentSidecar | null; stopping: boolean } = { host: null, sidecar: null, stopping: false };
+  const state: { host: HostProcess | null; sidecar: AgentSidecar | null; stopping: boolean; hostProgressUnsubscribe?: () => void } = { host: null, sidecar: null, stopping: false };
   const getHost = () => state.host;
   const getSidecar = () => state.sidecar;
 
@@ -129,6 +137,8 @@ export async function startPiHost(config: PiHostConfig, options: { log?: HostLog
     const host = new HostProcess({ binaryPath: config.hostCoreBinary, dataDir: config.dataDir, onStderr: log.child("host") });
     host.onExit(({ intentional }) => {
       if (state.host !== host) return;
+      state.hostProgressUnsubscribe?.();
+      state.hostProgressUnsubscribe = undefined;
       state.host = null;
       if (intentional || state.stopping) return;
       log("error", "host-core exited unexpectedly");
@@ -144,6 +154,11 @@ export async function startPiHost(config: PiHostConfig, options: { log?: HostLog
       throw error;
     }
     runtime.attachHost(host);
+    state.hostProgressUnsubscribe?.();
+    state.hostProgressUnsubscribe = host.onNotification((method, params) => {
+      if (state.host !== host || method !== "goalProgress.changed" || !isGoalProgressChangedEvent(params)) return;
+      agentHost.publishGoalProgressChanged(params);
+    });
     state.sidecar?.setHost(host);
     log("info", "host-core handshake ok", { generation: host.generation });
   };
@@ -275,6 +290,8 @@ export async function startPiHost(config: PiHostConfig, options: { log?: HostLog
       plans.dispose();
       await runtime.dispose();
       await state.sidecar?.dispose();
+      state.hostProgressUnsubscribe?.();
+      state.hostProgressUnsubscribe = undefined;
       await state.host?.dispose();
       state.sidecar = null;
       state.host = null;
