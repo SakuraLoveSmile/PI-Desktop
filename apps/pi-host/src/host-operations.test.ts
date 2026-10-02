@@ -82,6 +82,8 @@ function fakeHost(calls: Array<{ method: string; params: unknown }>, projectPath
           return { report: {} } as T;
         case "goalReports.get":
           return { report: {} } as T;
+        case "goalProgress.get":
+          return { progress: { sessionId: params.sessionId, executionId: params.executionId, revision: 1 } } as T;
         case "goalReports.list":
           return { reports: [] } as T;
         case "goalReports.retry":
@@ -238,6 +240,22 @@ describe("pi-host operations over host-core", () => {
     barrier = { pending: 0, failed: [] };
     await operations.goalReports?.retry("s1", "execution-1");
     expect(calls.at(-1)?.method).toBe("goalReports.retry");
+  });
+
+  it("reads Goal Progress from the authoritative host-core namespace", async () => {
+    const root = await realpath(await mkdtemp(join(tmpdir(), "pi-host-ops-")));
+    dirs.push(root);
+    const calls: Array<{ method: string; params: unknown }> = [];
+    const operations = createHostOperations({
+      getHost: () => fakeHost(calls, root),
+      runtime: { compact: async () => ({ accepted: true }), isBusy: () => false, withSessionOperation: runSessionOperation },
+    });
+    const result = await operations.goalProgress?.get({ sessionId: "s1", executionId: "execution-1" });
+    expect(result?.progress).toMatchObject({ sessionId: "s1", executionId: "execution-1", revision: 1 });
+    expect(calls).toEqual([{
+      method: "goalProgress.get",
+      params: { sessionId: "s1", executionId: "execution-1" },
+    }]);
   });
 
   it("holds the session operation lock across the persistence barrier and report finalization", async () => {

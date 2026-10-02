@@ -141,14 +141,14 @@ export function AnchoredMenu({
     }
     const menuRect = menu.getBoundingClientRect();
     const width = matchAnchorWidth ? anchorRect.width : undefined;
-    const surfaceWidth = width ?? menuRect.width;
+    const surfaceWidth = width ?? menu.offsetWidth;
     const maxLeft = Math.max(MARGIN, window.innerWidth - surfaceWidth - MARGIN);
     const preferredLeft =
       align === "end" ? anchorRect.right - surfaceWidth : anchorRect.left;
     const left = Math.min(Math.max(MARGIN, preferredLeft), maxLeft);
     const below = anchorRect.bottom + GAP;
-    const above = anchorRect.top - menuRect.height - GAP;
-    const maxTop = Math.max(MARGIN, window.innerHeight - menuRect.height - MARGIN);
+    const above = anchorRect.top - menu.offsetHeight - GAP;
+    const maxTop = Math.max(MARGIN, window.innerHeight - menu.offsetHeight - MARGIN);
     const preferredTop = side === "top" ? above : below;
     const fallbackTop = side === "top" ? below : above;
     const preferredFits = preferredTop >= MARGIN && preferredTop <= maxTop;

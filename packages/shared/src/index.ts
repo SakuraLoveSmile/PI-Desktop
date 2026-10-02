@@ -72,6 +72,7 @@ export * from "./header-value.js";
 
 export * from "./pi-skill-discovery.js";
 export * from "./goal-report.js";
+export * from "./goal-progress.js";
 export * from "./team.js";
 
 export type { ExpectedMarketplace, MarketReview } from "./types/plugins.js";

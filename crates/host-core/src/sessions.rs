@@ -2288,10 +2288,10 @@ pub fn delete_session(db: &Database, id: &str) -> Result<bool> {
     if crate::plans::has_live_scratch_goal(db, id)? {
         return Err(anyhow!("PLAN_CONFIGURATION_BLOCKED"));
     }
-    let n = db
-        .conn()
-        .prepare_cached("DELETE FROM sessions WHERE id = ?1")?
-        .execute(params![id])?;
+    let tx = db.conn().unchecked_transaction()?;
+    crate::goal_progress::cleanup_session_conn(&tx, id)?;
+    let n = tx.execute("DELETE FROM sessions WHERE id = ?1", params![id])?;
+    tx.commit()?;
     if n > 0 {
         // Here rather than in the RPC handler so every deletion path (UI,
         // failed scheduled-run cleanup) also drops the transcript files.
@@ -2310,6 +2310,7 @@ pub fn delete_session_with_team_cleanup(db: &Database, id: &str) -> Result<bool>
     }
     let tx = db.conn().unchecked_transaction()?;
     crate::team::lifecycle::cleanup_team_on_lead_delete_conn(&tx, id)?;
+    crate::goal_progress::cleanup_session_conn(&tx, id)?;
     let deleted = tx.execute("DELETE FROM sessions WHERE id=?1", [id])? > 0;
     tx.commit()?;
     if deleted {

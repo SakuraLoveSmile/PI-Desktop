@@ -148,6 +148,17 @@ function build(options: { permissionMode?: SessionSummary["permissionMode"]; que
 }
 
 describe("AgentHost ingest", () => {
+  it("publishes Goal Progress changes on the durable session event stream", () => {
+    const { host, received } = build();
+    host.publishGoalProgressChanged({ sessionId: "s1", executionId: "execution-1", revision: 2 });
+    expect(received.at(-1)).toMatchObject({
+      scope: "session",
+      sessionId: "s1",
+      kind: "session.changed",
+      payload: { goalProgress: { sessionId: "s1", executionId: "execution-1", revision: 2 } },
+    });
+  });
+
   it("reconciles only a matching optimistic user item and ignores duplicate, unknown and wrong-turn acknowledgements", async () => {
     const { host, received, sessions } = build();
     sessions.summaries.set("s2", summary("s2"));

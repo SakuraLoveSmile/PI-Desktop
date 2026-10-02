@@ -155,6 +155,7 @@ impl PlanManager {
         if changed != 1 {
             return Err(plan_error("PLAN_EXECUTION_STALE"));
         }
+        crate::goal_progress::invalidate_write_token_conn(&tx, execution_id)?;
         audit::append_tx(
             &tx,
             "plan_execution_finished",

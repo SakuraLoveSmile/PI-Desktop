@@ -2,6 +2,16 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const ptBREntries: ChangelogEntry[] = [
   {
+    "version": "0.15.7",
+    "date": "2026-10-02",
+    "highlights": [
+      "Acompanhe o progresso em tempo real de metas aprovadas e consulte os relatórios de conclusão.",
+      "Os cartões de especialistas mantêm visíveis as tarefas enviadas com sucesso e incluem links para seus detalhes.",
+      "Melhora títulos de sessões fixadas, menus de modelos e a descoberta opcional de skills.",
+    ],
+  },
+
+  {
     "version": "0.15.6",
     "date": "2026-09-23",
     "highlights": [

@@ -178,6 +178,22 @@ test("Goal Report channels use the RACP slash operation names", async () => {
   ]);
 });
 
+test("Goal Progress reads use the mapped host session and read-only RACP operation", async () => {
+  const { backend, client } = makeBackend({
+    "goalProgress/get": { progress: { sessionId: HOST_SESSION_ID, executionId: "execution-1", revision: 3 } },
+  });
+  assert.equal(backend.handles(IPC.invoke.goalProgressGet), true);
+  const result = await backend.invoke(IPC.invoke.goalProgressGet, [
+    { sessionId: REMOTE_SESSION_ID, executionId: "execution-1" },
+  ]);
+  assert.equal(result.progress.revision, 3);
+  assert.equal(result.progress.sessionId, REMOTE_SESSION_ID);
+  assert.deepEqual(client.calls, [{
+    method: "goalProgress/get",
+    params: { sessionId: HOST_SESSION_ID, executionId: "execution-1" },
+  }]);
+});
+
 test("agentPrompt starts a turn with reject_if_busy and returns the local response shape", async () => {
   const turn = makeRacpTurn({ id: "turn-42" });
   const { backend, client } = makeBackend({

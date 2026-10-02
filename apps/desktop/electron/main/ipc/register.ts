@@ -1,4 +1,5 @@
 import { registerGoalReportIpc } from "./goal-report-ipc.js";
+import { registerGoalProgressIpc } from "./goal-progress-ipc.js";
 import { join } from "node:path";
 import { app, dialog, type BrowserWindow, type IpcMain, type IpcMainInvokeEvent } from "electron";
 import { err, ErrorCodes, IPC, ok, type Result } from "@pi-desktop/shared";
@@ -257,6 +258,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     stripWinLongPrefix,
   });
   registerGoalReportIpc({ handle, getHost });
+  registerGoalProgressIpc({ handle, getHost });
   registerTeamIpc({
     registrar,
     getHost,

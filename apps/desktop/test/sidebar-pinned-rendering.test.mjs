@@ -198,3 +198,72 @@ test("sidebar renders global pins once, outside project folding and history limi
     await server.close();
   }
 });
+
+test("sidebar session rows place pin and native badges after title to preserve start alignment", async () => {
+  const previousDocument = globalThis.document;
+  const server = await createServer({
+    root: fileURLToPath(new URL("..", import.meta.url)),
+    configFile: false,
+    server: { middlewareMode: true, hmr: false, ws: false },
+    esbuild: { jsx: "automatic" },
+    appType: "custom",
+    optimizeDeps: { noDiscovery: true, include: [] },
+  });
+  try {
+    const { Sidebar } = await server.ssrLoadModule("/src/components/Sidebar.tsx");
+    const { useAppStore } = await server.ssrLoadModule("/src/stores/app-store.ts");
+    await i18n.init({ lng: "en", resources: { en: { translation: catalogs.en } } });
+    const old = "2020-01-01T00:00:00Z";
+    const session = (id, projectPath, source) => ({
+      id,
+      title: `Title ${id}`,
+      projectPath,
+      source,
+      createdAt: old,
+      updatedAt: old,
+    });
+    const pinnedNative = session("pin-native", "/open", "pi-native");
+    const regular = session("reg-01", "/open");
+    const seed = {
+      sessions: [pinnedNative, regular],
+      sessionMeta: { "pin-native": { pinned: true } },
+      projectMeta: {},
+      openProjectPaths: ["/open"],
+      openProjects: [],
+      workspace: null,
+      activeProjectPath: null,
+      activeSessionId: null,
+      selectingSessionId: null,
+      page: "chat",
+      projectCollapsed: {},
+      sessionView: { sort: "recent", archived: false },
+    };
+    Object.assign(useAppStore.getInitialState(), seed);
+    globalThis.document = { documentElement: { dataset: { theme: "light" } } };
+    const html = renderToStaticMarkup(
+      createElement(
+        I18nextProvider,
+        { i18n },
+        createElement(Sidebar, {
+          collapsed: false,
+          onToggle() {},
+          sidebarWidth: 275,
+          onWidthChange() {},
+          onWidthCommit() {},
+        }),
+      ),
+    );
+    // Pin icon and native badge must appear after thread-item-title in the DOM
+    const titleIndex = html.indexOf("Title pin-native</span>");
+    const pinIndex = html.indexOf("thread-item-pin");
+    const sourceIndex = html.indexOf("thread-item-source");
+    assert.ok(titleIndex !== -1, "title must be rendered");
+    assert.ok(pinIndex !== -1, "pin icon must be rendered");
+    assert.ok(sourceIndex !== -1, "source badge must be rendered");
+    assert.ok(pinIndex > titleIndex, "pin icon must appear after title");
+    assert.ok(sourceIndex > titleIndex, "source badge must appear after title");
+  } finally {
+    globalThis.document = previousDocument;
+    await server.close();
+  }
+});

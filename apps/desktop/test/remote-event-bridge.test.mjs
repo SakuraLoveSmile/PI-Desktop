@@ -140,6 +140,20 @@ test("session.changed forwards a PlanningStateEvent as a local planning_state Ag
   assert.equal(forwarded.sessionId, undefined);
 });
 
+test("session.changed forwards Goal Progress with the remote renderer session id", () => {
+  const { bridge, events } = collect();
+  bridge.handle(makeEnvelope({
+    kind: "session.changed",
+    payload: {
+      goalProgress: { sessionId: HOST_SESSION_ID, executionId: "execution-1", revision: 4 },
+    },
+  }));
+  assert.deepEqual(events, [{
+    channel: IPC.event.goalProgressChanged,
+    payload: { sessionId: REMOTE_SESSION_ID, executionId: "execution-1", revision: 4 },
+  }]);
+});
+
 test("session.changed status-only payloads are dropped", () => {
   const { bridge, events } = collect();
   bridge.handle(

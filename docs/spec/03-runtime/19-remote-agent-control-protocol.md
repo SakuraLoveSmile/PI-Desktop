@@ -585,6 +585,7 @@ session root as working directory and stream through `terminal.output`.
 | `session/rename` | controller | Rename a session |
 | `session/delete` | owner | Delete a session and its transcript on the Host |
 | `session/compact` | controller | Run a manual context checkpoint on the active session |
+| `goalProgress/get` | viewer | Read the named execution snapshot within the requested session; progress writes and token issuance remain private sidecar operations |
 | `goalReports/get` | viewer | Read a report or its bounded Host state for the named session; another session's report is indistinguishable from a missing report |
 | `goalReports/list` | viewer | List durable report summaries for the named session |
 | `goalReports/retry` | controller | Re-finalize a failed report from Host-owned durable facts after transcript persistence succeeds; never reruns the Goal |

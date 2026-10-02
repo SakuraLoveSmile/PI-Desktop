@@ -73,11 +73,17 @@ const server = createServer(async (req, res) => {
     res.writeHead(200, { 'content-type': 'text/event-stream' });
     const emit = (delta, finish_reason = null) => res.write(`data: ${JSON.stringify({ ...base, choices: [{ index: 0, delta, finish_reason }] })}\n\n`);
     const availableTools = request.tools.map(tool => tool.function.name);
-    const name = calls === 1 ? 'SubmitGoal' : calls === 2 ? 'Write' : calls === 3 ? 'SubmitGoalReport' : null;
+    const name = calls === 1 ? 'SubmitGoal'
+      : calls === 2 || calls === 4 ? 'UpdateGoalProgress'
+        : calls === 3 ? 'Write'
+          : calls === 5 ? 'SubmitGoalReport'
+            : null;
     if (name) {
       assert.ok(request.tools.some(tool => tool.function.name === name), `${name} must be available`);
       const args = name === 'SubmitGoal'
         ? { title: 'Temporary Goal', markdown, question: 'Approve this goal?' }
+        : name === 'UpdateGoalProgress'
+          ? { items: [{ id: 'write-file', label: 'Write goal-result.txt', status: calls === 2 ? 'in_progress' : 'completed' }] }
         : name === 'Write'
           ? { path: 'goal-result.txt', content: 'GOAL_OK' }
           : {
@@ -116,7 +122,7 @@ const server = createServer(async (req, res) => {
       emit({ role: 'assistant', tool_calls: [{ index: 0, id: `fixture-${name}`, type: 'function', function: { name, arguments: JSON.stringify(args) } }] });
       emit({}, 'tool_calls');
     } else {
-      assert.equal(calls, 4, 'no extra execution or recovery request');
+      assert.equal(calls, 6, 'no extra execution or recovery request');
       assert.ok(availableTools.includes('SubmitGoalReport'), 'SubmitGoalReport must remain available before the final response');
       emit({ role: 'assistant', content: 'Goal complete. goal-result.txt contains GOAL_OK.' });
       emit({}, 'stop');
@@ -235,7 +241,7 @@ try {
   await waitFor(async () => { if (fixtureError) throw fixtureError; const { session: current } = await invoke('sessionGet', { id: session.id }); return current.messages.some(message => message.role === 'assistant' && message.content.includes('Goal complete.')); }, 30000, 'approved Goal execution');
   assert.equal(readFileSync(join(scratch, 'goal-result.txt'), 'utf8'), 'GOAL_OK');
   assert.equal(existsSync(join(project, 'goal-result.txt')), false);
-  assert.equal(calls, 4);
+  assert.equal(calls, 6);
   const { session: finished } = await invoke('sessionGet', { id: session.id });
   assert.equal(finished.mode, 'agent'); assert.equal(finished.projectPath ?? null, null);
   const submit = finished.messages.find(message => message.toolName === 'SubmitGoal');
@@ -251,6 +257,16 @@ try {
   assert.equal(reportResult.report?.execution.status, 'completed', 'Host report must describe the completed execution');
   assert.equal(reportResult.report?.executionId, reportCard.executionId, 'Host report must match the visible report card');
   assert.equal(reportResult.report?.verdict, 'met');
+  const progressResult = await invoke('goalProgressGet', {
+    sessionId: session.id,
+    executionId: reportCard.executionId,
+  });
+  assert.equal(progressResult.progress?.sessionId, session.id);
+  assert.equal(progressResult.progress?.executionId, reportCard.executionId);
+  assert.equal(progressResult.progress?.revision, 2, 'real sidecar progress updates must persist through both Host writes');
+  assert.deepEqual(progressResult.progress?.items, [
+    { id: 'write-file', label: 'Write goal-result.txt', status: 'completed' },
+  ]);
   const reportList = await invoke('goalReportList', { sessionId: session.id });
   const reportSummary = reportList.reports?.find(item => item.executionId === reportCard.executionId);
   assert.equal(reportSummary?.status, 'ready', 'Host must list the report as ready');
@@ -351,7 +367,7 @@ try {
   const retriedReport = await invoke('goalReportGet', { sessionId: retrySession.id, executionId: failedExecutionId });
   assert.equal(retriedReport.report?.verdict, 'unknown');
   assert.deepEqual(retriedReport.report?.checks, [], 'fallback must not invent passed checks');
-  assert.equal(calls, 4, 'report Retry must not rerun the Goal or call the model');
+  assert.equal(calls, 6, 'report Retry must not rerun the Goal or call the model');
   const retriedScreenshotPath = join(root, 'goal-report-retried.png');
   const retriedScreenshot = await send('Page.captureScreenshot', { format: 'png' });
   writeFileSync(retriedScreenshotPath, Buffer.from(retriedScreenshot.data, 'base64'));

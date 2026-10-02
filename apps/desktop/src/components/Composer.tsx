@@ -65,6 +65,7 @@ import { useVoiceInput } from "../features/voice/useVoiceInput";
 import { VoiceOverlay } from "../features/voice/VoiceOverlay";
 import "../styles/voice.css";
 import { ComposerStatus } from "../features/chat/composer/ComposerStatus";
+import { GoalProgressBar } from "../features/chat/composer/GoalProgressBar";
 
 const EMPTY_QUEUED_PROMPTS: QueuedPrompt[] = [];
 
@@ -638,6 +639,14 @@ export function Composer({
           dismissDroppedDirectories={dismissDroppedDirectories}
         />
         <ComposerImageAttachments controller={draft.imagePreview} onRemove={draft.removeImage} disabled={inputBlocked} />
+        {planCheckpoint &&
+        (planCheckpoint.executionKind ?? planCheckpoint.kind) === "goal" &&
+        activeSessionId ? (
+          <GoalProgressBar
+            sessionId={activeSessionId}
+            proposal={planCheckpoint}
+          />
+        ) : null}
         <div
           ref={composerShellRef}
           className={`composer-shell${inputBlocked ? " is-gated" : ""}${

@@ -4,6 +4,7 @@ mod artifacts;
 mod audit;
 mod config_sync;
 mod db;
+mod goal_progress;
 mod goal_reports;
 mod keyboard;
 mod mcp_servers;

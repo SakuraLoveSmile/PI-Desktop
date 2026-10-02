@@ -136,6 +136,7 @@ async function scenarioStructuredWithAssets(binary, tempRoot) {
       // Submit draft
       await ctx.host.call("goalReports.submitDraft", { executionId, draft });
 
+      await ctx.host.call("plans.finishExecution", { executionId, status: "completed" });
       // Finalize report
       const finalizeRes = await ctx.host.call("goalReports.finalizeReport", {
         executionId,
@@ -231,6 +232,7 @@ async function scenarioTamperDetection(binary, tempRoot) {
         summary: "Original pristine report",
       };
       await ctx.host.call("goalReports.submitDraft", { executionId, draft });
+      await ctx.host.call("plans.finishExecution", { executionId, status: "completed" });
       await ctx.host.call("goalReports.finalizeReport", { executionId, status: "completed" });
 
       const reportPath = join(ctx.dataDir, "goal_reports", session.id, `${executionId}.json`);
@@ -277,6 +279,7 @@ async function scenarioIdempotentRetry(binary, tempRoot) {
       assert(failedRes.state === "failed", `expected failed state: ${shortJson(failedRes)}`);
 
       // Retry report
+      await ctx.host.call("plans.finishExecution", { executionId, status: "completed" });
       const retryRes = await ctx.host.call("goalReports.retry", {
         sessionId: session.id,
         executionId,

@@ -2497,6 +2497,16 @@ Background polls report nothing, since only the manual path has a caller
 watching.
 
 
+### Goal real-time progress tracking
+
+The renderer queries live goal progress via `goalProgressGet({ executionId, sessionId? })`
+and subscribes to real-time progress updates via the `goalProgressChanged` IPC event
+(`{ sessionId, executionId, revision }`). Progress notifications are decoupled from
+report finalization events (`goalReportsChanged`).
+Goal progress IPC routes remote-owned session IDs to the paired Host via the
+read-only `goalProgress/get` RACP operation. Remote progress events are translated
+to the Desktop session ID; token issuance and writes are not exposed to RACP.
+
 ### Goal report asset reads and check observations
 
 `goalReports/getAsset` accepts the session/execution pair plus an asset id and

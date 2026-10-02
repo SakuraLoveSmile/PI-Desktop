@@ -47,8 +47,13 @@ type TeamDetailView =
   | { kind: "panorama" };
 type TeamTaskReadiness = TeamSnapshot["readiness"][number];
 
-function requestedView(initialTaskId?: string, initialView: TeamPanelProps["initialView"] = "aggregate"): TeamDetailView {
+function requestedView(
+  initialTaskId?: string,
+  initialMemberSessionId?: string,
+  initialView: TeamPanelProps["initialView"] = "aggregate",
+): TeamDetailView {
   if (initialTaskId) return { kind: "task", taskId: initialTaskId };
+  if (initialMemberSessionId) return { kind: "member", memberSessionId: initialMemberSessionId };
   if (initialView === "task") return { kind: "aggregate" };
   return { kind: initialView ?? "aggregate" };
 }
@@ -57,6 +62,7 @@ export type TeamPanelProps = {
   teamSessionId: string;
   onSelectSession?: (sessionId: string) => void;
   initialTaskId?: string;
+  initialMemberSessionId?: string;
   navigationSeq?: number;
   initialView?: "aggregate" | "board" | "task" | "panorama";
 };
@@ -65,6 +71,7 @@ export function TeamPanel({
   teamSessionId,
   onSelectSession,
   initialTaskId,
+  initialMemberSessionId,
   navigationSeq,
   initialView = "aggregate",
 }: TeamPanelProps) {
@@ -109,8 +116,8 @@ export function TeamPanel({
     setProgressExpanded(true);
     setActionError(null);
     boardScrollTopRef.current = 0;
-    setView(requestedView(initialTaskId, initialView));
-  }, [initialTaskId, initialView, teamSessionId, navigationSeq]);
+    setView(requestedView(initialTaskId, initialMemberSessionId, initialView));
+  }, [initialTaskId, initialMemberSessionId, initialView, teamSessionId, navigationSeq]);
 
   useEffect(() => {
     setSavedViewport(getPanoramaViewport(panoramaScopeKey));

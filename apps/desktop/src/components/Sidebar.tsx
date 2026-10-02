@@ -1910,13 +1910,13 @@ export function Sidebar({
           aria-current={active ? "page" : undefined}
           aria-describedby={sessionHoverCard?.session.id === session.id ? `session-hover-${session.id}` : undefined}
         >
+          <span className="thread-item-title">{taskTitle(rowTitle)}</span>
           {sessionPinned(session, meta) ? (
             <IconPin size={11} className="thread-item-pin" aria-hidden />
           ) : null}
           {session.source === "pi-native" ? (
             <span className="thread-item-source" title="Native Pi session">Pi</span>
           ) : null}
-          <span className="thread-item-title">{taskTitle(rowTitle)}</span>
           {options?.global ? (
             <span className="thread-item-project">
               {owningProject}

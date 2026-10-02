@@ -1105,6 +1105,30 @@ fn goal_report_rpc_err(error: impl ToString) -> JsonRpcError {
             "NOT_FOUND",
         );
     }
+    if message.starts_with("GOAL_EXECUTION_NOT_TERMINAL") {
+        return rpc_err(
+            1002,
+            "goal execution is not terminal",
+            "GOAL_EXECUTION_NOT_TERMINAL",
+        );
+    }
+    rpc_err(1000, message, "INTERNAL")
+}
+
+fn goal_progress_rpc_err(error: impl ToString) -> JsonRpcError {
+    let message = error.to_string();
+    if message.starts_with("UNAUTHORIZED") {
+        return rpc_err(1007, message, "UNAUTHORIZED");
+    }
+    if message.starts_with("GOAL_PROGRESS_NOT_RUNNING") {
+        return rpc_err(1002, message, "GOAL_PROGRESS_NOT_RUNNING");
+    }
+    if message.starts_with("CONFLICT") {
+        return rpc_err(1008, message, "CONFLICT");
+    }
+    if message.starts_with("INVALID_ARGUMENT") {
+        return rpc_err(1002, message, "INVALID_PARAMS");
+    }
     rpc_err(1000, message, "INTERNAL")
 }
 
@@ -4827,7 +4851,7 @@ async fn handle_request(
                     status,
                     error_code,
                 )
-                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                .map_err(goal_report_rpc_err)?
             };
             emit_notification(
                 &tx,
@@ -4975,6 +4999,92 @@ async fn handle_request(
                 length,
             );
             Ok(json!(chunk))
+        }
+        "goalProgress.get" => {
+            let execution_id = params
+                .get("executionId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "executionId required", "INVALID_PARAMS"))?;
+            let session_id = params.get("sessionId").and_then(|v| v.as_str());
+            let st = state.lock().await;
+            let progress = crate::goal_progress::get_progress(&st.db, session_id, execution_id)
+                .map_err(goal_progress_rpc_err)?;
+            Ok(json!({ "progress": progress }))
+        }
+        "goalProgress.issueToken" => {
+            let execution_id = params
+                .get("executionId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "executionId required", "INVALID_PARAMS"))?;
+            let session_id = params
+                .get("sessionId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let turn_id = params
+                .get("turnId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "turnId required", "INVALID_PARAMS"))?;
+            let st = state.lock().await;
+            let token =
+                crate::goal_progress::issue_write_token(&st.db, session_id, execution_id, turn_id)
+                    .map_err(goal_progress_rpc_err)?;
+            Ok(json!({ "writeToken": token }))
+        }
+        "goalProgress.update" => {
+            let execution_id = params
+                .get("executionId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "executionId required", "INVALID_PARAMS"))?;
+            let session_id = params
+                .get("sessionId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let write_token = params
+                .get("writeToken")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "writeToken required", "INVALID_PARAMS"))?;
+            let expected_revision = params.get("expectedRevision").and_then(|v| v.as_i64());
+            let items: Vec<crate::goal_progress::GoalProgressItem> = params
+                .get("items")
+                .cloned()
+                .ok_or_else(|| rpc_err(1002, "items required", "INVALID_PARAMS"))
+                .and_then(|v| {
+                    serde_json::from_value(v)
+                        .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))
+                })?;
+
+            let snapshot = {
+                let st = state.lock().await;
+                crate::goal_progress::update_progress(
+                    &st.db,
+                    session_id,
+                    execution_id,
+                    write_token,
+                    expected_revision,
+                    items,
+                )
+                .map_err(goal_progress_rpc_err)?
+            };
+
+            emit_notification(
+                &tx,
+                "goalProgress.changed",
+                json!({
+                    "sessionId": snapshot.session_id,
+                    "executionId": snapshot.execution_id,
+                    "revision": snapshot.revision,
+                }),
+            )
+            .await;
+
+            Ok(json!({ "progress": snapshot }))
         }
 
         method if method.starts_with("scheduled.") => {
