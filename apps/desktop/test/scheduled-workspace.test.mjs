@@ -7,6 +7,7 @@ import { I18nextProvider } from "react-i18next";
 import { catalogs } from "@pi-desktop/i18n";
 import { createServer } from "vite";
 import { fileURLToPath } from "node:url";
+import { readFile } from "node:fs/promises";
 
 const NOW = Date.parse("2026-01-02T12:00:00Z");
 
@@ -330,4 +331,111 @@ test("a run's transcript follows the run, not just its session", async () => {
   );
   assert.match(source, /run\.status !== "running"/, "an in-flight run keeps following it");
   assert.match(source, /revision\.current\+\+/, "and a late response cannot overwrite a newer read");
+});
+
+const TASK_INTERVAL = {
+  ...TASK_A,
+  id: "task-interval",
+  title: "Interval sweep",
+  cadence: "interval",
+  schedule: { hour: 0, minute: 0, weekday: 0, intervalMinutes: 90 },
+};
+
+/** A catalog lookup with the shape i18next gives `cadenceLabel`, so the shared
+ * phrasing can be asserted without a component around it. */
+function englishLookup() {
+  const scheduled = catalogs.en.scheduled;
+  return (key, options) => {
+    const name = key.replace("scheduled.", "");
+    const value = scheduled[name] ?? scheduled[`${name}_other`];
+    return String(value).replace(/\{\{(\w+)\}\}/g, (_, token) =>
+      String(options?.[token] ?? ""),
+    );
+  };
+}
+
+test("an interval task states its own span, never a clock", async () => {
+  await withVite(async (server) => {
+    const format = await server.ssrLoadModule("/src/features/scheduled/scheduled-format.ts");
+    assert.deepEqual(format.intervalAmount(30), { unit: "minutes", value: 30 });
+    assert.deepEqual(format.intervalAmount(90), { unit: "minutes", value: 90 });
+    assert.deepEqual(format.intervalAmount(120), { unit: "hours", value: 2 });
+    assert.deepEqual(format.intervalAmount(1440), { unit: "hours", value: 24 });
+    for (const value of [null, undefined, 0, 4, 1441, Number.NaN]) {
+      assert.equal(format.intervalAmount(value), null, `${value} is not an interval`);
+    }
+    assert.equal(format.SCHEDULED_INTERVAL_MINUTES.min, 5);
+    assert.equal(format.SCHEDULED_INTERVAL_MINUTES.max, 1440);
+
+    assert.equal(format.convertInterval(90, "minutes", "hours"), 2);
+    assert.equal(format.convertInterval(2, "hours", "minutes"), 120);
+    assert.equal(format.convertInterval(1, "hours", "hours"), 1);
+    assert.equal(format.convertInterval(0, "minutes", "hours"), 1);
+    assert.equal(format.convertInterval(99, "hours", "minutes"), 1440);
+
+    const labels = await server.ssrLoadModule("/src/features/scheduled/scheduled-labels.ts");
+    const t = englishLookup();
+    assert.equal(labels.cadenceLabel(t, TASK_INTERVAL), "Every 90 minutes");
+    assert.equal(
+      labels.cadenceLabel(t, {
+        ...TASK_INTERVAL,
+        schedule: { hour: 0, minute: 0, weekday: 0, intervalMinutes: 120 },
+      }),
+      "Every 2 hours",
+    );
+    assert.equal(labels.cadenceLabel(t, TASK_A), "Daily");
+    assert.equal(labels.cadenceLabel(t, { ...TASK_INTERVAL, schedule: null }), "Interval");
+    assert.equal(labels.cadenceHasClock("daily"), true);
+    assert.equal(labels.cadenceHasClock("weekly"), true);
+    assert.equal(labels.cadenceHasClock("interval"), false);
+
+    const rail = await render(server, "/src/features/scheduled/ScheduledTaskRail.tsx", "ScheduledTaskRail", {
+      tasks: [TASK_INTERVAL, TASK_B],
+      latestRuns: new Map([["task-interval", RUN_COMPLETED]]),
+      selectedTaskId: "task-interval",
+      now: NOW,
+      locale: "en",
+      onSelect() {},
+    });
+    assert.match(rail, /Every 90 minutes/);
+    assert.doesNotMatch(rail, /00:00/);
+    assert.match(rail, /Manual/);
+  });
+});
+
+test("the editor states an interval as a count plus its unit", async () => {
+  await withVite(async (server) => {
+    const editor = (task) =>
+      render(server, "/src/features/scheduled/ScheduledEditor.tsx", "ScheduledEditor", {
+        task,
+        projects: [],
+        currentWorkspacePath: "/Users/dev/project",
+        busy: false,
+        save: async () => {},
+        cancel() {},
+      });
+
+    const minutes = await editor(TASK_INTERVAL);
+    assert.match(minutes, /class="scheduled-interval"/);
+    assert.match(minutes, /value="90"/);
+    assert.match(minutes, /Minutes/);
+    assert.match(minutes, /Runs once per interval/);
+
+    const hours = await editor({
+      ...TASK_INTERVAL,
+      schedule: { hour: 0, minute: 0, weekday: 0, intervalMinutes: 120 },
+    });
+    assert.match(hours, /value="2"/);
+    assert.match(hours, /Hours/);
+
+    const calendar = await editor(TASK_A);
+    assert.doesNotMatch(calendar, /class="scheduled-interval"/);
+    assert.match(calendar, /09:05/);
+  });
+});
+
+test("the task form owns the Scheduled page while it is open", async () => {
+  const source = await readFile(new URL("../src/pages/ScheduledPage.tsx", import.meta.url), "utf8");
+  assert.match(source, /loaded && tasks\.length > 0 && !editor \?/);
+  assert.match(source, /className="scheduled-editor-slot"/);
 });

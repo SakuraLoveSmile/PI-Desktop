@@ -123,11 +123,21 @@ pub fn configure(config: &mut Value, input: &Value, cadence: &str, now: i64) -> 
         || input.get("cadence").is_some()
         || input.get("enabled").is_some()
     {
-        let next = config
+        let armed = config
             .get("schedule")
-            .and_then(|value| serde_json::from_value::<Schedule>(value.clone()).ok())
-            .and_then(|schedule| schedule.next(cadence, now));
-        config["nextRunAt"] = json!(next);
+            .and_then(|value| serde_json::from_value::<Schedule>(value.clone()).ok());
+        // An interval task is armed by its own value: a schedule without
+        // intervalMinutes would leave the next occurrence empty, so the input
+        // is refused instead of saved as a task that never fires.
+        if cadence == "interval"
+            && armed
+                .as_ref()
+                .and_then(|schedule| schedule.interval_minutes)
+                .is_none()
+        {
+            bail!("an interval schedule requires intervalMinutes");
+        }
+        config["nextRunAt"] = json!(armed.and_then(|schedule| schedule.next(cadence, now)));
     }
     Ok(())
 }
@@ -242,5 +252,50 @@ mod tests {
                 .status,
             "aborted"
         );
+    }
+
+    #[test]
+    fn interval_tasks_wait_their_own_minutes_and_need_their_value() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = Database::open_in_dir(dir.path()).unwrap();
+        let rejected = create_task(
+            &db,
+            &json!({"prompt":"check", "cadence":"interval", "schedule":{"hour":0,"minute":0,"weekday":0}}),
+        );
+        assert!(
+            rejected.is_err(),
+            "an interval schedule without its value would never fire"
+        );
+
+        let task = create_task(
+            &db,
+            &json!({"prompt":"check", "cadence":"interval",
+                    "schedule":{"hour":0,"minute":0,"weekday":0,"intervalMinutes":15}}),
+        )
+        .unwrap();
+        let next = crate::db::ts_to_ms(task.next_run_at.as_ref().unwrap());
+        let now = now_ms();
+        assert!(next > now && next <= now + 15 * 60_000 + 5_000);
+        assert!(due(&db, next - 60_000).unwrap().is_empty(), "not due yet");
+        assert_eq!(due(&db, next).unwrap(), vec![task.id.clone()]);
+
+        // A cadence switch keeps the value for the way back and arms the new
+        // rule from it instead.
+        let daily = update_task(
+            &db,
+            &json!({"id":task.id,"cadence":"daily",
+                    "schedule":{"hour":9,"minute":30,"weekday":0,"intervalMinutes":15}}),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(daily.cadence, "daily");
+        assert_eq!(
+            daily
+                .schedule
+                .as_ref()
+                .and_then(|item| item.interval_minutes),
+            Some(15)
+        );
+        assert!(daily.next_run_at.is_some(), "a daily task keeps its clock");
     }
 }

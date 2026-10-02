@@ -67,7 +67,7 @@ pub struct TaskRun {
     pub ended_at: Option<String>,
 }
 
-const CADENCES: [&str; 4] = ["manual", "hourly", "daily", "weekly"];
+const CADENCES: [&str; 5] = ["manual", "hourly", "interval", "daily", "weekly"];
 
 fn normalize_cadence(value: Option<&str>) -> String {
     match value {

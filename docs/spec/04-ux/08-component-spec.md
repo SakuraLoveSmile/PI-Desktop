@@ -4114,7 +4114,8 @@ TASKS (2)                     │ Nightly dependency check   [Enabled] [Run now]
 
 | State | Appearance |
 |---|---|
-| Selected task | Raised tile with the shared raised shadow, and one `aria-current="true"` |
+| Selected task | Accent-tinted raised tile with the shared raised shadow and a 2px accent bar on the leading edge, and one `aria-current="true"`. The tint matters in both themes: a plain raised fill is white on white in the light theme |
+| Selected run | The same accent tint with the leading bar, one step lighter because the row sits inside a card |
 | Running task | Warning-coloured dot in the row plus a `Running / awaiting input` badge |
 | Paused task | `Disabled` chip; the row still reports its last outcome |
 | Never run | `Not run yet` in the row's outcome line |
@@ -4137,6 +4138,12 @@ TASKS (2)                     │ Nightly dependency check   [Enabled] [Run now]
 - The conversation mode decides who owns a run's transcript: `perRun` opens a
   conversation for each run, and `reuse` continues the task's previous one while
   it still exists and still belongs to the same project.
+- The task form owns the page while it is open: the task column and the task
+  page are not rendered, so the draft never competes with the page it came from.
+- An interval task states a count with a minute or hour unit (5 minutes to 24
+  hours, stored as minutes, refused outside that range). The value rides along
+  with every armed cadence, so switching between a calendar and an interval
+  loses neither, and the row reports the span instead of a clock.
 - Open conversation is the only action that leaves for the chat route. A
   scheduled run's conversation then shows a back row in the chat top bar,
   labelled with the route and, when the row's own origin is known, the task it

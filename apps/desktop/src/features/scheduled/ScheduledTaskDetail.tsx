@@ -12,7 +12,7 @@ import {
   formatScheduleClock,
 } from "./scheduled-format";
 import { resolveSelectedRun, runDurationMs } from "./scheduled-runs";
-import { CADENCE_I18N_KEYS, RUN_STATUS_I18N_KEYS } from "./scheduled-labels";
+import { cadenceHasClock, cadenceLabel, CADENCE_I18N_KEYS, RUN_STATUS_I18N_KEYS } from "./scheduled-labels";
 import { ScheduledRunHistory } from "./ScheduledRunHistory";
 import { ScheduledRunTranscript } from "./ScheduledRunTranscript";
 
@@ -66,8 +66,8 @@ export function ScheduledTaskDetail({
   const [instructionOpen, setInstructionOpen] = useState(false);
   const latest = runs[0] ?? null;
   const latestDuration = runDurationMs(latest);
-  const clock = formatScheduleClock(task.schedule);
-  const cadence = t(CADENCE_I18N_KEYS[task.cadence]);
+  const clock = cadenceHasClock(task.cadence) ? formatScheduleClock(task.schedule) : null;
+  const cadence = cadenceLabel(t, task);
   const selectedRun = resolveSelectedRun(runs, selectedRunId);
   const selectedDuration = runDurationMs(selectedRun);
   const selectedSessionId = selectedRun?.sessionId ?? null;

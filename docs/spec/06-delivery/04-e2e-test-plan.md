@@ -415,6 +415,10 @@
   select custom days, save and reopen; reject empty days; verify the four defaults,
   arrows, Home/End, Enter, Escape/Tab and outside dismissal; select hourly without time
   fields and verify its first occurrence is one hour away; pause/resume; Run now
+  select an interval cadence, enter 30 minutes and verify the row states that
+  span instead of a clock, then switch to a weekly cadence and back to confirm
+  the value survived; open the edit form and verify the task column and the task
+  page step aside;
   and read the admitted run's transcript inside the task page; open the result
   conversation from that page and verify its top bar offers the way back to the
   scheduled task; return and confirm the same task and run are still selected;
@@ -431,7 +435,9 @@
   not dispatch, both execution paths reach the real Agent sidecar, the task's own
   history lists each run with its status and duration and Open conversation
   reaches the persisted transcript while the SessionList and session search never
-  list it, that conversation's top bar returns to the same task and run, and
+  list it, that conversation's top bar returns to the same task and run, an
+  interval task arms from the span the form states and reports it in its row,
+  the task form owns the page while it is open, and
   automatic execution does not require a
   renderer prompt. Host tests additionally prove duplicate admission rejection,
   stale/missed occurrence handling, invalid input rejection and recovery.

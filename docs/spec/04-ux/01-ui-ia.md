@@ -246,7 +246,9 @@ destination, chat as the home surface, tools and permissions inline.
 ### 3.3 Scheduled
 A task column beside the selected task's page, with an explicit create/edit form, a cadence dropdown, time,
 next occurrence, saved project, per-task permission/model selection, a per-task conversation mode (a new conversation per run, or one conversation every run continues), pause/resume and delete confirmation. Hourly
-schedules repeat at one-hour intervals without a time selector. Daily schedules
+schedules repeat at one-hour intervals without a time selector. An interval
+schedule states its own span as a count with a minute or hour unit (5 minutes to
+24 hours) and counts elapsed time from the moment it was armed. Daily schedules
 use a themed time-period dropdown: Morning 09:00, Afternoon 14:00, Evening
 19:00, Night 22:00. The form does not expose hour/minute editing. AI tools may
 set an exact time; a non-preset time displays as Custom with its HH:mm value
@@ -255,6 +257,11 @@ separate dropdown listing Monday through Sunday with selection markers.
 Each day toggles independently; there are no preset combinations. An empty
 selection disables saving. The menu supports arrows, Home/End, Enter/Space,
 Escape/outside dismissal, and exposes selected states. The column reports each
+Escape/outside dismissal, exposes selected states, and owns the page while it is
+open: the task column and the task page step aside rather than compete with the
+draft. The form also states an interval as a count with a minute or hour unit
+(5 minutes to 24 hours) and keeps that value while another cadence is selected,
+so switching a task between a calendar and an interval loses neither.
 task's cadence and clock, the outcome of its newest run with its duration, and
 whether it is paused or running. The task page shows that task's last run, next
 occurrence, project, permission and model, its instruction behind a disclosure,

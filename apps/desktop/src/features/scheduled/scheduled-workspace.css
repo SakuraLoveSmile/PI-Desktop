@@ -111,9 +111,11 @@
   background: var(--ds-bg-hover);
 }
 
+/* Selection has to read on both themes: the raised fill is white on white in
+   the light theme, so the row also carries an accent tint and a leading bar. */
 .scheduled-task.is-selected {
-  background: var(--ds-raised);
-  box-shadow: var(--ds-raised-shadow);
+  background: color-mix(in oklab, var(--ds-accent) 12%, var(--ds-raised));
+  box-shadow: var(--ds-raised-shadow), inset 2px 0 0 var(--ds-accent);
 }
 
 .scheduled-task-title {
@@ -341,8 +343,11 @@
   background: var(--ds-bg-hover);
 }
 
+/* The selected run follows the task column's language: accent tint plus the
+   same leading bar, one step lighter because it sits inside a card. */
 .scheduled-run.is-selected {
-  background: var(--ds-bg-active);
+  background: color-mix(in oklab, var(--ds-accent) 10%, var(--ds-tile-deep));
+  box-shadow: inset 2px 0 0 var(--ds-accent);
 }
 
 .scheduled-run-main {

@@ -102,7 +102,9 @@ export function ScheduledPage() {
           </Panel>
         ) : null}
 
-        {loaded && tasks.length > 0 ? (
+        {/* The form owns the page while it is open: the task column and the
+            selected task's page would only compete with the draft. */}
+        {loaded && tasks.length > 0 && !editor ? (
           <div className="scheduled-workspace">
             <ScheduledTaskRail
               tasks={tasks}

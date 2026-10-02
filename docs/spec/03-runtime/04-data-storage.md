@@ -1105,7 +1105,7 @@ CREATE TABLE scheduled_tasks (
   id          TEXT PRIMARY KEY,
   title       TEXT NOT NULL,
   prompt      TEXT NOT NULL,
-  cadence     TEXT NOT NULL DEFAULT 'manual',  -- manual | hourly | daily | weekly
+  cadence     TEXT NOT NULL DEFAULT 'manual',  -- manual | hourly | interval | daily | weekly
   enabled     INTEGER NOT NULL DEFAULT 1,
   project_id  INTEGER REFERENCES projects(id) ON DELETE SET NULL,
   config_json TEXT NOT NULL DEFAULT '{}',      -- mode, cron expr, model override, notify policy
@@ -1134,14 +1134,20 @@ SessionList and session search hide the transcript while it has a run, and
 deleting the task returns it to the ordinary lists instead of leaving it
 unreachable (issue #1291).
 The existing JSON extension stores `schedule: {hour, minute, weekday}`,
-`nextRunAt` (epoch milliseconds), `workspacePath`, and `sessionMode` (`perRun` or
-`reuse`, absent means `perRun`) for desktop automations.
+`intervalMinutes` (5–1440; required by an `interval` cadence and read by no other
+one, so a schedule that keeps the field keeps its value), `nextRunAt` (epoch
+milliseconds), `workspacePath`, and `sessionMode` (`perRun` or `reuse`, absent
+means `perRun`) for desktop automations.
 Optional `weekdays` stores 1–7 unique integers in 0–6, overriding legacy
 `weekday` for weekly schedules. Missing `weekdays` preserves the single-day
 behavior. Invalid or empty selections are rejected before mutation. No table
 migration is needed. Daily/weekly schedules use the host local timezone; hourly
-schedules compute `nextRunAt = now + 3_600_000`, ignoring calendar fields. Absence
-of `schedule` leaves legacy tasks unarmed. No physical schema change is made.
+and interval schedules count elapsed time from the moment they were armed:
+hourly computes `nextRunAt = now + 3_600_000` and interval computes
+`nextRunAt = now + intervalMinutes × 60_000`, both ignoring calendar fields.
+An `interval` task whose schedule carries no `intervalMinutes` is refused rather
+than saved unarmed. Absence of `schedule` leaves legacy tasks unarmed. No
+physical schema change is made.
 Task wire fields project `schedule`, RFC3339 `nextRunAt`, `workspacePath` and the
 optional task-owned `permissionMode` plus paired `providerId`/`modelId` values.
 These additive values stay in `config_json`; no physical migration is required.

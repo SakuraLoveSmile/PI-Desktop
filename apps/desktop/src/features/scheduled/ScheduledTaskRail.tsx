@@ -10,7 +10,7 @@ import {
 } from "../../components/icons";
 import { formatDuration, formatRelativeMoment, formatScheduleClock } from "./scheduled-format";
 import { runDurationMs } from "./scheduled-runs";
-import { CADENCE_I18N_KEYS, RUN_STATUS_I18N_KEYS } from "./scheduled-labels";
+import { cadenceHasClock, cadenceLabel, RUN_STATUS_I18N_KEYS } from "./scheduled-labels";
 
 function RunGlyph({ run }: { run: ScheduledTaskRun }) {
   switch (run.status) {
@@ -58,8 +58,8 @@ export function ScheduledTaskRail({
           const selected = task.id === selectedTaskId;
           const latest = latestRuns.get(task.id) ?? null;
           const duration = runDurationMs(latest);
-          const clock = formatScheduleClock(task.schedule);
-          const cadence = t(CADENCE_I18N_KEYS[task.cadence]);
+          const clock = cadenceHasClock(task.cadence) ? formatScheduleClock(task.schedule) : null;
+          const cadence = cadenceLabel(t, task);
           const running = latest?.status === "running";
           return (
             <li key={task.id}>

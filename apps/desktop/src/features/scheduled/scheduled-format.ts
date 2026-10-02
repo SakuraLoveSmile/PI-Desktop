@@ -81,3 +81,49 @@ export function formatScheduleClock(
 export function lastAttemptAt(task: ScheduledTask): string | null {
   return task.lastRunAt ?? null;
 }
+
+/**
+ * Elapsed minutes an `interval` task waits between runs, as stored. Mirrors
+ * `INTERVAL_MIN_MINUTES` / `INTERVAL_MAX_MINUTES` in
+ * `crates/host-core/src/scheduled/timing.rs`, which stays authoritative: the
+ * host refuses to arm anything outside this range.
+ */
+export const SCHEDULED_INTERVAL_MINUTES = { min: 5, max: 1440 } as const;
+
+/**
+ * A stored interval in the largest whole unit that still states it exactly, so
+ * `60` reports as one hour rather than sixty minutes. `null` when the value
+ * cannot describe an interval — the same values the host refuses to arm.
+ */
+export function intervalAmount(
+  minutes: number | null | undefined,
+): { unit: "minutes" | "hours"; value: number } | null {
+  if (minutes === null || minutes === undefined) return null;
+  const value = Math.trunc(minutes);
+  if (
+    !Number.isFinite(value) ||
+    value < SCHEDULED_INTERVAL_MINUTES.min ||
+    value > SCHEDULED_INTERVAL_MINUTES.max
+  ) {
+    return null;
+  }
+  return value % 60 === 0
+    ? { unit: "hours", value: value / 60 }
+    : { unit: "minutes", value };
+}
+
+/** The same span in another unit, clamped into the range the host arms. */
+export function convertInterval(
+  value: number,
+  from: "minutes" | "hours",
+  to: "minutes" | "hours",
+): number {
+  if (from === to || !Number.isFinite(value)) return value;
+  if (to === "hours") {
+    return Math.min(SCHEDULED_INTERVAL_MINUTES.max / 60, Math.max(1, Math.round(value / 60)));
+  }
+  return Math.min(
+    SCHEDULED_INTERVAL_MINUTES.max,
+    Math.max(SCHEDULED_INTERVAL_MINUTES.min, Math.round(value * 60)),
+  );
+}
