@@ -256,13 +256,15 @@ and survives other form edits until the user explicitly selects a preset. Weekly
 separate dropdown listing Monday through Sunday with selection markers.
 Each day toggles independently; there are no preset combinations. An empty
 selection disables saving. The menu supports arrows, Home/End, Enter/Space,
-Escape/outside dismissal, and exposes selected states. The column reports each
 Escape/outside dismissal, exposes selected states, and owns the page while it is
 open: the task column and the task page step aside rather than compete with the
 draft. The form also states an interval as a count with a minute or hour unit
 (5 minutes to 24 hours) and keeps that value while another cadence is selected,
-so switching a task between a calendar and an interval loses neither.
-task's cadence and clock, the outcome of its newest run with its duration, and
+so switching a task between a calendar and an interval loses neither. The column
+reports each task's cadence and clock, the outcome of that task's own newest run
+— read per task from the host, so a task that has been idle while others ran is
+never reported as never run — with its duration, and whether it is paused or
+running.
 whether it is paused or running. The task page shows that task's last run, next
 occurrence, project, permission and model, its instruction behind a disclosure,
 its own run history newest first (status, start time, duration, stable error

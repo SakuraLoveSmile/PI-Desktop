@@ -271,6 +271,24 @@ fn handle_with_workspace_policy(
         }
         "scheduled.listRuns" => {
             let task_id = params.get("taskId").and_then(|v| v.as_str());
+            // The task column needs each task's own newest run: a global window
+            // would report an idle task as "never run" once other tasks fill it.
+            if params
+                .get("latestPerTask")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+            {
+                if task_id.is_some() {
+                    return Err(rpc_err(
+                        1002,
+                        "latestPerTask cannot be scoped to a single task",
+                        "INVALID_PARAMS",
+                    ));
+                }
+                let runs = scheduled::latest_run_per_task(&st.db)
+                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+                return Ok(json!({ "runs": runs }));
+            }
             let limit = params.get("limit").and_then(|v| v.as_i64()).unwrap_or(50);
             let runs = scheduled::list_runs(&st.db, task_id, limit)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
@@ -900,5 +918,58 @@ mod tests {
             assert_eq!(error.data.unwrap()["errorCode"], "INVALID_PARAMS");
         }
         assert!(scheduled::list_tasks(&state.db).unwrap().is_empty());
+    }
+
+    #[test]
+    fn the_task_column_asks_for_one_newest_run_per_task() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut st = AppState::open(dir.path()).unwrap();
+        st.handshook = true;
+        let create = |title: &str| {
+            handle(
+                &st,
+                "scheduled.create",
+                json!({ "title": title, "prompt": "Review", "cadence": "manual", "schedule": null }),
+            )
+            .unwrap()["task"]["id"]
+                .as_str()
+                .unwrap()
+                .to_string()
+        };
+        let idle = create("Idle");
+        let busy = create("Busy");
+        // The idle task ran first; afterwards the busy one produced two runs.
+        for (index, task) in [(0i64, &idle), (1, &idle), (2, &busy), (3, &busy)] {
+            let started = 1_000 + index * 100;
+            st.db
+                .conn()
+                .execute(
+                    &format!(
+                        "INSERT INTO task_runs
+                           (id, task_id, session_id, status, error_code, started_at, ended_at)
+                         VALUES ('run-{index}', '{task}', NULL, 'completed', NULL, {started}, {})",
+                        started + 500
+                    ),
+                    [],
+                )
+                .unwrap();
+        }
+
+        let scoped = handle(&st, "scheduled.listRuns", json!({ "latestPerTask": true })).unwrap();
+        let runs = scoped["runs"].as_array().unwrap();
+        assert_eq!(runs.len(), 2, "one run per task");
+        assert_eq!(runs[0]["id"], "run-3");
+        assert_eq!(
+            runs[1]["id"], "run-1",
+            "the idle task reports its own newest run"
+        );
+
+        let rejected = handle(
+            &st,
+            "scheduled.listRuns",
+            json!({ "latestPerTask": true, "taskId": idle }),
+        )
+        .unwrap_err();
+        assert_eq!(rejected.data.unwrap()["errorCode"], "INVALID_PARAMS");
     }
 }

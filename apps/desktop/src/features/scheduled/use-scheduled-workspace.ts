@@ -8,8 +8,8 @@ import { peekScheduledReturn } from "./scheduled-return";
 /** Same cadence the page always used: the host owns admission, the page only
  * reflects it. */
 const REFRESH_INTERVAL_MS = 10_000;
-/** One read feeds every task row's last outcome; the host bounds it at 200. */
-const RAIL_RUN_LIMIT = 100;
+/** What each task row reports: the host answers one newest run per task, so a
+ * task idle while others produced runs never reads as never run. */
 /** The selected task's own history, which the run panel reads. */
 const TASK_RUN_LIMIT = 200;
 
@@ -48,7 +48,7 @@ export function useScheduledWorkspace(
   // Coming back from a run's conversation restores the same task and run.
   const restored = peekScheduledReturn();
   const [tasks, setTasks] = useState<ScheduledTask[]>([]);
-  const [recentRuns, setRecentRuns] = useState<ScheduledTaskRun[]>([]);
+  const [latestPerTaskRuns, setLatestPerTaskRuns] = useState<ScheduledTaskRun[]>([]);
   const [taskRuns, setTaskRuns] = useState<ScheduledTaskRun[]>([]);
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(restored?.taskId ?? null);
@@ -76,12 +76,12 @@ export function useScheduledWorkspace(
     try {
       const [taskResult, runResult, projectResult] = await Promise.all([
         api.listScheduled(),
-        api.listScheduledRuns({ limit: RAIL_RUN_LIMIT }),
+        api.listScheduledRuns({ latestPerTask: true }),
         api.listProjects().catch(() => ({ projects: [] as ProjectRecord[] })),
       ]);
       if (!mounted.current || request !== revision.current) return;
       setTasks(taskResult.tasks);
-      setRecentRuns(runResult.runs);
+      setLatestPerTaskRuns(runResult.runs);
       setProjects(projectResult.projects);
       setError("");
       setLoaded(true);
@@ -147,7 +147,7 @@ export function useScheduledWorkspace(
     [tasks, selectedTaskId],
   );
   const runs = useMemo(() => runsForTask(taskRuns, selectedTaskId), [taskRuns, selectedTaskId]);
-  const latestRuns = useMemo(() => latestRunByTask(recentRuns), [recentRuns]);
+  const latestRuns = useMemo(() => latestRunByTask(latestPerTaskRuns), [latestPerTaskRuns]);
 
   const action = useCallback(
     async (work: () => Promise<void>): Promise<boolean> => {
@@ -212,7 +212,10 @@ export function useScheduledWorkspace(
 
   const selectTask = useCallback((taskId: string) => setSelectedTaskId(taskId), []);
   const selectRun = useCallback((runId: string) => setSelectedRunId(runId), []);
-  const runningFor = useCallback((taskId: string) => taskIsRunning(recentRuns, taskId), [recentRuns]);
+  const runningFor = useCallback(
+    (taskId: string) => taskIsRunning(latestPerTaskRuns, taskId),
+    [latestPerTaskRuns],
+  );
 
   return {
     tasks,

@@ -439,3 +439,22 @@ test("the task form owns the Scheduled page while it is open", async () => {
   assert.match(source, /loaded && tasks\.length > 0 && !editor \?/);
   assert.match(source, /className="scheduled-editor-slot"/);
 });
+
+test("the task column reads one newest run per task, not a global window", async () => {
+  // A global window drops an idle task's rows once other tasks fill it, and the
+  // column then reports that task as never run. The host answers per task.
+  const source = await readFile(
+    new URL("../src/features/scheduled/use-scheduled-workspace.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /api\.listScheduledRuns\(\{ latestPerTask: true \}\)/);
+  assert.doesNotMatch(source, /RAIL_RUN_LIMIT/);
+  assert.match(
+    source,
+    /const \[latestPerTaskRuns, setLatestPerTaskRuns\]/,
+    "the column's state is named for what it holds",
+  );
+
+  const api = await readFile(new URL("../src/lib/api.ts", import.meta.url), "utf8");
+  assert.match(api, /latestPerTask\?: boolean/);
+});

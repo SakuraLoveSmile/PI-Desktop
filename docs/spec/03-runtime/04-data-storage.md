@@ -1133,6 +1133,12 @@ The ownership is derived on read and never stored on the session row, so the
 SessionList and session search hide the transcript while it has a run, and
 deleting the task returns it to the ordinary lists instead of leaving it
 unreachable (issue #1291).
+`scheduled.listRuns` answers two shapes: one task's own history (`taskId`, at most
+200 rows) and one newest run per task (`latestPerTask`, one row per task, never
+combined with `taskId`). The task column reads the second shape. A global window
+over `task_runs` can be filled by one busy task — retention keeps the last 100
+runs *per task* — and would then report an idle task as never run, so the read
+that feeds the column is per task rather than a shared window.
 The existing JSON extension stores `schedule: {hour, minute, weekday}`,
 `intervalMinutes` (5–1440; required by an `interval` cadence and read by no other
 one, so a schedule that keeps the field keeps its value), `nextRunAt` (epoch

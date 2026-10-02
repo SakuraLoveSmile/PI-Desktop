@@ -914,7 +914,9 @@ CREATE INDEX idx_task_runs ON task_runs(task_id, started_at DESC);
 
 生成会话的运行通过 `session_id` 免费获取其转录本。
 该转录本通过针对 `task_runs` 的 `EXISTS` 判断被识别为自动化产出，每个会话摘要与搜索命中都以 `scheduledRun` 返回这一归属。归属在读取时派生、不写入会话行：因此在该会话仍属于某次运行时，会话列表与会话搜索会隐藏它；删除任务后它会回到普通列表，而不会变得无法访问（issue #1291）。
-`config_json` 保存 `schedule: {hour, minute, weekday}`、`intervalMinutes`（5–1440，只有 `interval` 周期读取，因此保留该字段的排程会保留它的值）、毫秒时间戳 `nextRunAt`、
+`scheduled.listRuns` 提供两种形状：单任务自己的历史（`taskId`，最多 200 条）与每任务最新一次运行（`latestPerTask`，每个任务一行，不能与 `taskId` 同时使用）。任务列读取后者：`task_runs` 的全局窗口可能被某个繁忙任务填满（保留策略是按任务各留最近 100 条），那样空闲任务会被误报为「尚未运行」，所以喂给任务列的读取按任务而不是共享窗口。
+
+`config_json` 保存 `schedule: {hour, minute, weekday}`
 `workspacePath`、会话模式 `sessionMode`（`perRun` 或 `reuse`，缺失按 `perRun`），以及可选的任务级 `permissionMode` 与成对的 `providerId`／`modelId`。
 这些新增字段无需物理表迁移。缺少模型字段时仍在运行时读取应用默认值；缺少权限字段时，
 自动运行继续使用 Ask，立即运行继续继承全局权限。每天、每周按宿主本地时区计算；每小时与间隔按准入时刻起算的经过时间计算：每小时采用 `nextRunAt = now + 3_600_000`，间隔采用 `nextRunAt = now + intervalMinutes × 60_000`，两者都忽略日历时间字段。

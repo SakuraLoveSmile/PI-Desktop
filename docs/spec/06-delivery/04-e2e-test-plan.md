@@ -419,6 +419,8 @@
   span instead of a clock, then switch to a weekly cadence and back to confirm
   the value survived; open the edit form and verify the task column and the task
   page step aside;
+  then let one task accumulate more runs than the shared window while another
+  stays idle, and verify the idle task still reports its own last outcome;
   and read the admitted run's transcript inside the task page; open the result
   conversation from that page and verify its top bar offers the way back to the
   scheduled task; return and confirm the same task and run are still selected;
@@ -437,7 +439,9 @@
   reaches the persisted transcript while the SessionList and session search never
   list it, that conversation's top bar returns to the same task and run, an
   interval task arms from the span the form states and reports it in its row,
-  the task form owns the page while it is open, and
+  the task form owns the page while it is open, a task that stayed idle while
+  another accumulated more runs than the shared window still reports its own
+  last outcome, and
   automatic execution does not require a
   renderer prompt. Host tests additionally prove duplicate admission rejection,
   stale/missed occurrence handling, invalid input rejection and recovery.
