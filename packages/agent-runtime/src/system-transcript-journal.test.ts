@@ -80,6 +80,16 @@ describe("model system journal", () => {
     expect(checkpoint?.toolsAdded).toEqual(initial.toolsAdded);
   });
 
+  it("recognizes a restored checkpoint with text blocks without adding durable rows", async () => {
+    const blocks: SystemMessage = { ...initial, content: [{ type: "text", text: "Extension instructions" }] };
+    const checkpoint = systemTranscriptCheckpoint([blocks, user])!;
+    const journal = new SystemTranscriptJournal();
+    journal.rememberCheckpoint(JSON.stringify(checkpoint));
+    const append = vi.fn();
+    await journal.persist(JSON.parse(JSON.stringify([checkpoint, user])), [], append);
+    expect(append).not.toHaveBeenCalled();
+  });
+
   it.each([null, {}, { ...initial, timestamp: -1 }, { ...initial, toolsAdded: [{ name: "Read", parameters: "bad" }] }])("rejects malformed saved state", (value) => {
     expect(() => readSystemMessage(value)).toThrow("Invalid persisted model system message");
   });

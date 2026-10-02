@@ -2213,11 +2213,10 @@ describe("DesktopAgentRuntime deferred tool catalog", () => {
     expect(agent.state.tools.some((tool: any) => tool.name === "BrowserPreview")).toBe(
       true,
     );
-    // Tool deltas append new declarations; catalog order is not semantic.
-    const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
-    expect([...getCurrentTools(agent.state.messages)].sort(byName)).toEqual(
-      agent.state.tools.map(toToolDeclaration).sort(byName),
-    );
+    // Reset retains executability; Pi declares it at the next dispatch, not
+    // while this test calls preparation helpers outside the agent loop.
+    expect(getCurrentTools(agent.state.messages).some((tool) => tool.name === "BrowserPreview")).toBe(false);
+    await runtime.dispose();
   });
 });
 

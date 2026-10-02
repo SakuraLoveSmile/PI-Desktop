@@ -106,8 +106,12 @@ export function rebuildSystemTranscript(
 
 /** Fold state only at an explicit compaction boundary, with semantic time. */
 export function systemTranscriptCheckpoint(messages: readonly AgentMessage[]): SystemMessage | undefined {
-  const checkpoint = currentSystemMessage(messages);
-  if (!checkpoint?.sections || !(CONTEXT_BUDGET_SECTION in checkpoint.sections)) return checkpoint;
+  const current = currentSystemMessage(messages);
+  if (!current) return undefined;
+  // Use the journal's durable shape, including extension-provided text blocks.
+  const checkpoint: SystemMessage = { ...current, content: contentText(current.content),
+    ...(current.toolsAdded ? { toolsAdded: current.toolsAdded.map(toToolDeclaration) } : {}) };
+  if (!checkpoint.sections || !(CONTEXT_BUDGET_SECTION in checkpoint.sections)) return checkpoint;
   const { [CONTEXT_BUDGET_SECTION]: _expired, ...sections } = checkpoint.sections;
   return { ...checkpoint, sections };
 }

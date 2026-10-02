@@ -19,6 +19,7 @@ import {
   replaceSystemPrompt,
   systemTranscriptCheckpoint,
   systemPromptContent,
+  removeTrailingAssistantMessages,
 } from "./system-transcript.js";
 
 const read: Tool = { name: "Read", description: "Read text", parameters: Type.Object({ path: Type.String() }) };
@@ -50,6 +51,15 @@ function estimateContextTokens(messages: AgentMessage[]) {
 afterEach(() => vi.restoreAllMocks());
 
 describe("system transcript helpers", () => {
+  it("removes failed trailing responses across cleanup deltas without changing system state", () => {
+    const messages = [initial, user, assistant, delta, { ...assistant, timestamp: 3_000 }];
+    const cleaned = removeTrailingAssistantMessages(messages);
+    expect(cleaned).toEqual([initial, user, delta]);
+    expect(getCurrentTools(cleaned)).toEqual(getCurrentTools(messages));
+    expect(messages).toHaveLength(5);
+    expect(removeTrailingAssistantMessages([user, assistant])).toEqual([user]);
+    expect(removeTrailingAssistantMessages([assistant, user, delta])).toEqual([assistant, user, delta]);
+  });
   it("updates only the changed skill entry and preserves unrelated sections", () => {
     const previous: AgentMessage[] = [{
       role: "system", content: "", timestamp: 1,

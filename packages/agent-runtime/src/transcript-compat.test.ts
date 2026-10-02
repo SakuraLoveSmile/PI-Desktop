@@ -14,6 +14,10 @@ const provider: RuntimeProviderConfig = {
 };
 
 describe("transcript compatibility binding", () => {
+  it("keeps Pi transport capabilities when models.dev owns published metadata", () => {
+    expect(buildProviderModel({ ...provider, modelConfig: { ...provider.modelConfig!, source: "models.dev" } }).compat)
+      .toMatchObject({ supportsMidConvoSystemMessages: true });
+  });
   it("keeps instruction and tool capabilities independent on the exact binding", () => {
     expect(buildProviderModel(provider).compat).toMatchObject({ supportsMidConvoSystemMessages: true, supportsMidConvoToolAdditions: false });
     expect(buildProviderModel({ ...provider, baseUrl: `${baseUrl}/` }).compat).toMatchObject({ supportsMidConvoSystemMessages: true });

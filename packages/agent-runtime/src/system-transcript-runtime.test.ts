@@ -86,6 +86,9 @@ describe("system state through the Desktop user path", () => {
       const activation = after.findIndex((message) => message.role === "toolResult" && message.toolName === "ToolSearch");
       expect(after.slice(activation + 1)).toContainEqual(expect.objectContaining({ role: "system", toolsAdded: expect.arrayContaining([expect.objectContaining({ name: "BrowserPreview" })]) }));
       expect(f.rows.filter((row) => row.modelSystem)).toHaveLength(2);
+      await f.prompt("same-runtime-user");
+      expect(getCurrentTools(f.requests[2]).some((tool) => tool.name === "BrowserPreview")).toBe(true);
+      expect(f.rows.filter((row) => row.modelSystem)).toHaveLength(2);
       const restored = fixture(structuredClone(f.rows));
       try {
         await restored.prompt("user-2");

@@ -38,6 +38,13 @@ Accept transcript capability opt-ins only when that identity matches the actual
 request route. Let Pi adapt the request for partial or absent support; never
 persist an adapter's folded projection.
 
+The current models.dev catalog remains authoritative for published limits,
+prices and modalities. Independently copy only the five transcript transport
+flags and their original binding from Pi's exact published model. Do not derive
+transport support from a models.dev metadata match or an account endpoint
+override. Both Pi and models.dev metadata projections can carry that binding;
+unverified routes and generic records retain the conservative fallback.
+
 The existing Pi 0.99.1 dependency patch adds the missing mid-conversation system
 capability to its `deepseek-flash` catalog entry. Authorized official-endpoint
 experiments confirmed both preserved cache reuse and effective updated

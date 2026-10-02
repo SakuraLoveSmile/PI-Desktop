@@ -1308,6 +1308,11 @@ and redefinitions use the adapter's supported fallback. Model switching never
 rewrites the canonical journal. Cache savings depend on the actual provider;
 unsupported routes may still rebuild the request prefix.
 
+Published model limits, prices and modalities remain owned by models.dev. Its
+runtime projection separately carries Pi's exact published transcript capability
+flags and original binding. An enriched metadata source does not grant native
+support by itself, and account overrides never replace that original binding.
+
 The pinned Pi patch declares mid-conversation system support for
 `deepseek-flash` on its published `openai-completions` binding at
 `https://api.deepseek.com`. Skill changes on this binding append system updates
