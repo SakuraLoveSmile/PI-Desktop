@@ -4216,7 +4216,7 @@ Conversation overflow                    Composer draft (unsent)
 
 | State | Appearance |
 |---|---|
-| Reference attached | Chat-icon chip on the user message, named with the catalog's reference label and the referenced conversation's title |
+| Reference attached | Chat-icon chip on the user message, named with the catalog's reference label and the referenced conversation's current title |
 | Reference skipped | Nothing is attached; the link stays plaintext in the message |
 | Another project | Skipped the same way: that transcript is not this turn's context |
 | Self-reference | Dropped before any read, so the conversation itself is never a reference |
@@ -4238,6 +4238,11 @@ Conversation overflow                    Composer draft (unsent)
   re-resolves it from that conversation's current content.
 - Activating the chip opens the referenced conversation; the reference is a
   link, not a copy of that transcript.
+- The chip names the conversation from its current title, so a rename — manual
+  or the first-turn summary — follows through to every message that references
+  it. The name recorded when the reference was made stays the fallback for a
+  conversation this viewer no longer lists, and is the name the quoted block
+  keeps for the model.
 - The visible text is never rewritten: the link a reader typed stays in the
   message, and only the attached excerpt is additive.
 - Boundary: only conversations of the same project are read, the current

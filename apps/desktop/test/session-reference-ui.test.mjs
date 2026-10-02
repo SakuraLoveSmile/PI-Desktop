@@ -36,7 +36,9 @@ const t = (key, values) => {
     : raw;
 };
 
-const useAppStore = (selector) => selector({ selectSession: async () => {} });
+/** The chip reads the live conversation title from the store, like the app. */
+const store = { selectSession: async () => {}, sessions: [] };
+const useAppStore = (selector) => selector(store);
 
 const Icon = () => React.createElement("svg", { "aria-hidden": true });
 
@@ -144,6 +146,7 @@ const renderRow = (message) =>
 
 test("a referenced conversation renders as a chip naming its own target", () => {
   locale = "en";
+  store.sessions = [];
   const html = renderChip();
   assert.match(html, /data-action="open-session-reference"/);
   assert.match(html, /data-session-id="session-a"/);
@@ -165,10 +168,36 @@ test("a referenced conversation renders as a chip naming its own target", () => 
 
 test("the chip speaks the reader's language", () => {
   locale = "zh-CN";
+  store.sessions = [];
   const html = renderChip();
   assert.match(html, /会话引用 · Nightly review/);
   assert.match(html, /title="打开会话 Nightly review"/);
   assert.match(html, /aria-label="会话引用 · Nightly review"/);
+});
+
+test("a renamed conversation follows through to every message that references it", () => {
+  locale = "zh-CN";
+  store.sessions = [{ id: "session-a", title: "依赖清理顺序（改名后）" }];
+  const renamed = renderChip();
+  assert.match(renamed, /会话引用 · 依赖清理顺序（改名后）/);
+  assert.match(renamed, /title="打开会话 依赖清理顺序（改名后）"/);
+  assert.doesNotMatch(renamed, /Nightly review/, "the pasted name does not survive a rename");
+
+  store.sessions = [{ id: "session-b", title: "另一段对话" }];
+  assert.match(
+    renderChip(),
+    /会话引用 · Nightly review/,
+    "an unlisted conversation keeps the name recorded on the message",
+  );
+  assert.doesNotMatch(renderChip(), /另一段对话/, "another conversation's title is not borrowed");
+
+  store.sessions = [{ id: "session-a", title: "  " }];
+  assert.match(
+    renderChip(),
+    /会话引用 · Nightly review/,
+    "an empty title falls back to the recorded name",
+  );
+  store.sessions = [];
 });
 
 test("a user message shows the reference next to its own words", () => {

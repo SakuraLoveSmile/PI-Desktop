@@ -1849,7 +1849,7 @@ identify the platform validation still needed.
   link and read the clipboard. 2) Open B, paste the link into the Composer
   draft, send it, and inspect the user message. 3) Ask a follow-up in B without
   repeating the link. 4) Paste C's link into B and send. 5) In A, send A's own
-  link.
+  link. 6) Rename A from its conversation overflow menu, then return to B.
 - **Expected**: The clipboard holds `pi-desktop://session/<A's id>`. B's user
   message keeps the link text visible and shows a chat-icon chip labelled with
   the catalog's reference label and A's title; activating the chip opens A. The
@@ -1858,6 +1858,9 @@ identify the platform validation still needed.
   nothing: the message keeps its plaintext and the model receives no excerpt
   from them, because the resolver drops a self-reference before any read and
   discards an excerpt whose conversation belongs to another project.
+  Renaming A afterwards renames the chip in B, which names the conversation from
+  its current title; the excerpt the model already read keeps the name recorded
+  when the reference was made.
 - **Specs linked**: `04-ux/08-component-spec.md` §20B,
   `03-runtime/04-data-storage.md`, `03-runtime/02-agent-runtime.md`
 - **Acceptance criterion**: C — Conversation & stream
