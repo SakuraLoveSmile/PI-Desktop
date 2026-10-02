@@ -65,8 +65,6 @@ CREATE TABLE sessions (
                                           'high', 'xhigh', 'max', 'omit')),
   permission_mode TEXT NOT NULL DEFAULT 'inherit'
                 CHECK (permission_mode IN ('inherit', 'ask', 'accept-edits', 'auto')),
-  execution_profile TEXT NOT NULL DEFAULT 'standard'
-                CHECK (execution_profile IN ('standard', 'team')),
   source      TEXT,
   deleted_at  INTEGER,
   pinned      INTEGER NOT NULL DEFAULT 0,
@@ -251,7 +249,6 @@ CREATE TABLE IF NOT EXISTS plan_approvals (
   turn_id               TEXT NOT NULL,
   tool_call_id          TEXT NOT NULL UNIQUE,
   kind                  TEXT NOT NULL DEFAULT 'plan' CHECK (kind IN ('plan', 'goal')),
-  artifact_workspace_kind TEXT NOT NULL DEFAULT 'project' CHECK (artifact_workspace_kind IN ('project', 'scratch')),
   plan_json             TEXT NOT NULL,
   title                 TEXT NOT NULL DEFAULT '',
   question              TEXT NOT NULL DEFAULT '',
@@ -272,13 +269,6 @@ CREATE TABLE IF NOT EXISTS plan_approvals (
   artifact_size_bytes   INTEGER,
   version               INTEGER NOT NULL DEFAULT 1,
   execution_id          TEXT UNIQUE,
-  execution_provider_id TEXT,
-  execution_model_id    TEXT,
-  execution_kind        TEXT CHECK (execution_kind IN ('plan', 'goal')),
-  revision_intent_json  TEXT,
-  revision_state        TEXT CHECK (revision_state IN ('ready', 'started', 'failed', 'submitted')),
-  revision_turn_id      TEXT,
-  revision_error_code   TEXT,
   execution_state       TEXT CHECK (execution_state IN (
     'queued', 'running', 'completed', 'interrupted'
   ))
@@ -294,66 +284,4 @@ CREATE INDEX IF NOT EXISTS idx_plan_approvals_execution_queue
   WHERE execution_state IN ('queued', 'running');
 CREATE INDEX IF NOT EXISTS idx_plan_approvals_execution_id
   ON plan_approvals(execution_id) WHERE execution_id IS NOT NULL;
-
-CREATE TABLE IF NOT EXISTS plan_execution_schedules (
-  proposal_id   TEXT PRIMARY KEY REFERENCES plan_approvals(request_id) ON DELETE CASCADE,
-  scheduled_for INTEGER NOT NULL,
-  timezone      TEXT NOT NULL,
-  state         TEXT NOT NULL CHECK (state IN ('scheduled', 'missed', 'claimed', 'cancelled')),
-  updated_at    INTEGER NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_plan_execution_schedules_due
-  ON plan_execution_schedules(state, scheduled_for);
-"#;
-
-/// Canonical Team tables (ADR 0307). Kept in one batch so fresh databases and
-/// migrations share the identical definition, checks, and indexes.
-pub(crate) const TEAM_SCHEMA: &str = r#"
-CREATE TABLE IF NOT EXISTS teams (
-  team_session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
-  revision        INTEGER NOT NULL DEFAULT 1,
-  paused          INTEGER NOT NULL DEFAULT 0,
-  created_at      INTEGER NOT NULL,
-  updated_at      INTEGER NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS team_members (
-  team_session_id   TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-  member_session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-  name              TEXT NOT NULL,
-  description       TEXT,
-  context_kind      TEXT NOT NULL DEFAULT 'fresh'
-                    CHECK (context_kind IN ('fresh', 'fork')),
-  phase             TEXT NOT NULL DEFAULT 'provisioning'
-                    CHECK (phase IN ('provisioning', 'idle', 'running', 'failed', 'completed')),
-  model_id          TEXT,
-  provider_id       TEXT,
-  error             TEXT,
-  created_at        INTEGER NOT NULL,
-  updated_at        INTEGER NOT NULL,
-  PRIMARY KEY (team_session_id, name),
-  UNIQUE (team_session_id, member_session_id)
-);
-CREATE INDEX IF NOT EXISTS idx_team_members_session
-  ON team_members(member_session_id);
-
-CREATE TABLE IF NOT EXISTS team_tasks (
-  team_session_id   TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-  task_id           TEXT NOT NULL,
-  revision          INTEGER NOT NULL DEFAULT 1,
-  subject           TEXT NOT NULL,
-  description       TEXT,
-  status            TEXT NOT NULL DEFAULT 'pending'
-                    CHECK (status IN ('pending', 'in_progress', 'completed', 'failed', 'cancelled')),
-  owner_session_id  TEXT REFERENCES sessions(id) ON DELETE SET NULL,
-  owner_member_name TEXT,
-  blocked_by_json   TEXT NOT NULL DEFAULT '[]',
-  write_scopes_json TEXT NOT NULL DEFAULT '[]',
-  deleted           INTEGER NOT NULL DEFAULT 0,
-  created_at        INTEGER NOT NULL,
-  updated_at        INTEGER NOT NULL,
-  PRIMARY KEY (team_session_id, task_id)
-);
-CREATE INDEX IF NOT EXISTS idx_team_tasks_status
-  ON team_tasks(team_session_id, status);
 "#;
