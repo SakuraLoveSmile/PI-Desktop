@@ -888,14 +888,19 @@ identify the platform validation still needed.
   resources, and the tray starts without a missing-icon warning. Key lifecycle
   and error records are written to the categorized logs. GitHub auto-update is
   not started until after `ensureWindow`, and a hung feed cannot keep updater
-  status on `checking` for Chromium's ~60s timeout.
+  status on `checking` for Chromium's ~60s timeout. The Main output root also
+  resolves from inside Rollup shared chunks (`out/main/chunks/*.js`), so the
+  renderer entry, preloads, and the forked plugin host keep their authored
+  relative paths instead of resolving one level too deep (black screen).
 - **Specs linked**: `03-runtime/07-process-model.md`, `04-ux/01-ui-ia.md`,
   `03-runtime/09-logging-and-observability.md`
 - **Acceptance**: A (app startup)
 - **Milestone**: M1
 - **Status**: Partially automated (`runtime-build-contract.test.mjs` covers the
   dependency build contract; `update-timeout.test.mjs` and
-  `auto-update.test.mjs` cover the bounded auto-check contract; Electron window
+  `auto-update.test.mjs` cover the bounded auto-check contract;
+  `main-module-path.test.mjs` covers the Main output-root contract from the
+  entry bundle and from inside `out/main/chunks/`; Electron window
   launch remains Draft)
 
 #### E2E-002: IPC bridge is functional
