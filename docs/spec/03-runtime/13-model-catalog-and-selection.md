@@ -69,8 +69,11 @@ entitled to it.
   mapping, the runtime sends that canonical value through to the adapter rather
   than letting the adapter clamp it to `high`. Existing non-null catalog
   mappings remain authoritative for providers that translate the level.
-- The wire API is derived from the provider's published `npm` adapter
-  (`apiStyleForAdapter`) and is only editable inside **Advanced**.
+- Named service defaults may derive their wire API from the provider's
+  published `npm` adapter (`apiStyleForAdapter`). A custom endpoint's saved
+  API style is the selected gateway format and takes precedence over a model's
+  published adapter; named and OAuth providers may keep a model-level wire API
+  pin when their catalog requires it.
 - A custom model ID is always accepted, so a gateway without a `/models` route
   stays usable.
 
@@ -355,8 +358,11 @@ Bindings written before either marker preserve their stored window and output
 cap, including 128,000 and 8,192, because old records cannot distinguish generic
 seeds from user choices. Only explicit `catalog` provenance follows later
 corrections. Unknown models use conservative
-128k / 8.2k limits and are never promoted from an ID pattern alone. Both markers
-are optional, so old configs remain readable and downgrade clients ignore them.
+128k / 8.2k runtime limits and are never promoted from an ID pattern alone.
+Settings shows an em dash for an unpublished limit unless the user explicitly
+configured that value; the Advanced inputs retain the conservative runtime
+limits until the user edits them. Both markers are optional, so old configs
+remain readable and downgrade clients ignore them.
 
 The configured user value remains persisted and visible in Advanced settings, but
 provider safety does not trust an enlarged override beyond a known published

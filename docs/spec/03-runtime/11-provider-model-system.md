@@ -667,13 +667,15 @@ including reasoning-model routes. A resolved model record may explicitly set
 role; this override is model-scoped and does not change other providers.
 
 A catalog entry may additionally pin a model-level wire API (for example,
-`api: "openai-responses"`). When present it wins over the provider-wide
-`apiStyle` if compatible with the provider's protocol family (so responses-only
-models under an `opencode_go` provider are sent through the Responses adapter
-instead of Chat Completions). Foreign catalog wire APIs (such as
-`google-generative-ai` or `anthropic-messages` matched on relay endpoints) do
-not overwrite an OpenAI-compatible provider's configured wire style (issue #1310).
-Without a model-level pin the provider-wide style applies unchanged.
+`api: "openai-responses"`). A custom endpoint uses its saved provider-wide
+`apiStyle` first because that field records the format the user selected for
+that gateway; published model metadata cannot silently retarget it. Other
+provider rows may use a model-level pin when its protocol family is compatible,
+so responses-only models under an `opencode_go` provider use the Responses
+adapter instead of Chat Completions. Foreign catalog wire APIs (such as
+`google-generative-ai` or `anthropic-messages` matched on an OpenAI-compatible
+relay) do not replace the provider's configured wire style (issue #1310).
+Without a model-level pin the provider-wide style applies.
 
 This is the **universal escape hatch** guaranteeing market coverage beyond native integrations.
 
