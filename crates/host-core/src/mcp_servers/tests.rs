@@ -34,6 +34,12 @@ fn validation_accepts_http_endpoints_and_rejects_bad_ids() {
     assert!(McpServerRegistry::validate_config(&config).is_err());
     config.command = Some("node".into());
     assert!(McpServerRegistry::validate_config(&config).is_ok());
+    config.timeout_seconds = Some(0);
+    assert!(McpServerRegistry::validate_config(&config).is_err());
+    config.timeout_seconds = Some(601);
+    assert!(McpServerRegistry::validate_config(&config).is_err());
+    config.timeout_seconds = Some(60);
+    assert!(McpServerRegistry::validate_config(&config).is_ok());
 }
 
 #[test]
@@ -65,6 +71,7 @@ fn disabled_project_server_shadows_global_server() {
         env: BTreeMap::new(),
         url: None,
         headers: BTreeMap::new(),
+        timeout_seconds: None,
         enabled: true,
         scope: ActivationScope::default(),
         created_at: String::new(),

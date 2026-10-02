@@ -41,6 +41,8 @@ pub struct McpServerRecord {
     pub url: Option<String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub headers: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout_seconds: Option<u64>,
     pub enabled: bool,
     #[serde(default)]
     pub scope: ActivationScope,
@@ -68,6 +70,8 @@ struct McpConfig {
     url: Option<String>,
     #[serde(default)]
     headers: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    timeout_seconds: Option<u64>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -84,6 +88,7 @@ pub struct McpServerInput {
     pub env: Option<BTreeMap<String, String>>,
     pub url: Option<String>,
     pub headers: Option<BTreeMap<String, String>>,
+    pub timeout_seconds: Option<u64>,
     pub enabled: Option<bool>,
     /// Kept for protocol compatibility; capability state is app-local instead.
     #[allow(dead_code)]
@@ -242,6 +247,7 @@ impl McpServerRegistry {
                 env: config.env,
                 url: config.url,
                 headers: config.headers,
+                timeout_seconds: config.timeout_seconds,
                 enabled,
                 scope: scope_for(level, owner_project_path.as_deref()),
                 created_at: updated_at.clone(),
@@ -318,6 +324,11 @@ impl McpServerRegistry {
         check_len("label", &config.label)?;
         if let Some(description) = &config.description {
             check_len("description", description)?;
+        }
+        if let Some(timeout) = config.timeout_seconds {
+            if !(1..=600).contains(&timeout) {
+                bail!("MCP_INVALID: timeoutSeconds must be between 1 and 600");
+            }
         }
         match config.transport.as_str() {
             "stdio" => {
@@ -411,6 +422,9 @@ impl McpServerRegistry {
                 .filter(|value| !value.is_empty())
                 .or_else(|| current.and_then(|record| record.description.clone())),
             transport,
+            timeout_seconds: input
+                .timeout_seconds
+                .or_else(|| current.and_then(|record| record.timeout_seconds)),
             ..Default::default()
         };
         if config.transport == "stdio" {
