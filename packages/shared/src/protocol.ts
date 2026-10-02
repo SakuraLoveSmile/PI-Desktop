@@ -2,7 +2,7 @@ export const PROTOCOL_VERSION = 11 as const;
 export const SCHEMA_VERSION = 16 as const;
 export const APP_ID = "net.aiuo.pi-desktop";
 export const APP_NAME = "PI-Desktop";
-export const APP_VERSION = "0.16.0-beta.1";
+export const APP_VERSION = "0.16.0";
 
 export const APP_MENU_COMMANDS = [
   "newTask",
@@ -105,7 +105,7 @@ export const IPC = {
     liveVoiceStopWorkOperation: "pi-desktop/voice/live/work/stopOperation",
     liveVoiceCancelQueuedOperation: "pi-desktop/voice/live/work/cancelQueuedOperation",
     liveVoiceWidgetAction: "pi-desktop/voice/live/widget/action",
-    liveVoiceWidgetIssue: "pi-desktop/voice/live/widget/issue",
+    liveVoiceWidgetOwnerState: "pi-desktop/voice/live/widget/ownerState",
     liveVoiceWidgetVisibility: "pi-desktop/voice/live/widget/visibility",
     agentCompact: "pi-desktop/agent/compact",
     agentAbort: "pi-desktop/agent/abort",
