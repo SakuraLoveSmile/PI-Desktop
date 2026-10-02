@@ -366,13 +366,14 @@ test("a remote mcp server negotiates over http and keeps its session", async (t)
 });
 
 test("a remote MCP tool can run longer than the connection timeout", async (t) => {
-  const { url } = await startHttpServer(t, { slowToolDelayMs: 80 });
+  // Keep connectTimeoutMs < slowToolDelayMs < callTimeoutMs, each with headroom for a loaded CI host.
+  const { url } = await startHttpServer(t, { slowToolDelayMs: 1_200 });
   const client = new McpServerClient({
     rootPath: mkdtempSync(join(tmpdir(), "pi-mcp-http-")),
     server: { id: "remote", transport: "http", url },
     values: {},
-    connectTimeoutMs: 20,
-    callTimeoutMs: 500,
+    connectTimeoutMs: 1_000,
+    callTimeoutMs: 10_000,
   });
   t.after(() => client.close());
 
