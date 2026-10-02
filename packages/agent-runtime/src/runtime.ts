@@ -1,3 +1,4 @@
+import { orderSystemRows, SystemTranscriptJournal } from "./system-transcript-journal.js";
 import { accountModelStream } from "./request-usage.js";
 import { modeToolDenial, retainModeToolDeclaration, withModeExecutionGuard } from "./mode-tool-access.js";
 import { restoreHostedSearchReplay } from "./hosted-search-replay.js";
@@ -40,6 +41,7 @@ import {
 } from "@earendil-works/pi-agent-core";
 import {
   isContextOverflow,
+  getCurrentTools,
   Type,
   type Api,
   type AssistantMessage,
@@ -136,9 +138,12 @@ import { withExplicitRequired } from "./tool-schema.js";
 import { buildSessionContext } from "./session-context.js";
 import {
   initialSystemTranscript,
+  CONTEXT_BUDGET_SECTION,
+  syncSystemSections,
+  systemTranscriptCheckpoint,
+  removeTrailingAssistantMessages,
   rebuildSystemTranscript,
   replaceSystemPrompt,
-  syncSystemTools,
   systemPromptContent,
 } from "./system-transcript.js";
 import {
@@ -205,6 +210,7 @@ import type { CustomSystemPrompt } from "./custom-system-prompt.js";
 import { projectMemoryPrompt } from "./project-memory-prompt.js";
 import {
   pluginSkillsPrompt,
+  pluginSkillsPromptSections,
   SKILL_TOOL_NAME,
   type PluginSkillDef,
 } from "./plugin-skills-prompt.js";
@@ -1794,6 +1800,8 @@ export class DesktopAgentRuntime {
   };
   private terminatingToolCalls = new Set<string>();
   private fullEntries: MessageEntry[];
+  private readonly systemJournal = new SystemTranscriptJournal();
+  private composedSections: Record<string, string> = {};
   private activeCompaction?: ContextCompactionRecord;
   private compactionEnabled: boolean;
   private readonly compactionStrategy: CompactionStrategy;
@@ -1846,7 +1854,7 @@ export class DesktopAgentRuntime {
     this.streamSink = createStreamCoalescer(opts.onEvent);
     this.onEvent = (envelope) => this.streamSink.push(envelope);
     this.pluginTools = opts.pluginTools ?? [];
-    this.pluginSkills = opts.pluginSkills ?? [];
+    this.pluginSkills = [...(opts.pluginSkills ?? [])].sort((left, right) => left.id.localeCompare(right.id));
     this.trustedExtensionSpecs = opts.trustedExtensions ?? [];
     this.subagents = opts.subagents ?? [];
     this.subagentProviders = opts.subagentProviders ?? {};
@@ -1881,7 +1889,6 @@ export class DesktopAgentRuntime {
     this.delegationChains.hydrate(
       rebuildChainsFromTranscript(this.transcriptHistory),
     );
-    const skillsPrompt = pluginSkillsPrompt(this.pluginSkills);
     // Parts: [0] is the product persona; [1:] are operational rules a custom
     // SYSTEM.md must not remove (tool guidance, delegation, scratch, skills).
     const defaultSystemPromptParts = [
@@ -1913,8 +1920,6 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             `Your scratch directory for this session is \`${formatScratchDirForShell(this.commandShell, this.scratchDir)}\` (in Bash: ${shellScratchVariable(this.commandShell)}). Store ad-hoc temporary and intermediate files there using absolute paths. Workspace writes must be task-related project files or required toolchain outputs. Scratch persists across turns and is deleted with the session.`,
           ]
         : []),
-      // Plugin skills (D174).
-      ...(skillsPrompt ? [skillsPrompt] : []),
     ];
     // A custom SYSTEM.md replaces only the product persona line, never the
     // operational rules in the default parts: tool guidance, delegation
@@ -2058,19 +2063,24 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       // The provider's rule that a tool-call id is unique is enforced here, on
       // the last view before the wire: the request is the only place it can be
       // guaranteed for both a rebuilt context and one that grew in this process.
-      convertToLlm: (messages) =>
-        alignRetainedReasoningIdentity(
-          convertToLlm(this.dropDuplicateToolCalls(messages)),
-          this.reasoningReplayIdentity(),
-        ),
+      convertToLlm: async (messages) => {
+        await this.systemJournal.persist(messages, this.fullEntries, async (message) => {
+          await this.host.call("session.appendMessage", {
+            sessionId: this.sessionId, turnId: this.turnId, message,
+          });
+        });
+        return alignRetainedReasoningIdentity(
+          convertToLlm(this.dropDuplicateToolCalls(messages)), this.reasoningReplayIdentity(),
+        );
+      },
       prepareNextTurnWithContext: (context, signal) =>
         this.prepareNextTurn(context, signal),
       afterToolCall: async (context) => this.afterToolCall(context),
       initialState: {
         model,
-        tools,
+        tools: [],
         thinkingLevel: agentThinkingLevel(this.thinkingLevel),
-        messages: initialSystemTranscript(this.composeSystemPrompt(), tools, this.liveSessionContext().messages),
+        messages: initialSystemTranscript(this.composeSystemPrompt(), tools, this.liveSessionContext().messages, this.composedSections),
       },
       // Plan transitions must be the only tool call in an assistant batch.
       // Sequential execution also makes the host-confirmed mode change visible
@@ -2093,6 +2103,9 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         return { action: "end" };
       },
     });
+
+    // Avoid Pi inserting a tool-only baseline ahead of restored legacy rows.
+    this.setAgentTools(tools);
 
     // pi awaits every listener, so a throw here would reject the run in
     // progress and, with nothing awaiting that rejection, could take the whole
@@ -2119,6 +2132,18 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
   setInfiniteProviderRetry(enabled: boolean): void {
     if (this.disposed) throw new Error("runtime disposed");
     this.infiniteProviderRetry = enabled;
+  }
+
+  /** Refresh catalog instructions without changing the running session owner. */
+  setPluginSkills(skills: PluginSkillDef[]): void {
+    if (this.disposed) throw new Error("runtime disposed");
+    if (this.getStatus().isRunning) throw new Error("cannot update skills during an active turn");
+    const sorted = [...skills].sort((left, right) => left.id.localeCompare(right.id));
+    if (pluginSkillsDigest(this.pluginSkills) === pluginSkillsDigest(sorted)) return;
+    this.pluginSkills = sorted;
+    this.rebuildToolCatalog();
+    this.setAgentTools(this.activeTools());
+    this.setAgentSystemPrompt(this.composeSystemPrompt());
   }
 
   /** Switch the planning state on this Agent without creating another Agent. */
@@ -2161,7 +2186,9 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       (this.agent.state as unknown as { systemPrompt: string }).systemPrompt = prompt;
       return;
     }
-    this.agent.state.messages = replaceSystemPrompt(this.agent.state.messages, prompt);
+    this.agent.state.messages = prompt === this.composedSystemPrompt
+      ? syncSystemSections(this.agent.state.messages, this.composedSections)
+      : replaceSystemPrompt(this.agent.state.messages, prompt);
   }
 
   private setAgentMessages(messages: AgentMessage[]): void {
@@ -2169,17 +2196,13 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       this.agent.state.messages = messages;
       return;
     }
-    this.agent.state.messages = syncSystemTools(
-      rebuildSystemTranscript(this.agent.state.messages, messages),
-      this.agent.state.tools,
+    this.agent.state.messages = rebuildSystemTranscript(
+      this.agent.state.messages.filter((message) => message.role !== "system" || !this.systemJournal.isPersisted(message)), messages,
     );
   }
 
   private setAgentTools(tools: AgentTool[]): void {
     this.agent.state.tools = tools;
-    if (this.agentUsesTranscriptSystemMessages()) {
-      this.agent.state.messages = syncSystemTools(this.agent.state.messages, tools);
-    }
   }
 
   private agentSystemPromptContent(): string {
@@ -2198,17 +2221,18 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             runningDelegationIds: this.runningDelegationIds(),
           })
         : "";
-    const composed = composeModeSystemPrompt(
-      this.mode,
-      [
-        this.baseSystemPrompt,
+    this.composedSections = {
+      runtime: this.baseSystemPrompt,
+      ...pluginSkillsPromptSections(this.pluginSkills),
+      context: composeModeSystemPrompt(this.mode, [
         ...(this.customSystemPrompt?.append ? [this.customSystemPrompt.append] : []),
         ...(optionalToolsPrompt ? [optionalToolsPrompt] : []),
         ...(projectPrompt ? [projectPrompt] : []),
         ...(memoryPrompt ? [memoryPrompt] : []),
         ...(resumablePrompt ? [resumablePrompt] : []),
-      ].join("\n\n"),
-    );
+      ].join("\n\n")),
+    };
+    const composed = Object.values(this.composedSections).filter(Boolean).join("\n\n");
     this.composedSystemPrompt = composed;
     return composed;
   }
@@ -2421,9 +2445,8 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
   /** True when this runtime can be reused for a prompt with the given config. */
   matches(config: RuntimeMatchConfig): boolean {
     const requestedPluginTools = config.pluginTools ?? [];
-    const requestedPluginSkills = config.pluginSkills ?? [];
-    const current = this.pluginTools.map((t) => t.name).sort().join(",");
-    const next = requestedPluginTools.map((t) => t.name).sort().join(",");
+    const current = safeJson([...this.pluginTools].sort((a, b) => a.name.localeCompare(b.name)));
+    const next = safeJson([...requestedPluginTools].sort((a, b) => a.name.localeCompare(b.name)));
     const currentThinkingLevels = [
       ...(this.provider.supportedThinkingLevels ?? ["off"]),
     ]
@@ -2466,10 +2489,6 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         safeJson(config.customSystemPrompt ?? null) &&
       (this.projectMemory ?? "") === (config.projectMemory?.trim() ?? "") &&
       (this.projectPath ?? "") === (config.projectPath?.trim() ?? "") &&
-      // Enabling a plugin, revoking agent.prompt.inject or renaming a skill
-      // changes the catalog digest, which retires the runtime and its stale
-      // prompt. Bodies are excluded: the Skill tool always reads them fresh.
-      pluginSkillsDigest(this.pluginSkills) === pluginSkillsDigest(requestedPluginSkills) &&
       // Editing `~/.agents/subagents/*.md` must reach the next prompt. Definition
       // bodies are part of the `Task` tool's behavior, so unlike skills they
       // are compared in full.
@@ -2770,14 +2789,17 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     // (the nearest one above), keeping each call adjacent to its result as
     // the provider APIs require.
     let toolCarrier: AssistantMessage | undefined;
-    for (const m of history) {
+    for (const m of orderSystemRows(history)) {
       // Subagent rows belong to the transcript and to review, never to the
       // parent's model context (ADR 0062): the parent only ever saw the `Task`
       // report, and replaying a delegate's messages would both contradict that
       // and reintroduce the context cost delegation exists to avoid.
       if (m.parentToolCallId) continue;
       const timestamp = Date.parse(m.createdAt) || Date.now();
-      if (m.role === "user") {
+      if (m.role === "system" && m.modelSystem) {
+        toolCarrier = undefined;
+        append(m.id, this.systemJournal.restore(m));
+      } else if (m.role === "user") {
         toolCarrier = undefined;
         const attachments = (m.attachments ?? []).map((attachment) =>
           runtimeAttachmentFromMessage(
@@ -2824,8 +2846,13 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
           role: "assistant",
           content,
           api,
-          provider: this.provider.id,
-          model: this.provider.modelId,
+          // Persisted providerId identifies a local account; Pi compares its
+          // vendor identity to decide whether native thinking can be replayed.
+          // Keep known account/model switches distinct; legacy rows have no
+          // source identity and retain the existing current-model fallback.
+          provider: !m.providerId || m.providerId === this.provider.id
+            ? this.model.provider : m.providerId,
+          model: m.modelId || this.model.id,
           usage: usageToPi(m.usage),
           stopReason: "stop",
           timestamp,
@@ -2841,8 +2868,8 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             role: "assistant",
             content: [],
             api,
-            provider: this.provider.id,
-            model: this.provider.modelId,
+            provider: this.model.provider,
+            model: this.model.id,
             usage: usageToPi(undefined),
             stopReason: "toolUse",
             timestamp,
@@ -2893,6 +2920,9 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
   ): Entry[] {
     const entries: Entry[] = [...this.fullEntries];
     if (!checkpoint) return entries;
+    if (isRecord(checkpoint.details) && checkpoint.details.systemMessageJson) {
+      this.systemJournal.rememberCheckpoint(checkpoint.details.systemMessageJson);
+    }
     const throughIndex = entries.findIndex(
       (entry) => entry.id === checkpoint.throughMessageId,
     );
@@ -5306,7 +5336,15 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
   private restoreDeferredToolsFromContext(): void {
     if (this.deferredToolNames.size === 0) return;
     const { messages } = this.liveSessionContext();
-    for (const message of messages) {
+    const lastSystem = messages.map((message) => message.role).lastIndexOf("system");
+    if (lastSystem >= 0) {
+      for (const tool of getCurrentTools(messages)) {
+        if (this.deferredToolNames.has(tool.name)) this.activeDeferredToolNames.add(tool.name);
+      }
+    }
+    // Legacy histories lack declarations. For current histories, only results
+    // after the last declaration can represent an activation not yet declared.
+    for (const message of messages.slice(lastSystem + 1)) {
       if (message.role !== "toolResult" || message.isError) continue;
       if (isMissingToolResultPlaceholder(message.content)) continue;
       const names =
@@ -5923,8 +5961,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
 
     // agentLoopContinue refuses a transcript ending in an assistant message,
     // and this one carries nothing worth resending anyway.
-    const messages = [...this.agent.state.messages];
-    while (messages.at(-1)?.role === "assistant") messages.pop();
+    const messages = removeTrailingAssistantMessages(this.agent.state.messages);
     this.setAgentMessages(messages);
 
     const promptBefore = this.agentSystemPromptContent();
@@ -5974,8 +6011,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         this.pendingOverflow = false;
         this.suppressOverflowRunEnd = false;
         this.overflowRecoveryAttempted = true;
-        const messages = [...this.agent.state.messages];
-        while (messages.at(-1)?.role === "assistant") messages.pop();
+        const messages = removeTrailingAssistantMessages(this.agent.state.messages);
         this.setAgentMessages(messages);
         const compacted = await this.runCompaction(
           "overflow",
@@ -6031,8 +6067,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     // pi-agent-core refuses `continue()` when the transcript ends in an
     // assistant message. The progress text is already visible in the reused
     // bubble, so it must not be sent back as model context.
-    const messages = [...this.agent.state.messages];
-    while (messages.at(-1)?.role === "assistant") messages.pop();
+    const messages = removeTrailingAssistantMessages(this.agent.state.messages);
     this.setAgentMessages(messages);
 
     const promptBefore = this.agentSystemPromptContent();
@@ -6358,12 +6393,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     return { context };
   }
 
-  /**
-   * Codex's two-tier `maybe_record`, as a system-prompt append for this turn
-   * only. Codex writes its reminders into conversation history; we have no
-   * channel for a synthetic message that stays out of the transcript, and the
-   * append is equivalent without persisting anything.
-   */
+  /** A replaceable reminder section expires when compaction opens a new window. */
   private withContextBudgetReminder(
     context: AgentContext,
     budget: ContextBudget,
@@ -6381,7 +6411,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       ...(systemPrompt ? { systemPrompt } : {}),
       messages: [
         ...context.messages,
-        { role: "system", content: reminder, timestamp: Date.now() },
+        { role: "system", content: "", sections: { [CONTEXT_BUDGET_SECTION]: reminder }, timestamp: Date.now() },
       ],
     } as AgentContext;
   }
@@ -6828,6 +6858,11 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     mustFitSafeBudget: boolean,
     fallback?: ContextCompactionFallback,
   ): Promise<CheckpointPersistResult> {
+    const systemMessage = systemTranscriptCheckpoint(this.agent.state.messages);
+    checkpoint = {
+      ...checkpoint,
+      details: { ...(isRecord(checkpoint.details) ? checkpoint.details : {}), ...(systemMessage ? { systemMessageJson: JSON.stringify(systemMessage) } : {}) },
+    };
     const compactedBudget = this.contextBudget(
       this.liveSessionContext(checkpoint).messages,
     );
@@ -6853,7 +6888,10 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     // resetting its `claim_*` flags when the context window turns over.
     this.contextReminderClaimed = false;
     this.contextFallbackReminderClaimed = false;
-    this.setAgentMessages(this.liveSessionContext().messages);
+    this.agent.state.messages = this.liveSessionContext().messages;
+    for (const message of this.agent.state.messages) {
+      if (message.role === "system") this.systemJournal.remember(message, checkpoint.id);
+    }
     this.emit({
       type: "compaction_end",
       reason,

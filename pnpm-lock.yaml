@@ -178,7 +178,7 @@ patchedDependencies:
     hash: b98bc9f5653147d34650f4be892612c7b34f7c553a58cb70457cf900310347d7
     path: patches/@earendil-works__pi-agent-core@0.99.1.patch
   '@earendil-works/pi-ai@0.99.1':
-    hash: c9e66480f4eefd4a5d3ac998d3b65bf761fb22a17a238cb44c76d31448454ec4
+    hash: d146cb1c4386252dd01f522fab0c388868fed0c86d230b4c34e5fd28a8bfc6e4
     path: patches/@earendil-works__pi-ai@0.99.1.patch
   '@earendil-works/pi-coding-agent@0.99.1':
     hash: 0e05051778ef4ffca9bac7ec68cae64f1d659d4b8640eeeb1a121e0f620a6abe
@@ -209,7 +209,7 @@ importers:
     devDependencies:
       '@earendil-works/pi-ai':
         specifier: 0.99.1
-        version: 0.99.1(patch_hash=c9e66480f4eefd4a5d3ac998d3b65bf761fb22a17a238cb44c76d31448454ec4)(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(undici@6.28.0)(ws@8.21.1)(zod@4.4.3)
+        version: 0.99.1(patch_hash=d146cb1c4386252dd01f522fab0c388868fed0c86d230b4c34e5fd28a8bfc6e4)(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(undici@6.28.0)(ws@8.21.1)(zod@4.4.3)
       '@earendil-works/pi-mcp':
         specifier: 0.99.1
         version: 0.99.1
@@ -404,7 +404,7 @@ importers:
         version: 0.99.1(patch_hash=b98bc9f5653147d34650f4be892612c7b34f7c553a58cb70457cf900310347d7)(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(undici@8.10.2)(ws@8.21.1)(zod@4.4.3)
       '@earendil-works/pi-ai':
         specifier: 0.99.1
-        version: 0.99.1(patch_hash=c9e66480f4eefd4a5d3ac998d3b65bf761fb22a17a238cb44c76d31448454ec4)(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(undici@8.10.2)(ws@8.21.1)(zod@4.4.3)
+        version: 0.99.1(patch_hash=d146cb1c4386252dd01f522fab0c388868fed0c86d230b4c34e5fd28a8bfc6e4)(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(undici@8.10.2)(ws@8.21.1)(zod@4.4.3)
       '@earendil-works/pi-coding-agent':
         specifier: 0.99.1
         version: 0.99.1(patch_hash=0e05051778ef4ffca9bac7ec68cae64f1d659d4b8640eeeb1a121e0f620a6abe)(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@8.21.1)(zod@4.4.3)
@@ -5310,7 +5310,7 @@ snapshots:
   '@earendil-works/pi-agent-core@0.99.1(patch_hash=b98bc9f5653147d34650f4be892612c7b34f7c553a58cb70457cf900310347d7)(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(undici@8.10.2)(ws@8.21.1)(zod@4.4.3)':
     dependencies:
       '@earendil-works/chord': 0.99.1
-      '@earendil-works/pi-ai': 0.99.1(patch_hash=c9e66480f4eefd4a5d3ac998d3b65bf761fb22a17a238cb44c76d31448454ec4)(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(undici@8.10.2)(ws@8.21.1)(zod@4.4.3)
+      '@earendil-works/pi-ai': 0.99.1(patch_hash=d146cb1c4386252dd01f522fab0c388868fed0c86d230b4c34e5fd28a8bfc6e4)(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(undici@8.10.2)(ws@8.21.1)(zod@4.4.3)
       '@earendil-works/pi-telemetry': 0.99.1
       diff: 8.0.4
       ignore: 7.0.8
@@ -5329,7 +5329,7 @@ snapshots:
       - ws
       - zod
 
-  '@earendil-works/pi-ai@0.99.1(patch_hash=c9e66480f4eefd4a5d3ac998d3b65bf761fb22a17a238cb44c76d31448454ec4)(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(undici@6.28.0)(ws@8.21.1)(zod@4.4.3)':
+  '@earendil-works/pi-ai@0.99.1(patch_hash=d146cb1c4386252dd01f522fab0c388868fed0c86d230b4c34e5fd28a8bfc6e4)(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(undici@6.28.0)(ws@8.21.1)(zod@4.4.3)':
     dependencies:
       '@anthropic-ai/sdk': 0.124.0(zod@4.4.3)
       '@aws-sdk/client-bedrock-runtime': 3.1127.0
@@ -5354,7 +5354,7 @@ snapshots:
       - ws
       - zod
 
-  '@earendil-works/pi-ai@0.99.1(patch_hash=c9e66480f4eefd4a5d3ac998d3b65bf761fb22a17a238cb44c76d31448454ec4)(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(undici@8.10.2)(ws@8.21.1)(zod@4.4.3)':
+  '@earendil-works/pi-ai@0.99.1(patch_hash=d146cb1c4386252dd01f522fab0c388868fed0c86d230b4c34e5fd28a8bfc6e4)(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(undici@8.10.2)(ws@8.21.1)(zod@4.4.3)':
     dependencies:
       '@anthropic-ai/sdk': 0.124.0(zod@4.4.3)
       '@aws-sdk/client-bedrock-runtime': 3.1127.0
@@ -5387,7 +5387,7 @@ snapshots:
     dependencies:
       '@earendil-works/chord': 0.99.1
       '@earendil-works/pi-agent-core': 0.99.1(patch_hash=b98bc9f5653147d34650f4be892612c7b34f7c553a58cb70457cf900310347d7)(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(undici@8.10.2)(ws@8.21.1)(zod@4.4.3)
-      '@earendil-works/pi-ai': 0.99.1(patch_hash=c9e66480f4eefd4a5d3ac998d3b65bf761fb22a17a238cb44c76d31448454ec4)(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(undici@8.10.2)(ws@8.21.1)(zod@4.4.3)
+      '@earendil-works/pi-ai': 0.99.1(patch_hash=d146cb1c4386252dd01f522fab0c388868fed0c86d230b4c34e5fd28a8bfc6e4)(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(undici@8.10.2)(ws@8.21.1)(zod@4.4.3)
       '@earendil-works/pi-codemode': 0.99.1
       '@earendil-works/pi-mcp': 0.99.1
       '@earendil-works/pi-tui': 0.99.1

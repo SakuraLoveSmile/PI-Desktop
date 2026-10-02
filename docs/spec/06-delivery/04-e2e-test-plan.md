@@ -16258,3 +16258,42 @@ renderer's durable transcript reads. No real model or provider is contacted.
 - Installed Electron, real account/paid API and cross-version rollback are
   separate release qualification. No MCP, Codemode or virtual-router migration
   is included. See `docs/project/pi-0991-adoption.md` for candidate evidence.
+
+### E2E-SYSTEM-TRANSCRIPT: Ordered model state survives restart and compaction
+
+- Fixture: isolated Host data directory, production AgentSidecar transport and
+  separate Node runtime/Pi process, local SSE provider; no real provider
+  credentials or user's Desktop process. The harness persists completed
+  messages; it does not exercise Electron's UI or persistence outbox.
+- Send a prompt, activate BrowserPreview through ToolSearch, and verify the next
+  request includes the schema. Confirm the baseline and delta are acknowledged
+  by Host and survive stopping/restarting both processes without duplicate rows.
+- Resume the session, update a skill catalog on the same runtime, and confirm the
+  next request uses the new catalog while keeping a second unchanged entry.
+  Runtime/adapter tests verify the native delta contains only the modified entry,
+  and fallback models receive the complete current catalog with removals applied.
+  Invoke Skill through the actual sidecar
+  bridge with a fixture body supplied by the embedding host. Compact, restart
+  the sidecar, and verify current skills and active tools survive without
+  replaying old tool results. Remove the final skill and verify its catalog and
+  executable schema disappear without recreating the runtime.
+- Automated: `node scripts/e2e-system-transcript.mjs` with
+  `PI_DESKTOP_HOST_BIN` pointing to the candidate Host binary. Requires built
+  shared/host-runtime/agent-runtime packages. Renderer projection tests ensure
+  model-state records stay hidden while ordinary system notices remain visible.
+- Adapter contract tests cover exact model/API/endpoint capability binding,
+  partial support, unverified relay fallback, removals/redefinitions and model
+  switching without canonical-history mutation. Real cache-hit improvement is
+  a separately authorized provider experiment, not an offline-test claim.
+
+- Flash regression: load the pinned Pi `deepseek-flash` model, serialize its
+  Desktop projection, and pass skill updates/removals through the real adapter.
+  The official binding preserves the earlier wire prefix; changed bindings
+  retain the folded fallback. Covered by `flash-transcript.test.ts`.
+- Authorized live Flash acceptance: use isolated development sessions with
+  short and long contexts. Alternate unchanged turns and single-skill updates,
+  confirm current Skill bodies execute, and compare actual outgoing prefixes
+  plus reported usage. After restart, verify no duplicate system updates and
+  same-model assistant reasoning remains separate from visible content. Adapter
+  regressions also cover legacy identities and genuine account/model changes. Cache
+  percentages are observations, not deterministic pass thresholds.

@@ -519,8 +519,8 @@ anchors on the last assistant usage and estimates everything after it as
 `chars / 4`: that constant under-counts CJK text, and with no anchor left it
 omits system/tool overhead. The budget also computes the output-cap estimator
 over non-system conversation messages plus the current system prompt and active
-tool schemas. System-transcript rows are metadata snapshots of that same prompt
-and are excluded from this component, so the request estimate counts the prompt
+tool schemas. System-transcript rows are chronological updates, already covered by that
+folded prompt/tool floor, and are excluded from this component, so the request estimate counts the prompt
 and schemas exactly once. The budget uses the larger of this full-request
 estimate and the calibrated message estimate. This is a hard floor before the
 first calibration sample and prevents counting overhead twice after an
@@ -1278,6 +1278,51 @@ payload hook keeps its own object and its return value still wins.
 + [optional user custom instructions]
 ```
 
+### 7.0.0 Chronological system state (issue #1285)
+
+The Pi agent loop owns `toolsAdded` / `toolsRemoved` declarations, including
+same-name schema replacement. Desktop never moves an update ahead of the user
+or ToolSearch result that preceded it. Instruction composition uses independent
+`runtime`, `skills` (loading instructions), `skill:<exact-id>` (one catalog
+entry each), and `context` sections. Refreshing an idle skill catalog appends only
+changed entries, uses null to revoke removed entries, and updates the executable
+catalog. Unchanged entries and loading instructions are not repeated. Restoring
+an older aggregate `skills` section upgrades it once at the continuation
+boundary; checkpoints retain the effective per-entry state. Bodies remain
+on-demand and permission-checked. Different plugin tool schemas/permissions
+invalidate idle reuse even when their names are unchanged.
+
+Before model dispatch, Desktop acknowledges new system records through Host's
+existing transcript writer. Restart replays these provider-neutral records in
+order. An old history without records receives the current declaration at its
+continuation boundary; Desktop does not invent historical instructions. Explicit
+compaction saves the effective system state once before summary and retained
+tail; it does not replay old tool deltas or preserve removed tools.
+
+Mid-conversation instructions, tool additions and full tool changes are separate
+capabilities. Desktop accepts catalog opt-ins only for the same published model,
+wire API and effective endpoint (including path and port). Unknown models,
+changed bindings and unverified relays use Pi's conservative request projection.
+Partial support keeps instruction updates but folds tools as required; removals
+and redefinitions use the adapter's supported fallback. Model switching never
+rewrites the canonical journal. Cache savings depend on the actual provider;
+unsupported routes may still rebuild the request prefix.
+
+The pinned Pi patch declares mid-conversation system support for
+`deepseek-flash` on its published `openai-completions` binding at
+`https://api.deepseek.com`. Skill changes on this binding append system updates
+without rewriting the previous request prefix. This does not enable native tool
+additions or changes, and does not apply to unverified gateways, aliases or APIs.
+The declaration comes from the patched Pi catalog, not provider settings or a
+second Desktop model catalog.
+
+When restoring assistant history, map the current local account ID to the Pi
+model's provider identity and retain recorded model IDs. A different recorded
+account or model remains distinct. Legacy rows without identity retain the
+current-model fallback. Same-model Completions reasoning stays in its native
+reasoning field, never appended to visible answer text because of an account
+UUID/vendor-name mismatch.
+
 ### 7.0.1 User custom system prompt files (issue #542)
 
 The `[optional user custom instructions]` layer is the pi-compatible file pair
@@ -1378,7 +1423,11 @@ schemas. Providers with native deferred-tool search receive the definitions at
 that load point; other providers receive the active definitions normally.
 
 At the start of each new user prompt, the sidecar clears the in-memory deferred
-activation set and rebuilds it from the effective context. Successful
+activation set and rebuilds it from the effective context. Recorded system
+messages (including a compaction checkpoint) define the active baseline. Only
+successful tool results after the latest declaration can add a new activation;
+older results must not resurrect a removed tool. Histories without system records
+continue to use successful results throughout their effective context.
 `ToolSearch` results contribute their canonical `details.addedToolNames`.
 For compatibility, historical `details.activated` and top-level
 `addedToolNames` markers are also accepted. Successful results from deferred
