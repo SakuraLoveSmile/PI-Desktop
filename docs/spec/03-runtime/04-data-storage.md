@@ -1134,7 +1134,8 @@ SessionList and session search hide the transcript while it has a run, and
 deleting the task returns it to the ordinary lists instead of leaving it
 unreachable (issue #1291).
 The existing JSON extension stores `schedule: {hour, minute, weekday}`,
-`nextRunAt` (epoch milliseconds) and `workspacePath` for desktop automations.
+`nextRunAt` (epoch milliseconds), `workspacePath`, and `sessionMode` (`perRun` or
+`reuse`, absent means `perRun`) for desktop automations.
 Optional `weekdays` stores 1–7 unique integers in 0–6, overriding legacy
 `weekday` for weekly schedules. Missing `weekdays` preserves the single-day
 behavior. Invalid or empty selections are rejected before mutation. No table

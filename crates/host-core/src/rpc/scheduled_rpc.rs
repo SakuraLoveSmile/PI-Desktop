@@ -196,23 +196,43 @@ fn handle_with_workspace_policy(
             let uses_task_execution_settings = task.permission_mode.is_some()
                 || task.thinking_level.is_some()
                 || (task.provider_id.is_some() && task.model_id.is_some());
-            let session = if automatic || uses_task_execution_settings {
-                sessions::create_session_with_options(&st.db, options)
+            // A `reuse` task continues its own previous conversation, but only
+            // while that conversation still exists and still belongs to the same
+            // project; a deleted one, or a re-pointed task, opens a fresh one.
+            let target_project = options.project_path.clone();
+            let reused = if task.session_mode == "reuse" {
+                scheduled::reusable_session(&st.db, id, target_project.as_deref())
+                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
             } else {
-                sessions::create_session(
-                    &st.db,
-                    options.title,
-                    options.mode,
-                    options.provider_id,
-                    options.model_id,
-                    options.project_path,
-                )
-            }
-            .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
-            let run_id = match scheduled::begin_run(&st.db, id, Some(&session.id)) {
+                None
+            };
+            let starting_fresh = reused.is_none();
+            let session_id = match reused {
+                Some(session_id) => session_id,
+                None => {
+                    let session = if automatic || uses_task_execution_settings {
+                        sessions::create_session_with_options(&st.db, options)
+                    } else {
+                        sessions::create_session(
+                            &st.db,
+                            options.title,
+                            options.mode,
+                            options.provider_id,
+                            options.model_id,
+                            options.project_path,
+                        )
+                    }
+                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+                    session.id
+                }
+            };
+            let run_id = match scheduled::begin_run(&st.db, id, Some(&session_id)) {
                 Ok(run_id) => run_id,
                 Err(error) => {
-                    let _ = sessions::delete_session(&st.db, &session.id);
+                    // Only a conversation this dispatch opened is cleaned up.
+                    if starting_fresh {
+                        let _ = sessions::delete_session(&st.db, &session_id);
+                    }
                     return Err(rpc_err(1000, error.to_string(), "INTERNAL"));
                 }
             };
@@ -220,7 +240,7 @@ fn handle_with_workspace_policy(
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
                 .unwrap_or(task);
             Ok(json!({
-                "sessionId": session.id,
+                "sessionId": session_id,
                 "prompt": task.prompt,
                 "task": task,
                 "runId": run_id
@@ -370,6 +390,73 @@ mod tests {
             flag(&ordinary.id).is_some(),
             "the conversation itself survives the task deletion"
         );
+    }
+
+    /// A `reuse` task keeps one conversation; the default keeps one per run.
+    #[tokio::test]
+    async fn reuse_tasks_continue_one_conversation_and_per_run_tasks_do_not() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut st = AppState::open(dir.path()).unwrap();
+        st.handshook = true;
+        let create = |mode: Option<&str>| {
+            let mut params =
+                json!({"title":"Nightly","prompt":"Summarize","cadence":"manual","schedule":null});
+            if let Some(mode) = mode {
+                params["sessionMode"] = json!(mode);
+            }
+            handle(&st, "scheduled.create", params).unwrap()["task"].clone()
+        };
+        let dispatch = |id: &str| handle(&st, "scheduled.run", json!({"id":id})).unwrap();
+        let settle = |launch: &Value| {
+            handle(
+                &st,
+                "scheduled.finishRun",
+                json!({"runId":launch["runId"].as_str().unwrap(),"status":"completed"}),
+            )
+            .unwrap();
+        };
+
+        let per_run = create(None);
+        assert_eq!(
+            per_run["sessionMode"],
+            json!("perRun"),
+            "a task without the setting keeps the historical shape"
+        );
+        let per_run_id = per_run["id"].as_str().unwrap();
+        let first = dispatch(per_run_id);
+        settle(&first);
+        let second = dispatch(per_run_id);
+        settle(&second);
+        assert_ne!(
+            first["sessionId"], second["sessionId"],
+            "a per-run task opens a conversation per run"
+        );
+
+        let reuse = create(Some("reuse"));
+        assert_eq!(reuse["sessionMode"], json!("reuse"));
+        let reuse_id = reuse["id"].as_str().unwrap();
+        let first = dispatch(reuse_id);
+        settle(&first);
+        let second = dispatch(reuse_id);
+        settle(&second);
+        assert_eq!(
+            first["sessionId"], second["sessionId"],
+            "a reuse task continues the conversation its previous run used"
+        );
+
+        // Deleting that conversation starts a fresh one instead of failing.
+        sessions::delete_session(&st.db, first["sessionId"].as_str().unwrap()).unwrap();
+        let third = dispatch(reuse_id);
+        settle(&third);
+        assert_ne!(third["sessionId"], first["sessionId"]);
+
+        let invalid = handle(
+            &st,
+            "scheduled.create",
+            json!({"title":"Bad","prompt":"Summarize","cadence":"manual",
+                   "schedule":null,"sessionMode":"sometimes"}),
+        );
+        assert!(invalid.is_err(), "an unknown conversation mode is refused");
     }
 
     #[tokio::test]

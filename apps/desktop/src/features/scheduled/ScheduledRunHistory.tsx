@@ -41,7 +41,7 @@ export function ScheduledRunHistory({
   busy: boolean;
   locale: string;
   onSelectRun: (runId: string) => void;
-  onOpenSession: (sessionId: string) => void;
+  onOpenSession: (sessionId: string, runId: string) => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -94,7 +94,7 @@ export function ScheduledRunHistory({
                       ariaLabel={t("scheduled.openResult")}
                       className="scheduled-icon-btn"
                       disabled={busy}
-                      onClick={() => onOpenSession(sessionId)}
+                      onClick={() => onOpenSession(sessionId, run.id)}
                     >
                       <IconExternal size={14} aria-hidden />
                     </TooltipButton>

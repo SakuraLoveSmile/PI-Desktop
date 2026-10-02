@@ -7,6 +7,10 @@ use crate::db::{now_ms, Database};
 
 const TASK_PERMISSION_MODES: [&str; 3] = ["ask", "accept-edits", "auto"];
 
+/// Whether a run opens its own conversation or continues the task's previous
+/// one. `perRun` is the historical behavior.
+pub const TASK_SESSION_MODES: [&str; 2] = ["perRun", "reuse"];
+
 pub fn validate_execution_input(input: &Value) -> Result<()> {
     if let Some(value) = input.get("thinkingLevel") {
         if !value.is_null()
@@ -40,6 +44,15 @@ pub fn validate_execution_input(input: &Value) -> Result<()> {
             bail!("providerId and modelId must be nonempty strings together, or both null");
         }
     }
+    if let Some(value) = input.get("sessionMode") {
+        if !value.is_null()
+            && !value
+                .as_str()
+                .is_some_and(|mode| TASK_SESSION_MODES.contains(&mode))
+        {
+            bail!("sessionMode must be perRun, reuse, or null");
+        }
+    }
     Ok(())
 }
 
@@ -68,6 +81,13 @@ pub(crate) fn configure_execution(config: &mut Value, input: &Value) {
         } else {
             object.insert("providerId".into(), input["providerId"].clone());
             object.insert("modelId".into(), input["modelId"].clone());
+        }
+    }
+    if let Some(value) = input.get("sessionMode") {
+        if value.is_null() {
+            object.remove("sessionMode");
+        } else if let Some(mode) = value.as_str() {
+            object.insert("sessionMode".into(), json!(mode));
         }
     }
 }

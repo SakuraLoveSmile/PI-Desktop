@@ -54,7 +54,7 @@ export function ScheduledTaskDetail({
   now: number;
   locale: string;
   onSelectRun: (runId: string) => void;
-  onOpenSession: (sessionId: string) => void;
+  onOpenSession: (sessionId: string, runId: string) => void;
   onRunNow: () => void;
   onEdit: () => void;
   onToggleEnabled: () => void;
@@ -136,6 +136,13 @@ export function ScheduledTaskDetail({
           {t(PERMISSION_MODE_I18N_KEYS[task.permissionMode ?? "inherit"])}
         </Fact>
         <Fact label={t("scheduled.detailModel")}>{model}</Fact>
+        <Fact label={t("scheduled.sessionMode")}>
+          {t(
+            task.sessionMode === "reuse"
+              ? "scheduled.sessionModeReuse"
+              : "scheduled.sessionModePerRun",
+          )}
+        </Fact>
       </dl>
 
       <section className="scheduled-card" aria-labelledby="scheduled-instruction">
@@ -190,7 +197,7 @@ export function ScheduledTaskDetail({
                 size="sm"
                 variant="ghost"
                 disabled={busy}
-                onClick={() => onOpenSession(selectedSessionId)}
+                onClick={() => onOpenSession(selectedSessionId, selectedRun.id)}
               >
                 <IconExternal size={13} aria-hidden />
                 {t("scheduled.openResult")}

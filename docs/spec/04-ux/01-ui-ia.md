@@ -245,7 +245,7 @@ destination, chat as the home surface, tools and permissions inline.
 
 ### 3.3 Scheduled
 A task column beside the selected task's page, with an explicit create/edit form, a cadence dropdown, time,
-next occurrence, saved project, per-task permission/model selection, pause/resume and delete confirmation. Hourly
+next occurrence, saved project, per-task permission/model selection, a per-task conversation mode (a new conversation per run, or one conversation every run continues), pause/resume and delete confirmation. Hourly
 schedules repeat at one-hour intervals without a time selector. Daily schedules
 use a themed time-period dropdown: Morning 09:00, Afternoon 14:00, Evening
 19:00, Night 22:00. The form does not expose hour/minute editing. AI tools may
@@ -262,7 +262,10 @@ its own run history newest first (status, start time, duration, stable error
 code), and the transcript of the selected run read in the page through a bounded
 read. A run's transcript belongs to this route: the SessionList and global
 session search never list it, and Open conversation is the explicit action that
-carries it into the chat route. The footer clock and global search open
+carries it into the chat route, and the chat top bar then offers that
+conversation's own way back: the row names the task it belongs to, and returning
+restores the same task and the same run, reusing the navigation history when
+this route is directly behind it. The footer clock and global search open
 this route. Run now dispatches in the background, selects the run it admitted,
 and leaves the reader on this page. Automatic runs never steal foreground
 focus. See [desktop automations](../../adr/scheduled-desktop-automations.md).

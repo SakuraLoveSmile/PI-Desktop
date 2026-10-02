@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ProjectRecord, ScheduledTask, ScheduledTaskRun } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
-import { latestRunByTask, runsForTask, taskIsRunning } from "./scheduled-runs";
+import { latestRunByTask, resolveSelectedTaskId, runsForTask, taskIsRunning } from "./scheduled-runs";
 import type { ScheduledDraft } from "./ScheduledEditor";
+import { peekScheduledReturn } from "./scheduled-return";
 
 /** Same cadence the page always used: the host owns admission, the page only
  * reflects it. */
@@ -44,12 +45,14 @@ export type ScheduledWorkspace = {
 export function useScheduledWorkspace(
   onError: (message: string) => void,
 ): ScheduledWorkspace {
+  // Coming back from a run's conversation restores the same task and run.
+  const restored = peekScheduledReturn();
   const [tasks, setTasks] = useState<ScheduledTask[]>([]);
   const [recentRuns, setRecentRuns] = useState<ScheduledTaskRun[]>([]);
   const [taskRuns, setTaskRuns] = useState<ScheduledTaskRun[]>([]);
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(restored?.taskId ?? null);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(restored?.runId ?? null);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
@@ -121,16 +124,21 @@ export function useScheduledWorkspace(
   }, [refresh, readTaskRuns]);
 
   // Keep one task selected: the first one, or the previous selection while it
-  // still exists. A deleted task never leaves the pane pointing at nothing.
+  // still exists. A deleted task never leaves the pane pointing at nothing, and
+  // a selection restored from a conversation outlives the first, empty read.
   useEffect(() => {
-    setSelectedTaskId((current) => {
-      if (current && tasks.some((task) => task.id === current)) return current;
-      return tasks[0]?.id ?? null;
-    });
-  }, [tasks]);
+    setSelectedTaskId((current) => resolveSelectedTaskId(tasks, current, loaded));
+  }, [tasks, loaded]);
 
+  // A task switch releases the run selection, but the pair restored from a
+  // conversation must survive the first mount or the reader loses the row that
+  // brought them back.
+  const previousTaskRef = useRef<string | null>(restored?.taskId ?? null);
   useEffect(() => {
-    setSelectedRunId(null);
+    if (previousTaskRef.current !== selectedTaskId) {
+      previousTaskRef.current = selectedTaskId;
+      setSelectedRunId(null);
+    }
     if (selectedTaskId) void readTaskRuns(selectedTaskId);
   }, [selectedTaskId, readTaskRuns]);
 

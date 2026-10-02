@@ -107,6 +107,9 @@ export type ScheduledTaskRun = {
   errorCode: string | null; startedAt: string; endedAt: string | null;
 };
 
+/** How a scheduled run relates to the task's conversations. */
+export type ScheduledSessionMode = "perRun" | "reuse";
+
 export type ScheduledTask = {
   id: string;
   title: string;
@@ -123,6 +126,11 @@ export type ScheduledTask = {
   /** Explicit task-owned execution settings. Missing fields preserve legacy behavior. */
   permissionMode?: GlobalPermissionMode;
   thinkingLevel?: SessionThinkingLevel;
+  /**
+   * Whether each run opens its own conversation (`perRun`, the default) or
+   * continues the conversation its previous run used (`reuse`).
+   */
+  sessionMode?: ScheduledSessionMode;
   providerId?: string;
   modelId?: string;
 };

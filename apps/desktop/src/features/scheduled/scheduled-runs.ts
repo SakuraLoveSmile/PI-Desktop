@@ -1,4 +1,4 @@
-import type { ScheduledTaskRun } from "@pi-desktop/shared";
+import type { ScheduledTask, ScheduledTaskRun } from "@pi-desktop/shared";
 
 export type ScheduledRunStatus = ScheduledTaskRun["status"];
 
@@ -85,4 +85,18 @@ export function latestRunForTask(
 ): ScheduledTaskRun | null {
   if (!taskId) return null;
   return runsForTask(runs, taskId)[0] ?? null;
+}
+
+/** The task the workspace keeps selected: the caller's pick while that task
+ * still exists, otherwise the first one. A selection restored from a
+ * conversation must survive the first read — an empty list is not a verdict
+ * on whether the task exists. */
+export function resolveSelectedTaskId(
+  tasks: readonly ScheduledTask[],
+  selectedTaskId: string | null | undefined,
+  loaded: boolean,
+): string | null {
+  if (!loaded) return selectedTaskId ?? null;
+  if (selectedTaskId && tasks.some((task) => task.id === selectedTaskId)) return selectedTaskId;
+  return tasks[0]?.id ?? null;
 }

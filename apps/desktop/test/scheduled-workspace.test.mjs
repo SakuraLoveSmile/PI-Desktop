@@ -124,6 +124,27 @@ test("run helpers scope, order, and measure one task's history", async () => {
   });
 });
 
+test("the workspace keeps exactly one task selected across a reload", async () => {
+  await withVite(async (server) => {
+    const runs = await server.ssrLoadModule("/src/features/scheduled/scheduled-runs.ts");
+
+    assert.equal(
+      runs.resolveSelectedTaskId([], "task-b", false),
+      "task-b",
+      "a task restored from a conversation outlives the first, empty read",
+    );
+    assert.equal(runs.resolveSelectedTaskId([TASK_A, TASK_B], "task-b", true), "task-b");
+    assert.equal(
+      runs.resolveSelectedTaskId([TASK_A, TASK_B], "task-deleted", true),
+      "task-a",
+      "a task that is gone falls back to the first one",
+    );
+    assert.equal(runs.resolveSelectedTaskId([TASK_A, TASK_B], null, true), "task-a");
+    assert.equal(runs.resolveSelectedTaskId([], null, true), null);
+    assert.equal(runs.resolveSelectedTaskId([], "task-b", true), null, "an empty list selects nothing");
+  });
+});
+
 test("run formatting stays compact, localized, and bounded", async () => {
   await withVite(async (server) => {
     const format = await server.ssrLoadModule("/src/features/scheduled/scheduled-format.ts");
@@ -205,6 +226,18 @@ test("the task page reads facts, history, and the selected run in place", async 
     assert.match(html, /~/u, "the project path is shortened");
     assert.match(html, /Auto/, "the task's own permission mode is shown");
     assert.match(html, /Fixture provider \/ fixture/, "the model fact names the provider, not its id");
+    assert.match(
+      html,
+      /New conversation per run/,
+      "the task's conversation mode is part of the facts",
+    );
+    const reused = await render(
+      server,
+      "/src/features/scheduled/ScheduledTaskDetail.tsx",
+      "ScheduledTaskDetail",
+      { ...props, task: { ...TASK_A, sessionMode: "reuse" } },
+    );
+    assert.match(reused, /Reuse one conversation/, "a reuse task says so");
     const unnamedProvider = await render(
       server,
       "/src/features/scheduled/ScheduledTaskDetail.tsx",

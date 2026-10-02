@@ -40,12 +40,19 @@ pub struct ScheduledTask {
     pub model_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub thinking_level: Option<String>,
+    /// Whether each run continues one conversation or opens its own.
+    #[serde(default = "default_session_mode")]
+    pub session_mode: String,
     /// Presence distinguishes a saved project (including null) from legacy tasks.
     #[serde(skip)]
     pub(crate) workspace_bound: bool,
     /// Calendar intent is independent from Hourly's compatibility schedule.
     #[serde(skip)]
     pub(crate) calendar_configured: bool,
+}
+
+fn default_session_mode() -> String {
+    "perRun".to_string()
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -225,6 +232,14 @@ fn task_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ScheduledTask> {
             .and_then(Value::as_str)
             .filter(|level| sessions::is_valid_thinking_level(level))
             .map(str::to_string),
+        // Absent or unrecognized config keeps the historical shape: one
+        // conversation per run.
+        session_mode: config
+            .get("sessionMode")
+            .and_then(Value::as_str)
+            .filter(|mode| automation::TASK_SESSION_MODES.contains(mode))
+            .unwrap_or("perRun")
+            .to_string(),
     })
 }
 
@@ -433,6 +448,30 @@ pub fn begin_run(db: &Database, task_id: &str, session_id: Option<&str>) -> Resu
     .execute(params![run_id, task_id, session_id, now])?;
     tx.commit()?;
     Ok(run_id)
+}
+
+/// The conversation a `reuse` task should continue: the session its newest run
+/// used, while that session still exists and still belongs to the same project.
+/// A deleted conversation — or a task re-pointed at another folder — starts a
+/// new one instead of replaying into the wrong workspace.
+pub fn reusable_session(
+    db: &Database,
+    task_id: &str,
+    project_path: Option<&str>,
+) -> Result<Option<String>> {
+    let found: Option<String> = db
+        .conn()
+        .prepare_cached(
+            "SELECT r.session_id FROM task_runs r
+             JOIN sessions s ON s.id = r.session_id
+             LEFT JOIN projects p ON p.id = s.project_id
+             WHERE r.task_id = ?1 AND r.session_id IS NOT NULL AND s.deleted_at IS NULL
+               AND ((?2 IS NULL AND s.project_id IS NULL) OR p.path = ?2)
+             ORDER BY r.started_at DESC LIMIT 1",
+        )?
+        .query_row(params![task_id, project_path], |row| row.get(0))
+        .optional()?;
+    Ok(found)
 }
 
 pub fn finish_run(

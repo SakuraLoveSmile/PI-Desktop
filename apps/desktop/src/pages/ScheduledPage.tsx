@@ -8,6 +8,7 @@ import { ScheduledEditor, type ScheduledDraft } from "../features/scheduled/Sche
 import { ScheduledTaskDetail } from "../features/scheduled/ScheduledTaskDetail";
 import { ScheduledTaskRail } from "../features/scheduled/ScheduledTaskRail";
 import { useScheduledWorkspace } from "../features/scheduled/use-scheduled-workspace";
+import { rememberScheduledReturn } from "../features/scheduled/scheduled-return";
 import "../features/scheduled/scheduled-workspace.css";
 
 /**
@@ -29,7 +30,17 @@ export function ScheduledPage() {
   const { tasks, projects, selectedTask, selectedTaskId, runs, latestRuns, selectedRunId, busy, loaded, error } =
     workspace;
 
-  const openSession = async (sessionId: string) => {
+  // Remember where the reader came from: the conversation offers the way back,
+  // and this page restores the same task and the same run.
+  const openSession = async (sessionId: string, runId: string) => {
+    if (selectedTask) {
+      rememberScheduledReturn({
+        taskId: selectedTask.id,
+        taskTitle: selectedTask.title,
+        runId,
+        sessionId,
+      });
+    }
     await selectSession(sessionId);
     setPage("chat");
   };
@@ -111,7 +122,7 @@ export function ScheduledPage() {
                 now={now}
                 locale={locale}
                 onSelectRun={workspace.selectRun}
-                onOpenSession={(sessionId) => void openSession(sessionId)}
+                onOpenSession={(sessionId, runId) => void openSession(sessionId, runId)}
                 onRunNow={() => void workspace.runTaskNow(selectedTask.id)}
                 onEdit={() => setEditor(selectedTask)}
                 onToggleEnabled={() =>

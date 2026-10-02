@@ -416,7 +416,8 @@
   arrows, Home/End, Enter, Escape/Tab and outside dismissal; select hourly without time
   fields and verify its first occurrence is one hour away; pause/resume; Run now
   and read the admitted run's transcript inside the task page; open the result
-  conversation from that page; configure a daily task for the next real minute;
+  conversation from that page and verify its top bar offers the way back to the
+  scheduled task; return and confirm the same task and run are still selected;
   observe automatic completion; delete the settled task. In a normal Agent
   conversation, use model tool calls to discover, create, list, update to 15:30
   and delete a task. Verify the custom time appears in the form and survives
@@ -430,7 +431,8 @@
   not dispatch, both execution paths reach the real Agent sidecar, the task's own
   history lists each run with its status and duration and Open conversation
   reaches the persisted transcript while the SessionList and session search never
-  list it, and automatic execution does not require a
+  list it, that conversation's top bar returns to the same task and run, and
+  automatic execution does not require a
   renderer prompt. Host tests additionally prove duplicate admission rejection,
   stale/missed occurrence handling, invalid input rejection and recovery.
 - **Specs:** 04-ux/01-ui-ia §3.3; 04-ux/08-component-spec §6, §20A;

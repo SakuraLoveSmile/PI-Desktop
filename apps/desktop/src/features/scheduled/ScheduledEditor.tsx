@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { GlobalPermissionMode, ProjectRecord, ScheduledTask } from "@pi-desktop/shared";
+import type { GlobalPermissionMode, ProjectRecord, ScheduledTask, ScheduledSessionMode } from "@pi-desktop/shared";
 import { Button, Field, Input, Textarea } from "../../components/ui";
 import { SettingsMenuSelect } from "../../components/settings/SettingsMenuSelect";
 import { ScheduledWeekdaySelect } from "./ScheduledWeekdaySelect";
@@ -17,6 +17,7 @@ export type ScheduledDraft = Pick<ScheduledTask, "title" | "prompt" | "cadence" 
   providerId?: string | null;
   modelId?: string | null;
   thinkingLevel?: ScheduledTask["thinkingLevel"] | null;
+  sessionMode?: ScheduledSessionMode;
 };
 
 export function ScheduledEditor({
@@ -52,6 +53,10 @@ export function ScheduledEditor({
     task?.permissionMode ?? "ask",
   );
   const [permissionTouched, setPermissionTouched] = useState(false);
+  // A conversation mode always has a value, so it is saved with every draft.
+  const [sessionMode, setSessionMode] = useState<ScheduledSessionMode>(
+    task?.sessionMode ?? "perRun",
+  );
   const defaultModel = !task && settings?.defaultProviderId && settings.defaultModelId
     ? { providerId: settings.defaultProviderId, modelId: settings.defaultModelId }
     : {};
@@ -93,7 +98,7 @@ export function ScheduledEditor({
         if (busy || !valid) return;
         const executionSettings: Pick<
           ScheduledDraft,
-          "workspacePath" | "permissionMode" | "providerId" | "modelId" | "thinkingLevel"
+          "workspacePath" | "permissionMode" | "providerId" | "modelId" | "thinkingLevel" | "sessionMode"
         > = {};
         if (!task || task.workspacePath || workspaceTouched) {
           if (workspacePath) executionSettings.workspacePath = workspacePath;
@@ -108,6 +113,8 @@ export function ScheduledEditor({
         if (modelTouched || task?.thinkingLevel) {
           executionSettings.thinkingLevel = modelSelection.thinkingLevel ?? null;
         }
+        // The mode always has a value, so it is saved with every draft.
+        executionSettings.sessionMode = sessionMode;
         void save({
           title: title.trim(),
           prompt: prompt.trim(),
@@ -152,6 +159,7 @@ export function ScheduledEditor({
             projects={projects}
             permissionMode={permissionMode}
             modelSelection={modelSelection}
+            sessionMode={sessionMode}
             busy={busy}
             onWorkspaceChange={(path) => {
               setWorkspacePath(path);
@@ -165,12 +173,19 @@ export function ScheduledEditor({
               setModelSelection(selection);
               setModelTouched(true);
             }}
+            onSessionModeChange={setSessionMode}
           />
         </div>
       </Field>
       {permissionMode === "auto" && (
         <p className="dest-row-meta scheduled-permission-warning" role="status">
           {t("scheduled.autoPermissionHint")}
+        </p>
+      )}
+
+      {sessionMode === "reuse" && (
+        <p className="dest-row-meta" role="status">
+          {t("scheduled.sessionModeHint")}
         </p>
       )}
       <div className="scheduled-fields">

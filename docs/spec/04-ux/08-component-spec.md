@@ -4134,7 +4134,14 @@ TASKS (2)                     │ Nightly dependency check   [Enabled] [Run now]
 - The instruction is disclosed on demand and starts collapsed.
 - Run now dispatches in the background, selects the run it admitted, and keeps
   the reader on the route.
-- Open conversation is the only action that leaves for the chat route.
+- The conversation mode decides who owns a run's transcript: `perRun` opens a
+  conversation for each run, and `reuse` continues the task's previous one while
+  it still exists and still belongs to the same project.
+- Open conversation is the only action that leaves for the chat route. A
+  scheduled run's conversation then shows a back row in the chat top bar,
+  labelled with the route and, when the row's own origin is known, the task it
+  belongs to; returning restores that task and that run, and steps back through
+  the navigation history when this route is directly behind the conversation.
 - Above 900px the task column sticks below the titlebar band; below it the
   column stacks above the page.
 - Motion: colour and chevron transitions only, disabled under

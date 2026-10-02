@@ -37,11 +37,15 @@ function roleLabelKey(role: UiMessage["role"]): string {
 function TranscriptMessage({ message }: { message: UiMessage }) {
   const { t } = useTranslation();
   const text = message.content.trim();
-  // A tool call with no text of its own adds nothing a reader can use here.
+  // A step with no text of its own adds nothing a reader can use here.
   if (!text) return null;
   return (
     <li className={`scheduled-message scheduled-message-${message.role}`}>
-      <span className="scheduled-message-role">{t(roleLabelKey(message.role))}</span>
+      <span className="scheduled-message-role">
+        {message.role === "tool" && message.toolName
+          ? message.toolName
+          : t(roleLabelKey(message.role))}
+      </span>
       <p className="scheduled-message-text" data-status={message.status ?? "complete"}>
         {text}
       </p>
@@ -50,9 +54,10 @@ function TranscriptMessage({ message }: { message: UiMessage }) {
 }
 
 /**
- * Read-only view of one run's transcript, rendered inside the Scheduled page so
- * reviewing an automation result never costs a conversation switch. The
- * conversation itself stays one explicit action away.
+ * Read-only view of one run's transcript — the steps it took and the answer it
+ * produced — rendered inside the Scheduled page so reviewing an automation
+ * result never costs a conversation switch. The conversation itself stays one
+ * explicit action away.
  */
 export function ScheduledRunTranscript({ run }: { run: ScheduledTaskRun }) {
   const { t } = useTranslation();
@@ -124,7 +129,11 @@ export function ScheduledRunTranscript({ run }: { run: ScheduledTaskRun }) {
   if (reading.messages.length === 0) {
     return (
       <p className="scheduled-hint" role={reading.status === "loading" ? "status" : undefined}>
-        {t(reading.status === "loading" ? "scheduled.runContentLoading" : "scheduled.runContentUnavailable")}
+        {t(
+          reading.status === "loading"
+            ? "scheduled.runContentLoading"
+            : "scheduled.runContentUnavailable",
+        )}
       </p>
     );
   }
