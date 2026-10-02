@@ -1245,7 +1245,10 @@ fn read_image_block(
     }
     let bytes = std::fs::read(resolved).map_err(|e| {
         if e.kind() == std::io::ErrorKind::NotFound {
-            ("FILE_NOT_FOUND".into(), format!("File not found: {display}"))
+            (
+                "FILE_NOT_FOUND".into(),
+                format!("File not found: {display}"),
+            )
         } else {
             ("TOOL_FAILED".into(), format!("read failed: {e}"))
         }
@@ -3430,7 +3433,11 @@ mod tests {
             5_000,
         )
         .await;
-        assert!(result.ok, "png should read as an image block: {:?}", result.error_code);
+        assert!(
+            result.ok,
+            "png should read as an image block: {:?}",
+            result.error_code
+        );
         let content = result.content.as_object().expect("object result");
         let images = content["images"].as_array().expect("images array");
         assert_eq!(images.len(), 1);
