@@ -308,6 +308,21 @@
   session, clicks an outline dash while follow is pinned, and asserts the
   scroller's distance from the bottom once the exchange has settled.
 
+### E2E-ASKTOOL-compact-card-interaction
+
+- **Preconditions:** No live provider is required; the fixture stubs
+  `api.resolveAskTool` and seeds one two-question ask through the real store
+  slice.
+- **Steps:** Mount the production `AskToolCard`, assert the header Tab order
+  (decline, skip, next) with no legacy bottom action row, then walk select →
+  next → submit, skip → submit, decline-all, and a custom answer, remounting
+  with a fresh request id between flows.
+- **Expected:** Every flow resolves through the store's `resolveAsk` with the
+  exact answers (skips recorded as `null`), and no render errors are reported.
+- **Status:** Automated in `pnpm test:e2e:asktool-card`, which mounts the
+   production `AskToolCard` in a real Chromium page and clicks through the
+   header actions.
+
 ### E2E-POWER-keep-awake-setting
 
 - **Preconditions:** An isolated desktop profile with the setting absent; no
