@@ -5285,8 +5285,15 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
     // compaction trigger, so the model can close out before host compaction.
     expect(below.context.systemPrompt).toContain("<context_budget>");
     expect(below.context.systemPrompt).toContain("new_context");
+    expect(below.context.messages.at(-1)).toMatchObject({
+      role: "system",
+      content: "",
+      sections: { context_budget: expect.stringContaining("<context_budget>") },
+    });
+    expect(getCurrentSystemMessage(below.context.messages)?.sections?.context_budget).toContain("new_context");
     expect(stillBelow.context.systemPrompt).not.toContain("<context_budget>");
-    // The reminder rides on the turn's context only; nothing is persisted.
+    // The legacy prompt baseline stays unchanged; the returned transcript
+    // carries the reminder section through the normal persistence path.
     expect((runtime as any).agent.state.systemPrompt).not.toContain(
       "<context_budget>",
     );
