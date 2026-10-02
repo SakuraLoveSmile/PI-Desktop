@@ -12,7 +12,6 @@ import {
 import {
   capabilitiesFromModelConfig,
   type ModelConfig,
-  modelConfigWithBinding,
   visionFromModelConfig,
   type ThinkingCapabilities,
 } from "@pi-desktop/agent-runtime";
@@ -123,11 +122,10 @@ export function createProviderCatalogRuntime({
       // A user-pinned window/cap is never replaced by the published number
       // (spec §9.1, issue #1176); an inherited one keeps following the catalog.
       const limits = resolveBindingLimits(catalogConfig, binding);
-      const effective = modelConfigWithBinding(limits.catalogConfig, limits.binding);
       return {
         ...binding,
-        contextWindow: effective.contextWindow,
-        maxTokens: effective.maxTokens,
+        contextWindow: limits.binding.contextWindow ?? limits.catalogConfig.contextWindow,
+        maxTokens: limits.binding.maxTokens ?? limits.catalogConfig.maxTokens,
         maxTokensSource: binding.maxTokensSource ?? "user" as const,
       };
     });
