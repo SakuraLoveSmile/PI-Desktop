@@ -676,9 +676,12 @@ role; this override is model-scoped and does not change other providers.
 
 A catalog entry may additionally pin a model-level wire API (for example,
 `api: "openai-responses"`). When present it wins over the provider-wide
-`apiStyle`, so responses-only models under an `opencode_go` provider are sent
-through the Responses adapter instead of Chat Completions. Without a
-model-level pin the provider-wide style applies unchanged.
+`apiStyle` if compatible with the provider's protocol family (so responses-only
+models under an `opencode_go` provider are sent through the Responses adapter
+instead of Chat Completions). Foreign catalog wire APIs (such as
+`google-generative-ai` or `anthropic-messages` matched on relay endpoints) do
+not overwrite an OpenAI-compatible provider's configured wire style (issue #1310).
+Without a model-level pin the provider-wide style applies unchanged.
 
 This is the **universal escape hatch** guaranteeing market coverage beyond native integrations.
 
