@@ -429,9 +429,16 @@
   select a daily time period from four fixed defaults; open the weekday menu,
   select custom days, save and reopen; reject empty days; verify the four defaults,
   arrows, Home/End, Enter, Escape/Tab and outside dismissal; select hourly without time
-  fields and verify its first occurrence is one hour away; pause/resume; Run now;
-  open the result conversation; configure a daily task for the next real minute;
-  observe automatic completion; delete the settled task. In a normal Agent
+  fields and verify its first occurrence is one hour away; pause/resume; Run now
+  and read the admitted run's transcript inside the task page; select an interval
+  cadence, enter 30 minutes and verify the row states that span instead of a
+  clock, then switch to a weekly cadence and back to confirm the value survived;
+  open the edit form and verify the task column and the task page step aside;
+  let one task accumulate more runs than the shared window while another stays
+  idle, and verify the idle task still reports its own last outcome; open the
+  result conversation from that page and verify its top bar offers the way back
+  to the scheduled task; return and confirm the same task and run are still
+  selected; observe automatic completion; delete the settled task. In a normal Agent
   conversation, use model tool calls to discover, create, list, update to 15:30
   and delete a task. Verify the custom time appears in the form and survives
   renaming. The model is a local deterministic fixture, not a live provider.
@@ -441,12 +448,19 @@
   Composer-style bottom toolbar, including at the narrow viewport, with no horizontal overflow.
   Legacy rows without the new fields retain their previous defaults. Configuration
   persists, next time is visible, paused tasks do
-  not dispatch, both execution paths reach the real Agent sidecar, history links
-  to the persisted transcript, and automatic execution does not require a
+  not dispatch, both execution paths reach the real Agent sidecar, the task's own
+  history lists each run with its status and duration and Open conversation
+  reaches the persisted transcript while the SessionList and session search never
+  list it, that conversation's top bar returns to the same task and run, an
+  interval task arms from the span the form states and reports it in its row,
+  the task form owns the page while it is open, a task that stayed idle while
+  another accumulated more runs than the shared window still reports its own
+  last outcome, and
+  automatic execution does not require a
   renderer prompt. Host tests additionally prove duplicate admission rejection,
   stale/missed occurrence handling, invalid input rejection and recovery.
-- **Specs:** 04-ux/01-ui-ia §3.3; 03-runtime/04-data-storage §4.11;
-  ADR scheduled-desktop-automations; ADR 0305.
+- **Specs:** 04-ux/01-ui-ia §3.3; 04-ux/08-component-spec §6, §20A;
+  03-runtime/04-data-storage §4.11; ADR scheduled-desktop-automations; ADR 0305.
 - **Acceptance:** Scheduled task execution and recoverable run history.
 - **Milestone:** Post-MVP desktop automations.
 - **Status:** Automated in `node scripts/e2e-scheduled.mjs`; run against the
@@ -4829,10 +4843,10 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   references until the selected transport exposes a native PDF block. A
   provider-discovered or explicitly configured ID absent from models.dev remains
   runnable with the generic text-only, non-reasoning shape; pi-ai supplies only
-  the selected wire adapter, OAuth flow, and account model availability. A
-  ChatGPT Plus/Pro or GitHub Copilot account lists `gpt-6-sol`, `gpt-6-luna`,
-  and `grok-4.7` from the pinned pi-ai 0.99.1 catalog; the account Pi adapter then
-  supplies their published metadata.
+  the selected wire adapter, OAuth flow, and fallback account IDs. A ChatGPT
+  Plus/Pro or GitHub Copilot account lists IDs returned by its live account
+  endpoint; matching models.dev records supply their published metadata, while
+  live-only IDs absent from models.dev keep generic chat limits and capabilities.
 - **Specs linked**: `02-architecture/02-tech-stack.md`,
   `03-runtime/11-provider-model-system.md`,
   `03-runtime/13-model-catalog-and-selection.md`, ADR 0134
@@ -7969,7 +7983,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 #### E2E-102e: Unknown model ids fail closed for vision transport
 
-- **Preconditions**: A custom provider/model id absent from the pi-ai catalog,
+- **Preconditions**: A custom provider/model id absent from the models.dev catalog,
   discovery data that incorrectly labels it `vision`, no explicit
   `supportsImages` binding override, and a pasted PNG.
 - **Steps**:
@@ -8789,21 +8803,18 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
      release file or writing a user cache. 4. Add an ID absent from models.dev
      and inspect its generic fallback card. 5. In the OAuth protocol fixture,
      sign in to an account that offers a new Claude ID absent from models.dev
-     but with a pinned same-tier sibling. Resolve its runtime binding, apply
-     runtime model configuration without a saved model binding, and send `high`,
-     `xhigh`, and `max` through the real Anthropic adapter to an intercepted HTTP
-     boundary. Repeat with null-disabled levels, an all-disabled map, a
-     non-reasoning sibling, and an ID with no same-tier sibling.
+     while a same-tier Pi sibling exists. Resolve its runtime binding, apply
+     runtime model configuration without a saved model binding, and send a
+     request through the real Anthropic adapter to an intercepted HTTP boundary.
+     Confirm the sibling does not supply chat limits, reasoning levels or effort
+     mappings.
 - **Expected**: models.dev fields prefill known model bindings and remain the
   published metadata source. Provider keys are never included in the fixed
   models.dev request. Custom IDs without metadata retain generic defaults.
-  An OAuth live-only ID may use the existing same-tier fallback: protocol
-  compatibility and effort mappings travel with borrowed reasoning. Requests
-  use adaptive thinking and the requested effort, without legacy token budgets;
-  sparse mappings retain defaults and explicit nulls remain unsupported. A
-  non-reasoning sibling remains off-only, and no same-tier sibling means no
-  inferred reasoning. Published metadata and explicit mapping/compatibility
-  values take precedence. Copilot Bearer authentication remains unchanged.
+  An OAuth live-only ID does not inherit metadata from a Pi sibling; only an
+  exact models.dev match supplies its chat limits and reasoning shape. The
+  selected adapter keeps its wire behavior, and Copilot Bearer authentication
+  remains unchanged.
 - **Specs linked**: `03-runtime/11-provider-model-system.md` §6.2 and §8a,
   `03-runtime/13-model-catalog-and-selection.md` §11.1–§12, ADR 0134
 - **Acceptance**: B (model config), C (conversation & stream), Security
@@ -11757,7 +11768,9 @@ This test plan spec is accepted when:
   account model and save. 5) Reopen the account editor and read that model's
   chips. 6) For an OpenAI Codex account, inspect `gpt-6-astra` (or another
   account model also published under models.dev's `openai` provider) and confirm
-  its published context/output limits and reasoning levels are present. 7) In
+  its published context/output limits and reasoning levels are present. For
+  `gpt-6.1-sol`, verify a 1,050,000-token context and 128,000-token output cap.
+  7) In
   the account editor, hand-type a custom model ID the catalog does not publish,
   enable a thinking level on it, and save.
 - **Expected**: Both dialogs render the same picker — the same discovered list,
@@ -11770,8 +11783,9 @@ This test plan spec is accepted when:
   generic 128,000 / 8,192 / no-reasoning defaults. The authenticated ChatGPT
   list comes from `GET {base}/codex/models` on the account token, so an id the
   pin does not know yet is selectable when that response includes it; pi-ai is
-  only the fallback when the request fails. models.dev cannot add a missing
-  OAuth ID. A model with no published record keeps its explicit levels, starts
+  only the OAuth/transport adapter; it supplies no sibling chat-model limits.
+  models.dev enriches an ID only when its record matches. A model with no
+  published record keeps its explicit levels, starts
   at `off` when no binding default is stored, and keeps all choices available
   for manual opt-in. The account's default model stays the head binding.
 - **Specs linked**: `04-ux/06-settings-ia.md`,
@@ -15416,14 +15430,14 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 
 #### E2E-MODEL-catalog-window-correction-reaches-saved-bindings
 
-- **Goal**: a Pi catalog limit correction — the context window or the output cap —
+- **Goal**: a models.dev limit correction — the context window or the output cap —
   reaches an already saved binding without deleting and re-adding the model, while
   a number the user entered in Settings is never overwritten.
 - **Steps**:
-  1. Configure a provider, select a model Pi publishes a context window
+  1. Configure a provider, select a model models.dev publishes a context window
      for, and save. Open the row's Advanced body and read the context-window field
      and its hint.
-  2. Serve a corrected catalog record for that model (a different published
+  2. Serve a corrected models.dev record for that model (a different published
      window), reopen Settings, and read the row, the context inspector, and the
      window a new session launches with.
   3. Type a window in the Advanced field — the preset ladder once and a
