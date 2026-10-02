@@ -893,9 +893,10 @@ type Block =
       status: "ok" | "error" | "denied"; result?: unknown;
       completedAt?: string; durationMs?: number;
       toolUsage?: ToolTokenUsage }
-  | { type: "attachment"; kind: "image" | "file"; name: string;
-      ref: string /* attachments/<sha256> or absolute path */;
-      mimeType?: string; size?: number }
+  | { type: "attachment"; kind: "image" | "file" | "session"; name: string;
+      ref: string /* attachments/<sha256>, absolute path, or session id */;
+      mimeType?: string; size?: number;
+      text?: string /* bounded referenced-conversation excerpt */ }
   | { type: "hostedSearch"; status: "searching" | "completed" | "failed";
       rounds: Array<{ id: string;
         status: "searching" | "completed" | "failed";
@@ -918,6 +919,13 @@ type Block =
   `scratch/<sessionId>/replayed/` when a path fallback is required. Images
   above the inline bound are hashed and copied with streaming file operations;
   startup and history hydration must not load the whole image into memory.
+- A `kind: "session"` block is a conversation reference: it stores the session
+  id it names, the display title, and the bounded excerpt quoted to the model,
+  so a later turn reads the same reference instead of re-reading the referenced
+  conversation. The excerpt bound, the same-project rule, and the
+  `<session_reference>` prompt block belong to the reference contract
+  (`04-ux/08-component-spec.md` §20B); the host stores exactly what it is given
+  and never reads the referenced session to build one.
 - Assistant thinking is stored only in `thinking` blocks inside the file. The
   derived `text` column contains final answer text, so transcript search and
   answer previews do not expose or mix reasoning.

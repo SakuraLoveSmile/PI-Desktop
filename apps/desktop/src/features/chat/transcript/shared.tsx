@@ -38,6 +38,7 @@ import {
   IconAudio,
   IconBot,
   IconBranch,
+  IconChat,
   IconCheck,
   IconChevronRight,
   IconCircleAlert,
@@ -452,6 +453,33 @@ export function FileRefChip({
       </button>
       <ContextMenu state={fileMenu} onClose={closeFileMenu} />
     </>
+  );
+}
+
+/**
+ * A referenced conversation on a user message (issue #1324). The draft carried
+ * a `pi-desktop://session/<id>` link; main attached a bounded excerpt for the
+ * model and this chip is how the reader sees and reopens it.
+ */
+export function SessionRefChip({ attachment }: { attachment: MessageAttachment }) {
+  const { t } = useTranslation();
+  const selectSession = useAppStore((state) => state.selectSession);
+  const label = `${t("chat.sessionReference")} · ${attachment.name}`;
+  return (
+    <button
+      type="button"
+      className="composer-chip chat-file-chip"
+      data-action="open-session-reference"
+      data-session-id={attachment.ref}
+      title={t("chat.sessionReferenceOpen", { title: attachment.name })}
+      aria-label={label}
+      onClick={() => void selectSession(attachment.ref).catch(() => undefined)}
+    >
+      <span className="composer-chip-icon" aria-hidden>
+        <IconChat size={13} />
+      </span>
+      <span className="composer-chip-name">{label}</span>
+    </button>
   );
 }
 

@@ -266,9 +266,16 @@ import {
 
 export type { RuntimeProviderConfig } from "./provider-binding.js";
 
-export type RuntimePromptAttachment = AgentPromptAttachment & {
+export type RuntimePromptAttachment = Omit<AgentPromptAttachment, "kind"> & {
+  /**
+   * `session` is written by Electron main for a resolved
+   * `pi-desktop://session/<id>` reference; the renderer never sends it.
+   */
+  kind: AgentPromptAttachment["kind"] | "session";
   /** Base64 payload is transient and only crosses the sidecar for this turn. */
   data?: string;
+  /** Bounded excerpt of a referenced conversation (`kind: "session"`). */
+  text?: string;
 };
 
 export type RuntimePrompt = {
@@ -277,9 +284,24 @@ export type RuntimePrompt = {
   attachments?: RuntimePromptAttachment[];
 };
 
+/**
+ * The user's own words plus one quoted block per referenced conversation. The
+ * visible prompt is never rewritten: references are additive, and the model
+ * must receive this text — a reference accounted for by compaction but absent
+ * from the provider request would be context the user never got.
+ */
+function promptText(input: RuntimePrompt): string {
+  const references = (input.attachments ?? [])
+    .map((attachment) => sessionReferenceBlock(attachment))
+    .filter((block): block is string => block !== null);
+  return references.length
+    ? `${input.text}\n\n${references.join("\n\n")}`.trim()
+    : input.text;
+}
+
 function promptContent(input: string | RuntimePrompt): UserMessage["content"] {
   if (typeof input === "string") return input;
-  const text = input.text;
+  const text = promptText(input);
   const images = (input.attachments ?? []).filter(
     (attachment) =>
       attachment.kind === "image" &&
@@ -322,8 +344,30 @@ function runtimeAttachmentFromMessage(
     kind: attachment.kind,
     ...(attachment.mimeType ? { mimeType: attachment.mimeType } : {}),
     ...(attachment.size !== undefined ? { size: attachment.size } : {}),
+    ...(attachment.text ? { text: attachment.text } : {}),
     ...(data ? { data } : {}),
   };
+}
+
+/** Attribute-safe text: a session title may contain quotes or angle brackets. */
+function escapeAttribute(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+/**
+ * A referenced conversation travels with the user's message as one delimited
+ * block: it is quoted context, not the user's own words (a session link in the
+ * draft produced it), so the model reads it as reference material.
+ */
+export function sessionReferenceBlock(attachment: RuntimePromptAttachment): string | null {
+  const text = attachment.text?.trim();
+  if (!text) return null;
+  const title = escapeAttribute(attachment.name || attachment.path);
+  return `<session_reference name="${title}" session="${escapeAttribute(attachment.path)}">\n${text}\n</session_reference>`;
 }
 
 // pi-ai's adapter retry is disabled here so setup and mid-stream 429s share
@@ -8260,7 +8304,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       if (typeof modelInput === "string") {
         await this.agent.prompt(modelInput);
       } else {
-        await this.agent.prompt(modelInput.text, promptImages(modelInput));
+        await this.agent.prompt(promptText(modelInput), promptImages(modelInput));
       }
       await this.waitForIdleAndSteering();
       void this.extensionRunner?.emit("agent_settled", { type: "agent_settled" });
