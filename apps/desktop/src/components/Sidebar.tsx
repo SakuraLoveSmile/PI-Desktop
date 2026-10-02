@@ -28,7 +28,7 @@ import {
   sessionArchived,
   sessionPinned,
 } from "../lib/sidebar-session-groups";
-import { isAutomationSession } from "../lib/session-origin";
+import { listableSessions } from "../lib/session-origin";
 import {
   composerDropItems,
   hasComposerFileDrag,
@@ -637,8 +637,7 @@ export function Sidebar({
     // point (issue #1291). The session stays in the store so the chat surface
     // can still resolve its title, source, and capabilities when it is opened
     // from there.
-    const candidates = sessions
-      .filter((session) => !isAutomationSession(session))
+    const candidates = listableSessions(sessions)
       .filter((session) => showArchived || !sessionArchived(session, sessionMeta[session.id]));
     // Empty sessions are durable sidebar rows now. Their message count, not
     // their title, controls New Task reuse, so a manual rename never changes

@@ -1139,6 +1139,16 @@ combined with `taskId`). The task column reads the second shape. A global window
 over `task_runs` can be filled by one busy task — retention keeps the last 100
 runs *per task* — and would then report an idle task as never run, so the read
 that feeds the column is per task rather than a shared window.
+Retention keeps the newest 100 runs per task (`TASK_RUNS_KEEP`, applied on every
+boot). Ownership is derived from those rows, so a pruned run takes two things
+with it: the run leaves the task's history, and its session stops carrying
+`scheduledRun`, which returns that transcript to the SessionList and to session
+search. A task that runs faster than the kept window — an `interval` task from
+five minutes up, an hourly task after roughly four days — reaches that boundary;
+replacing the derived marker with a persistent origin is tracked with the rest
+of issue #1291.
+The task page also reads at most 200 runs per task, the bound
+`scheduled.listRuns` enforces for a single task's history.
 The existing JSON extension stores `schedule: {hour, minute, weekday}`,
 `intervalMinutes` (5–1440; required by an `interval` cadence and read by no other
 one, so a schedule that keeps the field keeps its value), `nextRunAt` (epoch

@@ -20,3 +20,15 @@ export function isAutomationSession(
 ): boolean {
   return session?.scheduledRun === true;
 }
+
+/**
+ * The conversations a session list may offer to enter. Automation transcripts
+ * are entered from the Scheduled page — that task's run history reads them in
+ * place — so the SessionList's groups, search's recents view, and the tray drop
+ * them before they can be listed or switched to.
+ */
+export function listableSessions<T extends Pick<SessionSummary, "scheduledRun">>(
+  sessions: readonly T[],
+): T[] {
+  return sessions.filter((session) => !isAutomationSession(session));
+}

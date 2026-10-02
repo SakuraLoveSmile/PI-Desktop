@@ -299,13 +299,13 @@ test("automation ownership keeps run transcripts out of the lists", async () => 
   });
 });
 
-test("the session list and search both consume the automation predicate", async () => {
+test("the session list and search both consume the ownership rule", async () => {
   const { readFile } = await import("node:fs/promises");
   const sidebar = await readFile(new URL("../src/components/Sidebar.tsx", import.meta.url), "utf8");
-  assert.match(sidebar, /import \{ isAutomationSession \} from "\.\.\/lib\/session-origin";/);
+  assert.match(sidebar, /import \{ listableSessions \} from "\.\.\/lib\/session-origin";/);
   assert.match(
     sidebar,
-    /\.filter\(\(session\) => !isAutomationSession\(session\)\)/,
+    /listableSessions\(sessions\)/,
     "the sidebar drops automation transcripts before grouping",
   );
   const search = await readFile(new URL("../src/hooks/use-session-search.ts", import.meta.url), "utf8");
@@ -313,6 +313,15 @@ test("the session list and search both consume the automation predicate", async 
     search,
     /state\.hits\.filter\(\(hit\) => !isAutomationSession\(hit\.session\)\)/,
     "search never offers one as a conversation to open",
+  );
+  const palette = await readFile(
+    new URL("../src/components/SearchDialog.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(
+    palette,
+    /listableSessions\(q \? search\.hits\.map/,
+    "and its empty-query recents list applies the same rule",
   );
 });
 
@@ -457,4 +466,30 @@ test("the task column reads one newest run per task, not a global window", async
 
   const api = await readFile(new URL("../src/lib/api.ts", import.meta.url), "utf8");
   assert.match(api, /latestPerTask\?: boolean/);
+});
+
+test("every session list the user can enter drops a run's transcript", async () => {
+  await withVite(async (server) => {
+    const origin = await server.ssrLoadModule("/src/lib/session-origin.ts");
+    const listed = [
+      { id: "plain" },
+      { id: "automation", scheduledRun: true },
+      { id: "legacy" },
+      { id: "explicit-false", scheduledRun: false },
+    ];
+    assert.deepEqual(
+      origin.listableSessions(listed).map((session) => session.id),
+      ["plain", "legacy", "explicit-false"],
+      "only a run's transcript leaves the list",
+    );
+    assert.deepEqual(origin.listableSessions([]), []);
+
+    // The tray applies the same rule in the main process, where the renderer's
+    // helper cannot be imported; its own test exercises that filter.
+    const tray = await readFile(
+      new URL("../electron/main/tray-sessions.ts", import.meta.url),
+      "utf8",
+    );
+    assert.match(tray, /trayVisibleSessions\(listed\.sessions\)/);
+  });
 });

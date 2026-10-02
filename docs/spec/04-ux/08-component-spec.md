@@ -4144,6 +4144,10 @@ TASKS (2)                     │ Nightly dependency check   [Enabled] [Run now]
   hours, stored as minutes, refused outside that range). The value rides along
   with every armed cadence, so switching between a calendar and an interval
   loses neither, and the row reports the span instead of a clock.
+- Ownership is derived, so the two windows are visible: the host keeps the newest
+  100 runs per task and the page reads at most 200, and a run older than either
+  leaves both the task's history and its transcript's `scheduledRun` marker. See
+  [data storage](../03-runtime/04-data-storage.md) §4.11.
 - Open conversation is the only action that leaves for the chat route. A
   scheduled run's conversation then shows a back row in the chat top bar,
   labelled with the route and, when the row's own origin is known, the task it

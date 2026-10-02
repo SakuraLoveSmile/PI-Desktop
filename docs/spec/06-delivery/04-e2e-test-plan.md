@@ -416,15 +416,16 @@
   arrows, Home/End, Enter, Escape/Tab and outside dismissal; select hourly without time
   fields and verify its first occurrence is one hour away; pause/resume; Run now
   select an interval cadence, enter 30 minutes and verify the row states that
-  span instead of a clock, then switch to a weekly cadence and back to confirm
-  the value survived; open the edit form and verify the task column and the task
-  page step aside;
-  then let one task accumulate more runs than the shared window while another
-  stays idle, and verify the idle task still reports its own last outcome;
-  and read the admitted run's transcript inside the task page; open the result
-  conversation from that page and verify its top bar offers the way back to the
-  scheduled task; return and confirm the same task and run are still selected;
-  observe automatic completion; delete the settled task. In a normal Agent
+  fields and verify its first occurrence is one hour away; pause/resume; Run now
+  and read the admitted run's transcript inside the task page; select an interval
+  cadence, enter 30 minutes and verify the row states that span instead of a
+  clock, then switch to a weekly cadence and back to confirm the value survived;
+  open the edit form and verify the task column and the task page step aside;
+  let one task accumulate more runs than the shared window while another stays
+  idle, and verify the idle task still reports its own last outcome; open the
+  result conversation from that page and verify its top bar offers the way back
+  to the scheduled task; return and confirm the same task and run are still
+  selected;
   conversation, use model tool calls to discover, create, list, update to 15:30
   and delete a task. Verify the custom time appears in the form and survives
   renaming. The model is a local deterministic fixture, not a live provider.
