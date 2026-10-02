@@ -332,7 +332,13 @@ describe("catalog and roles", () => {
       profile: "remote-host",
       mutation: true,
     });
+    expect(RACP_OPERATIONS["goalProgress/get"]).toEqual({
+      role: "viewer",
+      profile: "remote-host",
+      mutation: false,
+    });
     expect(rolesAllowOperation(["viewer"], "goalReports/get")).toBe(true);
+    expect(rolesAllowOperation(["viewer"], "goalProgress/get")).toBe(true);
     expect(rolesAllowOperation(["viewer"], "goalReports/retry")).toBe(false);
     expect(rolesAllowOperation(["controller"], "goalReports/retry")).toBe(true);
   });

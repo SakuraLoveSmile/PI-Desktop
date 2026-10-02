@@ -27,6 +27,7 @@ import {
   workPanelWidthForSidebarReopen,
 } from "../../lib/work-panel-resize";
 import { browserPluginTab, goalReportWorkPanelTab } from "../../lib/work-panel-tabs";
+import { shouldAutoOpenGoalReportWorkPanel } from "../../lib/goal-report-presentation";
 import { useAppStore } from "../../stores/app-store";
 import { useSidebarTransition } from "./useSidebarTransition";
 import { useStartupWatchdog } from "./useStartupWatchdog";
@@ -43,6 +44,7 @@ const MODIFIER_ONLY_KEYS = new Set([
 const PLUGIN_THEME_STYLE_ID = "pi-plugin-theme";
 
 export function useAppShellRuntime() {
+  const autoOpenedGoalReportExecutionsRef = useRef<Set<string>>(new Set());
   const { t } = useTranslation();
   const platform = window.piDesktop?.platform ?? "darwin";
   const bootstrap = useAppStore((s) => s.bootstrap);
@@ -590,7 +592,14 @@ export function useAppShellRuntime() {
     const offGoalReportChanged = api.onGoalReportChanged((event) => {
       const store = useAppStore.getState();
       void store.refreshGoalReports(event.sessionId);
-      if (event.sessionId === store.activeSessionId) {
+      if (
+        shouldAutoOpenGoalReportWorkPanel({
+          event,
+          activeSessionId: store.activeSessionId,
+          openedExecutionIds: autoOpenedGoalReportExecutionsRef.current,
+        })
+      ) {
+        autoOpenedGoalReportExecutionsRef.current.add(event.executionId);
         store.openWorkPanelTabForSession(
           event.sessionId,
           goalReportWorkPanelTab(event.executionId),

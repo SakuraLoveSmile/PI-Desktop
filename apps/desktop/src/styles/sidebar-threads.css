@@ -28,7 +28,7 @@
   flex: 1;
   align-items: center;
   gap: 5px;
-  padding: 5px 6px 5px 20px;
+  padding: 5px 6px 5px 38px;
   text-align: left;
   color: inherit;
 }
@@ -413,4 +413,14 @@
   font-size: var(--text-xs-plus);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.thread-item-source {
+  flex: 0 0 auto;
+  font-size: var(--text-2xs);
+  padding: 0 4px;
+  border-radius: var(--radius-2xs);
+  background: var(--ds-tile-deep);
+  color: var(--ds-text-faint);
+  line-height: var(--leading-compact);
 }

@@ -1,5 +1,6 @@
 import {
   memo,
+  useContext,
   useMemo,
   useRef,
   type MouseEvent as ReactMouseEvent,
@@ -56,6 +57,9 @@ import { useSmoothText } from "../../../hooks/useSmoothText";
 import { TurnProcess } from "./TurnProcess";
 import { PlanApprovalBar } from "../../../components/PlanApprovalBar";
 import { AskToolCompletedSummary } from "../../../components/AskToolCompletedSummary";
+import { TeamDispatchContext, type TeamDispatchCardItem } from "../../../lib/team-dispatch";
+import { TeamDispatchCardsGroup } from "./TeamDispatchCard";
+
 
 const EMPTY_PROPOSALS: PlanProposal[] = [];
 
@@ -382,6 +386,40 @@ export const AssistantTurn = memo(function AssistantTurn({
   );
   statusesRef.current = turnDelegationStatuses;
   timingsRef.current = turnDelegationTimings;
+  const dispatchIndex = useContext(TeamDispatchContext);
+  const turnDispatchCards = useMemo(() => {
+    const cards: TeamDispatchCardItem[] = [];
+    const seenTaskKeys = new Set<string>();
+    for (const part of entry.parts) {
+      if (part.kind === "message") {
+        const list = dispatchIndex.cardsByMessageId.get(part.message.id);
+        if (list) {
+          for (const item of list) {
+            const key = `${item.teamSessionId}:${item.taskId}`;
+            if (!seenTaskKeys.has(key)) {
+              seenTaskKeys.add(key);
+              cards.push(item);
+            }
+          }
+        }
+      } else if (part.kind === "activity") {
+        for (const act of part.items) {
+          const list = dispatchIndex.cardsByMessageId.get(act.message.id);
+          if (list) {
+            for (const item of list) {
+              const key = `${item.teamSessionId}:${item.taskId}`;
+              if (!seenTaskKeys.has(key)) {
+                seenTaskKeys.add(key);
+                cards.push(item);
+              }
+            }
+          }
+        }
+      }
+    }
+    return cards;
+  }, [entry.parts, dispatchIndex]);
+
   const groupProcess = useAppStore((state) =>
     shouldGroupTurnProcess(
       resolveThinkingDisplayMode(state.settings?.thinkingDisplayMode),
@@ -442,6 +480,9 @@ export const AssistantTurn = memo(function AssistantTurn({
             {completedAsks.map((item) => <AskToolCompletedSummary key={item.message.id} message={item.message} />)}
           </>
         )}
+        {turnDispatchCards.length > 0 ? (
+          <TeamDispatchCardsGroup cards={turnDispatchCards} />
+        ) : null}
         {turnProposals.map((proposal) => <PlanApprovalBar key={proposal.id} proposal={proposal} />)}
         {turnAllActivityItems.filter((item) => item.kind === "tool" && item.message.toolName === "GenerateImages").map((item) => (
           <GeneratedImages key={item.message.id} message={item.message} />

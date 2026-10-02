@@ -599,6 +599,8 @@ export const en = {
     artifactScratchUnavailable: "The temporary session directory is unavailable.",
   },
   goal: {
+    progressInitializing: "Preparing…",
+    progressFailed: "Progress unavailable",
     planning: "Defining goal",
     approvalRegion: "Goal approval",
     readyAnnouncement: "Goal contract ready. It is open in the Work Panel.",
@@ -1815,6 +1817,11 @@ sklm: {
     close: "Close widget",
   },
   team: {
+    viewMemberDetail: "View {{name}} details",
+    memberDetailUnavailable: "Member details unavailable",
+    dispatchCardsLabel: "Expert task dispatches",
+    untitledTask: "Untitled task",
+
     title: "Expert Team",
     roster: "Team Roster",
     board: "Task Board",
@@ -1887,6 +1894,7 @@ sklm: {
     openTaskWithStatus: "Open task {{subject}} ({{status}})",
     viewAllTasks: "View all {{count}} tasks",
     roles: {
+      expert: "Expert",
       researcher: "Researcher",
       executor: "Executor",
       reviewer: "Reviewer",
@@ -2092,6 +2100,8 @@ sklm: {
     piSkillsRefresh: "Refresh pi CLI skills",
     piSkillsEmpty: "No pi CLI npm skill packages found.",
     piSkillsLoading: "Looking for pi CLI skills…",
+    piSkillsDismiss: "Dismiss pi CLI skills",
+    piSkillsReveal: "Show pi CLI skills",
     importExtension: "Import pi extension",
     importExtensionDone: "Imported as plugin {{id}}",
     importExtensionDepsFailed: "Imported as plugin {{id}}, but installing dependencies failed: {{error}}",

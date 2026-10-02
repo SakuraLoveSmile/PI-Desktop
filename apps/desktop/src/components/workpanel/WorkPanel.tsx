@@ -1003,8 +1003,9 @@ export function WorkPanel({
             >
               <TeamPanel
                 teamSessionId={activeTab.resource ?? activeSessionId ?? ""}
-                initialView={activeTab.teamTarget?.kind}
+                initialView={activeTab.teamTarget?.kind === "member" ? undefined : activeTab.teamTarget?.kind}
                 initialTaskId={activeTab.teamTarget?.taskId}
+                initialMemberSessionId={activeTab.teamTarget?.kind === "member" ? activeTab.teamTarget.memberSessionId : undefined}
                 navigationSeq={activeTab.teamNavigationSeq}
                 onSelectSession={(sessionId: string) => void selectSession(sessionId)}
               />

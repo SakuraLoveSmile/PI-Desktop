@@ -5,6 +5,7 @@ import type {
   GoalReport,
   GoalReportAssetChunk,
   GoalReportSummary,
+  GoalProgressSnapshot,
   RacpProjectSummary,
   WorkspaceDiff,
 } from "@pi-desktop/shared";
@@ -67,6 +68,10 @@ export interface RacpGoalReportAccess {
   getAsset?(input: { sessionId: string; executionId: string; screenshotId: string; offset?: number; length?: number }): Promise<GoalReportAssetChunk>;
 }
 
+export interface RacpGoalProgressAccess {
+  get(input: { sessionId: string; executionId: string }): Promise<{ progress: GoalProgressSnapshot | null }>;
+}
+
 export type TerminalOpenResult = {
   terminalId: string;
   /** Bounded replay ring, base64 (spec §6.2). */
@@ -94,6 +99,7 @@ export type RacpHostOperations = {
   projects: RacpProjectCatalog;
   workspace: RacpWorkspaceAccess;
   goalReports?: RacpGoalReportAccess;
+  goalProgress?: RacpGoalProgressAccess;
   terminal?: RacpTerminalAccess;
   /** Owner-only: revoke a paired device (spec `session/revoke`). */
   revokeDevice?: (deviceId: string) => Promise<boolean>;

@@ -378,7 +378,8 @@ test("motion feedback is composited, bounded, and accessible", () => {
   assert.match(styles, /@keyframes work-panel-out/);
   assert.match(styles, /translateX\(8px\)/);
   assert.match(styles, /\.composer-shell:focus-within/);
-  assert.doesNotMatch(styles, /backdrop-filter:\s*blur/);
+  // Match declarations, not feature-query headers used by glass fallback rules.
+  assert.doesNotMatch(styles, /^\s*backdrop-filter:\s*blur/m);
   assert.match(styles, /\.chat-error-notice > span[\s\S]*?overflow-wrap:\s*anywhere/);
   assert.match(
     styles,
