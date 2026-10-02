@@ -30,6 +30,16 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.15.7",
+    date: "2026-10-02",
+    highlights: [
+      "Track live progress for approved Goals and review their completion reports.",
+      "Keep successful task dispatches visible in expert cards, with links to task details.",
+      "Improve pinned session titles, model menus, and optional skill discovery.",
+    ],
+  },
+
+  {
     version: "0.15.6",
     date: "2026-09-23",
     highlights: [
@@ -843,6 +853,16 @@ const enEntries: ChangelogEntry[] = [
 
 const zhCNEntries: ChangelogEntry[] = [
   {
+    version: "0.15.7",
+    date: "2026-10-02",
+    highlights: [
+      "跟踪已批准目标的实时进度，并查看完成报告。",
+      "专家任务卡片会保留成功派发的状态，并链接到任务详情。",
+      "改进固定会话标题、模型菜单和可选技能发现。",
+    ],
+  },
+
+  {
     version: "0.15.6",
     date: "2026-09-23",
     highlights: [
@@ -1655,6 +1675,16 @@ const zhCNEntries: ChangelogEntry[] = [
 ];
 
 const zhTWEntries: ChangelogEntry[] = [
+  {
+    version: "0.15.7",
+    date: "2026-10-02",
+    highlights: [
+      "追蹤已核准目標的即時進度，並檢視完成報告。",
+      "專家任務卡片會保留成功派送的狀態，並連結至任務詳細資訊。",
+      "改進釘選工作階段標題、模型選單和選用技能探索。",
+    ],
+  },
+
   {
     version: "0.15.6",
     date: "2026-09-23",

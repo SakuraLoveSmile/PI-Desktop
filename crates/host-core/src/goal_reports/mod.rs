@@ -589,6 +589,24 @@ pub fn finalize_report(
         return Err(anyhow!("INVALID_ARGUMENT: execution is not a goal"));
     }
 
+    let terminal_state = match facts.execution_state.as_deref() {
+        Some("completed") => "completed",
+        Some("interrupted") => "interrupted",
+        _ => {
+            return Err(anyhow!(
+                "GOAL_EXECUTION_NOT_TERMINAL: execution is not terminal"
+            ))
+        }
+    };
+
+    if let Some(override_status) = status_override {
+        if override_status != "completed" && override_status != "interrupted" {
+            return Err(anyhow!(
+                "GOAL_EXECUTION_NOT_TERMINAL: execution status override is not terminal"
+            ));
+        }
+    }
+
     let existing: Option<(String, Option<String>, i64, String)> = db
         .conn()
         .prepare_cached(
@@ -654,10 +672,7 @@ pub fn finalize_report(
         None
     };
 
-    let execution_status = match status_override.or(facts.execution_state.as_deref()) {
-        Some("interrupted") => "interrupted",
-        _ => "completed",
-    };
+    let execution_status = status_override.unwrap_or(terminal_state);
     let error_code = error_code_override.or(facts.error_code.as_deref());
 
     let (integrity_kind, verdict, summary, full_report) = match maybe_draft {

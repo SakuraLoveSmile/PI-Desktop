@@ -148,6 +148,8 @@ stdio 与 Tokio 的动态阻塞池隔离，因此后一种情况
 | `PLAN_APPROVAL_INTERRUPTED` | 不 | 待批准在中止、崩溃或持久性失败期间关闭 |
 | `PLAN_ARTIFACT_WRITE_FAILED` | 不 | 主机无法将确切的字节写入新的 `.pi/<kind>/*.md` 工件 |
 | `PLAN_EXECUTION_INTERRUPTED` | 不 | 已批准的 queued/running Plan 或 Goal 执行已停止且不重播 |
+| `GOAL_EXECUTION_NOT_TERMINAL` | 不 | Goal 尚未结算，不能生成最终报告 |
+| `GOAL_PROGRESS_NOT_RUNNING` | 不 | 执行或绑定回合已停止，不能写入进度 |
 | `PLAN_REQUIRES_INTERACTIVE_SESSION` | 不 | unattended/scheduled Plan 或 Goal 运行无法请求批准 |
 | `PLAN_NOT_FOUND` | 不 | 没有审批记录与该提案 id 匹配 |
 | `PLAN_SESSION_NOT_FOUND` | 不 | Plan/Goal RPC 点名了主机没有的会话 |

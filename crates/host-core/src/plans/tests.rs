@@ -608,10 +608,28 @@ fn claim_and_finish_are_durable_cas_transitions() {
     let running = manager.claim_execution(&db, &id).unwrap();
     assert_eq!(running.state, EXECUTION_RUNNING);
     assert!(manager.claim_execution(&db, &id).is_err());
+    db.conn()
+        .execute(
+            "INSERT INTO kv (ns, key, value_json, updated_at) VALUES (?1, ?2, '{}', 1)",
+            params![crate::goal_progress::GOAL_PROGRESS_AUTH_KV_NAMESPACE, id],
+        )
+        .unwrap();
     let completed = manager
         .finish_execution(&db, &id, EXECUTION_COMPLETED, None)
         .unwrap();
     assert_eq!(completed.state, EXECUTION_COMPLETED);
+    let tokens: i64 = db
+        .conn()
+        .query_row(
+            "SELECT COUNT(*) FROM kv WHERE ns = ?1 AND key = ?2",
+            params![crate::goal_progress::GOAL_PROGRESS_AUTH_KV_NAMESPACE, id],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(
+        tokens, 0,
+        "settlement must discard private progress authorization"
+    );
     assert!(manager
         .finish_execution(&db, &id, EXECUTION_INTERRUPTED, Some("late"))
         .is_err());

@@ -806,6 +806,14 @@ from transcript text.
 Submitting a late draft cannot move a `ready` or `failed` report back to
 `draft`; the Host rejects it before changing either the report file or row.
 
+Real-time goal progress snapshots are stored in Host KV under namespace `goal_progress_v1`,
+keyed by `executionId`. The snapshot payload follows `GoalProgressSnapshot`:
+`{ schemaVersion: 1, sessionId, proposalId, executionId, revision, items: Array<{ id, label, status }>, updatedAt }`.
+Private write tokens are transiently held in Host KV under namespace `goal_progress_auth_v1`
+bound to the running execution ID, active turn ID, and session ID. These are additive KV entries
+and require no database migration. Tokens are deleted atomically when an execution finishes
+and cleared at Host startup. Session deletion removes both snapshot and authorization entries.
+
 Expert Team state is stored in three Host-owned tables (ADR 0307):
 
 - `teams` is keyed by the Lead session and stores revision and pause state.

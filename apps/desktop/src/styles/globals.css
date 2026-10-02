@@ -29,6 +29,8 @@
 @import "./sessions.css";
 @import "./work-panel.css";
 @import "./goal-report.css";
+@import "./goal-progress.css";
+@import "./team-dispatch.css";
 @import "./agent-panorama.css";
 @import "./providers.css";
 @import "./model-config.css";

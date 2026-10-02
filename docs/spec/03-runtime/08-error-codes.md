@@ -146,6 +146,8 @@ does not turn temporary thread pressure into a host process exit.
 | `PLAN_APPROVAL_INTERRUPTED` | no | pending approval closed during abort, crash, or persistence failure |
 | `PLAN_ARTIFACT_WRITE_FAILED` | no | host could not write exact bytes to a new `.pi/<kind>/*.md` artifact |
 | `PLAN_EXECUTION_INTERRUPTED` | no | approved queued/running Plan or Goal execution stopped without replay |
+| `GOAL_EXECUTION_NOT_TERMINAL` | no | completion report requested before its Goal execution settled |
+| `GOAL_PROGRESS_NOT_RUNNING` | no | progress write attempted after its execution or bound turn stopped |
 | `PLAN_REQUIRES_INTERACTIVE_SESSION` | no | unattended/scheduled Plan or Goal run cannot request approval |
 | `PLAN_NOT_FOUND` | no | no approval row matches the proposal id |
 | `PLAN_SESSION_NOT_FOUND` | no | the Plan/Goal RPC named a session the host does not have |

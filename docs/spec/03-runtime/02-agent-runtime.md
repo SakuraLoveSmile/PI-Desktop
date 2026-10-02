@@ -716,6 +716,18 @@ acceptance criterion by running the checks the contract names, keep working
 while a criterion is unmet and an untried approach remains, stop early only
 when a boundary blocks it, and close with a criterion-by-criterion report of
 what was met and the evidence observed.
+
+### Goal Progress Tracking and UpdateGoalProgress Tool
+
+During active execution of an approved Goal, the Agent runtime issues a private write authorization
+token (`writeToken`) from the Host and exposes the `UpdateGoalProgress` tool to the agent.
+
+- **Tool Definition:** `UpdateGoalProgress({ items: Array<{ id: string, label: string, status: "pending" | "in_progress" | "completed" | "failed" }> })`
+- **Security Boundary:** The tool is bound to the specific running execution and turn. The private `writeToken`
+  is maintained internally by the runtime and is never leaked to public transcript messages, model prompt contexts, or UI payloads.
+- **Lifecycle Cleanup:** When the goal execution completes, aborts, errors, or the runtime is disposed,
+  the tool is removed and the write token is invalidated on the Host.
+
 ## 5c. Thinking capability and stream contract
 
 - Canonical levels are `off`, `minimal`, `low`, `medium`, `high`, `xhigh`,

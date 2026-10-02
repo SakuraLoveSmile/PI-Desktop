@@ -25,6 +25,7 @@ import type {
   RacpSessionStatus,
   RacpTurn,
   RacpTurnAdmission,
+  GoalProgressChangedEvent,
   ToolPermissionRequest,
   UiMessage,
 } from "@pi-desktop/shared";
@@ -372,6 +373,16 @@ export class AgentHost {
     if (summary.planningState) state.planningState = summary.planningState;
     if (kind !== "session.created") this.emit(state, "session.changed", { session: summary }, {});
     this.hub.publish({ scope: "host", sessionId: summary.id, revision: state.revision, kind, payload: { session: summary } });
+  }
+
+  /** Publish a durable session event for a Host-owned Goal Progress update. */
+  publishGoalProgressChanged(event: GoalProgressChangedEvent): void {
+    const sessionId = event.sessionId.trim();
+    if (!sessionId || !event.executionId.trim() || !Number.isInteger(event.revision) || event.revision < 1) return;
+    const state = this.state(sessionId);
+    this.emit(state, "session.changed", {
+      goalProgress: { ...event, sessionId },
+    }, {});
   }
 
   // -------------------------------------------------------------------------

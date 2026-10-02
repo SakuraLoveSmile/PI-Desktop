@@ -10,6 +10,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers/ts-import-hooks.mjs")));
 
 const { createHostRuntime } = await import("../electron/main/runtime/host.ts");
+const { IPC } = await import("@pi-desktop/shared");
 const { createSessionCoordination } = await import(
   "../electron/main/runtime/session-coordination.ts"
 );
@@ -80,9 +81,10 @@ const TOOL_NAME = VALUE_BY_FIELD.toolName;
  * decide that question itself. `activeTurn` seeds the session's live turn;
  * leaving it out models a session whose turn has already ended.
  */
-function fixture({ activeTurn } = {}) {
+function fixture({ activeTurn, agentHostBridge = null } = {}) {
   const calls = [];
   const invocations = [];
+  const rendererEvents = [];
   let notification = null;
 
   const activeTurns = new Map();
@@ -107,7 +109,7 @@ function fixture({ activeTurn } = {}) {
   const runtime = createHostRuntime({
     // The notification handler ignores anything from a host generation that is
     // no longer current, so the fake must be the live one.
-    runtimeState: { host, sidecar: null, agentHostBridge: null },
+    runtimeState: { host, sidecar: null, agentHostBridge },
     dataDir: "/tmp/pi-desktop-test",
     logger: { app() {}, child: () => ({ app() {} }), flushChild() {} },
     persistenceOutbox: { size: () => 0, flush: async () => undefined },
@@ -129,7 +131,7 @@ function fixture({ activeTurn } = {}) {
     },
     userMcp: { callTool: async () => null },
     pluginActiveInProject: () => true,
-    sendToRenderer() {},
+    sendToRenderer: (channel, payload) => rendererEvents.push({ channel, payload }),
     emitAgentEvent() {},
     togglePluginLauncher: async () => undefined,
     finishTurn: async () => undefined,
@@ -147,9 +149,25 @@ function fixture({ activeTurn } = {}) {
   return {
     calls,
     invocations,
+    rendererEvents,
     notify: (method, params) => notification(method, params),
   };
 }
+
+test("desktop Goal Progress notifications publish to AgentHost and retain local IPC delivery", () => {
+  const published = [];
+  const bridge = { agentHost: { publishGoalProgressChanged: (event) => published.push(event) } };
+  const f = fixture({ agentHostBridge: bridge });
+  const event = { sessionId: SESSION_ID, executionId: "exec-progress", revision: 2 };
+
+  f.notify("goalProgress.changed", event);
+
+  assert.deepEqual(published, [event]);
+  assert.deepEqual(f.rendererEvents, [{
+    channel: IPC.event.goalProgressChanged,
+    payload: event,
+  }]);
+});
 
 function fullPayload() {
   return Object.fromEntries(FIELDS.map((field) => [field, VALUE_BY_FIELD[field]]));

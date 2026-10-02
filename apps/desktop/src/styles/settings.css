@@ -3790,6 +3790,24 @@
 }
 
 /* Discovered local package paths remain readable at narrow settings widths. */
+.pi-skill-discovery-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.pi-skill-discovery-header .settings-card-heading {
+  margin: 0;
+}
+.pi-skill-discovery-dismiss {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+}
+.pi-skill-discovery-collapsed {
+  margin-bottom: 24px;
+}
 .pi-skill-discovery .settings-row-detail {
   overflow-wrap: anywhere;
 }

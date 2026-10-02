@@ -2,6 +2,16 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const frEntries: ChangelogEntry[] = [
   {
+    "version": "0.15.7",
+    "date": "2026-10-02",
+    "highlights": [
+      "Suivez la progression en direct des objectifs approuvés et consultez leurs rapports d'achèvement.",
+      "Les cartes d'experts conservent les tâches distribuées avec succès et proposent un lien vers leurs détails.",
+      "Améliore les titres des sessions épinglées, les menus de modèles et la découverte facultative de compétences.",
+    ],
+  },
+
+  {
     "version": "0.15.6",
     "date": "2026-09-23",
     "highlights": [

@@ -151,6 +151,7 @@ impl Database {
                 )?;
             }
         }
+        crate::goal_progress::cleanup_auth_tokens_conn(&tx)?;
         tx.commit()?;
         self.conn.execute(
             "DELETE FROM audit_log WHERE ts < ?1",

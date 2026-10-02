@@ -153,3 +153,18 @@ test("reasoning projection uses the selected exact catalog row and binding", asy
   assert.match(source, /sameComposerModelId\(candidate\.modelId, modelId\)/);
   assert.match(source, /sameComposerModelId\(candidate\.id, model\.modelId\)/);
 });
+
+test("composer-model-thinking-menu uses 96% opacity, blur, and solid fallback", () => {
+  assert.match(
+    stylesSource,
+    /\.composer-model-thinking-menu\s*\{[\s\S]*?background:\s*color-mix\(in oklab, var\(--ds-bg-elevated-opaque\) 96%, transparent\);[\s\S]*?backdrop-filter:\s*saturate\(1\.6\) blur\(40px\);/,
+  );
+  assert.match(
+    stylesSource,
+    /@supports not \(\(backdrop-filter: blur\(1px\)\) or \(-webkit-backdrop-filter: blur\(1px\)\)\)\s*\{\s*\.composer-model-thinking-menu\s*\{\s*background:\s*var\(--ds-bg-elevated-opaque\);/,
+  );
+  assert.match(
+    stylesSource,
+    /:root\[data-theme="light"\] \.composer-model-thinking-menu\s*\{[\s\S]*?background:\s*var\(--ds-bg-elevated-opaque\);[\s\S]*?backdrop-filter:\s*none;/,
+  );
+});

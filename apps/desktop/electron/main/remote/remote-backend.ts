@@ -18,6 +18,7 @@ import type {
   AgentQueuePushRequest,
   AgentStatus,
   AgentStopResponse,
+  GoalProgressSnapshot,
   AskToolResolution,
   PlanResolutionResult,
   PlanResolveRequest,
@@ -86,6 +87,7 @@ const HANDLED_CHANNELS: ReadonlySet<string> = new Set([
   IPC.invoke.goalReportGet,
   IPC.invoke.goalReportList,
   IPC.invoke.goalReportRetry,
+  IPC.invoke.goalProgressGet,
 ]);
 
 export function createRemoteBackend(options: RemoteBackendOptions): RemoteBackend {
@@ -360,6 +362,18 @@ export function createRemoteBackend(options: RemoteBackendOptions): RemoteBacken
           ...(typeof req.offset === "number" ? { offset: req.offset } : {}),
           ...(typeof req.length === "number" ? { length: req.length } : {}),
         });
+      }
+      case IPC.invoke.goalProgressGet: {
+        const req = args[0] as { sessionId: string; executionId: string };
+        const result = await client.request<{ progress: GoalProgressSnapshot | null }>("goalProgress/get", {
+          sessionId: hostIdFor(args),
+          executionId: req.executionId,
+        });
+        return {
+          progress: result.progress
+            ? { ...result.progress, sessionId: req.sessionId }
+            : null,
+        };
       }
       case IPC.invoke.plansResolve: {
         const resolution = args[0] as PlanResolveRequest;

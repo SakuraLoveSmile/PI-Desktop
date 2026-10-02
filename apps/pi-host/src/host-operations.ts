@@ -12,8 +12,8 @@ import {
   type HostSessionRecord,
   type RuntimeService,
 } from "@pi-desktop/host-runtime";
-import type { RacpGoalReportAccess, RacpHostOperations, RacpProjectCatalog, RacpSessionCatalog, RacpWorkspaceAccess } from "@pi-desktop/racp";
-import { ErrorCodes, type GoalReport, type GoalReportSummary, type RacpProjectSummary } from "@pi-desktop/shared";
+import type { RacpGoalProgressAccess, RacpGoalReportAccess, RacpHostOperations, RacpProjectCatalog, RacpSessionCatalog, RacpWorkspaceAccess } from "@pi-desktop/racp";
+import { ErrorCodes, type GoalProgressSnapshot, type GoalReport, type GoalReportSummary, type RacpProjectSummary } from "@pi-desktop/shared";
 
 /** A project row as host-core lists it. */
 type ProjectRow = { id: number; path: string; name: string; pinned?: boolean };
@@ -81,6 +81,15 @@ function createGoalReportAccess(deps: HostOperationsDeps): RacpGoalReportAccess 
         }
         return host.call<{ report: GoalReportSummary }>("goalReports.retry", { sessionId, executionId }).catch(hostError);
       });
+    },
+  };
+}
+
+function createGoalProgressAccess(deps: HostOperationsDeps): RacpGoalProgressAccess {
+  return {
+    async get(input) {
+      const host = requireHost(deps.getHost);
+      return host.call<{ progress: GoalProgressSnapshot | null }>("goalProgress.get", input).catch(hostError);
     },
   };
 }
@@ -280,6 +289,7 @@ export function createHostOperations(deps: HostOperationsDeps): Omit<RacpHostOpe
     projects: createProjectCatalog(deps),
     workspace: createWorkspaceAccess(deps),
     goalReports: createGoalReportAccess(deps),
+    goalProgress: createGoalProgressAccess(deps),
     ...(deps.revokeDevice ? { revokeDevice: deps.revokeDevice } : {}),
   };
 }

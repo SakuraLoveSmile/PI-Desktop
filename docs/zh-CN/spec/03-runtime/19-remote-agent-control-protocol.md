@@ -206,6 +206,7 @@ owner，工作区读取都按会话持久根、Host 忽略规则和 `PATH_OUTSID
 | `session/rename` | controller | 重命名会话 |
 | `session/delete` | owner | 删除会话及其在 Host 上的 transcript |
 | `session/compact` | controller | 对活动会话执行手动上下文检查点 |
+| `goalProgress/get` | viewer | 读取指定会话的执行进度快照；写入和令牌签发仍仅供执行 sidecar 使用 |
 | `goalReports/get` | viewer | 读取指定会话的报告或 Host 有界状态；其他会话的报告与不存在的报告不可区分 |
 | `goalReports/list` | viewer | 列出指定会话的持久报告摘要 |
 | `goalReports/retry` | controller | transcript 持久化成功后，依据 Host 持久事实重新完成失败报告；绝不重跑 Goal |

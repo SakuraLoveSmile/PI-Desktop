@@ -3468,7 +3468,12 @@ identify the platform validation still needed.
   and `off` without closing the menu: its horizontal position stays stable,
   and the trigger stays inside its slot, including with a long model name.
   Moving the anchor and dispatching a viewport resize must reposition the
-  menu without an event-target type error. Automated geometry coverage:
+  menu without an event-target type error. In dark mode, `.composer-model-thinking-menu` uses an anti-bleed surface with
+  96% opacity (`color-mix(in oklab, var(--ds-bg-elevated-opaque) 96%, transparent)`)
+  and `backdrop-filter: blur(40px)`, falling back to solid `--ds-bg-elevated-opaque`
+  where `backdrop-filter` is unsupported; light mode maintains a solid background so
+  underlying transcript text is obscured while menu text and slider labels remain sharp.
+  Automated geometry and surface coverage:
   `node scripts/e2e-composer-thinking-layout.mjs` (isolated Electron fixture,
   production React picker and compiled styles; no live providers).
   Repeat native mouse press/release to open, select the first and subsequent
@@ -14040,7 +14045,10 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   match. The title button stays transparent. Only a conversation uses selected
   fill, which wins over hover; workspace identity remains a separate dot with
   no persistent header fill. Folding never promotes the project to selected.
-  Pinned and standalone rows use the same selected surface. Keyboard focus
+  Pinned and standalone rows use the same selected surface. Session titles
+  across ordinary, team lead, running/error/selected, and pinned/native sessions
+  maintain unified horizontal start coordinates (`rect.left`, within 1px), with
+  trailing pin and native badges placed after the title. Keyboard focus
   retains an outline, action buttons retain local feedback, drop-target paint
   wins over hover, and blur releases hover without clearing selection. Settings
   replaces sidebar navigation, and returning restores conversation and workspace
@@ -15176,13 +15184,17 @@ the latest destination. These assertions measure work counts, not device FPS.
   directories do not count as imports; scoped packages are discovered. Unrelated
   dependencies and unreadable scopes do not hide healthy skills. A registered
   import remains marked imported after runtime failure while its error stays visible.
+  The header dismiss control closes the discovery panel to a secondary reveal button;
+  closing ignores late discovery responses and initiates no imports; reveal triggers
+  fresh discovery; busy imports disable dismiss and refresh; remount restores the
+  default expanded state.
 - **Specs:** 07-plugins/16-trusted-extensions; ADR pi-npm-skill-discovery.
 - **Acceptance:** Plugin skill discovery and explicit trust boundary.
 - **Milestone:** Post-MVP compatibility.
 - **Status:** Automated via `apps/desktop/test/pi-skill-discovery.test.mjs` (real
   import and plugin child process, native dialog boundary controlled) and
   `node scripts/e2e-pi-skill-discovery-ui.mjs` (real React/Chromium panel with
-  controlled IPC results). Optional `PI_SKILL_PACKAGE_FIXTURE` points to an
+  dismiss, reveal, late response ignore, busy controls, and remount restoration). Optional `PI_SKILL_PACKAGE_FIXTURE` points to an
   unpacked published package for the reported planning-with-files path.
 
 ### E2E-SESSION-temporary-attachment-fork: Preview and independent branch inputs
@@ -15409,6 +15421,11 @@ renderer's durable transcript reads. No real model or provider is contacted.
   its conclusion, execution status, evidence and limitations. A criterion is
   presented as met only when the structured report and durable evidence support
   it. A fallback report identifies unknown or missing evidence.
+- **Progress:** Approved Goal progress accepts pending/in-progress/completed/failed items.
+  Unauthorized turns and stale revisions are rejected. A new execution ignores old report
+  and progress responses; terminal settlement revokes writes, retains readable progress,
+  and session deletion removes it. Failed Team operations do not change dispatch cards;
+  successful task updates to failed remain visible. Member and task links open their own detail.
 - **Recovery and failure:** Ready reports remain readable after restart.
   Invalid or failed draft persistence never publishes a stale or misleading
   ready report. A late draft submission after `ready` or `failed` is rejected
@@ -15425,8 +15442,11 @@ renderer's durable transcript reads. No real model or provider is contacted.
   03-runtime/04-data-storage, 03-runtime/06-host-rpc-protocol,
   04-ux/08-component-spec.
 - **Automation:** `node scripts/e2e-temporary-goal.mjs`,
-  `pnpm test:e2e:goal-report`, Goal Report runtime/Host tests, and the focused
-  Goal Report renderer tests. Remote contract coverage includes the RACP role,
+  `pnpm test:e2e:goal-report`, `node scripts/e2e-goal-team-renderer-ui.mjs`,
+  `pnpm test:e2e:team`, Goal Report runtime/Host tests,
+  and the focused Goal Report renderer tests (`apps/desktop/test/goal-report-finalization.test.mjs`,
+  `apps/desktop/test/goal-report-presentation.test.mjs`, `apps/desktop/test/goal-progress-presentation.test.mjs`,
+  `apps/desktop/test/team-dispatch.test.mjs`). Remote contract coverage includes the RACP role,
   Host-operation barrier, persistence queue, and Electron remote-backend tests.
   Electron uses the isolated local fake model.
 - **Milestone:** Maintenance.

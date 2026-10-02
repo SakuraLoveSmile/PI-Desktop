@@ -2,6 +2,16 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const koEntries: ChangelogEntry[] = [
   {
+    version: "0.15.7",
+    date: "2026-10-02",
+    highlights: [
+      "승인된 목표의 실시간 진행 상황을 추적하고 완료 보고서를 확인하세요.",
+      "전문가 작업 카드에 성공적으로 전달된 작업 상태를 유지하고 작업 상세 정보로 연결합니다.",
+      "고정된 세션 제목, 모델 메뉴, 선택적 스킬 검색을 개선했습니다.",
+    ],
+  },
+
+  {
     version: "0.15.6",
     date: "2026-09-23",
     highlights: [
