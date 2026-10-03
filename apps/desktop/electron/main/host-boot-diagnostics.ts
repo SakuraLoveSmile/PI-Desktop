@@ -3,7 +3,10 @@
  *
  * - `DB_SCHEMA_TOO_NEW`: a newer Pi-Desktop-Plus already migrated the local data
  *   directory; this older build's host-core refuses to open it. Looping
- *   restarts only repeats the same stderr line.
+ *   restarts only repeats the same stderr line. host-core refuses on either
+ *   schema track: the shared `user_version` chain (`database schema version`)
+ *   or the Plus-only track (`Plus schema version`). Both report their own
+ *   numbers, which the banner shows as found/supported.
  * - `ARCH_MISMATCH`: the installed build is not native to this CPU (typically
  *   the Intel macOS build on Apple Silicon under Rosetta). It runs, but slower,
  *   so the UI points at the matching download instead of staying silent.
@@ -17,7 +20,7 @@ export const ARCH_MISMATCH_STATUS = "ARCH_MISMATCH";
 export type SchemaTooNew = { found: number; supported: number };
 
 const SCHEMA_TOO_NEW_RE =
-  /database schema version (\d+) is newer than supported (\d+)/;
+  /(?:database|Plus) schema version (\d+) is newer than supported (\d+)/;
 
 /** Parse host-core's refusal line from stderr or an error message. */
 export function parseSchemaTooNew(text: unknown): SchemaTooNew | null {

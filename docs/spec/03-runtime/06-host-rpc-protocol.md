@@ -176,10 +176,13 @@ creates neither A2A tables nor unowned plugin-session rows. The schema version i
 internal persistence invariant, not an additional JSON-RPC field; the
 checkpoint architecture remains host-owned.
 
-The current host-core storage schema is v22. The v21-to-v22 additive migration
-adds approved execution provider/model bindings, durable revision intent fields,
-and the `plan_execution_schedules` table. Protocol v11 remains the wire
-version; this persistence increment does not add a JSON-RPC version field.
+The shared host-core storage chain is v19. Plus-only structures, including
+approved execution provider/model bindings, durable revision intent fields, and
+the `plan_execution_schedules` table, are versioned by the separate Plus track
+recorded in `plus_schema_meta` (current v4; see the data-storage spec, section
+7.1), so a Plus persistence increment does not move `user_version`. Protocol v11
+remains the wire version; persistence increments on either track do not add a
+JSON-RPC version field.
 
 ## 4. Method catalog (MVP)
 

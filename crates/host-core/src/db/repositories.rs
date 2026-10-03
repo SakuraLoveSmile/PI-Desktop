@@ -116,6 +116,11 @@ impl Database {
         "#,
         )?;
         let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+        // Legacy fork databases carry Plus-only changes on `user_version`
+        // numbers that collide with upstream's chain; move them onto the Plus
+        // track before the shared chain dispatches (ADR plus-schema-version-track).
+        let version = plus_schema::reconcile_before_upstream_chain(&conn, path, version)?;
+        let fresh = version == 0;
         match version {
             0 => {
                 let has_tables: i64 = conn.query_row(
@@ -135,8 +140,6 @@ impl Database {
                 tx.execute_batch(SCHEMA_LATEST)?;
                 tx.execute_batch(PLAN_APPROVALS_SCHEMA)?;
                 tx.execute_batch(crate::session_collaboration::SCHEMA)?;
-                tx.execute_batch(crate::goal_reports::SCHEMA)?;
-                tx.execute_batch(TEAM_SCHEMA)?;
                 tx.pragma_update(None, "user_version", SCHEMA_VERSION)?;
                 tx.commit()?;
             }
@@ -182,10 +185,6 @@ impl Database {
             18 => {
                 migrate_v18_to_v19(&conn, path)?;
             }
-            19 => {
-                migrate_v19_to_v20(&conn, path)?;
-            }
-            20..=22 => {}
             legacy @ 1..=6 => {
                 let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
                 drop(conn);
@@ -216,23 +215,10 @@ impl Database {
         }
         if migrated_version == 18 {
             migrate_v18_to_v19(&conn, path)?;
-            migrated_version = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
         }
-        if migrated_version == 19 {
-            migrate_v19_to_v20(&conn, path)?;
-            migrated_version = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
-        }
-        if migrated_version == 20 {
-            migrate_v20_to_v21(&conn, path)?;
-            migrated_version = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
-        }
-        if migrated_version == 21 {
-            migrate_v21_to_v22(&conn, path)?;
-            migrated_version = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
-        }
-        if migrated_version == 22 {
-            migrate_v22_to_v23(&conn, path)?;
-        }
+        // Apply or re-verify the Plus-only structures once the shared chain is
+        // done, so an upstream step that rebuilt a table cannot drop them.
+        plus_schema::apply_pending(&conn, path, fresh, version)?;
         let db = Self { conn, data_dir };
         db.boot_maintenance()?;
         crate::session_collaboration::recover(&db)?;

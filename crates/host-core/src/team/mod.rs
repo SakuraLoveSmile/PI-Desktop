@@ -17,6 +17,11 @@ mod roster_tests;
 #[cfg(test)]
 mod tests;
 
+/// Canonical Team tables, applied by the Plus schema track
+/// (`db::plus_schema`). Idempotent (`IF NOT EXISTS`) so every Plus step and
+/// re-verification pass can replay it.
+pub(crate) const SCHEMA: &str = include_str!("schema.sql");
+
 pub use board::{
     create_team_task, get_team_board_projection, get_team_task, list_team_tasks, update_team_task,
     CreateTaskParams, UpdateTaskParams,

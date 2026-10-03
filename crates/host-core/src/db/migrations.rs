@@ -652,6 +652,18 @@ pub(crate) fn create_migration_backup(
     path: &Path,
     version: i64,
 ) -> Result<PathBuf> {
+    create_migration_backup_at(conn, path, migration_backup_path(path, version), version)
+}
+
+/// Snapshot `path` to `backup` and verify the copy carries `version`. The
+/// caller names the file so a track other than the upstream `user_version`
+/// chain (the Plus schema track) never overwrites a `v{N}.bak`.
+pub(crate) fn create_migration_backup_at(
+    conn: &Connection,
+    path: &Path,
+    backup: PathBuf,
+    version: i64,
+) -> Result<PathBuf> {
     let checkpoint: (i64, i64, i64) = conn
         .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| {
             Ok((row.get(0)?, row.get(1)?, row.get(2)?))
@@ -663,7 +675,6 @@ pub(crate) fn create_migration_backup(
         ));
     }
 
-    let backup = migration_backup_path(path, version);
     let backup_name = backup
         .file_name()
         .and_then(|name| name.to_str())
@@ -884,169 +895,4 @@ pub(crate) fn migrate_v18_to_v19(conn: &Connection, path: &Path) -> Result<()> {
     })();
     let _ = conn.pragma_update(None, "foreign_keys", true);
     result
-}
-
-/// v20 adds `artifact_workspace_kind` to `plan_approvals` to durably distinguish
-/// between project-origin and scratch-origin contract checkpoints, and creates
-/// `goal_reports` storage for Goal completion reporting.
-pub(crate) fn migrate_v19_to_v20_tx(tx: &rusqlite::Transaction<'_>) -> Result<()> {
-    let has_workspace_kind: bool = tx.query_row(
-        "SELECT EXISTS(
-             SELECT 1 FROM pragma_table_info('plan_approvals') WHERE name = 'artifact_workspace_kind'
-         )",
-        [],
-        |row| row.get(0),
-    )?;
-    if !has_workspace_kind {
-        tx.execute_batch(
-            "ALTER TABLE plan_approvals ADD COLUMN artifact_workspace_kind TEXT NOT NULL DEFAULT 'project' CHECK (artifact_workspace_kind IN ('project', 'scratch'));",
-        )?;
-    }
-    tx.execute_batch(crate::goal_reports::SCHEMA)?;
-    tx.pragma_update(None, "user_version", 20i64)?;
-    Ok(())
-}
-
-pub(crate) fn migrate_v19_to_v20(conn: &Connection, path: &Path) -> Result<()> {
-    let backup = create_migration_backup(conn, path, 19)?;
-    conn.pragma_update(None, "foreign_keys", false)?;
-    let result = (|| {
-        let tx = conn.unchecked_transaction()?;
-        migrate_v19_to_v20_tx(&tx)?;
-        tx.commit().with_context(|| {
-            format!(
-                "commit schema v19 to v20 migration; backup {} remains",
-                backup.display()
-            )
-        })
-    })();
-    let _ = conn.pragma_update(None, "foreign_keys", true);
-    result
-}
-
-/// v21 adds execution profiles and Team tables, and completes Goal objects for
-/// databases created by either unreleased v20 branch.
-pub(crate) fn migrate_v20_to_v21_tx(tx: &rusqlite::Transaction<'_>) -> Result<()> {
-    let has_execution_profile: bool = tx.query_row(
-        "SELECT EXISTS(
-             SELECT 1 FROM pragma_table_info('sessions') WHERE name = 'execution_profile'
-         )",
-        [],
-        |row| row.get(0),
-    )?;
-    if !has_execution_profile {
-        tx.execute_batch(
-            "ALTER TABLE sessions
-             ADD COLUMN execution_profile TEXT NOT NULL DEFAULT 'standard'
-             CHECK (execution_profile IN ('standard', 'team'));",
-        )?;
-    }
-
-    let has_workspace_kind: bool = tx.query_row(
-        "SELECT EXISTS(
-             SELECT 1 FROM pragma_table_info('plan_approvals') WHERE name = 'artifact_workspace_kind'
-         )",
-        [],
-        |row| row.get(0),
-    )?;
-    if !has_workspace_kind {
-        tx.execute_batch(
-            "ALTER TABLE plan_approvals ADD COLUMN artifact_workspace_kind TEXT NOT NULL DEFAULT 'project' CHECK (artifact_workspace_kind IN ('project', 'scratch'));",
-        )?;
-    }
-
-    tx.execute_batch(super::schema::TEAM_SCHEMA)?;
-    tx.execute_batch(crate::goal_reports::SCHEMA)?;
-    tx.pragma_update(None, "user_version", 21i64)?;
-    Ok(())
-}
-
-pub(crate) fn migrate_v20_to_v21(conn: &Connection, path: &Path) -> Result<()> {
-    let backup = create_migration_backup(conn, path, 20)?;
-    conn.pragma_update(None, "foreign_keys", false)?;
-    let result = (|| {
-        let tx = conn.unchecked_transaction()?;
-        migrate_v20_to_v21_tx(&tx)?;
-        tx.commit().with_context(|| {
-            format!(
-                "commit schema v20 to v21 migration; backup {} remains",
-                backup.display()
-            )
-        })
-    })();
-    let _ = conn.pragma_update(None, "foreign_keys", true);
-    result
-}
-
-/// v22 binds approved execution models and stores one-time Plan/Goal schedules.
-pub(crate) fn migrate_v21_to_v22(conn: &Connection, path: &Path) -> Result<()> {
-    let backup = create_migration_backup(conn, path, 21)?;
-    let tx = conn.unchecked_transaction()?;
-    for (name, definition) in [
-        ("execution_provider_id", "TEXT"),
-        ("execution_model_id", "TEXT"),
-        ("revision_intent_json", "TEXT"),
-        (
-            "revision_state",
-            "TEXT CHECK (revision_state IN ('ready', 'started', 'failed', 'submitted'))",
-        ),
-        ("revision_turn_id", "TEXT"),
-        ("revision_error_code", "TEXT"),
-    ] {
-        let exists: bool = tx.query_row(
-            "SELECT EXISTS(SELECT 1 FROM pragma_table_info('plan_approvals') WHERE name = ?1)",
-            params![name],
-            |row| row.get(0),
-        )?;
-        if !exists {
-            tx.execute_batch(&format!(
-                "ALTER TABLE plan_approvals ADD COLUMN {name} {definition};"
-            ))?;
-        }
-    }
-    tx.execute_batch(
-        "CREATE TABLE IF NOT EXISTS plan_execution_schedules (
-           proposal_id TEXT PRIMARY KEY REFERENCES plan_approvals(request_id) ON DELETE CASCADE,
-           scheduled_for INTEGER NOT NULL,
-           timezone TEXT NOT NULL,
-           state TEXT NOT NULL CHECK (state IN ('scheduled', 'missed', 'claimed', 'cancelled')),
-           updated_at INTEGER NOT NULL
-         );
-         CREATE INDEX IF NOT EXISTS idx_plan_execution_schedules_due
-           ON plan_execution_schedules(state, scheduled_for);",
-    )?;
-    tx.pragma_update(None, "user_version", 22i64)?;
-    tx.commit().with_context(|| {
-        format!(
-            "commit schema v21 to v22 migration; backup {} remains",
-            backup.display()
-        )
-    })?;
-    Ok(())
-}
-
-/// v23 binds additive effective execution_kind ('plan' | 'goal') to plan_approvals.
-pub(crate) fn migrate_v22_to_v23(conn: &Connection, path: &Path) -> Result<()> {
-    let backup = create_migration_backup(conn, path, 22)?;
-    verify_migration_backup(&backup, 22)?;
-    let tx = conn.unchecked_transaction()?;
-    let exists: bool = tx.query_row(
-        "SELECT EXISTS(SELECT 1 FROM pragma_table_info('plan_approvals') WHERE name = 'execution_kind')",
-        [],
-        |row| row.get(0),
-    )?;
-    if !exists {
-        tx.execute_batch(
-            "ALTER TABLE plan_approvals ADD COLUMN execution_kind TEXT CHECK (execution_kind IN ('plan', 'goal'));
-             UPDATE plan_approvals SET execution_kind = kind WHERE (execution_id IS NOT NULL OR status = 'approved') AND execution_kind IS NULL;"
-        )?;
-    }
-    tx.pragma_update(None, "user_version", 23i64)?;
-    tx.commit().with_context(|| {
-        format!(
-            "commit schema v22 to v23 migration; backup {} remains",
-            backup.display()
-        )
-    })?;
-    Ok(())
 }
