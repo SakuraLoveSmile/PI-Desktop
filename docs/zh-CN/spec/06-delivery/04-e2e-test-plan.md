@@ -9259,3 +9259,10 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **验收：** 缓存路径、迁移和清理单测通过；Windows task-candidate 验证应覆盖更新源传输、安装器交接和文件系统行为，且不连接真实发布源。
 - **里程碑：** M6+
 - **状态：** 单测和源码契约覆盖（`update-cache.test.mjs`、`auto-update.test.mjs`）；仍需 Windows 安装器/E2E 验证。
+
+### 导入扩展时发现 GUI 环境下的可执行文件回归（#1173）
+
+使用无法解析 Node/npm 的 GUI 风格 `PATH` 启动依赖安装，并在 `~/.local/bin` 准备可信 fixture 安装。
+校验和 npm 两个安装阶段都必须使用该安装，同时保留应用自身的 `PATH`，且不探测 shell 启动文件。
+显式选择的 npm 仍优先使用其所在目录。缺少安装时仍返回 `npm-unavailable` 并保留原生选择器恢复路径。
+可执行集成 fixture 使用真实隔离子进程，并检查仅注册表安装和凭据隔离。
