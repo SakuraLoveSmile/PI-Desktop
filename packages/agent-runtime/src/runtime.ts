@@ -15,13 +15,6 @@ import {
 } from "./delegation-message.js";
 import {
   Agent,
-  BACKGROUND_CONTEXT,
-  compact,
-  convertToLlm,
-  estimateContextTokens,
-  estimateTokens,
-  prepareCompaction,
-  withAbortSignal,
   type AgentContext,
   type AgentEvent,
   type AgentLoopTurnUpdate,
@@ -30,13 +23,8 @@ import {
   type AgentToolResult,
   type AfterToolCallContext,
   type AfterToolCallResult,
-  type CompactionPreparation,
-  type CompactionEntry,
-  type CompactionSettings,
   type BeforeToolCallContext,
   type BeforeToolCallResult,
-  type Entry,
-  type MessageEntry,
   type PrepareNextTurnContext,
 } from "@earendil-works/pi-agent-core";
 import {
@@ -136,6 +124,20 @@ import {
 } from "./agent-messages.js";
 import { withExplicitRequired } from "./tool-schema.js";
 import { buildSessionContext } from "./session-context.js";
+import { prepareCompaction } from "./pi-runtime-compaction-plan.js";
+import { compact } from "./pi-runtime-compaction-summary.js";
+import {
+  estimateContextTokens,
+  estimateTokens,
+} from "./pi-runtime-estimates.js";
+import { convertToLlm } from "./pi-runtime-messages.js";
+import type {
+  CompactionEntry,
+  CompactionPreparation,
+  CompactionSettings,
+  Entry,
+  MessageEntry,
+} from "./pi-runtime-types.js";
 import {
   initialSystemTranscript,
   CONTEXT_BUDGET_SECTION,
@@ -2611,6 +2613,10 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
   private extensionModelRegistry(): Record<string, unknown> {
     const getRunner = () => this.extensionRunner;
     const models = () => [this.model, ...(getRunner()?.getAgentModels() ?? [])];
+    const hasConfiguredProvider = (providerId: string) =>
+      providerId === this.provider.id ||
+      providerId === this.model.provider ||
+      (getRunner()?.getAgents().some((agent) => agent.providerId === providerId) ?? false);
     return {
       getAll: () => [...new Map(models().map((model) => [`${model.provider}/${model.id}`, model])).values()],
       getAvailable: () => [...new Map(models().map((model) => [`${model.provider}/${model.id}`, model])).values()],
@@ -2620,12 +2626,11 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         getRunner()?.getAgents().find((agent) => agent.providerId === providerId)?.name ??
         (providerId === this.provider.id ? this.provider.name : providerId),
       getProviderAuthStatus: (providerId: string) => ({
-        configured: [this.provider.id, ...(getRunner()?.getAgents().map((agent) => agent.providerId) ?? [])].includes(providerId),
+        configured: hasConfiguredProvider(providerId),
         source: "plugin",
       }),
       hasConfiguredAuth: (model: { provider?: string }) =>
-        typeof model.provider === "string" &&
-        [this.provider.id, ...(getRunner()?.getAgents().map((agent) => agent.providerId) ?? [])].includes(model.provider),
+        typeof model.provider === "string" && hasConfiguredProvider(model.provider),
     };
   }
 
@@ -7037,9 +7042,9 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     try {
       const result = await compact(
         preparation,
-        // The summary is a provider request like any other turn, but
-        // pi-agent-core builds its options itself and never reaches `streamFn`,
-        // so the headers have to ride on the collection.
+        // The summary is a provider request like any other turn. The desktop
+        // compaction adapter calls `completeSimple` directly instead of
+        // `streamFn`, so headers have to ride on the collection.
         models,
         this.model,
         undefined,
@@ -7049,7 +7054,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         // pi's classifier decides what is transient; the waits honour `signal`.
         COMPACTION_SUMMARY_RETRY_POLICY,
         undefined,
-        withAbortSignal(signal, BACKGROUND_CONTEXT),
+        signal,
       );
       if (!result.ok) {
         this.emitCompactionFailureDiagnostic(
