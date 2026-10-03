@@ -29,6 +29,7 @@ Each ADR includes:
 | plus-independent-application-identity | [Independent Pi-Desktop-Plus application identity](plus-independent-application-identity.md) | Accepted; fork identity, isolated data and release sources |
 | plus-plan-goal-revision-and-one-time-execution-lifecycle | [Durable Plan/Goal revision and one-time execution lifecycle](plus-plan-goal-revision-and-one-time-execution-lifecycle.md) | Accepted for implementation |
 | plus-schema-version-track | [Plus schema changes run on their own version track](plus-schema-version-track.md) | Accepted (amends temporary-goal-scratch-workspace) |
+| plus-version-line | [Plus releases use their own version line, and `packages/*` follow the upstream sync](plus-version-line.md) | Accepted (amends decisions-log D260) |
 | 0001 | Use Electron as the desktop shell | Accepted |
 | 0002 | Use the pi Agent Harness as the kernel | Accepted |
 | 0003 | Hybrid runtime — Rust host core + Node pi agent sidecar | Superseded in part |

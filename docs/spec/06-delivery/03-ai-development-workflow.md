@@ -580,8 +580,9 @@ When the change is a **stable app version release** (version bump + tag),
 Definition of Done also requires, **before** the tag, that every
 version-bearing surface describes the new version: the shipped-locale in-app
 changelog entries in `packages/shared/src/changelog.ts` (English and every
-shipped product locale, with aligned highlight counts) with its `changelog.test.ts` list, every workspace
-`package.json` (including `docs/package.json`), the Cargo workspace version and
+shipped product locale, with aligned highlight counts) with its `changelog.test.ts` list, every app
+`package.json` (root, `apps/*`, and `docs/package.json`; `packages/*` keep the
+upstream-synced version, ADR plus-version-line), the Cargo workspace version and
 `host-core` lockfile entry, `APP_VERSION`, and the release line stated in
 `README.md` + `README.zh-CN.md`. `node scripts/check-release-docs.mjs` must
 pass; `scripts/release.mjs` runs it and refuses to tag otherwise. See

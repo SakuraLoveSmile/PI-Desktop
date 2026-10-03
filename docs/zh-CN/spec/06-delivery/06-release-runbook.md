@@ -98,7 +98,8 @@ Windows 可执行文件和原生窗口图标中使用 `build/icon.ico`。渲染�
 | `packages/shared/src/changelog.ts` | 英文、zh-CN、zh-TW 条目按最新优先排列，亮点条数一致 |
 | `packages/shared/src/changelog-de.ts`、`changelog-es.ts`、`changelog-fr.ts`、`changelog-ko.ts`、`changelog-tr.ts` | 版本集合与亮点条数与英文一致 |
 | `packages/shared/src/changelog.test.ts` | 该版本加入最新优先清单的首位 |
-| `package.json`、`apps/*/package.json`、`packages/*/package.json`、`docs/package.json` | 版本号一致（`docs` 是第三个工作区根，不在 `apps`/`packages` 之下） |
+| `package.json`、`apps/*/package.json`、`docs/package.json` | 版本号一致（`docs` 是第三个工作区根，不在 `apps`/`packages` 之下） |
+| `packages/*/package.json` | 发布时不提升：各自保持最近一次同步的上游树的版本，预检只要求它们彼此一致（ADR plus-version-line） |
 | `Cargo.toml` 的 `[workspace.package]`、`Cargo.lock` 的 `host-core` | 版本号一致 |
 | `packages/shared/src/protocol.ts` 的 `APP_VERSION` | 版本号一致 |
 | `README.md`、`README.zh-CN.md` | 状态章节声明当前 `<major>.<minor>.x` 版本线；工具链、命令与路线图描述仍然成立 |
