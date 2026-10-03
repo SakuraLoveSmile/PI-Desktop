@@ -160,7 +160,8 @@ Surfaces in scope:
 | `packages/shared/src/changelog.ts` | Newest-first English, zh-CN, and zh-TW entries, matching highlight counts |
 | `packages/shared/src/changelog-de.ts`, `changelog-es.ts`, `changelog-fr.ts`, `changelog-ko.ts`, `changelog-tr.ts` | Same versions and highlight counts as English |
 | `packages/shared/src/changelog.test.ts` | Version added at the top of the newest-first list |
-| `package.json`, `apps/*/package.json`, `packages/*/package.json`, `docs/package.json` | Same version (`docs` is a third workspace root, not under `apps`/`packages`) |
+| `package.json`, `apps/*/package.json`, `docs/package.json` | Same version (`docs` is a third workspace root, not under `apps`/`packages`) |
+| `packages/*/package.json` | Not bumped by a release: each keeps the version of the upstream tree last synced from, and the preflight only requires them to agree with each other (ADR plus-version-line) |
 | `Cargo.toml` `[workspace.package]`, `Cargo.lock` `host-core` | Same version |
 | `packages/shared/src/protocol.ts` `APP_VERSION` | Same version |
 | `README.md`, `README.zh-CN.md` | Status section states the current `<major>.<minor>.x` release line; toolchain, command, and roadmap claims still true |

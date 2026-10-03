@@ -389,7 +389,8 @@ git push origin --delete <type>/<short-description>
 当更改是**稳定应用程序版本发布**（版本提升 + 标签）时，完成的定义还要求在
 打标签**之前**，所有带版本号的位置都描述新版本：`packages/shared/src/changelog.ts`
 中的已发货语言应用内变更日志条目（英语和每个已发货产品语言，亮点条数一致）及其
-`changelog.test.ts` 清单、每个工作区 `package.json`（含 `docs/package.json`）、
+`changelog.test.ts` 清单、每个应用 `package.json`（根、`apps/*` 与 `docs/package.json`；
+`packages/*` 保持上游同步版本，见 ADR plus-version-line）、
 Cargo 工作区版本与 `host-core` 锁文件条目、`APP_VERSION`，以及 `README.md` +
 `README.zh-CN.md` 中声明的版本线。`node scripts/check-release-docs.mjs` 必须
 通过；`scripts/release.mjs` 会执行它，未通过则拒绝打标签。参见
