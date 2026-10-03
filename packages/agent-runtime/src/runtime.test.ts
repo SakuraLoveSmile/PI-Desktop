@@ -2424,6 +2424,132 @@ describe("DesktopAgentRuntime tool schema completeness (#864)", () => {
 });
 
 describe("DesktopAgentRuntime plan transitions", () => {
+  it.each(["plan", "goal"] as const)(
+    "continues the %s user turn after a missing-workspace submission",
+    async (kind) => {
+      const host = {
+        call: vi.fn(async (method: string) => {
+          if (method === "plans.submit") {
+            throw Object.assign(new Error("PLAN_WORKSPACE_REQUIRED"), {
+              data: { errorCode: "PLAN_WORKSPACE_REQUIRED" },
+            });
+          }
+          return undefined;
+        }),
+      };
+      const runtime = createRuntime({ host, mode: kind });
+      const requests: AgentMessage[][] = [];
+      const internals = runtime as unknown as {
+        agent: Agent;
+        models: {
+          streamSimple: (
+            model: unknown,
+            context: { messages: AgentMessage[] },
+          ) => ReturnType<typeof createAssistantMessageEventStream>;
+        };
+      };
+      internals.models = {
+        streamSimple: (_model, context) => {
+          requests.push([...context.messages]);
+          const submit = requests.length % 2 === 1;
+          const message = assistantMessage({
+            content: submit
+              ? [
+                  {
+                    type: "toolCall",
+                    id: `submit-${requests.length}`,
+                    name: kind === "plan" ? "SubmitPlan" : "SubmitGoal",
+                    arguments: {
+                      title: "Proposal",
+                      markdown: "# Proposal",
+                      question: "Proceed?",
+                    },
+                  },
+                ]
+              : [
+                  {
+                    type: "text",
+                    text: "Bind a project workspace before submitting. Here is the proposal.",
+                  },
+                ],
+            stopReason: submit ? "toolUse" : "stop",
+          }) as unknown as AssistantMessage;
+          const stream = createAssistantMessageEventStream();
+          queueMicrotask(() => {
+            stream.push({ type: "start", partial: message });
+            stream.push({
+              type: "done",
+              reason: submit ? "toolUse" : "stop",
+              message,
+            });
+            stream.end(message);
+          });
+          return stream;
+        },
+      };
+      try {
+        await runtime.prompt(
+          "Propose the work before changing anything.",
+          "user-1",
+          "turn-1",
+        );
+        expect(requests).toHaveLength(2);
+        const result = requests[1].find(
+          (message) => message.role === "toolResult",
+        );
+        expect(result).toMatchObject({ isError: true, toolCallId: "submit-1" });
+        expect(JSON.stringify(result)).toContain(
+          "Bind this session to a project workspace",
+        );
+        expect(internals.agent.state.messages.at(-1)).toMatchObject({
+          role: "assistant",
+          content: [
+            {
+              type: "text",
+              text: expect.stringContaining("Here is the proposal"),
+            },
+          ],
+        });
+        expect(runtime.getStatus().planningState).toBe("planning");
+        await runtime.prompt("Continue.", "user-2", "turn-2");
+        expect(requests).toHaveLength(4);
+        expect(internals.agent.state.messages.at(-1)).toMatchObject({
+          role: "assistant",
+        });
+      } finally {
+        await runtime.dispose();
+      }
+    },
+  );
+
+  it.each(["PLAN_ARTIFACT_WRITE_FAILED", "PLAN_SESSION_NOT_FOUND"])(
+    "still terminates submission for %s",
+    async (errorCode) => {
+      const host = { call: vi.fn().mockRejectedValue({ data: { errorCode } }) };
+      const runtime = createRuntime({ host, mode: "plan", turnId: "turn-1" });
+      const { agent } = runtime as unknown as { agent: Agent };
+      try {
+        const tool = agent.state.tools.find(
+          (entry) => entry.name === "SubmitPlan",
+        );
+        if (!tool) throw new Error("Missing submit tool");
+        const result = await tool.execute("submit", {
+          title: "Plan",
+          markdown: "# Plan",
+          question: "Proceed?",
+        });
+        expect(result).toMatchObject({
+          isError: true,
+          terminate: true,
+          details: { errorCode },
+        });
+        expect(runtime.getStatus().planningState).toBe("planning");
+      } finally {
+        await runtime.dispose();
+      }
+    },
+  );
+
   it("guards transition batches and terminates after durable plan submission", async () => {
     const host = { call: vi.fn() };
     const runtime = createRuntime({ host, turnId: "turn-1" });
