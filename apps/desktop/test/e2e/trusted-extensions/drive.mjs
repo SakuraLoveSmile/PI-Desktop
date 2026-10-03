@@ -75,7 +75,7 @@ let detail = await tool("pi_session_get", { id: sessionId });
 let messages = detail?.session?.messages ?? [];
 const toolRow = messages.find((m) => m.role === "tool" && m.toolName === "fx_add");
 const assistant = [...messages].reverse().find((m) => m.role === "assistant");
-check("fx_add tool executed", !!toolRow, JSON.stringify(toolRow?.content ?? toolRow).slice(0, 120));
+check("fx_add tool executed", !!toolRow, (JSON.stringify(toolRow?.content ?? toolRow) ?? "undefined").slice(0, 120));
 check("tool_result replacement reached the model", /42 \(replaced\)/.test(assistant?.content ?? ""), assistant?.content);
 
 const requests = readFileSync(join(root, "requests.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
