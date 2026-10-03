@@ -78,7 +78,8 @@ are rejected. The stable installation lock prevents competing managed launches.
 Rust's offline `--relocate-data <old-root> <copied-root>` mode owns structured
 path relocation in the copied SQLite index, transcripts/revisions/checkpoints,
 outbox, installed plugin registry and agent capability metadata. It does not boot
-RPC, upgrade schemas, recover turns, or sweep scratch. It changes only known
+RPC, upgrade schemas, recover turns, or sweep scratch, and it never joins a
+database to the Plus track (section 7.1). It changes only known
 path-bearing fields under the old root. External projects, dev/builtin plugins,
 narrative text, commands, source code, secrets, and arbitrary plugin-private formats
 are preserved. Credentials and their machine key migrate as bytes with their
@@ -1661,6 +1662,13 @@ edited.
   re-synced.
 - **Fresh installs.** A new database runs the shared v19 DDL, then every Plus
   step, and records the track version. It takes no backup.
+- **Offline relocation.** The cold storage migration's `--relocate-data` pass
+  (section 2, user-selected storage location) opens SQLite directly and never
+  goes through `Database::open`, so it does not reconcile a legacy fork
+  database, take a Plus backup, or apply pending steps; the next normal open of
+  the relocated database does. Plus-owned records (Goal report files, review
+  snapshots, Expert Team write scopes) hold paths relative to the data root or
+  the project, so relocation has no path of theirs to rewrite.
 
 ## 8. Retention & maintenance
 
