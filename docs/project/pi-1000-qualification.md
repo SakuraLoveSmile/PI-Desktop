@@ -1,10 +1,24 @@
 # Pi 1.0.0 migration qualification
 
 Status is for the task candidate based on
-`afe0fe4b0b52e21df1506f7ab46271a1754c643e`, on branch `upgrade/pi-1.0.0` in
-the dedicated worktree. The candidate is uncommitted. `PASS` means the stated
+commit `d636e8a88`, based on `afe0fe4b0b52e21df1506f7ab46271a1754c643e`, on
+branch `upgrade/pi-1.0.0` in the dedicated worktree. `PASS` means the stated
 local evidence ran; it does not extend to a live provider, real user data, or
 another platform. See the release limitations at the end.
+
+## Task candidate E2E
+
+- Task candidate commit: `d636e8a88`
+- Base main: `afe0fe4b0b52e21df1506f7ab46271a1754c643e`
+- E2E suites: Hosted Search, images, trusted extensions, provider order,
+  provider API style, subagents, subagent models, remote host, Live Voice, and
+  Live Voice interaction.
+- Result: **PASS** on every listed suite.
+- Environment: macOS arm64 with local fixtures and isolated temporary profiles.
+  The compatible Host Core binary was rebuilt with `cargo build --locked
+  -p host-core` using the host's shared Cargo target. The older prebuilt binary
+  lacked the current `session.recordUsage` RPC and was not used for the passing
+  candidate run.
 
 ## Environment and artifact identity
 
@@ -19,7 +33,7 @@ another platform. See the release limitations at the end.
 - Hosted Search's final 7-scenario E2E snapshot digest (entry + ESM marker +
   relative chunks): `f985081cb1f3fd1220dbb5d15bde98e1f976cee8f9f103dd3bdefdcc4067f6db`.
 - `pnpm test:e2e:hosted-search` wrote fixture evidence to
-  `/var/folders/pw/qtkwc6cx67d28cj0znhrklg00000gn/T/hosted-search-e2e-nhcyVs/result.json`.
+  `/var/folders/pw/qtkwc6cx67d28cj0znhrklg00000gn/T/hosted-search-e2e-fp602Z/result.json`.
 - The packaged artifact checked was an unsigned macOS arm64 `.app` directory
   build. Electron Builder reported no Developer ID signing identity; no
   installer was signed, uploaded, or released.
@@ -51,7 +65,7 @@ another platform. See the release limitations at the end.
 | NATIVE-01 | PASS | Native-session and compaction regression suites passed; packaged boot probe read 800 temporary session records. No user profile was opened. |
 | NATIVE-02 | PASS | Native-session/lease tests passed for conflict and file ownership guards; no external native-session files were modified. |
 | NATIVE-03 | PASS | Runtime lifecycle tests and trusted-extension E2E passed for startup failure, cancellation, settlement, and tool restrictions. |
-| EXT-01 | PASS | Trusted-extension E2E: 39/39 scenarios passed for aliases, TS loading, cache reuse, types, and diagnostics. |
+| EXT-01 | PASS | Trusted-extension E2E: 40/40 scenarios passed for aliases, TS loading, cache reuse, types, diagnostics, extension tool results, and blocked Bash. |
 | EXT-02 | PASS | Runner tests use the real Jiti loader with an unsupported static named import; it stays undefined and emits an `unsupported_api` diagnostic. Direct missing-export access and legacy aliases are covered too. |
 | BUNDLE-01 | PASS | Standalone OAuth bundle test passed outside the repository with empty `NODE_PATH`; sidecar E2E ran the generated bundle. |
 | RELEASE-01 | BLOCKED_ENVIRONMENT | macOS arm64 `.app` directory packaging and isolated boot passed, including Host protocol 11 and 800 temporary session reads. Windows/Linux and signed installers were not available. |
@@ -79,6 +93,8 @@ another platform. See the release limitations at the end.
 | `pnpm run pack` | PASS, macOS arm64 unsigned `.app` directory build; Builder warned that no signing identity was present |
 | `test/packaging-footprint.test.mjs` | PASS, 9 tests; models.dev resource is present in package mapping |
 | `pnpm -r --if-present test` | PASS, all workspace package suites completed with exit code 0 |
+| `cargo build --locked -p host-core` | PASS, rebuilt the stale shared Host Core artifact to provide the current `session.recordUsage` RPC for isolated E2E runs |
+| Task-candidate E2E suites listed above | PASS; all ran against commit `d636e8a88` with local fixtures |
 
 E2E fixtures used local providers and temporary data directories. No paid API,
 real provider, real user profile, live OAuth account, or real Desktop window was
