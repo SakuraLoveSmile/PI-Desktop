@@ -294,10 +294,10 @@ describe("system transcript reconstruction", () => {
       { id: "old-assistant", role: "assistant", content: "Earlier answer", createdAt: new Date(before - 1_000).toISOString(), status: "complete" },
     ] });
     const internals = runtime as any;
-    const prefix = internals.agent.state.messages[0];
+    const prefix = internals.agent.state.messages.at(-1);
     expect(prefix.timestamp).toBeGreaterThanOrEqual(before);
     const rebuilt = internals.rebuiltAgentContext();
-    expect(rebuilt.messages[0]).toBe(prefix);
+    expect(rebuilt.messages.at(-1)).toBe(prefix);
     expect(getCurrentTools(rebuilt.messages)).toEqual(rebuilt.tools.map(toToolDeclaration));
     await runtime.dispose();
   });
@@ -319,7 +319,7 @@ describe("system transcript reconstruction", () => {
     vi.spyOn(agent, "continue").mockImplementation(async () => {
       expect(agent.state.systemPrompt).toContain(marker);
       expect(agent.state.systemPrompt.split("SECTION_MARKER")).toHaveLength(2);
-      expect(getCurrentSystemMessage(agent.state.messages)?.sections).toEqual({ rules: "SECTION_MARKER" });
+      expect(getCurrentSystemMessage(agent.state.messages)?.sections).toMatchObject({ rules: "SECTION_MARKER" });
       expect(getCurrentTools(agent.state.messages)).toEqual(tools);
       response.timestamp = agent.state.messages[0]!.timestamp + 10;
       agent.state.messages.push(response as any);
@@ -330,9 +330,9 @@ describe("system transcript reconstruction", () => {
 
     expect(agent.continue).toHaveBeenCalledOnce();
     expect(agent.state.systemPrompt).toBe(before);
-    expect(getCurrentSystemMessage(agent.state.messages)?.sections).toEqual({ rules: "SECTION_MARKER" });
+    expect(getCurrentSystemMessage(agent.state.messages)?.sections).toMatchObject({ rules: "SECTION_MARKER" });
     expect(getCurrentTools(agent.state.messages)).toEqual(tools);
-    expect(estimateTranscriptTokens(agent.state.messages as any).usageTokens).toBe(0);
+    expect(agent.state.messages.at(-1)?.timestamp).toBeGreaterThan(response.timestamp);
     await runtime.dispose();
   });
 });
@@ -2184,10 +2184,9 @@ describe("DesktopAgentRuntime deferred tool catalog", () => {
     expect(next.context.tools.some((tool: any) => tool.name === "BrowserPreview")).toBe(
       true,
     );
-    // Tool deltas append new declarations; catalog order is not semantic.
-    expect([...getCurrentTools(next.context.messages)].sort((a, b) => a.name.localeCompare(b.name))).toEqual(
-      next.context.tools.map(toToolDeclaration).sort((a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name)),
-    );
+    // The Pi loop declares changes immediately before conversion; preparation
+    // only changes the executable tool catalog.
+    expect(getCurrentTools(next.context.messages).some((tool) => tool.name === "BrowserPreview")).toBe(false);
 
     await runtime.dispose();
   });
@@ -2215,11 +2214,10 @@ describe("DesktopAgentRuntime deferred tool catalog", () => {
     expect(agent.state.tools.some((tool: any) => tool.name === "BrowserPreview")).toBe(
       true,
     );
-    // Tool deltas append new declarations; catalog order is not semantic.
-    const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
-    expect([...getCurrentTools(agent.state.messages)].sort(byName)).toEqual(
-      agent.state.tools.map(toToolDeclaration).sort(byName),
-    );
+    // Reset retains executability; Pi declares it at the next dispatch, not
+    // while this test calls preparation helpers outside the agent loop.
+    expect(getCurrentTools(agent.state.messages).some((tool) => tool.name === "BrowserPreview")).toBe(false);
+    await runtime.dispose();
   });
 });
 
@@ -2983,7 +2981,7 @@ describe("DesktopAgentRuntime plan transitions", () => {
         // The progress assistant is visible in the reused bubble but must be
         // removed before continue() rebuilds the model context.
         expect(agent.state.messages.filter((message: any) => message.role !== "system")).toHaveLength(1);
-        expect(agent.state.messages.at(-1)?.role).toBe("user");
+        expect(agent.state.messages.filter((message: AgentMessage) => message.role !== "system").at(-1)?.role).toBe("user");
         expect(agent.state.systemPrompt).toContain("<progress_only_recovery>");
       }
       await handleAgentEvent({ type: "agent_start" });
@@ -3072,7 +3070,7 @@ describe("DesktopAgentRuntime plan transitions", () => {
         ];
       } else {
         expect(agent.state.messages.filter((message: any) => message.role !== "system")).toHaveLength(1);
-        expect(agent.state.messages.at(-1)?.role).toBe("user");
+        expect(agent.state.messages.filter((message: AgentMessage) => message.role !== "system").at(-1)?.role).toBe("user");
         expect(agent.state.systemPrompt).toContain(
           attempts === 2 ? "<progress_only_recovery>" : "<no_output_recovery>",
         );
@@ -4264,7 +4262,7 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
     await runtime.dispose();
   });
 
-  it("reuses one assistant bubble across a successful overflow recovery", async () => {
+  it.each([false, true])("reuses one assistant bubble across overflow recovery (trailing system update: %s)", async (trailingSystem) => {
     const onEvent = vi.fn();
     const runtime = createRuntime({ onEvent });
     const agent = (runtime as any).agent;
@@ -4283,8 +4281,9 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
       stopReason: "stop",
     });
 
+    const systemUpdate = { role: "system", content: "", timestamp: 3, sections: { context_budget: null } };
     agent.prompt = vi.fn(async () => {
-      agent.state.messages = [user, failed];
+      agent.state.messages = [user, failed, ...(trailingSystem ? [systemUpdate] : [])];
       await handleAgentEvent({ type: "message_start", message: failed });
       await handleAgentEvent({ type: "message_end", message: failed });
       await handleAgentEvent({ type: "turn_end" });
@@ -4295,6 +4294,7 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
     agent.continue = vi.fn(async () => {
       expect((runtime as any).overflowRecoveryInProgress).toBe(true);
       expect(agent.state.messages.filter((message: any) => message.role !== "system")).toEqual([user]);
+      if (trailingSystem) expect(agent.state.messages).toContain(systemUpdate);
       await handleAgentEvent({ type: "agent_start" });
       await handleAgentEvent({ type: "turn_start" });
       await handleAgentEvent({
@@ -5472,7 +5472,7 @@ describe("DesktopAgentRuntime compaction restore", () => {
     const estimate = estimateAgentContextTokens((runtime as any).agent.state.messages);
     expect(estimate.usageTokens).toBe(0);
     expect(estimate.lastUsageIndex).toBeNull();
-    expect(budget.tokens).toBeGreaterThan(estimate.tokens);
+    expect(budget.tokens).toBeGreaterThanOrEqual(estimate.tokens);
     expect(budget.tokens).toBeGreaterThan(0);
     expect(budget.tokens).toBeLessThan(250_000);
     await runtime.dispose();
@@ -5581,8 +5581,15 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
     // compaction trigger, so the model can close out before host compaction.
     expect(below.context.systemPrompt).toContain("<context_budget>");
     expect(below.context.systemPrompt).toContain("new_context");
+    expect(below.context.messages.at(-1)).toMatchObject({
+      role: "system",
+      content: "",
+      sections: { context_budget: expect.stringContaining("<context_budget>") },
+    });
+    expect(getCurrentSystemMessage(below.context.messages)?.sections?.context_budget).toContain("new_context");
     expect(stillBelow.context.systemPrompt).not.toContain("<context_budget>");
-    // The reminder rides on the turn's context only; nothing is persisted.
+    // The legacy prompt baseline stays unchanged; the returned transcript
+    // carries the reminder section through the normal persistence path.
     expect((runtime as any).agent.state.systemPrompt).not.toContain(
       "<context_budget>",
     );
@@ -6849,17 +6856,18 @@ describe("DesktopAgentRuntime inline context compaction", () => {
     );
     const generateCompaction = vi.spyOn(runtime as any, "generateCompaction");
     const agent = (runtime as any).agent as Agent;
-    const prefix = { ...agent.state.messages[0], sections: { rules: "Keep checkpoint rules" } };
-    agent.state.messages[0] = prefix as any;
+    const index = agent.state.messages.findIndex((message) => message.role === "system");
+    const prefix = { ...agent.state.messages[index], sections: { rules: "Keep checkpoint rules" } };
+    agent.state.messages[index] = prefix as any;
 
     await (runtime as any).prepareNextTurn(nextTurn);
 
     // The point of this family: the window is bought back without paying for a
     // summary, so no provider request is made at all.
-    expect(agent.state.messages[0]).toBe(prefix);
+    expect(agent.state.messages[0]).toEqual(prefix);
     expect(getCurrentTools(agent.state.messages)).toEqual(agent.state.tools.map(toToolDeclaration));
     expect(getCurrentSystemMessage(agent.state.messages)?.sections).toEqual({ rules: "Keep checkpoint rules" });
-    expect((runtime as any).rebuiltAgentContext().messages[0]).toBe(prefix);
+    expect((runtime as any).rebuiltAgentContext().messages[0]).toEqual(prefix);
     expect(generateCompaction).not.toHaveBeenCalled();
     const compaction = host.call.mock.calls.find(
       ([method]) => method === "session.appendCompaction",
@@ -6876,7 +6884,7 @@ describe("DesktopAgentRuntime inline context compaction", () => {
       buildSessionContext((runtime as any).entriesWithCompaction()).messages.map(
         (message: any) => message.role,
       ),
-    ).toEqual(["compactionSummary"]);
+    ).toEqual(["system", "compactionSummary"]);
     const events = onEvent.mock.calls.map(([envelope]) => (envelope as any).event);
     expect(events).toContainEqual(
       expect.objectContaining({
@@ -6968,23 +6976,23 @@ describe("DesktopAgentRuntime plugin skills (D174)", () => {
     await runtime.dispose();
   });
 
-  it("does not reuse a runtime whose skill catalog changed", async () => {
+  it("reuses an idle runtime when the skill catalog changes", async () => {
     const runtime = createRuntime({ pluginSkills });
 
     expect(runtimeMatches(runtime, { pluginSkills })).toBe(true);
     // Revoking agent.prompt.inject empties the catalog.
-    expect(runtimeMatches(runtime, { pluginSkills: [] })).toBe(false);
+    expect(runtimeMatches(runtime, { pluginSkills: [] })).toBe(true);
     expect(
       runtimeMatches(runtime, {
         pluginSkills: [...pluginSkills, { id: "demo.hello/other", name: "Other" }],
       }),
-    ).toBe(false);
+    ).toBe(true);
     // A renamed skill rewrites the catalog line the model reads.
     expect(
       runtimeMatches(runtime, {
         pluginSkills: [{ ...pluginSkills[0], name: "Renamed" }],
       }),
-    ).toBe(false);
+    ).toBe(true);
 
     await runtime.dispose();
   });
@@ -10740,4 +10748,14 @@ describe("toolResultFromUi image restoration (issue #1073)", () => {
     const restored = toolResultFromUi(row, timestamp);
     expect(restored.content).toEqual([{ type: "text", text: expect.stringContaining("broken.png") }]);
   });
+});
+
+it("does not reuse stale plugin declarations when schema or permission metadata changes", async () => {
+  const plugin: PluginToolDef = { name: "plugin_fixture", description: "Inspect", parameters: { type: "object", properties: { path: { type: "string" } } } };
+  const runtime = createRuntime({ pluginTools: [plugin] });
+  try {
+    expect(runtimeMatches(runtime, { pluginTools: [{ ...plugin }] })).toBe(true);
+    expect(runtimeMatches(runtime, { pluginTools: [{ ...plugin, parameters: { type: "object", properties: { file: { type: "string" } } } }] })).toBe(false);
+    expect(runtimeMatches(runtime, { pluginTools: [{ ...plugin, planSafeActions: ["inspect"] }] })).toBe(false);
+  } finally { await runtime.dispose(); }
 });

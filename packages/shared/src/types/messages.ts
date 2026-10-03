@@ -83,6 +83,15 @@ export type UiMessage = {
   id: string;
   role: UiMessageRole;
   content: string;
+  /** Internal model instructions/tool declarations; never a visible chat row. */
+  modelSystem?: {
+    version: 1;
+    /** The following user input can have been persisted before runtime admission. */
+    beforeMessageId?: string;
+    afterMessageId?: string;
+    /** Opaque JSON preserves section and schema key order across Host storage. */
+    messageJson: string;
+  };
   /** Authenticated agent-to-agent provenance; never inferred from message text. */
   sessionMessage?: SessionMessageOrigin;
   /** Present only on the durable user row created by a Live Voice operation. */

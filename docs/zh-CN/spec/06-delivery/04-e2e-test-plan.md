@@ -9290,6 +9290,39 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **里程碑：** M6+
 - **状态：** 单测和源码契约覆盖（`update-cache.test.mjs`、`auto-update.test.mjs`）；仍需 Windows 安装器/E2E 验证。
 
+### E2E-FIXED-TOOL-DECLARATIONS: Stable Flash schemas with independent activation
+
+- Fixture: production AgentSidecar and isolated Host, official Pi Flash binding,
+  and a child-process fetch boundary redirected to local HTTP/SSE. Credentials
+  are dummy values and synthetic tools have no external side effects.
+- Prompt, search Alpha, execute Alpha, search Beta and execute Beta. HTTP payload
+  tests assert identical ordered `tools` and unchanged prior message prefixes.
+  Directly calling a declared but inactive tool must fail before the Host.
+- Restart both processes, then compact and restart again: Alpha stays activated,
+  Beta remains inactive despite its declaration. Activate Beta, then remove it
+  from the catalog and verify it cannot execute. New schema/route epochs must
+  not restore old grants. Host rejection and Plan guards remain effective.
+- Runtime contracts additionally cover legacy migration, interrupted activation,
+  malformed metadata, temporary prompt replacement, deterministic catalog order,
+  the 128-tool boundary and insufficient-context fallback.
+- Automated: `node scripts/e2e-fixed-tool-declarations.mjs` with built
+  shared/host-runtime/agent-runtime and `PI_DESKTOP_HOST_BIN` set to the candidate
+  Host binary; `fixed-tool-runtime.test.ts` and `fixed-tool-declarations.test.ts`
+  cover HTTP payload and policy contracts. Electron UI/outbox is outside this
+  fixture's scope.
+- Separately authorized official Flash experiments compare several independent
+  on-demand/fixed sessions with the same synthetic catalog and call sequence.
+  Record cold requests, both activations, follow-up cache hits/misses and
+  cumulative input cost. Report the larger first request and possible short-chat
+  cost increase, alongside any longer-conversation benefit. Offline test success
+  alone is not evidence of provider cache behavior.
+
+- Overflow/system-update integration: recover a provider context overflow with
+  a system delta after the failed assistant message. Keep that delta, remove the
+  failed assistant before compaction, and reuse one visible assistant message
+  through successful recovery. Terminal failure and Stop retain their existing
+  closure behavior. Covered by the parameterized runtime overflow user-path test.
+
 #### E2E-262：聊天 path:line 引用打开文件并滚动到目标行
 
 - **前提：** 隔离 Electron/Chromium、活动工作区和会话、可用的随应用打包文件管理器视图，以及确定性的文件系统 IPC fixture。
