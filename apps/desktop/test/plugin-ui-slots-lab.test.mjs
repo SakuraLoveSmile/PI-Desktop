@@ -242,9 +242,11 @@ test("the renderer entry loads a sample into every slot", async (t) => {
   assert.deepEqual(sessions(user), [SESSION]);
 
   const reply = turn();
+  // Plus renders the answer before the turn's process disclosure, so the
+  // block renderer in the reply comes ahead of the tool card.
   assert.deepEqual(samples(reply), [
-    "toolCard",
     "blockRenderer",
+    "toolCard",
     "assistantAction:left",
     "assistantAction:right",
     "assistantAction:refuse",
