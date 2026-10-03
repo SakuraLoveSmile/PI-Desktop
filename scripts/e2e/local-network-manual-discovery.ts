@@ -125,6 +125,7 @@ async function run(): Promise<void> {
     refresh: async () => true,
     getStatus: () => ({ loaded: true, source: "bundled", catalogPath: "", providerCount: 0 }),
     findModel: () => undefined,
+    configureAccount: () => {},
     modelsForProvider: () => [],
   };
 
