@@ -1,5 +1,6 @@
 import type {
   AgentEventEnvelope,
+  BrowserState,
   AgentQueueChangedEvent,
   AgentStatus,
   AppNotification,
@@ -59,12 +60,16 @@ export type ToastItem = {
   variant: ToastVariant;
   /** Auto-dismiss delay in ms; 0 keeps the toast until dismissed. */
   duration: number;
+  /** Notification chime is enabled by default. */
+  sound: boolean;
 };
 
 export type ToastOptions = {
   variant?: ToastVariant;
   /** Override the variant default (4s, error 8s); 0 disables auto-dismiss. */
   duration?: number;
+  /** Suppress the default soft chime when another notification surface already played it. */
+  sound?: boolean;
 };
 
 export type AgentTurnResult = {
@@ -179,7 +184,7 @@ export type AppState = {
   toasts: ToastItem[];
   notifications: AppNotification[];
   unreadNotificationCount: number;
-  page: "chat" | "pulls" | "scheduled" | "plugins" | "settings";
+  page: "chat" | "scheduled" | "plugins" | "settings";
   /** Tab ids come from the shared settings index. */
   settingsTab: SettingsTabId;
   /** Pending row anchor (i18n key) to flash after landing on a settings tab. */
@@ -218,7 +223,8 @@ export type AppState = {
     content: string,
     draft?: ComposerDraftSnapshot,
     targetSessionId?: string,
-    options?: { revisionProposalId?: string; onAccepted?: (sessionId: string) => void },
+    onAccepted?: (sessionId: string) => void,
+    options?: { revisionProposalId?: string },
   ) => Promise<boolean>;
   steerPrompt: (content: string, draft?: ComposerDraftSnapshot) => Promise<boolean>;
   enqueuePrompt: (
@@ -407,6 +413,7 @@ export type AppState = {
   setWorkPanelWidth: (width: number) => void;
   openFileInWorkPanel: (path: string, mimeType?: string) => void;
   openUrlInWorkPanel: (url: string) => void;
+  updateBrowserWorkPanelTab: (state: BrowserState) => void;
 };
 
 export type AppStateData = {

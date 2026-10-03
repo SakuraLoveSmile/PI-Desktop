@@ -1,6 +1,7 @@
 import { session, shell, WebContentsView, type BrowserWindow } from "electron";
 import { join } from "node:path";
 import { parseAllowedExternalUrl } from "./safe-open-external";
+import { PanelSenders, pageGoneWithin } from "./plugin-panel-senders";
 import {
   PLUGIN_VIEW_LOCATION_EVENT,
   PLUGIN_VIEW_LOCATION_PARAM,
@@ -8,6 +9,10 @@ import {
   planLocationDelivery,
   viewEntryUrl,
 } from "./plugin-view-location";
+import {
+  scaleBoundsToDip,
+  type PluginViewBounds,
+} from "./plugin-view-bounds";
 import {
   applyPluginEgressPolicy,
   pluginSessionPartition,
@@ -18,7 +23,6 @@ import {
   PLUGIN_PANEL_LOCALE_ARGUMENT_PREFIX,
   type PluginPanelTheme,
 } from "../shared/plugin-panel-chrome";
-import { scaleBoundsToDip, type PluginViewBounds } from "./plugin-view-bounds";
 
 /**
  * Re-exported so the location contract stays addressable through the module
@@ -104,7 +108,13 @@ export class PluginViewHost {
   private lastCssBounds: PluginViewBounds | null = null;
   private clock = 0;
   private onBlockedRequest?: PluginPanelBlockedRequest;
-  private zoomListener: (() => void) | null = null;
+  /**
+   * Identity of the pages allowed to use the bridge, keyed by web contents. A
+   * view keeps its plugin for as long as its page exists, not only while it is
+   * cached in `views`, so a call that arrives while the view is being dropped
+   * still belongs to its own plugin.
+   */
+  private senders = new PanelSenders();
 
   constructor(onBlockedRequest?: PluginPanelBlockedRequest) {
     this.onBlockedRequest = onBlockedRequest;
@@ -149,6 +159,8 @@ export class PluginViewHost {
     this.bindZoom();
   }
 
+  private zoomListener: (() => void) | null = null;
+
   private bindZoom(): void {
     const contents = this.window && !this.window.isDestroyed() ? this.window.webContents : null;
     if (!contents || contents.isDestroyed()) return;
@@ -169,7 +181,7 @@ export class PluginViewHost {
       try {
         contents.removeListener("zoom-changed", onChange);
       } catch {
-        // Contents may already be destroyed during shutdown.
+        // contents already destroyed
       }
     };
   }
@@ -189,11 +201,7 @@ export class PluginViewHost {
    * calls from docked views on the same channel it serves panel windows.
    */
   pluginIdForSender(senderId: number): string | null {
-    for (const entry of this.views.values()) {
-      const wc = entry.view.webContents;
-      if (!wc.isDestroyed() && wc.id === senderId) return entry.pluginId;
-    }
-    return null;
+    return this.senders.pluginFor(senderId);
   }
 
   /**
@@ -226,6 +234,12 @@ export class PluginViewHost {
       loaded: false,
     };
     this.views.set(key, entry);
+    // A docked view can call the bridge from its first script, so its identity is
+    // registered before the document loads and released only when the page is
+    // gone — never when the host merely drops the cached surface around it.
+    const senderId = view.webContents.id;
+    this.senders.register(senderId, request.pluginId);
+    view.webContents.once("destroyed", () => this.senders.release(senderId));
     view.webContents.once("did-finish-load", () => {
       entry.loaded = true;
     });
@@ -326,9 +340,21 @@ export class PluginViewHost {
     }
   }
 
-  dispose(): void {
+  /**
+   * Drop every view and wait, bounded, for the pages to be gone, so a caller
+   * that is about to stop the plugin runtime knows no view page can still call
+   * it. Shutdown sequences this before that stop.
+   */
+  async dispose(): Promise<void> {
     this.unbindZoom();
-    for (const key of [...this.views.keys()]) this.destroy(key);
+    await Promise.allSettled(
+      [...this.views.values()].map(async (entry) => {
+        // Captured while the view is alive; `destroy` closes the page below.
+        const page = entry.view.webContents;
+        this.destroy(entry.key);
+        await pageGoneWithin(page);
+      }),
+    );
   }
 
   private destroy(key: string): void {

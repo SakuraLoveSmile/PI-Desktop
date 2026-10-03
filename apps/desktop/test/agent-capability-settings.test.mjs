@@ -56,7 +56,7 @@ test("skills and MCP filter one list by level instead of stacking two sections",
   }
   assert.doesNotMatch(layout, /AgentCapabilitySection|AgentCapabilityColumn/);
   assert.match(layout, /agent-capability-list/);
-  assert.match(layout, /<SegmentedControl/);
+  assert.match(layout, /<SegmentedControl[\s\S]*?value=\{filter\}/);
   assert.match(ui, /role = "radiogroup"/);
   assert.match(layout, /label=\{t\("settings\.capabilityFilterLabel"\)\}/);
   assert.match(layout, /settings\.capabilityFilterAll/);

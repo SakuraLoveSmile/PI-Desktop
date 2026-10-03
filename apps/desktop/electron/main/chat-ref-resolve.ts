@@ -275,6 +275,9 @@ export async function resolveChatFileRef(
   const rootList = orderedRoots(roots);
   if (rootList.length === 0) return null;
 
+  const cleanedPosixRef = toPosix(cleanRef(ref));
+  const isAttachmentRef = /^attachments(?:\/|$)/i.test(cleanedPosixRef);
+
   // 1. An absolute reference that already names a real path inside a known root
   //    is unambiguous evidence, so it outranks every shorthand rule below. A
   //    POSIX-style path on Windows finds nothing here, which is correct: step 2
@@ -300,11 +303,10 @@ export async function resolveChatFileRef(
   //    filesystem path: it names a stored blob by hash, and the files-tab
   //    contract spells it that way. Resolve it against the attachment root
   //    directly instead of searching for a path that cannot exist.
-  const attachmentPrefixed = segmentsOf(cleanRef(ref))[0] === "attachments";
-  if (isAttachmentBlobRef(ref)) {
+  if (isAttachmentRef && isAttachmentBlobRef(cleanedPosixRef)) {
     const attachmentsRoot = roots.attachments;
     if (!attachmentsRoot) return null;
-    const blobHash = segmentsOf(cleanRef(ref)).at(-1);
+    const blobHash = segmentsOf(cleanedPosixRef).at(-1);
     if (!blobHash || !ATTACHMENT_HASH_PATTERN.test(blobHash)) return null;
     const resolvedRoot = resolve(attachmentsRoot);
     const absolutePath = join(resolvedRoot, blobHash.toLowerCase());
@@ -330,7 +332,10 @@ export async function resolveChatFileRef(
     tails.push(parsed.segments.slice(parsed.segments.length - length));
   }
   for (const root of rootList) {
-    if (attachmentPrefixed && root.kind === "attachments") continue;
+    // The attachment store holds hash-named blobs only, so an `attachments/...`
+    // reference that is not a well-formed blob never searches it. It may still
+    // name an ordinary project path such as `attachments/manual.pdf`.
+    if (isAttachmentRef && root.kind === "attachments") continue;
     if (!parsed.absolute) {
       const absolutePath = join(root.path, ...parsed.segments);
       if (await isRegularFile(absolutePath)) {

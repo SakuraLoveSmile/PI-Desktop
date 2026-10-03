@@ -7,12 +7,11 @@ import {
   formatFileInsert,
   isSvgAttachment,
   MAX_INLINE_IMAGE_BYTES,
+  MAX_INLINED_IMAGE_HISTORY_BYTES,
   SVG_MIME_TYPE,
   type MessageAttachment,
   type UiMessage,
 } from "@pi-desktop/shared";
-
-const DEFAULT_MAX_INLINE_IMAGE_HISTORY_BYTES = MAX_INLINE_IMAGE_BYTES * 5;
 
 type ResolvedAttachment = {
   attachment: MessageAttachment;
@@ -27,52 +26,17 @@ export type AttachmentHistoryContext = {
   projectPath?: string;
   attachmentsDir?: string;
   supportsVision: boolean;
-  /** Maximum aggregate raw image bytes inlined while restoring history. */
-  maxInlinedImageHistoryBytes?: number;
+  /**
+   * Maximum aggregate raw image bytes inlined during history restoration
+   * (default: 30 MB, hard-capped by MAX_INLINED_IMAGE_HISTORY_BYTES).
+   * The newest attachments are considered first; older ones use the safe path fallback.
+   */
+  maxInlinedImageBytes?: number;
 };
-
-/** Remove the prompt that is being sent separately from restored history. */
-export function excludeCurrentPrompt(
-  history: UiMessage[],
-  currentPrompt: string | undefined,
-  userMessageId?: string,
-): UiMessage[] {
-  if (currentPrompt === undefined) return history;
-  const last = history.at(-1);
-  const matches = last?.role === "user" && (
-    userMessageId ? last.id === userMessageId : last.content === currentPrompt
-  );
-  return matches ? history.slice(0, -1) : history;
-}
 
 function pathInside(root: string, candidate: string): boolean {
   const child = relative(root, candidate);
   return child === "" || (!child.startsWith("..") && !isAbsolute(child));
-}
-
-/** Read only the size already admitted by the history budget. */
-export async function readFileAtRecordedSize(
-  path: string,
-  expectedSize: number,
-  openFile: typeof open = open,
-): Promise<Buffer | undefined> {
-  const file = await openFile(path, "r");
-  try {
-    const current = await file.stat();
-    if (!current.isFile() || current.size !== expectedSize) return undefined;
-    const bytes = Buffer.allocUnsafe(expectedSize);
-    let offset = 0;
-    while (offset < expectedSize) {
-      const { bytesRead } = await file.read(bytes, offset, expectedSize - offset, offset);
-      if (bytesRead === 0) return undefined;
-      offset += bytesRead;
-    }
-    const afterRead = await file.stat();
-    if (!afterRead.isFile() || afterRead.size !== expectedSize) return undefined;
-    return bytes;
-  } finally {
-    await file.close();
-  }
 }
 
 async function replayedAttachmentPath(
@@ -100,17 +64,44 @@ async function replayedAttachmentPath(
   return target;
 }
 
+/** Read only the size already admitted by the history budget. */
+async function readFileAtRecordedSize(
+  path: string,
+  expectedSize: number,
+): Promise<Buffer | undefined> {
+  const file = await open(path, "r");
+  try {
+    const current = await file.stat();
+    if (!current.isFile() || current.size !== expectedSize) return undefined;
+    const bytes = Buffer.allocUnsafe(expectedSize);
+    let offset = 0;
+    while (offset < expectedSize) {
+      const { bytesRead } = await file.read(
+        bytes,
+        offset,
+        expectedSize - offset,
+        offset,
+      );
+      if (bytesRead === 0) return undefined;
+      offset += bytesRead;
+    }
+    return bytes;
+  } finally {
+    await file.close();
+  }
+}
+
 export async function hydrateAttachmentHistory(
   history: UiMessage[],
   params: AttachmentHistoryContext,
 ): Promise<UiMessage[]> {
   const supportsVision = params.supportsVision;
-  const requestedBudget = params.maxInlinedImageHistoryBytes;
-  const maxInlinedImageHistoryBytes =
+  const requestedBudget = params.maxInlinedImageBytes;
+  const maxInlinedImageBytes =
     requestedBudget === undefined || !Number.isFinite(requestedBudget)
-      ? DEFAULT_MAX_INLINE_IMAGE_HISTORY_BYTES
+      ? MAX_INLINED_IMAGE_HISTORY_BYTES
       : Math.min(
-          DEFAULT_MAX_INLINE_IMAGE_HISTORY_BYTES,
+          MAX_INLINED_IMAGE_HISTORY_BYTES,
           Math.max(0, Math.floor(requestedBudget)),
         );
   const roots = [
@@ -127,12 +118,16 @@ export async function hydrateAttachmentHistory(
       }
     }),
   );
+
   const resolveAttachment = async (
     sourceAttachment: NonNullable<UiMessage["attachments"]>[number],
   ): Promise<ResolvedAttachment> => {
-    // Old transcripts can still label SVG as an image. Normalize before every
-    // early return, and discard any stale transient data without mutating history.
-    const cleanAttachment: MessageAttachment = { ...sourceAttachment, data: undefined };
+    // History from the host never contains transient data. Strip stale in-memory
+    // payloads as well so a caller cannot bypass the aggregate hydration budget.
+    const cleanAttachment: MessageAttachment = {
+      ...sourceAttachment,
+      data: undefined,
+    };
     const attachment: MessageAttachment = isSvgAttachment(
       sourceAttachment.mimeType,
       sourceAttachment.name,
@@ -157,7 +152,10 @@ export async function hydrateAttachmentHistory(
         return { attachment };
       }
       const size = (await stat(canonical)).size;
-      const canInline = supportsVision && attachment.kind === "image" && size <= MAX_INLINE_IMAGE_BYTES;
+      const canInline =
+        supportsVision &&
+        attachment.kind === "image" &&
+        size <= MAX_INLINE_IMAGE_BYTES;
       if (canInline) return { attachment, canonicalPath: canonical, size };
       return {
         attachment,
@@ -179,14 +177,23 @@ export async function hydrateAttachmentHistory(
     }),
   );
 
-  let remainingBytes = maxInlinedImageHistoryBytes;
+  // Allocate the byte budget in reverse transcript order, then reverse attachment
+  // order within a message. This preserves every image when the history fits while
+  // keeping the most recent visual context when the aggregate exceeds the cap.
+  let remainingBytes = maxInlinedImageBytes;
   const selectedForInlining: ResolvedAttachment[] = [];
   for (let messageIndex = resolvedHistory.length - 1; messageIndex >= 0; messageIndex--) {
     const resolved = resolvedHistory[messageIndex];
     if (!resolved) continue;
     for (let attachmentIndex = resolved.length - 1; attachmentIndex >= 0; attachmentIndex--) {
       const item = resolved[attachmentIndex];
-      if (!item?.canonicalPath || item.size === undefined || item.size > remainingBytes) continue;
+      if (
+        !item?.canonicalPath ||
+        item.size === undefined ||
+        item.size > remainingBytes
+      ) {
+        continue;
+      }
       remainingBytes -= item.size;
       selectedForInlining.push(item);
     }
@@ -197,7 +204,10 @@ export async function hydrateAttachmentHistory(
       try {
         const bytes = await readFileAtRecordedSize(item.canonicalPath!, item.size!);
         if (!bytes) return;
-        item.attachment = { ...item.attachment, data: bytes.toString("base64") };
+        item.attachment = {
+          ...item.attachment,
+          data: bytes.toString("base64"),
+        };
         item.inlined = true;
       } catch {
         // A failed transient read should not prevent the remaining history restoring.
@@ -210,13 +220,19 @@ export async function hydrateAttachmentHistory(
     if (!resolved) continue;
     for (const item of resolved) {
       if (!item.canonicalPath || item.inlined) continue;
-      fallbackTasks.push((async () => {
-        try {
-          item.fallbackPath = await replayedAttachmentPath(params, item.attachment, item.canonicalPath!);
-        } catch {
-          // Path fallback is best-effort, matching the existing restore contract.
-        }
-      })());
+      fallbackTasks.push(
+        (async () => {
+          try {
+            item.fallbackPath = await replayedAttachmentPath(
+              params,
+              item.attachment,
+              item.canonicalPath!,
+            );
+          } catch {
+            // Path fallback is best-effort, matching the existing restore contract.
+          }
+        })(),
+      );
     }
   }
   await Promise.all(fallbackTasks);
@@ -231,8 +247,14 @@ export async function hydrateAttachmentHistory(
       .join("")
       .trim();
     const content = message.content.trim()
-      ? fallbackPaths ? `${message.content}\n${fallbackPaths}` : message.content
+      ? fallbackPaths
+        ? `${message.content}\n${fallbackPaths}`
+        : message.content
       : fallbackPaths;
-    return { ...message, content, attachments: resolved.map((item) => item.attachment) };
+    return {
+      ...message,
+      content,
+      attachments: resolved.map((item) => item.attachment),
+    };
   });
 }

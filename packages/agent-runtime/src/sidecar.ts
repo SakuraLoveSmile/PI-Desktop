@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 import type { ModelAuth } from "@earendil-works/pi-ai";
 import { ParentHostProxy } from "./parent-host-proxy.js";
 import { visionFromModelConfig } from "./model-capabilities.js";
-import { excludeCurrentPrompt, hydrateAttachmentHistory } from "./attachment-history.js";
+import { hydrateAttachmentHistory } from "./attachment-history.js";
 import { classifyAgentError } from "./agent-errors.js";
 import { readLocalRequestErrorDetails } from "./local-request-errors.js";
 import {
@@ -261,14 +261,16 @@ async function runtimeFor(
         compaction?: ContextCompactionRecord;
       } | null;
     }>("session.get", { id: sessionId });
-    const supportsVision = visionFromModelConfig(params.provider.modelConfig);
+    let restoredMessages = detail?.session?.messages ?? [];
     // The current prompt is sent separately below. Exclude its persisted row
     // before attachment hydration so it cannot consume the history byte budget.
-    const restoredMessages = excludeCurrentPrompt(
-      detail?.session?.messages ?? [],
-      currentPrompt,
-      params.userMessageId,
-    );
+    if (currentPrompt !== undefined && params.userMessageId) {
+      const last = restoredMessages.at(-1);
+      if (last?.role === "user" && last.id === params.userMessageId) {
+        restoredMessages = restoredMessages.slice(0, -1);
+      }
+    }
+    const supportsVision = visionFromModelConfig(params.provider.modelConfig);
     history = await hydrateAttachmentHistory(restoredMessages, {
       scratchDir: params.scratchDir,
       projectPath: params.projectPath,
@@ -278,6 +280,13 @@ async function runtimeFor(
     compaction = detail?.session?.compaction;
   } catch {
     // History restore is best-effort; a prompt can still start cleanly.
+  }
+  // Older callers without a stable message id retain the previous content match.
+  if (currentPrompt !== undefined && !params.userMessageId) {
+    const last = history.at(-1);
+    if (last?.role === "user" && last.content === currentPrompt) {
+      history = history.slice(0, -1);
+    }
   }
   const runtime = new DesktopAgentRuntime({
     host: hostProxy,

@@ -53,7 +53,6 @@ export type ComposerToolbarProps = {
   enhancementUndoText: string | null;
   enhancePrompt: () => Promise<void>;
   undoPromptEnhancement: () => void;
-  clearEnhancementError: () => void;
   runActive: boolean;
   hasDraftContent: boolean;
   abort: AppState["abort"];
@@ -98,7 +97,6 @@ export function ComposerToolbar({
   enhancementUndoText,
   enhancePrompt,
   undoPromptEnhancement,
-  clearEnhancementError: _clearEnhancementError,
   runActive,
   hasDraftContent,
   abort,

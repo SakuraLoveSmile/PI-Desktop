@@ -23,6 +23,7 @@ const [
   eventsSlice,
   queueSlice,
   transcriptSlice,
+  storeHelpers,
   toolbar,
   submitHook,
   draftHook,
@@ -38,6 +39,7 @@ const [
   readStoreModule("slices/events-slice.ts"),
   readStoreModule("slices/queue-slice.ts"),
   readStoreModule("slices/transcript-slice.ts"),
+  readStoreModule("helpers/store-helpers.ts"),
   readComposerModule("ComposerToolbar.tsx"),
   readComposerModule("hooks/useComposerSubmit.ts"),
   readComposerModule("hooks/useComposerDraft.ts"),
@@ -252,7 +254,10 @@ test("send clears the composer before the round trip and restores a rejected dra
   // Optimistic clear, restore on rejection. The clear must precede the await.
   const regularSendAt = submit.indexOf("if (!steering && !modelReady)");
   const clearAt = submit.indexOf("draft.clearDraftForKey(submittedDraftKey, submittedDraftRevision, submittedDraft);", regularSendAt);
-  const promptAt = submit.indexOf("await sendPrompt(inlineContent, submittedDraft, activeSessionId ?? undefined", regularSendAt);
+  const promptMatch = /await sendPrompt\(\s*inlineContent,\s*submittedDraft,\s*activeSessionId \?\? undefined/.exec(
+    submit.slice(regularSendAt),
+  );
+  const promptAt = promptMatch ? regularSendAt + promptMatch.index : -1;
   assert.ok(regularSendAt > 0 && clearAt > regularSendAt && promptAt > clearAt,
     "draft must be cleared before awaiting sendPrompt");
   assert.match(submit, /if \(!accepted\) draft\.restoreDraftForKey\(submittedDraftKey, submittedDraft\);/);
@@ -286,24 +291,30 @@ test("mode slash prefixes send the trailing prompt and retain failed drafts", ()
   );
   assert.match(
     submit,
-    /const submittedDraftRevision = draft\.draftRevision\(submittedDraftKey\);\s*const submittedDraft = draft\.draftSnapshot\(text\);[\s\S]*?draft\.clearDraftForKey\(submittedDraftKey, submittedDraftRevision, submittedDraft\);\s*try \{\s*const accepted = steering[\s\S]*?await steerPrompt\(inlineContent, submittedDraft\)[\s\S]*?await sendPrompt\(inlineContent, submittedDraft, activeSessionId \?\? undefined, \{[\s\S]*?onAccepted: captureAcceptedSession[\s\S]*?\}\);\s*if \(!accepted\) draft\.restoreDraftForKey\(submittedDraftKey, submittedDraft\);/,
+    /const submittedDraftRevision = draft\.draftRevision\(submittedDraftKey\);\s*const submittedDraft = draft\.draftSnapshot\(text\);[\s\S]*?draft\.clearDraftForKey\(submittedDraftKey, submittedDraftRevision, submittedDraft\);\s*try \{\s*const accepted = steering\s*\?\s*await steerPrompt\(inlineContent, submittedDraft\)\s*:\s*await sendPrompt\(\s*inlineContent,\s*submittedDraft,\s*activeSessionId \?\? undefined,\s*captureAcceptedSession,\s*\);\s*if \(!accepted\) draft\.restoreDraftForKey\(submittedDraftKey, submittedDraft\);/,
   );
   assert.match(store, /draft\?: ComposerDraftSnapshot/);
   const sendPrompt = queueSlice.slice(
-    queueSlice.indexOf("sendPrompt: async (content, draft, requestedSessionId, options)"),
+    queueSlice.indexOf("sendPrompt: async (content, draft, requestedSessionId, onAccepted"),
   );
   assert.match(sendPrompt, /return false;/);
   assert.match(
     sendPrompt,
     // The prompt call carries the submitted content and attachment mapping.
-    /await api\.prompt\(\{[\s\S]*?sessionId,[\s\S]*?content,[\s\S]*?attachments:[\s\S]*?promptAttachmentsFromDraft\(draft\.fileReferences\)[\s\S]*?\}\);[\s\S]*?return true/,
+    /await api\.prompt\(\{[\s\S]*?sessionId,[\s\S]*?content,[\s\S]*?attachments:[\s\S]*?promptAttachmentsFromDraft\(draft\.fileReferences\)[\s\S]*?\}\);[\s\S]*?onAccepted\?\.\(startedIn\);\s*return true/,
+  );
+  assert.match(
+    sendPrompt,
+    /const accepted = await get\(\)\.enqueuePrompt\(content, draft, sessionId\);\s*if \(accepted\) onAccepted\?\.\(sessionId\);\s*return accepted/,
   );
 });
 
 test("draft attachment routing keeps image chips structured and file chips textual", () => {
-  const helperSource = appStore.match(
-    /function promptAttachmentsFromDraft\([\s\S]*?\n\}\n\nfunction promptAttachmentsFromMessage/,
-  )?.[0]?.replace(/\n\nfunction promptAttachmentsFromMessage[\s\S]*$/, "");
+  const helperSource = storeHelpers.match(
+    /(?:export\s+)?function promptAttachmentsFromDraft\([\s\S]*?\n\}\n\n(?:export\s+)?function promptAttachmentsFromMessage/,
+  )?.[0]
+    ?.replace(/\n\n(?:export\s+)?function promptAttachmentsFromMessage[\s\S]*$/, "")
+    .replace(/^export\s+/, "");
   assert.ok(helperSource, "prompt attachment mapper not found");
   const executable = helperSource.replace(
     /function promptAttachmentsFromDraft\(\s*references: ComposerDraftSnapshot\["fileReferences"\],\s*\): AgentPromptAttachment\[\] \{/,
@@ -351,7 +362,7 @@ test("draft attachment routing keeps image chips structured and file chips textu
 
 test("the user row is inserted before the host round trip and echoed under the same id (D288)", () => {
   const sendPrompt = queueSlice.slice(
-    queueSlice.indexOf("sendPrompt: async (content, draft, requestedSessionId, options)"),
+    queueSlice.indexOf("sendPrompt: async (content, draft, requestedSessionId, onAccepted"),
   );
   assert.ok(sendPrompt.length > 0, "sendPrompt not found");
   const insertAt = sendPrompt.indexOf("insertOptimisticUserMessage(startedIn, optimisticMessage)");

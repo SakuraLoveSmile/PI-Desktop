@@ -31,6 +31,7 @@ export type ComposerInputProps = {
   onSubmit: (steering?: boolean) => void;
   onInsertNewline: () => void;
   onInput: (source: string, caret: number) => void;
+  /** Terminal-style recall; returns true when the arrow key was consumed. */
   onHistoryNavigate: (direction: "older" | "newer") => boolean;
   onCompositionStart: () => void;
   onCompositionEnd: (event: FormEvent<HTMLDivElement>) => void;
@@ -140,7 +141,10 @@ export function ComposerInput({
             }
             if (
               (event.key === "ArrowUp" || event.key === "ArrowDown") &&
-              !event.shiftKey && !event.altKey && !event.metaKey && !event.ctrlKey &&
+              !event.shiftKey &&
+              !event.altKey &&
+              !event.metaKey &&
+              !event.ctrlKey &&
               onHistoryNavigate(event.key === "ArrowUp" ? "older" : "newer")
             ) {
               event.preventDefault();

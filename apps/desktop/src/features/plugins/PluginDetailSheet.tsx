@@ -1,4 +1,4 @@
-import { Button, TooltipButton, cx } from "../../components/ui";
+import { Button, TooltipButton, cx, portalOverlay } from "../../components/ui";
 import {
   IconCheck,
   IconLink,
@@ -42,8 +42,8 @@ export function PluginDetailSheet({
   queueInstall,
   setSelectedVersion,
 }: PluginsPageModel) {
-  return (
-    selectedId ? (
+  return selectedId
+    ? portalOverlay(
         <div className="plugins-sheet-layer">
           <button
             type="button"
@@ -363,8 +363,7 @@ export function PluginDetailSheet({
               </>
             )}
           </aside>
-        </div>
-
-    ) : null
-  );
+        </div>,
+      )
+    : null;
 }

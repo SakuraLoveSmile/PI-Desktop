@@ -40,22 +40,17 @@ function SkillInvocationText({ message }: { message: UiMessage }) {
   const parts: ReactNode[] = [];
   let cursor = 0;
   for (const mention of mentions) {
-    const valid = Number.isInteger(mention.start) &&
-      Number.isInteger(mention.end) &&
-      mention.start >= cursor &&
-      mention.start + 1 < mention.end &&
-      mention.end <= command.length &&
-      command.slice(mention.start, mention.end).startsWith("/") &&
-      !/\s/.test(command.slice(mention.start, mention.end));
-    if (!valid) return <LinkifiedText text={command} attachments={message.attachments} />;
+    if (
+      !Number.isInteger(mention.start) ||
+      !Number.isInteger(mention.end) ||
+      mention.start < cursor ||
+      mention.end > command.length ||
+      !command.slice(mention.start, mention.end).startsWith("/")
+    ) {
+      return <LinkifiedText text={command} attachments={message.attachments} />;
+    }
     if (mention.start > cursor) {
-      parts.push(
-        <LinkifiedText
-          key={`text-${cursor}`}
-          text={command.slice(cursor, mention.start)}
-          attachments={message.attachments}
-        />,
-      );
+      parts.push(<LinkifiedText key={`text-${cursor}`} text={command.slice(cursor, mention.start)} attachments={message.attachments} />);
     }
     parts.push(
       <code key={`skill-${mention.start}`} className="chat-command-chip" title={mention.id}>
@@ -65,9 +60,7 @@ function SkillInvocationText({ message }: { message: UiMessage }) {
     cursor = mention.end;
   }
   if (cursor < command.length) {
-    parts.push(
-      <LinkifiedText key={`text-${cursor}`} text={command.slice(cursor)} attachments={message.attachments} />,
-    );
+    parts.push(<LinkifiedText key={`text-${cursor}`} text={command.slice(cursor)} attachments={message.attachments} />);
   }
   return <>{parts}</>;
 }
@@ -276,6 +269,7 @@ export const MessageRow = memo(function MessageRow({
                             name={attachment.name}
                             path={attachment.ref}
                             kind={attachment.kind}
+                            mimeType={attachment.mimeType}
                             onOpen={openFileRef}
                           />
                         </span>

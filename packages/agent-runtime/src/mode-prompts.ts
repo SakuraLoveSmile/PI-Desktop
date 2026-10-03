@@ -1,7 +1,7 @@
 import type { Mode } from "@pi-desktop/shared";
 
 export const DEFAULT_RUNTIME_SYSTEM_PROMPT =
-  "You are Pi-Desktop-Plus, a local-first coding agent. Prefer concise, actionable answers. Use tools when they help.";
+  "You are Pi-Desktop-Plus, a coding agent. Answer in the user's language. Be concise, direct, and actionable.";
 
 export const PLAN_MODE_SYSTEM_PROMPT = [
   "You are operating in Plan mode as the same Pi-Desktop-Plus agent, in a planning state.",

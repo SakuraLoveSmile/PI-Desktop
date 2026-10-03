@@ -27,11 +27,6 @@ const SettingsPage = lazy(() =>
     default: module.SettingsPage,
   })),
 );
-const PullRequestsPage = lazy(() =>
-  import("../../pages/PullRequestsPage").then((module) => ({
-    default: module.PullRequestsPage,
-  })),
-);
 const ScheduledPage = lazy(() =>
   import("../../pages/ScheduledPage").then((module) => ({
     default: module.ScheduledPage,
@@ -111,7 +106,6 @@ export function AppShell() {
             className="app-chat-shell"
             hidden={page === "settings"}
             inert={page === "settings" ? true : undefined}
-            aria-hidden={page === "settings" ? true : undefined}
           >
             {!sidebarCollapsed || sidebarExiting ? (
               <Sidebar
@@ -245,11 +239,7 @@ export function AppShell() {
                 )}
 
                 <Suspense fallback={<RoutePending />}>
-                  {page === "pulls" ? (
-                    <div className="route-surface route-page">
-                      <PullRequestsPage />
-                    </div>
-                  ) : page === "scheduled" ? (
+                  {page === "scheduled" ? (
                     <div className="route-surface route-page">
                       <ScheduledPage />
                     </div>
