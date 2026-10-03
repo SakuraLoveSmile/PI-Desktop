@@ -19,3 +19,8 @@ The Rust entries currently document legacy modules that were outside the
 follow-up split scope. New Rust domain files are expected to remain below the
 limit. An allowlist entry records an explicit debt boundary; it does not raise
 the general limit for future files.
+
+A file that a sync merge brings in byte-identical from vastsa/PI-Desktop counts
+as newly added here. If it is over the limit it is listed with that reason
+instead of being split, because a split here would conflict with every later
+sync; any decomposition lands upstream first.
