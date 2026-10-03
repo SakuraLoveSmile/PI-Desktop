@@ -153,6 +153,11 @@ pub struct MessageAttachment {
     pub mime_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size: Option<i64>,
+    /// Bounded excerpt of a referenced conversation (`kind: "session"`), written
+    /// by Electron main when the prompt carried a `pi-desktop://session/<id>`
+    /// link. Travels with the user message so the model keeps reading it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -439,6 +444,9 @@ pub(crate) fn ui_to_record(message: &UiMessage) -> (MessageRecord, Option<String
                 if let Some(size) = attachment.size {
                     block.insert("size".into(), json!(size));
                 }
+                if let Some(text) = &attachment.text {
+                    block.insert("text".into(), json!(text));
+                }
                 blocks.push(Value::Object(block));
             }
         }
@@ -575,6 +583,10 @@ pub(crate) fn record_to_ui(record: MessageRecord) -> UiMessage {
                     .and_then(|v| v.as_str())
                     .map(str::to_string),
                 size: block.get("size").and_then(|v| v.as_i64()),
+                text: block
+                    .get("text")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string),
             })
         })
         .collect::<Vec<_>>();
@@ -4785,6 +4797,7 @@ mod tests {
             reference: "attachments/abc123".into(),
             mime_type: Some("image/png".into()),
             size: Some(42),
+            text: None,
         }]);
 
         append_message(&db, &session.id, &user, None).unwrap();
