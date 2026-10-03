@@ -147,6 +147,7 @@
   --ds-goal: #2dd4bf;
   --ds-goal-soft: color-mix(in oklab, var(--ds-goal) 15%, transparent);
   --ds-shadow-dialog: 0 16px 48px rgba(0, 0, 0, 0.55);
+  --ds-shadow-model-menu: var(--ds-shadow-dialog);
   /* Codex --elevation-prominent (same stroke+lift in dark and light) */
   --ds-elevation-stroke: 0 0 0 0.5px color-mix(in oklab, var(--gray-0) 12%, transparent);
   /* D297: the composer lifts by shadow alone; the hairline stroke is gone. */
@@ -285,7 +286,7 @@
   --ds-goal: #0d9488;
   --ds-goal-soft: color-mix(in oklab, var(--ds-goal) 12%, transparent);
   --ds-shadow-dialog: 0 16px 48px rgba(0, 0, 0, 0.12);
-  --ds-shadow-model-menu-light:
+  --ds-shadow-model-menu:
     0 0 0 0.5px color-mix(in oklab, #1a1c1f 10%, transparent),
     0 8px 32px rgba(0, 0, 0, 0.1),
     0 2px 8px rgba(0, 0, 0, 0.06);

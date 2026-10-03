@@ -13,7 +13,7 @@ import {
   headPermission,
   removePermission,
 } from "../../lib/pending-permissions";
-import type { AppState, ToastOptions } from "../app-state";
+import type { AppState } from "../app-state";
 import type { InteractionRuntime } from "../runtime/interaction-runtime";
 import type { SessionRuntime } from "../runtime/session-runtime";
 import type { StoreAccess } from "./types";
@@ -112,7 +112,7 @@ export function createInteractionSlice({
         await finishCancelledConversion(proposalId, sessionId);
         return false;
       }
-      const accepted = await get().sendPrompt(intent.content, intent.draft, sessionId, {
+      const accepted = await get().sendPrompt(intent.content, intent.draft, sessionId, undefined, {
         revisionProposalId: proposalId,
       });
       if (accepted && intent.targetKind === "goal" && cancelledConversions.has(proposalId)) {
@@ -405,6 +405,7 @@ export function createInteractionSlice({
             message,
             variant,
             duration,
+            sound: options?.sound !== false,
           },
         ];
         return { toasts: next.slice(-TOAST_STACK_LIMIT) };

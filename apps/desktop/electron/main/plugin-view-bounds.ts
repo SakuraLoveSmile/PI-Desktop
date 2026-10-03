@@ -1,11 +1,14 @@
-export type PluginViewBounds = {
+﻿export type PluginViewBounds = {
   x: number;
   y: number;
   width: number;
   height: number;
 };
 
-/** Convert renderer CSS pixels to the DIPs expected by WebContentsView. */
+/**
+ * Convert a renderer CSS-pixel rect into the unscaled DIPs
+ * `WebContentsView.setBounds` expects. At zoomFactor 1 the two spaces match.
+ */
 export function scaleBoundsToDip(
   bounds: PluginViewBounds,
   zoomFactor: number,

@@ -769,18 +769,13 @@ token (`writeToken`) from the Host and exposes the `UpdateGoalProgress` tool to 
   restores as an errored result; a tool row whose assistant row was lost
   gets a synthesized call-only assistant carrier so call/result pairs stay
   well-formed for every provider API.
-- Vision runtimes hydrate persisted image refs only from the session-bound
-  attachment, scratch, and project roots. Images within the 10 MB inline
-  safety bound become transient pi-ai image blocks; oversized or unavailable
-  images become safe `@path` fallbacks. Oversized history hydration copies
-  files without first loading their contents into memory. Restored history has
-  a 50 MB aggregate inline-image budget; the newest eligible attachments win,
-  and a file is read only when its size is unchanged before and after the
-  bounded read. Base64 is never restored into durable UI messages or
-  transcript records. The prompt currently being sent is removed from the
-  persisted tail before hydration, matched by `userMessageId` when available
-  and by its original user content for legacy callers without that id, so a
-  fallback path cannot cause the prompt to be sent twice.
+Vision runtimes hydrate persisted image refs only from the session-bound
+attachment, scratch, and project roots. Each image remains subject to the 10 MB
+safety bound, and restored history has a 30 MB aggregate raw-byte budget.
+The newest refs are considered first; all eligible images remain image blocks
+when the history fits, while over-budget or oversized images become safe
+`@path` fallbacks. Reads are bounded by the admitted file size. Base64 is
+transient and never restored into durable UI messages or transcript records.
 - Failed assistant messages remain durable diagnostic transcript entries but
   are never restored into pi model context on a later turn.
 - A tool-call id is unique in every request. The transcript is an append-only
@@ -1269,7 +1264,9 @@ Caller-supplied headers override the client and User-Agent defaults. An empty
 session header is restored from the conversation id so OpenCode Go cannot
 return `MissingSessionID`. A provider-row `headers` map is applied after this
 merge (headers plus a fetch wrapper) so custom values win over the OpenCode
-default and over adapter last-writes. Reserved keys cannot smash
+default and over adapter last-writes. The Google adapters take the merged
+`headers` without the wrapper, because they reject any other `fetch`
+(issue #1072). Reserved keys cannot smash
 `x-opencode-session`. This is an agent-runtime concern, matching the
 official Pi coding-agent attribution layer; pi-ai's `sessionId` stream option
 does not emit `x-opencode-session`.

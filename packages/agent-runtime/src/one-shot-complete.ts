@@ -19,7 +19,7 @@ import {
   buildProviderModel,
   copilotRequestHeaders,
   createProviderModels,
-  providerAllowsCustomFetch,
+  providerRequestFetch,
   type RuntimeProviderConfig,
 } from "./provider-binding.js";
 import {
@@ -100,11 +100,14 @@ export async function completeOneShot(
         ...(options.signal ? { signal: options.signal } : {}),
         maxRetries: 0,
         ...(thinkingLevel !== "off" ? { reasoning: thinkingLevel } : {}),
-        fetch: captureProviderResponse(undefined, (response, _requestBytes, failure) => {
-          providerStatus = response?.status;
-          providerHeaders = response?.headers;
-          providerFailure = failure;
-        }),
+        fetch: providerRequestFetch(
+          model.api,
+          captureProviderResponse(undefined, (response, _requestBytes, failure) => {
+            providerStatus = response?.status;
+            providerHeaders = response?.headers;
+            providerFailure = failure;
+          }),
+        ),
       },
       {
         ...openCodeEndpointFromProvider(provider, model),
@@ -115,7 +118,7 @@ export async function completeOneShot(
       copilotRequestHeaders(provider, context),
       provider.headers,
     ),
-    { allowCustomFetch: providerAllowsCustomFetch(provider) },
+    model.api,
   );
   const stream = createProviderRetryStream(
     model,

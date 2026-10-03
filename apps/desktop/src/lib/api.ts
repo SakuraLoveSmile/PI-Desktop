@@ -17,7 +17,6 @@ import type {
   SpeechSynthesizeRequest,
   SpeechSynthesizeResult,
   SpeechTranscribeRequest,
-  SpeechTranscribeResult,
   SessionSummarizeTitleRequest,
   SessionSummarizeTitleResponse,
   AgentStopResponse,
@@ -74,7 +73,6 @@ import type {
   ProjectMemory,
   ProjectMemoryEntry,
   ProjectWorkspace,
-  PullRequestSummary,
   ScheduledTask,
   ProviderCreateInput,
   ProviderPublic,
@@ -410,6 +408,8 @@ export function validateSettingsWrite(settings: AppSettings): AppSettings {
     infiniteProviderRetry?: unknown;
     autoGenerateSessionTitles?: unknown;
     smoothStreaming?: unknown;
+    updatePreference?: unknown;
+    lastNotifiedUpdateVersion?: unknown;
     networkProxy?: unknown;
     networkPolicy?: unknown;
   };
@@ -467,6 +467,25 @@ export function validateSettingsWrite(settings: AppSettings): AppSettings {
     typeof value.smoothStreaming !== "boolean"
   ) {
     throw Object.assign(new Error("smoothStreaming is invalid"), {
+      errorCode: "INVALID_PARAMS",
+    });
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(value, "updatePreference") &&
+    value.updatePreference !== "automatic" &&
+    value.updatePreference !== "manual"
+  ) {
+    throw Object.assign(new Error("updatePreference is invalid"), {
+      errorCode: "INVALID_PARAMS",
+    });
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(value, "lastNotifiedUpdateVersion") &&
+    (typeof value.lastNotifiedUpdateVersion !== "string" ||
+      value.lastNotifiedUpdateVersion.trim().length === 0 ||
+      value.lastNotifiedUpdateVersion.length > 128)
+  ) {
+    throw Object.assign(new Error("lastNotifiedUpdateVersion is invalid"), {
       errorCode: "INVALID_PARAMS",
     });
   }
@@ -773,6 +792,8 @@ export const api = {
    *
    * `source` reports where the list came from: `remote` is the service's own
    * answer, `catalog` means the endpoint published nothing and models.dev was
+   * `source` reports where the list came from: `remote` is the service's own
+   * answer, `catalog` means the endpoint published nothing and models.dev was
    * used instead, `cache` is the local table, `fallback` is just the configured
    * model id.
    *
@@ -780,6 +801,11 @@ export const api = {
    * is the only thing that may enable macOS's supplemental Local Network alert
    * trigger, it changes nothing about the request the endpoint sees, and it is
    * never persisted, forwarded to the host or passed by any other caller.
+   *
+   * The resolution fields let the form show what the probe actually did:
+   * `effectiveBaseUrl` is the address that answered (which may be a completed
+   * candidate rather than the typed URL), `discoveryStyle` is how it was asked,
+   * and `evidence` is the reason the candidate was chosen.
    */
   listProviderModels: (input: {
     providerId?: string;
@@ -794,6 +820,10 @@ export const api = {
       models: ModelInfo[];
       source: "cache" | "remote" | "catalog" | "fallback";
       error?: string;
+      effectiveBaseUrl?: string;
+      discoveryStyle?: string;
+      apiStyleHint?: string;
+      evidence?: string;
     }>(IPC.invoke.providersListModels, input),
   /**
    * Look one hand-typed model id up in the local models.dev snapshot.
@@ -923,8 +953,6 @@ export const api = {
     ),
   setProject: (path: string) =>
     invoke<{ workspace: ProjectWorkspace | null }>(IPC.invoke.projectSet, path),
-  listPullRequests: () =>
-    invoke<{ pulls: PullRequestSummary[]; error?: string }>(IPC.invoke.pullsList),
   listScheduled: () =>
     invoke<{ tasks: ScheduledTask[] }>(IPC.invoke.scheduledList),
   createScheduled: (input: {
@@ -1342,10 +1370,10 @@ export const api = {
   pluginViewOpen: (
     pluginId: string,
     viewId: string,
-    extra?: { sessionId?: string; location?: string },
+    extra?: { sessionId?: string; location?: string; tabId?: string },
   ) => invoke(IPC.invoke.pluginViewOpen, { pluginId, viewId, ...extra }),
-  pluginViewClose: (pluginId: string, viewId: string) =>
-    invoke(IPC.invoke.pluginViewClose, { pluginId, viewId }),
+  pluginViewClose: (pluginId: string, viewId: string, extra?: { sessionId: string; tabId?: string }) =>
+    invoke(IPC.invoke.pluginViewClose, { pluginId, viewId, ...extra }),
   pluginViewSetBounds: (bounds: {
     x: number;
     y: number;
@@ -1403,9 +1431,6 @@ export const api = {
   /** Ask the running install to stop. Only a download can be interrupted. */
   marketCancelInstall: (id: string) =>
     invoke<{ cancelled: boolean; id: string }>(IPC.invoke.marketCancelInstall, { id }),
-  /** Read-only discovery never grants package permissions. */
-  discoverPiSkills: () => invoke<import("@pi-desktop/shared").PiSkillDiscovery>(IPC.invoke.piSkillDiscover),
-  importPiSkills: (id: string) => invoke<{ canceled: boolean; id?: string; dependencies?: { state: string; error?: string } }>(IPC.invoke.piSkillImport, { id }),
   /** Import a pi CLI extension file or directory as a development plugin (spec 16 §3). */
   importPiExtension: () =>
     invoke<
@@ -1476,7 +1501,8 @@ export const api = {
       ...(mimeType ? { mimeType } : {}),
     }),
   fsReveal: (path: string) => invoke(IPC.invoke.fsReveal, { path }),
-  fsOpen: (path: string) => invoke(IPC.invoke.fsOpen, { path }),
+  fsOpen: (path: string, mimeType?: string) =>
+    invoke(IPC.invoke.fsOpen, { path, mimeType }),
   fsIndex: () => invoke<FsIndexResult>(IPC.invoke.fsIndex),
   /**
    * Complete a file reference from chat text to a real file (D320 follow-up).
@@ -1669,6 +1695,10 @@ export const api = {
     return window.piDesktop.on(IPC.event.notificationChanged, (payload) =>
       listener((payload as { notification: AppNotification }).notification),
     );
+  },
+  onNotificationSound: (listener: () => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.notificationSound, () => listener());
   },
 
   // --- Remote hosts (R2b pairing UX) -----------------------------------------

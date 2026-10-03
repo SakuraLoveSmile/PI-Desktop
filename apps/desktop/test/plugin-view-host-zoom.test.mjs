@@ -13,10 +13,15 @@ const electron = `data:text/javascript,${encodeURIComponent(`
       this.bounds = null;
       this.webContents = new EventEmitter();
       this.webContents.id = nextId++;
-      this.webContents.isDestroyed = () => false;
+      let destroyed = false;
+      this.webContents.isDestroyed = () => destroyed;
       this.webContents.loadURL = async () => {};
       this.webContents.setWindowOpenHandler = () => {};
-      this.webContents.close = () => {};
+      // Closing a page destroys it, which dispose() waits for.
+      this.webContents.close = () => {
+        destroyed = true;
+        this.webContents.emit("destroyed");
+      };
     }
     setBounds(bounds) { this.bounds = { ...bounds }; }
   }
@@ -84,7 +89,7 @@ test("PluginViewHost rescales the visible view when the window zoom changes", ()
   assert.equal(window.webContents.listenerCount("zoom-changed"), 1);
 });
 
-test("PluginViewHost removes the zoom listener when detached or disposed", () => {
+test("PluginViewHost removes the zoom listener when detached or disposed", async () => {
   const detachedWindow = browserWindow();
   const detachedHost = new PluginViewHost();
   openVisibleView(detachedHost, detachedWindow);
@@ -94,6 +99,6 @@ test("PluginViewHost removes the zoom listener when detached or disposed", () =>
   const disposedWindow = browserWindow();
   const disposedHost = new PluginViewHost();
   openVisibleView(disposedHost, disposedWindow);
-  disposedHost.dispose();
+  await disposedHost.dispose();
   assert.equal(disposedWindow.webContents.listenerCount("zoom-changed"), 0);
 });

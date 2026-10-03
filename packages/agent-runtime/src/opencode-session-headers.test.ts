@@ -249,16 +249,13 @@ describe("completeOneShot OpenCode headers", () => {
     });
   });
 
-  it.each([
-    ["Gemini", "google_generative_ai"],
-    ["Vertex", "google-vertex"],
-  ])("keeps %s SDK transports free of wrapped fetch", async (_label, apiStyle) => {
+  it("keeps the Gemini SDK transport free of wrapped fetch", async () => {
     let captured: SimpleStreamOptions | undefined;
     const controller = new AbortController();
     const result = await completeOneShot(
       {
         ...provider,
-        apiStyle,
+        apiStyle: "google_generative_ai",
         vendorKey: "google",
         baseUrl: "https://generativelanguage.googleapis.com/v1beta",
         headers: { "X-Gateway": "1" },

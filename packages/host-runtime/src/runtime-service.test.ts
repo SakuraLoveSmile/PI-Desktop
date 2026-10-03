@@ -339,7 +339,7 @@ describe("RuntimeService prompt lifecycle", () => {
     });
   });
 
-  it("settles every running turn as aborted with the generic crash code when the sidecar dies", async () => {
+  it("settles every running turn as aborted with the honest crash code when the sidecar dies", async () => {
     const { host, sidecar, service, ended } = build();
     await service.prompt({ sessionId: "s1", content: "hello", effectivePermissionMode: "ask", principal: owner });
     sidecar.exit?.({ intentional: false, code: 1, signal: null });

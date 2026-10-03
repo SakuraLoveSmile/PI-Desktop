@@ -352,21 +352,14 @@ pub struct MessageAttachment {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SkillMention {
-    pub start: usize,
-    pub end: usize,
-    pub id: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct UiMessage {
     pub id: String,
     pub role: String,
     pub content: String,
-    /// Original typed slash invocation; content contains the expanded prompt.
+    /// Original text for a slash template or Skill invocation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub command: Option<String>,
+    /// Validated Skill tokens in `command`, with UTF-16 offsets for the renderer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub skill_mentions: Option<Vec<SkillMention>>,
     /// Host-authenticated agent-to-agent origin, never a human authorization.
@@ -434,6 +427,14 @@ pub struct UiMessage {
     /// as an additive `hostedSearch` transcript block; no SQL migration.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hosted_search: Option<Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillMention {
+    pub start: usize,
+    pub end: usize,
+    pub id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -767,8 +768,8 @@ pub(crate) fn record_to_ui(record: MessageRecord) -> UiMessage {
             id: record.id,
             role: record.role,
             content: text,
-            command,
-            skill_mentions,
+            command: command.clone(),
+            skill_mentions: skill_mentions.clone(),
             session_message,
             attachments: None,
             steering,
@@ -6691,7 +6692,7 @@ mod tests {
             panic!("expected child")
         };
         let child_scratch = crate::scratch::session_dir(db.data_dir(), &child.summary.id).unwrap();
-        let child_file = child_scratch.join("pasted/first note.txt");
+        let child_file = child_scratch.join("pasted").join("first note.txt");
         assert_eq!(
             std::fs::read_to_string(&child_file).unwrap(),
             "original reference bytes"
@@ -6727,7 +6728,8 @@ mod tests {
         };
         let grandchild_file = crate::scratch::session_dir(db.data_dir(), &grandchild.summary.id)
             .unwrap()
-            .join("pasted/first note.txt");
+            .join("pasted")
+            .join("first note.txt");
         assert_eq!(
             std::fs::read_to_string(&grandchild_file).unwrap(),
             "original reference bytes"

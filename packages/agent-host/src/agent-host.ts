@@ -26,7 +26,6 @@ import type {
   RacpTurn,
   RacpTurnAdmission,
   GoalProgressChangedEvent,
-  ToolPermissionRequest,
   UiMessage,
 } from "@pi-desktop/shared";
 import {
@@ -34,6 +33,7 @@ import {
   RACP_DEFAULT_LIMITS,
   RACP_DEFAULT_POLICY,
   applyMessageUpdate,
+  askToolOptionLabel,
   deltaStreamPayloadFits,
   effectiveRemotePermissionMode,
   racpKindForAgentEvent,
@@ -173,6 +173,8 @@ export class AgentHost {
   private readonly states = new Map<string, SessionState>();
   private readonly turnIndex = new Map<string, string>();
   private readonly runtimeAliases = new Map<string, string>();
+  /** The dequeued turn whose runtime prompt acknowledgement is still pending. */
+  private readonly startingQueuedTurns = new Map<string, TurnRecord>();
   private readonly idempotency = new Map<string, IdempotencyEntry>();
   private readonly draining = new Set<string>();
   /** A pass that arrived while one was running: the queue must be looked at again. */
@@ -865,6 +867,7 @@ export class AgentHost {
           : await this.queue.shift(sessionId);
         if (!record) return;
         const turn = this.ensureTurn(state, record.id);
+        this.startingQueuedTurns.set(sessionId, turn);
         try {
           const started = await this.runtime.prompt({
             sessionId,
@@ -903,6 +906,8 @@ export class AgentHost {
           this.emit(state, "turn.failed", { turn: this.toRacpTurn(state, turn) }, { turnId: turn.id });
           this.renumberQueue(state);
           this.notifyQueue(sessionId);
+        } finally {
+          this.startingQueuedTurns.delete(sessionId);
         }
       }
   }
@@ -1202,7 +1207,9 @@ export class AgentHost {
       questions: request.questions.map((question, index) => ({
         id: `${request.requestId}:${index}`,
         question: question.question,
-        options: question.options,
+        // RACP v1 keeps answer choices as labels; the desktop-only description
+        // remains local to the inline asktool card.
+        options: question.options.map(askToolOptionLabel),
         multiSelect: question.multiSelect ?? false,
       })),
     };
@@ -1267,11 +1274,13 @@ export class AgentHost {
   private resolveTurnId(state: SessionState, runtimeTurnId: string): string {
     const alias = this.runtimeAliases.get(runtimeTurnId);
     if (alias) return alias;
-    // A queued turn that started before its prompt() call returned: adopt
-    // the runtime id for the head record so the two never diverge.
-    const head = this.queue.peek(state.id);
-    if (head && state.activeTurnId === undefined && !state.turns.has(runtimeTurnId) && this.draining.has(state.id)) {
-      return head.id;
+    // prompt() can emit events before returning its runtime id. The starting
+    // record has already left the queue; the new head belongs to another turn.
+    const starting = this.startingQueuedTurns.get(state.id);
+    if (starting && !starting.runtimeTurnId && !state.turns.has(runtimeTurnId)) {
+      starting.runtimeTurnId = runtimeTurnId;
+      this.runtimeAliases.set(runtimeTurnId, starting.id);
+      return starting.id;
     }
     return runtimeTurnId;
   }

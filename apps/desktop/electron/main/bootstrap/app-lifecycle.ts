@@ -19,9 +19,10 @@ import {
 import { catalogs, resolveLocale } from "@pi-desktop/i18n";
 import { installApplicationMenu } from "../application-menu";
 import { createTraySessions } from "../tray-sessions";
+import { createTaskbarUnreadBadge } from "../taskbar-unread-badge";
 import { createWindow, type WindowLifecycleState } from "./window";
 import { windowToggleAction } from "./window-visibility";
-import type { BrowserPane } from "../browser-view";
+import type { BrowserHost } from "../browser-host";
 import type { Logger } from "../logger";
 import type { PluginRuntime } from "../plugin-runtime";
 import type { PluginViewHost } from "../plugin-view-host";
@@ -65,7 +66,7 @@ export type ApplicationLifecycleDependencies = {
   showPluginLauncher: () => Promise<void>;
   askCloseBehavior: (window: BrowserWindow) => Promise<CloseBehavior | null>;
   applyCloseBehavior: (behavior: CloseBehavior) => void;
-  browserPane: BrowserPane;
+  browserHost: BrowserHost;
   pluginViews: PluginViewHost;
   plugins: PluginRuntime;
   logger: Pick<Logger, "app">;
@@ -98,7 +99,7 @@ export function createApplicationLifecycle({
   showPluginLauncher,
   askCloseBehavior,
   applyCloseBehavior,
-  browserPane,
+  browserHost,
   pluginViews,
   plugins,
   logger,
@@ -114,6 +115,12 @@ export function createApplicationLifecycle({
     getRunningSessionIds,
     isQuitting: () => state.quitting,
     onChanged: () => updateTrayMenu(),
+    logger,
+  });
+  const taskbarUnreadBadge = createTaskbarUnreadBadge({
+    getHost,
+    getMainWindow: () => state.mainWindow,
+    isQuitting: () => state.quitting,
     logger,
   });
   let trayActivationGeneration = 0;
@@ -276,6 +283,9 @@ export function createApplicationLifecycle({
     state.tray.on("double-click", restoreMainWindow);
     updateTrayMenu();
     void traySessions.refresh();
+    void taskbarUnreadBadge.refresh();
+    // Window is live here; force-paint any count learned before the BrowserWindow existed.
+    taskbarUnreadBadge.replay();
   }
 
 
@@ -330,16 +340,13 @@ export function createApplicationLifecycle({
       observedWorkPanelBaseBounds,
       classifyDisplayTransition,
       resetMenuRendererReady,
-      markMenuRendererReady,
-      sendToRenderer,
       safeOpenExternal,
       showPluginLauncher,
       askCloseBehavior,
       applyCloseBehavior,
       createTray,
-      browserPane,
+      browserHost,
       pluginViews,
-      plugins,
       logger,
     });
   }
@@ -661,6 +668,7 @@ export function createApplicationLifecycle({
 
   return {
     traySessions,
+    taskbarUnreadBadge,
     applyDevelopmentBranding,
     hasVisibleWindow,
     restoreMainWindow,

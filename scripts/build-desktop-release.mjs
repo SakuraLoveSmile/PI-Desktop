@@ -98,6 +98,14 @@ if (target === "win") {
     ...forwardedArgs,
     "-c.extraMetadata.piDistribution=zip",
   ]);
+  await runBuilder([
+    "--win",
+    "portable",
+    "--publish",
+    "never",
+    ...forwardedArgs,
+    "-c.extraMetadata.piDistribution=portable",
+  ]);
 } else if (target === "mac") {
   await runMacIdentityLane();
 } else {

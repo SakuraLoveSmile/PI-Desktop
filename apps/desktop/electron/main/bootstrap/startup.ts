@@ -82,11 +82,10 @@ export type StartupDependencies = {
   updater: AppUpdaterController;
   modelsDevCatalog: ModelsDevCatalog;
   plugins: PluginRuntime;
-  activeTurns: Map<string, string>;
   /**
    * Shared busy check from `runtime/session-coordination.ts`. The queue must
    * stay held while a turn's announcement is still running, so this cannot be
-   * derived here from `activeTurns` alone.
+   * be derived from the startup state alone.
    */
   isSessionBusy: (sessionId: string) => boolean;
   getHost: () => HostProcess | null;
@@ -154,7 +153,6 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
       updater,
       modelsDevCatalog,
       plugins,
-      activeTurns,
       isSessionBusy,
       getHost,
       getMainWindow,
@@ -372,7 +370,11 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
     // GitHub discovery is delayed and time-bounded. Never start it before the
     // first window exists: a hung feed used to sit in "checking" for ~60s and
     // compete with boot for the net stack.
-    updater.startAutoCheck();
+    // Adopt legacy NSIS baselines before the delayed feed check can start. The
+    // filesystem work runs after the first window exists and never blocks boot.
+    void updater
+      .reclaimRelocatedUpdateCache()
+      .finally(() => updater.startAutoCheck());
     // createWindow awaits the initial load (loadFile resolves on
     // did-finish-load), so the page is up; give React a beat to mount its
     // event subscriptions before pushing the boot outcome.
@@ -423,10 +425,7 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
                };
              })()`,
             );
-            let resolveCtrlR: ((prevented: boolean) => void) | undefined;
-            const ctrlRObserved = new Promise<boolean>((resolve) => {
-              resolveCtrlR = resolve;
-            });
+            let ctrlRPrevented = false;
             const observeCtrlR = (
               event: Electron.Event,
               input: Electron.Input,
@@ -439,7 +438,7 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
                 !input.alt &&
                 !input.shift
               ) {
-                resolveCtrlR?.(event.defaultPrevented);
+                ctrlRPrevented = event.defaultPrevented;
               }
             };
             window!.webContents.on("before-input-event", observeCtrlR);
@@ -454,16 +453,14 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
                 keyCode: "R",
                 modifiers: ["control"],
               });
-              probe.ctrlRBlocked = await Promise.race([
-                ctrlRObserved,
-                new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2_000)),
-              ]);
+              await new Promise((resolve) => setTimeout(resolve, 100));
             } finally {
               window!.webContents.removeListener(
                 "before-input-event",
                 observeCtrlR,
               );
             }
+            probe.ctrlRBlocked = ctrlRPrevented;
             probe.appName = app.getName();
             probe.menuCount = Menu.getApplicationMenu()?.items.length ?? 0;
             if (!host || !window) throw new Error("session-list probe requires a healthy desktop");
