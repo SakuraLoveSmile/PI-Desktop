@@ -353,7 +353,9 @@ export async function transcriptLongHistoryProbe() {
           toolArgs: { command: "printf changed-giant-tool" } } });
         await until(() => host.textContent?.includes("changed-giant-tool") === true, "giant group changed tool");
       } else {
-        flushSync(() => element<HTMLButtonElement>(".subagent-topology-node-header").click());
+        // Plus renders delegations as the compact Task progress card, whose
+        // row opens the child transcript as the upstream topology node does.
+        flushSync(() => element(".subagent-tasks-row").click());
         await until(() => host.querySelector('[data-testid="subagent-transcript-tab"]') !== null, "child transcript dock");
         const parent = useAppStore.getState().messages[1];
         send(item.summary.id, { type: "message_update", stream: "delta", deltaText: " child-fresh",

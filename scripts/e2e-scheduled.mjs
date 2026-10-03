@@ -242,8 +242,8 @@ try {
   await key("ArrowDown", 40);
   await key("Enter", 13);
   await waitFor(() => evaluate(`!!document.querySelector('.composer-menu-root')`), 5000, "task model selection returns to root");
-  await evaluate(`[...document.querySelectorAll('.composer-menu-entry')].find(e => e.textContent.includes('Reasoning')).click()`);
-  await click("high", '.composer-thinking-list [role="menuitemradio"]');
+  await click("high", ".composer-thinking-tick");
+  await waitFor(() => evaluate(`document.querySelector('.composer-thinking-range')?.getAttribute('aria-valuetext') === 'high'`), 5000, "reasoning slider at high");
   await key("Escape", 27);
   const unchangedDefaults = await invoke("settingsGet");
   assert.equal(unchangedDefaults.defaultProviderId, provider.id, "task selection cannot change the conversation default provider");
