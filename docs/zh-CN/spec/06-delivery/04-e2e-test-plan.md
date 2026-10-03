@@ -7014,22 +7014,28 @@ eleven-tool-round desktop paths are verified by
 #### E2E-164：上下文压缩保留活动任务边界
 
 - **先决条件**：提供商夹具可以在一个会话中完成多个连续任务，在终止边界触发自动
-  检查点，在工具循环期间触发活动回合检查点，并且可以重启会话。
+  检查点，在工具循环期间触发活动回合检查点，并且可以重启会话。桌面 transcript
+  runner 还会将确定性的本地 provider 溢出恢复事件经过生产运行时事件处理、转录投影和
+  assistant-turn renderer 回放。
 - **步骤**：
   1. 在同一会话中完成任务 A 和任务 B，使用不同指令并产生可见的完成回复。
   2. 在已完成回合后触发检查点，然后发送任务 C，捕获下一次提供商请求的上下文。
   3. 在任务 D 仍有工具结果或 `toolUse` 待处理时触发压缩，捕获下一次请求。
   4. 重启并重新打开会话，然后再发送一条提示。
+  5. 在隔离的溢出夹具中，第一次 provider 响应超出上下文窗口后暂停压缩并检查渲染的助手回合，
+     然后让重试成功。
 - **预期**：已完成回合检查点的保留尾部为空；下一次请求包含其摘要和任务 C，不包含裸的
   A/B 提示。活动检查点只保留最新的活动用户提示，不包含更早的用户提示或边界前的
   助手／工具消息。重启遵守 `retainedTailMode`，没有该字段的旧多用户尾部归一化为
-  最新用户消息。可见转录本保持完整，检查点行仍然存在。
+  最新用户消息。可恢复溢出正在压缩时，原助手气泡保持运行态且不显示错误卡片；重试成功后
+  同一个气泡只完成一次。重试失败时显示终态错误。可见转录本保持完整，检查点行仍然存在。
 - **链接规格**：`03-runtime/02-agent-runtime.md`、`03-runtime/04-data-storage.md`、
   `03-runtime/16-tool-result-limits.md`、`08-meta/decisions-log.md`（D275）、ADR 0136
 - **验收**：C（聊天／流）、F（持久性）、质量
 - **里程碑**：M5
 - **状态**：已覆盖单元测试（`packages/agent-runtime/src/runtime.test.ts`、
-  `context-compaction.test.mjs`）；provider/UI 旅程草稿
+  `context-compaction.test.mjs`）；隔离溢出恢复夹具通过 `pnpm test:e2e:transcript`；更完整的
+  provider/UI 旅程仍为草稿
 
 #### E2E-172：回合进行中改思考档位不会塌缩未固定会话菜单
 
