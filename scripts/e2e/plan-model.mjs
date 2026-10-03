@@ -22,41 +22,37 @@ export function planModelFixture() {
       const emit = (delta, finish_reason = null) =>
         res.write(`data: ${JSON.stringify({ ...base, choices: [{ index: 0, delta, finish_reason }] })}\n\n`);
       res.writeHead(200, { "content-type": "text/event-stream" });
-      if (scenario === "goal" || scenario === "plan") {
-        const tools = request.tools ?? [];
-        const submitName = scenario === "goal" ? "SubmitGoal" : "SubmitPlan";
-        const matchedSubmit = tools.find((tool) => {
-          const n = tool.function?.name?.toLowerCase();
-          return n === submitName.toLowerCase() || n === `submit_${scenario}`;
-        });
-        const matchedSearch = tools.find((tool) => {
-          const n = tool.function?.name?.toLowerCase();
-          return n === "toolsearch" || n === "tool_search";
-        });
-        const matchedTool = matchedSubmit || matchedSearch || tools[0];
-        const name = matchedTool?.function?.name ?? submitName;
-        const submitAvailable = Boolean(matchedSubmit);
-        const args = submitAvailable
-          ? scenario === "goal"
-            ? {
-                title: "Converted Goal",
-                markdown: "# Goal\n\nDeliver the approved outcome.\n\n## Acceptance criteria\n\n- Confirm the result.\n\n## Boundaries\n\n- Keep user data intact.",
-                question: "Approve this Goal contract separately?",
-              }
-            : {
-                title: "Revised Plan",
-                markdown: "# Revised Plan\n\n- Include the requested verification.",
-                question: "Approve this revised plan?",
-              }
-          : { query: submitName };
+      // An armed scenario answers only a request that can submit its contract.
+      // Any other request (the Agent that executes an approved Plan or Goal
+      // has neither Submit tool) gets the plain reply below, which ends its
+      // run, and leaves the scenario armed for the request it was set up for.
+      const submitName = scenario === "goal" ? "SubmitGoal" : "SubmitPlan";
+      const submitTool = scenario === null
+        ? undefined
+        : (request.tools ?? []).find((tool) => {
+            const n = tool.function?.name?.toLowerCase();
+            return n === submitName.toLowerCase() || n === `submit_${scenario}`;
+          });
+      if (submitTool) {
+        const args = scenario === "goal"
+          ? {
+              title: "Converted Goal",
+              markdown: "# Goal\n\nDeliver the approved outcome.\n\n## Acceptance criteria\n\n- Confirm the result.\n\n## Boundaries\n\n- Keep user data intact.",
+              question: "Approve this Goal contract separately?",
+            }
+          : {
+              title: "Revised Plan",
+              markdown: "# Revised Plan\n\n- Include the requested verification.",
+              question: "Approve this revised plan?",
+            };
         emit({ role: "assistant", tool_calls: [{
           index: 0,
           id: `plan-model-tool-${calls}`,
           type: "function",
-          function: { name, arguments: JSON.stringify(args) },
+          function: { name: submitTool.function.name, arguments: JSON.stringify(args) },
         }] });
         emit({}, "tool_calls");
-        if (submitAvailable) scenario = null;
+        scenario = null;
       } else {
         emit({ role: "assistant", content: "Scheduled review complete." });
         emit({}, "stop");
