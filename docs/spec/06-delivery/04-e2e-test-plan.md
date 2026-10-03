@@ -15516,7 +15516,10 @@ renderer's durable transcript reads. No real model or provider is contacted.
   together; change the planning model and send a revision; reload and inspect
   both immutable cards; open View details and verify the Work Panel Markdown
   preview opens only after the click; convert the current Plan to Goal and
-  approve the new Goal separately; schedule a future one-time execution.
+  approve the new Goal separately, then wait for its execution to reach
+  `completed` and the session to go idle (the fake provider ends that run with
+  one plain reply, so no run outlives the case); schedule a future one-time
+  execution.
 - **Expected:** A revision retires only the exact pending proposal and creates a
   new approval. A stale or duplicate response fails closed. Goal conversion
   never executes the Plan. Schedule captures proposal id/version, artifact
