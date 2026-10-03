@@ -119,6 +119,11 @@ No host RPC or storage schema change is required.
    the durable user message. Only an image that is within the 10 MB inline
    bound for a vision model is read into memory; larger images use streamed
    hashing/copying and the existing safe path fallback
+   A `pi-desktop://session/<id>` link in the draft is resolved in the same step
+   into a bounded excerpt attachment: the same project only, the current
+   conversation dropped before any read, and the runtime quotes it to the model
+   as one `<session_reference name="…" session="…">` block ahead of the user's
+   own words
 7. snapshot the effective shell ID and dialect for the turn
 8. start pi turn with the resolved session configuration and effective
    thinking level; HTTP 429 setup and stream failures use the runtime-owned
@@ -656,6 +661,15 @@ The model receives an ordinary error tool result with the original call id;
 no editing, delegation, fake user message or transcript deletion occurs.
 Other deferred/plugin tools keep their existing visibility rules. See
 [the declaration/permission decision](../../adr/plan-tool-declarations-and-execution-denials.md).
+
+Plan/Goal entry remains available without a project workspace. A submission
+requires a persisted session workspace for its approval artifact.
+`PLAN_WORKSPACE_REQUIRED` from submission is a recoverable tool error: it
+explains how to bind a workspace and directs the agent to present the proposal
+in chat without retrying until a workspace is bound. It does not terminate the
+model loop, create an approval, or authorize execution. Successful submission
+still terminates for approval; other submission failures retain their existing
+termination behavior.
 
 Approval has only `approve` and `reject`. Approval commits `mode = agent`, the
 explicit permission mode, an execution ID, and `execution_state = queued` on

@@ -1,5 +1,6 @@
 import { TOOL_ACTIVATION_SECTION, toolDeclarationPolicy, toolActivationSection, restoredToolActivation, syncToolActivation, type ToolDeclarationPolicy } from "./fixed-tool-declarations.js";
 import { orderSystemRows, SystemTranscriptJournal } from "./system-transcript-journal.js";
+import { planWorkspaceRequiredResult } from "./plan-workspace-error.js";
 import { accountModelStream } from "./request-usage.js";
 import { modeToolDenial, retainModeToolDeclaration, withModeExecutionGuard } from "./mode-tool-access.js";
 import { restoreHostedSearchReplay } from "./hosted-search-replay.js";
@@ -275,9 +276,16 @@ import {
 
 export type { RuntimeProviderConfig } from "./provider-binding.js";
 
-export type RuntimePromptAttachment = AgentPromptAttachment & {
+export type RuntimePromptAttachment = Omit<AgentPromptAttachment, "kind"> & {
+  /**
+   * `session` is written by Electron main for a resolved
+   * `pi-desktop://session/<id>` reference; the renderer never sends it.
+   */
+  kind: AgentPromptAttachment["kind"] | "session";
   /** Base64 payload is transient and only crosses the sidecar for this turn. */
   data?: string;
+  /** Bounded excerpt of a referenced conversation (`kind: "session"`). */
+  text?: string;
 };
 
 export type RuntimePrompt = {
@@ -286,9 +294,24 @@ export type RuntimePrompt = {
   attachments?: RuntimePromptAttachment[];
 };
 
+/**
+ * The user's own words plus one quoted block per referenced conversation. The
+ * visible prompt is never rewritten: references are additive, and the model
+ * must receive this text — a reference accounted for by compaction but absent
+ * from the provider request would be context the user never got.
+ */
+function promptText(input: RuntimePrompt): string {
+  const references = (input.attachments ?? [])
+    .map((attachment) => sessionReferenceBlock(attachment))
+    .filter((block): block is string => block !== null);
+  return references.length
+    ? `${input.text}\n\n${references.join("\n\n")}`.trim()
+    : input.text;
+}
+
 function promptContent(input: string | RuntimePrompt): UserMessage["content"] {
   if (typeof input === "string") return input;
-  const text = input.text;
+  const text = promptText(input);
   const images = (input.attachments ?? []).filter(
     (attachment) =>
       attachment.kind === "image" &&
@@ -331,8 +354,30 @@ function runtimeAttachmentFromMessage(
     kind: attachment.kind,
     ...(attachment.mimeType ? { mimeType: attachment.mimeType } : {}),
     ...(attachment.size !== undefined ? { size: attachment.size } : {}),
+    ...(attachment.text ? { text: attachment.text } : {}),
     ...(data ? { data } : {}),
   };
+}
+
+/** Attribute-safe text: a session title may contain quotes or angle brackets. */
+function escapeAttribute(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+/**
+ * A referenced conversation travels with the user's message as one delimited
+ * block: it is quoted context, not the user's own words (a session link in the
+ * draft produced it), so the model reads it as reference material.
+ */
+export function sessionReferenceBlock(attachment: RuntimePromptAttachment): string | null {
+  const text = attachment.text?.trim();
+  if (!text) return null;
+  const title = escapeAttribute(attachment.name || attachment.path);
+  return `<session_reference name="${title}" session="${escapeAttribute(attachment.path)}">\n${text}\n</session_reference>`;
 }
 
 // pi-ai's adapter retry is disabled here so setup and mid-stream 429s share
@@ -1818,6 +1863,7 @@ export class DesktopAgentRuntime {
   private pendingSteering = new Map<AgentMessage, string>();
   private pendingOverflow = false;
   private overflowRecoveryAttempted = false;
+  private overflowRecoveryInProgress = false;
   private suppressOverflowRunEnd = false;
   private turnHadError = false;
   /** Bumped at the start of each parent `prompt()` / `executeApprovedPlan()`. */
@@ -5483,6 +5529,8 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             question,
           });
         } catch (error) {
+          const recovery = planWorkspaceRequiredResult(error);
+          if (recovery) return recovery;
           const errorCode =
             (error as { data?: { errorCode?: string } })?.data?.errorCode ??
             "PLAN_SUBMIT_FAILED";
@@ -5905,6 +5953,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
   private resetRunRecoveryState(): void {
     this.pendingOverflow = false;
     this.overflowRecoveryAttempted = false;
+    this.overflowRecoveryInProgress = false;
     this.suppressOverflowRunEnd = false;
     this.pendingProviderRetry = undefined;
     this.providerTransientRetryAttempt = 0;
@@ -6063,38 +6112,42 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         this.pendingOverflow = false;
         this.suppressOverflowRunEnd = false;
         this.overflowRecoveryAttempted = true;
-        const messages = removeTrailingAssistantMessages(this.agent.state.messages);
-        this.setAgentMessages(messages);
-        const compacted = await this.runCompaction(
-          "overflow",
-          true,
-          "active_turn",
-        );
-        if (!compacted) {
-          this.terminateParentTurn();
-          if (this.compactionAborted) {
-            // The user stopped the turn while the checkpoint was being written.
-            // That is an aborted turn, not a compaction failure: close it the
-            // way a stopped stream closes, with no error row.
-            this.finalizeCurrentAssistant("aborted");
-            this.emit({ type: "turn_end" });
-            this.emit({ type: "agent_end", messageIds: [] });
-            return false;
-          }
-          this.emit({
-            type: "error",
-            error: {
+        this.overflowRecoveryInProgress = true;
+        try {
+          const messages = removeTrailingAssistantMessages(this.agent.state.messages);
+          this.setAgentMessages(messages);
+          const compacted = await this.runCompaction(
+            "overflow",
+            true,
+            "active_turn",
+          );
+          if (!compacted) {
+            this.terminateParentTurn();
+            if (this.compactionAborted) {
+              // The user stopped the turn while the checkpoint was being written.
+              // That is an aborted turn, not a compaction failure: close it the
+              // way a stopped stream closes, with no error row.
+              this.finalizeCurrentAssistant("aborted");
+              this.emit({ type: "turn_end" });
+              this.emit({ type: "agent_end", messageIds: [] });
+              return false;
+            }
+            const error = {
               code: "CONTEXT_COMPACTION_FAILED",
               message: "Context overflow recovery could not create a checkpoint",
               retriable: false,
-            },
-          });
-          return false;
+            } satisfies ReturnType<typeof classifyAgentError>;
+            this.finalizeCurrentAssistant("error", error);
+            this.emit({ type: "error", error });
+            return false;
+          }
+          this.turnHadError = false;
+          this.requestStartedAt = Date.now();
+          await this.agent.continue();
+          await this.waitForIdleAndSteering();
+        } finally {
+          this.overflowRecoveryInProgress = false;
         }
-        this.turnHadError = false;
-        this.requestStartedAt = Date.now();
-        await this.agent.continue();
-        await this.waitForIdleAndSteering();
         continue;
       }
       if (this.pendingSilentTurnRerun) {
@@ -7488,6 +7541,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         if (this.steeringContinuation) break;
         if (
           this.providerRetryInProgress ||
+          this.overflowRecoveryInProgress ||
           this.silentTurnRerunInProgress ||
           this.progressTurnRerunInProgress
         ) {
@@ -7498,6 +7552,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       case "turn_start":
         if (
           this.providerRetryInProgress ||
+          this.overflowRecoveryInProgress ||
           this.silentTurnRerunInProgress ||
           this.progressTurnRerunInProgress
         ) {
@@ -7512,6 +7567,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
           const content = assistantContent((event.message as any).content);
           const retryingAssistant =
             this.providerRetryInProgress ||
+            this.overflowRecoveryInProgress ||
             this.silentTurnRerunInProgress ||
             this.progressTurnRerunInProgress
               ? this.currentAssistant
@@ -7519,7 +7575,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
           const initialText =
             content.hasText && content.text.length > 0
               ? content.text
-              : this.progressTurnRerunInProgress
+              : this.progressTurnRerunInProgress || this.overflowRecoveryInProgress
                 ? retryingAssistant?.content ?? ""
                 : content.text;
           this.currentAssistant = {
@@ -7540,6 +7596,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             // duplicate error row when the second request succeeds. The same
             // applies to a silent-turn re-run: one bubble, no empty row.
             this.providerRetryInProgress = false;
+            this.overflowRecoveryInProgress = false;
             this.silentTurnRerunInProgress = false;
             this.progressTurnRerunInProgress = false;
             this.emit({ type: "message_update", message: this.currentAssistant });
@@ -7801,6 +7858,33 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             this.streamStartedAt = undefined;
             break;
           }
+          const canRecoverOverflow =
+            this.compactionEnabled &&
+            overflow &&
+            !this.overflowRecoveryAttempted;
+          if (canRecoverOverflow) {
+            // Keep the failed response inside the same visible assistant bubble
+            // while compaction prepares the retry. A provider overflow is an
+            // internal recovery transition, not a terminal user-facing error.
+            this.currentAssistant = {
+              ...this.currentAssistant,
+              content: nextText,
+              ...(nextThinking
+                ? { thinking: nextThinking }
+                : content.hasThinking
+                  ? { thinking: undefined }
+                  : {}),
+              status: "streaming",
+              modelId: this.provider.modelId,
+              providerId: this.provider.id,
+              ...(usage ? { usage } : {}),
+            };
+            this.emit({ type: "message_update", message: this.currentAssistant });
+            this.streamStartedAt = undefined;
+            this.pendingOverflow = true;
+            this.suppressOverflowRunEnd = true;
+            break;
+          }
           const emptyResponse = silentTurn;
           const diagnosticError = classifiedError;
           const retryProviderAttempt =
@@ -7872,10 +7956,6 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
           this.activeProviderRetryAttempt = 0;
           this.streamStartedAt = undefined;
           this.currentAssistant = undefined;
-          const canRecoverOverflow =
-            this.compactionEnabled &&
-            overflow &&
-            !this.overflowRecoveryAttempted;
           if (exemptSilence) {
             // Accepted silence is still nothing worth resending: keep it out
             // of the runtime entries, exactly as a restored transcript would,
@@ -7892,10 +7972,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
           } else {
             this.turnHadError = true;
           }
-          if (canRecoverOverflow) {
-            this.pendingOverflow = true;
-            this.suppressOverflowRunEnd = true;
-          } else if (diagnosticError) {
+          if (diagnosticError) {
             this.terminateParentTurn();
             this.emit({ type: "error", error: diagnosticError });
           }
@@ -8350,7 +8427,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       if (typeof modelInput === "string") {
         await this.agent.prompt(modelInput);
       } else {
-        await this.agent.prompt(modelInput.text, promptImages(modelInput));
+        await this.agent.prompt(promptText(modelInput), promptImages(modelInput));
       }
       await this.waitForIdleAndSteering();
       void this.extensionRunner?.emit("agent_settled", { type: "agent_settled" });

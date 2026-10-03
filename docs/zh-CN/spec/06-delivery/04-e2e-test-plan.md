@@ -768,6 +768,29 @@ task-candidate E2E 从请求工作树运行，但使用主工作区已经准备�
 - **覆盖**：`scripts/e2e/composer-submission.tsx`，由
   `pnpm test:e2e:composer-paste` 执行；真实桌面录屏使用隔离数据，以及响应时间受控的本地模型。
 
+#### E2E-SESSION-reference-conversation-link：粘贴的会话链接把那段对话带进本轮
+
+- **先决条件**：隔离的桌面配置；一个项目内有会话 A 与 B，另一个项目内有会话 C；
+  已配置一个会依据给定上下文作答的模型。
+- **步骤**： 1) 在 A 的对话溢出菜单选「复制会话链接」，读取剪贴板。
+  2) 打开 B，把链接粘贴进输入框草稿并发送，检查用户消息。
+  3) 在 B 里追问一次，不再重复链接。 4) 把 C 的链接粘贴进 B 并发送。
+  5) 在 A 里发送 A 自己的链接。 6) 从 A 的对话溢出菜单给它改名，然后回到 B。
+- **预期**：剪贴板内容是 `pi-desktop://session/<A 的 id>`。B 的用户消息保留可见的链接
+  文本，并显示聊天图标芯片，标签为语言目录里的引用标签加 A 的标题；激活芯片会打开 A。
+  回答使用 A 的内容，追问仍然读到同一份引用，而无需再次写入链接。C 的链接与 A 自己的
+  链接什么都不附带：消息保持纯文本，模型收不到它们的任何摘录——解析器在任何读取之前
+  丢掉自引用，并丢弃属于其他项目的对话摘录。
+  事后给 A 改名，B 里的芯片会跟着改名——芯片按被引用对话的当前标题命名；模型已经读过的
+  摘录则保留引用产生时记录的名称。
+- **关联规范**：`04-ux/08-component-spec.md` §20B、`03-runtime/04-data-storage.md`、
+  `03-runtime/02-agent-runtime.md`
+- **验收标准**：C — 对话与流
+- **里程碑**：M2
+- **状态**：Draft — 解析器与芯片已由源码级测试覆盖：
+  `apps/desktop/test/session-references.test.mjs`、
+  `apps/desktop/test/session-reference-ui.test.mjs`
+
 ### 对话顶部栏
 
 #### E2E-087：对话顶部栏在聊天路径上呈现
@@ -3654,8 +3677,9 @@ IPC 请求无法关闭。
     压缩行仍被绘制。检查点之前的 regenerate/fork 具体记录的边界被丢弃；
     以幸存消息为锚点的记录被保留／重新映射。
   - 确切的提供程序溢出仅从模型中删除失败的助手
-    上下文，压缩后重试一次，并且不会在第二次循环
-    溢出。
+    上下文；压缩／重试等待期间，界面保留同一个助手气泡并保持运行态；
+    压缩后只重试一次，第二次溢出不循环。第一次可恢复溢出不发终态错误消息或
+    `error` 事件；只有重试／压缩失败时才以 `CONTEXT_TOO_LARGE` 或真实终态错误收口。
   - 如果自动摘要生成失败，则持久保留尾部回退
     附加检查点，运行保持活动状态，并有一个警告解释
     旧模型上下文被减少；该检查点的转录行显示
@@ -7013,22 +7037,28 @@ eleven-tool-round desktop paths are verified by
 #### E2E-164：上下文压缩保留活动任务边界
 
 - **先决条件**：提供商夹具可以在一个会话中完成多个连续任务，在终止边界触发自动
-  检查点，在工具循环期间触发活动回合检查点，并且可以重启会话。
+  检查点，在工具循环期间触发活动回合检查点，并且可以重启会话。桌面 transcript
+  runner 还会将确定性的本地 provider 溢出恢复事件经过生产运行时事件处理、转录投影和
+  assistant-turn renderer 回放。
 - **步骤**：
   1. 在同一会话中完成任务 A 和任务 B，使用不同指令并产生可见的完成回复。
   2. 在已完成回合后触发检查点，然后发送任务 C，捕获下一次提供商请求的上下文。
   3. 在任务 D 仍有工具结果或 `toolUse` 待处理时触发压缩，捕获下一次请求。
   4. 重启并重新打开会话，然后再发送一条提示。
+  5. 在隔离的溢出夹具中，第一次 provider 响应超出上下文窗口后暂停压缩并检查渲染的助手回合，
+     然后让重试成功。
 - **预期**：已完成回合检查点的保留尾部为空；下一次请求包含其摘要和任务 C，不包含裸的
   A/B 提示。活动检查点只保留最新的活动用户提示，不包含更早的用户提示或边界前的
   助手／工具消息。重启遵守 `retainedTailMode`，没有该字段的旧多用户尾部归一化为
-  最新用户消息。可见转录本保持完整，检查点行仍然存在。
+  最新用户消息。可恢复溢出正在压缩时，原助手气泡保持运行态且不显示错误卡片；重试成功后
+  同一个气泡只完成一次。重试失败时显示终态错误。可见转录本保持完整，检查点行仍然存在。
 - **链接规格**：`03-runtime/02-agent-runtime.md`、`03-runtime/04-data-storage.md`、
   `03-runtime/16-tool-result-limits.md`、`08-meta/decisions-log.md`（D275）、ADR 0136
 - **验收**：C（聊天／流）、F（持久性）、质量
 - **里程碑**：M5
 - **状态**：已覆盖单元测试（`packages/agent-runtime/src/runtime.test.ts`、
-  `context-compaction.test.mjs`）；provider/UI 旅程草稿
+  `context-compaction.test.mjs`）；隔离溢出恢复夹具通过 `pnpm test:e2e:transcript`；更完整的
+  provider/UI 旅程仍为草稿
 
 #### E2E-172：回合进行中改思考档位不会塌缩未固定会话菜单
 
@@ -9246,3 +9276,9 @@ the latest destination. These assertions measure work counts, not device FPS.
   cumulative input cost. Report the larger first request and possible short-chat
   cost increase, alongside any longer-conversation benefit. Offline test success
   alone is not evidence of provider cache behavior.
+
+- Overflow/system-update integration: recover a provider context overflow with
+  a system delta after the failed assistant message. Keep that delta, remove the
+  failed assistant before compaction, and reuse one visible assistant message
+  through successful recovery. Terminal failure and Stop retain their existing
+  closure behavior. Covered by the parameterized runtime overflow user-path test.
