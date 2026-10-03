@@ -2,6 +2,8 @@ import {
   app,
   BrowserWindow,
   ipcMain,
+  powerMonitor,
+  session,
 } from "electron";
 import { join } from "node:path";
 import {
@@ -38,7 +40,11 @@ import {
 } from "./models-dev-catalog";
 import { VendorOAuth } from "./oauth";
 import { AppUpdaterController } from "./updater";
-import type { WorkPanelReservationState } from "./work-panel-window";
+import {
+  WINDOW_MIN_HEIGHT,
+  WINDOW_MIN_WIDTH,
+  type WorkPanelReservationState,
+} from "./work-panel-window";
 import { InflightCheckpointer } from "@pi-desktop/host-runtime";
 import { withGitBranch } from "./workspace-git";
 import { applyDevelopmentUserData, desktopDataDir } from "./data-paths";
@@ -46,6 +52,9 @@ import { createPlanUiProbe } from "./plan-ui-probe";
 import { DESKTOP_PRINCIPAL } from "./agent-host-bridge";
 import { registerIpcHandlers } from "./ipc/register";
 import { createVoiceService } from "./voice-service";
+import { MicrophoneLeaseRegistry } from "./live-voice/microphone-lease";
+import { createLiveCallService } from "./live-voice/runtime";
+import { installLiveMicrophonePermissionHandlers } from "./live-voice/microphone-permissions";
 import { MainProcessState } from "./bootstrap/main-state";
 import { registerApplicationActivation } from "./bootstrap/app-activation";
 import { createHostRuntime } from "./runtime/host";
@@ -113,8 +122,6 @@ if (!hasSingleInstanceLock) {
   app.quit();
 }
 
-const WINDOW_MIN_WIDTH = 1040;
-const WINDOW_MIN_HEIGHT = 700;
 // Native resize streams can pause briefly while the pointer crosses a display
 // scale boundary. Keep recovery out of that gesture and only run it after the
 // bounds have been stable for one short interaction window.
@@ -826,7 +833,31 @@ runtimeLifecycle = createRuntimeLifecycle({
 });
 const { bootHostStatus, bootBackends, stopPlanSchedulePoller } = runtimeLifecycle;
 
-const voiceService = createVoiceService(dataDir + "/voice-models", getMainWindow);
+let voiceServiceReference: ReturnType<typeof createVoiceService> | null = null;
+const microphoneLeases = new MicrophoneLeaseRegistry(() => {
+  const phase = voiceServiceReference?.getState().phase;
+  return phase === "preparing" || phase === "starting" || phase === "listening" || phase === "transcribing" || phase === "cancelling";
+});
+const voiceService = createVoiceService(
+  dataDir + "/voice-models",
+  getMainWindow,
+  (token) => microphoneLeases.acquire("dictation", token),
+);
+voiceServiceReference = voiceService;
+const liveCallService = createLiveCallService({
+  getHost,
+  getMainWindow,
+  getAgentHostBridge: () => mainState.agentHostBridge,
+  vendorOAuth,
+  microphoneLeases,
+  resolveAgentRuntimeLaunch: (sessionId, session, settings, overrides) => {
+    if (!sessionLaunchRuntime) return Promise.reject(new Error("session launch runtime is not initialized"));
+    return sessionLaunchRuntime.resolveAgentRuntimeLaunch(sessionId, session, settings, {
+      ...overrides,
+      mode: "agent",
+    });
+  },
+});
 
 function registerIpc() {
   return registerIpcHandlers({
@@ -925,6 +956,7 @@ function registerIpc() {
     sendToRenderer,
     voiceService,
     teamDelivery,
+    liveCallService,
   });
 }
 
@@ -937,6 +969,36 @@ app.on("web-contents-created", (_event, contents) => {
   contents.on("will-attach-webview", (event) => {
     event.preventDefault();
   });
+});
+
+const liveLifecycleWindows = new WeakSet<BrowserWindow>();
+app.on("browser-window-created", (_event, window) => {
+  queueMicrotask(() => {
+    if (getMainWindow() !== window || liveLifecycleWindows.has(window)) return;
+    liveLifecycleWindows.add(window);
+    const contentsId = window.webContents.id;
+    window.on("hide", () => {
+      void liveCallService.endForWebContents(contentsId, "window-hidden");
+    });
+    window.webContents.on("did-start-navigation", (_event, _url, _inPlace, isMainFrame) => {
+      if (isMainFrame) void liveCallService.endForWebContents(contentsId, "window-navigated", true);
+    });
+    window.webContents.once("render-process-gone", () => {
+      void liveCallService.endForWebContents(contentsId, "renderer-gone", true);
+    });
+    window.webContents.once("destroyed", () => {
+      void liveCallService.endForWebContents(contentsId, "renderer-gone", true);
+    });
+  });
+});
+app.once("ready", () => {
+  installLiveMicrophonePermissionHandlers({
+    targetSession: session.defaultSession,
+    getMainWindow,
+    hasReservation: (owner) => liveCallService.hasMicrophoneReservation(owner),
+  });
+  powerMonitor.on("suspend", () => void liveCallService.endForLifecycle("app-suspended"));
+  powerMonitor.on("lock-screen", () => void liveCallService.endForLifecycle("app-suspended"));
 });
 
 registerApplicationStartup({
@@ -993,6 +1055,7 @@ registerShutdownHandlers({
   confirmQuitDialog,
   disposePowerSaveBlockers,
   stopPlanSchedulePoller,
+  liveCallService,
 });
 
 registerApplicationActivation({

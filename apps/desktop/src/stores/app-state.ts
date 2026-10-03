@@ -27,6 +27,7 @@ import type {
   ReviewRollbackResult,
   SessionSummary,
   SessionThinkingLevel,
+  SessionTodoSnapshot,
   UiMessage,
 } from "@pi-desktop/shared";
 import type { SettingsTabId } from "../lib/settings-search";
@@ -181,6 +182,9 @@ export type AppState = {
   planDraftsDirty: Record<string, boolean>;
   /** Goal completion report summaries per session. */
   goalReports: Record<string, GoalReportSummary[]>;
+  /** Host-authoritative Todo snapshots keyed by session. */
+  sessionTodos: Record<string, SessionTodoSnapshot>;
+  applyTodosChanged: (snapshot: SessionTodoSnapshot) => void;
   toasts: ToastItem[];
   notifications: AppNotification[];
   unreadNotificationCount: number;

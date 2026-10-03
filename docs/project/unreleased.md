@@ -6,6 +6,12 @@
   Member sessions are grouped under their Lead, and approved Plan/Goal runs can
   receive one concise automatic title without changing execution on failure.
 
+- `/compact` and automatic context compaction work again on a gateway that
+  fronts a Codex backend. The summary request of a checkpoint now carries the
+  conversation identity every other turn of the session sends
+  (`prompt_cache_key`), instead of being the one request the gateway answers
+  with `400 invalid codex request`.
+
 - Claude models on a GitHub Copilot account no longer fail with "missing
   required Authorization header". Their Anthropic Messages requests now
   authenticate with `Authorization: Bearer` instead of sending the Copilot
