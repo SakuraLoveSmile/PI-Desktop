@@ -101,6 +101,15 @@ test("the hard boundary is enforced by the host, with a model-side escape hatch"
     /checkpoint truncated: this message crossed the retained context budget/,
   );
   assert.match(runtime, /pendingOverflow/);
+  assert.match(runtime, /overflowRecoveryInProgress/);
+  assert.match(
+    runtime,
+    /const canRecoverOverflow =[\s\S]*?status: "streaming"[\s\S]*?message_update[\s\S]*?this\.pendingOverflow = true;/,
+  );
+  assert.match(
+    runtime,
+    /CONTEXT_COMPACTION_FAILED[\s\S]*?finalizeCurrentAssistant\("error", error\)/,
+  );
   assert.match(runtime, /runCompaction\(\s*"overflow",\s*true,\s*"active_turn",?\s*\)/);
   assert.match(runtime, /fallback: "retained_tail"/);
   // Codex's tool, verbatim and parameterless, plus its two-tier reminder.

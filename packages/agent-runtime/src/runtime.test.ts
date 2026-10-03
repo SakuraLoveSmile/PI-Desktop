@@ -4183,7 +4183,7 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
     await runtime.dispose();
   });
 
-  it("recognizes the Bedrock prompt-too-long response and defers the terminal error", async () => {
+  it("keeps recoverable overflow streaming while compaction is pending", async () => {
     const onEvent = vi.fn();
     const runtime = createRuntime({ onEvent });
     const handleAgentEvent = (runtime as any).handleAgentEvent.bind(runtime);
@@ -4206,6 +4206,124 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
     await handleAgentEvent({ type: "agent_end", messages: [] });
 
     const events = onEvent.mock.calls.map(([envelope]) => (envelope as any).event);
+    const messageUpdates = events.filter((event) => event.type === "message_update");
+    expect(messageUpdates).toHaveLength(1);
+    expect(messageUpdates[0].message).toMatchObject({ status: "streaming" });
+    expect(messageUpdates[0].message.error).toBeUndefined();
+    expect(events.some((event) => event.type === "message_end")).toBe(false);
+    expect(events.some((event) => event.type === "error")).toBe(false);
+    expect(events.some((event) => event.type === "agent_end")).toBe(false);
+    expect((runtime as any).pendingOverflow).toBe(true);
+
+    await runtime.dispose();
+  });
+
+  it("reuses one assistant bubble across a successful overflow recovery", async () => {
+    const onEvent = vi.fn();
+    const runtime = createRuntime({ onEvent });
+    const agent = (runtime as any).agent;
+    const handleAgentEvent = (runtime as any).handleAgentEvent.bind(runtime);
+    const user = { role: "user", content: "hello", timestamp: 1 };
+    const failed = {
+      ...assistantMessage({
+        content: [{ type: "text", text: "partial response" }],
+        stopReason: "error",
+      }),
+      errorMessage: "400: prompt is too long: 1077172 tokens > 1000000 maximum",
+      timestamp: 2,
+    };
+    const recovered = assistantMessage({
+      content: [{ type: "text", text: "recovered response" }],
+      stopReason: "stop",
+    });
+
+    agent.prompt = vi.fn(async () => {
+      agent.state.messages = [user, failed];
+      await handleAgentEvent({ type: "message_start", message: failed });
+      await handleAgentEvent({ type: "message_end", message: failed });
+      await handleAgentEvent({ type: "turn_end" });
+      await handleAgentEvent({ type: "agent_end", messages: [] });
+    });
+    agent.waitForIdle = vi.fn(async () => undefined);
+    (runtime as any).runCompaction = vi.fn(async () => true);
+    agent.continue = vi.fn(async () => {
+      expect((runtime as any).overflowRecoveryInProgress).toBe(true);
+      expect(agent.state.messages.filter((message: any) => message.role !== "system")).toEqual([user]);
+      await handleAgentEvent({ type: "agent_start" });
+      await handleAgentEvent({ type: "turn_start" });
+      await handleAgentEvent({
+        type: "message_start",
+        message: { role: "assistant", content: [] },
+      });
+      await handleAgentEvent({ type: "message_end", message: recovered });
+      await handleAgentEvent({ type: "turn_end" });
+      await handleAgentEvent({ type: "agent_end", messages: [] });
+    });
+
+    await runtime.prompt("hello", "user-1");
+
+    const events = onEvent.mock.calls.map(([envelope]) => (envelope as any).event);
+    const messageEvents = events.filter((event) =>
+      ["message_start", "message_update", "message_end"].includes(event.type),
+    );
+    expect(agent.continue).toHaveBeenCalledOnce();
+    expect(new Set(messageEvents.map((event) => event.message.id)).size).toBe(1);
+    expect(events.filter((event) => event.type === "message_end")).toHaveLength(1);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "message_end",
+        message: expect.objectContaining({
+          status: "complete",
+          content: "recovered response",
+        }),
+      }),
+    );
+    expect(events.some((event) => event.type === "error")).toBe(false);
+    expect(events.filter((event) => event.type === "agent_end")).toHaveLength(1);
+
+    await runtime.dispose();
+  });
+
+  it("surfaces a terminal error when the overflow retry also exceeds the context", async () => {
+    const onEvent = vi.fn();
+    const runtime = createRuntime({ onEvent });
+    const agent = (runtime as any).agent;
+    const handleAgentEvent = (runtime as any).handleAgentEvent.bind(runtime);
+    const user = { role: "user", content: "hello", timestamp: 1 };
+    const overflowMessage = (timestamp: number) => ({
+      ...assistantMessage({ content: [], stopReason: "error" }),
+      errorMessage: "400: prompt is too long: 1077172 tokens > 1000000 maximum",
+      timestamp,
+    });
+
+    agent.prompt = vi.fn(async () => {
+      const failed = overflowMessage(2);
+      agent.state.messages = [user, failed];
+      await handleAgentEvent({ type: "message_start", message: failed });
+      await handleAgentEvent({ type: "message_end", message: failed });
+      await handleAgentEvent({ type: "turn_end" });
+      await handleAgentEvent({ type: "agent_end", messages: [] });
+    });
+    agent.waitForIdle = vi.fn(async () => undefined);
+    (runtime as any).runCompaction = vi.fn(async () => true);
+    agent.continue = vi.fn(async () => {
+      const failed = overflowMessage(3);
+      await handleAgentEvent({ type: "agent_start" });
+      await handleAgentEvent({ type: "turn_start" });
+      await handleAgentEvent({
+        type: "message_start",
+        message: { role: "assistant", content: [] },
+      });
+      await handleAgentEvent({ type: "message_end", message: failed });
+      await handleAgentEvent({ type: "turn_end" });
+      await handleAgentEvent({ type: "agent_end", messages: [] });
+    });
+
+    await runtime.prompt("hello", "user-1");
+
+    const events = onEvent.mock.calls.map(([envelope]) => (envelope as any).event);
+    expect(events.filter((event) => event.type === "message_start")).toHaveLength(1);
+    expect(events.filter((event) => event.type === "message_end")).toHaveLength(1);
     expect(events).toContainEqual(
       expect.objectContaining({
         type: "message_end",
@@ -4215,9 +4333,12 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
         }),
       }),
     );
-    expect(events.some((event) => event.type === "error")).toBe(false);
-    expect(events.some((event) => event.type === "agent_end")).toBe(false);
-    expect((runtime as any).pendingOverflow).toBe(true);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "error",
+        error: expect.objectContaining({ code: "CONTEXT_TOO_LARGE" }),
+      }),
+    );
 
     await runtime.dispose();
   });
