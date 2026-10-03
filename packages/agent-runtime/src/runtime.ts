@@ -23,13 +23,6 @@ import {
 } from "./delegation-message.js";
 import {
   Agent,
-  BACKGROUND_CONTEXT,
-  compact,
-  convertToLlm,
-  estimateContextTokens,
-  estimateTokens,
-  prepareCompaction,
-  withAbortSignal,
   type AgentContext,
   type AgentEvent,
   type AgentLoopTurnUpdate,
@@ -38,13 +31,8 @@ import {
   type AgentToolResult,
   type AfterToolCallContext,
   type AfterToolCallResult,
-  type CompactionPreparation,
-  type CompactionEntry,
-  type CompactionSettings,
   type BeforeToolCallContext,
   type BeforeToolCallResult,
-  type Entry,
-  type MessageEntry,
   type PrepareNextTurnContext,
 } from "@earendil-works/pi-agent-core";
 import {
@@ -149,6 +137,20 @@ import {
 import { withExplicitRequired } from "./tool-schema.js";
 import { createTeamTools, teamSystemPrompt } from "./team/index.js";
 import { buildSessionContext } from "./session-context.js";
+import { prepareCompaction } from "./pi-runtime-compaction-plan.js";
+import { compact } from "./pi-runtime-compaction-summary.js";
+import {
+  estimateContextTokens,
+  estimateTokens,
+} from "./pi-runtime-estimates.js";
+import { convertToLlm } from "./pi-runtime-messages.js";
+import type {
+  CompactionEntry,
+  CompactionPreparation,
+  CompactionSettings,
+  Entry,
+  MessageEntry,
+} from "./pi-runtime-types.js";
 import {
   initialSystemTranscript,
   rebuildSystemTranscript,
@@ -1493,16 +1495,12 @@ function selectRetainedUserMessages(
 
 /** Rebuild a pi-ai tool result from a persisted tool row. Rows that never
  * finished (app quit / abort mid-tool) restore as errored results so the
- * model knows the call produced nothing. */
-function toolResultFromUi(
+ * model knows the call produced nothing. Exported for tests. */
+export function toolResultFromUi(
   m: UiMessage,
   timestamp: number,
 ): ToolResultMessage {
-  const raw = m.toolResult as
-    | { content?: unknown; details?: unknown }
-    | string
-    | null
-    | undefined;
+  const raw: unknown = m.toolResult;
   const blocks: ToolResultMessage["content"] = [];
   const rawBlocks =
     isRecord(raw) && Array.isArray(raw.content) ? raw.content : undefined;
@@ -1522,7 +1520,27 @@ function toolResultFromUi(
   } else if (typeof raw === "string" && raw.trim()) {
     blocks.push({ type: "text", text: raw });
   } else if (raw !== undefined && raw !== null) {
-    blocks.push({ type: "text", text: safeJson(raw) });
+    // A host Read of an image file returns a top-level `images` array rather
+    // than content blocks; restore those as real image content so the model
+    // sees the picture across a restart, not just the JSON text (#1073).
+    const rawObject = isRecord(raw) ? raw : undefined;
+    const images = rawObject?.images;
+    if (rawObject && Array.isArray(images)) {
+      const rest = { ...rawObject };
+      delete rest.images;
+      blocks.push({ type: "text", text: safeJson(rest) });
+      for (const image of images) {
+        if (
+          isRecord(image) &&
+          typeof image.data === "string" &&
+          typeof image.mimeType === "string"
+        ) {
+          blocks.push({ type: "image", data: image.data, mimeType: image.mimeType });
+        }
+      }
+    } else {
+      blocks.push({ type: "text", text: safeJson(raw) });
+    }
   }
   const interrupted = m.toolStatus === "running";
   const rawRecord: Record<string, unknown> | undefined = isRecord(raw)
@@ -5381,7 +5399,14 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
   }
 
   private resetDeferredToolsForPrompt(): void {
-    this.activeDeferredToolNames.clear();
+    // Sticky activation (#1225): on-demand tools stay active for the whole
+    // session instead of being reset at every prompt. A context-only restore
+    // drops the activation whenever the announcing rows fall out of the window
+    // (compaction, long turns), and the next direct call then fails with
+    // "Tool <name> not found" at name resolution — the intermittent 0 ms
+    // rejection on Windows. `rebuildToolCatalog` still prunes names that left
+    // the catalog (mode switches, extension reloads), so the set cannot
+    // outlive the tools it names.
     this.restoreDeferredToolsFromContext();
     this.setAgentTools(this.activeTools());
   }
@@ -7120,9 +7145,9 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     try {
       const result = await compact(
         preparation,
-        // The summary is a provider request like any other turn, but
-        // pi-agent-core builds its options itself and never reaches `streamFn`,
-        // so the headers have to ride on the collection.
+        // The summary is a provider request like any other turn. The desktop
+        // compaction adapter calls `completeSimple` directly instead of
+        // `streamFn`, so headers have to ride on the collection.
         models,
         this.model,
         undefined,
@@ -7132,7 +7157,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         // pi's classifier decides what is transient; the waits honour `signal`.
         COMPACTION_SUMMARY_RETRY_POLICY,
         undefined,
-        withAbortSignal(signal, BACKGROUND_CONTEXT),
+        signal,
       );
       if (!result.ok) {
         this.emitCompactionFailureDiagnostic(
