@@ -1,3 +1,4 @@
+import { accountModelStream } from "./request-usage.js";
 import { modeToolDenial, retainModeToolDeclaration, withModeExecutionGuard } from "./mode-tool-access.js";
 import { restoreHostedSearchReplay } from "./hosted-search-replay.js";
 import { requestExtensionUi } from "./extensions/ui-request.js";
@@ -2018,14 +2019,19 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             stallAbort.signal,
           ]),
         };
+        const usageTurnId = this.turnId;
         const retryStream = createProviderRetryStream(
           m,
           context,
           attemptOptions,
-          (retryOptions) =>
+          (retryOptions) => accountModelStream(m, () =>
             this.thinkingLevel === "omit"
               ? this.models.stream(omitThinkingModel(m), context, retryOptions)
-              : this.models.streamSimple(m, context, retryOptions),
+              : this.models.streamSimple(m, context, retryOptions), {
+                providerId: this.provider.id,
+                nativeCost: this.provider.modelConfig?.nativeCost,
+                onUsage: (usage) => this.emit({ type: "usage", usage }, usageTurnId),
+              }),
           {
             claim: (error, phase) => this.claimProviderRetry(error, phase),
             headers: () => this.providerRetryHeaders,
@@ -4840,6 +4846,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     const tagged: UiMessage = {
       ...row,
       parentToolCallId: envelope.parentToolCallId ?? row.parentToolCallId,
+      nestedParentToolCallId: envelope.nestedParentToolCallId ?? row.nestedParentToolCallId,
       agentName: envelope.agentName ?? row.agentName,
     };
     const key =
@@ -4873,6 +4880,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       toolStatus: event.isError ? "error" : "success",
       isError: Boolean(event.isError),
       parentToolCallId: envelope.parentToolCallId,
+      nestedParentToolCallId: envelope.nestedParentToolCallId,
       agentName: envelope.agentName,
     };
   }
@@ -6992,12 +7000,14 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     preparation: ShapedPreparation,
     signal: AbortSignal,
   ): Promise<Awaited<ReturnType<typeof compact>>> {
+    const usageTurnId = this.turnId;
     return compact(
       preparation,
       // The summary is a provider request like any other turn, but
       // pi-agent-core builds its options itself and never reaches `streamFn`,
       // so the headers have to ride on the collection.
-      withCompactionRequestHeaders(this.models, this.provider, this.sessionId),
+      withCompactionRequestHeaders(this.models, this.provider, this.sessionId,
+        usage => this.emit({ type: "usage", usage }, usageTurnId)),
       this.model,
       undefined,
       agentThinkingLevel(this.thinkingLevel),
