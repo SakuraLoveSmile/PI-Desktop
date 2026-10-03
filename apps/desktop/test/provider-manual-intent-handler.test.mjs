@@ -114,7 +114,7 @@ async function harness(t, options = {}) {
     refresh: async () => true,
     getStatus: () => ({ loaded: true, source: "bundled", catalogPath: "", providerCount: 0 }),
     findModel: () => undefined,
-    anthropicThinkingFor: () => undefined,
+    configureAccount: () => {},
     modelsForProvider: () => options.catalogModels ?? [],
   };
 
