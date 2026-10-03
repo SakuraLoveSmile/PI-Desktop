@@ -227,20 +227,23 @@ export function FilesTab() {
       setFileError(false);
       try {
         setFile(await api.fsRead(rel, mimeType));
-        if (position?.line != null) {
-          requestAnimationFrame(() => {
-            const lineNode = viewerBodyRef.current?.querySelector(
-              `[data-line="${position.line}"]`,
-            );
-            lineNode?.scrollIntoView({ block: "center" });
-          });
-        }
       } catch {
         setFileError(true);
       }
     },
     [],
   );
+
+  useEffect(() => {
+    if (!file || selectedLine == null) return;
+    const frame = requestAnimationFrame(() => {
+      const lineNode = viewerBodyRef.current?.querySelector(
+        `[data-line="${selectedLine}"]`,
+      );
+      lineNode?.scrollIntoView({ block: "center" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [file, selectedLine]);
 
   const openMp4 = useCallback(async () => {
     if (!selected) return;
