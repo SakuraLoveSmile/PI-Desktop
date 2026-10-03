@@ -1,4 +1,4 @@
-# 04. 数据存储（架构 v21）
+# 04. 数据存储（共享架构 v19，Plus 轨道 v4）
 
 > **翻译说明：** 本页是与 [英文源规格](/spec/03-runtime/04-data-storage) 一一对应的机器辅助翻译。代码、协议字段和标识符保持原文；如翻译与英文源事实有歧义，以英文版本为准。
 
@@ -31,7 +31,7 @@
    查询、整数倍、单写入器 WAL、热路径上没有 JSON 扫描。
 4. **可扩展，无需迁移**，成本低廉（块词汇、JSONL 行
    类型、kv 命名空间、`config_json` 列），**带有迁移**，其中
-结构（新实体），由 `PRAGMA user_version` 版本化。
+结构（新实体），由 `PRAGMA user_version` 版本化，Plus 专有实体则由 Plus 轨道版本化（第 7.1 节）。
 5. **Plan/Goal 检查点是不可变的主机工件**，具有记录的路径，
    哈希值和大小；现有的批准行还带有执行字段。
    启动中断是进程纪元栅栏，并且不会重播任何工作。
@@ -50,6 +50,9 @@ host-core 之前被解析为绝对路径。
  ├── pi.sqlite.v8.bak     # exact readable backup before v8→v15 destructive work
  ├── pi.sqlite.v9.bak     # exact readable backup before v9→v15 destructive work
  ├── pi.sqlite.v10.bak    # exact readable backup before v10→v15 destructive work
+ ├── pi.sqlite.legacy-v<N>.bak # backup before a legacy fork database joins the Plus track (7.1)
+ ├── pi.sqlite.repair-v<N>.bak # backup before an older build's user_version change is undone (7.1)
+ ├── pi.sqlite.plus-v<N>.bak   # backup before pending Plus steps run on an existing database (7.1)
  ├── sessions/            # transcript file store (D119) — host-core only
  │    ├── <sessionId>.jsonl           # live transcript (header + messages)
  │    ├── <sessionId>.revisions.jsonl # regenerate branches, append-only
@@ -178,7 +181,8 @@ PRAGMA trusted_schema = ON;       -- required by the FTS triggers (§4.8); the D
 PRAGMA auto_vacuum = INCREMENTAL; -- set at creation, before any table
 ```
 
-- 架构版本位于 `PRAGMA user_version` (v15 = `15`) 中。 v1 `meta`
+- 共享架构版本位于 `PRAGMA user_version`（当前 v19 = `19`）中。Plus 专有结构
+  单独由 `plus_schema_meta` 版本化（当前 Plus 轨道 v4，第 7.1 节）。v1 `meta`
   桌子不见了。
 - host-core 是**单一作者**；语句使用 `prepare_cached`；每个
   多行写入在一个事务中运行。
@@ -658,7 +662,9 @@ CREATE UNIQUE INDEX idx_session_collaboration_receipt
   `UiMessage.sessionMessage` 投影到 UI。宿主校验阻止伪造、剥离、编辑或重新生成协作输入
   变成人类输入。该元数据是增量字段，不需要给 `messages` 增加列。
 
-### 4.6d Goal reports 与 Expert Team 状态（架构 v20-v21）
+### 4.6d Goal reports 与 Expert Team 状态（Plus 轨道 P1-P2）
+
+本节的结构由 Plus 步骤 P1 和 P2 创建（第 7.1 节），从不由共享的 `user_version` 链创建。
 
 Goal report 的身份和生命周期由 Host 存储在 `goal_reports`，以
 `execution_id` 为键并归属一个 session。报告正文通过原子发布写入
@@ -1140,18 +1146,19 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
 - JSON 列在热路径上盲读（按原样发送到渲染器）；
   任何过滤或求和的内容都是按规则提升的列。
 
-## 7. 版本控制、v7 重置和 v8 到 v21 迁移
+## 7. 版本控制、v7 重置和 v8 到 v19 迁移
 
-- `PRAGMA user_version` 保留模式权限；未来的结构性变化
+- `PRAGMA user_version` 仍是与上游 PI-Desktop 共享的迁移链的模式权限；该链未来的结构性变化
   再次添加有序的 Rust 迁移 fns，每个都在一个事务中，并带有一个
-  `pi.sqlite.v<n>.bak` 在破坏性步骤之前进行复制。
+  `pi.sqlite.v<n>.bak` 在破坏性步骤之前进行复制。Plus 专有的结构性变化
+  从不推进它，而是运行在 Plus 轨道上（第 7.1 节）。
 - **v7 是一个中断重置 (D119)，而不是迁移。** 使用以下命令打开数据库
   `user_version` 1–6 WAL 检查点，将其重命名为 `pi.sqlite.v6.bak`
   （删除过时的 `sessions/<id>.jsonl`/`idx_sessions_updated` 同级文件），并引导一个新的 v7 文件。
   旧文件中的会话、提供程序和设置不会保留；
   存档仍保留以供手动恢复。所有 v7 之前的迁移代码
   （v1 `settings.sqlite` 导入，v2→v6 链）被删除。
-- 全新安装直接运行完整的 v21 DDL。
+- 全新安装直接运行完整的 v19 DDL，然后运行 Plus 步骤（第 7.1 节）。
 - **架构 v15 是增量的。** 它增加 `turn_queue` 表及其两个索引（D386 / ADR 0213），使 Host
   拥有的回合队列在重启后存活；不改动任何已有行，迁移前保留 `pi.sqlite.v14.bak`。
 - **架构 v16 是增量的。** 它增加会话协作 link 和投递表、生命周期索引，以及可为空的
@@ -1163,13 +1170,6 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
   v15→v16 会话协作步骤现在写入 `16`（它自己的版本）而不是最新的架构常量，
   因此 v15 文件可以在一次启动中走完两个步骤。
 - **架构 v18 到 v19 是增量的。** 它增加 `omit` thinking level，同时保留已存会话设置（ADR 0295）。
-- **架构 v19 到 v20 是增量的。** 它增加
-  `plan_approvals.artifact_workspace_kind` 和 Goal completion `goal_reports`；事务前保留
-  `pi.sqlite.v19.bak`。
-- **架构 v20 到 v21 是增量的。** 它增加 `sessions.execution_profile` 以及
-  `teams`、`team_members`、`team_tasks`（ADR 0307）。该步骤也会幂等补齐 Goal v20 对象，
-  因此来自任一未发布 v20 分支的数据库都能保留数据升级。事务前保留
-  `pi.sqlite.v20.bak`。
 - **架构 v7 首先到达 v8，然后使用受保护的路径。** v7→v8
   迁移之后是相同的受保护的 v8→v15 迁移；架构-v9 和
   schema-v10 数据库采用相同的受保护路径并接收精确的可读数据
@@ -1233,6 +1233,43 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
 - 转录文件格式在会话中携带自己的 `schema` 字段
   标题行；未知的行类型会被跳过，因此文件格式会增加
   无需重置。
+
+### 7.1 Plus 轨道
+
+`PRAGMA user_version` 专用于与上游 PI-Desktop 共享的迁移链，只在合入上游迁移时才会前进
+（ADR plus-schema-version-track）。Plus 专有结构运行在同一数据库内的第二条轨道上，
+因此合入上游永远不会重编号，也不会与 Plus 数据冲突。Plus 步骤有序、仅增量且幂等。
+它们位于 `crates/host-core/src/db/plus_schema.rs`，当前轨道版本为 4：
+
+| 步骤 | 增加 |
+|---|---|
+| P1 | `plan_approvals.artifact_workspace_kind` 和 `goal_reports` 表 |
+| P2 | `sessions.execution_profile` 以及 `teams`、`team_members`、`team_tasks` 表 |
+| P3 | `plan_approvals` 上的执行 provider/model 绑定和修订意图字段，以及 `plan_execution_schedules` 表 |
+| P4 | `plan_approvals.execution_kind`，对已批准的提案按 `kind` 回填 |
+
+P1 到 P4 是早期 fork 构建以 `user_version` 20 到 23 发布的 Plus 专有变更。每个步骤在改动前都会先探测，
+因此来自任一未发布 v20 形态（仅 Goal reports，或仅 workspace kind）的数据库都能保留数据完成升级，
+旧提案仍可读取，可选绑定与调度状态为空。新增 Plus 变更时追加一个步骤并提升轨道版本；
+已应用的步骤永不修改。
+
+- **状态。** `plus_schema_meta` 只有一行（`id = 1`）：`plus_version`，以及 `upstream_version`——
+  上一次识别 Plus 的打开结束时留下的 `user_version`。
+- **打开顺序。** `Database::open` 先对账 Plus 轨道，再运行不变的共享链，最后应用或重新校验 Plus 步骤。
+- **更新的数据库。** 高于当前构建的 `plus_version` 会被拒绝，错误为
+  `Plus schema version N is newer than supported M`。启动诊断把它与共享链的拒绝同样对待
+  （`DB_SCHEMA_TOO_NEW`，见进程模型中的启动结果一节）。
+- **旧版 fork 数据库。** 含有 Plus 结构、没有 `plus_schema_meta` 且 `user_version` 为 20 到 23
+  的数据库由早期 fork 构建写入。在经过校验的 `pi.sqlite.legacy-v<N>.bak` 之后，一个事务应用全部
+  Plus 步骤、写入 meta（轨道 4，共享 19），并把 `user_version` 设为 19。失败则回滚事务，
+  旧版数据库保持原样。
+- **较旧的 fork 构建。** 较旧的 fork 构建打开已对账的数据库时，会重新运行自己幂等的步骤，
+  并把 `user_version` 留在 20 到 23。本构建下一次打开时先保留 `pi.sqlite.repair-v<N>.bak`，
+  再恢复 meta 记录的 `user_version`，不会显示降级横幅。
+- **待应用步骤。** Plus 轨道落后的数据库先保留 `pi.sqlite.plus-v<from>.bak`，再在一个事务中
+  应用缺失的步骤并更新 meta。当共享版本在本次打开期间或自 meta 写入以来发生变化时，
+  会重放全部步骤（上游步骤可能重建了带有 Plus 列的表），并重新同步 meta。
+- **全新安装。** 新数据库运行共享的 v19 DDL，再运行全部 Plus 步骤并记录轨道版本，不产生备份。
 
 ## 8. 保留和维护
 

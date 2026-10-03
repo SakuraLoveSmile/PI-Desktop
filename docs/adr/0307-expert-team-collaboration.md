@@ -98,7 +98,9 @@ ledger to team peers:
   continue operating under `executionProfile = "standard"`.
 - Host-level security: no client or renderer can forge team origin or bypass
   host permission ceilings.
-- Storage schema upgrades safely to version 21 with additive migrations.
+- Storage gains the Team tables and `sessions.execution_profile` through an
+  additive Plus schema step (P2) that runs on the Plus track and leaves
+  `user_version` alone (ADR plus-schema-version-track).
 - Desktop UI gains clear two-axis Composer controls (`Agent` / `Expert Team` profile
   and `None` / `Plan` / `Goal` contract).
 

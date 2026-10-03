@@ -42,6 +42,20 @@ test("host-core's downgrade refusal is parsed from stderr", () => {
   assert.equal(parseSchemaTooNew(undefined), null);
 });
 
+test("the Plus-track refusal is parsed like the shared-chain one", () => {
+  const plusLine = "Error: Plus schema version 5 is newer than supported 4";
+  assert.deepEqual(parseSchemaTooNew(plusLine), { found: 5, supported: 4 });
+  assert.deepEqual(
+    parseSchemaTooNew(`2026-10-02T14:37:21Z ERROR ${plusLine}\n`),
+    { found: 5, supported: 4 },
+  );
+  assert.deepEqual(schemaTooNewOf(new Error(plusLine)), { found: 5, supported: 4 });
+  assert.equal(isDbSchemaTooNewError(new Error(plusLine)), true);
+  // Only the two exact refusal phrasings count; other schema text does not.
+  assert.equal(parseSchemaTooNew("Plus schema version 5 is older than supported 4"), null);
+  assert.equal(parseSchemaTooNew("plugin schema version 5 is newer than supported 4"), null);
+});
+
 test("the schema error keeps both numbers and is recognised in every shape", () => {
   const error = new DbSchemaTooNewError({ found: 14, supported: 13 });
   assert.equal(error.code, DB_SCHEMA_TOO_NEW_STATUS);

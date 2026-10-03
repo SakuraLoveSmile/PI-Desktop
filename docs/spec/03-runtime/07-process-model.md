@@ -135,12 +135,14 @@ the needed glibc.
 Two more boot outcomes are named rather than left as a generic outage (D380):
 
 - **Downgraded build.** host-core refuses a data directory whose SQLite schema
-  is newer than the build supports (`database schema version N is newer than
-  supported M` on stderr). Electron parses that line from the last stderr
-  before exit, stops the restart loop on the first failure, and pushes
-  `hostStatus` with `message: "DB_SCHEMA_TOO_NEW"` and both numbers. The banner
-  tells the user to install the newer PI-Desktop that last opened this data.
-  No data is migrated down.
+  is newer than the build supports, on either schema track: `database schema
+  version N is newer than supported M` for the shared `user_version` chain, or
+  `Plus schema version N is newer than supported M` for the Plus track
+  (storage spec, section 7.1), on stderr. Electron parses that line from the
+  last stderr before exit, stops the restart loop on the first failure, and
+  pushes `hostStatus` with `message: "DB_SCHEMA_TOO_NEW"` and both numbers,
+  those of the track that refused. The banner tells the user to install the
+  newer PI-Desktop that last opened this data. No data is migrated down.
 - **Non-native build.** At boot Electron compares `process.arch` with the CPU
   (on macOS via `sysctl.proc_translated`, which is `1` only under Rosetta 2;
   elsewhere via `os.machine()`). A mismatch rides on the boot `hostStatus` as

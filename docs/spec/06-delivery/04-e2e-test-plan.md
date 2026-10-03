@@ -15666,3 +15666,43 @@ renderer's durable transcript reads. No real model or provider is contacted.
 - **Steps**: Inspect Overview, Team aggregate, board, member/task detail and the three-column shell at 320/450/620px panel widths and 100%/150% font scale in light/dark and English/Chinese. Record the offending element's `clientWidth`/`scrollWidth`, then verify a bounded local fix while exercising Work Panel tab-strip scrolling, Markdown table/code scrolling and panorama world panning.
 - **Expected**: No page-level horizontal scrollbar or displaced shell content; long content remains accessible in detail, and intentional local scroll/pan surfaces still work.
 - **Automation**: Extend the isolated Team/three-column Electron harness after confirming it measures the production shell. Record the tested commit, panel dimensions, font scale, theme, locale and offender evidence.
+
+### E2E-STORAGE-plus-legacy-schema-reconciles-before-upstream-chain
+
+- **Status:** Automated at the host-core boundary by `cargo test -p host-core
+  --locked plus_schema` (the five historical legacy shapes, repair, refusal, and
+  fresh install) and by `host-boot-diagnostics.test.mjs` (banner mapping). Steps
+  1 to 4 were also run by hand on the task candidate against a database written
+  by the released fork build; they have no script because they need a released
+  fork host-core binary. Step 5 is covered by the automated tests only.
+- **Preconditions:** Isolated copies of a database written by a released fork
+  build (`user_version` 23, with sessions, a Team lead and member, Plan and Goal
+  approvals, and a Goal report), the released host-core binary, and the candidate
+  host-core binary. `PI_DESKTOP_DATA_DIR` points at the copy; no real user data
+  directory is read.
+- **Steps:**
+  1. Start the candidate against the legacy copy, wait for readiness, stop it.
+  2. Read `user_version`, `plus_schema_meta`, the backup files, and the seeded
+     rows. Start and stop the candidate again and compare.
+  3. Start the released host-core on the same directory, stop it, and start the
+     candidate once more.
+  4. Start the candidate on an empty directory.
+  5. On a copy, raise `plus_schema_meta.plus_version` above the candidate's and
+     start the candidate.
+- **Expected:** Step 1 leaves `pi.sqlite.legacy-v23.bak`, a readable copy at
+  `user_version` 23, and a live database at `user_version` 19 whose meta is Plus
+  4, shared 19, with every seeded row intact. The restart in step 2 changes
+  nothing and writes no backup. In step 3 the released build re-runs its own
+  steps and leaves 23; the candidate then takes `pi.sqlite.repair-v23.bak` and
+  returns to 19 with the same rows and no downgrade banner. Step 4 creates a
+  database with the Plus structures, meta 4 and 19, and no backup, whose
+  objects match a fresh install of the released build plus `plus_schema_meta`.
+  Step 5 exits with `Plus schema version N is newer than supported 4` and leaves
+  the file untouched; the desktop maps that line to `DB_SCHEMA_TOO_NEW`.
+- **Specs:** 03-runtime/04-data-storage (section 7.1), 03-runtime/07-process-model;
+  ADR plus-schema-version-track.
+- **Acceptance:** A released Plus database opens, moves to the Plus track once
+  behind a recoverable backup, and cannot be mistaken for a newer database by a
+  later upstream sync.
+- **Milestone:** Maintenance.
+- **Command:** `cargo test -p host-core --locked plus_schema`.

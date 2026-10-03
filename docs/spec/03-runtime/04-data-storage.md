@@ -1,4 +1,4 @@
-# 04. Data Storage (Schema v22)
+# 04. Data Storage (Shared schema v19, Plus track v4)
 
 ## 0. Ownership decision
 
@@ -30,7 +30,8 @@ schema v7, v8, v11, and v14:
    message content.
 4. **Extensible without migrations** where cheap (block vocabulary, JSONL line
    types, kv namespaces, `config_json` columns), **with migrations** where
-   structural (new entities), versioned by `PRAGMA user_version`.
+   structural (new entities), versioned by `PRAGMA user_version`, or by the
+   Plus track for Plus-only entities (section 7.1).
 
 Project groups use the existing `kv` extension boundary rather than a new
 relational schema. The host stores one JSON record per group in the
@@ -60,6 +61,9 @@ to an absolute path before it reaches host-core as a child-process variable.
  ├── pi.sqlite.v8.bak     # exact readable backup before v8→v15 destructive work
  ├── pi.sqlite.v9.bak     # exact readable backup before v9→v15 destructive work
  ├── pi.sqlite.v10.bak    # exact readable backup before v10→v15 destructive work
+ ├── pi.sqlite.legacy-v<N>.bak # backup before a legacy fork database joins the Plus track (7.1)
+ ├── pi.sqlite.repair-v<N>.bak # backup before an older build's user_version change is undone (7.1)
+ ├── pi.sqlite.plus-v<N>.bak   # backup before pending Plus steps run on an existing database (7.1)
  ├── sessions/            # transcript file store (D119) — host-core only
  │    ├── <sessionId>.jsonl           # live transcript (header + messages)
  │    ├── <sessionId>.revisions.jsonl # regenerate branches, append-only
@@ -238,8 +242,9 @@ PRAGMA trusted_schema = ON;       -- required by the FTS triggers (§4.8); the D
 PRAGMA auto_vacuum = INCREMENTAL; -- set at creation, before any table
 ```
 
-- Schema version lives in `PRAGMA user_version` (current v22 = `22`). The v1 `meta`
-  table is gone.
+- The shared schema version lives in `PRAGMA user_version` (current v19 = `19`).
+  Plus-only structures are versioned separately in `plus_schema_meta` (current
+  Plus track v4, section 7.1). The v1 `meta` table is gone.
 - host-core is the **single writer**; statements use `prepare_cached`; every
   multi-row write runs in one transaction.
 - Boot maintenance runs before RPC service: one transaction marks every
@@ -793,7 +798,10 @@ CREATE UNIQUE INDEX idx_session_collaboration_receipt
   collaboration input from becoming ordinary human input. This metadata is
   additive and does not require a column in `messages`.
 
-### 4.6d Goal reports and Expert Team state (schema v20-v21)
+### 4.6d Goal reports and Expert Team state (Plus track P1-P2)
+
+The structures in this section are created by Plus steps P1 and P2 (section
+7.1), never by the shared `user_version` chain.
 
 Goal report identity and lifecycle are Host-owned in `goal_reports`, keyed by
 `execution_id` and scoped to a session. A report body is atomically published
@@ -828,7 +836,8 @@ Session ID. It is copied from a `TeamLaunchReviewMember` only in the confirmed
 review transaction. Old reviews without this field remain valid. Session list
 and search projections derive the optional `SessionSummary.team` relation by
 joining existing Team tables; this is not a new SQL column. These additions do
-not change schema version 21 or the existing ownership of Team/Session data.
+not change the Plus track version or the existing ownership of Team/Session
+data.
 
 Deleting a member session while it belongs to a Team is rejected. Deleting the
 Lead atomically resets member sessions to `standard` and removes Team state;
@@ -1388,24 +1397,21 @@ truncating at a guessed position.
 - JSON columns are read blind on hot paths (shipped to the renderer as-is);
   anything filtered or summed is a promoted column by rule.
 
-## 7. Versioning, v7 reset, and v8-to-v22 migration
+## 7. Versioning, v7 reset, and v8-to-v19 migration
 
-- `PRAGMA user_version` stays the schema authority; future structural changes
+- `PRAGMA user_version` stays the schema authority for the migration chain
+  shared with upstream PI-Desktop; future structural changes to that chain
   add ordered Rust migration fns again, each in one transaction, with a
-  `pi.sqlite.v<n>.bak` copy before destructive steps.
+  `pi.sqlite.v<n>.bak` copy before destructive steps. Plus-only structural
+  changes never advance it and run on the Plus track (section 7.1).
 - **v7 is a breaking reset (D119), not a migration.** Opening a database with
   `user_version` 1–6 WAL-checkpoints it, renames it to `pi.sqlite.v6.bak`
   (removing stale `-wal`/`-shm` siblings), and bootstraps a fresh v7 file.
   Sessions, providers, and settings from the old file are not carried over;
   the archive remains for manual recovery. All pre-v7 migration code
   (v1 `settings.sqlite` import, v2→v6 chain) is deleted.
-- Fresh installs run the full v22 DDL directly.
-- **Schema v21 to v22 is additive.** It adds approved execution provider/model
-  bindings and the durable `revision_intent_*` fields to `plan_approvals`,
-  creates `plan_execution_schedules`, and sets `PRAGMA user_version = 22`.
-  The migration creates a readable pre-change backup and preserves all existing
-  proposals, artifacts, transcripts, and recurring scheduled tasks. Legacy
-  proposals remain readable with absent optional bindings and schedule state.
+- Fresh installs run the full v19 DDL directly, then the Plus steps (section
+  7.1).
 - **Schema v7 first reaches v8, then uses the guarded path.** The v7→v8
   migration is followed by the same guarded v8→v15 migration; schema-v9 and
   schema-v10 databases take the same guarded path and receive an exact readable
@@ -1466,14 +1472,6 @@ truncating at a guessed position.
   integrity checks.
 - **Schema v18 to v19 is additive.** It adds the `omit` thinking level while
   preserving stored session settings (ADR 0295).
-- **Schema v19 to v20 is additive.** It adds
-  `plan_approvals.artifact_workspace_kind` and `goal_reports` (Goal completion
-  reports); a `pi.sqlite.v19.bak` copy precedes the transaction.
-- **Schema v20 to v21 is additive.** It adds `sessions.execution_profile` and
-  the `teams`, `team_members`, and `team_tasks` tables (ADR 0307). The step
-  also idempotently completes Goal v20 objects so either unreleased v20 branch
-  upgrades without discarding data. A `pi.sqlite.v20.bak` copy precedes the
-  transaction.
 
 The `largePasteThreshold` app setting is additive JSON rather than a database
 schema field. Host settings reads normalize a missing, malformed, or
@@ -1491,6 +1489,57 @@ destructive migration or a second settings store.
 - The transcript file format carries its own `schema` field in the session
   header line; unknown line types are skipped, so additive file-format growth
   needs no reset.
+
+### 7.1 Plus track
+
+`PRAGMA user_version` is reserved for the chain shared with upstream PI-Desktop
+and moves only when upstream migrations are merged (ADR
+plus-schema-version-track). Plus-only structures run on a second track in the
+same database, so merging upstream never renumbers or collides with Plus data.
+Plus steps are ordered, additive, and idempotent. They live in
+`crates/host-core/src/db/plus_schema.rs`, and the current track version is 4:
+
+| Step | Adds |
+|---|---|
+| P1 | `plan_approvals.artifact_workspace_kind` and the `goal_reports` table |
+| P2 | `sessions.execution_profile` and the `teams`, `team_members`, and `team_tasks` tables |
+| P3 | execution provider/model bindings and revision intent fields on `plan_approvals`, and the `plan_execution_schedules` table |
+| P4 | `plan_approvals.execution_kind`, backfilled from `kind` for approved proposals |
+
+P1 to P4 are the Plus-only changes earlier fork builds shipped as
+`user_version` 20 to 23. Every step probes before it changes anything, so a
+database from either unreleased historical v20 shape (Goal reports only, or
+workspace kind only) completes without discarding data, and legacy proposals
+stay readable with absent optional bindings and schedule state. A new Plus
+change appends a step and bumps the track version; an applied step is never
+edited.
+
+- **State.** `plus_schema_meta` holds one row (`id = 1`): `plus_version`, and
+  `upstream_version`, the `user_version` the last Plus-aware open left behind.
+- **Open sequence.** `Database::open` reconciles the Plus track, runs the
+  unchanged shared chain, then applies or re-verifies the Plus steps.
+- **Newer database.** A `plus_version` above the build's own is refused with
+  `Plus schema version N is newer than supported M`. Boot diagnostics treat it
+  like the shared-chain refusal (`DB_SCHEMA_TOO_NEW`, process model section on
+  boot outcomes).
+- **Legacy fork database.** A database with Plus structures, no
+  `plus_schema_meta`, and `user_version` 20 to 23 was written by an earlier fork
+  build. After a verified `pi.sqlite.legacy-v<N>.bak`, one transaction applies
+  every Plus step, writes the meta (track 4, shared 19), and sets
+  `user_version` to 19. A failure rolls the transaction back and leaves the
+  legacy database as it was.
+- **Older fork build.** An older fork build that opens a reconciled database
+  re-runs its own idempotent steps and leaves `user_version` at 20 to 23. The
+  next open of this build takes `pi.sqlite.repair-v<N>.bak` and restores the
+  `user_version` the meta recorded; no downgrade banner is shown.
+- **Pending steps.** A database that is behind on the Plus track takes
+  `pi.sqlite.plus-v<from>.bak`, then applies the missing steps and updates the
+  meta in one transaction. When the shared version moved during the open or
+  since the meta was written, all steps are replayed, because an upstream step
+  may have rebuilt a table that carries Plus columns, and the meta is
+  re-synced.
+- **Fresh installs.** A new database runs the shared v19 DDL, then every Plus
+  step, and records the track version. It takes no backup.
 
 ## 8. Retention & maintenance
 

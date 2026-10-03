@@ -341,6 +341,7 @@ Each ADR includes:
 | 0307 | [Expert Team collaboration architecture](0307-expert-team-collaboration.md) | Accepted for implementation |
 | 0308 | [Independent Pi-Desktop-Plus application identity](0308-independent-plus-application-identity.md) | Accepted; fork identity, isolated data and release sources |
 | 0309 | [Durable Plan/Goal revision and one-time execution lifecycle](0309-plan-goal-revision-and-one-time-execution-lifecycle.md) | Accepted for implementation |
+| plus-schema-version-track | [Plus schema changes run on their own version track](plus-schema-version-track.md) | Accepted (amends temporary-goal-scratch-workspace) |
 | turn-process-and-thinking-display | [Turn process and thinking presentation](turn-process-and-thinking-display.md) | Accepted |
 | provider-display-order | [Provider display order](provider-display-order.md) | Accepted |
 | registry-header-variable-spelling | [Remote header variables accept the registry's `{name}` spelling](registry-header-variable-spelling.md) | Proposed |
