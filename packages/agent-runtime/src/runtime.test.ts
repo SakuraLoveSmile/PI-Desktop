@@ -3814,6 +3814,52 @@ describe("DesktopAgentRuntime session collaboration provenance", () => {
       await runtime.dispose();
     }
   });
+  it("quotes a referenced conversation in the turn the model actually receives", async () => {
+    const runtime = createRuntime();
+    const agent = (runtime as any).agent;
+    const handle = (runtime as any).handleAgentEvent.bind(runtime);
+    const calls: Array<{ text: string; images: unknown[] }> = [];
+    const respond = async (text: string, images: unknown[] = []) => {
+      calls.push({ text, images: images ?? [] });
+      await handle({ type: "agent_start" });
+      const reply = assistantMessage({ content: [{ type: "text", text: "ok" }] });
+      agent.state.messages = [{ role: "user", content: text, timestamp: 1 }, reply];
+      await handle({ type: "message_start", message: reply });
+      await handle({ type: "message_end", message: reply });
+      await handle({ type: "turn_end" });
+      await handle({ type: "agent_end", messages: [] });
+    };
+    agent.prompt = vi.fn(respond);
+    agent.waitForIdle = vi.fn(async () => undefined);
+    const excerpt = "user: ship the lockfile fix\nassistant: two advisories";
+    try {
+      await runtime.prompt(
+        {
+          text: "continue from the reference",
+          attachments: [
+            {
+              path: "6f1d2c3b-4a59-4e7f-8a90-b1c2d3e4f506",
+              name: "Nightly check",
+              kind: "session",
+              text: excerpt,
+            },
+          ],
+        },
+        "user-1",
+        "turn-1",
+      );
+      expect(agent.prompt).toHaveBeenCalledOnce();
+      const [turn] = calls;
+      expect(turn?.text.startsWith("continue from the reference")).toBe(true);
+      expect(turn?.text).toContain(
+        '<session_reference name="Nightly check" session="6f1d2c3b-4a59-4e7f-8a90-b1c2d3e4f506">',
+      );
+      expect(turn?.text).toContain(excerpt);
+      expect(turn?.images).toEqual([]);
+    } finally {
+      await runtime.dispose();
+    }
+  });
 
 });
 
