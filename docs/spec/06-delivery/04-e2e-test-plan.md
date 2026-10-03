@@ -15476,7 +15476,7 @@ renderer's durable transcript reads. No real model or provider is contacted.
   receipts, cross-Team access, task ownership, Lead-only operations, owner
   reassignment/unassignment, CAS and dependencies. Stop/abort tests require
   Team pause before exact-turn interruption.
-- **Specs:** ADR 0307; 03-runtime/02-agent-runtime, 03-tools-and-permissions,
+- **Specs:** ADR plus-expert-team-collaboration; 03-runtime/02-agent-runtime, 03-tools-and-permissions,
   04-data-storage, 06-host-rpc-protocol; 04-ux/08-component-spec.
 - **Automation:** `pnpm test:e2e:team`, `pnpm --filter @pi-desktop/agent-host
   test`, `cargo test -p host-core --locked`, and the desktop Team interaction
@@ -15524,7 +15524,7 @@ renderer's durable transcript reads. No real model or provider is contacted.
   An overdue schedule is `missed` and requires explicit Run now; cancellation
   prevents a claim. Reload preserves terminal cards as read-only history.
 - **Specs:** 03-runtime/01, 03-runtime/02, 03-runtime/04, 03-runtime/06,
-  04-ux/01, 04-ux/08, ADR 0309.
+  04-ux/01, 04-ux/08, ADR plus-plan-goal-revision-and-one-time-execution-lifecycle.
 - **Status:** Required for the Plan workflow implementation candidate.
 
 ### E2E-CHAT-asktool-overview-and-compact
@@ -15580,7 +15580,7 @@ renderer's durable transcript reads. No real model or provider is contacted.
   `/v1/models` response and rendered `lan-fixture` rows after Allow, no automatic
   re-prompt loop after Deny, and a retained choice across restart — with the
   official application's identity, choice, profile and data untouched.
-- **Specs:** 03-runtime/12 §12 manual intent and trigger; ADR 0308 independent
+- **Specs:** 03-runtime/12 §12 manual intent and trigger; ADR plus-independent-application-identity independent
   Plus application identity; ADR 0278 canonical application id.
 - **Acceptance:** The automated layer is required and runs offline. The native
   layer is required for the repair's final acceptance and cannot be replaced by

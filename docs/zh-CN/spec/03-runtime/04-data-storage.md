@@ -674,7 +674,7 @@ Goal report 的身份和生命周期由 Host 存储在 `goal_reports`，以
 删除 session 会级联删除记录并移除对应报告文件。报告内容不会从转录文本推断。
 迟到的草稿提交不能把 `ready` 或 `failed` 报告改回 `draft`；Host 在修改报告文件或记录前拒绝它。
 
-Expert Team 状态由 Host 存在三个表中（ADR 0307）：
+Expert Team 状态由 Host 存在三个表中（ADR plus-expert-team-collaboration）：
 
 - `teams` 以 Lead session 为键，保存 revision 和暂停状态。
 - `team_members` 将持久 member session 绑定到 Lead，保存 Team 内唯一名称、

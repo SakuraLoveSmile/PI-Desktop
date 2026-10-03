@@ -9,7 +9,7 @@
  * Because both flags are added here, the *only* macOS package path that can reach
  * electron-builder is one that carries them; there is no fallback to the stock
  * Electron distribution, whose main executable UUID collides with the official
- * application and costs this app its Local Network identity (ADR 0308).
+ * application and costs this app its Local Network identity (ADR plus-independent-application-identity).
  *
  * Two failure modes are guarded explicitly, both observed while wiring this up:
  * a bare `--` forwarded by `pnpm run <script> -- <args>` makes electron-builder's

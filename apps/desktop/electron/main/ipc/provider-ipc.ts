@@ -59,7 +59,7 @@ export type ProviderIpcDependencies = {
  * Record one trigger verdict. Diagnostics carry the stage, the reason and a
  * node error code only: an endpoint, a header, a query or a credential must
  * never reach a log line, and no verdict means permission was granted
- * (ADR 0308 / Apple TN3179).
+ * (ADR plus-independent-application-identity / Apple TN3179).
  */
 function logLocalNetworkTrigger(
   logger: Pick<Logger, "app">,

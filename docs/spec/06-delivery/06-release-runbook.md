@@ -49,7 +49,7 @@ linked content, so every fork of one Electron release keeps the same UUID as the
 official application. macOS attributes Local Network privacy to the code signature
 together with that UUID, so sharing it costs this application its own permission —
 measured here as no prompt, no privacy-pane entry, and dropped LAN requests
-(ADR 0308).
+(ADR plus-independent-application-identity).
 
 Consequences: a macOS package now needs a working `clang` toolchain, the assembler
 runs offline (it uses the `node_modules/electron/dist` the pinned dependency

@@ -26,6 +26,10 @@ Each ADR includes:
 | subagent-model-fallback | [Ordered subagent model fallback](subagent-model-fallback.md) | Accepted for implementation |
 | subagent-model-opt-in | [Separate Subagent Model Opt-In from Definition Pins](subagent-model-opt-in.md) | Accepted for implementation |
 | temporary-goal-scratch-workspace | [Temporary Goal sessions own a persistent scratch workspace](temporary-goal-scratch-workspace.md) | Accepted |
+| plus-expert-team-collaboration | [Expert Team collaboration architecture](plus-expert-team-collaboration.md) | Accepted for implementation |
+| plus-independent-application-identity | [Independent Pi-Desktop-Plus application identity](plus-independent-application-identity.md) | Accepted; fork identity, isolated data and release sources |
+| plus-plan-goal-revision-and-one-time-execution-lifecycle | [Durable Plan/Goal revision and one-time execution lifecycle](plus-plan-goal-revision-and-one-time-execution-lifecycle.md) | Accepted for implementation |
+| plus-schema-version-track | [Plus schema changes run on their own version track](plus-schema-version-track.md) | Accepted (amends temporary-goal-scratch-workspace) |
 | 0001 | Use Electron as the desktop shell | Accepted |
 | 0002 | Use the pi Agent Harness as the kernel | Accepted |
 | 0003 | Hybrid runtime — Rust host core + Node pi agent sidecar | Superseded in part |
@@ -338,10 +342,6 @@ Each ADR includes:
 | 0304 | [Trust the network endpoints the user enters themselves](0304-user-supplied-endpoint-trust.md) | Accepted for implementation (amends ADR 0243 / 0245 / 0247; follows ADR 0142 / 0257 / 0300) |
 | 0305 | [Keep scheduled-task execution settings task-owned](0305-scheduled-task-execution-settings.md) | Accepted for implementation (amends scheduled-desktop-automations) |
 | 0306 | [Brazilian Portuguese (pt-BR) shell locale](0306-portuguese-brazil-shell-locale.md) | Accepted (amends ADR 0160 / 0183 / 0185) |
-| 0307 | [Expert Team collaboration architecture](0307-expert-team-collaboration.md) | Accepted for implementation |
-| 0308 | [Independent Pi-Desktop-Plus application identity](0308-independent-plus-application-identity.md) | Accepted; fork identity, isolated data and release sources |
-| 0309 | [Durable Plan/Goal revision and one-time execution lifecycle](0309-plan-goal-revision-and-one-time-execution-lifecycle.md) | Accepted for implementation |
-| plus-schema-version-track | [Plus schema changes run on their own version track](plus-schema-version-track.md) | Accepted (amends temporary-goal-scratch-workspace) |
 | turn-process-and-thinking-display | [Turn process and thinking presentation](turn-process-and-thinking-display.md) | Accepted |
 | provider-display-order | [Provider display order](provider-display-order.md) | Accepted |
 | registry-header-variable-spelling | [Remote header variables accept the registry's `{name}` spelling](registry-header-variable-spelling.md) | Proposed |

@@ -309,7 +309,7 @@ ADR 0285）。渲染进程除了一个标识徽章外看不到本地/远程之�
 | `PAIRING_TOKEN_EXPIRED` | 否 | 一次性配对令牌在配对完成前已过期 |
 | `CAPABILITY_UNAVAILABLE` | 否 | 请求的操作对应主机声明为不可用的能力（如附件、工具中继） |
 
-### 3.9 专家团队协作（ADR 0307）
+### 3.9 专家团队协作（ADR plus-expert-team-collaboration）
 
 在协调带有队友、共享任务看板和对等邮箱的专家团队会话时由 host-core 和代理运行时发出。
 

@@ -389,7 +389,7 @@ test("desktop packaging builds the native host before every local target", () =>
   for (const name of ["pack", "dist", "dist:mac", "dist:win", "dist:linux"]) {
     const script = packageJson.scripts[name];
     assert.match(script, /pnpm run build:host-release/);
-    // The macOS lanes package through the identity-aware wrapper (ADR 0308), so
+    // The macOS lanes package through the identity-aware wrapper (ADR plus-independent-application-identity), so
     // recognize it as the packaging command alongside the other two entries.
     const packagingCommand = script.includes("build-desktop-release.mjs")
       ? "build-desktop-release.mjs"

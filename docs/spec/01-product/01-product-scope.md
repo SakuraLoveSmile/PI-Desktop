@@ -150,4 +150,4 @@ Pi-Desktop-Plus uses isolated Electron profiles and `~/.pi-desktop-plus`
 (`~/.pi-desktop-plus-dev` for desktop development). It does not import or
 modify PI-Desktop data. Explicit data-directory overrides remain available.
 Release and update artifacts come from `SakuraLoveSmile/PI-Desktop`.
-See [ADR 0308](../../adr/0308-independent-plus-application-identity.md).
+See [ADR plus-independent-application-identity](../../adr/plus-independent-application-identity.md).

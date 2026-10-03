@@ -1,4 +1,4 @@
-# ADR 0308: Independent Pi-Desktop-Plus Application Identity
+# ADR: Independent Pi-Desktop-Plus Application Identity
 
 - Status: Accepted
 - Date: 2026-09-26

@@ -753,5 +753,5 @@ Authority boundary — what the trigger may and may not do:
 
 If macOS refuses, the app does not re-prompt in a loop; the user enables
 Pi-Desktop-Plus in System Settings → Privacy & Security → Local Network and uses
-the same Fetch list control again. ADR 0308 records the identity half of this
+the same Fetch list control again. ADR plus-independent-application-identity records the identity half of this
 repair.
