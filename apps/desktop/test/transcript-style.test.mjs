@@ -586,6 +586,25 @@ test("thread scroll reserves stable gutters before overflow appears", () => {
   );
 });
 
+test("the display toolbar keeps its top band when the minimap rail mounts", async () => {
+  // Not part of globals.css: the control imports its own stylesheet.
+  const toolbarStyles = await readFile(
+    new URL("../src/styles/thinking-display-control.css", import.meta.url),
+    "utf8",
+  );
+  // The rail mounts between the toolbar and the scroller once the settle veil
+  // lifts. An adjacent-sibling match stops applying then and the transcript
+  // content gains 8px at its top.
+  assert.match(
+    toolbarStyles,
+    /\.transcript-display-toolbar ~ \.thread-scroll \.thread-content \{\s*padding-top:\s*12px;/,
+  );
+  assert.doesNotMatch(
+    toolbarStyles,
+    /\.transcript-display-toolbar \+ \.thread-scroll/,
+  );
+});
+
 test("conversation minimap stays centered below titlebar at high density", () => {
   assert.match(
     minimapSource,
