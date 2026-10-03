@@ -30,6 +30,7 @@
     "test:e2e:composer-occlusion": "node scripts/e2e-theme-surfaces.mjs --dock-mask-only",
     "test:e2e:composer-mode-menus": "node scripts/e2e-composer-mode-menus.mjs",
     "test:e2e:composer-autocomplete": "node scripts/e2e-composer-autocomplete.mjs",
+    "test:e2e:composer-ime-slash": "node scripts/e2e-composer-ime-stack.mjs",
     "test:e2e:composer-model-selection": "node scripts/e2e-composer-model-selection.mjs",
     "test:e2e:composer-paste": "node scripts/e2e-composer-paste.mjs",
     "test:e2e:composer-input-history": "node scripts/e2e-composer-input-history.mjs",
@@ -44,6 +45,7 @@
     "test:e2e:hosted-search": "node scripts/e2e-hosted-search.mjs",
     "test:e2e:oauth-retry": "node --test apps/desktop/test/anthropic-oauth-retry.test.mjs",
     "test:e2e:boot": "node scripts/e2e-electron-boot.mjs",
+    "test:e2e:todos": "node scripts/e2e-todo-checklist.mjs",
     "test:e2e:settings-scroll": "node scripts/e2e-settings-scroll.mjs",
     "test:e2e:config-sync": "node scripts/e2e-config-sync-multidevice.mjs",
     "test:e2e:layout": "node scripts/e2e-three-column-layout.mjs",
@@ -70,6 +72,7 @@
     "test:e2e:plugin-import-deps": "node scripts/e2e-plugin-import-deps.mjs",
     "test:e2e:trusted-extensions": "node scripts/e2e-trusted-extensions.mjs",
     "test:e2e:plus-curated": "node scripts/e2e-plus-curated.mjs",
+    "test:e2e:plugin-ui-slots": "node scripts/e2e-plugin-ui-slots.mjs",
     "test:e2e:collaboration": "node scripts/e2e-session-collaboration.mjs",
     "test:e2e:session-completion": "node scripts/e2e-session-completion.mjs",
     "test:e2e:remote-host": "node scripts/e2e-remote-host.mjs",
@@ -78,7 +81,8 @@
     "test:e2e:goal-report": "node scripts/e2e-goal-report.mjs",
     "test:e2e:turn-get": "node scripts/e2e-turn-get.mjs",
     "test:e2e:temporary-goal": "node scripts/e2e-temporary-goal.mjs",
-    "test:e2e:team": "node scripts/e2e-team.mjs"
+    "test:e2e:team": "node scripts/e2e-team.mjs",
+    "test:e2e:live-voice-interaction": "node scripts/test-live-voice-interaction.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.13",

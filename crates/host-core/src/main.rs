@@ -27,6 +27,7 @@ mod session_search;
 mod sessions;
 mod state;
 mod team;
+mod todos;
 mod tool_budget;
 mod tools;
 mod transcripts;

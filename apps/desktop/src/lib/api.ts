@@ -135,6 +135,7 @@ import type {
   GoalProgressSnapshot,
   GoalProgressChangedEvent,
   SessionRenameGuard,
+  SessionTodoSnapshot,
 } from "@pi-desktop/shared";
 import {
   defaultCommandShellForPlatform,
@@ -308,6 +309,7 @@ declare global {
     piDesktop?: {
       invoke: <T = unknown>(channel: string, ...args: unknown[]) => Promise<Result<T>>;
       on: (channel: string, listener: (...args: unknown[]) => void) => () => void;
+      onLiveVoicePort?: () => () => void;
       channels: typeof IPC;
       platform: NodeJS.Platform;
       /** Authoritative OS locale passed from the main process at window creation. */
@@ -1023,8 +1025,8 @@ export const api = {
       sessionId,
       ...(turnId ? { turnId } : {}),
     }),
-  stop: (sessionId: string) =>
-    invoke<AgentStopResponse>(IPC.invoke.agentStop, { sessionId }),
+  stop: (sessionId: string, turnId?: string) =>
+    invoke<AgentStopResponse>(IPC.invoke.agentStop, { sessionId, ...(turnId ? { turnId } : {}) }),
   queuePrompt: (req: AgentQueuePushRequest) =>
     invoke<QueuedTurnSummary>(IPC.invoke.agentQueuePush, req),
   listQueuedPrompts: (sessionId: string) =>
@@ -1096,6 +1098,9 @@ export const api = {
     invoke<GoalReportAssetChunk>(IPC.invoke.goalReportGetAsset, params),
   listPlugins: () =>
     invoke<{ plugins: PluginSummary[] }>(IPC.invoke.pluginList),
+  /** One renderer slot component asking its own plugin for one JSON answer. */
+  pluginRendererCall: (pluginId: string, method: string, args?: unknown) =>
+    invoke(IPC.invoke.pluginRendererCall, pluginId, method, args),
   /**
    * Picking a folder only reports what it declares; the load happens in
    * `confirmLoadDevPlugin` once the user has seen that.
@@ -1255,16 +1260,20 @@ export const api = {
   createUserSkill: (skill: UserSkillInput) =>
     invoke<{ skill: UserSkillRecord }>(IPC.invoke.skillCreate, skill),
   /**
-   * Opens a native picker for one file or (when `sourceKind === "dir"`) a
-   * folder; `canceled` when the user backed out. `mode: "link"` swaps copy
-   * for a symlink import.
+   * Opens a native picker for one file or multiple skill folders.
+   * Folder results report successful and failed imports independently.
    */
   importUserSkill: (
     query?: AgentCapabilityQuery & {
       sourceKind?: "file" | "dir";
       mode?: "copy" | "link";
     },
-  ) => invoke<{ canceled?: boolean; skill?: UserSkillRecord }>(IPC.invoke.skillImport, query),
+  ) => invoke<{
+    canceled?: boolean;
+    skill?: UserSkillRecord;
+    imported?: UserSkillRecord[];
+    failed?: Array<{ path: string; error: string }>;
+  }>(IPC.invoke.skillImport, query),
   /**
    * Scan third-party AI-tool skill directories. The scanner never throws;
    * a source that failed to read is reported with an `error` on its row.
@@ -1647,6 +1656,14 @@ export const api = {
     if (!window.piDesktop?.on) return () => undefined;
     return window.piDesktop.on(IPC.event.goalReportChanged, (payload) =>
       listener(payload),
+    );
+  },
+  getTodos: (sessionId: string) =>
+    invoke<SessionTodoSnapshot>(IPC.invoke.todosGet, { sessionId }),
+  onTodosChanged: (listener: (snapshot: SessionTodoSnapshot) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.todosChanged, (payload) =>
+      listener(payload as SessionTodoSnapshot),
     );
   },
   onOauthLogin: (listener: (event: OAuthLoginEvent) => void) => {
