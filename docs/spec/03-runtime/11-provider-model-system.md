@@ -121,14 +121,14 @@ missing reasoning is filled with a documented placeholder instead of `""`
 ADR 0256 / #296). Official `deepseek.com` rows keep empty-string fill (#223).
 The overlay does not change `thinkingFormat`.
 
-Anthropic Messages requests set `forceAdaptiveThinking: true` when the
-Pi catalog record publishes a reasoning `effort` option and no
-`budget_tokens` option (for example Opus 4.7+, Opus 5.x, Fable). Those models
-reject `thinking.type=enabled` with HTTP 400, and Pi catalog carries no pi-ai
-compat record, so without the flag pi-ai would fall back to budget thinking.
+Anthropic Messages requests set `forceAdaptiveThinking: true` for the models
+that reject `thinking.type=enabled` with HTTP 400 (for example Opus 4.7+,
+Opus 5.x, Fable). The Pi catalog record publishes that flag in `compat` and the
+projection preserves it. A projection without a compat record, such as a row
+saved before the Pi catalog carried one, derives the flag from the published
+reasoning options instead: an `effort` option and no `budget_tokens` option.
 Models that still publish `budget_tokens`, including those that also publish
-`effort`, keep budget thinking by default. The catalog uses this same rule
-for the protocol displayed in model settings. An explicit
+`effort`, keep budget thinking by default. An explicit
 `ModelBinding.thinkingProtocol` selection (`legacy` or `adaptive`) overrides
 the default; an absent field preserves the existing inference. An explicit
 catalog `compat` record is preserved.
@@ -143,12 +143,13 @@ transfer; limits and modalities stay generic, and aliases, renamed ids, other
 wire APIs, and non-Claude ids served over the Anthropic protocol are unchanged
 (#990).
 
-The published models.dev record may carry `thinkingProtocol: "adaptive"` for
-Anthropic models that publish `reasoning` and at least one `effort` option but
-no `budget_tokens` option. This protocol flows through the model catalog and
-saved binding to the provider request. A saved binding override wins; when
-neither catalog nor binding specifies a protocol, the existing runtime
-capability inference remains the fallback.
+The catalog model info carries `thinkingProtocol: "adaptive"` when the Pi
+catalog record publishes `compat.forceAdaptiveThinking: true`, so the protocol
+shown in model settings and the one seeded into a binding created from that
+model match the request Pi builds. This protocol flows through the model
+catalog and saved binding to the provider request. A saved binding override
+wins; when neither catalog nor binding specifies a protocol, the existing
+runtime capability inference remains the fallback.
 
 ## 5. Built-in vendor matrix (ship intent)
 

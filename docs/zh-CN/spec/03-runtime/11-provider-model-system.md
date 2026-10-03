@@ -113,12 +113,14 @@ OpenAI 风格的 Copilot 线路 API 仍将令牌作为请求密钥签名；所�
 见 ADR 0256 / #296）。官方 `deepseek.com` 行仍使用空串回填（#223）。该覆盖不改
 `thinkingFormat`。
 
-当 Pi catalog 记录发布了推理 `effort` 选项且没有 `budget_tokens` 选项时
-（例如 Opus 4.7+、Opus 5.x、Fable），Anthropic Messages 请求会设置
-`forceAdaptiveThinking: true`。这些模型会以 HTTP 400 拒绝
-`thinking.type=enabled`，而 Pi catalog 不携带 pi-ai 的 compat 记录，缺少该标志时
-pi-ai 会回落到 budget 思考。仍发布 `budget_tokens` 的模型保持 budget 思考，显式的
-目录 `compat` 记录会被保留。
+会以 HTTP 400 拒绝 `thinking.type=enabled` 的模型（例如 Opus 4.7+、Opus 5.x、
+Fable），其 Anthropic Messages 请求会设置 `forceAdaptiveThinking: true`。Pi catalog
+记录在 `compat` 中发布该标志，投影会保留它；没有 compat 记录的投影（例如在 Pi
+catalog 携带该记录之前保存的行）则改为根据已发布的推理选项推导：有 `effort` 选项且
+没有 `budget_tokens` 选项。仍发布 `budget_tokens` 的模型（包括同时发布 `effort`
+的模型）默认保持 budget 思考。显式的 `ModelBinding.thinkingProtocol`
+（`legacy` 或 `adaptive`）会覆盖默认值；字段缺省时沿用现有推断。显式的目录
+`compat` 记录会被保留。
 
 目录无法识别的 Anthropic Messages 行（例如某个自定义网关 URL 提供多家发布方都列出的
 模型 ID）仍回退到通用模型形状，但当 Anthropic 自己的 Pi catalog 记录中存在完全相同的
@@ -126,10 +128,12 @@ pi-ai 会回落到 budget 思考。仍发布 `budget_tokens` 的模型保持 bud
 模型接受哪种思考形状是模型本身的属性，而非部署的属性，因此只迁移这两个字段；上下文与
 模态限制保持通用值，别名、改名后的 ID、其他 wire API，以及通过 Anthropic 协议提供的
 非 Claude 模型均不受影响（#990）。
-models.dev 可以为发布了 `reasoning` 和至少一个 `effort` 选项、但没有
-`budget_tokens` 的 Anthropic 模型标记 `thinkingProtocol: "adaptive"`。该协议会
-经过模型目录和已保存的 binding 进入提供商请求。已保存的 binding 覆盖优先；目录
-和 binding 都没有指定时，继续使用现有运行时能力推断。
+
+当 Pi catalog 记录发布 `compat.forceAdaptiveThinking: true` 时，目录模型信息会携带
+`thinkingProtocol: "adaptive"`，因此模型设置中显示的协议，以及据该模型创建的 binding
+所预置的协议，都与 Pi 构造的请求一致。该协议会经过模型目录和已保存的 binding
+进入提供商请求。已保存的 binding 覆盖优先；目录和 binding 都没有指定时，继续使用
+现有运行时能力推断。
 
 ## 5. 内置供应商矩阵（发货意图）
 
