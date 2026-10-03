@@ -12,7 +12,7 @@ import {
   type Provider,
 } from "@earendil-works/pi-ai";
 import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
-import { matchNamedPreset, resolveBindingLimits, THINKING_LEVELS, type ModelBinding, type ModelInfo } from "@pi-desktop/shared";
+import { matchNamedPreset, resolveBindingLimits, THINKING_LEVELS, type ModelBinding, type ModelInfo, type ThinkingProtocol } from "@pi-desktop/shared";
 import { genericModelConfig, modelConfigFromPi, modelConfigWithBinding, type ModelConfig } from "@pi-desktop/agent-runtime";
 
 /** Compatibility type names only. The independent models.dev catalog is removed. */
@@ -49,8 +49,21 @@ export function apiMatches(left: string | undefined, right: string | undefined):
   return value !== undefined && value === normalizedApiUrl(right);
 }
 
+/**
+ * Pi publishes adaptive-only Claude models through compat. Surfacing it keeps
+ * the thinking protocol selector and a binding seeded from this model in step
+ * with the request Pi will actually build.
+ */
+function publishedThinkingProtocol(model: Model<Api>): ThinkingProtocol | undefined {
+  const compat = model.compat;
+  return compat && "forceAdaptiveThinking" in compat && compat.forceAdaptiveThinking === true
+    ? "adaptive"
+    : undefined;
+}
+
 /** A projection, not a second metadata source. Non-chat operations never reach this shape. */
 export function modelInfoFromModelsDev(model: Model<Api>, providerId: string): ModelInfo {
+  const thinkingProtocol = publishedThinkingProtocol(model);
   return {
     providerId,
     modelId: model.id,
@@ -58,6 +71,7 @@ export function modelInfoFromModelsDev(model: Model<Api>, providerId: string): M
     reasoning: model.reasoning,
     supportedThinkingLevels: getSupportedThinkingLevels(model),
     thinkingLevelMap: model.thinkingLevelMap,
+    ...(thinkingProtocol ? { thinkingProtocol } : {}),
     contextWindow: model.contextWindow,
     maxTokens: model.maxTokens,
     modalities: { input: [...model.input], output: ["text"] },
