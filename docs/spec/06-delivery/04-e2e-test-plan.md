@@ -6233,8 +6233,11 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
     before a checkpoint boundary drops that record specifically; records
     anchored on surviving messages are preserved/remapped.
   - The exact provider overflow removes only the failed assistant from model
-    context, retries once after compaction, and does not loop on a second
-    overflow.
+    context, keeps the visible assistant bubble in a running state while
+    compaction/retry is pending, retries once after compaction, and does not
+    loop on a second overflow. A recoverable first overflow emits no terminal
+    error message or `error` event; only a failed retry (or failed compaction)
+    closes the bubble with `CONTEXT_TOO_LARGE` / the actual terminal error.
   - If automatic summary generation fails, a durable retained-tail fallback
     checkpoint is appended, the run stays active, and one warning explains
     that older model context was reduced; the transcript row for that
