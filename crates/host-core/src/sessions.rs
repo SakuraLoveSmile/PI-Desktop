@@ -314,6 +314,13 @@ pub struct SessionSummary {
     pub team: Option<SessionTeamRelation>,
     pub updated_at: String,
     pub created_at: String,
+    /// True when this session is the transcript owned by a scheduled-task run.
+    /// Automation transcripts are entered from the Scheduled page, so the
+    /// sidebar and session search hide them (issue #1291). The value is derived
+    /// from `task_runs.session_id` on read; no session column stores it, and
+    /// deleting the task frees its sessions back into the ordinary lists.
+    #[serde(default)]
+    pub scheduled_run: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1404,7 +1411,8 @@ const SUMMARY_SELECT: &str =
             p.name,
             CASE WHEN lead.team_session_id IS NOT NULL THEN 'lead'
                  WHEN member.team_session_id IS NOT NULL THEN 'member' END,
-            COALESCE(member.team_session_id, lead.team_session_id), member.name
+            COALESCE(member.team_session_id, lead.team_session_id), member.name,
+            EXISTS (SELECT 1 FROM task_runs r WHERE r.session_id = s.id) AS scheduled_run
      FROM sessions s LEFT JOIN projects p ON p.id = s.project_id
      LEFT JOIN teams lead ON lead.team_session_id = s.id
      LEFT JOIN team_members member ON member.member_session_id = s.id
@@ -1437,6 +1445,9 @@ pub(crate) fn summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Sess
                 })
             })
             .transpose()?,
+        // Read by name: search and listing build their own column lists, so the
+        // alias keeps this mapper independent of any one query's column order.
+        scheduled_run: row.get("scheduled_run")?,
     })
 }
 
@@ -1688,6 +1699,8 @@ fn create_session_with_options_inner(
         team: None,
         updated_at: ms_to_ts(now),
         created_at: ms_to_ts(now),
+        // The run row that owns this transcript is written after creation.
+        scheduled_run: false,
     })
 }
 
@@ -2111,6 +2124,8 @@ pub fn fork_session_through(
         team: None,
         updated_at: created_at.clone(),
         created_at,
+        // A fork is the user's own conversation, not the automation's transcript.
+        scheduled_run: false,
     };
     let messages = records.into_iter().map(record_to_ui).collect();
     Ok(ForkSessionResult::Created(Box::new(SessionDetail {
@@ -5660,6 +5675,8 @@ mod tests {
             execution_profile: "standard".into(),
             project_name: None,
             team: None,
+            // Ownership is derived from `task_runs`, so an import is never one.
+            scheduled_run: false,
             created_at: "2025-01-01T00:00:00Z".into(),
             updated_at: "2025-01-02T00:00:00Z".into(),
         };
@@ -5713,6 +5730,8 @@ mod tests {
             execution_profile: "standard".into(),
             project_name: None,
             team: None,
+            // Ownership is derived from `task_runs`, so an import is never one.
+            scheduled_run: false,
             created_at: "2025-01-01T00:00:00Z".into(),
             updated_at: "2025-01-01T00:00:00Z".into(),
         };
@@ -6541,6 +6560,8 @@ mod tests {
             execution_profile: "standard".into(),
             project_name: None,
             team: None,
+            // Ownership is derived from `task_runs`, so an import is never one.
+            scheduled_run: false,
             created_at: "2025-01-01T00:00:00Z".into(),
             updated_at: "2025-01-01T00:00:00Z".into(),
         };

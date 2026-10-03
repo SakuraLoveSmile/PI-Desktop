@@ -92,6 +92,9 @@
   cannot be persisted. A late draft can no longer replace a ready or failed
   report, and another session's pending transcript does not block publication.
 
+- Settings can now move the application's data to a folder you choose, show
+  the migration's progress, and safely reclaim regenerable caches.
+
 - Live Voice is now available to everyone, and a call starts in the current
   session.
 
