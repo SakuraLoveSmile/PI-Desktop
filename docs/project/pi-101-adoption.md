@@ -1,8 +1,8 @@
 # Pi 1.0.1 adoption
 
-Status: task candidate on `fix/pi-1.0.1-adaptation`, based on the latest
-`origin/main` at `7f1d7c1ce5f21a533c8910249bb6d22320d4581e`. Validation and
-landing status are recorded below after candidate checks.
+Status: task candidate commit `2c90e2ebb0598fb2e3d4b31c78265eec8a2e6d71`
+on `fix/pi-1.0.1-adaptation`, based on `origin/main` at
+`3b036cc7810e18b3ef7689a2b93385125a8d0a3f`.
 
 ## Scope
 
@@ -44,7 +44,7 @@ lockfile; do not broaden them.
 | Package | Patch SHA-256 |
 | --- | --- |
 | `@earendil-works/pi-agent-core@1.0.1` | `02de513ae53cf7f1e92d0cfc7fce07cf880d31195f5ec621d2f2197ead92a9da` |
-| `@earendil-works/pi-ai@1.0.1` | `b8c1b3aa54b7649346e1eb2fc225471b32e47a209bbda021704f26dd2647e603` |
+| `@earendil-works/pi-ai@1.0.1` | `0c7a4701594d70c49699adfef275d7c1f997d1c55d103ab09f3377523d322981` |
 | `@earendil-works/pi-coding-agent@1.0.1` | `ab63d8f7817d606be15d14daedd329df64bb34e73b71c6842b02f67643ba0769` |
 
 The `check:pi-dependencies` and `check:pi-patches` scripts verify exact direct
@@ -53,20 +53,24 @@ representative patched source and declaration contracts.
 
 ## Validation
 
-Preliminary checks on the task working tree based on
-`7f1d7c1ce5f21a533c8910249bb6d22320d4581e` passed below. They are not the
-final candidate result: rerun the relevant checks after committing and
-refreshing the branch against the newer `origin/main` before landing.
+| Candidate | `2c90e2ebb0598fb2e3d4b31c78265eec8a2e6d71` |
+| --- | --- |
+| Base main | `3b036cc7810e18b3ef7689a2b93385125a8d0a3f` |
+| E2E suites | Pi Agent Runtime live request; protocol-level `pnpm test:e2e` |
+| Result | Both passed; smoke suite 25/25 passed, 0 skipped |
+| Environment | `.env`-configured model and host-core built from the candidate source; output redacted API key and endpoint. |
 
-- Frozen install, Pi pin/patch checks, and `pnpm audit --recursive --prod`.
-- `pnpm build:js`, agent-runtime and desktop typechecks, and `pnpm lint`.
-- Agent Runtime: 85 files / 1,163 tests. Desktop: 3,482 tests.
-- `pnpm docs:check` and `pnpm check:agent-policy`.
-- `node scripts/e2e-agent-live.mjs` using the configured `.env` model through
-  Pi Agent Runtime and candidate host-core: passed with the expected reply.
-- `pnpm test:e2e` using the same `.env` model: 25/25 passed, including live
-  completion and streaming requests.
-- `cargo build --locked -p host-core` using the shared host Cargo target.
+- `pnpm install --frozen-lockfile --ignore-scripts`, `pnpm check:pi-dependencies`,
+  `pnpm check:pi-patches`, and `pnpm audit --recursive --prod` passed; audit
+  found no known vulnerabilities.
+- `pnpm build:js`, agent-runtime and desktop typechecks, and `pnpm lint` passed.
+- Agent Runtime: 93 files / 1,234 tests. Desktop: 3,484 tests; no failures or
+  skipped tests.
+- `pnpm docs:check` and `pnpm check:agent-policy` passed.
+- `node scripts/e2e-agent-live.mjs` returned the expected
+  `hello-from-pi-desktop` response.
+- `pnpm test:e2e` passed 25/25, including live completion and streaming.
+- `cargo build --locked -p host-core` passed using the shared host Cargo target.
 
 ## Rollback
 
