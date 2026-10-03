@@ -126,7 +126,7 @@ function HighlightedText({ path, content }: { path: string; content: string }) {
     <pre className="file-viewer-code">
       {tokens
         ? tokens.tokens.map((row, i) => (
-            <div className="file-viewer-line" key={i}>
+            <div className="file-viewer-line" data-line={i + 1} key={i}>
               {row.length === 0
                 ? "\n"
                 : row.map((token, j) => (
@@ -137,7 +137,7 @@ function HighlightedText({ path, content }: { path: string; content: string }) {
             </div>
           ))
         : visible.split("\n").map((line, i) => (
-            <div className="file-viewer-line" key={i}>
+            <div className="file-viewer-line" data-line={i + 1} key={i}>
               {line || "\n"}
             </div>
           ))}
@@ -163,8 +163,10 @@ export function FilesTab() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedMimeType, setSelectedMimeType] = useState<string | undefined>();
+  const [selectedLine, setSelectedLine] = useState<number | undefined>();
   const [file, setFile] = useState<FsReadResult | null>(null);
   const [fileError, setFileError] = useState(false);
+  const viewerBodyRef = useRef<HTMLDivElement>(null);
 
   // Workspace switches reset all browsing state. Guarded so it only fires on
   // an actual root change: an unconditional [root] effect also runs on the
@@ -178,6 +180,7 @@ export function FilesTab() {
     setExpanded(new Set());
     setSelected(null);
     setSelectedMimeType(undefined);
+    setSelectedLine(undefined);
     setFile(null);
     setFileError(false);
   }, [root]);
@@ -219,14 +222,15 @@ export function FilesTab() {
     async (rel: string, mimeType?: string, position?: { line?: number; column?: number }) => {
       setSelected(rel);
       setSelectedMimeType(mimeType);
+      setSelectedLine(position?.line);
       setFile(null);
       setFileError(false);
       try {
         setFile(await api.fsRead(rel, mimeType));
         if (position?.line != null) {
           requestAnimationFrame(() => {
-            const lineNode = document.querySelector(
-              `.work-files-preview [data-line="${position.line}"]`,
+            const lineNode = viewerBodyRef.current?.querySelector(
+              `[data-line="${position.line}"]`,
             );
             lineNode?.scrollIntoView({ block: "center" });
           });
@@ -351,6 +355,7 @@ export function FilesTab() {
             onClick={() => {
               setSelected(null);
               setSelectedMimeType(undefined);
+              setSelectedLine(undefined);
               setFile(null);
             }}
           >
@@ -370,12 +375,15 @@ export function FilesTab() {
             <IconExternal size={14} />
           </TooltipButton>
         </div>
-        <div className="file-viewer-body">
+        <div className="file-viewer-body" ref={viewerBodyRef}>
           {fileError ? (
             <WorkTabEmpty icon={IconFileText} title={t("panel.files.error")} />
           ) : !file ? (
             <div className="file-tree-note">{t("panel.files.loading")}</div>
-          ) : file.kind === "text" && isMarkdownPath(selected) ? (
+          ) :
+          file.kind === "text" &&
+          isMarkdownPath(selected) &&
+          selectedLine === undefined ? (
             <div className="file-viewer-markdown prose-chat">
               <Markdown source={file.content ?? ""} baseDir={fileDirOf(selected)} />
             </div>

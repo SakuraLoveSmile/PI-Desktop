@@ -136,10 +136,10 @@ function useResolveChatFileRef() {
  * Open a file reference the conversation mentioned.
  *
  * A workspace `.html` page in the primary folder stays with the side browser
- * (ADR 0163): it is a page to run, not a file to read. A project file opens in
- * the bundled file view when that view is installed and on the host file tab
- * otherwise; scratch and attachment files live outside the project and always
- * take the host file tab.
+ * (ADR 0163): it is a page to run, not a file to read. A plain project file
+ * opens in the bundled file view when available; a positioned `path:line`
+ * reference uses the host file tab, which can scroll to the requested line.
+ * Scratch and attachment files also use the host file tab.
  */
 export function useOpenChatFileRef() {
   const resolveRef = useResolveChatFileRef();
@@ -165,7 +165,9 @@ export function useOpenChatFileRef() {
       void (async () => {
         const resolved = await resolveRef(path, baseDir);
         if (!resolved) return;
+        const hasPosition = line !== undefined || column !== undefined;
         if (
+          !hasPosition &&
           resolved.inProject &&
           resolved.primary &&
           resolved.relativePath &&
@@ -174,10 +176,12 @@ export function useOpenChatFileRef() {
           openUrl(resolved.relativePath);
           return;
         }
-        if (resolved.inProject && fileViewAvailable) {
-          // Thread path:line into the plugin tab so the bundled file view can
-          // scroll to the line (#681 / #1149 review). Host fallback uses openFile.
-          openTab(fileManagerPluginTab(resolved.path, { line, column }));
+        if (
+          resolved.inProject &&
+          fileViewAvailable &&
+          !hasPosition
+        ) {
+          openTab(fileManagerPluginTab(resolved.path));
           return;
         }
         openFile(resolved.path, mimeType, { line, column });

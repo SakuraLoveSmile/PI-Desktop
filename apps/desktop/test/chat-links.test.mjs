@@ -751,4 +751,10 @@ test("resolvePreviewTarget carries line/col on file chips (#681)", () => {
     line: 42,
     column: 7,
   });
+  assert.deepEqual(resolvePreviewTarget(`${ROOT}/src/a.ts:42:7`, ROOT), {
+    kind: "file",
+    path: `${ROOT}/src/a.ts`,
+    line: 42,
+    column: 7,
+  });
 });

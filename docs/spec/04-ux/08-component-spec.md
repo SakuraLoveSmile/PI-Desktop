@@ -1537,6 +1537,10 @@ storage but compose into one assistant turn until the next user message.
   content's left rule is itself a pointer and keyboard-focusable collapse
   control.
 - Hover code block: copy button appears
+- Click a transcript file reference with `:line[:column]`: resolve the file
+  first, then open it in the host `file:` tab and scroll the requested line into
+  view. Plain project-file references still prefer the bundled file view, whose
+  open contract does not carry a line position.
 - Hover or focus a minimap marker: show the localized sender and a bounded
   plaintext preview; multiple assistant fragments produced within one user
   turn are combined into one AI-response marker and preview; nearby markers

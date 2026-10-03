@@ -225,9 +225,8 @@ export function resolvePreviewTarget(
   }
   const file = parseFileRef(trimmed);
   if (!file) return null;
-  if (isAbsoluteFilePath(file)) return { kind: "file", path: file };
+  if (isAbsoluteFilePath(file)) return { kind: "file", path: file, ...(position ?? {}) };
   const rel = toWorkspaceRel(file, root, baseDir);
-  const position = parseFileRefPosition(trimmed);
   return rel ? { kind: "file", path: rel, ...(position ?? {}) } : null;
 }
 

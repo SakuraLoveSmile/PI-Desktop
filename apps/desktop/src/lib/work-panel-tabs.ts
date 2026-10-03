@@ -154,19 +154,14 @@ export const FILE_MANAGER_PLUGIN_TAB = {
   viewId: "manager",
 } as const;
 
-/** The file view, asked to show one file (optional chat `path:line` position). */
-export function fileManagerPluginTab(
-  location: string,
-  position?: { line?: number; column?: number },
-): WorkPanelTab {
+/** The file view, asked to show one file. */
+export function fileManagerPluginTab(location: string): WorkPanelTab {
   return {
     ...pluginWorkPanelTab(
       FILE_MANAGER_PLUGIN_TAB.pluginId,
       FILE_MANAGER_PLUGIN_TAB.viewId,
     ),
     location,
-    ...(position?.line != null ? { line: position.line } : {}),
-    ...(position?.column != null ? { column: position.column } : {}),
   };
 }
 
