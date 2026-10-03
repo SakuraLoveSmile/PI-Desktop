@@ -35,7 +35,7 @@ import {
 import { conversationMenuItems } from "./menu-items";
 import { ThinkingDisplayControl } from "./ThinkingDisplayControl";
 import { buildTeamDispatchIndex, TeamDispatchContext } from "../../../lib/team-dispatch";
-
+import { SlotSessionProvider } from "../../../plugins/renderer-slots/use-slots";
 
 const EMPTY_PLAN_PROPOSALS: PlanProposal[] = [];
 
@@ -175,6 +175,7 @@ function TranscriptBody({
     veilPhase,
     handleScroll,
     revealEarlierHistory,
+    releaseFollow,
     jumpToLatest,
     disclosureAnchorNotifier,
   } = useTranscriptScroll({
@@ -265,6 +266,7 @@ function TranscriptBody({
     <TranscriptSearchContext.Provider value={searchTarget}>
     <DisclosureAnchorContext.Provider value={disclosureAnchorNotifier}>
     <TeamDispatchContext.Provider value={teamDispatchIndex}>
+    <SlotSessionProvider sessionId={sessionId ?? ""}>
     <div
       className="thread-wrap"
       ref={wrapRef}
@@ -299,6 +301,7 @@ function TranscriptBody({
           hasEarlier={hasEarlierHistory}
           loadingEarlier={loadingOlder}
           onRevealEarlier={revealEarlierHistory}
+          onReleaseFollow={releaseFollow}
         />
       ) : null}
       <div
@@ -437,6 +440,7 @@ function TranscriptBody({
         </TooltipButton>
       ) : null}
     </div>
+    </SlotSessionProvider>
     </TeamDispatchContext.Provider>
     </DisclosureAnchorContext.Provider>
     </TranscriptSearchContext.Provider>

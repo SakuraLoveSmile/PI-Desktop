@@ -3,8 +3,8 @@
 > **翻译说明：** 本页是与 [英文源规格](/spec/00-baseline) 一一对应的机器辅助翻译。代码、协议字段和标识符保持原文；如翻译与英文源事实有歧义，以英文版本为准。
 
 
-- 基线版本：`0.4.16`
-- 日期：`2026-08-14`
+- 基线版本：`0.4.19`
+- 日期：`2026-09-29`
 - 状态：`Frozen for implementation details (Plan checkpoint artifact + approval/execution startup fence + protocol v11 + schema v15 + host-owned plugin session import/read/update/delete P0/P1 + selectable shell catalog + icon-free composer prompt row + turn-boundary context checkpoint compaction + session-scoped work panel + pi-owned model metadata + provider/runtime safety + M5 hardening + settings IA + project archive + sidebar organization + app update delivery + three-platform release + Extensions page density and theme-readable actions + custom global UI font)`
 - 语言政策：**英语优先**
 - 后端策略：**Rust 主机核心 + pi 代理 sidecar**
@@ -24,7 +24,7 @@
 > 在 D120 / ADR 0022 中打包应用程序更新模式，同时保留 D010。
 > `0.4.7` 通过 D126 提升了 D010 仅适用于 macOS 的发行范围：标签构建
 > 发布 macOS arm64、Windows x64 的安装程序和电子更新程序源，
-> 和 Linux x64。
+> 和 Linux x64 及 arm64。
 > D285 在 arm64 通道旁增加本机 macOS Intel x64 标签通道；两个 macOS
 > 架构都从匹配的运行器发布 DMG/ZIP 工件。
 > `0.4.8` 将持久项目索引从主页侧边栏移至
@@ -111,7 +111,7 @@
     值仍然是对话表面的实现细节，而不是
     操作模式
 16.Agent 工具：**读取/Glob/Grep/写入/编辑/Bash**
-17、权限超时：**120s→拒绝**
+17、本地权限确认：**无自动截止时间；必须明确决定或取消**
 18. 会话授予范围：**按工具名称**
 19. `~/.pi` 自动导入：**不在 MVP 中**
 20.不在MVP中：**网关/远程WebUI控制**；D370 记录的本地回环 MCP 控制是
@@ -124,7 +124,7 @@
 26.插件信任第一步：**sha256校验和；稍后签名**
 27. 第一个发布平台：**macOS 仅arm64** — 在 preload/D126 中提升；
     标签构建现在发布本机 macOS arm64 和 Intel x64、Windows x64 及
-    Linux x64 AppImage、deb 和 rpm 工件
+    Linux x64 及 arm64 AppImage、deb 和 rpm 工件
 28. TS模式库：**typebox**
 29. i18n 库：**i18next**
 30. Bash：**非交互式、流式传输并从可选择的 shell 解析

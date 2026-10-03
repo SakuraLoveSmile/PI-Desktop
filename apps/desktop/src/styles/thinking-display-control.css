@@ -14,7 +14,10 @@
   padding: 2px 12px 2px 0;
 }
 
-:root .thread-wrap .transcript-display-toolbar + .thread-scroll .thread-content {
+/* The minimap rail mounts between the toolbar and the scroller once the settle
+   veil lifts, so this has to be a general sibling match: an adjacent one stops
+   matching then and the transcript content gains 8px at its top. */
+:root .thread-wrap .transcript-display-toolbar ~ .thread-scroll .thread-content {
   padding-top: 12px;
 }
 

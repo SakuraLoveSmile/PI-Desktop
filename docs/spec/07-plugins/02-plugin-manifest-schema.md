@@ -149,7 +149,7 @@ type PluginContributes = {
  settings?: PluginSettingContrib[];
  themes?: PluginThemeContrib[];
  scenicThemes?: PluginScenicThemesContrib;
- windowAppearance?: PluginWindowAppearanceContrib; // native window background; needs `ui.window.appearance`
+ windowAppearance?: PluginWindowAppearanceContrib; // native window background and Windows corner radius; needs `ui.window.appearance`
  mcpServers?: PluginMcpServerContrib[];
   services?: PluginServiceContrib[];
   bus?: PluginBusContrib;
@@ -236,7 +236,13 @@ type PluginScenicThemesContrib = {
 
 type PluginWindowAppearanceContrib = {
  backgroundColor?: { light?: string; dark?: string }; // #rrggbb | #rrggbbaa
+ cornerRadius?: number; // integer 0..24 DIP, Windows main window only; default 4
 };
+
+`cornerRadius` belongs to the contributing plugin and applies while any of its
+declared themes is selected. It does not change macOS/Linux native corners.
+Removing the theme or its `ui.window.appearance` grant restores the Windows
+main-window default of 4 DIP. Invalid or fractional values reject the manifest.
 
 type PluginSkillContrib = {
  id?: string; // defaults to the file name without its extension
@@ -327,6 +333,7 @@ type PluginPermission =
  | "agent.prompt.inject"
  | "provider.register"
  | "net.fetch"
+ | "net.anyHost"
  | "shell.openExternal"
  | "mcp.server.local"
  | "mcp.server.remote"
@@ -410,6 +417,18 @@ covers the domain and its subdomains.
 [03-plugin-api.md](03-plugin-api.md) §3). The permission is implemented: a
 connect is confined to `manifest.net.domains`, and a host that is not declared
 is refused before the transport is asked to open anything.
+
+### 5.3.1 net.anyHost — the escape hatch
+
+`"net.anyHost"` lifts the allowlist for a plugin whose endpoints the user types
+in (a self-hosted server, a personal domain no manifest written ahead of time
+can name). With the grant, every egress path above admits any host over
+http(s)/ws(s) — except cloud metadata endpoints (`169.254.169.254` and peers),
+which the grant never reaches: their answers are instance credentials. A host
+declared in `net.domains` keeps today's behavior, so existing manifests are
+unaffected; a plugin without the grant sees no change either. The grant is
+an install-time permission like any other: the user sees it in the review
+dialog and nothing prompts at request time.
 
 ## 5.1 Bus topic grammar
 

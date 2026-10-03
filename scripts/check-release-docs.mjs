@@ -8,9 +8,12 @@
  *   node scripts/check-release-docs.mjs <version>   # check against an explicit version
  *
  * Checks (D260, docs/spec/06-delivery/06-release-runbook.md section 4.1):
- *   1. Workspace version surfaces agree: every workspace package.json,
- *      [workspace.package] in Cargo.toml, the host-core Cargo.lock entry, and
- *      APP_VERSION in packages/shared/src/protocol.ts.
+ *   1. Workspace version surfaces agree: the app package.json files (root,
+ *      docs, apps/*), [workspace.package] in Cargo.toml, the host-core
+ *      Cargo.lock entry, and APP_VERSION in packages/shared/src/protocol.ts.
+ *      packages/* keep the version of the upstream tree they were synced
+ *      from (docs/adr/plus-version-line.md) and only have to agree with each
+ *      other.
  *   2. apps/desktop/resources/models.dev/api.json parses as a provider catalog.
  *   3. packages/shared/src/changelog*.ts has an entry for the version under
  *      every shipped locale, newest-first, with matching highlight counts.
@@ -31,7 +34,7 @@ import {
 import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
-import { resolveReleaseDocumentCheck } from "./release-version-check.mjs";
+import { resolveReleaseDocumentCheck, workspaceVersionFailures } from "./release-version-check.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const read = (relPath) => readFileSync(path.join(root, relPath), "utf8");
@@ -63,9 +66,12 @@ for (const group of ["apps", "packages"]) {
     if (dir.isDirectory() && existsSync(path.join(root, relPath))) packageFiles.push(relPath);
   }
 }
-for (const relPath of packageFiles) {
-  const found = JSON.parse(read(relPath)).version;
-  if (found !== surfaceVersion) fail(relPath, `version is ${found}, expected ${surfaceVersion}`);
+const manifests = packageFiles.map((relPath) => ({
+  relPath,
+  version: JSON.parse(read(relPath)).version,
+}));
+for (const { relPath, message } of workspaceVersionFailures(manifests, surfaceVersion)) {
+  fail(relPath, message);
 }
 
 for (const [relPath, pattern, label] of [
@@ -79,22 +85,16 @@ for (const [relPath, pattern, label] of [
   }
 }
 
-// 2. Bundled models.dev snapshot.
-const modelsDevCatalogPath = "apps/desktop/resources/models.dev/api.json";
+// 2. Settings-only operation metadata. Runtime chat metadata is supplied by Pi.
+const operationMetadataPath = "apps/desktop/electron/main/settings-operation-metadata.json";
 try {
-  const catalog = JSON.parse(read(modelsDevCatalogPath));
-  if (
-    !catalog ||
-    Array.isArray(catalog) ||
-    typeof catalog !== "object" ||
-    !Object.values(catalog).some(
-      (provider) => provider && typeof provider === "object" && provider.models,
-    )
-  ) {
-    fail(modelsDevCatalogPath, "contains no provider model records");
-  }
+  const catalog = JSON.parse(read(operationMetadataPath));
+  if (!Array.isArray(catalog) || catalog.length === 0 || catalog.some(model =>
+    !model.vendor || !model.id || !model.modalities?.output?.length ||
+    (model.modalities.input?.includes("text") && model.modalities.output.every(value => value === "text")) || model.cost || model.api || model.baseUrl || model.auth
+  )) fail(operationMetadataPath, "expected display-only non-chat metadata");
 } catch (error) {
-  fail(modelsDevCatalogPath, `could not parse bundled catalog: ${error.message}`);
+  fail(operationMetadataPath, `could not parse settings metadata: ${error.message}`);
 }
 
 // 3. Shipped-locale in-app changelog. Compile the source catalog in a temporary
@@ -105,15 +105,13 @@ async function loadChangelogCatalog() {
   const typescript = require("typescript");
   const tempDir = mkdtempSync(path.join(root, ".release-changelog-"));
   writeFileSync(path.join(tempDir, "package.json"), '{"type":"module"}\n', "utf8");
-  const sources = [
-    "packages/shared/src/changelog.ts",
-    "packages/shared/src/changelog-de.ts",
-    "packages/shared/src/changelog-es.ts",
-    "packages/shared/src/changelog-fr.ts",
-    "packages/shared/src/changelog-ko.ts",
-    "packages/shared/src/changelog-pt-BR.ts",
-    "packages/shared/src/changelog-tr.ts",
-  ];
+  // Derive the module list from the directory: a new shipped locale or a
+  // further split of the catalog must not silently fall out of this preflight.
+  const changelogSrcDir = "packages/shared/src";
+  const sources = readdirSync(path.join(root, changelogSrcDir))
+    .filter((name) => /^changelog(-[A-Za-z-]+)?\.ts$/.test(name))
+    .sort()
+    .map((name) => `${changelogSrcDir}/${name}`);
   try {
     for (const relPath of sources) {
       const output = typescript.transpileModule(read(relPath), {

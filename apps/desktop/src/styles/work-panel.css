@@ -30,6 +30,12 @@
     both;
 }
 
+.work-panel-pending {
+  align-items: center;
+  justify-content: center;
+  animation: none;
+}
+
 .work-panel.is-exit-pending,
 .work-panel.is-exiting {
   pointer-events: none;
@@ -655,7 +661,7 @@
 }
 
 .subagent-transcript-jump {
-  bottom: calc(72px + 4px);
+  bottom: calc(var(--st-composer-dock-height, 68px) + 8px);
   z-index: 6;
 }
 

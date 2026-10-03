@@ -12,6 +12,7 @@ import {
   createProvider,
   type Api,
   type Context,
+  type FetchFunction,
   type Model,
   type ModelAuth,
   type Models,
@@ -26,13 +27,13 @@ import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.l
 import { openAICodexResponsesApi } from "@earendil-works/pi-ai/api/openai-codex-responses.lazy";
 import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
 import { googleGenerativeAIApi } from "@earendil-works/pi-ai/api/google-generative-ai.lazy";
-import { googleVertexApi } from "@earendil-works/pi-ai/api/google-vertex.lazy";
 import { piMessagesApi } from "@earendil-works/pi-ai/api/pi-messages.lazy";
 import { GITHUB_COPILOT_MODELS } from "@earendil-works/pi-ai/providers/github-copilot.models";
 import {
   OPENCODE_GO_API_STYLE,
   OPENCODE_GO_BASE_URL,
   resolveApiStyle,
+  normalizeApiStyle,
   resolveNativeWebSearch,
   nativeWebSearchTransport,
   deepseekRequestCompat,
@@ -56,7 +57,7 @@ export type RuntimeProviderConfig = {
   apiStyle?: string;
   supportsReasoning: boolean;
   supportedThinkingLevels: ThinkingLevel[];
-  /** Complete model metadata resolved from models.dev by Electron main. */
+  /** Effective Pi model metadata resolved by Electron main. */
   modelConfig?: ModelConfig;
   /**
    * Optional outbound HTTP headers. Empty/absent keeps adapter defaults.
@@ -94,6 +95,32 @@ export function runtimeBaseUrlForApi(api: Api, baseUrl: string): string {
   const withoutTrailingSlash = baseUrl.replace(/\/+$/, "");
   const withoutVersion = withoutTrailingSlash.replace(/\/v1$/i, "");
   return withoutVersion || withoutTrailingSlash;
+}
+
+/**
+ * Whether `api`'s pi-ai adapter accepts a caller-supplied `fetch`.
+ *
+ * The Google adapters throw unless `options.fetch` is `globalThis.fetch`
+ * itself, and every wrapper this runtime builds is a different function, so a
+ * request bound for them must carry no `fetch` at all (issue #1072). An
+ * unknown wire API is treated as accepting one: only these two are known to
+ * refuse, and the default must stay "inject" for everything else.
+ */
+export function adapterAcceptsCustomFetch(api: Api | undefined): boolean {
+  return api !== "google-generative-ai" && api !== "google-vertex";
+}
+
+/**
+ * The `fetch` one request may hand to `api`'s adapter: the caller's wrapper
+ * where the adapter accepts one, otherwise nothing. Callers keep building the
+ * wrapper (response capture, header override); this only decides whether it
+ * reaches the adapter.
+ */
+export function providerRequestFetch(
+  api: Api | undefined,
+  fetchFn: FetchFunction | undefined,
+): FetchFunction | undefined {
+  return adapterAcceptsCustomFetch(api) ? fetchFn : undefined;
 }
 
 /** Map a stored provider apiStyle onto a pi-ai wire API. Unknown styles fall
@@ -138,13 +165,6 @@ export function apiBindingForStyle(apiStyle?: string): ApiBinding {
         adapter: googleGenerativeAIApi,
         defaultBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
       };
-    case "google_vertex":
-    case "google-vertex":
-      return {
-        api: "google-vertex",
-        adapter: googleVertexApi,
-        defaultBaseUrl: "https://us-central1-aiplatform.googleapis.com",
-      };
     default:
       return {
         api: "openai-completions",
@@ -165,25 +185,38 @@ export function providerRequestKey(provider: RuntimeProviderConfig): string {
  * Resolve the wire API for one provider row. A catalog entry may pin a wire
  * API that differs from the provider-wide style (e.g. responses-only models
  * under an opencode_go provider, which defaults to Chat Completions). Honor
- * the model-level api when present so such models are not sent through the
- * wrong adapter (the gateway answers 500, see #105).
+ * the model-level api when compatible or when the provider has no explicit
+ * wire style; never let a foreign-family catalog match (e.g. Google Generative AI
+ * on a Gemini model served by an OpenAI-compatible relay) overwrite the provider's
+ * wire protocol (see #105, #1310).
  */
 export function apiBindingForProviderModel(provider: RuntimeProviderConfig): ApiBinding {
   return apiBindingForStyle(providerRequestTransport(provider).apiStyle);
 }
 
-/**
- * The Google GenAI SDK owns its transport and rejects a request-scoped fetch
- * override. Keep the wrapper out of Gemini and Vertex requests; their model
- * headers still flow through the SDK's supported options.headers path.
- */
-export function providerAllowsCustomFetch(provider: RuntimeProviderConfig): boolean {
-  const api = apiBindingForProviderModel(provider).api;
-  return api !== "google-generative-ai" && api !== "google-vertex";
-}
-
 function providerRequestTransport(provider: RuntimeProviderConfig) {
-  const apiStyle = resolveApiStyle(provider.modelConfig?.api) ?? provider.apiStyle;
+  const modelStyle = resolveApiStyle(provider.modelConfig?.api);
+  const resolvedProviderStyle = resolveApiStyle(provider.apiStyle);
+  const providerStyle = resolvedProviderStyle ?? (provider.apiStyle ? normalizeApiStyle(provider.apiStyle) : undefined);
+  const customEndpoint = provider.vendorKey?.trim().toLowerCase() === "custom";
+  const isOpenAiStyle = (style: string | undefined) =>
+    style === "chat_completions" ||
+    style === "responses" ||
+    style === "openai_codex_responses" ||
+    style === OPENCODE_GO_API_STYLE;
+  const isCompatible =
+    !providerStyle ||
+    !modelStyle ||
+    modelStyle === providerStyle ||
+    (isOpenAiStyle(providerStyle) && isOpenAiStyle(modelStyle));
+  // A custom endpoint's saved API format describes the user's actual gateway.
+  // Published model metadata may describe another publisher's default adapter;
+  // it cannot silently retarget that request. Other providers may use a
+  // compatible model-level pin, such as OpenCode Go's Responses route (#105),
+  // but foreign catalog protocols must not replace the provider's wire style.
+  const apiStyle = customEndpoint
+    ? provider.apiStyle ?? modelStyle
+    : (isCompatible ? modelStyle : undefined) ?? provider.apiStyle;
   return nativeWebSearchTransport({
     apiStyle,
     baseUrl: provider.baseUrl ?? provider.modelConfig?.baseUrl ?? apiBindingForStyle(apiStyle).defaultBaseUrl,
@@ -203,7 +236,7 @@ function nativeCopilotHeaders(modelId: string): Record<string, string> | undefin
     : undefined;
   if (model?.headers) return model.headers;
 
-  // A model returned by models.dev or a user's Copilot entitlement may not be
+  // A model returned by Pi or a user's Copilot entitlement may not be
   // present in pi-ai's pinned built-in catalog. Its transport still requires
   // the same client identity headers as every other Copilot model.
   return Object.values(GITHUB_COPILOT_MODELS).find((entry) => entry.headers)?.headers;
@@ -224,11 +257,43 @@ export function copilotRequestHeaders(
 }
 
 /**
+ * Row-scoped models bypass pi-ai's native Copilot Bearer branch, so the token
+ * would leave as X-Api-Key. Send it as Bearer and null out X-Api-Key instead.
+ * Keep apiKey set so the Anthropic SDK skips its default credential chain.
+ * OpenAI-style adapters already sign an apiKey as Bearer.
+ */
+function copilotRequestAuth(
+  provider: Pick<RuntimeProviderConfig, "vendorKey">,
+  api: Api,
+  auth: ModelAuth,
+): ModelAuth {
+  if (
+    provider.vendorKey?.trim().toLowerCase() !== "github-copilot" ||
+    api !== "anthropic-messages" ||
+    !auth.apiKey
+  ) {
+    return auth;
+  }
+  const { apiKey, headers, ...rest } = auth;
+  const requestHeaders: NonNullable<ModelAuth["headers"]> = Object.fromEntries(
+    Object.entries(headers ?? {}).filter(([name]) => {
+      const lowerName = name.toLowerCase();
+      return lowerName !== "authorization" && lowerName !== "x-api-key";
+    }),
+  );
+  return {
+    ...rest,
+    apiKey,
+    headers: { ...requestHeaders, Authorization: `Bearer ${apiKey}`, "X-Api-Key": null },
+  };
+}
+
+/**
  * Claude models that publish an effort ladder without a `budget_tokens`
  * option (Opus 4.7+, Opus 5.x, Fable, ...) reject `thinking.type=enabled`
  * with a 400. pi-ai only sends adaptive thinking when
- * `compat.forceAdaptiveThinking` is set, and models.dev carries no compat
- * record, so derive the flag from the published reasoning options.
+ * `compat.forceAdaptiveThinking` is set. Legacy projections can lack that
+ * compatibility record, so derive the flag from published reasoning options.
  */
 function requiresAdaptiveThinking(
   model: Pick<ModelConfig, "reasoning" | "reasoningOptions">,
@@ -247,8 +312,15 @@ export function buildProviderModel(
   const binding = apiBindingForProviderModel(provider);
   const catalog = provider.modelConfig;
   const catalogModel = catalog
-    ? (({ source: _source, ...model }) => model)(catalog)
-    : genericModelConfig(provider.modelId, provider.baseUrl ?? binding.defaultBaseUrl);
+    ? (({ source: _source, nativeCost, ...model }) => ({
+        ...model,
+        ...(nativeCost ? { cost: nativeCost } : {}),
+      }))(catalog)
+    : {
+        ...genericModelConfig(provider.modelId, provider.baseUrl ?? binding.defaultBaseUrl),
+        reasoning: provider.supportsReasoning,
+        supportedThinkingLevels: provider.supportedThinkingLevels,
+      };
   const baseUrl = runtimeBaseUrlForApi(
     binding.api,
     providerRequestTransport(provider).baseUrl ?? binding.defaultBaseUrl,
@@ -305,7 +377,7 @@ export function buildProviderModel(
     ...catalogModel,
     id: provider.modelId,
     api: binding.api,
-    provider: provider.id,
+    provider: provider.extensionAgentKey ? provider.id : (provider.vendorKey?.trim() || provider.id),
     baseUrl,
     webSearch:
       resolveNativeWebSearch({
@@ -319,57 +391,50 @@ export function buildProviderModel(
   } as Model<Api>;
 }
 
-/** A single-model registry for one resolved provider. */
+/** Account-local operation registry. Vendor identity stays internal; auth stays row-scoped. */
+export function createAccountModels(
+  provider: RuntimeProviderConfig,
+  operations: Pick<Parameters<typeof createProvider>[0], "models" | "api" | "images" | "classifiers">,
+): Models {
+  const models = createModels({ authContext: { env: async () => undefined, fileExists: async () => false } });
+  const providerId = provider.extensionAgentKey ? provider.id : (provider.vendorKey?.trim() || provider.id);
+  models.setProvider(createProvider({
+    id: providerId,
+    name: provider.name,
+    baseUrl: provider.baseUrl,
+    ...operations,
+    models: operations.models.map((model) => ({ ...model, provider: providerId })),
+    auth: {
+      apiKey: {
+        name: `${provider.name} credential`,
+        resolve: async () => ({
+          auth: provider.resolveAuth
+            ? await provider.resolveAuth()
+            : provider.authKind === "none" ? {} : { apiKey: providerRequestKey(provider) },
+        }),
+      },
+    },
+  }));
+  return models;
+}
+
+/** A single account registry for an effective chat binding and optional other operations. */
 export function createProviderModels(
   provider: RuntimeProviderConfig,
   model: Model<Api>,
+  operations?: Pick<Parameters<typeof createProvider>[0], "models" | "images" | "classifiers">,
 ): Models {
-  const requestKey = providerRequestKey(provider);
   const resolveAuth = provider.resolveAuth;
-  const copilotAnthropicBearer =
-    provider.vendorKey?.trim().toLowerCase() === "github-copilot" &&
-    model.api === "anthropic-messages";
-  const models = createModels();
-  models.setProvider(
-    createProvider({
-      id: provider.id,
-      name: provider.name,
-      baseUrl: model.baseUrl,
-      auth: {
-        apiKey: {
-          name: `${provider.name} API key`,
-          // Plain apiKey semantics let each adapter emit its own auth header
-          // (Bearer for OpenAI-style APIs, x-api-key for Anthropic, …).
-          //
-          // A vendor account resolves instead through Electron main, which
-          // returns the whole `ModelAuth` — token, headers, and the
-          // per-credential baseUrl GitHub Copilot hands out. pi-ai calls this
-          // for every request and caches nothing, so a token that rotates
-          // mid-session is picked up on the next one.
-          resolve: async () => {
-            const auth = resolveAuth ? await resolveAuth() : { apiKey: requestKey };
-            if (!copilotAnthropicBearer || !auth.apiKey) {
-              return { auth, ...(resolveAuth ? { source: "OAuth" } : {}) };
-            }
-            return {
-              auth: {
-                ...auth,
-                apiKey: undefined,
-                headers: {
-                  ...(auth.headers ?? {}),
-                  Authorization: `Bearer ${auth.apiKey}`,
-                },
-              },
-              ...(resolveAuth ? { source: "OAuth" } : {}),
-            };
-          },
-        },
-      },
-      models: [model],
-      api: apiBindingForProviderModel(provider).adapter(),
-    }),
-  );
-  return models;
+  return createAccountModels({
+    ...provider,
+    resolveAuth: async () => resolveAuth
+      ? copilotRequestAuth(provider, model.api, await resolveAuth())
+      : { apiKey: providerRequestKey(provider) },
+  }, {
+    ...operations,
+    models: [model, ...(operations?.models ?? [])],
+    api: apiBindingForProviderModel(provider).adapter(),
+  });
 }
 /** Build a pi-ai model collection for a trusted extension-owned agent. */
 export function createExtensionAgentModels(input: {
@@ -378,7 +443,7 @@ export function createExtensionAgentModels(input: {
   model: Model<Api>;
   stream: ProviderStreams;
 }): Models {
-  const models = createModels();
+  const models = createModels({ authContext: { env: async () => undefined, fileExists: async () => false } });
   models.setProvider(
     createProvider({
       id: input.providerId,

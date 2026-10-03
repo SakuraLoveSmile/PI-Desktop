@@ -3,6 +3,7 @@ mod agent_capabilities;
 mod artifacts;
 mod audit;
 mod config_sync;
+mod data_relocation;
 mod db;
 mod goal_progress;
 mod goal_reports;
@@ -27,6 +28,7 @@ mod session_search;
 mod sessions;
 mod state;
 mod team;
+mod todos;
 mod tool_budget;
 mod tools;
 mod transcripts;
@@ -41,8 +43,14 @@ use tracing_subscriber::EnvFilter;
 
 use crate::state::AppState;
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    if data_relocation::run_cli()? {
+        return Ok(());
+    }
     if std::env::args().any(|arg| arg == tools::INTERNAL_TOOL_RUNNER_FLAG) {
         let exit_code = match tools::run_internal_tool_runner().await {
             Ok(exit_code) => exit_code,

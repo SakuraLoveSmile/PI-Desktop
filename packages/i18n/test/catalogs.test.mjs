@@ -21,6 +21,25 @@ function placeholders(value) {
 
 const english = flattenCatalog(en);
 
+test("offline storage maintenance has localized progress and recovery copy before renderer startup", () => {
+  const fields = ["progressTitle", "progressHint", "failedTitle", "failedHint", "continueOriginal", "unavailableHint"];
+  const stages = ["scanning", "copying", "verifying", "relocating", "cleaning", "complete", "failed"];
+  for (const [locale, catalog] of Object.entries(catalogs)) {
+    const copy = catalog.settings.storage;
+    for (const field of fields) {
+      assert.equal(typeof copy[field], "string", `${locale}: ${field}`);
+      assert.ok(copy[field].trim(), `${locale}: ${field} must not be blank`);
+    }
+    assert.deepEqual(Object.keys(copy.stages).sort(), [...stages].sort(), locale);
+    for (const stage of stages) assert.ok(copy.stages[stage].trim(), `${locale}: ${stage}`);
+    if (locale !== "en") {
+      assert.notEqual(copy.progressTitle, en.settings.storage.progressTitle, locale);
+      assert.notEqual(copy.failedHint, en.settings.storage.failedHint, locale);
+      assert.notEqual(copy.unavailableHint, en.settings.storage.unavailableHint, locale);
+    }
+  }
+});
+
 test("every shipped catalog matches English keys and interpolation variables", () => {
   for (const [id, catalog] of Object.entries(catalogs)) {
     const flat = flattenCatalog(catalog);
@@ -29,6 +48,31 @@ test("every shipped catalog matches English keys and interpolation variables", (
       assert.deepEqual(placeholders(flat[key]), placeholders(english[key]), `${id} ${key}`);
     }
   }
+});
+
+test("Live Voice preparation and call recovery copy is localized in every shipped catalog", () => {
+  const keys = [
+    "prepareCall", "details", "workOptions", "allowWork", "noWorkSession",
+    "playbackBlocked", "playbackFailed", "mediaReleaseUnconfirmed",
+    "callActionFailed", "workNotConnected", "transcript", "transcriptEmpty",
+    "userSpeaking", "assistantSpeaking", "muted", "resumePlayback",
+    "selectWorkSession", "shareContext", "contextShared",
+    "contextNotShared", "createWorkSession", "viewWorkSession", "enableDetail",
+    "microphoneDenied", "microphoneUnavailable", "microphoneBusy",
+    "phase.connecting", "phase.closing",
+  ].map((key) => `liveVoice.${key}`);
+
+  for (const [id, catalog] of Object.entries(catalogs)) {
+    const flat = flattenCatalog(catalog);
+    for (const key of keys) {
+      assert.equal(typeof flat[key], "string", `${id} ${key}`);
+      assert.notEqual(flat[key].trim(), "", `${id} ${key}`);
+      if (id !== "en") assert.notEqual(flat[key], english[key], `${id} ${key} must not fall back to English`);
+    }
+  }
+
+  assert.match(english["liveVoice.enableDetail"], /current Composer session as the default work target/);
+  assert.match(english["liveVoice.enableDetail"], /switch sessions by voice/);
 });
 
 test("canonical thinking levels are not translated catalog entries", () => {
