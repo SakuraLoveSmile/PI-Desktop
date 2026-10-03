@@ -72,6 +72,8 @@ export * from "./native-web-search-transport.js";
 export * from "./header-value.js";
 
 export * from "./session-todos.js";
+export * from "./tool-call-lineage.js";
+export * from "./event-usage.js";
 export * from "./pi-skill-discovery.js";
 export * from "./goal-report.js";
 export * from "./goal-progress.js";

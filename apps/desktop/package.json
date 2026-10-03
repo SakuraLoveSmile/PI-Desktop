@@ -36,7 +36,8 @@
     "electron-updater": "^6.8.9"
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "0.87.1",
+    "@earendil-works/pi-ai": "0.99.1",
+    "@earendil-works/pi-mcp": "0.99.1",
     "@pi-desktop/agent-host": "workspace:*",
     "@pi-desktop/agent-runtime": "workspace:*",
     "@pi-desktop/host-runtime": "workspace:*",
@@ -135,10 +136,6 @@
       {
         "from": "resources/plugins",
         "to": "plugins"
-      },
-      {
-        "from": "resources/models.dev",
-        "to": "models.dev"
       }
     ],
     "mac": {
@@ -159,7 +156,7 @@
       "entitlementsInherit": "build/entitlements.mac.plist",
       "extendInfo": {
         "NSLocalNetworkUsageDescription": "Pi-Desktop-Plus needs local network access so agents can reach OpenAI-compatible providers, Ollama, and other AI endpoints running on your LAN. / Pi-Desktop-Plus 需要本地网络访问权限，以便助手请求同一局域网中的 OpenAI 兼容服务、Ollama 等本地 AI 端点。",
-        "NSMicrophoneUsageDescription": "Pi-Desktop-Plus plugins may use the microphone after you grant them audio access. / 在你授权后，Pi-Desktop-Plus 插件可以使用麦克风。",
+        "NSMicrophoneUsageDescription": "Pi-Desktop-Plus uses the microphone for Live voice calls and authorized plugin audio access. / Pi-Desktop-Plus 使用麦克风进行实时语音通话，以及你已授权的插件音频访问。",
         "NSBonjourServices": [
           "_http._tcp",
           "_https._tcp"
