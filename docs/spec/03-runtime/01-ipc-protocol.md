@@ -2281,13 +2281,14 @@ error model. Both the text payload and `structuredContent` are size-bounded to
 512 KiB (`MAX_RESULT_CHARS`). A larger answer is not returned verbatim: it is
 replaced by `{truncated: true, reason: "MCP_RESULT_LIMIT", preview: "<the first
 512 KiB of the JSON>"}`, so an external caller can never receive a silently
-shortened payload. `session/get` (`pi_session_get`) additionally projects the
-session's `compaction` record down to the compact identity (`createdAt`, and
-`details.generation`) before bounding: a long session's
-`ContextCompactionRecord` (`summary` / `retainedTail` / `details.modifiedFiles`)
-grows without bound and would otherwise push the whole answer — including
-`messages` — over the limit, leaving external callers unable to read any
-transcript.
+shortened payload. If an oversized answer comes from `session/get`
+(`pi_session_get`) and has a `compaction` record, Main projects that record to
+the compact identity (`createdAt` and `details.generation`) and checks the size
+again before returning the truncation envelope. This lets a long session's
+transcript survive when its unbounded `ContextCompactionRecord` (`summary` /
+`retainedTail` / `details.modifiedFiles`) alone caused the overflow. Results
+already under the limit retain their full compaction details, and the desktop's
+own session detail is unchanged.
 
 The six `session/collaboration/*` operations are first-party-plugin-only: they
 require an authenticated plugin tool invocation context, so they appear in

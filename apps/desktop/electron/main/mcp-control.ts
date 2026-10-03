@@ -527,12 +527,22 @@ export function stripSecretMaterial(value: unknown): unknown {
   return output;
 }
 
-export function boundMcpResult(value: unknown): unknown {
-  let text: string;
+function serializeMcpResult(value: unknown): string {
   try {
-    text = JSON.stringify(value ?? null);
+    return JSON.stringify(value ?? null);
   } catch {
-    text = JSON.stringify({ value: String(value) });
+    return JSON.stringify({ value: String(value) });
+  }
+}
+
+export function boundMcpResult(
+  value: unknown,
+  projectOversized?: (value: unknown) => unknown,
+): unknown {
+  let text = serializeMcpResult(value);
+  if (text.length > MAX_RESULT_CHARS && projectOversized) {
+    value = projectOversized(value);
+    text = serializeMcpResult(value);
   }
   if (text.length <= MAX_RESULT_CHARS) {
     try {
@@ -1149,11 +1159,11 @@ export class McpControlServer {
       if (!tool) return { response: rpcError(id, -32602, `unknown tool: ${name}`) };
       try {
         const raw = await tool.execute(input);
-        // `pi_session_get` can carry an unbounded compaction record; project it
-        // to the compact control-plane shape before bounding so the transcript
-        // survives (mocode #495).
+        // Preserve ordinary session details; project oversized session/get
+        // compaction metadata only before falling back to the truncation envelope.
         const value = boundMcpResult(
-          name === "pi_session_get" ? projectSessionGetResult(raw) : raw,
+          raw,
+          name === "pi_session_get" ? projectSessionGetResult : undefined,
         );
         return {
           response: response(id, {

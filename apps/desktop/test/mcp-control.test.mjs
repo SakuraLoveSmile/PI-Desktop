@@ -82,6 +82,36 @@ test("local MCP control server authenticates, discovers, and invokes desktop ope
   const dataDir = mkdtempSync(join(tmpdir(), "pi-mcp-control-"));
   const calls = [];
   const events = [];
+  const sessionMessages = [
+    { id: "m1", role: "user", content: "hello" },
+    { id: "m2", role: "assistant", content: "hi" },
+  ];
+  const largeSession = {
+    session: {
+      id: "large-session",
+      compaction: {
+        id: "cp-large",
+        createdAt: "2026-10-03T07:37:04.094Z",
+        summary: "x".repeat(700_000),
+        retainedTail: [{ content: "large" }],
+        details: { generation: 13, modifiedFiles: ["src/a.ts"] },
+      },
+      messages: sessionMessages,
+    },
+  };
+  const smallSession = {
+    session: {
+      id: "small-session",
+      compaction: {
+        id: "cp-small",
+        createdAt: "2026-10-03T07:37:04.094Z",
+        summary: "Keep this summary",
+        retainedTail: [{ content: "Keep this reply" }],
+        details: { generation: 2, modifiedFiles: ["src/b.ts"] },
+      },
+      messages: sessionMessages,
+    },
+  };
   const server = new McpControlServer({
     dataDir,
     port: 0,
@@ -97,6 +127,10 @@ test("local MCP control server authenticates, discovers, and invokes desktop ope
       }
       if (channel === "pi-desktop/session/create") {
         return { session: { id: "session-created", projectPath: args[0]?.projectPath ?? null } };
+      }
+      if (channel === "pi-desktop/session/get") {
+        if (args[0]?.id === largeSession.session.id) return largeSession;
+        if (args[0]?.id === smallSession.session.id) return smallSession;
       }
       return { ok: true };
     },
@@ -393,6 +427,39 @@ test("local MCP control server authenticates, discovers, and invokes desktop ope
   assert.equal(readSession.body.result.isError, undefined);
   assert.equal(events.filter(Boolean).length, refreshCount);
 
+  const readLargeSession = await post(
+    info.url,
+    info.token,
+    {
+      jsonrpc: "2.0",
+      id: 16,
+      method: "tools/call",
+      params: { name: "pi_session_get", arguments: { id: largeSession.session.id } },
+    },
+    { "Mcp-Session-Id": sessionId },
+  );
+  const largeResult = readLargeSession.body.result.structuredContent;
+  assert.equal(largeResult.truncated, undefined);
+  assert.deepEqual(largeResult.session.messages, sessionMessages);
+  assert.equal(largeResult.session.compaction.createdAt, largeSession.session.compaction.createdAt);
+  assert.equal(largeResult.session.compaction.details.generation, 13);
+  assert.equal(largeResult.session.compaction.summary, undefined);
+  assert.equal(largeResult.session.compaction.retainedTail, undefined);
+  assert.equal(largeResult.session.compaction.details.modifiedFiles, undefined);
+
+  const readSmallSession = await post(
+    info.url,
+    info.token,
+    {
+      jsonrpc: "2.0",
+      id: 17,
+      method: "tools/call",
+      params: { name: "pi_session_get", arguments: { id: smallSession.session.id } },
+    },
+    { "Mcp-Session-Id": sessionId },
+  );
+  assert.deepEqual(readSmallSession.body.result.structuredContent, smallSession);
+
   const missingPath = await post(
     info.url,
     info.token,
@@ -541,8 +608,7 @@ test("session/get compaction metadata is projected before bounding (mocode #495)
   const unprojected = boundMcpResult(raw);
   assert.equal(unprojected.truncated, true);
 
-  const projected = projectSessionGetResult(raw);
-  const bounded = boundMcpResult(projected);
+  const bounded = boundMcpResult(raw, projectSessionGetResult);
   assert.notEqual(bounded.truncated, true, "projected answer must fit the limit");
 
   const session = bounded.session;
@@ -562,15 +628,23 @@ test("session/get projection leaves a small session untouched (mocode #495)", ()
   const raw = {
     session: {
       id: "s1",
-      compaction: { createdAt: "t", details: { generation: 1 } },
+      compaction: {
+        id: "cp1",
+        createdAt: "t",
+        summary: "A small summary",
+        retainedTail: [{ role: "assistant", content: "A retained reply" }],
+        details: { generation: 1, modifiedFiles: ["src/a.ts"] },
+      },
       messages: [],
     },
   };
-  const projected = projectSessionGetResult(raw);
-  assert.deepEqual(projected.session.compaction, raw.session.compaction);
+  assert.deepEqual(boundMcpResult(raw, projectSessionGetResult), raw);
   // Non-session shapes and sessions without a compaction record pass through.
-  assert.deepEqual(projectSessionGetResult({ ok: true }), { ok: true });
-  assert.deepEqual(projectSessionGetResult({ session: { id: "s2" } }), { session: { id: "s2" } });
+  assert.deepEqual(boundMcpResult({ ok: true }, projectSessionGetResult), { ok: true });
+  assert.deepEqual(
+    boundMcpResult({ session: { id: "s2" } }, projectSessionGetResult),
+    { session: { id: "s2" } },
+  );
 });
 
 test("renderer refresh events fire only for mutating control operations", () => {
