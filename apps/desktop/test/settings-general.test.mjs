@@ -73,6 +73,10 @@ const languageSource = await readFile(
   new URL("../src/lib/app-language.ts", import.meta.url),
   "utf8",
 );
+const rendererLanguageSource = await readFile(
+  new URL("../src/lib/renderer-language.ts", import.meta.url),
+  "utf8",
+);
 const enLocaleSource = await readFile(
   new URL("../../../packages/i18n/src/locales/en/index.ts", import.meta.url),
   "utf8",
@@ -242,8 +246,8 @@ test("basics gates developer tools behind a persisted developer mode", () => {
 
 test("stored language drives i18n and native labels at startup and on settings change", () => {
   assert.match(languageSource, /export function initLanguageSync/);
-  assert.match(languageSource, /changeLanguage/);
-  assert.match(languageSource, /resolveLocale/);
+  assert.match(rendererLanguageSource, /changeLanguage/);
+  assert.match(rendererLanguageSource, /resolveLocale/);
   assert.match(mainSource, /initLanguageSync\(\)/);
   assert.match(electronMainSource, /catalogs\[resolveLocale\(locale\)\]/);
 });
@@ -525,4 +529,17 @@ test("native select menus keep readable theme colors across the app on Windows",
     stylesSource,
     /:root\[data-theme="light"\]\s*\{[^}]*color-scheme:\s*light;/s,
   );
+});
+
+test("Live Voice account cards show their options only after a provider is chosen", async () => {
+  const source = await readFile(
+    new URL("../src/features/settings/voice/LiveVoiceSettings.tsx", import.meta.url),
+    "utf8",
+  );
+  // A card with no provider account bound is the picker and nothing else: the
+  // model, voice, and protocol rows belong to a chosen binding instead of
+  // rendering as empty disabled controls.
+  assert.match(source, /\{current && adapter !== "codex-live" \? \(/);
+  assert.match(source, /\{current && adapter === "openai-realtime" \? \(/);
+  assert.doesNotMatch(source, /disabled=\{!current/);
 });

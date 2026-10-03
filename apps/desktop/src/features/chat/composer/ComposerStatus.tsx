@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Badge, Button, TooltipButton } from "../../../components/ui";
 import {
   IconArrowDown,
@@ -23,6 +23,7 @@ import {
   resetEmptyQueueDisclosure,
   toggleQueueDisclosure,
 } from "./queue-disclosure-state";
+import { useAppStore } from "../../../stores/app-store";
 
 export type ComposerStatusProps = {
   t: TFunction;
@@ -41,7 +42,8 @@ export type ComposerStatusProps = {
   dismissDroppedDirectories: () => void;
 };
 
-/** Non-editor composer status rows: queue, enhancement errors, and folder drops. */
+/** Non-editor composer status rows: queue, folder drops, and the one-shot
+ *  enhancement failure, which is reported through the global toast. */
 export function ComposerStatus({
   t,
   queueScopeKey,
@@ -77,6 +79,28 @@ export function ComposerStatus({
     item.content.trim() ||
     item.draft.fileReferences.map((reference) => reference.name).join(", ") ||
     t("chat.queuedPromptEmpty");
+  const showToast = useAppStore((state) => state.showToast);
+  // A failed enhancement is a one-shot result of the Enhance action: it goes to
+  // the toast stack and the pending error is cleared, so a remount can neither
+  // re-report it nor render the old inline row again.
+  const reportedEnhancementError = useRef<string | null>(null);
+  useEffect(() => {
+    if (!enhancementError) {
+      reportedEnhancementError.current = null;
+      return;
+    }
+    const key = `${enhancementError.code}\u0000${enhancementError.message}`;
+    if (reportedEnhancementError.current === key) return;
+    reportedEnhancementError.current = key;
+    // The store already reads the provider's own answer as either a specific
+    // reason or the generic failure, so the sentence is not prefixed again; the
+    // inline row carried the verbatim code, so the toast keeps it.
+    showToast(
+      `${enhancementError.message} (${enhancementError.code})`,
+      { variant: "error" },
+    );
+    clearEnhancementError();
+  }, [enhancementError, clearEnhancementError, showToast, t]);
 
   return (
     <>
@@ -201,23 +225,6 @@ export function ComposerStatus({
             })}
           </div>
         </section>
-      ) : null}
-      {enhancementError ? (
-        <div className="composer-enhancement-error" role="alert">
-          <span className="composer-enhancement-error-message">
-            {t("chat.enhancementFailed")}: {enhancementError.message}
-          </span>
-          <code>{enhancementError.code}</code>
-          <TooltipButton
-            type="button"
-            className="composer-enhancement-error-dismiss"
-            tooltip={t("chat.dismissEnhancementError")}
-            ariaLabel={t("chat.dismissEnhancementError")}
-            onClick={clearEnhancementError}
-          >
-            <IconX size={13} aria-hidden="true" />
-          </TooltipButton>
-        </div>
       ) : null}
       {droppedDirectories.length ? (
         <div className="composer-directory-drop" role="status">

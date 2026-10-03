@@ -91,3 +91,59 @@
 - Goal Completion Reports stay failed when their session's final transcript
   cannot be persisted. A late draft can no longer replace a ready or failed
   report, and another session's pending transcript does not block publication.
+
+- Live Voice is now available to everyone, and a call starts in the current
+  session.
+
+- Sessions have a checklist that keeps its authoritative state after the local
+  service restarts.
+
+- One-off notices now appear in the shared toast stack instead of blocking
+  dialogs.
+
+- Model lists are matched against official provider metadata, so relay
+  services and model names stay accurate.
+
+- The Live Voice call bar can dock as a desktop widget.
+
+- A Live Voice call bound to a work session now shows a waiting request instead
+  of only saying it must be handled on the desktop: the compact bar keeps a
+  waiting line, and Call Details shows the question, the tool awaiting
+  permission, or the plan awaiting approval together with an action that opens
+  that exact session. The decision itself still belongs to the session's own
+  card, so answering or approving from the call remains impossible.
+
+- A Live Voice work call can now answer the bound session's open AskTool
+  question by voice: the question and its own options are read out, and the
+  spoken answer may only select among those options. Permission, Plan, and Goal
+  approvals remain desktop decisions, and an answer that does not match an
+  offered option (or a session without exactly one open question) is refused
+  and sent back to the card instead of guessing.
+
+- Reloading the desktop renderer no longer drops the AskTool and permission
+  cards a session is still waiting on: the pending interactive requests are
+  read back from Host state and the cards come back.
+
+- Plugins can fill seven finalized UI slots and draw their own layered
+  dialogs.
+
+- Plugins can read and rewrite the composer draft, and request any-host network
+  access at install time.
+
+- Large subagent scratch output now spills to disk and shows resume hints
+  instead of failing the turn.
+
+- Chat file references open at complete paths inside project roots, and
+  user-message links stay selectable and copyable.
+
+- Long conversations stay responsive while streaming, and every host request
+  slot is released under a wall-clock budget.
+
+- MCP connections are more reliable: streamable-HTTP replies arrive before the
+  SSE stream closes, and OAuth issuer paths and resource scopes survive.
+
+- The Edit tool accepts the legacy `old_string`/`new_string` shape that older
+  models still send.
+
+- The window minimum is lowered to 800×560 (capped to the work area), and the
+  Windows frameless rim is removed.

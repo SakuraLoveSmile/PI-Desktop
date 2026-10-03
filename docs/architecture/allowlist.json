@@ -1,10 +1,15 @@
 {
   "typescript": {
     "apps/desktop/electron/main/bootstrap/window.ts": "Existing window lifecycle extraction from the main-process facade; further decomposition is outside this follow-up scope.",
+    "apps/desktop/electron/main/live-voice/call-service.ts": "Upstream-owned Live Voice call service, merged byte-identical from vastsa/PI-Desktop. A split here would conflict with every later upstream sync, so any decomposition lands upstream first and arrives through the sync.",
+    "apps/desktop/electron/main/live-voice/work-bridge.ts": "Upstream-owned Live Voice work bridge, merged byte-identical from vastsa/PI-Desktop. A split here would conflict with every later upstream sync, so any decomposition lands upstream first and arrives through the sync.",
     "apps/desktop/src/features/voice/live/live-call-controller.ts": "Upstream-owned Live Voice call controller, merged byte-identical from vastsa/PI-Desktop. A split here would conflict with every later upstream sync, so any decomposition lands upstream first and arrives through the sync.",
     "packages/agent-runtime/src/native-pi-session.test.ts": "Native Pi continuation regression coverage is kept with the source boundary while the protocol and fixture contract stabilise; split by lifecycle once the native adapter surface settles.",
     "packages/agent-runtime/src/native-pi-session.ts": "Native Pi discovery, immutable projection, guarded continuation, and fork publication share one sidecar-private source boundary; split by lifecycle once the native adapter contract stabilises without widening path ownership.",
-    "packages/host-runtime/src/live-work/coordinator.ts": "Upstream-owned Live Voice work-session coordinator, merged byte-identical from vastsa/PI-Desktop. A split here would conflict with every later upstream sync, so any decomposition lands upstream first and arrives through the sync."
+    "packages/host-runtime/src/live-work/coordinator.ts": "Upstream-owned Live Voice work-session coordinator, merged byte-identical from vastsa/PI-Desktop. A split here would conflict with every later upstream sync, so any decomposition lands upstream first and arrives through the sync.",
+    "packages/shared/src/changelog-en.ts": "Declarative English release-note catalog kept as one independently loaded locale chunk; changelog data is exempt from the ordinary source-module size budget.",
+    "packages/shared/src/changelog-zh-CN.ts": "Declarative Simplified Chinese release-note catalog kept as one independently loaded locale chunk; changelog data is exempt from the ordinary source-module size budget.",
+    "packages/shared/src/changelog-zh-TW.ts": "Declarative Traditional Chinese release-note catalog kept as one independently loaded locale chunk; changelog data is exempt from the ordinary source-module size budget."
   },
   "rust": {
     "crates/host-core/src/rpc/mod.rs": "Legacy RPC dispatch module; its extraction is outside this refactor scope.",
@@ -13,6 +18,7 @@
     "crates/host-core/src/plugin_sessions.rs": "Legacy plugin session lifecycle module; its extraction is outside this refactor scope.",
     "crates/host-core/src/transcripts.rs": "Legacy transcript persistence module; its extraction is outside this refactor scope.",
     "crates/host-core/src/plugins/tests.rs": "Existing plugin-domain test module retained while production plugin code is split.",
+    "crates/host-core/src/plugins/validation.rs": "Upstream-owned plugin validation module, 997 LOC at the last upstream sync and so under the limit. The fork's offline curated-fixture admission adds 11 hook lines at its file:// call sites (the admission logic itself lives in plugins/fixture.rs), which puts the file just past 1000. Remove this entry once an upstream split of the module arrives through a sync.",
     "crates/host-core/src/db/tests.rs": "Existing database-domain test module retained while production database code is split.",
     "crates/host-core/src/providers/tests.rs": "Existing provider-domain test module retained while production provider code is split.",
     "crates/host-core/src/user_skills.rs": "User-skill catalog crossed the Rust 1000-LOC limit when the scan-and-batch-import path landed (PR #515); the file still holds one cohesive discovery/import lifecycle and is exempted until the batch-import surface is separated.",
