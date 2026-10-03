@@ -49,7 +49,7 @@ and final delivery to the user remain in Chinese; this repository's root
   this task's real numbers and evidence.
 
 Before code edits, read root and nearest scoped `AGENTS.md`, the affected
-package README if present, `docs/spec/00-baseline.md`, ADR 0062/0226/0307/0309,
+package README if present, `docs/spec/00-baseline.md`, ADR 0062/0226/plus-expert-team-collaboration/plus-plan-goal-revision-and-one-time-execution-lifecycle,
 `docs/spec/04-ux/{07-ui-design-system,08-component-spec}.md`, and the three
 delivery docs under `docs/spec/06-delivery/`. `apps/desktop/README.md` does not
 exist on the surveyed base. The root `AGENTS.md` wins over old local-main or

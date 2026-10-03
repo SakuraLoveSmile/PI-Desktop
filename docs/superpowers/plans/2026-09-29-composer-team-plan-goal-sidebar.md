@@ -36,8 +36,8 @@ unrelated transcript, title, usage, or Goal-report tasks.
   `Task*` subagent detail already opens a right Work Panel tab, while its large
   topology remains in the main transcript and the Overview lacks a roster.
 - Before implementation read root/scoped `AGENTS.md`, `docs/spec/00-baseline.md`,
-  `docs/adr/0307-expert-team-collaboration.md`,
-  `docs/adr/0309-plan-goal-revision-and-one-time-execution-lifecycle.md`,
+  `docs/adr/plus-expert-team-collaboration.md`,
+  `docs/adr/plus-plan-goal-revision-and-one-time-execution-lifecycle.md`,
   `docs/spec/03-runtime/{02-agent-runtime,10-session-state-machine}.md`,
   `docs/spec/04-ux/{07-ui-design-system,08-component-spec}.md`, and the three
   delivery documents under `docs/spec/06-delivery/`. Current types, schemas,
@@ -167,7 +167,7 @@ unrelated transcript, title, usage, or Goal-report tasks.
     bypass approval, replay a claimed execution, or silently turn a Plan into
     Goal for legacy clients. Scheduling binds the same effective kind to the
     one-time snapshot; its existing missed/interrupted/no-replay rules remain.
-    ADR 0309 and affected runtime/UX/E2E specs must be amended because they
+    ADR plus-plan-goal-revision-and-one-time-execution-lifecycle and affected runtime/UX/E2E specs must be amended because they
     currently require a separate Goal revision and approval.
 
 ## Work packages and exclusive ownership

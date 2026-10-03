@@ -78,7 +78,7 @@ pnpm --filter @pi-desktop/desktop exec electron-vite build
 
 # The packaged candidate must carry an independently linked Electron main
 # executable: without it the app keeps the official application's main executable
-# UUID and loses its own Local Network identity (ADR 0308). A caller may point
+# UUID and loses its own Local Network identity (ADR plus-independent-application-identity). A caller may point
 # PI_ELECTRON_DIST at a distribution assembled earlier; otherwise assemble one
 # here, offline, from the pinned official distribution.
 if [[ -z "${PI_ELECTRON_DIST:-}" ]]; then

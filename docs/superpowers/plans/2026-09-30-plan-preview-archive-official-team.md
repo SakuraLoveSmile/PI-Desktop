@@ -63,7 +63,7 @@ scoped rules exist. Read existing source/tests and the relevant portions of:
 - `docs/spec/06-delivery/{03-ai-development-workflow,04-e2e-test-plan,05-change-checklist}.md`;
 - T1/T2: `docs/spec/04-ux/09-interaction-patterns.md`, FilesTab/Sidebar and nearby tests;
 - T3: `docs/spec/07-plugins/{07-plugin-marketplace,08-plugin-signing-updates,17-plus-curated-channel}.md`;
-- T4: `docs/adr/0307-expert-team-collaboration.md`, Team contracts and tests;
+- T4: `docs/adr/plus-expert-team-collaboration.md`, Team contracts and tests;
 - T5: `docs/spec/03-runtime/{04-data-storage,16-tool-result-limits,19-remote-agent-control-protocol}.md`, Goal report code and tests.
 
 Repository workflow rules take precedence over stale delivery prose, including
@@ -602,7 +602,7 @@ Record skipped checks honestly; preserve historical evidence as dated history.
 | 4 | AGENTS.md §7 hotspots | Stale: `plugins.rs` 79 LOC, `db.rs` 62, `ChatTranscript.tsx` 1. The real giant is `crates/host-core/src/rpc/mod.rs` (10727) |
 | 5 | AGENTS.md §2 scoped rules | Only `apps/desktop/src/AGENTS.md` exists; the electron, ipc, shared, host-core, agent-runtime, plugin-sdk paths are absent |
 | 6 | "Do not run `verify:ui:*`" | No such script exists in any `package.json`; the referenced gate is doc residue |
-| 7 | ADR 0307 implies nine tools in every mode | It does not: `docs/adr/0307:88-91` scopes them to Team turns and names four tools plus "etc." |
+| 7 | ADR plus-expert-team-collaboration implies nine tools in every mode | It does not: `docs/adr/plus-expert-team-collaboration:88-91` scopes them to Team turns and names four tools plus "etc." |
 | 8 | Global prose edits would reach "reports" | They do not: the report uses `.goal-report-prose` (`GoalReportTab.tsx:257`, `work-panel.css:1322`). Affected surfaces are chat, Team transcript, subagent transcript, table fullscreen preview, file preview |
 | 9 | Preserve file-viewer copy/export/maximize | `FilesTab` has four controls only: back, path+tooltip, size, reveal. Copy/export live in `MarkdownTable`, maximize in the WorkPanel header |
 | 10 | `resolvePlanArtifactPath()` resolves the owning project root | It resolves the scratch root only (`lib/plan-artifact.ts:41-43`); project artifacts stay workspace-relative and are joined with `workspace?.path` in `FilesTab.tsx` |

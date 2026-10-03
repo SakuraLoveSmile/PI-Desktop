@@ -822,7 +822,7 @@ bound to the running execution ID, active turn ID, and session ID. These are add
 and require no database migration. Tokens are deleted atomically when an execution finishes
 and cleared at Host startup. Session deletion removes both snapshot and authorization entries.
 
-Expert Team state is stored in three Host-owned tables (ADR 0307):
+Expert Team state is stored in three Host-owned tables (ADR plus-expert-team-collaboration):
 
 - `teams` is keyed by the Lead session and stores revision and pause state.
 - `team_members` binds durable member sessions to the Lead, with a unique name
