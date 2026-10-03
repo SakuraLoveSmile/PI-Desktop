@@ -83,7 +83,8 @@ export type McpServerInput = {
   env?: Record<string, string>;
   url?: string;
   headers?: Record<string, string>;
-  timeoutSeconds?: number;
+  /** Set to null to clear an existing server-specific timeout override. */
+  timeoutSeconds?: number | null;
   enabled?: boolean;
   scope?: ActivationScope;
 };

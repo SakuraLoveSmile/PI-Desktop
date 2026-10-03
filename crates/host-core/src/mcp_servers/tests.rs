@@ -57,6 +57,29 @@ fn config_round_trips_without_activation_fields() {
 }
 
 #[test]
+fn clearing_a_custom_timeout_restores_the_default() {
+    let dir = tempdir().unwrap();
+    let mut registry = McpServerRegistry::new(dir.path());
+    let mut initial = stdio("slow-server");
+    initial.timeout_seconds = Some(Some(45));
+    let saved = registry.upsert(initial).unwrap();
+    assert_eq!(saved.timeout_seconds, Some(45));
+
+    let preserve = serde_json::from_value(serde_json::json!({ "id": "slow-server" })).unwrap();
+    let preserved = registry.upsert(preserve).unwrap();
+    assert_eq!(preserved.timeout_seconds, Some(45));
+
+    let clear = serde_json::from_value(serde_json::json!({
+        "id": "slow-server",
+        "timeoutSeconds": null
+    }))
+    .unwrap();
+    let updated = registry.upsert(clear).unwrap();
+
+    assert_eq!(updated.timeout_seconds, None);
+}
+
+#[test]
 fn disabled_project_server_shadows_global_server() {
     let global = McpServerRecord {
         id: "files".into(),

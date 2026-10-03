@@ -5,7 +5,7 @@ use crate::agent_capabilities::{
     CapabilityLevel, CapabilityState, CapabilityTarget,
 };
 use anyhow::{bail, Context, Result};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::path::Path;
@@ -88,11 +88,21 @@ pub struct McpServerInput {
     pub env: Option<BTreeMap<String, String>>,
     pub url: Option<String>,
     pub headers: Option<BTreeMap<String, String>>,
-    pub timeout_seconds: Option<u64>,
+    #[serde(default, deserialize_with = "deserialize_timeout_override")]
+    pub timeout_seconds: Option<Option<u64>>,
     pub enabled: Option<bool>,
     /// Kept for protocol compatibility; capability state is app-local instead.
     #[allow(dead_code)]
     pub scope: Option<ActivationScope>,
+}
+
+fn deserialize_timeout_override<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<Option<u64>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Option::<u64>::deserialize(deserializer).map(Some)
 }
 
 pub struct McpServerRegistry {
@@ -424,7 +434,7 @@ impl McpServerRegistry {
             transport,
             timeout_seconds: input
                 .timeout_seconds
-                .or_else(|| current.and_then(|record| record.timeout_seconds)),
+                .unwrap_or_else(|| current.and_then(|record| record.timeout_seconds)),
             ..Default::default()
         };
         if config.transport == "stdio" {
