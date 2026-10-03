@@ -3809,7 +3809,7 @@ identify the platform validation still needed.
 
 - **Preconditions**: One retained logical project is visible in the sidebar and
   in Settings → Project archive; it has a primary folder and one additional
-  folder.
+  folder without chats.
 - **Steps**: 1) Open the project's overflow menu in the sidebar and choose
   Edit project. 2) Change the name, remove the additional folder, and add it
   again with the native folder picker. 3) Confirm the Primary row cannot be
@@ -3825,14 +3825,35 @@ identify the platform validation still needed.
   Primary folder as the first row, and updates the root count without removing
   another row. Saving persists one logical group with the adjusted roots; the
   name survives restart, while normalized paths, workspace identity, sessions,
-  and on-disk folders remain unchanged. A root with existing chats is rejected
-  instead of orphaning those chats.
+  and on-disk folders remain unchanged.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/08-component-spec.md`,
   `04-ux/09-interaction-patterns.md`
 - **Acceptance**: D (workspace identity), F (local presentation persistence)
 - **Milestone**: M5
 - **Status**: Unit-covered (`project-edit.test.mjs`,
   `sidebar-preferences.test.mjs`); rendered scenario Draft
+
+#### E2E-048c: Detach a project folder with chats and delete it
+
+- **Preconditions**: One retained logical project has a primary folder and an
+  additional folder with at least one saved chat. All chats are idle.
+- **Steps**: 1) Open Edit project and remove the additional folder. 2) Save and
+  inspect the remaining group and the standalone project row for the detached
+  folder. 3) Open the detached project's chat and confirm its transcript is
+  intact. 4) Delete the detached project using its two-click delete action.
+  5) Inspect the remaining group, project list, chat list, and folder on disk.
+- **Expected**: Removing the folder from the group preserves its project row,
+  chats, and transcripts, and exposes it as a standalone project. Future chats
+  use the detached project's path-scoped context; shared instructions and
+  memory remain with the original group. The confirmed delete then removes that
+  project's sessions and transcripts while keeping its folder on disk; the
+  original group remains with its primary folder.
+- **Specs linked**: `03-runtime/04-data-storage.md`,
+  `04-ux/08-component-spec.md`, `04-ux/09-interaction-patterns.md`, ADR 0249,
+  ADR 0251.
+- **Acceptance**: C (project and chat interaction), F (persistence), Quality.
+- **Milestone**: M5
+- **Status**: Host RPC integration-covered; full UI scenario Draft
 
 #### E2E-048A: Project session lists fold after the ten most recent rows
 
@@ -8768,16 +8789,20 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   6. Click a project file path in the conversation. Confirm it opens in this
      view on that file — a chat click now prefers the file view over the host
      `file:` tab.
-  7. Disable the File Manager plugin. Confirm the view disappears from the menu
+  7. Click a conversation reference to `src/example.ts:42`. Confirm the host
+     `file:` tab opens at line 42 even though the File Manager plugin is enabled.
+  8. Disable the File Manager plugin. Confirm the view disappears from the menu
      and the panel, and that a clicked conversation file path falls back to the
      host `file:<path>` tab under Open resources.
-  8. Re-enable it, then restart the app. Confirm the enabled state and the tree
+  9. Re-enable it, then restart the app. Confirm the enabled state and the tree
      return, and that the registry did not gain a duplicate row.
 - **Expected**: A panel surface runs entirely on the public plugin contribution
   channel, is user-disableable, cannot be uninstalled, and survives restart. Its
   host-mediated actions obey the declared `fs.read` scope, and its own reads and
   writes stay inside the jail of the one project folder it is browsing
-  (ADR 0241, ADR 0263).
+  (ADR 0241, ADR 0263). Plain project-file links open in the bundled view; a
+  positioned `path:line` reference opens the host file tab and scrolls the
+  requested line even while the plugin view is available.
 - **Specs linked**: `07-plugins/03-plugin-api.md` §3,
   `07-plugins/13-plugin-permissions-matrix.md` §2,
   `04-ux/08-component-spec.md` §5, ADR 0104, ADR 0109, ADR 0111,
@@ -9287,6 +9312,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 | A / C / Quality — Sidebar material and settings return | E2E-LAYOUT-sidebar-settings |
 | C / Quality — Destination loading and focus | E2E-087b |
 | A / H / Quality — Renderer process crash recovery | E2E-RUNTIME-renderer-crash-recovery |
+| C / F / Quality — Project folder with chats detaches and deletes safely | E2E-048c |
 | B / F / Security — Provider copy | E2E-PROVIDER-copy-config-without-credentials |
 | B / F / Quality — Selected model order | E2E-MODEL-selected-order-persists |
 | E / F / Quality — MCP server timeout override | E2E-261 |
@@ -16384,6 +16410,24 @@ renderer's durable transcript reads. No real model or provider is contacted.
 - Installed Electron, real account/paid API and cross-version rollback are
   separate release qualification. No MCP, Codemode or virtual-router migration
   is included. See `docs/project/pi-0991-adoption.md` for candidate evidence.
+
+#### E2E-262: Transcript path:line opens and scrolls the host file viewer
+
+- **Preconditions:** Isolated Electron/Chromium, an active workspace and session,
+  the bundled file-manager view available, and deterministic filesystem IPC
+  fixtures.
+- **Steps:** Render a real transcript `path:line:column` reference followed by
+  sentence punctuation; click its verified file chip and wait for the host file
+  viewer to load.
+- **Expected:** Despite the bundled file-manager view being available, the
+  positioned reference opens in the host's read-only file tab. The file request
+  retains its line and column, and the viewer scrolls the requested line into
+  the visible center area. The path and file contents remain the same as the
+  reference target.
+- **Specs:** `04-ux/08` §11.8; ADR 0262.
+- **Status:** `node scripts/e2e-file-ref-line-scroll.mjs` mounts production
+  `LinkifiedText` and `FilesTab` in isolated Electron with filesystem IPC
+  fixtures; no real project files or provider are used.
 
 ### Imported-extension GUI executable discovery regression (#1173)
 
