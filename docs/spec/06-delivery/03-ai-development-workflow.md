@@ -185,6 +185,30 @@ an unambiguous pull request number for this repository.
 - When both an issue and a pull request are linked, R6 applies to the pull
   request and R5 still applies to the issue after the merged outcome.
 
+#### R6.1 — Temporary pull-request type restriction
+
+> **While this subsection is in force, outside contributions are limited to
+> `perf` and `fix` pull requests; maintainer-planned work keeps every type.**
+
+- Effective 2026-09-26 until a maintainer removes this subsection.
+- The restriction governs outside contributions. Maintainers — accounts with
+  write access to this repository, plus the branches and automated agent work
+  they direct — keep every change type, including `feat`.
+- An outside pull request of any other change type — `feat`, `refactor`,
+  `docs`, `test`, `chore`, `build`, or `ci` — is not a landing candidate.
+  Comment with this policy in the pull request's language, then close it
+  without merging, and do not reimplement it as a replacement while the
+  restriction is in force. The type is read from the pull request's title and
+  commits; relabelling other work as `fix` or `perf` does not qualify it.
+- Feature intent goes to a feature request issue, not to a pull request.
+- `fix` and `perf` pull requests still carry the full R6 bar: the real root
+  cause, the smallest coherent change, and no harm blockers.
+- Closing a pull request whose type is out of scope does not violate R6's "do
+  not discard contributor work" clause; that clause protects an in-scope
+  root-cause fix.
+- Removing this subsection lifts the restriction. It is not a permanent
+  narrowing of the contribution scope.
+
 ### R7 — Code-bearing changes require relevant E2E after main integration
 
 > **Every code-bearing change must pass relevant E2E on a candidate that
@@ -556,8 +580,9 @@ When the change is a **stable app version release** (version bump + tag),
 Definition of Done also requires, **before** the tag, that every
 version-bearing surface describes the new version: the shipped-locale in-app
 changelog entries in `packages/shared/src/changelog.ts` (English and every
-shipped product locale, with aligned highlight counts) with its `changelog.test.ts` list, every workspace
-`package.json` (including `docs/package.json`), the Cargo workspace version and
+shipped product locale, with aligned highlight counts) with its `changelog.test.ts` list, every app
+`package.json` (root, `apps/*`, and `docs/package.json`; `packages/*` keep the
+upstream-synced version, ADR plus-version-line), the Cargo workspace version and
 `host-core` lockfile entry, `APP_VERSION`, and the release line stated in
 `README.md` + `README.zh-CN.md`. `node scripts/check-release-docs.mjs` must
 pass; `scripts/release.mjs` runs it and refuses to tag otherwise. See
@@ -633,4 +658,7 @@ This workflow spec itself is accepted when:
       on in the issue language and closed when conclusive.
 - [ ] Linked GitHub pull requests land only when they fix the reported root
       cause with a minimal diff; contributor work is not discarded for nits.
+- [ ] Outside contributions are limited to `perf` and `fix` pull requests while
+      the temporary type restriction in R6.1 is in force.
+
 - [ ] All indexes updated (NAV, delivery README, spec README, docs README, BOARD).

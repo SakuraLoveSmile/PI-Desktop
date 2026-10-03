@@ -297,6 +297,20 @@ test("wrapped user links keep plaintext alignment", () => {
   assert.match(userLinkStyles, /overflow-wrap:\s*anywhere;/);
 });
 
+test("user-message links stay selectable inside the inert button baseline", () => {
+  // base.css makes every <button> unselectable, and a class selector outranks
+  // that type rule. Without this opt-in a drag across the message skips the
+  // URL and copying drops it.
+  assert.match(
+    stylesSource,
+    /button,\s*\[role="button"\],[\s\S]*?\{\s*-webkit-user-select:\s*none;\s*user-select:\s*none;/,
+  );
+  const userLinkStyles = stylesSource.match(/\.chat-text-link \{([^}]*)\}/)?.[1];
+  assert.ok(userLinkStyles);
+  assert.match(userLinkStyles, /-webkit-user-select:\s*text;/);
+  assert.match(userLinkStyles, /(?<!-webkit-)user-select:\s*text;/);
+});
+
 test("user-message file chips reuse the composer chip node", () => {
   assert.match(transcriptSource, /className=\"composer-chip chat-file-chip\"/);
   assert.match(transcriptSource, /composer-chip-name/);
@@ -569,6 +583,25 @@ test("thread scroll reserves stable gutters before overflow appears", () => {
   assert.match(
     stylesSource,
     /\.thread-scroll\s*\{[\s\S]*?overflow:\s*auto;[\s\S]*?scrollbar-gutter:\s*stable;/,
+  );
+});
+
+test("the display toolbar keeps its top band when the minimap rail mounts", async () => {
+  // Not part of globals.css: the control imports its own stylesheet.
+  const toolbarStyles = await readFile(
+    new URL("../src/styles/thinking-display-control.css", import.meta.url),
+    "utf8",
+  );
+  // The rail mounts between the toolbar and the scroller once the settle veil
+  // lifts. An adjacent-sibling match stops applying then and the transcript
+  // content gains 8px at its top.
+  assert.match(
+    toolbarStyles,
+    /\.transcript-display-toolbar ~ \.thread-scroll \.thread-content \{\s*padding-top:\s*12px;/,
+  );
+  assert.doesNotMatch(
+    toolbarStyles,
+    /\.transcript-display-toolbar \+ \.thread-scroll/,
   );
 });
 

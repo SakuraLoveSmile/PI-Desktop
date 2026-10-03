@@ -245,21 +245,19 @@ export function RemoteHostsPage() {
             value={addMode}
             onChange={(mode) => setAddMode(mode)}
             options={[
-              { value: "ssh", label: t("settings.remoteHosts.addSsh") },
-              { value: "pair", label: t("settings.remoteHosts.addPair") },
+              { value: "ssh", label: t("settings.remoteHosts.addSsh"), id: "remote-host-add-ssh", controls: "remote-host-add-panel-ssh" },
+              { value: "pair", label: t("settings.remoteHosts.addPair"), id: "remote-host-add-pair", controls: "remote-host-add-panel-pair" },
             ]}
             label={t("settings.remoteHosts.addTitle")}
             role="tablist"
             disabled={busy}
-            tabIdPrefix="remote-host-add"
-            panelIdPrefix="remote-host-add-panel"
           />
         </div>
         <div className="settings-panel">
           <form
             id="remote-host-add-panel-ssh"
             role="tabpanel"
-            aria-labelledby="remote-host-add-tab-ssh"
+            aria-labelledby="remote-host-add-ssh"
             hidden={addMode !== "ssh"}
             className="settings-remote-host-form settings-remote-host-add-panel"
             onSubmit={submitSsh}
@@ -386,7 +384,7 @@ export function RemoteHostsPage() {
           <form
             id="remote-host-add-panel-pair"
             role="tabpanel"
-            aria-labelledby="remote-host-add-tab-pair"
+            aria-labelledby="remote-host-add-pair"
             hidden={addMode !== "pair"}
             className="settings-remote-host-form settings-remote-host-add-panel"
             onSubmit={submit}

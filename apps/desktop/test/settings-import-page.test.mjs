@@ -30,10 +30,8 @@ function cssRule(selector) {
 test("import is one workbench per kind instead of four stacked scan cards", () => {
   // One tab strip owns the four kinds; each kind gets one panel behind it.
   assert.match(page, /role="tablist"/);
-  assert.match(page, /tabIdPrefix="import"/);
-  assert.match(page, /panelIdPrefix="import-panel"/);
-  assert.match(page, /id={`import-panel-\$\{entry\.id\}`}/);
-  assert.match(page, /<SegmentedControl/);
+  assert.match(page, /id: `import-tab-\$\{entry\.id\}`/);
+  assert.match(page, /controls: `import-panel-\$\{entry\.id\}`/);
   assert.match(page, /aria-labelledby={`import-tab-\$\{entry\.id\}`}/);
 
   // One toolbar and one idle state per kind — not per section or per step.

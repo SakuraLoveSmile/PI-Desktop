@@ -1,4 +1,4 @@
-import test from "node:test";
+﻿import test from "node:test";
 import assert from "node:assert/strict";
 import { scaleBoundsToDip } from "../electron/main/plugin-view-bounds.ts";
 
@@ -10,6 +10,8 @@ test("scaleBoundsToDip leaves a 100% zoom rect unchanged", () => {
 });
 
 test("scaleBoundsToDip multiplies CSS pixels by zoomFactor", () => {
+  // At 90% zoom a CSS x of 1333 maps to DIP 1200 — matching the ~148px
+  // right-shift reported in #980 when CSS pixels were passed through.
   assert.deepEqual(
     scaleBoundsToDip({ x: 1333, y: 40, width: 400, height: 800 }, 0.9),
     { x: 1200, y: 36, width: 360, height: 720 },

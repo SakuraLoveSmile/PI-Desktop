@@ -22,10 +22,12 @@ pub(crate) const PLUS_SCHEMA_VERSION: i64 = 4;
 
 /// `user_version` a legacy fork database is reset to: the last number the
 /// fork shared with upstream before it used v20..=v23 for Plus-only changes.
-const FORK_SHARED_BASELINE: i64 = 19;
+pub(super) const FORK_SHARED_BASELINE: i64 = 19;
 
 /// `user_version` values released fork builds used for Plus-only changes.
-const LEGACY_FORK_VERSIONS: RangeInclusive<i64> = 20..=23;
+/// This is released history: it does not move when upstream raises
+/// `SCHEMA_VERSION`, and from 20 upward it overlaps upstream's own numbers.
+pub(super) const LEGACY_FORK_VERSIONS: RangeInclusive<i64> = 20..=23;
 
 /// Tables only the Plus track creates. Their presence proves a Plus build
 /// touched the file; keep in sync with [`STEPS`] (a test enforces it).
@@ -255,7 +257,9 @@ fn reject_newer_plus_version(plus_version: i64) -> Result<()> {
 ///   Plus step, stamped on the Plus track, and reset to the shared baseline.
 /// - A reconciled database an older fork build bumped back into that range
 ///   (meta present, `user_version` above this build's chain) is backed up and
-///   restored to the `user_version` the meta recorded.
+///   restored to the `user_version` the meta recorded. Numbers the shared
+///   chain has reached are upstream's and are never repaired, so the repair
+///   window shrinks as `SCHEMA_VERSION` rises and closes at 23.
 ///
 /// Every other number is returned unchanged; the caller refuses what it does
 /// not support.

@@ -160,7 +160,8 @@ Surfaces in scope:
 | `packages/shared/src/changelog.ts` | Newest-first English, zh-CN, and zh-TW entries, matching highlight counts |
 | `packages/shared/src/changelog-de.ts`, `changelog-es.ts`, `changelog-fr.ts`, `changelog-ko.ts`, `changelog-tr.ts` | Same versions and highlight counts as English |
 | `packages/shared/src/changelog.test.ts` | Version added at the top of the newest-first list |
-| `package.json`, `apps/*/package.json`, `packages/*/package.json`, `docs/package.json` | Same version (`docs` is a third workspace root, not under `apps`/`packages`) |
+| `package.json`, `apps/*/package.json`, `docs/package.json` | Same version (`docs` is a third workspace root, not under `apps`/`packages`) |
+| `packages/*/package.json` | Not bumped by a release: each keeps the version of the upstream tree last synced from, and the preflight only requires them to agree with each other (ADR plus-version-line) |
 | `Cargo.toml` `[workspace.package]`, `Cargo.lock` `host-core` | Same version |
 | `packages/shared/src/protocol.ts` `APP_VERSION` | Same version |
 | `README.md`, `README.zh-CN.md` | Status section states the current `<major>.<minor>.x` release line; toolchain, command, and roadmap claims still true |
@@ -299,24 +300,12 @@ exactly one architecture-labelled DMG and ZIP (including blockmaps) and rejects
 any unlabelled or wrong-architecture macOS artifact.
 
 The DMG uses a branded 720×440 background with a two-icon drag-to-Applications
-gesture. The app and Applications link are the only items in the window. The
-opening-help note and the executable command helper are not included in the DMG.
+gesture. The app and Applications link are the only items in the window.
 
-The macOS ZIP includes both `Pi-Desktop-Plus-macOS-opening-help.txt` and the
-executable `Pi-Desktop-Plus-macOS-open.command` at the package root. After moving
-`Pi-Desktop-Plus.app` to `/Applications` or `~/Applications`, ZIP users can
-double-click the helper. It searches only those two fixed locations, removes
-only the recursive `com.apple.quarantine` attribute when present, and opens
-Pi-Desktop-Plus. Before doing so it verifies `CFBundleIdentifier=cn.sakura.pi-desktop`.
-It does not use `sudo` or accept an arbitrary application path. The manual
-fallback for the standard system location is:
-
-```sh
-xattr -r -d com.apple.quarantine /Applications/Pi-Desktop-Plus.app
-```
-
-This helper is only for a trusted unsigned artifact when macOS reports that the
-app is damaged. Signed and notarized builds should open without it.
+The macOS ZIP contains `Pi-Desktop-Plus.app` at its root. Neither the DMG nor ZIP
+ships an opening-help note or executable first-launch helper, including local
+and unsigned debug builds. Tagged artifacts remain signed and notarized; the
+unsigned lane is for debugging and does not imply Gatekeeper qualification.
 
 DMG, ZIP, NSIS, AppImage, deb, rpm, blockmap, and updater feed outputs are already
 compressed or compression-insensitive. The workflow therefore uploads their
