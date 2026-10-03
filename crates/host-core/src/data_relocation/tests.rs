@@ -313,6 +313,75 @@ fn handles_legacy_schema_without_upgrading_or_creating_missing_tables() {
 }
 
 #[test]
+fn legacy_fork_database_is_not_reconciled_onto_the_plus_track_by_relocation() {
+    let temporary = tempfile::tempdir().unwrap();
+    let source = temporary.path().join("old");
+    let destination = temporary.path().join("new");
+    fs::create_dir_all(&source).unwrap();
+    fs::create_dir_all(&destination).unwrap();
+    // The shape `Database::open` would reconcile: a Plus-only table, no Plus
+    // meta, and a `user_version` inside the range legacy fork builds used.
+    let database = Connection::open(destination.join("pi.sqlite")).unwrap();
+    database
+        .execute_batch(
+            "PRAGMA user_version=23;
+             CREATE TABLE projects(id INTEGER PRIMARY KEY,path TEXT UNIQUE);
+             CREATE TABLE goal_reports(execution_id TEXT PRIMARY KEY,file_path TEXT);",
+        )
+        .unwrap();
+    database
+        .execute(
+            "INSERT INTO projects(path) VALUES (?1)",
+            params![source.join("project").to_string_lossy()],
+        )
+        .unwrap();
+    database
+        .execute(
+            "INSERT INTO goal_reports(execution_id,file_path) VALUES ('exec','goal_reports/session/exec.json')",
+            [],
+        )
+        .unwrap();
+    drop(database);
+    relocate(&source, &destination).unwrap();
+    let database = Connection::open(destination.join("pi.sqlite")).unwrap();
+    let version: i64 = database
+        .query_row("PRAGMA user_version", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(
+        version, 23,
+        "relocation must leave the schema version for the next normal open"
+    );
+    let meta_tables: i64 = database
+        .query_row(
+            "SELECT count(*) FROM sqlite_master WHERE name='plus_schema_meta'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(meta_tables, 0, "relocation must not stamp the Plus track");
+    let path: String = database
+        .query_row("SELECT path FROM projects", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(path, destination.join("project").to_string_lossy());
+    // Fork-owned persisted paths are relative to the data root, so they keep
+    // resolving after the profile moves and must stay byte-identical.
+    let report: String = database
+        .query_row("SELECT file_path FROM goal_reports", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(report, "goal_reports/session/exec.json");
+    drop(database);
+    let entries: Vec<_> = fs::read_dir(&destination)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    assert_eq!(
+        entries,
+        ["pi.sqlite"],
+        "a Plus reconcile backup would add a sibling file"
+    );
+}
+
+#[test]
 fn project_capability_overrides_follow_the_moved_project_without_changing_globals() {
     use crate::agent_capabilities::{CapabilityLevel, CapabilityState};
     let temporary = tempfile::tempdir().unwrap();
