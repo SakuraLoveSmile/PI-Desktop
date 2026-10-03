@@ -45,13 +45,50 @@ transport support from a models.dev metadata match or an account endpoint
 override. Both Pi and models.dev metadata projections can carry that binding;
 unverified routes and generic records retain the conservative fallback.
 
-The existing Pi 0.99.1 dependency patch adds the missing mid-conversation system
+The Pi 1.0.0 dependency patch adds the missing mid-conversation system
 capability to its `deepseek-flash` catalog entry. Authorized official-endpoint
 experiments confirmed both preserved cache reuse and effective updated
 instructions. Keep this correction in the single Pi catalog, not a parallel
 Desktop allowlist; remove the hunk when an upgraded Pi catalog carries it.
 The model/API/endpoint binding check still excludes aliases and relays. Native
 tool-addition and tool-change flags are not enabled by this correction.
+
+## Fixed declarations for the verified Flash route
+
+For the exact official `deepseek-flash` / `openai-completions` binding with
+verified chronological system support, declare the complete current tool catalog
+in deterministic name order from the first request. ToolSearch changes execution
+activation only. This is a Desktop declaration policy, not an additional Pi
+transport capability or an endpoint switch. Other bindings keep on-demand
+schema publication; native tool-state flags alone do not prove cache stability.
+
+Keep activation separate from declarations in a versioned `tool_activation`
+system section. The section records active deferred names and a SHA-256 identity
+of the account, model, API, endpoint, declarations and deferred-name set. Updates
+append after tool results and persist through the existing Host journal and
+compaction checkpoint. Restoration never interprets the complete declaration
+snapshot as permission to execute every tool. Successful ToolSearch results
+newer than the saved activation section recover an interrupted activation.
+Invalid, unknown-version or mismatched state grants no activation. Legacy
+histories without this section retain their existing activation evidence rules.
+
+Check activation before extension hooks or Host execution, then retain all
+existing mode, approval and Host restrictions. A catalog/schema/mode/account or
+route change starts a new declaration epoch and invalidates prior activation;
+removed tools cannot be invoked. Temporary prompt replacement must preserve the
+activation metadata. Current runtime activation remains authoritative between
+prompts; declarations do not re-grant revoked activation.
+
+DeepSeek limits a request to 128 functions. If the full catalog exceeds that
+limit, or its estimated prompt/schema cost leaves less than the ordinary
+retained-tail budget below the automatic compaction threshold, use the existing
+on-demand path and log the fallback reason. Never truncate a catalog. Context
+estimation charges the full declared catalog while fixed declarations are active.
+
+The first request is larger. Short conversations may cost more overall even
+when later cache-hit ratios improve. Acceptance compares cold and subsequent
+uncached tokens and cumulative input cost across both short and longer synthetic
+conversations; no universal savings or hit-rate guarantee is made.
 
 ## Alternatives and consequences
 

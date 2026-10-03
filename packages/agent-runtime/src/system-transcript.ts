@@ -1,3 +1,4 @@
+import { TOOL_ACTIVATION_SECTION } from "./fixed-tool-declarations.js";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import {
   contentText,
@@ -35,7 +36,7 @@ function currentSystemMessage(messages: readonly AgentMessage[]): SystemMessage 
 export const CONTEXT_BUDGET_SECTION = "context_budget";
 
 function desktopSectionNames(sections: Record<string, unknown>): string[] {
-  return ["runtime", "skills", ...Object.keys(sections)
+  return ["runtime", TOOL_ACTIVATION_SECTION, "skills", ...Object.keys(sections)
     .filter((name) => name.startsWith(SKILL_SECTION_PREFIX))
     .sort((a, b) => a.localeCompare(b)), "context"];
 }
@@ -83,7 +84,8 @@ export function initialSystemTranscript(
 
 export function replaceSystemPrompt(messages: AgentMessage[], prompt: string): AgentMessage[] {
   if (prompt === getCurrentSystemPrompt(messages) || prompt === systemPromptContent(messages)) return messages;
-  return syncSystemSections(messages, { runtime: prompt });
+  const activation = getCurrentSystemMessage(messages)?.sections?.[TOOL_ACTIVATION_SECTION];
+  return syncSystemSections(messages, { runtime: prompt, ...(activation ? { [TOOL_ACTIVATION_SECTION]: activation } : {}) });
 }
 
 export function rebuildSystemTranscript(
