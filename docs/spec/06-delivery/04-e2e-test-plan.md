@@ -16364,3 +16364,21 @@ renderer's durable transcript reads. No real model or provider is contacted.
 - Installed Electron, real account/paid API and cross-version rollback are
   separate release qualification. No MCP, Codemode or virtual-router migration
   is included. See `docs/project/pi-0991-adoption.md` for candidate evidence.
+
+#### E2E-262: Transcript path:line opens and scrolls the host file viewer
+
+- **Preconditions:** Isolated Electron/Chromium, an active workspace and session,
+  the bundled file-manager view available, and deterministic filesystem IPC
+  fixtures.
+- **Steps:** Render a real transcript `path:line:column` reference followed by
+  sentence punctuation; click its verified file chip and wait for the host file
+  viewer to load.
+- **Expected:** Despite the bundled file-manager view being available, the
+  positioned reference opens in the host's read-only file tab. The file request
+  retains its line and column, and the viewer scrolls the requested line into
+  the visible center area. The path and file contents remain the same as the
+  reference target.
+- **Specs:** `04-ux/08` §11.8; ADR 0262.
+- **Status:** `node scripts/e2e-file-ref-line-scroll.mjs` mounts production
+  `LinkifiedText` and `FilesTab` in isolated Electron with filesystem IPC
+  fixtures; no real project files or provider are used.

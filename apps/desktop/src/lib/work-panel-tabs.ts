@@ -36,6 +36,21 @@ export type WorkPanelContext = WorkPanelTabsState & {
   } | null;
 };
 
+/** Build the file-view request represented by an active file tab. */
+export function createWorkPanelFileRequest(
+  tab: WorkPanelTab,
+  seq: number,
+): WorkPanelContext["fileRequest"] {
+  if (tab.kind !== "file" || !tab.resource) return null;
+  return {
+    path: tab.resource,
+    seq,
+    ...(tab.mimeType ? { mimeType: tab.mimeType } : {}),
+    ...(tab.line != null ? { line: tab.line } : {}),
+    ...(tab.column != null ? { column: tab.column } : {}),
+  };
+}
+
 let newWorkPanelTabSequence = 0;
 
 export function emptyWorkPanelContext(): WorkPanelContext {

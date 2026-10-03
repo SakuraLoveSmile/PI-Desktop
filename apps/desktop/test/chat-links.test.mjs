@@ -735,6 +735,8 @@ test("adjacent parenthesis-wrapped URLs all remain independently linkable", () =
 test("parseFileRefPosition keeps :line[:col] that parseFileRef strips", () => {
   assert.deepEqual(parseFileRefPosition("src/main.rs:42"), { line: 42 });
   assert.deepEqual(parseFileRefPosition("src/main.rs:42:7"), { line: 42, column: 7 });
+  assert.deepEqual(parseFileRefPosition("src/main.rs:42."), { line: 42 });
+  assert.deepEqual(parseFileRefPosition("src/main.rs:42:7,"), { line: 42, column: 7 });
   assert.equal(parseFileRefPosition("src/main.rs"), null);
   assert.equal(parseFileRefPosition("src/main.rs:0"), null);
 });
@@ -746,6 +748,12 @@ test("resolvePreviewTarget carries line/col on file chips (#681)", () => {
     line: 42,
   });
   assert.deepEqual(resolvePreviewTarget("src/a.ts:42:7", ROOT), {
+    kind: "file",
+    path: "src/a.ts",
+    line: 42,
+    column: 7,
+  });
+  assert.deepEqual(resolvePreviewTarget("src/a.ts:42:7.", ROOT), {
     kind: "file",
     path: "src/a.ts",
     line: 42,

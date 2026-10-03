@@ -56,7 +56,8 @@ function stripLineRef(path: string): string {
 export function parseFileRefPosition(
   text: string,
 ): { line: number; column?: number } | null {
-  const match = text.trim().match(/:(\d+)(?::(\d+))?$/);
+  const token = text.trim().replace(/[.,!?;:，。！？；：]+$/u, "");
+  const match = token.match(/:(\d+)(?::(\d+))?$/);
   if (!match) return null;
   const line = Number(match[1]);
   if (!Number.isFinite(line) || line < 1) return null;
@@ -214,7 +215,10 @@ export function resolvePreviewTarget(
   const trimmed = text.trim();
   if (isHttpUrl(trimmed)) return { kind: "url", url: trimmed };
   const position = parseFileRefPosition(trimmed);
-  const at = unwrapAtFileRef(trimmed);
+  const pathText = position
+    ? trimmed.replace(/[.,!?;:，。！？；：]+$/u, "")
+    : trimmed;
+  const at = unwrapAtFileRef(pathText);
   if (at) {
     const cleaned = stripLineRef(at);
     if (isAbsoluteFilePath(cleaned)) {
@@ -223,7 +227,7 @@ export function resolvePreviewTarget(
     const rel = toWorkspaceRel(cleaned, root, baseDir);
     return rel ? { kind: "file", path: rel, ...(position ?? {}) } : null;
   }
-  const file = parseFileRef(trimmed);
+  const file = parseFileRef(pathText);
   if (!file) return null;
   if (isAbsoluteFilePath(file)) return { kind: "file", path: file, ...(position ?? {}) };
   const rel = toWorkspaceRel(file, root, baseDir);

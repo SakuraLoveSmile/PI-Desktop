@@ -139,7 +139,10 @@ function useResolveChatFileRef() {
  * (ADR 0163): it is a page to run, not a file to read. A plain project file
  * opens in the bundled file view when available; a positioned `path:line`
  * reference uses the host file tab, which can scroll to the requested line.
- * Scratch and attachment files also use the host file tab.
+ * The plugin view accepts opaque path locations and has no line-navigation
+ * contract, so positioned references keep their path unchanged and use the
+ * host viewer's existing scroll support. Scratch and attachment files also use
+ * the host file tab.
  */
 export function useOpenChatFileRef() {
   const resolveRef = useResolveChatFileRef();
