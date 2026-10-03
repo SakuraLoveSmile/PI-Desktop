@@ -1,19 +1,25 @@
 import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import test from "node:test";
+import { register } from "node:module";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { loadStyles } from "./helpers/styles.mjs";
-import { en } from "../../../packages/i18n/src/locales/en/index.ts";
-import { zhCN } from "../../../packages/i18n/src/locales/zh-CN/index.ts";
-import { zhTW } from "../../../packages/i18n/src/locales/zh-TW/index.ts";
-import { de } from "../../../packages/i18n/src/locales/de/index.ts";
-import { es } from "../../../packages/i18n/src/locales/es/index.ts";
-import { fr } from "../../../packages/i18n/src/locales/fr/index.ts";
-import { ko } from "../../../packages/i18n/src/locales/ko/index.ts";
-import { ptBR } from "../../../packages/i18n/src/locales/pt-BR/index.ts";
-import { tr } from "../../../packages/i18n/src/locales/tr/index.ts";
+
+// The non-English catalogs import the English one through a `.js` specifier
+// that only exists as `.ts` on disk, so they load through the shared hooks.
+const here = dirname(fileURLToPath(import.meta.url));
+register(pathToFileURL(join(here, "helpers/ts-import-hooks.mjs")));
+const { en } = await import("../../../packages/i18n/src/locales/en/index.ts");
+const { zhCN } = await import("../../../packages/i18n/src/locales/zh-CN/index.ts");
+const { zhTW } = await import("../../../packages/i18n/src/locales/zh-TW/index.ts");
+const { de } = await import("../../../packages/i18n/src/locales/de/index.ts");
+const { es } = await import("../../../packages/i18n/src/locales/es/index.ts");
+const { fr } = await import("../../../packages/i18n/src/locales/fr/index.ts");
+const { ko } = await import("../../../packages/i18n/src/locales/ko/index.ts");
+const { ptBR } = await import("../../../packages/i18n/src/locales/pt-BR/index.ts");
+const { tr } = await import("../../../packages/i18n/src/locales/tr/index.ts");
 
 /**
  * The Agent > MCP page owns one block that is not an installed server: the
@@ -22,7 +28,6 @@ import { tr } from "../../../packages/i18n/src/locales/tr/index.ts";
  * a row that can be filtered, moved, renamed, deleted, or OAuth-authorized.
  */
 const catalogs = { en, "zh-CN": zhCN, "zh-TW": zhTW, de, es, fr, ko, "pt-BR": ptBR, tr };
-const here = dirname(fileURLToPath(import.meta.url));
 const read = (path) => readFileSync(join(here, path), "utf8");
 const mcp = read("../src/components/settings/AgentMcpPage.tsx");
 const api = read("../src/lib/api.ts");

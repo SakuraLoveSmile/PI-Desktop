@@ -268,7 +268,7 @@ test("assistant turn renders responses before secondary turn-process disclosure"
   );
   assert.match(
     assistantTurnSource,
-    /\{responses\.map\(renderPart\)\}[\s\S]*?<TurnProcess[\s\S]*?hasAnswer=\{Boolean\(actionMessage \|\| content\)\}/,
+    /<AssistantTurnParts parts=\{responses\}[\s\S]*?<TurnProcess[\s\S]*?hasAnswer=\{Boolean\(actionMessage\)\}/,
     "responses (the answer) must be rendered before TurnProcess in the turn hierarchy",
   );
   assert.match(
