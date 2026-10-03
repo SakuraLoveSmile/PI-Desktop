@@ -4908,6 +4908,14 @@ eleven-tool-round desktop paths are verified by
 - **里程碑**：M5
 - **状态**：单元覆盖（`apps/desktop/test/mcp-oauth.test.mjs`、`apps/desktop/test/user-mcp.test.mjs`）；完整 UI 之旅草案
 
+#### E2E-261：清除单服务器 MCP 超时覆盖
+
+- **前提**：隔离 Electron 配置及一个超时覆盖为 45 秒的已保存 MCP 服务器；不连接真实服务器或提供商。
+- **步骤**：打开生产 MCP 编辑器，输入超出范围的值并确认保存按钮禁用，然后清空超时字段并保存。
+- **预期**：无效超时无法保存。清空已有覆盖是有效操作，并序列化为 `timeoutSeconds: null`，使 host-core 删除覆盖并使用默认值。
+- **验收**：`node scripts/e2e-mcp-timeout-clear.mjs` 使用生产编辑器验证表单和保存序列化。`apps/desktop/test/mcp-editor-timeout.test.mjs` 覆盖值转换；host-core MCP 测试覆盖 null 清除及默认行为。不连接真实 MCP 服务器。
+- **里程碑**：M6+
+
 #### E2E-101：用户技能编写一次并限定每个项目的范围
 
 - **先决条件**：磁盘上有两个项目。每个中都有一个 Agent 会话。
@@ -5519,6 +5527,7 @@ eleven-tool-round desktop paths are verified by
 | A / H / Quality — 渲染器进程崩溃恢复 | E2E-RUNTIME-renderer-crash-recovery |
 | B / F / Security — 提供商复制 | E2E-PROVIDER-copy-config-without-credentials |
 | B / F / Quality — 已选模型顺序 | E2E-MODEL-selected-order-persists |
+| E / F / Quality — MCP 服务器超时覆盖 | E2E-261 |
 | A — 应用程序启动 | E2E-001、E2E-002、E2E-003、E2E-004、E2E-067、E2E-076、E2E-079、E2E-092、E2E-097、E2E-143、E2E-150、E2E-168、E2E-204、E2E-217 |
 | B——模型配置 | E2E-005、E2E-005G、E2E-006、E2E-007、E2E-038、E2E-050、E2E-052、E2E-055、E2E-066、E2E-080、E2E-082、E2E-151、E2E-005J、E2E-199、E2E-201、E2E-202、E2E-203、E2E-209、E2E-166 |
 | C — 对话和直播 | E2E-CHAT-running-status-survives-output-pauses、E2E-008、E2E-008d、E2E-008a、E2E-009、E2E-010、E2E-011、E2E-011a、E2E-011b、E2E-031、E2E-040、E2E-047、E2E-048、E2E-048A、E2E-049、E2E-052、 E2E-053、E2E-054、E2E-055、E2E-059、E2E-059a、E2E-060c、E2E-060d、E2E-061、E2E-061a、E2E-062、E2E-064、E2E-065、E2E-068、E2E-071、 E2E-073、E2E-074、E2E-075、E2E-081、E2E-083、E2E-084、E2E-086、E2E-087、E2E-088、E2E-088b、E2E-089、E2E-090、E2E-094、E2E-095、E2E-096、 E2E-097、E2E-098、E2E-099、E2E-102、E2E-102a、E2E-102b、E2E-106、E2E-109、E2E-111、E2E-114、E2E-116、E2E-117、E2E-118、E2E-119、 E2E-120、E2E-121、E2E-代理-001、E2E-142、E2E-144、E2E-145、E2E-146、E2E-147、E2E-151、E2E-199、E2E-250、E2E-166、E2E-SUBAGENT-resume-a-settled-delegation |
@@ -5589,6 +5598,7 @@ eleven-tool-round desktop paths are verified by
 | M6+ | E2E-121、E2E-122、E2E-123、E2E-142、E2E-148、E2E-150、E2E-151、E2E-168、E2E-199、E2E-200、E2E-202、E2E-203、E2E-209、E2E-211、E2E-UPDATE-preference-and-once-only-reminder、E2E-212、E2E-213、E2E-214、E2E-215、E2E-216、E2E-217、E2E-257、E2E-166、E2E-SUBAGENT-resume-a-settled-delegation |
 | M6+（Session Orchestrator） | E2E-PLUGIN-session-orchestrator-real-workers |
 | M6+（已选模型顺序） | E2E-MODEL-selected-order-persists |
+| M6+（MCP 服务器超时覆盖） | E2E-261 |
 | M6+（目的页加载与焦点） | E2E-087b |
 | M6+（会话列表响应性） | E2E-SESSION-list-refresh-keeps-desktop-responsive |
 | M6+（Windows 更新缓存） | E2E-260 |
