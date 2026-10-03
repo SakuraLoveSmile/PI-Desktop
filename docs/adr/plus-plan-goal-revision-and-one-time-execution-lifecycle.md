@@ -1,4 +1,4 @@
-# ADR 0309: Durable Plan/Goal revision and one-time execution lifecycle
+# ADR: Durable Plan/Goal revision and one-time execution lifecycle
 
 - Status: Accepted for implementation
 - Date: 2026-09-29

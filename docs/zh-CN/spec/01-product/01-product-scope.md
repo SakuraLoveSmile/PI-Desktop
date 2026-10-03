@@ -141,4 +141,4 @@ Plan 和 Goal 是合约模式，而不是严格的只读安全配置文件：Bas
 ## Plus 独立安装
 
 Pi-Desktop-Plus 使用独立 Electron 配置和 `~/.pi-desktop-plus` 数据目录；开发数据使用 `~/.pi-desktop-plus-dev`。不会自动导入、移动或修改 PI-Desktop 数据。显式数据目录覆盖继续有效，更新来自 `SakuraLoveSmile/PI-Desktop`。
-参见 [ADR 0308](../../../adr/0308-independent-plus-application-identity.md)。
+参见 [ADR plus-independent-application-identity](../../../adr/plus-independent-application-identity.md)。

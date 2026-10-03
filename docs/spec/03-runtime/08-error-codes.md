@@ -313,7 +313,7 @@ codes surface through the same error object as any other call.
 | `PAIRING_TOKEN_EXPIRED` | no | the single-use pairing token expired before pairing completed |
 | `CAPABILITY_UNAVAILABLE` | no | an operation was requested for a capability the host advertised as unavailable (e.g. attachments, tool relay) |
 
-### 3.9 Expert Team collaboration (ADR 0307)
+### 3.9 Expert Team collaboration (ADR plus-expert-team-collaboration)
 
 Emitted by host-core and the agent runtime when coordinating an Expert Team session
 with teammates, shared task boards, and peer mailboxes.

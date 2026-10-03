@@ -99,7 +99,7 @@ test(
     }
     await chmod(join(repoRoot, "scripts", "release-macos.sh"), 0o755);
     await writeStubs(bin, log, repoRoot);
-    // The signed lane requires an independent Electron distribution (ADR 0308),
+    // The signed lane requires an independent Electron distribution (ADR plus-independent-application-identity),
     // so point it at one instead of letting it reach electron-builder with the
     // stock distribution.
     await mkdir(join(root, "electron-dist-identity", "Electron.app"), { recursive: true });

@@ -38,7 +38,7 @@ Preserve official PI-Desktop, Plus profiles, Keychain entries, existing provider
 - The hook automatically fetches after edits (600 ms debounce) and refreshes saved providers. Its `reload()` is the existing manual action. Both currently use the same request shape. `requestSeq` rejects stale renderer results but does not cancel an already-issued main-process request.
 - Source inspection is the UI baseline. No native window was opened during planning. No layout or visual design change is requested.
 
-Read before implementation: root `AGENTS.md`; nearest existing scoped rules (`apps/desktop/src/AGENTS.md` for renderer work); root `README.md` and `packages/README.md`; `docs/spec/00-baseline.md`; `docs/spec/03-runtime/11-provider-model-system.md` and `12-provider-config-schema.md`; `docs/spec/06-delivery/{03-ai-development-workflow,04-e2e-test-plan,05-change-checklist}.md`; `docs/adr/0278-canonical-application-id.md`, `0289-signed-macos-github-releases.md`, and `0308-independent-plus-application-identity.md`. Some rule paths advertised by root AGENTS, including Electron and shared scoped files and `apps/desktop/README.md`, do not exist on the surveyed base; use root rules rather than inventing them. ADR 0308 intentionally amends upstream identity decisions for this fork; keep `cn.sakura.pi-desktop`.
+Read before implementation: root `AGENTS.md`; nearest existing scoped rules (`apps/desktop/src/AGENTS.md` for renderer work); root `README.md` and `packages/README.md`; `docs/spec/00-baseline.md`; `docs/spec/03-runtime/11-provider-model-system.md` and `12-provider-config-schema.md`; `docs/spec/06-delivery/{03-ai-development-workflow,04-e2e-test-plan,05-change-checklist}.md`; `docs/adr/0278-canonical-application-id.md`, `0289-signed-macos-github-releases.md`, and `plus-independent-application-identity.md`. Some rule paths advertised by root AGENTS, including Electron and shared scoped files and `apps/desktop/README.md`, do not exist on the surveyed base; use root rules rather than inventing them. ADR plus-independent-application-identity intentionally amends upstream identity decisions for this fork; keep `cn.sakura.pi-desktop`.
 
 External references:
 
@@ -128,7 +128,7 @@ Deliverables: backward-compatible manual intent, integrated controller, regressi
 
 Owner: main agent. Exclusive files: plan execution record, relevant spec sections, `scripts/e2e/provider-api-style.tsx` integration, and a focused isolated Electron IPC smoke scenario if the existing harness cannot exercise the real main handler. Do not create a general permission-testing platform. T3's final native acceptance depends on both T1 and T2 being integrated and the required environment being authorized/available.
 
-Update `docs/spec/03-runtime/12-provider-config-schema.md` with manual intent/trigger behavior, `docs/spec/06-delivery/04-e2e-test-plan.md` with a uniquely named `E2E-MAC-local-network-manual-discovery` scenario and traceability, `docs/adr/0308-independent-plus-application-identity.md` with qualified executable identity, and relevant user/build documentation. Keep domain rules in one authoritative section. Do not amend frozen process/storage ownership; a new ADR is needed only if implementation would cross those boundaries, which this plan excludes.
+Update `docs/spec/03-runtime/12-provider-config-schema.md` with manual intent/trigger behavior, `docs/spec/06-delivery/04-e2e-test-plan.md` with a uniquely named `E2E-MAC-local-network-manual-discovery` scenario and traceability, `docs/adr/plus-independent-application-identity.md` with qualified executable identity, and relevant user/build documentation. Keep domain rules in one authoritative section. Do not amend frozen process/storage ownership; a new ADR is needed only if implementation would cross those boundaries, which this plan excludes.
 
 Validation sequence:
 
@@ -233,7 +233,7 @@ its socket before the fetch; diagnostics carry stage/reason/code only; a dispose
 controller starts nothing while discovery still answers. Recorded in
 `docs/spec/06-delivery/04-e2e-test-plan.md` as `E2E-MAC-local-network-manual-discovery`
 with traceability, in `docs/spec/03-runtime/12-provider-config-schema.md` §12, and in
-ADR 0308.
+ADR plus-independent-application-identity.
 
 #### T3 native items that are NOT run (no authorization, no clean environment)
 
@@ -309,7 +309,7 @@ executable ourselves and reuse everything else from the pinned official distribu
 - Wired into `pack`, `dist:mac`, the macOS branch of `build-desktop-release.mjs` (so `dist` is
   covered) and `release-macos.sh` (which now requires a distribution). Windows and Linux lanes are
   untouched; `window-menu.test.mjs` recognizes the new packaging entry.
-- ADR 0308 and `docs/spec/06-delivery/06-release-runbook.md` record the decision, the measurements
+- ADR plus-independent-application-identity and `docs/spec/06-delivery/06-release-runbook.md` record the decision, the measurements
   and the packaging instructions.
 
 ### Measured evidence
@@ -356,7 +356,7 @@ the one that exposed the silent `--` fallback; the corrected lane was therefore 
 ### Signing unblocked (2026-10-01, same day)
 
 The Apple Development lane had been unusable here (four of five builds aborted inside code signing).
-Two independent causes were found and fixed; both are recorded in ADR 0308.
+Two independent causes were found and fixed; both are recorded in ADR plus-independent-application-identity.
 
 1. `codesign --timestamp` loses its token mid-build on this host. Measured directly: twenty-five
    consecutive signings of the same file with the same flags produced one failure, at request 24,
