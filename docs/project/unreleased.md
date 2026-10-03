@@ -28,6 +28,10 @@
 - macOS DMG and ZIP packages no longer include the obsolete first-launch helper
   and opening-help files.
 
+- Skills now discovers installed pi CLI npm skill packages and offers explicit
+  import with a source and executable-extension confirmation. Imported packages
+  remain managed in Plugins; discovery never enables code automatically.
+
 - Subagent topology cards and their live process rows now follow the main
   conversation's responsive width behavior: long descriptions, paths,
   commands, and summaries wrap inside the dock instead of requiring repeated
