@@ -210,6 +210,25 @@ test("matching text does not collapse an optimistic prompt with attachments", ()
   );
 });
 
+test("a distant same-text durable row is not treated as the optimistic echo", () => {
+  const optimistic = message("11111111-2222-4333-8444-555555555555", {
+    role: "user",
+    content: "same prompt",
+    createdAt: "2026-08-31T00:00:00.000Z",
+    status: "complete",
+  });
+  const durable = message("sdk-user-1", {
+    role: "user",
+    content: "same prompt",
+    createdAt: "2026-08-31T00:00:30.001Z",
+  });
+
+  assert.deepEqual(
+    mergeLiveSessionMessages([durable], [optimistic, durable]).map(({ id }) => id),
+    ["11111111-2222-4333-8444-555555555555", "sdk-user-1"],
+  );
+});
+
 test("live event upserts preserve array identity for unchanged rows", () => {
   const original = [message("answer", { status: "streaming" })];
   const updated = upsertLiveSessionMessage(original, {
