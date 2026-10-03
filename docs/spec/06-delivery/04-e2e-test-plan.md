@@ -3322,7 +3322,7 @@ identify the platform validation still needed.
 
 #### E2E-MCP-pi-client-owner-policy: Pi protocol under existing Desktop owners
 
-- **Preconditions**: Pi 0.99.1 with the pinned host-policy patch; offline stdio and
+- **Preconditions**: Pi 1.0.0 with the pinned host-policy patch; offline stdio and
   HTTP fixtures, no paid provider or user credentials.
 - **Steps**: Run `plugin-mcp.test.mjs`, `user-mcp.test.mjs`,
   `mcp-stdio-launch.test.mjs`, `mcp-call-registry.test.mjs`, `mcp-oauth.test.mjs`,
@@ -6262,8 +6262,11 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
     before a checkpoint boundary drops that record specifically; records
     anchored on surviving messages are preserved/remapped.
   - The exact provider overflow removes only the failed assistant from model
-    context, retries once after compaction, and does not loop on a second
-    overflow.
+    context, keeps the visible assistant bubble in a running state while
+    compaction/retry is pending, retries once after compaction, and does not
+    loop on a second overflow. A recoverable first overflow emits no terminal
+    error message or `error` event; only a failed retry (or failed compaction)
+    closes the bubble with `CONTEXT_TOO_LARGE` / the actual terminal error.
   - If automatic summary generation fails, a durable retained-tail fallback
     checkpoint is appended, the run stays active, and one warning explains
     that older model context was reduced; the transcript row for that
@@ -6759,6 +6762,22 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 - **Milestone**: M6
 - **Status**: Automated (passed 2026-08-04): `test:e2e:plan` plus host-core
   permission/policy and agent-runtime tool-composition tests
+
+#### E2E-PLAN-WORKSPACE: Missing workspace does not strand a contract turn
+
+- **Preconditions**: Isolated host, active global workspace, temporary session
+  without a persisted project workspace; repeat for Plan and Goal.
+- **Steps**: Enter the contract from Agent mode and submit. In the runtime,
+  submit from a workspace-less contract session, receive the tool error, deliver
+  a final explanation, and repeat on
+  the user's next "continue" turn. Use a bound project as the success control.
+- **Expected**: Entry succeeds and leaves the session in planning state.
+  Submission fails with `PLAN_WORKSPACE_REQUIRED` without an approval or
+  artifact. The runtime returns a non-terminating error with workspace binding
+  guidance and permits a final assistant response. No execution is authorized.
+  Bound-project submission still produces a pending immutable checkpoint.
+- **Status**: Automated by `scripts/e2e-plan.mjs` and the runtime Plan transition
+  tests with a scripted provider boundary.
 
 #### E2E-106: SubmitPlan rejects into editable planning and resubmits a new artifact
 
@@ -8533,6 +8552,25 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   the existing 20 login/session regressions also passed. This is a pre-merge
   transport and orchestration integration test, not live OAuth, visual UI or
   Host persistence validation. Post-integration main E2E is NOT RUN.
+
+#### E2E-OAUTH-anthropic-copy-code: Anthropic copy-code login uses the existing prompt bridge
+
+- **Preconditions**: A local token-endpoint fixture intercepts only Anthropic's
+  OAuth token URL. The production pi-ai Anthropic flow and Desktop `VendorOAuth`
+  use an in-memory Host RPC fixture. No real account or remote endpoint is used.
+- **Steps**: Start an Anthropic vendor login; choose `copy_code` from the
+  `select` prompt; inspect the generated authorization URL; provide a synthetic
+  `code#state` to the manual-code prompt; finish token exchange against the
+  fixture; resolve request auth and inspect the stored Host credential.
+- **Expected**: The select options retain `browser` and `copy_code`; the
+  authorization URL uses `https://platform.claude.com/oauth/code/callback`;
+  the token exchange succeeds; refresh credentials stay under the
+  provider-scoped Host OAuth reference and only the short-lived access token is
+  returned to runtime auth. No API-key secret is created.
+- **Specs linked**: `03-runtime/14-secrets-storage.md` §10; `07-plugins/16-trusted-extensions.md` §4.
+- **Acceptance**: B (vendor accounts), Security, Quality.
+- **Status**: Local provider-flow integration fixture; no live account or visual
+  renderer validation.
 
 #### E2E-151: Multiple vendor accounts stay isolated through login, use, and removal
 
@@ -11916,7 +11954,9 @@ This test plan spec is accepted when:
 - **Preconditions**: A provider fixture can complete multiple sequential tasks,
   trigger inline automatic compaction at 90% of `hardLimit` (before the hard
   boundary), exercise an active-turn checkpoint during a tool loop, and restart
-  a session.
+  a session. The desktop transcript runner also replays a deterministic local
+  provider-overflow recovery through the production runtime event handler,
+  transcript store projection, and assistant-turn renderer.
 - **Steps**:
   1. Complete task A and task B in one session with distinct instructions and
      visible completion replies.
@@ -11932,6 +11972,9 @@ This test plan spec is accepted when:
      capture the first request and confirm preflight compaction runs before
      `continue()` while retaining the internal approved-plan instruction.
   6. Restart and reopen the session, then send another prompt.
+  7. In the isolated overflow fixture, pause compaction after the first provider
+     response exceeds the context window. Inspect the rendered assistant turn,
+     then let the retry complete.
 - **Expected**: Automatic session compaction starts at
    `floor(hardLimit * 0.9)` for prompt, approved-plan, and in-run turn
    preflights; the estimate includes serialized messages, the active system
@@ -11944,7 +11987,10 @@ This test plan spec is accepted when:
    checkpoint retains exactly the latest active user prompt, with no older
    user prompts or pre-boundary assistant/tool messages. Restart honors
    `retainedTailMode`, and legacy multi-user tails normalize to the latest user
-   message. If automatic summary generation fails at the hard boundary, the
+   message. During recoverable overflow compaction, the existing assistant
+   bubble stays streaming without an error card; a successful retry completes
+   that same bubble once. A failed retry surfaces its terminal error. If
+   automatic summary generation fails at the hard boundary, the
    fallback retains a bounded recent user tail. The visible transcript remains
    complete and checkpoint rows remain.
 - **Specs linked**: `03-runtime/02-agent-runtime.md`,
@@ -11953,7 +11999,8 @@ This test plan spec is accepted when:
 - **Acceptance**: C (chat/stream), F (persistence), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered (`packages/agent-runtime/src/context-budget.test.ts`,
-  `runtime.test.ts`, `subagent-context.test.ts`); provider/UI journey Draft
+  `runtime.test.ts`, `subagent-context.test.ts`); isolated overflow recovery
+  fixture passed through `pnpm test:e2e:transcript`; broader provider/UI journey Draft
 
 #### E2E-165: A2A and Peer tools are withdrawn
 
@@ -12177,17 +12224,22 @@ are withdrawn with ADR 0165.
   back. 3) Confirm the newest user row (and any streaming tail) is at the
   bottom of the transcript and the session still shows as running. 4) Optional:
   Stop, switch away and back; the same newest rows remain in chronological
-  order.
+  order. 5) With an older identical prompt already durable, send that same
+  text again and immediately switch away and back before its persistence
+  acknowledgement is applied.
 - **Expected**: Revalidation does not append older live history after the
   bounded durable page. The mounted trailing window still shows the just-sent
   prompt and the live tail. The turn continues in the background across the
-  switch. Stop is not required to make the prompt visible again.
+  switch. The older same-text row remains distinct and cannot suppress the new
+  optimistic prompt; the durable echo replaces that prompt in place. Stop is
+  not required to make the prompt visible again.
 - **Specs linked**: `04-ux/08-component-spec.md` §1.6 / §3.5,
   `04-ux/09-interaction-patterns.md` (session isolation), ADR 0120, ADR 0137,
   `08-meta/decisions-log.md` (D261, D317)
 - **Acceptance**: C (conversation & stream), F (persistence), Quality
 - **Milestone**: M5
-- **Status**: Unit-covered (`session-transcript.test.mjs` D317 cases); full
+- **Status**: Unit-covered (`session-transcript.test.mjs` D317 and missed-ack
+  same-text cases); full
   desktop journey Draft (run only in a capable environment when this surface changes)
 
 #### E2E-183: Switching an idle session keeps a completed reply that is not on disk yet
@@ -13074,22 +13126,27 @@ are withdrawn with ADR 0165.
   Dismiss it, navigate away and back, repeat the check, then restart and check
   again. 4) Confirm the same version does not raise another notice, while the
   Settings row still shows it and opens Releases. 5) Select Automatic and
-  confirm the existing in-app download/install behavior resumes. 6) Launch the
-  portable ZIP profile and confirm Manual is the default; inspect the warning
-  before explicitly selecting Automatic.
+  surface an available version. Dismiss the in-app banner while downloading;
+  verify the transfer is cancelled and the update will not install on quit.
+  Restart, check the same version again, and verify it remains dismissed and
+  does not download. Then surface a newer version and verify automatic
+  downloading resumes. 6) Launch the portable ZIP profile and confirm Manual
+  is the default; inspect the warning before explicitly selecting Automatic.
 - **Expected**: The preference persists per installation. Manual performs
   discovery only and stores the last reminded version so repeated checks and
-  app restarts do not repeat the notice; the Info row remains actionable.
-  Automatic retains the existing installer behavior where supported. ZIP and
-  legacy portable builds default to Manual, and Automatic is an explicit,
-  warned opt-in that can replace the extracted copy with NSIS.
+  app restarts do not repeat the notice; the Info row remains actionable. A
+  dismissed version stays ignored across restarts in either mode. In-app
+  dismissal cancels an active transfer and prevents install-on-quit for that
+  version; a newer release clears the dismissal and resumes automatic delivery.
+  ZIP and legacy portable builds default to Manual, and Automatic is an
+  explicit, warned opt-in that can replace the extracted copy with NSIS.
 - **Specs linked**: `03-runtime/07-process-model.md`,
   `04-ux/09-interaction-patterns.md`, ADR 0022 / D628
 - **Acceptance**: Quality (settings interaction and release safety)
 - **Milestone**: M6+
 - **Status**: Setting selection/persistence covered by
-  `pnpm test:e2e:settings-scroll`; mode/reminder policy covered by
-  `update-preference.test.mjs`. Packaged Windows installer journey remains
+  `pnpm test:e2e:settings-scroll`; dismissal and download cancellation covered
+  by `updater-controller.test.mjs`. Packaged Windows installer journey remains
   runner validation.
 
 #### E2E-213: The first Composer model menu paint keeps configured aliases
@@ -14253,15 +14310,17 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 
 #### E2E-244: Unsupported APIs, load errors, and handler timeouts degrade to diagnostics
 
-- **Preconditions**: Three enabled fixture extensions: one importing
-  `@earendil-works/pi-tui` at top level and calling `ui.setWidget`; one whose
+- **Preconditions**: Four enabled fixture extensions: one importing
+  `@earendil-works/pi-tui` at top level and calling `ui.setWidget`; one importing
+  an unsupported named export from `@earendil-works/pi-coding-agent`; one whose
   module throws at load; one whose `context` handler never resolves.
 - **Steps**: 1) Start a turn. 2) Open the diagnostics drawer for each entry.
-  3) Wait past the 30 s handler limit. 4) Disable the throwing extension and
-  start another turn.
+  3) Confirm the unsupported export stays undefined. 4) Wait past the 30 s
+  handler limit. 5) Disable the throwing extension and start another turn.
 - **Expected**: The pi-tui import succeeds, `setWidget` returns an inert
   `dispose`, and one diagnostic per member is recorded; the throwing
-  extension shows `error` with message and stack, the composer shows a
+  coding-agent export stays unavailable and reports `unsupported_api`; the
+  throwing extension shows `error` with message and stack, the composer shows a
   one-line notice, and the other extensions still load; the stalled handler
   is abandoned after 30 s with a diagnostic and the turn completes with the
   unmodified context; after disabling, the notice disappears at the next turn
@@ -14269,7 +14328,7 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Specs linked**: `07-plugins/16-trusted-extensions.md` §4.2, §4.4, §5, §6
 - **Acceptance**: Quality
 - **Milestone**: Post-MVP (R7 v1)
-- **Status**: Partially automated (`pnpm test:e2e:trusted-extensions`); load errors and inert terminal-UI APIs degrade to diagnostics, while the stalled-handler timeout and disable-at-boundary journey remain additional validation.
+- **Status**: Partially automated (`pnpm test:e2e:trusted-extensions`); missing static named exports are covered through the real Jiti loader by `runner.test.ts`, while diagnostics-drawer rendering for that import, the stalled-handler timeout, and disable-at-boundary journey remain additional validation.
 
 #### E2E-245: The packaged sidecar loads a TypeScript extension through jiti
 
@@ -16258,7 +16317,7 @@ renderer's durable transcript reads. No real model or provider is contacted.
 
 ## E2E-OAUTH-pi-installation-identity-and-standalone-load
 
-- **Preconditions**: Pi 0.99.1; temporary Host secrets and account fixtures;
+- **Preconditions**: Pi 1.0.0; temporary Host secrets and account fixtures;
   network/browser/callback I/O mocked; no user account or paid service.
 - **Steps**: Run `installation-identity.test.mjs`, `vendor-oauth-login.test.mjs`
   and `oauth-standalone-bundle.test.mjs` under `apps/desktop/test`.

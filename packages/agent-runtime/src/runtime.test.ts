@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { estimateContextTokens as estimateAgentContextTokens, estimateTokens, type Agent, type AgentMessage } from "@earendil-works/pi-agent-core";
+import { type Agent, type AgentMessage } from "@earendil-works/pi-agent-core";
 import {
   createAssistantMessageEventStream,
   getCurrentTools,
@@ -10,6 +10,7 @@ import {
 import { formatSessionMessage, type SessionMessageOrigin } from "@pi-desktop/shared";
 import { estimateContextTokens as estimateTranscriptTokens } from "@earendil-works/pi-ai/utils/estimate";
 import { buildSessionContext } from "./session-context.js";
+import { estimateContextTokens as estimateAgentContextTokens, estimateTokens } from "./pi-runtime-estimates.js";
 import {
   COMPACTION_FALLBACK_MARKER,
   DesktopAgentRuntime,
@@ -2423,6 +2424,132 @@ describe("DesktopAgentRuntime tool schema completeness (#864)", () => {
 });
 
 describe("DesktopAgentRuntime plan transitions", () => {
+  it.each(["plan", "goal"] as const)(
+    "continues the %s user turn after a missing-workspace submission",
+    async (kind) => {
+      const host = {
+        call: vi.fn(async (method: string) => {
+          if (method === "plans.submit") {
+            throw Object.assign(new Error("PLAN_WORKSPACE_REQUIRED"), {
+              data: { errorCode: "PLAN_WORKSPACE_REQUIRED" },
+            });
+          }
+          return undefined;
+        }),
+      };
+      const runtime = createRuntime({ host, mode: kind });
+      const requests: AgentMessage[][] = [];
+      const internals = runtime as unknown as {
+        agent: Agent;
+        models: {
+          streamSimple: (
+            model: unknown,
+            context: { messages: AgentMessage[] },
+          ) => ReturnType<typeof createAssistantMessageEventStream>;
+        };
+      };
+      internals.models = {
+        streamSimple: (_model, context) => {
+          requests.push([...context.messages]);
+          const submit = requests.length % 2 === 1;
+          const message = assistantMessage({
+            content: submit
+              ? [
+                  {
+                    type: "toolCall",
+                    id: `submit-${requests.length}`,
+                    name: kind === "plan" ? "SubmitPlan" : "SubmitGoal",
+                    arguments: {
+                      title: "Proposal",
+                      markdown: "# Proposal",
+                      question: "Proceed?",
+                    },
+                  },
+                ]
+              : [
+                  {
+                    type: "text",
+                    text: "Bind a project workspace before submitting. Here is the proposal.",
+                  },
+                ],
+            stopReason: submit ? "toolUse" : "stop",
+          }) as unknown as AssistantMessage;
+          const stream = createAssistantMessageEventStream();
+          queueMicrotask(() => {
+            stream.push({ type: "start", partial: message });
+            stream.push({
+              type: "done",
+              reason: submit ? "toolUse" : "stop",
+              message,
+            });
+            stream.end(message);
+          });
+          return stream;
+        },
+      };
+      try {
+        await runtime.prompt(
+          "Propose the work before changing anything.",
+          "user-1",
+          "turn-1",
+        );
+        expect(requests).toHaveLength(2);
+        const result = requests[1].find(
+          (message) => message.role === "toolResult",
+        );
+        expect(result).toMatchObject({ isError: true, toolCallId: "submit-1" });
+        expect(JSON.stringify(result)).toContain(
+          "Bind this session to a project workspace",
+        );
+        expect(internals.agent.state.messages.at(-1)).toMatchObject({
+          role: "assistant",
+          content: [
+            {
+              type: "text",
+              text: expect.stringContaining("Here is the proposal"),
+            },
+          ],
+        });
+        expect(runtime.getStatus().planningState).toBe("planning");
+        await runtime.prompt("Continue.", "user-2", "turn-2");
+        expect(requests).toHaveLength(4);
+        expect(internals.agent.state.messages.at(-1)).toMatchObject({
+          role: "assistant",
+        });
+      } finally {
+        await runtime.dispose();
+      }
+    },
+  );
+
+  it.each(["PLAN_ARTIFACT_WRITE_FAILED", "PLAN_SESSION_NOT_FOUND"])(
+    "still terminates submission for %s",
+    async (errorCode) => {
+      const host = { call: vi.fn().mockRejectedValue({ data: { errorCode } }) };
+      const runtime = createRuntime({ host, mode: "plan", turnId: "turn-1" });
+      const { agent } = runtime as unknown as { agent: Agent };
+      try {
+        const tool = agent.state.tools.find(
+          (entry) => entry.name === "SubmitPlan",
+        );
+        if (!tool) throw new Error("Missing submit tool");
+        const result = await tool.execute("submit", {
+          title: "Plan",
+          markdown: "# Plan",
+          question: "Proceed?",
+        });
+        expect(result).toMatchObject({
+          isError: true,
+          terminate: true,
+          details: { errorCode },
+        });
+        expect(runtime.getStatus().planningState).toBe("planning");
+      } finally {
+        await runtime.dispose();
+      }
+    },
+  );
+
   it("guards transition batches and terminates after durable plan submission", async () => {
     const host = { call: vi.fn() };
     const runtime = createRuntime({ host, turnId: "turn-1" });
@@ -4102,7 +4229,7 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
     await runtime.dispose();
   });
 
-  it("recognizes the Bedrock prompt-too-long response and defers the terminal error", async () => {
+  it("keeps recoverable overflow streaming while compaction is pending", async () => {
     const onEvent = vi.fn();
     const runtime = createRuntime({ onEvent });
     const handleAgentEvent = (runtime as any).handleAgentEvent.bind(runtime);
@@ -4125,6 +4252,124 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
     await handleAgentEvent({ type: "agent_end", messages: [] });
 
     const events = onEvent.mock.calls.map(([envelope]) => (envelope as any).event);
+    const messageUpdates = events.filter((event) => event.type === "message_update");
+    expect(messageUpdates).toHaveLength(1);
+    expect(messageUpdates[0].message).toMatchObject({ status: "streaming" });
+    expect(messageUpdates[0].message.error).toBeUndefined();
+    expect(events.some((event) => event.type === "message_end")).toBe(false);
+    expect(events.some((event) => event.type === "error")).toBe(false);
+    expect(events.some((event) => event.type === "agent_end")).toBe(false);
+    expect((runtime as any).pendingOverflow).toBe(true);
+
+    await runtime.dispose();
+  });
+
+  it("reuses one assistant bubble across a successful overflow recovery", async () => {
+    const onEvent = vi.fn();
+    const runtime = createRuntime({ onEvent });
+    const agent = (runtime as any).agent;
+    const handleAgentEvent = (runtime as any).handleAgentEvent.bind(runtime);
+    const user = { role: "user", content: "hello", timestamp: 1 };
+    const failed = {
+      ...assistantMessage({
+        content: [{ type: "text", text: "partial response" }],
+        stopReason: "error",
+      }),
+      errorMessage: "400: prompt is too long: 1077172 tokens > 1000000 maximum",
+      timestamp: 2,
+    };
+    const recovered = assistantMessage({
+      content: [{ type: "text", text: "recovered response" }],
+      stopReason: "stop",
+    });
+
+    agent.prompt = vi.fn(async () => {
+      agent.state.messages = [user, failed];
+      await handleAgentEvent({ type: "message_start", message: failed });
+      await handleAgentEvent({ type: "message_end", message: failed });
+      await handleAgentEvent({ type: "turn_end" });
+      await handleAgentEvent({ type: "agent_end", messages: [] });
+    });
+    agent.waitForIdle = vi.fn(async () => undefined);
+    (runtime as any).runCompaction = vi.fn(async () => true);
+    agent.continue = vi.fn(async () => {
+      expect((runtime as any).overflowRecoveryInProgress).toBe(true);
+      expect(agent.state.messages.filter((message: any) => message.role !== "system")).toEqual([user]);
+      await handleAgentEvent({ type: "agent_start" });
+      await handleAgentEvent({ type: "turn_start" });
+      await handleAgentEvent({
+        type: "message_start",
+        message: { role: "assistant", content: [] },
+      });
+      await handleAgentEvent({ type: "message_end", message: recovered });
+      await handleAgentEvent({ type: "turn_end" });
+      await handleAgentEvent({ type: "agent_end", messages: [] });
+    });
+
+    await runtime.prompt("hello", "user-1");
+
+    const events = onEvent.mock.calls.map(([envelope]) => (envelope as any).event);
+    const messageEvents = events.filter((event) =>
+      ["message_start", "message_update", "message_end"].includes(event.type),
+    );
+    expect(agent.continue).toHaveBeenCalledOnce();
+    expect(new Set(messageEvents.map((event) => event.message.id)).size).toBe(1);
+    expect(events.filter((event) => event.type === "message_end")).toHaveLength(1);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "message_end",
+        message: expect.objectContaining({
+          status: "complete",
+          content: "recovered response",
+        }),
+      }),
+    );
+    expect(events.some((event) => event.type === "error")).toBe(false);
+    expect(events.filter((event) => event.type === "agent_end")).toHaveLength(1);
+
+    await runtime.dispose();
+  });
+
+  it("surfaces a terminal error when the overflow retry also exceeds the context", async () => {
+    const onEvent = vi.fn();
+    const runtime = createRuntime({ onEvent });
+    const agent = (runtime as any).agent;
+    const handleAgentEvent = (runtime as any).handleAgentEvent.bind(runtime);
+    const user = { role: "user", content: "hello", timestamp: 1 };
+    const overflowMessage = (timestamp: number) => ({
+      ...assistantMessage({ content: [], stopReason: "error" }),
+      errorMessage: "400: prompt is too long: 1077172 tokens > 1000000 maximum",
+      timestamp,
+    });
+
+    agent.prompt = vi.fn(async () => {
+      const failed = overflowMessage(2);
+      agent.state.messages = [user, failed];
+      await handleAgentEvent({ type: "message_start", message: failed });
+      await handleAgentEvent({ type: "message_end", message: failed });
+      await handleAgentEvent({ type: "turn_end" });
+      await handleAgentEvent({ type: "agent_end", messages: [] });
+    });
+    agent.waitForIdle = vi.fn(async () => undefined);
+    (runtime as any).runCompaction = vi.fn(async () => true);
+    agent.continue = vi.fn(async () => {
+      const failed = overflowMessage(3);
+      await handleAgentEvent({ type: "agent_start" });
+      await handleAgentEvent({ type: "turn_start" });
+      await handleAgentEvent({
+        type: "message_start",
+        message: { role: "assistant", content: [] },
+      });
+      await handleAgentEvent({ type: "message_end", message: failed });
+      await handleAgentEvent({ type: "turn_end" });
+      await handleAgentEvent({ type: "agent_end", messages: [] });
+    });
+
+    await runtime.prompt("hello", "user-1");
+
+    const events = onEvent.mock.calls.map(([envelope]) => (envelope as any).event);
+    expect(events.filter((event) => event.type === "message_start")).toHaveLength(1);
+    expect(events.filter((event) => event.type === "message_end")).toHaveLength(1);
     expect(events).toContainEqual(
       expect.objectContaining({
         type: "message_end",
@@ -4134,9 +4379,12 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
         }),
       }),
     );
-    expect(events.some((event) => event.type === "error")).toBe(false);
-    expect(events.some((event) => event.type === "agent_end")).toBe(false);
-    expect((runtime as any).pendingOverflow).toBe(true);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "error",
+        error: expect.objectContaining({ code: "CONTEXT_TOO_LARGE" }),
+      }),
+    );
 
     await runtime.dispose();
   });
@@ -5988,9 +6236,9 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
   it("keeps the summary a fallback checkpoint carries forward", async () => {
     // A fallback checkpoint stores any carried-forward summary ahead of its
     // recovery notice (see `createFallbackCheckpoint`). The next preparation
-    // must strip only the notice: pi's `prepareCompaction` cannot rebuild the
-    // older context from the transcript on its own, so dropping the carried
-    // summary would lose it permanently (#224).
+    // must strip only the notice: preparation cannot rebuild the older context
+    // from the transcript on its own, so dropping the carried summary would
+    // lose it permanently (#224).
     const runtime = createRuntime();
     (runtime as any).fullEntries = [
       {

@@ -3677,8 +3677,9 @@ IPC 请求无法关闭。
     压缩行仍被绘制。检查点之前的 regenerate/fork 具体记录的边界被丢弃；
     以幸存消息为锚点的记录被保留／重新映射。
   - 确切的提供程序溢出仅从模型中删除失败的助手
-    上下文，压缩后重试一次，并且不会在第二次循环
-    溢出。
+    上下文；压缩／重试等待期间，界面保留同一个助手气泡并保持运行态；
+    压缩后只重试一次，第二次溢出不循环。第一次可恢复溢出不发终态错误消息或
+    `error` 事件；只有重试／压缩失败时才以 `CONTEXT_TOO_LARGE` 或真实终态错误收口。
   - 如果自动摘要生成失败，则持久保留尾部回退
     附加检查点，运行保持活动状态，并有一个警告解释
     旧模型上下文被减少；该检查点的转录行显示
@@ -7019,25 +7020,45 @@ eleven-tool-round desktop paths are verified by
 - **验收**：B（模型配置）、质量
 - **里程碑**：M6+
 
+#### E2E-OAUTH-anthropic-copy-code：Anthropic 复制代码登录复用现有提示桥接
+
+- **前置条件**：本地 token 端点夹具只拦截 Anthropic OAuth token URL。生产 pi-ai
+  Anthropic 流程与 Desktop `VendorOAuth` 使用内存 Host RPC 夹具；不使用真实账户或远程端点。
+- **步骤**：发起 Anthropic 厂商登录；在 `select` 提示中选择 `copy_code`；检查授权 URL；
+  为 manual-code 提示输入合成的 `code#state`；通过夹具完成 token 交换；解析请求认证并检查
+  Host 中存储的凭据。
+- **预期**：选择项保留 `browser` 和 `copy_code`；授权 URL 使用
+  `https://platform.claude.com/oauth/code/callback`；token 交换成功；refresh 凭据保存在
+  provider 作用域的 Host OAuth 引用中，运行时只获得短期 access token；不创建 API-key secret。
+- **链接规格**：`03-runtime/14-secrets-storage.md` §10；`07-plugins/16-trusted-extensions.md` §4。
+- **验收**：B（厂商账户）、安全、质量。
+- **状态**：本地 provider-flow 集成夹具；未验证真实账户或渲染器视觉流程。
+
 #### E2E-164：上下文压缩保留活动任务边界
 
 - **先决条件**：提供商夹具可以在一个会话中完成多个连续任务，在终止边界触发自动
-  检查点，在工具循环期间触发活动回合检查点，并且可以重启会话。
+  检查点，在工具循环期间触发活动回合检查点，并且可以重启会话。桌面 transcript
+  runner 还会将确定性的本地 provider 溢出恢复事件经过生产运行时事件处理、转录投影和
+  assistant-turn renderer 回放。
 - **步骤**：
   1. 在同一会话中完成任务 A 和任务 B，使用不同指令并产生可见的完成回复。
   2. 在已完成回合后触发检查点，然后发送任务 C，捕获下一次提供商请求的上下文。
   3. 在任务 D 仍有工具结果或 `toolUse` 待处理时触发压缩，捕获下一次请求。
   4. 重启并重新打开会话，然后再发送一条提示。
+  5. 在隔离的溢出夹具中，第一次 provider 响应超出上下文窗口后暂停压缩并检查渲染的助手回合，
+     然后让重试成功。
 - **预期**：已完成回合检查点的保留尾部为空；下一次请求包含其摘要和任务 C，不包含裸的
   A/B 提示。活动检查点只保留最新的活动用户提示，不包含更早的用户提示或边界前的
   助手／工具消息。重启遵守 `retainedTailMode`，没有该字段的旧多用户尾部归一化为
-  最新用户消息。可见转录本保持完整，检查点行仍然存在。
+  最新用户消息。可恢复溢出正在压缩时，原助手气泡保持运行态且不显示错误卡片；重试成功后
+  同一个气泡只完成一次。重试失败时显示终态错误。可见转录本保持完整，检查点行仍然存在。
 - **链接规格**：`03-runtime/02-agent-runtime.md`、`03-runtime/04-data-storage.md`、
   `03-runtime/16-tool-result-limits.md`、`08-meta/decisions-log.md`（D275）、ADR 0136
 - **验收**：C（聊天／流）、F（持久性）、质量
 - **里程碑**：M5
 - **状态**：已覆盖单元测试（`packages/agent-runtime/src/runtime.test.ts`、
-  `context-compaction.test.mjs`）；provider/UI 旅程草稿
+  `context-compaction.test.mjs`）；隔离溢出恢复夹具通过 `pnpm test:e2e:transcript`；更完整的
+  provider/UI 旅程仍为草稿
 
 #### E2E-172：回合进行中改思考档位不会塌缩未固定会话菜单
 
@@ -7717,18 +7738,20 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 
 #### E2E-244：不支持的 API、加载错误与处理器超时降级为诊断
 
-- **前置条件**：三个已启用的夹具扩展：一个在顶层导入 `@earendil-works/pi-tui` 并
-  调用 `ui.setWidget`；一个模块在加载时抛出；一个 `context` 处理器永不返回。
-- **步骤**：1）开始一个回合。2）打开每个条目的诊断抽屉。3）等待超过 30 秒处理器
-  限制。4）禁用抛出的扩展并开始另一个回合。
+- **前置条件**：四个已启用的夹具扩展：一个在顶层导入 `@earendil-works/pi-tui` 并
+  调用 `ui.setWidget`；一个从 `@earendil-works/pi-coding-agent` 导入不支持的命名导出；
+  一个模块在加载时抛出；一个 `context` 处理器永不返回。
+- **步骤**：1）开始一个回合。2）打开每个条目的诊断抽屉。3）确认不支持的导出仍为
+  undefined。4）等待超过 30 秒处理器限制。5）禁用抛出的扩展并开始另一个回合。
 - **预期**：pi-tui 导入成功，`setWidget` 返回惰性 `dispose`，每个成员记录一条诊断；
-  抛出的扩展显示 `error` 及消息和堆栈，composer 显示一行提示，其余扩展仍加载；
+  不支持的 coding-agent 导出保持不可用并记录 `unsupported_api`；抛出的扩展显示 `error`
+  及消息和堆栈，composer 显示一行提示，其余扩展仍加载；
   停滞的处理器在 30 秒后被放弃并记诊断，回合以未修改的上下文完成；禁用后提示在
   下一回合边界消失，且没有运行中的回合被打断。
 - **链接规格**：`07-plugins/16-trusted-extensions.md` §4.2、§4.4、§5、§6
 - **验收**：质量
 - **里程碑**：MVP 后（R7 v1）
-- **状态**：部分自动化（`pnpm test:e2e:trusted-extensions`）；加载错误与惰性 terminal-UI API 会降级为诊断；停滞处理器超时和边界禁用旅程仍需额外验证
+- **状态**：部分自动化（`pnpm test:e2e:trusted-extensions`）；`runner.test.ts` 通过真实 Jiti loader 覆盖缺失的静态命名导出；该导入对应的诊断抽屉渲染、停滞处理器超时和边界禁用旅程仍需额外验证
 
 #### E2E-245：打包后的 sidecar 经 jiti 加载 TypeScript 扩展
 
