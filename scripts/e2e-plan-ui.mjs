@@ -1825,8 +1825,6 @@ async function runAcceptance(state) {
   const sourcePlan = await submitPlan(state, goalSession.id, "goalSource");
   await settlePlanProbe(state, goalSession.id, sourcePlan.turnId, "completed");
   await waitFor(async () => (await inspectUi(state)).bar?.status === "pending", "source Plan card", state);
-  fixture.setScenario("goal");
-  fixture.setScenario("goal");
   await clickSelector(state, '[data-testid="plan-approval-bar"] .plan-approval-goal-toggle [role="switch"]', "Convert Plan to Goal");
   await clickSelector(state, '[data-testid="plan-approval-bar"] .plan-approval-approve-main', "Approve Plan as Goal");
   const approvedGoal = await waitFor(async () => {
@@ -1834,7 +1832,23 @@ async function runAcceptance(state) {
     return result.history?.find((item) => item.id === sourcePlan.proposalId && item.status === "approved" && item.executionKind === "goal");
   }, "Plan approved with executionKind goal", state, 45_000);
   assert(approvedGoal, "Approved execution did not have executionKind = goal");
-  record("E2E-PLAN-GOAL-CONVERSION", true, `plan=${sourcePlan.proposalId} executionKind=${approvedGoal.executionKind}`);
+  // Approval starts a real Agent turn. Let it end before the next case: a run
+  // left streaming keeps the renderer busy and starves every later CDP call.
+  const finishedGoal = await waitFor(async () => {
+    const result = await getPreloadResult(state, "plansPending", [{ sessionId: goalSession.id }]);
+    return result.history?.find((item) =>
+      item.id === sourcePlan.proposalId && (item.executionState === "completed" || item.executionState === "interrupted"));
+  }, "converted Goal execution to finish", state, 45_000);
+  assert(finishedGoal.executionState === "completed", `converted Goal execution ended ${finishedGoal.executionState}`);
+  await waitFor(async () => {
+    const result = await getPreloadResult(state, "agentGetStatus", [goalSession.id]);
+    return result?.status?.isRunning === false;
+  }, "converted Goal session to become idle", state);
+  record(
+    "E2E-PLAN-GOAL-CONVERSION",
+    true,
+    `plan=${sourcePlan.proposalId} executionKind=${approvedGoal.executionKind} executionState=${finishedGoal.executionState}`,
+  );
   await captureScreenshot(state, "e2e-plan-goal-conversion");
 
   const alternate = (await getPreloadResult(state, "providersCreate", [{
