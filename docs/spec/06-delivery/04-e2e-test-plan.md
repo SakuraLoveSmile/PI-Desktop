@@ -13426,10 +13426,10 @@ are withdrawn with ADR 0165.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md` §13d
 - **Acceptance**: C (sessions), Quality
 - **Milestone**: M6+
-- **Status**: Unit-covered by `apps/desktop/test/mcp-control.test.mjs`
-  (`session/get compaction metadata is projected before bounding`,
-  `session/get projection leaves a small session untouched`); the full Electron
-  journey remains deferred by the no-local-E2E policy
+- **Status**: The local MCP server contract test in
+  `apps/desktop/test/mcp-control.test.mjs` exercises authenticated JSON-RPC
+  `tools/call` for both oversized and under-limit `pi_session_get` results. The
+  separate full Electron-to-Host journey remains release qualification.
 
 #### E2E-234: Workspace security denylist and ignore layers
 

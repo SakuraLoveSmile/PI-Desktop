@@ -7648,10 +7648,9 @@ eleven-tool-round desktop paths are verified by
 - **链接规格**：`03-runtime/01-ipc-protocol.md` §13d
 - **验收**：C（会话）、质量
 - **里程碑**：M6+
-- **状态**：由 `apps/desktop/test/mcp-control.test.mjs` 单元覆盖
-  （`session/get compaction metadata is projected before bounding`、
-  `session/get projection leaves a small session untouched`）；完整 Electron 旅程仍按
-  无本地 E2E 策略延后
+- **状态**：`apps/desktop/test/mcp-control.test.mjs` 中的本地 MCP Server 合约测试会运行带认证的
+  JSON-RPC `tools/call`，分别验证超限和未超限的 `pi_session_get` 答复。完整 Electron 到 Host
+  旅程仍属于发布验收。
 
 ## 受信任扩展场景（R7 v1）
 
