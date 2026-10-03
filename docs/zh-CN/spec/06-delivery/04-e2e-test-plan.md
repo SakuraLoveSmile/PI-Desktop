@@ -9012,7 +9012,7 @@ the latest destination. These assertions measure work counts, not device FPS.
   的协作消息则会中断。Host 测试覆盖幂等、继承权限的发送者上限、入队后接收权限提高时拒绝启动、
   队列/turn 回执、跨 Team 访问、任务所有权、Lead 专属操作、负责人重新分配/取消、CAS 与依赖。
   Stop/Abort 测试要求先暂停 Team，再按精确 turn ID 中断。
-- **规范：** ADR 0307；03-runtime/02-agent-runtime、03-tools-and-permissions、
+- **规范：** ADR plus-expert-team-collaboration；03-runtime/02-agent-runtime、03-tools-and-permissions、
   04-data-storage、06-host-rpc-protocol；04-ux/08-component-spec。
 - **自动化：** `pnpm test:e2e:team`、`pnpm --filter @pi-desktop/agent-host test`、
   `cargo test -p host-core --locked` 和 desktop Team 交互测试。Electron 场景仅使用隔离配置
@@ -9076,7 +9076,7 @@ the latest destination. These assertions measure work counts, not device FPS.
   `/v1/models` response and rendered `lan-fixture` rows after Allow, no automatic
   re-prompt loop after Deny, and a retained choice across restart — with the
   official application's identity, choice, profile and data untouched.
-- **Specs:** 03-runtime/12 §12 manual intent and trigger; ADR 0308 independent
+- **Specs:** 03-runtime/12 §12 manual intent and trigger; ADR plus-independent-application-identity independent
   Plus application identity; ADR 0278 canonical application id.
 - **Acceptance:** The automated layer is required and runs offline. The native
   layer is required for the repair's final acceptance and cannot be replaced by

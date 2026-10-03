@@ -1,4 +1,4 @@
-# ADR 0307: Host-owned Expert Team collaboration with durable member sessions
+# ADR: Host-owned Expert Team collaboration with durable member sessions
 
 - Status: Accepted for implementation
 - Date: 2026-09-25
