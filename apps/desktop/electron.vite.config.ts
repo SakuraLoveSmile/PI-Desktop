@@ -53,6 +53,9 @@ export default defineConfig({
     define: {
       "process.env.WS_NO_BUFFER_UTIL": "\"1\"",
       "process.env.WS_NO_UTF_8_VALIDATE": "\"1\"",
+      // The main bundle is ESM (`type: module`), where Node does not provide
+      // the CommonJS `__dirname` global used by Electron's relative asset paths.
+      "__dirname": "import.meta.dirname",
     },
     build: {
       rollupOptions: {
@@ -111,11 +114,28 @@ export default defineConfig({
     },
     plugins: [react(), tailwindcss(), tightenCsp(), dropLegacyFontFallbacks()],
     resolve: {
-      alias: {
-        "@renderer": resolve("src"),
+      alias: [
+        { find: "@renderer", replacement: resolve("src") },
+        {
+          find: /^@pi-desktop\/i18n\/locales\/([^/]+)$/,
+          replacement: resolve(
+            __dirname,
+            "../../packages/i18n/src/locales/$1/index.ts",
+          ),
+        },
+        {
+          find: "@pi-desktop/i18n/locale-info",
+          replacement: resolve(
+            __dirname,
+            "../../packages/i18n/src/locale-info.ts",
+          ),
+        },
         // Always read locale source so new keys work without a stale packages/*/dist.
-        "@pi-desktop/i18n": resolve(__dirname, "../../packages/i18n/src/index.ts"),
-      },
+        {
+          find: "@pi-desktop/i18n",
+          replacement: resolve(__dirname, "../../packages/i18n/src/index.ts"),
+        },
+      ],
     },
   },
 });

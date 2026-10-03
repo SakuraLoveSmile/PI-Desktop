@@ -38,6 +38,7 @@ import { registerSpeechIpc } from "./speech-ipc";
 import { registerVoiceIpc } from "./voice-ipc";
 import { registerLiveVoiceIpc } from "./live-voice-ipc";
 import type { LiveCallService } from "../live-voice/call-service";
+import type { LiveVoiceWidget } from "../live-voice/widget-window";
 import type { IpcRegistrar } from "./types";
 import type { createTraySessions } from "../tray-sessions";
 import type { createTaskbarUnreadBadge } from "../taskbar-unread-badge";
@@ -63,6 +64,7 @@ export type RegisterIpcDependencies = {
   activeUserSubagentDocuments: (...args: any[]) => Promise<any>;
   disabledBuiltinSubagents: () => Promise<string[]>;
   liveCallService?: LiveCallService;
+  liveVoiceWidget?: LiveVoiceWidget;
   mcpOAuth?: McpOAuthManager;
   [name: string]: any;
 };
@@ -170,6 +172,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     voiceService,
     teamDelivery,
     liveCallService,
+    liveVoiceWidget,
   } = dependencies;
 
 
@@ -503,8 +506,8 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
   if (voiceService) {
     registerVoiceIpc({ registrar, voiceService });
   }
-  if (liveCallService) {
-    registerLiveVoiceIpc({ registrar, service: liveCallService, getMainWindow });
+  if (liveCallService && liveVoiceWidget) {
+    registerLiveVoiceIpc({ registrar, service: liveCallService, getMainWindow, widget: liveVoiceWidget });
   }
 
   registerRemoteHostIpc({ registrar });

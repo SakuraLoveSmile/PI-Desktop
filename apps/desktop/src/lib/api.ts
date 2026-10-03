@@ -25,6 +25,7 @@ import type {
   QueuedTurnSummary,
   AgentStatus,
   AskToolResolution,
+  PendingInteractiveRequests,
   AgentInstructionFile,
   AppSettings,
   ExpectedMarketplace,
@@ -1058,6 +1059,8 @@ export const api = {
     invoke(IPC.invoke.toolResolvePermission, resolution),
   resolveAskTool: (resolution: AskToolResolution) =>
     invoke(IPC.invoke.askToolResolve, resolution),
+  pendingInteractive: (sessionId: string) =>
+    invoke<PendingInteractiveRequests>(IPC.invoke.pendingInteractive, { sessionId }),
   pendingPlans: (sessionId?: string) =>
     invoke<PlansPendingResult>(
       IPC.invoke.plansPending,
@@ -1538,10 +1541,10 @@ export const api = {
       IPC.invoke.windowSetWorkPanelChatWidth,
       { width },
     ),
-  setWindowBackgroundColor: (theme: "light" | "dark", color?: string) =>
-    invoke<{ applied: boolean; theme: "light" | "dark"; color?: string }>(
+  setWindowBackgroundColor: (theme: "light" | "dark", color?: string, cornerRadius?: number) =>
+    invoke<{ applied: boolean; theme: "light" | "dark"; color?: string; cornerRadius?: number | null }>(
       IPC.invoke.windowSetBackgroundColor,
-      { theme, color },
+      { theme, color, cornerRadius },
     ),
   windowControl: (action: WindowControlAction) =>
     invoke<{ maximized: boolean }>(IPC.invoke.windowControl, { action }),
