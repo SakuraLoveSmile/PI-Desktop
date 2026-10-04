@@ -631,6 +631,22 @@ contract is being negotiated.
 - `session.endTurn` — marks a still-started revision intent failed when its
   exact revision turn ends without submitting a replacement proposal, and
   emits `plans.changed` so the retry card refreshes
+
+- `plans.dueSchedules({ nowMs? })` returns `{ schedules, nextDueAt }`.
+  `schedules` contains eligible schedules at or before `nowMs`; `nextDueAt` is
+  the earliest eligible future timestamp in epoch milliseconds, or `null`. Both
+  queries require a scheduled snapshot, an approved proposal and no execution
+  state. This additive field needs no database migration.
+- Main polls immediately on start, then wakes at the next due time, clamped to
+  1–30 s (30 s when no schedule exists). `plans.changed` nudges the poller after
+  200 ms; system resume nudges it too. Polls are single-flight; a nudge during a
+  poll requests one follow-up. Host/sidecar unavailability, Host errors and
+  non-busy claim failures retry after 5 s. Busy schedules remain marked missed.
+  Stop and Host restart remove timers and notification subscriptions; restart
+  preserves stop → mark missed → drain → start recovery ordering. While the
+  running app sleeps, overdue schedules can still be claimed after resume;
+  startup/restart missed handling is unchanged.
+
 - `plans.queuedExecutions` / `plans.claimExecution` /
   `plans.finishExecution` — consume and transition execution fields on the
   same approval row; the claimed execution reports its `kind` so the sidecar can
