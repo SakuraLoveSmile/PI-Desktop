@@ -194,6 +194,49 @@ function bashParams(sessionId, toolCallId, shell, command, extra = {}) {
   };
 }
 
+async function scenarioWorkspaceRequired(binary, tempRoot) {
+  return withScenario("E2E-PLAN-WORKSPACE", async (ctx) => {
+    for (const kind of ["plan", "goal"]) {
+      const session = await createSession(ctx.host, undefined, "Temporary contract", "agent");
+      const turnId = await beginTurn(ctx.host, session.id);
+      const entered = await ctx.host.call("plans.enter", {
+        sessionId: session.id, turnId, toolCallId: "enter", kind,
+      });
+      assert(entered.state === "planning", "temporary session cannot enter planning");
+      const submit = () => ctx.host.call("plans.submit", {
+        sessionId: session.id, turnId, toolCallId: "submit", kind,
+        title: "Proposal", markdown: "# Proposal", question: "Proceed?",
+      });
+      if (kind === "goal") {
+        // A temporary Goal owns its session scratch workspace (ADR
+        // temporary-goal-scratch-workspace) and never borrows the visible one.
+        const submitted = await submit();
+        const artifact = submitted?.proposal?.artifact;
+        assert(submitted?.status === "pending", `temporary Goal was not submitted: ${shortJson(submitted)}`);
+        assert(
+          artifact?.workspaceKind === "scratch" && /^\.pi\/goal\/[^/\\]+\.md$/.test(artifact.relativePath),
+          `temporary Goal artifact is not in its scratch workspace: ${shortJson(artifact)}`,
+        );
+        assert(
+          existsSync(join(ctx.dataDir, "scratch", session.id, ...artifact.relativePath.split("/"))),
+          "temporary Goal artifact is missing from the session scratch workspace",
+        );
+        assert(!existsSync(join(ctx.workspace, ".pi")), "temporary Goal wrote into the visible workspace");
+        const pending = await ctx.host.call("plans.pending", { sessionId: session.id });
+        assert(pending.plans.length === 1, `temporary Goal approval is not pending: ${shortJson(pending)}`);
+        await resolvePlan(ctx.host, submitted.proposal, "reject");
+      } else {
+        await expectRpcError(submit, ["PLAN_WORKSPACE_REQUIRED"]);
+        const pending = await ctx.host.call("plans.pending", { sessionId: session.id });
+        assert(pending.state === "planning", "failed submission changed planning state");
+        assert(pending.plans.length === 0, "failed submission created an approval");
+      }
+      await endTurn(ctx.host, turnId);
+    }
+    return "Plan rejects submission without a project; a temporary Goal submits into its scratch workspace";
+  }, binary, tempRoot);
+}
+
 async function scenario105(binary, tempRoot) {
   return withScenario("E2E-105", async (ctx) => {
     await writeFile(join(ctx.workspace, "readme.txt"), "Plan workspace read fixture\n", "utf8");
@@ -973,6 +1016,7 @@ async function main() {
 
   const tempRoot = await mkdtemp(join(tmpdir(), "pi-desktop-plan-e2e-"));
   try {
+    await runScenario("E2E-PLAN-WORKSPACE", () => scenarioWorkspaceRequired(binary, tempRoot));
     await runScenario("E2E-105", () => scenario105(binary, tempRoot));
     await runScenario("E2E-106", () => scenario106(binary, tempRoot));
     await runScenario("E2E-PLAN-005", () => scenarioPlanSafePlugin(binary, tempRoot));
