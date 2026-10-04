@@ -1770,7 +1770,10 @@ When Host claims an approved Plan or Goal execution, the runtime starts the
 autonomous execution context at the approved contract. Planning and revision
 turns remain in the transcript for provenance but are excluded from the
 execution model context; the execution provider/model and permission binding
-come from the approved snapshot.
+come from the approved snapshot. The `system` rows that carry the runtime
+prompt and the tool declarations are not turns: they stay in the execution
+context, so an execution request, and the live state a compaction checkpoint
+folds, keep the system state an ordinary request has.
 
 AskTool resolution returns structured `details.questions`, ordered
 `details.answers`, and `details.resolvedAt` in addition to its localized text

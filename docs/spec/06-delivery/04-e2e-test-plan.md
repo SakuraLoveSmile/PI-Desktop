@@ -16745,6 +16745,21 @@ renderer's durable transcript reads. No real model or provider is contacted.
   04-ux/01, 04-ux/08, ADR plus-plan-goal-revision-and-one-time-execution-lifecycle.
 - **Status:** Required for the Plan workflow implementation candidate.
 
+### E2E-PLAN-execution-keeps-system-state
+
+- **Preconditions:** Isolated runtime and a deterministic provider fixture that
+  records the messages of every request; a session with one Agent turn, one
+  Plan-mode turn, and an approved Plan.
+- **Steps:** Execute the approved Plan, then send one more turn in the same
+  session.
+- **Expected:** The execution request leads with the same runtime prompt as the
+  first Agent request and declares every tool that request declared. It carries
+  the approved contract and neither planning turn. The follow-up request and the
+  live state a compaction checkpoint folds keep the same runtime prompt.
+- **Specs:** 03-runtime/02.
+- **Status:** Unit-covered (`approved-execution-context.test.ts`); full
+  provider/UI journey Draft.
+
 ### E2E-CHAT-asktool-overview-and-compact
 
 - **Preconditions:** Isolated session with a deterministic AskTool result,

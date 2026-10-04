@@ -141,6 +141,7 @@ import {
 import { withExplicitRequired } from "./tool-schema.js";
 import { createTeamTools, teamSystemPrompt } from "./team/index.js";
 import { buildSessionContext } from "./session-context.js";
+import { entriesFromExecutionStart } from "./approved-execution-context.js";
 import { prepareCompaction } from "./pi-runtime-compaction-plan.js";
 import { compact } from "./pi-runtime-compaction-summary.js";
 import {
@@ -3089,7 +3090,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
   ): Entry[] {
     const entries: Entry[] = this.executionContextStartIndex === null
       ? [...this.fullEntries]
-      : this.fullEntries.slice(this.executionContextStartIndex);
+      : entriesFromExecutionStart(this.fullEntries, this.executionContextStartIndex);
     if (!checkpoint) return entries;
     if (isRecord(checkpoint.details) && checkpoint.details.systemMessageJson) {
       this.systemJournal.rememberCheckpoint(checkpoint.details.systemMessageJson);
@@ -8538,6 +8539,8 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     this.autonomousExecution = true;
     // The transcript stays complete, but execution sees only its approved
     // contract and subsequent work, never planning turns from another model.
+    // The system state is transcript rows too, so entriesFromExecutionStart
+    // keeps it.
     this.executionContextStartIndex = this.fullEntries.length;
 
     const kind = execution.kind === "goal" ? "goal" : "plan";
