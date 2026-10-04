@@ -399,6 +399,18 @@ ids 和非负 `tokensBefore`；它不会插入 message/search 行
   终端卡
 - `plans.resolve` — 验证一个匹配的 approve/reject 响应，并且
   批准，提交所选权限模式和 `execution_state = queued`
+
+- `plans.dueSchedules({ nowMs? })` 返回 `{ schedules, nextDueAt }`：
+  `schedules` 包含在 `nowMs` 或之前到期的合格计划；`nextDueAt` 是最早的未来
+  合格到期时间（epoch ms），无计划时为 `null`。两者只包含 scheduled、approved
+  且无 execution state 的快照。新增响应字段不需要数据库迁移。
+- Main 启动时立即查询，再按下次到期时间唤醒，间隔限制为 1–30 s，无计划时
+  为 30 s。`plans.changed` 和系统 resume 触发 200 ms 防抖唤醒。查询单飞；
+  查询期间的唤醒要求结束后再查一次。Host/sidecar 未就绪、Host 错误和非 busy
+  claim 失败在 5 s 后重试。busy 仍标为 missed。停止及 Host 重启清理订阅和
+  定时器；重启保留 stop → mark missed → drain → start 顺序。运行中睡眠跨过
+  到期时间后仍可在唤醒时 claim；启动及重启的 missed 处理不变。
+
 - `plans.queuedExecutions` / `plans.claimExecution` /
 `plans.finishExecution` — 消耗并转换执行字段
   同一审批行；声明的执行报告其 `kind`，因此 sidecar 可以

@@ -20,6 +20,7 @@ import type { PluginRuntime } from "../plugin-runtime";
 import type { RuntimeState } from "./context";
 import { syncPluginDisplayLocale } from "../plugin-display-locale";
 import { RuntimeSupervisor } from "@pi-desktop/host-runtime";
+import { createPlanSchedulePoller, type PlanSchedulePollResult } from "./plan-schedule-poller";
 
 type RestartKind = "host" | "sidecar";
 
@@ -32,7 +33,7 @@ export type RuntimeLifecycleDependencies = {
   startSidecar: () => Promise<void>;
   drainApprovedPlanExecutions: () => Promise<void>;
   markMissedPlanSchedules: () => Promise<void>;
-  pollPlanSchedules: () => Promise<void>;
+  pollPlanSchedules: () => Promise<PlanSchedulePollResult>;
   applyNetworkProxyFromAppSettings: (settings: unknown) => Promise<unknown>;
   plugins: PluginRuntime;
   setCurrentWorkspacePath: (path: string | null) => void;
@@ -74,23 +75,19 @@ export function createRuntimeLifecycle({
   runtimeArch: () => ReturnType<typeof detectRuntimeArch>;
   bootBackends: () => Promise<void>;
   stopPlanSchedulePoller: () => void;
+  nudgePlanSchedulePoller: () => void;
 } {
   let runtimeArchCache: ReturnType<typeof detectRuntimeArch> | null = null;
-  let scheduleTimer: NodeJS.Timeout | null = null;
-  const startPlanSchedulePoller = () => {
-    if (scheduleTimer) return;
-    scheduleTimer = setInterval(() => {
-      if (isQuitting()) return;
-      void pollPlanSchedules().catch((error) =>
-        logger.app("runtime", "warn", "scheduled plan poll failed", { data: String(error) }),
-      );
-    }, 1_000);
-    scheduleTimer.unref();
-  };
-  const stopPlanSchedulePoller = () => {
-    if (scheduleTimer) clearInterval(scheduleTimer);
-    scheduleTimer = null;
-  };
+  const schedulePoller = createPlanSchedulePoller({
+    getHost: () => runtimeState.host,
+    poll: pollPlanSchedules,
+    report: (error) => logger.app("runtime", "warn", "scheduled plan poll failed", {
+      data: String(error),
+    }),
+  });
+  const startPlanSchedulePoller = schedulePoller.start;
+  const stopPlanSchedulePoller = schedulePoller.stop;
+  const nudgePlanSchedulePoller = schedulePoller.nudge;
 
   /**
    * Fatal boot refusals a restart can never fix (D380): the schema check comes
@@ -332,5 +329,5 @@ export function createRuntimeLifecycle({
     if (schedulesRecovered) startPlanSchedulePoller();
   };
 
-  return { superviseRestart, bootHostStatus, runtimeArch, bootBackends, stopPlanSchedulePoller };
+  return { superviseRestart, bootHostStatus, runtimeArch, bootBackends, stopPlanSchedulePoller, nudgePlanSchedulePoller };
 }

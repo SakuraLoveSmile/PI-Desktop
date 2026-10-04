@@ -70,7 +70,8 @@ pub(super) async fn handle(
                     Ok(json!({ "proposalId": id, "sessionId": proposal.session_id }))
                 })
                 .collect::<std::result::Result<Vec<_>, JsonRpcError>>()?;
-            Ok(json!({ "schedules": schedules }))
+            let next_due_at = st.plans.next_due_at(&st.db, now).map_err(plan_rpc_err)?;
+            Ok(json!({ "schedules": schedules, "nextDueAt": next_due_at }))
         }
         "plans.claimSchedule" => {
             let proposal_id = params
@@ -269,5 +270,86 @@ pub(super) async fn handle(
             format!("method not found: {method}"),
             "NOT_FOUND",
         )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn due_schedules_returns_additive_next_deadline_and_honors_now_ms() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = Arc::new(Mutex::new(AppState::open(dir.path()).unwrap()));
+        let (tx, _rx) = mpsc::unbounded_channel();
+        assert_eq!(
+            handle(
+                state.clone(),
+                "plans.dueSchedules",
+                json!({ "nowMs": 1_000 }),
+                tx.clone()
+            )
+            .await
+            .unwrap(),
+            json!({ "schedules": [], "nextDueAt": null })
+        );
+        let workspace = dir.path().join("workspace");
+        std::fs::create_dir(&workspace).unwrap();
+        let proposal = {
+            let st = state.lock().await;
+            let session = sessions::create_session(
+                &st.db,
+                None,
+                Some("plan".into()),
+                None,
+                None,
+                Some(workspace.to_string_lossy().into_owned()),
+            )
+            .unwrap();
+            let turn = sessions::begin_turn(&st.db, &session.id, None, None).unwrap();
+            let proposal = st
+                .plans
+                .submit(
+                    &st.db,
+                    plans::PlanSubmitParams {
+                        workspace_root: &workspace,
+                        session_id: &session.id,
+                        turn_id: &turn,
+                        tool_call_id: "rpc-schedule-test",
+                        kind: "plan",
+                        title: "Plan",
+                        markdown: "# Plan",
+                        question: "Proceed?",
+                        artifact_workspace_kind: "project",
+                    },
+                )
+                .unwrap();
+            st.db
+                .conn()
+                .execute(
+                    "UPDATE plan_approvals SET status = 'approved' WHERE request_id = ?1",
+                    rusqlite::params![proposal.id],
+                )
+                .unwrap();
+            st.db.conn().execute("INSERT INTO plan_execution_schedules (proposal_id, scheduled_for, timezone, state, updated_at) VALUES (?1, 2_000, 'UTC', 'scheduled', 1)", rusqlite::params![proposal.id]).unwrap();
+            proposal
+        };
+        assert_eq!(
+            handle(
+                state.clone(),
+                "plans.dueSchedules",
+                json!({ "nowMs": 1_999 }),
+                tx.clone()
+            )
+            .await
+            .unwrap(),
+            json!({ "schedules": [], "nextDueAt": 2_000 })
+        );
+        assert_eq!(
+            handle(state, "plans.dueSchedules", json!({ "nowMs": 2_000 }), tx)
+                .await
+                .unwrap(),
+            json!({ "schedules": [{ "proposalId": proposal.id, "sessionId": proposal.session_id }], "nextDueAt": null })
+        );
     }
 }
