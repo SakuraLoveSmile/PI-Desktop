@@ -6940,12 +6940,17 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   a final explanation, and repeat on
   the user's next "continue" turn. Use a bound project as the success control.
 - **Expected**: Entry succeeds and leaves the session in planning state.
-  Submission fails with `PLAN_WORKSPACE_REQUIRED` without an approval or
-  artifact. The runtime returns a non-terminating error with workspace binding
-  guidance and permits a final assistant response. No execution is authorized.
+  A temporary Plan's submission fails with `PLAN_WORKSPACE_REQUIRED` without an
+  approval or artifact. A temporary Goal submits into its session scratch
+  workspace (`workspaceKind: scratch`, ADR temporary-goal-scratch-workspace) and
+  never writes to the active global workspace; its approval stays pending. When
+  the Host does report `PLAN_WORKSPACE_REQUIRED`, the runtime returns a
+  non-terminating error with workspace binding guidance and permits a final
+  assistant response. No execution is authorized.
   Bound-project submission still produces a pending immutable checkpoint.
 - **Status**: Automated by `scripts/e2e-plan.mjs` and the runtime Plan transition
-  tests with a scripted provider boundary.
+  tests with a scripted provider boundary. The temporary Goal journey through the
+  real sidecar is `E2E-GOAL-temporary-workspace`.
 
 #### E2E-106: SubmitPlan rejects into editable planning and resubmits a new artifact
 

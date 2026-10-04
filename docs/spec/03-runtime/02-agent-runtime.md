@@ -679,7 +679,8 @@ Other deferred/plugin tools keep their existing visibility rules. See
 [the declaration/permission decision](../../adr/plan-tool-declarations-and-execution-denials.md).
 
 Plan/Goal entry remains available without a project workspace. A submission
-requires a persisted session workspace for its approval artifact.
+requires a persisted session workspace for its approval artifact: the project
+for Plan, and for a temporary Goal its own scratch workspace (below).
 `PLAN_WORKSPACE_REQUIRED` from submission is a recoverable tool error: it
 explains how to bind a workspace and directs the agent to present the proposal
 in chat without retrying until a workspace is bound. It does not terminate the
