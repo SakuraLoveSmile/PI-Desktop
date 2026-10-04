@@ -109,7 +109,7 @@ async function loadChangelogCatalog() {
   // further split of the catalog must not silently fall out of this preflight.
   const changelogSrcDir = "packages/shared/src";
   const sources = readdirSync(path.join(root, changelogSrcDir))
-    .filter((name) => /^changelog(-[A-Za-z-]+)?\.ts$/.test(name))
+    .filter((name) => /^(?:changelog(-[A-Za-z-]+)?|plus-changelog)\.ts$/.test(name))
     .sort()
     .map((name) => `${changelogSrcDir}/${name}`);
   try {
