@@ -15461,6 +15461,19 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Specs:** IPC native routing; runtime §12; storage §12; security §12.
 - **Status:** Documented; run after integration into main.
 
+### E2E-SESSION-native-pi-duplicate-id-collapses
+
+- **Preconditions:** An isolated Pi agent directory contains a valid native v3
+  session and a copied JSONL file under a nested directory with the same
+  `header.id`.
+- **Steps:** Start PI-Desktop with the fixture-only agent directory, refresh the
+  session list, open the listed native session, and search its transcript.
+- **Expected:** The list contains one row for that native id. Detail and search
+  resolve through the selected file; duplicate files remain byte-identical and
+  are not rewritten or deleted.
+- **Specs:** runtime §12; storage §12; ADR 0254.
+- **Status:** Source-regression covered; full Desktop journey Draft.
+
 
 ### E2E-SUBAGENT-ordered-model-fallback-preserves-work
 
