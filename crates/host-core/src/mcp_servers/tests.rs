@@ -58,25 +58,31 @@ fn config_round_trips_without_activation_fields() {
 
 #[test]
 fn clearing_a_custom_timeout_restores_the_default() {
-    let dir = tempdir().unwrap();
-    let mut registry = McpServerRegistry::new(dir.path());
-    let mut initial = stdio("slow-server");
-    initial.timeout_seconds = Some(Some(45));
-    let saved = registry.upsert(initial).unwrap();
-    assert_eq!(saved.timeout_seconds, Some(45));
+    // A global server is written to the global capability root, which is the
+    // real home directory unless a test repoints it. Parallel tests do repoint
+    // it, so this case has to take the same lock or it reads their directory.
+    let home = tempdir().unwrap();
+    let app = tempdir().unwrap();
+    test_support::with_global_agents(home.path(), || {
+        let mut registry = McpServerRegistry::new(app.path());
+        let mut initial = stdio("slow-server");
+        initial.timeout_seconds = Some(Some(45));
+        let saved = registry.upsert(initial).unwrap();
+        assert_eq!(saved.timeout_seconds, Some(45));
 
-    let preserve = serde_json::from_value(serde_json::json!({ "id": "slow-server" })).unwrap();
-    let preserved = registry.upsert(preserve).unwrap();
-    assert_eq!(preserved.timeout_seconds, Some(45));
+        let preserve = serde_json::from_value(serde_json::json!({ "id": "slow-server" })).unwrap();
+        let preserved = registry.upsert(preserve).unwrap();
+        assert_eq!(preserved.timeout_seconds, Some(45));
 
-    let clear = serde_json::from_value(serde_json::json!({
-        "id": "slow-server",
-        "timeoutSeconds": null
-    }))
-    .unwrap();
-    let updated = registry.upsert(clear).unwrap();
+        let clear = serde_json::from_value(serde_json::json!({
+            "id": "slow-server",
+            "timeoutSeconds": null
+        }))
+        .unwrap();
+        let updated = registry.upsert(clear).unwrap();
 
-    assert_eq!(updated.timeout_seconds, None);
+        assert_eq!(updated.timeout_seconds, None);
+    });
 }
 
 #[test]
