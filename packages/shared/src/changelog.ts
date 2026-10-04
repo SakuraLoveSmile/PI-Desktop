@@ -8,6 +8,7 @@ import { koEntries } from "./changelog-ko.js";
 import { ptBREntries } from "./changelog-pt-BR.js";
 import { trEntries } from "./changelog-tr.js";
 import { normalizeChangelogVersion, resolveChangelogLocale } from "./changelog-runtime.js";
+import { withPlusEntries } from "./plus-changelog.js";
 
 export { normalizeChangelogVersion, resolveChangelogLocale } from "./changelog-runtime.js";
 
@@ -36,15 +37,15 @@ export type ChangelogEntry = {
 
 /** Locale → newest-first product notes. */
 export const CHANGELOG: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
-  en: enEntries,
-  "zh-CN": zhCNEntries,
-  "zh-TW": zhTWEntries,
-  tr: trEntries,
-  de: deEntries,
-  es: esEntries,
-  fr: frEntries,
-  ko: koEntries,
-  "pt-BR": ptBREntries,
+  en: withPlusEntries("en", enEntries),
+  "zh-CN": withPlusEntries("zh-CN", zhCNEntries),
+  "zh-TW": withPlusEntries("zh-TW", zhTWEntries),
+  tr: withPlusEntries("tr", trEntries),
+  de: withPlusEntries("de", deEntries),
+  es: withPlusEntries("es", esEntries),
+  fr: withPlusEntries("fr", frEntries),
+  ko: withPlusEntries("ko", koEntries),
+  "pt-BR": withPlusEntries("pt-BR", ptBREntries),
 };
 
 export function getChangelogEntry(
