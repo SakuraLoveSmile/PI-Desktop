@@ -2,6 +2,7 @@ import type { PersistenceOutbox } from "../persistence-outbox";
 import { ErrorCodes, IPC, type AgentEventEnvelope, type AppNotification, type PlanExecution, type PlanExecutionFinishStatus, type UiMessage } from "@pi-desktop/shared";
 import { executionFromResponse, executionListFromResponse, planExecutionFromUnknown } from "@pi-desktop/host-runtime";
 import type { RuntimeState } from "./context";
+import type { PlanSchedulePollResult } from "./plan-schedule-poller";
 import type {
   SessionCoordination,
   TurnEndedPayload,
@@ -101,12 +102,12 @@ export function createPlanRuntime({
   drainApprovedPlanExecutions: () => Promise<void>;
   dispatchExecutionForProposal: (proposalId: string) => Promise<void>;
   markMissedPlanSchedules: () => Promise<void>;
-  pollPlanSchedules: () => Promise<void>;
+  pollPlanSchedules: () => Promise<PlanSchedulePollResult>;
 } {
 // Read the shared turn state once, by the names the finalizer below uses. The
 // instance is owned by the coordination factory; this module only reads it.
 const approvedExecutionKinds = new Map<string, string>();
-let scheduledPoll: Promise<void> | null = null;
+let scheduledPoll: Promise<PlanSchedulePollResult> | null = null;
 const {
   activeTurns,
   activeTurnUsages,
@@ -621,38 +622,48 @@ async function markMissedPlanSchedules(): Promise<void> {
   await runtimeState.host.call("plans.markMissedSchedules");
 }
 
-async function pollPlanSchedules(): Promise<void> {
+async function pollPlanSchedules(): Promise<PlanSchedulePollResult> {
   if (scheduledPoll) return scheduledPoll;
   scheduledPoll = (async () => {
-    if (!runtimeState.host || !runtimeState.sidecar || isQuitting()) return;
-    const due = await runtimeState.host.call<{ schedules?: Array<{ proposalId: string; sessionId: string }> }>("plans.dueSchedules");
+    const host = runtimeState.host;
+    const sidecar = runtimeState.sidecar;
+    const isCurrent = () => runtimeState.host === host && runtimeState.sidecar === sidecar && !isQuitting();
+    if (!host || !sidecar || isQuitting()) return { nextDueAt: null, retrySoon: true };
+    const due = await host.call<{ schedules?: Array<{ proposalId: string; sessionId: string }>; nextDueAt: number | null }>("plans.dueSchedules");
+    let retrySoon = false;
     for (const { proposalId, sessionId } of due.schedules ?? []) {
-      if (isQuitting()) break;
+      if (!isCurrent()) return { nextDueAt: null, retrySoon: true };
       try {
-        const claimed = await runtimeState.host.call("plans.claimSchedule", { proposalId, sessionId });
+        const claimed = await host.call("plans.claimSchedule", { proposalId, sessionId });
+        if (!isCurrent()) return { nextDueAt: null, retrySoon: true };
         const execution = executionFromResponse(claimed);
         if (execution) await dispatchApprovedPlan(execution);
       } catch (error) {
+        if (!isCurrent()) return { nextDueAt: null, retrySoon: true };
         const code = (error as { data?: { errorCode?: string }; errorCode?: string })?.data?.errorCode
           ?? (error as { errorCode?: string })?.errorCode;
         if (code === "PLAN_SCHEDULE_SESSION_BUSY") {
           try {
-            await runtimeState.host.call("plans.markScheduleMissed", { proposalId, sessionId });
+            await host.call("plans.markScheduleMissed", { proposalId, sessionId });
           } catch (markError) {
+            retrySoon = true;
             logger.app("runtime", "warn", "busy scheduled plan could not be marked missed", {
               data: { proposalId, error: String(markError) },
             });
           }
           continue;
         }
+        retrySoon = true;
         logger.app("runtime", "warn", "scheduled plan claim failed", {
           data: { proposalId, error: String(error) },
         });
       }
     }
+    return isCurrent() ? { nextDueAt: due.nextDueAt, retrySoon }
+      : { nextDueAt: null, retrySoon: true };
   })();
   try {
-    await scheduledPoll;
+    return await scheduledPoll;
   } finally {
     scheduledPoll = null;
   }
