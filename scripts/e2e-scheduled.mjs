@@ -242,6 +242,8 @@ try {
   await key("ArrowDown", 40);
   await key("Enter", 13);
   await waitFor(() => evaluate(`!!document.querySelector('.composer-menu-root')`), 5000, "task model selection returns to root");
+  // The reasoning level is an inline slider on the measured root menu (issue
+  // #417); there is no separate reasoning view left to open.
   await click("high", ".composer-thinking-tick");
   await waitFor(() => evaluate(`document.querySelector('.composer-thinking-range')?.getAttribute('aria-valuetext') === 'high'`), 5000, "reasoning slider at high");
   await key("Escape", 27);

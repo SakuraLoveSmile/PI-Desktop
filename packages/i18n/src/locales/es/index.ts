@@ -189,6 +189,7 @@ export const es = {
     batchDelete: "Eliminar {{count}} sesiones",
     batchDeleteConfirm: "¿Eliminar {{count}} sesiones?",
     "copyConversationId": "Copiar ID de conversación",
+    "copySessionLink": "Copiar enlace de la conversación",
     "openSessionPath": "Abrir ruta de sesión",
     "timeGroupYesterday": "Ayer",
     "timeGroupThisWeek": "Anterior 7 días",
@@ -352,6 +353,8 @@ export const es = {
     "conversationMenu": "Acciones de la conversación",
     "selectMessageText": "Seleccionar el texto del mensaje",
     "copyConversation": "Copiar la conversación",
+    "sessionReference": "Conversación",
+    "sessionReferenceOpen": "Abrir la conversación {{title}}",
     "selectConversationText": "Seleccionar el texto de la conversación",
     "scrollToTop": "Ir al principio",
     "speakerYou": "Tú",
@@ -1744,7 +1747,7 @@ sklm: {
     "openActions": "Abrir acciones para {{name}}",
     "reorder": "Reordenar {{name}}",
     "editTitle": "Editar proyecto",
-    "editDescription": "Actualiza el nombre y las carpetas del proyecto.",
+    "editDescription": "Una carpeta quitada con chats pasa a ser un proyecto independiente y conserva sus chats.",
     "editAction": "Guardar cambios",
     "editSaving": "Guardando…",
     "editCancel": "Cancelar",
@@ -2532,7 +2535,11 @@ sklm: {
       "errorCommandDots": "El comando no puede contener '..'.",
       "errorUrl": "Se requiere una URL.",
       "errorUrlShape": "Esa no es una URL válida.",
-      "errorUrlScheme": "Utilice una URL http o https."
+      "errorUrlScheme": "Utilice una URL http o https.",
+      "timeout": "Tiempo de espera de conexión",
+      "timeoutHint": "Tiempo de espera en segundos para conectar y descubrir herramientas (predeterminado: 10s, máx: 600s).",
+      "timeoutPlaceholder": "10",
+      "errorTimeoutRange": "El tiempo de espera debe estar entre 1 y 600 segundos."
     },
     "skills": {
       "add": "Nueva habilidad",

@@ -616,6 +616,7 @@ Agent Runtime 使用：
 
 * `pi-ai`
 * `pi-agent-core`
+* `pi-coding-agent`
 
 > **Pi 提供 Agent Engine，Pi-Desktop-Plus 在其上构建 Desktop Workspace、Session、权限、插件与 Agent 编排。**
 
