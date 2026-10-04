@@ -1,8 +1,30 @@
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+#!/usr/bin/env node
+/**
+ * Require every Pi patch to be mapped in pnpm-workspace.yaml, installed by
+ * pnpm, recorded in pnpm-lock.yaml, and to still carry the audited contracts.
+ *
+ * Usage:
+ *   node scripts/check-pi-patches.mjs
+ *   node scripts/check-pi-patches.mjs --root <dir>
+ *   pnpm check:pi-patches
+ */
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { installedPatchHashes } from "./pi-patch-hash.mjs";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+function parseArgs(argv) {
+  let out = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+  for (let i = 0; i < argv.length; i += 1) {
+    if (argv[i] === "--root" && argv[i + 1]) {
+      out = resolve(argv[i + 1]);
+      i += 1;
+    }
+  }
+  return out;
+}
+
+const root = parseArgs(process.argv.slice(2));
 const targetVersion = "1.0.1";
 const entries = [
   {
@@ -39,10 +61,20 @@ for (const entry of entries) {
   const workspaceMapping = `'${entry.name}@${targetVersion}': ${entry.patch}`;
   if (!workspace.includes(workspaceMapping)) throw new Error(`pnpm-workspace.yaml does not map ${entry.name} to ${entry.patch}`);
   const packagePath = join(root, entry.packagePath);
-  const resolved = realpathSync(packagePath);
-  const patchHash = resolved.match(/patch_hash=([a-f0-9]+)/)?.[1];
-  if (!patchHash || !lockfile.includes(`${entry.name}@${targetVersion}(patch_hash=${patchHash}`)) {
-    throw new Error(`${entry.name}@${targetVersion} installed patch hash is absent from pnpm-lock.yaml`);
+  if (!existsSync(packagePath)) {
+    throw new Error(`Install dependencies before this check; missing ${entry.packagePath}`);
+  }
+  const patchHashes = installedPatchHashes(root, entry.name, targetVersion);
+  if (patchHashes.length === 0) {
+    throw new Error(`${entry.name}@${targetVersion} is not installed as a patched instance`);
+  }
+  const unlocked = patchHashes.filter(
+    (patchHash) => !lockfile.includes(`${entry.name}@${targetVersion}(patch_hash=${patchHash}`),
+  );
+  if (unlocked.length > 0) {
+    throw new Error(
+      `${entry.name}@${targetVersion} installed patch hash is absent from pnpm-lock.yaml: ${unlocked.join(", ")}`,
+    );
   }
 }
 
