@@ -801,7 +801,7 @@ runtimeLifecycle = createRuntimeLifecycle({
   isQuitting: () => mainState.quitting,
   getDisplayLocale: () => applicationAppearanceState.updaterLocale,
 });
-const { bootHostStatus, bootBackends, stopPlanSchedulePoller } = runtimeLifecycle;
+const { bootHostStatus, bootBackends, stopPlanSchedulePoller, nudgePlanSchedulePoller } = runtimeLifecycle;
 
 let voiceServiceReference: ReturnType<typeof createVoiceService> | null = null;
 const microphoneLeases = new MicrophoneLeaseRegistry(() => {
@@ -989,6 +989,7 @@ void app.whenReady().then(() => {
     hasReservation: (owner) => liveCallService.hasMicrophoneReservation(owner),
   });
   powerMonitor.on("suspend", () => void liveCallService.endForLifecycle("app-suspended"));
+  powerMonitor.on("resume", nudgePlanSchedulePoller);
   powerMonitor.on("lock-screen", () => void liveCallService.endForLifecycle("app-suspended"));
 });
 
