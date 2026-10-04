@@ -14,7 +14,7 @@
  * document (D164 + D260, docs/spec/06-delivery/06-release-runbook.md section 4.1):
  *   - the pinned Pi packages supply the model catalog
  *     and committed with the release tag
- *   - packages/shared/src/changelog*.ts (one entry for <version> in every
+ *   - packages/shared/src/plus-changelog.ts (one Plus entry for <version> in every
  *     shipped locale, matching highlight counts) and its newest-first list in
  *     changelog.test.ts
  *   - the release line stated in README.md and README.zh-CN.md

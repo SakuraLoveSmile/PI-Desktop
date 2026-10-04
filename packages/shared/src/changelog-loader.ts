@@ -1,4 +1,5 @@
 import { resolveChangelogLocale } from "./changelog-runtime.js";
+import { withPlusEntries } from "./plus-changelog.js";
 import type { ChangelogEntry, ChangelogLocale } from "./changelog.js";
 
 export { normalizeChangelogVersion, resolveChangelogLocale } from "./changelog-runtime.js";
@@ -26,7 +27,7 @@ export function loadChangelogCatalog(
   const existing = catalogRequests.get(locale);
   if (existing) return existing;
 
-  const request = catalogLoaders[locale]();
+  const request = catalogLoaders[locale]().then((catalog) => withPlusEntries(locale, catalog));
   catalogRequests.set(locale, request);
   void request.catch(() => {
     if (catalogRequests.get(locale) === request) catalogRequests.delete(locale);
