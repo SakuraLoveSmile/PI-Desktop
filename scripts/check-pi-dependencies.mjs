@@ -1,8 +1,30 @@
+#!/usr/bin/env node
+/**
+ * Require every pinned Pi package to be installed at the target version, and
+ * the ones we patch to be installed as pnpm's patched instance.
+ *
+ * Usage:
+ *   node scripts/check-pi-dependencies.mjs
+ *   node scripts/check-pi-dependencies.mjs --root <dir>
+ *   pnpm check:pi-dependencies
+ */
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { installedPatchHashes } from "./pi-patch-hash.mjs";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+function parseArgs(argv) {
+  let out = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+  for (let i = 0; i < argv.length; i += 1) {
+    if (argv[i] === "--root" && argv[i + 1]) {
+      out = resolve(argv[i + 1]);
+      i += 1;
+    }
+  }
+  return out;
+}
+
+const root = parseArgs(process.argv.slice(2));
 const targetVersion = "1.0.1";
 
 function readJson(path) {
@@ -25,7 +47,7 @@ function assertInstalled(packagePath, expectedName, { patched = false } = {}) {
   if (manifest.name !== expectedName || manifest.version !== targetVersion) {
     throw new Error(`${packagePath} resolves to ${manifest.name}@${manifest.version}, expected ${expectedName}@${targetVersion}`);
   }
-  if (patched && !resolved.includes("patch_hash=")) {
+  if (patched && installedPatchHashes(root, expectedName, targetVersion).length === 0) {
     throw new Error(`${packagePath} does not resolve to pnpm's patched package instance`);
   }
 }
