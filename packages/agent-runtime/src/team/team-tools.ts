@@ -5,6 +5,7 @@
 import { Type } from "@earendil-works/pi-ai";
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { RuntimeHost } from "../host-client.js";
+import { createWaitForUpdatesTool } from "./wait-for-updates.js";
 import {
   type TeamTaskRecord,
   type TeamMemberRecord,
@@ -317,135 +318,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
     },
   };
 
-  const waitForUpdatesTool: AgentTool = {
-    name: "wait_for_updates",
-    label: "Wait for Updates",
-    description:
-      "Wait for teammate updates (mailbox messages, task board updates) with a timeout in seconds.",
-    parameters: Type.Object({
-      timeoutSeconds: Type.Optional(
-        Type.Number({
-          description: "Timeout in seconds (1-60, default 10).",
-          minimum: 1,
-          maximum: 60,
-        }),
-      ),
-    }),
-    execute: async (_toolCallId, params, signal): Promise<AgentToolResult> => {
-      try {
-        const p = params as { timeoutSeconds?: number };
-        const timeoutMs =
-          Math.min(Math.max(Number(p.timeoutSeconds) || 10, 1), 60) * 1000;
-        const start = Date.now();
-
-        // Baseline state
-        const [initBoard, initMsgs] = await Promise.all([
-          host
-            .call<TeamBoardProjection>("team.getBoard", { teamSessionId, callerSessionId })
-            .catch(() => null),
-          host
-            .call<{ messages: unknown[] }>("team.listMessages", {
-              teamSessionId,
-              callerSessionId,
-              sessionId: callerSessionId,
-            })
-            .catch(() => null),
-        ]);
-        const baselineRev = initBoard?.revision ?? 0;
-        const baselineMsgCount = initMsgs?.messages?.length ?? 0;
-
-        while (Date.now() - start < timeoutMs) {
-          if (signal?.aborted) {
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: JSON.stringify({ updated: false, reason: "aborted" }),
-                },
-              ],
-              details: { updated: false, reason: "aborted" },
-            };
-          }
-
-          await new Promise((r) => setTimeout(r, 1000));
-
-          const [currBoard, currMsgs] = await Promise.all([
-            host
-              .call<TeamBoardProjection>("team.getBoard", { teamSessionId, callerSessionId })
-              .catch(() => null),
-            host
-              .call<{ messages: unknown[] }>("team.listMessages", {
-                teamSessionId,
-                callerSessionId,
-                sessionId: callerSessionId,
-              })
-              .catch(() => null),
-          ]);
-
-          if (currBoard && currBoard.revision !== baselineRev) {
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: JSON.stringify({
-                    updated: true,
-                    reason: "task_board_changed",
-                    revision: currBoard.revision,
-                  }),
-                },
-              ],
-              details: {
-                updated: true,
-                reason: "task_board_changed",
-                revision: currBoard.revision,
-              },
-            };
-          }
-
-          if (currMsgs && currMsgs.messages.length !== baselineMsgCount) {
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: JSON.stringify({
-                    updated: true,
-                    reason: "new_mailbox_messages",
-                    count: currMsgs.messages.length,
-                  }),
-                },
-              ],
-              details: {
-                updated: true,
-                reason: "new_mailbox_messages",
-                count: currMsgs.messages.length,
-              },
-            };
-          }
-        }
-
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({ updated: false, reason: "timeout" }),
-            },
-          ],
-          details: { updated: false, reason: "timeout" },
-        };
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Error: " + message,
-            },
-          ],
-          details: { error: message },
-        };
-      }
-    },
-  };
+  const waitForUpdatesTool = createWaitForUpdatesTool(opts);
 
   const interruptAgentTool: AgentTool = {
     name: "interrupt_agent",

@@ -420,6 +420,16 @@ to later refresh and inference; the vendor picker does not collect them.
   delivery. Host resolves the sender's effective permission mode (including
   `inherit` against the current default) and stores it as the message ceiling;
   `session.beginTurn` enforces that ceiling before a recipient turn starts.
+
+The `wait_for_updates` tool subscribes before reading its baseline and wakes on
+matching `team.changed` / `team.messageQueued` notifications, debounced for
+100 ms. It rechecks every 5 s as a bounded fallback, or every 1 s when the Host
+has no notification API. Baseline failures return a tool error; recheck failures
+are retried, and a deadline with no successful recheck returns the last error.
+Abort returns immediately. Every exit removes subscriptions, timers and abort
+listeners. Board/message change reasons and successful timeout behavior remain
+unchanged.
+
 - `team.ackMessage({ teamSessionId, ackSessionId, messageId })` accepts only
   the target member and requires a durable Host queue or turn receipt. Repeated
   acknowledgements are idempotent. It does not reject a durable receipt solely

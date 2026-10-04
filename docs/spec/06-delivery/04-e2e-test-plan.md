@@ -17097,3 +17097,13 @@ registry-only installation and credential isolation.
 - **Acceptance:** Rust boundaries/RPC tests and controlled-clock Main tests prove exact timing. `e2e-plan-ui` one-time schedule covers the real UI/Host/sidecar path; its 45 s completion window alone does not prove prompt wakeup. Run smoke, boot, plan and scheduled regression suites too.
 - **Milestone:** Maintenance.
 - **Status:** Automated tests required on the task candidate; record actual results separately.
+
+## E2E-TEAM-notification-wait
+
+- **Preconditions:** Isolated runtime Host fixture; controlled clock; no real provider.
+- **Steps:** Enter `wait_for_updates` through the registered Team tool. Fail the baseline, then exercise idle waiting, matching and unrelated Team notifications, fallback without notifications, transient/persistent recheck failure and abort.
+- **Expected:** A failed baseline is an error rather than a false update. Matching notifications wake after 100 ms; fallback is 5 s with notifications or 1 s without them. No overlapping rechecks; abort returns immediately and every exit disposes resources. A deadline without a successful recheck reports the error.
+- **Specs:** 03-runtime/06-host-rpc-protocol, Team notification contract.
+- **Acceptance:** Runtime interaction tests prove direct wait behavior; `e2e-team` and `e2e-session-collaboration` cover Team wiring, not direct wait latency.
+- **Milestone:** Maintenance.
+- **Status:** Automated tests required on the task candidate; record actual results separately.

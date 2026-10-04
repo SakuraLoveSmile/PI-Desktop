@@ -281,6 +281,13 @@ type ToolBudgetHealth = {
   持久化一条 Team 来源的消息并发出 `team.messageQueued`。立即响应报告邮箱状态，不代表投递
   已完成。Host 会解析发送者的有效权限模式（`inherit` 按当前默认权限解析）并保存为消息
   上限；接收会话的 `session.beginTurn` 在启动回合前必须符合该上限。
+
+`wait_for_updates` 先订阅再读取基线，收到同一 Team 的 `team.changed` /
+`team.messageQueued` 通知后防抖 100 ms 复查。通知可用时每 5 s 兜底复查，
+Host 无通知 API 时仍每 1 s 复查。基线失败返回工具错误；复查失败继续重试，
+截止前没有成功复查则返回最后的错误。取消立即返回，所有退出路径清除订阅、
+定时器和取消监听。变更原因与正常超时判定保持不变。
+
 - `team.ackMessage({ teamSessionId, ackSessionId, messageId })` 仅接受目标成员的确认，并要求
   Host 队列或 turn 回执已持久化。重复确认是幂等的；回合获准启动后，任一会话的权限设置
   变化都不会单独否定已持久化的回执。
