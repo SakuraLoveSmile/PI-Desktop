@@ -3067,8 +3067,10 @@ describe("DesktopAgentRuntime plan transitions", () => {
       const handleAgentEvent = (runtime as any).handleAgentEvent.bind(runtime);
       const submitTool = agent.state.tools.find((tool: any) => tool.name === toolName);
 
+      // A missing workspace is a recoverable tool error, so a fatal rejection
+      // needs another host code.
       host.call.mockRejectedValueOnce({
-        data: { errorCode: "PLAN_WORKSPACE_REQUIRED" },
+        data: { errorCode: "PLAN_SUBMIT_FAILED" },
       });
 
       const submitResult = await submitTool.execute(`submit-${kind}`, {
@@ -3093,7 +3095,7 @@ describe("DesktopAgentRuntime plan transitions", () => {
 
       expect(errorIdx).toBeGreaterThanOrEqual(0);
       expect(agentEndIdx).toBeGreaterThan(errorIdx);
-      expect(events[errorIdx].error.code).toBe("PLAN_WORKSPACE_REQUIRED");
+      expect(events[errorIdx].error.code).toBe("PLAN_SUBMIT_FAILED");
 
       await runtime.dispose();
     },
@@ -3176,7 +3178,7 @@ describe("DesktopAgentRuntime plan transitions", () => {
     const submitTool = agent.state.tools.find((tool: any) => tool.name === "SubmitPlan");
 
     host.call.mockRejectedValueOnce({
-      data: { errorCode: "PLAN_WORKSPACE_REQUIRED" },
+      data: { errorCode: "PLAN_SUBMIT_FAILED" },
     });
 
     const submitResult = await submitTool.execute("submit-plan-override", {
