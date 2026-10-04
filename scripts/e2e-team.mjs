@@ -636,7 +636,9 @@ async function resizePanel(sendCdp, evaluate, width) {
     return { width: panel.getBoundingClientRect().width, x: handle.left + handle.width / 2, y: handle.top + 120 };
   })()`);
   await sendCdp("Input.dispatchMouseEvent", { type: "mousePressed", x: bounds.x, y: bounds.y, button: "left", clickCount: 1 });
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="work-panel"]')?.dataset.resizing === 'true'`), "panel resize gesture admitted");
   await sendCdp("Input.dispatchMouseEvent", { type: "mouseMoved", x: bounds.x + bounds.width - width, y: bounds.y, button: "left", buttons: 1 });
+  await waitFor(() => evaluate(`Math.abs(document.querySelector('[data-testid="work-panel"]').getBoundingClientRect().width - ${width}) < 2`), `panel drag reached ${width}px`);
   await sendCdp("Input.dispatchMouseEvent", { type: "mouseReleased", x: bounds.x + bounds.width - width, y: bounds.y, button: "left", clickCount: 1 });
   await waitFor(() => evaluate(`Math.abs(document.querySelector('[data-testid="work-panel"]').getBoundingClientRect().width - ${width}) < 2`), `panel resized to ${width}px`);
 }
@@ -675,6 +677,7 @@ async function verifyTeamLayoutMatrix(sendCdp, evaluate, locale) {
     }
   } finally {
     await evaluate(`document.documentElement.style.removeProperty('--font-scale'); document.documentElement.setAttribute('data-theme', 'dark'); true`);
+    await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
     await resizePanel(sendCdp, evaluate, 360);
     await sendCdp("Emulation.clearDeviceMetricsOverride");
   }
