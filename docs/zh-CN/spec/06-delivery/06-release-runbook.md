@@ -98,7 +98,8 @@ Windows 可执行文件和原生窗口图标中使用 `build/icon.ico`。渲染�
 | `packages/shared/src/changelog.ts` | 英文、zh-CN、zh-TW 条目按最新优先排列，亮点条数一致 |
 | `packages/shared/src/changelog-de.ts`、`changelog-es.ts`、`changelog-fr.ts`、`changelog-ko.ts`、`changelog-tr.ts` | 版本集合与亮点条数与英文一致 |
 | `packages/shared/src/changelog.test.ts` | 该版本加入最新优先清单的首位 |
-| `package.json`、`apps/*/package.json`、`packages/*/package.json`、`docs/package.json` | 版本号一致（`docs` 是第三个工作区根，不在 `apps`/`packages` 之下） |
+| `package.json`、`apps/*/package.json`、`docs/package.json` | 版本号一致（`docs` 是第三个工作区根，不在 `apps`/`packages` 之下） |
+| `packages/*/package.json` | 发布时不提升：各自保持最近一次同步的上游树的版本，预检只要求它们彼此一致（ADR plus-version-line） |
 | `Cargo.toml` 的 `[workspace.package]`、`Cargo.lock` 的 `host-core` | 版本号一致 |
 | `packages/shared/src/protocol.ts` 的 `APP_VERSION` | 版本号一致 |
 | `README.md`、`README.zh-CN.md` | 状态章节声明当前 `<major>.<minor>.x` 版本线；工具链、命令与路线图描述仍然成立 |
@@ -208,22 +209,12 @@ Intel x64 通道发布 `Pi-Desktop-Plus-<version>-x64.dmg` 和
 上传前，每个 macOS 运行器必须恰好生成一个带架构后缀的 DMG 和 ZIP（包括
 blockmap），任何无后缀或架构错误的 macOS 工件都会使发布失败。
 
-DMG 使用带有品牌视觉的 720×440 背景，只展示拖入 Applications 的双图标安装手势。
-窗口里只有应用和 Applications 链接；打开说明和可执行 command 助手都不放入 DMG。
+DMG 使用带品牌视觉的 720×440 背景，只展示拖入 Applications 的双图标安装手势。
+窗口里只有应用和 Applications 链接。
 
-macOS ZIP 在安装包根目录包含 `Pi-Desktop-Plus-macOS-opening-help.txt` 和可执行的
-`Pi-Desktop-Plus-macOS-open.command`。将 `Pi-Desktop-Plus.app` 移动到 `/Applications` 或
-`~/Applications` 后，ZIP 用户可以双击该助手。它只搜索这两个固定位置，在存在时递归
-删除唯一的 `com.apple.quarantine` 属性，然后打开 Pi-Desktop-Plus。在执行前它会校验
-`CFBundleIdentifier=cn.sakura.pi-desktop`。它不会使用 `sudo`，也不接受任意应用路径。
-标准系统位置的终端备用命令为：
-
-```sh
-xattr -r -d com.apple.quarantine /Applications/Pi-Desktop-Plus.app
-```
-
-该助手仅适用于可信来源的未签名工件在 macOS 上提示应用已损坏的场景；已签名并公证
-的版本无需执行它。
+macOS ZIP 在安装包根目录包含 `Pi-Desktop-Plus.app`。DMG 和 ZIP 都不附带打开说明或首次
+启动命令助手，本地与未签名调试构建也一样。标签发布工件仍会签名并公证；未签名通道
+仅用于调试，不代表已通过 Gatekeeper 验证。
 
 标签构建和 `sign_macos: true`（手动运行的默认值）仅从 GitHub Actions 密钥接收 `CSC_LINK`、`CSC_KEY_PASSWORD`、`APPLE_ID`、`APPLE_APP_SPECIFIC_PASSWORD` 和 `APPLE_TEAM_ID`，通过 `CSC_NAME=${MAC_SIGNING_IDENTITY}`（裸通用名——electron-builder 拒绝 `Developer ID Application:` 前缀）固定证书，强制代码签名与 `notarytool` 公证 `Pi-Desktop-Plus.app`。随后 DMG 会由 `scripts/notarize-and-staple-macos-release-dmg.sh` 单独提交到同一个服务，只有返回 `Accepted` 才允许装订票据。之后验证身份、代码签名完整性（含 `pi-desktop-host-core`）、Gatekeeper `Notarized Developer ID` 以及两份已装订票据，再进行任何工件上传。
 

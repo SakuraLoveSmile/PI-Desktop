@@ -352,26 +352,22 @@ pub struct MessageAttachment {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SkillMention {
-    pub start: usize,
-    pub end: usize,
-    pub id: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct UiMessage {
     pub id: String,
     pub role: String,
     pub content: String,
-    /// Original typed slash invocation; content contains the expanded prompt.
+    /// Original text for a slash template or Skill invocation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub command: Option<String>,
+    /// Validated Skill tokens in `command`, with UTF-16 offsets for the renderer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub skill_mentions: Option<Vec<SkillMention>>,
     /// Host-authenticated agent-to-agent origin, never a human authorization.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_message: Option<Value>,
+    /// Minimal provenance for an accepted Live Voice work input.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub voice_origin: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attachments: Option<Vec<MessageAttachment>>,
     /// Accepted input to an existing turn, preserved by Stop after renderer reload.
@@ -434,6 +430,14 @@ pub struct UiMessage {
     /// as an additive `hostedSearch` transcript block; no SQL migration.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hosted_search: Option<Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillMention {
+    pub start: usize,
+    pub end: usize,
+    pub id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -513,6 +517,9 @@ pub(crate) fn ui_to_record(message: &UiMessage) -> (MessageRecord, Option<String
     }
     if let Some(origin) = &message.session_message {
         meta_obj.insert("sessionMessage".into(), origin.clone());
+    }
+    if let Some(origin) = &message.voice_origin {
+        meta_obj.insert("voiceOrigin".into(), origin.clone());
     }
     if let Some(steering) = message.steering {
         meta_obj.insert("steering".into(), json!(steering));
@@ -666,6 +673,7 @@ pub(crate) fn record_to_ui(record: MessageRecord) -> UiMessage {
         .get("skillMentions")
         .and_then(|value| serde_json::from_value(value.clone()).ok());
     let session_message = meta.get("sessionMessage").cloned();
+    let voice_origin = meta.get("voiceOrigin").cloned();
     let steering = meta.get("steering").and_then(Value::as_bool);
     let status = meta
         .get("status")
@@ -767,9 +775,10 @@ pub(crate) fn record_to_ui(record: MessageRecord) -> UiMessage {
             id: record.id,
             role: record.role,
             content: text,
-            command,
-            skill_mentions,
+            command: command.clone(),
+            skill_mentions: skill_mentions.clone(),
             session_message,
+            voice_origin: voice_origin.clone(),
             attachments: None,
             steering,
             created_at: record.created_at,
@@ -821,6 +830,7 @@ pub(crate) fn record_to_ui(record: MessageRecord) -> UiMessage {
             command,
             skill_mentions,
             session_message,
+            voice_origin,
             attachments,
             steering,
             created_at: record.created_at,
@@ -4561,6 +4571,7 @@ mod tests {
             command: None,
             skill_mentions: None,
             attachments: None,
+            voice_origin: None,
             steering: None,
             created_at: ts.into(),
             thinking: None,
@@ -5734,6 +5745,7 @@ mod tests {
             command: None,
             skill_mentions: None,
             attachments: None,
+            voice_origin: None,
             steering: None,
             created_at: "2025-05-01T00:00:02Z".into(),
             thinking: None,
@@ -6165,6 +6177,7 @@ mod tests {
             command: None,
             skill_mentions: None,
             attachments: None,
+            voice_origin: None,
             steering: None,
             created_at: "2025-05-01T00:00:01Z".into(),
             thinking: Some("first plan\nsecond plan".into()),
@@ -6250,6 +6263,7 @@ mod tests {
             command: None,
             skill_mentions: None,
             attachments: None,
+            voice_origin: None,
             steering: None,
             created_at: "2025-05-01T00:00:01Z".into(),
             thinking: None,
@@ -6691,7 +6705,7 @@ mod tests {
             panic!("expected child")
         };
         let child_scratch = crate::scratch::session_dir(db.data_dir(), &child.summary.id).unwrap();
-        let child_file = child_scratch.join("pasted/first note.txt");
+        let child_file = child_scratch.join("pasted").join("first note.txt");
         assert_eq!(
             std::fs::read_to_string(&child_file).unwrap(),
             "original reference bytes"
@@ -6727,7 +6741,8 @@ mod tests {
         };
         let grandchild_file = crate::scratch::session_dir(db.data_dir(), &grandchild.summary.id)
             .unwrap()
-            .join("pasted/first note.txt");
+            .join("pasted")
+            .join("first note.txt");
         assert_eq!(
             std::fs::read_to_string(&grandchild_file).unwrap(),
             "original reference bytes"

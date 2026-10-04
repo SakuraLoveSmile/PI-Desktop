@@ -649,8 +649,9 @@ export class RuntimeService implements RuntimePort {
     await this.events.flushCheckpoint(sessionId);
     if (this.activeTurns.get(sessionId) !== crashedTurnId) return;
     this.events.settleCheckpoint(sessionId);
-    // The headless sidecar exit payload has no stderr tail, so use the honest
-    // generic crash code rather than unrelated plan approval vocabulary.
+    // The sidecar handle's exit info carries no stderr tail, so this path
+    // cannot classify a heap exhaustion; it still names the failure honestly
+    // instead of borrowing plan-approval vocabulary (issue #1077).
     await this.finishTurn(sessionId, "aborted", ErrorCodes.AGENT_SIDECAR_CRASHED, {
       turnId: crashedTurnId,
       recoverInflight: true,

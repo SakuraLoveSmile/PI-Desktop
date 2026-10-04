@@ -21,6 +21,8 @@ import {
 } from "../../../components/icons";
 import { TooltipButton } from "../../../components/ui";
 import { userMessageMenuItems } from "./menu-items";
+import { ActionSlotSide } from "./ActionBarSlots";
+import { slotMessage } from "../../../plugins/renderer-slots/slot-message";
 import { SessionMessageOrigin } from "./SessionMessageOrigin";
 import {
   CopyButton,
@@ -40,22 +42,17 @@ function SkillInvocationText({ message }: { message: UiMessage }) {
   const parts: ReactNode[] = [];
   let cursor = 0;
   for (const mention of mentions) {
-    const valid = Number.isInteger(mention.start) &&
-      Number.isInteger(mention.end) &&
-      mention.start >= cursor &&
-      mention.start + 1 < mention.end &&
-      mention.end <= command.length &&
-      command.slice(mention.start, mention.end).startsWith("/") &&
-      !/\s/.test(command.slice(mention.start, mention.end));
-    if (!valid) return <LinkifiedText text={command} attachments={message.attachments} />;
+    if (
+      !Number.isInteger(mention.start) ||
+      !Number.isInteger(mention.end) ||
+      mention.start < cursor ||
+      mention.end > command.length ||
+      !command.slice(mention.start, mention.end).startsWith("/")
+    ) {
+      return <LinkifiedText text={command} attachments={message.attachments} />;
+    }
     if (mention.start > cursor) {
-      parts.push(
-        <LinkifiedText
-          key={`text-${cursor}`}
-          text={command.slice(cursor, mention.start)}
-          attachments={message.attachments}
-        />,
-      );
+      parts.push(<LinkifiedText key={`text-${cursor}`} text={command.slice(cursor, mention.start)} attachments={message.attachments} />);
     }
     parts.push(
       <code key={`skill-${mention.start}`} className="chat-command-chip" title={mention.id}>
@@ -65,9 +62,7 @@ function SkillInvocationText({ message }: { message: UiMessage }) {
     cursor = mention.end;
   }
   if (cursor < command.length) {
-    parts.push(
-      <LinkifiedText key={`text-${cursor}`} text={command.slice(cursor)} attachments={message.attachments} />,
-    );
+    parts.push(<LinkifiedText key={`text-${cursor}`} text={command.slice(cursor)} attachments={message.attachments} />);
   }
   return <>{parts}</>;
 }
@@ -91,6 +86,8 @@ export const MessageRow = memo(function MessageRow({
   const editableUserMessage = isUser && !isSessionMessage;
   const workspaceRoot = useAppStore((s) => s.workspace?.path);
   const openFileRef = useOpenChatFileRef();
+  // userAction belongs to user cards; other rows keep a plugin-free bar.
+  const slotUser = isUser ? slotMessage("user", message) : undefined;
   // Slash prompts are stored expanded; editing works on the typed form so the
   // resent turn re-expands the template (D123).
   const editSeed =
@@ -276,6 +273,7 @@ export const MessageRow = memo(function MessageRow({
                             name={attachment.name}
                             path={attachment.ref}
                             kind={attachment.kind}
+                            mimeType={attachment.mimeType}
                             onOpen={openFileRef}
                           />
                         </span>
@@ -315,6 +313,7 @@ export const MessageRow = memo(function MessageRow({
         {!editing && (hasAnswer || showRevisionPager) ? (
           <div className="message-actions">
             <MessageTimestamp createdAt={message.createdAt} />
+            <ActionSlotSide slot="userAction" side="left" message={slotUser} />
             {showRevisionPager ? (
               <div className="message-revision-pager" role="group" aria-label={t("chat.revisions")}>
                 <TooltipButton
@@ -373,6 +372,7 @@ export const MessageRow = memo(function MessageRow({
                 <IconTrash size={13} />
               </TooltipButton>
             ) : null}
+            <ActionSlotSide slot="userAction" side="right" message={slotUser} />
           </div>
         ) : null}
       </div>

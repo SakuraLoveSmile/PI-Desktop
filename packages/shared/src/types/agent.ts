@@ -4,7 +4,7 @@ import type { AppError } from "../errors.js";
 import type { PlanExecution, PlanningStateEvent } from "./plans.js";
 import type { ContextCompactionFallback, ContextCompactionMark, ContextCompactionReason } from "./sessions.js";
 import type { AgentStatus } from "./sessions.js";
-import type { MessageUsage, ToolTokenUsage, UiMessage } from "./messages.js";
+import type { MessageUsage, ToolTokenUsage, UiMessage, VoiceOrigin } from "./messages.js";
 import type { PermissionDecision, Risk } from "./permissions.js";
 import type { ThinkingLevel } from "./models.js";
 import type { RacpPermissionMode } from "../racp.js";
@@ -42,6 +42,8 @@ export type AgentPromptRequest = {
    * mints its own.
    */
   messageId?: string;
+  /** Main-trusted source metadata for a Live Voice work admission. */
+  voiceOrigin?: VoiceOrigin;
   /**
    * Renderer snapshot of the chat session visible when the prompt was sent.
    * Electron installs it before asynchronous turn setup for notification
@@ -72,7 +74,7 @@ export type AgentPromptAttachment = {
 
 export type AgentSteerRequest = Pick<
   AgentPromptRequest,
-  "sessionId" | "content" | "attachments" | "messageId"
+  "sessionId" | "content" | "attachments" | "messageId" | "voiceOrigin"
 > & {
   expectedTurnId: string;
 };
@@ -141,6 +143,8 @@ export type QueuedTurnSummary = {
   sessionId: string;
   content: string;
   sessionMessageId?: string;
+  userMessageId?: string;
+  voiceOrigin?: VoiceOrigin;
   attachments?: AgentPromptAttachment[];
   position: number;
   /** Set only for promoted entries; entries arrive in delivery order. */
@@ -152,6 +156,8 @@ export type AgentQueuePushRequest = {
   sessionId: string;
   content: string;
   sessionMessageId?: string;
+  userMessageId?: string;
+  voiceOrigin?: VoiceOrigin;
   attachments?: AgentPromptAttachment[];
   idempotencyKey?: string;
 };
@@ -188,10 +194,45 @@ export type ToolPermissionResolution = {
   decision: PermissionDecision;
 };
 
+/** A selectable asktool answer: a plain label or a label with supporting copy. */
+export type AskToolOption =
+  | string
+  | {
+      label: string;
+      description?: string;
+    };
+
+/** Normalize a model-provided asktool option and discard malformed/empty values. */
+export function normalizeAskToolOption(value: unknown): AskToolOption | undefined {
+  if (typeof value === "string") {
+    const label = value.trim();
+    return label || undefined;
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const option = value as Record<string, unknown>;
+  const label = typeof option.label === "string" ? option.label.trim() : "";
+  if (!label) return undefined;
+  const description =
+    typeof option.description === "string" ? option.description.trim() : "";
+  return description ? { label, description } : { label };
+}
+
+export function askToolOptionLabel(option: AskToolOption): string {
+  return typeof option === "string" ? option : option.label;
+}
+
+export function askToolOptionDescription(
+  option: AskToolOption,
+): string | undefined {
+  if (typeof option === "string") return undefined;
+  const description = option.description?.trim();
+  return description || undefined;
+}
+
 /** A model-created question shown in the inline asktool card. */
 export type AskToolQuestion = {
   question: string;
-  options: string[];
+  options: AskToolOption[];
   multiSelect?: boolean;
 };
 

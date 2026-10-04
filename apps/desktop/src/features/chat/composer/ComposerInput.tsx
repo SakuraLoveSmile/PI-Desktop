@@ -8,12 +8,10 @@ import type {
   RefObject,
   SetStateAction,
 } from "react";
-import type { useComposerAutocomplete } from "../../../hooks/use-composer-autocomplete";
 import { editorSelectionRange, readEditorValue } from "./editor";
 import { ComposerImagePreview } from "./ComposerImagePreview";
+import type { CompletionController } from "./hooks/useComposerCompletions";
 import type { ComposerImagePreviewController } from "./hooks/useComposerImagePreview";
-
-type AutocompleteController = ReturnType<typeof useComposerAutocomplete>;
 
 export type ComposerInputProps = {
   imagePreview?: ComposerImagePreviewController;
@@ -25,15 +23,23 @@ export type ComposerInputProps = {
   pasting: boolean;
   enterToSend: boolean;
   runActive: boolean;
-  composerAc: AutocompleteController;
+  composerAc: CompletionController;
   onPaste: (event: ClipboardEvent<HTMLDivElement>) => void;
   onAcceptCompletion: (index: number) => void;
   onSubmit: (steering?: boolean) => void;
   onInsertNewline: () => void;
   onInput: (source: string, caret: number) => void;
+  /** Terminal-style recall; returns true when the arrow key was consumed. */
   onHistoryNavigate: (direction: "older" | "newer") => boolean;
   onCompositionStart: () => void;
   onCompositionEnd: (event: FormEvent<HTMLDivElement>) => void;
+  /**
+   * A composition that the browser never reports as ended. A Windows Chinese
+   * IME drops `compositionend` when the composing text is deleted, which
+   * would otherwise leave the draft composing forever (#929). An input event
+   * that is not part of a composition is proof it is over.
+   */
+  onSettledInput: () => void;
   onFocus: () => void;
   onBlur: () => void;
 };
@@ -58,6 +64,7 @@ export function ComposerInput({
   onHistoryNavigate,
   onCompositionStart,
   onCompositionEnd,
+  onSettledInput,
   onFocus,
   onBlur,
 }: ComposerInputProps) {
@@ -100,6 +107,9 @@ export function ComposerInput({
             const element = event.currentTarget;
             const source = readEditorValue(element);
             const { start } = editorSelectionRange(element);
+            // An input outside a composition proves the previous one ended,
+            // even when the IME never sent compositionend (#929).
+            if (!(event.nativeEvent as InputEvent).isComposing) onSettledInput();
             onInput(source, start);
           }}
           onCompositionStart={onCompositionStart}
@@ -140,7 +150,10 @@ export function ComposerInput({
             }
             if (
               (event.key === "ArrowUp" || event.key === "ArrowDown") &&
-              !event.shiftKey && !event.altKey && !event.metaKey && !event.ctrlKey &&
+              !event.shiftKey &&
+              !event.altKey &&
+              !event.metaKey &&
+              !event.ctrlKey &&
               onHistoryNavigate(event.key === "ArrowUp" ? "older" : "newer")
             ) {
               event.preventDefault();

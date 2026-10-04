@@ -17,13 +17,13 @@ import {
   IconStop,
   IconUndo2,
 } from "../../../components/icons";
-import { VoiceMicButton } from "../../voice/VoiceMicButton";
+import { LiveVoiceControls } from "../../voice/live/LiveVoiceControls";
 import { ComposerPlusMenu } from "./ComposerPlusMenu";
 import { ComposerModelPicker } from "./ComposerModelPicker";
 import { ComposerExecutionProfilePicker } from "./ComposerExecutionProfilePicker";
 import { ComposerContractPicker } from "./ComposerContractPicker";
+import { ComposerControlSlots } from "./ComposerControlSlots";
 import type { useComposerModelMenu } from "./hooks/useComposerModelMenu";
-import type { VoicePhase } from "../../voice/useVoiceInput";
 
 type ModelMenuController = ReturnType<typeof useComposerModelMenu>;
 
@@ -53,24 +53,21 @@ export type ComposerToolbarProps = {
   enhancementUndoText: string | null;
   enhancePrompt: () => Promise<void>;
   undoPromptEnhancement: () => void;
-  clearEnhancementError: () => void;
   runActive: boolean;
   hasDraftContent: boolean;
   abort: AppState["abort"];
   submit: () => Promise<void>;
-  voicePhase: VoicePhase;
-  voiceEnabled: boolean;
-  onVoiceToggle: () => void;
-  onVoiceCancel: () => void;
   onInsertReference: (item: { path: string; name: string; isDir: boolean }) => void;
   onInsertCommand: (command: ComposerCommand) => void;
+  workSessionId?: string;
+  workSessionLabel?: string;
 };
 
 /**
  * Composer toolbar:
  * Left to right: fixed `+` menu trigger, profile picker, model/reasoning picker,
  * compact mode indicator (when Plan or Goal is active).
- * Right: prompt enhancement, voice input, send/stop.
+ * Right: plugin controls, prompt enhancement, live voice, send/stop.
  */
 export function ComposerToolbar({
   t,
@@ -98,17 +95,14 @@ export function ComposerToolbar({
   enhancementUndoText,
   enhancePrompt,
   undoPromptEnhancement,
-  clearEnhancementError: _clearEnhancementError,
   runActive,
   hasDraftContent,
   abort,
   submit,
-  voicePhase,
-  voiceEnabled,
-  onVoiceToggle,
-  onVoiceCancel,
   onInsertReference,
   onInsertCommand,
+  workSessionId,
+  workSessionLabel,
 }: ComposerToolbarProps) {
   const [plusOpen, setPlusOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -235,10 +229,12 @@ export function ComposerToolbar({
             setPlusOpen(true);
           }}
         />
+        <ComposerControlSlots side="left" />
       </div>
 
-      {/* Right side: Enhancement, Voice, Send/Stop */}
+      {/* Right side: Plugin controls, Enhancement, Live voice, Send/Stop */}
       <div className="composer-right">
+        <ComposerControlSlots side="right" />
         <TooltipButton
           type="button"
           className={`icon-btn icon-btn-square composer-enhance-btn${enhancingPrompt ? " is-loading" : ""}`}
@@ -277,15 +273,7 @@ export function ComposerToolbar({
           </TooltipButton>
         ) : null}
 
-        {voiceEnabled && (
-          <VoiceMicButton
-            t={t}
-            phase={voicePhase}
-            disabled={controlsBlocked}
-            onToggle={onVoiceToggle}
-            onCancel={onVoiceCancel}
-          />
-        )}
+        <LiveVoiceControls t={t} workSessionId={workSessionId} />
 
         {runActive && !hasDraftContent ? (
           <TooltipButton

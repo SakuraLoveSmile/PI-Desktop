@@ -18,7 +18,13 @@
 
 import { AsyncLocalStorage } from "node:async_hooks";
 import { HEADER_VALUE_MAX_BYTES, inspectHeaderValue } from "@pi-desktop/shared";
-import type { FetchFunction, ProviderHeaders, SimpleStreamOptions } from "@earendil-works/pi-ai";
+import type {
+  Api,
+  FetchFunction,
+  ProviderHeaders,
+  SimpleStreamOptions,
+} from "@earendil-works/pi-ai";
+import { adapterAcceptsCustomFetch } from "./provider-binding.js";
 
 export const PROVIDER_HEADERS_MAX = 32;
 export const PROVIDER_HEADER_KEY_MAX_BYTES = 256;
@@ -183,26 +189,29 @@ export function withProviderHeadersFetch(
 export function withProviderHeaders(
   options: SimpleStreamOptions | undefined,
   headers: Record<string, string> | undefined,
-  config: { allowCustomFetch?: boolean } = {},
+  api?: Api,
 ): SimpleStreamOptions {
+  const acceptsFetch = adapterAcceptsCustomFetch(api);
   const normalized = normalizeProviderHeaders(headers);
-  if (!normalized && config.allowCustomFetch !== false) return options ?? {};
-  const merged = normalized
-    ? mergeProviderHeaders(options?.headers, normalized)
+  if (!normalized) {
+    // The refusal is about the `fetch` alone, so it holds even when this row
+    // has no header override to merge.
+    if (acceptsFetch || !options || options.fetch === undefined) return options ?? {};
+    return { ...options, fetch: undefined };
+  }
+  const merged = mergeProviderHeaders(options?.headers, normalized);
+  // The wrapper is the last writer for adapters that read their headers from
+  // the request, but pi-ai's Google adapters reject any `fetch` that is not
+  // `globalThis.fetch` (issue #1072). They keep the merged `headers` above —
+  // which their adapter forwards to the SDK client verbatim — and inherit no
+  // fetch at all, so a caller-supplied one is cleared instead of wrapped.
+  const fetch = acceptsFetch
+    ? withProviderHeadersFetch(options?.fetch, normalized)
     : undefined;
-  const fetch = config.allowCustomFetch === false
-    ? undefined
-    : withProviderHeadersFetch(options?.fetch, normalized);
-  const withoutFetch = config.allowCustomFetch === false
-    ? (() => {
-        const { fetch: _fetch, ...rest } = options ?? {};
-        return rest;
-      })()
-    : options ?? {};
   return {
-    ...withoutFetch,
+    ...(options ?? {}),
     ...(merged ? { headers: merged } : {}),
-    ...(fetch ? { fetch } : {}),
+    ...(acceptsFetch ? (fetch ? { fetch } : {}) : { fetch: undefined }),
   };
 }
 

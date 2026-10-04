@@ -9,7 +9,6 @@ import {
 } from "@pi-desktop/shared";
 import type { AppState } from "../../../../stores/app-store";
 import { useAppStore } from "../../../../stores/app-store";
-import type { ComposerDraftSnapshot } from "../../../../lib/composer-smart-stop";
 import { api } from "../../../../lib/api";
 import { draftKeyForSession } from "../../../../lib/composer-draft-cache";
 import { runExtensionCommand, runPaletteCommand } from "../../../../lib/commands";
@@ -19,6 +18,7 @@ import {
   resolveSlashDispatch,
 } from "../slash-dispatch";
 import { readEditorValue, setEditorCaret, type ComposerFileReference } from "../editor";
+import type { ComposerDraftSnapshot } from "../../../../lib/composer-smart-stop";
 import type { ComposerDraftController } from "./useComposerDraft";
 
 type UseComposerSubmitOptions = {
@@ -36,6 +36,7 @@ type UseComposerSubmitOptions = {
   sendPrompt: AppState["sendPrompt"];
   steerPrompt: AppState["steerPrompt"];
   showToast: AppState["showToast"];
+  /** Record an accepted submission for ArrowUp recall. */
   recordHistory?: (snapshot: ComposerDraftSnapshot, sessionId: string) => void;
   draft: Pick<
     ComposerDraftController,
@@ -212,12 +213,17 @@ export function useComposerSubmit({
     const submittedDraftKey = draftKey;
     const submittedDraftRevision = draft.draftRevision(submittedDraftKey);
     const submittedDraft = draft.draftSnapshot(text);
+    // Recall keeps what the user typed, in the conversation that submitted it.
+    // For a mode command that is the whole `/agent …` text rather than its body,
+    // so re-submitting re-runs it; every other recorded path stores exactly the
+    // accepted payload. A send from the empty home has no session yet, so the id
+    // is resolved after the submission materialized it.
     let acceptedSessionId = activeSessionId ?? undefined;
-    const captureAcceptedSession = (sessionId: string) => {
-      acceptedSessionId = sessionId;
-    };
     const remember = () => {
       if (acceptedSessionId) recordHistory?.(submittedDraft, acceptedSessionId);
+    };
+    const captureAcceptedSession = (sessionId: string) => {
+      acceptedSessionId = sessionId;
     };
     // Slash dispatch stays local for builtin and extension commands, while
     // templates, skills, and unknown aliases continue as normal prompt text. A
@@ -259,7 +265,7 @@ export function useComposerSubmit({
               ),
               draft.draftSnapshot(visibleCommandBody),
               activeSessionId ?? undefined,
-              { onAccepted: captureAcceptedSession },
+              captureAcceptedSession,
             );
             if (accepted) draft.clearDraftForKey(submittedDraftKey, submittedDraftRevision, submittedDraft);
             if (accepted) remember();
@@ -305,9 +311,12 @@ export function useComposerSubmit({
     try {
       const accepted = steering
         ? await steerPrompt(inlineContent, submittedDraft)
-        : await sendPrompt(inlineContent, submittedDraft, activeSessionId ?? undefined, {
-            onAccepted: captureAcceptedSession,
-          });
+        : await sendPrompt(
+            inlineContent,
+            submittedDraft,
+            activeSessionId ?? undefined,
+            captureAcceptedSession,
+          );
       if (!accepted) draft.restoreDraftForKey(submittedDraftKey, submittedDraft);
       else remember();
     } catch (error) {

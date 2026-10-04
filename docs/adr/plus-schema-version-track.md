@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-02
+- Updated: 2026-10-03, by the first upstream sync (shared chain at 21)
 - Amends: [Temporary Goal sessions own a persistent scratch workspace](temporary-goal-scratch-workspace.md),
   and the storage notes of the Expert Team and Plan/Goal revision records, which
   count their schema changes as versions 20 to 23 of the shared chain
@@ -38,9 +39,11 @@ it. Merging upstream under that arrangement has no safe outcome:
 Reserve `PRAGMA user_version` for the shared upstream chain and give Plus a
 second, independent version track in the same database file.
 
-1. **Shared chain.** `SCHEMA_VERSION` returns to 19 and moves only when
-   upstream migrations are merged. A Plus change never advances it and never
-   edits the shared baseline DDL (`SCHEMA_LATEST`, `PLAN_APPROVALS_SCHEMA`).
+1. **Shared chain.** `SCHEMA_VERSION` follows upstream: it returned to 19, the
+   fork point, when the track was introduced, and moves only when upstream
+   migrations are merged (21 once the sync that merged upstream's v20 and v21
+   landed). A Plus change never advances it and never edits the shared
+   baseline DDL (`SCHEMA_LATEST`, `PLAN_APPROVALS_SCHEMA`).
 2. **Plus track.** Plus structures are created by an ordered list of additive,
    idempotent steps in `crates/host-core/src/db/plus_schema.rs`, versioned by
    `PLUS_SCHEMA_VERSION` (currently 4). P1 to P4 are the former fork v20 to
@@ -74,7 +77,10 @@ second, independent version track in the same database file.
    own idempotent v19 to v23 steps and leaves `user_version` at 20 to 23. The
    next open of this build takes `pi.sqlite.repair-v<N>.bak` and restores the
    `user_version` the meta recorded, so rolling a build back and forward keeps
-   the data and shows no downgrade banner.
+   the data and shows no downgrade banner. Only numbers above this build's own
+   `SCHEMA_VERSION` are repaired; the numbers the shared chain has reached are
+   upstream's, so a Plus-track database standing there is migrated by the
+   chain like any other.
 7. **Other backups and fresh installs.** Applying pending Plus steps to an
    existing database that is behind on the track takes
    `pi.sqlite.plus-v<from>.bak` first. A fresh database runs the shared
@@ -93,19 +99,31 @@ second, independent version track in the same database file.
 - A fork build that predates the track keeps working on a Plus-track database,
   and the next launch of a newer build undoes that build's `user_version`
   change.
-- Known limitation: while `SCHEMA_VERSION` is 19, a database at 20 to 23 that
-  already has a meta row is read as advanced by an older fork build and is
+- Known limitation: a database above this build's `SCHEMA_VERSION`, at most 23,
+  that already has a meta row is read as advanced by an older fork build and is
   repaired. A database a genuine upstream build advanced from a Plus-track file
   cannot be told apart. The two lines default to separate data directories, so
-  this needs both pointed at one directory by hand. The repair rule narrows by
-  itself once `SCHEMA_VERSION` rises, because it only fires above the build's
-  own chain.
-- The first upstream sync that raises `SCHEMA_VERSION` must add a guard test
-  that a Plus-track database keeps its Plus column values through every
-  upstream step that rebuilds a table carrying Plus columns (the `sessions`
-  rebuild of the v18 to v19 step is the existing pattern). The replay re-adds a
-  dropped column but cannot restore its values. That sync must also keep the
-  legacy range as released history instead of moving it with `SCHEMA_VERSION`.
+  this needs both pointed at one directory by hand. The window narrows with
+  every sync that raises `SCHEMA_VERSION`: with the shared chain at 21 only 22
+  and 23 qualify, and the rule closes at 23, after which
+  `restore_recorded_upstream_version` is dead code and is removed. The legacy
+  range itself (20 to 23) is released history and does not move with
+  `SCHEMA_VERSION`; the numbers upstream has reached inside it, 20 and 21
+  today, belong to the shared chain. A legacy fork database at one of those
+  numbers still has no meta row, so it is reconciled and not repaired.
+- Upstream steps that follow the fork point are guarded by tests, not by
+  review. `upstream_steps_above_the_fork_baseline_keep_plus_values` and
+  `joint_upstream_v20_v21_steps_and_plus_reconciliation_keep_every_plus_value`
+  prove that a Plus-track database keeps every Plus column value through the
+  upstream steps merged so far, and `legacy_range_numbers_inside_the_shared_chain_are_migrated_not_repaired`
+  covers the numbers the two lines share. The fixtures derive older shapes by
+  stripping `UPSTREAM_STEPS`, and a coverage test fails when `SCHEMA_VERSION`
+  moves past the last listed step. Each later sync that raises `SCHEMA_VERSION`
+  appends its steps there, so the tests exercise the new step, and must keep
+  the legacy range where it is. A step that rebuilds a table carrying Plus
+  columns is the case to watch (the `sessions` rebuild of the v18 to v19 step
+  is the existing pattern): the replay re-adds a dropped column but cannot
+  restore its values.
 - Future Plus-only structural changes use a Plus step. The shared baseline DDL,
   `SCHEMA_VERSION`, and the `user_version` match arms are for upstream changes
   only.

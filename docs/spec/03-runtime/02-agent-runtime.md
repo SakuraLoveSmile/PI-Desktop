@@ -661,6 +661,16 @@ submitted Markdown bytes in a new immutable
 structured title/question in `plan_approvals`, and moves the live state to
 `awaiting_approval`.
 
+Plan/Goal requests retain Write/Edit declarations and, when subagents are
+configured, the Task/TaskWait/TaskList/TaskStop declarations. They are marked
+unavailable in the active mode. The execution allowlist remains unchanged:
+prohibited calls are blocked before extension call hooks and handlers, and a
+handler retained across a mode change rechecks that mode before executing.
+The model receives an ordinary error tool result with the original call id;
+no editing, delegation, fake user message or transcript deletion occurs.
+Other deferred/plugin tools keep their existing visibility rules. See
+[the declaration/permission decision](../../adr/plan-tool-declarations-and-execution-denials.md).
+
 Approval accepts `approve`, `reject`, `request_changes`, and `schedule`.
 `approve` commits `mode = agent`, the explicit permission mode, an execution
 ID, and `execution_state = queued` on the same `plan_approvals` row in one host
@@ -769,18 +779,13 @@ token (`writeToken`) from the Host and exposes the `UpdateGoalProgress` tool to 
   restores as an errored result; a tool row whose assistant row was lost
   gets a synthesized call-only assistant carrier so call/result pairs stay
   well-formed for every provider API.
-- Vision runtimes hydrate persisted image refs only from the session-bound
-  attachment, scratch, and project roots. Images within the 10 MB inline
-  safety bound become transient pi-ai image blocks; oversized or unavailable
-  images become safe `@path` fallbacks. Oversized history hydration copies
-  files without first loading their contents into memory. Restored history has
-  a 50 MB aggregate inline-image budget; the newest eligible attachments win,
-  and a file is read only when its size is unchanged before and after the
-  bounded read. Base64 is never restored into durable UI messages or
-  transcript records. The prompt currently being sent is removed from the
-  persisted tail before hydration, matched by `userMessageId` when available
-  and by its original user content for legacy callers without that id, so a
-  fallback path cannot cause the prompt to be sent twice.
+Vision runtimes hydrate persisted image refs only from the session-bound
+attachment, scratch, and project roots. Each image remains subject to the 10 MB
+safety bound, and restored history has a 30 MB aggregate raw-byte budget.
+The newest refs are considered first; all eligible images remain image blocks
+when the history fits, while over-budget or oversized images become safe
+`@path` fallbacks. Reads are bounded by the admitted file size. Base64 is
+transient and never restored into durable UI messages or transcript records.
 - Failed assistant messages remain durable diagnostic transcript entries but
   are never restored into pi model context on a later turn.
 - A tool-call id is unique in every request. The transcript is an append-only
@@ -965,10 +970,11 @@ keyboard-focus, and reduced-motion checks require project-provided browser
 tests or other tooling. Its statuses are `completed`, `failed`,
 `aborted`, `timed_out` and the registry-only `stopped`;
 the terminal ones surface through `TaskWait`, whose text is
-the report (bounded to `MAX_SUBAGENT_REPORT_CHARS`, 12k) and whose details
+the report (bounded to `MAX_SUBAGENT_REPORT_CHARS`, 12k; when exceeded, persisted to session scratch with a pointer notice per ADR 0062) and whose details
 carry `delegationId`, `agent`, `modelId`, `thinkingLevel`, `status`, `startedAt`,
-`completedAt` when settled, `turns`, `toolCalls` and, on failure or timeout,
-`error`. The same effective model and thinking fields are included in the
+`completedAt` when settled, `turns`, `toolCalls`, and `scratchReportPath` when
+the full report was spilled to scratch; on failure or timeout they carry
+`error` (including resume ID hints on `SUBAGENT_OUTPUT_TRUNCATED`). The same effective model and thinking fields are included in the
 immediate `Task` result and in lifecycle snapshots so live and restored
 delegation views do not re-derive them from definitions or parent settings.
 `startedAt` and `completedAt` are runtime timestamps in milliseconds and are the source of
@@ -993,9 +999,14 @@ they can end the parent turn even if a delegate ignores its abort. Ending the
 parent loop does not otherwise abort delegates.
 
 Fatal provider/stream errors (including exhausted HTTP 429) and parent aborts
-retain their existing `failed` and `aborted` outcomes. A terminal parent error
-also aborts leftover delegates, skips the resume prompt, and returns the
-session to idle so Continue is not `AGENT_BUSY` (D352).
+retain their existing `failed` and `aborted` outcomes. If an assistant response
+ends at the provider's output-token limit (`stopReason: "length"` or
+`"max_tokens"`) after emitting report text, the delegate instead settles as
+`failed` with `SUBAGENT_OUTPUT_TRUNCATED` and `outputTruncated: true`; its
+bounded partial report remains under the failure explanation for diagnosis. A
+later delegate turn that ends normally clears the marker and can complete. A
+terminal parent error also aborts leftover delegates, skips the resume prompt,
+and returns the session to idle so Continue is not `AGENT_BUSY` (D352).
 
 **Resumable delegations (ADR 0279).** `Task` accepts an optional `resume`
 parameter carrying the `delegationId` of a settled delegation in the same
@@ -1269,7 +1280,9 @@ Caller-supplied headers override the client and User-Agent defaults. An empty
 session header is restored from the conversation id so OpenCode Go cannot
 return `MissingSessionID`. A provider-row `headers` map is applied after this
 merge (headers plus a fetch wrapper) so custom values win over the OpenCode
-default and over adapter last-writes. Reserved keys cannot smash
+default and over adapter last-writes. The Google adapters take the merged
+`headers` without the wrapper, because they reject any other `fetch`
+(issue #1072). Reserved keys cannot smash
 `x-opencode-session`. This is an agent-runtime concern, matching the
 official Pi coding-agent attribution layer; pi-ai's `sessionId` stream option
 does not emit `x-opencode-session`.
@@ -1280,6 +1293,17 @@ function, so agent-runtime applies the header merge to the model collection it
 hands to compaction. That request carries the session's conversation id rather
 than the per-call id the harness would otherwise mint, so a summary reaches the
 same gateway backend as the conversation it summarizes.
+
+The same seam restores the conversation key itself. pi-agent-core asks for
+`cacheRetention: "none"` on a summary, and the Responses-shaped adapters read
+that as "no `prompt_cache_key`", so the summary alone drops the identity every
+other turn sends; a gateway fronting a Codex backend rejects such a request with
+400 `invalid_responses_request`. For `openai-responses` and
+`openai-codex-responses` the summary payload therefore carries the session id as
+`prompt_cache_key` (clamped to the adapter's 64-character limit) unless the
+adapter or a caller already set one. Every other wire API keeps its payload
+exactly as the adapter built it, and the key is added on a copy, so a caller's
+payload hook keeps its own object and its return value still wins.
 
 
 ## 7. System prompt composition
@@ -1634,11 +1658,16 @@ browseable.
 
 ### Provider certificate trust (issue #714)
 
-The desktop sidecar starts with Node's `--use-system-ca`, retaining bundled
-roots and inherited `NODE_EXTRA_CA_CERTS`. It uses the OS trust store without
-turning off chain or hostname validation. Restart after updating local trust
-or the extra-CA startup environment. Headless pi-host launch behavior and
-System/Direct/Custom proxy routing are unchanged.
+The desktop sidecar's effective trust set is the union of Node's bundled
+roots, the inherited `NODE_EXTRA_CA_CERTS` set, and the OS trust store, with
+chain and hostname validation on. On Windows and Linux the launcher passes
+Node's `--use-system-ca` to obtain the system roots. On macOS the Electron
+build applies that flag by replacing the bundled roots instead of adding them
+and its system enumeration misses public anchors (issue #1187), so the
+launcher omits the flag and the sidecar merges the three sets into the default
+CA set itself at startup (`agent-runtime system-ca`). Restart after updating
+local trust or the extra-CA startup environment. Headless pi-host launch
+behavior and System/Direct/Custom proxy routing are unchanged.
 
 Explicit certificate verification errors are terminal for both setup and
 stream recovery in main sessions and built-in delegates. Their structured

@@ -77,7 +77,12 @@ OpenCode Go 以一个名为 `opencode_go` 的 API 风格预设暴露。它仍然
 主机为 `opencode.ai` 的自定义 OpenAI 兼容行也会收到同样的标头。系统不依赖
 pi-ai 去发出 `x-opencode-session`。每个提供商行（AI 服务或 OAuth 账户）都可以
 设置可选的 `headers`；留空则保持适配器默认值。一层 fetch 包装是最后的写入方，
-因此 Codex 与 Anthropic 无法覆盖它们。
+因此 Codex 与 Anthropic 无法覆盖它们。pi-ai 的 Google 适配器
+（`google-generative-ai`、`google-vertex`）会拒绝任何不是 `globalThis.fetch`
+的 `fetch`，因此发往它们的请求不带 fetch，只通过合并后的 `headers` 送达 SDK
+客户端；调用方传入的 `fetch` 会被清除而非包装（issue #1072）。由于这些适配器既看不到包装、也从不调用
+`onResponse`，这样的行不上报捕获到的 HTTP 状态与传输原因：`Retry-After`
+退回有界退避阶梯，issue-234 的传输诊断与重建对它不生效。
 
 当 OAuth 厂商围绕本地 provider 行 id 重建运行时模型时，运行时仍保留 pi-ai
 原生传输元数据，不会把该行当作普通 OpenAI 端点。GitHub Copilot 请求会保留
@@ -85,6 +90,12 @@ pi-ai 去发出 `x-opencode-session`。每个提供商行（AI 服务或 OAuth �
 与 `Copilot-Integration-Id`；Agent 运行时还会按上下文加入动态的
 `X-Initiator`、`Openai-Intent` 与图像请求标头。本地行 id 仍然拥有认证绑定与
 对话记录身份；用户设置的提供商 headers 仍是最后的覆盖层。
+
+Copilot 的 Anthropic Messages（Claude）请求将每次请求解析的 OAuth 令牌作为
+`Authorization: Bearer` 标头认证发送，不携带 `X-Api-Key`，因为 pi-ai 仅在
+`model.provider` 为 `github-copilot` 时选择 Copilot Bearer 认证。
+OpenAI 风格的 Copilot 线路 API 仍将令牌作为请求密钥签名；所有线路均保留
+逐请求认证解析与账户专属的 `baseUrl`。
 
 智谱 / GLM 与 Z.AI 是命名的 OpenAI 兼容端点预设，收录在一份由 models.dev
 支撑的、简短的第一方厂商服务列表中（含小米）。添加提供商时的「服务」选择器
@@ -109,6 +120,12 @@ pi-ai 去发出 `x-opencode-session`。每个提供商行（AI 服务或 OAuth �
 pi-ai 会回落到 budget 思考。仍发布 `budget_tokens` 的模型保持 budget 思考，显式的
 目录 `compat` 记录会被保留。
 
+目录无法识别的 Anthropic Messages 行（例如某个自定义网关 URL 提供多家发布方都列出的
+模型 ID）仍回退到通用模型形状，但当 Anthropic 自己的 models.dev 记录中存在完全相同的
+模型 ID 时，会采用该记录的 `reasoning_options` 及派生的 `thinkingLevelMap`。Claude
+模型接受哪种思考形状是模型本身的属性，而非部署的属性，因此只迁移这两个字段；上下文与
+模态限制保持通用值，别名、改名后的 ID、其他 wire API，以及通过 Anthropic 协议提供的
+非 Claude 模型均不受影响（#990）。
 models.dev 可以为发布了 `reasoning` 和至少一个 `effort` 选项、但没有
 `budget_tokens` 的 Anthropic 模型标记 `thinkingProtocol: "adaptive"`。该协议会
 经过模型目录和已保存的 binding 进入提供商请求。已保存的 binding 覆盖优先；目录
@@ -193,8 +210,9 @@ PI-Desktop 不得把用户永久限制在一份简短的固定模型列表上。
    PDF 附件仍然是有界的文件引用，而不会被错误地编码成图片。
 7. 用户编辑过的 `ModelBinding` 值仍属于显式的提供商配置：它们控制选定的请求
    上限、启用的思考级别、应用到新的主页草稿与新持久化会话的默认思考级别
-   （会被钳制到已启用集合上；只有在默认值未设置时才取已启用中最强的那个），
-   以及附件能力覆盖。`models.dev` 提供已发布的元数据，并为新添加的已知模型
+   （会被钳制到已启用集合上；已匹配目录的模型在默认值未设置时取已启用中最强的
+   那个，未匹配模型则从 `off` 开始），以及附件能力覆盖。`models.dev` 提供已发布的
+   元数据，并为新添加的已知模型
    播下初始的思考级别选择；它不是对用户为该端点显式启用的级别的运行时闸门。
    出于兼容考虑，仍然带着旧的通用 `128,000` 上下文种子的 binding 会跟随新
    发布的 `limit.context`；非默认的 Advanced 值仍保持显式。这样目录刷新之后，
@@ -210,9 +228,9 @@ PI-Desktop 不得把用户永久限制在一份简短的固定模型列表上。
    经常接受其目录条目未列出的输入。启用图片输入会打开临时图片内容块；启用
    PDF 输入只记录该能力，不改变编码方式——pi-ai 0.87.1 没有 PDF 内容块，
    PDF 仍是有界的文件引用。
-10. 设置里的复选框展示的是相对于已发布基线的有效答案；把某一项设回已发布的
-    值，存下来的是"跟随目录"，而不是一个取值相同的覆盖。因此与 models.dev
-    保持一致本身就是重置，不需要另外的重置控件，也不需要逐项能力的解释文案。
+10. 设置里的复选框展示相对于已发布基线的有效答案。未修改或为 `null` 时跟随目录；
+    用户一旦更改复选框，所选布尔值就会显式固定，即使它与当前目录值相同。目录刷新
+    不会撤销用户主动做出的选择。
 10a. `nativeWebSearch` 是两态主动开启（缺省即关闭；models.dev 不发布托管工具能力，
     因此没有目录默认值）。启用后，当模型解析到 `anthropic-messages`、
     `openai-responses`、`azure-openai-responses` 或 `openai-codex-responses`
@@ -330,8 +348,8 @@ type ThinkingLevel =
 上面这些兼容性字段，是为老客户端保留的持久化模式兼容面。PI-Desktop 不再把
 它们当作运行时的模型覆盖来读取。`ModelInfo` 的推理支持与受支持的思考级别
 描述的是解析出的 models.dev 记录；有效的 provider/会话能力则来自那个确切的
-`ModelBinding`。未知的自由格式 id 以通用形态起步，不带任何推断出的推理能力，
-但显式的 binding 可以主动启用相应级别。
+`ModelBinding`。未知的自由格式 id 以通用形态起步，不带任何推断出的推理能力；
+空的绑定等级数组是通用种子，非空的显式 binding 才会主动启用或禁用相应级别。
 
 提供商对话框会为每个选中的模型持久化一条 `ModelBinding`。第一条 binding 是
 当前对话以及旧版运行时消费方的有效模型。对话级别的模型切换与跨数组路由仍属
@@ -392,13 +410,17 @@ sidecar 请求
 这类行的模型发现读取已登录账户自己的模型列表；连接测试仍通过解析认证来证明
 账户。请求失败，或返回的不是模型列表时，才回退到 pi-ai（`models.getAvailable`，
 含厂商自己的 `filterModels`）。各厂商打自己的接口：ChatGPT Plus/Pro
-（`openai-codex`）是 `GET {base}/codex/models`，因此 `gpt-6-luna` 这类账户
-已经提供、pin 里还没有的 id 也能出现；普通 `{ data: [...] }` 不当成 Codex
-列表。Copilot 是带 IDE 身份头和 `X-GitHub-Api-Version` 的 `GET {base}/models`，
+（`openai-codex`）是 `GET {base}/codex/models?client_version=…`，因此
+`gpt-6-luna` 这类账户已经提供、pin 里还没有的 id 也能出现；该接口要求
+`client_version`，并隐藏最低 Codex 客户端版本更高的模型，所以取值是固定的
+Codex CLI 版本（`CODEX_MODELS_CLIENT_VERSION`），账户模型缺失时调高；普通
+`{ data: [...] }` 不当成 Codex 列表。Copilot 是带 IDE 身份头和 `X-GitHub-Api-Version` 的 `GET {base}/models`，
 只保留 `model_picker_enabled === true` 且未被策略禁用的 id，pin 不认识的 id
 只有在其家族已经对应唯一线路 API 时才加入。Anthropic 用 OAuth 身份头请求
 `GET {base}/v1/models`。Kimi、Meta、xAI、OpenRouter 请求 `GET {base}/models`
 （Kimi 走 Anthropic 风格的 `/v1`）。Radius 继续用网关目录刷新，不再另打一遍。
+账户请求失败时，日志记录 HTTP 状态码和一小段单行的响应内容摘要，其中去掉了
+请求自身的凭据和任何形似令牌的值，便于从提供商日志诊断上游契约变化。
 图像、视频、语音和嵌入模型会被丢掉。models.dev 不认识的 id 只从同档位的 pin
 兄弟继承限额，xAI 按 `grok-4.7`、`grok-4.6`、`grok-4.5`、`grok-4.3` 的固定新到旧顺序，
 不按 pin 顺序。models.dev 不能把账户列表里没有的 id 加进去。一个厂商可以

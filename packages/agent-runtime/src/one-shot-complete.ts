@@ -19,7 +19,7 @@ import {
   buildProviderModel,
   copilotRequestHeaders,
   createProviderModels,
-  providerAllowsCustomFetch,
+  providerRequestFetch,
   type RuntimeProviderConfig,
 } from "./provider-binding.js";
 import {
@@ -48,6 +48,8 @@ export type OneShotCompleteStream = (
 export type OneShotCompleteOptions = {
   signal?: AbortSignal;
   stream?: OneShotCompleteStream;
+  /** Optional hard cap for callers whose response schema has a small bound. */
+  maxOutputTokens?: number;
   emptyErrorCode?: string;
   emptyErrorMessage?: string;
   /** Conversation id forwarded to OpenCode as `x-opencode-session`. */
@@ -96,15 +98,24 @@ export async function completeOneShot(
   const requestOptions: SimpleStreamOptions = withProviderHeaders(
     withOpenCodeSessionHeaders(
       {
-        maxTokens: clampOutputToContext(model, context, undefined),
+        maxTokens: clampOutputToContext(
+          model,
+          context,
+          options.maxOutputTokens === undefined
+            ? undefined
+            : Math.min(model.maxTokens, Math.max(1, Math.floor(options.maxOutputTokens))),
+        ),
         ...(options.signal ? { signal: options.signal } : {}),
         maxRetries: 0,
         ...(thinkingLevel !== "off" ? { reasoning: thinkingLevel } : {}),
-        fetch: captureProviderResponse(undefined, (response, _requestBytes, failure) => {
-          providerStatus = response?.status;
-          providerHeaders = response?.headers;
-          providerFailure = failure;
-        }),
+        fetch: providerRequestFetch(
+          model.api,
+          captureProviderResponse(undefined, (response, _requestBytes, failure) => {
+            providerStatus = response?.status;
+            providerHeaders = response?.headers;
+            providerFailure = failure;
+          }),
+        ),
       },
       {
         ...openCodeEndpointFromProvider(provider, model),
@@ -115,7 +126,7 @@ export async function completeOneShot(
       copilotRequestHeaders(provider, context),
       provider.headers,
     ),
-    { allowCustomFetch: providerAllowsCustomFetch(provider) },
+    model.api,
   );
   const stream = createProviderRetryStream(
     model,

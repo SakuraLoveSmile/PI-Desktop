@@ -12,6 +12,7 @@ import {
   createProvider,
   type Api,
   type Context,
+  type FetchFunction,
   type Model,
   type ModelAuth,
   type Models,
@@ -26,7 +27,6 @@ import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.l
 import { openAICodexResponsesApi } from "@earendil-works/pi-ai/api/openai-codex-responses.lazy";
 import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
 import { googleGenerativeAIApi } from "@earendil-works/pi-ai/api/google-generative-ai.lazy";
-import { googleVertexApi } from "@earendil-works/pi-ai/api/google-vertex.lazy";
 import { piMessagesApi } from "@earendil-works/pi-ai/api/pi-messages.lazy";
 import { GITHUB_COPILOT_MODELS } from "@earendil-works/pi-ai/providers/github-copilot.models";
 import {
@@ -96,6 +96,32 @@ export function runtimeBaseUrlForApi(api: Api, baseUrl: string): string {
   return withoutVersion || withoutTrailingSlash;
 }
 
+/**
+ * Whether `api`'s pi-ai adapter accepts a caller-supplied `fetch`.
+ *
+ * The Google adapters throw unless `options.fetch` is `globalThis.fetch`
+ * itself, and every wrapper this runtime builds is a different function, so a
+ * request bound for them must carry no `fetch` at all (issue #1072). An
+ * unknown wire API is treated as accepting one: only these two are known to
+ * refuse, and the default must stay "inject" for everything else.
+ */
+export function adapterAcceptsCustomFetch(api: Api | undefined): boolean {
+  return api !== "google-generative-ai" && api !== "google-vertex";
+}
+
+/**
+ * The `fetch` one request may hand to `api`'s adapter: the caller's wrapper
+ * where the adapter accepts one, otherwise nothing. Callers keep building the
+ * wrapper (response capture, header override); this only decides whether it
+ * reaches the adapter.
+ */
+export function providerRequestFetch(
+  api: Api | undefined,
+  fetchFn: FetchFunction | undefined,
+): FetchFunction | undefined {
+  return adapterAcceptsCustomFetch(api) ? fetchFn : undefined;
+}
+
 /** Map a stored provider apiStyle onto a pi-ai wire API. Unknown styles fall
  * back to OpenAI Chat Completions, the pre-apiStyle behavior. */
 export function apiBindingForStyle(apiStyle?: string): ApiBinding {
@@ -138,13 +164,6 @@ export function apiBindingForStyle(apiStyle?: string): ApiBinding {
         adapter: googleGenerativeAIApi,
         defaultBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
       };
-    case "google_vertex":
-    case "google-vertex":
-      return {
-        api: "google-vertex",
-        adapter: googleVertexApi,
-        defaultBaseUrl: "https://us-central1-aiplatform.googleapis.com",
-      };
     default:
       return {
         api: "openai-completions",
@@ -170,16 +189,6 @@ export function providerRequestKey(provider: RuntimeProviderConfig): string {
  */
 export function apiBindingForProviderModel(provider: RuntimeProviderConfig): ApiBinding {
   return apiBindingForStyle(providerRequestTransport(provider).apiStyle);
-}
-
-/**
- * The Google GenAI SDK owns its transport and rejects a request-scoped fetch
- * override. Keep the wrapper out of Gemini and Vertex requests; their model
- * headers still flow through the SDK's supported options.headers path.
- */
-export function providerAllowsCustomFetch(provider: RuntimeProviderConfig): boolean {
-  const api = apiBindingForProviderModel(provider).api;
-  return api !== "google-generative-ai" && api !== "google-vertex";
 }
 
 function providerRequestTransport(provider: RuntimeProviderConfig) {
@@ -221,6 +230,38 @@ export function copilotRequestHeaders(
     messages: context.messages,
     hasImages: hasCopilotVisionInput(context.messages),
   });
+}
+
+/**
+ * Row-scoped models bypass pi-ai's native Copilot Bearer branch, so the token
+ * would leave as X-Api-Key. Send it as Bearer and null out X-Api-Key instead.
+ * Keep apiKey set so the Anthropic SDK skips its default credential chain.
+ * OpenAI-style adapters already sign an apiKey as Bearer.
+ */
+function copilotRequestAuth(
+  provider: Pick<RuntimeProviderConfig, "vendorKey">,
+  api: Api,
+  auth: ModelAuth,
+): ModelAuth {
+  if (
+    provider.vendorKey?.trim().toLowerCase() !== "github-copilot" ||
+    api !== "anthropic-messages" ||
+    !auth.apiKey
+  ) {
+    return auth;
+  }
+  const { apiKey, headers, ...rest } = auth;
+  const requestHeaders: NonNullable<ModelAuth["headers"]> = Object.fromEntries(
+    Object.entries(headers ?? {}).filter(([name]) => {
+      const lowerName = name.toLowerCase();
+      return lowerName !== "authorization" && lowerName !== "x-api-key";
+    }),
+  );
+  return {
+    ...rest,
+    apiKey,
+    headers: { ...requestHeaders, Authorization: `Bearer ${apiKey}`, "X-Api-Key": null },
+  };
 }
 
 /**
@@ -326,9 +367,6 @@ export function createProviderModels(
 ): Models {
   const requestKey = providerRequestKey(provider);
   const resolveAuth = provider.resolveAuth;
-  const copilotAnthropicBearer =
-    provider.vendorKey?.trim().toLowerCase() === "github-copilot" &&
-    model.api === "anthropic-messages";
   const models = createModels();
   models.setProvider(
     createProvider({
@@ -338,31 +376,22 @@ export function createProviderModels(
       auth: {
         apiKey: {
           name: `${provider.name} API key`,
-          // Plain apiKey semantics let each adapter emit its own auth header
+          // Stored apiKey semantics let each adapter emit its own auth header
           // (Bearer for OpenAI-style APIs, x-api-key for Anthropic, …).
           //
           // A vendor account resolves instead through Electron main, which
           // returns the whole `ModelAuth` — token, headers, and the
           // per-credential baseUrl GitHub Copilot hands out. pi-ai calls this
           // for every request and caches nothing, so a token that rotates
-          // mid-session is picked up on the next one.
-          resolve: async () => {
-            const auth = resolveAuth ? await resolveAuth() : { apiKey: requestKey };
-            if (!copilotAnthropicBearer || !auth.apiKey) {
-              return { auth, ...(resolveAuth ? { source: "OAuth" } : {}) };
-            }
-            return {
-              auth: {
-                ...auth,
-                apiKey: undefined,
-                headers: {
-                  ...(auth.headers ?? {}),
-                  Authorization: `Bearer ${auth.apiKey}`,
-                },
-              },
-              ...(resolveAuth ? { source: "OAuth" } : {}),
-            };
-          },
+          // mid-session is picked up on the next one. Copilot's Anthropic wire
+          // needs explicit Bearer auth because the model uses a row id.
+          resolve: async () =>
+            resolveAuth
+              ? {
+                  auth: copilotRequestAuth(provider, model.api, await resolveAuth()),
+                  source: "OAuth",
+                }
+              : { auth: { apiKey: requestKey } },
         },
       },
       models: [model],
