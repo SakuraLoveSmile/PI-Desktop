@@ -89,7 +89,8 @@ pub fn search(db: &Database, query: &str, offset: i64) -> Result<SearchPage> {
                 COALESCE(member.team_session_id, lead.team_session_id), member.name,
                 COALESCE(matched.count, 0),
                 (pi_search_contains(s.title, ?1) OR pi_search_contains(p.name, ?1)
-                 OR pi_search_contains(p.path, ?1)) AS metadata_match
+                 OR pi_search_contains(p.path, ?1)) AS metadata_match,
+                EXISTS (SELECT 1 FROM task_runs r WHERE r.session_id = s.id) AS scheduled_run
          FROM sessions s LEFT JOIN projects p ON p.id = s.project_id
          LEFT JOIN teams lead ON lead.team_session_id = s.id
          LEFT JOIN team_members member ON member.member_session_id = s.id

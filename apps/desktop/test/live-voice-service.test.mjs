@@ -1,76 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
-import { createServer } from "vite";
-
-const owner = { webContentsId: 4, frameProcessId: 1, frameRoutingId: 2, url: "file:///app/index.html" };
-const otherOwner = { ...owner, frameRoutingId: 3 };
-const binding = { id: "codex-main", adapterId: "codex-live", providerId: "codex-account-a", voice: "cove" };
-const requestId = "3d7d68a1-6283-4cfb-a40e-2dd1a74fd19f";
-
-async function loadModules(t) {
-  const server = await createServer({
-    root: fileURLToPath(new URL("..", import.meta.url)),
-    configFile: false,
-    server: { middlewareMode: true, hmr: false, ws: false },
-    appType: "custom",
-    optimizeDeps: { noDiscovery: true, include: [] },
-  });
-  t.after(() => server.close());
-  return {
-    ...(await server.ssrLoadModule("/electron/main/live-voice/call-service.ts")),
-    ...(await server.ssrLoadModule("/electron/main/live-voice/microphone-lease.ts")),
-  };
-}
-
-function dependencies(overrides = {}) {
-  const state = {
-    events: [],
-    controls: [],
-    transcripts: [],
-    adapters: [],
-    releasedMic: [],
-    settings: { liveVoice: { enabled: true, selectedBindingId: binding.id, bindings: [binding] }, voice: { enabled: false } },
-  };
-  const provider = {
-    id: binding.providerId,
-    name: "Codex",
-    vendorKey: "openai-codex",
-    enabled: true,
-    authKind: "oauth",
-    hasSecret: true,
-    models: [],
-    supportsReasoning: false,
-    supportedThinkingLevels: [],
-  };
-  const deps = {
-    loadSettings: async () => state.settings,
-    authResolver: {
-      provider: async (providerId) => providerId === provider.id ? { provider } : null,
-      resolve: async () => ({ provider, auth: { kind: "codex-oauth", accessToken: "test-token", accountId: "account-a" } }),
-    },
-    createAdapter: (context) => {
-      state.adapters.push(context);
-      return {
-        adapterId: "codex-live",
-        mediaKind: "webrtc",
-        connect: async ({ offerSdp }) => {
-          assert.equal(offerSdp, "v=0\r\n");
-          return { answerSdp: "v=0\r\n" };
-        },
-        close: async () => undefined,
-      };
-    },
-    createPcmBridge: () => { throw new Error("Codex must not create a PCM bridge"); },
-    sendView: (_owner, view) => state.events.push(view),
-    sendControl: (_owner, event) => state.controls.push(event),
-    sendTranscript: (_owner, event) => state.transcripts.push(event),
-    ownerAlive: () => true,
-    acquireMicrophone: (callId) => () => state.releasedMic.push(callId),
-    ...overrides,
-  };
-  return { deps, state };
-}
+import { binding, dependencies, loadModules, otherOwner, owner, requestId } from "./helpers/live-voice-service-fixture.mjs";
 
 test("Live call follows prepare, connect, mute, in-memory transcript, reject-only delegation, and end", async (t) => {
   const { LiveCallService } = await loadModules(t);
@@ -146,7 +76,7 @@ test("an explicitly bound work call forwards only the declared tool candidate to
     bindingId: binding.id,
     expectedSettingsRevision: status.settingsRevision,
     initialMuted: true,
-    workTarget: { workSessionId: "session-a", contextEnabled: false },
+    workTarget: { workSessionId: "session-a" },
   });
   t.after(async () => {
     const ending = service.end(owner, { callId: prepared.callId, reason: "user-ended" }).catch(() => undefined);
@@ -179,6 +109,47 @@ test("an explicitly bound work call forwards only the declared tool candidate to
   assert.deepEqual(closed, [prepared.callId]);
 });
 
+test("Live operation controls require the owner and forward only call-scoped operation IDs", async (t) => {
+  const { LiveCallService } = await loadModules(t);
+  const routed = [];
+  const { deps } = dependencies({
+    resolveWorkBinding: async (target) => ({
+      workSessionId: target.workSessionId,
+      workBindingRevision: 1,
+      label: "Fixture / Target",
+      contextEnabled: target.contextEnabled,
+    }),
+    openWorkScope: () => undefined,
+    receiveWorkCandidate: async () => undefined,
+    stopWorkOperation: async (input) => { routed.push({ kind: "stop", ...input }); return { status: "requested" }; },
+    cancelQueuedWorkOperation: async (input) => { routed.push({ kind: "cancel", ...input }); return { status: "canceled" }; },
+  });
+  const service = new LiveCallService(deps);
+  const status = await service.status();
+  const prepared = await service.prepare(owner, {
+    requestId,
+    bindingId: binding.id,
+    expectedSettingsRevision: status.settingsRevision,
+    initialMuted: true,
+    workTarget: { workSessionId: "session-a" },
+  });
+  t.after(async () => {
+    const ending = service.end(owner, { callId: prepared.callId, reason: "user-ended" }).catch(() => undefined);
+    try { service.reportMedia(owner, { callId: prepared.callId, kind: "released" }); } catch { /* the service may already have cleaned up */ }
+    await ending;
+  });
+  await service.connect(owner, { callId: prepared.callId, offerSdp: "v=0\r\n" });
+  service.reportMedia(owner, { callId: prepared.callId, kind: "phase", phase: "connected" });
+
+  await assert.rejects(service.stopWorkOperation(otherOwner, { callId: prepared.callId, operationId: "operation-a" }), { errorCode: "LIVE_INVALID_OWNER" });
+  assert.deepEqual(await service.stopWorkOperation(owner, { callId: prepared.callId, operationId: "operation-a" }), { status: "requested" });
+  assert.deepEqual(await service.cancelQueuedWorkOperation(owner, { callId: prepared.callId, operationId: "operation-b" }), { status: "canceled" });
+  assert.deepEqual(routed, [
+    { kind: "stop", callId: prepared.callId, operationId: "operation-a" },
+    { kind: "cancel", callId: prepared.callId, operationId: "operation-b" },
+  ]);
+});
+
 test("work feedback waits for a quiet window and reports local delivery separately from task execution", async (t) => {
   const { LiveCallService } = await loadModules(t);
   let now = 1_000;
@@ -206,7 +177,7 @@ test("work feedback waits for a quiet window and reports local delivery separate
     bindingId: binding.id,
     expectedSettingsRevision: status.settingsRevision,
     initialMuted: true,
-    workTarget: { workSessionId: "session-a", contextEnabled: false },
+    workTarget: { workSessionId: "session-a" },
   });
   t.after(async () => {
     const ending = service.end(owner, { callId: prepared.callId, reason: "user-ended" }).catch(() => undefined);
@@ -274,7 +245,7 @@ test("a shared terminal turn produces one feedback item and updates every linked
     bindingId: binding.id,
     expectedSettingsRevision: status.settingsRevision,
     initialMuted: true,
-    workTarget: { workSessionId: "session-a", contextEnabled: false },
+    workTarget: { workSessionId: "session-a" },
   });
   t.after(async () => {
     const ending = service.end(owner, { callId: prepared.callId, reason: "user-ended" }).catch(() => undefined);
