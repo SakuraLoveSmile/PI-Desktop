@@ -150,3 +150,51 @@
 
 - The window minimum is lowered to 800×560 (capped to the work area), and the
   Windows frameless rim is removed.
+
+- A conversation can be handed to another turn by pasting its
+  `pi-desktop://session/<id>` link into the Composer. The conversation menu
+  copies the link, Host resolves it into a bounded excerpt of a conversation in
+  the same project, and the transcript shows it as a chip that opens that
+  conversation.
+
+- `path:line` file references open at the referenced line from chat, the work
+  panel and the bundled file manager.
+
+- Every user MCP server can set its own connection timeout (1-600 seconds);
+  clearing the field restores the default.
+
+- Images returned by MCP and plugin tools reach vision models as image blocks
+  instead of flattened JSON text, and survive a restart.
+
+- A missing Plan/Goal workspace no longer ends the turn: the agent explains how
+  to bind one and delivers the proposal in chat. An automatic compaction retry
+  after a provider context overflow no longer shows a terminal error card.
+
+- Deleting a project inside a multi-folder group now detaches it from the group
+  instead of failing, folders that still have chats can be detached, and a
+  refused removal leaves the group untouched.
+
+- Copies or backups of a session file no longer appear as a second
+  conversation, and a prompt sent just before switching sessions no longer
+  appears twice when you return.
+
+- Streaming answers no longer jump vertically, and the stream cursor stays
+  inline instead of drawing a stray line inside nested lists.
+
+- Dismissing an update notice is remembered across restarts and cancels that
+  release's in-app download.
+
+- Docked plugin views such as the browser and file manager are hidden while
+  project dialogs and extension prompts are open, and a plugin imported from a
+  Dock-launched app can find npm.
+
+- External MCP clients can read long sessions: the session read bounds its
+  compaction metadata instead of replacing the whole answer.
+
+- Tool searches no longer invalidate the request prefix: on-demand tool
+  declarations are sent once per account and stay available for the whole
+  session.
+
+- The agent runtime moves to the Pi 1.0.1 line, keeping provider, OAuth and
+  trusted-extension behavior. Production dependencies now resolve patched
+  brace-expansion and js-yaml releases.

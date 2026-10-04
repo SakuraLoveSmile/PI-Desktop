@@ -613,6 +613,7 @@ The Agent Runtime uses:
 
 * `pi-ai`
 * `pi-agent-core`
+* `pi-coding-agent`
 
 > **Pi provides the Agent Engine. Pi-Desktop-Plus builds the persistent desktop workspace, sessions, permissions, plugins, and agent orchestration around it.**
 
