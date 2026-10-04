@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 import type { ModelAuth } from "@earendil-works/pi-ai";
 import { ParentHostProxy } from "./parent-host-proxy.js";
 import { visionFromModelConfig } from "./model-capabilities.js";
-import { excludeCurrentPrompt, hydrateAttachmentHistory } from "./attachment-history.js";
+import { hydrateAttachmentHistory } from "./attachment-history.js";
 import { classifyAgentError } from "./agent-errors.js";
 import { readLocalRequestErrorDetails } from "./local-request-errors.js";
 import {
@@ -25,7 +25,9 @@ import {
   normalizeSupportedThinkingLevels,
   normalizeThinkingLevel,
 } from "./sidecar-config.js";
+import { matchesExpectedTurnId } from "./turn-target.js";
 import { applyNodeNetworkProxy } from "./node-proxy.js";
+import { applyAdditiveDefaultCaCertificates } from "./system-ca.js";
 import { NATIVE_PI_SESSION_PREFIX, nativePiService } from "./native-pi-session.js";
 import {
   isCommandShellOption,
@@ -261,14 +263,16 @@ async function runtimeFor(
         compaction?: ContextCompactionRecord;
       } | null;
     }>("session.get", { id: sessionId });
-    const supportsVision = visionFromModelConfig(params.provider.modelConfig);
+    let restoredMessages = detail?.session?.messages ?? [];
     // The current prompt is sent separately below. Exclude its persisted row
     // before attachment hydration so it cannot consume the history byte budget.
-    const restoredMessages = excludeCurrentPrompt(
-      detail?.session?.messages ?? [],
-      currentPrompt,
-      params.userMessageId,
-    );
+    if (currentPrompt !== undefined && params.userMessageId) {
+      const last = restoredMessages.at(-1);
+      if (last?.role === "user" && last.id === params.userMessageId) {
+        restoredMessages = restoredMessages.slice(0, -1);
+      }
+    }
+    const supportsVision = visionFromModelConfig(params.provider.modelConfig);
     history = await hydrateAttachmentHistory(restoredMessages, {
       scratchDir: params.scratchDir,
       projectPath: params.projectPath,
@@ -278,6 +282,13 @@ async function runtimeFor(
     compaction = detail?.session?.compaction;
   } catch {
     // History restore is best-effort; a prompt can still start cleanly.
+  }
+  // Older callers without a stable message id retain the previous content match.
+  if (currentPrompt !== undefined && !params.userMessageId) {
+    const last = history.at(-1);
+    if (last?.role === "user" && last.content === currentPrompt) {
+      history = history.slice(0, -1);
+    }
   }
   const runtime = new DesktopAgentRuntime({
     host: hostProxy,
@@ -505,9 +516,9 @@ async function handle(method: string, params: any): Promise<unknown> {
       }
       const runtime = runtimes.get(sessionId);
       const turnId = typeof params.turnId === "string" ? params.turnId : undefined;
-      if (turnId && runtime?.getStatus().currentTurnId !== turnId) return { ok: false, aborted: false };
+      if (!matchesExpectedTurnId(runtime?.getStatus().currentTurnId, turnId)) return { ok: false, aborted: false };
       await hostProxy.call("plans.abort", { sessionId, ...(turnId ? { turnId } : {}) }).catch(() => undefined);
-      if (runtime && runtimes.get(sessionId) === runtime && (!turnId || runtime.getStatus().currentTurnId === turnId)) {
+      if (runtime && runtimes.get(sessionId) === runtime && matchesExpectedTurnId(runtime.getStatus().currentTurnId, turnId)) {
         await runtime.abort();
       }
       return { ok: true };
@@ -518,6 +529,10 @@ async function handle(method: string, params: any): Promise<unknown> {
         return nativePiService().abort(sessionId);
       }
       const runtime = runtimes.get(sessionId);
+      const turnId = typeof params.turnId === "string" ? params.turnId : undefined;
+      if (!matchesExpectedTurnId(runtime?.getStatus().currentTurnId, turnId)) {
+        return { requested: false };
+      }
       return runtime?.requestGracefulStop() ?? { requested: false };
     }
     case "asktool.resolve": {
@@ -632,4 +647,7 @@ if (bootProxy) {
     // Invalid boot payload is ignored; sidecar.configure will replace it.
   }
 }
+// The default TLS context is configured before any provider request can be
+// issued, so the merged CA set covers every transport this sidecar builds.
+applyAdditiveDefaultCaCertificates();
 process.stderr.write("[agent-sidecar] ready (host-proxy mode)\n");

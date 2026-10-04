@@ -18,8 +18,18 @@ test("tablist controls expose stable ids and point to their matching panels", as
   try {
     const { SegmentedControl } = await server.ssrLoadModule("/src/components/ui.tsx");
     const options = [
-      { value: "ssh", label: "SSH" },
-      { value: "pair", label: "Pair" },
+      {
+        value: "ssh",
+        label: "SSH",
+        id: "remote-host-add-tab-ssh",
+        controls: "remote-host-add-panel-ssh",
+      },
+      {
+        value: "pair",
+        label: "Pair",
+        id: "remote-host-add-tab-pair",
+        controls: "remote-host-add-panel-pair",
+      },
     ];
     const html = renderToStaticMarkup(
       createElement(
@@ -31,8 +41,6 @@ test("tablist controls expose stable ids and point to their matching panels", as
           options,
           label: "Add method",
           role: "tablist",
-          tabIdPrefix: "remote-host-add",
-          panelIdPrefix: "remote-host-add-panel",
         }),
         ...options.map(({ value }) =>
           createElement("form", {
@@ -64,8 +72,6 @@ test("tablist controls expose stable ids and point to their matching panels", as
       options,
       label: "Add method",
       role: "tablist",
-      tabIdPrefix: "remote-host-add",
-      panelIdPrefix: "remote-host-add-panel",
     });
     let selected = "ssh";
     const buttons = control.props.children;
@@ -118,8 +124,6 @@ test("tablist controls expose stable ids and point to their matching panels", as
         options,
         label: "添加方式",
         role: "tablist",
-        tabIdPrefix: "remote-host-add",
-        panelIdPrefix: "remote-host-add-panel",
       }),
     );
     assert.match(translatedHtml, /id="remote-host-add-tab-ssh"/);
@@ -132,8 +136,6 @@ test("tablist controls expose stable ids and point to their matching panels", as
       label: "Add method",
       role: "tablist",
       disabled: true,
-      tabIdPrefix: "remote-host-add",
-      panelIdPrefix: "remote-host-add-panel",
     });
     assert.ok(disabledControl.props.children.every((button) => button.props.disabled));
   } finally {

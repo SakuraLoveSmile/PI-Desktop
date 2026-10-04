@@ -138,27 +138,37 @@ describe("withProviderHeaders", () => {
     expect(base).toHaveBeenCalledOnce();
   });
 
-  it("can keep SDK-owned transports free of a request-scoped fetch", () => {
-    const base = vi.fn();
+  it("keeps the headers but drops the fetch for the Google adapters", () => {
+    const base = vi.fn(async () => new Response("ok"));
     const result = withProviderHeaders(
-      { fetch: base },
+      { headers: { "User-Agent": "pi-desktop/0.0.0" }, fetch: base },
       { "X-Gateway": "1" },
-      { allowCustomFetch: false },
+      "google-generative-ai",
     );
+
+    expect(result.headers).toMatchObject({
+      "User-Agent": "pi-desktop/0.0.0",
+      "X-Gateway": "1",
+    });
     expect(result.fetch).toBeUndefined();
-    expect(result.headers).toEqual({ "X-Gateway": "1" });
     expect(base).not.toHaveBeenCalled();
   });
 
-  it("removes SDK-incompatible fetch even without custom headers", () => {
-    const base = vi.fn();
-    const result = withProviderHeaders(
-      { fetch: base, headers: { Accept: "application/json" } },
-      undefined,
-      { allowCustomFetch: false },
-    );
+  it("clears an inherited fetch for a Google adapter with no header override", () => {
+    const base = vi.fn(async () => new Response("ok"));
+
+    const result = withProviderHeaders({ fetch: base }, undefined, "google-generative-ai");
+
     expect(result.fetch).toBeUndefined();
-    expect(result.headers).toEqual({ Accept: "application/json" });
+    expect(base).not.toHaveBeenCalled();
+  });
+
+  it("returns the caller's options untouched for every other adapter", () => {
+    const base = vi.fn(async () => new Response("ok"));
+    const options = { fetch: base };
+
+    expect(withProviderHeaders(options, undefined, "openai-completions")).toBe(options);
+    expect(withProviderHeaders(options, {}, "anthropic-messages")).toBe(options);
   });
 });
 

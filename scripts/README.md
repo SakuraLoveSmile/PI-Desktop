@@ -12,8 +12,8 @@ disagrees, so a green `check:release-docs` is a precondition, not a substitute.
 
 | Script | Alias | Purpose |
 |---|---|---|
-| `release.mjs` | `node scripts/release.mjs <version> [--tag]` | Bump every workspace version surface, commit, and optionally create the `vX.Y.Z` tag the Release workflow builds from |
-| `check-release-docs.mjs` | `pnpm check:release-docs` | Verify the changelog, its test list, `APP_VERSION`, workspace versions, Cargo versions, and both README release lines agree |
+| `release.mjs` | `node scripts/release.mjs <version> [--tag]` | Bump every app version surface (`packages/*` keep the upstream-synced version), commit, and optionally create the `vX.Y.Z` tag the Release workflow builds from |
+| `check-release-docs.mjs` | `pnpm check:release-docs` | Verify the changelog, its test list, `APP_VERSION`, app and `packages/*` versions, Cargo versions, and both README release lines agree |
 | `check-agent-policy-sync.mjs` | `pnpm check:agent-policy` | Verify `AGENTS.md` and `CLAUDE.md` share the same `Policy-Sync` token, cross-references, and non-negotiable policy anchors |
 | `check-marketplace-catalog.mjs` | `pnpm check:marketplace -- --url <url> --plugin <id>` | Marketplace catalog preflight; rejects a version record missing a checksum, package URL, size, or permissions, and a catalog `author` that is not a string |
 | `check-style-tokens.mjs` | run by the desktop `lint` script | Fail renderer styles that hardcode values instead of design-system tokens |
@@ -54,6 +54,9 @@ they cover are specified in
 | `e2e-plan-ui.mjs` | `pnpm test:e2e:plan-ui` | Plan approval through the rendered UI |
 | `e2e-electron-boot.mjs` | `pnpm test:e2e:boot` | Electron boot probe |
 | `e2e-provider-recovery.mjs` | `node scripts/e2e-provider-recovery.mjs` | Isolated desktop with a localhost fault-injection provider: socket failures, interrupted streams, Responses recovery, exhausted retries, Continue, and recovery across eleven real Read calls. Requires a built desktop/runtime and host binary (`PI_DESKTOP_HOST_BIN` when outside the checkout); retains screenshots and JSON under `.artifacts/issue-699/` |
+| `e2e-settings-scroll.mjs` | `pnpm test:e2e:settings-scroll` | Production Settings component navigation, search anchoring, focus-on-mount, and scroll behavior |
+| `e2e-transcript-render.mjs` | `pnpm test:e2e:transcript` | Production transcript render boundaries, runtime status geometry, and deterministic smooth-text cadence |
+| `e2e-config-sync-multidevice.mjs` | `pnpm test:e2e:config-sync` | Two isolated host-core devices against an ephemeral local WebDAV fixture; covers encrypted sync, new-device approval, cross-device edits, conditional requests, and ciphertext-only remote storage |
 | `e2e-supervision.mjs` | `pnpm test:e2e:supervision` | Process supervision and restart behavior |
 | `e2e-subagents.mjs` | `pnpm test:e2e:subagents` | Subagent registry over RPC, then through the real loader (D202) |
 | `e2e-agent-live.mjs` | `node scripts/e2e-agent-live.mjs` | Live streaming chat through agent-runtime + host-core. Requires `PI_DESKTOP_TEST_API_KEY`, `PI_DESKTOP_TEST_BASE_URL`, and `PI_DESKTOP_TEST_MODEL` (no defaults), so it has no `pnpm` alias |

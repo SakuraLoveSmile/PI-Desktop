@@ -1,4 +1,3 @@
-import { registerPiSkillDiscoveryIpc } from "./pi-skill-discovery-ipc";
 /**
  * Electron IPC for plugin-contributed agent extensions (spec 07-plugins/16 §10.2).
  *
@@ -15,6 +14,7 @@ import {
   type AgentExtensionBridge,
 } from "./agent-extensions.js";
 import { installDependenciesWithNpmRecovery, type NpmRecoveryDependencies } from "./npm-install-recovery";
+import { registerPiSkillDiscoveryIpc } from "./pi-skill-discovery-ipc";
 
 export type AgentExtensionIpcDeps = NpmRecoveryDependencies & {
   handle: (channel: string, fn: (...args: any[]) => Promise<any>) => void;

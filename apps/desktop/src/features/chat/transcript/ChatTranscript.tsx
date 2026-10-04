@@ -35,7 +35,7 @@ import {
 import { conversationMenuItems } from "./menu-items";
 import { ThinkingDisplayControl } from "./ThinkingDisplayControl";
 import { buildTeamDispatchIndex, TeamDispatchContext } from "../../../lib/team-dispatch";
-
+import { SlotSessionProvider } from "../../../plugins/renderer-slots/use-slots";
 
 const EMPTY_PLAN_PROPOSALS: PlanProposal[] = [];
 
@@ -265,6 +265,7 @@ function TranscriptBody({
     <TranscriptSearchContext.Provider value={searchTarget}>
     <DisclosureAnchorContext.Provider value={disclosureAnchorNotifier}>
     <TeamDispatchContext.Provider value={teamDispatchIndex}>
+    <SlotSessionProvider sessionId={sessionId ?? ""}>
     <div
       className="thread-wrap"
       ref={wrapRef}
@@ -437,6 +438,7 @@ function TranscriptBody({
         </TooltipButton>
       ) : null}
     </div>
+    </SlotSessionProvider>
     </TeamDispatchContext.Provider>
     </DisclosureAnchorContext.Provider>
     </TranscriptSearchContext.Provider>

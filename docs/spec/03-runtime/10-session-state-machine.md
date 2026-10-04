@@ -118,7 +118,9 @@ phases, task states and queued Team mail, never the pause flag alone.
    tool row begins, abort preserves the partial transcript and restores no
    draft. The snapshot keeps structured file/image references and is never
    reconstructed by parsing model-facing `@path` text.
-5. Permission timeout moves to tool denied, then agent may continue or end based on runtime handling
+5. A local permission remains in `waiting_permission` until explicit allow,
+   deny, cancellation, or host shutdown; an explicit deny then moves to tool
+   denied and the agent may continue or end based on runtime handling
 6. Session status returns to idle after terminal turn states are persisted
 7. Changing the renderer's active project/session does not transition or abort
    any background session

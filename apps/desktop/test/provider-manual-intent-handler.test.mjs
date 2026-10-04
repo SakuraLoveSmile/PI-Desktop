@@ -16,10 +16,17 @@
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import http from "node:http";
+import { register } from "node:module";
 import test from "node:test";
 import ts from "typescript";
 import { IPC } from "../../../packages/shared/src/protocol.ts";
-import * as modelDiscovery from "../electron/main/model-discovery.ts";
+
+// The discovery sweep and the catalog read use bundler-style relative imports.
+register(new URL("./helpers/ts-import-hooks.mjs", import.meta.url));
+const shared = await import("@pi-desktop/shared");
+const modelDiscovery = await import("../electron/main/model-discovery.ts");
+const providerEndpointProbe = await import("../electron/main/provider-endpoint-probe.ts");
+const modelsDev = await import("../electron/main/models-dev-catalog.ts");
 
 /** Minimal CJS loader for the main-process module under test. */
 function load(relative, imports) {
@@ -107,6 +114,7 @@ async function harness(t, options = {}) {
     refresh: async () => true,
     getStatus: () => ({ loaded: true, source: "bundled", catalogPath: "", providerCount: 0 }),
     findModel: () => undefined,
+    anthropicThinkingFor: () => undefined,
     modelsForProvider: () => options.catalogModels ?? [],
   };
 
@@ -114,23 +122,19 @@ async function harness(t, options = {}) {
     "@pi-desktop/shared": {
       IPC,
       ErrorCodes: { TIMEOUT: "TIMEOUT" },
-      resolveBindingContextWindow: (catalogConfig) => ({ catalogConfig, binding: undefined }),
+      inferEndpointProfile: shared.inferEndpointProfile,
+      normalizeApiStyle: shared.normalizeApiStyle,
+      resolveBindingLimits: shared.resolveBindingLimits,
     },
     "../oauth": { OAUTH_AUTH_KIND: "oauth" },
     "../model-discovery": modelDiscovery,
+    "../provider-endpoint-probe": providerEndpointProbe,
     "@pi-desktop/agent-runtime": {
-      genericModelConfig: (modelId) => ({
-        name: modelId,
-        contextWindow: 32000,
-        maxTokens: 4000,
-        modalities: { input: ["text"], output: ["text"] },
-      }),
       modelConfigWithBinding: (catalogConfig) => catalogConfig,
-      mergeProviderHeaders: (base, extra) => ({ ...base, ...(extra ?? {}) }),
     },
     "../models-dev-catalog": {
-      modelConfigFromModelsDev: () => ({}),
-      modelInfoFromModelsDev: () => ({}),
+      catalogModelConfigFor: modelsDev.catalogModelConfigFor,
+      modelInfoFromModelsDev: modelsDev.modelInfoFromModelsDev,
     },
     "../host-process": {},
     "../logger": {},

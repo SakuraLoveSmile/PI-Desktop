@@ -365,7 +365,6 @@ export function Tooltip({
   label,
   children,
   className,
-  ariaLabel,
   disabled = false,
   delayMs = 300,
   hideDelayMs = 100,
@@ -693,21 +692,20 @@ export function SegmentedControl<T extends string>({
   className,
   itemClassName,
   disabled,
-  tabIdPrefix,
-  panelIdPrefix,
 }: {
   value: T;
   onChange: (value: T) => void;
-  options: readonly { readonly value: T; readonly label: ReactNode }[];
+  options: readonly {
+    readonly value: T;
+    readonly label: ReactNode;
+    readonly id?: string;
+    readonly controls?: string;
+  }[];
   label: string;
   role?: "group" | "radiogroup" | "tablist";
   className?: string;
   itemClassName?: string;
   disabled?: boolean;
-  /** Stable prefix for tab ids when the label is localized or user supplied. */
-  tabIdPrefix?: string;
-  /** Optional matching panel-id prefix for tab/panel accessibility wiring. */
-  panelIdPrefix?: string;
 }) {
   const itemRole = role === "tablist" ? "tab" : role === "radiogroup" ? "radio" : undefined;
   return (
@@ -723,10 +721,8 @@ export function SegmentedControl<T extends string>({
           {...(itemRole === "tab"
             ? {
                 role: "tab",
-                id: `${tabIdPrefix ?? label}-tab-${option.value}`,
-                "aria-controls": panelIdPrefix
-                  ? `${panelIdPrefix}-${option.value}`
-                  : undefined,
+                id: option.id ?? `${label}-tab-${option.value}`,
+                "aria-controls": option.controls,
                 "aria-selected": value === option.value,
                 tabIndex: value === option.value ? 0 : -1,
               }

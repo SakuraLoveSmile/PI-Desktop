@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Bump the workspace version everywhere and (optionally) create the release tag.
+ * Bump the app version everywhere and (optionally) create the release tag.
+ * `packages/*` manifests keep the upstream-synced version (ADR plus-version-line).
  *
  * Usage:
  *   node scripts/release.mjs <version>          # bump files only
@@ -126,10 +127,10 @@ function bumpPackageJson(relPath) {
 bumpPackageJson("package.json");
 // `docs` is a third workspace root (pnpm-workspace.yaml), not under apps/packages.
 bumpPackageJson("docs/package.json");
-for (const group of ["apps", "packages"]) {
-  for (const dir of readdirSync(path.join(root, group), { withFileTypes: true })) {
-    if (dir.isDirectory()) bumpPackageJson(path.join(group, dir.name, "package.json"));
-  }
+// `packages/*` are left alone: they keep the version of the upstream tree they
+// were synced from, so a sync merge never conflicts on them (ADR plus-version-line).
+for (const dir of readdirSync(path.join(root, "apps"), { withFileTypes: true })) {
+  if (dir.isDirectory()) bumpPackageJson(path.join("apps", dir.name, "package.json"));
 }
 
 // Cargo workspace version ([workspace.package] in root Cargo.toml), lockfile

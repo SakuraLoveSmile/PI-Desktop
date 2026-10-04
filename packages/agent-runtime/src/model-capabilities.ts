@@ -4,7 +4,6 @@ import {
   type ModelBinding,
   type ModelInfo,
   type ModelModality,
-  type ThinkingLevel,
 } from "@pi-desktop/shared";
 import type { ModelConfig, ThinkingCapabilitySet } from "./thinking-level.js";
 
@@ -64,9 +63,9 @@ export function capabilitiesFromModelInfo(model?: ModelInfo | null): ModelCapabi
 
 /**
  * Apply explicit per-provider model settings. Thinking levels and output limits
- * come from the user's binding. A legacy/generated 128k context value is treated
- * as the generic fallback when a published catalog window is available; every
- * other context value remains an explicit Advanced override.
+ * come from the user's binding. Only a context window explicitly marked as
+ * catalog-sourced follows a published correction; an unmarked legacy value is
+ * preserved because it may be the user's exact 128k override.
  */
 export function modelConfigWithBinding(
   model: ModelConfig,
@@ -74,6 +73,7 @@ export function modelConfigWithBinding(
     | Pick<
         ModelBinding,
         | "contextWindow"
+        | "contextWindowSource"
         | "maxTokens"
         | "thinkingLevels"
         | "thinkingProtocol"
@@ -83,10 +83,31 @@ export function modelConfigWithBinding(
       >
     | null,
 ): ModelConfig {
+  // A live-only account model may already carry explicit sibling capabilities.
+  // Preserve those until a stored user binding overrides them; only a truly
+  // unclassified generic row needs the unrestricted defaults below.
+  if (!binding && (model.supportedThinkingLevels?.length || model.thinkingLevelMap)) {
+    return model;
+  }
+  // A generic discovery row carries no trusted capability restriction. Keep
+  // all levels selectable unless the user stored a non-empty override.
+  // This is an effective runtime policy, not published catalog metadata.
+  if (model.source === "generic" && !binding?.thinkingLevels.length) {
+    model = {
+      ...model,
+      reasoning: true,
+      supportedThinkingLevels: [...THINKING_LEVELS],
+      thinkingLevelMap: {
+        ...model.thinkingLevelMap,
+        xhigh: model.thinkingLevelMap?.xhigh ?? "xhigh",
+        max: model.thinkingLevelMap?.max ?? "max",
+      },
+    };
+  }
   if (!binding) return model;
-  const enabledThinkingLevels = THINKING_LEVELS.filter((level) =>
-    binding.thinkingLevels.includes(level),
-  );
+  const enabledThinkingLevels = model.source === "generic" && binding.thinkingLevels.length === 0
+    ? [...THINKING_LEVELS]
+    : THINKING_LEVELS.filter((level) => binding.thinkingLevels.includes(level));
   const thinkingLevelMap = { ...(model.thinkingLevelMap ?? {}) };
   const compat = binding.thinkingProtocol
     ? {
@@ -105,9 +126,15 @@ export function modelConfigWithBinding(
       thinkingLevelMap[level] = level;
     }
   }
+  const publishedContextWindow = model.source === "generic"
+    ? undefined
+    : model.contextWindow;
   const contextWindow =
-    effectiveContextWindow(model.contextWindow, binding.contextWindow) ??
-    model.contextWindow;
+    effectiveContextWindow(
+      publishedContextWindow,
+      binding.contextWindow,
+      binding.contextWindowSource,
+    ) ?? model.contextWindow;
   const catalogContextWindow =
     model.catalogContextWindow ??
     (model.source === "models.dev" && model.contextWindow > 0
