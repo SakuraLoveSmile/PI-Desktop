@@ -70,10 +70,10 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   lines are rendered. These are visual landmarks only, not a second navigation
   level.
   When search filters the directory, empty clusters and their headings disappear.
-- **Voice** is an Experimental Preferences destination between AI and
-  Shortcuts, present only in development builds while developer mode is on.
-  Its existing build/developer gate applies to the rail, page, search hits,
-  and idle Composer entry; this interaction redesign does not widen access.
+- **Voice** is a regular Preferences destination between AI and Shortcuts,
+  present in every build with no Experimental badge and no developer-mode
+  requirement. Its rail row, page, search hits, and idle Composer entry are
+  available to all users.
   It is the only place to enable Live Voice. See the Voice section below.
 - **Cloud sync / 云同步** is a developer-only, Experimental destination: its
   rail row, page, and settings-search hits exist only while
@@ -100,6 +100,25 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 ## 2. Section contents
 
 ### General
+
+- **Storage** shows the effective application data path and the reclaimable cache
+  size. It is included in settings search. Choose directory uses the native picker;
+  confirmation displays both application and browser source paths, the target,
+  migration scope and the restart/backup policy. Cancelling has no side effects.
+  Accepting locks repeat actions until the app exits through ordered shutdown.
+- A separate sandboxed cold-maintenance window shows localized scanning, copying,
+  verifying and internal-path relocation stages, file counts, copied/verified bytes
+  and determinate progress where known. It does not load plugins or agent services.
+  Failure explains that the original profile remains active, then returns to it;
+  settings exposes the error and permits retry. A disconnected selected volume
+  blocks startup with a recovery explanation instead of silently using empty data.
+- **Clear cache** shows a size and requires an inline confirmation describing the
+  retained durable data before clearing and restarting. **Delete old backups** is
+  separate, lists original paths and warns users to check their plugins and old
+  attachments first. Arbitrary plugin-owned absolute references cannot be rewritten
+  by the host. Environment-controlled profiles display why maintenance is disabled.
+  Confirmation gets keyboard focus, asynchronous errors remain visible, and all
+  visible copy is localized. These operations affect only this local installation.
 - **Appearance** card:
   - **Theme**: a searchable picker row (same anchored-menu pattern as
     Language). The closed trigger sizes to the current label, capped by the
@@ -299,17 +318,22 @@ The user-facing dashboard is marketplace plugin `pi.token-insights`, opened from
 the command palette (`usage`, `tokens`, `用量`). Settings search does not index
 a usage tab.
 
-### Voice (experimental)
+### Voice
 
-- This development-build and developer-mode gated destination owns Live Voice
-  enablement and provider bindings. Disabled Live Voice has no Composer voice
-  or work icon; enabling it reveals one preparation entry, never auto-starts a
-  call, and never grants work access.
+- This destination owns Live Voice enablement and provider bindings, and is
+  reachable in every build without developer mode. Its enable card keeps the
+  explanation behind the heading's help mark and the Model configuration link
+  on the card's heading line, so no control floats between the rows. Disabled
+  Live Voice has no Composer voice or work icon; enabling it reveals one
+  preparation entry, never auto-starts a call, and never grants work access.
 - Bind an existing compatible provider account, choose the exact next-call
   binding, and configure its model, voice, and explicit Realtime profile where
-  applicable. Readiness describes that selected binding, not whether any other
-  configured provider is ready. Credentials remain in the existing Host/Main
-  systems and are not shown or copied into the renderer.
+  applicable. An account card with nothing bound shows only its picker: the
+  next-call, model, voice, and profile rows appear with the binding instead of
+  rendering as empty disabled controls. Readiness describes that selected
+  binding, not whether any other configured provider is ready. Credentials
+  remain in the existing Host/Main systems and are not shown or copied into the
+  renderer.
 - Provider-binding edits remain locked while that binding is active. Turning
   Live Voice off ends the call, but the global compact call bar remains visible
   through Main termination and renderer media cleanup, including while Settings
@@ -468,8 +492,11 @@ a usage tab.
     `/messages`, `/chat/completions`, or `/responses` when the field loses
     focus. The placeholder is enough — no helper paragraph under the URL.
     Invalid URLs show an inline error and block discovery and save. A failed
-    model-list probe shows a compact classified error in the empty pane, or a
-    one-line banner above a cached list; raw HTTP/JSON dumps are not shown.
+    model-list probe reports one classified sentence through the app toast and
+    leaves a one-line “no list” label in the empty pane, or the rows in place
+    above it; raw HTTP/JSON dumps are shown in neither. A settled probe —
+    connected, catalog, or refused — is announced once instead of holding a
+    status row under the key.
     Named display names and optional custom headers stay behind Advanced settings.
     The dialog header's upper-right actions include an explicit Advanced settings
     button that opens a separate compact modal, keeping the main form focused on

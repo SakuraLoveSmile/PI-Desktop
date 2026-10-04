@@ -38,7 +38,10 @@ const ICE_GATHER_TIMEOUT_MS = 10_000;
 type StartResources = {
   requestId: string;
   callId?: string;
+  microphoneRequest?: Promise<MediaStream>;
+  microphoneRequestSettled?: boolean;
   stream?: MediaStream;
+  streamStopped?: boolean;
   context?: AudioContext;
   port?: MessagePort;
   pcm?: LivePcmSession;
@@ -112,7 +115,7 @@ export class LiveCallController {
     }
   }
 
-  async start(options: { workTarget?: { workSessionId: string; contextEnabled: boolean } } = {}): Promise<void> {
+  async start(options: { workTarget?: { workSessionId: string }; shareSelectedSessionContext?: boolean } = {}): Promise<void> {
     if (this.snapshot.starting || this.snapshot.stopping || isLive(this.snapshot.call?.phase)) return;
     if (this.snapshot.call?.error?.code === "LIVE_MEDIA_RELEASE_UNCONFIRMED" || this.snapshot.errorCode === "LIVE_MEDIA_RELEASE_UNCONFIRMED") {
       this.patch({ errorCode: "LIVE_MEDIA_RELEASE_UNCONFIRMED" });
@@ -125,6 +128,8 @@ export class LiveCallController {
     const selected = cachedStatus.bindings.find((item) => item.bindingId === selectedId && item.selectable);
     if (!selected) throw liveError("LIVE_NOT_CONFIGURED");
 
+    const currentSessionId = options.workTarget?.workSessionId ?? useAppStore.getState().activeSessionId;
+    const workTarget = currentSessionId ? { workSessionId: currentSessionId } : undefined;
     const requestId = crypto.randomUUID();
     const resources: StartResources = { requestId, abort: new AbortController(), captureEpoch: 0, completedControlActions: new Set() };
     this.resources.set(requestId, resources);
@@ -141,7 +146,8 @@ export class LiveCallController {
         bindingId: selected.bindingId,
         expectedSettingsRevision: cachedStatus.settingsRevision,
         initialMuted: true,
-        ...(options.workTarget ? { workTarget: options.workTarget } : {}),
+        ...(workTarget ? { workTarget } : {}),
+        ...(options.shareSelectedSessionContext !== undefined ? { shareSelectedSessionContext: options.shareSelectedSessionContext } : {}),
       });
       void prepareRequest.then((prepared) => {
         if (resources.abort.signal.aborted || generation !== this.generation) {
@@ -149,13 +155,16 @@ export class LiveCallController {
         }
       }).catch(() => undefined);
       micRequest = requestMicrophone(this.microphoneDeviceId);
+      resources.microphoneRequest = micRequest;
       void micRequest.then((stream) => {
-        if (resources.abort.signal.aborted || generation !== this.generation) stopStream(stream);
-      }).catch(() => undefined);
-      if (selected.adapterId !== "codex-live" || options.workTarget) {
-        resources.context = new AudioContext({ sampleRate: 48_000 });
-        void resources.context.resume().catch(() => undefined);
-      }
+        resources.microphoneRequestSettled = true;
+        resources.stream = stream;
+        if (resources.abort.signal.aborted || generation !== this.generation) this.stopCapture(resources);
+      }, () => {
+        resources.microphoneRequestSettled = true;
+      });
+      resources.context = new AudioContext({ sampleRate: 48_000 });
+      void resources.context.resume().catch(() => undefined);
       if (!prepareRequest || !micRequest) throw liveError("LIVE_MEDIA_UNSUPPORTED");
       const [stream, freshStatus, prepared] = await Promise.all([
         abortableMicrophone(micRequest, resources.abort.signal),
@@ -463,7 +472,10 @@ export class LiveCallController {
   }
 
   private readonly handlePortMessage = (event: MessageEvent): void => {
-    if (event.source !== window || event.origin !== window.location.origin || !event.data || typeof event.data !== "object") return;
+    // Electron serializes file:// as the opaque "null" origin on window.postMessage.
+    // The source-window check and per-call nonce still bind this transfer to our renderer.
+    const trustedFileOrigin = window.location.protocol === "file:" && event.origin === "null";
+    if (event.source !== window || (!trustedFileOrigin && event.origin !== window.location.origin) || !event.data || typeof event.data !== "object") return;
     const data = event.data as { kind?: unknown; callId?: unknown; nonce?: unknown };
     const port = event.ports[0];
     if (data.kind !== "pi-desktop-live-voice-port" || typeof data.callId !== "string" || typeof data.nonce !== "string" || !/^[0-9a-f-]{36}$/i.test(data.nonce) || !port || event.ports.length !== 1) return;
@@ -680,24 +692,42 @@ export class LiveCallController {
       });
     }
     if (notifyMain && resources.callId && !resources.releaseReportPromise) {
-      resources.releaseReportPromise = resources.releasePromise.then(async (released) => {
-        if (!released) {
-          resources.releaseAckSettled = true;
-          this.completeResourceLifecycle(resources);
-          return;
-        }
-        try {
+      const released = resources.pcm
+        ? resources.releasePromise.then((ok) => {
+          if (!ok) throw liveError("LIVE_MEDIA_RELEASE_UNCONFIRMED");
+        })
+        : this.reportMicrophoneReleased(resources).then(async () => {
           await liveVoiceApi.reportMedia({ callId: resources.callId!, kind: "released" });
-        } catch {
-          resources.releaseFailed = true;
-          this.patch({ errorCode: "LIVE_MEDIA_RELEASE_UNCONFIRMED" });
-        } finally {
-          resources.releaseAckSettled = true;
-          this.completeResourceLifecycle(resources);
-        }
+        });
+      resources.releaseReportPromise = released.catch(() => {
+        resources.releaseFailed = true;
+        this.patch({ errorCode: "LIVE_MEDIA_RELEASE_UNCONFIRMED" });
+      }).finally(() => {
+        resources.releaseAckSettled = true;
+        this.completeResourceLifecycle(resources);
       });
     }
     return resources.releaseReportPromise ?? resources.releasePromise.then(() => undefined);
+  }
+
+  private async reportMicrophoneReleased(resources: StartResources): Promise<void> {
+    if (resources.microphoneRequest && !resources.microphoneRequestSettled) {
+      await resources.microphoneRequest.then(() => undefined, () => undefined);
+    }
+    if (!this.stopCapture(resources)) {
+      throw liveError("LIVE_MEDIA_RELEASE_UNCONFIRMED");
+    }
+  }
+
+  private stopCapture(resources: StartResources): boolean {
+    if (resources.streamStopped || !resources.stream) return true;
+    try {
+      stopStream(resources.stream);
+      resources.streamStopped = true;
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private async releaseResourcesOnce(resources: StartResources): Promise<boolean> {
@@ -711,13 +741,13 @@ export class LiveCallController {
     if (resources.heartbeat) clearInterval(resources.heartbeat);
     resources.abort.abort();
     cleanup(() => this.stopPlaybackMonitor(resources));
-    if (resources.stream) cleanup(() => stopStream(resources.stream!));
-    if (resources.channel) cleanup(() => resources.channel!.close());
-    if (resources.peer) cleanup(() => resources.peer!.close());
-    if (resources.audio) cleanup(() => {
-      resources.audio!.pause();
-      resources.audio!.srcObject = null;
-      resources.audio!.remove();
+    if (!this.stopCapture(resources)) released = false;
+    cleanup(() => resources.channel?.close());
+    cleanup(() => resources.peer?.close());
+    cleanup(() => {
+      resources.audio?.pause();
+      if (resources.audio) resources.audio.srcObject = null;
+      resources.audio?.remove();
     });
     if (resources.pcm) await cleanupAsync(() => resources.pcm?.release());
     if (!resources.pcm && resources.context && resources.context.state !== "closed") {

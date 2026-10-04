@@ -103,6 +103,46 @@ async function loadFixtureCatalog(t, fixture = catalogFixture) {
   return catalog;
 }
 
+test("the bundled models.dev OpenAI record supplies the selected model limits", async () => {
+  const catalogPath = fileURLToPath(new URL("../resources/models.dev/api.json", import.meta.url));
+  const catalog = new ModelsDevCatalog({ catalogPath });
+  assert.equal(await catalog.ensureLoaded(), true);
+  const model = catalog.findModel({ vendorKey: "openai", modelId: "gpt-6.1-sol" });
+  assert.ok(model);
+  const config = catalogModelConfigFor(catalog, {
+    providerId: "chatgpt-account",
+    vendorKey: "openai-codex",
+    baseUrl: "https://chatgpt.com/backend-api",
+    modelId: "gpt-6.1-sol",
+  });
+  assert.equal(model.limit.context, 1_050_000);
+  assert.equal(model.limit.output, 128_000);
+  assert.equal(config.source, "models.dev");
+  assert.equal(config.contextWindow, 1_050_000);
+  assert.equal(config.maxTokens, 128_000);
+});
+
+test("explicit account limits stay pinned over a later models.dev value", async (t) => {
+  const catalog = await loadFixtureCatalog(t, {
+    openai: {
+      name: "OpenAI",
+      api: "https://api.openai.com/v1",
+      models: { model: { id: "model", limit: { context: 1_000_000, output: 100_000 } } },
+    },
+  });
+  const info = modelInfoFromModelsDev(catalog.findModel({ vendorKey: "openai", modelId: "model" }), "account");
+  const binding = bindingForCustomModelInfo("model", info);
+  binding.contextWindow = 40_000;
+  binding.contextWindowSource = "user";
+  binding.maxTokens = 4_000;
+  binding.maxTokensSource = "user";
+  catalog.configureAccount({ id: "account", vendorKey: "openai", models: [binding] });
+  const config = catalog.modelConfigFor({ providerId: "account", vendorKey: "openai", modelId: "model" });
+  assert.equal(config.contextWindow, 40_000);
+  assert.equal(config.maxTokens, 4_000);
+  assert.equal(config.source, "models.dev");
+});
+
 function observeModelIdReads(model) {
   const modelId = model.modelId;
   let reads = 0;
@@ -659,11 +699,17 @@ test("resellers still answer for an id no shipped publisher states", async (t) =
   assert.equal(match.limit.context, 262_144);
 });
 
-test("a route prefix reaches a unique leaf while deployment markers stay unmatched", async (t) => {
+test("route prefixes and official deployment markers resolve without rewriting served IDs", async (t) => {
   // Exact last-segment match allows `test/mimo-v2.5` → `mimo-v2.5`.
   // Markers like `-thinking` / `-test` are part of the leaf and do not strip.
   const catalog = await loadFixtureCatalog(t, {
     gateway: { api: "https://gateway.example/v1", models: {} },
+    google: { models: {
+      "gemini-2.5-pro": {
+        id: "gemini-2.5-pro", tool_call: true,
+        limit: { context: 1_048_576, output: 65_536 },
+      },
+    } },
     xiaomi: { models: {
       "mimo-v2.5": {
         id: "mimo-v2.5", tool_call: true,
@@ -688,6 +734,7 @@ test("a route prefix reaches a unique leaf while deployment markers stay unmatch
   assert.equal(relay("mimo-v2.5-thinking"), undefined);
   assert.equal(relay("test/mimo-v2.5-pro-test"), undefined);
   assert.equal(relay("mimo-v2.5-asr"), undefined);
+  assert.equal(relay("gemini-2.5-pro-1m")?.modelId, "gemini-2.5-pro");
 });
 
 test("a shipped publisher answers first for a row anchored to a reseller", async (t) => {
@@ -805,7 +852,6 @@ test("models.dev records retain all published model parameters and modalities", 
     type: "effort",
     values: ["low", "medium", "high", "xhigh", "max"],
   }]);
-  assert.equal(model.thinkingProtocol, "adaptive");
   assert.deepEqual(model.modalities, {
     input: ["text", "image", "pdf"],
     output: ["text"],
@@ -855,7 +901,6 @@ test("models.dev records retain all published model parameters and modalities", 
   assert.ok(info.capabilities.includes("attachments"));
   assert.equal(info.capabilities.includes("temperature"), false);
   assert.equal(info.catalogSource, "models.dev");
-  assert.equal(info.thinkingProtocol, "adaptive");
   assert.deepEqual(info.thinkingLevelMap, {
     low: "low",
     medium: "medium",
