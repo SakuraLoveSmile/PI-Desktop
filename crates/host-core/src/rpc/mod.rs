@@ -8,6 +8,8 @@ mod todos;
 
 #[cfg(test)]
 mod fork_dispatch_tests;
+#[cfg(test)]
+mod project_group_removal_tests;
 
 use std::io::{self, BufRead, BufReader as StdBufReader, Read, Write};
 use std::path::{Path, PathBuf};
