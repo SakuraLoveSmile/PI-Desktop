@@ -370,10 +370,11 @@ impl Database {
     }
 
     /// Removes one root from a stored group as part of that project's delete
-    /// (#1358). Unlike `update_project_group` this never rejects a path with
-    /// sessions — the caller deletes them right after — and it may remove the
-    /// primary, in which case the first remaining root becomes primary.
-    /// Removing the last root deletes the group record.
+    /// (#1358). The caller preflights running sessions and then deletes this
+    /// project's sessions as part of the same RPC flow. Unlike
+    /// `update_project_group`, this may remove the fixed primary root; the
+    /// first remaining root becomes primary. Removing the last root deletes
+    /// the group record.
     pub fn remove_project_from_group(
         &self,
         id: &str,

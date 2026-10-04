@@ -1988,15 +1988,28 @@ async fn handle_request(
                     "CONFLICT",
                 ));
             }
-            // A path in a multi-folder project group is detached from the
-            // group as part of the delete: this handler already bulk-deletes
-            // the project's sessions, so requiring the user to remove the
-            // folder from the group first would deadlock against the group's
-            // own "still has chats" guard (#1358). The group keeps its
-            // primary when it is not the deleted path; otherwise the first
-            // remaining root becomes primary. A single-folder stored group is
-            // just a wrapper around one project, so removing that project
-            // also removes the now-empty group record.
+            let session_ids = st
+                .db
+                .project_session_ids(&path)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            // A running turn still owns its session's tools and working
+            // directory and is still writing to that session's transcript, so
+            // the bulk delete waits until every attached session is idle.
+            for id in &session_ids {
+                if sessions::session_has_running_turn(&st.db, id)
+                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                {
+                    return Err(rpc_err(1008, "project has running sessions", "CONFLICT"));
+                }
+            }
+            // Check for a running session before changing group membership.
+            // A busy project must remain in its original group.
+            // Once the project is known to be idle, detach its root as part of
+            // this delete because the group editor keeps its primary root
+            // fixed and preserves chats on detached non-primary roots (#1358).
+            // If the primary is removed, the first remaining root becomes primary. A
+            // single-folder group is just a wrapper around one project, so
+            // deleting that project also removes the now-empty group record.
             if let Some(group) = st
                 .db
                 .stored_project_group_for_path(&path)
@@ -2010,20 +2023,6 @@ async fn handle_request(
                     st.db
                         .delete_project_group_record(&group.id)
                         .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
-                }
-            }
-            let session_ids = st
-                .db
-                .project_session_ids(&path)
-                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
-            // A running turn still owns its session's tools and working
-            // directory and is still writing to that session's transcript, so
-            // the bulk delete waits until every attached session is idle.
-            for id in &session_ids {
-                if sessions::session_has_running_turn(&st.db, id)
-                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
-                {
-                    return Err(rpc_err(1008, "project has running sessions", "CONFLICT"));
                 }
             }
             crate::scheduled::project::pause(&st.db, &path)
@@ -5815,7 +5814,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn projects_remove_refuses_stored_group_root() {
+    async fn projects_remove_detaches_stored_group_root_and_promotes_next_root() {
         let data_dir = tempfile::tempdir().unwrap();
         let grouped_dir = data_dir.path().join("grouped");
         let extra_dir = data_dir.path().join("extra");
@@ -5824,47 +5823,57 @@ mod tests {
         let mut app_state = AppState::open(data_dir.path()).unwrap();
         app_state.handshook = true;
         let grouped_path = grouped_dir.to_string_lossy().to_string();
+        let extra_path = extra_dir.to_string_lossy().to_string();
         app_state
             .db
-            .create_project_group(
-                "Grouped",
-                &[
-                    grouped_path.clone(),
-                    extra_dir.to_string_lossy().to_string(),
-                ],
-            )
+            .create_project_group("Grouped", &[grouped_path.clone(), extra_path.clone()])
             .unwrap();
         let state = Arc::new(Mutex::new(app_state));
 
-        let error = handle_request(
+        let removed = handle_request(
             state.clone(),
             "projects.remove",
-            json!({ "path": grouped_path }),
+            json!({ "path": grouped_path.clone() }),
             mpsc::unbounded_channel().0,
         )
         .await
-        .expect_err("a stored project group root must not be removed");
-        assert_eq!(error.code, 1002);
-        assert_eq!(
-            error.data.as_ref().and_then(|data| data.get("errorCode")),
-            Some(&json!("INVALID_PARAMS"))
-        );
+        .expect("deleting a grouped project root also detaches it");
+        assert_eq!(removed["removed"], json!(true));
 
-        let canonical =
-            crate::db::canonical_project_path(&grouped_path).expect("canonical project path");
+        let canonical_grouped =
+            crate::db::canonical_project_path(&grouped_path).expect("deleted project path");
+        let canonical_extra =
+            crate::db::canonical_project_path(&extra_path).expect("remaining project path");
         let projects = handle_request(
-            state,
+            state.clone(),
             "projects.list",
             json!({}),
             mpsc::unbounded_channel().0,
         )
         .await
         .unwrap();
+        assert!(!projects["projects"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|project| project["path"].as_str() == Some(canonical_grouped.as_str())));
         assert!(projects["projects"]
             .as_array()
             .unwrap()
             .iter()
-            .any(|project| project["path"].as_str() == Some(canonical.as_str())));
+            .any(|project| project["path"].as_str() == Some(canonical_extra.as_str())));
+
+        let groups = handle_request(
+            state,
+            "project.groups.list",
+            json!({}),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap();
+        assert_eq!(groups["groups"].as_array().unwrap().len(), 1);
+        assert_eq!(groups["groups"][0]["primaryPath"], json!(canonical_extra));
+        assert_eq!(groups["groups"][0]["roots"].as_array().unwrap().len(), 1);
     }
 
     /// A single-folder stored project group is just a wrapper around one
@@ -5915,13 +5924,23 @@ mod tests {
     /// A running turn owns its session's tools, working directory, and
     /// transcript writes, so the bulk delete waits until the project is idle.
     #[tokio::test]
-    async fn projects_remove_refuses_while_a_session_is_running() {
+    async fn projects_remove_refuses_while_a_session_is_running_without_detaching_group() {
         let data_dir = tempfile::tempdir().unwrap();
         let project_dir = data_dir.path().join("busy-project");
+        let remaining_dir = data_dir.path().join("remaining-project");
         fs::create_dir_all(&project_dir).unwrap();
+        fs::create_dir_all(&remaining_dir).unwrap();
         let mut app_state = AppState::open(data_dir.path()).unwrap();
         app_state.handshook = true;
         let project_path = project_dir.to_string_lossy().to_string();
+        let remaining_path = remaining_dir.to_string_lossy().to_string();
+        app_state
+            .db
+            .create_project_group(
+                "Busy group",
+                &[project_path.clone(), remaining_path.clone()],
+            )
+            .unwrap();
         let session_id = sessions::create_session_with_options(
             &app_state.db,
             sessions::SessionCreateOptions {
@@ -5972,6 +5991,25 @@ mod tests {
             .unwrap()
             .iter()
             .any(|project| project["path"].as_str() == Some(canonical.as_str())));
+        let groups_while_busy = handle_request(
+            state.clone(),
+            "project.groups.list",
+            json!({}),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            groups_while_busy["groups"][0]["roots"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
+        assert_eq!(
+            groups_while_busy["groups"][0]["primaryPath"],
+            json!(canonical)
+        );
         let listed = handle_request(
             state.clone(),
             "session.list",
@@ -5995,7 +6033,7 @@ mod tests {
         .await
         .unwrap();
         let removed = handle_request(
-            state,
+            state.clone(),
             "projects.remove",
             json!({ "path": project_path }),
             mpsc::unbounded_channel().0,
@@ -6004,6 +6042,28 @@ mod tests {
         .unwrap();
         assert_eq!(removed["removed"], json!(true));
         assert_eq!(removed["sessionsRemoved"], json!(1));
+        let groups_after_delete = handle_request(
+            state,
+            "project.groups.list",
+            json!({}),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap();
+        let remaining_canonical =
+            crate::db::canonical_project_path(&remaining_path).expect("remaining project path");
+        assert_eq!(groups_after_delete["groups"].as_array().unwrap().len(), 1);
+        assert_eq!(
+            groups_after_delete["groups"][0]["roots"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            groups_after_delete["groups"][0]["primaryPath"],
+            json!(remaining_canonical)
+        );
     }
 
     #[tokio::test]

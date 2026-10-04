@@ -1433,9 +1433,10 @@ fn remove_project_from_group_detaches_even_with_chats_and_may_move_primary() {
         Some(primary.to_string_lossy().into_owned()),
     )
     .unwrap();
+    let project_session_ids = db.project_session_ids(&group.primary_path).unwrap();
     assert_eq!(
-        db.project_session_ids(&group.primary_path).unwrap(),
-        [session.id]
+        project_session_ids.as_slice(),
+        std::slice::from_ref(&session.id)
     );
 
     // Removing the primary moves the role to the first remaining root and
@@ -1463,7 +1464,11 @@ fn remove_project_from_group_detaches_even_with_chats_and_may_move_primary() {
         .remove_project_from_group(&group.id, &canonical_first)
         .unwrap();
     assert!(gone.is_none());
-    assert_eq!(db.list_project_groups().unwrap().len(), 0);
+    assert!(!db
+        .list_project_groups()
+        .unwrap()
+        .iter()
+        .any(|candidate| candidate.id == group.id));
     // The chats of removed roots stay reachable for the caller's bulk delete.
     assert_eq!(
         db.project_session_ids(&group.primary_path).unwrap(),
