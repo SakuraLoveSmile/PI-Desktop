@@ -217,13 +217,14 @@ branch. Preserve dirty primary files and every other task's worktree.
   not established and machine load was not recorded. Retain both results when
   diagnosing a candidate. This is historical evidence, not a rerun for this
   documentation change or proof that every timeout is harmless.
-- `e2e-provider-api-style` can race the recommended-model preselection: the
+- Before [PR 39](https://github.com/SakuraLoveSmile/PI-Desktop/pull/39),
+  `e2e-provider-api-style` could race the recommended-model preselection: the
   harness switches to an explicit selection before the recommended model is
   checked, then reports "StepFun model was not selected". The local
   `fix/upstream-test-harness` candidate waits for `checked === true` before
-  switching and passed 12/12 fixture runs. The fix is now published as
-  [PR 39](https://github.com/SakuraLoveSmile/PI-Desktop/pull/39), pending merge;
-  those repeat runs are not a main-branch acceptance result.
+  switching and passed 12/12 fixture runs. PR 39 is now merged; the harness
+  waits for the recommended selection before switching. Those repeat runs
+  belong to the original local candidate, not a new main-branch acceptance run.
 - Renderer reload under heavy load can fail timing-sensitive UI harnesses.
   Capture the failing step and logs, compare the unchanged baseline, and
   separate harness timing from an actual lost user state. Do not disable the
