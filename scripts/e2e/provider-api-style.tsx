@@ -219,9 +219,9 @@ globalThis.providerApiStyleProbe = async () => {
         `${locale}: StepFun discovery used the wrong route or credentials`);
       const stepfunCheckbox = () => [...document.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')]
         .find((input) => input.closest("label")?.textContent?.includes("step-5-preview"));
-      await until(() => Boolean(stepfunCheckbox()), "StepFun discovered model");
-      // Exercise explicit selection even when the recommendation preselected it.
-      if (stepfunCheckbox()!.checked) click(stepfunCheckbox());
+      await until(() => stepfunCheckbox()?.checked === true, "StepFun recommended model selected");
+      // Wait for preselection before exercising an explicit deselect/reselect.
+      click(stepfunCheckbox());
       click(stepfunCheckbox());
       assert(stepfunCheckbox()!.checked, `${locale}: StepFun model was not selected`);
       await until(() => !control("settings.saveProvider").disabled, "StepFun save enabled");
