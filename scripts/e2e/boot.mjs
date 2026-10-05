@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 export function repositoryRoot() {
   return join(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -14,6 +14,15 @@ export function desktopPaths(root = repositoryRoot()) {
       ? join(appDir, "node_modules", "electron", "dist", "electron.exe")
       : join(appDir, "node_modules", ".bin", "electron");
   return { appDir, electronBinary };
+}
+
+export function findDesktopRendererTarget(targets, appDir) {
+  const rendererUrl = pathToFileURL(join(appDir, "out", "renderer", "index.html")).href;
+  return targets.find((target) =>
+    target.type === "page" &&
+    target.webSocketDebuggerUrl &&
+    target.url === rendererUrl,
+  );
 }
 
 export function resolveElectronBinary(root = repositoryRoot()) {
