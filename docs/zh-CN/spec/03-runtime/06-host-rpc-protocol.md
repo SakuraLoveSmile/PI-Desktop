@@ -412,7 +412,8 @@ ids 和非负 `tokensBefore`；它不会插入 message/search 行
   合格到期时间（epoch ms），无计划时为 `null`。两者只包含 scheduled、approved
   且无 execution state 的快照。新增响应字段不需要数据库迁移。
 - Main 启动时立即查询，再按下次到期时间唤醒，间隔限制为 1–30 s，无计划时
-  为 30 s。`plans.changed` 和系统 resume 触发 200 ms 防抖唤醒。查询单飞；
+  为 30 s；`nextDueAt` 缺失、非数字或非有限值时也使用 30 s。
+  `plans.changed` 和系统 resume 触发 200 ms 防抖唤醒。查询单飞；
   查询期间的唤醒要求结束后再查一次。Host/sidecar 未就绪、Host 错误和非 busy
   claim 失败在 5 s 后重试。busy 仍标为 missed。停止及 Host 重启清理订阅和
   定时器；重启保留 stop → mark missed → drain → start 顺序。运行中睡眠跨过

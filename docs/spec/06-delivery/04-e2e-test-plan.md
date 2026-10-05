@@ -17097,7 +17097,7 @@ registry-only installation and credential isolation.
 
 - **Preconditions:** Temporary profile/Host data; local fixture provider; controlled-clock poller tests.
 - **Steps:** Schedule one approved Plan for the future through Plan UI, await execution, then exercise idle polling, change notifications, resume, Host restart, busy admission and failures.
-- **Expected:** Due schedules are claimed within 1 s in normal operation; empty queues poll about twice per minute. Resume nudges immediately; busy work is marked missed. Startup/restart recovery order and sleep-overdue admission semantics remain unchanged. Failed Host/non-busy claim work retries after 5 s; stop leaves no timers or subscriptions.
+- **Expected:** Due schedules are claimed within 1 s in normal operation; empty queues poll about twice per minute. A missing, non-numeric or non-finite next deadline uses the same 30 s idle interval. Resume nudges immediately; busy work is marked missed. Startup/restart recovery order and sleep-overdue admission semantics remain unchanged. Failed Host/non-busy claim work retries after 5 s; stop leaves no timers or subscriptions.
 - **Specs:** 03-runtime/06-host-rpc-protocol; ADR plus-plan-goal-revision-and-one-time-execution-lifecycle.
 - **Acceptance:** Rust boundaries/RPC tests and controlled-clock Main tests prove exact timing. `e2e-plan-ui` one-time schedule covers the real UI/Host/sidecar path; its 45 s completion window alone does not prove prompt wakeup. Run smoke, boot, plan and scheduled regression suites too.
 - **Milestone:** Maintenance.

@@ -63,8 +63,8 @@ export function createPlanSchedulePoller(options: {
     try {
       const result = await options.poll();
       if (!result.retrySoon) {
-        delay = result.nextDueAt === null ? 30_000
-          : Math.min(30_000, Math.max(1_000, result.nextDueAt - Date.now()));
+        delay = typeof result.nextDueAt === "number" && Number.isFinite(result.nextDueAt)
+          ? Math.min(30_000, Math.max(1_000, result.nextDueAt - Date.now())) : 30_000;
       }
     } catch (error) {
       options.report(error);
