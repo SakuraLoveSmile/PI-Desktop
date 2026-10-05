@@ -408,7 +408,11 @@ ids 和非负 `tokensBefore`；它不会插入 message/search 行
   批准，提交所选权限模式和 `execution_state = queued`
 
 - `plans.dueSchedules({ nowMs? })` 返回 `{ schedules, nextDueAt }`：
-  `schedules` 包含在 `nowMs` 或之前到期的合格计划；`nextDueAt` 是最早的未来
+  未明确传入 `nowMs` 时，扫描、claim 和恢复操作在拿到 Host 状态锁后才读取时间，
+  锁等待不会延长自动执行宽限。
+  查询前 Host 原子地把超出 120000 ms 宽限的计划标为 missed，并对每个新转变
+  的 proposal 发送一次 `plans.changed`。`schedules` 包含在 `nowMs` 或之前到期、
+  且仍在宽限内（包含 120000 ms 边界）的合格计划；`nextDueAt` 是最早的未来
   合格到期时间（epoch ms），无计划时为 `null`。两者只包含 scheduled、approved
   且无 execution state 的快照。新增响应字段不需要数据库迁移。
 - Main 启动时立即查询，再按下次到期时间唤醒，间隔限制为 1–30 s，无计划时
@@ -416,7 +420,11 @@ ids 和非负 `tokensBefore`；它不会插入 message/search 行
   查询期间的唤醒要求结束后再查一次。Host/sidecar 未就绪、Host 错误和非 busy
   claim 失败在 5 s 后重试。busy 仍标为 missed。停止及 Host 重启清理订阅和
   定时器；重启保留 stop → mark missed → drain → start 顺序。运行中睡眠跨过
-  到期时间后仍可在唤醒时 claim；启动及重启的 missed 处理不变。
+  到期时间后，仅在两分钟宽限内（包含边界）可以自动 claim；超过宽限需用户
+  确认立即运行。claim 会再次检查宽限，超出时原子标为 missed、发送
+  `plans.changed` 并返回 `PLAN_SCHEDULE_MISSED`，不创建执行。明确的立即运行
+  （`allowMissed: true`）绕过自动宽限。启动及重启仍把所有到期计划标为 missed，
+  不适用宽限。
 
 - `plans.queuedExecutions` / `plans.claimExecution` /
 `plans.finishExecution` — 消耗并转换执行字段
