@@ -21,7 +21,7 @@ try {
     format: "iife",
     jsx: "automatic",
     define: { "process.env.NODE_ENV": '"production"' },
-    loader: { ".css": "empty" },
+    loader: { ".css": "empty", ".svg": "dataurl" },
     alias: {
       "@pi-desktop/i18n": join(root, "packages/i18n/src/index.ts"),
       react: join(root, "apps/desktop/node_modules/react"),

@@ -16,7 +16,7 @@ const temp = await mkdtemp(join(cache, "run-"));
 await require("esbuild").build({
   entryPoints: [join(root, "scripts/e2e/copy-conversation.tsx")],
   outfile: join(temp, "renderer.js"), bundle: true, platform: "browser", format: "iife",
-  loader: { ".css": "empty" }, jsx: "automatic", define: { "process.env.NODE_ENV": '"production"' },
+  loader: { ".css": "empty", ".svg": "dataurl" }, jsx: "automatic", define: { "process.env.NODE_ENV": '"production"' },
   alias: { react: join(desktop, "node_modules/react"), "react-dom": join(desktop, "node_modules/react-dom") },
   nodePaths: [join(desktop, "node_modules")],
 });
