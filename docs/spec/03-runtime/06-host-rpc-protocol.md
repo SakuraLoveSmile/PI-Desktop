@@ -656,7 +656,8 @@ contract is being negotiated.
   queries require a scheduled snapshot, an approved proposal and no execution
   state. This additive field needs no database migration.
 - Main polls immediately on start, then wakes at the next due time, clamped to
-  1–30 s (30 s when no schedule exists). `plans.changed` nudges the poller after
+  1–30 s (30 s when no schedule exists or `nextDueAt` is missing, non-numeric
+  or non-finite). `plans.changed` nudges the poller after
   200 ms; system resume nudges it too. Polls are single-flight; a nudge during a
   poll requests one follow-up. Host/sidecar unavailability, Host errors and
   non-busy claim failures retry after 5 s. Busy schedules remain marked missed.

@@ -37,6 +37,15 @@ test("idle polling reads twice in the first minute instead of sixty times", asyn
   await advance(t, 29_999); assert.equal(s.calls(), 2);
 });
 
+for (const nextDueAt of [undefined, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, "13000"]) {
+  test(`invalid deadline ${String(nextDueAt)} uses the thirty second idle interval`, async (t) => {
+    const s = setup(t, async () => ({ nextDueAt, retrySoon: false }));
+    s.runner.start(); await setImmediate();
+    await advance(t, 29_999); assert.equal(s.calls(), 1);
+    await advance(t, 1); assert.equal(s.calls(), 2);
+  });
+}
+
 test("future deadlines trigger on time with one second floor and thirty second ceiling", async (t) => {
   let nextDueAt = 13_000;
   const s = setup(t, async () => ({ nextDueAt, retrySoon: false }));
