@@ -221,8 +221,9 @@ branch. Preserve dirty primary files and every other task's worktree.
   harness switches to an explicit selection before the recommended model is
   checked, then reports "StepFun model was not selected". The local
   `fix/upstream-test-harness` candidate waits for `checked === true` before
-  switching and passed 12/12 fixture runs. That fix is not yet merged into
-  main; those repeat runs are not a main-branch acceptance result.
+  switching and passed 12/12 fixture runs. The fix is now published as
+  [PR 39](https://github.com/SakuraLoveSmile/PI-Desktop/pull/39), pending merge;
+  those repeat runs are not a main-branch acceptance result.
 - Renderer reload under heavy load can fail timing-sensitive UI harnesses.
   Capture the failing step and logs, compare the unchanged baseline, and
   separate harness timing from an actual lost user state. Do not disable the
