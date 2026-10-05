@@ -37,7 +37,7 @@ try {
     jsx: "automatic",
     define: { "process.env.NODE_ENV": '"production"' },
     // The fixture measures its own geometry, so no app stylesheet is needed.
-    loader: { ".css": "empty" },
+    loader: { ".css": "empty", ".svg": "dataurl" },
     alias: {
       "@pi-desktop/i18n": join(root, "packages/i18n/src/index.ts"),
       react: join(root, "apps/desktop/node_modules/react"),
