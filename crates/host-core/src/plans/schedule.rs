@@ -8,14 +8,30 @@ const SCHEDULED: &str = "scheduled";
 const MISSED: &str = "missed";
 const CLAIMED: &str = "claimed";
 const CANCELLED: &str = "cancelled";
+const AUTOMATIC_CLAIM_GRACE_MS: i64 = 120_000;
 const ELIGIBLE_SCHEDULE: &str =
     "s.state = ?1 AND p.status = 'approved' AND p.execution_state IS NULL";
 
-/// Mark due schedules as missed. This is intentionally a separate operation
-/// from `due_schedules`: callers that are running the host can claim due work,
-/// while restart maintenance can mark work that was not observed as missed.
 impl PlanManager {
+    /// Restart recovery has no catch-up window, even for a recently due schedule.
     pub fn mark_overdue_schedules_missed(&self, db: &Database, now_ms: i64) -> Result<Vec<String>> {
+        self.mark_schedules_missed_before(db, now_ms, now_ms)
+    }
+
+    /// Running-app polls allow at most two minutes of delay, including the boundary.
+    pub fn mark_delayed_schedules_missed(&self, db: &Database, now_ms: i64) -> Result<Vec<String>> {
+        let Some(cutoff) = now_ms.checked_sub(AUTOMATIC_CLAIM_GRACE_MS + 1) else {
+            return Ok(Vec::new());
+        };
+        self.mark_schedules_missed_before(db, now_ms, cutoff)
+    }
+
+    fn mark_schedules_missed_before(
+        &self,
+        db: &Database,
+        now_ms: i64,
+        cutoff: i64,
+    ) -> Result<Vec<String>> {
         let tx = db.conn().unchecked_transaction()?;
         let proposal_ids = {
             let mut stmt = tx.prepare_cached(
@@ -24,7 +40,7 @@ impl PlanManager {
                  WHERE state = ?1 AND scheduled_for <= ?2
                  ORDER BY scheduled_for ASC, proposal_id ASC",
             )?;
-            let rows = stmt.query_map(params![SCHEDULED, now_ms], |row| row.get(0))?;
+            let rows = stmt.query_map(params![SCHEDULED, cutoff], |row| row.get(0))?;
             rows.collect::<rusqlite::Result<Vec<String>>>()?
         };
 
@@ -32,8 +48,8 @@ impl PlanManager {
             tx.execute(
                 "UPDATE plan_execution_schedules
                  SET state = ?1, updated_at = ?2
-                 WHERE state = ?3 AND scheduled_for <= ?2",
-                params![MISSED, now_ms, SCHEDULED],
+                 WHERE state = ?3 AND scheduled_for <= ?4",
+                params![MISSED, now_ms, SCHEDULED, cutoff],
             )?;
             for proposal_id in &proposal_ids {
                 audit::append_tx(
@@ -81,8 +97,8 @@ impl PlanManager {
     }
 
     /// Atomically claim one schedule and create its queued execution record.
-    /// `allow_missed` is reserved for an explicit user-triggered run after a
-    /// restart; it never causes the scheduler to catch up automatically.
+    /// `allow_missed` is reserved for an explicit user-triggered Run now;
+    /// it never causes the scheduler to catch up automatically.
     pub fn claim_schedule(
         &self,
         db: &Database,
@@ -94,11 +110,11 @@ impl PlanManager {
             return Err(plan_error("PLAN_INVALID_ARGUMENT"));
         }
         let tx = db.conn().unchecked_transaction()?;
-        let schedule_state = tx
+        let (schedule_state, scheduled_for) = tx
             .query_row(
-                "SELECT state FROM plan_execution_schedules WHERE proposal_id = ?1",
+                "SELECT state, scheduled_for FROM plan_execution_schedules WHERE proposal_id = ?1",
                 params![proposal_id],
-                |row| row.get::<_, String>(0),
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)),
             )
             .optional()?
             .ok_or_else(|| plan_error("PLAN_SCHEDULE_NOT_FOUND"))?;
@@ -126,6 +142,24 @@ impl PlanManager {
         if proposal.status != STATUS_APPROVED || proposal.execution_state.is_some() {
             return Err(plan_error("PLAN_SCHEDULE_STALE"));
         }
+        if schedule_state == SCHEDULED
+            && !allow_missed
+            && now_ms.saturating_sub(scheduled_for) > AUTOMATIC_CLAIM_GRACE_MS
+        {
+            tx.execute(
+                "UPDATE plan_execution_schedules SET state = ?1, updated_at = ?2
+                     WHERE proposal_id = ?3 AND state = ?4",
+                params![MISSED, now_ms, proposal_id, SCHEDULED],
+            )?;
+            audit::append_tx(
+                &tx,
+                "plan_execution_schedule_missed",
+                Some(&proposal.session_id),
+                json!({"proposalId": proposal_id, "state": MISSED, "reason": "overdue"}),
+            )?;
+            tx.commit()?;
+            return Err(plan_error("PLAN_SCHEDULE_MISSED"));
+        }
         let session_busy: bool = tx.query_row(
             "SELECT EXISTS(SELECT 1 FROM plan_approvals
                  WHERE session_id = ?1 AND request_id != ?2
@@ -142,15 +176,8 @@ impl PlanManager {
             .target_permission_mode
             .as_deref()
             .ok_or_else(|| plan_error("PLAN_PERMISSION_MODE_REQUIRED"))?;
-        if schedule_state == SCHEDULED {
-            let scheduled_for: i64 = tx.query_row(
-                "SELECT scheduled_for FROM plan_execution_schedules WHERE proposal_id = ?1",
-                params![proposal_id],
-                |row| row.get(0),
-            )?;
-            if scheduled_for > now_ms {
-                return Err(plan_error("PLAN_SCHEDULE_NOT_DUE"));
-            }
+        if schedule_state == SCHEDULED && scheduled_for > now_ms {
+            return Err(plan_error("PLAN_SCHEDULE_NOT_DUE"));
         }
 
         let execution_id = Uuid::new_v4().to_string();
