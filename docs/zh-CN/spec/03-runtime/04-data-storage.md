@@ -38,13 +38,14 @@
 
 ## 2. 文件布局
 
-正式打包版把上述目录树放在 `~/.pi-desktop`；开发构建放在 `~/.pi-desktop-dev`，
-因为正式版与 `pnpm dev` 是两个需要同时运行的安装（D599、ADR 0094）。
+Plus 正式打包版把上述目录树放在 `~/.pi-desktop-plus`；开发构建放在 `~/.pi-desktop-plus-dev`，
+因为正式版与 `pnpm dev` 是两个需要同时运行的安装（D599、ADR 0094；本 fork 的路径由
+[独立应用身份](../../../adr/plus-independent-application-identity.md)修订）。
 `PI_DESKTOP_DATA_DIR` 会整体替换任一默认根目录，并在作为子进程环境变量传给
 host-core 之前被解析为绝对路径。
 
 ```text
-~/.pi-desktop/
+~/.pi-desktop-plus/
  ├── pi.sqlite            # index database (WAL: + -wal/-shm) — host-core only
  ├── pi.sqlite.v6.bak     # archived pre-v7 database (D119 breaking reset)
  ├── pi.sqlite.v8.bak     # exact readable backup before v8→v15 destructive work
