@@ -34,7 +34,7 @@ try {
     },
     // Styles come from the app's built stylesheet below; the component and its
     // hook are the real modules under test.
-    loader: { ".css": "empty" },
+    loader: { ".css": "empty", ".svg": "dataurl" },
     alias: {
       "@pi-desktop/i18n": join(root, "packages/i18n/src/index.ts"),
       // The fixture lives outside the desktop package; use its React instance.
