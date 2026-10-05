@@ -9,7 +9,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { desktopPaths, repositoryRoot, resolveElectronBinary } from "./e2e/boot.mjs";
+import { desktopPaths, findDesktopRendererTarget, repositoryRoot, resolveElectronBinary } from "./e2e/boot.mjs";
 import { resolveHostBinary } from "./e2e/host.mjs";
 import { planModelFixture } from "./e2e/plan-model.mjs";
 
@@ -477,12 +477,7 @@ async function connectRenderer(state) {
     async () => {
       try {
         const targets = await fetchJsonList(state.cdpPort);
-        return targets.find(
-          (target) =>
-            target.type === "page" &&
-            target.webSocketDebuggerUrl &&
-            (target.url.startsWith("file:") || target.title === "PI-Desktop"),
-        );
+        return findDesktopRendererTarget(targets, appDir);
       } catch {
         return null;
       }
