@@ -107,14 +107,17 @@ review snapshots, plugin code/data, models, configuration, or logs. Partial clea
 failure remains observable, retains active roots, and can be retried.
 
 
-A packaged installation keeps this tree in `~/.pi-desktop`. A development build
-keeps the same tree in `~/.pi-desktop-dev`, because a shipped app and a
+A packaged Plus installation keeps this tree in `~/.pi-desktop-plus`. A
+development build keeps the same tree in `~/.pi-desktop-plus-dev`, because a
+shipped app and a
 `pnpm dev` host are two installations that have to run at the same time (D599,
-ADR 0094). `PI_DESKTOP_DATA_DIR` replaces either root outright and is resolved
+ADR 0094, amended for this fork by
+[independent identity](../../adr/plus-independent-application-identity.md)).
+`PI_DESKTOP_DATA_DIR` replaces either root outright and is resolved
 to an absolute path before it reaches host-core as a child-process variable.
 
 ```text
-~/.pi-desktop/
+~/.pi-desktop-plus/
  ├── pi.sqlite            # index database (WAL: + -wal/-shm) — host-core only
  ├── pi.sqlite.v6.bak     # archived pre-v7 database (D119 breaking reset)
  ├── pi.sqlite.v8.bak     # exact readable backup before v8→v15 destructive work
