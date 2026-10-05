@@ -635,7 +635,10 @@ contract is being negotiated.
 - `plans.claimSchedule` / `plans.cancelSchedule` — atomically claim a due
   schedule (including an explicitly confirmed missed schedule) or cancel a
   scheduled/missed snapshot. A claim is single-use and returns the bound
-  execution descriptor
+  execution descriptor. Automatic claims allow at most 120000 ms after the
+  deadline (inclusive); a later claim atomically marks it missed, emits
+  `plans.changed` and returns `PLAN_SCHEDULE_MISSED` without creating an execution.
+  Explicit Run now (`allowMissed: true`) bypasses that automatic grace window.
 - `plans.markRevisionFailed` — records a failed revision admission while
   retaining the saved revision intent for retry
 - `session.endTurn` — marks a still-started revision intent failed when its
@@ -643,7 +646,12 @@ contract is being negotiated.
   emits `plans.changed` so the retry card refreshes
 
 - `plans.dueSchedules({ nowMs? })` returns `{ schedules, nextDueAt }`.
-  `schedules` contains eligible schedules at or before `nowMs`; `nextDueAt` is
+  Without an explicit `nowMs`, scan/claim/recovery time is read after acquiring
+  Host state, so lock contention cannot extend the admission window.
+  Before reading, Host atomically marks schedules more than 120000 ms overdue
+  as missed and emits `plans.changed` once per transitioned proposal.
+  `schedules` contains eligible schedules at or before `nowMs` within that
+  inclusive grace window; `nextDueAt` is
   the earliest eligible future timestamp in epoch milliseconds, or `null`. Both
   queries require a scheduled snapshot, an approved proposal and no execution
   state. This additive field needs no database migration.
@@ -655,8 +663,9 @@ contract is being negotiated.
   non-busy claim failures retry after 5 s. Busy schedules remain marked missed.
   Stop and Host restart remove timers and notification subscriptions; restart
   preserves stop → mark missed → drain → start recovery ordering. While the
-  running app sleeps, overdue schedules can still be claimed after resume;
-  startup/restart missed handling is unchanged.
+  running app sleeps, schedules can be claimed after resume only within that
+  inclusive two-minute grace window. Longer delays require explicit Run now;
+  startup/restart still mark all due schedules missed without a grace window.
 
 - `plans.queuedExecutions` / `plans.claimExecution` /
   `plans.finishExecution` — consume and transition execution fields on the
