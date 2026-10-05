@@ -22,3 +22,7 @@ Upstream v0.15.6 → v0.16.1 has been merged.
 - Skills now discovers installed pi CLI npm skill packages and offers explicit
   import with a source and executable-extension confirmation. Imported packages
   remain managed in Plugins; discovery never enables code automatically.
+
+- One-time Plan/Goal schedules allow up to two minutes of delay while the app
+  stays running, including sleep/resume. Longer delays are marked missed and
+  require Run now confirmation; restarting the app still never catches up.

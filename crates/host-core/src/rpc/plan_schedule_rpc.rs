@@ -10,20 +10,49 @@ use tokio::sync::{mpsc, Mutex};
 use super::{emit_notification, plan_rpc_err, rpc_err, AppState, JsonRpcError};
 use crate::{plans, sessions};
 
+#[cfg(test)]
+#[path = "plan_schedule_grace_tests.rs"]
+mod grace_tests;
+
+async fn notify_schedule_change(tx: &mpsc::UnboundedSender<String>, proposal: plans::PlanProposal) {
+    emit_notification(
+        tx,
+        "plans.changed",
+        json!({
+            "sessionId": proposal.session_id,
+            "proposalId": proposal.id,
+            "state": "inactive",
+            "kind": proposal.kind,
+            "proposal": proposal,
+        }),
+    )
+    .await;
+}
+
 pub(super) async fn handle(
     state: Arc<Mutex<AppState>>,
     method: &str,
     params: Value,
     tx: mpsc::UnboundedSender<String>,
 ) -> Result<Value, JsonRpcError> {
+    handle_with_clock(state, method, params, tx, crate::db::now_ms).await
+}
+
+async fn handle_with_clock(
+    state: Arc<Mutex<AppState>>,
+    method: &str,
+    params: Value,
+    tx: mpsc::UnboundedSender<String>,
+    now_ms: impl Fn() -> i64,
+) -> Result<Value, JsonRpcError> {
     match method {
         "plans.markMissedSchedules" => {
-            let now = params
-                .get("nowMs")
-                .and_then(|v| v.as_i64())
-                .unwrap_or_else(crate::db::now_ms);
             let (proposal_ids, proposals) = {
                 let st = state.lock().await;
+                let now = params
+                    .get("nowMs")
+                    .and_then(Value::as_i64)
+                    .unwrap_or_else(&now_ms);
                 let proposal_ids = st
                     .plans
                     .mark_overdue_schedules_missed(&st.db, now)
@@ -39,27 +68,28 @@ pub(super) async fn handle(
                 (proposal_ids, proposals)
             };
             for proposal in proposals {
-                emit_notification(
-                    &tx,
-                    "plans.changed",
-                    json!({
-                        "sessionId": proposal.session_id,
-                        "proposalId": proposal.id,
-                        "state": "inactive",
-                        "kind": proposal.kind,
-                        "proposal": proposal,
-                    }),
-                )
-                .await;
+                notify_schedule_change(&tx, proposal).await;
             }
             Ok(json!({ "proposalIds": proposal_ids }))
         }
         "plans.dueSchedules" => {
+            let st = state.lock().await;
             let now = params
                 .get("nowMs")
-                .and_then(|v| v.as_i64())
-                .unwrap_or_else(crate::db::now_ms);
-            let st = state.lock().await;
+                .and_then(Value::as_i64)
+                .unwrap_or_else(&now_ms);
+            let missed_ids = st
+                .plans
+                .mark_delayed_schedules_missed(&st.db, now)
+                .map_err(plan_rpc_err)?;
+            let missed = missed_ids
+                .iter()
+                .map(|id| {
+                    plans::get_proposal(&st.db, id)
+                        .map_err(plan_rpc_err)?
+                        .ok_or_else(|| plan_rpc_err("PLAN_NOT_FOUND"))
+                })
+                .collect::<Result<Vec<_>, _>>()?;
             let proposal_ids = st.plans.due_schedules(&st.db, now).map_err(plan_rpc_err)?;
             let schedules = proposal_ids
                 .iter()
@@ -71,6 +101,10 @@ pub(super) async fn handle(
                 })
                 .collect::<std::result::Result<Vec<_>, JsonRpcError>>()?;
             let next_due_at = st.plans.next_due_at(&st.db, now).map_err(plan_rpc_err)?;
+            drop(st);
+            for proposal in missed {
+                notify_schedule_change(&tx, proposal).await;
+            }
             Ok(json!({ "schedules": schedules, "nextDueAt": next_due_at }))
         }
         "plans.claimSchedule" => {
@@ -84,26 +118,40 @@ pub(super) async fn handle(
                 .and_then(|v| v.as_str())
                 .filter(|value| !value.trim().is_empty())
                 .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
-            let now = params
-                .get("nowMs")
-                .and_then(|v| v.as_i64())
-                .unwrap_or_else(crate::db::now_ms);
             let allow_missed = params
                 .get("allowMissed")
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false);
-            let execution = {
+            let (result, missed) = {
                 let st = state.lock().await;
+                let now = params
+                    .get("nowMs")
+                    .and_then(Value::as_i64)
+                    .unwrap_or_else(&now_ms);
                 let proposal = plans::get_proposal(&st.db, proposal_id)
                     .map_err(plan_rpc_err)?
                     .ok_or_else(|| plan_rpc_err("PLAN_NOT_FOUND"))?;
                 if proposal.session_id != session_id {
                     return Err(plan_rpc_err("PLAN_APPROVAL_STALE"));
                 }
-                st.plans
-                    .claim_schedule(&st.db, proposal_id, now, allow_missed)
-                    .map_err(plan_rpc_err)?
+                let result = st
+                    .plans
+                    .claim_schedule(&st.db, proposal_id, now, allow_missed);
+                let missed = if proposal.schedule_state.as_deref() == Some("scheduled")
+                    && result
+                        .as_ref()
+                        .is_err_and(|error| error.to_string() == "PLAN_SCHEDULE_MISSED")
+                {
+                    plans::get_proposal(&st.db, proposal_id).map_err(plan_rpc_err)?
+                } else {
+                    None
+                };
+                (result, missed)
             };
+            if let Some(proposal) = missed {
+                notify_schedule_change(&tx, proposal).await;
+            }
+            let execution = result.map_err(plan_rpc_err)?;
             emit_notification(
                 &tx,
                 "plans.changed",

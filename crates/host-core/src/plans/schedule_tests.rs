@@ -116,6 +116,76 @@ fn claim_schedule_is_atomic_and_only_succeeds_once() {
 }
 
 #[test]
+fn automatic_claim_has_an_inclusive_two_minute_grace_window() {
+    for delay in [0, 1, 119_999, 120_000] {
+        let (_dir, db, proposal) = approved_schedule(1_000);
+        assert!(PlanManager
+            .claim_schedule(&db, &proposal.id, 1_000 + delay, false)
+            .is_ok());
+    }
+    let (_dir, db, proposal) = approved_schedule(1_000);
+    assert_eq!(
+        PlanManager
+            .claim_schedule(&db, &proposal.id, 999, false)
+            .unwrap_err()
+            .to_string(),
+        "PLAN_SCHEDULE_NOT_DUE"
+    );
+}
+
+#[test]
+fn delayed_automatic_claim_marks_missed_without_creating_execution() {
+    let (_dir, db, proposal) = approved_schedule(1_000);
+    assert_eq!(
+        PlanManager
+            .claim_schedule(&db, &proposal.id, 121_001, false)
+            .unwrap_err()
+            .to_string(),
+        "PLAN_SCHEDULE_MISSED"
+    );
+    let updated = get_proposal(&db, &proposal.id).unwrap().unwrap();
+    assert_eq!(updated.schedule_state.as_deref(), Some(MISSED));
+    assert_eq!(updated.execution_state, None);
+    assert_eq!(updated.execution_id, None);
+    assert_eq!(
+        PlanManager
+            .claim_schedule(&db, &proposal.id, 122_000, false)
+            .unwrap_err()
+            .to_string(),
+        "PLAN_SCHEDULE_MISSED"
+    );
+    let execution = PlanManager
+        .claim_schedule(&db, &proposal.id, 122_000, true)
+        .unwrap();
+    assert_eq!(execution.state, EXECUTION_QUEUED);
+}
+
+#[test]
+fn concurrent_automatic_claims_create_only_one_execution() {
+    let (dir, db, proposal) = approved_schedule(1_000);
+    let barrier = std::sync::Arc::new(std::sync::Barrier::new(2));
+    let claims: Vec<_> = (0..2)
+        .map(|_| {
+            let db = Database::open(&dir.path().join("pi.sqlite")).unwrap();
+            let proposal_id = proposal.id.clone();
+            let barrier = barrier.clone();
+            std::thread::spawn(move || {
+                barrier.wait();
+                PlanManager.claim_schedule(&db, &proposal_id, 121_000, false)
+            })
+        })
+        .collect();
+    let results: Vec<_> = claims
+        .into_iter()
+        .map(|claim| claim.join().unwrap())
+        .collect();
+    assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
+    let updated = get_proposal(&db, &proposal.id).unwrap().unwrap();
+    assert_eq!(updated.schedule_state.as_deref(), Some(CLAIMED));
+    assert_eq!(updated.execution_state.as_deref(), Some(EXECUTION_QUEUED));
+}
+
+#[test]
 fn missed_schedule_requires_explicit_allowance() {
     let (_dir, db, proposal) = approved_schedule(1_000);
     let manager = PlanManager;

@@ -37,7 +37,13 @@ in `plan_execution_schedules`. Host-core performs one atomic claim. A due
 snapshot is either claimed once, cancelled before claim, or marked `missed` and
 requires explicit Run now confirmation. The schedule is independent of
 recurring `scheduled_tasks`; it is never rebound to a later Markdown revision
-and is not automatically caught up after a missed time.
+and is not automatically caught up after a missed time. While the app remains
+running, automatic admission permits up to two minutes of delay after the UTC
+deadline (inclusive), including sleep/resume. Longer delays atomically mark the
+snapshot `missed` without queuing an execution; the user must confirm Run now.
+Host enforces this window both when scanning due schedules and when claiming
+one, so a claim cannot cross the boundary after a successful scan. Startup and
+Host restart still mark every due schedule `missed`, with no grace window.
 
 The renderer keeps the Composer visible during review, restores bounded
 proposal history after reload, and exposes terminal cards read-only. Work Panel
