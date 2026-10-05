@@ -22,6 +22,7 @@ try {
     platform: "browser",
     format: "iife",
     jsx: "automatic",
+    loader: { ".css": "empty", ".svg": "dataurl" },
     define: { "process.env.NODE_ENV": '"production"' },
     alias: {
       react: join(root, "apps/desktop/node_modules/react"),
@@ -76,9 +77,20 @@ app.whenReady().then(async () => {
     await checkProfileLabel("专家团队");
     win.setContentSize(498, 720);
     await checkProfileLabel("专家团队");
+    await waitFor('!document.querySelector(".composer-contract-chip")');
+    await click(".composer-plus > button");
+    await checkMenu(".composer-plus-menu.is-open");
+    await click('.composer-plus-menu.is-open [role="switch"][aria-label="Goal"]');
+    await waitFor('document.querySelector(".composer-contract-chip")?.dataset.mode === "goal"');
+    await click(".composer-plus > button");
+    await waitFor('!document.querySelector(".composer-plus-menu.is-open")');
     await click(".composer-contract-chip");
-    await checkMenu(".composer-contract-menu.is-open");
-    await click('.composer-contract-menu.is-open [role="menuitemradio"]:last-child');
+    await checkMenu(".composer-plus-menu.is-open");
+    await click('.composer-plus-menu.is-open [role="switch"][aria-label="Plan"]');
+    await waitFor('document.querySelector(".composer-contract-chip")?.dataset.mode === "plan"');
+    await click('.composer-plus-menu.is-open [role="switch"][aria-label="Plan"]');
+    await waitFor('!document.querySelector(".composer-contract-chip")');
+    await click('.composer-plus-menu.is-open [role="switch"][aria-label="Goal"]');
     await waitFor('document.querySelector(".composer-contract-chip")?.dataset.mode === "goal"');
     console.log("COMPOSER_MODE_MENUS " + JSON.stringify({ ok: true, profile: "team", mode: "goal" }));
     app.quit();
