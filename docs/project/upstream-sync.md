@@ -177,6 +177,12 @@ branch. Preserve dirty primary files and every other task's worktree.
   `SakuraLoveSmile/PI-Desktop` releases/updater source. No upstream feed fallback.
   See [independent identity](../adr/plus-independent-application-identity.md).
 - **Version line:** Plus app semver independent from upstream library versions.
+- **Renderer E2E asset loaders ([PR 38](https://github.com/SakuraLoveSmile/PI-Desktop/pull/38), merged):**
+  five upstream-owned scripts (`e2e-transcript-render`,
+  `e2e-transcript-disclosure-anchor`, `e2e-transcript-minimap-jump`,
+  `e2e-copy-conversation` and `e2e-work-panel-reorder`, under `scripts/` with
+  `.mjs` extensions) add `".svg": "dataurl"` for Plus `PixelAvatar` assets.
+  Keep this one-line-per-script difference when syncing.
 - **Persistence:** separate Plus migration track, with recoverable legacy
   reconciliation and upgrade coverage.
 - **Team behavior:** Host-owned Expert Team state and durable mailbox/task
@@ -201,10 +207,24 @@ branch. Preserve dirty primary files and every other task's worktree.
 
 ## Known validation flakes
 
-- Plan UI `E2E-PLAN-REVISION` can time out in its fixture. Track
-  [PR 28](https://github.com/SakuraLoveSmile/PI-Desktop/pull/28), refresh its
-  original task branch and rerun `e2e-plan-ui` before landing that fix. Until
-  verified merged, retain a baseline A/B run when it affects a candidate.
+- The Plan UI `E2E-PLAN-REVISION` fixture timeout was fixed by
+  [PR 28](https://github.com/SakuraLoveSmile/PI-Desktop/pull/28), merged on
+  2026-10-05. Its refreshed candidate passed five consecutive `e2e-plan-ui`
+  runs and protocol smoke; the GitHub integration candidate had the same tree.
+  This fix does not close the separate renderer-reload timing issue below.
+- During the 2026-10-04 sync validation, `e2e-scheduled` timed out waiting for
+  "Scheduled review complete."; four isolated retries passed. The cause was
+  not established and machine load was not recorded. Retain both results when
+  diagnosing a candidate. This is historical evidence, not a rerun for this
+  documentation change or proof that every timeout is harmless.
+- Before [PR 39](https://github.com/SakuraLoveSmile/PI-Desktop/pull/39),
+  `e2e-provider-api-style` could race the recommended-model preselection: the
+  harness switches to an explicit selection before the recommended model is
+  checked, then reports "StepFun model was not selected". The local
+  `fix/upstream-test-harness` candidate waits for `checked === true` before
+  switching and passed 12/12 fixture runs. PR 39 is now merged; the harness
+  waits for the recommended selection before switching. Those repeat runs
+  belong to the original local candidate, not a new main-branch acceptance run.
 - Renderer reload under heavy load can fail timing-sensitive UI harnesses.
   Capture the failing step and logs, compare the unchanged baseline, and
   separate harness timing from an actual lost user state. Do not disable the
