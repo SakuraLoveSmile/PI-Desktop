@@ -32,7 +32,11 @@ pub fn begin_turn(
             "CONFLICT: session message already claimed or settled"
         ));
     }
-    super::permissions::check_target(db, session_id, &message.permission_ceiling)?;
+    if message.plugin_id.starts_with("team:") {
+        super::permissions::check_team_target(db, session_id, &message.permission_ceiling)?;
+    } else {
+        super::permissions::check_target(db, session_id, &message.permission_ceiling)?;
+    }
     let turn = if message.kind == "message" && message.plugin_id.starts_with("team:") {
         sessions::begin_turn_for_team_mail(db, session_id, message_id, provider, model)?
     } else {

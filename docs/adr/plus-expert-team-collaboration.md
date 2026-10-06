@@ -194,3 +194,50 @@ The process model, permission ceilings, Team/standard Task tool isolation,
 session persistence ownership, and Plugin SDK contract do not change. The
 additions are local-Host projections and renderer presentation over existing
 Host-owned sessions, KV metadata, and Team tables.
+
+## Team planning amendment (2026-10-06)
+
+Team is an execution profile, independent of the Plan/Agent operating state.
+A Plan Lead keeps ordinary Plan permissions and the Team coordination tools.
+It declares `lead_only` for indivisible work or proposes experts through the
+existing trusted launch review. Confirmation creates the planning round,
+approved research identities, and the existing Lead continuation in one Host
+transaction. No researcher runs before review confirmation.
+
+The Host records research purpose per approved member, planning ID and round
+ID in versioned KV metadata. A Lead is never a research member. Research members
+can inspect through Read/Glob/Grep and coordinate through the bounded Team
+mailbox; they cannot invoke shell, file mutations, plugins or Host-local tools.
+The parent proxy checks authoritative Host identity before local interception.
+Plugin SessionTask messaging remains Agent-only. A confirmed Agent execution
+review may explicitly assign a research member an execution purpose; closing
+or approving a planning round alone never grants writable capability.
+
+Task creation/assignment enrolls expected research before messages can run.
+Submission validates approved current identity, round, live owned task,
+revision, dependencies and bounded structured findings. Result persistence,
+task completion and Team revision advance atomically. Ordinary task completion
+cannot substitute for research. Full summary/findings/risks/recommendations/
+verified sources are retained and returned to the Lead. A result is at most
+32 KiB and a round at most 128 KiB; arrays contain at most 32 entries of at most
+2,000 bytes and the summary at most 4,000 bytes.
+
+The Lead can submit only after every enrolled task and clarification settles;
+lead-only planning permits zero research tasks. SubmitPlan retries with the
+same identity and content return the original proposal. Rejection retains
+research for revision; approval/scheduling closes Lead planning through existing
+Plan transitions. Cancelled clarification waits and process recovery clear
+pending question blockers without replaying research. The internal round helper
+is not an arbitrary sidecar RPC. SQLite schema, process ownership and Plugin SDK
+contracts remain unchanged.
+
+Interrupted/expired pending plan proposals also return the retained research
+round to aggregation. Startup recovery follows the existing no-replay fence.
+Dissolving a Team deletes its planning/purpose KV metadata in the detach
+transaction; research members become standalone standard Plan conversations,
+retaining transcripts, model bindings and permission selections. Ordinary
+execution members retain the existing standalone Agent behavior.
+
+Confirmed researchers also persist session mode Plan as a compatibility
+boundary. Only a subsequently confirmed Agent execution review restores Agent
+mode. Existing execution members and standard Plan/Goal are unaffected.

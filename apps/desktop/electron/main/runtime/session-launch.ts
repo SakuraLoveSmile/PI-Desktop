@@ -606,12 +606,7 @@ export function createSessionLaunchRuntime({
       overrides.executionProfile ?? session.executionProfile ?? "standard",
     );
     const teamContext = executionProfile === "team"
-      ? await runtimeState.host!.call<{
-          teamSessionId: string;
-          callerSessionId: string;
-          isLead: boolean;
-          memberName?: string;
-        } | null>("team.getRuntimeContext", { sessionId })
+      ? await runtimeState.host!.call<import("@pi-desktop/shared").TeamRuntimeContextProjection | null>("team.getRuntimeContext", { sessionId })
       : undefined;
     if (executionProfile === "team" && !teamContext) {
       throw Object.assign(new Error("Team runtime context unavailable"), {

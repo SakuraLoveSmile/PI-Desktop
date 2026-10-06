@@ -20,6 +20,12 @@ pub(crate) fn effective_mode(db: &Database, session_id: &str) -> Result<String> 
 }
 
 pub(crate) fn check_target(db: &Database, session_id: &str, ceiling: &str) -> Result<()> {
+    check_target_mode(db, session_id, ceiling, false)
+}
+pub(crate) fn check_team_target(db: &Database, session_id: &str, ceiling: &str) -> Result<()> {
+    check_target_mode(db, session_id, ceiling, true)
+}
+fn check_target_mode(db: &Database, session_id: &str, ceiling: &str, team: bool) -> Result<()> {
     fn rank(mode: &str) -> u8 {
         match mode {
             "auto" => 2,
@@ -32,7 +38,8 @@ pub(crate) fn check_target(db: &Database, session_id: &str, ceiling: &str) -> Re
             "PERMISSION_DENIED: target permission mode exceeds the sending session's authorization"
         ));
     }
-    if sessions::session_mode(db, session_id)?.as_deref() != Some("agent") {
+    let mode = sessions::session_mode(db, session_id)?;
+    if mode.as_deref() != Some("agent") && !(team && mode.as_deref() == Some("plan")) {
         return Err(anyhow!(
             "PERMISSION_DENIED: session communication requires Agent mode"
         ));

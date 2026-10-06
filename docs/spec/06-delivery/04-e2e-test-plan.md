@@ -9454,6 +9454,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 | Acceptance | Scenarios |
 |---|---|
+| C / Quality / Security — Approved read-only Team planning | E2E-TEAM-approved-plan-research-and-execution |
 | C / Quality — Independent Team panorama/task/member tabs | E2E-TEAM-panorama-and-member-tabs |
 | C / Quality — Live dispatch card and single task target | E2E-TEAM-dispatch-card-live-status-and-joining |
 | C / E / F / Quality / Security — Session Todo checklist | E2E-CHAT-session-todo-checklist |
@@ -17224,3 +17225,32 @@ registry-only installation and credential isolation.
   proves renderer interactions and native download, not paid-provider behavior.
 - **Milestone:** Maintenance.
 - **Status:** Run on the task candidate; record actual results separately.
+
+## E2E-TEAM-approved-plan-research-and-execution
+
+- **Preconditions:** Isolated production Electron/Main/Host/sidecar candidate, two research fixtures, temporary workspace and localhost SSE provider; no user data or real model.
+- **Steps:** Cancel a review and restart a pending review; confirm the replacement. Create two owned research tasks, run real Read calls and hold the second result. Attempt early submission, then settle both researchers, inspect complete findings, submit, request revision, reject/retry and approve. Allow the execution Write through the ordinary permission card and verify exact marker bytes.
+- **Expected:** No researcher call before confirmation; first result cannot authorize submission. Research tools stay read-only, full findings reach the saved artifact, approvals recover safely, execution permissions stay normal, and research members are not elevated by Plan approval or Team deletion.
+- **Specs:** `03-runtime/06-host-rpc-protocol.md`, `03-runtime/08-error-codes.md`, ADR plus-expert-team-collaboration.
+- **Acceptance:** C / Quality / Security — approved planning cooperation and permission isolation.
+- **Milestone:** Maintenance.
+- **Status:** Required on the refreshed task candidate; record actual commit/base and results separately.
+- **Automation:** `node scripts/e2e-team-planning.mjs`, Host planning/approval regressions and actual stdio proxy tests.
+
+
+
+Use the isolated local Team fixture through the real composer, trusted review,
+Host, sidecar and loopback model service. Confirm no members/provider calls
+before review. After confirmation create two owned research tasks, hold one
+researcher, and verify the first result leaves two expected/one completed and
+no pending plan. Release the second; retain full bounded findings and resolve
+a user clarification before SubmitPlan. Reject, revise, retry the same
+submission, approve, and verify the Lead can write the isolated workspace using
+normal Agent permissions. Researchers remain read-only after approval.
+
+Lower-level regression checks cover lead_only, ownership, missing/deleted
+tasks, round/revision mismatch, dependencies, payload limits, idempotency,
+ordinary-completion bypass, Team revision notifications, stop/restart question
+cleanup, local tool interception and unchanged standard Plan/Goal behavior.
+Run `PI_E2E_TEAM_PLANNING=1 node scripts/e2e-team.mjs` for the integration path;
+never use a real provider or the user's running application as its fixture.

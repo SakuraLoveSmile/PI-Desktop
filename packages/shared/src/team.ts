@@ -495,3 +495,45 @@ export type TeamExecutionDecision = {
 export type DeclareTeamStrategyArgs =
   | { strategy: "lead_only"; reason: string }
   | { strategy: "delegate"; reason: string; members: TeamProposedMember[] };
+
+export type TeamWorkPurpose = "execute" | "plan_research";
+export type TeamRuntimeContextProjection = {
+  teamSessionId: string;
+  callerSessionId: string;
+  isLead: boolean;
+  memberName?: string;
+  workPurpose?: TeamWorkPurpose;
+  planningId?: string;
+  roundId?: string;
+};
+export const SUBMIT_RESEARCH_RESULT_TOOL_NAME = "submit_research_result";
+export type StructuredResearchResult = {
+  summary: string;
+  findings: string[];
+  risks: string[];
+  recommendations: string[];
+  verifiedSources: string[];
+};
+export type TeamResearchResult = {
+  taskId: string;
+  memberSessionId: string;
+  memberName: string;
+  taskRevision: number;
+  structuredResult: StructuredResearchResult;
+  submittedAt: string;
+};
+export type TeamPlanningProjection = {
+  planningId: string;
+  teamSessionId: string;
+  roundId: string;
+  phase: "researching" | "clarifying" | "aggregating" | "submitted" | "closed";
+  workPurpose: "plan_research";
+  reviewId: string | null;
+  totalExpectedTasks: number;
+  completedResearchTasks: number;
+  openQuestionsCount: number;
+  isReadyForPlanSubmission: boolean;
+  proposalId: string | null;
+  results: TeamResearchResult[];
+  updatedAt: string;
+};
