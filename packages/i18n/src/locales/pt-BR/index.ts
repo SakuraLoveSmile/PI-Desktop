@@ -1920,7 +1920,7 @@ export const ptBR = {
     taskReadiness: "Readiness",
     taskScopes: "Escopos de gravação",
     teamOverview: "Team Overview",
-    lead: "Lead",
+    lead: "Lead Agent",
     membersCount: "{{count}} members",
     tasksProgress: "{{completed}}/{{total}} tasks completed",
     viewTeam: "View Team Board",

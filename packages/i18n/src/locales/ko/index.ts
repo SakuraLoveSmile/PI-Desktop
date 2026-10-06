@@ -1984,7 +1984,7 @@ sklm: {
     taskReadiness: "Readiness",
     taskScopes: "쓰기 범위",
     teamOverview: "Team Overview",
-    lead: "Lead",
+    lead: "Lead Agent",
     membersCount: "{{count}} members",
     tasksProgress: "{{completed}}/{{total}} tasks completed",
     viewTeam: "View Team Board",

@@ -2932,6 +2932,33 @@ body, including extra activity. Both expose expanded state and controlled IDs.
 The compact board's row declarations remain unchanged. Empty artifact copy is
 muted 13px, with zh-CN `暂无产物`; other locales retain their specified copy.
 
+### Shared panorama presentation
+
+Team and ordinary subagent panoramas share compact 276×86px nodes, a two-column
+layout, 42px horizontal gaps, 64px root-to-first-row gap and 96px row gaps. The
+root starts at y=40, centered over the content width; a partial final row is
+centered and the bottom margin is 40px. Root-to-child cubic edges leave the root
+bottom center and reach each child top center, with a 46px control-point bend.
+Fit/reset/zoom/pan math and 50%–150% zoom limits retain their existing behavior.
+The existing dotted canvas remains; with more than two children, edges to later
+rows may pass behind earlier opaque nodes.
+
+Nodes use secondary surfaces, subtle borders, 8px radius and no shadow. Their
+upper row has a decorative 32px portrait, secondary 12.5px identity and a primary
+semibold 14px task title, both single-line with ellipsis. The 32px lower status
+row has a static decorative 12px glyph and localized text. Running uses a muted
+loader with success-colored text; completed uses success, failed error, paused
+warning and idle/todo/blocked muted. A supplied status label overrides the
+standard phase label. The Team root label is `Lead Agent` in every locale;
+zh copy reads `协调专家任务` / `協調專家任務` and running `进行中` / `進行中`.
+
+The toolbar sits 20px from the top/right and uses accessible icon-only tooltip
+buttons: optional Back plus divider, Zoom out, numeric percentage, Zoom in,
+divider, Fit and Reset. Back remains available in subagent panorama navigation;
+its surrounding Work Panel tab chrome is unchanged. Zoom-boundary disabling,
+keyboard focus, pointer capture, stale-data Retry and viewport preservation
+across Team snapshots continue unchanged. Node buttons contain phrasing markup.
+
 ### 10C.3 Accessibility
 
 - The panel has a localized heading and labeled roster and board sections.

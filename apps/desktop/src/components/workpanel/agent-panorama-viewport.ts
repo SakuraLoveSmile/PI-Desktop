@@ -25,25 +25,32 @@ export type PanoramaLayout = {
   topologyKey: string;
 };
 
-export const PANORAMA_NODE_WIDTH = 304;
-export const PANORAMA_NODE_HEIGHT = 140;
-export const PANORAMA_GAP_X = 24;
-export const PANORAMA_ROOT_CHILD_GAP = 80;
-export const PANORAMA_ROW_GAP = 32;
+export const PANORAMA_NODE_WIDTH = 276;
+export const PANORAMA_NODE_HEIGHT = 86;
+export const PANORAMA_GAP_X = 42;
+export const PANORAMA_ROOT_CHILD_GAP = 64;
+export const PANORAMA_ROW_GAP = 96;
+export const PANORAMA_MAX_COLUMNS = 2;
+export const PANORAMA_EDGE_BEND = 46;
+
+export function panoramaEdgePath(rcx: number, rby: number, ccx: number, cty: number): string {
+  return `M ${rcx} ${rby} C ${rcx} ${rby + PANORAMA_EDGE_BEND}, ${ccx} ${cty - PANORAMA_EDGE_BEND}, ${ccx} ${cty}`;
+}
+
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 1.5;
 
 export function createPanoramaLayout(childIds: readonly string[]): PanoramaLayout {
-  const columns = Math.max(1, Math.min(childIds.length, 3));
+  const columns = Math.max(1, Math.min(childIds.length, PANORAMA_MAX_COLUMNS));
   const width = Math.max(
     PANORAMA_NODE_WIDTH,
     columns * PANORAMA_NODE_WIDTH + (columns - 1) * PANORAMA_GAP_X,
   );
   const root = { id: "root", x: (width - PANORAMA_NODE_WIDTH) / 2, y: 40 };
   const children = childIds.map((id, index) => {
-    const row = Math.floor(index / 3);
-    const column = index % 3;
-    const rowCount = Math.min(3, childIds.length - row * 3);
+    const row = Math.floor(index / PANORAMA_MAX_COLUMNS);
+    const column = index % PANORAMA_MAX_COLUMNS;
+    const rowCount = Math.min(PANORAMA_MAX_COLUMNS, childIds.length - row * PANORAMA_MAX_COLUMNS);
     const rowWidth = rowCount * PANORAMA_NODE_WIDTH + (rowCount - 1) * PANORAMA_GAP_X;
     return {
       id,
