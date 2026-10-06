@@ -1904,6 +1904,7 @@ export const ptBR = {
     viewMemberDetail: "Ver detalhes de {{name}}",
     memberDetailUnavailable: "Detalhes do membro indisponíveis",
     dispatchCardsLabel: "Tarefas distribuídas para especialistas",
+    expertJoining: "Novo especialista entrando…",
     untitledTask: "Tarefa sem título",
     memberDetail: "Member Detail",
     taskDetail: "Task Detail",

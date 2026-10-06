@@ -1958,6 +1958,7 @@ sklm: {
     viewMemberDetail: "{{name}} ayrıntılarını görüntüle",
     memberDetailUnavailable: "Üye ayrıntıları kullanılamıyor",
     dispatchCardsLabel: "Uzman görev dağıtımları",
+    expertJoining: "Yeni uzman katılıyor…",
     untitledTask: "Adsız görev",
     memberDetail: "Member Detail",
     taskDetail: "Task Detail",

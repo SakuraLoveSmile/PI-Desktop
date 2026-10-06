@@ -2846,6 +2846,17 @@ the Lead assigns tasks to specialized teammates via `task_create` and `task_upda
   chat session, opening task details without selecting another main session.
   Teammate identity/avatar has no separate member navigation control.
 
+### Expert joining feedback
+
+The live Assistant turn shows a joining row while any `spawn_teammate` tool is
+running. It appears after the dispatch cards, including when no card exists yet,
+and disappears when every spawn tool finishes or the turn stops being active.
+Historical turns never show stale joining feedback. The row has `role="status"`,
+a decorative 16px flag and localized `team.expertJoining` text (for example,
+`New expert joining…` or `新专家加入中…`), with a 24px minimum height, 6px icon/text
+gap and muted 13px text. Only the label pulses; reduced-motion preferences
+remove the animation. The indicator changes no Team runtime or persisted state.
+
 ## 10C. Expert Team Work Panel
 
 ### 10C.1 Purpose

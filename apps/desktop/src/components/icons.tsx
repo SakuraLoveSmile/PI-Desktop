@@ -37,6 +37,7 @@ import {
   FileDiff,
   FileSpreadsheet,
   FileText,
+  Flag,
   Folder,
   FolderOpen,
   FolderPlus,
@@ -163,6 +164,7 @@ export const IconRefresh = icon(RefreshCcw);
 export const IconChat = icon(MessageSquare);
 /** Session creation affordance. Keep it distinct from generic add actions. */
 export const IconNewSession = icon(MessageSquarePlus);
+export const IconFlag = icon(Flag);
 export const IconFolder = icon(Folder);
 export const IconFolderOpen = icon(FolderOpen);
 export const IconNewProject = icon(FolderPlus);

@@ -4,6 +4,7 @@ import { useAppStore } from "../../../stores/app-store";
 import { useTeamSnapshot } from "../../../hooks/useTeamSnapshot";
 import { teamWorkPanelTab } from "../../../lib/work-panel-tabs";
 import { PixelAvatar } from "../../../components/workpanel/team/PixelAvatar";
+import { IconFlag } from "../../../components/icons";
 import { TooltipButton } from "../../../components/ui";
 import { dispatchFallbackState, type TeamDispatchCardItem } from "../../../lib/team-dispatch";
 import { buildTeamTaskRows, taskStateLabelKey } from "../../../lib/team-presentation";
@@ -66,11 +67,13 @@ export const TeamDispatchCard = memo(function TeamDispatchCard({
 
 export const TeamDispatchCardsGroup = memo(function TeamDispatchCardsGroup({
   cards,
+  joining = false,
 }: {
   cards: TeamDispatchCardItem[];
+  joining?: boolean;
 }) {
   const { t } = useTranslation();
-  if (!cards || cards.length === 0) return null;
+  if (cards.length === 0 && !joining) return null;
   return (
     <div
       className="team-dispatch-cards-group"
@@ -83,6 +86,12 @@ export const TeamDispatchCardsGroup = memo(function TeamDispatchCardsGroup({
           card={card}
         />
       ))}
+      {joining ? (
+        <div className="team-dispatch-joining" role="status">
+          <IconFlag size={16} aria-hidden />
+          <span className="team-dispatch-joining-label">{t("team.expertJoining")}</span>
+        </div>
+      ) : null}
     </div>
   );
 });

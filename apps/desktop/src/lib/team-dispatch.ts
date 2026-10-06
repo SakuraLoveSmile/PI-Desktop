@@ -15,6 +15,12 @@ export function dispatchFallbackState(status: string | undefined): TaskVisualSta
   }
 }
 
+export function isTeammateJoining(
+  tools: readonly Pick<UiMessage, "toolName" | "toolStatus">[],
+): boolean {
+  return tools.some((tool) => tool.toolName === "spawn_teammate" && tool.toolStatus === "running");
+}
+
 function parseJsonSafe(val: unknown): Record<string, unknown> | null {
   if (!val) return null;
   if (typeof val === "object" && !Array.isArray(val)) return val as Record<string, unknown>;

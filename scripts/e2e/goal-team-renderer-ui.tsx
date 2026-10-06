@@ -5,7 +5,7 @@ import { I18nextProvider } from "react-i18next";
 import type { GoalProgressChangedEvent, GoalProgressSnapshot, GoalReportChangedEvent, PlanProposal, TeamSnapshot } from "@pi-desktop/shared";
 import { catalogs } from "@pi-desktop/i18n";
 import { GoalProgressBar } from "../../apps/desktop/src/features/chat/composer/GoalProgressBar";
-import { TeamDispatchCard } from "../../apps/desktop/src/features/chat/transcript/TeamDispatchCard";
+import { TeamDispatchCardsGroup } from "../../apps/desktop/src/features/chat/transcript/TeamDispatchCard";
 import { api } from "../../apps/desktop/src/lib/api";
 import { useAppStore } from "../../apps/desktop/src/stores/app-store";
 import type { TeamDispatchCardItem } from "../../apps/desktop/src/lib/team-dispatch";
@@ -151,10 +151,10 @@ globalThis.goalTeamRendererUiProbe = async () => {
       teamSessionId: "team-session", taskId: "task-real", firstCreateMessageId: "message-create",
       task: { taskId: "task-real", subject: "Review change", status: "pending", ownerMemberName: "researcher", ownerSessionId: "member-session" },
     };
-    const renderAll = (proposal: PlanProposal, sessionId = "goal-session") => createElement(I18nextProvider, { i18n },
+    const renderAll = (proposal: PlanProposal, sessionId = "goal-session", joining = false) => createElement(I18nextProvider, { i18n },
       createElement(Fragment, null,
         createElement(GoalProgressBar, { sessionId, proposal }),
-        createElement(TeamDispatchCard, { card }),
+        createElement(TeamDispatchCardsGroup, { cards: [card], joining }),
       ));
     await act(async () => { root.render(renderAll(oldProposal)); });
     await act(async () => container.querySelector<HTMLButtonElement>(".goal-progress-toggle-btn")?.click());
@@ -220,8 +220,18 @@ globalThis.goalTeamRendererUiProbe = async () => {
     assert(openedTabs.length === 1, "one card click must open exactly one work panel target");
     assert(openedTabs[0].sessionId === "lead-session", "card click must open from the active session");
     assert(JSON.stringify(openedTabs[0].tab.teamTarget) === JSON.stringify({ kind: "task", taskId: "task-real" }), "card click must open the task detail target");
+    const renderJoining = (joining: boolean) => createElement(I18nextProvider, { i18n },
+      createElement(TeamDispatchCardsGroup, { cards: [], joining }));
+    await act(async () => { root.render(renderJoining(true)); });
+    assert(container.querySelector('.team-dispatch-joining[role="status"]')?.textContent === "New expert joining…", "joining feedback must render even before a task card exists");
+    const joiningLabel = container.querySelector(".team-dispatch-joining-label");
+    if (joiningLabel && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      assert(getComputedStyle(joiningLabel).animationName === "none", "reduced motion must disable joining animation");
+    }
+    await act(async () => { root.render(renderJoining(false)); });
+    assert(container.childElementCount === 0, "joining feedback must disappear when spawning finishes and there are no cards");
     const screenshotProposal = { ...newProposal, executionId: "screenshot-execution" } as PlanProposal;
-    await act(async () => { root.render(renderAll(screenshotProposal, "screenshot-session")); });
+    await act(async () => { root.render(renderAll(screenshotProposal, "screenshot-session", true)); });
     await until(() => container.querySelector(".goal-progress-capsule-text")?.textContent?.trim() === "1/1", "ready progress for screenshot");
     await act(async () => container.querySelector<HTMLButtonElement>(".goal-progress-toggle-btn")?.click());
     await until(() => container.textContent?.includes("Screenshot step") === true, "expanded goal for screenshot");
@@ -244,5 +254,5 @@ globalThis.goalTeamRendererUiProbe = async () => {
     api.onHostStatus = originalHostStatus;
     useAppStore.setState({ openWorkPanelTabForSession: originalStoreMethod });
   }
-  return { ok: true, cardHeight, scenarios: ["goal execution and session switch", "cross-session event isolation", "stale report event", "out-of-order progress revisions", "ready report completion", "single task navigation"] };
+  return { ok: true, cardHeight, reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches, scenarios: ["goal execution and session switch", "cross-session event isolation", "stale report event", "out-of-order progress revisions", "ready report completion", "single task navigation", "expert joining feedback"] };
 };

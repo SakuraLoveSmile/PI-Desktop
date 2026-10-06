@@ -53,7 +53,7 @@ import { EntryExtraStack } from "./EntryExtraStack";
 import { slotMessage } from "../../../plugins/renderer-slots/slot-message";
 import { PlanApprovalBar } from "../../../components/PlanApprovalBar";
 import { AskToolCompletedSummary } from "../../../components/AskToolCompletedSummary";
-import { TeamDispatchContext, type TeamDispatchCardItem } from "../../../lib/team-dispatch";
+import { TeamDispatchContext, isTeammateJoining, type TeamDispatchCardItem } from "../../../lib/team-dispatch";
 import { TeamDispatchCardsGroup } from "./TeamDispatchCard";
 
 const EMPTY_PROPOSALS: PlanProposal[] = [];
@@ -295,6 +295,7 @@ export const AssistantTurn = memo(function AssistantTurn({
   const toolsRef = useRef(summary.tools);
   const tools = reuseReferences(toolsRef.current, summary.tools);
   toolsRef.current = tools;
+  const teammateJoining = isActive && isTeammateJoining(tools);
   const generatedImages = useMemo(() => tools
     .filter((message) => message.toolName === "GenerateImages")
     .map((message) => <GeneratedImages key={message.id} message={message} />), [tools]);
@@ -409,8 +410,8 @@ export const AssistantTurn = memo(function AssistantTurn({
             {completedAsks.map((message) => <AskToolCompletedSummary key={message.id} message={message} />)}
           </>
         )}
-        {turnDispatchCards.length > 0 ? (
-          <TeamDispatchCardsGroup cards={turnDispatchCards} />
+        {turnDispatchCards.length > 0 || teammateJoining ? (
+          <TeamDispatchCardsGroup cards={turnDispatchCards} joining={teammateJoining} />
         ) : null}
         {turnProposals.map((proposal) => <PlanApprovalBar key={proposal.id} proposal={proposal} />)}
         {generatedImages}

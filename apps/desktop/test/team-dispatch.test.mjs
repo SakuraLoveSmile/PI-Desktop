@@ -12,7 +12,27 @@ const {
   extractTaskFromToolMessage,
   buildTeamDispatchIndex,
   dispatchFallbackState,
+  isTeammateJoining,
 } = await import("../src/lib/team-dispatch.ts");
+
+test("isTeammateJoining follows only running spawn tools", () => {
+  assert.equal(isTeammateJoining([{ toolName: "spawn_teammate", toolStatus: "running" }]), true);
+  for (const toolStatus of ["success", "error", "denied", undefined]) {
+    assert.equal(isTeammateJoining([{ toolName: "spawn_teammate", toolStatus }]), false);
+  }
+  assert.equal(isTeammateJoining([{ toolName: "task_create", toolStatus: "running" }]), false);
+  assert.equal(isTeammateJoining([]), false);
+  assert.equal(isTeammateJoining([
+    { toolName: "spawn_teammate", toolStatus: "success" },
+    { toolName: "spawn_teammate", toolStatus: "running" },
+  ]), true);
+});
+
+test("only the active assistant turn exposes expert joining feedback", () => {
+  const source = readFileSync(join(here, "../src/features/chat/transcript/AssistantTurn.tsx"), "utf8");
+  assert.match(source, /isActive && isTeammateJoining\(tools\)/);
+  assert.match(source, /joining=\{teammateJoining\}/);
+});
 
 test("dispatchFallbackState accepts known states and defaults unsupported values to pending", () => {
   for (const state of ["pending", "in_progress", "completed", "failed", "cancelled"]) {

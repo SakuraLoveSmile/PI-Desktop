@@ -1911,6 +1911,7 @@ sklm: {
     viewMemberDetail: "查看成員 {{name}}",
     memberDetailUnavailable: "成員詳情無法使用",
     dispatchCardsLabel: "專家任務分派",
+    expertJoining: "新專家加入中…",
     untitledTask: "未命名任務",
 
     title: "專家團隊",
