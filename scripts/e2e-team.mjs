@@ -689,33 +689,70 @@ async function verifyStaleTeamTabRetry(evaluate, testId) {
 }
 
 async function resizePanel(sendCdp, evaluate, width) {
+  await waitFor(() => evaluate(`(() => {
+    const panel=document.querySelector('[data-testid="work-panel"]');
+    return panel && !panel.hasAttribute('data-resizing') &&
+      panel.getAnimations({subtree:true}).every(animation => animation.playState !== 'running');
+  })()`), "previous resize and panel animations settled");
   const bounds = await evaluate(`(() => {
-    const panel = document.querySelector('[data-testid="work-panel"]');
-    const handle = panel.querySelector('.work-panel-resize').getBoundingClientRect();
-    return { width: panel.getBoundingClientRect().width, x: handle.left + handle.width / 2, y: handle.top + 120 };
+    const panel=document.querySelector('[data-testid="work-panel"]');
+    const handle=panel.querySelector('.work-panel-resize');
+    const rect=handle.getBoundingClientRect();
+    const x=rect.left+rect.width/2, y=rect.top+120;
+    if (document.elementFromPoint(x,y) !== handle) throw new Error('Resize handle is obscured');
+    const trace={events:[],pointerId:null};
+    const record=event => {
+      if (event.type === 'pointerdown') trace.pointerId=event.pointerId;
+      trace.events.push({type:event.type,pointerId:event.pointerId,captured:handle.hasPointerCapture(event.pointerId)});
+    };
+    const types=['pointerdown','pointerup','pointercancel','gotpointercapture','lostpointercapture'];
+    for (const type of types) handle.addEventListener(type,record);
+    const blur=() => trace.events.push({type:'blur'});
+    window.addEventListener('blur',blur);
+    window.__teamResizeTrace={trace,handle,dispose:() => {
+      for (const type of types) handle.removeEventListener(type,record);
+      window.removeEventListener('blur',blur);
+    }};
+    return {width:panel.getBoundingClientRect().width,x,y};
   })()`);
-  await sendCdp("Input.dispatchMouseEvent", { type: "mousePressed", x: bounds.x, y: bounds.y, button: "left", buttons: 1, clickCount: 1 });
+  let failure;
   try {
-    await waitFor(() => evaluate(`document.querySelector('[data-testid="work-panel"]')?.dataset.resizing === 'true'`), "panel resize gesture admitted");
-    await sendCdp("Input.dispatchMouseEvent", { type: "mouseMoved", x: bounds.x + bounds.width - width, y: bounds.y, button: "left", buttons: 1 });
-    await waitFor(() => evaluate(`Math.abs(document.querySelector('[data-testid="work-panel"]').getBoundingClientRect().width - ${width}) < 2`), `panel drag reached ${width}px`);
+    await sendCdp("Input.dispatchMouseEvent", {type:"mousePressed",x:bounds.x,y:bounds.y,button:"left",buttons:1,clickCount:1});
+    await waitFor(() => evaluate(`(() => {
+      const {trace,handle}=window.__teamResizeTrace;
+      return trace.pointerId !== null && handle.hasPointerCapture(trace.pointerId) &&
+        document.querySelector('[data-testid="work-panel"]').dataset.resizing === 'true';
+    })()`), "current pointer captured for panel resize");
+    await sendCdp("Input.dispatchMouseEvent", {type:"mouseMoved",x:bounds.x+bounds.width-width,y:bounds.y,button:"left",buttons:1});
+    await waitFor(() => evaluate(`Math.abs(document.querySelector('[data-testid="work-panel"]').getBoundingClientRect().width-${width}) < 2`), `panel drag reached ${width}px`);
   } catch (error) {
-    const state = await evaluate(`(() => {
-      const panel=document.querySelector('[data-testid="work-panel"]');
-      const handle=panel?.querySelector('.work-panel-resize');
-      return { actualWidth: panel?.getBoundingClientRect().width,
-        computedWidth: panel ? getComputedStyle(panel).width : null,
-        styleWidth: panel?.style.getPropertyValue('--work-panel-width'),
-        resizing: panel?.getAttribute('data-resizing'),
-        mousePointerCaptured: handle?.hasPointerCapture(1),
-        handleBounds: handle?.getBoundingClientRect().toJSON() };
-    })()`);
-    console.error("TEAM_RESIZE_FAILURE", JSON.stringify({ fromBounds: bounds, targetWidth: width, error: String(error), state }));
-    throw error;
+    failure=error;
   } finally {
-    await sendCdp("Input.dispatchMouseEvent", { type: "mouseReleased", x: bounds.x + bounds.width - width, y: bounds.y, button: "left", buttons: 0, clickCount: 1 });
+    try {
+      await sendCdp("Input.dispatchMouseEvent", {type:"mouseReleased",x:bounds.x+bounds.width-width,y:bounds.y,button:"left",buttons:0,clickCount:1});
+      await waitFor(() => evaluate(`(() => {
+        const {trace,handle}=window.__teamResizeTrace;
+        return trace.events.some(event => event.type === 'pointerup' && event.pointerId === trace.pointerId) &&
+          !handle.hasPointerCapture(trace.pointerId) &&
+          !document.querySelector('[data-testid="work-panel"]').hasAttribute('data-resizing');
+      })()`), "current pointer released and resize state cleared");
+      await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
+    } catch (error) {
+      failure ??= error;
+    }
+    if (failure) {
+      const state=await evaluate(`(() => {
+        const {trace,handle}=window.__teamResizeTrace;
+        const panel=document.querySelector('[data-testid="work-panel"]');
+        return {events:trace.events,pointerId:trace.pointerId,captured:trace.pointerId !== null && handle.hasPointerCapture(trace.pointerId),
+          actualWidth:panel.getBoundingClientRect().width,resizing:panel.getAttribute('data-resizing'),handleBounds:handle.getBoundingClientRect().toJSON()};
+      })()`);
+      console.error("TEAM_RESIZE_FAILURE",JSON.stringify({fromBounds:bounds,targetWidth:width,error:String(failure),state}));
+    }
+    await evaluate(`window.__teamResizeTrace.dispose(); delete window.__teamResizeTrace; true`);
   }
-  await waitFor(() => evaluate(`Math.abs(document.querySelector('[data-testid="work-panel"]').getBoundingClientRect().width - ${width}) < 2`), `panel resized to ${width}px`);
+  if (failure) throw failure;
+  await waitFor(() => evaluate(`Math.abs(document.querySelector('[data-testid="work-panel"]').getBoundingClientRect().width-${width}) < 2`), `panel resized to ${width}px`);
 }
 
 async function verifyTeamLayoutMatrix(sendCdp, evaluate, locale) {
