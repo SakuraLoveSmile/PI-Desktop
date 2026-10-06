@@ -56,8 +56,14 @@ export function createTeamMemberTranscriptController(memberSessionId: string, de
         }
         if (entry.revision <= readRevision && durable && teamMemberVisibleMessageMatches(durable, entry.message, entry.partial)) live.delete(id);
       }
-      let merged = mergeLiveSessionMessages(bounded.messages.filter((message) => !removed.has(message.id)), [...live.values()].map((entry) => entry.message));
-      for (const entry of live.values()) merged = upsertLiveSessionMessage(merged, entry.message);
+      const overlays = [...live.values()].map((entry) => {
+        const durable = entry.partial && bounded.messages.find((message) => message.id === entry.message.id);
+        // A tab can miss tool_start. Preserve persisted name/arguments while
+        // the final event still takes precedence over a stale running row.
+        return durable ? { ...durable, ...entry.message } : entry.message;
+      });
+      let merged = mergeLiveSessionMessages(bounded.messages.filter((message) => !removed.has(message.id)), overlays);
+      for (const message of overlays) merged = upsertLiveSessionMessage(merged, message);
       const next = bound(merged);
       publish({ messages: next.messages, loading: false, error: null,
         truncated: result.session?.hasMoreBefore === true || bounded.messagesTruncated || next.messagesTruncated || localTruncated,
