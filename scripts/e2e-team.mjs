@@ -741,15 +741,24 @@ async function resizePanel(sendCdp, evaluate, width) {
       failure ??= error;
     }
     if (failure) {
-      const state=await evaluate(`(() => {
+      try {
+        const state=await evaluate(`(() => {
         const {trace,handle}=window.__teamResizeTrace;
         const panel=document.querySelector('[data-testid="work-panel"]');
         return {events:trace.events,pointerId:trace.pointerId,captured:trace.pointerId !== null && handle.hasPointerCapture(trace.pointerId),
           actualWidth:panel.getBoundingClientRect().width,resizing:panel.getAttribute('data-resizing'),handleBounds:handle.getBoundingClientRect().toJSON()};
       })()`);
-      console.error("TEAM_RESIZE_FAILURE",JSON.stringify({fromBounds:bounds,targetWidth:width,error:String(failure),state}));
+        console.error("TEAM_RESIZE_FAILURE",JSON.stringify({fromBounds:bounds,targetWidth:width,error:String(failure),state}));
+      } catch (error) {
+        console.error("TEAM_RESIZE_DIAGNOSTIC_FAILURE",JSON.stringify({primaryError:String(failure),error:String(error)}));
+      }
     }
-    await evaluate(`window.__teamResizeTrace.dispose(); delete window.__teamResizeTrace; true`);
+    try {
+      await evaluate(`window.__teamResizeTrace?.dispose(); delete window.__teamResizeTrace; true`);
+    } catch (error) {
+      console.error("TEAM_RESIZE_DISPOSAL_FAILURE",String(error));
+      failure ??= error;
+    }
   }
   if (failure) throw failure;
   await waitFor(() => evaluate(`Math.abs(document.querySelector('[data-testid="work-panel"]').getBoundingClientRect().width-${width}) < 2`), `panel resized to ${width}px`);
