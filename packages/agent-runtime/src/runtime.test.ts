@@ -182,6 +182,9 @@ function createRuntime(
       callerSessionId: string;
       isLead: boolean;
       memberName?: string;
+      workPurpose?: "execute" | "plan_research";
+      planningId?: string;
+      roundId?: string;
     };
     host: { call: ReturnType<typeof vi.fn>; onNotification?: ReturnType<typeof vi.fn> };
     onEvent: (envelope: unknown) => void;
@@ -294,7 +297,17 @@ describe("DesktopAgentRuntime Team strategy wiring", () => {
     }
   });
 
-  it("exposes Team tools and guidance only in Agent mode", async () => {
+  it("research members never declare mutation, shell, plugin or Plan transition tools", async () => {
+    const runtime = createRuntime({executionProfile:"team",mode:"agent",teamContext:{teamSessionId:"lead",callerSessionId:"researcher",isLead:false,workPurpose:"plan_research",planningId:"plan",roundId:"round"}});
+    try {
+      const agent = (runtime as unknown as {agent:Agent}).agent;
+      const names=agent.state.tools.map(tool=>tool.name);
+      expect(names).toEqual(expect.arrayContaining(["Read","Glob","Grep","submit_research_result","team_status"]));
+      for(const forbidden of ["Write","Edit","Bash","Skill","BrowserPreview","EnterPlanMode","SubmitPlan","task_create","spawn_teammate","asktool"]) expect(names).not.toContain(forbidden);
+    } finally {await runtime.dispose();}
+  });
+
+  it("exposes coordinator tools in Plan and preserves Agent Team tools", async () => {
     const runtime = createRuntime({
       mode: "plan",
       executionProfile: "team",
@@ -318,8 +331,8 @@ describe("DesktopAgentRuntime Team strategy wiring", () => {
 
     try {
       expect((runtime as any).agent.state.tools.map((tool: { name: string }) => tool.name))
-        .not.toEqual(expect.arrayContaining([...teamNames, "declare_team_strategy"]));
-      expect((runtime as any).agent.state.systemPrompt).not.toContain("declare_team_strategy");
+        .toEqual(expect.arrayContaining([...teamNames, "declare_team_strategy"]));
+      expect((runtime as any).agent.state.systemPrompt).toContain("declare_team_strategy");
 
       runtime.setMode("agent");
       expect((runtime as any).agent.state.tools.map((tool: { name: string }) => tool.name))
@@ -333,8 +346,8 @@ describe("DesktopAgentRuntime Team strategy wiring", () => {
 
       runtime.setMode("plan");
       expect((runtime as any).agent.state.tools.map((tool: { name: string }) => tool.name))
-        .not.toEqual(expect.arrayContaining([...teamNames, "declare_team_strategy"]));
-      expect((runtime as any).agent.state.systemPrompt).not.toContain("declare_team_strategy");
+        .toEqual(expect.arrayContaining([...teamNames, "declare_team_strategy"]));
+      expect((runtime as any).agent.state.systemPrompt).toContain("declare_team_strategy");
     } finally {
       await runtime.dispose();
     }

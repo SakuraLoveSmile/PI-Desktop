@@ -24,6 +24,9 @@ await mkdir(fixtureHome, { recursive: true });
 const originalHome = process.env.HOME;
 process.env.HOME = fixtureHome;
 
+const planningFixture = process.env.PI_E2E_TEAM_PLANNING === "1"
+  ? (await import("./e2e-team-planning.mjs")).createPlanningFixture(projectPath)
+  : null;
 const calls = [];
 const titleRequests = [];
 const titleDiagnostics = [];
@@ -92,6 +95,8 @@ const providerServer = createServer(async (req, res) => {
         : userText.includes("Create an approved Team execution plan")
           ? "Approved Team Assignment"
           : "Expert Team Delegation";
+    } else if (planningFixture) {
+      ({ toolCall, finalText } = await planningFixture.respond({ userText, priorToolNames, activeTurnMessages, activeToolText, toolNames }));
     } else if (userText.includes("Standard coexistence probe")) {
       assert.ok(toolNames.includes("Task"), "standard session lost its Task tool");
       assert.equal(toolNames.includes("declare_team_strategy"), false, "standard session exposed Team dispatch");
@@ -103,7 +108,9 @@ const providerServer = createServer(async (req, res) => {
       finalText = "STANDARD_CHILD_RESULT";
     } else if (userText.includes("Create an approved Team execution plan")) {
       assert.ok(toolNames.includes("SubmitPlan"), "Plan runtime lacks SubmitPlan");
-      toolCall = { name: "SubmitPlan", args: {
+      toolCall = !priorToolNames.includes("declare_team_strategy")
+        ? { name: "declare_team_strategy", args: { strategy: "lead_only", reason: "This fixture plan needs no research." } }
+        : { name: "SubmitPlan", args: {
         title: "Approved Team Assignment",
         question: "Run this approved Team plan?",
         markdown: "# Approved Team Assignment\n\n1. Coordinate the approved Team execution.\n2. Record the result for the Lead.\n",
@@ -827,6 +834,12 @@ try {
 
   let { sendCdp, evaluate, invoke } = await startApp();
 
+  if (planningFixture) {
+    await planningFixture.runJourney({
+      planLead, invoke, evaluate, sendCdp, waitFor, calls, projectPath,
+      submitComposerPrompt, openTeamPanel, saveScreenshot, startApp, stopApp,
+    });
+  } else {
   await waitFor(() => evaluate(`!!document.querySelector('[data-sidebar-session-row="${lead.id}"]') && !document.querySelector('.startup-splash')`), "Lead in sidebar");
   await evaluate(`document.querySelector('[data-sidebar-session-row="${lead.id}"] button.thread-item-main')?.click()`);
   await waitFor(() => evaluate(`!!document.querySelector('[data-sidebar-session-row="${lead.id}"].active')`), "Lead selected");
@@ -1271,6 +1284,7 @@ try {
   await verifyTeamLayoutMatrix(sendCdp, evaluate, "zh-CN");
   assert.equal(titleRequests.length, 3, "renderer reload must not duplicate title requests");
   console.log("PASS Chinese Team presentation: compact progress and identities survive renderer reload without another title request");
+  }
 } catch (error) {
   if (socket?.readyState === 1 && lastSendCdp) {
     try { console.error(`Failure image: ${await saveScreenshot(lastSendCdp, "team-failure.png")}`); } catch {}
@@ -1280,6 +1294,7 @@ try {
   console.error(appOutput?.slice(-4000));
   throw error;
 } finally {
+  planningFixture?.releaseResearch();
   socket?.close();
   await stopApp();
   await host.stop();

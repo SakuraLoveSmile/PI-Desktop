@@ -13,7 +13,17 @@ use crate::sessions;
 
 pub(super) fn team_rpc_err(e: anyhow::Error) -> JsonRpcError {
     let msg = e.to_string();
-    let code_str = if msg.contains("TEAM_DELIVERY_PENDING") {
+    let code_str = if msg.contains("TEAM_PLANNING_NOT_READY") {
+        "TEAM_PLANNING_NOT_READY"
+    } else if msg.contains("TEAM_PLANNING_STALE") {
+        "TEAM_PLANNING_STALE"
+    } else if msg.contains("TEAM_PLANNING_CLOSED") {
+        "TEAM_PLANNING_CLOSED"
+    } else if msg.contains("TEAM_RESEARCH_INVALID") {
+        "TEAM_RESEARCH_INVALID"
+    } else if msg.contains("TEAM_RESEARCH_READ_ONLY") {
+        "TEAM_RESEARCH_READ_ONLY"
+    } else if msg.contains("TEAM_DELIVERY_PENDING") {
         "TEAM_DELIVERY_PENDING"
     } else if msg.contains("TEAM_UNAUTHORIZED") {
         "TEAM_UNAUTHORIZED"
@@ -151,12 +161,20 @@ pub(super) async fn handle(
                     session_id,
                 )
                 .map_err(team_rpc_err)?;
-                return Ok(json!({
+                let purpose =
+                    crate::team::planning::purpose(&st.db, session_id).map_err(team_rpc_err)?;
+                let mut context = json!({
                     "teamSessionId": member.team_session_id,
                     "callerSessionId": session_id,
                     "isLead": false,
                     "memberName": member_name,
-                }));
+                    "workPurpose": purpose.as_ref().map(|p|p.work_purpose.as_str()).unwrap_or("execute"),
+                });
+                if let Some(purpose) = purpose.filter(|p| p.work_purpose == "plan_research") {
+                    context["planningId"] = json!(purpose.planning_id);
+                    context["roundId"] = json!(purpose.round_id);
+                }
+                return Ok(context);
             }
             crate::team::validate_team_lead(&st.db, session_id).map_err(team_rpc_err)?;
             Ok(json!({
@@ -164,6 +182,62 @@ pub(super) async fn handle(
                 "callerSessionId": session_id,
                 "isLead": true,
             }))
+        }
+        "team.getPlanning"
+        | "team.submitResearchResult"
+        | "team.openPlanningQuestion"
+        | "team.closePlanningQuestion" => {
+            let required = |key: &str| {
+                params
+                    .get(key)
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| rpc_err(1002, format!("{key} required"), "INVALID_PARAMS"))
+            };
+            let team = required("teamSessionId")?;
+            let caller = required("callerSessionId")?;
+            if method == "team.getPlanning" {
+                return crate::team::planning::projection(&st.db, team, caller)
+                    .map_err(team_rpc_err);
+            }
+            let round = required("roundId")?;
+            if method == "team.submitResearchResult" {
+                let result =
+                    serde_json::from_value(params.get("structuredResult").cloned().ok_or_else(
+                        || rpc_err(1002, "structuredResult required", "INVALID_PARAMS"),
+                    )?)
+                    .map_err(|e| rpc_err(1002, e.to_string(), "TEAM_RESEARCH_INVALID"))?;
+                let submitted = crate::team::planning::submit(
+                    &st.db,
+                    crate::team::planning::SubmitResearch {
+                        team,
+                        caller,
+                        planning_id: required("planningId")?,
+                        round_id: round,
+                        task_id: required("taskId")?,
+                        expected_revision: params
+                            .get("expectedRevision")
+                            .and_then(Value::as_i64)
+                            .ok_or_else(|| {
+                            rpc_err(1002, "expectedRevision required", "INVALID_PARAMS")
+                        })?,
+                        result,
+                    },
+                )
+                .map_err(team_rpc_err)?;
+                send_team_changed(&st.db, &tx, team, "task")?;
+                return Ok(json!({"result":submitted}));
+            }
+            crate::team::planning::question(
+                &st.db,
+                team,
+                caller,
+                round,
+                required("questionId")?,
+                method == "team.openPlanningQuestion",
+            )
+            .map_err(team_rpc_err)?;
+            send_team_changed(&st.db, &tx, team, "task")?;
+            Ok(json!({"ok":true}))
         }
         "team.getRoster" => {
             let team_id = params
