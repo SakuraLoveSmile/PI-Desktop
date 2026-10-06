@@ -860,17 +860,46 @@ try {
   assert.ok(boardTaskId, "board fixture task id was not initialized");
   await waitFor(async () => (await invoke("agentGetStatus", lead.id)).status?.isRunning === false, "Lead idle before task completion fixture");
   await activateOverviewTab(sendCdp, evaluate);
-  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-count')?.innerText === '0/6'`), "Overview baseline before live task mutation");
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.completed === '0' && document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.total === '6'`), "Overview baseline before live task mutation");
   await invoke("agentPrompt", { sessionId: lead.id, viewingSessionId: lead.id, content: "Mark the board fixture task completed." });
   await waitFor(() => modelGates.taskUpdate.entered, "task update held after Host mutation");
   const updatedBoard = await invoke("teamGetBoard", { teamSessionId: lead.id });
   assert.equal(updatedBoard.tasks.find((task) => task.taskId === boardTaskId)?.status, "completed", "completed board fixture did not persist");
-  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-count')?.innerText === '1/6'`), "mounted Overview refreshes before the running turn settles");
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.completed === '1' && document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.total === '6'`), "mounted Overview refreshes before the running turn settles");
   releaseModelRequest("taskUpdate");
   await waitFor(async () => (await invoke("agentGetStatus", lead.id)).status?.isRunning === false, "Lead settled after task completion fixture");
   await activateOverviewTab(sendCdp, evaluate);
   await waitFor(() => evaluate(`document.querySelectorAll('[data-testid="overview-team-progress"] .team-progress-row').length === 5`), "five compact Overview task rows");
   assert.match(await evaluate(`document.querySelector('[data-testid="overview-tab"]')?.innerText ?? ''`), /researcher|Alex/i, "Overview should expose the Team task/member summary");
+  const overviewMetrics = await evaluate(`(() => {
+    const overview = document.querySelector('[data-testid="overview-tab"]');
+    const section = overview.querySelector('section.team-progress');
+    return {
+      header: section.querySelector('.team-progress-header').getBoundingClientRect().height,
+      row: section.querySelector('.team-progress-row').getBoundingClientRect().height,
+      summaries: Array.from(overview.querySelectorAll('details > summary')).map(summary => ({
+        height: summary.getBoundingClientRect().height,
+        chevrons: summary.querySelectorAll('.work-panel-overview-chevron').length,
+        border: getComputedStyle(summary.parentElement).borderBottomStyle,
+      })),
+      extraInside: !!section.querySelector('.work-panel-overview-status'),
+      separateProgress: Array.from(overview.querySelectorAll('details > summary')).some(summary => summary.innerText.trim() === 'Progress'),
+    };
+  })()`);
+  assert.ok(Math.abs(overviewMetrics.header - 48) <= 2, `Team progress header geometry: ${JSON.stringify(overviewMetrics)}`);
+  assert.ok(Math.abs(overviewMetrics.row - 50) <= 2, `Team progress row geometry: ${JSON.stringify(overviewMetrics)}`);
+  assert.ok(overviewMetrics.summaries.every(summary => Math.abs(summary.height - 48) <= 2 && summary.chevrons === 1 && summary.border === 'dashed'), `Overview chrome geometry: ${JSON.stringify(overviewMetrics)}`);
+  assert.equal(overviewMetrics.extraInside, true, "Team status must stay inside progress");
+  assert.equal(overviewMetrics.separateProgress, false, "Team Overview must not repeat the ordinary progress disclosure");
+  await evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-group-toggle')?.click()`);
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-rows')?.getClientRects().length === 0`), "Ad-hocs collapse actually hides rows");
+  await evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-group-toggle')?.click()`);
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-row')?.getClientRects().length > 0`), "Ad-hocs reopen restores rows");
+  await evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-toggle')?.click()`);
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-body')?.getClientRects().length === 0`), "progress collapse hides task and extra content");
+  await evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-toggle')?.click()`);
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-body')?.getClientRects().length > 0`), "progress reopen restores task and extra content");
+  console.log(`PASS Overview geometry/disclosures: ${JSON.stringify(overviewMetrics)}`);
   await saveScreenshot(sendCdp, "team-overview-progress.png");
   await evaluate(`Array.from(document.querySelectorAll('[data-testid="overview-team-progress"] button')).find(button => /view all/i.test(button.innerText))?.click()`);
   await waitFor(() => evaluate(`document.querySelectorAll('.team-board-row').length === 6`), "all six compact board rows");
@@ -935,6 +964,8 @@ try {
   await submitComposerPrompt(sendCdp, evaluate, "Standard coexistence probe: delegate one read-only task and report the result.");
   await waitFor(() => calls.some(call => call.userText.includes('STANDARD_CHILD_RESULT') && call.tool === null), "ordinary Task delegate executed");
   await waitFor(async () => (await invoke("agentGetStatus", standardSession.id)).status?.isRunning === false, "ordinary Task parent settled");
+  await activateOverviewTab(sendCdp, evaluate);
+  assert.equal(await evaluate(`Array.from(document.querySelectorAll('[data-testid="overview-tab"] details > summary')).some(summary => summary.innerText.trim() === 'Progress')`), true, "ordinary session keeps its progress disclosure");
   const standardDetail = await invoke("sessionGet", { id: standardSession.id });
   assert.ok(standardDetail.session.messages.some(message => message.content?.includes('STANDARD_PARENT_RESULT')));
   assert.equal((await invoke("teamGetRoster", {teamSessionId: lead.id})).members.length, 5, "ordinary delegate changed the Team roster");
@@ -1036,7 +1067,7 @@ try {
   await waitFor(() => evaluate(`!!document.querySelector('[data-session-pane="${lead.id}"][data-visible="true"]')`), "Lead reopened after Chinese reload");
   await openTeamPanel(sendCdp, evaluate);
   await activateOverviewTab(sendCdp, evaluate);
-  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"]')?.innerText.includes('任务进度')`), "Chinese compact Team progress");
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"]')?.innerText.includes('进展')`), "Chinese compact Team progress");
   await saveScreenshot(sendCdp, "team-overview-zh-CN.png");
   await verifyTeamLayoutMatrix(sendCdp, evaluate, "zh-CN");
   assert.equal(titleRequests.length, 3, "renderer reload must not duplicate title requests");

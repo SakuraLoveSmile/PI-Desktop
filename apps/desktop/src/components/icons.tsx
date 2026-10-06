@@ -20,6 +20,11 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  Circle,
+  CircleArrowRight,
+  CircleDashed,
+  CircleSlash,
+  CircleX,
   CircleAlert,
   CircleCheck,
   CircleHelp,
@@ -258,6 +263,11 @@ export const IconX = icon(X);
 export const IconTrash = icon(Trash2);
 export const IconStar = icon(Star);
 /* Toast status glyphs (see ToastHost) */
+export const IconCircle = icon(Circle);
+export const IconCircleDashed = icon(CircleDashed);
+export const IconCircleX = icon(CircleX);
+export const IconCircleSlash = icon(CircleSlash);
+export const IconCircleArrowRight = icon(CircleArrowRight);
 export const IconCircleCheck = icon(CircleCheck);
 export const IconCircleAlert = icon(CircleAlert);
 export const IconTriangleAlert = icon(TriangleAlert);
