@@ -3439,9 +3439,23 @@ transcript and Overview history.
 - Goal shares the Plan approval surface (D198). The bar reads its copy from the
   proposal's `kind`, so a goal contract shows the matching approval label and
   artifact opener while the layout and remembered permission split-button stay
-  identical. The bar sits in the transparent composer dock, so it paints
-  `--ds-bg-composer` with `--ds-shadow-composer` like queued prompt rows rather
-  than the in-flow `--ds-tile` wash.
+  identical. Approval cards stay in the session's chronological transcript:
+  immediately after their parent SubmitPlan/SubmitGoal call, before subsequent
+  continuation output. Resolving a card updates it in place. A missing submit
+  row uses the checkpoint creation time as its placement boundary. Retained
+  panes read their own session's proposals, never the active pane's proposals.
+  Detailed and compact presentation preserve that boundary and the existing
+  answer-first process disclosure within each side of it. Cards scroll normally
+  with their transcript; they retain `--ds-bg-composer` and
+  `--ds-shadow-composer` styling.
+- A checkpoint with Markdown offers Copy Markdown and Download Markdown next to
+  View details, whether pending or resolved. Both export the exact submitted
+  bytes without granting approval or changing execution state. Download uses
+  the artifact filename, or a sanitized title with a `.md` extension. Empty
+  checkpoints have no export buttons. Copy/download failures show a localized
+  error. Temporary download links, Blob URLs and timers are released on success,
+  error or component disposal; late clipboard completion cannot notify another
+  pane. The details and approval groups wrap without clipping at narrow widths.
 
 ### 11.6 Accessibility
 

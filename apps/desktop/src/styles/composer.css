@@ -681,6 +681,13 @@
   white-space: nowrap;
 }
 
+.plan-approval-export {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 4px;
+}
+
 .plan-approval-actions {
   position: relative;
   display: flex;

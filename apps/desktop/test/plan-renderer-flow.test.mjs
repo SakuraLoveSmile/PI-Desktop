@@ -39,7 +39,9 @@ test("terminal proposals and execution states stay session-scoped and readable",
   }
   assert.match(store, /planCheckpoints: Record<string, PlanProposal>/);
   assert.match(store, /planHistory: Record<string, PlanProposal\[\]>/);
-  assert.match(assistantTurn, /turnProposals\.map\(\(proposal\) => <PlanApprovalBar/);
+  assert.match(assistantTurn, /section\.proposal \? <PlanApprovalBar/);
+  assert.match(assistantTurn, /useContext\(PlanTranscriptContext\)/);
+  assert.doesNotMatch(assistantTurn, /state\.activeSessionId/);
   assert.match(approvalBar, /data-execution-state=\{proposal\.executionState \|\| ""\}/);
   assert.match(approvalBar, /scheduleState/);
   assert.doesNotMatch(store, /planApprovalPermissionMode/);

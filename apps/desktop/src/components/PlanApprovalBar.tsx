@@ -23,6 +23,7 @@ import {
   IconFileText,
 } from "./icons";
 import { Button, Input, Select, SettingsToggle, TooltipButton } from "./ui";
+import { PlanMarkdownActions } from "./PlanMarkdownActions";
 import { AnchoredMenu } from "./settings/AnchoredMenu";
 
 const APPROVAL_MODES: readonly GlobalPermissionMode[] = [
@@ -98,6 +99,7 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
         : kind;
   const copy = (name: string) => t(copyKey(effectiveKind, name));
   const artifactPath = proposal.artifact?.relativePath?.trim() || null;
+  const markdown = proposal.markdown || proposal.plan || "";
   const busy = resolving;
   const blockedByDraft = isPending && draftDirty;
   const scheduleInstant = scheduledFor ? new Date(scheduledFor).getTime() : NaN;
@@ -322,6 +324,7 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
               </span>
             </button>
           ) : null}
+          {markdown ? <PlanMarkdownActions markdown={markdown} artifactPath={artifactPath} title={proposal.title} /> : null}
         </div>
         {isPending ? (
         <div className="plan-approval-actions">
