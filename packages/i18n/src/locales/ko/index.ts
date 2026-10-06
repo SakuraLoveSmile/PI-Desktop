@@ -1969,6 +1969,8 @@ sklm: {
     memberDetailUnavailable: "멤버 세부 정보를 사용할 수 없습니다",
     dispatchCardsLabel: "전문가 작업 배정",
     expertJoining: "새 전문가 합류 중…",
+    adHocTaskTitle: "Ad-hoc: {{subject}}",
+    adHocGroup: "Ad-hoc 작업",
     untitledTask: "제목 없는 작업",
     memberDetail: "Member Detail",
     taskDetail: "Task Detail",

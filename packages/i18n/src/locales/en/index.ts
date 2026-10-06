@@ -1951,6 +1951,8 @@ sklm: {
     memberDetailUnavailable: "Member details unavailable",
     dispatchCardsLabel: "Expert task dispatches",
     expertJoining: "New expert joining…",
+    adHocTaskTitle: "Ad-hoc: {{subject}}",
+    adHocGroup: "Ad-hocs",
     untitledTask: "Untitled task",
 
     title: "Expert Team",

@@ -2904,6 +2904,34 @@ Each member row can open that member's durable session. Loading, empty, refresh,
 and error states remain visible and localized. The panel does not claim a
 message was delivered based only on mailbox enqueue state.
 
+### Overview chrome and task progress
+
+All session Overview disclosures use 48px headers with secondary, normal-weight
+14px text, 12px left inset and dashed default-border separators. Native disclosure
+markers are replaced by one decorative 16px right-hand chevron, rotating left
+when closed; reduced-motion preferences remove the transition. The subagent
+summary retains its existing panorama control between its label and chevron.
+The metadata header remains above the scroll area.
+
+Team sessions show one progress section (`进展` / `進展`) with a panorama link,
+arrow, divider and independent 24px disclosure control. The section publishes
+`data-completed` and `data-total` for the current non-deleted tasks; the old
+completed/total disclosure badge is removed. Its body has an initially open
+`Ad-hocs <total>` group and up to five prioritized task rows. Rows are 50px tall:
+a 16px state glyph precedes a secondary 14px `Ad-hoc: <subject>` title; the second
+line shows a 12px decorative avatar and muted 13px role/display-name identity.
+Pending, blocked, in-progress, completed, failed and cancelled use their shared
+state glyphs and localized status labels. Row accessible names include subject
+and status; the snapshot pause flag is carried into the owner projection.
+
+The Team progress body's extra content contains the Lead's current status and
+plan/proposal activity (or localized no-plans copy). Team sessions have no
+separate ordinary progress disclosure; non-Team sessions retain it. Group
+collapse hides only its task rows, while progress collapse hides its entire
+body, including extra activity. Both expose expanded state and controlled IDs.
+The compact board's row declarations remain unchanged. Empty artifact copy is
+muted 13px, with zh-CN `暂无产物`; other locales retain their specified copy.
+
 ### 10C.3 Accessibility
 
 - The panel has a localized heading and labeled roster and board sections.

@@ -666,44 +666,93 @@
   white-space: nowrap;
 }
 
-.team-progress {
-  display: flex;
+.team-task-glyph { display: inline-flex; flex: none; align-items: center; justify-content: center; color: var(--ds-text-muted); }
+.team-task-glyph[data-state="in_progress"] { color: var(--ds-text-primary); }
+.team-task-glyph[data-state="completed"] { color: var(--ds-success); }
+.team-task-glyph[data-state="failed"] { color: var(--ds-error); }
+.team-progress { display: flex; flex-direction: column; }
+.team-progress-header { display: flex; align-items: center; gap: 8px; min-height: 48px; }
+.team-progress-title {
+  flex: 1 1 auto;
   min-width: 0;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.team-progress-header {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.team-progress-disclosure,
-.team-progress-panorama {
-  min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.team-progress-count {
-  color: var(--ds-text-muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.team-progress-panorama {
-  max-width: 48%;
+  margin: 0;
   overflow: hidden;
   color: var(--ds-text-secondary);
-  font-size: var(--text-xs);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-normal);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.team-progress-panorama {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  border-radius: var(--radius-3xs);
+  color: var(--ds-text-secondary);
+  font-size: var(--text-md);
+}
+.team-progress-panorama:hover { color: var(--ds-text-primary); }
+.team-progress-divider { flex: none; width: 1px; height: 12px; background: var(--ds-border-default); }
+.team-progress-toggle,
+.team-progress-group-toggle { border-radius: var(--radius-3xs); color: var(--ds-text-muted); }
+.team-progress-toggle { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 24px; height: 24px; }
+.team-progress-toggle:hover { background: var(--ds-bg-hover); color: var(--ds-text-primary); }
+.team-progress-toggle svg,
+.team-progress-group-toggle svg { transition: transform var(--motion-duration-fast) var(--motion-ease-out); }
+.team-progress-toggle[aria-expanded="false"] svg,
+.team-progress-group-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+.team-progress-group-toggle {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  font-size: var(--text-md);
+}
+.team-progress-rows[hidden] { display: none; }
+.team-progress-rows { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.team-progress-row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 4px;
+  width: 100%;
+  min-height: 50px;
+  padding: 4px 0;
+  border-radius: var(--radius-3xs);
+  line-height: var(--leading-normal);
+  text-align: left;
+}
+.team-progress-row .team-task-glyph { grid-column: 1; grid-row: 1; }
+.team-progress-task {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-base);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.team-progress-row:hover .team-progress-task { color: var(--ds-text-primary); }
+.team-progress-row .team-person {
+  display: inline-flex;
+  grid-column: 2;
+  grid-row: 2;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  color: var(--ds-text-muted);
+  font-size: var(--text-md);
+}
+@media (prefers-reduced-motion: reduce) {
+  .team-progress-toggle svg,
+  .team-progress-group-toggle svg { transition: none; }
+}
 
-.team-progress-rows,
 .team-board-rows {
   display: flex;
   min-width: 0;
@@ -712,17 +761,6 @@
   margin: 0;
   padding: 0;
   list-style: none;
-}
-
-.team-progress-row {
-  width: 100%;
-  min-width: 0;
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
-  gap: 8px;
-  padding: 5px 6px;
-  text-align: left;
 }
 
 .team-task-state {
@@ -746,24 +784,6 @@
 
 @keyframes team-task-spin {
   to { transform: rotate(360deg); }
-}
-
-.team-progress-copy {
-  display: flex;
-  min-width: 0;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.team-progress-task {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--ds-text-primary);
-  font-size: var(--text-base);
-  font-weight: var(--font-weight-medium);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .team-empty-copy {

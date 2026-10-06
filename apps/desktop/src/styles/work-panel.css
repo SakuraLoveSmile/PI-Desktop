@@ -159,24 +159,43 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: clip;
-  padding: 14px 16px 24px;
+  padding: 4px 12px 24px;
 }
 
 .work-panel-overview-section {
-  border-bottom: 1px solid var(--ds-border-default);
+  border-bottom: 1px dashed var(--ds-border-default);
 }
 
 .work-panel-overview-section summary {
-  padding: 13px 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-normal);
+  list-style: none;
   cursor: pointer;
-  color: var(--ds-text-primary);
-  font-size: var(--text-md);
-  font-weight: var(--font-weight-semibold);
-  list-style-position: inside;
 }
+.work-panel-overview-section summary::-webkit-details-marker { display: none; }
+.work-panel-overview-summary-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.work-panel-overview-chevron {
+  flex: none;
+  margin-inline-start: auto;
+  color: var(--ds-text-muted);
+  transition: transform var(--motion-duration-fast) var(--motion-ease-out);
+}
+.work-panel-overview-section:not([open]) > summary .work-panel-overview-chevron { transform: rotate(-90deg); }
 
 .work-panel-overview-section-body {
-  padding: 0 4px 14px;
+  padding: 0 0 12px;
 }
 
 .work-panel-overview-status,
@@ -329,7 +348,12 @@
 
 .work-panel-overview-empty-copy {
   margin: 0;
-  padding: 8px 0;
+  padding: 0;
+  font-size: var(--text-md);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .work-panel-overview-chevron { transition: none; }
 }
 
 .work-panel-resize {

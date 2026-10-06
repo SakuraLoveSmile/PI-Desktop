@@ -1912,6 +1912,8 @@ sklm: {
     memberDetailUnavailable: "成員詳情無法使用",
     dispatchCardsLabel: "專家任務分派",
     expertJoining: "新專家加入中…",
+    adHocTaskTitle: "Ad-hoc: {{subject}}",
+    adHocGroup: "Ad-hocs",
     untitledTask: "未命名任務",
 
     title: "專家團隊",
@@ -1980,7 +1982,7 @@ sklm: {
     coordinatingExperts: "正在協調專家任務",
     waitingForMembers: "等待團隊成員",
     noCurrentTask: "目前沒有任務",
-    taskProgress: "任務進度",
+    taskProgress: "進展",
     viewInPanorama: "在專家團全景圖中查看",
     numberedTask: "任務 {{number}}：{{subject}}",
     openTaskWithStatus: "開啟任務：{{subject}}（{{status}}）",
