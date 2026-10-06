@@ -2418,7 +2418,7 @@ identify the platform validation still needed.
   ring and action controls retain usable hit targets, and the single Send/Stop
   slot remains reachable. Both mode menus are visible and pointer-accessible,
   and each selection updates its trigger. The execution-profile labels
-  `智能体` and `专家团队` remain fully visible at desktop and narrow composer widths.
+  `智能体` and `专家团` remain fully visible at desktop and narrow composer widths.
   Home and thread-docked composers match.
 - **Specs linked**: `04-ux/08-component-spec.md` (§11)
 - **Acceptance**: C (send/UI), Quality

@@ -251,7 +251,7 @@ export const zhTW = {
     planStatus: { approved: "已批准", changes_requested: "修訂中", rejected: "已拒絕", expired: "已過期", interrupted: "已中斷" },
     profileAgent: "智能體",
     profileAgentDesc: "單智能體標準執行",
-    profileTeam: "專家團隊",
+    profileTeam: "專家團",
     profileTeamDesc: "多智能體自主協作團隊，擁有共享任務看板",
     profileTeamNotice: "可能發起多個並行模型調用",
     profileBlockedByRunningTeammate: "有團隊成員正在運行或初始化，暫無法切回單智能體",
@@ -1917,7 +1917,7 @@ sklm: {
     adHocGroup: "Ad-hocs",
     untitledTask: "未命名任務",
 
-    title: "專家團隊",
+    title: "專家團",
     roster: "團隊成員名單",
     board: "任務看板",
     warnings: "作用域衝突警告",
