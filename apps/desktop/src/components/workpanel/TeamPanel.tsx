@@ -7,6 +7,7 @@ import type {
   UiMessage,
 } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
+import { requestedView, type TeamDetailView } from "../../lib/team-panel-view";
 import { getPanoramaViewport, savePanoramaViewport } from "../../lib/panorama-memory";
 import type { PanoramaViewport } from "./agent-panorama-viewport";
 import { useTeamSnapshot } from "../../hooks/useTeamSnapshot";
@@ -39,24 +40,7 @@ import { MemberIdentity, TeamTaskProgress } from "./team/TeamTaskProgress";
 import "../../styles/team-panel.css";
 import { AgentPanorama, type PanoramaNode } from "./AgentPanorama";
 
-type TeamDetailView =
-  | { kind: "aggregate" }
-  | { kind: "board" }
-  | { kind: "member"; memberSessionId: string }
-  | { kind: "task"; taskId: string }
-  | { kind: "panorama" };
 type TeamTaskReadiness = TeamSnapshot["readiness"][number];
-
-function requestedView(
-  initialTaskId?: string,
-  initialMemberSessionId?: string,
-  initialView: TeamPanelProps["initialView"] = "aggregate",
-): TeamDetailView {
-  if (initialTaskId) return { kind: "task", taskId: initialTaskId };
-  if (initialMemberSessionId) return { kind: "member", memberSessionId: initialMemberSessionId };
-  if (initialView === "task") return { kind: "aggregate" };
-  return { kind: initialView ?? "aggregate" };
-}
 
 export type TeamPanelProps = {
   teamSessionId: string;
@@ -80,7 +64,7 @@ export function TeamPanel({
   const error = snapshotError && ["TEAM_DISSOLVED", "TEAM_SCOPE_MISMATCH"].includes(snapshotError)
     ? t(`team.snapshotErrors.${snapshotError}`) : snapshotError;
   const [resuming, setResuming] = useState(false);
-  const [view, setView] = useState<TeamDetailView>(() => requestedView(initialTaskId, initialView));
+  const [view, setView] = useState<TeamDetailView>(() => requestedView({ taskId: initialTaskId, memberSessionId: initialMemberSessionId, view: initialView }));
   const [viewStack, setViewStack] = useState<TeamDetailView[]>([]);
   const [boardFilter, setBoardFilter] = useState<BoardFilter>("all");
   const [boardQuery, setBoardQuery] = useState("");
@@ -116,7 +100,7 @@ export function TeamPanel({
     setProgressExpanded(true);
     setActionError(null);
     boardScrollTopRef.current = 0;
-    setView(requestedView(initialTaskId, initialMemberSessionId, initialView));
+    setView(requestedView({ taskId: initialTaskId, memberSessionId: initialMemberSessionId, view: initialView }));
   }, [initialTaskId, initialMemberSessionId, initialView, teamSessionId, navigationSeq]);
 
   useEffect(() => {
