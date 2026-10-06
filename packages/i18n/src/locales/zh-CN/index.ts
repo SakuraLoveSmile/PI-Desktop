@@ -251,7 +251,7 @@ export const zhCN = {
     planStatus: { approved: "已批准", changes_requested: "修订中", rejected: "已拒绝", expired: "已过期", interrupted: "已中断" },
     profileAgent: "智能体",
     profileAgentDesc: "单智能体标准执行",
-    profileTeam: "专家团队",
+    profileTeam: "专家团",
     profileTeamDesc: "多智能体自主协作团队，拥有共享任务看板",
     profileTeamNotice: "可能发起多个并行模型调用",
     profileBlockedByRunningTeammate: "有团队成员正在运行或初始化，暂无法切回单智能体",
@@ -1917,7 +1917,7 @@ sklm: {
     adHocGroup: "Ad-hocs",
     untitledTask: "未命名任务",
 
-    title: "专家团队",
+    title: "专家团",
     roster: "团队花名册",
     board: "任务看板",
     warnings: "作用域冲突警告",
