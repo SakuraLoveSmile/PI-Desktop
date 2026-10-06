@@ -1912,6 +1912,7 @@ sklm: {
     memberDetailUnavailable: "成员详情不可用",
     dispatchCardsLabel: "专家任务分派",
     expertJoining: "新专家加入中…",
+    teamPanoramaTitle: "专家团全景图",
     adHocTaskTitle: "Ad-hoc: {{subject}}",
     adHocGroup: "Ad-hocs",
     untitledTask: "未命名任务",

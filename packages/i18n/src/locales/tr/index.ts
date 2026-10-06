@@ -1959,6 +1959,7 @@ sklm: {
     memberDetailUnavailable: "Üye ayrıntıları kullanılamıyor",
     dispatchCardsLabel: "Uzman görev dağıtımları",
     expertJoining: "Yeni uzman katılıyor…",
+    teamPanoramaTitle: "Ekip panoraması",
     adHocTaskTitle: "Ad-hoc: {{subject}}",
     adHocGroup: "Ad-hoc görevler",
     untitledTask: "Adsız görev",

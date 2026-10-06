@@ -9454,6 +9454,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 | Acceptance | Scenarios |
 |---|---|
+| C / Quality — Independent Team panorama/task/member tabs | E2E-TEAM-panorama-and-member-tabs |
 | C / Quality — Live dispatch card and single task target | E2E-TEAM-dispatch-card-live-status-and-joining |
 | C / E / F / Quality / Security — Session Todo checklist | E2E-CHAT-session-todo-checklist |
 | C / E / Security / Quality — Live Voice four-stage interaction | E2E-LIVE-VOICE-four-stage-ui |
@@ -16927,12 +16928,41 @@ renderer's durable transcript reads. No real model or provider is contacted.
   2. Verify confirmed members keep their routing handles and receive the proposed display identities. Start controlled member turns and update task state independently. Let the Lead become idle while a member remains running; verify the Lead stays idle with a waiting label and the member shows its Host phase.
   3. Start one approved Plan/Goal execution and capture the fake title-summary request. Replay the same execution event and reload the renderer. Verify one request total, no member title request, and that a manual rename or newer execution wins over a delayed title result.
   4. Queue eight ordinary Composer prompts. Fold and expand the queue, then execute an existing row action. Verify the mailbox and Composer queue remain separate and disclosure does not send or remove work by itself.
-  5. From Overview, measure the 48px progress/header chrome and 50px task rows at 100% font scale. Check dashed separators and one right chevron per summary. Collapse/reopen the Ad-hocs group and whole progress section; verify visible rows and extra status/activity disappear and return. Confirm Team status/proposals stay inside progress, while a standard session retains its separate Progress disclosure. Open a progress row and its owner detail; return without changing the selected Lead. Open the compact board, filter and search, enter task detail, then return with filter/query/scroll preserved. Confirm cancelled tasks remain reachable through All and completed tasks never display as blocked.
-  6. Open the panorama, zoom to 80%, pan, and deliver a controlled Team revision with new member objects/status. Verify the transform and subsequent drag remain continuous. Explicit Fit and Reset still work.
+  5. From Overview, measure the 48px progress/header chrome and 50px task rows at 100% font scale. Check dashed separators and one right chevron per summary. Collapse/reopen the Ad-hocs group and whole progress section; verify visible rows and extra status/activity disappear and return. Confirm Team status/proposals stay inside progress, while a standard session retains its separate Progress disclosure. Open a progress row in its own task tab without changing the selected Lead or replacing the aggregate tab; re-click the row and verify its existing tab activates. Select the aggregate tab to return. Open the compact board, filter and search, enter task detail, then return with filter/query/scroll preserved. Confirm cancelled tasks remain reachable through All and completed tasks never display as blocked.
+  6. Open the separate Team panorama tab and verify its localized label/tooltip. Check 276×86px nodes and 32px avatars, zoom to 80%, pan, and deliver a controlled Team revision with new member objects/status. Verify the transform and subsequent drag remain continuous. Open a child focus task or member in its own tab, then select the retained panorama tab and verify its viewport survives. Explicit Fit and Reset still work.
   7. Expand the Lead sidebar group, select a member, collapse/reopen and reload. Verify one visible Lead group plus the real member sessions, stable identities, individual actions, and unchanged session IDs/transcripts.
   8. Open a standard Agent session and run its ordinary Task delegate path. Compare its history/counts with the Team sessions and board. Switch back, pause, queue Team mail, reload, and Resume; verify held mail is delivered once and standard delegates remain separate.
 - **Expected**: Local Desktop surfaces render the same current Team revision, including review/decision. Only confirmed strategy data dispatches. Member activity comes from Host turns, not task status. Navigation and display identity remain stable without selecting another main session. Standard subagents, Team members, Composer prompts and Team mail remain distinct. Title or UI failure does not change execution success.
-- **Automation**: `node scripts/e2e-team.mjs` covers approved title, review, queue, snapshot, board, five members, Overview geometry/group/progress disclosures, ordinary Task coexistence, controlled refresh/drag, narrow/font-scaled layout and Chinese reload; `node scripts/e2e-team-review-ui.mjs` covers proposal edit/confirm/cancel; run `pnpm test:e2e:subagent-models` and `pnpm test:e2e:subagents` for profile isolation. Run native Electron at supported panel widths and record fixture/profile identity. The HTML preview and source-regex checks do not substitute for this user path.
+- **Automation**: `node scripts/e2e-team.mjs` covers approved title, review, queue, snapshot, board, five members, Overview geometry/group/progress disclosures, independent Team target tabs, ordinary Task coexistence, controlled refresh/drag, narrow/font-scaled layout and Chinese reload; `node scripts/e2e-team-review-ui.mjs` covers proposal edit/confirm/cancel; run `pnpm test:e2e:subagent-models` and `pnpm test:e2e:subagents` for profile isolation. Run native Electron at supported panel widths and record fixture/profile identity. The HTML preview and source-regex checks do not substitute for this user path.
+
+### E2E-TEAM-panorama-and-member-tabs
+
+- **Status:** Implementation validation pending for the visual-parity candidate.
+- **Preconditions:** Isolated Desktop/Host/runtime, controlled Team members and
+  owned/name-only/unowned task fixtures, no user profile or paid provider.
+- **Steps:**
+  1. Keep an aggregate tab open. Open panorama and check its stable tab ID,
+     users icon, localized label and matching hover title.
+  2. Click a member with a focus task and verify its own task tab, captured
+     subject, message-circle icon and active Lead session. Select the panorama
+     tab, then click a member without tasks and verify its own member tab and
+     display-name label. The root is not clickable.
+  3. Open a task from Overview or a dispatch card, then repeat the same action;
+     verify one tab per target and activation of the existing target.
+  4. Switch among aggregate, task/member and panorama tabs. Verify aggregate
+     remains available and manual panorama zoom/pan survive each switch.
+- **Expected:** IDs come from the Team tab helper and distinguish panorama,
+  task and member targets. Routing follows the target object. Strict ownership
+  and running/pending/latest-update focus selection govern child navigation.
+  Hover titles show labels, aggregate navigation and ordinary subagents remain
+  intact, and no persisted state or external protocol changes.
+- **Specs:** `04-ux/08-component-spec.md` §10C.
+- **Acceptance:** C / Quality — distinct Team navigation and viewport continuity.
+- **Milestone:** Post-MVP Expert Team visual parity, WP-E2.
+- **Automation:** `node scripts/e2e-team.mjs`,
+  `node scripts/e2e-goal-team-renderer-ui.mjs`,
+  `node scripts/e2e-work-panel-reorder.mjs`; focus/IDs/labels/icons also have
+  targeted unit coverage. Record the tested commit/base and isolated profile.
 
 ### E2E-TEAM-horizontal-overflow
 

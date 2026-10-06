@@ -2959,6 +2959,43 @@ its surrounding Work Panel tab chrome is unchanged. Zoom-boundary disabling,
 keyboard focus, pointer capture, stale-data Retry and viewport preservation
 across Team snapshots continue unchanged. Node buttons contain phrasing markup.
 
+### Independent Team tabs
+
+Team aggregate/board, panorama, task and member surfaces coexist in the selected
+chat session's Work Panel. All IDs are built by `teamWorkPanelTabId`; routing
+reads `teamTarget.kind` and never parses IDs. `resource` remains the Team session
+ID, and each explicit target navigation increments `teamNavigationSeq`.
+
+| Target | Tab ID | Label | Icon |
+| --- | --- | --- | --- |
+| none / aggregate / board | `team:<teamSessionId>` | `panel.tabs.team` | users |
+| panorama | `team:<teamSessionId>:panorama` | `team.teamPanoramaTitle` | users |
+| task | `team:<teamSessionId>:task:<taskId>` | localized `Ad-hoc: <subject>` | message-circle |
+| member | `team:<teamSessionId>:member:<memberSessionId>` | display name | message-circle |
+
+The tab hover title equals its display label for every Team surface; it does
+not expose the Team session ID. Task/member labels are captured at open time,
+with the existing generic Team label when unavailable. The Overview tab uses
+a map icon; all other tab chrome and ordinary subagent behavior stay unchanged.
+Tabs remain in memory and require no persisted-data migration.
+
+A dispatch card, Overview progress row, aggregate progress row or panorama child
+opens its own task/member tab without replacing the aggregate tab. Reopening a
+target activates its existing tab. Board, roster and task-owner drilldown remain
+inside the aggregate/detail panel. The panorama is mounted separately and has
+no in-canvas Back control; return by selecting its retained tab. Its viewport
+scope stays `team:desktop:<teamSessionId>` and its saved viewport survives tab
+and session switches and snapshot refresh.
+
+A member focus task requires matching owner session ID when set; only tasks
+without an owner session ID may match the immutable member name. Deleted tasks
+are excluded. In creation order (`createdAt`, then `taskId`), select the first
+in-progress task, then the first pending task, then the most recently updated
+remaining task. A child opens that task with its subject label, or opens the
+member tab with its display name when there is no focus task. The Lead root
+remains noninteractive. Dissolved/scope-mismatch snapshot errors share their
+existing localized mapping across Team surfaces; other error text stays visible.
+
 ### 10C.3 Accessibility
 
 - The panel has a localized heading and labeled roster and board sections.

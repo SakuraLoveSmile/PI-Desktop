@@ -105,8 +105,21 @@ export function switchWorkPanelContextState(
 }
 
 
-export function teamWorkPanelTab(teamSessionId: string, teamTarget?: TeamWorkPanelTarget): WorkPanelTab {
-  return { id: `team:${teamSessionId}`, kind: "team", resource: teamSessionId, ...(teamTarget ? { teamTarget, teamNavigationSeq: ++teamNavigationSequence } : {}) };
+export function teamWorkPanelTabId(teamSessionId: string, target?: TeamWorkPanelTarget): string {
+  switch (target?.kind) {
+    case "panorama": return `team:${teamSessionId}:panorama`;
+    case "task": return `team:${teamSessionId}:task:${target.taskId}`;
+    case "member": return `team:${teamSessionId}:member:${target.memberSessionId}`;
+    default: return `team:${teamSessionId}`;
+  }
+}
+
+export function teamWorkPanelTab(teamSessionId: string, teamTarget?: TeamWorkPanelTarget, label?: string): WorkPanelTab {
+  return {
+    id: teamWorkPanelTabId(teamSessionId, teamTarget), kind: "team", resource: teamSessionId,
+    ...(teamTarget ? { teamTarget, teamNavigationSeq: ++teamNavigationSequence } : {}),
+    ...(label !== undefined ? { label } : {}),
+  };
 }
 
 export function toolWorkPanelTab(

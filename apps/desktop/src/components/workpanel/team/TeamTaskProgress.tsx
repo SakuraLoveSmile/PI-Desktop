@@ -26,7 +26,7 @@ export function TeamTaskProgress({
   total: number;
   expanded: boolean;
   onToggle: () => void;
-  onOpenTask: (taskId: string) => void;
+  onOpenTask: (taskId: string, subject: string) => void;
   onOpenPanorama: () => void;
   onOpenBoard: () => void;
   extra?: ReactNode;
@@ -66,7 +66,7 @@ export function TeamTaskProgress({
                 <li key={task.taskId}>
                   <TooltipButton className="team-progress-row" tooltip={task.subject}
                     ariaLabel={t("team.openTaskWithStatus", { subject: task.subject, status: t(taskStateLabelKey(state)) })}
-                    onClick={() => onOpenTask(task.taskId)}>
+                    onClick={() => onOpenTask(task.taskId, task.subject)}>
                     <TaskStateGlyph state={state} />
                     <span className="team-progress-task">{t("team.adHocTaskTitle", { subject: task.subject })}</span>
                     {owner ? <MemberIdentity member={owner} avatarSize={12} />

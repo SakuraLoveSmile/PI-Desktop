@@ -8,12 +8,10 @@ import type {
 } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
 import { requestedView, type TeamDetailView } from "../../lib/team-panel-view";
-import { getPanoramaViewport, savePanoramaViewport } from "../../lib/panorama-memory";
-import type { PanoramaViewport } from "./agent-panorama-viewport";
 import { useTeamSnapshot } from "../../hooks/useTeamSnapshot";
 import {
   buildTeamTaskRows,
-  deriveTeamLeadVisualState,
+  localizedTeamSnapshotError,
   projectMemberIdentities,
   selectOverviewTaskRows,
   type BoardFilter,
@@ -38,7 +36,6 @@ import { CompactTeamBoard } from "./team/CompactTeamBoard";
 import { TeamStatusBadge } from "./team/TeamStatusBadge";
 import { MemberIdentity, TeamTaskProgress } from "./team/TeamTaskProgress";
 import "../../styles/team-panel.css";
-import { AgentPanorama, type PanoramaNode } from "./AgentPanorama";
 
 type TeamTaskReadiness = TeamSnapshot["readiness"][number];
 
@@ -48,7 +45,9 @@ export type TeamPanelProps = {
   initialTaskId?: string;
   initialMemberSessionId?: string;
   navigationSeq?: number;
-  initialView?: "aggregate" | "board" | "task" | "panorama";
+  initialView?: "aggregate" | "board";
+  onOpenPanorama: () => void;
+  onOpenTask: (taskId: string, subject: string) => void;
 };
 
 export function TeamPanel({
@@ -58,11 +57,12 @@ export function TeamPanel({
   initialMemberSessionId,
   navigationSeq,
   initialView = "aggregate",
+  onOpenPanorama,
+  onOpenTask,
 }: TeamPanelProps) {
   const { t } = useTranslation();
   const { snapshot, loading, error: snapshotError, refresh, lastSuccessAt } = useTeamSnapshot(teamSessionId);
-  const error = snapshotError && ["TEAM_DISSOLVED", "TEAM_SCOPE_MISMATCH"].includes(snapshotError)
-    ? t(`team.snapshotErrors.${snapshotError}`) : snapshotError;
+  const error = snapshotError ? localizedTeamSnapshotError(snapshotError, t) : snapshotError;
   const [resuming, setResuming] = useState(false);
   const [view, setView] = useState<TeamDetailView>(() => requestedView({ taskId: initialTaskId, memberSessionId: initialMemberSessionId, view: initialView }));
   const [viewStack, setViewStack] = useState<TeamDetailView[]>([]);
@@ -72,16 +72,7 @@ export function TeamPanel({
   const boardScrollRef = useRef<HTMLDivElement>(null);
   const boardScrollTopRef = useRef(0);
   const [actionError, setActionError] = useState<string | null>(null);
-  const panoramaScopeKey = `team:desktop:${teamSessionId}`;
-  const [savedViewport, setSavedViewport] = useState<PanoramaViewport | undefined>(() =>
-    getPanoramaViewport(panoramaScopeKey),
-  );
-
   const loadData = useCallback(() => refresh(), [refresh]);
-  const handleViewportSave = useCallback((scopeKey: string, viewport: PanoramaViewport) => {
-    savePanoramaViewport(scopeKey, viewport);
-    if (scopeKey === panoramaScopeKey) setSavedViewport(viewport);
-  }, [panoramaScopeKey]);
   const navigate = useCallback((next: TeamDetailView) => {
     setViewStack((stack) => [...stack, view]);
     setView(next);
@@ -102,10 +93,6 @@ export function TeamPanel({
     boardScrollTopRef.current = 0;
     setView(requestedView({ taskId: initialTaskId, memberSessionId: initialMemberSessionId, view: initialView }));
   }, [initialTaskId, initialMemberSessionId, initialView, teamSessionId, navigationSeq]);
-
-  useEffect(() => {
-    setSavedViewport(getPanoramaViewport(panoramaScopeKey));
-  }, [panoramaScopeKey]);
 
   useEffect(() => {
     if (view.kind === "board" && boardScrollRef.current) {
@@ -172,63 +159,6 @@ export function TeamPanel({
   const overviewRows = selectOverviewTaskRows(taskRows);
   const completedCount = tasks.filter((task) => task.status === "completed").length;
 
-  if (view.kind === "panorama" && snapshot) {
-    const leadState = deriveTeamLeadVisualState(
-      snapshot.leadPhase,
-      isPaused,
-      roster,
-      tasks,
-      snapshot.queuedMessageCount,
-    );
-    const rootNode: PanoramaNode = {
-      id: snapshot.teamSessionId,
-      name: t("team.lead"),
-      task: t("team.coordinatingExperts"),
-      status: leadState.status,
-      statusLabel: leadState.waitingForMembers ? t("team.waitingForMembers") : undefined,
-      avatarSeed: snapshot.teamSessionId,
-      isLead: true,
-      avatarIcon: "users",
-      isRoot: true,
-    };
-
-    const identities = projectMemberIdentities(roster, isPaused);
-    const childNodes: PanoramaNode[] = roster.map((member, index) => {
-      const memberTasks = tasks.filter((t) => t.ownerSessionId === member.memberSessionId);
-      const activeTask = memberTasks.find((t) => t.status === "in_progress") ?? memberTasks[0];
-      const identity = identities[index];
-      const status = isPaused ? "paused" : member.phase === "provisioning" ? "idle" : member.phase;
-
-      return {
-        id: member.memberSessionId,
-        name: identity.displayName,
-        roleLabel: t(`team.roles.${identity.role}`),
-        avatarSeed: member.memberSessionId,
-        task: activeTask?.subject ?? member.description ?? t("team.noCurrentTask"),
-        status,
-        contextKind: member.contextKind,
-        avatarIcon: "bot",
-      };
-    });
-
-    return (
-      <AgentPanorama
-        title={t("team.panoramaTitle")}
-        rootNode={rootNode}
-        childNodes={childNodes}
-        onBack={goBack}
-        onSelectNode={(memberSessionId) => navigate({ kind: "member", memberSessionId })}
-        emptyMessage={t("team.emptyRoster")}
-        loading={loading && !snapshot}
-        error={snapshot ? null : error}
-        staleError={snapshot ? error : null}
-        onRetry={() => void loadData()}
-        viewportScopeKey={panoramaScopeKey}
-        savedViewport={savedViewport}
-        onViewportSave={handleViewportSave}
-      />
-    );
-  }
   if (view.kind === "member") {
     const selectedMember = roster.find((m) => m.memberSessionId === view.memberSessionId);
     if (selectedMember) {
@@ -355,7 +285,7 @@ export function TeamPanel({
             className="icon-btn icon-btn-square"
             tooltip={t("team.viewPanorama")}
             ariaLabel={t("team.viewPanorama")}
-            onClick={() => navigate({ kind: "panorama" })}
+            onClick={() => onOpenPanorama()}
           >
             <IconWorkflow size={14} />
           </TooltipButton>
@@ -483,8 +413,8 @@ export function TeamPanel({
         total={tasks.length}
         expanded={progressExpanded}
         onToggle={() => setProgressExpanded((expanded) => !expanded)}
-        onOpenTask={(taskId) => navigate({ kind: "task", taskId })}
-        onOpenPanorama={() => navigate({ kind: "panorama" })}
+        onOpenTask={onOpenTask}
+        onOpenPanorama={() => onOpenPanorama()}
         onOpenBoard={() => navigate({ kind: "board" })}
       />
     </div>
