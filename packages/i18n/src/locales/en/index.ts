@@ -1950,6 +1950,7 @@ sklm: {
     viewMemberDetail: "View {{name}} details",
     memberDetailUnavailable: "Member details unavailable",
     dispatchCardsLabel: "Expert task dispatches",
+    expertJoining: "New expert joining…",
     untitledTask: "Untitled task",
 
     title: "Expert Team",

@@ -16899,16 +16899,24 @@ renderer's durable transcript reads. No real model or provider is contacted.
   2. Verify the card shows `In progress` and the projected `Researcher Alex`
      identity. Measure its outer height and count focusable card controls.
   3. Click the card once and inspect the Work Panel target and originating session.
+  4. Start a `spawn_teammate` tool on the active turn before any card exists.
+     Verify the joining status row, then finish the spawn and verify the empty
+     group disappears. Repeat on a historical turn; verify no joining indicator.
+  5. Enable reduced motion and inspect the joining label's animation.
 - **Expected:** Snapshot status wins over the pending tool result; identity matches
   Overview's role/display-name projection. Height is within 58–66 CSS px. Exactly
   one card button opens exactly one task target for the real task ID from the
-  active Lead session; no separate member target is opened.
+  active Lead session; no separate member target is opened. Joining feedback
+  appears only while an active-turn spawn is running, works without task cards,
+  disappears after completion and has no animation with reduced motion.
 - **Specs:** `04-ux/08-component-spec.md` §10B.5.
 - **Acceptance:** C / Quality — current Team state and accessible single-target navigation.
-- **Milestone:** Post-MVP Expert Team visual parity, WP-A.
+- **Milestone:** Post-MVP Expert Team visual parity, WP-A / WP-B.
 - **Automation:** `node scripts/e2e-goal-team-renderer-ui.mjs` uses the real card
   with the API boundary controlled; `node scripts/e2e-team.mjs` covers the
-  isolated Desktop/Host/runtime Team user path. Joining-row coverage is added in WP-B.
+  isolated Desktop/Host/runtime Team user path. `team-dispatch.test.mjs` covers
+  running/success/error/other-tool detection and the active-turn render gate;
+  the renderer harness covers joining-only appearance and removal.
 
 ### E2E-TEAM-live-overview-board-panorama-and-coexistence
 

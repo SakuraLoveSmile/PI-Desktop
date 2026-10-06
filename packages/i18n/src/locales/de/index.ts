@@ -1953,6 +1953,7 @@ sklm: {
     viewMemberDetail: "Details von {{name}} anzeigen",
     memberDetailUnavailable: "Mitgliederdetails nicht verfügbar",
     dispatchCardsLabel: "Aufgabenverteilungen der Experten",
+    expertJoining: "Neuer Experte tritt bei…",
     untitledTask: "Unbenannte Aufgabe",
     memberDetail: "Member Detail",
     taskDetail: "Task Detail",

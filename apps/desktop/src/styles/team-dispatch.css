@@ -54,3 +54,17 @@
 @media (prefers-reduced-motion: reduce) {
   .team-dispatch-card { transition: none; }
 }
+
+.team-dispatch-joining {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-md);
+}
+.team-dispatch-joining-label { animation: team-dispatch-joining-pulse 1.4s ease-in-out infinite alternate; }
+@keyframes team-dispatch-joining-pulse { from { opacity: 1; } to { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) {
+  .team-dispatch-joining-label { animation: none; }
+}
