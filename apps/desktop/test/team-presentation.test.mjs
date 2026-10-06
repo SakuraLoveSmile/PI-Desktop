@@ -7,7 +7,15 @@ import {
   localTeamSessionId,
   projectMemberIdentities,
   selectOverviewTaskRows,
+  taskStateLabelKey,
 } from "../src/lib/team-presentation.ts";
+
+test("taskStateLabelKey shares localized labels for all six task states", () => {
+  for (const state of ["pending", "in_progress", "completed", "failed", "cancelled"]) {
+    assert.equal(taskStateLabelKey(state), `team.taskStatus.${state}`);
+  }
+  assert.equal(taskStateLabelKey("blocked"), "team.waitingForDependencies");
+});
 
 test("local Team navigation resolves members to their Lead and excludes remote/native authorities", () => {
   const lead = { id: "lead", executionProfile: "team" };

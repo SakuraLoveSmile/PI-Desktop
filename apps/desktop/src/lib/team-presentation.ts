@@ -25,6 +25,10 @@ export type MemberView = {
 };
 
 export type TaskVisualState = TeamTaskRecord["status"] | "blocked";
+export function taskStateLabelKey(state: TaskVisualState): string {
+  return state === "blocked" ? "team.waitingForDependencies" : `team.taskStatus.${state}`;
+}
+
 export type TaskRow = {
   task: TeamTaskRecord;
   ordinal: number;

@@ -9454,6 +9454,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 | Acceptance | Scenarios |
 |---|---|
+| C / Quality — Live dispatch card and single task target | E2E-TEAM-dispatch-card-live-status-and-joining |
 | C / E / F / Quality / Security — Session Todo checklist | E2E-CHAT-session-todo-checklist |
 | C / E / Security / Quality — Live Voice four-stage interaction | E2E-LIVE-VOICE-four-stage-ui |
 | C / F — Hourly task updates | E2E-SCHEDULED-manual-to-hourly |
@@ -16885,6 +16886,29 @@ renderer's durable transcript reads. No real model or provider is contacted.
   and fake provider); `node scripts/e2e-team-review-ui.mjs` (component interaction
   at the API boundary); `cargo test -p host-core --locked team` and the
   `team_rpc_full_journey` contract test. Real-model quality is outside this gate.
+
+### E2E-TEAM-dispatch-card-live-status-and-joining
+
+- **Status:** Implementation validation pending for the visual-parity task candidate.
+- **Preconditions:** Isolated Electron/Chromium candidate, controlled Team snapshot
+  and tool-message fixtures, English catalog, production card and styles; no user
+  profile, real provider or paid API.
+- **Steps:**
+  1. Render a persistent dispatch card from a successful task-create fixture with
+     pending status, and load its Team snapshot containing an in-progress task.
+  2. Verify the card shows `In progress` and the projected `Researcher Alex`
+     identity. Measure its outer height and count focusable card controls.
+  3. Click the card once and inspect the Work Panel target and originating session.
+- **Expected:** Snapshot status wins over the pending tool result; identity matches
+  Overview's role/display-name projection. Height is within 58–66 CSS px. Exactly
+  one card button opens exactly one task target for the real task ID from the
+  active Lead session; no separate member target is opened.
+- **Specs:** `04-ux/08-component-spec.md` §10B.5.
+- **Acceptance:** C / Quality — current Team state and accessible single-target navigation.
+- **Milestone:** Post-MVP Expert Team visual parity, WP-A.
+- **Automation:** `node scripts/e2e-goal-team-renderer-ui.mjs` uses the real card
+  with the API boundary controlled; `node scripts/e2e-team.mjs` covers the
+  isolated Desktop/Host/runtime Team user path. Joining-row coverage is added in WP-B.
 
 ### E2E-TEAM-live-overview-board-panorama-and-coexistence
 

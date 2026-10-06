@@ -1,5 +1,19 @@
 import { createContext } from "react";
 import type { UiMessage } from "@pi-desktop/shared";
+import type { TaskVisualState } from "./team-presentation";
+
+export function dispatchFallbackState(status: string | undefined): TaskVisualState {
+  switch (status) {
+    case "pending":
+    case "in_progress":
+    case "completed":
+    case "failed":
+    case "cancelled":
+      return status;
+    default:
+      return "pending";
+  }
+}
 
 function parseJsonSafe(val: unknown): Record<string, unknown> | null {
   if (!val) return null;
