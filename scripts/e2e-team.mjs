@@ -694,7 +694,7 @@ async function resizePanel(sendCdp, evaluate, width) {
     const handle = panel.querySelector('.work-panel-resize').getBoundingClientRect();
     return { width: panel.getBoundingClientRect().width, x: handle.left + handle.width / 2, y: handle.top + 120 };
   })()`);
-  await sendCdp("Input.dispatchMouseEvent", { type: "mousePressed", x: bounds.x, y: bounds.y, button: "left", clickCount: 1 });
+  await sendCdp("Input.dispatchMouseEvent", { type: "mousePressed", x: bounds.x, y: bounds.y, button: "left", buttons: 1, clickCount: 1 });
   try {
     await waitFor(() => evaluate(`document.querySelector('[data-testid="work-panel"]')?.dataset.resizing === 'true'`), "panel resize gesture admitted");
     await sendCdp("Input.dispatchMouseEvent", { type: "mouseMoved", x: bounds.x + bounds.width - width, y: bounds.y, button: "left", buttons: 1 });
@@ -713,7 +713,7 @@ async function resizePanel(sendCdp, evaluate, width) {
     console.error("TEAM_RESIZE_FAILURE", JSON.stringify({ fromBounds: bounds, targetWidth: width, error: String(error), state }));
     throw error;
   } finally {
-    await sendCdp("Input.dispatchMouseEvent", { type: "mouseReleased", x: bounds.x + bounds.width - width, y: bounds.y, button: "left", clickCount: 1 });
+    await sendCdp("Input.dispatchMouseEvent", { type: "mouseReleased", x: bounds.x + bounds.width - width, y: bounds.y, button: "left", buttons: 0, clickCount: 1 });
   }
   await waitFor(() => evaluate(`Math.abs(document.querySelector('[data-testid="work-panel"]').getBoundingClientRect().width - ${width}) < 2`), `panel resized to ${width}px`);
 }
