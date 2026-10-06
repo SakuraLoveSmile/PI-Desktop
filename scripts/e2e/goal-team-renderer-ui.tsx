@@ -10,6 +10,7 @@ import { api } from "../../apps/desktop/src/lib/api";
 import { useAppStore } from "../../apps/desktop/src/stores/app-store";
 import type { TeamDispatchCardItem } from "../../apps/desktop/src/lib/team-dispatch";
 import "../../apps/desktop/src/styles/tokens.css";
+import "../../apps/desktop/src/styles/base.css";
 import "../../apps/desktop/src/styles/goal-progress.css";
 import "../../apps/desktop/src/styles/team-dispatch.css";
 
@@ -55,6 +56,7 @@ globalThis.goalTeamRendererUiProbe = async () => {
   document.body.append(container);
   const root = createRoot(container);
   let preserveForScreenshot = false;
+  let cardHeight = 0;
   const progressListeners = new Map<string, Array<(event: GoalProgressChangedEvent) => void>>();
   const reportListeners = new Map<string, Array<(event: GoalReportChangedEvent) => void>>();
   const initialProgress = new Map<string, ReturnType<typeof deferred<{ progress: GoalProgressSnapshot | null }>>>();
@@ -120,7 +122,14 @@ globalThis.goalTeamRendererUiProbe = async () => {
         createdAt: "2026-01-01T00:00:00.000Z",
         updatedAt: "2026-01-01T00:00:00.000Z",
       }],
-      tasks: [], readiness: [], scopeOverlaps: [], leadPhase: "idle",
+      tasks: [{
+        teamSessionId: "team-session", taskId: "task-real", revision: 2,
+        subject: "Review change", status: "in_progress", ownerSessionId: "member-session",
+        ownerMemberName: "researcher", blockedBy: [], writeScopes: [], deleted: false,
+        createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:01:00.000Z",
+      }],
+      readiness: [{ taskId: "task-real", isReady: true, unresolvedBlockedBy: [] }],
+      scopeOverlaps: [], leadPhase: "idle",
       queuedMessageCount: 0, review: null, decision: null,
     } satisfies TeamSnapshot);
     useAppStore.setState({
@@ -196,13 +205,21 @@ globalThis.goalTeamRendererUiProbe = async () => {
     await act(async () => reportReads.get("execution-new")?.resolve({ report: { status: "ready" } }));
     await until(() => !container.querySelector('[data-testid="goal-progress-bar"]'), `ready report hides completed execution (listeners=${readyHandlers.length})`);
 
-    await until(() => Boolean(container.querySelector(".team-dispatch-card-expert")), "dispatch card member");
-    await act(async () => container.querySelector<HTMLButtonElement>(".team-dispatch-card-expert")?.click());
-    await act(async () => container.querySelector<HTMLButtonElement>(".team-dispatch-task-title-btn")?.click());
-    assert(openedTabs.length === 2, "member and task links must open work panel targets");
-    assert(openedTabs[0].sessionId === "lead-session", "member link must open from the active session");
-    assert(JSON.stringify(openedTabs[0].tab.teamTarget) === JSON.stringify({ kind: "member", memberSessionId: "member-session" }), "member click must open the actual member detail target");
-    assert(JSON.stringify(openedTabs[1].tab.teamTarget) === JSON.stringify({ kind: "task", taskId: "task-real" }), "task click must open the task detail target");
+    await until(() => container.querySelector(".team-dispatch-card")?.getAttribute("data-state") === "in_progress", "live dispatch card status");
+    const dispatchCard = container.querySelector<HTMLElement>(".team-dispatch-card");
+    assert(dispatchCard?.textContent?.includes("In progress"), "snapshot status must replace the pending tool fixture");
+    assert(dispatchCard?.querySelector(".team-dispatch-identity")?.textContent === "Researcher Alex", "dispatch identity must match the projected member identity");
+    assert(dispatchCard?.querySelectorAll("button").length === 1, "dispatch card must have one focusable control");
+    cardHeight = dispatchCard?.getBoundingClientRect().height ?? 0;
+    const cardMetrics = Array.from(dispatchCard?.querySelectorAll("button, .team-dispatch-card-row, .team-dispatch-identity, .team-dispatch-title, img") ?? []).map((element) => {
+      const style = getComputedStyle(element);
+      return { className: element.className, height: element.getBoundingClientRect().height, fontSize: style.fontSize, lineHeight: style.lineHeight };
+    });
+    assert(cardHeight >= 58 && cardHeight <= 66, `dispatch card height must be within [58, 66], got ${cardHeight}: ${JSON.stringify(cardMetrics)}`);
+    await act(async () => container.querySelector<HTMLButtonElement>(".team-dispatch-card-open")?.click());
+    assert(openedTabs.length === 1, "one card click must open exactly one work panel target");
+    assert(openedTabs[0].sessionId === "lead-session", "card click must open from the active session");
+    assert(JSON.stringify(openedTabs[0].tab.teamTarget) === JSON.stringify({ kind: "task", taskId: "task-real" }), "card click must open the task detail target");
     const screenshotProposal = { ...newProposal, executionId: "screenshot-execution" } as PlanProposal;
     await act(async () => { root.render(renderAll(screenshotProposal, "screenshot-session")); });
     await until(() => container.querySelector(".goal-progress-capsule-text")?.textContent?.trim() === "1/1", "ready progress for screenshot");
@@ -227,5 +244,5 @@ globalThis.goalTeamRendererUiProbe = async () => {
     api.onHostStatus = originalHostStatus;
     useAppStore.setState({ openWorkPanelTabForSession: originalStoreMethod });
   }
-  return { ok: true, scenarios: ["goal execution and session switch", "cross-session event isolation", "stale report event", "out-of-order progress revisions", "ready report completion", "member detail and task navigation"] };
+  return { ok: true, cardHeight, scenarios: ["goal execution and session switch", "cross-session event isolation", "stale report event", "out-of-order progress revisions", "ready report completion", "single task navigation"] };
 };

@@ -34,7 +34,7 @@ export function PixelAvatar({
 }: {
   seed: string;
   lead?: boolean;
-  size?: 20 | 24 | 32 | 48;
+  size?: 12 | 16 | 20 | 24 | 32 | 48;
 }) {
   return (
     <img

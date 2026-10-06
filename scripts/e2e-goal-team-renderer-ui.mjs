@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,6 +13,8 @@ import { resolveElectronBinary } from "./e2e/boot.mjs";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(join(root, "packages/agent-runtime/package.json"));
 const { build } = require("esbuild");
+const desktopRequire = createRequire(join(root, "apps/desktop/package.json"));
+const { compile } = desktopRequire("tailwindcss");
 const { electronBinary } = resolveElectronBinary(root);
 const temp = await mkdtemp(join(tmpdir(), "pi-goal-team-renderer-ui-"));
 const evidenceDir = join(root, ".review-evidence");
@@ -37,6 +39,10 @@ try {
     },
     nodePaths: [join(root, "apps/desktop/node_modules")],
   });
+  // Match the production CSS pipeline: esbuild leaves @theme tokens inert.
+  const stylesheet = join(temp, "renderer.css");
+  const compiledCss = await compile(await readFile(stylesheet, "utf8"));
+  await writeFile(stylesheet, compiledCss.build([]));
   await writeFile(
     join(temp, "index.html"),
     '<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src \'self\'; style-src \'self\' \'unsafe-inline\'; img-src \'self\' data:"><link rel="stylesheet" href="renderer.css"><title>Goal and Team renderer interactions</title><body><script src="renderer.js"></script>',

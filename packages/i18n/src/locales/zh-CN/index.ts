@@ -1953,7 +1953,7 @@ sklm: {
       completed: "已完成",
     },
     taskStatus: {
-      pending: "待处理",
+      pending: "等待中",
       in_progress: "进行中",
       blocked: "受阻",
       completed: "已完成",

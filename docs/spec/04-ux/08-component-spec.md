@@ -2820,14 +2820,31 @@ the Lead assigns tasks to specialized teammates via `task_create` and `task_upda
 
 - **Persistent Slot:** Located outside the collapsible `TurnProcess` accordion in `AssistantTurn`,
   ensuring constant visibility in both Compact mode and collapsed process turns.
-- **Card Styling:** Single-layer border card featuring teammate `PixelAvatar`, role name,
-  real-time task status badge, L-shaped connector line, and bold task title.
+- **Live Projection:** The existing Team snapshot is authoritative for the task subject,
+  visual state and owner identity. `buildTeamTaskRows` supplies the same owner projection
+  as Overview; identity text is the localized role followed by the display name
+  (for example, `Researcher Alex`). Avatar selection uses the durable member session ID.
+  When no live row is available, the tool-derived card supplies subject, owner handle
+  and status; unknown or missing status falls back to pending.
+- **States:** Pending, in progress, completed, failed and cancelled use
+  `team.taskStatus.<state>`. Pending tasks with unresolved dependencies show
+  `team.waitingForDependencies` (blocked). Status is plain text: muted by default,
+  secondary while in progress, success for completed and error for failed.
+- **Card Geometry:** A tile background, default border and tokenized 8px radius enclose
+  one full-width control. Padding is 10px top, 12px inline and 8px bottom, with a 4px
+  row gap; height is approximately 62px (acceptance window 58–66px). The first row
+  has a 16px avatar, 13px secondary identity and right-aligned status. The second
+  has a decorative CSS L-connector and 14px semibold title beginning about 35px
+  from the inner left. Card groups retain a 12px gap. Motion is disabled under
+  reduced-motion preferences; focus rings remain available.
 - **Deduplication & Anchoring:** Cards are indexed across transcript messages by `{teamSessionId, taskId}`
   anchored to the initial `task_create` message ID; subsequent `task_update` events update the
   card state in place without duplicating cards.
-- **Navigation Wiring:** Clicking a task title invokes `teamWorkPanelTab(teamSessionId, { kind: "task", taskId })`
-  to open task details in the Work Panel; clicking teammate identity/avatar switches the Work Panel
-  to board view without navigating away from the active chat session.
+- **Single Navigation Target:** Each card has exactly one focusable control, with an
+  accessible name containing the subject and current status. Clicking anywhere on it
+  invokes `teamWorkPanelTab(teamSessionId, { kind: "task", taskId })` from the active
+  chat session, opening task details without selecting another main session.
+  Teammate identity/avatar has no separate member navigation control.
 
 ## 10C. Expert Team Work Panel
 
