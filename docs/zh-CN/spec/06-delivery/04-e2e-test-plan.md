@@ -5547,6 +5547,8 @@ eleven-tool-round desktop paths are verified by
 ## 8. 可追溯性矩阵
 | 验收 | 应用场景 |
 |---|---|
+| C / Quality — 独立 Team 全景图／任务／成员标签页 | E2E-TEAM-panorama-and-member-tabs |
+| C / Quality — 实时派发卡片与单一任务目标 | E2E-TEAM-dispatch-card-live-status-and-joining |
 | C / E / F / Quality / Security — Session Todo checklist | E2E-CHAT-session-todo-checklist |
 | C / E / Security / Quality — Live Voice 四阶段交互 | E2E-LIVE-VOICE-four-stage-ui |
 | C / F — Hourly task updates | E2E-SCHEDULED-manual-to-hourly |
@@ -9484,13 +9486,43 @@ the latest destination. These assertions measure work counts, not device FPS.
   at the API boundary); `cargo test -p host-core --locked team` and the
   `team_rpc_full_journey` contract test. Real-model quality is outside this gate.
 
+### E2E-TEAM-dispatch-card-live-status-and-joining
+
+- **状态：** 专家团视觉一致性任务候选的实现验证待完成。
+- **前提：** 隔离的 Electron/Chromium 候选、受控 Team 快照和工具消息 fixture、英文文案目录及生产卡片／样式；不使用用户配置、真实 Provider 或付费 API。
+- **步骤：** 1）用成功的 task-create fixture 渲染 pending 派发卡片，并加载包含 in-progress 任务的 Team 快照。2）确认卡片显示 `In progress` 和投影后的 `Researcher Alex` 身份；测量卡片外部高度并统计可聚焦控件。3）点击卡片一次，检查 Work Panel 目标及来源会话。4）在活动回合中尚无卡片时启动 `spawn_teammate` 工具，确认显示加入状态行；结束 spawn 后确认空状态组消失。对历史回合重复并确认不显示加入提示。5）启用 reduced motion 并检查加入标签的动画。
+- **预期：** 快照状态优先于 pending 工具结果；身份与概览的角色／展示名投影一致。高度在 58–66 CSS px 范围内。卡片恰有一个按钮，该按钮从活动 Lead 会话打开一个指向真实 task ID 的任务目标；不打开单独的成员目标。加入提示只在活动回合 spawn 运行时出现，无需已有任务卡片，完成后消失，且 reduced motion 下没有动画。
+- **规格：** `04-ux/08-component-spec.md` §10B.5。
+- **验收：** C / Quality — 当前 Team 状态与可访问的单目标导航。
+- **里程碑：** Post-MVP Expert Team visual parity，WP-A / WP-B。
+- **自动化：** `node scripts/e2e-goal-team-renderer-ui.mjs` 使用真实卡片并控制 API 边界；`node scripts/e2e-team.mjs` 覆盖隔离的 Desktop/Host/runtime Team 用户旅程。`team-dispatch.test.mjs` 覆盖运行／成功／错误／其他工具检测和活动回合渲染条件；renderer harness 覆盖只有加入提示时的显示与移除。
+
 ### E2E-TEAM-live-overview-board-panorama-and-coexistence
 
-- **Status:** Automated and passed on the isolated macOS ARM64 candidate; see the UX repair plan for commit/base and evidence. Remote landing and user acceptance remain separate gates.
-- **Preconditions:** Isolated Desktop profile and temporary Host data, local fake provider that records title-summary calls, controlled Team turns/task revisions; no user profile, production service, or paid model.
-- **Steps:** 1) Create a Lead and propose members with optional role/displayName through `declare_team_strategy`; verify pending review creates no member/work, edit model choice, then confirm. 2) Verify stable display identity over unchanged routing handles; run a member while Lead is idle and assert each status reflects Host turn phase. 3) Start an approved Plan/Goal, replay its event and reload; verify one title request, no member request, and that manual/newer title wins over a delayed response. 4) Fold/expand eight Composer prompts and run an existing queue action; mailbox and Composer queue remain separate. 5) Open progress/task/member detail and return without switching the main Lead; filter/search the compact board and preserve state when returning. 6) Zoom/pan to 80%, deliver a Host revision, and verify viewport remains continuous; Fit/Reset still work. 7) Expand/select/collapse/reload the sidebar group and preserve all real IDs/transcripts. 8) Run a standard Task delegate in a separate Agent session, compare histories/counts, then pause, queue Team mail, reload and Resume.
-- **Expected:** All local Desktop Team surfaces use the same current snapshot including review/decision. Only confirmed proposals dispatch. Member activity is independent from task state. Identity, navigation and manual viewport survive refresh; standard subagents, Team members, Composer prompts and Team mail stay distinct. Title failure does not affect execution.
-- **Automation:** `node scripts/e2e-team.mjs` covers the real isolated user path, five members, all queue actions, ordinary Task coexistence, refresh-in-flight and English/Chinese layout matrices; `node scripts/e2e-team-review-ui.mjs` covers review interaction; run `pnpm test:e2e:subagent-models` and `pnpm test:e2e:subagents`. The isolated native user path is still required; the HTML preview and source-regex checks cannot replace it.
+- **状态：** 在隔离 macOS ARM64 任务候选上自动化并通过；提交／基线和证据见 UX repair plan。远端合入和用户验收仍是独立关卡。
+- **前提：** 隔离的 Desktop profile 和临时 Host 数据目录、本地会记录 title-summary 调用的 fake provider、受控 Team 回合／任务修订；不使用用户配置、生产服务或付费模型。
+- **步骤：** 1）创建本地 Team Lead，通过 `declare_team_strategy` 提交含可选 `{ role, displayName }` 的 researcher/executor 成员提案。确认前检查 review，验证尚未创建成员会话、分派或邮箱工作；编辑模型选择后确认一次。2）验证成员保留路由 handle 并获得提议的展示身份。启动受控成员回合并独立更新任务状态；Lead 空闲而成员仍运行时，确认 Lead 显示等待标签、成员显示 Host 阶段。3）启动一个已批准的 Plan/Goal 执行并捕获 fake title-summary 请求。重放相同执行事件并重载 renderer；确认请求总数为一次、无成员标题请求，并且手动重命名或较新的执行优先于迟到的标题结果。4）向普通 Composer 队列加入八条提示，折叠和展开队列，再执行已有行操作；确认 mailbox 与 Composer 队列相互独立，折叠操作本身不会发送或移除工作。5）从概览测量 100% 字体比例下 48px 进展／标题区域和 50px 任务行。检查虚线分隔线和每个摘要仅一个右箭头。折叠／展开 Ad-hocs 分组和整个进展分区，确认任务行及附加状态／活动内容随之隐藏和恢复。确认 Team 状态／提案位于进展中，普通会话仍保留独立 Progress 折叠项。打开进展行的独立任务标签，不改变所选 Lead 或替换汇总标签；再次点击时确认激活已有标签。选择汇总标签返回。打开紧凑看板，筛选并搜索，进入任务详情后返回并确认筛选／查询／滚动位置保留。确认 All 筛选仍可访问已取消任务，completed 任务不会显示为 blocked。6）打开独立 Team 全景图标签，检查本地化标签／tooltip。检查 276×86px 节点和 32px 头像，缩放到 80%、平移，并送入含新成员对象／状态的受控 Team 修订；验证变换和后续拖动连续。将子节点的聚焦任务或成员打开到独立标签，再选回保留的全景图标签并确认视口保留；显式 Fit 和 Reset 仍有效。7）展开 Lead 侧栏分组，选择成员，折叠／重开并重载。确认只显示一个 Lead 分组和真实成员会话，身份稳定，单独操作有效，session ID／转录不变。8）打开普通 Agent 会话并运行普通 Task delegate 路径，对比其历史／计数与 Team 会话／看板。切回 Team、暂停、排队 Team 邮件、重载并 Resume；确认保留的邮件只送达一次，普通 delegate 仍相互独立。
+- **预期：** 本地 Desktop 各 Team 表面呈现同一当前 Team 修订，包含 review／decision。只有确认后的策略数据会派发。成员活动来自 Host 回合，而非任务状态。导航和展示身份稳定，且不会切换其他主会话。普通子代理、Team 成员、Composer 提示和 Team 邮件相互独立。标题或 UI 失败不改变执行结果。
+- **自动化：** `node scripts/e2e-team.mjs` 覆盖已批准标题、review、队列、快照、看板、五名成员、概览尺寸／分组／进展折叠项、独立 Team 目标标签、普通 Task 共存、受控刷新／拖动、窄布局／字体缩放及中文重载；`node scripts/e2e-team-review-ui.mjs` 覆盖提案编辑／确认／取消；运行 `pnpm test:e2e:subagent-models` 和 `pnpm test:e2e:subagents` 验证 profile 隔离。使用受支持面板宽度运行原生 Electron 并记录 fixture/profile 身份。HTML 预览和源码正则检查不能代替此用户旅程。
+
+### E2E-TEAM-panorama-and-member-tabs
+
+- **状态：** 专家团视觉一致性候选的实现验证待完成。
+- **前提：** 隔离 Desktop/Host/runtime、受控 Team 成员及有负责人／仅名称／无负责人任务 fixture；不使用用户配置或付费 Provider。
+- **步骤：** 1）保持汇总标签打开，打开全景图并检查稳定标签 ID、users 图标、本地化标签及一致的悬停标题。2）点击有聚焦任务的成员，确认打开其独立任务标签，标签捕获任务主题、使用 message-circle 图标，且 Lead 主会话仍活动。选中全景图标签，再点击无任务成员，确认打开独立成员标签并使用展示名标签。根节点不可点击。3）从概览或派发卡片打开任务，再次执行相同操作，确认每个目标只有一个标签且会激活已有标签。4）在汇总、任务／成员和全景图标签间切换，确认汇总标签保留，手动全景图缩放／平移跨切换保留。
+- **预期：** ID 由 Team 标签 helper 生成，并区分全景图、任务和成员目标。路由依据目标对象。严格负责人匹配及 running/pending/最近更新的聚焦选择规则控制子节点导航。悬停标题显示标签，不影响汇总导航和普通子代理；不修改持久状态或外部协议。
+- **规格：** `04-ux/08-component-spec.md` §10C。
+- **验收：** C / Quality — 独立 Team 导航和视口连续性。
+- **里程碑：** Post-MVP Expert Team visual parity，WP-E2。
+- **自动化：** `node scripts/e2e-team.mjs`、`node scripts/e2e-goal-team-renderer-ui.mjs`、`node scripts/e2e-work-panel-reorder.mjs`；聚焦选择／ID／标签／图标也有定向单测覆盖。记录候选／基线和隔离 profile。
+
+### E2E-TEAM-live-task-member-tabs
+
+- **状态：** 专家团视觉一致性候选的实现验证待完成。
+- **前提：** 隔离 Desktop/Host/runtime 和本地 fake SSE provider；研究员模型请求由现有显式 fixture 门控暂停。
+- **步骤：** 在 owner 运行时从概览打开有负责人的任务，打开／关闭 Info 并确认展开状态、描述、负责人和长范围内容均可见且无水平溢出。点击任务身份打开成员标签；点击聚焦标题和负责人身份时再次激活已有任务／成员标签，不产生重复项。释放模型门控。不重开成员标签，观察其角色工具行、思考展开项和最终回答。选择保留的任务标签并确认最终转录。分别在每个表面临时让隔离 fixture 数据库的快照读取失败，恢复表后点击 Retry，确认转录保留。验证已完成成员和任务图标解析到当前成功 token。
+- **预期：** 标题高约 60 CSS px（容差 58–62），标题按钮命中区至少 24 px；标签提供本地化日志区域和静态运行图标，且没有 composer 或回滚控件。转录事件不会回退到旧持久化内容。控制器定向测试覆盖合并、语义确认、终态替换、有界结构化工具元数据、重启、错误和 StrictMode dispose。
+- **自动化：** `node scripts/e2e-team.mjs`、`node --test apps/desktop/test/team-member-transcript-runtime.test.mjs`、`node scripts/e2e-work-panel-reorder.mjs`。记录候选／基线和 profile。
 
 ### E2E-TEAM-horizontal-overflow
 

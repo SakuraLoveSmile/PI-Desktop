@@ -2820,14 +2820,42 @@ the Lead assigns tasks to specialized teammates via `task_create` and `task_upda
 
 - **Persistent Slot:** Located outside the collapsible `TurnProcess` accordion in `AssistantTurn`,
   ensuring constant visibility in both Compact mode and collapsed process turns.
-- **Card Styling:** Single-layer border card featuring teammate `PixelAvatar`, role name,
-  real-time task status badge, L-shaped connector line, and bold task title.
+- **Live Projection:** The existing Team snapshot is authoritative for the task subject,
+  visual state and owner identity. `buildTeamTaskRows` supplies the same owner projection
+  as Overview; identity text is the localized role followed by the display name
+  (for example, `Researcher Alex`). Avatar selection uses the durable member session ID.
+  When no live row is available, the tool-derived card supplies subject, owner handle
+  and status; unknown or missing status falls back to pending.
+- **States:** Pending, in progress, completed, failed and cancelled use
+  `team.taskStatus.<state>`. Pending tasks with unresolved dependencies show
+  `team.waitingForDependencies` (blocked). Status is plain text: muted by default,
+  secondary while in progress, success for completed and error for failed.
+- **Card Geometry:** A tile background, default border and tokenized 8px radius enclose
+  one full-width control. Padding is 10px top, 12px inline and 8px bottom, with a 4px
+  row gap; height is approximately 62px (acceptance window 58–66px). The first row
+  has a 16px avatar, 13px secondary identity and right-aligned status. The second
+  has a decorative CSS L-connector and 14px semibold title beginning about 35px
+  from the inner left. Card groups retain a 12px gap. Motion is disabled under
+  reduced-motion preferences; focus rings remain available.
 - **Deduplication & Anchoring:** Cards are indexed across transcript messages by `{teamSessionId, taskId}`
   anchored to the initial `task_create` message ID; subsequent `task_update` events update the
   card state in place without duplicating cards.
-- **Navigation Wiring:** Clicking a task title invokes `teamWorkPanelTab(teamSessionId, { kind: "task", taskId })`
-  to open task details in the Work Panel; clicking teammate identity/avatar switches the Work Panel
-  to board view without navigating away from the active chat session.
+- **Single Navigation Target:** Each card has exactly one focusable control, with an
+  accessible name containing the subject and current status. Clicking anywhere on it
+  invokes `teamWorkPanelTab(teamSessionId, { kind: "task", taskId })` from the active
+  chat session, opening task details without selecting another main session.
+  Teammate identity/avatar has no separate member navigation control.
+
+### Expert joining feedback
+
+The live Assistant turn shows a joining row while any `spawn_teammate` tool is
+running. It appears after the dispatch cards, including when no card exists yet,
+and disappears when every spawn tool finishes or the turn stops being active.
+Historical turns never show stale joining feedback. The row has `role="status"`,
+a decorative 16px flag and localized `team.expertJoining` text (for example,
+`New expert joining…` or `新专家加入中…`), with a 24px minimum height, 6px icon/text
+gap and muted 13px text. Only the label pulses; reduced-motion preferences
+remove the animation. The indicator changes no Team runtime or persisted state.
 
 ## 10C. Expert Team Work Panel
 
@@ -2875,6 +2903,126 @@ A paused Team exposes Resume; successful resume releases held Team messages.
 Each member row can open that member's durable session. Loading, empty, refresh,
 and error states remain visible and localized. The panel does not claim a
 message was delivered based only on mailbox enqueue state.
+
+### Overview chrome and task progress
+
+All session Overview disclosures use 48px headers with secondary, normal-weight
+14px text, 12px left inset and dashed default-border separators. Native disclosure
+markers are replaced by one decorative 16px right-hand chevron, rotating left
+when closed; reduced-motion preferences remove the transition. The subagent
+summary retains its existing panorama control between its label and chevron.
+The metadata header remains above the scroll area.
+
+Team sessions show one progress section (`进展` / `進展`) with a panorama link,
+arrow, divider and independent 24px disclosure control. The section publishes
+`data-completed` and `data-total` for the current non-deleted tasks; the old
+completed/total disclosure badge is removed. Its body has an initially open
+`Ad-hocs <total>` group and up to five prioritized task rows. Rows are 50px tall:
+a 16px state glyph precedes a secondary 14px `Ad-hoc: <subject>` title; the second
+line shows a 12px decorative avatar and muted 13px role/display-name identity.
+Pending, blocked, in-progress, completed, failed and cancelled use their shared
+state glyphs and localized status labels. Row accessible names include subject
+and status; the snapshot pause flag is carried into the owner projection.
+
+The Team progress body's extra content contains the Lead's current status and
+plan/proposal activity (or localized no-plans copy). Team sessions have no
+separate ordinary progress disclosure; non-Team sessions retain it. Group
+collapse hides only its task rows, while progress collapse hides its entire
+body, including extra activity. Both expose expanded state and controlled IDs.
+The compact board's row declarations remain unchanged. Empty artifact copy is
+muted 13px, with zh-CN `暂无产物`; other locales retain their specified copy.
+
+### Shared panorama presentation
+
+Team and ordinary subagent panoramas share compact 276×86px nodes, a two-column
+layout, 42px horizontal gaps, 64px root-to-first-row gap and 96px row gaps. The
+root starts at y=40, centered over the content width; a partial final row is
+centered and the bottom margin is 40px. Root-to-child cubic edges leave the root
+bottom center and reach each child top center, with a 46px control-point bend.
+Fit/reset/zoom/pan math and 50%–150% zoom limits retain their existing behavior.
+The existing dotted canvas remains; with more than two children, edges to later
+rows may pass behind earlier opaque nodes.
+
+Nodes use secondary surfaces, subtle borders, 8px radius and no shadow. Their
+upper row has a decorative 32px portrait, secondary 12.5px identity and a primary
+semibold 14px task title, both single-line with ellipsis. The 32px lower status
+row has a static decorative 12px glyph and localized text. Running uses a muted
+loader with success-colored text; completed uses success, failed error, paused
+warning and idle/todo/blocked muted. A supplied status label overrides the
+standard phase label. The Team root label is `Lead Agent` in every locale;
+zh copy reads `协调专家任务` / `協調專家任務` and running `进行中` / `進行中`.
+
+The toolbar sits 20px from the top/right and uses accessible icon-only tooltip
+buttons: optional Back plus divider, Zoom out, numeric percentage, Zoom in,
+divider, Fit and Reset. Back remains available in subagent panorama navigation;
+its surrounding Work Panel tab chrome is unchanged. Zoom-boundary disabling,
+keyboard focus, pointer capture, stale-data Retry and viewport preservation
+across Team snapshots continue unchanged. Node buttons contain phrasing markup.
+
+### Independent Team tabs
+
+Team aggregate/board, panorama, task and member surfaces coexist in the selected
+chat session's Work Panel. All IDs are built by `teamWorkPanelTabId`; routing
+reads `teamTarget.kind` and never parses IDs. `resource` remains the Team session
+ID, and each explicit target navigation increments `teamNavigationSeq`.
+
+| Target | Tab ID | Label | Icon |
+| --- | --- | --- | --- |
+| none / aggregate / board | `team:<teamSessionId>` | `panel.tabs.team` | users |
+| panorama | `team:<teamSessionId>:panorama` | `team.teamPanoramaTitle` | users |
+| task | `team:<teamSessionId>:task:<taskId>` | localized `Ad-hoc: <subject>` | message-circle |
+| member | `team:<teamSessionId>:member:<memberSessionId>` | display name | message-circle |
+
+The tab hover title equals its display label for every Team surface; it does
+not expose the Team session ID. Task/member labels are captured at open time,
+with the existing generic Team label when unavailable. The Overview tab uses
+a map icon; all other tab chrome and ordinary subagent behavior stay unchanged.
+Tabs remain in memory and require no persisted-data migration.
+
+A dispatch card, Overview progress row, aggregate progress row or panorama child
+opens its own task/member tab without replacing the aggregate tab. Reopening a
+target activates its existing tab. Board, roster and task-owner drilldown remain
+inside the aggregate/detail panel. The panorama is mounted separately and has
+no in-canvas Back control; return by selecting its retained tab. Its viewport
+scope stays `team:desktop:<teamSessionId>` and its saved viewport survives tab
+and session switches and snapshot refresh.
+
+A member focus task requires matching owner session ID when set; only tasks
+without an owner session ID may match the immutable member name. Deleted tasks
+are excluded. In creation order (`createdAt`, then `taskId`), select the first
+in-progress task, then the first pending task, then the most recently updated
+remaining task. A child opens that task with its subject label, or opens the
+member tab with its display name when there is no focus task. The Lead root
+remains noninteractive. Dissolved/scope-mismatch snapshot errors share their
+existing localized mapping across Team surfaces; other error text stays visible.
+
+### Task and member tab transcripts
+
+Independent task/member tabs use a two-row header (about 60 CSS px), a 16 px
+pixel avatar and identity, static phase/task glyph and label, connector, and
+ellipsized focus-task title. The task identity opens the owner's member tab;
+the member focus title opens that task's tab. Open-in-main selects the real
+member session. The task info action reveals description, dependencies, write
+scopes and overlap warnings. An unassigned task opens its brief by default,
+disables member navigation and shows the no-transcript state. Deleted/missing
+tasks retain the tab's captured label and show the no-current-task state.
+Owner resolution gives an explicit session ID priority and uses immutable name
+only when that ID is absent, including the brief's owner navigation.
+
+The read-only transcript has no composer or rollback control. User prompts,
+role-tool rows, thinking disclosures, answers and inline errors reuse the main
+transcript presentation. It follows new content while pinned and preserves
+reading position during manual scrolling/disclosure expansion. Snapshot changes,
+relevant member events, focus and Host restart trigger coalesced bounded reads
+(latest 200 messages, 64 KiB characters per displayed field). A bounded event
+overlay prevents event-before-persistence rollback until visible fields match;
+replacement and empty-terminal removals cannot resurrect from stale reads.
+Host restart removes unfinished ephemeral overlays and retains completed outbox
+rows. Failed snapshot reads retain the last good header and transcript and show
+a localized error with Retry in each tab; unknown members do not claim an idle
+phase. Previous messages remain visible with a read error; earlier-message
+truncation has a localized notice, while clipped content carries its display
+marker. Unmount removes subscriptions and ignores stale generation results.
 
 ### 10C.3 Accessibility
 

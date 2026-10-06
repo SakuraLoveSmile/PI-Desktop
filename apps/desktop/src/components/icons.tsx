@@ -20,9 +20,15 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  Circle,
+  CircleArrowRight,
+  CircleDashed,
+  CircleSlash,
+  CircleX,
   CircleAlert,
   CircleCheck,
   CircleHelp,
+  CirclePause,
   ClipboardPaste,
   Clock,
   CloudDownload,
@@ -37,6 +43,7 @@ import {
   FileDiff,
   FileSpreadsheet,
   FileText,
+  Flag,
   Folder,
   FolderOpen,
   FolderPlus,
@@ -51,9 +58,12 @@ import {
   Link,
   ListChecks,
   LogOut,
+  Loader,
+  Map as MapIcon,
   Mic,
   MicOff,
   Minus,
+  MessageCircle,
   MessageSquare,
   MessageSquarePlus,
   Monitor,
@@ -78,6 +88,7 @@ import {
   RefreshCcw,
   RefreshCw,
   RotateCw,
+  Scan,
   Search,
   Server,
   Settings,
@@ -103,6 +114,8 @@ import {
   Workflow,
   Wrench,
   X,
+  ZoomIn,
+  ZoomOut,
   type LucideIcon,
   type LucideProps,
 } from "lucide-react";
@@ -161,8 +174,10 @@ export const IconArrowUpDown = icon(ArrowUpDown);
 export const IconSearch = icon(Search);
 export const IconRefresh = icon(RefreshCcw);
 export const IconChat = icon(MessageSquare);
+export const IconMessageCircle = icon(MessageCircle);
 /** Session creation affordance. Keep it distinct from generic add actions. */
 export const IconNewSession = icon(MessageSquarePlus);
+export const IconFlag = icon(Flag);
 export const IconFolder = icon(Folder);
 export const IconFolderOpen = icon(FolderOpen);
 export const IconNewProject = icon(FolderPlus);
@@ -256,6 +271,18 @@ export const IconX = icon(X);
 export const IconTrash = icon(Trash2);
 export const IconStar = icon(Star);
 /* Toast status glyphs (see ToastHost) */
+export const IconMap = icon(MapIcon);
+export const IconLoader = icon(Loader);
+export const IconZoomIn = icon(ZoomIn);
+export const IconZoomOut = icon(ZoomOut);
+export const IconScan = icon(Scan);
+export const IconRefreshCw = icon(RefreshCw);
+export const IconCirclePause = icon(CirclePause);
+export const IconCircle = icon(Circle);
+export const IconCircleDashed = icon(CircleDashed);
+export const IconCircleX = icon(CircleX);
+export const IconCircleSlash = icon(CircleSlash);
+export const IconCircleArrowRight = icon(CircleArrowRight);
 export const IconCircleCheck = icon(CircleCheck);
 export const IconCircleAlert = icon(CircleAlert);
 export const IconTriangleAlert = icon(TriangleAlert);
