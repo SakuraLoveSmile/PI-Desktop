@@ -1,4 +1,5 @@
 import {
+  Fragment,
   memo,
   useContext,
   useMemo,
@@ -51,6 +52,8 @@ import { TurnProcess } from "./TurnProcess";
 import { ActionSlotSide } from "./ActionBarSlots";
 import { EntryExtraStack } from "./EntryExtraStack";
 import { slotMessage } from "../../../plugins/renderer-slots/slot-message";
+import { planTranscriptEntryKey, splitPlanTurn } from "../../../lib/plan-transcript";
+import { PlanTranscriptContext } from "../../../lib/plan-transcript-context";
 import { PlanApprovalBar } from "../../../components/PlanApprovalBar";
 import { AskToolCompletedSummary } from "../../../components/AskToolCompletedSummary";
 import { TeamDispatchContext, isTeammateJoining, type TeamDispatchCardItem } from "../../../lib/team-dispatch";
@@ -62,13 +65,14 @@ type AssistantTurnProps = {
   entry: AssistantTurnEntry;
   isActive: boolean;
   runtimeActivity?: AgentActivity;
+  proposals?: readonly PlanProposal[];
 };
 
 function assistantTurnPropsEqual(
   previous: AssistantTurnProps,
   next: AssistantTurnProps,
 ) {
-  if (previous.isActive !== next.isActive || previous.runtimeActivity !== next.runtimeActivity) return false;
+  if (previous.isActive !== next.isActive || previous.runtimeActivity !== next.runtimeActivity || previous.proposals !== next.proposals) return false;
   if (previous.entry === next.entry) return true;
   if (
     previous.entry.id !== next.entry.id ||
@@ -145,19 +149,25 @@ export function TranscriptEntryView({
   isActive: boolean;
   runtimeActivity?: AgentActivity;
 }) {
+  const planIndex = useContext(PlanTranscriptContext);
+  const proposals = planIndex.byEntry.get(planTranscriptEntryKey(entry)) ?? EMPTY_PROPOSALS;
   if (entry.kind === "assistant-turn") {
     return (
       <AssistantTurn
         entry={entry}
         isActive={isActive}
         runtimeActivity={runtimeActivity}
+        proposals={proposals}
       />
     );
   }
   if (entry.kind === "compaction") {
     return <CompactionRow mark={entry.mark} />;
   }
-  return <MessageRow message={entry.message} isRunning={isRunning} />;
+  return <>
+    <MessageRow message={entry.message} isRunning={isRunning} />
+    {proposals.map((proposal) => <PlanApprovalBar key={proposal.id} proposal={proposal} />)}
+  </>;
 }
 
 function transcriptEntryKey(entry: TranscriptEntry): string {
@@ -235,6 +245,7 @@ export const AssistantTurn = memo(function AssistantTurn({
   entry,
   isActive,
   runtimeActivity,
+  proposals = EMPTY_PROPOSALS,
 }: AssistantTurnProps) {
   const { t } = useTranslation();
   const openTranscriptMenu = useTranscriptMenu();
@@ -302,18 +313,6 @@ export const AssistantTurn = memo(function AssistantTurn({
   // Delegation status/timing depends on actual tool messages, never on thinking
   // or text and never on a Task's attached child transcript identity.
   const delegationItems = useMemo(() => tools.map((message) => ({ kind: "tool" as const, message })), [tools]);
-  // Plan approvals and completed asks belong to the turn that issued the tool
-  // call, so they are matched through this turn's tool messages.
-  const proposals = useAppStore((state) =>
-    state.activeSessionId ? state.planHistory[state.activeSessionId] ?? EMPTY_PROPOSALS : EMPTY_PROPOSALS,
-  );
-  const turnProposals = useMemo(() => {
-    const toolCalls = new Set(tools.map((message) => message.toolCallId));
-    return proposals.filter((proposal) => toolCalls.has(proposal.toolCallId));
-  }, [proposals, tools]);
-  const completedAsks = useMemo(() => tools.filter(
-    (message) => message.toolName === "asktool" && message.toolStatus === "success",
-  ), [tools]);
   const rawDelegationStatuses = useMemo(
     () => collectDelegationStatuses(delegationItems, { turnLive: isActive }),
     [delegationItems, isActive],
@@ -375,8 +374,10 @@ export const AssistantTurn = memo(function AssistantTurn({
       resolveThinkingDisplayMode(state.settings?.thinkingDisplayMode),
     ),
   );
-  const { process, responses, lastActivityPart } = summary;
-  const activePart = isActive ? entry.parts.at(-1) : undefined;
+  const sections = useMemo(() => splitPlanTurn(entry, proposals), [entry, proposals]);
+  const renderedParts = useMemo(() => sections.flatMap((section) => section.parts), [sections]);
+  const activePart = isActive ? renderedParts.at(-1) : undefined;
+  const lastActivityPart = renderedParts.findLast((part) => part.kind === "activity");
   const partContext = { isActive, activePart, lastActivityPart, runtimeActivity, turnDelegationStatuses, turnDelegationTimings };
 
   return (
@@ -389,31 +390,36 @@ export const AssistantTurn = memo(function AssistantTurn({
       aria-label={t("chat.assistantMessage")}
     >
       <div className="message-col">
-        {groupProcess ? (
-          <>
-            {completedAsks.map((message) => <AskToolCompletedSummary key={message.id} message={message} />)}
-            <AssistantTurnParts parts={responses} {...partContext} />
-            <TurnProcess
-              turnId={entry.id}
-              processParts={process}
-              turnParts={entry.parts}
-              isActive={isActive}
-              hasAnswer={Boolean(actionMessage)}
-              delegationStatuses={turnDelegationStatuses}
-            >
-              <AssistantTurnParts parts={process} {...partContext} />
-            </TurnProcess>
-          </>
-        ) : (
-          <>
-            <AssistantTurnParts parts={entry.parts} {...partContext} />
-            {completedAsks.map((message) => <AskToolCompletedSummary key={message.id} message={message} />)}
-          </>
-        )}
+        {sections.map((section) => {
+          const sectionSummary = getAssistantTurnSummary({ ...entry, parts: section.parts });
+          const { process, responses } = sectionSummary;
+          const completedAsks = sectionSummary.tools.filter(
+            (message) => message.toolName === "asktool" && message.toolStatus === "success",
+          );
+          return <Fragment key={section.key}>
+            {groupProcess ? <>
+              {completedAsks.map((message) => <AskToolCompletedSummary key={message.id} message={message} />)}
+              <AssistantTurnParts parts={responses} {...partContext} />
+              <TurnProcess
+                turnId={section.key}
+                processParts={process}
+                turnParts={section.parts}
+                isActive={isActive && section === sections.at(-1)}
+                hasAnswer={responses.length > 0}
+                delegationStatuses={turnDelegationStatuses}
+              >
+                <AssistantTurnParts parts={process} {...partContext} />
+              </TurnProcess>
+            </> : <>
+              <AssistantTurnParts parts={section.parts} {...partContext} />
+              {completedAsks.map((message) => <AskToolCompletedSummary key={message.id} message={message} />)}
+            </>}
+            {section.proposal ? <PlanApprovalBar key={section.proposal.id} proposal={section.proposal} /> : null}
+          </Fragment>;
+        })}
         {turnDispatchCards.length > 0 || teammateJoining ? (
           <TeamDispatchCardsGroup cards={turnDispatchCards} joining={teammateJoining} />
         ) : null}
-        {turnProposals.map((proposal) => <PlanApprovalBar key={proposal.id} proposal={proposal} />)}
         {generatedImages}
         {!isActive && metaMessage ? (
           <MessageMeta

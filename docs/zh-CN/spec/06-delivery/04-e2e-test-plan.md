@@ -5567,7 +5567,7 @@ eleven-tool-round desktop paths are verified by
 | E / F / Quality — MCP 服务器超时覆盖 | E2E-261 |
 | A — 应用程序启动 | E2E-001、E2E-002、E2E-003、E2E-004、E2E-067、E2E-076、E2E-079、E2E-092、E2E-097、E2E-143、E2E-150、E2E-168、E2E-204、E2E-217 |
 | B——模型配置 | E2E-005、E2E-005G、E2E-006、E2E-007、E2E-038、E2E-050、E2E-052、E2E-055、E2E-066、E2E-080、E2E-082、E2E-151、E2E-005J、E2E-199、E2E-201、E2E-202、E2E-203、E2E-209、E2E-166 |
-| C — 对话和直播 | E2E-CHAT-running-status-survives-output-pauses、E2E-008、E2E-008d、E2E-008a、E2E-009、E2E-010、E2E-011、E2E-011a、E2E-011b、E2E-031、E2E-040、E2E-047、E2E-048、E2E-048c、E2E-048A、E2E-049、E2E-052、 E2E-053、E2E-054、E2E-055、E2E-059、E2E-059a、E2E-060c、E2E-060d、E2E-061、E2E-061a、E2E-062、E2E-064、E2E-065、E2E-068、E2E-071、 E2E-073、E2E-074、E2E-075、E2E-081、E2E-083、E2E-084、E2E-086、E2E-087、E2E-088、E2E-088b、E2E-089、E2E-090、E2E-094、E2E-095、E2E-096、 E2E-097、E2E-098、E2E-099、E2E-102、E2E-102a、E2E-102b、E2E-106、E2E-109、E2E-111、E2E-114、E2E-116、E2E-117、E2E-118、E2E-119、 E2E-120、E2E-121、E2E-代理-001、E2E-142、E2E-144、E2E-145、E2E-146、E2E-147、E2E-151、E2E-199、E2E-250、E2E-166、E2E-SUBAGENT-resume-a-settled-delegation |
+| C — 对话和直播 | E2E-PLAN-chronological-card-and-markdown-export、 E2E-CHAT-running-status-survives-output-pauses、E2E-008、E2E-008d、E2E-008a、E2E-009、E2E-010、E2E-011、E2E-011a、E2E-011b、E2E-031、E2E-040、E2E-047、E2E-048、E2E-048c、E2E-048A、E2E-049、E2E-052、 E2E-053、E2E-054、E2E-055、E2E-059、E2E-059a、E2E-060c、E2E-060d、E2E-061、E2E-061a、E2E-062、E2E-064、E2E-065、E2E-068、E2E-071、 E2E-073、E2E-074、E2E-075、E2E-081、E2E-083、E2E-084、E2E-086、E2E-087、E2E-088、E2E-088b、E2E-089、E2E-090、E2E-094、E2E-095、E2E-096、 E2E-097、E2E-098、E2E-099、E2E-102、E2E-102a、E2E-102b、E2E-106、E2E-109、E2E-111、E2E-114、E2E-116、E2E-117、E2E-118、E2E-119、 E2E-120、E2E-121、E2E-代理-001、E2E-142、E2E-144、E2E-145、E2E-146、E2E-147、E2E-151、E2E-199、E2E-250、E2E-166、E2E-SUBAGENT-resume-a-settled-delegation |
 | C — 对话和直播（输入框草稿） | E2E-011c、E2E-011c-1 |
 | A / C / F / Quality — Tray session navigation | E2E-TRAY-bounded-session-navigation |
 | D——工作区 | E2E-012、E2E-013、E2E-022B、E2E-024I、E2E-047、E2E-049、E2E-057、E2E-058、E2E-060、E2E-068、E2E-075、E2E-078、E2E-153 |
@@ -9589,3 +9589,24 @@ the latest destination. These assertions measure work counts, not device FPS.
 校验和 npm 两个安装阶段都必须使用该安装，同时保留应用自身的 `PATH`，且不探测 shell 启动文件。
 显式选择的 npm 仍优先使用其所在目录。缺少安装时仍返回 `npm-unavailable` 并保留原生选择器恢复路径。
 可执行集成 fixture 使用真实隔离子进程，并检查仅注册表安装和凭据隔离。
+
+
+## E2E-PLAN-chronological-card-and-markdown-export
+
+- **前提：** 隔离 React/Chromium fixture、临时本地 profile 和下载目录；使用真实
+  转写组件与 store，只模拟 Host 和剪贴板边界，不访问提供商或用户运行中的应用。
+- **步骤：** 分别提交并批准／拒绝 Plan 和 Goal，追加执行输出、移除提交记录，
+  同时保留具有相同工具 ID 的另一个会话面板；在详细和精简模式重复。滚动已处理
+  卡片并打开产物。复制／下载包含 CRLF 和中文的 Markdown；注入剪贴板与 Blob
+  创建错误，在复制或下载清理尚未完成时销毁组件。检查待批准卡片在 EN/zh-CN、
+  320、450 和 620 px 下的布局。
+- **预期：** 所有状态下，仅一个属于对应会话的卡片位于后续输出之前，并随正文
+  正常滚动。产物入口仍可用；复制与原生下载保留精确 Markdown 字节和产物文件名，
+  不处理提案。失败可见，已销毁操作不显示过期成功通知，临时 Blob URL、链接和
+  计时器全部释放。所有检查宽度下，按钮均位于卡片边界内。
+- **规格：** 04-ux/08-component-spec，Plan/Goal 共用批准表面。
+- **验收：** `node scripts/e2e-plan-transcript-ui.mjs`，以及聚焦的 plan-transcript
+  和已有 turn-process/renderer-flow 测试。fixture 验证渲染器交互与原生下载，
+  不证明付费提供商行为。
+- **里程碑：** 维护。
+- **状态：** 在任务候选上执行，实际结果单独记录。
