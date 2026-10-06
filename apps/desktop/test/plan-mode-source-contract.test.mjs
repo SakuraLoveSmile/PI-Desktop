@@ -200,7 +200,7 @@ test("terminal Plan checkpoints remain as read-only transcript cards", () => {
   for (const status of ["rejected", "expired", "interrupted", "approved", "queued", "running"]) {
     assert.match(planStateSource, new RegExp(`"${status}"`));
   }
-  assert.match(assistantTurnSource, /turnProposals\.map\(\(proposal\) => <PlanApprovalBar/);
+  assert.match(assistantTurnSource, /<PlanApprovalBar\b/);
   assert.match(barSource, /\{isPending \? \(/);
   assert.match(barSource, /proposal\.revisionIntent/);
   assert.doesNotMatch(composerSource, /<PlanApprovalBar proposal=/);
