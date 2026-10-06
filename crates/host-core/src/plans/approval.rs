@@ -56,6 +56,7 @@ pub fn expire_pending_approvals(db: &Database) -> Result<()> {
         params![now],
     )?;
     for (proposal_id, session_id, turn_id, tool_call_id) in expired {
+        crate::team::planning::resolved(db, &session_id, &proposal_id, "expire")?;
         audit::append_tx(
             &tx,
             "plan_approval_expired",
@@ -249,6 +250,25 @@ impl PlanManager {
         if !live_turn_belongs_to_session(db, session_id, turn_id)? {
             return Err(plan_error("PLAN_APPROVAL_STALE"));
         }
+        if kind == KIND_PLAN {
+            if let Some(state) = crate::team::planning::get(db, session_id)? {
+                if state.phase == "submitted" {
+                    if let Some(id) = state.proposal_id {
+                        if let Some(proposal) = get_proposal(db, &id)? {
+                            if proposal.turn_id == turn_id
+                                && proposal.tool_call_id == tool_call_id
+                                && proposal.title == title.trim()
+                                && proposal.question == question.trim()
+                                && proposal.markdown == markdown
+                            {
+                                return Ok(proposal);
+                            }
+                        }
+                    }
+                }
+            }
+            crate::team::planning::validate_submission(db, session_id)?;
+        }
         let has_pending: bool = db.conn().query_row(
             "SELECT EXISTS(
              SELECT 1 FROM plan_approvals
@@ -320,6 +340,9 @@ impl PlanManager {
                     "artifact": artifact,
                 }),
             )?;
+            if kind == KIND_PLAN {
+                crate::team::planning::submitted(db, session_id, &id)?;
+            }
             tx.commit()?;
             Ok(())
         })();
@@ -711,6 +734,9 @@ impl PlanManager {
                 "revisionIntentStored": revision_intent_json.is_some(),
             }),
         )?;
+        if kind == KIND_PLAN {
+            crate::team::planning::resolved(db, session_id, proposal_id, action)?;
+        }
         tx.commit()?;
         let proposal =
             get_proposal(db, proposal_id)?.ok_or_else(|| plan_error("PLAN_NOT_FOUND"))?;
@@ -844,6 +870,7 @@ impl PlanManager {
                 )?
                 .execute(params![now, id])?;
             if changed == 1 {
+                crate::team::planning::resolved(db, session_id, id, "abort")?;
                 let session_id_for_audit: String = tx.query_row(
                     "SELECT session_id FROM plan_approvals WHERE request_id = ?1",
                     params![id],

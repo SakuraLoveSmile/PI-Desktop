@@ -8,6 +8,7 @@ describe("Expert Team tools and prompt (ADR 0304)", () => {
   const createMockHost = (handlers: Record<string, (params: any) => Promise<any>>) => {
     return {
       call: vi.fn(async (method: string, params?: any) => {
+        if (method === "team.getPlanning" && !handlers[method]) return null;
         if (handlers[method]) {
           return handlers[method](params);
         }
@@ -404,5 +405,30 @@ describe("Expert Team tools and prompt (ADR 0304)", () => {
     const memberPrompt = teamSystemPrompt({ isLead: false, memberName: "Coder" });
     expect(memberPrompt).toContain('teammate "Coder"');
     expect(memberPrompt).toContain("Teammates cannot spawn other teammates");
+  });
+});
+
+describe("planning research boundary", () => {
+  it("binds research authority to Host context and returns full planning evidence", async () => {
+    const planning = { planningId: "trusted-plan", roundId: "trusted-round", results: [{ structuredResult: {summary:"source", findings:["facts"],risks:["race"],recommendations:["CAS"],verifiedSources:["src/main.ts"]}}] };
+    const call=vi.fn(async (method:string) => {
+      if(method==="team.getBoard") return {teamSessionId:"lead",revision:1,tasks:[{taskId:"research",subject:"Inspect"}],readiness:[],scopeOverlaps:[]};
+      if(method==="team.getPlanning") return planning;
+      if(method==="team.submitResearchResult") return {result:planning.results[0]};
+      if(method==="team.getRoster") return {teamSessionId:"lead",paused:false,members:[]};
+      throw new Error(`Unexpected ${method}`);
+    });
+    const tools=createTeamTools({teamSessionId:"lead",callerSessionId:"approved-member",isLead:false,workPurpose:"plan_research",planningId:"trusted-plan",roundId:"trusted-round",host:{call} as unknown as RuntimeHost});
+    expect(tools.map(t=>t.name)).toEqual(["send_message","wait_for_updates","task_update","task_list","task_get","team_status","submit_research_result"]);
+    const submit=tools.find(t=>t.name==="submit_research_result")!;
+    expect(submit.parameters).not.toHaveProperty("properties.planningId");
+    await submit.execute("result",{taskId:"research",expectedRevision:1,structuredResult:planning.results[0].structuredResult,planningId:"forged",roundId:"forged",callerSessionId:"lead"});
+    expect(call).toHaveBeenCalledWith("team.submitResearchResult",expect.objectContaining({callerSessionId:"approved-member",planningId:"trusted-plan",roundId:"trusted-round"}));
+    const status=await tools.find(t=>t.name==="team_status")!.execute("status",{});
+    expect(status.content[0]).toEqual({type:"text",text:expect.stringContaining('"risks":["race"]')});
+    const detail=await tools.find(t=>t.name==="task_get")!.execute("task",{taskId:"research"});
+    expect(detail.content[0]).toEqual({type:"text",text:expect.stringContaining('"verifiedSources":["src/main.ts"]')});
+    expect(teamSystemPrompt({isLead:true,mode:"plan"})).toContain("Lead and coordinator");
+    expect(teamSystemPrompt({isLead:false,workPurpose:"plan_research"})).toContain("Read, Glob and Grep only");
   });
 });

@@ -174,6 +174,7 @@ pub fn declare_team_strategy(
             &format!("{team_session_id}:latest"),
             &json!(lead_turn_id),
         )?;
+        super::planning::start(db, team_session_id, "lead_only", None, vec![])?;
         bump_team_revision_tx(&tx, team_session_id)?;
         tx.commit()?;
 
@@ -646,6 +647,13 @@ pub fn confirm_launch_review(
             member_session_ids.push(session_id);
         }
 
+        super::planning::start(
+            db,
+            team_session_id,
+            "delegate",
+            Some(review_id),
+            member_session_ids.clone(),
+        )?;
         let mut confirmed_review = current;
         confirmed_review.status = "confirmed".to_string();
         confirmed_review.revision += 1;

@@ -1491,3 +1491,61 @@ notification carrying that same snapshot. Approval and rejection require the
 current entity digest, so a security-relevant edit cannot reuse an older local
 decision. Disconnect deletes only local credentials, vault keys, metadata and
 staging files; remote objects remain intact.
+
+### Expert Team planning (local Host)
+
+Plan Team Leads retain standard Plan permissions and coordination tools.
+`team.getRuntimeContext` returns research purpose and planning/round IDs only
+for confirmed research members; Lead context never has research purpose.
+Trusted launch-review confirmation and the planning round commit atomically.
+Task create/update enrolls research tasks in the same transaction as assignment.
+
+`team.getPlanning({ teamSessionId, callerSessionId })` returns null without a
+round, otherwise planningId, teamSessionId, roundId, phase, workPurpose,
+reviewId, totalExpectedTasks, completedResearchTasks, openQuestionsCount,
+isReadyForPlanSubmission, proposalId, results and updatedAt. Results contain
+full bounded structuredResult (summary, findings, risks, recommendations and
+verifiedSources), task identity, owner identity, submitted task revision and
+timestamp. `team_status` and `task_get` include this projection.
+
+`team.submitResearchResult` requires teamSessionId, callerSessionId, planningId,
+roundId, taskId, expectedRevision and structuredResult. IDs are bound from the
+trusted runtime context, never model-supplied authority. Host checks current
+approved research identity, task ownership/non-deletion/dependencies and CAS.
+An identical result retry is idempotent; a conflicting retry is rejected.
+Completion and Team revision commit together. Per-result bytes are capped at
+32 KiB and all results in a round at 128 KiB; each array has at most 32 entries
+of 2,000 bytes and summary at most 4,000 bytes. Ordinary task_update completion
+cannot bypass research submission.
+
+Lead-only `team.openPlanningQuestion` and `team.closePlanningQuestion` require
+teamSessionId, callerSessionId, roundId and questionId. The runtime brackets
+asktool waits including cancellation; stop/restart clears cancelled blockers.
+SubmitPlan is gated on all expected results and settled questions; lead_only
+requires no research tasks. Same submission retries return the same proposal.
+Rejection reopens aggregation preserving results; approve/schedule uses existing
+Plan transitions and closes planning. Researchers remain read-only until a new
+Agent execution review explicitly authorizes them.
+
+The sidecar proxy permits only the new planning read/result/question methods,
+not arbitrary round creation or trusted review mutations. Before Host-local
+execution the parent calls internal `tools.authorizeLocal({ sessionId,
+toolName })`; persisted research identity and session mode override sidecar
+mode claims. Rust tools.execute enforces the same research boundary. Team
+mailbox supports same-Team planning while plugin SessionTask stays Agent-only.
+
+Interrupted/expired proposal recovery returns retained research to aggregation
+without replay. Team dissolution deletes planning/purpose KV in the detach
+transaction, converting research members to standalone standard Plan while
+preserving transcripts/models/permission selections; execution members retain
+existing standalone Agent semantics.
+
+Confirmed research assignment persists member session mode Plan alongside the
+purpose metadata, so older runtimes cannot expose ordinary Agent writers by
+ignoring new context fields. Only confirmed Agent execution assignment restores
+member Agent mode; normal execution members and standard contracts are unchanged.
+
+Result receipt alone does not settle a researcher turn. Readiness and SubmitPlan
+also require every approved research member's active turn to end. The Lead's
+own active synthesis turn is permitted; existing Team activity revisions wake
+wait_for_updates after research settlement.

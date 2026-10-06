@@ -160,12 +160,21 @@ pub(crate) fn cleanup_team_on_lead_delete_conn(
     };
 
     for member_id in member_ids {
+        conn.execute("UPDATE sessions SET mode='plan' WHERE id=?1 AND EXISTS (SELECT 1 FROM kv WHERE ns='team-member-purpose-v1' AND key=?1 AND json_extract(value_json,'$.workPurpose')='plan_research')",[&member_id])?;
+        conn.execute(
+            "DELETE FROM kv WHERE ns='team-member-purpose-v1' AND key=?1",
+            [&member_id],
+        )?;
         conn.execute(
             "UPDATE sessions SET execution_profile = 'standard', updated_at = ?2 WHERE id = ?1",
             params![member_id, now],
         )?;
     }
 
+    conn.execute(
+        "DELETE FROM kv WHERE ns='team-planning-v1' AND key=?1",
+        [lead_session_id],
+    )?;
     conn.execute(
         "DELETE FROM team_tasks WHERE team_session_id = ?1",
         params![lead_session_id],

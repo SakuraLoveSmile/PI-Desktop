@@ -5547,6 +5547,7 @@ eleven-tool-round desktop paths are verified by
 ## 8. 可追溯性矩阵
 | 验收 | 应用场景 |
 |---|---|
+| C / Quality / Security — 经审批的只读专家团规划 | E2E-TEAM-approved-plan-research-and-execution |
 | C / Quality — 独立 Team 全景图／任务／成员标签页 | E2E-TEAM-panorama-and-member-tabs |
 | C / Quality — 实时派发卡片与单一任务目标 | E2E-TEAM-dispatch-card-live-status-and-joining |
 | C / E / F / Quality / Security — Session Todo checklist | E2E-CHAT-session-todo-checklist |
@@ -9610,3 +9611,19 @@ the latest destination. These assertions measure work counts, not device FPS.
   不证明付费提供商行为。
 - **里程碑：** 维护。
 - **状态：** 在任务候选上执行，实际结果单独记录。
+
+## E2E-TEAM-approved-plan-research-and-execution
+
+- **前提：** 隔离的生产 Electron/Main/Host/侧车、两名研究成员、临时项目与本机 SSE 夹具；不访问用户数据或真实模型。
+- **步骤：** 取消审批、重启待审方案并确认新审批；创建两项归属明确的任务，实际 Read 并暂停第二份结果。尝试提前提交，随后结束全部研究回合、读取完整结果、提交、请求修订、拒绝重试并批准。通过普通权限卡允许执行 Write，检查文件精确字节。
+- **预期：** 确认前零研究调用；首份结果不能提交。研究工具保持只读，完整结果进入产物；审批可以恢复，正常执行权限保留，批准方案或删除团队不会提升研究成员权限。
+- **规格：** `03-runtime/06-host-rpc-protocol.md`、`03-runtime/08-error-codes.md`、ADR plus-expert-team-collaboration。
+- **验收：** C / Quality / Security — 审批后的规划协作与权限隔离。
+- **里程碑：** 维护。
+- **状态：** 在最新主线任务候选上执行，记录实际提交、基线和结果。
+- **自动化：** `node scripts/e2e-team-planning.mjs`、Host 规划／审批回归与真实 stdio 代理测试。
+
+
+
+通过隔离 Team 夹具的真实输入框、可信审批、Host、侧车和本机模型服务验证：审批前无成员和模型调用；批准后建立两项归属明确的研究任务，暂停第二名研究员，第一份结果后仍有两项预期任务且不可提交。第二份结果和用户问题完成后提交；拒绝、修订、同次重试、批准后，Lead 按标准 Agent 权限写入隔离目录。批准后研究成员保持只读。
+低层回归验证 lead_only、任务归属/删除/依赖、旧轮次、CAS、结果预算、幂等、普通完成绕过、revision、停止和重启后的问题清理、本地工具权限以及标准 Plan/Goal。集成命令为 PI_E2E_TEAM_PLANNING=1 node scripts/e2e-team.mjs，不调用真实模型或用户运行中的应用。

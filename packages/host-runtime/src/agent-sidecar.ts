@@ -93,6 +93,10 @@ const HOST_PROXY_ALLOWED = new Set([
   "team.getExecutionDecision",
   "team.getLaunchReview",
   "team.getRoster",
+  "team.getPlanning",
+  "team.submitResearchResult",
+  "team.openPlanningQuestion",
+  "team.closePlanningQuestion",
   "team.interruptMember",
   "team.listMessages",
   "team.sendMessage",
@@ -564,6 +568,8 @@ export class AgentSidecar {
             ? this.localTools.get(requestedToolName)
             : undefined;
         if (localTool) {
+          if (!this.host) throw new Error("host unavailable");
+          await this.host.call("tools.authorizeLocal", {sessionId: params.sessionId, toolName: requestedToolName});
           const toolName = requestedToolName;
           // Local tools can bypass host-core's permission boundary. Plan mode
           // therefore permits only the read-only BrowserPreview bridge; every

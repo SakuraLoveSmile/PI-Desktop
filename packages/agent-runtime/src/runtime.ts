@@ -121,6 +121,9 @@ import {
   normalizeExecutionProfile,
   isTeamTool,
   DECLARE_TEAM_STRATEGY_TOOL_NAME,
+  SUBMIT_RESEARCH_RESULT_TOOL_NAME,
+  type TeamRuntimeContextProjection,
+  type TeamPlanningProjection,
   type ProposalKind,
   type SubagentPermission,
 } from "@pi-desktop/shared";
@@ -1039,11 +1042,7 @@ export type AgentRuntimeOptions = {
   /** Resolved keys explicitly opted into Task.model selection; pins alone grant no override. */
   subagentModelKeys?: string[];
   executionProfile?: ExecutionProfile;
-  teamContext?: {
-    teamSessionId: string;
-    callerSessionId: string;
-    isLead: boolean;
-    memberName?: string;
+  teamContext?: TeamRuntimeContextProjection & {
     abortActiveTurn?: (memberSessionId: string) => Promise<boolean>;
   };
 };
@@ -1074,7 +1073,7 @@ export type RuntimeMatchConfig = {
   /** Resolved keys explicitly opted into Task.model selection; pins alone grant no override. */
   subagentModelKeys?: string[];
   teamContext?: Pick<NonNullable<AgentRuntimeOptions["teamContext"]>,
-    "teamSessionId" | "callerSessionId" | "isLead" | "memberName">;
+    "teamSessionId" | "callerSessionId" | "isLead" | "memberName" | "workPurpose" | "planningId" | "roundId">;
 };
 
 /** Tool calls ride in the assistant content array as `type: "toolCall"`. A
@@ -2366,9 +2365,11 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       ...pluginSkillsPromptSections(this.pluginSkills),
       context: composeModeSystemPrompt(this.mode, [
         ...(this.customSystemPrompt?.append ? [this.customSystemPrompt.append] : []),
-        ...(this.mode === "agent" && this.executionProfile === "team"
+        ...((this.mode === "agent" || this.mode === "plan") && this.executionProfile === "team"
           ? [
               teamSystemPrompt({
+                mode: this.mode,
+                workPurpose: this.teamContext?.workPurpose,
                 isLead: this.teamContext?.isLead ?? false,
                 memberName: this.teamContext?.memberName,
                 teamSessionId: this.teamContext?.teamSessionId ?? "",
@@ -3706,12 +3707,21 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
           toolCallId,
           questions,
         };
-        const answers = await this.waitForAskTool(request, signal);
-        const text = formatAskToolOutput(questions, answers);
-        return {
-          content: [{ type: "text", text }],
-          details: { questions, answers, resolvedAt: new Date().toISOString() },
-        };
+        const planning = this.mode === "plan" && this.teamContext?.isLead
+          ? await this.host.call<TeamPlanningProjection | null>("team.getPlanning", {teamSessionId: this.teamContext.teamSessionId, callerSessionId: this.sessionId})
+          : null;
+        const questionContext = planning ? {teamSessionId: planning.teamSessionId, callerSessionId: this.sessionId, roundId: planning.roundId} : null;
+        try {
+          if (questionContext) {
+            for (let index=0;index<questions.length;index++) await this.host.call("team.openPlanningQuestion", {...questionContext, questionId: `${request.requestId}:${index}`});
+          }
+          const answers = await this.waitForAskTool(request, signal);
+          return {content: [{type: "text", text: formatAskToolOutput(questions, answers)}], details: {questions, answers, resolvedAt: new Date().toISOString()}};
+        } finally {
+          if (questionContext) {
+            for (let index=0;index<questions.length;index++) await this.host.call("team.closePlanningQuestion", {...questionContext, questionId: `${request.requestId}:${index}`});
+          }
+        }
       },
     };
 
@@ -3807,10 +3817,13 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             this.buildSubagentStopTool(),
           ]
         : [];
-    const teamTools = isTeam && this.mode === "agent"
+    const teamTools = isTeam && (this.mode === "agent" || this.mode === "plan")
       ? createTeamTools({
           teamSessionId: this.teamContext?.teamSessionId ?? "",
           callerSessionId: this.teamContext?.callerSessionId ?? this.sessionId,
+          workPurpose: this.teamContext?.workPurpose,
+          planningId: this.teamContext?.planningId,
+          roundId: this.teamContext?.roundId,
           isLead: this.teamContext?.isLead ?? false,
           host: this.host,
           getTurnId: () => this.turnId,
@@ -3855,7 +3868,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
   private rebuildToolCatalog(): void {
     const catalog = new Map<string, AgentTool>();
     for (const tool of this.buildToolDefinitions()) {
-      if (!this.isToolAllowedInMode(tool.name) && !retainModeToolDeclaration(tool.name)) continue;
+      if (!this.isToolAllowedInMode(tool.name) && (this.teamContext?.workPurpose === "plan_research" || !retainModeToolDeclaration(tool.name))) continue;
       // The execution mode is decided here, in one place, so no tool can grow
       // an accidental parallel batch: everything is sequential except `Task`.
       // pi runs a whole batch sequentially when it holds one sequential tool,
@@ -3926,6 +3939,10 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
   }
 
   private isToolAllowedInMode(name: string): boolean {
+    if (this.teamContext?.workPurpose === "plan_research") {
+      return new Set(["Read", "Glob", "Grep", "send_message", "wait_for_updates", "task_update", "task_list", "task_get", "team_status", SUBMIT_RESEARCH_RESULT_TOOL_NAME]).has(name);
+    }
+    if (this.mode === "plan" && this.executionProfile === "team" && (isTeamTool(name) || name === DECLARE_TEAM_STRATEGY_TOOL_NAME)) return true;
     const kind = proposalKindForMode(this.mode);
     if (!kind) return true;
     // Contract modes are read-only: inspection tools, plan-safe plugin
@@ -3957,6 +3974,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       name === SUBAGENT_STOP_TOOL_NAME ||
       name === SUBMIT_GOAL_REPORT_TOOL_NAME ||
       name === UPDATE_GOAL_PROGRESS_TOOL_NAME ||
+      name === SUBMIT_RESEARCH_RESULT_TOOL_NAME ||
       name === DECLARE_TEAM_STRATEGY_TOOL_NAME ||
       isTeamTool(name) ||
       (this.mode === "agent"

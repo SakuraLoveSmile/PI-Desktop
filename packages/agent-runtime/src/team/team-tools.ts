@@ -18,12 +18,17 @@ import {
   type TeamLaunchReview,
   DECLARE_TEAM_STRATEGY_TOOL_NAME,
   MAX_TEAM_STRATEGY_REASON_CHARS,
+  type TeamWorkPurpose, type TeamPlanningProjection, type StructuredResearchResult,
+  SUBMIT_RESEARCH_RESULT_TOOL_NAME,
 } from "@pi-desktop/shared";
 
 export interface TeamToolsOptions {
   teamSessionId: string;
   callerSessionId: string;
   isLead: boolean;
+  workPurpose?: TeamWorkPurpose;
+  planningId?: string;
+  roundId?: string;
   host: RuntimeHost;
   getTurnId?: () => string | undefined;
   abortActiveTurn?: (memberSessionId: string) => Promise<boolean>;
@@ -631,7 +636,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
           content: [
             {
               type: "text",
-              text: JSON.stringify({ task }),
+              text: JSON.stringify({ task, planning: await host.call<TeamPlanningProjection | null>("team.getPlanning", {teamSessionId,callerSessionId}) }),
             },
           ],
           details: task,
@@ -659,7 +664,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
     parameters: Type.Object({}),
     execute: async (): Promise<AgentToolResult> => {
       try {
-        const [roster, board] = await Promise.all([
+        const [roster, board, planning] = await Promise.all([
           host.call<TeamRosterProjection>("team.getRoster", {
             teamSessionId,
             callerSessionId,
@@ -668,6 +673,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
             teamSessionId,
             callerSessionId,
           }),
+          host.call<TeamPlanningProjection | null>("team.getPlanning", {teamSessionId, callerSessionId}),
         ]);
 
         return {
@@ -675,6 +681,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
             {
               type: "text",
               text: JSON.stringify({
+                planning,
                 teamSessionId: roster.teamSessionId,
                 paused: roster.paused,
                 revision: board.revision,
@@ -685,7 +692,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
               }),
             },
           ],
-          details: { roster, board },
+          details: { roster, board, planning },
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -702,6 +709,23 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
     },
   };
 
+  const submitResearchTool: AgentTool = {
+    name: SUBMIT_RESEARCH_RESULT_TOOL_NAME, label: "Submit Research Result",
+    description: "Submit bounded findings for your assigned research task. Atomically completes it.",
+    parameters: Type.Object({taskId: Type.String(), expectedRevision: Type.Integer({minimum:1}), structuredResult: Type.Object({
+      summary: Type.String({minLength:1,maxLength:4000}),
+      findings: Type.Array(Type.String({maxLength:2000}),{maxItems:32}),
+      risks: Type.Array(Type.String({maxLength:2000}),{maxItems:32}),
+      recommendations: Type.Array(Type.String({maxLength:2000}),{maxItems:32}),
+      verifiedSources: Type.Array(Type.String({maxLength:2000}),{maxItems:32}),
+    })}),
+    execute: async (_id,params) => {
+      const p=params as {taskId:string;expectedRevision:number;structuredResult:StructuredResearchResult};
+      const result=await host.call("team.submitResearchResult",{teamSessionId,callerSessionId,planningId:opts.planningId,roundId:opts.roundId,taskId:p.taskId,expectedRevision:p.expectedRevision,structuredResult:p.structuredResult});
+      return {content:[{type:"text",text:JSON.stringify(result)}],details:result};
+    },
+  };
+  if (opts.workPurpose === "plan_research") return [sendMessageTool,waitForUpdatesTool,taskUpdateTool,taskListTool,taskGetTool,teamStatusTool,submitResearchTool];
   const tools = [
     ...(isLead ? [declareTeamStrategyTool] : []),
     spawnTeammateTool,

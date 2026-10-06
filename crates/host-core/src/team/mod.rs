@@ -7,6 +7,9 @@ pub mod lifecycle;
 mod lifecycle_tests;
 pub mod mailbox;
 pub mod model;
+pub mod planning;
+#[cfg(test)]
+mod planning_tests;
 pub mod review;
 pub(super) mod review_selection;
 #[cfg(test)]

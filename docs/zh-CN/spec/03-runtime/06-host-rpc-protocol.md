@@ -1105,3 +1105,17 @@ schedule，Manual 转 Hourly 继续使用现有默认间隔行为。
 保存和读取工作区绑定时统一使用现有项目路径规范化规则。在 Windows 上，
 斜杠方向、大小写、末尾分隔符和扩展路径前缀的差异不会再让同项目会话看不到任务。
 缺失的旧版绑定与显式 null 仍保持不同语义；其他项目的工具不能查询或修改绑定任务。
+
+### 专家团规划补充
+
+方案模式的 Lead 保留标准规划权限和协调工具。批准专家名单时，Host 在同一事务中保存研究轮次和已批准成员身份；Lead 不会获得研究成员身份。
+新增 team.getPlanning 返回 planningId、teamSessionId、roundId、phase、workPurpose、reviewId、totalExpectedTasks、completedResearchTasks、openQuestionsCount、isReadyForPlanSubmission、proposalId、results 与 updatedAt；没有轮次时返回 null。team_status 和 task_get 包含完整研究投影。
+team.submitResearchResult 绑定可信运行时身份和轮次，接受 taskId、expectedRevision 及 structuredResult；后者保存 summary、findings、risks、recommendations、verifiedSources。Host 校验批准身份、当前轮次、任务归属、删除状态、依赖和修订号，原子保存结果、完成任务并推进 Team revision。同内容重试幂等；普通 task_update 不能代替研究提交。单结果最多 32 KiB、整轮最多 128 KiB；各列表最多 32 项、每项 2,000 字节，摘要最多 4,000 字节。
+Lead 专用 openPlanningQuestion / closePlanningQuestion 使用 teamSessionId、callerSessionId、roundId 和 questionId；asktool 的取消、停止和进程恢复清除待回答阻塞。全部任务与问题完成后才能提交，lead_only 允许零研究任务。拒绝保留研究供修订；批准或定时执行沿用原有方案转换。关闭规划不会自动赋予研究成员写权限，必须重新批准 Agent 执行名单。
+侧车仅开放必要规划查询、结果和问题 RPC，不开放任意创建轮次或可信审批修改。父进程在本地工具拦截前调用内部 tools.authorizeLocal，Rust tools.execute 同样依据持久身份校验。Team 邮箱允许同团规划协作，插件 SessionTask 仍限 Agent。
+
+方案中断或到期后保留研究并恢复汇总，不重放任务。解散专家团在脱离事务内清理规划/成员用途 KV；研究成员保留转写、模型和权限选择，转为独立标准 Plan 会话；普通执行成员仍沿用原有独立 Agent 语义。
+
+批准研究任务时同时持久化成员会话模式为 Plan，旧运行时忽略新用途字段也不会获得普通 Agent 写工具；只有重新批准 Agent 执行分配才能恢复成员 Agent 模式。正常执行成员和标准 Plan/Goal 不变。
+
+收到结果不等于研究回合结束。就绪状态和 SubmitPlan 还要求全部已批准研究成员的运行回合结束，允许 Lead 自己的汇总回合仍在运行；现有 Team 活动 revision 在研究结算后唤醒 wait_for_updates。
