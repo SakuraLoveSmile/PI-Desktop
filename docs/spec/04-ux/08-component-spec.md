@@ -2996,6 +2996,34 @@ member tab with its display name when there is no focus task. The Lead root
 remains noninteractive. Dissolved/scope-mismatch snapshot errors share their
 existing localized mapping across Team surfaces; other error text stays visible.
 
+### Task and member tab transcripts
+
+Independent task/member tabs use a two-row header (about 60 CSS px), a 16 px
+pixel avatar and identity, static phase/task glyph and label, connector, and
+ellipsized focus-task title. The task identity opens the owner's member tab;
+the member focus title opens that task's tab. Open-in-main selects the real
+member session. The task info action reveals description, dependencies, write
+scopes and overlap warnings. An unassigned task opens its brief by default,
+disables member navigation and shows the no-transcript state. Deleted/missing
+tasks retain the tab's captured label and show the no-current-task state.
+Owner resolution gives an explicit session ID priority and uses immutable name
+only when that ID is absent, including the brief's owner navigation.
+
+The read-only transcript has no composer or rollback control. User prompts,
+role-tool rows, thinking disclosures, answers and inline errors reuse the main
+transcript presentation. It follows new content while pinned and preserves
+reading position during manual scrolling/disclosure expansion. Snapshot changes,
+relevant member events, focus and Host restart trigger coalesced bounded reads
+(latest 200 messages, 64 KiB characters per displayed field). A bounded event
+overlay prevents event-before-persistence rollback until visible fields match;
+replacement and empty-terminal removals cannot resurrect from stale reads.
+Host restart removes unfinished ephemeral overlays and retains completed outbox
+rows. Failed snapshot reads retain the last good header and transcript and show
+a localized error with Retry in each tab; unknown members do not claim an idle
+phase. Previous messages remain visible with a read error; earlier-message
+truncation has a localized notice, while clipped content carries its display
+marker. Unmount removes subscriptions and ignores stale generation results.
+
 ### 10C.3 Accessibility
 
 - The panel has a localized heading and labeled roster and board sections.

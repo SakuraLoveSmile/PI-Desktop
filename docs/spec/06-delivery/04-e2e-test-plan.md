@@ -16964,11 +16964,36 @@ renderer's durable transcript reads. No real model or provider is contacted.
   `node scripts/e2e-work-panel-reorder.mjs`; focus/IDs/labels/icons also have
   targeted unit coverage. Record the tested commit/base and isolated profile.
 
+### E2E-TEAM-live-task-member-tabs
+
+- **Status:** Implementation validation pending for the visual-parity candidate.
+- **Preconditions:** Isolated Desktop/Host/runtime and local fake SSE provider;
+  the researcher model request is held by the existing explicit fixture gate.
+- **Steps:** Open an owned task from Overview while its owner is running, then
+  open/close Info and verify its expanded state, description, owner and long
+  scopes without horizontal overflow. Click its identity to open the member tab;
+  click the focus title and owner identity to reactivate the existing task/member
+  tabs without duplicates. Release the model gate. Without
+  reopening the member tab, observe its role-tool row, reasoning disclosure and
+  final answer. Select the retained task tab and verify the final transcript.
+  Temporarily fail snapshot reads in the isolated fixture database on each
+  surface, restore the table, and use Retry without losing the transcript.
+  Verify completed member and task glyphs resolve to the current success token.
+- **Expected:** Headers measure about 60 CSS px (58–62 tolerance), with header
+  button hit areas at least 24 px; tabs expose
+  localized log regions, static running glyphs, and no composer or rollback.
+  Transcript events never roll back to stale persistence. Focused controller
+  tests cover coalescing, semantic acknowledgement, terminal replacements,
+  bounded structured tool metadata, restart, errors and StrictMode disposal.
+- **Automation:** `node scripts/e2e-team.mjs`,
+  `node --test apps/desktop/test/team-member-transcript-runtime.test.mjs`,
+  `node scripts/e2e-work-panel-reorder.mjs`. Record candidate/base and profile.
+
 ### E2E-TEAM-horizontal-overflow
 
 - **Status**: Planned for the current repair; the actual overflow offender has not been identified in the integrated app.
 - **Preconditions**: Isolated Desktop candidate, long task subject and unbroken scope/path fixtures, existing minimum chat width, and no user data.
-- **Steps**: Inspect Overview, Team aggregate, board, member/task detail and the three-column shell at 320/450/620px panel widths and 100%/150% font scale in light/dark and English/Chinese. Record the offending element's `clientWidth`/`scrollWidth`, then verify a bounded local fix while exercising Work Panel tab-strip scrolling, Markdown table/code scrolling and panorama world panning.
+- **Steps**: Inspect Overview, Team aggregate, board, member/task detail, independent task tab and the three-column shell at 320/450/620px panel widths and 100%/150% font scale in light/dark and English/Chinese. Record the offending element's `clientWidth`/`scrollWidth`, then verify a bounded local fix while exercising Work Panel tab-strip scrolling, Markdown table/code scrolling and panorama world panning.
 - **Expected**: No page-level horizontal scrollbar or displaced shell content; long content remains accessible in detail, and intentional local scroll/pan surfaces still work.
 - **Automation**: Extend the isolated Team/three-column Electron harness after confirming it measures the production shell. Record the tested commit, panel dimensions, font scale, theme, locale and offender evidence.
 

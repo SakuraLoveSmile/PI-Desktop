@@ -82,6 +82,7 @@ const providerServer = createServer(async (req, res) => {
       titleSystemPrompt.includes("descriptive session title summarizing the conversation");
     let toolCall;
     let finalText;
+    let thinkingText;
     let kind = "agent";
 
     if (isTitleRequest) {
@@ -155,6 +156,7 @@ const providerServer = createServer(async (req, res) => {
         toolCall = { name: "declare_team_strategy", args: { strategy: "lead_only", reason: "This short task needs no specialist." }};
       } else { finalText = "Handled by Lead only."; }
     } else if (userText.includes("Send the exact message TEAM_RESULT")) {
+      thinkingText = "TEAM_MEMBER_THINKING: verify the fixed result before reporting.";
       if (!priorToolNames.includes("send_message")) {
         assert.ok(toolNames.includes("send_message"), "member runtime lacks send_message");
         if (!memberGateUsed) {
@@ -230,6 +232,7 @@ const providerServer = createServer(async (req, res) => {
     const emit = (delta, finishReason = null) => {
       res.write(`data: ${JSON.stringify({ ...base, choices: [{ index: 0, delta, finish_reason: finishReason }] })}\n\n`);
     };
+    if (thinkingText) emit({ role: "assistant", reasoning_content: thinkingText });
     if (toolCall) {
       emit({
         role: "assistant",
@@ -637,6 +640,47 @@ async function verifyStalePanoramaRetry(sendCdp, evaluate) {
   console.log("PASS Panorama stale recovery: failed read retains canvas, Retry remains clickable and restores the snapshot");
 }
 
+async function assertTeamSuccessGlyph(evaluate, selector, label) {
+  const colors = await evaluate(`(() => {
+    const probe=document.createElement('span'); probe.style.color='var(--ds-success)'; document.body.append(probe);
+    try { return { expected:getComputedStyle(probe).color, actual:document.querySelector(${JSON.stringify(selector)}) ? getComputedStyle(document.querySelector(${JSON.stringify(selector)})).color : null }; }
+    finally { probe.remove(); }
+  })()`);
+  assert.equal(colors.actual, colors.expected, `${label} completed glyph uses the success token`);
+}
+
+async function verifyTeamHeaderHitAreas(evaluate, testId) {
+  const result = await evaluate(`(() => {
+    const buttons=Array.from(document.querySelectorAll('[data-testid="${testId}"] .team-work-tab-header button:not(:disabled)'));
+    const rects=buttons.map(button => button.getBoundingClientRect());
+    return { targets: buttons.map((button,index) => {
+      const rect=rects[index], x=rect.left+rect.width/2;
+      return { height:rect.height, width:rect.width,
+        top:document.elementFromPoint(x,rect.top+1)?.closest('button')===button,
+        bottom:document.elementFromPoint(x,rect.bottom-1)?.closest('button')===button };
+    }), overlap:rects.some((a,index) => rects.slice(index+1).some(b =>
+      Math.min(a.right,b.right)>Math.max(a.left,b.left) && Math.min(a.bottom,b.bottom)>Math.max(a.top,b.top))) };
+  })()`);
+  assert.ok(result.targets.length > 0);
+  assert.ok(result.targets.every(target => target.height >= 24 && target.width >= 24 && target.top && target.bottom), `${testId} actual pointer targets: ${JSON.stringify(result)}`);
+  assert.equal(result.overlap, false, `${testId} header pointer targets overlap`);
+}
+
+async function verifyStaleTeamTabRetry(evaluate, testId) {
+  const fixtureDatabase = join(dataDir, "pi.sqlite");
+  const transcriptBefore = await evaluate(`document.querySelector('[data-testid="${testId}"] [role="log"]')?.innerText ?? ''`);
+  execFileSync("sqlite3", [fixtureDatabase, "PRAGMA busy_timeout=5000; ALTER TABLE team_tasks RENAME TO team_tasks_fixture_failure;"]);
+  try {
+    await evaluate(`window.dispatchEvent(new Event('focus'))`);
+    await waitFor(() => evaluate(`!!document.querySelector('[data-testid="${testId}"] .team-error-banner button')`), `${testId} failed-read banner`);
+    assert.equal(await evaluate(`document.querySelector('[data-testid="${testId}"] [role="log"]')?.innerText ?? ''`), transcriptBefore, "snapshot read failure retains the visible member transcript");
+  } finally {
+    execFileSync("sqlite3", [fixtureDatabase, "PRAGMA busy_timeout=5000; ALTER TABLE team_tasks_fixture_failure RENAME TO team_tasks;"]);
+  }
+  await evaluate(`document.querySelector('[data-testid="${testId}"] .team-error-banner button')?.click()`);
+  await waitFor(() => evaluate(`!document.querySelector('[data-testid="${testId}"] .team-error-banner')`), `${testId} Retry restores snapshot`);
+}
+
 async function resizePanel(sendCdp, evaluate, width) {
   const bounds = await evaluate(`(() => {
     const panel = document.querySelector('[data-testid="work-panel"]');
@@ -673,7 +717,7 @@ async function verifyTeamLayoutMatrix(sendCdp, evaluate, locale) {
   let matrixPosition = { locale, surface: "setup" };
   const diagnostics = () => evaluate(`(() => {
     const panel=document.querySelector('[data-testid="work-panel"]');
-    const view=document.querySelector('.team-panel[data-testid],.work-panel-overview');
+    const view=document.querySelector('.team-panel[data-testid],.work-panel-overview,.team-work-tab');
     return { tab: document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id'),
       view: view?.getAttribute('data-testid'), width: panel?.getBoundingClientRect().width,
       resizing: panel?.getAttribute('data-resizing'), fontScale: getComputedStyle(document.documentElement).getPropertyValue('--font-scale'),
@@ -688,7 +732,7 @@ async function verifyTeamLayoutMatrix(sendCdp, evaluate, locale) {
         await waitFor(() => evaluate(`document.querySelectorAll('.team-progress-row').length > 0`), "live task rows for layout matrix");
         if (surface === "taskTab") {
           await evaluate(`document.querySelector('.team-progress-row')?.click()`);
-          await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-task-detail"]')`), "task tab for layout matrix");
+          await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-task-tab"]')`), "task tab for layout matrix");
         } else if (surface !== "overview") {
           await evaluate(`Array.from(document.querySelectorAll('.team-progress button')).find(button => /view all|查看全部/i.test(button.innerText))?.click()`);
           await waitFor(() => evaluate(`!!document.querySelector('.team-board-row')`), "board for layout matrix");
@@ -891,7 +935,7 @@ try {
   assert.equal(manualViewport.zoom, 0.8, "panorama manual zoom should be 80%");
   manualViewport = await refreshWhileDragging(sendCdp, evaluate);
   await evaluate(`document.querySelector('.agent-panorama-node.is-clickable')?.click()`);
-  await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-task-detail"],[data-testid="team-member-detail"]')`), "task/member tab from panorama");
+  await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-task-tab"],[data-testid="team-member-tab"]')`), "task/member tab from panorama");
   assert.match(await evaluate(`document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id')`), new RegExp(`^team:${lead.id}:(task|member):`));
   await evaluate(`document.querySelector('[data-work-panel-tab-id="team:${lead.id}:panorama"] .work-panel-tab-button')?.click()`);
   await waitFor(() => evaluate(`!!document.querySelector('[data-panorama-canvas]')`), "return to panorama tab");
@@ -899,7 +943,7 @@ try {
   const idleMember = activeSnapshot.members.find((item) => item.name === "executor");
   assert.ok(idleMember, "fixture requires a member without assigned tasks");
   await evaluate(`document.querySelector('[data-node-id="${idleMember.memberSessionId}"].is-clickable')?.click()`);
-  await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-member-detail"]')`), "member without focus task opens member tab");
+  await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-member-tab"]')`), "member without focus task opens member tab");
   assert.equal(await evaluate(`document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id')`), `team:${lead.id}:member:${idleMember.memberSessionId}`);
   assert.equal(await evaluate(`document.querySelector('[data-work-panel-tab-id].active .work-panel-tab-button')?.innerText.trim()`), "Sam");
   assert.equal(await evaluate(`document.querySelector('[data-work-panel-tab-id].active .work-panel-tab-button')?.getAttribute('title')`), "Sam");
@@ -912,7 +956,67 @@ try {
   await verifyStalePanoramaRetry(sendCdp, evaluate);
   const waitingImage = await saveScreenshot(sendCdp, "team-panorama-waiting-members.png");
 
+  // Open both live tab surfaces while the local model gate is still held.
+  await activateOverviewTab(sendCdp, evaluate);
+  await waitFor(() => evaluate(`document.querySelectorAll('.team-progress-row').length > 0`), "live task entry before member release");
+  await evaluate(`document.querySelector('.team-progress-row')?.click()`);
+  await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-task-tab"]')`), "live task tab before member release");
+  const liveTaskTabId = await evaluate(`document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id')`);
+  const taskHeaderHeight = await evaluate(`document.querySelector('[data-testid="team-task-tab"] .team-work-tab-header').getBoundingClientRect().height`);
+  assert.ok(Math.abs(taskHeaderHeight - 60) <= 2, `compact task header: ${taskHeaderHeight}`);
+  assert.equal(await evaluate(`document.querySelectorAll('[data-testid="team-task-tab"] textarea,[data-testid="team-task-tab"] .composer').length`), 0);
+  await verifyTeamHeaderHitAreas(evaluate, "team-task-tab");
+  assert.equal(await evaluate(`document.querySelector('[data-testid="team-task-tab"] .team-work-tab-action[aria-expanded]')?.getAttribute('aria-expanded')`), "false");
+  await evaluate(`document.querySelector('[data-testid="team-task-tab"] .team-work-tab-action[aria-expanded]')?.click()`);
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="team-task-tab"] .team-work-tab-action[aria-expanded]')?.getAttribute('aria-expanded') === 'true' && !!document.querySelector('[data-testid="team-task-tab"] .team-work-tab-brief')`), "task Info opens its brief");
+  const brief = await evaluate(`(() => {
+    const surface=document.querySelector('[data-testid="team-task-tab"]'), brief=surface.querySelector('.team-work-tab-brief');
+    return { description:brief.querySelector('.team-card-desc')?.innerText,
+      owner:brief.querySelector('.team-owner-btn')?.innerText,
+      scopes:Array.from(brief.querySelectorAll('.team-detail-field-value')).some(field => field.innerText.includes('long-directory-')),
+      bounded:brief.scrollWidth<=brief.clientWidth && surface.scrollWidth<=surface.clientWidth && document.documentElement.scrollWidth<=document.documentElement.clientWidth };
+  })()`);
+  assert.match(brief.description, /Detail for E2E board fixture task/); assert.match(brief.owner, /Researcher Alex/);
+  assert.equal(brief.scopes, true); assert.equal(brief.bounded, true, `expanded task brief must wrap long description/scopes: ${JSON.stringify(brief)}`);
+  await evaluate(`document.querySelector('[data-testid="team-task-tab"] .team-work-tab-action[aria-expanded]')?.click()`);
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="team-task-tab"] .team-work-tab-action[aria-expanded]')?.getAttribute('aria-expanded') === 'false' && !document.querySelector('[data-testid="team-task-tab"] .team-work-tab-brief')`), "task Info closes its brief");
+  await evaluate(`document.querySelector('[data-testid="team-task-tab"] .team-work-tab-identity')?.click()`);
+  await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-member-tab"]')`), "owner opens live member tab");
+  assert.equal(await evaluate(`document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id')`), `team:${lead.id}:member:${member.memberSessionId}`);
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="team-member-tab"] .team-work-tab-status')?.innerText.includes('Running')`), "member tab reflects running snapshot phase");
+  const memberHeaderHeight = await evaluate(`document.querySelector('[data-testid="team-member-tab"] .team-work-tab-header').getBoundingClientRect().height`);
+  assert.ok(Math.abs(memberHeaderHeight - 60) <= 2, `compact member header: ${memberHeaderHeight}`);
+  assert.equal(await evaluate(`document.querySelectorAll('[data-testid="team-member-tab"] textarea,[data-testid="team-member-tab"] .composer,[data-testid="team-member-tab"] .inline-review-card').length`), 0);
+  await verifyTeamHeaderHitAreas(evaluate, "team-member-tab");
+  const liveTabCount = await evaluate(`document.querySelectorAll('[data-work-panel-tab-id]').length`);
+  await evaluate(`document.querySelector('[data-testid="team-member-tab"] .team-work-tab-task-link')?.click()`);
+  await waitFor(() => evaluate(`document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id') === ${JSON.stringify(liveTaskTabId)} && !!document.querySelector('[data-testid="team-task-tab"]')`), "member focus title reactivates its stored task tab");
+  assert.equal(await evaluate(`document.querySelectorAll('[data-work-panel-tab-id]').length`), liveTabCount, "member focus navigation reuses the task tab");
+  await evaluate(`document.querySelector('[data-testid="team-task-tab"] .team-work-tab-identity')?.click()`);
+  await waitFor(() => evaluate(`document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id') === 'team:${lead.id}:member:${member.memberSessionId}' && !!document.querySelector('[data-testid="team-member-tab"]')`), "owner navigation returns to its stored member tab");
+  assert.equal(await evaluate(`document.querySelectorAll('[data-work-panel-tab-id]').length`), liveTabCount, "owner navigation reuses the member tab");
   releaseModelRequest("member");
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="team-member-tab"]')?.innerText.includes('TEAM_RESULT was sent to Lead.')`), "live final answer appears without reopening", 60_000);
+  await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-member-tab"] .team-transcript-tool-item .tool-row') && !!document.querySelector('[data-testid="team-member-tab"] .thinking')`), "live tool and thinking rows without reopening");
+  await evaluate(`document.querySelector('[data-testid="team-member-tab"] .thinking:not(.open) button')?.click()`);
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="team-member-tab"]')?.innerText.includes('TEAM_MEMBER_THINKING')`), "thinking disclosure shows real reasoning text");
+  // message_end is visible before agent_end; keep fault injection away from
+  // the member's shutdown and the Lead's queued mailbox/context work.
+  await waitFor(async () => {
+    const snapshot = await invoke("teamGetSnapshot", { teamSessionId: lead.id });
+    if (snapshot.leadPhase === "running" || snapshot.queuedMessageCount !== 0 ||
+      snapshot.members.some((item) => item.phase === "running" || item.phase === "provisioning")) return false;
+    const statuses = await Promise.all([lead.id, ...snapshot.members.map((item) => item.memberSessionId)]
+      .map((sessionId) => invoke("agentGetStatus", sessionId)));
+    return statuses.every((result) => result.status?.isRunning === false);
+  }, "all Team actors and mailbox settled before snapshot fault injection", 60_000);
+  await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-member-tab"] .team-work-tab-status[data-phase="completed"] > svg')`), "member tab reflects completed snapshot phase");
+  await assertTeamSuccessGlyph(evaluate, '[data-testid="team-member-tab"] .team-work-tab-status > svg', "member");
+  await verifyStaleTeamTabRetry(evaluate, "team-member-tab");
+  await evaluate(`document.querySelector('[data-work-panel-tab-id="${liveTaskTabId}"] .work-panel-tab-button')?.click()`);
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="team-task-tab"]')?.innerText.includes('TEAM_RESULT was sent to Lead.')`), "retained task tab receives final transcript");
+  await verifyStaleTeamTabRetry(evaluate, "team-task-tab");
+  console.log(`PASS Live Team task/member tabs: running→thinking/tool/final without reopening; headers ${taskHeaderHeight}/${memberHeaderHeight}px; no composer/rollback`);
 
   let roster;
   await waitFor(async () => {
@@ -947,11 +1051,14 @@ try {
   await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.completed === '1' && document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.total === '6'`), "mounted Overview refreshes before the running turn settles");
   releaseModelRequest("taskUpdate");
   await waitFor(async () => (await invoke("agentGetStatus", lead.id)).status?.isRunning === false, "Lead settled after task completion fixture");
+  await evaluate(`document.querySelector('[data-work-panel-tab-id="${liveTaskTabId}"] .work-panel-tab-button')?.click()`);
+  await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-task-tab"] .team-task-glyph[data-state="completed"] svg')`), "stored task tab reflects completed snapshot state");
+  await assertTeamSuccessGlyph(evaluate, '[data-testid="team-task-tab"] .team-task-glyph[data-state="completed"] svg', "task");
   await activateOverviewTab(sendCdp, evaluate);
   await waitFor(() => evaluate(`document.querySelectorAll('[data-testid="overview-team-progress"] .team-progress-row').length === 5`), "five compact Overview task rows");
   assert.match(await evaluate(`document.querySelector('[data-testid="overview-tab"]')?.innerText ?? ''`), /researcher|Alex/i, "Overview should expose the Team task/member summary");
   await evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-row')?.click()`);
-  await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-task-detail"]')`), "Overview opens independent task tab");
+  await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-task-tab"]')`), "Overview opens independent task tab");
   const taskTabId = await evaluate(`document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id')`);
   assert.match(taskTabId, new RegExp(`^team:${lead.id}:task:`));
   assert.equal(await evaluate(`(() => { const button=document.querySelector('[data-work-panel-tab-id].active .work-panel-tab-button'); return button.getAttribute('title') === button.innerText.trim(); })()`), true, "task tooltip equals its captured label");

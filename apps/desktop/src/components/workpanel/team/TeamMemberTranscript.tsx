@@ -1,59 +1,48 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import type { UiMessage } from "@pi-desktop/shared";
-import { api } from "../../../lib/api";
-import { IconCircleAlert, IconRefresh } from "../../icons";
+import { useTeamMemberTranscript } from "../../../hooks/useTeamMemberTranscript";
+import { useTeamSnapshot } from "../../../hooks/useTeamSnapshot";
+import { useFollowScroll } from "../../../hooks/use-follow-scroll";
+import { DisclosureAnchorContext } from "../../../lib/disclosure-anchor-context";
+import { TooltipButton } from "../../ui";
+import { IconArrowDown, IconCircleAlert, IconRefresh } from "../../icons";
 import { TranscriptDisclosureProvider } from "../../../features/chat/transcript/disclosure";
 import { ToolRow } from "../../../features/chat/transcript/ToolRow";
 import { Markdown } from "../../Markdown";
 import { AssistantErrorMessage, ThinkingRow } from "../../../features/chat/transcript/shared";
 import { buildTeamMemberTranscriptRows } from "../../../lib/team-member-transcript";
 
-export function TeamMemberTranscript({ memberSessionId, isRunning = false }: { memberSessionId: string; isRunning?: boolean }) {
+export function TeamMemberTranscript({ memberSessionId, teamSessionId, isRunning = false, tabBody = false }: {
+  memberSessionId: string; teamSessionId?: string; isRunning?: boolean; tabBody?: boolean;
+}) {
   const { t } = useTranslation();
-  const [messages, setMessages] = useState<UiMessage[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const loadSeqRef = useRef(0);
-
-  useEffect(() => {
-    const seq = ++loadSeqRef.current;
-    setLoading(true);
-    setError(null);
-    api.getSession(memberSessionId)
-      .then((detail) => {
-        if (seq !== loadSeqRef.current) return;
-        setMessages(detail?.session?.messages ?? []);
-      })
-      .catch((err) => {
-        if (seq !== loadSeqRef.current) return;
-        setError(err instanceof Error ? err.message : String(err));
-      })
-      .finally(() => {
-        if (seq === loadSeqRef.current) setLoading(false);
-      });
-  }, [memberSessionId]);
-
+  const { snapshot } = useTeamSnapshot(teamSessionId);
+  const { messages, loading, error, truncated } = useTeamMemberTranscript(memberSessionId, { snapshotRevision: snapshot?.revision });
+  const { scrollRef, contentRef, showJump, handleScroll, jumpToLatest, scheduleFollowScroll, disclosureAnchorNotifier } = useFollowScroll();
+  useLayoutEffect(() => { if (tabBody) jumpToLatest(); }, [tabBody, memberSessionId, jumpToLatest]);
+  useLayoutEffect(() => { if (tabBody) scheduleFollowScroll(); }, [tabBody, messages, scheduleFollowScroll]);
   const rows = useMemo(() => buildTeamMemberTranscriptRows(messages), [messages]);
 
-  return (
-    <section className="team-section team-transcript-section">
-      <div className="team-section-header">
-        <span>{t("team.transcript")}</span>
-      </div>
-      {loading ? (
+  const content = (
+    <div ref={tabBody ? contentRef : undefined}>
+      {!tabBody ? <div className="team-section-header"><span>{t("team.transcript")}</span></div> : null}
+      {truncated ? <p className="team-transcript-notice" role="status">{t("team.transcriptTruncated")}</p> : null}
+      {loading && rows.length === 0 ? (
         <div className="team-loading-state">
           <IconRefresh className="animate-spin" size={18} />
           <span>{t("common.loading")}</span>
         </div>
-      ) : error ? (
+      ) : null}
+      {error ? (
         <div className="team-error-state">
           <IconCircleAlert size={20} />
           <span>{error}</span>
         </div>
-      ) : rows.length === 0 ? (
+      ) : null}
+      {!loading && !error && rows.length === 0 ? (
         <div className="team-empty-state">{t("team.noTranscript")}</div>
-      ) : (
+      ) : null}
+      {rows.length > 0 ? (
         <TranscriptDisclosureProvider key={memberSessionId}>
           <div className="team-transcript-list">
             {rows.map(({ kind, message }) => kind === "user" ? (
@@ -85,7 +74,16 @@ export function TeamMemberTranscript({ memberSessionId, isRunning = false }: { m
             ))}
           </div>
         </TranscriptDisclosureProvider>
-      )}
-    </section>
+      ) : null}
+    </div>
+  );
+  if (!tabBody) return <section className="team-section team-transcript-section">{content}</section>;
+  return (
+    <DisclosureAnchorContext.Provider value={disclosureAnchorNotifier}>
+      <div ref={scrollRef} className="team-work-tab-body" data-scroll-owner="follow" onScroll={handleScroll}
+        role="log" aria-live="polite" aria-label={t("team.transcript")} tabIndex={0}>{content}</div>
+      {showJump ? <TooltipButton className="jump-latest-btn team-work-tab-jump" tooltip={t("chat.scrollToBottom")}
+        ariaLabel={t("chat.scrollToBottom")} onClick={jumpToLatest}><IconArrowDown size={14} /></TooltipButton> : null}
+    </DisclosureAnchorContext.Provider>
   );
 }
