@@ -4,7 +4,6 @@ import type {
   TeamMemberRecord,
   TeamSnapshot,
   TeamTaskRecord,
-  UiMessage,
 } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
 import { requestedView, type TeamDetailView } from "../../lib/team-panel-view";
@@ -27,11 +26,8 @@ import {
   IconWorkflow,
 } from "../icons";
 import { Button, TooltipButton } from "../ui";
-import { TranscriptDisclosureProvider } from "../../features/chat/transcript/disclosure";
-import { ToolRow } from "../../features/chat/transcript/ToolRow";
-import { Markdown } from "../Markdown";
-import { AssistantErrorMessage } from "../../features/chat/transcript/shared";
-import { ReviewChangeCard } from "../ReviewChangeCard";
+import { TeamMemberTranscript } from "./team/TeamMemberTranscript";
+import { TeamTaskBrief } from "./team/TeamTaskBrief";
 import { CompactTeamBoard } from "./team/CompactTeamBoard";
 import { TeamStatusBadge } from "./team/TeamStatusBadge";
 import { MemberIdentity, TeamTaskProgress } from "./team/TeamTaskProgress";
@@ -439,29 +435,6 @@ function TeamMemberDetail({
   onSelectTask: (taskId: string) => void;
 }) {
   const { t } = useTranslation();
-  const [messages, setMessages] = useState<UiMessage[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const loadSeqRef = useRef(0);
-
-  useEffect(() => {
-    const seq = ++loadSeqRef.current;
-    setLoading(true);
-    setError(null);
-    api.getSession(member.memberSessionId)
-      .then((detail) => {
-        if (seq !== loadSeqRef.current) return;
-        setMessages(detail?.session?.messages ?? []);
-      })
-      .catch((err) => {
-        if (seq !== loadSeqRef.current) return;
-        setError(err instanceof Error ? err.message : String(err));
-      })
-      .finally(() => {
-        if (seq === loadSeqRef.current) setLoading(false);
-      });
-  }, [member.memberSessionId]);
-
   const assignedTasks = tasks.filter(
     (task) =>
       task.ownerSessionId === member.memberSessionId ||
@@ -566,86 +539,7 @@ function TeamMemberDetail({
         )}
       </section>
 
-      <section className="team-section team-transcript-section">
-        <div className="team-section-header">
-          <span>{t("team.transcript")}</span>
-        </div>
-        {loading ? (
-          <div className="team-loading-state">
-            <IconRefresh className="animate-spin" size={18} />
-            <span>{t("common.loading")}</span>
-          </div>
-        ) : error ? (
-          <div className="team-error-state">
-            <IconCircleAlert size={20} />
-            <span>{error}</span>
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="team-empty-state">{t("team.noTranscript")}</div>
-        ) : (
-          <TranscriptDisclosureProvider key={member.memberSessionId}>
-            <div className="team-transcript-list">
-              {messages.map((message) => {
-                if (message.role === "user") {
-                  return (
-                    <div key={message.id} className="message-row user">
-                      <div className="message-col">
-                        <div className="message-bubble">
-                          <div className="message-user-text selectable">
-                            {message.content}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                }
-                if (message.role === "assistant") {
-                  if (message.toolName) {
-                    return (
-                      <div key={message.id} className="team-transcript-tool-item">
-                        <ToolRow message={message} />
-                        <ReviewChangeCard message={message} />
-                      </div>
-                    );
-                  }
-                  if (message.content) {
-                    return (
-                      <div
-                        key={message.id}
-                        className="message-row assistant"
-                        data-message-id={message.id}
-                      >
-                        <div className="message-col">
-                          <div className="message-bubble">
-                            <div className="prose-chat selectable">
-                              <Markdown source={message.content} />
-                            </div>
-                            {message.error ? (
-                              <AssistantErrorMessage message={message} />
-                            ) : null}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-                  if (message.error) {
-                    return (
-                      <div key={message.id} className="message-row assistant">
-                        <div className="message-col">
-                          <div className="message-bubble">
-                            <AssistantErrorMessage message={message} />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-                }
-                return null;
-              })}
-            </div>
-          </TranscriptDisclosureProvider>
-        )}
-      </section>
+      <TeamMemberTranscript memberSessionId={member.memberSessionId} />
     </div>
   );
 }
@@ -715,59 +609,8 @@ function TeamTaskDetail({
         ) : null}
       </section>
 
-      <section className="team-section">
-        <div className="team-detail-field">
-          <span className="team-detail-field-label">{t("team.taskOwner")}</span>
-          {ownerMember ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              onClick={() => onSelectMember(ownerMember.memberSessionId)}
-              className="team-owner-btn"
-            >
-              {identities.get(ownerMember.memberSessionId) ? (
-                <MemberIdentity member={identities.get(ownerMember.memberSessionId)!} />
-              ) : ownerMember.name}
-            </Button>
-          ) : (
-            <span className="team-detail-field-value">
-              {task.ownerMemberName ?? t("team.unassigned")}
-            </span>
-          )}
-        </div>
-
-        {task.blockedBy.length > 0 ? (
-          <div className="team-detail-field">
-            <span className="team-detail-field-label">{t("team.taskReadiness")}</span>
-            <span className="team-detail-field-value">
-              {t("team.blockedBy", {
-                tasks: task.blockedBy.map((id) => `#${id}`).join(", "),
-              })}
-            </span>
-          </div>
-        ) : null}
-
-        {task.writeScopes.length > 0 ? (
-          <div className="team-detail-field">
-            <span className="team-detail-field-label">{t("team.taskScopes")}</span>
-            <span className="team-detail-field-value">
-              {t("team.scopes", { scopes: task.writeScopes.join(", ") })}
-            </span>
-          </div>
-        ) : null}
-        {taskOverlaps.map((overlap) => (
-          <div key={`${overlap.scope}-${overlap.taskIds.join("-")}`} className="team-detail-field">
-            <span className="team-detail-field-label">{t("team.warnings")}</span>
-            <span className="team-detail-field-value">
-              {t("team.overlapTask", {
-                tasks: overlap.taskIds.map((id) => `#${id}`).join(", "),
-                scope: overlap.scope,
-              })}
-            </span>
-          </div>
-        ))}
-      </section>
+      <TeamTaskBrief task={task} ownerMember={ownerMember} identities={identities}
+        taskOverlaps={taskOverlaps} onSelectMember={onSelectMember} />
     </div>
   );
 }

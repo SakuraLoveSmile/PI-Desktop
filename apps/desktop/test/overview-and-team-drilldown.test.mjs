@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const [overviewSource, teamPanelSource, englishLocaleSource, chineseLocaleSource] = await Promise.all([
+const [overviewSource, teamPanelSource, memberTranscriptSource, englishLocaleSource, chineseLocaleSource] = await Promise.all([
   readFile(new URL("../src/components/workpanel/OverviewTab.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/components/workpanel/TeamPanel.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../src/components/workpanel/team/TeamMemberTranscript.tsx", import.meta.url), "utf8"),
   readFile(new URL("../../../packages/i18n/src/locales/en/index.ts", import.meta.url), "utf8"),
   readFile(new URL("../../../packages/i18n/src/locales/zh-CN/index.ts", import.meta.url), "utf8"),
 ]);
@@ -36,8 +37,8 @@ test("TeamPanel implements in-panel read-only member and task detail with back b
   assert.match(teamPanelSource, /team\.taskDetail/);
   assert.match(teamPanelSource, /team\.back/);
   assert.match(teamPanelSource, /team\.assignedTasks/);
-  assert.match(teamPanelSource, /team\.transcript/);
-  assert.match(teamPanelSource, /api\.getSession/);
+  assert.match(memberTranscriptSource, /team\.transcript/);
+  assert.match(memberTranscriptSource, /api\.getSession/);
   assert.match(teamPanelSource, /team-clickable-card/);
 });
 
