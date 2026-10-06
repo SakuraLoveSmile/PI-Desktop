@@ -101,6 +101,41 @@ test("replacement, optimistic reconciliation, and empty terminal tombstones prev
   assert.ok(!ids.includes("provisional") && !ids.includes("empty") && !ids.includes("optimistic")); dispose();
 });
 
+test("missed tool start adopts durable details and acknowledges unordered result JSON", async () => {
+  let durable = [];
+  const h = harness(async () => detail(durable));
+  const dispose = h.controller.start(); await flush();
+  const result = { stdout: "done", stderr: "", exitCode: 0 };
+  h.emit({ type: "tool_end", toolCallId: "late-tool", result }); await flush();
+  durable = [message("late-tool", "", { role: "tool", toolCallId: "late-tool",
+    toolName: "Bash", toolArgs: { command: "echo done" }, toolStatus: "running", status: "streaming" })];
+  await h.controller.refresh();
+  assert.equal(h.controller.getState().messages[0].toolName, "Bash");
+  assert.deepEqual(h.controller.getState().messages[0].toolArgs, { command: "echo done" });
+  assert.equal(h.controller.getState().messages[0].toolStatus, "success", "stale persistence cannot erase final event");
+  durable = [{ ...durable[0], content: JSON.stringify(result, null, 2), toolResult: result,
+    toolStatus: "success", status: "complete", toolDurationMs: 42 }];
+  await h.controller.refresh();
+  assert.equal(h.controller.getState().messages[0].toolDurationMs, 42);
+  durable = [{ ...durable[0], toolDurationMs: 43, toolArgs: { command: "durable enrichment" } }];
+  await h.controller.refresh();
+  assert.deepEqual(h.controller.getState().messages[0].toolArgs, { command: "durable enrichment" }, "acknowledgment releases the overlay");
+  dispose();
+});
+
+test("complete tool overlays acknowledge semantically equal result content", async () => {
+  const result = { stdout: "done", stderr: "", exitCode: 0 };
+  let durable = [];
+  const h = harness(async () => detail(durable)); const dispose = h.controller.start(); await flush();
+  h.emit({ type: "tool_start", toolCallId: "tool", toolName: "Bash", args: { command: "echo done" } });
+  h.emit({ type: "tool_end", toolCallId: "tool", result }); await flush();
+  durable = [{ ...h.controller.getState().messages[0], content: JSON.stringify(result, null, 2), toolResult: result }];
+  await h.controller.refresh();
+  durable = [{ ...durable[0], toolArgs: { command: "updated metadata" } }]; await h.controller.refresh();
+  assert.deepEqual(h.controller.getState().messages[0].toolArgs, { command: "updated metadata" });
+  dispose();
+});
+
 test("terminal tool overlay survives stale persistence and bounded values keep real ToolRow semantics", async () => {
   let durable = [message("t", "", { role: "tool", toolCallId: "t", toolName: "Bash", toolStatus: "running", status: "streaming", toolArgs: { command: "exit 7" } })];
   const h = harness(async () => detail(durable)); const dispose = h.controller.start(); await flush();

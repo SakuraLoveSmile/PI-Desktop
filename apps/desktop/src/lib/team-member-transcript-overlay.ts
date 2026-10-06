@@ -104,6 +104,11 @@ export function teamMemberVisibleMessageMatches(durable: UiMessage, live: UiMess
   const metadata = ["toolDurationMs", "providerId", "modelId", "usage", "toolUsage"] as const;
   return metadata.every((key) => live[key] === undefined || equalValue(durable[key], live[key])) && fields.every((key) => {
     if (partial && live[key] === undefined) return true;
+    // ToolRow renders the structured result. Its JSON presentation can differ
+    // in property order between the event preview and persisted transcript.
+    if (key === "content" && live.role === "tool" && live.toolResult !== undefined && durable.toolResult !== undefined) {
+      return equalValue(durable.toolResult, live.toolResult);
+    }
     const fallback = key === "thinking" ? "" : key === "isError" ? false : undefined;
     return equalValue(durable[key] ?? fallback, live[key] ?? fallback);
   });
