@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { UiMessage } from "@pi-desktop/shared";
 import { api } from "../../../lib/api";
@@ -6,10 +6,10 @@ import { IconCircleAlert, IconRefresh } from "../../icons";
 import { TranscriptDisclosureProvider } from "../../../features/chat/transcript/disclosure";
 import { ToolRow } from "../../../features/chat/transcript/ToolRow";
 import { Markdown } from "../../Markdown";
-import { AssistantErrorMessage } from "../../../features/chat/transcript/shared";
-import { ReviewChangeCard } from "../../ReviewChangeCard";
+import { AssistantErrorMessage, ThinkingRow } from "../../../features/chat/transcript/shared";
+import { buildTeamMemberTranscriptRows } from "../../../lib/team-member-transcript";
 
-export function TeamMemberTranscript({ memberSessionId }: { memberSessionId: string }) {
+export function TeamMemberTranscript({ memberSessionId, isRunning = false }: { memberSessionId: string; isRunning?: boolean }) {
   const { t } = useTranslation();
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,6 +34,8 @@ export function TeamMemberTranscript({ memberSessionId }: { memberSessionId: str
       });
   }, [memberSessionId]);
 
+  const rows = useMemo(() => buildTeamMemberTranscriptRows(messages), [messages]);
+
   return (
     <section className="team-section team-transcript-section">
       <div className="team-section-header">
@@ -49,68 +51,38 @@ export function TeamMemberTranscript({ memberSessionId }: { memberSessionId: str
           <IconCircleAlert size={20} />
           <span>{error}</span>
         </div>
-      ) : messages.length === 0 ? (
+      ) : rows.length === 0 ? (
         <div className="team-empty-state">{t("team.noTranscript")}</div>
       ) : (
         <TranscriptDisclosureProvider key={memberSessionId}>
           <div className="team-transcript-list">
-            {messages.map((message) => {
-              if (message.role === "user") {
-                return (
-                  <div key={message.id} className="message-row user">
-                    <div className="message-col">
-                      <div className="message-bubble">
-                        <div className="message-user-text selectable">
-                          {message.content}
-                        </div>
-                      </div>
-                    </div>
+            {rows.map(({ kind, message }) => kind === "user" ? (
+              <div key={`user-${message.id}`} className="message-row user">
+                <div className="message-col">
+                  <div className="message-bubble">
+                    <div className="message-user-text selectable">{message.content}</div>
                   </div>
-                );
-              }
-              if (message.role === "assistant") {
-                if (message.toolName) {
-                  return (
-                    <div key={message.id} className="team-transcript-tool-item">
-                      <ToolRow message={message} />
-                      <ReviewChangeCard message={message} />
-                    </div>
-                  );
-                }
-                if (message.content) {
-                  return (
-                    <div
-                      key={message.id}
-                      className="message-row assistant"
-                      data-message-id={message.id}
-                    >
-                      <div className="message-col">
-                        <div className="message-bubble">
-                          <div className="prose-chat selectable">
-                            <Markdown source={message.content} />
-                          </div>
-                          {message.error ? (
-                            <AssistantErrorMessage message={message} />
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                }
-                if (message.error) {
-                  return (
-                    <div key={message.id} className="message-row assistant">
-                      <div className="message-col">
-                        <div className="message-bubble">
-                          <AssistantErrorMessage message={message} />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                }
-              }
-              return null;
-            })}
+                </div>
+              </div>
+            ) : kind === "tool" ? (
+              <div key={`tool-${message.id}`} className="team-transcript-tool-item">
+                <ToolRow message={message} />
+              </div>
+            ) : kind === "thinking" ? (
+              <ThinkingRow key={`thinking-${message.id}`} message={message}
+                streaming={isRunning && message.status === "streaming"} />
+            ) : (
+              <div key={`answer-${message.id}`} className="message-row assistant" data-message-id={message.id}>
+                <div className="message-col">
+                  <div className="message-bubble">
+                    {message.content ? (
+                      <div className="prose-chat selectable"><Markdown source={message.content} /></div>
+                    ) : null}
+                    {message.error ? <AssistantErrorMessage message={message} /> : null}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </TranscriptDisclosureProvider>
       )}
