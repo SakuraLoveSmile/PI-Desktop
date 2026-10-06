@@ -1968,6 +1968,7 @@ sklm: {
     taskDetail: "任务详情",
     back: "返回",
     assignedTasks: "分配的任务",
+    transcriptTruncated: "较早的消息未显示，打开会话可查看完整转写。",
     transcript: "成员对话记录",
     noTranscript: "该成员暂无消息记录。",
     noAssignedTasks: "该成员暂无分配任务。",

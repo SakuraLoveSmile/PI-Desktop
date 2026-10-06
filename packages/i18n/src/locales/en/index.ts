@@ -2007,6 +2007,7 @@ sklm: {
     taskDetail: "Task Detail",
     back: "Back",
     assignedTasks: "Assigned Tasks",
+    transcriptTruncated: "Earlier messages are hidden. Open the conversation to read the full transcript.",
     transcript: "Teammate Transcript",
     noTranscript: "No messages from this teammate yet.",
     noAssignedTasks: "No tasks assigned to this teammate.",
