@@ -739,6 +739,7 @@ export function useTranscriptScroll({
     showJump,
     historyEntries,
     tailEntry,
+    transcriptEntries: entries,
     minimapMessages,
     hasEarlierHistory,
     hydrationBounded,

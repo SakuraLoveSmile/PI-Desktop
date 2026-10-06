@@ -1,4 +1,4 @@
-import { memo, useMemo, type MouseEvent as ReactMouseEvent } from "react";
+import { memo, useMemo, useRef, type MouseEvent as ReactMouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 import type { PlanProposal, PlanningState, UiMessage } from "@pi-desktop/shared";
 import { proposalKindForMode } from "@pi-desktop/shared";
@@ -34,6 +34,8 @@ import {
 } from "./TranscriptMenu";
 import { conversationMenuItems } from "./menu-items";
 import { ThinkingDisplayControl } from "./ThinkingDisplayControl";
+import { buildPlanTranscriptIndex } from "../../../lib/plan-transcript";
+import { PlanTranscriptContext } from "../../../lib/plan-transcript-context";
 import { buildTeamDispatchIndex, TeamDispatchContext } from "../../../lib/team-dispatch";
 import { SlotSessionProvider } from "../../../plugins/renderer-slots/use-slots";
 
@@ -123,22 +125,6 @@ function TranscriptBody({
   const currentProposal = useAppStore((state) =>
     sessionId ? state.pendingPlans[sessionId] : undefined,
   );
-  const visibleToolCalls = new Set(messages.map((message) => message.toolCallId));
-  const orphanedProposals: PlanProposal[] = [];
-  const orphanedIds = new Set<string>();
-  for (const proposal of [...sessionProposals, currentProposal]) {
-    if (!proposal || visibleToolCalls.has(proposal.toolCallId) || orphanedIds.has(proposal.id)) continue;
-    orphanedIds.add(proposal.id);
-    orphanedProposals.push(proposal);
-  }
-  orphanedProposals.sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt));
-  const firstVisibleMessageAt = messages[0] ? Date.parse(messages[0].createdAt) : NaN;
-  const olderOrphanedProposals = orphanedProposals.filter(
-    (proposal) => Number.isFinite(firstVisibleMessageAt) && Date.parse(proposal.createdAt) < firstVisibleMessageAt,
-  );
-  const recentOrphanedProposals = orphanedProposals.filter(
-    (proposal) => !olderOrphanedProposals.includes(proposal),
-  );
   // Plan and Goal both project `planning`; the durable mode names which
   // contract is being written, so the indicator can use that kind's copy.
   const planningKind = useAppStore(
@@ -168,6 +154,7 @@ function TranscriptBody({
     showJump,
     historyEntries,
     tailEntry,
+    transcriptEntries,
     minimapMessages,
     hasEarlierHistory,
     hydrationBounded,
@@ -193,6 +180,15 @@ function TranscriptBody({
     searchTarget,
     readingWindow,
   });
+
+  const previousPlanIndex = useRef<ReturnType<typeof buildPlanTranscriptIndex>>(undefined);
+  const planTranscriptIndex = useMemo(() => buildPlanTranscriptIndex(
+    transcriptEntries,
+    currentProposal ? [...sessionProposals, currentProposal] : sessionProposals,
+    sessionId,
+    previousPlanIndex.current,
+  ), [transcriptEntries, sessionProposals, currentProposal, sessionId]);
+  previousPlanIndex.current = planTranscriptIndex;
 
   const specializedActivity = agentActivity;
   const hasSpecializedActivity = specializedActivity !== undefined;
@@ -266,6 +262,7 @@ function TranscriptBody({
     <TranscriptSearchContext.Provider value={searchTarget}>
     <DisclosureAnchorContext.Provider value={disclosureAnchorNotifier}>
     <TeamDispatchContext.Provider value={teamDispatchIndex}>
+    <PlanTranscriptContext.Provider value={planTranscriptIndex}>
     <SlotSessionProvider sessionId={sessionId ?? ""}>
     <div
       className="thread-wrap"
@@ -330,7 +327,7 @@ function TranscriptBody({
             // view, which is exactly the jitter this avoids.
             <div className="transcript-hydration-spacer" aria-hidden />
           ) : null}
-          {!readingWindow ? olderOrphanedProposals.map((proposal) => (
+          {!readingWindow ? planTranscriptIndex.beforeEntries.map((proposal) => (
             <PlanApprovalBar key={proposal.id} proposal={proposal} />
           )) : null}
           <TranscriptHistory entries={historyEntries} isRunning={isRunning} />
@@ -354,9 +351,6 @@ function TranscriptBody({
           ) : null}
           {!readingWindow ? (
             <>
-              {recentOrphanedProposals.map((proposal) => (
-                <PlanApprovalBar key={proposal.id} proposal={proposal} />
-              ))}
               {goalReports?.filter(shouldPresentGoalReportInTranscript).map((report) => (
                 <GoalReportCard
                   key={report.reportId}
@@ -441,6 +435,7 @@ function TranscriptBody({
       ) : null}
     </div>
     </SlotSessionProvider>
+    </PlanTranscriptContext.Provider>
     </TeamDispatchContext.Provider>
     </DisclosureAnchorContext.Provider>
     </TranscriptSearchContext.Provider>
