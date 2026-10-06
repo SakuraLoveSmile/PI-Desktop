@@ -15,6 +15,8 @@ target/
 apps/desktop/out/
 apps/desktop/dist-electron/
 apps/desktop/release/
+apps/desktop/release-local-*/
+apps/desktop/release-signed-*/
 packages/*/dist/
 packages/*/dist-bundle/
 apps/*/dist-bundle/
