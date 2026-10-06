@@ -1,6 +1,6 @@
 # Expert Team Visual Parity Plan
 
-Status: planned, not started. Revision: `team-visual-v1`, 2026-10-06, Asia/Taipei.
+Status: locally validated; awaiting user acceptance. Revision: `team-visual-v1`, 2026-10-06, Asia/Taipei.
 
 ## Integration baseline — 2026-10-06
 
@@ -1740,19 +1740,151 @@ Required test cases:
 7. `readOptions` reaches `getSession` unchanged.
 8. Host restart and focus each trigger a read.
 
-## Appendix H — Execution record template (integrator; appended to this file in the optional final docs commit)
+## Appendix H — Execution record (2026-10-06, Asia/Taipei)
 
-```text
-WP | Commit | Executor report OK | Reviewer OK | Checks | E2E | Deviations | STOPs
-A  |        |                    |             |        |     |            |
-…
-Task candidate:
-Base main:
-E2E suites:
-Result:
-Environment:
-Remaining user decisions:
-```
+All ten work packages are implemented and independently reviewed. Local
+validation is complete; user acceptance is pending. No push, PR, merge,
+installation, or release was performed. The primary checkout, its four
+untracked release directories, and other tasks' dirty worktrees were preserved.
+
+### Candidate and environment
+
+- Task candidate: `400ea2339abbdf9cd1a660f9d4e8c52c0a8e7d6c`.
+- Base main: `97388c1713aa5453de0b4b8012ac08dec3367038`.
+- Final refresh: `git fetch origin main` and `git rebase origin/main`;
+  branch already current. `node scripts/check-pr-base-main.mjs` passed.
+- Request branch: `feat/expert-team-visual-parity`.
+- Worktree: `../PI-Desktop-worktrees/expert-team-visual-parity`.
+- Dependencies: symlink overlays reuse the primary installation, with workspace
+  package links pointing to this worktree. No dependencies were installed.
+- Workspace dists were built using the installed TypeScript executable.
+  The initial RACP build-order failure was resolved by building agent-host first.
+- Host: `CARGO_TARGET_DIR=/tmp/pi-expert-team-visual-parity-target cargo build
+  -p host-core --locked`, successful; that binary was passed through
+  `PI_DESKTOP_HOST_BIN`.
+- Real Electron/Main/Host used temporary profiles and deterministic local model
+  fixtures. The runner removed `ANTHROPIC_*`, `CLAUDECODE`, and optional live-model
+  test variables. The user's running application and real providers were not used.
+- Final logs and selected screenshots are in the ignored local directory
+  `.review-evidence/expert-team-visual-parity-400ea2339/`. They are not committed.
+- The integrator personally inspected the card, overview, panorama, and task-tab
+  screenshots. These are actual Electron captures with synthetic fixture data.
+
+### Work packages
+
+| WP | Commit | Executor report | Independent review | Local checks | Actual UI coverage |
+| --- | --- | --- | --- | --- | --- |
+| A | `50954cc55` | OK | OK | 17 focused + 88 protected tests; types/style/i18n/architecture | Single control, live state, identity, card 61.789px |
+| B | `8fbba87b8` | OK | OK | 19 focused + 34 turn tests; types/style/i18n/architecture | Joining appears/disappears; forced reduced-motion has no animation |
+| C | `132b78306` | OK | OK | 22 focused tests plus strengthened glyph checks; types/style/i18n/architecture | Header 48px, row 50px, dashed sections, real collapse, ordinary Progress retained |
+| D | `df062001a` | OK | OK | 10 tests; types/style/i18n/architecture; viewport code comparison | Nodes 276x86, avatars 32x32, icon toolbar, zoom/pan/refresh/resize |
+| E1 | `2e655beaa` | OK | OK | 20 tests; types/architecture; TeamPanel 859 to 843 lines | Covered by E2/final navigation |
+| E2 | `e7789f74f` | OK | OK | 78 focused + 38 protected tests; types/style/i18n/architecture | Separate panorama/task/member tabs, repeated-open dedupe, tooltip labels, preserved viewport |
+| F1 | `198911637` | OK | OK | 30 tests; types/architecture; normalized extraction comparison | Covered by F3/final; TeamPanel 773 to 616 lines |
+| F2 | `25f00d531` | OK | OK | 31 tests; types/style/architecture | Real tools/thinking in F3; no rollback component |
+| F3 | `3978f9b8d` | OK | OK | 29 scoped tests; types/style/i18n/architecture | Live final answer without reopening, errors/Retry, actual hit areas, Info/links, state colors |
+| G | `400ea2339` | OK | OK | i18n 30 tests/dist; syntax/diff/architecture | Composer profile visible and unclipped with the new copy |
+
+F1 preserved fetch/rendering/brief DOM before F2/F3 changed behavior. All new
+TS/TSX modules remain below 500 lines. WorkPanel is 1102 lines (net -5),
+TeamPanel 616 (net -243), and AssistantTurn net +1. The other frozen hotspots
+were not modified. No IPC, shared contract, Rust, runtime, SDK, or schema changed.
+
+### Final checks on the task candidate
+
+- Scoped renderer tests: **204 passed, 0 failed, 0 skipped**, using `node --test`
+  with the following files under `apps/desktop/test/`:
+  `team-dispatch`, `team-presentation`, `agent-panorama-viewport`,
+  `subagent-progress-panorama`, `team-panel-view`, `work-panel-tabs`,
+  `team-work-panel-tab`, `team-panel`, `overview-and-team-drilldown`,
+  `team-member-transcript`, `team-member-transcript-runtime`, `renderer-branding`,
+  `composer-pickers`, `plan-artifact-resolution`, `work-panel`, `subagent-panel`,
+  `sidebar-navigation`, `assistant-turns`, `turn-process`, `subagent-transcript`
+  (each with the `.test.mjs` suffix).
+- `node_modules/.bin/tsc -p apps/desktop/tsconfig.json --noEmit`: passed.
+- `node scripts/check-style-tokens.mjs`: passed.
+- `node scripts/check-architecture.mjs --base origin/main`: passed, 17 new TS files.
+- `git diff --check origin/main`: passed.
+- i18n: `../../node_modules/.bin/vitest run` from `packages/i18n`: **30 passed**;
+  `node_modules/.bin/tsc -p packages/i18n/tsconfig.json`: dist rebuilt.
+- `../../node_modules/.bin/electron-vite build` from `apps/desktop`: passed.
+- Biome changed-path lint processed **zero files** because the existing include
+  scope excludes these paths. This is not reported as a passing lint check;
+  configuration was not loosened. Types, style guards, tests, and independent
+  reviews provide the applicable evidence.
+
+| Required suite (direct command) | Result on `400ea2339` | Saved log |
+| --- | --- | --- |
+| `node scripts/e2e-team.mjs` | Passed, including both locale/layout matrices | `team.log` |
+| `node scripts/e2e-goal-team-renderer-ui.mjs` | Passed, 7 scenarios; card 61.789px | `renderer.log` |
+| `node scripts/e2e-work-panel-reorder.mjs` | Passed | `reorder.log` |
+| `node scripts/e2e-plan-ui.mjs` | 9 passed, 0 failed; 0 console diagnostics | `plan-ui.log` |
+| `node scripts/e2e-composer-mode-menus.mjs` | Passed | `composer.log` |
+
+The optional paid/live-provider Plan case was skipped intentionally. Optional
+layout/theme/review suites and `verify:ui:*` were not run. No PR integration
+candidate exists because remote delivery was not requested. A later docs-only
+execution-record commit does not change this tested executable candidate.
+
+### Approved deviations and STOP resolutions
+
+| WP | Plan item | Resolution | Reason/evidence | Approved by |
+| --- | --- | --- | --- | --- |
+| A | Allowed files / S1, S9 | Add `scripts/e2e-goal-team-renderer-ui.mjs`; compile bundled CSS with the existing Tailwind compiler | Raw esbuild retained `@theme`, yielding 16px/normal fonts and a 69px card; correct compilation measures 61.789px without changing product CSS or the 58-66 gate | Integrator |
+| All applicable | Biome command scope | Preserve include scope and report zero-file limitation | Existing config does not cover changed paths; no guard edits | Integrator |
+| C | Appendix B.3 | Add `.team-progress-rows[hidden] { display: none; }` | Author `display:flex` otherwise overrides the browser hidden rule; real collapse checked | Integrator |
+| D | E2E selector-only scope | Add node/avatar/toolbar measurements | Needed to prove the prescribed geometry in Electron | Integrator |
+| E2 | S2 error-mapping source shape | Extract the same string mapping, retaining caller null guards | Two existing expressions differed syntactically but had the same codes and semantics | Integrator |
+| E2 | S9 navigation helper | Unwind the bounded in-panel stack, wait for actual view/tab settlement | One Back reached board rather than aggregate after independent tabs preserved the stack | Integrator |
+| E2 | S9 diagnostics/cleanup | Preserve primary errors and always release failed mouse gestures | The second run's resize cleanup masked the primary failure; explicit synchronization and cleanup then passed | Integrator |
+| F1 | Source assertion owner | Move both fetch and transcript-label assertions to the extracted component | DOM/fetch/brief normalized comparison remains identical | Integrator |
+| F2 | S2 type/prop shapes | Use actual `assistant-turns` export and `answer` kind; optional `isRunning` prop | The named re-export/text/error kinds do not exist; intended rendering is preserved | Integrator |
+| F3 | Appendix G type-only imports / allowed files | Reuse pure transcript helpers and add `lib/team-member-transcript-overlay.ts` | Events precede asynchronous persistence, so read-only invalidation can permanently miss final rows | Integrator |
+| F3 | Live bounds/lifecycle | Bounded event overlays, semantic acknowledgment, tombstones, generation ownership, restart cleanup | Deterministic tests cover stale reads, replacement, parallel order, errors, disposal/StrictMode, tool metadata and prototype-safe previews | Integrator |
+| F3 | C.3 / S7 target geometry | 24px hit areas with local margins; focus-heading clipping removed | Real `elementFromPoint` checks prove upper/lower edges are clickable while headers stay 60/59.25px | Integrator |
+| F3 | C.3 / S7 SVG colors | Limit neutral color to direct glyphs and apply member phase colors | Broad descendant rule overrode shared TaskStateGlyph success/error colors; completed colors checked in Electron | Integrator |
+| F3 | Error recovery | Retain snapshot error/Retry and last-good transcript in both new tabs | Preserves the previous panel's observable failure behavior; both real read-fault/Retry paths pass | Integrator |
+| F3 | Test fault synchronization | Wait for fixture actors to settle before renaming the temporary tasks table | Prevents a read-fault probe from interfering with unrelated active agent execution | Integrator |
+
+Structured live previews preserve tool-result types, paths, exit codes and error
+codes; they do not stringify entire result objects. Recent history is bounded to
+200 rows and visible text fields to 65,536 characters. Content clipping does not
+incorrectly trigger the earlier-history notice. There is no idle polling.
+
+Two E2 Team runs failed and remain documented: the first exposed the single-Back
+helper assumption; the second exposed cleanup masking a resize error. The exact
+second resize trigger was not recovered after synchronization fixed the run.
+Subsequent F3 and final candidate runs passed; it is not classified as the known
+Plan UI flake. The final Plan UI run passed first time.
+
+Three mistaken F3 verification invocations are not gate evidence: `pnpm --filter
+@pi-desktop/desktop typecheck` was rejected by the symlink task-state protection;
+a root-directory Vitest invocation scanned unrelated suites and failed suite
+collection; an invented node-test path failed resolution before testing. No
+configuration, dependency links or primary files were edited to bypass these
+errors. The integrator re-ran the correct package-local Vitest command, and the
+normal direct TypeScript checks passed.
+
+### Copy inventory and remaining decisions
+
+Remaining old-name matches are intentional:
+
+- This plan's baseline defect, old-to-new copy table, WP-G instructions and spec
+  index retain historical wording.
+- `docs/superpowers/plans/assets/expert-team-ux/preview.html`, lines 40/55/60:
+  historical related-plan preview.
+- `docs/zh-CN/spec/03-runtime/08-error-codes.md`, lines 348/350: architectural
+  collaboration prose, not the Composer label.
+- `packages/i18n/src/locales/zh-CN/index.ts`, `panel.overview.teamSection`:
+  explicitly excluded from this rename.
+
+There are no unresolved implementation STOPs or user decisions blocking local
+use. No upcoming/unreleased entry exists in the shipped changelog catalogs;
+per §6.4, no version was invented. A localized changelog bullet should be added
+when a future release entry/version is selected. Remote publication, merging,
+installation and release remain outside this local delivery.
+
+---
 
 ## Appendix I — File map
 
