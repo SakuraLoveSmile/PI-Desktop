@@ -3,6 +3,8 @@ mod goal_rpc;
 mod plan_schedule_rpc;
 mod scheduled_rpc;
 mod scheduled_tools;
+#[cfg(test)]
+mod team_planning_tests;
 mod team_rpc;
 mod todos;
 
@@ -1249,7 +1251,8 @@ fn plan_rpc_err(error: impl ToString) -> JsonRpcError {
     let error_code = message
         .split_whitespace()
         .next()
-        .filter(|code| code.starts_with("PLAN_"))
+        .map(|code| code.trim_end_matches(':'))
+        .filter(|code| code.starts_with("PLAN_") || code.starts_with("TEAM_"))
         .unwrap_or("PLAN_INTERNAL")
         .to_string();
     rpc_err(1015, message, &error_code)
@@ -3889,6 +3892,8 @@ async fn handle_request(
                 .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
             let (changed, kind) = {
                 let st = state.lock().await;
+                crate::team::planning::cancel_questions(&st.db, session_id)
+                    .map_err(team_rpc_err)?;
                 let changed = st
                     .plans
                     .abort_session(&st.db, session_id)
@@ -3927,11 +3932,39 @@ async fn handle_request(
             }
             Ok(json!({ "tools": definitions }))
         }
+        "tools.authorizeLocal" => {
+            let session = params
+                .get("sessionId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let tool = params
+                .get("toolName")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "toolName required", "INVALID_PARAMS"))?;
+            let st = state.lock().await;
+            crate::team::planning::validate_tool(&st.db, session, tool).map_err(team_rpc_err)?;
+            let mode = sessions::session_mode(&st.db, session)
+                .map_err(team_rpc_err)?
+                .ok_or_else(|| rpc_err(1007, "session not found", "SESSION_NOT_FOUND"))?;
+            if mode == "plan" && tool != "BrowserPreview" {
+                return Err(rpc_err(
+                    1002,
+                    "local tool unavailable in Plan",
+                    "TOOL_DISABLED_IN_PLAN",
+                ));
+            }
+            Ok(json!({"mode":mode}))
+        }
         "tools.execute" => {
             let call_started = std::time::Instant::now();
             let p: ToolsExecuteParams = serde_json::from_value(params.clone())
                 .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
             let execution_timeout_ms = tools::effective_timeout_ms(&p.tool_name, p.timeout_ms);
+            {
+                let st = state.lock().await;
+                crate::team::planning::validate_tool(&st.db, &p.session_id, &p.tool_name)
+                    .map_err(team_rpc_err)?;
+            }
 
             let command_shell_id = if p.tool_name == "Bash" {
                 let catalog = {

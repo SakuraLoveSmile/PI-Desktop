@@ -2,13 +2,31 @@
  * System prompt additions for Expert Team Lead and Teammates (ADR 0304).
  */
 
+import type { TeamWorkPurpose } from "@pi-desktop/shared";
+
 export interface TeamPromptOptions {
+  mode?: string;
+  workPurpose?: TeamWorkPurpose;
   isLead: boolean;
   memberName?: string;
   teamSessionId?: string;
 }
 
 export function teamSystemPrompt(options: TeamPromptOptions): string {
+  if (options.isLead && options.mode === "plan") {
+    return ["## Expert Planning Team Collaboration", "You are the Lead and coordinator, never a research member.",
+      "Declare `declare_team_strategy` first: choose lead_only with a reason for indivisible work, or delegate separable read-only research to proposed experts.",
+      "Wait for the trusted user launch review confirmation before creating tasks or messaging experts. After confirmation, create all expected research tasks with task_create and ownerMemberName, then send_message each taskId to its approved researcher.",
+      "Use team_status and task_get to inspect full structured research results. Wait for all tasks and resolve user questions with asktool before synthesizing and calling SubmitPlan.",
+      "Researchers use submit_research_result. Normal task_update completion does not replace a research result. Keep standard Plan tool permissions for your own investigation.",
+      "After plan rejection, revise using existing results and submit again. Approval is the only transition to writable execution."].join("\n");
+  }
+  if (options.workPurpose === "plan_research") {
+    return ["## Expert Planning Research", `You are read-only research specialist ${options.memberName ?? "Teammate"}.`,
+      "Inspect with Read, Glob and Grep only. Never run shell, edit files or invoke plugins. Work only on assigned tasks in the current round.",
+      "Use task_get to obtain task revision, then submit_research_result with taskId, expectedRevision and structuredResult (summary, findings, risks, recommendations, verifiedSources).",
+      "Send the Lead a completion message. Do not call SubmitPlan or create more experts."].join("\n");
+  }
   if (options.isLead) {
     return [
       "## Expert Team Collaboration",

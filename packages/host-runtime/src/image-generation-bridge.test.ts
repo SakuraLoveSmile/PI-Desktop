@@ -47,7 +47,7 @@ it("authorizes image calls through the host before executing the local handler",
     return { ok: true, content: "image" };
   });
   expect((await execute()).ok).toBe(true);
-  expect(calls).toEqual(["tools.execute", "generated"]);
+  expect(calls).toEqual(["tools.authorizeLocal", "tools.execute", "generated"]);
 });
 
 it("preserves stable local error codes through real reverse RPC", async () => {
@@ -115,5 +115,5 @@ it("tools.abort reaches the in-flight request and still forwards host cancellati
     params: { sessionId: "s", toolCallId: "i" },
   });
   expect((await pending).ok).toBe(false);
-  expect(calls).toEqual(["tools.execute", "tools.abort"]);
+  expect(calls).toEqual(["tools.authorizeLocal", "tools.execute", "tools.abort"]);
 });

@@ -581,3 +581,10 @@ summary. It asks the user to check the certificate, clock, and trusted roots
 used by security software/proxies, then restart after changing trust. It does
 not claim that interception is the only possible cause or offer a TLS bypass.
 Manual Continue remains available after the cause is corrected.
+
+Expert Team planning additionally reports `TEAM_PLANNING_NOT_READY` while
+expected findings/questions remain, `TEAM_PLANNING_STALE` for an old round,
+`TEAM_PLANNING_CLOSED` for closed-round mutations, `TEAM_RESEARCH_INVALID` for
+invalid/budget-exceeding findings or ordinary completion bypass, and
+`TEAM_RESEARCH_READ_ONLY` for a researcher attempting a non-inspection tool.
+These codes survive both Rust RPC and the Host-sidecar proxy.

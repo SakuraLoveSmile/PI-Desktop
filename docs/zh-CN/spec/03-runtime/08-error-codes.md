@@ -536,3 +536,5 @@ transcript 保留稳定错误码、传输 errno 和原始 details，但使用本
 单个存储块无法回放属于另一种情况：网关丢弃 id 时本应用本身就会存下仅供展示的块，
 因此该消息的整条 replay 降级为“没有 replay”，而不是让之后每一轮请求都失败。
 回合继续执行，展示轮次不变；诊断只记录块数与阶段，不复制搜索内容、结果或凭据。
+
+专家团规划新增 TEAM_PLANNING_NOT_READY（研究或问题未完成）、TEAM_PLANNING_STALE（旧轮次）、TEAM_PLANNING_CLOSED（关闭后的修改）、TEAM_RESEARCH_INVALID（非法或超限结果、普通完成绕过）及 TEAM_RESEARCH_READ_ONLY（研究成员调用非读取工具）。错误代码由 Rust RPC 和 Host 侧车代理完整保留。

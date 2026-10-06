@@ -29,7 +29,7 @@ fn validate_participant_permissions(
     target_session_id: &str,
 ) -> Result<String> {
     let ceiling = crate::session_collaboration::permissions::effective_mode(db, source_session_id)?;
-    crate::session_collaboration::permissions::check_target(db, target_session_id, &ceiling)?;
+    crate::session_collaboration::permissions::check_team_target(db, target_session_id, &ceiling)?;
     Ok(ceiling)
 }
 

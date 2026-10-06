@@ -24,6 +24,9 @@ await mkdir(fixtureHome, { recursive: true });
 const originalHome = process.env.HOME;
 process.env.HOME = fixtureHome;
 
+const planningFixture = process.env.PI_E2E_TEAM_PLANNING === "1"
+  ? (await import("./e2e-team-planning.mjs")).createPlanningFixture(projectPath)
+  : null;
 const calls = [];
 const titleRequests = [];
 const titleDiagnostics = [];
@@ -92,6 +95,8 @@ const providerServer = createServer(async (req, res) => {
         : userText.includes("Create an approved Team execution plan")
           ? "Approved Team Assignment"
           : "Expert Team Delegation";
+    } else if (planningFixture) {
+      ({ toolCall, finalText } = await planningFixture.respond({ userText, priorToolNames, activeTurnMessages, activeToolText, toolNames }));
     } else if (userText.includes("Standard coexistence probe")) {
       assert.ok(toolNames.includes("Task"), "standard session lost its Task tool");
       assert.equal(toolNames.includes("declare_team_strategy"), false, "standard session exposed Team dispatch");
@@ -103,7 +108,9 @@ const providerServer = createServer(async (req, res) => {
       finalText = "STANDARD_CHILD_RESULT";
     } else if (userText.includes("Create an approved Team execution plan")) {
       assert.ok(toolNames.includes("SubmitPlan"), "Plan runtime lacks SubmitPlan");
-      toolCall = { name: "SubmitPlan", args: {
+      toolCall = !priorToolNames.includes("declare_team_strategy")
+        ? { name: "declare_team_strategy", args: { strategy: "lead_only", reason: "This fixture plan needs no research." } }
+        : { name: "SubmitPlan", args: {
         title: "Approved Team Assignment",
         question: "Run this approved Team plan?",
         markdown: "# Approved Team Assignment\n\n1. Coordinate the approved Team execution.\n2. Record the result for the Lead.\n",
@@ -682,33 +689,79 @@ async function verifyStaleTeamTabRetry(evaluate, testId) {
 }
 
 async function resizePanel(sendCdp, evaluate, width) {
+  await waitFor(() => evaluate(`(() => {
+    const panel=document.querySelector('[data-testid="work-panel"]');
+    return panel && !panel.hasAttribute('data-resizing') &&
+      panel.getAnimations({subtree:true}).every(animation => animation.playState !== 'running');
+  })()`), "previous resize and panel animations settled");
   const bounds = await evaluate(`(() => {
-    const panel = document.querySelector('[data-testid="work-panel"]');
-    const handle = panel.querySelector('.work-panel-resize').getBoundingClientRect();
-    return { width: panel.getBoundingClientRect().width, x: handle.left + handle.width / 2, y: handle.top + 120 };
+    const panel=document.querySelector('[data-testid="work-panel"]');
+    const handle=panel.querySelector('.work-panel-resize');
+    const rect=handle.getBoundingClientRect();
+    const x=rect.left+rect.width/2, y=rect.top+120;
+    if (document.elementFromPoint(x,y) !== handle) throw new Error('Resize handle is obscured');
+    const trace={events:[],pointerId:null};
+    const record=event => {
+      if (event.type === 'pointerdown') trace.pointerId=event.pointerId;
+      trace.events.push({type:event.type,pointerId:event.pointerId,captured:handle.hasPointerCapture(event.pointerId)});
+    };
+    const types=['pointerdown','pointerup','pointercancel','gotpointercapture','lostpointercapture'];
+    for (const type of types) handle.addEventListener(type,record);
+    const blur=() => trace.events.push({type:'blur'});
+    window.addEventListener('blur',blur);
+    window.__teamResizeTrace={trace,handle,dispose:() => {
+      for (const type of types) handle.removeEventListener(type,record);
+      window.removeEventListener('blur',blur);
+    }};
+    return {width:panel.getBoundingClientRect().width,x,y};
   })()`);
-  await sendCdp("Input.dispatchMouseEvent", { type: "mousePressed", x: bounds.x, y: bounds.y, button: "left", clickCount: 1 });
+  let failure;
   try {
-    await waitFor(() => evaluate(`document.querySelector('[data-testid="work-panel"]')?.dataset.resizing === 'true'`), "panel resize gesture admitted");
-    await sendCdp("Input.dispatchMouseEvent", { type: "mouseMoved", x: bounds.x + bounds.width - width, y: bounds.y, button: "left", buttons: 1 });
-    await waitFor(() => evaluate(`Math.abs(document.querySelector('[data-testid="work-panel"]').getBoundingClientRect().width - ${width}) < 2`), `panel drag reached ${width}px`);
+    await sendCdp("Input.dispatchMouseEvent", {type:"mousePressed",x:bounds.x,y:bounds.y,button:"left",buttons:1,clickCount:1});
+    await waitFor(() => evaluate(`(() => {
+      const {trace,handle}=window.__teamResizeTrace;
+      return trace.pointerId !== null && handle.hasPointerCapture(trace.pointerId) &&
+        document.querySelector('[data-testid="work-panel"]').dataset.resizing === 'true';
+    })()`), "current pointer captured for panel resize");
+    await sendCdp("Input.dispatchMouseEvent", {type:"mouseMoved",x:bounds.x+bounds.width-width,y:bounds.y,button:"left",buttons:1});
+    await waitFor(() => evaluate(`Math.abs(document.querySelector('[data-testid="work-panel"]').getBoundingClientRect().width-${width}) < 2`), `panel drag reached ${width}px`);
   } catch (error) {
-    const state = await evaluate(`(() => {
-      const panel=document.querySelector('[data-testid="work-panel"]');
-      const handle=panel?.querySelector('.work-panel-resize');
-      return { actualWidth: panel?.getBoundingClientRect().width,
-        computedWidth: panel ? getComputedStyle(panel).width : null,
-        styleWidth: panel?.style.getPropertyValue('--work-panel-width'),
-        resizing: panel?.getAttribute('data-resizing'),
-        mousePointerCaptured: handle?.hasPointerCapture(1),
-        handleBounds: handle?.getBoundingClientRect().toJSON() };
-    })()`);
-    console.error("TEAM_RESIZE_FAILURE", JSON.stringify({ fromBounds: bounds, targetWidth: width, error: String(error), state }));
-    throw error;
+    failure=error;
   } finally {
-    await sendCdp("Input.dispatchMouseEvent", { type: "mouseReleased", x: bounds.x + bounds.width - width, y: bounds.y, button: "left", clickCount: 1 });
+    try {
+      await sendCdp("Input.dispatchMouseEvent", {type:"mouseReleased",x:bounds.x+bounds.width-width,y:bounds.y,button:"left",buttons:0,clickCount:1});
+      await waitFor(() => evaluate(`(() => {
+        const {trace,handle}=window.__teamResizeTrace;
+        return trace.events.some(event => event.type === 'pointerup' && event.pointerId === trace.pointerId) &&
+          !handle.hasPointerCapture(trace.pointerId) &&
+          !document.querySelector('[data-testid="work-panel"]').hasAttribute('data-resizing');
+      })()`), "current pointer released and resize state cleared");
+      await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
+    } catch (error) {
+      failure ??= error;
+    }
+    if (failure) {
+      try {
+        const state=await evaluate(`(() => {
+        const {trace,handle}=window.__teamResizeTrace;
+        const panel=document.querySelector('[data-testid="work-panel"]');
+        return {events:trace.events,pointerId:trace.pointerId,captured:trace.pointerId !== null && handle.hasPointerCapture(trace.pointerId),
+          actualWidth:panel.getBoundingClientRect().width,resizing:panel.getAttribute('data-resizing'),handleBounds:handle.getBoundingClientRect().toJSON()};
+      })()`);
+        console.error("TEAM_RESIZE_FAILURE",JSON.stringify({fromBounds:bounds,targetWidth:width,error:String(failure),state}));
+      } catch (error) {
+        console.error("TEAM_RESIZE_DIAGNOSTIC_FAILURE",JSON.stringify({primaryError:String(failure),error:String(error)}));
+      }
+    }
+    try {
+      await evaluate(`window.__teamResizeTrace?.dispose(); delete window.__teamResizeTrace; true`);
+    } catch (error) {
+      console.error("TEAM_RESIZE_DISPOSAL_FAILURE",String(error));
+      failure ??= error;
+    }
   }
-  await waitFor(() => evaluate(`Math.abs(document.querySelector('[data-testid="work-panel"]').getBoundingClientRect().width - ${width}) < 2`), `panel resized to ${width}px`);
+  if (failure) throw failure;
+  await waitFor(() => evaluate(`Math.abs(document.querySelector('[data-testid="work-panel"]').getBoundingClientRect().width-${width}) < 2`), `panel resized to ${width}px`);
 }
 
 async function verifyTeamLayoutMatrix(sendCdp, evaluate, locale) {
@@ -827,6 +880,12 @@ try {
 
   let { sendCdp, evaluate, invoke } = await startApp();
 
+  if (planningFixture) {
+    await planningFixture.runJourney({
+      planLead, invoke, evaluate, sendCdp, waitFor, calls, projectPath,
+      submitComposerPrompt, openTeamPanel, saveScreenshot, startApp, stopApp,
+    });
+  } else {
   await waitFor(() => evaluate(`!!document.querySelector('[data-sidebar-session-row="${lead.id}"]') && !document.querySelector('.startup-splash')`), "Lead in sidebar");
   await evaluate(`document.querySelector('[data-sidebar-session-row="${lead.id}"] button.thread-item-main')?.click()`);
   await waitFor(() => evaluate(`!!document.querySelector('[data-sidebar-session-row="${lead.id}"].active')`), "Lead selected");
@@ -1271,6 +1330,7 @@ try {
   await verifyTeamLayoutMatrix(sendCdp, evaluate, "zh-CN");
   assert.equal(titleRequests.length, 3, "renderer reload must not duplicate title requests");
   console.log("PASS Chinese Team presentation: compact progress and identities survive renderer reload without another title request");
+  }
 } catch (error) {
   if (socket?.readyState === 1 && lastSendCdp) {
     try { console.error(`Failure image: ${await saveScreenshot(lastSendCdp, "team-failure.png")}`); } catch {}
@@ -1280,6 +1340,7 @@ try {
   console.error(appOutput?.slice(-4000));
   throw error;
 } finally {
+  planningFixture?.releaseResearch();
   socket?.close();
   await stopApp();
   await host.stop();

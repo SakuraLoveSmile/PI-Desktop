@@ -110,6 +110,13 @@ pub fn create_team_task(db: &Database, params: CreateTaskParams<'_>) -> Result<T
     } = params;
 
     let caller_name = validate_team_participant(db, team_session_id, caller_session_id)?;
+    if super::planning::purpose(db, caller_session_id)?
+        .is_some_and(|p| p.work_purpose == "plan_research")
+    {
+        return Err(anyhow!(
+            "TEAM_RESEARCH_READ_ONLY: researchers cannot create tasks"
+        ));
+    }
     let is_lead = caller_session_id == team_session_id;
     if !is_lead {
         super::review::require_approved_member(db, team_session_id, caller_session_id)?;
@@ -203,29 +210,41 @@ pub fn create_team_task(db: &Database, params: CreateTaskParams<'_>) -> Result<T
     let blocked_by_json = serde_json::to_string(&blocked_by)?;
     let write_scopes_json = serde_json::to_string(&write_scopes)?;
 
-    db.conn().execute(
-        "INSERT INTO team_tasks (
+    crate::sessions::with_savepoint(db.conn(), "team_create_task", |_| {
+        db.conn().execute(
+            "INSERT INTO team_tasks (
             team_session_id, task_id, revision, subject, description, status,
             owner_session_id, owner_member_name, blocked_by_json, write_scopes_json,
             deleted, created_at, updated_at
          ) VALUES (?1, ?2, 1, ?3, ?4, 'pending', ?5, ?6, ?7, ?8, 0, ?9, ?9)",
-        params![
+            params![
+                team_session_id,
+                task_id,
+                subject,
+                description,
+                owner_session_id,
+                owner_member_name,
+                blocked_by_json,
+                write_scopes_json,
+                now
+            ],
+        )?;
+
+        db.conn().execute(
+            "UPDATE teams SET revision = revision + 1, updated_at = ?2 WHERE team_session_id = ?1",
+            params![team_session_id, now],
+        )?;
+
+        super::planning::enrol(
+            db,
             team_session_id,
             task_id,
-            subject,
-            description,
-            owner_session_id,
-            owner_member_name,
-            blocked_by_json,
-            write_scopes_json,
-            now
-        ],
-    )?;
-
-    db.conn().execute(
-        "UPDATE teams SET revision = revision + 1, updated_at = ?2 WHERE team_session_id = ?1",
-        params![team_session_id, now],
-    )?;
+            owner_session_id.as_deref(),
+            false,
+            "pending",
+        )?;
+        Ok(())
+    })?;
 
     Ok(TeamTask {
         team_session_id: team_session_id.to_string(),
@@ -408,33 +427,45 @@ pub fn update_team_task(db: &Database, params: UpdateTaskParams<'_>) -> Result<T
     let blocked_by_json = serde_json::to_string(&final_blocked_by)?;
     let write_scopes_json = serde_json::to_string(&final_write_scopes)?;
 
-    db.conn().execute(
-        "UPDATE team_tasks
+    crate::sessions::with_savepoint(db.conn(), "team_update_task", |_| {
+        super::planning::enrol(
+            db,
+            team_session_id,
+            task_id,
+            final_owner_session_id.as_deref(),
+            final_deleted,
+            final_status,
+        )?;
+        db.conn().execute(
+            "UPDATE team_tasks
          SET revision = ?1, subject = ?2, description = ?3, status = ?4,
              owner_session_id = ?5, owner_member_name = ?6, blocked_by_json = ?7,
              write_scopes_json = ?8, deleted = ?9, updated_at = ?10
          WHERE team_session_id = ?11 AND task_id = ?12 AND revision = ?13",
-        params![
-            next_revision,
-            final_subject,
-            final_description,
-            final_status,
-            final_owner_session_id,
-            final_owner_member_name,
-            blocked_by_json,
-            write_scopes_json,
-            if final_deleted { 1 } else { 0 },
-            now,
-            team_session_id,
-            task_id,
-            expected_revision
-        ],
-    )?;
+            params![
+                next_revision,
+                final_subject,
+                final_description,
+                final_status,
+                final_owner_session_id,
+                final_owner_member_name,
+                blocked_by_json,
+                write_scopes_json,
+                if final_deleted { 1 } else { 0 },
+                now,
+                team_session_id,
+                task_id,
+                expected_revision
+            ],
+        )?;
 
-    db.conn().execute(
-        "UPDATE teams SET revision = revision + 1, updated_at = ?2 WHERE team_session_id = ?1",
-        params![team_session_id, now],
-    )?;
+        db.conn().execute(
+            "UPDATE teams SET revision = revision + 1, updated_at = ?2 WHERE team_session_id = ?1",
+            params![team_session_id, now],
+        )?;
+
+        Ok(())
+    })?;
 
     Ok(TeamTask {
         team_session_id: team_session_id.to_string(),

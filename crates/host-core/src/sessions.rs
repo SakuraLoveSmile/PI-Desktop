@@ -31,6 +31,9 @@ pub(crate) fn with_savepoint<T>(
             | "team_selection"
             | "team_activity"
             | "team_mailbox"
+            | "team_create_task"
+            | "team_update_task"
+            | "team_research_result"
     ) {
         return Err(anyhow!("invalid internal savepoint name"));
     }
@@ -2373,6 +2376,10 @@ pub fn delete_session(db: &Database, id: &str) -> Result<bool> {
     }
     let tx = db.conn().unchecked_transaction()?;
     crate::goal_progress::cleanup_session_conn(&tx, id)?;
+    tx.execute(
+        "DELETE FROM kv WHERE ns IN ('team-planning-v1','team-member-purpose-v1') AND key=?1",
+        [id],
+    )?;
     let n = tx.execute("DELETE FROM sessions WHERE id = ?1", params![id])?;
     tx.commit()?;
     if n > 0 {
@@ -2394,6 +2401,10 @@ pub fn delete_session_with_team_cleanup(db: &Database, id: &str) -> Result<bool>
     let tx = db.conn().unchecked_transaction()?;
     crate::team::lifecycle::cleanup_team_on_lead_delete_conn(&tx, id)?;
     crate::goal_progress::cleanup_session_conn(&tx, id)?;
+    tx.execute(
+        "DELETE FROM kv WHERE ns IN ('team-planning-v1','team-member-purpose-v1') AND key=?1",
+        [id],
+    )?;
     let deleted = tx.execute("DELETE FROM sessions WHERE id=?1", [id])? > 0;
     tx.commit()?;
     if deleted {

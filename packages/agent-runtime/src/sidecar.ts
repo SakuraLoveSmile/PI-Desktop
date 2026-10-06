@@ -103,12 +103,7 @@ type RuntimeParams = {
   sessionId: string;
   mode?: Mode;
   executionProfile?: import("@pi-desktop/shared").ExecutionProfile;
-  teamContext?: {
-    teamSessionId: string;
-    callerSessionId: string;
-    isLead: boolean;
-    memberName?: string;
-  };
+  teamContext?: import("@pi-desktop/shared").TeamRuntimeContextProjection;
   /** Durable host turn ID for the prompt currently being executed. */
   turnId?: string;
   thinkingLevel?: SessionThinkingLevel;
