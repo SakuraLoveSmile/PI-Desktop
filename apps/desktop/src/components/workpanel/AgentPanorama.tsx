@@ -5,10 +5,9 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  IconCheck,
+  IconCircle, IconCircleCheck, IconCircleDashed, IconCirclePause, IconCircleX,
+  IconLoader, IconZoomIn, IconZoomOut, IconScan, IconRefreshCw,
   IconChevronLeft,
-  IconMinus,
-  IconPlus,
   IconRefresh,
   IconX,
 } from "../icons";
@@ -16,6 +15,7 @@ import { Button, TooltipButton } from "../ui";
 import { PixelAvatar } from "./team/PixelAvatar";
 import {
   createPanoramaLayout,
+  panoramaEdgePath,
   PANORAMA_NODE_HEIGHT,
   PANORAMA_NODE_WIDTH,
   usePanoramaViewport,
@@ -115,10 +115,19 @@ export function AgentPanorama({
       blocked: t("team.readiness.blocked"),
     };
 
+    const Glyph = {
+      running: IconLoader,
+      completed: IconCircleCheck,
+      failed: IconCircleX,
+      paused: IconCirclePause,
+      blocked: IconCircleDashed,
+      idle: IconCircle,
+      todo: IconCircle,
+    }[status] ?? IconCircle;
+
     return (
       <span className={`agent-panorama-status-badge status-${status}`}>
-        {status === "completed" && <IconCheck size={12} aria-hidden />}
-        {status === "failed" && <IconX size={12} aria-hidden />}
+        <Glyph size={12} aria-hidden />
         <span>{statusLabel ?? statusLabels[status] ?? status}</span>
       </span>
     );
@@ -142,9 +151,9 @@ export function AgentPanorama({
           <IconX size={24} />
           <span>{error}</span>
           {onRetry && (
-            <button type="button" className="agent-panorama-btn" onClick={onRetry}>
+            <Button size="sm" className="agent-panorama-btn" onClick={onRetry}>
               {t("team.retry")}
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -184,58 +193,36 @@ export function AgentPanorama({
       {/* Top right toolbar */}
       <div className="agent-panorama-toolbar" data-panorama-toolbar data-panorama-tool>
         {onBack && (
-          <TooltipButton
-            type="button"
-            className="icon-btn"
-            tooltip={t("team.back")}
-            ariaLabel={t("team.back")}
-            onClick={onBack}
-          >
-            <IconChevronLeft size={16} />
-            <span className="text-sm">{t("team.back")}</span>
-          </TooltipButton>
+          <>
+            <TooltipButton type="button" className="icon-btn icon-btn-square"
+              tooltip={t("team.back")} ariaLabel={t("team.back")} onClick={onBack}>
+              <IconChevronLeft size={16} aria-hidden />
+            </TooltipButton>
+            <span className="agent-panorama-toolbar-divider" aria-hidden />
+          </>
         )}
         <div className="agent-panorama-zoom-controls">
-          <TooltipButton
-            type="button"
-            className="icon-btn icon-btn-square"
-            tooltip={t("team.zoomOut")}
-            ariaLabel={t("team.zoomOut")}
-            disabled={viewport.zoom <= 0.5}
-            onClick={() => zoomBy(-0.1)}
-          >
-            <IconMinus size={14} />
+          <TooltipButton type="button" className="icon-btn icon-btn-square"
+            tooltip={t("team.zoomOut")} ariaLabel={t("team.zoomOut")}
+            disabled={viewport.zoom <= 0.5} onClick={() => zoomBy(-0.1)}>
+            <IconZoomOut size={16} aria-hidden />
           </TooltipButton>
           <span className="agent-panorama-zoom-label">{Math.round(viewport.zoom * 100)}%</span>
-          <TooltipButton
-            type="button"
-            className="icon-btn icon-btn-square"
-            tooltip={t("team.zoomIn")}
-            ariaLabel={t("team.zoomIn")}
-            disabled={viewport.zoom >= 1.5}
-            onClick={() => zoomBy(0.1)}
-          >
-            <IconPlus size={14} />
-          </TooltipButton>
-          <TooltipButton
-            type="button"
-            className="agent-panorama-text-btn"
-            tooltip={t("team.zoomFit")}
-            ariaLabel={t("team.zoomFit")}
-            onClick={fit}
-          >
-            {t("team.zoomFit")}
-          </TooltipButton>
-          <TooltipButton
-            type="button"
-            className="agent-panorama-text-btn"
-            tooltip={t("team.zoomReset")}
-            ariaLabel={t("team.zoomReset")}
-            onClick={reset}
-          >
-            {t("team.zoomReset")}
+          <TooltipButton type="button" className="icon-btn icon-btn-square"
+            tooltip={t("team.zoomIn")} ariaLabel={t("team.zoomIn")}
+            disabled={viewport.zoom >= 1.5} onClick={() => zoomBy(0.1)}>
+            <IconZoomIn size={16} aria-hidden />
           </TooltipButton>
         </div>
+        <span className="agent-panorama-toolbar-divider" aria-hidden />
+        <TooltipButton type="button" className="icon-btn icon-btn-square"
+          tooltip={t("team.zoomFit")} ariaLabel={t("team.zoomFit")} onClick={fit}>
+          <IconScan size={16} aria-hidden />
+        </TooltipButton>
+        <TooltipButton type="button" className="icon-btn icon-btn-square"
+          tooltip={t("team.zoomReset")} ariaLabel={t("team.zoomReset")} onClick={reset}>
+          <IconRefreshCw size={16} aria-hidden />
+        </TooltipButton>
       </div>
 
       {/* Stage */}
@@ -258,8 +245,7 @@ export function AgentPanorama({
           {layout.children.map((childPos) => {
             const childCenterX = childPos.x + PANORAMA_NODE_WIDTH / 2;
             const childTopY = childPos.y;
-            const midY = (rootBottomY + childTopY) / 2;
-            const d = `M ${rootCenterX} ${rootBottomY} C ${rootCenterX} ${midY}, ${childCenterX} ${midY}, ${childCenterX} ${childTopY}`;
+            const d = panoramaEdgePath(rootCenterX, rootBottomY, childCenterX, childTopY);
             return (
               <path
                 key={`edge-${childPos.id}`}
@@ -279,11 +265,11 @@ export function AgentPanorama({
           data-node-id={rootNode.id}
           data-panorama-node
         >
-          <div className="agent-panorama-node-header">
+          <span className="agent-panorama-node-header">
             <span className="agent-panorama-node-avatar" aria-hidden="true">
-              <PixelAvatar seed={rootNode.avatarSeed ?? rootNode.id} lead={rootNode.isLead} size={48} />
+              <PixelAvatar seed={rootNode.avatarSeed ?? rootNode.id} lead={rootNode.isLead} size={32} />
             </span>
-            <div className="agent-panorama-node-copy">
+            <span className="agent-panorama-node-copy">
               <span className="agent-panorama-node-title" title={rootIdentity}>
                 {rootIdentity}
               </span>
@@ -292,11 +278,11 @@ export function AgentPanorama({
                   {rootNode.task}
                 </span>
               )}
-            </div>
-          </div>
-          <div className="agent-panorama-node-status">
+            </span>
+          </span>
+          <span className="agent-panorama-node-status">
             {renderStatusBadge(rootNode.status, rootNode.statusLabel)}
-          </div>
+          </span>
         </div>
 
         {/* Child Nodes */}
@@ -318,11 +304,11 @@ export function AgentPanorama({
               disabled={!onSelectNode}
               onClick={() => onSelectNode?.(child.id)}
             >
-              <div className="agent-panorama-node-header">
+              <span className="agent-panorama-node-header">
                 <span className="agent-panorama-node-avatar" aria-hidden="true">
-                  <PixelAvatar seed={child.avatarSeed ?? child.id} lead={child.isLead} size={48} />
+                  <PixelAvatar seed={child.avatarSeed ?? child.id} lead={child.isLead} size={32} />
                 </span>
-                <div className="agent-panorama-node-copy">
+                <span className="agent-panorama-node-copy">
                   <span className="agent-panorama-node-title" title={identity}>
                     {identity}
                   </span>
@@ -331,11 +317,11 @@ export function AgentPanorama({
                       {child.task}
                     </span>
                   )}
-                </div>
-              </div>
-              <div className="agent-panorama-node-status">
+                </span>
+              </span>
+              <span className="agent-panorama-node-status">
                 {renderStatusBadge(child.status, child.statusLabel)}
-              </div>
+              </span>
             </Button>
           );
         })}

@@ -817,6 +817,17 @@ try {
   await waitFor(() => evaluate(`!!document.querySelector('[data-panorama-canvas]')`), "Team panorama");
   await waitFor(() => evaluate(`document.querySelector('.agent-panorama-root-node .agent-panorama-node-status')?.innerText.includes('Waiting for team members')`), "settled Lead waiting status");
   await evaluate(`Array.from(document.querySelectorAll('[data-panorama-tool] button')).find((button) => /reset/i.test(button.getAttribute('aria-label') ?? ''))?.click()`);
+  await waitFor(() => evaluate(`Number(document.querySelector('[data-panorama-canvas]')?.dataset.panoramaZoom) === 1`), "Reset establishes 100% panorama geometry");
+  const panoramaMetrics = await evaluate(`Array.from(document.querySelectorAll('[data-panorama-node]')).map(node => {
+    const rect = node.getBoundingClientRect();
+    const avatar = node.querySelector('.agent-panorama-node-avatar img').getBoundingClientRect();
+    return { width: rect.width, height: rect.height, avatarWidth: avatar.width, avatarHeight: avatar.height };
+  })`);
+  assert.ok(panoramaMetrics.length >= 2, "panorama geometry needs root and child nodes");
+  assert.ok(panoramaMetrics.every(node => Math.abs(node.width - 276) < 1 && Math.abs(node.height - 86) < 1 && Math.abs(node.avatarWidth - 32) < 1 && Math.abs(node.avatarHeight - 32) < 1), `Panorama compact geometry: ${JSON.stringify(panoramaMetrics)}`);
+  const toolbarMetrics = await evaluate(`Array.from(document.querySelectorAll('[data-panorama-toolbar] button')).map(button => ({ label: button.getAttribute('aria-label'), text: button.innerText.trim() }))`);
+  assert.ok(toolbarMetrics.every(button => button.label && button.text === ''), `panorama toolbar must be icon-only with accessible labels: ${JSON.stringify(toolbarMetrics)}`);
+  console.log(`PASS Panorama compact geometry/icons: ${JSON.stringify(panoramaMetrics)}`);
   for (let index = 0; index < 2; index += 1) {
     await evaluate(`Array.from(document.querySelectorAll('[data-panorama-tool] button')).find((button) => /zoom out/i.test(button.getAttribute('aria-label') ?? ''))?.click()`);
   }

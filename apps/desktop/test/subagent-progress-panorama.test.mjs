@@ -50,13 +50,15 @@ test("AgentPanorama implements zoom, fit, reset, pan, and coordinate geometry", 
   assert.match(viewportSource, /MAX_ZOOM = 1\.5/);
   assert.match(agentPanoramaSource, /zoomBy\(0\.1\)/);
 
-  // Layout math: root centered at top, children rows of at most 3
-  assert.match(viewportSource, /Math\.min\(childIds\.length, 3\)/);
-  assert.match(viewportSource, /PANORAMA_NODE_WIDTH = 304/);
-  assert.match(viewportSource, /PANORAMA_ROOT_CHILD_GAP = 80/);
+  // Layout math: root centered at top, children rows of at most 2
+  assert.match(viewportSource, /PANORAMA_MAX_COLUMNS = 2/);
+  assert.match(viewportSource, /Math\.min\(childIds\.length, PANORAMA_MAX_COLUMNS\)/);
+  assert.match(viewportSource, /PANORAMA_NODE_WIDTH = 276/);
+  assert.match(viewportSource, /PANORAMA_ROOT_CHILD_GAP = 64/);
 
   // SVG Bezier connectors
-  assert.match(agentPanoramaSource, /M \$\{rootCenterX\} \$\{rootBottomY\} C/);
+  assert.match(viewportSource, /export function panoramaEdgePath/);
+  assert.match(agentPanoramaSource, /panoramaEdgePath\(/);
   assert.match(agentPanoramaSource, /agent-panorama-edges-layer/);
 
   // Key controls and actions
@@ -90,7 +92,7 @@ test("CSS rules include agent-panorama import and compact task progress styles",
   assert.match(messagesCssSource, /\.subagent-tasks-header/);
   assert.match(messagesCssSource, /\.subagent-tasks-row/);
   assert.match(agentPanoramaCssSource, /\.agent-panorama/);
-  assert.match(agentPanoramaCssSource, /width:\s*304px;/);
+  assert.match(agentPanoramaCssSource, /width:\s*276px;/);
   assert.match(agentPanoramaCssSource, /\.agent-panorama-edge/);
 });
 

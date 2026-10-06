@@ -1969,7 +1969,7 @@ sklm: {
     taskReadiness: "Readiness",
     taskScopes: "Schreibbereiche",
     teamOverview: "Team Overview",
-    lead: "Lead",
+    lead: "Lead Agent",
     membersCount: "{{count}} members",
     tasksProgress: "{{completed}}/{{total}} tasks completed",
     viewTeam: "View Team Board",
