@@ -63,6 +63,7 @@ import {
   Mic,
   MicOff,
   Minus,
+  MessageCircle,
   MessageSquare,
   MessageSquarePlus,
   Monitor,
@@ -173,6 +174,7 @@ export const IconArrowUpDown = icon(ArrowUpDown);
 export const IconSearch = icon(Search);
 export const IconRefresh = icon(RefreshCcw);
 export const IconChat = icon(MessageSquare);
+export const IconMessageCircle = icon(MessageCircle);
 /** Session creation affordance. Keep it distinct from generic add actions. */
 export const IconNewSession = icon(MessageSquarePlus);
 export const IconFlag = icon(Flag);

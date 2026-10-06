@@ -1954,6 +1954,7 @@ sklm: {
     memberDetailUnavailable: "Détails du membre indisponibles",
     dispatchCardsLabel: "Tâches distribuées aux experts",
     expertJoining: "Un nouvel expert rejoint l'équipe…",
+    teamPanoramaTitle: "Panorama de l'équipe",
     adHocTaskTitle: "Ad hoc : {{subject}}",
     adHocGroup: "Tâches ad hoc",
     untitledTask: "Tâche sans titre",

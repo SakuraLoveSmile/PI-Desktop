@@ -167,6 +167,20 @@ export function buildTeamTaskRows(
     }));
 }
 
+export function memberFocusTask(member: TeamMemberRecord, tasks: TeamTaskRecord[]): TeamTaskRecord | undefined {
+  const owned = tasks.filter((task) => !task.deleted && (task.ownerSessionId
+    ? task.ownerSessionId === member.memberSessionId
+    : task.ownerMemberName === member.name)).sort(byCreationOrder);
+  return owned.find((task) => task.status === "in_progress")
+    ?? owned.find((task) => task.status === "pending")
+    ?? owned.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+}
+
+export function localizedTeamSnapshotError(error: string, translate: (key: string) => string): string {
+  return ["TEAM_DISSOLVED", "TEAM_SCOPE_MISMATCH"].includes(error)
+    ? translate(`team.snapshotErrors.${error}`) : error;
+}
+
 const overviewPriority: Record<TaskVisualState, number> = {
   failed: 0,
   in_progress: 1,

@@ -18,7 +18,7 @@ import { delegateTaskDescription } from "../../lib/subagent-transcript";
 import { useTeamSnapshot } from "../../hooks/useTeamSnapshot";
 import { useOverviewMetadata } from "../../hooks/useOverviewMetadata";
 import { getPanoramaViewport, savePanoramaViewport } from "../../lib/panorama-memory";
-import { buildTeamTaskRows, localTeamSessionId, selectOverviewTaskRows } from "../../lib/team-presentation";
+import { localizedTeamSnapshotError, buildTeamTaskRows, localTeamSessionId, selectOverviewTaskRows } from "../../lib/team-presentation";
 import { TeamTaskProgress } from "./team/TeamTaskProgress";
 import { Button } from "../ui";
 import { isActivePlanExecution } from "../../lib/plan-mode-state";
@@ -145,9 +145,9 @@ export function OverviewTab() {
   const teamRows = useMemo(() => teamData
     ? buildTeamTaskRows(teamData.tasks, teamData.members, teamData.readiness, teamData.paused)
     : [], [teamData]);
-  const openTeamTarget = (target: { kind: "aggregate" | "board" | "panorama" | "task"; taskId?: string }) => {
+  const openTeamTarget = (target: { kind: "aggregate" | "board" | "panorama" | "task"; taskId?: string }, label?: string) => {
     if (activeSessionId && teamSessionId) {
-      openWorkPanelTabForSession(activeSessionId, teamWorkPanelTab(teamSessionId, target));
+      openWorkPanelTabForSession(activeSessionId, teamWorkPanelTab(teamSessionId, target, label));
     }
   };
 
@@ -292,7 +292,7 @@ export function OverviewTab() {
         {isTeam && teamSessionId && (
           <section className="work-panel-overview-section work-panel-overview-team-progress" data-testid="overview-team-progress">
             {teamError && <div className="team-error-banner" role="status">
-              <span>{t("team.staleData")}: {["TEAM_DISSOLVED", "TEAM_SCOPE_MISMATCH"].includes(teamError) ? t(`team.snapshotErrors.${teamError}`) : teamError}</span>
+              <span>{t("team.staleData")}: {localizedTeamSnapshotError(teamError, t)}</span>
               <Button size="sm" onClick={() => void refreshTeam()}>{t("team.retry")}</Button>
             </div>}
             {teamData ? <TeamTaskProgress
@@ -302,7 +302,7 @@ export function OverviewTab() {
               total={teamData.tasks.filter((task) => !task.deleted).length}
               expanded={teamExpanded[teamSessionId] ?? true}
               onToggle={() => setTeamExpanded((state) => ({ ...state, [teamSessionId]: !(state[teamSessionId] ?? true) }))}
-              onOpenTask={(taskId) => openTeamTarget({ kind: "task", taskId })}
+              onOpenTask={(taskId, subject) => openTeamTarget({ kind: "task", taskId }, subject)}
               onOpenPanorama={() => openTeamTarget({ kind: "panorama" })}
               onOpenBoard={() => openTeamTarget({ kind: "board" })}
             /> : !teamError && teamLoading ? <p className="work-panel-overview-empty-copy" role="status">{t("common.loading")}</p> : null}

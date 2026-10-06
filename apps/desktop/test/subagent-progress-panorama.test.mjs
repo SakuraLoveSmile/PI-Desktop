@@ -8,6 +8,7 @@ const [
   viewportSource,
   overviewTabSource,
   teamPanelSource,
+  teamPanoramaSource,
   messagesCssSource,
   agentPanoramaCssSource,
   globalsCssSource,
@@ -19,6 +20,7 @@ const [
   readFile(new URL("../src/components/workpanel/agent-panorama-viewport.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/components/workpanel/OverviewTab.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/components/workpanel/TeamPanel.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../src/components/workpanel/team/TeamPanoramaTab.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/styles/messages.css", import.meta.url), "utf8"),
   readFile(new URL("../src/styles/agent-panorama.css", import.meta.url), "utf8"),
   readFile(new URL("../src/styles/globals.css", import.meta.url), "utf8"),
@@ -77,10 +79,13 @@ test("OverviewTab integrates AgentPanorama and toggles between overview and pano
   assert.match(overviewTabSource, /openSubagentTab/);
 });
 
-test("TeamPanel integrates AgentPanorama with lead root and member children", () => {
-  assert.match(teamPanelSource, /AgentPanorama/);
-  assert.match(teamPanelSource, /view\.kind === "panorama"/);
-  assert.match(teamPanelSource, /team\.lead/);
+test("Team panorama owns the canvas separately from the aggregate panel", () => {
+  assert.match(teamPanoramaSource, /AgentPanorama/);
+  assert.match(teamPanoramaSource, /team\.lead/);
+  assert.match(teamPanoramaSource, /memberFocusTask/);
+  assert.match(teamPanoramaSource, /teamWorkPanelTab\(/);
+  assert.doesNotMatch(teamPanoramaSource, /onBack=/);
+  assert.doesNotMatch(teamPanelSource, /AgentPanorama|view\.kind === "panorama"/);
   assert.match(teamPanelSource, /roster\.map/);
   assert.match(teamPanelSource, /navigate\(\{ kind: "member", memberSessionId \}\)/);
   assert.match(teamPanelSource, /setView\(next \?\? \{ kind: "aggregate" \}\)/);

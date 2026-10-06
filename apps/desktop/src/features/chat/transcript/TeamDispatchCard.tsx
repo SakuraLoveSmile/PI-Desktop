@@ -42,7 +42,7 @@ export const TeamDispatchCard = memo(function TeamDispatchCard({
     if (!session) return;
     openWorkPanelTabForSession(
       session,
-      teamWorkPanelTab(teamSessionId, { kind: "task", taskId: card.taskId }),
+      teamWorkPanelTab(teamSessionId, { kind: "task", taskId: card.taskId }, subject),
     );
   };
 

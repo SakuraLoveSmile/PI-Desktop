@@ -83,7 +83,7 @@ test("TeamPanel renders a compact searchable board and opens full task detail", 
   assert.match(teamPanelSource, /TeamTaskProgress/);
   assert.match(teamPanelSource, /TeamTaskDetail/);
   assert.match(teamPanelSource, /initialTaskId\?: string/);
-  assert.match(teamPanelSource, /initialView\?: "aggregate" \| "board" \| "task" \| "panorama"/);
+  assert.match(teamPanelSource, /initialView\?: "aggregate" \| "board"/);
 });
 
 test("TeamPanel localizes DTO values and data consistency errors", () => {
@@ -114,8 +114,8 @@ test("TeamPanel localizes DTO values and data consistency errors", () => {
   assert.doesNotMatch(teamPanelSource, />Blocked</);
 });
 
-test("WorkPanel mounts TeamPanel for team tabs and registers team tool", () => {
-  assert.match(workPanelSource, /<TeamPanel/);
+test("WorkPanel mounts TeamWorkPanelSurface for team tabs and registers team tool", () => {
+  assert.match(workPanelSource, /<TeamWorkPanelSurface/);
   assert.match(workPanelSource, /activeTab\?\.kind === "team"/);
   assert.match(workPanelSource, /team:\s*IconUsers/);
   assert.match(workPanelSource, /teamWorkPanelTab/);

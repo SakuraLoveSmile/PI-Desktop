@@ -71,7 +71,7 @@ globalThis.goalTeamRendererUiProbe = async () => {
   const originalTeamChanged = api.onTeamChanged;
   const originalHostStatus = api.onHostStatus;
   const originalStoreMethod = useAppStore.getState().openWorkPanelTabForSession;
-  const openedTabs: Array<{ sessionId: string; tab: { teamTarget?: unknown } }> = [];
+  const openedTabs: Array<{ sessionId: string; tab: { id: string; label?: string; teamTarget?: unknown } }> = [];
   try {
     for (const id of ["execution-old", "execution-new"]) {
       initialProgress.set(id, deferred());
@@ -219,6 +219,8 @@ globalThis.goalTeamRendererUiProbe = async () => {
     await act(async () => container.querySelector<HTMLButtonElement>(".team-dispatch-card-open")?.click());
     assert(openedTabs.length === 1, "one card click must open exactly one work panel target");
     assert(openedTabs[0].sessionId === "lead-session", "card click must open from the active session");
+    assert(openedTabs[0].tab.id === "team:team-session:task:task-real", "task card must open its own tab ID");
+    assert(openedTabs[0].tab.label === "Review change", "task card captures the current subject as its tab label");
     assert(JSON.stringify(openedTabs[0].tab.teamTarget) === JSON.stringify({ kind: "task", taskId: "task-real" }), "card click must open the task detail target");
     const renderJoining = (joining: boolean) => createElement(I18nextProvider, { i18n },
       createElement(TeamDispatchCardsGroup, { cards: [], joining }));

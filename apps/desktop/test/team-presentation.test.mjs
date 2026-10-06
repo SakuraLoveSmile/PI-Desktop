@@ -15,7 +15,37 @@ import {
   projectMemberIdentities,
   selectOverviewTaskRows,
   taskStateLabelKey,
+  memberFocusTask,
+  localizedTeamSnapshotError,
 } from "../src/lib/team-presentation.ts";
+
+test("member focus selects current work with strict ownership and stable creation ties", () => {
+  const owner = member("researcher", "member-1");
+  const owned = (id, status, date, extra = {}) => task(id, status, date, { ownerSessionId: "member-1", ...extra });
+  const pending = owned("pending", "pending", "2026-01-01");
+  const running = owned("running", "in_progress", "2026-01-02");
+  const latest = owned("latest", "completed", "2026-01-03", { updatedAt: "2026-01-09" });
+  assert.equal(memberFocusTask(owner, [latest, pending, running]), running);
+  assert.equal(memberFocusTask(owner, [latest, pending]), pending);
+  assert.equal(memberFocusTask(owner, [owned("older", "failed", "2026-01-04"), latest]), latest);
+  const named = owned("named", "in_progress", "2026-01-01", { ownerSessionId: null, ownerMemberName: "researcher" });
+  const other = owned("other", "in_progress", "2026-01-01", { ownerSessionId: "member-2", ownerMemberName: "researcher" });
+  assert.equal(memberFocusTask(owner, [other, named]), named);
+  assert.equal(memberFocusTask(owner, [other, { ...named, deleted: true }]), undefined);
+  const earlier = owned("a", "in_progress", "2026-01-02");
+  const later = owned("b", "in_progress", "2026-01-02");
+  assert.equal(memberFocusTask(owner, [later, earlier]), earlier);
+  assert.equal(memberFocusTask(owner, []), undefined);
+});
+
+test("snapshot errors localize only the existing domain error codes", () => {
+  const translate = (key) => `localized:${key}`;
+  for (const code of ["TEAM_DISSOLVED", "TEAM_SCOPE_MISMATCH"]) {
+    assert.equal(localizedTeamSnapshotError(code, translate), `localized:team.snapshotErrors.${code}`);
+  }
+  assert.equal(localizedTeamSnapshotError("read failed", translate), "read failed");
+  assert.equal(localizedTeamSnapshotError("", translate), "");
+});
 
 test("Team progress presents ad-hoc tasks, state labels and extra activity in one disclosure", async () => {
   const server = await createServer({
