@@ -82,6 +82,7 @@ const providerServer = createServer(async (req, res) => {
       titleSystemPrompt.includes("descriptive session title summarizing the conversation");
     let toolCall;
     let finalText;
+    let thinkingText;
     let kind = "agent";
 
     if (isTitleRequest) {
@@ -155,6 +156,7 @@ const providerServer = createServer(async (req, res) => {
         toolCall = { name: "declare_team_strategy", args: { strategy: "lead_only", reason: "This short task needs no specialist." }};
       } else { finalText = "Handled by Lead only."; }
     } else if (userText.includes("Send the exact message TEAM_RESULT")) {
+      thinkingText = "TEAM_MEMBER_THINKING: verify the fixed result before reporting.";
       if (!priorToolNames.includes("send_message")) {
         assert.ok(toolNames.includes("send_message"), "member runtime lacks send_message");
         if (!memberGateUsed) {
@@ -230,6 +232,7 @@ const providerServer = createServer(async (req, res) => {
     const emit = (delta, finishReason = null) => {
       res.write(`data: ${JSON.stringify({ ...base, choices: [{ index: 0, delta, finish_reason: finishReason }] })}\n\n`);
     };
+    if (thinkingText) emit({ role: "assistant", reasoning_content: thinkingText });
     if (toolCall) {
       emit({
         role: "assistant",
@@ -411,15 +414,23 @@ async function openTeamPanel(sendCdp, evaluate) {
   if (await evaluate(`!!document.querySelector('[data-testid="team-panel"]')`)) return;
   const existingTeamTab = await evaluate(`(() => {
     const tab = Array.from(document.querySelectorAll('[data-work-panel-tab-id]'))
-      .find((node) => node.getAttribute('data-work-panel-tab-id')?.startsWith('team:'));
+      .find((node) => /^team:[^:]+$/.test(node.getAttribute('data-work-panel-tab-id') ?? ''));
     if (!tab) return false;
     tab.querySelector('.work-panel-tab-button')?.click();
-    return true;
+    return tab.getAttribute('data-work-panel-tab-id');
   })()`);
   if (existingTeamTab) {
-    await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-panel"],.team-back-btn,[data-panorama-canvas]')`), "existing Team surface");
-    if (!await evaluate(`!!document.querySelector('[data-testid="team-panel"]')`)) {
-      await evaluate(`(document.querySelector('.team-back-btn') ?? document.querySelector('.agent-panorama-toolbar button'))?.click()`);
+    await waitFor(() => evaluate(`document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id') === ${JSON.stringify(existingTeamTab)}`), "aggregate Team tab activated");
+    await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-panel"],.team-back-btn')`), "existing Team surface");
+    await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
+    // The fixture can leave task/member -> board -> aggregate on the local stack.
+    for (let depth = 0; depth < 3; depth += 1) {
+      if (await evaluate(`!!document.querySelector('[data-testid="team-panel"]')`)) break;
+      const previousView = await evaluate(`document.querySelector('.team-panel[data-testid]')?.getAttribute('data-testid')`);
+      assert.ok(["team-task-detail", "team-member-detail", "team-task-board"].includes(previousView), `unexpected Team view while returning to aggregate: ${previousView}`);
+      await evaluate(`document.querySelector('.team-back-btn')?.click()`);
+      await waitFor(() => evaluate(`(() => { const view=document.querySelector('.team-panel[data-testid]'); return !!view && view.getAttribute('data-testid') !== ${JSON.stringify(previousView)}; })()`), `Team Back left ${previousView}`);
+      await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
     }
     await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-panel"]')`), "existing Team panel tab");
     return;
@@ -629,6 +640,47 @@ async function verifyStalePanoramaRetry(sendCdp, evaluate) {
   console.log("PASS Panorama stale recovery: failed read retains canvas, Retry remains clickable and restores the snapshot");
 }
 
+async function assertTeamSuccessGlyph(evaluate, selector, label) {
+  const colors = await evaluate(`(() => {
+    const probe=document.createElement('span'); probe.style.color='var(--ds-success)'; document.body.append(probe);
+    try { return { expected:getComputedStyle(probe).color, actual:document.querySelector(${JSON.stringify(selector)}) ? getComputedStyle(document.querySelector(${JSON.stringify(selector)})).color : null }; }
+    finally { probe.remove(); }
+  })()`);
+  assert.equal(colors.actual, colors.expected, `${label} completed glyph uses the success token`);
+}
+
+async function verifyTeamHeaderHitAreas(evaluate, testId) {
+  const result = await evaluate(`(() => {
+    const buttons=Array.from(document.querySelectorAll('[data-testid="${testId}"] .team-work-tab-header button:not(:disabled)'));
+    const rects=buttons.map(button => button.getBoundingClientRect());
+    return { targets: buttons.map((button,index) => {
+      const rect=rects[index], x=rect.left+rect.width/2;
+      return { height:rect.height, width:rect.width,
+        top:document.elementFromPoint(x,rect.top+1)?.closest('button')===button,
+        bottom:document.elementFromPoint(x,rect.bottom-1)?.closest('button')===button };
+    }), overlap:rects.some((a,index) => rects.slice(index+1).some(b =>
+      Math.min(a.right,b.right)>Math.max(a.left,b.left) && Math.min(a.bottom,b.bottom)>Math.max(a.top,b.top))) };
+  })()`);
+  assert.ok(result.targets.length > 0);
+  assert.ok(result.targets.every(target => target.height >= 24 && target.width >= 24 && target.top && target.bottom), `${testId} actual pointer targets: ${JSON.stringify(result)}`);
+  assert.equal(result.overlap, false, `${testId} header pointer targets overlap`);
+}
+
+async function verifyStaleTeamTabRetry(evaluate, testId) {
+  const fixtureDatabase = join(dataDir, "pi.sqlite");
+  const transcriptBefore = await evaluate(`document.querySelector('[data-testid="${testId}"] [role="log"]')?.innerText ?? ''`);
+  execFileSync("sqlite3", [fixtureDatabase, "PRAGMA busy_timeout=5000; ALTER TABLE team_tasks RENAME TO team_tasks_fixture_failure;"]);
+  try {
+    await evaluate(`window.dispatchEvent(new Event('focus'))`);
+    await waitFor(() => evaluate(`!!document.querySelector('[data-testid="${testId}"] .team-error-banner button')`), `${testId} failed-read banner`);
+    assert.equal(await evaluate(`document.querySelector('[data-testid="${testId}"] [role="log"]')?.innerText ?? ''`), transcriptBefore, "snapshot read failure retains the visible member transcript");
+  } finally {
+    execFileSync("sqlite3", [fixtureDatabase, "PRAGMA busy_timeout=5000; ALTER TABLE team_tasks_fixture_failure RENAME TO team_tasks;"]);
+  }
+  await evaluate(`document.querySelector('[data-testid="${testId}"] .team-error-banner button')?.click()`);
+  await waitFor(() => evaluate(`!document.querySelector('[data-testid="${testId}"] .team-error-banner')`), `${testId} Retry restores snapshot`);
+}
+
 async function resizePanel(sendCdp, evaluate, width) {
   const bounds = await evaluate(`(() => {
     const panel = document.querySelector('[data-testid="work-panel"]');
@@ -636,22 +688,52 @@ async function resizePanel(sendCdp, evaluate, width) {
     return { width: panel.getBoundingClientRect().width, x: handle.left + handle.width / 2, y: handle.top + 120 };
   })()`);
   await sendCdp("Input.dispatchMouseEvent", { type: "mousePressed", x: bounds.x, y: bounds.y, button: "left", clickCount: 1 });
-  await waitFor(() => evaluate(`document.querySelector('[data-testid="work-panel"]')?.dataset.resizing === 'true'`), "panel resize gesture admitted");
-  await sendCdp("Input.dispatchMouseEvent", { type: "mouseMoved", x: bounds.x + bounds.width - width, y: bounds.y, button: "left", buttons: 1 });
-  await waitFor(() => evaluate(`Math.abs(document.querySelector('[data-testid="work-panel"]').getBoundingClientRect().width - ${width}) < 2`), `panel drag reached ${width}px`);
-  await sendCdp("Input.dispatchMouseEvent", { type: "mouseReleased", x: bounds.x + bounds.width - width, y: bounds.y, button: "left", clickCount: 1 });
+  try {
+    await waitFor(() => evaluate(`document.querySelector('[data-testid="work-panel"]')?.dataset.resizing === 'true'`), "panel resize gesture admitted");
+    await sendCdp("Input.dispatchMouseEvent", { type: "mouseMoved", x: bounds.x + bounds.width - width, y: bounds.y, button: "left", buttons: 1 });
+    await waitFor(() => evaluate(`Math.abs(document.querySelector('[data-testid="work-panel"]').getBoundingClientRect().width - ${width}) < 2`), `panel drag reached ${width}px`);
+  } catch (error) {
+    const state = await evaluate(`(() => {
+      const panel=document.querySelector('[data-testid="work-panel"]');
+      const handle=panel?.querySelector('.work-panel-resize');
+      return { actualWidth: panel?.getBoundingClientRect().width,
+        computedWidth: panel ? getComputedStyle(panel).width : null,
+        styleWidth: panel?.style.getPropertyValue('--work-panel-width'),
+        resizing: panel?.getAttribute('data-resizing'),
+        mousePointerCaptured: handle?.hasPointerCapture(1),
+        handleBounds: handle?.getBoundingClientRect().toJSON() };
+    })()`);
+    console.error("TEAM_RESIZE_FAILURE", JSON.stringify({ fromBounds: bounds, targetWidth: width, error: String(error), state }));
+    throw error;
+  } finally {
+    await sendCdp("Input.dispatchMouseEvent", { type: "mouseReleased", x: bounds.x + bounds.width - width, y: bounds.y, button: "left", clickCount: 1 });
+  }
   await waitFor(() => evaluate(`Math.abs(document.querySelector('[data-testid="work-panel"]').getBoundingClientRect().width - ${width}) < 2`), `panel resized to ${width}px`);
 }
 
 async function verifyTeamLayoutMatrix(sendCdp, evaluate, locale) {
   await sendCdp("Emulation.setDeviceMetricsOverride", { width: 1600, height: 1000, deviceScaleFactor: 1, mobile: false });
+  let primaryError;
+  let matrixPosition = { locale, surface: "setup" };
+  const diagnostics = () => evaluate(`(() => {
+    const panel=document.querySelector('[data-testid="work-panel"]');
+    const view=document.querySelector('.team-panel[data-testid],.work-panel-overview,.team-work-tab');
+    return { tab: document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id'),
+      view: view?.getAttribute('data-testid'), width: panel?.getBoundingClientRect().width,
+      resizing: panel?.getAttribute('data-resizing'), fontScale: getComputedStyle(document.documentElement).getPropertyValue('--font-scale'),
+      back: !!document.querySelector('.team-back-btn') };
+  })()`);
   try {
-    for (const surface of ["overview", "aggregate", "board", "detail"]) {
+    for (const surface of ["overview", "aggregate", "board", "detail", "taskTab"]) {
+      matrixPosition = { locale, surface, stage: "navigation" };
       await openTeamPanel(sendCdp, evaluate);
       if (surface !== "aggregate") {
         await activateOverviewTab(sendCdp, evaluate);
         await waitFor(() => evaluate(`document.querySelectorAll('.team-progress-row').length > 0`), "live task rows for layout matrix");
-        if (surface !== "overview") {
+        if (surface === "taskTab") {
+          await evaluate(`document.querySelector('.team-progress-row')?.click()`);
+          await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-task-tab"]')`), "task tab for layout matrix");
+        } else if (surface !== "overview") {
           await evaluate(`Array.from(document.querySelectorAll('.team-progress button')).find(button => /view all|查看全部/i.test(button.innerText))?.click()`);
           await waitFor(() => evaluate(`!!document.querySelector('.team-board-row')`), "board for layout matrix");
           if (surface === "detail") {
@@ -661,13 +743,15 @@ async function verifyTeamLayoutMatrix(sendCdp, evaluate, locale) {
         }
       }
       for (const width of [320, 450, 620]) {
+        matrixPosition = { locale, surface, width, stage: "resize" };
         await resizePanel(sendCdp, evaluate, width);
         for (const scale of [1, 1.5]) for (const theme of ["dark", "light"]) {
+          matrixPosition = { locale, surface, width, scale, theme, stage: "measure" };
           await evaluate(`document.documentElement.style.setProperty('--font-scale', '${scale}'); document.documentElement.setAttribute('data-theme', '${theme}'); true`);
           await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
           const metrics = await evaluate(`(() => {
             const root=document.documentElement;
-            const surface=document.querySelector('.team-panel, .work-panel-overview');
+            const surface=document.querySelector('.team-panel, .work-panel-overview, .team-work-tab');
             return { page: [root.clientWidth, root.scrollWidth], surface: [surface.clientWidth, surface.scrollWidth] };
           })()`);
           assert.ok(metrics.page[1] <= metrics.page[0] && metrics.surface[1] <= metrics.surface[0], `${locale}/${surface}/${width}/${scale}/${theme} overflows: ${JSON.stringify(metrics)}`);
@@ -675,13 +759,24 @@ async function verifyTeamLayoutMatrix(sendCdp, evaluate, locale) {
         }
       }
     }
+  } catch (error) {
+    primaryError = error;
+    console.error("TEAM_LAYOUT_PRIMARY_FAILURE", JSON.stringify({ ...matrixPosition, error: String(error), state: await diagnostics() }));
+    await saveScreenshot(sendCdp, `team-layout-primary-${locale}.png`);
+    throw error;
   } finally {
-    await evaluate(`document.documentElement.style.removeProperty('--font-scale'); document.documentElement.setAttribute('data-theme', 'dark'); true`);
-    await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
-    await resizePanel(sendCdp, evaluate, 360);
-    await sendCdp("Emulation.clearDeviceMetricsOverride");
+    try {
+      await evaluate(`document.documentElement.style.removeProperty('--font-scale'); document.documentElement.setAttribute('data-theme', 'dark'); true`);
+      await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
+      await resizePanel(sendCdp, evaluate, 360);
+    } catch (error) {
+      console.error("TEAM_LAYOUT_CLEANUP_FAILURE", JSON.stringify({ ...matrixPosition, error: String(error), state: await diagnostics() }));
+      if (!primaryError) throw error;
+    } finally {
+      await sendCdp("Emulation.clearDeviceMetricsOverride");
+    }
   }
-  console.log(`PASS Team layout matrix ${locale}: Overview/aggregate/board/long detail, 320/450/620px, 100%/150%, dark/light`);
+  console.log(`PASS Team layout matrix ${locale}: Overview/aggregate/board/long detail/task tab, 320/450/620px, 100%/150%, dark/light`);
 }
 
 try {
@@ -813,10 +908,26 @@ try {
   assert.equal(await evaluate(`document.querySelector('[data-sidebar-session-row="${member.memberSessionId}"] .thread-item-title')?.innerText`), 'Researcher Alex', "generated member label should show the full role/name instead of repeating its routing title");
   console.log("PASS Sidebar grouping: member expands under Lead with its presentation identity");
 
-  await evaluate(`Array.from(document.querySelectorAll('[data-testid="team-panel"] .team-panel-actions button'))[0]?.click()`);
+  await evaluate(`Array.from(document.querySelectorAll('[data-testid="team-panel"] .team-panel-actions button')).find(button => /view panorama/i.test(button.getAttribute('aria-label') ?? ''))?.click()`);
   await waitFor(() => evaluate(`!!document.querySelector('[data-panorama-canvas]')`), "Team panorama");
+  assert.equal(await evaluate(`document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id')`), `team:${lead.id}:panorama`, "panorama opens its own tab");
+  assert.equal(await evaluate(`document.querySelector('[data-work-panel-tab-id].active .work-panel-tab-button')?.innerText.trim()`), "Team panorama");
+  assert.equal(await evaluate(`document.querySelector('[data-work-panel-tab-id].active .work-panel-tab-button')?.getAttribute('title')`), "Team panorama", "team tooltip follows its label");
+  assert.equal(await evaluate(`document.querySelectorAll('[data-work-panel-tab-id="team:${lead.id}"]').length`), 1, "aggregate tab is retained");
+
   await waitFor(() => evaluate(`document.querySelector('.agent-panorama-root-node .agent-panorama-node-status')?.innerText.includes('Waiting for team members')`), "settled Lead waiting status");
   await evaluate(`Array.from(document.querySelectorAll('[data-panorama-tool] button')).find((button) => /reset/i.test(button.getAttribute('aria-label') ?? ''))?.click()`);
+  await waitFor(() => evaluate(`Number(document.querySelector('[data-panorama-canvas]')?.dataset.panoramaZoom) === 1`), "Reset establishes 100% panorama geometry");
+  const panoramaMetrics = await evaluate(`Array.from(document.querySelectorAll('[data-panorama-node]')).map(node => {
+    const rect = node.getBoundingClientRect();
+    const avatar = node.querySelector('.agent-panorama-node-avatar img').getBoundingClientRect();
+    return { width: rect.width, height: rect.height, avatarWidth: avatar.width, avatarHeight: avatar.height };
+  })`);
+  assert.ok(panoramaMetrics.length >= 2, "panorama geometry needs root and child nodes");
+  assert.ok(panoramaMetrics.every(node => Math.abs(node.width - 276) < 1 && Math.abs(node.height - 86) < 1 && Math.abs(node.avatarWidth - 32) < 1 && Math.abs(node.avatarHeight - 32) < 1), `Panorama compact geometry: ${JSON.stringify(panoramaMetrics)}`);
+  const toolbarMetrics = await evaluate(`Array.from(document.querySelectorAll('[data-panorama-toolbar] button')).map(button => ({ label: button.getAttribute('aria-label'), text: button.innerText.trim() }))`);
+  assert.ok(toolbarMetrics.every(button => button.label && button.text === ''), `panorama toolbar must be icon-only with accessible labels: ${JSON.stringify(toolbarMetrics)}`);
+  console.log(`PASS Panorama compact geometry/icons: ${JSON.stringify(panoramaMetrics)}`);
   for (let index = 0; index < 2; index += 1) {
     await evaluate(`Array.from(document.querySelectorAll('[data-panorama-tool] button')).find((button) => /zoom out/i.test(button.getAttribute('aria-label') ?? ''))?.click()`);
   }
@@ -824,16 +935,88 @@ try {
   assert.equal(manualViewport.zoom, 0.8, "panorama manual zoom should be 80%");
   manualViewport = await refreshWhileDragging(sendCdp, evaluate);
   await evaluate(`document.querySelector('.agent-panorama-node.is-clickable')?.click()`);
-  await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-member-detail"]')`), "member detail from panorama");
-  await evaluate(`document.querySelector('.team-back-btn')?.click()`);
+  await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-task-tab"],[data-testid="team-member-tab"]')`), "task/member tab from panorama");
+  assert.match(await evaluate(`document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id')`), new RegExp(`^team:${lead.id}:(task|member):`));
+  await evaluate(`document.querySelector('[data-work-panel-tab-id="team:${lead.id}:panorama"] .work-panel-tab-button')?.click()`);
+  await waitFor(() => evaluate(`!!document.querySelector('[data-panorama-canvas]')`), "return to panorama tab");
   assert.deepEqual(await panoramaViewport(sendCdp, evaluate), manualViewport, "manual viewport changed after member detail/back");
+  const idleMember = activeSnapshot.members.find((item) => item.name === "executor");
+  assert.ok(idleMember, "fixture requires a member without assigned tasks");
+  await evaluate(`document.querySelector('[data-node-id="${idleMember.memberSessionId}"].is-clickable')?.click()`);
+  await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-member-tab"]')`), "member without focus task opens member tab");
+  assert.equal(await evaluate(`document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id')`), `team:${lead.id}:member:${idleMember.memberSessionId}`);
+  assert.equal(await evaluate(`document.querySelector('[data-work-panel-tab-id].active .work-panel-tab-button')?.innerText.trim()`), "Sam");
+  assert.equal(await evaluate(`document.querySelector('[data-work-panel-tab-id].active .work-panel-tab-button')?.getAttribute('title')`), "Sam");
+  await evaluate(`document.querySelector('[data-work-panel-tab-id="team:${lead.id}:panorama"] .work-panel-tab-button')?.click()`);
+  await waitFor(() => evaluate(`!!document.querySelector('[data-panorama-canvas]')`), "panorama retained after member navigation");
+  assert.deepEqual(await panoramaViewport(sendCdp, evaluate), manualViewport, "member navigation must preserve panorama viewport");
   await assertNoPageHorizontalOverflow(sendCdp, evaluate);
   assert.deepEqual(await panoramaViewport(sendCdp, evaluate), manualViewport, "manual viewport changed after resizing");
-  console.log("PASS Panorama: 80% zoom, in-flight refresh retains canvas, continuous drag, detail/back and resize preserve viewport");
+  console.log("PASS Panorama: 80% zoom, in-flight refresh retains canvas, continuous drag, independent detail/panorama tabs and resize preserve viewport");
   await verifyStalePanoramaRetry(sendCdp, evaluate);
   const waitingImage = await saveScreenshot(sendCdp, "team-panorama-waiting-members.png");
 
+  // Open both live tab surfaces while the local model gate is still held.
+  await activateOverviewTab(sendCdp, evaluate);
+  await waitFor(() => evaluate(`document.querySelectorAll('.team-progress-row').length > 0`), "live task entry before member release");
+  await evaluate(`document.querySelector('.team-progress-row')?.click()`);
+  await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-task-tab"]')`), "live task tab before member release");
+  const liveTaskTabId = await evaluate(`document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id')`);
+  const taskHeaderHeight = await evaluate(`document.querySelector('[data-testid="team-task-tab"] .team-work-tab-header').getBoundingClientRect().height`);
+  assert.ok(Math.abs(taskHeaderHeight - 60) <= 2, `compact task header: ${taskHeaderHeight}`);
+  assert.equal(await evaluate(`document.querySelectorAll('[data-testid="team-task-tab"] textarea,[data-testid="team-task-tab"] .composer').length`), 0);
+  await verifyTeamHeaderHitAreas(evaluate, "team-task-tab");
+  assert.equal(await evaluate(`document.querySelector('[data-testid="team-task-tab"] .team-work-tab-action[aria-expanded]')?.getAttribute('aria-expanded')`), "false");
+  await evaluate(`document.querySelector('[data-testid="team-task-tab"] .team-work-tab-action[aria-expanded]')?.click()`);
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="team-task-tab"] .team-work-tab-action[aria-expanded]')?.getAttribute('aria-expanded') === 'true' && !!document.querySelector('[data-testid="team-task-tab"] .team-work-tab-brief')`), "task Info opens its brief");
+  const brief = await evaluate(`(() => {
+    const surface=document.querySelector('[data-testid="team-task-tab"]'), brief=surface.querySelector('.team-work-tab-brief');
+    return { description:brief.querySelector('.team-card-desc')?.innerText,
+      owner:brief.querySelector('.team-owner-btn')?.innerText,
+      scopes:Array.from(brief.querySelectorAll('.team-detail-field-value')).some(field => field.innerText.includes('long-directory-')),
+      bounded:brief.scrollWidth<=brief.clientWidth && surface.scrollWidth<=surface.clientWidth && document.documentElement.scrollWidth<=document.documentElement.clientWidth };
+  })()`);
+  assert.match(brief.description, /Detail for E2E board fixture task/); assert.match(brief.owner, /Researcher Alex/);
+  assert.equal(brief.scopes, true); assert.equal(brief.bounded, true, `expanded task brief must wrap long description/scopes: ${JSON.stringify(brief)}`);
+  await evaluate(`document.querySelector('[data-testid="team-task-tab"] .team-work-tab-action[aria-expanded]')?.click()`);
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="team-task-tab"] .team-work-tab-action[aria-expanded]')?.getAttribute('aria-expanded') === 'false' && !document.querySelector('[data-testid="team-task-tab"] .team-work-tab-brief')`), "task Info closes its brief");
+  await evaluate(`document.querySelector('[data-testid="team-task-tab"] .team-work-tab-identity')?.click()`);
+  await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-member-tab"]')`), "owner opens live member tab");
+  assert.equal(await evaluate(`document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id')`), `team:${lead.id}:member:${member.memberSessionId}`);
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="team-member-tab"] .team-work-tab-status')?.innerText.includes('Running')`), "member tab reflects running snapshot phase");
+  const memberHeaderHeight = await evaluate(`document.querySelector('[data-testid="team-member-tab"] .team-work-tab-header').getBoundingClientRect().height`);
+  assert.ok(Math.abs(memberHeaderHeight - 60) <= 2, `compact member header: ${memberHeaderHeight}`);
+  assert.equal(await evaluate(`document.querySelectorAll('[data-testid="team-member-tab"] textarea,[data-testid="team-member-tab"] .composer,[data-testid="team-member-tab"] .inline-review-card').length`), 0);
+  await verifyTeamHeaderHitAreas(evaluate, "team-member-tab");
+  const liveTabCount = await evaluate(`document.querySelectorAll('[data-work-panel-tab-id]').length`);
+  await evaluate(`document.querySelector('[data-testid="team-member-tab"] .team-work-tab-task-link')?.click()`);
+  await waitFor(() => evaluate(`document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id') === ${JSON.stringify(liveTaskTabId)} && !!document.querySelector('[data-testid="team-task-tab"]')`), "member focus title reactivates its stored task tab");
+  assert.equal(await evaluate(`document.querySelectorAll('[data-work-panel-tab-id]').length`), liveTabCount, "member focus navigation reuses the task tab");
+  await evaluate(`document.querySelector('[data-testid="team-task-tab"] .team-work-tab-identity')?.click()`);
+  await waitFor(() => evaluate(`document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id') === 'team:${lead.id}:member:${member.memberSessionId}' && !!document.querySelector('[data-testid="team-member-tab"]')`), "owner navigation returns to its stored member tab");
+  assert.equal(await evaluate(`document.querySelectorAll('[data-work-panel-tab-id]').length`), liveTabCount, "owner navigation reuses the member tab");
   releaseModelRequest("member");
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="team-member-tab"]')?.innerText.includes('TEAM_RESULT was sent to Lead.')`), "live final answer appears without reopening", 60_000);
+  await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-member-tab"] .team-transcript-tool-item .tool-row') && !!document.querySelector('[data-testid="team-member-tab"] .thinking')`), "live tool and thinking rows without reopening");
+  await evaluate(`document.querySelector('[data-testid="team-member-tab"] .thinking:not(.open) button')?.click()`);
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="team-member-tab"]')?.innerText.includes('TEAM_MEMBER_THINKING')`), "thinking disclosure shows real reasoning text");
+  // message_end is visible before agent_end; keep fault injection away from
+  // the member's shutdown and the Lead's queued mailbox/context work.
+  await waitFor(async () => {
+    const snapshot = await invoke("teamGetSnapshot", { teamSessionId: lead.id });
+    if (snapshot.leadPhase === "running" || snapshot.queuedMessageCount !== 0 ||
+      snapshot.members.some((item) => item.phase === "running" || item.phase === "provisioning")) return false;
+    const statuses = await Promise.all([lead.id, ...snapshot.members.map((item) => item.memberSessionId)]
+      .map((sessionId) => invoke("agentGetStatus", sessionId)));
+    return statuses.every((result) => result.status?.isRunning === false);
+  }, "all Team actors and mailbox settled before snapshot fault injection", 60_000);
+  await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-member-tab"] .team-work-tab-status[data-phase="completed"] > svg')`), "member tab reflects completed snapshot phase");
+  await assertTeamSuccessGlyph(evaluate, '[data-testid="team-member-tab"] .team-work-tab-status > svg', "member");
+  await verifyStaleTeamTabRetry(evaluate, "team-member-tab");
+  await evaluate(`document.querySelector('[data-work-panel-tab-id="${liveTaskTabId}"] .work-panel-tab-button')?.click()`);
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="team-task-tab"]')?.innerText.includes('TEAM_RESULT was sent to Lead.')`), "retained task tab receives final transcript");
+  await verifyStaleTeamTabRetry(evaluate, "team-task-tab");
+  console.log(`PASS Live Team task/member tabs: running→thinking/tool/final without reopening; headers ${taskHeaderHeight}/${memberHeaderHeight}px; no composer/rollback`);
 
   let roster;
   await waitFor(async () => {
@@ -860,17 +1043,62 @@ try {
   assert.ok(boardTaskId, "board fixture task id was not initialized");
   await waitFor(async () => (await invoke("agentGetStatus", lead.id)).status?.isRunning === false, "Lead idle before task completion fixture");
   await activateOverviewTab(sendCdp, evaluate);
-  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-count')?.innerText === '0/6'`), "Overview baseline before live task mutation");
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.completed === '0' && document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.total === '6'`), "Overview baseline before live task mutation");
   await invoke("agentPrompt", { sessionId: lead.id, viewingSessionId: lead.id, content: "Mark the board fixture task completed." });
   await waitFor(() => modelGates.taskUpdate.entered, "task update held after Host mutation");
   const updatedBoard = await invoke("teamGetBoard", { teamSessionId: lead.id });
   assert.equal(updatedBoard.tasks.find((task) => task.taskId === boardTaskId)?.status, "completed", "completed board fixture did not persist");
-  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-count')?.innerText === '1/6'`), "mounted Overview refreshes before the running turn settles");
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.completed === '1' && document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.total === '6'`), "mounted Overview refreshes before the running turn settles");
   releaseModelRequest("taskUpdate");
   await waitFor(async () => (await invoke("agentGetStatus", lead.id)).status?.isRunning === false, "Lead settled after task completion fixture");
+  await evaluate(`document.querySelector('[data-work-panel-tab-id="${liveTaskTabId}"] .work-panel-tab-button')?.click()`);
+  await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-task-tab"] .team-task-glyph[data-state="completed"] svg')`), "stored task tab reflects completed snapshot state");
+  await assertTeamSuccessGlyph(evaluate, '[data-testid="team-task-tab"] .team-task-glyph[data-state="completed"] svg', "task");
   await activateOverviewTab(sendCdp, evaluate);
   await waitFor(() => evaluate(`document.querySelectorAll('[data-testid="overview-team-progress"] .team-progress-row').length === 5`), "five compact Overview task rows");
   assert.match(await evaluate(`document.querySelector('[data-testid="overview-tab"]')?.innerText ?? ''`), /researcher|Alex/i, "Overview should expose the Team task/member summary");
+  await evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-row')?.click()`);
+  await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-task-tab"]')`), "Overview opens independent task tab");
+  const taskTabId = await evaluate(`document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id')`);
+  assert.match(taskTabId, new RegExp(`^team:${lead.id}:task:`));
+  assert.equal(await evaluate(`(() => { const button=document.querySelector('[data-work-panel-tab-id].active .work-panel-tab-button'); return button.getAttribute('title') === button.innerText.trim(); })()`), true, "task tooltip equals its captured label");
+
+  const tabCount = await evaluate(`document.querySelectorAll('[data-work-panel-tab-id]').length`);
+  await activateOverviewTab(sendCdp, evaluate);
+  await evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-row')?.click()`);
+  await waitFor(() => evaluate(`document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id') === ${JSON.stringify(taskTabId)}`), "re-clicking task reactivates its existing tab");
+  assert.equal(await evaluate(`document.querySelectorAll('[data-work-panel-tab-id]').length`), tabCount, "reopening task must not duplicate tabs");
+  assert.equal(await evaluate(`document.querySelectorAll('[data-work-panel-tab-id="team:${lead.id}"]').length`), 1, "task navigation retains aggregate tab");
+  await activateOverviewTab(sendCdp, evaluate);
+  const overviewMetrics = await evaluate(`(() => {
+    const overview = document.querySelector('[data-testid="overview-tab"]');
+    const section = overview.querySelector('section.team-progress');
+    return {
+      header: section.querySelector('.team-progress-header').getBoundingClientRect().height,
+      row: section.querySelector('.team-progress-row').getBoundingClientRect().height,
+      summaries: Array.from(overview.querySelectorAll('details > summary')).map(summary => ({
+        height: summary.getBoundingClientRect().height,
+        chevrons: summary.querySelectorAll('.work-panel-overview-chevron').length,
+        border: getComputedStyle(summary.parentElement).borderBottomStyle,
+      })),
+      extraInside: !!section.querySelector('.work-panel-overview-status'),
+      separateProgress: Array.from(overview.querySelectorAll('details > summary')).some(summary => summary.innerText.trim() === 'Progress'),
+    };
+  })()`);
+  assert.ok(Math.abs(overviewMetrics.header - 48) <= 2, `Team progress header geometry: ${JSON.stringify(overviewMetrics)}`);
+  assert.ok(Math.abs(overviewMetrics.row - 50) <= 2, `Team progress row geometry: ${JSON.stringify(overviewMetrics)}`);
+  assert.ok(overviewMetrics.summaries.every(summary => Math.abs(summary.height - 48) <= 2 && summary.chevrons === 1 && summary.border === 'dashed'), `Overview chrome geometry: ${JSON.stringify(overviewMetrics)}`);
+  assert.equal(overviewMetrics.extraInside, true, "Team status must stay inside progress");
+  assert.equal(overviewMetrics.separateProgress, false, "Team Overview must not repeat the ordinary progress disclosure");
+  await evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-group-toggle')?.click()`);
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-rows')?.getClientRects().length === 0`), "Ad-hocs collapse actually hides rows");
+  await evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-group-toggle')?.click()`);
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-row')?.getClientRects().length > 0`), "Ad-hocs reopen restores rows");
+  await evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-toggle')?.click()`);
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-body')?.getClientRects().length === 0`), "progress collapse hides task and extra content");
+  await evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-toggle')?.click()`);
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-body')?.getClientRects().length > 0`), "progress reopen restores task and extra content");
+  console.log(`PASS Overview geometry/disclosures: ${JSON.stringify(overviewMetrics)}`);
   await saveScreenshot(sendCdp, "team-overview-progress.png");
   await evaluate(`Array.from(document.querySelectorAll('[data-testid="overview-team-progress"] button')).find(button => /view all/i.test(button.innerText))?.click()`);
   await waitFor(() => evaluate(`document.querySelectorAll('.team-board-row').length === 6`), "all six compact board rows");
@@ -935,6 +1163,8 @@ try {
   await submitComposerPrompt(sendCdp, evaluate, "Standard coexistence probe: delegate one read-only task and report the result.");
   await waitFor(() => calls.some(call => call.userText.includes('STANDARD_CHILD_RESULT') && call.tool === null), "ordinary Task delegate executed");
   await waitFor(async () => (await invoke("agentGetStatus", standardSession.id)).status?.isRunning === false, "ordinary Task parent settled");
+  await activateOverviewTab(sendCdp, evaluate);
+  assert.equal(await evaluate(`Array.from(document.querySelectorAll('[data-testid="overview-tab"] details > summary')).some(summary => summary.innerText.trim() === 'Progress')`), true, "ordinary session keeps its progress disclosure");
   const standardDetail = await invoke("sessionGet", { id: standardSession.id });
   assert.ok(standardDetail.session.messages.some(message => message.content?.includes('STANDARD_PARENT_RESULT')));
   assert.equal((await invoke("teamGetRoster", {teamSessionId: lead.id})).members.length, 5, "ordinary delegate changed the Team roster");
@@ -1036,7 +1266,7 @@ try {
   await waitFor(() => evaluate(`!!document.querySelector('[data-session-pane="${lead.id}"][data-visible="true"]')`), "Lead reopened after Chinese reload");
   await openTeamPanel(sendCdp, evaluate);
   await activateOverviewTab(sendCdp, evaluate);
-  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"]')?.innerText.includes('任务进度')`), "Chinese compact Team progress");
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"]')?.innerText.includes('进展')`), "Chinese compact Team progress");
   await saveScreenshot(sendCdp, "team-overview-zh-CN.png");
   await verifyTeamLayoutMatrix(sendCdp, evaluate, "zh-CN");
   assert.equal(titleRequests.length, 3, "renderer reload must not duplicate title requests");

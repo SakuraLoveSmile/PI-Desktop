@@ -74,9 +74,9 @@ app.whenReady().then(async () => {
     await checkMenu(".composer-profile-menu.is-open");
     await click('.composer-profile-menu.is-open [aria-checked="false"]');
     await waitFor('document.querySelector(".composer-profile-chip")?.dataset.profile === "team"');
-    await checkProfileLabel("专家团队");
+    await checkProfileLabel("专家团");
     win.setContentSize(498, 720);
-    await checkProfileLabel("专家团队");
+    await checkProfileLabel("专家团");
     await waitFor('!document.querySelector(".composer-contract-chip")');
     await click(".composer-plus > button");
     await checkMenu(".composer-plus-menu.is-open");

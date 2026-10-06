@@ -1,15 +1,16 @@
-import { useId } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Button, TooltipButton } from "../../ui";
-import { IconCheck, IconChevronDown, IconChevronRight, IconExternal, IconRefresh } from "../../icons";
+import { IconArrowUpRight, IconChevronDown } from "../../icons";
 import { PixelAvatar } from "./PixelAvatar";
-import type { MemberView, TaskRow, TaskVisualState } from "../../../lib/team-presentation";
+import { TaskStateGlyph } from "./TaskStateGlyph";
+import { taskStateLabelKey, type MemberView, type TaskRow } from "../../../lib/team-presentation";
 
-export function MemberIdentity({ member }: { member: MemberView }) {
+export function MemberIdentity({ member, avatarSize = 20 }: { member: MemberView; avatarSize?: 12 | 16 | 20 }) {
   const { t } = useTranslation();
   return (
     <span className="team-person">
-      <PixelAvatar seed={member.sessionId} />
+      <PixelAvatar seed={member.sessionId} size={avatarSize} />
       <span className="team-person-name">
         {t(`team.roles.${member.role}`)} {member.displayName}
       </span>
@@ -17,105 +18,72 @@ export function MemberIdentity({ member }: { member: MemberView }) {
   );
 }
 
-function TaskStateIcon({ state }: { state: TaskVisualState }) {
-  return (
-    <span className={`team-task-state team-task-state-${state}`} aria-hidden="true">
-      {state === "completed" ? (
-        <IconCheck size={12} />
-      ) : state === "in_progress" ? (
-        <IconRefresh size={13} className="team-task-spinner" />
-      ) : state === "blocked" ? (
-        "!"
-      ) : state === "failed" ? (
-        "×"
-      ) : (
-        "·"
-      )}
-    </span>
-  );
-}
-
 export function TeamTaskProgress({
-  rows,
-  completed,
-  total,
-  expanded,
-  onToggle,
-  onOpenTask,
-  onOpenPanorama,
-  onOpenBoard,
+  rows, completed, total, expanded, onToggle, onOpenTask, onOpenPanorama, onOpenBoard, extra,
 }: {
   rows: TaskRow[];
   completed: number;
   total: number;
   expanded: boolean;
   onToggle: () => void;
-  onOpenTask: (taskId: string) => void;
+  onOpenTask: (taskId: string, subject: string) => void;
   onOpenPanorama: () => void;
   onOpenBoard: () => void;
+  extra?: ReactNode;
 }) {
   const { t } = useTranslation();
-  const rowsId = useId();
+  const [groupOpen, setGroupOpen] = useState(true);
+  const bodyId = useId();
+  const groupId = useId();
   return (
-    <section className="team-progress" aria-label={t("team.taskProgress")}>
+    <section className="team-progress" aria-label={t("team.taskProgress")}
+      data-completed={completed} data-total={total}>
       <header className="team-progress-header">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="team-progress-disclosure"
-          aria-expanded={expanded}
-          aria-controls={rowsId}
-          onClick={onToggle}
-        >
-          {expanded ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
-          <span>{t("team.taskProgress")}</span>
-          <span className="team-progress-count">{completed}/{total}</span>
-        </Button>
-        <TooltipButton
-          className="team-progress-panorama"
-          tooltip={t("team.viewInPanorama")}
-          ariaLabel={t("team.viewInPanorama")}
-          onClick={onOpenPanorama}
-        >
+        <h3 className="team-progress-title">{t("team.taskProgress")}</h3>
+        <TooltipButton className="team-progress-panorama" tooltip={t("team.viewInPanorama")}
+          ariaLabel={t("team.viewInPanorama")} onClick={onOpenPanorama}>
           <span>{t("team.viewInPanorama")}</span>
-          <IconExternal size={13} />
+          <IconArrowUpRight size={16} aria-hidden />
+        </TooltipButton>
+        <span className="team-progress-divider" aria-hidden="true" />
+        <TooltipButton className="team-progress-toggle" tooltip={t("team.taskProgress")}
+          ariaLabel={t("team.taskProgress")} aria-expanded={expanded} aria-controls={bodyId} onClick={onToggle}>
+          <IconChevronDown size={16} aria-hidden />
         </TooltipButton>
       </header>
-      <ol id={rowsId} className="team-progress-rows" hidden={!expanded}>
-        {rows.map(({ task, ordinal, state, owner }) => (
-          <li key={task.taskId}>
-            <Button
-              variant="ghost"
-              className="team-progress-row"
-              aria-label={t("team.openTaskWithStatus", {
-                subject: task.subject,
-                status: state === "blocked"
-                  ? t("team.waitingForDependencies")
-                  : t(`team.taskStatus.${state}`),
-              })}
-              onClick={() => onOpenTask(task.taskId)}
-            >
-              <TaskStateIcon state={state} />
-              <span className="team-progress-copy">
-                <span className="team-progress-task" title={task.subject}>
-                  {t("team.numberedTask", { number: ordinal, subject: task.subject })}
-                </span>
-                {owner ? (
-                  <MemberIdentity member={owner} />
-                ) : (
-                  <span className="team-person">{t("team.unassigned")}</span>
-                )}
-              </span>
-            </Button>
-          </li>
-        ))}
-      </ol>
-      {expanded && total > rows.length ? (
-        <Button variant="ghost" size="sm" onClick={onOpenBoard}>
-          {t("team.viewAllTasks", { count: total })}
-        </Button>
-      ) : null}
-      {expanded && total === 0 ? <p className="team-empty-copy">{t("team.noTasks")}</p> : null}
+      <div id={bodyId} className="team-progress-body" hidden={!expanded}>
+        {total > 0 ? (
+          <>
+            <TooltipButton className="team-progress-group-toggle" tooltip={t("team.adHocGroup")}
+              ariaLabel={t("team.adHocGroup")} aria-expanded={groupOpen} aria-controls={groupId}
+              onClick={() => setGroupOpen((open) => !open)}>
+              <span>{t("team.adHocGroup")}</span>
+              <span className="team-progress-group-count">{total}</span>
+              <IconChevronDown size={14} aria-hidden />
+            </TooltipButton>
+            <ol id={groupId} className="team-progress-rows" hidden={!groupOpen}>
+              {rows.map(({ task, state, owner }) => (
+                <li key={task.taskId}>
+                  <TooltipButton className="team-progress-row" tooltip={task.subject}
+                    ariaLabel={t("team.openTaskWithStatus", { subject: task.subject, status: t(taskStateLabelKey(state)) })}
+                    onClick={() => onOpenTask(task.taskId, task.subject)}>
+                    <TaskStateGlyph state={state} />
+                    <span className="team-progress-task">{t("team.adHocTaskTitle", { subject: task.subject })}</span>
+                    {owner ? <MemberIdentity member={owner} avatarSize={12} />
+                      : <span className="team-person">{t("team.unassigned")}</span>}
+                  </TooltipButton>
+                </li>
+              ))}
+            </ol>
+            {total > rows.length ? (
+              <Button variant="ghost" size="sm" className="team-progress-view-all" onClick={onOpenBoard}>
+                {t("team.viewAllTasks", { count: total })}
+              </Button>
+            ) : null}
+          </>
+        ) : <p className="team-empty-copy">{t("team.noTasks")}</p>}
+        {extra}
+      </div>
     </section>
   );
 }

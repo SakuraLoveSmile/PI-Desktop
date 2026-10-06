@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { PlanProposal, UiMessage } from "@pi-desktop/shared";
 import { useAppStore } from "../../stores/app-store";
-import { IconBot, IconFileText, IconInfo, IconWorkflow } from "../icons";
+import { IconChevronDown, IconBot, IconFileText, IconInfo, IconWorkflow } from "../icons";
 import { AgentPanorama, type PanoramaNode, type PanoramaNodeStatus } from "./AgentPanorama";
 import { fileWorkPanelTab, teamWorkPanelTab } from "../../lib/work-panel-tabs";
 import { resolvePlanArtifactPath } from "../../lib/plan-artifact";
@@ -18,7 +18,7 @@ import { delegateTaskDescription } from "../../lib/subagent-transcript";
 import { useTeamSnapshot } from "../../hooks/useTeamSnapshot";
 import { useOverviewMetadata } from "../../hooks/useOverviewMetadata";
 import { getPanoramaViewport, savePanoramaViewport } from "../../lib/panorama-memory";
-import { buildTeamTaskRows, localTeamSessionId, selectOverviewTaskRows } from "../../lib/team-presentation";
+import { localizedTeamSnapshotError, buildTeamTaskRows, localTeamSessionId, selectOverviewTaskRows } from "../../lib/team-presentation";
 import { TeamTaskProgress } from "./team/TeamTaskProgress";
 import { Button } from "../ui";
 import { isActivePlanExecution } from "../../lib/plan-mode-state";
@@ -143,11 +143,11 @@ export function OverviewTab() {
   const { error: metadataError } = useOverviewMetadata(activeSessionId);
   const [teamExpanded, setTeamExpanded] = useState<Record<string, boolean>>({});
   const teamRows = useMemo(() => teamData
-    ? buildTeamTaskRows(teamData.tasks, teamData.members, teamData.readiness)
+    ? buildTeamTaskRows(teamData.tasks, teamData.members, teamData.readiness, teamData.paused)
     : [], [teamData]);
-  const openTeamTarget = (target: { kind: "aggregate" | "board" | "panorama" | "task"; taskId?: string }) => {
+  const openTeamTarget = (target: { kind: "aggregate" | "board" | "panorama" | "task"; taskId?: string }, label?: string) => {
     if (activeSessionId && teamSessionId) {
-      openWorkPanelTabForSession(activeSessionId, teamWorkPanelTab(teamSessionId, target));
+      openWorkPanelTabForSession(activeSessionId, teamWorkPanelTab(teamSessionId, target, label));
     }
   };
 
@@ -251,6 +251,25 @@ export function OverviewTab() {
       ? planningState
       : outcome ?? "idle";
 
+  const progressContent = (
+    <>
+      <div className="work-panel-overview-status">
+        <span>{t("panel.overview.statusLabel")}</span>
+        <strong>{t(`panel.overview.status.${status}`, { defaultValue: status })}</strong>
+      </div>
+      {proposals.length > 0 ? proposals.map((proposal) => (
+        <div className="work-panel-overview-row" key={proposal.id}>
+          <span className="work-panel-overview-row-label">{proposalLabel(proposal)}</span>
+          <span className="work-panel-overview-row-detail">
+            {t(`panel.overview.status.${proposalStatus(proposal)}`, { defaultValue: proposalStatus(proposal) })}
+          </span>
+        </div>
+      )) : (
+        <p className="work-panel-overview-empty-copy">{t("panel.overview.noPlans")}</p>
+      )}
+    </>
+  );
+
   return (
     <div className="work-panel-overview" data-testid="overview-tab">
       {metadataError && <p className="work-panel-overview-empty-copy" role="status">{t("team.staleData")}: {metadataError}</p>}
@@ -273,16 +292,17 @@ export function OverviewTab() {
         {isTeam && teamSessionId && (
           <section className="work-panel-overview-section work-panel-overview-team-progress" data-testid="overview-team-progress">
             {teamError && <div className="team-error-banner" role="status">
-              <span>{t("team.staleData")}: {["TEAM_DISSOLVED", "TEAM_SCOPE_MISMATCH"].includes(teamError) ? t(`team.snapshotErrors.${teamError}`) : teamError}</span>
+              <span>{t("team.staleData")}: {localizedTeamSnapshotError(teamError, t)}</span>
               <Button size="sm" onClick={() => void refreshTeam()}>{t("team.retry")}</Button>
             </div>}
             {teamData ? <TeamTaskProgress
               rows={selectOverviewTaskRows(teamRows)}
+              extra={progressContent}
               completed={teamData.tasks.filter((task) => !task.deleted && task.status === "completed").length}
               total={teamData.tasks.filter((task) => !task.deleted).length}
               expanded={teamExpanded[teamSessionId] ?? true}
               onToggle={() => setTeamExpanded((state) => ({ ...state, [teamSessionId]: !(state[teamSessionId] ?? true) }))}
-              onOpenTask={(taskId) => openTeamTarget({ kind: "task", taskId })}
+              onOpenTask={(taskId, subject) => openTeamTarget({ kind: "task", taskId }, subject)}
               onOpenPanorama={() => openTeamTarget({ kind: "panorama" })}
               onOpenBoard={() => openTeamTarget({ kind: "board" })}
             /> : !teamError && teamLoading ? <p className="work-panel-overview-empty-copy" role="status">{t("common.loading")}</p> : null}
@@ -292,7 +312,7 @@ export function OverviewTab() {
         {(!isTeam || subagents.length > 0) && (
         <details className="work-panel-overview-section" open>
           <summary className="work-panel-overview-subagents-summary">
-            <span>{t(isTeam ? "team.previousSubagents" : "panel.overview.subagents")}</span>
+            <span className="work-panel-overview-summary-label">{t(isTeam ? "team.previousSubagents" : "panel.overview.subagents")}</span>
             {subagents.length > 0 && !isTeam && (
               <button
                 type="button"
@@ -309,6 +329,7 @@ export function OverviewTab() {
                 <span>{t("team.viewPanorama")}</span>
               </button>
             )}
+            <IconChevronDown size={16} className="work-panel-overview-chevron" aria-hidden />
           </summary>
           <div className="work-panel-overview-section-body">
             {subagents.length > 0 ? (
@@ -338,28 +359,21 @@ export function OverviewTab() {
 
         )}
 
-        <details className="work-panel-overview-section" open>
-          <summary>{t("panel.overview.progress")}</summary>
-          <div className="work-panel-overview-section-body">
-            <div className="work-panel-overview-status">
-              <span>{t("panel.overview.statusLabel")}</span>
-              <strong>{t(`panel.overview.status.${status}`, { defaultValue: status })}</strong>
-            </div>
-            {proposals.length > 0 ? proposals.map((proposal) => (
-              <div className="work-panel-overview-row" key={proposal.id}>
-                <span className="work-panel-overview-row-label">{proposalLabel(proposal)}</span>
-                <span className="work-panel-overview-row-detail">
-                  {t(`panel.overview.status.${proposalStatus(proposal)}`, { defaultValue: proposalStatus(proposal) })}
-                </span>
-              </div>
-            )) : (
-              <p className="work-panel-overview-empty-copy">{t("panel.overview.noPlans")}</p>
-            )}
-          </div>
-        </details>
+        {!isTeam && (
+          <details className="work-panel-overview-section" open>
+            <summary>
+              <span className="work-panel-overview-summary-label">{t("panel.overview.progress")}</span>
+              <IconChevronDown size={16} className="work-panel-overview-chevron" aria-hidden />
+            </summary>
+            <div className="work-panel-overview-section-body">{progressContent}</div>
+          </details>
+        )}
 
         <details className="work-panel-overview-section" open>
-          <summary>{t("panel.overview.artifacts")}</summary>
+          <summary>
+            <span className="work-panel-overview-summary-label">{t("panel.overview.artifacts")}</span>
+            <IconChevronDown size={16} className="work-panel-overview-chevron" aria-hidden />
+          </summary>
           <div className="work-panel-overview-section-body">
             {artifactItems.length > 0 ? artifactItems.map((item) => (
               <button
@@ -383,7 +397,10 @@ export function OverviewTab() {
         </details>
 
         <details className="work-panel-overview-section" open>
-          <summary>{t("panel.overview.references")}</summary>
+          <summary>
+            <span className="work-panel-overview-summary-label">{t("panel.overview.references")}</span>
+            <IconChevronDown size={16} className="work-panel-overview-chevron" aria-hidden />
+          </summary>
           <div className="work-panel-overview-section-body">
             {references.length > 0 ? references.map((reference) => (
               <button

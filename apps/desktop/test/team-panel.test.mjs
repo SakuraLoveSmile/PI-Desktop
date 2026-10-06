@@ -83,7 +83,7 @@ test("TeamPanel renders a compact searchable board and opens full task detail", 
   assert.match(teamPanelSource, /TeamTaskProgress/);
   assert.match(teamPanelSource, /TeamTaskDetail/);
   assert.match(teamPanelSource, /initialTaskId\?: string/);
-  assert.match(teamPanelSource, /initialView\?: "aggregate" \| "board" \| "task" \| "panorama"/);
+  assert.match(teamPanelSource, /initialView\?: "aggregate" \| "board"/);
 });
 
 test("TeamPanel localizes DTO values and data consistency errors", () => {
@@ -114,10 +114,30 @@ test("TeamPanel localizes DTO values and data consistency errors", () => {
   assert.doesNotMatch(teamPanelSource, />Blocked</);
 });
 
-test("WorkPanel mounts TeamPanel for team tabs and registers team tool", () => {
-  assert.match(workPanelSource, /<TeamPanel/);
+test("WorkPanel mounts TeamWorkPanelSurface for team tabs and registers team tool", () => {
+  assert.match(workPanelSource, /<TeamWorkPanelSurface/);
   assert.match(workPanelSource, /activeTab\?\.kind === "team"/);
   assert.match(workPanelSource, /team:\s*IconUsers/);
   assert.match(workPanelSource, /teamWorkPanelTab/);
   assert.match(workPanelSource, /localTeamSessionId\(activeSession\)/);
+});
+
+
+test("Team task/member tabs use compact live transcript surfaces with no composer", async () => {
+  const [surface, task, member, transcript, hook] = await Promise.all([
+    "TeamWorkPanelSurface", "TeamTaskTab", "TeamMemberTab", "TeamMemberTranscript",
+  ].map((name) => readFile(new URL(`../src/components/workpanel/team/${name}.tsx`, import.meta.url), "utf8")).concat([
+    readFile(new URL("../src/hooks/useTeamMemberTranscript.ts", import.meta.url), "utf8"),
+  ]));
+  assert.match(surface, /<TeamTaskTab/); assert.match(surface, /taskLabel=\{tab.label\}/); assert.match(surface, /<TeamMemberTab/);
+  assert.match(task, /data-testid="team-task-tab"/); assert.match(member, /data-testid="team-member-tab"/);
+  assert.match(task, /team-work-tab-header/); assert.match(member, /memberFocusTask/);
+  for (const source of [task, member]) { assert.match(source, /team-error-banner/); assert.match(source, /localizedTeamSnapshotError\(error, t\)/); assert.match(source, /void refresh\(\)/); }
+  assert.match(member, /\{member \? <span className="team-work-tab-status" data-phase=\{visualPhase\}/);
+  assert.match(task, /avatarSize=\{16\}/); assert.match(member, /avatarSize=\{16\}/);
+  assert.match(task, /isRunning=\{ownerMember\?\.phase === "running"\}/);
+  assert.match(transcript, /useTeamMemberTranscript/); assert.match(transcript, /useFollowScroll/);
+  assert.match(transcript, /DisclosureAnchorContext.Provider/); assert.match(transcript, /role="log"/);
+  assert.match(transcript, /team.transcriptTruncated/); assert.match(hook, /messageLimit: 200/);
+  for (const source of [task, member, transcript]) assert.doesNotMatch(source, /<Textarea|composer|ReviewChangeCard/);
 });

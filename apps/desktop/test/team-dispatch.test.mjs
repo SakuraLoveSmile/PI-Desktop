@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { register } from "node:module";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -10,7 +11,44 @@ register(pathToFileURL(join(here, "helpers/ts-import-hooks.mjs")));
 const {
   extractTaskFromToolMessage,
   buildTeamDispatchIndex,
+  dispatchFallbackState,
+  isTeammateJoining,
 } = await import("../src/lib/team-dispatch.ts");
+
+test("isTeammateJoining follows only running spawn tools", () => {
+  assert.equal(isTeammateJoining([{ toolName: "spawn_teammate", toolStatus: "running" }]), true);
+  for (const toolStatus of ["success", "error", "denied", undefined]) {
+    assert.equal(isTeammateJoining([{ toolName: "spawn_teammate", toolStatus }]), false);
+  }
+  assert.equal(isTeammateJoining([{ toolName: "task_create", toolStatus: "running" }]), false);
+  assert.equal(isTeammateJoining([]), false);
+  assert.equal(isTeammateJoining([
+    { toolName: "spawn_teammate", toolStatus: "success" },
+    { toolName: "spawn_teammate", toolStatus: "running" },
+  ]), true);
+});
+
+test("only the active assistant turn exposes expert joining feedback", () => {
+  const source = readFileSync(join(here, "../src/features/chat/transcript/AssistantTurn.tsx"), "utf8");
+  assert.match(source, /isActive && isTeammateJoining\(tools\)/);
+  assert.match(source, /joining=\{teammateJoining\}/);
+});
+
+test("dispatchFallbackState accepts known states and defaults unsupported values to pending", () => {
+  for (const state of ["pending", "in_progress", "completed", "failed", "cancelled"]) {
+    assert.equal(dispatchFallbackState(state), state);
+  }
+  for (const state of [undefined, "unknown", "blocked", ""]) {
+    assert.equal(dispatchFallbackState(state), "pending");
+  }
+});
+
+test("dispatch cards use live task rows and a single task control", () => {
+  const source = readFileSync(join(here, "../src/features/chat/transcript/TeamDispatchCard.tsx"), "utf8");
+  assert.match(source, /buildTeamTaskRows\(/);
+  assert.match(source, /team-dispatch-card-open/);
+  assert.doesNotMatch(source, /team-dispatch-card-expert|team-dispatch-task-title-btn/);
+});
 
 test("extractTaskFromToolMessage extracts task details from task_create and task_update", () => {
   // Non-task tool

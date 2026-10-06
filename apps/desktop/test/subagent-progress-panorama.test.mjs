@@ -8,6 +8,7 @@ const [
   viewportSource,
   overviewTabSource,
   teamPanelSource,
+  teamPanoramaSource,
   messagesCssSource,
   agentPanoramaCssSource,
   globalsCssSource,
@@ -19,6 +20,7 @@ const [
   readFile(new URL("../src/components/workpanel/agent-panorama-viewport.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/components/workpanel/OverviewTab.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/components/workpanel/TeamPanel.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../src/components/workpanel/team/TeamPanoramaTab.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/styles/messages.css", import.meta.url), "utf8"),
   readFile(new URL("../src/styles/agent-panorama.css", import.meta.url), "utf8"),
   readFile(new URL("../src/styles/globals.css", import.meta.url), "utf8"),
@@ -50,13 +52,15 @@ test("AgentPanorama implements zoom, fit, reset, pan, and coordinate geometry", 
   assert.match(viewportSource, /MAX_ZOOM = 1\.5/);
   assert.match(agentPanoramaSource, /zoomBy\(0\.1\)/);
 
-  // Layout math: root centered at top, children rows of at most 3
-  assert.match(viewportSource, /Math\.min\(childIds\.length, 3\)/);
-  assert.match(viewportSource, /PANORAMA_NODE_WIDTH = 304/);
-  assert.match(viewportSource, /PANORAMA_ROOT_CHILD_GAP = 80/);
+  // Layout math: root centered at top, children rows of at most 2
+  assert.match(viewportSource, /PANORAMA_MAX_COLUMNS = 2/);
+  assert.match(viewportSource, /Math\.min\(childIds\.length, PANORAMA_MAX_COLUMNS\)/);
+  assert.match(viewportSource, /PANORAMA_NODE_WIDTH = 276/);
+  assert.match(viewportSource, /PANORAMA_ROOT_CHILD_GAP = 64/);
 
   // SVG Bezier connectors
-  assert.match(agentPanoramaSource, /M \$\{rootCenterX\} \$\{rootBottomY\} C/);
+  assert.match(viewportSource, /export function panoramaEdgePath/);
+  assert.match(agentPanoramaSource, /panoramaEdgePath\(/);
   assert.match(agentPanoramaSource, /agent-panorama-edges-layer/);
 
   // Key controls and actions
@@ -75,10 +79,13 @@ test("OverviewTab integrates AgentPanorama and toggles between overview and pano
   assert.match(overviewTabSource, /openSubagentTab/);
 });
 
-test("TeamPanel integrates AgentPanorama with lead root and member children", () => {
-  assert.match(teamPanelSource, /AgentPanorama/);
-  assert.match(teamPanelSource, /view\.kind === "panorama"/);
-  assert.match(teamPanelSource, /team\.lead/);
+test("Team panorama owns the canvas separately from the aggregate panel", () => {
+  assert.match(teamPanoramaSource, /AgentPanorama/);
+  assert.match(teamPanoramaSource, /team\.lead/);
+  assert.match(teamPanoramaSource, /memberFocusTask/);
+  assert.match(teamPanoramaSource, /teamWorkPanelTab\(/);
+  assert.doesNotMatch(teamPanoramaSource, /onBack=/);
+  assert.doesNotMatch(teamPanelSource, /AgentPanorama|view\.kind === "panorama"/);
   assert.match(teamPanelSource, /roster\.map/);
   assert.match(teamPanelSource, /navigate\(\{ kind: "member", memberSessionId \}\)/);
   assert.match(teamPanelSource, /setView\(next \?\? \{ kind: "aggregate" \}\)/);
@@ -90,7 +97,7 @@ test("CSS rules include agent-panorama import and compact task progress styles",
   assert.match(messagesCssSource, /\.subagent-tasks-header/);
   assert.match(messagesCssSource, /\.subagent-tasks-row/);
   assert.match(agentPanoramaCssSource, /\.agent-panorama/);
-  assert.match(agentPanoramaCssSource, /width:\s*304px;/);
+  assert.match(agentPanoramaCssSource, /width:\s*276px;/);
   assert.match(agentPanoramaCssSource, /\.agent-panorama-edge/);
 });
 

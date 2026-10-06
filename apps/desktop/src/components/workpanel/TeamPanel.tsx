@@ -4,15 +4,13 @@ import type {
   TeamMemberRecord,
   TeamSnapshot,
   TeamTaskRecord,
-  UiMessage,
 } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
-import { getPanoramaViewport, savePanoramaViewport } from "../../lib/panorama-memory";
-import type { PanoramaViewport } from "./agent-panorama-viewport";
+import { requestedView, type TeamDetailView } from "../../lib/team-panel-view";
 import { useTeamSnapshot } from "../../hooks/useTeamSnapshot";
 import {
   buildTeamTaskRows,
-  deriveTeamLeadVisualState,
+  localizedTeamSnapshotError,
   projectMemberIdentities,
   selectOverviewTaskRows,
   type BoardFilter,
@@ -28,35 +26,14 @@ import {
   IconWorkflow,
 } from "../icons";
 import { Button, TooltipButton } from "../ui";
-import { TranscriptDisclosureProvider } from "../../features/chat/transcript/disclosure";
-import { ToolRow } from "../../features/chat/transcript/ToolRow";
-import { Markdown } from "../Markdown";
-import { AssistantErrorMessage } from "../../features/chat/transcript/shared";
-import { ReviewChangeCard } from "../ReviewChangeCard";
+import { TeamMemberTranscript } from "./team/TeamMemberTranscript";
+import { TeamTaskBrief } from "./team/TeamTaskBrief";
 import { CompactTeamBoard } from "./team/CompactTeamBoard";
 import { TeamStatusBadge } from "./team/TeamStatusBadge";
 import { MemberIdentity, TeamTaskProgress } from "./team/TeamTaskProgress";
 import "../../styles/team-panel.css";
-import { AgentPanorama, type PanoramaNode } from "./AgentPanorama";
 
-type TeamDetailView =
-  | { kind: "aggregate" }
-  | { kind: "board" }
-  | { kind: "member"; memberSessionId: string }
-  | { kind: "task"; taskId: string }
-  | { kind: "panorama" };
 type TeamTaskReadiness = TeamSnapshot["readiness"][number];
-
-function requestedView(
-  initialTaskId?: string,
-  initialMemberSessionId?: string,
-  initialView: TeamPanelProps["initialView"] = "aggregate",
-): TeamDetailView {
-  if (initialTaskId) return { kind: "task", taskId: initialTaskId };
-  if (initialMemberSessionId) return { kind: "member", memberSessionId: initialMemberSessionId };
-  if (initialView === "task") return { kind: "aggregate" };
-  return { kind: initialView ?? "aggregate" };
-}
 
 export type TeamPanelProps = {
   teamSessionId: string;
@@ -64,7 +41,9 @@ export type TeamPanelProps = {
   initialTaskId?: string;
   initialMemberSessionId?: string;
   navigationSeq?: number;
-  initialView?: "aggregate" | "board" | "task" | "panorama";
+  initialView?: "aggregate" | "board";
+  onOpenPanorama: () => void;
+  onOpenTask: (taskId: string, subject: string) => void;
 };
 
 export function TeamPanel({
@@ -74,13 +53,14 @@ export function TeamPanel({
   initialMemberSessionId,
   navigationSeq,
   initialView = "aggregate",
+  onOpenPanorama,
+  onOpenTask,
 }: TeamPanelProps) {
   const { t } = useTranslation();
   const { snapshot, loading, error: snapshotError, refresh, lastSuccessAt } = useTeamSnapshot(teamSessionId);
-  const error = snapshotError && ["TEAM_DISSOLVED", "TEAM_SCOPE_MISMATCH"].includes(snapshotError)
-    ? t(`team.snapshotErrors.${snapshotError}`) : snapshotError;
+  const error = snapshotError ? localizedTeamSnapshotError(snapshotError, t) : snapshotError;
   const [resuming, setResuming] = useState(false);
-  const [view, setView] = useState<TeamDetailView>(() => requestedView(initialTaskId, initialView));
+  const [view, setView] = useState<TeamDetailView>(() => requestedView({ taskId: initialTaskId, memberSessionId: initialMemberSessionId, view: initialView }));
   const [viewStack, setViewStack] = useState<TeamDetailView[]>([]);
   const [boardFilter, setBoardFilter] = useState<BoardFilter>("all");
   const [boardQuery, setBoardQuery] = useState("");
@@ -88,16 +68,7 @@ export function TeamPanel({
   const boardScrollRef = useRef<HTMLDivElement>(null);
   const boardScrollTopRef = useRef(0);
   const [actionError, setActionError] = useState<string | null>(null);
-  const panoramaScopeKey = `team:desktop:${teamSessionId}`;
-  const [savedViewport, setSavedViewport] = useState<PanoramaViewport | undefined>(() =>
-    getPanoramaViewport(panoramaScopeKey),
-  );
-
   const loadData = useCallback(() => refresh(), [refresh]);
-  const handleViewportSave = useCallback((scopeKey: string, viewport: PanoramaViewport) => {
-    savePanoramaViewport(scopeKey, viewport);
-    if (scopeKey === panoramaScopeKey) setSavedViewport(viewport);
-  }, [panoramaScopeKey]);
   const navigate = useCallback((next: TeamDetailView) => {
     setViewStack((stack) => [...stack, view]);
     setView(next);
@@ -116,12 +87,8 @@ export function TeamPanel({
     setProgressExpanded(true);
     setActionError(null);
     boardScrollTopRef.current = 0;
-    setView(requestedView(initialTaskId, initialMemberSessionId, initialView));
+    setView(requestedView({ taskId: initialTaskId, memberSessionId: initialMemberSessionId, view: initialView }));
   }, [initialTaskId, initialMemberSessionId, initialView, teamSessionId, navigationSeq]);
-
-  useEffect(() => {
-    setSavedViewport(getPanoramaViewport(panoramaScopeKey));
-  }, [panoramaScopeKey]);
 
   useEffect(() => {
     if (view.kind === "board" && boardScrollRef.current) {
@@ -188,63 +155,6 @@ export function TeamPanel({
   const overviewRows = selectOverviewTaskRows(taskRows);
   const completedCount = tasks.filter((task) => task.status === "completed").length;
 
-  if (view.kind === "panorama" && snapshot) {
-    const leadState = deriveTeamLeadVisualState(
-      snapshot.leadPhase,
-      isPaused,
-      roster,
-      tasks,
-      snapshot.queuedMessageCount,
-    );
-    const rootNode: PanoramaNode = {
-      id: snapshot.teamSessionId,
-      name: t("team.lead"),
-      task: t("team.coordinatingExperts"),
-      status: leadState.status,
-      statusLabel: leadState.waitingForMembers ? t("team.waitingForMembers") : undefined,
-      avatarSeed: snapshot.teamSessionId,
-      isLead: true,
-      avatarIcon: "users",
-      isRoot: true,
-    };
-
-    const identities = projectMemberIdentities(roster, isPaused);
-    const childNodes: PanoramaNode[] = roster.map((member, index) => {
-      const memberTasks = tasks.filter((t) => t.ownerSessionId === member.memberSessionId);
-      const activeTask = memberTasks.find((t) => t.status === "in_progress") ?? memberTasks[0];
-      const identity = identities[index];
-      const status = isPaused ? "paused" : member.phase === "provisioning" ? "idle" : member.phase;
-
-      return {
-        id: member.memberSessionId,
-        name: identity.displayName,
-        roleLabel: t(`team.roles.${identity.role}`),
-        avatarSeed: member.memberSessionId,
-        task: activeTask?.subject ?? member.description ?? t("team.noCurrentTask"),
-        status,
-        contextKind: member.contextKind,
-        avatarIcon: "bot",
-      };
-    });
-
-    return (
-      <AgentPanorama
-        title={t("team.panoramaTitle")}
-        rootNode={rootNode}
-        childNodes={childNodes}
-        onBack={goBack}
-        onSelectNode={(memberSessionId) => navigate({ kind: "member", memberSessionId })}
-        emptyMessage={t("team.emptyRoster")}
-        loading={loading && !snapshot}
-        error={snapshot ? null : error}
-        staleError={snapshot ? error : null}
-        onRetry={() => void loadData()}
-        viewportScopeKey={panoramaScopeKey}
-        savedViewport={savedViewport}
-        onViewportSave={handleViewportSave}
-      />
-    );
-  }
   if (view.kind === "member") {
     const selectedMember = roster.find((m) => m.memberSessionId === view.memberSessionId);
     if (selectedMember) {
@@ -371,7 +281,7 @@ export function TeamPanel({
             className="icon-btn icon-btn-square"
             tooltip={t("team.viewPanorama")}
             ariaLabel={t("team.viewPanorama")}
-            onClick={() => navigate({ kind: "panorama" })}
+            onClick={() => onOpenPanorama()}
           >
             <IconWorkflow size={14} />
           </TooltipButton>
@@ -499,8 +409,8 @@ export function TeamPanel({
         total={tasks.length}
         expanded={progressExpanded}
         onToggle={() => setProgressExpanded((expanded) => !expanded)}
-        onOpenTask={(taskId) => navigate({ kind: "task", taskId })}
-        onOpenPanorama={() => navigate({ kind: "panorama" })}
+        onOpenTask={onOpenTask}
+        onOpenPanorama={() => onOpenPanorama()}
         onOpenBoard={() => navigate({ kind: "board" })}
       />
     </div>
@@ -525,29 +435,6 @@ function TeamMemberDetail({
   onSelectTask: (taskId: string) => void;
 }) {
   const { t } = useTranslation();
-  const [messages, setMessages] = useState<UiMessage[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const loadSeqRef = useRef(0);
-
-  useEffect(() => {
-    const seq = ++loadSeqRef.current;
-    setLoading(true);
-    setError(null);
-    api.getSession(member.memberSessionId)
-      .then((detail) => {
-        if (seq !== loadSeqRef.current) return;
-        setMessages(detail?.session?.messages ?? []);
-      })
-      .catch((err) => {
-        if (seq !== loadSeqRef.current) return;
-        setError(err instanceof Error ? err.message : String(err));
-      })
-      .finally(() => {
-        if (seq === loadSeqRef.current) setLoading(false);
-      });
-  }, [member.memberSessionId]);
-
   const assignedTasks = tasks.filter(
     (task) =>
       task.ownerSessionId === member.memberSessionId ||
@@ -652,86 +539,7 @@ function TeamMemberDetail({
         )}
       </section>
 
-      <section className="team-section team-transcript-section">
-        <div className="team-section-header">
-          <span>{t("team.transcript")}</span>
-        </div>
-        {loading ? (
-          <div className="team-loading-state">
-            <IconRefresh className="animate-spin" size={18} />
-            <span>{t("common.loading")}</span>
-          </div>
-        ) : error ? (
-          <div className="team-error-state">
-            <IconCircleAlert size={20} />
-            <span>{error}</span>
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="team-empty-state">{t("team.noTranscript")}</div>
-        ) : (
-          <TranscriptDisclosureProvider key={member.memberSessionId}>
-            <div className="team-transcript-list">
-              {messages.map((message) => {
-                if (message.role === "user") {
-                  return (
-                    <div key={message.id} className="message-row user">
-                      <div className="message-col">
-                        <div className="message-bubble">
-                          <div className="message-user-text selectable">
-                            {message.content}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                }
-                if (message.role === "assistant") {
-                  if (message.toolName) {
-                    return (
-                      <div key={message.id} className="team-transcript-tool-item">
-                        <ToolRow message={message} />
-                        <ReviewChangeCard message={message} />
-                      </div>
-                    );
-                  }
-                  if (message.content) {
-                    return (
-                      <div
-                        key={message.id}
-                        className="message-row assistant"
-                        data-message-id={message.id}
-                      >
-                        <div className="message-col">
-                          <div className="message-bubble">
-                            <div className="prose-chat selectable">
-                              <Markdown source={message.content} />
-                            </div>
-                            {message.error ? (
-                              <AssistantErrorMessage message={message} />
-                            ) : null}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-                  if (message.error) {
-                    return (
-                      <div key={message.id} className="message-row assistant">
-                        <div className="message-col">
-                          <div className="message-bubble">
-                            <AssistantErrorMessage message={message} />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-                }
-                return null;
-              })}
-            </div>
-          </TranscriptDisclosureProvider>
-        )}
-      </section>
+      <TeamMemberTranscript memberSessionId={member.memberSessionId} />
     </div>
   );
 }
@@ -801,59 +609,8 @@ function TeamTaskDetail({
         ) : null}
       </section>
 
-      <section className="team-section">
-        <div className="team-detail-field">
-          <span className="team-detail-field-label">{t("team.taskOwner")}</span>
-          {ownerMember ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              onClick={() => onSelectMember(ownerMember.memberSessionId)}
-              className="team-owner-btn"
-            >
-              {identities.get(ownerMember.memberSessionId) ? (
-                <MemberIdentity member={identities.get(ownerMember.memberSessionId)!} />
-              ) : ownerMember.name}
-            </Button>
-          ) : (
-            <span className="team-detail-field-value">
-              {task.ownerMemberName ?? t("team.unassigned")}
-            </span>
-          )}
-        </div>
-
-        {task.blockedBy.length > 0 ? (
-          <div className="team-detail-field">
-            <span className="team-detail-field-label">{t("team.taskReadiness")}</span>
-            <span className="team-detail-field-value">
-              {t("team.blockedBy", {
-                tasks: task.blockedBy.map((id) => `#${id}`).join(", "),
-              })}
-            </span>
-          </div>
-        ) : null}
-
-        {task.writeScopes.length > 0 ? (
-          <div className="team-detail-field">
-            <span className="team-detail-field-label">{t("team.taskScopes")}</span>
-            <span className="team-detail-field-value">
-              {t("team.scopes", { scopes: task.writeScopes.join(", ") })}
-            </span>
-          </div>
-        ) : null}
-        {taskOverlaps.map((overlap) => (
-          <div key={`${overlap.scope}-${overlap.taskIds.join("-")}`} className="team-detail-field">
-            <span className="team-detail-field-label">{t("team.warnings")}</span>
-            <span className="team-detail-field-value">
-              {t("team.overlapTask", {
-                tasks: overlap.taskIds.map((id) => `#${id}`).join(", "),
-                scope: overlap.scope,
-              })}
-            </span>
-          </div>
-        ))}
-      </section>
+      <TeamTaskBrief task={task} ownerMember={ownerMember} identities={identities}
+        taskOverlaps={taskOverlaps} onSelectMember={onSelectMember} />
     </div>
   );
 }

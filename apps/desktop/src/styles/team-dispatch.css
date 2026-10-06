@@ -1,167 +1,70 @@
-/*
- * Team Dispatch Card styling.
- * Single-layer border card with PixelAvatar, role & name, status badge,
- * L-shaped connector line, and bold task title.
- */
-
-.team-dispatch-cards-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 100%;
-  margin-top: 8px;
-  margin-bottom: 8px;
-  box-sizing: border-box;
-}
-
+.team-dispatch-cards-group { display: flex; flex-direction: column; gap: 12px; width: 100%; margin-block: 8px; }
 .team-dispatch-card {
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--radius-xs);
+  background: var(--ds-tile);
+  transition: border-color var(--motion-duration-fast) var(--motion-ease-out);
+}
+.team-dispatch-card:hover { border-color: var(--ds-border-strong); }
+.team-dispatch-card-open {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 14px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--ds-border-subtle);
-  background: var(--ds-tile);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  box-sizing: border-box;
-  transition: border-color 0.15s ease;
-}
-
-.team-dispatch-card:hover {
-  border-color: var(--ds-border-strong);
-}
-
-.team-dispatch-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 4px;
   width: 100%;
   min-width: 0;
-}
-
-.team-dispatch-card-expert {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  cursor: pointer;
-  background: transparent;
-  border: none;
-  padding: 0;
+  padding: 10px 12px 8px;
+  border-radius: inherit;
+  line-height: var(--leading-normal);
   text-align: left;
 }
-
-.team-dispatch-card-expert:hover .team-dispatch-display-name {
-  color: var(--ds-text-primary);
-  text-decoration: underline;
-}
-
-.team-dispatch-expert-name {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--text-xs);
+.team-dispatch-card-row { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; }
+.team-dispatch-identity {
+  flex: 1 1 auto;
   min-width: 0;
-}
-
-.team-dispatch-role-tag {
-  color: var(--ds-text-secondary);
-  font-size: var(--text-3xs);
-  font-weight: var(--font-weight-medium);
-  padding: 1px 5px;
-  border-radius: var(--radius-3xs);
-  background: color-mix(in oklab, var(--ds-text-primary) 6%, transparent);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
-  flex-shrink: 0;
-}
-
-.team-dispatch-display-name {
-  color: var(--ds-text-primary);
-  font-weight: var(--font-weight-medium);
-  font-size: var(--text-xs-plus);
   overflow: hidden;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-md);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-.team-dispatch-status-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 7px;
-  border-radius: var(--radius-3xs);
-  font-size: var(--text-3xs);
-  font-weight: var(--font-weight-medium);
-  letter-spacing: var(--tracking-wide);
-  flex-shrink: 0;
-  text-transform: uppercase;
+.team-dispatch-status { flex: none; color: var(--ds-text-muted); font-size: var(--text-md); }
+.team-dispatch-card[data-state="in_progress"] .team-dispatch-status { color: var(--ds-text-secondary); }
+.team-dispatch-card[data-state="completed"] .team-dispatch-status { color: var(--ds-success); }
+.team-dispatch-card[data-state="failed"] .team-dispatch-status { color: var(--ds-error); }
+.team-dispatch-connector {
+  flex: none;
+  align-self: flex-start;
+  width: 8px;
+  height: 10px;
+  margin-inline-start: 7px;
+  border-bottom: 1px solid var(--ds-border-strong);
+  border-left: 1px solid var(--ds-border-strong);
+  border-bottom-left-radius: var(--radius-3xs);
+}
+.team-dispatch-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ds-text-primary);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (prefers-reduced-motion: reduce) {
+  .team-dispatch-card { transition: none; }
 }
 
-.team-dispatch-status-badge[data-status="completed"] {
-  background: color-mix(in oklab, var(--ds-success) 15%, transparent);
-  color: var(--ds-success);
-}
-
-.team-dispatch-status-badge[data-status="in_progress"] {
-  background: color-mix(in oklab, var(--ds-accent) 15%, transparent);
-  color: var(--ds-accent);
-}
-
-.team-dispatch-status-badge[data-status="pending"] {
-  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
-  color: var(--ds-text-secondary);
-}
-
-.team-dispatch-status-badge[data-status="blocked"] {
-  background: color-mix(in oklab, var(--ds-warning) 15%, transparent);
-  color: var(--ds-warning);
-}
-
-.team-dispatch-status-badge[data-status="failed"] {
-  background: color-mix(in oklab, var(--ds-error) 15%, transparent);
-  color: var(--ds-error);
-}
-
-.team-dispatch-card-task-row {
+.team-dispatch-joining {
   display: flex;
   align-items: center;
   gap: 6px;
-  min-width: 0;
-  padding-left: 2px;
+  min-height: 24px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-md);
 }
-
-.team-dispatch-l-connector {
-  color: var(--ds-border-strong);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  margin-left: 4px;
-}
-
-.team-dispatch-task-title-btn {
-  background: transparent;
-  border: none;
-  padding: 2px 4px;
-  border-radius: var(--radius-3xs);
-  cursor: pointer;
-  text-align: left;
-  min-width: 0;
-  flex: 1;
-  color: var(--ds-text-primary);
-  font-size: var(--text-xs-plus);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  transition: color 0.15s ease, background-color 0.15s ease;
-}
-
-.team-dispatch-task-title-btn:hover {
-  color: var(--ds-accent);
-  background: color-mix(in oklab, var(--ds-text-primary) 5%, transparent);
-}
-
-.team-dispatch-task-title-btn strong {
-  font-weight: var(--font-weight-strong);
+.team-dispatch-joining-label { animation: team-dispatch-joining-pulse 1.4s ease-in-out infinite alternate; }
+@keyframes team-dispatch-joining-pulse { from { opacity: 1; } to { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) {
+  .team-dispatch-joining-label { animation: none; }
 }

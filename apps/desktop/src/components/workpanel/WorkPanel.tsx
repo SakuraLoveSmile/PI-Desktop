@@ -38,7 +38,7 @@ import {
   IconClose,
   IconDiff,
   IconFileText,
-  IconInfo,
+  IconMap,
   IconPanelMaximize,
   IconPanelRestore,
   IconPlug,
@@ -50,7 +50,8 @@ import { FilesTab } from "./FilesTab";
 import { PluginViewTab } from "./PluginViewTab";
 import { SubagentTranscriptTab } from "./SubagentTranscriptTab";
 import { GoalReportTab } from "./GoalReportTab";
-import { TeamPanel } from "./TeamPanel";
+import { TeamWorkPanelSurface } from "./team/TeamWorkPanelSurface";
+import { teamTabIcon, teamTabLabel } from "./team/team-work-panel-tab";
 import { OverviewTab } from "./OverviewTab";
 import {
   MAIN_PANE_MIN_WIDTH,
@@ -63,7 +64,7 @@ import {
 } from "../../lib/work-panel-resize";
 
 const TAB_ICONS = {
-  overview: IconInfo,
+  overview: IconMap,
   new: IconPlus,
   review: IconDiff,
   file: IconFileText,
@@ -113,7 +114,7 @@ type WorkPanelTool = {
 
 function tabLabel(
   tab: WorkPanelTab,
-  t: (key: string) => string,
+  t: (key: string, options?: Record<string, unknown>) => string,
   pluginViews: PluginViewMeta[],
 ) {
   if (tab.kind === "plugin") {
@@ -126,6 +127,7 @@ function tabLabel(
   if (tab.kind === "new") return t("panel.new.title");
   if (tab.kind === "subagent") return tab.label ?? t("panel.tabs.subagent");
   if (tab.kind === "goalReport") return tab.label ?? t("panel.tabs.goalReport");
+  if (tab.kind === "team") return teamTabLabel(tab, t);
   if (tab.kind !== "file") return t(`panel.tabs.${tab.kind}`);
   const path = tab.resource ?? "";
   return path.split("/").filter(Boolean).pop() || t("panel.tabs.file");
@@ -868,7 +870,7 @@ export function WorkPanel({
                       ? pluginViewIcon(
                           pluginViews.find((view) => view.ref === tab.resource)?.icon,
                         ) ?? TAB_ICONS.plugin
-                      : TAB_ICONS[tab.kind];
+                      : tab.kind === "team" ? teamTabIcon(tab) : TAB_ICONS[tab.kind];
                   return (
                     <div
                       className={cx(
@@ -894,7 +896,7 @@ export function WorkPanel({
                         aria-grabbed={draggingTabId === tab.id}
                         aria-keyshortcuts="Alt+ArrowLeft Alt+ArrowRight"
                         className="work-panel-tab-button"
-                        title={tab.kind === "subagent" ? label : tab.resource ?? label}
+                        title={tab.kind === "subagent" || tab.kind === "team" ? label : tab.resource ?? label}
                         onPointerDown={(event) => {
                           if (tab.kind !== "overview") beginTabReorder(event, tab.id);
                         }}
@@ -1002,14 +1004,7 @@ export function WorkPanel({
               role="tabpanel"
               aria-labelledby={`work-panel-tab-${activeTab.id}`}
             >
-              <TeamPanel
-                teamSessionId={activeTab.resource ?? activeSessionId ?? ""}
-                initialView={activeTab.teamTarget?.kind === "member" ? undefined : activeTab.teamTarget?.kind}
-                initialTaskId={activeTab.teamTarget?.taskId}
-                initialMemberSessionId={activeTab.teamTarget?.kind === "member" ? activeTab.teamTarget.memberSessionId : undefined}
-                navigationSeq={activeTab.teamNavigationSeq}
-                onSelectSession={(sessionId: string) => void selectSession(sessionId)}
-              />
+              <TeamWorkPanelSurface tab={activeTab} fallbackTeamSessionId={activeSessionId ?? ""} onSelectSession={(sessionId: string) => void selectSession(sessionId)} />
             </div>
           )}
           {activeTab?.kind === "review" && (

@@ -1,5 +1,25 @@
 import { createContext } from "react";
 import type { UiMessage } from "@pi-desktop/shared";
+import type { TaskVisualState } from "./team-presentation";
+
+export function dispatchFallbackState(status: string | undefined): TaskVisualState {
+  switch (status) {
+    case "pending":
+    case "in_progress":
+    case "completed":
+    case "failed":
+    case "cancelled":
+      return status;
+    default:
+      return "pending";
+  }
+}
+
+export function isTeammateJoining(
+  tools: readonly Pick<UiMessage, "toolName" | "toolStatus">[],
+): boolean {
+  return tools.some((tool) => tool.toolName === "spawn_teammate" && tool.toolStatus === "running");
+}
 
 function parseJsonSafe(val: unknown): Record<string, unknown> | null {
   if (!val) return null;

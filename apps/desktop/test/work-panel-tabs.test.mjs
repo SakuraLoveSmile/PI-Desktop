@@ -26,7 +26,38 @@ const {
   switchWorkPanelContextState,
   toolWorkPanelTab,
   teamWorkPanelTab,
+  teamWorkPanelTabId,
 } = await import("../src/lib/work-panel-tabs.ts");
+
+test("Team surfaces use distinct stable IDs, captured labels and deduplicate when reopened", () => {
+  for (const [target, suffix] of [
+    [undefined, ""], [{ kind: "aggregate" }, ""], [{ kind: "board" }, ""],
+    [{ kind: "panorama" }, ":panorama"], [{ kind: "task", taskId: "task-1" }, ":task:task-1"],
+    [{ kind: "member", memberSessionId: "member-1" }, ":member:member-1"],
+  ]) {
+    assert.equal(teamWorkPanelTabId("team-1", target), `team:team-1${suffix}`);
+  }
+  const aggregate = teamWorkPanelTab("team-1");
+  assert.equal(Object.hasOwn(aggregate, "label"), false);
+  let state = openWorkPanelTabState({ tabs: [], activeTabId: null }, aggregate);
+  for (const [target, label] of [
+    [{ kind: "panorama" }, undefined], [{ kind: "task", taskId: "task-1" }, "Inspect"],
+    [{ kind: "member", memberSessionId: "member-1" }, "Alex"],
+  ]) {
+    state = openWorkPanelTabState(state, teamWorkPanelTab("team-1", target, label));
+  }
+  assert.equal(state.tabs.length, 4);
+  const task = state.tabs.find((tab) => tab.teamTarget?.kind === "task");
+  assert.equal(task.label, "Inspect");
+  assert.equal(task.resource, "team-1");
+  const reopened = teamWorkPanelTab("team-1", { kind: "task", taskId: "task-1" }, "New subject");
+  state = openWorkPanelTabState(state, reopened);
+  assert.equal(state.tabs.length, 4);
+  assert.equal(state.activeTabId, task.id);
+  assert.equal(state.tabs.find((tab) => tab.id === task.id).label, "New subject");
+  assert.ok(reopened.teamNavigationSeq > task.teamNavigationSeq);
+  assert.ok(state.tabs.some((tab) => tab.id === aggregate.id));
+});
 
 test("Team task links reuse one tab but each explicit navigation gets a fresh request", () => {
   const first = teamWorkPanelTab("team-1", { kind: "task", taskId: "task-1" });

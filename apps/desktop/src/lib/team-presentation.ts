@@ -25,6 +25,10 @@ export type MemberView = {
 };
 
 export type TaskVisualState = TeamTaskRecord["status"] | "blocked";
+export function taskStateLabelKey(state: TaskVisualState): string {
+  return state === "blocked" ? "team.waitingForDependencies" : `team.taskStatus.${state}`;
+}
+
 export type TaskRow = {
   task: TeamTaskRecord;
   ordinal: number;
@@ -161,6 +165,20 @@ export function buildTeamTaskRows(
           ? identityByHandle.get(task.ownerMemberName)
           : undefined,
     }));
+}
+
+export function memberFocusTask(member: TeamMemberRecord, tasks: TeamTaskRecord[]): TeamTaskRecord | undefined {
+  const owned = tasks.filter((task) => !task.deleted && (task.ownerSessionId
+    ? task.ownerSessionId === member.memberSessionId
+    : task.ownerMemberName === member.name)).sort(byCreationOrder);
+  return owned.find((task) => task.status === "in_progress")
+    ?? owned.find((task) => task.status === "pending")
+    ?? owned.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+}
+
+export function localizedTeamSnapshotError(error: string, translate: (key: string) => string): string {
+  return ["TEAM_DISSOLVED", "TEAM_SCOPE_MISMATCH"].includes(error)
+    ? translate(`team.snapshotErrors.${error}`) : error;
 }
 
 const overviewPriority: Record<TaskVisualState, number> = {

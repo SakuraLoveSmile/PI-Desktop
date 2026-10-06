@@ -1,5 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { createServer } from "vite";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { createInstance } from "i18next";
+import { I18nextProvider } from "react-i18next";
 import {
   buildTeamTaskRows,
   deriveTeamLeadVisualState,
@@ -7,7 +14,99 @@ import {
   localTeamSessionId,
   projectMemberIdentities,
   selectOverviewTaskRows,
+  taskStateLabelKey,
+  memberFocusTask,
+  localizedTeamSnapshotError,
 } from "../src/lib/team-presentation.ts";
+
+test("member focus selects current work with strict ownership and stable creation ties", () => {
+  const owner = member("researcher", "member-1");
+  const owned = (id, status, date, extra = {}) => task(id, status, date, { ownerSessionId: "member-1", ...extra });
+  const pending = owned("pending", "pending", "2026-01-01");
+  const running = owned("running", "in_progress", "2026-01-02");
+  const latest = owned("latest", "completed", "2026-01-03", { updatedAt: "2026-01-09" });
+  assert.equal(memberFocusTask(owner, [latest, pending, running]), running);
+  assert.equal(memberFocusTask(owner, [latest, pending]), pending);
+  assert.equal(memberFocusTask(owner, [owned("older", "failed", "2026-01-04"), latest]), latest);
+  const named = owned("named", "in_progress", "2026-01-01", { ownerSessionId: null, ownerMemberName: "researcher" });
+  const other = owned("other", "in_progress", "2026-01-01", { ownerSessionId: "member-2", ownerMemberName: "researcher" });
+  assert.equal(memberFocusTask(owner, [other, named]), named);
+  assert.equal(memberFocusTask(owner, [other, { ...named, deleted: true }]), undefined);
+  const earlier = owned("a", "in_progress", "2026-01-02");
+  const later = owned("b", "in_progress", "2026-01-02");
+  assert.equal(memberFocusTask(owner, [later, earlier]), earlier);
+  assert.equal(memberFocusTask(owner, []), undefined);
+});
+
+test("snapshot errors localize only the existing domain error codes", () => {
+  const translate = (key) => `localized:${key}`;
+  for (const code of ["TEAM_DISSOLVED", "TEAM_SCOPE_MISMATCH"]) {
+    assert.equal(localizedTeamSnapshotError(code, translate), `localized:team.snapshotErrors.${code}`);
+  }
+  assert.equal(localizedTeamSnapshotError("read failed", translate), "read failed");
+  assert.equal(localizedTeamSnapshotError("", translate), "");
+});
+
+test("Team progress presents ad-hoc tasks, state labels and extra activity in one disclosure", async () => {
+  const server = await createServer({
+    root: fileURLToPath(new URL("..", import.meta.url)), configFile: false,
+    server: { middlewareMode: true, hmr: false, ws: false }, appType: "custom",
+    optimizeDeps: { noDiscovery: true, include: [] },
+  });
+  try {
+    const { TeamTaskProgress } = await server.ssrLoadModule("/src/components/workpanel/team/TeamTaskProgress.tsx");
+    const { TaskStateGlyph } = await server.ssrLoadModule("/src/components/workpanel/team/TaskStateGlyph.tsx");
+    for (const [state, glyph] of Object.entries({
+      pending: "circle", in_progress: "circle-arrow-right", blocked: "circle-dashed",
+      completed: "circle-check", failed: "circle-x", cancelled: "circle-slash",
+    })) {
+      const glyphHtml = renderToStaticMarkup(createElement(TaskStateGlyph, { state }));
+      assert.match(glyphHtml, new RegExp(`data-state="${state}" aria-hidden="true"`));
+      assert.match(glyphHtml, new RegExp(`lucide-${glyph}"`));
+    }
+    const i18n = createInstance();
+    await i18n.init({ lng: "en", resources: { en: { translation: { team: {
+      taskProgress: "Task progress", adHocGroup: "Ad-hocs", adHocTaskTitle: "Ad-hoc: {{subject}}",
+      openTaskWithStatus: "Open task {{subject}} ({{status}})",
+      waitingForDependencies: "Waiting for dependencies", roles: { researcher: "Researcher" },
+    } } } } });
+    const rows = buildTeamTaskRows([
+      task("blocked", "pending", "2026-01-01", { ownerSessionId: "alex" }),
+    ], [member("researcher", "alex", { presentation: { role: "researcher", displayName: "Alex" } })], [
+      { taskId: "blocked", isReady: false, unresolvedBlockedBy: ["missing"] },
+    ], true);
+    const render = (expanded) => renderToStaticMarkup(createElement(I18nextProvider, { i18n },
+      createElement(TeamTaskProgress, { rows, completed: 0, total: 1, expanded,
+        onToggle() {}, onOpenTask() {}, onOpenPanorama() {}, onOpenBoard() {},
+        extra: createElement("p", null, "Lead activity"),
+      })));
+    const html = render(true);
+    assert.match(html, /data-completed="0" data-total="1"/);
+    assert.match(html, /Ad-hocs/);
+    assert.match(html, /Ad-hoc: Task blocked/);
+    assert.match(html, /Open task Task blocked \(Waiting for dependencies\)/);
+    assert.match(html, /data-state="blocked"/);
+    assert.match(html, /width="12" height="12"/);
+    assert.match(html, /Researcher Alex/);
+    assert.match(html, /Lead activity/);
+    assert.doesNotMatch(html, /team-progress-count/);
+    assert.match(render(false), /class="team-progress-body" hidden=""/);
+    assert.equal(rows[0].owner.paused, true);
+    const overview = await readFile(new URL("../src/components/workpanel/OverviewTab.tsx", import.meta.url), "utf8");
+    assert.match(overview, /buildTeamTaskRows\(teamData.tasks, teamData.members, teamData.readiness, teamData.paused\)/);
+    assert.match(overview, /extra=\{progressContent\}/);
+    assert.match(overview, /!isTeam && \(/);
+  } finally {
+    await server.close();
+  }
+});
+
+test("taskStateLabelKey shares localized labels for all six task states", () => {
+  for (const state of ["pending", "in_progress", "completed", "failed", "cancelled"]) {
+    assert.equal(taskStateLabelKey(state), `team.taskStatus.${state}`);
+  }
+  assert.equal(taskStateLabelKey("blocked"), "team.waitingForDependencies");
+});
 
 test("local Team navigation resolves members to their Lead and excludes remote/native authorities", () => {
   const lead = { id: "lead", executionProfile: "team" };
