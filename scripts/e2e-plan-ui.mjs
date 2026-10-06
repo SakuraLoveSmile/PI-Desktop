@@ -640,6 +640,12 @@ async function inspectUi(state) {
     const operatingModes = modeButtons;
     const visiblePane = document.querySelector('.session-pane[data-visible="true"]');
     const bar = [...(visiblePane?.querySelectorAll('[data-testid="plan-approval-bar"]') ?? [])].at(-1);
+    // Markdown export actions are intentional; the card must still omit the
+    // former inline Markdown body and technical artifact metadata.
+    const approvalContent = bar?.cloneNode(true);
+    approvalContent?.querySelectorAll('[data-testid="plan-copy-markdown"], [data-testid="plan-download-markdown"]')
+      .forEach((node) => node.remove());
+    const approvalContentText = text(approvalContent);
     const approvalMain = bar?.querySelector(".plan-approval-approve-main");
     const approvalMenu = document.querySelector(".plan-approval-menu.is-open");
     const reject = bar?.querySelector(".plan-approval-reject");
@@ -686,6 +692,8 @@ async function inspectUi(state) {
             question: text(bar.querySelector(".plan-approval-summary")),
             artifactLabel: label(bar.querySelector("[data-testid=plan-open-artifact]")),
             artifactVisible: visible(bar.querySelector("[data-testid=plan-open-artifact]")),
+            markdownCopyVisible: visible(bar.querySelector('[data-testid="plan-copy-markdown"]')),
+            markdownDownloadVisible: visible(bar.querySelector('[data-testid="plan-download-markdown"]')),
             expiry: text(bar.querySelector(".plan-approval-expiry")),
             statusText: text(bar.querySelector(".plan-approval-schedule-status")),
             actionText: text(bar.querySelector(".plan-approval-actions")),
@@ -716,7 +724,7 @@ async function inspectUi(state) {
         /\\bfeedback\\b/i,
         /#[0-9a-f]{8,}/i,
       ].flatMap((pattern) => {
-        const match = barText.match(pattern);
+        const match = approvalContentText.match(pattern);
         return match ? [match[0]] : [];
       }),
       executionErrorText: text(document.querySelector(".chat-error-layer")),
@@ -1147,6 +1155,7 @@ function assertShellStructure(snapshot, expectedMode, locale) {
 
 function assertPendingUi(snapshot, locale, revision) {
   assert(snapshot.bar?.status === "pending", `expected pending Plan card, got ${jsonText(snapshot.bar)}`);
+  assert(snapshot.bar.markdownCopyVisible && snapshot.bar.markdownDownloadVisible, "pending Markdown checkpoint must expose both export actions");
   assert(snapshot.bar.title === `Plan UI ${revision}`, `pending title mismatch: ${jsonText(snapshot.bar)}`);
   assert(snapshot.bar.question.length > 0, `pending card omitted the proposal summary: ${jsonText(snapshot.bar)}`);
   assert(snapshot.bar.artifactVisible, "pending Plan artifact opener is not visible");
