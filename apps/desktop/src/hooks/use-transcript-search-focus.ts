@@ -73,7 +73,13 @@ export function installTranscriptSearchFocus({
     position.current = { requestId: target.requestId, alignUntil: performance.now() + 1500 };
   onNavigate(fresh);
 
-  let match = locateTranscriptSearch(message, target.query, source);
+  const findMatch = () => {
+    const found = locateTranscriptSearch(message, target.query, source);
+    // A dispatch card replaces the searchable raw tool payload with one button.
+    return message.classList.contains("team-dispatch-card") && !found.ranges.length && !found.sourceElement
+      ? { ranges: [], sourceElement: message } : found;
+  };
+  let match = findMatch();
   let highlight: Highlight | undefined;
   const paint = () => {
     match.sourceElement?.classList.add("transcript-search-source-match");
@@ -116,7 +122,7 @@ export function installTranscriptSearchFocus({
   );
   const mutation = new MutationObserver(() => {
     unpaint();
-    match = locateTranscriptSearch(message, target.query, source);
+    match = findMatch();
     paint();
     align();
   });

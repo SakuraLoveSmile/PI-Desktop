@@ -31,7 +31,7 @@ test("isTeammateJoining follows only running spawn tools", () => {
 test("only the active assistant turn exposes expert joining feedback", () => {
   const source = readFileSync(join(here, "../src/features/chat/transcript/AssistantTurn.tsx"), "utf8");
   assert.match(source, /isActive && isTeammateJoining\(tools\)/);
-  assert.match(source, /joining=\{teammateJoining\}/);
+  assert.match(source, /active: isActive, joining: teammateJoining/);
 });
 
 test("dispatchFallbackState accepts known states and defaults unsupported values to pending", () => {

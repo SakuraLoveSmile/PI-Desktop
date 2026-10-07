@@ -48,7 +48,7 @@ export const TeamDispatchCard = memo(function TeamDispatchCard({
 
   return (
     <article className="team-dispatch-card" data-task-id={card.taskId}
-      data-team-session-id={teamSessionId} data-state={state} aria-label={subject}>
+      data-team-session-id={teamSessionId} data-message-id={card.firstCreateMessageId} data-state={state} aria-label={subject}>
       <TooltipButton type="button" className="team-dispatch-card-open" tooltip={subject}
         ariaLabel={t("team.openTaskWithStatus", { subject, status: statusLabel })} onClick={handleOpen}>
         <span className="team-dispatch-card-row">
