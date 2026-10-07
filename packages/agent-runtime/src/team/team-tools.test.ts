@@ -177,6 +177,31 @@ describe("Expert Team tools and prompt (ADR 0304)", () => {
     }
   });
 
+  it("requires an explicit task owner for Plan Leads while preserving Agent backlog tasks", () => {
+    const host = createMockHost({});
+    const taskTool = (mode: string) => createTeamTools({
+      teamSessionId: "team-1", callerSessionId: "team-1", isLead: true, mode, host,
+    }).find(tool => tool.name === "task_create")!;
+    expect(taskTool("plan").parameters).toMatchObject({
+      required: expect.arrayContaining(["ownerMemberName"]),
+      properties: { ownerMemberName: { minLength: 1 } },
+    });
+    expect(taskTool("agent").parameters).not.toMatchObject({ required: expect.arrayContaining(["ownerMemberName"]) });
+  });
+
+  it.each(["task_create", "task_update"])("marks rejected %s assignments as errors", async (name) => {
+    const method = name === "task_create" ? "team.createTask" : "team.updateTask";
+    const host = createMockHost({ [method]: async () => {
+      throw new Error("TEAM_RESEARCH_INVALID: set ownerMemberName to an approved researcher");
+    } });
+    const tool = createTeamTools({ teamSessionId: "team-1", callerSessionId: "team-1", isLead: true, host })
+      .find(item => item.name === name)!;
+    await expect(tool.execute("assignment", name === "task_create"
+      ? { subject: "Research source" }
+      : { taskId: "task-1", expectedRevision: 1, ownerMemberName: "researcher" }))
+      .rejects.toThrow("TEAM_RESEARCH_INVALID: set ownerMemberName to an approved researcher");
+  });
+
   it("continues automatically after Plan researchers are materialized", async () => {
     const host = createMockHost({
       "team.declareStrategy": async () => ({

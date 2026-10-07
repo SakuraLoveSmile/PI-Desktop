@@ -45,6 +45,112 @@ function deferred<T>() {
 }
 
 describe("wait_for_updates", () => {
+  function queuedMessage(id: string) {
+    return { id, sourceSessionId: "researcher", targetSessionId: "member-1",
+      status: "queued", deliveryStatus: "acknowledged", turnId: null };
+  }
+
+  function leadWait(h: ReturnType<typeof harness>, yieldInbox = vi.fn(() => true)) {
+    const captureInboxYield = vi.fn(() => yieldInbox);
+    const tool = createTeamTools({ teamSessionId: "team-1", callerSessionId: "member-1",
+      host: h.host, isLead: true, mode: "plan", captureInboxYield }).find(tool => tool.name === "wait_for_updates");
+    if (!tool) throw new Error("Missing wait_for_updates");
+    return { tool, yieldInbox, captureInboxYield };
+  }
+
+  it("yields immediately for all queued unbound inbound mail, including ACKed receipts", async () => {
+    const h = harness();
+    const { tool, yieldInbox } = leadWait(h);
+    h.setReader(async method => method === "team.getBoard" ? { revision: 7 } : { messages: [
+      queuedMessage("a"), queuedMessage("b"), queuedMessage("c"), queuedMessage("d"),
+      { ...queuedMessage("bound"), turnId: "delivered-turn" },
+      { ...queuedMessage("settled"), status: "completed" },
+      { ...queuedMessage("outbound"), sourceSessionId: "member-1", targetSessionId: "researcher" },
+    ] });
+    const controller = new AbortController();
+    const removeListener = vi.spyOn(controller.signal, "removeEventListener");
+    const outcome = await tool.execute("wait-mail", {}, controller.signal);
+    expect(outcome.details).toEqual({ updated: true, reason: "pending_mailbox_messages", count: 4 });
+    expect(outcome.terminate).toBe(true);
+    expect(yieldInbox).toHaveBeenCalledExactlyOnceWith("wait-mail");
+    expect(h.rpc.mock.calls.map(([method]) => method)).toEqual(["team.getBoard", "team.listMessages"]);
+    expect(h.listeners.size).toBe(0);
+    expect(h.unsubscribe).toHaveBeenCalledOnce();
+    expect(removeListener).toHaveBeenCalledWith("abort", expect.any(Function));
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("yields on recheck even when total mailbox count stays unchanged and the board changes", async () => {
+    const h = harness();
+    let queued = false;
+    h.setReader(async method => method === "team.getBoard" ? { revision: queued ? 8 : 7 } : {
+      messages: [{ ...queuedMessage("a"), status: queued ? "queued" : "completed" }],
+    });
+    const { tool, yieldInbox } = leadWait(h);
+    const pending = tool.execute("wait-recheck", {});
+    await vi.advanceTimersByTimeAsync(0);
+    expect(yieldInbox).not.toHaveBeenCalled();
+    queued = true;
+    h.emit("team.messageQueued");
+    await vi.advanceTimersByTimeAsync(100);
+    expect((await pending).details).toEqual({ updated: true, reason: "pending_mailbox_messages", count: 1 });
+    expect(yieldInbox).toHaveBeenCalledExactlyOnceWith("wait-recheck");
+    expect(vi.getTimerCount()).toBe(0);
+    expect(h.listeners.size).toBe(0);
+  });
+
+  it.each(["abort", "deadline"])("does not yield for a queued baseline completing after %s", async ending => {
+    const h = harness();
+    const blocked = deferred<unknown>();
+    h.setReader(async method => method === "team.getBoard" ? { revision: 7 } : blocked.promise);
+    const { tool, yieldInbox } = leadWait(h);
+    const controller = new AbortController();
+    const pending = tool.execute("late-wait", { timeoutSeconds: 1 }, controller.signal);
+    if (ending === "abort") controller.abort();
+    else await vi.advanceTimersByTimeAsync(1000);
+    const outcome = await pending;
+    expect(outcome.terminate).toBeUndefined();
+    blocked.resolve({ messages: [queuedMessage("late")] });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(yieldInbox).not.toHaveBeenCalled();
+    expect(h.listeners.size).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each([{ isLead: false, mode: "plan" }, { isLead: true, mode: "agent" }])(
+    "preserves ordinary wait behavior for %j", async options => {
+      const h = harness();
+      h.setReader(async method => method === "team.getBoard" ? { revision: 7 } : { messages: [queuedMessage("a")] });
+      const captureInboxYield = vi.fn(() => vi.fn(() => true));
+      const tool = createTeamTools({ teamSessionId: "team-1", callerSessionId: "member-1", host: h.host,
+        ...options, captureInboxYield }).find(tool => tool.name === "wait_for_updates");
+      if (!tool) throw new Error("Missing wait_for_updates");
+      const pending = tool.execute("ordinary-wait", { timeoutSeconds: 1 });
+      await vi.advanceTimersByTimeAsync(1000);
+      expect((await pending).details).toEqual({ updated: false, reason: "timeout" });
+      expect(captureInboxYield).not.toHaveBeenCalled();
+    },
+  );
+
+  it("keeps approved execution mail in the same turn without yielding or replaying consumed results", async () => {
+    const h = harness();
+    const messages = [{ id: "execution-mail", content: "Full approved expert report" }];
+    h.setReader(async method => method === "team.readExecutionInbox" ? { turnId: "approved-turn", messages }
+      : method === "team.getBoard" ? { revision: 7 } : { messages: [queuedMessage("execution-mail")] });
+    const captureInboxYield = vi.fn(() => vi.fn(() => true));
+    const tool = createWaitForUpdatesTool({ teamSessionId: "team-1", callerSessionId: "member-1", host: h.host,
+      approvedExecution: () => true, getTurnId: () => "approved-turn", captureInboxYield });
+    const outcome = await tool.execute("approved-wait", {});
+    expect(outcome.details).toEqual({ updated: true, reason: "execution_inbox", messages });
+    expect(outcome.terminate).toBeUndefined();
+    const repeated = tool.execute("approved-recheck", { timeoutSeconds: 1 });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect((await repeated).details).toEqual({ updated: false, reason: "timeout" });
+    expect(captureInboxYield).not.toHaveBeenCalled();
+    expect(h.listeners.size).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it.each([1, 5, 10])("returns timeout for a healthy idle %s-second wait with RPC latency", async (timeoutSeconds) => {
     const h = harness();
     h.setReader(async (method) => {

@@ -984,7 +984,7 @@ try {
   } else if (planningFixture) {
     await planningFixture.runJourney({
       planLead, invoke, evaluate, sendCdp, waitFor, calls, projectPath,
-      submitComposerPrompt, openTeamPanel, saveScreenshot, startApp, stopApp,
+      submitComposerPrompt, openTeamPanel, activateOverviewTab, saveScreenshot, startApp, stopApp,
     });
   } else {
   await waitFor(() => evaluate(`!!document.querySelector('[data-sidebar-session-row="${lead.id}"]') && !document.querySelector('.startup-splash')`), "Lead in sidebar");

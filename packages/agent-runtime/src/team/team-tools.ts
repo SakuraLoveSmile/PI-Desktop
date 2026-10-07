@@ -33,12 +33,14 @@ export interface TeamToolsOptions {
   teamSessionId: string;
   callerSessionId: string;
   isLead: boolean;
+  mode?: string;
   workPurpose?: TeamWorkPurpose;
   planningId?: string;
   roundId?: string;
   host: RuntimeHost;
   getTurnId?: () => string | undefined;
   approvedExecution?: () => boolean;
+  captureInboxYield?: () => ((toolCallId: string) => boolean) | undefined;
   abortActiveTurn?: (memberSessionId: string) => Promise<boolean>;
 }
 
@@ -341,7 +343,9 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
     },
   };
 
-  const waitForUpdatesTool = createWaitForUpdatesTool(opts);
+  const waitForUpdatesTool = createWaitForUpdatesTool({ ...opts,
+    captureInboxYield: isLead && opts.mode === "plan" ? opts.captureInboxYield : undefined,
+  });
 
   const interruptAgentTool: AgentTool = {
     name: "interrupt_agent",
@@ -422,6 +426,10 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
     },
   };
 
+  const researchOwner = Type.String({
+    description: "Name of the approved researcher assigned to this task. Required for Plan research; send_message does not assign ownership.",
+    minLength: 1,
+  });
   const taskCreateTool: AgentTool = {
     name: "task_create",
     label: "Create Task",
@@ -444,55 +452,40 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
           description: "File/directory paths this task expects to modify.",
         }),
       ),
-      ownerMemberName: Type.Optional(
-        Type.String({
-          description: "Name of the teammate assigned to this task.",
-        }),
-      ),
+      ownerMemberName: isLead && opts.mode === "plan"
+        ? researchOwner
+        : Type.Optional(researchOwner),
     }),
     execute: async (_toolCallId, params): Promise<AgentToolResult> => {
-      try {
-        const p = params as {
-          subject: string;
-          description?: string;
-          blockedBy?: string[];
-          writeScopes?: string[];
-          ownerMemberName?: string;
-        };
-        const result = await host.call<{ task: TeamTaskRecord }>(
-          "team.createTask",
-          {
-            teamSessionId,
-            callerSessionId,
-            subject: p.subject,
-            description: p.description,
-            blockedBy: p.blockedBy,
-            writeScopes: p.writeScopes,
-            ownerMemberName: p.ownerMemberName,
-          },
-        );
+      const p = params as {
+        subject: string;
+        description?: string;
+        blockedBy?: string[];
+        writeScopes?: string[];
+        ownerMemberName?: string;
+      };
+      const result = await host.call<{ task: TeamTaskRecord }>(
+        "team.createTask",
+        {
+          teamSessionId,
+          callerSessionId,
+          subject: p.subject,
+          description: p.description,
+          blockedBy: p.blockedBy,
+          writeScopes: p.writeScopes,
+          ownerMemberName: p.ownerMemberName,
+        },
+      );
 
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({ task: result.task }),
-            },
-          ],
-          details: result.task,
-        };
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Error: " + message,
-            },
-          ],
-          details: { error: message },
-        };
-      }
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ task: result.task }),
+          },
+        ],
+        details: result.task,
+      };
     },
   };
 
@@ -524,56 +517,43 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
       deleted: Type.Optional(Type.Boolean()),
     }),
     execute: async (_toolCallId, params): Promise<AgentToolResult> => {
-      try {
-        const p = params as {
-          taskId: string;
-          expectedRevision: number;
-          subject?: string;
-          description?: string;
-          status?: TeamTaskStatus;
-          blockedBy?: string[];
-          writeScopes?: string[];
-          ownerMemberName?: string | null;
-          deleted?: boolean;
-        };
-        const result = await host.call<{ task: TeamTaskRecord }>(
-          "team.updateTask",
-          {
-            teamSessionId,
-            callerSessionId,
-            taskId: p.taskId,
-            expectedRevision: p.expectedRevision,
-            subject: p.subject,
-            description: p.description,
-            status: p.status,
-            blockedBy: p.blockedBy,
-            writeScopes: p.writeScopes,
-            ownerMemberName: p.ownerMemberName,
-            deleted: p.deleted,
-          },
-        );
+      const p = params as {
+        taskId: string;
+        expectedRevision: number;
+        subject?: string;
+        description?: string;
+        status?: TeamTaskStatus;
+        blockedBy?: string[];
+        writeScopes?: string[];
+        ownerMemberName?: string | null;
+        deleted?: boolean;
+      };
+      const result = await host.call<{ task: TeamTaskRecord }>(
+        "team.updateTask",
+        {
+          teamSessionId,
+          callerSessionId,
+          taskId: p.taskId,
+          expectedRevision: p.expectedRevision,
+          subject: p.subject,
+          description: p.description,
+          status: p.status,
+          blockedBy: p.blockedBy,
+          writeScopes: p.writeScopes,
+          ownerMemberName: p.ownerMemberName,
+          deleted: p.deleted,
+        },
+      );
 
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({ task: result.task }),
-            },
-          ],
-          details: result.task,
-        };
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Error: " + message,
-            },
-          ],
-          details: { error: message },
-        };
-      }
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ task: result.task }),
+          },
+        ],
+        details: result.task,
+      };
     },
   };
 

@@ -121,6 +121,12 @@ pub fn create_team_task(db: &Database, params: CreateTaskParams<'_>) -> Result<T
     if !is_lead {
         super::review::require_approved_member(db, team_session_id, caller_session_id)?;
     }
+    super::planning::validate_task_creation_owner(
+        db,
+        team_session_id,
+        owner_session_id,
+        owner_member_name,
+    )?;
     let (owner_session_id, owner_member_name) = if let Some(owner_id) = owner_session_id {
         let owner_name = validate_team_participant(db, team_session_id, owner_id)?;
         if let Some(requested_name) = owner_member_name {
