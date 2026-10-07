@@ -614,6 +614,28 @@
   overflow-wrap: break-word;
 }
 
+.approval-summary-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  line-height: inherit;
+}
+
+.approval-summary-text.expanded {
+  display: block;
+}
+
+.approval-summary-text p {
+  margin: 0;
+}
+
+.approval-summary-toggle.btn {
+  margin-top: 4px;
+  padding: 0;
+  color: var(--ds-text-secondary);
+}
+
 .plan-approval-schedule-status,
 .plan-approval-draft-warning {
   margin: 0;

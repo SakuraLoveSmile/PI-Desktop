@@ -69,6 +69,7 @@ describe("Expert Team tools and prompt (ADR 0304)", () => {
           status: "pending",
           members: params.members?.map((m: any) => ({
             name: m.name,
+            description: m.description,
             contextKind: m.contextKind ?? "fresh",
             presentation: m.presentation,
             selection: {
@@ -92,11 +93,11 @@ describe("Expert Team tools and prompt (ADR 0304)", () => {
     const declareTool = leadTools.find((t) => t.name === "declare_team_strategy")!;
     const res = await declareTool.execute("call-dec", {
       strategy: "delegate",
-      reason: "Needs specialists",
+      reason: "环境调研与方案设计可以独立核验，需要专家分工。",
       members: [
         {
           name: "coder",
-          description: "Write code",
+          description: "负责简洁架构方案实现。",
           presentation: { role: "executor", displayName: "Alex" },
         },
       ],
@@ -109,15 +110,67 @@ describe("Expert Team tools and prompt (ADR 0304)", () => {
       expect(data.reviewId).toBe("tlr_test");
       expect(data.status).toBe("pending");
       expect(data.members[0].name).toBe("coder");
+      expect(data.reason).toBe("环境调研与方案设计可以独立核验，需要专家分工。");
     }
     expect(host.call).toHaveBeenCalledWith("team.declareStrategy", expect.objectContaining({
       teamSessionId: "team-1",
       leadTurnId: "turn-100",
       strategy: "delegate",
+      reason: "环境调研与方案设计可以独立核验，需要专家分工。",
       members: [expect.objectContaining({
+        name: "coder",
+        description: "负责简洁架构方案实现。",
         presentation: { role: "executor", displayName: "Alex" },
       })],
     }));
+  });
+
+  it("guides concise localized launch review fields while preserving routing handles", () => {
+    const tools = createTeamTools({
+      teamSessionId: "team-1",
+      callerSessionId: "team-1",
+      isLead: true,
+      host: createMockHost({}),
+    });
+    const declaration = tools.find((tool) => tool.name === "declare_team_strategy")!;
+    expect(declaration.parameters).toHaveProperty("properties.reason.description",
+      expect.stringContaining("primary language of the user's request"));
+    expect(declaration.parameters).toHaveProperty("properties.reason.description",
+      expect.stringContaining("1-2 concise sentences"));
+    expect(declaration.parameters).toHaveProperty("properties.reason.description",
+      expect.stringContaining("independent workstreams"));
+    expect(declaration.parameters).toHaveProperty("properties.reason.maxLength", 1000);
+    expect(declaration.parameters).toHaveProperty("properties.members.items.properties.description.description",
+      expect.stringContaining("one concise sentence"));
+    expect(declaration.parameters).toHaveProperty("properties.members.items.properties.description.description",
+      expect.stringContaining("primary language of the user's request"));
+    expect(declaration.parameters).toHaveProperty("properties.members.items.properties.description.description",
+      expect.stringContaining("file/interface lists"));
+    expect(declaration.parameters).toHaveProperty("properties.members.items.properties.presentation.properties.displayName.description",
+      expect.stringContaining("short, user-readable"));
+    expect(declaration.parameters).toHaveProperty("properties.members.items.properties.presentation.properties.displayName.description",
+      expect.stringContaining("Alex or Sam"));
+    expect(declaration.parameters).toHaveProperty("properties.members.items.properties.name.description",
+      expect.stringContaining("stable English"));
+  });
+
+  it.each(["agent", "plan"])("guides localized expert launch reviews in %s Lead prompts", (mode) => {
+    const prompt = teamSystemPrompt({ isLead: true, mode });
+    for (const guidance of [
+      "reason",
+      "1-2 concise sentences",
+      "independent workstreams",
+      "members[].description",
+      "one concise sentence",
+      "file/interface lists",
+      "presentation.displayName",
+      "short, user-readable",
+      "Alex or Sam",
+      "stable English",
+      "do not translate",
+    ]) {
+      expect(prompt).toContain(guidance);
+    }
   });
 
   it("reads the active durable turn on each call and reports a missing turn", async () => {
@@ -308,6 +361,7 @@ describe("Expert Team tools and prompt (ADR 0304)", () => {
           taskId: "task-100",
           revision: 1,
           subject: params.subject,
+          description: params.description,
           status: "pending",
         },
       }),
@@ -315,6 +369,8 @@ describe("Expert Team tools and prompt (ADR 0304)", () => {
         task: {
           taskId: params.taskId,
           revision: 2,
+          subject: params.subject,
+          description: params.description,
           status: params.status,
         },
       }),
@@ -329,21 +385,79 @@ describe("Expert Team tools and prompt (ADR 0304)", () => {
     const createTool = tools.find((t) => t.name === "task_create")!;
     const updateTool = tools.find((t) => t.name === "task_update")!;
 
-    const createRes = await createTool.execute("c1", { subject: "Build UI" });
+    const createRes = await createTool.execute("c1", {
+      subject: "环境与工具链调研",
+      description: "Inspect workspace state, toolchains, and constraints for the new user management system.",
+    });
     if (createRes.content[0].type === "text") {
       const data = JSON.parse(createRes.content[0].text);
       expect(data.task.taskId).toBe("task-100");
+      expect(data.task.subject).toBe("环境与工具链调研");
+      expect(data.task.description).toContain("workspace state, toolchains, and constraints");
     }
 
     const updateRes = await updateTool.execute("c2", {
       taskId: "task-100",
       expectedRevision: 1,
+      subject: "简洁架构方案设计",
+      description: "Design a minimal defensible architecture using the confirmed constraints.",
       status: "in_progress",
     });
     if (updateRes.content[0].type === "text") {
       const data = JSON.parse(updateRes.content[0].text);
       expect(data.task.revision).toBe(2);
       expect(data.task.status).toBe("in_progress");
+      expect(data.task.subject).toBe("简洁架构方案设计");
+      expect(data.task.description).toContain("confirmed constraints");
+    }
+    expect(host.call).toHaveBeenCalledWith("team.updateTask", expect.objectContaining({
+      taskId: "task-100",
+      expectedRevision: 1,
+      subject: "简洁架构方案设计",
+      description: "Design a minimal defensible architecture using the confirmed constraints.",
+    }));
+  });
+
+  it.each(["task_create", "task_update"])("guides %s subjects without changing schema limits", (name) => {
+    const tools = createTeamTools({
+      teamSessionId: "team-1",
+      callerSessionId: "team-1",
+      isLead: true,
+      host: createMockHost({}),
+    });
+    const tool = tools.find((candidate) => candidate.name === name)!;
+    for (const guidance of [
+      "primary language of the user's request",
+      "8-16 Chinese characters",
+      "3-8 words",
+      "Recon:",
+      "Ad-hoc:",
+      "description",
+      "send_message",
+    ]) {
+      expect(tool.parameters).toHaveProperty("properties.subject.description", expect.stringContaining(guidance));
+    }
+    expect(tool.parameters).not.toHaveProperty("properties.subject.maxLength");
+    expect(tool.parameters).not.toHaveProperty("properties.subject.pattern");
+    expect(tool.parameters).toHaveProperty("required", name === "task_create"
+      ? expect.arrayContaining(["subject"])
+      : expect.not.arrayContaining(["subject"]));
+  });
+
+  it.each(["agent", "plan"])("guides concise localized task subjects in %s Lead prompts", (mode) => {
+    const prompt = teamSystemPrompt({ isLead: true, mode });
+    expect(prompt).toContain("task_create");
+    expect(prompt).toContain("task_update");
+    for (const guidance of [
+      "primary language of the user's request",
+      "8-16 Chinese characters",
+      "3-8 words",
+      "Recon:",
+      "Ad-hoc:",
+      "description",
+      "send_message",
+    ]) {
+      expect(prompt).toContain(guidance);
     }
   });
 

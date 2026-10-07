@@ -573,7 +573,26 @@ fn write_atomic(target_path: &Path, content: &[u8]) -> Result<(String, u64)> {
     Ok((hash, content.len() as u64))
 }
 
-/// Finalizes a goal report upon execution settlement.
+/// Publication and retry require the authoritative Host completion state.
+/// Keep the existing RPC error code; terminal interruption is not completion.
+fn require_completed_execution(facts: &ProposalFacts, status_override: Option<&str>) -> Result<()> {
+    if facts.kind != "goal" {
+        return Err(anyhow!("INVALID_ARGUMENT: execution is not a goal"));
+    }
+    if facts.execution_state.as_deref() != Some("completed") {
+        return Err(anyhow!(
+            "GOAL_EXECUTION_NOT_TERMINAL: goal execution has not completed"
+        ));
+    }
+    if status_override.is_some_and(|status| status != "completed") {
+        return Err(anyhow!(
+            "GOAL_EXECUTION_NOT_TERMINAL: report status must match the completed execution"
+        ));
+    }
+    Ok(())
+}
+
+/// Finalizes a goal report only after authoritative execution completion.
 ///
 /// Builds a structured snapshot if a valid draft exists, or a fallback report
 /// from verified host facts otherwise. Publishes atomically and stamps ready.
@@ -585,27 +604,7 @@ pub fn finalize_report(
     error_code_override: Option<&str>,
 ) -> Result<GoalReportSummary> {
     let facts = load_proposal_facts(db.conn(), execution_id)?;
-    if facts.kind != "goal" {
-        return Err(anyhow!("INVALID_ARGUMENT: execution is not a goal"));
-    }
-
-    let terminal_state = match facts.execution_state.as_deref() {
-        Some("completed") => "completed",
-        Some("interrupted") => "interrupted",
-        _ => {
-            return Err(anyhow!(
-                "GOAL_EXECUTION_NOT_TERMINAL: execution is not terminal"
-            ))
-        }
-    };
-
-    if let Some(override_status) = status_override {
-        if override_status != "completed" && override_status != "interrupted" {
-            return Err(anyhow!(
-                "GOAL_EXECUTION_NOT_TERMINAL: execution status override is not terminal"
-            ));
-        }
-    }
+    require_completed_execution(&facts, status_override)?;
 
     let existing: Option<(String, Option<String>, i64, String)> = db
         .conn()
@@ -672,11 +671,11 @@ pub fn finalize_report(
         None
     };
 
-    let execution_status = status_override.unwrap_or(terminal_state);
+    let execution_status = "completed";
     let error_code = error_code_override.or(facts.error_code.as_deref());
 
     let (integrity_kind, verdict, summary, full_report) = match maybe_draft {
-        Some(draft) if execution_status == "completed" => {
+        Some(draft) => {
             let verdict = draft
                 .get("verdict")
                 .and_then(Value::as_str)
@@ -760,16 +759,8 @@ pub fn finalize_report(
         }
         _ => {
             // Fallback report
-            let is_interrupted = execution_status == "interrupted";
-            let verdict = if is_interrupted { "blocked" } else { "unknown" }.to_string();
-            let fallback_summary = if is_interrupted {
-                format!(
-                    "Execution was interrupted ({}) before a structured report was finalized.",
-                    error_code.unwrap_or("unknown error")
-                )
-            } else {
-                "Execution finished without a submitted structured report; basic execution facts retained.".to_string()
-            };
+            let verdict = "unknown".to_string();
+            let fallback_summary = "Execution finished without a submitted structured report; basic execution facts retained.".to_string();
 
             let report_obj = json!({
                 "schemaVersion": GOAL_REPORT_SCHEMA_VERSION,

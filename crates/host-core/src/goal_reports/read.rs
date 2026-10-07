@@ -399,7 +399,7 @@ pub fn list_reports(db: &Database, session_id: &str) -> Result<Vec<GoalReportSum
     Ok(results)
 }
 
-/// Retries building a failed or pending report from local facts.
+/// Retries a completed execution report from local facts, without rerunning it.
 pub fn retry_report(
     db: &Database,
     session_id: &str,
@@ -429,6 +429,14 @@ pub fn retry_report(
         ));
     }
 
+    let facts = load_proposal_facts(db.conn(), execution_id)?;
+    if facts.session_id != session_id {
+        return Err(anyhow!(
+            "PERMISSION_DENIED: report belongs to another session"
+        ));
+    }
+    require_completed_execution(&facts, None)?;
+
     if status == "ready" {
         // If ready, query summary and return
         let summary: Option<GoalReportSummary> = db
@@ -454,7 +462,6 @@ pub fn retry_report(
     // A failed publication must never be retried from an agent draft. Remove
     // that stale input before rebuilding the report from durable Host facts.
     if status == "failed" {
-        let facts = load_proposal_facts(db.conn(), execution_id)?;
         let draft_path = draft_file_path(db.data_dir(), &facts.session_id, execution_id);
         if draft_path.exists() {
             fs::remove_file(draft_path).map_err(|err| {

@@ -23,7 +23,7 @@ fn goal_report_rpc_err(error: impl ToString) -> JsonRpcError {
     if message.starts_with("GOAL_EXECUTION_NOT_TERMINAL") {
         return rpc_err(
             1002,
-            "goal execution is not terminal",
+            "goal execution has not completed or report status does not match completion",
             "GOAL_EXECUTION_NOT_TERMINAL",
         );
     }
