@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { AgentHost } from "@pi-desktop/agent-host";
 import { createTeamDeliveryService } from "../electron/main/services/team-delivery.ts";
 import { restoreAgentHostThenDrain } from "../electron/main/runtime/team-startup.ts";
 
-function fixture({ paused = false, queueReceipt = false, failFirstAck = false, deferFirstRoster = false, noPendingMessages = false } = {}) {
+function fixture({ paused = false, queueReceipt = false, failFirstAck = false, deferFirstRoster = false, noPendingMessages = false, agentHost: providedAgentHost } = {}) {
   const order = [];
   const queueEntries = queueReceipt
     ? [{ sessionId: "member-1", sessionMessageId: "message-1" }]
@@ -60,6 +61,11 @@ function fixture({ paused = false, queueReceipt = false, failFirstAck = false, d
         roster.paused = true;
         return { paused: true };
       }
+      if (method === "team.resume") {
+        order.push("team-resume");
+        roster.paused = false;
+        return { paused: false };
+      }
       if (method === "team.getMessage") return { message };
       if (method === "team.ackMessage") {
         order.push("ack");
@@ -90,7 +96,7 @@ function fixture({ paused = false, queueReceipt = false, failFirstAck = false, d
     hold: (sessionId, reason) => order.push(`hold:${sessionId}:${reason}`),
     resume: (sessionId, reason) => order.push(`resume:${sessionId}:${reason}`),
   };
-  const agentHost = {
+  const agentHost = providedAgentHost ?? {
     queue,
     async enqueueTeamMessage(_principal, request) {
       order.push("enqueue");
@@ -112,15 +118,151 @@ function fixture({ paused = false, queueReceipt = false, failFirstAck = false, d
       return true;
     },
   };
+  let currentHost = host;
   const service = createTeamDeliveryService({
     principal: { subject: "desktop", roles: ["owner"], pairedDevice: true },
-    getHost: () => host,
+    getHost: () => currentHost,
     getBridge: () => bridge,
     activeTurns: new Map(),
     log: (...args) => order.push(args),
   });
-  return { service, hostCalls, queueEntries, order, message, firstRosterRead, releaseFirstRoster: () => releaseFirstRoster() };
+  return {
+    service, host, bridge, roster, hostCalls, queueEntries, order, message, firstRosterRead,
+    releaseFirstRoster: () => releaseFirstRoster(),
+    replaceHost: (replacement) => { currentHost = replacement; },
+  };
 }
+
+function userQueueFixture() {
+  const prompts = [];
+  const agentHost = new AgentHost({
+    runtime: {
+      async prompt(request) {
+        prompts.push(request);
+        return { turnId: `runtime-${request.sessionId}` };
+      },
+    },
+    sessions: {},
+    approvals: {},
+  });
+  return { ...fixture({ agentHost, noPendingMessages: true }), agentHost, prompts };
+}
+
+async function queueUserTurn(agentHost, sessionId) {
+  await agentHost.queue.push({
+    id: `turn-${sessionId}`,
+    sessionId,
+    principalSubject: "desktop",
+    content: `Continue ${sessionId}`,
+    sessionMessageId: `user-${sessionId}`,
+    idempotencyKey: `session-message:user-${sessionId}`,
+    effectivePermissionMode: "ask",
+    inputHash: sessionId,
+    priority: 1,
+    createdAt: 1,
+  });
+}
+
+test("Resume starts queued user turns for Lead and members even without pending Team mail", async () => {
+  const state = userQueueFixture();
+  await state.service.pauseTeam("lead");
+  for (const sessionId of ["lead", "member-1"]) {
+    await queueUserTurn(state.agentHost, sessionId);
+    state.agentHost.kick(sessionId);
+  }
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(state.prompts, []);
+  assert.equal(state.agentHost.queue.peek("lead").priority, 1);
+
+  await state.service.resumeTeam("lead");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(state.prompts.map((prompt) => prompt.sessionMessageId).sort(), ["user-lead", "user-member-1"]);
+  assert.equal(state.agentHost.queue.size("lead"), 0);
+  assert.equal(state.agentHost.queue.size("member-1"), 0);
+  await state.service.resumeTeam("lead");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(state.prompts.length, 2);
+});
+
+test("Resume preserves another queue owner's restore hold", async () => {
+  const state = userQueueFixture();
+  await state.service.pauseTeam("lead");
+  state.agentHost.queue.hold("lead", "restore");
+  await queueUserTurn(state.agentHost, "lead");
+
+  await state.service.resumeTeam("lead");
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepEqual(state.prompts, []);
+  assert.equal(state.agentHost.queue.isHeld("lead"), true);
+  assert.equal(state.agentHost.queue.size("lead"), 1);
+  assert.equal(state.agentHost.queue.isHeldByOtherThan("lead", "restore"), false);
+});
+
+test("Resume finishes mailbox acknowledgment before waking ordinary user queues", async () => {
+  const state = fixture({ paused: true });
+  await state.service.resumeTeam("lead");
+
+  assert.ok(state.order.indexOf("ack") < state.order.indexOf("kick:lead"));
+  assert.ok(state.order.indexOf("ack") < state.order.indexOf("kick:member-1"));
+});
+
+test("Pause during Resume's mailbox drain keeps user queues held", async () => {
+  const state = userQueueFixture();
+  await state.service.pauseTeam("lead");
+  await queueUserTurn(state.agentHost, "lead");
+  const call = state.host.call.bind(state.host);
+  let pendingRead;
+  const readingPending = new Promise((resolve) => { pendingRead = resolve; });
+  let releasePending;
+  state.host.call = async (method, params) => {
+    if (method === "team.pendingMessages") {
+      pendingRead();
+      await new Promise((resolve) => { releasePending = resolve; });
+    }
+    return call(method, params);
+  };
+  const resuming = state.service.resumeTeam("lead");
+  await readingPending;
+  const pausing = state.service.pauseTeam("lead");
+  releasePending();
+  await Promise.all([resuming, pausing]);
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepEqual(state.prompts, []);
+  assert.equal(state.agentHost.queue.isHeld("lead"), true);
+  assert.equal(state.agentHost.queue.size("lead"), 1);
+});
+
+test("a deleted Team during Resume's drain cannot wake stale member queues", async () => {
+  const state = fixture({ paused: true, noPendingMessages: true });
+  const call = state.host.call.bind(state.host);
+  let rosterReads = 0;
+  state.host.call = async (method, params) => {
+    if (method === "team.getRoster" && ++rosterReads === 3) {
+      throw Object.assign(new Error("Team was deleted"), { errorCode: "NOT_FOUND" });
+    }
+    return call(method, params);
+  };
+
+  await assert.rejects(state.service.resumeTeam("lead"), { errorCode: "NOT_FOUND" });
+  assert.equal(state.order.some((entry) => typeof entry === "string" && entry.startsWith("kick:")), false);
+});
+
+test("a replaced Host during Resume's final roster read cannot wake stale queues", async () => {
+  const state = fixture({ paused: true, noPendingMessages: true });
+  const call = state.host.call.bind(state.host);
+  let rosterReads = 0;
+  state.host.call = async (method, params) => {
+    if (method === "team.getRoster" && ++rosterReads === 3) {
+      state.replaceHost({ isAvailable: () => true });
+    }
+    return call(method, params);
+  };
+
+  await assert.rejects(state.service.resumeTeam("lead"), { errorCode: "HOST_UNAVAILABLE" });
+  assert.equal(state.order.some((entry) => typeof entry === "string" && entry.startsWith("kick:")), false);
+});
 
 test("Team mail is acknowledged only after its durable Agent Host queue receipt", async () => {
   const state = fixture();

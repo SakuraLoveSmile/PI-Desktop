@@ -9454,7 +9454,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 | Acceptance | Scenarios |
 |---|---|
-| C / Quality / Security — Approved read-only Team planning | E2E-TEAM-approved-plan-research-and-execution |
+| C / Quality / Security — Automatic read-only Team planning | E2E-TEAM-approved-plan-research-and-execution, E2E-TEAM-automatic-plan-research |
 | C / Quality — Independent Team panorama/task/member tabs | E2E-TEAM-panorama-and-member-tabs |
 | C / Quality — Live dispatch card and single task target | E2E-TEAM-dispatch-card-live-status-and-joining |
 | C / E / F / Quality / Security — Session Todo checklist | E2E-CHAT-session-todo-checklist |
@@ -17229,8 +17229,8 @@ registry-only installation and credential isolation.
 ## E2E-TEAM-approved-plan-research-and-execution
 
 - **Preconditions:** Isolated production Electron/Main/Host/sidecar candidate, two research fixtures, temporary workspace and localhost SSE provider; no user data or real model.
-- **Steps:** Cancel a review and restart a pending review; confirm the replacement. Create two owned research tasks, run real Read calls and hold the second result. Attempt early submission, then settle both researchers, inspect complete findings, submit, request revision, reject/retry and approve. Allow the execution Write through the ordinary permission card and verify exact marker bytes.
-- **Expected:** No researcher call before confirmation; first result cannot authorize submission. Research tools stay read-only, full findings reach the saved artifact, approvals recover safely, execution permissions stay normal, and research members are not elevated by Plan approval or Team deletion.
+- **Steps:** Submit a Team Plan request and automatically launch two read-only researchers without staffing approval. Create owned tasks, run real Read calls and hold the second result. Attempt early submission, settle both researchers, inspect complete findings and submit. Restart preserves findings and interrupted proposal history without replay. Request revision, reject/retry and approve. The Agent execution roster must appear automatically for user confirmation; allow its Ask Write once and verify exact marker bytes.
+- **Expected:** Planning requires no user staffing approval; actual read-only researchers run before a proposal can be submitted. First result alone cannot authorize submission. Full findings reach the saved artifact; execution roster confirmation and ordinary permissions remain required. Research members are not elevated by Plan approval or Team deletion.
 - **Specs:** `03-runtime/06-host-rpc-protocol.md`, `03-runtime/08-error-codes.md`, ADR plus-expert-team-collaboration.
 - **Acceptance:** C / Quality / Security — approved planning cooperation and permission isolation.
 - **Milestone:** Maintenance.
@@ -17239,14 +17239,14 @@ registry-only installation and credential isolation.
 
 
 
-Use the isolated local Team fixture through the real composer, trusted review,
-Host, sidecar and loopback model service. Confirm no members/provider calls
-before review. After confirmation create two owned research tasks, hold one
-researcher, and verify the first result leaves two expected/one completed and
-no pending plan. Release the second; retain full bounded findings and resolve
-a user clarification before SubmitPlan. Reject, revise, retry the same
-submission, approve, and verify the Lead can write the isolated workspace using
-normal Agent permissions. Researchers remain read-only after approval.
+Use the isolated local Team fixture through the real composer, Host, sidecar and
+loopback provider. Automatically launch two read-only researchers and verify
+there is no pending research review. Hold one researcher and verify the first
+result leaves two expected/one completed and no proposal. Retain full findings
+before SubmitPlan. Restart preserves results and interrupted proposal history
+without replay. Revision/retry launch automatic research; approved Agent work
+requires an automatically visible user-confirmed execution roster and normal
+Ask permissions. Researchers remain read-only until explicitly assigned execution.
 
 Lower-level regression checks cover lead_only, ownership, missing/deleted
 tasks, round/revision mismatch, dependencies, payload limits, idempotency,
@@ -17254,3 +17254,73 @@ ordinary-completion bypass, Team revision notifications, stop/restart question
 cleanup, local tool interception and unchanged standard Plan/Goal behavior.
 Run `PI_E2E_TEAM_PLANNING=1 node scripts/e2e-team.mjs` for the integration path;
 never use a real provider or the user's running application as its fixture.
+
+### E2E-TEAM-forced-delegation
+
+- Run `node scripts/e2e-team-forced.mjs` in the built candidate with real isolated
+  Electron/Main/Host/sidecar and localhost SSE.
+- Make the model attempt lead_only and solo Write/Bash/SubmitPlan. Assert rejection
+  and zero decisions/reviews/members/tasks/files/proposals. Retry delegate in the
+  same Agent turn, review the nonempty execution roster and explicitly launch it.
+  Plan delegate retry instead launches read-only research automatically.
+- A first tool-free final must recover once within the same durable user turn.
+  A valid pending Agent execution roster may end awaiting user confirmation;
+  Plan recovery must continue into automatic actual research. Repeated
+  refusal to delegate must end in an observable approval error without effects
+  or successful completion; cancellation and mode changes invalidate recovery.
+- Idle materialized members and queued dispatch do not grant substantive Lead
+  actions. Verify an actual owned expert turn and observable contribution before
+  Lead integration. Plan researchers read and submit full structured findings;
+  only complete research permits final submission.
+- Ordinary Team and Team planning journeys cover current-roster dispatch,
+  cancellation/recovery, genuine mailbox continuation and fresh expert reviews
+  for execution, with automatic research rounds for revision/retry. Standard
+  Plan remains compatible.
+
+Trusted completion notices retain silent acknowledgements only; any nonempty
+Team answer or subsequent human request still requires expert authority.
+
+Team queue regression: promote a user request with Send Now, observe Team Stop
+pauses all delivery and retains the queued request, then Resume through the UI.
+Without pending Team mail, the promoted request must start exactly once, require
+a fresh expert roster review and integrate a real approved expert contribution.
+
+### E2E-TEAM-automatic-plan-research
+
+- Preconditions: isolated production Electron/Main/Host/sidecar, temporary
+  project and localhost SSE; no real paid provider or user's running profile.
+- Steps: submit a Team Plan request from Composer; automatically declare and
+  materialize read-only researchers, create owned tasks and dispatch them in the
+  same Lead turn. Hold one result, inspect full findings, then release and submit.
+  Revise/retry without staffing approval; restart preserves results and interrupted
+  proposal history without provider replay. Approve the plan, confirm the Agent
+  execution roster, and allow its Ask-permission Write once.
+- Expected: zero research-launch confirmation actions, no pending planning roster
+  card and real expert Read/results before the plan proposal. Agent execution
+  still requires a user-confirmed roster and actual expert contribution. A Plan
+  no-tool final recovers into automatic research instead of waiting for approval.
+  Automatic Plan authority cannot authorize Agent work or mutate researcher files.
+- Specs: Host RPC launch policy, error codes, component spec and Expert Team ADR.
+- Acceptance: conversation, persistence, permissions and execution lifecycle.
+- Status: run on the current request candidate; record source/base and results.
+- Automation: `node scripts/e2e-team-planning.mjs` and
+  `node scripts/e2e-team-forced.mjs`; Host and runtime regression suites.
+
+### E2E-TEAM-plan-inbox-before-approval
+
+- Preconditions: isolated production Electron/Main/Host/AgentHost/sidecar, local
+  SSE provider and temporary workspace; no user profile or paid provider.
+- Steps: finish real structured research, then send a meaningful multilingual
+  supplementary report while Lead is busy. SubmitPlan normally defers; deliver
+  the exact message through its authenticated mailbox continuation. Queue an
+  ordinary user request while the final synthesis is held, then submit. Also
+  verify pure structured-result research with no duplicate completion sends.
+- Expected: no error/approval/file at deferral; full report preserved in the
+  final artifact, exactly one real message admission, no expert message left in
+  the composer when approval appears, and the user's queued request remains.
+  ACK alone never counts as consumed; cancelled messages are not blockers.
+- Specs: Host RPC PlanSubmitResult/inbox barrier and Expert Team ADR.
+- Acceptance: conversation, persistence, queue lifecycle and user-data retention.
+- Status: required on refreshed task candidate, record actual source/base.
+- Automation: `node scripts/e2e-team-planning.mjs`, Host planning/RPC and
+  real-stream runtime submission regressions.

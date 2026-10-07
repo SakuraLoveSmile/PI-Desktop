@@ -383,7 +383,7 @@ with teammates, shared task boards, and peer mailboxes.
 | `TEAM_MAILBOX_FULL` | yes | the recipient has reached the queued Team message limit |
 | `TEAM_MESSAGE_PAYLOAD_TOO_LARGE` | no | the Team message exceeds the 64 KiB payload limit |
 | `TEAM_DELIVERY_PENDING` | yes | the Host has not yet persisted a durable recipient queue or turn receipt |
-| `TEAM_APPROVAL_REQUIRED` | no | a launch review must be confirmed before expert teammates can start |
+| `TEAM_APPROVAL_REQUIRED` | no | the current Team strategy review must be confirmed before Lead execution, Plan submission or expert dispatch |
 | `TEAM_REVIEW_REVISION_CONFLICT` | yes | the launch review revision changed after the caller read it |
 | `TEAM_MODEL_SELECTION_INVALID` | no | a proposed provider/model/thinking route cannot be launched |
 | `TEAM_MEMBER_MODEL_CHANGE_BLOCKED` | no | the member holds an active turn or queued work on its route |

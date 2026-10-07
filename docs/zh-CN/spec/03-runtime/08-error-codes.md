@@ -375,7 +375,7 @@ ADR 0285）。渲染进程除了一个标识徽章外看不到本地/远程之�
 | `TEAM_MAILBOX_FULL` | 是 | 收件人的待处理团队消息已达到上限 |
 | `TEAM_MESSAGE_PAYLOAD_TOO_LARGE` | 否 | 团队消息超过 64 KiB 载荷上限 |
 | `TEAM_DELIVERY_PENDING` | 是 | Host 尚未持久化收件人的队列或 turn 回执 |
-| `TEAM_APPROVAL_REQUIRED` | 否 | 专家队友启动前必须确认启动审查确认 |
+| `TEAM_APPROVAL_REQUIRED` | 否 | The current Team strategy review must be confirmed before Lead execution, Plan submission or expert dispatch. |
 | `TEAM_REVIEW_REVISION_CONFLICT` | 是 | 启动审查版本在调用方读取后已发生变化 |
 | `TEAM_MODEL_SELECTION_INVALID` | 否 | 提议的模型/提供商/思考路线无法启动 |
 | `TEAM_MEMBER_MODEL_CHANGE_BLOCKED` | 否 | 该成员在其路线上持有活跃 turn 或排队任务 |

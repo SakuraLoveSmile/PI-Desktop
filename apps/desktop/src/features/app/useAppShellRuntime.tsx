@@ -12,6 +12,7 @@ import {
 } from "@pi-desktop/shared";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useTeamExecutionReview } from "../../hooks/useTeamExecutionReview";
 import { installRendererApi } from "../../capture/renderer-api";
 import { StartupSplash } from "../../components/StartupSplash";
 import { api } from "../../lib/api";
@@ -46,6 +47,7 @@ const MODIFIER_ONLY_KEYS = new Set([
 const PLUGIN_THEME_STYLE_ID = "pi-plugin-theme";
 
 export function useAppShellRuntime() {
+  useTeamExecutionReview();
   const autoOpenedGoalReportExecutionsRef = useRef<Set<string>>(new Set());
   const { t } = useTranslation();
   const platform = window.piDesktop?.platform ?? "darwin";
