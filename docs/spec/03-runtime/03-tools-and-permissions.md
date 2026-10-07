@@ -553,6 +553,21 @@ is guidance, not the security boundary.
 one subagent definition. Plan and Goal are read-only contract negotiations, so a
 delegate with `Bash`, `Edit` or `Write` would drive straight through them.
 
+In standard Agent mode, when at least one subagent is enabled, the prompt
+steers the parent to delegate separable, substantial work first: dispatch
+independent assignments with `Task` and converge using `TaskWait`. The parent
+keeps few-tool tasks and work requiring user participation. It must not recurse
+or start delegate debates, and may request at most one optional review. This is
+prompt steering rather than a runtime guarantee. With all subagents disabled,
+the delegation prompt section and `Task*` tools are absent. In Plan and Goal,
+declared `Task*` schemas remain unavailable under the existing execution gate.
+
+Expert Team execution uses the separate Team catalog. Its Lead defaults to
+`delegate`, assigning separable workflow tasks to experts through the task
+board; `lead_only` is limited to trivial indivisible work and requires a reason.
+Team approval and review remain in force. Team turns do not expose `Task*` or
+plugin `SessionTask`.
+
 A definition declares the tools its delegate may call. By default those names
 are drawn only from the seven working tools `Read`, `Glob`, `Grep`,
 `BrowserPreview`, `Bash`, `Edit` and `Write`. A definition that declares none

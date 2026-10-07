@@ -8,6 +8,10 @@
 
 ## Context
 
+The original 2026-08-16 context and decisions below record the initial
+background-delegation implementation. The operating policy is amended by the
+2026-10-07 update at the end of this ADR.
+
 ADR 0062 shipped delegation as context economy: `Task` runs one delegate to
 completion and returns its report, and the tool description tells the model to
 delegate only when a wide search or long survey would otherwise fill the parent
@@ -109,6 +113,26 @@ runs 10 delegates, telling the model to wait or stop first.
   and the new tools map to the same delegate presentation.
 - A delegate that outlives its turn is stopped, not left running; the prompt
   rule plus the turn-end abort make that the exception rather than the policy.
+
+## Delegation policy amendment (2026-10-07)
+
+For a standard Agent session with at least one enabled subagent, the orchestrator
+uses a delegate-first policy for separable, substantial work: split independent
+work, start suitable `Task` calls in parallel, continue useful parent work, and
+converge with `TaskWait`. The parent handles work that takes only a few tool
+calls and steps that require user participation. Delegates do not recursively
+delegate or debate one another; at most one optional review is used. This is
+prompt guidance, not a runtime guarantee that a model will delegate.
+
+When no subagent is enabled, the Delegation prompt section and the `Task*`
+tools are absent. Plan and Goal retain their declared `Task*` schemas where the
+catalog exists, but the operating-mode execution gate continues to reject those
+calls.
+
+This policy does not alter the tool lifecycle, permission model, concurrency
+limits, or containment boundaries decided above. Expert Team execution follows
+its separate Lead-to-expert delegation policy in the Expert Team collaboration
+ADR; Team turns continue to omit `Task*` and plugin `SessionTask`.
 
 ## Alternatives considered
 

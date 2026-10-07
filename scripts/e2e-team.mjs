@@ -83,6 +83,17 @@ const providerServer = createServer(async (req, res) => {
     const titleSystemPrompt = messages.find((message) => message.role === "system")?.content;
     const isTitleRequest = typeof titleSystemPrompt === "string" &&
       titleSystemPrompt.includes("descriptive session title summarizing the conversation");
+    if (!isTitleRequest && toolNames.includes("declare_team_strategy")) {
+      for (const name of ["Task", "TaskWait", "TaskList", "TaskStop", "SessionTask"]) {
+        assert.equal(toolNames.includes(name), false, `Team exposed ${name}`);
+      }
+      if (titleSystemPrompt?.includes("You are the Lead of an Expert Team.")) {
+        assert.match(titleSystemPrompt, /default[\s\S]*delegate|delegate[\s\S]*default/i,
+          "execution Lead receives delegate-by-default steering");
+        assert.match(titleSystemPrompt, /trivial[\s\S]*indivisible|indivisible[\s\S]*trivial/i,
+          "lead_only is limited to trivial indivisible work");
+      }
+    }
     let toolCall;
     let finalText;
     let thinkingText;
@@ -119,7 +130,7 @@ const providerServer = createServer(async (req, res) => {
       if (!priorToolNames.includes("declare_team_strategy")) {
         assert.ok(toolNames.includes("declare_team_strategy"), "approved Team execution lacks strategy declaration");
         toolCall = { name: "declare_team_strategy", args: {
-          strategy: "lead_only", reason: "The approved Plan can be executed by the Lead."
+          strategy: "lead_only", reason: "Acknowledging this fixture plan is trivial and indivisible; no expert work is needed."
         }};
       } else {
         finalText = "Approved Team plan execution finished.";
@@ -160,7 +171,7 @@ const providerServer = createServer(async (req, res) => {
       } else { finalText = "Approved work dispatched."; }
     } else if (userText.includes("Handle this without specialists")) {
       if (!priorToolNames.includes("declare_team_strategy") || !activeToolText.includes("lead_only")) {
-        toolCall = { name: "declare_team_strategy", args: { strategy: "lead_only", reason: "This short task needs no specialist." }};
+        toolCall = { name: "declare_team_strategy", args: { strategy: "lead_only", reason: "This fixed acknowledgement is trivial and indivisible; no expert work is needed." }};
       } else { finalText = "Handled by Lead only."; }
     } else if (userText.includes("Send the exact message TEAM_RESULT")) {
       thinkingText = "TEAM_MEMBER_THINKING: verify the fixed result before reporting.";
@@ -1259,7 +1270,7 @@ try {
   await invoke("agentPrompt", {sessionId: lead.id, viewingSessionId: lead.id, content: "Handle this without specialists."});
   await waitFor(async () => (await invoke("teamGetExecutionDecision", {teamSessionId: lead.id})).decision?.strategy === "lead_only", "latest lead-only decision");
   await openTeamPanel(sendCdp, evaluate);
-  await waitFor(() => evaluate(`document.querySelector('[data-testid="team-panel"]')?.innerText.includes('This short task needs no specialist.')`), "lead-only reason visible");
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="team-panel"]')?.innerText.includes('This fixed acknowledgement is trivial and indivisible; no expert work is needed.')`), "lead-only reason visible");
   assert.equal((await invoke("teamGetRoster", {teamSessionId: lead.id})).members.length, 5);
   console.log("PASS Team strategy: Lead-only decision and reason visible without an extra expert");
 

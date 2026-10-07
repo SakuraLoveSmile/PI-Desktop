@@ -678,6 +678,16 @@ no editing, delegation, fake user message or transcript deletion occurs.
 Other deferred/plugin tools keep their existing visibility rules. See
 [the declaration/permission decision](../../adr/plan-tool-declarations-and-execution-denials.md).
 
+In standard Agent mode with at least one enabled subagent, the system prompt
+uses delegate-first guidance for separable, substantial work: dispatch suitable
+independent tasks with `Task`, then converge through `TaskWait`. The parent
+handles work needing only a few tool calls and work requiring user input. The
+guidance retains the no-recursion, no-debate, and at-most-one-optional-review
+limits; it steers the model but does not guarantee delegation. With all
+subagents disabled, neither the delegation prompt section nor `Task*` tools
+are included. Expert Team execution uses its Lead-to-expert task-board policy
+and isolated Team tool catalog instead of standard subagent delegation.
+
 Plan/Goal entry remains available without a project workspace. A submission
 requires a persisted session workspace for its approval artifact: the project
 for Plan, and for a temporary Goal its own scratch workspace (below).
@@ -1462,9 +1472,8 @@ execution activation rules:
   `# Skills` section and a user-typed `/skill-id` both ask the model to call
   it, and a tool that is missing from the schema cannot be called at all
 - Agent: `Task`, `TaskWait`, `TaskList`, and `TaskStop` as well, whenever the
-  subagent catalog is non-empty (§5f) — a capability the model has to go
-  looking for is one it will not use, and the delegation lifecycle is worth
-  the extra schemas per request
+  subagent catalog is non-empty (§5f) — prompted for delegate-first orchestration
+  of separable, substantial work, and worth the extra schemas per request
 - Plan: `Read`, `Glob`, `Grep`, `BrowserPreview`, and `Bash`
 - both modes: `ToolSearch` when at least one deferred capability exists
 
