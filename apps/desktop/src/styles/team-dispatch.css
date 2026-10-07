@@ -68,3 +68,10 @@
 @media (prefers-reduced-motion: reduce) {
   .team-dispatch-joining-label { animation: none; }
 }
+
+.team-timeline-runtime {
+  min-height: 24px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+}

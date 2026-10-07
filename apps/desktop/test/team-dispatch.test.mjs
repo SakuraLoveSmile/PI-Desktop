@@ -31,7 +31,7 @@ test("isTeammateJoining follows only running spawn tools", () => {
 test("only the active assistant turn exposes expert joining feedback", () => {
   const source = readFileSync(join(here, "../src/features/chat/transcript/AssistantTurn.tsx"), "utf8");
   assert.match(source, /isActive && isTeammateJoining\(tools\)/);
-  assert.match(source, /joining=\{teammateJoining\}/);
+  assert.match(source, /active: isActive, joining: teammateJoining/);
 });
 
 test("dispatchFallbackState accepts known states and defaults unsupported values to pending", () => {
@@ -321,4 +321,85 @@ test("a running task_update without an authoritative result does not change or c
   assert.equal(index.cardsByTaskId.get("team-session:task-1")?.task.status, "pending");
   assert.equal(index.cardsByMessageId.has("msg-update-started"), false);
   assert.equal(index.cardsByMessageId.has("msg-orphan-update-started"), false);
+});
+
+function taskEnvelope(task) {
+  // createTeamTools returns the task in details; IPC and restored messages keep
+  // this AgentToolResult envelope rather than unwrapping its text content.
+  return { content: [{ type: "text", text: JSON.stringify({ task }) }], details: task };
+}
+
+test("runtime task result envelopes create cards and apply updates as objects or stored JSON", () => {
+  for (const serialize of [((value) => value), JSON.stringify]) {
+    const task = {
+      taskId: "envelope-task", teamSessionId: "envelope-team",
+      subject: "Inspect transcript", description: "Check real result envelopes",
+      status: "pending", ownerMemberName: "Alex", ownerSessionId: "expert-session",
+    };
+    const create = {
+      id: "envelope-create", role: "tool", toolName: "task_create", toolStatus: "success",
+      toolArgs: { subject: "Fallback title" }, toolResult: serialize(taskEnvelope(task)),
+    };
+    assert.deepEqual(extractTaskFromToolMessage(create), { action: "create", ...task });
+    const update = {
+      id: "envelope-update", role: "tool", toolName: "task_update", toolStatus: "success",
+      toolArgs: { taskId: task.taskId, status: "in_progress" },
+      toolResult: serialize(taskEnvelope({ ...task, status: "completed" })),
+    };
+    assert.deepEqual(extractTaskFromToolMessage(update), { action: "update", ...task, status: "completed" });
+    const index = buildTeamDispatchIndex([create, update]);
+    assert.equal(index.cardsByTaskId.size, 1);
+    assert.equal(index.cardsByMessageId.get(create.id)[0].task.status, "completed");
+    assert.equal(index.cardsByMessageId.has(update.id), false);
+  }
+});
+
+test("runtime task details retain argument fallbacks without guessing identifiers from content", () => {
+  const message = {
+    id: "details-fallback", role: "tool", toolName: "task_create",
+    toolArgs: {
+      teamSessionId: "argument-team", subject: "Argument subject", description: "Argument description",
+      ownerMemberName: "Sam", status: "in_progress",
+    },
+    toolResult: taskEnvelope({ taskId: "details-task" }),
+  };
+  assert.deepEqual(extractTaskFromToolMessage(message), {
+    action: "create", taskId: "details-task", ...message.toolArgs, ownerSessionId: undefined,
+  });
+  const contentOnly = { ...message, toolResult: { content: taskEnvelope({ taskId: "guessed-task" }).content } };
+  assert.deepEqual(extractTaskFromToolMessage(contentOnly), { action: null, taskId: null });
+});
+
+test("error task envelopes never create or update cards despite task-shaped details", () => {
+  const task = { taskId: "existing", status: "pending" };
+  const created = {
+    id: "envelope-existing", role: "tool", toolName: "task_create",
+    toolResult: taskEnvelope(task),
+  };
+  for (const toolName of ["task_create", "task_update"]) {
+    for (const serialize of [((value) => value), JSON.stringify]) {
+      for (const failure of [
+        { details: { ...task, status: "completed", error: "TEAM_UNAUTHORIZED" } },
+        { details: { ...task, isError: true } },
+        { isError: true },
+        { toolStatus: "running" },
+        { toolStatus: "error" },
+        { toolStatus: "denied" },
+      ]) {
+        const { details, ...messageFailure } = failure;
+        const failed = {
+          id: "failed-envelope", role: "tool", toolName, ...messageFailure,
+          toolResult: serialize({
+            ...taskEnvelope({ ...task, status: "completed" }),
+            ...(details ? { details } : {}),
+          }),
+        };
+        assert.deepEqual(extractTaskFromToolMessage(failed), { action: null, taskId: null });
+        const index = buildTeamDispatchIndex([created, failed], "team");
+        assert.equal(index.cardsByTaskId.size, 1);
+        assert.equal(index.cardsByTaskId.get("team:existing").task.status, "pending");
+        assert.equal(index.cardsByMessageId.has(failed.id), false);
+      }
+    }
+  }
 });
