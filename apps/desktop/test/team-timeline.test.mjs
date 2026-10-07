@@ -8,6 +8,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers/ts-import-hooks.mjs")));
 const { projectTeamTimeline } = await import("../src/lib/team-timeline.ts");
 const { buildTeamDispatchIndex } = await import("../src/lib/team-dispatch.ts");
+const { buildTranscriptEntries, reuseTranscriptEntries } = await import("../src/lib/assistant-turns.ts");
 
 function message(id, extra = {}) {
   return { id, role: "assistant", content: id, createdAt: `2026-10-07T00:00:00.${id.length}00Z`, ...extra };
@@ -167,6 +168,42 @@ test("unchanged pieces retain identity and keys while tail items append", () => 
   assert.equal(third.parts[1], first.parts[1]);
   assert.notEqual(third.parts[2], first.parts[2]);
   assert.deepEqual(third.sections[0].map((segment) => segment.key), first.sections[0].map((segment) => segment.key));
+});
+
+test("immutable transcript rebuilds retain finished split pieces while the live tail streams", () => {
+  const head = message("head", { thinking: "Finished reasoning", content: "" });
+  const anchor = create("dispatch").message;
+  const user = message("user", { role: "user" });
+  let messages = [user, head, anchor, message("tail", { thinking: "Streaming", content: "" })];
+  let entries = buildTranscriptEntries(messages).entries;
+  let source = entries[1].parts[0];
+  const first = project([{ parts: entries[1].parts }], { active: true });
+  assert.equal(first.parts[0].items[0].message, head);
+  const stableHead = first.parts[0];
+  const stableKeys = first.sections[0].map((segment) => segment.key);
+
+  for (let revision = 1; revision <= 24; revision++) {
+    messages = [...messages.slice(0, -1), message("tail", { thinking: `Streaming ${revision}`, content: "" })];
+    const rebuilt = buildTranscriptEntries(messages).entries;
+    const nextEntries = reuseTranscriptEntries(entries, rebuilt);
+    const nextSource = nextEntries[1].parts[0];
+    assert.notEqual(nextSource, source);
+    assert.equal(nextSource.items[0], source.items[0]);
+    const next = project([{ parts: nextEntries[1].parts }], { active: true });
+    assert.equal(next.parts[0], stableHead);
+    assert.notEqual(next.activePart, first.activePart);
+    assert.deepEqual(next.sections[0].map((segment) => segment.key), stableKeys);
+    assert.deepEqual(cards(next).map((card) => card.taskId), ["dispatch"]);
+    entries = nextEntries;
+    source = nextSource;
+  }
+
+  const final = message("answer");
+  const settledEntries = reuseTranscriptEntries(entries, buildTranscriptEntries([...messages, final]).entries);
+  const settled = project([{ parts: settledEntries[1].parts }]);
+  assert.equal(settled.parts[0], stableHead);
+  assert.equal(settled.parts[1].endedAt, final.createdAt);
+  assert.equal(settled.activePart, undefined);
 });
 
 test("plan sections stay aligned and flatten only projected parts in order", () => {
