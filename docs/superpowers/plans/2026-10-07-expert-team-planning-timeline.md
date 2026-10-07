@@ -368,3 +368,14 @@ follows its section.
 - Source-contract test `team-dispatch.test.mjs` follows the projection's active
   joining input; the mounted production renderer separately verifies joining
   and its removal. The original draft remains a historical baseline.
+
+- S1 consumer evidence correction: the real task producer returns
+  `AgentToolResult` with the task in `details`, and IPC/persistence retain that
+  envelope. The old card extractor ignored `details`, yielding an empty index
+  for real Plan research; the initial E2E history hypothesis was disproved by
+  the 29-message, nine-entry fixture. The integrator authorizes the minimal
+  `team-dispatch.ts` extractor correction plus existing regression tests to
+  read the already-declared envelope and reject its error flags. The dispatch
+  index function/types, Team runtime and IPC contracts remain unchanged.
+  The renderer probe now uses the same envelope, and the E2E waits for real
+  cards directly instead of adding an irrelevant history-loading step.

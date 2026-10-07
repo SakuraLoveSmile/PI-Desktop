@@ -85,6 +85,7 @@ export function extractTaskFromToolMessage(message: UiMessage): {
   const isCreate = message.toolName === "task_create";
   const args = parseJsonSafe(message.toolArgs);
   const result = parseJsonSafe(message.toolResult);
+  const details = parseJsonSafe(result?.details);
 
   if (
     message.isError ||
@@ -92,12 +93,14 @@ export function extractTaskFromToolMessage(message: UiMessage): {
     message.toolStatus === "error" ||
     message.toolStatus === "denied" ||
     result?.isError === true ||
-    (result?.error !== undefined && result.error !== null && result.error !== false)
+    (result?.error !== undefined && result.error !== null && result.error !== false) ||
+    details?.isError === true ||
+    (details?.error !== undefined && details.error !== null && details.error !== false)
   ) {
     return { action: null, taskId: null };
   }
 
-  const resTask = parseJsonSafe(result?.task) ?? (result?.taskId ? result : null);
+  const resTask = parseJsonSafe(result?.task) ?? (result?.taskId ? result : null) ?? details;
   const taskId = stringField(resTask?.taskId);
   if (!taskId) return { action: null, taskId: null };
 
