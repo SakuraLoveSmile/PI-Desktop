@@ -12,7 +12,7 @@ const {
   shouldAutoOpenGoalReportWorkPanel,
 } = await import("../src/lib/goal-report-presentation.ts");
 
-test("transcript presents only ready reports with terminal execution status", () => {
+test("transcript presents reports only for completed executions", () => {
   // Ready + completed -> true
   assert.equal(
     shouldPresentGoalReportInTranscript({
@@ -22,13 +22,13 @@ test("transcript presents only ready reports with terminal execution status", ()
     true,
   );
 
-  // Ready + interrupted -> true
+  // Legacy ready + interrupted reports no longer represent completion.
   assert.equal(
     shouldPresentGoalReportInTranscript({
       status: "ready",
       executionStatus: "interrupted",
     }),
-    true,
+    false,
   );
 
   // Ready but executionStatus is null or non-terminal -> false
@@ -73,6 +73,7 @@ test("transcript presents only ready reports with terminal execution status", ()
   );
   assert.equal(shouldPresentGoalReportInTranscript(null), false);
   assert.equal(shouldPresentGoalReportInTranscript(undefined), false);
+  assert.equal(shouldPresentGoalReportInTranscript({ status: "failed", executionStatus: "interrupted" }), false);
 });
 
 test("auto-opening panel requires matching active session, ready status, and opens at most once per execution", () => {
@@ -86,11 +87,13 @@ test("auto-opening panel requires matching active session, ready status, and ope
     reportId: "rep-1",
     status: "ready",
   };
+  const report = { ...readyEvent, executionStatus: "completed" };
 
   // 1. First ready event for active session -> true
   assert.equal(
     shouldAutoOpenGoalReportWorkPanel({
       event: readyEvent,
+      report,
       activeSessionId,
       openedExecutionIds: openedSet,
     }),
@@ -104,6 +107,7 @@ test("auto-opening panel requires matching active session, ready status, and ope
   assert.equal(
     shouldAutoOpenGoalReportWorkPanel({
       event: readyEvent,
+      report,
       activeSessionId,
       openedExecutionIds: openedSet,
     }),
@@ -114,6 +118,7 @@ test("auto-opening panel requires matching active session, ready status, and ope
   assert.equal(
     shouldAutoOpenGoalReportWorkPanel({
       event: readyEvent,
+      report,
       activeSessionId: "session-other",
       openedExecutionIds: new Set(),
     }),
@@ -125,10 +130,23 @@ test("auto-opening panel requires matching active session, ready status, and ope
     assert.equal(
       shouldAutoOpenGoalReportWorkPanel({
         event: { ...readyEvent, status },
+        report,
         activeSessionId,
         openedExecutionIds: new Set(),
       }),
       false,
     );
+  }
+});
+
+test("ready events for interrupted, missing or mismatched reports never open the panel", () => {
+  const event = { sessionId: "session", reportId: "report", executionId: "execution", status: "ready" };
+  for (const report of [null, undefined,
+    { ...event, executionStatus: "interrupted" },
+    { ...event, executionStatus: "completed", status: "failed" },
+    { ...event, executionStatus: "completed", sessionId: "other" },
+    { ...event, executionStatus: "completed", executionId: "other" },
+    { ...event, executionStatus: "completed", reportId: "other" }]) {
+    assert.equal(shouldAutoOpenGoalReportWorkPanel({ event, report, activeSessionId: "session" }), false);
   }
 });

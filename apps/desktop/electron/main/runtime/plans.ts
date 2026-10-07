@@ -32,6 +32,13 @@ export type FinishTurn = (
   options: FinishTurnOptions,
 ) => Promise<void>;
 
+/** Freeze an interrupted execution by its live session/turn identity, before I/O. */
+export type LockExecutionInterruption = (
+  sessionId: string,
+  turnId: string | null | undefined,
+  options?: { goalOnly?: boolean; errorCode?: string },
+) => string | undefined;
+
 export type PlanRuntimeState = {
   approvedExecutionDrain: Promise<void> | null;
 };
@@ -97,6 +104,7 @@ export function createPlanRuntime({
   persistenceOutbox,
 }: PlanRuntimeDependencies): {
   finishTurn: FinishTurn;
+  lockExecutionInterruption: LockExecutionInterruption;
   finishApprovedExecution: (executionId: string, status: PlanExecutionFinishStatus, errorCode?: string) => Promise<void>;
   dispatchApprovedPlan: (rawExecution: unknown) => Promise<void>;
   drainApprovedPlanExecutions: () => Promise<void>;
@@ -121,6 +129,31 @@ const {
   clearAbortReason,
   releaseTurnClaims,
 } = coordination;
+
+function executionIdForTurn(sessionId: string, turnId: string | null | undefined): string | undefined {
+  if (!isActiveTurn(sessionId, turnId)) return undefined;
+  const executionId = approvedExecutionIdsBySession.get(sessionId);
+  if (!executionId || finishedApprovedExecutions.has(executionId)) return undefined;
+  const turn = approvedExecutionTurns.get(executionId);
+  if (turn?.sessionId !== sessionId || turn.turnId !== turnId) return undefined;
+  return executionId;
+}
+
+function freezeExecutionFinish(executionId: string, status: PlanExecutionFinishStatus, errorCode?: string): void {
+  // The existing first-terminal-decision record is also used for intent before
+  // I/O. Stops and late events cannot rewrite a terminal decision already frozen.
+  if (!pendingExecutionFinishes.has(executionId)) {
+    pendingExecutionFinishes.set(executionId, { status, errorCode });
+  }
+}
+
+const lockExecutionInterruption: LockExecutionInterruption = (sessionId, turnId, options) => {
+  const executionId = executionIdForTurn(sessionId, turnId);
+  if (!executionId) return undefined;
+  if (options?.goalOnly && approvedExecutionKinds.get(executionId) !== "goal") return undefined;
+  freezeExecutionFinish(executionId, "interrupted", options?.errorCode ?? ErrorCodes.PLAN_EXECUTION_INTERRUPTED);
+  return executionId;
+};
 /** The Agent Host turn state for one settled turn. */
 function hostTurnStatus(
   reason: TurnEndReason,
@@ -192,6 +225,10 @@ function finishTurn(
   // start while this one unwinds, and everything keyed by the session alone is
   // then its data.
   const reason = peekAbortReason(id, turnId) ?? status;
+  const executionId = executionIdForTurn(id, turnId);
+  if (executionId) {
+    freezeExecutionFinish(executionId, reason === "completed" ? "completed" : "interrupted", errorCode);
+  }
   const turnUsage = activeTurnUsages.get(id);
   activeTurnUsages.delete(id);
   const runId = scheduledRunsBySession.get(id);
@@ -342,9 +379,7 @@ async function finishApprovedExecution(
 ): Promise<void> {
   if (finishedApprovedExecutions.has(executionId)) return;
   if (inFlightExecutionFinishes.has(executionId)) return;
-  if (!pendingExecutionFinishes.has(executionId)) {
-    pendingExecutionFinishes.set(executionId, { status, errorCode });
-  }
+  freezeExecutionFinish(executionId, status, errorCode);
   inFlightExecutionFinishes.add(executionId);
   if (!runtimeState.host) {
     inFlightExecutionFinishes.delete(executionId);
@@ -391,7 +426,7 @@ async function finishApprovedExecution(
     }
     approvedExecutionTurns.delete(executionId);
     claimedExecutionSessions.delete(executionId);
-    if (execKind !== "plan") {
+    if (execKind !== "plan" && pending.status === "completed") {
       try {
         if (persistenceBarrierFailed) {
           if (!sessionId) throw new Error("Goal report session unavailable after persistence barrier failure");
@@ -670,6 +705,7 @@ async function pollPlanSchedules(): Promise<PlanSchedulePollResult> {
 }
   return {
     finishTurn,
+    lockExecutionInterruption,
     finishApprovedExecution,
     dispatchApprovedPlan,
     drainApprovedPlanExecutions,
