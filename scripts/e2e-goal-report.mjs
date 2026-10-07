@@ -4,7 +4,7 @@
  *
  * Exercises the host RPC protocol for Goal completion reports:
  * - Structured draft submission and ready report lifecycle
- * - Invalidation and automatic fallback generation
+ * - Completed-only publication, interruption refusal, and completed fallback generation
  * - Session isolation, scope validation, and cascade deletion
  * - Persistence and host restart recovery
  * - Bounds enforcement (size limits, metrics, criteria)
@@ -187,6 +187,15 @@ async function scenarioStructuredReport(binary, tempRoot) {
     assert(report.limitations?.length === 1, shortJson(report));
     assert(report.nextSteps?.length === 1, shortJson(report));
 
+    await expectRpcError(
+      () => ctx.host.call("goalReports.finalizeReport", { executionId, status: "interrupted" }),
+      ["GOAL_EXECUTION_NOT_TERMINAL"],
+    );
+    const afterWrongOverride = await ctx.host.call("goalReports.get", {
+      sessionId: session.id, executionId,
+    });
+    assert(JSON.stringify(afterWrongOverride.report) === JSON.stringify(report), "interrupted override rewrote a completed report");
+
     // List reports
     const listRes = await ctx.host.call("goalReports.list", {
       sessionId: session.id,
@@ -256,14 +265,11 @@ async function scenarioFallbackReport(binary, tempRoot) {
     });
     assert(invalidateRes.ok === true, shortJson(invalidateRes));
 
-    // Settle execution to interrupted terminal state
-    await ctx.host.call("plans.finishExecution", { executionId, status: "interrupted", errorCode: "USER_CANCELLED" });
-
-    // Finalize report with interrupted status
+    // A completed execution without a valid draft still produces Host fallback facts.
+    await ctx.host.call("plans.finishExecution", { executionId, status: "completed" });
     const finalizeRes = await ctx.host.call("goalReports.finalizeReport", {
       executionId,
-      status: "interrupted",
-      errorCode: "USER_CANCELLED",
+      status: "completed",
     });
     assert(finalizeRes.report?.status === "ready", shortJson(finalizeRes));
     assert(finalizeRes.report?.integrity === "fallback", shortJson(finalizeRes));
@@ -273,13 +279,71 @@ async function scenarioFallbackReport(binary, tempRoot) {
       executionId,
     });
     const report = getRes.report;
-    assert(report?.execution?.status === "interrupted", shortJson(report));
+    assert(report?.execution?.status === "completed", shortJson(report));
     assert(report?.integrity?.kind === "fallback", shortJson(report));
-    assert(report?.verdict === "blocked", shortJson(report));
-    assert(report?.summary?.includes("USER_CANCELLED"), `fallback summary should mention error: ${report?.summary}`);
+    assert(report?.verdict === "unknown", shortJson(report));
 
     await endTurn(ctx.host, turnId);
     return `reportId=${report.reportId} integrity=fallback verdict=${report.verdict}`;
+  }, binary, tempRoot);
+}
+
+async function scenarioInterruptedExecution(binary, tempRoot) {
+  return withScenario("E2E-GOAL-REPORT-007", async (ctx) => {
+    const executions = [];
+    for (const withDraft of [false, true]) {
+      const { session, turnId, executionId } = await approvedGoalExecution(
+        ctx, `Interrupted Goal ${withDraft ? "Draft" : "Pending"}`, true,
+      );
+      await ctx.host.call("goalReports.bindExecutionTurn", { executionId, turnId });
+      if (withDraft) {
+        await ctx.host.call("goalReports.submitDraft", {
+          executionId,
+          draft: { verdict: "met", summary: "Unfinished draft must never be published." },
+        });
+      }
+      await ctx.host.call("plans.finishExecution", {
+        executionId, status: "interrupted", errorCode: "USER_CANCELLED",
+      });
+      const before = await ctx.host.call("goalReports.list", { sessionId: session.id });
+      const draftPath = join(ctx.dataDir, "goal_reports", session.id, `${executionId}.draft.json`);
+      const draftBytes = withDraft ? await readFile(draftPath, "utf8") : null;
+      ctx.host.clearNotifications();
+      for (const status of [undefined, "interrupted", "completed"]) {
+        await expectRpcError(
+          () => ctx.host.call("goalReports.finalizeReport", { executionId, status }),
+          ["GOAL_EXECUTION_NOT_TERMINAL"],
+        );
+      }
+      await expectRpcError(
+        () => ctx.host.call("goalReports.retry", { sessionId: session.id, executionId }),
+        ["GOAL_EXECUTION_NOT_TERMINAL"],
+      );
+      const read = await ctx.host.call("goalReports.get", { sessionId: session.id, executionId });
+      const after = await ctx.host.call("goalReports.list", { sessionId: session.id });
+      assert(read.state === (withDraft ? "draft" : "pending"), shortJson(read));
+      assert(read.report?.schemaVersion == null, "interruption exposed a finalized report body");
+      assert(JSON.stringify(after) === JSON.stringify(before), "refused calls changed report metadata");
+      assert(!existsSync(join(ctx.dataDir, "goal_reports", session.id, `${executionId}.json`)), "interruption published an artifact");
+      assert(ctx.host.matchingNotifications("goalReports.changed").length === 0, "refusal broadcast a report change");
+      if (withDraft) assert(await readFile(draftPath, "utf8") === draftBytes, "refusal changed the draft");
+      await endTurn(ctx.host, turnId);
+      executions.push({ sessionId: session.id, executionId, withDraft, draftPath, draftBytes });
+    }
+    await ctx.host.restart();
+    for (const { sessionId, executionId, withDraft, draftPath, draftBytes } of executions) {
+      const read = await ctx.host.call("goalReports.get", { sessionId, executionId });
+      const list = await ctx.host.call("goalReports.list", { sessionId });
+      assert(read.state === (withDraft ? "draft" : "pending"), shortJson(read));
+      assert(list.reports?.every((report) => report.status !== "ready"), shortJson(list));
+      assert(!existsSync(join(ctx.dataDir, "goal_reports", sessionId, `${executionId}.json`)), "restart published an interrupted artifact");
+      if (withDraft) assert(await readFile(draftPath, "utf8") === draftBytes, "restart changed the interrupted draft");
+      await expectRpcError(
+        () => ctx.host.call("goalReports.retry", { sessionId, executionId }),
+        ["GOAL_EXECUTION_NOT_TERMINAL"],
+      );
+    }
+    return "interruptedPendingAndDraftRefused=true metadataAndDraftPreserved=true restartHasNoArtifact=true";
   }, binary, tempRoot);
 }
 
@@ -530,6 +594,7 @@ async function main() {
     await runScenario("E2E-GOAL-REPORT-004", () => scenarioRestartRecovery(binary, tempRoot));
     await runScenario("E2E-GOAL-REPORT-005", () => scenarioDraftBounds(binary, tempRoot));
     await runScenario("E2E-GOAL-REPORT-006", () => scenarioPlanExclusion(binary, tempRoot));
+    await runScenario("E2E-GOAL-REPORT-007", () => scenarioInterruptedExecution(binary, tempRoot));
   } finally {
     await rm(tempRoot, { recursive: true, force: true, maxRetries: 8, retryDelay: 100 });
   }

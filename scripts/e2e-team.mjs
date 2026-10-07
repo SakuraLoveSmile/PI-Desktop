@@ -998,6 +998,44 @@ try {
   const toolbarMetrics = await evaluate(`Array.from(document.querySelectorAll('[data-panorama-toolbar] button')).map(button => ({ label: button.getAttribute('aria-label'), text: button.innerText.trim() }))`);
   assert.ok(toolbarMetrics.every(button => button.label && button.text === ''), `panorama toolbar must be icon-only with accessible labels: ${JSON.stringify(toolbarMetrics)}`);
   console.log(`PASS Panorama compact geometry/icons: ${JSON.stringify(panoramaMetrics)}`);
+  // Exercise legacy/model-provided text without changing persisted task data.
+  const longTextFixture = await evaluate(`(() => {
+    const selectors = ['.agent-panorama-node-title', '.agent-panorama-node-task'];
+    const results = [];
+    const originals = [];
+    for (const node of document.querySelectorAll('[data-panorama-node]')) {
+      const bounds = node.getBoundingClientRect();
+      for (const selector of selectors) {
+        const element = node.querySelector(selector);
+        if (!element) continue;
+        const original = element.textContent;
+        originals.push({ node: node.dataset.nodeId, selector, text: original });
+        for (const text of ['Recon: workspace state, toolchains, and constraints '.repeat(10), '简洁可维护性方案设计'.repeat(20), 'x'.repeat(500)]) {
+          element.textContent = text;
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          results.push({ node: node.dataset.nodeId, selector,
+            contained: rect.left >= bounds.left && rect.right <= bounds.right,
+            truncated: element.scrollWidth > element.clientWidth,
+            ellipsis: style.textOverflow === 'ellipsis' && style.overflow === 'hidden',
+          });
+        }
+        element.textContent = selector.endsWith('task')
+          ? 'Recon: workspace state, toolchains, and constraints for a new user management system'
+          : '调研员 Environment Scout with a very long expert identity';
+      }
+    }
+    return { metrics: results, originals };
+  })()`);
+  const longTextMetrics = longTextFixture.metrics;
+  assert.ok(longTextMetrics.length >= 12, "exercise root and child identity/task text");
+  assert.ok(longTextMetrics.every(item => item.contained && item.truncated && item.ellipsis),
+    `Long panorama titles must stay within each card: ${JSON.stringify(longTextMetrics)}`);
+  console.log(`Long-title evidence: ${await saveScreenshot(sendCdp, "team-panorama-long-titles.png")}`);
+  await evaluate(`(${JSON.stringify(longTextFixture.originals)}).forEach(({ node, selector, text }) => {
+    document.querySelector('[data-node-id="' + node + '"] ' + selector).textContent = text;
+  })`);
+  console.log("PASS Panorama long English, Chinese and unbroken titles remain inside root/child cards");
   for (let index = 0; index < 2; index += 1) {
     await evaluate(`Array.from(document.querySelectorAll('[data-panorama-tool] button')).find((button) => /zoom out/i.test(button.getAttribute('aria-label') ?? ''))?.click()`);
   }
@@ -1246,7 +1284,10 @@ try {
   await openTeamPanel(sendCdp, evaluate);
   await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-panel"] .team-member-card')`), "Team panel roster");
   const teamPanelText = await evaluate(`document.querySelector('[data-testid="team-panel"]')?.innerText ?? ''`);
-  assert.match(teamPanelText, /researcher/);
+  assert.match(teamPanelText, /Researcher Alex/);
+  assert.equal((await invoke("teamGetRoster", { teamSessionId: lead.id })).members
+    .find((item) => item.memberSessionId === member.memberSessionId)?.name, "researcher",
+  "localized display identity must not rename the routing handle");
   const screenshot = await sendCdp("Page.captureScreenshot", { format: "png" });
   screenshotPath = join(tempRoot, "team-panel.png");
   await writeFile(screenshotPath, Buffer.from(screenshot.data, "base64"));

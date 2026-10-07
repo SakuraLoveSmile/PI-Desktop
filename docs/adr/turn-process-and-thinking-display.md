@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-09-17
-- Amended: 2026-09-27
+- Amended: 2026-10-07
 - Issues: #510, #461
 - Amends: D071, [ADR 0242](0242-delta-only-streaming-updates.md)
 
@@ -16,7 +16,7 @@ readers also need a thinking indicator without rapidly changing reasoning text.
 
 ## Decision
 
-Both display modes project each loaded assistant-turn entry into one turn-process
+Detailed mode projects each loaded assistant-turn entry into one turn-process
 disclosure plus its trailing answer. Thinking, tools and intermediate assistant
 text keep their original order inside the process. A trailing assistant text
 stays visible while streaming; if later tool or thinking activity follows, that
@@ -24,6 +24,14 @@ text moves into the process without changing the stored message. There is no
 semantic final-answer marker in `UiMessage`, so the renderer does not guess
 intent from wording. User/system messages and compaction dividers retain their
 existing turn boundaries.
+
+The 2026-10-07 amendment keeps Compact progress messages and final answers in
+chronological order outside a whole-turn disclosure. This follows the user's
+request for readable, concise process dialogue: later tools no longer hide an
+earlier update. Localized activity groups and tool actions retain expandable
+details; raw command/argument previews and technical result chips stay in those
+details. Exact native Team actions use localized labels without changing tool
+classification or security. Detailed behavior and stored messages remain intact.
 
 The process has three independent disclosure levels: the whole turn process, an
 ordinary activity group, and one item's details. An ordinary activity group
@@ -37,10 +45,9 @@ Detailed mode starts active whole-process disclosures open. On completion,
 untouched whole-process disclosures close by default; an explicit user choice
 remains authoritative. The ordinary group that owns the active execution
 segment starts open, then closes on completion only while untouched. Other
-completed ordinary groups start closed. Compact mode starts process and
-ordinary-group disclosures closed, but an untouched active process containing
-any recorded failed or denied tool stays open through later recovery and closes
-on turn completion if still untouched. Compact mode keeps every tool/search
+completed ordinary groups start closed. Compact mode starts ordinary-group
+disclosures closed without a whole-turn process wrapper. Failed and denied tools
+retain visible status/issue labels and expandable details. Compact mode keeps every tool/search
 payload closed and renders no reasoning text or excerpt; it shows only the
 active thinking indicator and omits empty completed thinking-only containers.
 
@@ -80,12 +87,12 @@ delegated child work or treat a failed child as a failed assistant turn.
 
 ## Consequences
 
-- Both modes expose one whole-process disclosure while keeping the final answer
-  and actionable interruptions reachable outside it.
+- Detailed exposes one whole-process disclosure; Compact keeps chronological
+  progress dialogue visible. Both retain actionable interruptions and final answers.
 - Detailed mode keeps the active process visible, folds untouched completed
   processes by default, preserves explicit disclosure choices, and retains the
   literal-final-item leaf default.
-- Compact mode remains the low-detail option: the process is folded, payloads
+- Compact mode remains the low-detail option: activity groups are folded, payloads
   stay closed, and reasoning content is suppressed.
 - Disclosure memory is pane-owned presentation state with stable turn, group,
   and item identities; it is neither a persisted transcript contract nor a
@@ -103,3 +110,8 @@ E2E-CHAT-turn-process-and-thinking-display for the synchronized scenario text.
 For the 2026-09-27 amendment, `apps/desktop/test/turn-process.test.mjs` covers
 the default selection, and `pnpm test:e2e:transcript-disclosure` exercises
 active-to-completed collapse and user-open retention in real Chromium.
+
+The 2026-10-07 checks cover chronological Compact progress, localized native
+Team actions, full parameter/output expansion, search, failures and Detailed
+switching through focused tests and `scripts/e2e-transcript-render.mjs`. Model
+language guidance is validated separately from real model behavior.

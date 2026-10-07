@@ -100,9 +100,12 @@ test("missing and unknown display settings retain detailed mode", () => {
   assert.equal(resolveThinkingDisplayMode("compact"), "compact");
 });
 
-test("completed turn processes stay closed by default while active failures remain visible", () => {
+test("compact keeps chronological progress inline while detailed retains the process disclosure", () => {
   assert.equal(shouldGroupTurnProcess("detailed"), true);
-  assert.equal(shouldGroupTurnProcess("compact"), true);
+  assert.equal(shouldGroupTurnProcess("compact"), false);
+});
+
+test("completed turn processes stay closed by default while active failures remain visible", () => {
   assert.equal(shouldAutoOpenTurnProcess("detailed", false, false), false);
   assert.equal(shouldAutoOpenTurnProcess("detailed", false, true), false);
   assert.equal(shouldAutoOpenTurnProcess("detailed", true, false), true);

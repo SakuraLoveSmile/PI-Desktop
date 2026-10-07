@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { usageForEvent, ownsUsageTurn, applyMessageUpdate, tagMessageToolLineage, toolCallLineage, type AgentEventEnvelope, type UiMessage } from "@pi-desktop/shared";
-import type { FinishTurn } from "./plans";
+import type { FinishTurn, LockExecutionInterruption } from "./plans";
 import type { RuntimeState } from "./context";
 import type { InflightCheckpointer } from "@pi-desktop/host-runtime";
 import type { Logger } from "../logger";
@@ -14,7 +14,6 @@ export type EventPersistenceDependencies = {
   activeToolCallKey: (sessionId: string, toolCallId: string) => string;
   approvedExecutionIdsBySession: Map<string, string>;
   approvedExecutionTurns: Map<string, any>;
-  pendingExecutionFinishes: Map<string, any>;
   planSubmissionTurnIds: Set<string>;
   planSubmissionTurnKey: (sessionId: string, turnId: string) => string;
   inflightCheckpointer: InflightCheckpointer;
@@ -22,6 +21,7 @@ export type EventPersistenceDependencies = {
   addActiveTurnUsage: (sessionId: string, usage: any) => void;
   logger: Logger;
   finishTurn: FinishTurn;
+  lockExecutionInterruption: LockExecutionInterruption;
   /**
    * Terminal identity, shared with the event fan-out. Persistence is a separate
    * call, so a stale terminal event must be blocked here as well: the caller
@@ -40,7 +40,6 @@ export function createEventPersistence({
   activeToolCallKey,
   approvedExecutionIdsBySession,
   approvedExecutionTurns,
-  pendingExecutionFinishes,
   planSubmissionTurnIds,
   planSubmissionTurnKey,
   inflightCheckpointer,
@@ -48,6 +47,7 @@ export function createEventPersistence({
   addActiveTurnUsage,
   logger,
   finishTurn,
+  lockExecutionInterruption,
   isStaleTerminalEvent,
   finishApprovedExecution,
   emitAgentEvent,
@@ -81,11 +81,8 @@ function persistAgentEvent(envelope: AgentEventEnvelope): UiMessage | undefined 
   const executionId = (() => {
     const candidate = approvedExecutionIdsBySession.get(envelope.sessionId);
     if (!candidate) return undefined;
-    if (pendingExecutionFinishes.get(candidate)?.status === "interrupted") {
-      return undefined;
-    }
     const executionTurn = approvedExecutionTurns.get(candidate);
-    return executionTurn?.turnId === (envelope.turnId || turnId)
+    return executionTurn?.sessionId === envelope.sessionId && executionTurn.turnId === envelope.turnId
       ? candidate
       : undefined;
   })();
@@ -257,6 +254,13 @@ function persistAgentEvent(envelope: AgentEventEnvelope): UiMessage | undefined 
     }
   }
   if (event.type === "message_end" && event.message.role === "assistant") {
+    // The runtime can emit agent_end after a provider-aborted reply without an
+    // error event. Freeze the matching root execution before that terminal
+    // event can interpret it as successful completion. Historical/delegate
+    // replies are persisted below but cannot alter a live execution.
+    if (executionId && !envelope.parentToolCallId && (event.message.status === "aborted" || event.message.status === "error")) {
+      lockExecutionInterruption(envelope.sessionId, envelope.turnId, { errorCode: event.message.error?.code });
+    }
     // Checkpoint the finished snapshot before the outbox append (D327).
     // Settling first dropped the last interval of text, and endTurn used to
     // delete the host file while the final row was still queued.

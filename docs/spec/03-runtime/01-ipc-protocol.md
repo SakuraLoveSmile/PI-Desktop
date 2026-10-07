@@ -378,7 +378,7 @@ type PlanScheduleState = "scheduled" | "missed" | "claimed" | "cancelled";
 type SubmitPlanInput = {
   title: string;
   markdown: string;
-  question: string;
+  question: string; // Agent-generated concise approval overview in the user's language.
 };
 
 type PlanArtifact = {

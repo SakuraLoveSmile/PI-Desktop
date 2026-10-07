@@ -49,9 +49,9 @@ export function hasFailedProcessTool(parts: readonly AssistantTurnPart[]): boole
   );
 }
 
-/** Both presentation modes expose the same process hierarchy. */
+/** Compact keeps progress in place; Detailed retains its process hierarchy. */
 export function shouldGroupTurnProcess(mode: ThinkingDisplayMode): boolean {
-  return mode === "detailed" || mode === "compact";
+  return mode === "detailed";
 }
 
 /** The last activity chunk of a turn owns detailed-mode's default-open tool. */

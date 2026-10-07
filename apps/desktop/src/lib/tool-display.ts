@@ -11,6 +11,27 @@ export type ToolAction =
   | "todo"
   | "use";
 
+const COMPACT_TEAM_LABEL_KEYS: Readonly<Record<string, string>> = {
+  declare_team_strategy: "chat.teamToolActions.strategy",
+  spawn_teammate: "chat.teamToolActions.spawn",
+  send_message: "chat.teamToolActions.message",
+  interrupt_agent: "chat.teamToolActions.interrupt",
+  task_create: "chat.teamToolActions.createTask",
+  task_update: "chat.teamToolActions.updateTask",
+  task_list: "chat.teamToolActions.listTasks",
+  task_get: "chat.teamToolActions.getTask",
+  team_status: "chat.teamToolActions.status",
+  submit_research_result: "chat.teamToolActions.research",
+  wait_for_updates: "chat.teamToolActions.wait",
+};
+
+/** Presentation only: never classify a namespaced plugin as a built-in tool. */
+export function getCompactTeamToolLabelKey(toolName?: string): string | undefined {
+  return toolName && Object.hasOwn(COMPACT_TEAM_LABEL_KEYS, toolName)
+    ? COMPACT_TEAM_LABEL_KEYS[toolName]
+    : undefined;
+}
+
 const SUMMARY_KEYS: Record<ToolAction, string[]> = {
   read: ["path", "file_path", "filePath"],
   list: ["path", "pattern", "glob"],

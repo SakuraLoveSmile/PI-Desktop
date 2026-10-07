@@ -962,7 +962,10 @@ Agent calls a permission-gated tool (including Plan/Goal Bash under Ask or Accep
    Host-core preserves the exact Markdown bytes in a new immutable
    `.pi/plan/*.md` or `.pi/goal/*.md` artifact, records its path/hash/size and structured
    title/question, and the renderer displays the shared contract approval card with
-   only the title and artifact opener; the question remains host-side contract data.
+   the title, the Agent's concise approval overview in the user's language, and the
+   artifact opener. The overview uses the existing question field, remains persisted
+   approval data and does not replace the complete contract. Long legacy descriptions
+   can be expanded without changing the stored approval or opening execution.
    The opener hands that path to the bundled file view when it is launchable and to
    the host file tab otherwise, so the artifact opens beside the conversation in the
    same view the user's other project files use (D452).
