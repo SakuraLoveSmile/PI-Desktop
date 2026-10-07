@@ -299,7 +299,11 @@ export function TeamLaunchReviewPanel({
                 data-testid={`launch-review-member-${member.name}`}
               >
                 <div className="team-launch-review-member-info">
-                  <span className="team-launch-review-member-name">{member.name}</span>
+                  <span className="team-launch-review-member-name">
+                    {member.presentation
+                      ? `${t(`team.roles.${member.presentation.role}`)} ${member.presentation.displayName}`
+                      : member.name}
+                  </span>
                   <div className="team-launch-review-member-tags">
                     <span className="team-badge team-badge-context">
                       {t(`team.context.${member.contextKind}`)}

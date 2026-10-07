@@ -231,6 +231,21 @@ export const ptBR = {
     sessionMissing: "Essa sessão não existe mais"
   },
   chat: {
+    expandApprovalSummary: "Ver resumo completo",
+    collapseApprovalSummary: "Recolher resumo",
+    teamToolActions: {
+      strategy: "Review team strategy",
+      spawn: "Assign expert",
+      message: "Send collaboration message",
+      interrupt: "Stop expert",
+      createTask: "Create task",
+      updateTask: "Update task",
+      listTasks: "View tasks",
+      getTask: "View task",
+      status: "View team progress",
+      research: "Submit research findings",
+      wait: "Wait for expert progress",
+    },
     goalMode: "Meta",
     viewDetails: "Ver detalhes",
     schedule: "Agendar",

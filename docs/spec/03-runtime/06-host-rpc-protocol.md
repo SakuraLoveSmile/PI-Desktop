@@ -1026,7 +1026,7 @@ Plan still requires a persisted project. No global workspace fallback is used.
 type SubmitPlanParams = {
   title: string;
   markdown: string;
-  question: string;
+  question: string; // Same-Agent concise approval overview; complete details stay in markdown.
 };
 
 type ProposalKind = "plan" | "goal";

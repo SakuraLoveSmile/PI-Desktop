@@ -2,7 +2,7 @@ import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import { createInstance } from "i18next";
 import { I18nextProvider } from "react-i18next";
-import { en } from "@pi-desktop/i18n";
+import { en, zhCN } from "@pi-desktop/i18n";
 import type { AppSettings, UiMessage } from "@pi-desktop/shared";
 import { AssistantTurn } from "../../apps/desktop/src/features/chat/transcript/AssistantTurn";
 import { ThinkingDisplayModeRow } from "../../apps/desktop/src/components/settings/ThinkingDisplayModeRow";
@@ -33,7 +33,7 @@ export async function turnProcessProbe() {
   const i18n = createInstance();
   await i18n.init({
     lng: "en",
-    resources: { en: { translation: en } },
+    resources: { en: { translation: en }, "zh-CN": { translation: zhCN } },
     interpolation: { escapeValue: false },
   });
   const container = document.createElement("div");
@@ -201,195 +201,107 @@ export async function turnProcessProbe() {
       "failure remains visible",
     );
 
-    flushSync(() =>
-      useAppStore.setState({
-        settings: { ...settings, thinkingDisplayMode: "compact" },
-      }),
-    );
-    render(messages, false, null, "compact-group");
-    check(
-      container.querySelectorAll(".turn-process").length === 1,
-      "one process per turn",
-    );
-    check(
-      header()?.getAttribute("aria-expanded") === "false" && !visible(process()),
-      "compact completed process starts collapsed",
-    );
-    check(
-      container.querySelector('[data-message-id="edit"]')?.classList.contains("open") !== true,
-      "compact keeps tool payloads collapsed",
-    );
-    check(
-      header()?.textContent?.includes("2 tools"),
-      "process counts tools and progress once",
-    );
-    click(header());
-    check(
-      visible(container.querySelector('[data-message-id="progress"]')),
-      "expanding reveals intermediate progress",
-    );
-    check(
-      process()?.querySelectorAll(".tool-row").length === 2,
-      "compact expanding retains both tools without thinking",
-    );
-    render(messages, true, null, "compact-group");
-    render(messages, false, null, "compact-group");
-    check(
-      header()?.getAttribute("aria-expanded") === "true",
-      "manual disclosure survives active-to-complete transition",
-    );
-
-    render([intro, read], true, null, "live");
-    check(
-      header()?.getAttribute("aria-expanded") === "false",
-      "compact live process stays collapsed without a tool failure",
-    );
-    render(
-      messages,
-      false,
-      { sessionId: "s", messageId: "progress", query: "problem", requestId: 1 },
-      "search",
-    );
-    check(
-      visible(container.querySelector('[data-message-id="progress"]')),
-      "search reveals folded progress",
-    );
-
-    const liveThought = message("live-thought", "assistant", "", {
-      thinking: "Reasoning before the answer",
-      status: "streaming",
+    await i18n.changeLanguage("zh-CN");
+    flushSync(() => useAppStore.setState({
+      settings: { ...settings, thinkingDisplayMode: "compact" },
+    }));
+    const command = "printf 'Inspecting architecture and checking every constraint'\nnode --check src/example.ts";
+    const bash = message("bash", "tool", "English command result", {
+      toolName: "Bash", toolStatus: "success", toolCallId: "bash-call",
+      toolArgs: { command, description: "Inspect architecture with a very long English description" },
+      toolResult: { details: { stdout: "English command result", exitCode: 0 } },
     });
-    const processLabel = () =>
-      container.querySelector(".tool-activity-label")?.textContent;
-    render([liveThought], true, null, "thinking-transition");
-    check(
-      processLabel()?.startsWith(i18n.t("chat.thinkingFor", { time: "" })),
-      "active reasoning uses the thinking label",
-    );
-    render(
-      [{ ...liveThought, content: "Answer has started" }],
-      true,
-      null,
-      "thinking-transition",
-    );
-    check(
-      !header() &&
-        visible(container.querySelector('[data-message-id="live-thought"]')),
-      "answer streaming ends the thinking label even when reasoning is retained",
-    );
-    render(
-      [
-        liveThought,
-        message("separate-answer", "assistant", "Answer text", {
-          status: "streaming",
-        }),
-      ],
-      true,
-      null,
-      "thinking-transition",
-    );
-    check(
-      processLabel()?.startsWith(i18n.t("chat.processingFor", { time: "" })),
-      "a later answer takes precedence over an earlier streaming thought",
-    );
+    const zhIntro = { ...intro, content: "我会先检查相关文件。", thinking: "Long English reasoning should remain stored" };
+    const zhProgress = { ...progress, content: "已经找到原因，接下来修复。" };
+    const zhAnswer = { ...answer, content: "已完成修复。" };
+    const compactMessages = [zhIntro, bash, read, zhProgress, edit, zhAnswer];
+    const row = (id: string) => container.querySelector<HTMLElement>(`[data-message-id="${id}"]`);
+    const activityHeader = () => container.querySelector<HTMLButtonElement>(".process-activity-group.grouped > button");
+    const textIsVisible = (needle: string) => [...container.querySelectorAll<HTMLElement>("span, p, code, pre, dd")]
+      .some((element) => element.textContent?.includes(needle) && visible(element));
+    render(compactMessages, false, null, "compact-inline");
+    check(!header(), "compact does not wrap progress in a whole-turn disclosure");
+    check(visible(row("intro")) && visible(row("progress")) && visible(row("answer")),
+      "compact keeps Chinese progress and final answer visible");
+    const firstTop = row("intro")!.getBoundingClientRect().top;
+    const progressTop = row("progress")!.getBoundingClientRect().top;
+    const answerTop = row("answer")!.getBoundingClientRect().top;
+    check(firstTop < progressTop && progressTop < answerTop, "compact retains chronological progress order");
+    check(activityHeader()?.getAttribute("aria-expanded") === "false", "compact activity defaults collapsed");
+    check(!textIsVisible("Long English reasoning") && !textIsVisible("Inspecting architecture") && !textIsVisible("English command result"),
+      "compact default hides English reasoning commands and outputs");
+    check(activityHeader()?.textContent?.includes("2 次工具操作"), "compact group shows localized action count");
+    click(activityHeader());
+    check(visible(row("bash")) && !row("bash")?.classList.contains("open"), "opening an activity leaves command details folded");
+    check(row("bash")?.querySelector(".tool-row-name")?.textContent === i18n.t("chat.toolRan"), "compact command action is localized");
+    check(!row("bash")?.querySelector(".tool-row-summary") && !row("bash")?.querySelector(".tool-row-head-copy"),
+      "compact command header omits raw instruction and copy affordance");
+    click(row("bash")?.querySelector<HTMLButtonElement>(".tool-row-header") ?? null);
+    check(row("bash")?.querySelector(".tool-row-body")?.textContent?.includes(command), "explicit command expansion restores the complete multiline command");
+    check(Boolean(row("bash")?.querySelector(".tool-row-body .tool-row-head-copy")),
+      "expanded compact details retain the command copy action");
+    check(textIsVisible("English command result") && textIsVisible("Inspect architecture with a very long English description"), "explicit expansion reveals full original parameters and output");
+    render(compactMessages, true, null, "compact-inline");
+    render(compactMessages, false, null, "compact-inline");
+    check(row("bash")?.classList.contains("open"), "manual detail choice survives completion");
 
-    render([streaming, read], true, null, "stream-compact");
-    check(
-      process()?.querySelector('[data-message-id="stream"]'),
-      "later tool moves provisional text into process",
-    );
+    render([zhIntro, bash], true, null, "compact-stream");
+    check(visible(row("intro")) && !header(), "later tools never hide previously visible progress");
+    check(!row("bash")?.classList.contains("open") && !textIsVisible("Inspecting architecture"), "a live singleton keeps English payload folded");
+    render(compactMessages, false,
+      { sessionId: "s", messageId: "bash", query: "architecture", requestId: 1 }, "compact-search");
+    check(activityHeader()?.getAttribute("aria-expanded") === "true" && row("bash")?.classList.contains("open"),
+      "search reveals the owning compact activity and tool details");
+    check(textIsVisible("Inspecting architecture"), "search can read the full original command");
 
-    render(
-      [intro, { ...read, toolStatus: "error", isError: true }, answer],
-      true,
-      null,
-      "tool-error",
-    );
-    check(
-      header()?.getAttribute("aria-expanded") === "true" && visible(process()),
-      "an active tool failure opens an unclaimed process",
-    );
+    render([zhIntro, { ...bash, toolStatus: "error", toolResult: { details: { stdout: "English failure output", exitCode: 1 } }, isError: true }, zhAnswer], true, null, "compact-error");
+    check(visible(row("bash")) && row("bash")?.textContent?.includes(i18n.t("chat.toolFailed")) && !row("bash")?.classList.contains("open"),
+      "compact error status stays visible without opening command output");
+    render([zhIntro, { ...bash, toolStatus: "denied", toolResult: undefined }, zhAnswer], false, null, "compact-denied");
+    check(row("bash")?.textContent?.includes(i18n.t("chat.toolDenied")) && !row("bash")?.classList.contains("open"),
+      "compact denial stays visible without opening payload");
+    render([zhIntro, { ...bash, toolStatus: "error", toolResult: { details: { exitCode: 1 } } }, read, zhAnswer], false, null, "compact-group-error");
+    check(activityHeader()?.textContent?.includes("1 个问题") && activityHeader()?.getAttribute("aria-expanded") === "false",
+      "collapsed compact groups retain recorded issues");
+
+    const thought = message("thought", "assistant", "", { thinking: "hidden English thinking words", status: "streaming" });
+    render([thought], true, null, "compact-thinking");
+    check(visible(container.querySelector(".thinking-compact")) && container.textContent?.includes(i18n.t("chat.thinking")) && !container.textContent?.includes("hidden English thinking"),
+      "compact live thought shows only the Chinese indicator");
+    render([{ ...thought, status: "complete" }], false, null, "compact-thinking");
+    check(!container.querySelector(".thinking") && !header(), "completed compact thinking leaves no empty block");
+    render([{ ...thought, content: "开始回答。" }], true, null, "compact-thinking");
+    check(!container.querySelector(".thinking") && visible(row("thought")), "answer text ends compact thinking immediately");
+
+    render([zhIntro, message("team-create", "tool", "created", {
+      toolName: "task_create", toolStatus: "success", toolArgs: { title: "Very long English task instruction", description: "Detailed English plan" },
+    }), zhAnswer], false, null, "compact-team");
+    check(row("team-create")?.querySelector(".tool-row-name")?.textContent === "创建任务" && !textIsVisible("Very long English"),
+      "compact Team tool shows a Chinese action without English JSON");
+
+    render(compactMessages, false, null, "compact-switch");
+    flushSync(() => useAppStore.setState({ settings: { ...settings, thinkingDisplayMode: "detailed" } }));
+    check(Boolean(header()), "switching mounted history to detailed restores the process disclosure");
+    click(header());
+    check(Boolean(container.querySelector(".thinking")) && container.textContent?.includes("Long English reasoning"),
+      "detailed mode retains original English reasoning");
+    flushSync(() => useAppStore.setState({ settings: { ...settings, thinkingDisplayMode: "compact" } }));
+    check(!header() && visible(row("progress")) && !container.querySelector(".thinking"),
+      "switching back to compact restores readable progress");
+    check(zhIntro.thinking === "Long English reasoning should remain stored" && (bash.toolArgs as { command: string }).command === command,
+      "presentation never rewrites original thinking or command data");
 
     let saved: Partial<AppSettings> | undefined;
-    flushSync(() =>
-      root.render(
-        <I18nextProvider i18n={i18n}>
-          <ThinkingDisplayModeRow
-            settings={settings}
-            saveSettings={async (patch) => {
-              saved = patch;
-              useAppStore.setState({ settings: { ...settings, ...patch } });
-            }}
-          />
-        </I18nextProvider>,
-      ),
-    );
+    flushSync(() => root.render(
+      <I18nextProvider i18n={i18n}>
+        <ThinkingDisplayModeRow settings={settings} saveSettings={async (patch) => {
+          saved = patch;
+          useAppStore.setState({ settings: { ...settings, ...patch } });
+        }} />
+      </I18nextProvider>,
+    ));
     click(container.querySelector<HTMLElement>('[role="radio"][aria-checked="false"]'));
-    check(
-      saved?.thinkingDisplayMode === "compact",
-      "settings control saves compact mode",
-    );
-
-    render(
-      [intro, { ...read, toolStatus: "error", isError: true }, answer],
-      true,
-      null,
-      "compact-error",
-    );
-    check(
-      header()?.getAttribute("aria-expanded") === "true" && visible(process()),
-      "compact mode reveals an active tool failure",
-    );
-
-    const thought = message("thought", "assistant", "", {
-      thinking: "hidden thinking words",
-      status: "streaming",
-    });
-    render([thought], true, null, "compact");
-    check(
-      Boolean(header()) && !container.textContent?.includes("hidden thinking words"),
-      "compact live thinking has status without reasoning text",
-    );
-    click(header());
-    check(
-      visible(container.querySelector(".thinking-compact")),
-      "compact live thinking remains indicator-only when expanded",
-    );
-    render([{ ...thought, status: "complete" }], false, null, "compact");
-    check(
-      !header() && !container.querySelector(".thinking"),
-      "completed compact thinking leaves no empty process or thought block",
-    );
-    render([{ ...thought, content: "Started answer" }], true, null, "compact");
-    check(
-      !container.querySelector(".thinking") &&
-        visible(container.querySelector('[data-message-id="thought"]')),
-      "compact thinking ends as soon as answer text starts",
-    );
-    render(messages, false, null, "compact-tools");
-    check(
-      header()?.getAttribute("aria-expanded") === "false" && !visible(process()),
-      "compact completed process starts collapsed",
-    );
-    click(header());
-    check(
-      !container.querySelector(".thinking") &&
-        process()?.querySelectorAll(".tool-row").length === 2,
-      "compact keeps tools and progress accessible",
-    );
-    flushSync(() =>
-      useAppStore.setState({
-        settings: { ...settings, thinkingDisplayMode: "detailed" },
-      }),
-    );
-    check(
-      Boolean(container.querySelector(".thinking")),
-      "mode changes update mounted history",
-    );
-    check(
-      messages[0].thinking === "reasoning detail",
-      "presentation never deletes reasoning data",
-    );
+    check(saved?.thinkingDisplayMode === "compact", "settings control saves compact mode");
     return { ok: true, checks: notes };
   } finally {
     flushSync(() => root.unmount());

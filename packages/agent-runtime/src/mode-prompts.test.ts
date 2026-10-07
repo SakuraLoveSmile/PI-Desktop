@@ -6,6 +6,14 @@ import {
 } from "./mode-prompts.js";
 
 describe("mode-specific system prompts", () => {
+  it.each(["plan", "goal"] as const)("asks the same AI to summarize the %s approval separately from full Markdown", (mode) => {
+    const prompt = composeModeSystemPrompt(mode);
+    expect(prompt).toContain("Summarize the complete contract yourself");
+    expect(prompt).toContain("1-2 short plain-text sentences");
+    expect(prompt).toContain("user's language");
+    expect(prompt).toContain("Do not copy the plan body");
+    expect(prompt).toContain("important unresolved choices");
+  });
   it("composes Plan instructions over the shared runtime prompt", () => {
     const prompt = composeModeSystemPrompt("plan", "base instructions");
 
