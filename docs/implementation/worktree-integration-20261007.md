@@ -81,6 +81,23 @@ rerun. Later documentation-only commits do not change the tested executable
 tree. Recheck the final merge ref and CI before landing; new executable changes
 require affected validation again.
 
+CI follow-up: the Rust test file exceeded the architecture limit after the new
+regressions. Its three interruption/completion-eligibility tests were moved,
+without changing assertions, into `goal_reports/tests/completion_eligibility.rs`;
+the parent is now 980 lines. Cargo format, all 18 Goal tests and the architecture
+gate passed. The full runtime suite also passed all 1,322 tests.
+
+The complete desktop suite exposed three stale source-contract assertions for
+Compact presentation. These were updated to retain error isolation, explicit
+Compact expansion and full command copying in the appropriate header/detail
+locations; all 42 tests in those suites passed. The mounted Chromium fixture
+now clicks the real Compact copy button against an isolated clipboard boundary
+and verifies the full multiline command byte-for-byte (45 turn-process checks
+passed). The Settings specification and Chinese mirror were synchronized with
+the previously documented Compact behavior. These follow-ups change tests and
+documentation only, not production behavior. The complete desktop rerun passed
+3,838 tests, with one existing published-package fixture skipped; no tests failed.
+
 ## Limits
 
 Real-model delegation quality, token cost and latency: NOT RUN. No paid or

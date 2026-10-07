@@ -1,16 +1,17 @@
-import { readTranscriptSource } from "./helpers/source-contracts.mjs";
+import { readTranscriptModule, readTranscriptSource } from "./helpers/source-contracts.mjs";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 /*
- * A run row's head is the only place its command appears (D226): the body holds
- * output alone, so the head carries the copy affordance and the outcome beside
- * the caret. Those three controls live in markup and CSS, where nothing else
- * would notice them drifting apart.
+ * Detailed keeps the command and its copy affordance in the run head (D226).
+ * Compact hides raw commands from that head and restores the complete input
+ * and copy action inside explicitly expanded details (2026-10-07 amendment).
+ * Both presentations keep the outcome beside the caret.
  */
 
 const transcript = await readTranscriptSource();
+const toolRow = await readTranscriptModule("ToolRow.tsx");
 const styles = await readFile(
   new URL("../src/styles/messages.css", import.meta.url),
   "utf8",
@@ -29,10 +30,21 @@ test("only a run row outside the topology gets the three-control head", () => {
   assert.match(styles, /\.tool-row-head\.is-run \{[^}]*display: flex/);
 });
 
-test("the head copies the command, unsqueezed", () => {
-  assert.match(transcript, /\{runHead && command \? <ToolCommandCopy command=\{command\} \/> : null\}/);
+test("Detailed copies the full command in the head and Compact in expanded details", () => {
+  const headStart = toolRow.indexOf('<div className={`tool-row-head');
+  const bodyStart = toolRow.indexOf("{blocks && blocks.length > 0 ? (");
+  assert.ok(headStart >= 0 && bodyStart > headStart);
+  const head = toolRow.slice(headStart, bodyStart);
+  const body = toolRow.slice(bodyStart, toolRow.indexOf("{!imagesInTurn", bodyStart));
+  assert.match(head, /\{!compact && runHead && command \? <ToolCommandCopy command=\{command\} \/> : null\}/);
+  assert.match(body, /className="tool-row-body"/);
+  assert.match(body, /\{compact && runHead && command \? <ToolCommandCopy command=\{command\} \/> : null\}/);
+  // A closed row has no blocks/body. Compact restores every original input
+  // when opened, while both copy locations receive the unabridged command.
+  assert.match(toolRow, /const blocks = variant !== "topology" && open && hasDetails \? presentation\.current\?\.blocks : null/);
+  assert.match(toolRow, /blocks: compact\s*\? \[\.\.\.buildToolPresentation\(\{ toolArgs: message\.toolArgs \}\)/);
   assert.match(
-    transcript,
+    toolRow,
     /const command = runHead\s*\?\s*getToolSummaryValue\(message\.toolName, message\.toolArgs\)/,
   );
   assert.match(transcript, /onClick=\{\(\) => copy\(command\)\}/);
@@ -72,7 +84,7 @@ test("a run row states what the command did, not what the call did", () => {
   );
 });
 
-test("the body is the output, with no card around it", () => {
+test("run details render their output without a card", () => {
   assert.match(transcript, /<ToolDetailBlocks blocks=\{blocks\} plain=\{runHead\} \/>/);
   // No heading, no frame — but the channel keeps a name, so stderr is not told
   // apart by its tint alone.

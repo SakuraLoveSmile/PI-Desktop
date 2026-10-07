@@ -240,6 +240,22 @@ export async function turnProcessProbe() {
     check(row("bash")?.querySelector(".tool-row-body")?.textContent?.includes(command), "explicit command expansion restores the complete multiline command");
     check(Boolean(row("bash")?.querySelector(".tool-row-body .tool-row-head-copy")),
       "expanded compact details retain the command copy action");
+    // Keep the real button and copy hook, replacing only the external write so
+    // this isolated fixture never changes the user's system clipboard.
+    const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+    const copiedCommands: string[] = [];
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: async (text: string) => { copiedCommands.push(text); } },
+    });
+    try {
+      click(row("bash")?.querySelector<HTMLButtonElement>(".tool-row-body .tool-row-head-copy") ?? null);
+      check(copiedCommands.length === 1 && copiedCommands[0] === command,
+        "expanded compact copy writes the exact full multiline command");
+    } finally {
+      if (clipboardDescriptor) Object.defineProperty(navigator, "clipboard", clipboardDescriptor);
+      else Reflect.deleteProperty(navigator, "clipboard");
+    }
     check(textIsVisible("English command result") && textIsVisible("Inspect architecture with a very long English description"), "explicit expansion reveals full original parameters and output");
     render(compactMessages, true, null, "compact-inline");
     render(compactMessages, false, null, "compact-inline");
