@@ -6,6 +6,22 @@ Upstream v0.15.6 → v0.16.1 has been merged.
   substantial separable work first. Expert Team Leads are prompted to assign
   separable work to experts while retaining the existing approval flow.
 
+- Expert Team panorama cards contain long task titles without overlap. New
+  task titles are guided to stay concise and match the user's language; Chinese
+  task labels and groups no longer use English workflow prefixes. Existing
+  stored titles and full hover text are preserved.
+
+- Compact conversations keep concise progress in chronological order, with
+  Chinese tool actions and technical output behind expandable details. Team
+  launch reviews show readable roles/names and request brief localized reasons
+  and responsibilities. Plan/Goal approval asks the same Agent for a concise
+  overview, keeps full contracts in their artifacts, and allows long legacy
+  descriptions to expand without changing stored approval data.
+- Goal results appear only after execution completes. Interrupted Goals no longer
+  publish fallback reports or leave progress waiting for one, and report Retry
+  cannot manufacture a result for an incomplete execution. Existing interruption
+  records and artifacts are retained without showing completion cards.
+
 - Expert Team work is easier to follow: queued prompts can be folded, team
   progress and a searchable compact task board show stable member identities,
   live activity refreshes from Host state, and panorama zoom survives updates.

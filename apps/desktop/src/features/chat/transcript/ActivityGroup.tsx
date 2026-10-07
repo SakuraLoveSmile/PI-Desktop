@@ -259,7 +259,7 @@ export const ActivityGroup = memo(function ActivityGroup({
   const visibleItems = useMemo(() => cachedVisibleActivityItems(items, compact, isActive), [items, compact, isActive]);
   const first = items[0];
   const disclosure = useAutomaticDisclosure(
-    hasSubagentTopology ? live : visibleItems.length <= 1 || (!compact && live),
+    !compact && (hasSubagentTopology ? live : visibleItems.length <= 1 || live),
     revealRequest,
     disclosureKey("activity", first?.message.id ?? "", first?.kind ?? "", first?.kind === "hostedSearch" ? first.round.id : ""),
   );
@@ -316,7 +316,7 @@ export const ActivityGroup = memo(function ActivityGroup({
     ? runActivityLabel(runtimeActivity, t as Translate)
     : "";
   const currentDetail = useMemo(() =>
-    live && !runtimeStatus && lastItem && !(compact && lastItem.kind === "thinking")
+    live && !compact && !runtimeStatus && lastItem
       ? activityItemDetail(lastItem) : "",
   [live, runtimeStatus, lastItem, compact]);
   const tail = live && !open ? currentDetail : "";

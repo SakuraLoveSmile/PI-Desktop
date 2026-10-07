@@ -575,6 +575,7 @@ export function useAppShellRuntime() {
 
   useEffect(() => {
     const offEvent = api.onAgentEvent(handleAgentEvent);
+    let goalReportListenerActive = true;
     const offQueueChanged = api.onAgentQueueChanged((event) =>
       useAppStore.getState().applyQueueChanged(event),
     );
@@ -618,20 +619,25 @@ export function useAppShellRuntime() {
     });
     const offGoalReportChanged = api.onGoalReportChanged((event) => {
       const store = useAppStore.getState();
-      void store.refreshGoalReports(event.sessionId);
-      if (
-        shouldAutoOpenGoalReportWorkPanel({
-          event,
-          activeSessionId: store.activeSessionId,
-          openedExecutionIds: autoOpenedGoalReportExecutionsRef.current,
-        })
-      ) {
-        autoOpenedGoalReportExecutionsRef.current.add(event.executionId);
-        store.openWorkPanelTabForSession(
-          event.sessionId,
-          goalReportWorkPanelTab(event.executionId),
-        );
-      }
+      void store.refreshGoalReports(event.sessionId).then(() => {
+        if (!goalReportListenerActive) return;
+        const current = useAppStore.getState();
+        const report = current.goalReports[event.sessionId]?.find((item) => item.executionId === event.executionId);
+        if (
+          shouldAutoOpenGoalReportWorkPanel({
+            event,
+            report,
+            activeSessionId: current.activeSessionId,
+            openedExecutionIds: autoOpenedGoalReportExecutionsRef.current,
+          })
+        ) {
+          autoOpenedGoalReportExecutionsRef.current.add(event.executionId);
+          current.openWorkPanelTabForSession(
+            event.sessionId,
+            goalReportWorkPanelTab(event.executionId),
+          );
+        }
+      }).catch(() => showToast(t("goalReport.view.loadFailed"), { variant: "error" }));
     });
     const offHostStatus = api.onHostStatus((status) => {
       if (status.archMismatch) setArchMismatch(status.archMismatch);
@@ -829,6 +835,7 @@ export function useAppShellRuntime() {
     };
     window.addEventListener("keydown", onKey);
     return () => {
+      goalReportListenerActive = false;
       offEvent();
       offQueueChanged();
       offPlansChanged();

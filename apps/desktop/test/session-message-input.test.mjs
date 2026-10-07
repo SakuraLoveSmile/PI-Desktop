@@ -164,7 +164,7 @@ test("abort waits for prompt admission before dispatching to the sidecar", async
       return () => {};
     },
     finishTurn: async (...args) => { finishedTurns.push(args); },
-    lockAbortReason() {}, async finishApprovedExecution() {}, async dispatchApprovedPlan() {},
+    lockAbortReason() {}, lockExecutionInterruption() {}, async finishApprovedExecution() {}, async dispatchApprovedPlan() {},
     async dispatchExecutionForProposal() {}, emitAgentEvent() {}, setNotificationViewingSessionId() {},
     optionalWorkspaceRoot: async () => null,
     composerCommandService: { buildComposerCommands: async () => [] },

@@ -2,12 +2,13 @@ import { act, createElement, Fragment } from "react";
 import { createRoot } from "react-dom/client";
 import { createInstance } from "i18next";
 import { I18nextProvider } from "react-i18next";
-import type { GoalProgressChangedEvent, GoalProgressSnapshot, GoalReportChangedEvent, PlanProposal, TeamSnapshot } from "@pi-desktop/shared";
+import type { GoalProgressChangedEvent, GoalProgressSnapshot, GoalReportChangedEvent, GoalReportSummary, PlanProposal, TeamSnapshot } from "@pi-desktop/shared";
 import { catalogs } from "@pi-desktop/i18n";
 import { GoalProgressBar } from "../../apps/desktop/src/features/chat/composer/GoalProgressBar";
 import { TeamDispatchCardsGroup } from "../../apps/desktop/src/features/chat/transcript/TeamDispatchCard";
 import { api } from "../../apps/desktop/src/lib/api";
 import { useAppStore } from "../../apps/desktop/src/stores/app-store";
+import { ChatTranscript } from "../../apps/desktop/src/features/chat/transcript/ChatTranscript";
 import type { TeamDispatchCardItem } from "../../apps/desktop/src/lib/team-dispatch";
 import "../../apps/desktop/src/styles/tokens.css";
 import "../../apps/desktop/src/styles/base.css";
@@ -204,6 +205,8 @@ globalThis.goalTeamRendererUiProbe = async () => {
     await act(async () => readyHandlers.forEach((listener) => listener({ sessionId: "other-session", reportId: "report-new", executionId: "execution-new", proposalId: "proposal-new", status: "ready" })));
     await act(async () => reportReads.get("execution-new")?.resolve({ report: { status: "ready" } }));
     await until(() => !container.querySelector('[data-testid="goal-progress-bar"]'), `ready report hides completed execution (listeners=${readyHandlers.length})`);
+    await act(async () => { root.render(renderAll({ ...newProposal, executionState: "interrupted" })); });
+    assert(!container.querySelector('[data-testid="goal-progress-bar"]'), "interrupted execution ends progress without waiting for any report");
 
     await until(() => container.querySelector(".team-dispatch-card")?.getAttribute("data-state") === "in_progress", "live dispatch card status");
     const dispatchCard = container.querySelector<HTMLElement>(".team-dispatch-card");
@@ -232,6 +235,30 @@ globalThis.goalTeamRendererUiProbe = async () => {
     }
     await act(async () => { root.render(renderJoining(false)); });
     assert(container.childElementCount === 0, "joining feedback must disappear when spawning finishes and there are no cards");
+    const completion: GoalReportSummary = {
+      reportId: "report-completed", executionId: "execution-completed", sessionId: "report-session",
+      proposalId: "proposal-completed", status: "ready", executionStatus: "completed", verdict: "met",
+      integrity: "structured", summary: "Verified all requested work.", goalTitle: "Completed goal",
+      completedAt: 1, createdAt: 1,
+    };
+    const interruption: GoalReportSummary = { ...completion, reportId: "report-interrupted",
+      executionId: "execution-interrupted", executionStatus: "interrupted", verdict: "blocked",
+      integrity: "fallback", summary: "Execution was interrupted.", goalTitle: "Interrupted goal" };
+    const transcript = () => createElement(I18nextProvider, { i18n }, createElement(ChatTranscript, {
+      sessionId: "report-session", isRunning: false,
+      messages: [{ id: "goal-result-user", role: "user", content: "Complete the goal.", createdAt: "2026-01-01T00:00:00Z" },
+        { id: "goal-result-answer", role: "assistant", content: "The execution has stopped.", status: "complete", createdAt: "2026-01-01T00:00:01Z" }],
+    }));
+    await act(async () => { useAppStore.setState({ goalReports: { "report-session": [interruption] } }); root.render(transcript()); });
+    assert(!container.querySelector('[data-testid="goal-report-card"]'), "legacy interrupted report never renders a result card after loading history");
+    await act(async () => { useAppStore.setState({ goalReports: { "report-session": [interruption, completion] } }); });
+    await until(() => container.querySelectorAll('[data-testid="goal-report-card"]').length === 1, "only the completed report appears");
+    const completedCard = container.querySelector('[data-testid="goal-report-card"]');
+    assert(completedCard?.getAttribute("data-execution-id") === "execution-completed", "visible result belongs to the completed execution");
+    const openings = openedTabs.length;
+    await act(async () => completedCard?.querySelector<HTMLButtonElement>('[data-testid="goal-report-card-open-btn"]')?.click());
+    assert(openedTabs.length === openings + 1 && openedTabs.at(-1)?.sessionId === "report-session",
+      "completed result retains its session-owned work panel action");
     const screenshotProposal = { ...newProposal, executionId: "screenshot-execution" } as PlanProposal;
     await act(async () => { root.render(renderAll(screenshotProposal, "screenshot-session", true)); });
     await until(() => container.querySelector(".goal-progress-capsule-text")?.textContent?.trim() === "1/1", "ready progress for screenshot");
@@ -256,5 +283,5 @@ globalThis.goalTeamRendererUiProbe = async () => {
     api.onHostStatus = originalHostStatus;
     useAppStore.setState({ openWorkPanelTabForSession: originalStoreMethod });
   }
-  return { ok: true, cardHeight, reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches, scenarios: ["goal execution and session switch", "cross-session event isolation", "stale report event", "out-of-order progress revisions", "ready report completion", "single task navigation", "expert joining feedback"] };
+  return { ok: true, cardHeight, reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches, scenarios: ["goal execution and session switch", "cross-session event isolation", "stale report event", "out-of-order progress revisions", "ready report completion", "interruption without a result card or stuck progress", "completed report navigation", "single task navigation", "expert joining feedback"] };
 };

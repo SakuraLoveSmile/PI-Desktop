@@ -841,12 +841,21 @@ reading surface of the workstation.
 
 ### Turn process and thinking display
 
-Both Detailed and Compact project each loaded assistant turn into one whole-process
+Detailed projects each loaded assistant turn into one whole-process
 disclosure containing reasoning, tools, hosted searches and intermediate assistant
 text in transcript order. The trailing answer streams outside that disclosure;
 later activity can reclassify provisional answer text into the process without
 changing the stored message. Assistant errors and stopped trailing partial answers
 also stay outside it. User/system messages and compaction boundaries are unchanged.
+
+Compact instead preserves intermediate assistant progress and the final answer in
+their original chronological positions, so later tools do not hide earlier progress.
+Activity groups remain independently expandable with localized actions/counts.
+Raw commands, JSON arguments, long technical descriptions and result chips stay
+inside tool details by default; file preview targets remain available. Exact native
+Team tools receive localized action labels without changing tool permissions or
+classifying similarly named plugins as native tools. Search can reveal a target's
+group/item; errors, denied actions and pending decisions remain reachable.
 
 Within the process, an ordinary activity group represents one contiguous
 tool/search/thinking segment between progress paragraphs. It renders a group header
@@ -858,9 +867,8 @@ Detailed opens whole-process disclosures while a turn is active. When a turn
 settles, an untouched process defaults closed; an explicit user choice remains
 authoritative. The ordinary group owning the active execution segment starts
 open, then closes on completion only if untouched; other completed groups start
-closed. Compact starts the process and ordinary groups closed. Its untouched
-active process remains open when any failed or denied tool has been recorded,
-through later successful recovery, and closes on completion if still untouched.
+closed. Compact starts ordinary groups and tool payloads closed and has no
+whole-turn disclosure. Failed and denied tools retain visible issue/status labels.
 Group headers summarize count, running state and issue count without treating a
 failed child as a failed turn.
 
@@ -2699,12 +2707,17 @@ The card renders the structured title and an opener for the exact
 `.pi/<kind>/*.md` path; the opener prefers the bundled file view and falls back
 to the host file tab when that view is not launchable (D452). Opening the
 artifact reads the host-written file; renderer edits do not change the approved
-bytes. The submitted question/description, status, validity/deadline, inline
-Markdown, SHA-256, byte size, and revision/feedback controls are not rendered
-card content.
+bytes. The submitted question is the same Agent's concise approval overview in
+the user's language: intended result, essential scope/verification and whether to
+execute. It is generated with the contract, not extracted from Markdown or produced
+by an extra model request. Short questions are shown directly rather than replaced
+by the title. Long legacy descriptions are initially bounded to three lines, with
+an accessible expand/collapse control and safe Markdown formatting. Full contract
+bytes remain in the artifact and copy/download actions. Execution/schedule status
+is shown when applicable; validity/deadline, hash and byte size stay out of the card.
 
 The card implements a full-width column layout in the composer dock: title and
-summary text span the complete width and wrap naturally across phrase and
+summary text span the complete width and wrap within the three-line preview across phrase and
 character boundaries (`overflow-wrap: break-word`). A responsive footer separates
 artifact details on the left from execution controls on the right, wrapping
 actions to their own line on narrow widths without clipping or horizontal
@@ -2764,9 +2777,12 @@ was met.
 
 The transcript card identifies the Goal and verdict and opens its report in the
 Work Panel. The transcript presents a Goal completion card only when the execution
-has reached a terminal state (`completed` or `interrupted`) and the report has settled
-as `ready` (or terminal `failed` with Retry available). In-flight drafts and pending
+has reached `completed` and the report has settled
+as `ready` (or publication `failed` with Retry available). Interrupted execution,
+including historical interrupted ready/failed reports, is excluded. In-flight drafts and pending
 executions are strictly suppressed from transcript card rendering and automatic Work Panel opening.
+Automatic opening waits for refreshed report metadata, matches its session/execution/report
+identity to the event, and rechecks the active session and listener lifetime after the read.
 A ready report presents the Goal snapshot, execution status,
 structured or fallback integrity, supported criteria and checks, evidence,
 changed files, limitations, and next steps. Fallback reports identify missing
@@ -2776,8 +2792,9 @@ The Work Panel distinguishes loading, pending persistence, ready, failed,
 unavailable, and disconnected reads. Failures use localized generic text and
 may include a validated Host error code; raw exception messages are not shown.
 Retry is available for recoverable report failures and calls the Host report
-retry operation without rerunning the Goal or making another provider call.
+retry operation only for completed executions, without rerunning the Goal or making another provider call.
 Report reads and retry remain scoped to the owning session.
+Historical report files and execution records are retained; they are not rewritten or deleted.
 
 ### 10B.3 Accessibility
 
@@ -2803,8 +2820,9 @@ item checklist.
 - **Collapsible Goal Bar:** Presents active execution status, single-line truncated goal title,
   and expand/collapse toggle. When expanded, reveals the full goal description and live item checklist
   with a maximum 144px internal scroll area. Folding preference is remembered per session.
-- **Terminal Removal:** The active goal bar is automatically dismissed as soon as the goal execution
-  is terminal (`completed` or `interrupted`) and its completion report is `ready`.
+- **Terminal Removal:** An interrupted execution dismisses the active goal bar immediately,
+  without waiting for a report that will not be generated. A completed execution dismisses
+  the bar after its report is `ready`.
 - **Status Fallback:** If progress items are uninitialized or in an error state, display descriptive
   state text (e.g. `Initializing…` or `Execution failed`) without rendering misleading `0/0` or `0%` counters.
 - **Narrow Width:** Designed with fluid responsive layout adapting down to 450px without horizontal scrolling.
@@ -2887,6 +2905,14 @@ trusted confirmation; only confirmation stores the bounded presentation in
 Host KV. Legacy handles receive a stable renderer projection without renaming
 the Host record. Local pixel portraits are deterministic and decorative.
 
+Launch review cards use the localized role plus proposed displayName when
+presentation is present; reviews without presentation keep their original routing
+handle as the fallback. The same Lead is instructed to supply a one- or two-sentence
+reason, a one-sentence core responsibility per member and short readable display
+names in the user's language. Detailed file/interface assignments belong in tasks
+and messages. This adds no translation request, persisted rewrite or authorization
+change; legacy English descriptions remain available as their original text.
+
 The Team Overview shows compact task progress with a five-row limit and direct
 task, board, and panorama navigation. The board uses a compact filter/search
 list; descriptions, dependencies, write scopes, diagnostics, results, and
@@ -2946,7 +2972,16 @@ rows may pass behind earlier opaque nodes.
 Nodes use secondary surfaces, subtle borders, 8px radius and no shadow. Their
 upper row has a decorative 32px portrait, secondary 12.5px identity and a primary
 semibold 14px task title, both single-line with ellipsis. The 32px lower status
-row has a static decorative 12px glyph and localized text. Running uses a muted
+row spans the full node width; the upper row and its copy stay within the card
+even for long Chinese, English or unbroken legacy titles. Full identity and task
+text remain available through their existing hover titles. New Team task subjects
+are instructed to use the user's request language and concise action titles
+(roughly 8–16 Chinese characters or 3–8 words in other languages), without
+workflow prefixes; detailed requirements belong in the description or assignment
+message. This is generation guidance, not a new persisted-length restriction or
+automatic translation of existing tasks. Chinese task labels use `任务：` /
+`任務：`, with `临时任务` / `臨時任務` for their group.
+The status row has a static decorative 12px glyph and localized text. Running uses a muted
 loader with success-colored text; completed uses success, failed error, paused
 warning and idle/todo/blocked muted. A supplied status label overrides the
 standard phase label. The Team root label is `Lead Agent` in every locale;

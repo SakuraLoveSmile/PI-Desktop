@@ -317,6 +317,7 @@ describe("DesktopAgentRuntime Team strategy wiring", () => {
         isLead: true,
       },
     });
+    const agent = (runtime as unknown as { agent: Agent }).agent;
     const teamNames = [
       "spawn_teammate",
       "send_message",
@@ -333,6 +334,8 @@ describe("DesktopAgentRuntime Team strategy wiring", () => {
       expect((runtime as any).agent.state.tools.map((tool: { name: string }) => tool.name))
         .toEqual(expect.arrayContaining([...teamNames, "declare_team_strategy"]));
       expect((runtime as any).agent.state.systemPrompt).toContain("declare_team_strategy");
+      expect(agent.state.systemPrompt).toContain("primary language of the user's request");
+      expect(agent.state.systemPrompt).toContain("8-16 Chinese characters");
 
       runtime.setMode("agent");
       expect((runtime as any).agent.state.tools.map((tool: { name: string }) => tool.name))
@@ -343,11 +346,15 @@ describe("DesktopAgentRuntime Team strategy wiring", () => {
       expect(declaration.parameters.properties).not.toHaveProperty("callerSessionId");
       expect(declaration.parameters.properties).not.toHaveProperty("turnId");
       expect((runtime as any).agent.state.systemPrompt).toContain("declare_team_strategy");
+      expect(agent.state.systemPrompt).toContain("primary language of the user's request");
+      expect(agent.state.systemPrompt).toContain("8-16 Chinese characters");
 
       runtime.setMode("plan");
       expect((runtime as any).agent.state.tools.map((tool: { name: string }) => tool.name))
         .toEqual(expect.arrayContaining([...teamNames, "declare_team_strategy"]));
       expect((runtime as any).agent.state.systemPrompt).toContain("declare_team_strategy");
+      expect(agent.state.systemPrompt).toContain("primary language of the user's request");
+      expect(agent.state.systemPrompt).toContain("8-16 Chinese characters");
     } finally {
       await runtime.dispose();
     }
@@ -682,6 +689,9 @@ describe("custom system prompt files (issue #542)", () => {
     // Operational rules from the default prompt must survive the replacement.
     expect(prompt).toContain("Complete the requested work and relevant checks");
     expect(prompt).toContain("Before each tool batch, briefly state its purpose");
+    expect(prompt).toContain("User-visible progress updates");
+    expect(prompt).toContain("1-2 short sentences");
+    expect(prompt).toContain("Do not narrate internal phase names");
     expect(prompt).toContain("Editing workflow: inside the advertised workspace");
     expect(prompt).toContain("You are operating in Agent mode.");
 
@@ -2938,6 +2948,8 @@ describe("DesktopAgentRuntime plan transitions", () => {
     const submitTool = agent.state.tools.find((tool: any) => tool.name === "SubmitPlan");
     expect(submitTool.description).toContain("immutable historical checkpoints");
     expect(submitTool.description).toContain("new full snapshot in this turn");
+    expect(submitTool.parameters.properties.question.description).toContain("Summarize the complete contract yourself");
+    expect(submitTool.parameters.properties.title.description).toContain("user's language");
     const submitResult = await submitTool.execute("submit-call-1", {
       title: proposal.title,
       markdown: proposal.markdown,
