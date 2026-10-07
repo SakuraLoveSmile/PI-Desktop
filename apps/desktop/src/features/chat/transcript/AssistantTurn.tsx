@@ -56,8 +56,10 @@ import { planTranscriptEntryKey, splitPlanTurn } from "../../../lib/plan-transcr
 import { PlanTranscriptContext } from "../../../lib/plan-transcript-context";
 import { PlanApprovalBar } from "../../../components/PlanApprovalBar";
 import { AskToolCompletedSummary } from "../../../components/AskToolCompletedSummary";
-import { TeamDispatchContext, isTeammateJoining, type TeamDispatchCardItem } from "../../../lib/team-dispatch";
+import { TeamDispatchContext, isTeammateJoining } from "../../../lib/team-dispatch";
 import { TeamDispatchCardsGroup } from "./TeamDispatchCard";
+import { TeamTimeline } from "./TeamTimeline";
+import { projectTeamTimeline } from "../../../lib/team-timeline";
 
 const EMPTY_PROPOSALS: PlanProposal[] = [];
 
@@ -336,47 +338,16 @@ export const AssistantTurn = memo(function AssistantTurn({
   statusesRef.current = turnDelegationStatuses;
   timingsRef.current = turnDelegationTimings;
   const dispatchIndex = useContext(TeamDispatchContext);
-  const turnDispatchCards = useMemo(() => {
-    const cards: TeamDispatchCardItem[] = [];
-    const seenTaskKeys = new Set<string>();
-    for (const part of entry.parts) {
-      if (part.kind === "message") {
-        const list = dispatchIndex.cardsByMessageId.get(part.message.id);
-        if (list) {
-          for (const item of list) {
-            const key = `${item.teamSessionId}:${item.taskId}`;
-            if (!seenTaskKeys.has(key)) {
-              seenTaskKeys.add(key);
-              cards.push(item);
-            }
-          }
-        }
-      } else if (part.kind === "activity") {
-        for (const act of part.items) {
-          const list = dispatchIndex.cardsByMessageId.get(act.message.id);
-          if (list) {
-            for (const item of list) {
-              const key = `${item.teamSessionId}:${item.taskId}`;
-              if (!seenTaskKeys.has(key)) {
-                seenTaskKeys.add(key);
-                cards.push(item);
-              }
-            }
-          }
-        }
-      }
-    }
-    return cards;
-  }, [entry.parts, dispatchIndex]);
-
   const groupProcess = useAppStore((state) =>
     shouldGroupTurnProcess(
       resolveThinkingDisplayMode(state.settings?.thinkingDisplayMode),
     ),
   );
   const sections = useMemo(() => splitPlanTurn(entry, proposals), [entry, proposals]);
-  const renderedParts = useMemo(() => sections.flatMap((section) => section.parts), [sections]);
-  const activePart = isActive ? renderedParts.at(-1) : undefined;
+  const timeline = useMemo(() => projectTeamTimeline(sections, dispatchIndex,
+    { active: isActive, joining: teammateJoining }), [sections, dispatchIndex, isActive, teammateJoining]);
+  const renderedParts = useMemo(() => timeline?.parts ?? sections.flatMap((section) => section.parts), [sections, timeline]);
+  const activePart = timeline ? timeline.activePart : isActive ? renderedParts.at(-1) : undefined;
   const lastActivityPart = renderedParts.findLast((part) => part.kind === "activity");
   const partContext = { isActive, activePart, lastActivityPart, runtimeActivity, turnDelegationStatuses, turnDelegationTimings };
 
@@ -390,14 +361,17 @@ export const AssistantTurn = memo(function AssistantTurn({
       aria-label={t("chat.assistantMessage")}
     >
       <div className="message-col">
-        {sections.map((section) => {
+        {sections.map((section, index) => {
           const sectionSummary = getAssistantTurnSummary({ ...entry, parts: section.parts });
           const { process, responses } = sectionSummary;
           const completedAsks = sectionSummary.tools.filter(
             (message) => message.toolName === "asktool" && message.toolStatus === "success",
           );
           return <Fragment key={section.key}>
-            {groupProcess ? <>
+            {timeline ? <>
+              {completedAsks.map((message) => <AskToolCompletedSummary key={message.id} message={message} />)}
+              <TeamTimeline segments={timeline.sections[index]} tail={index === sections.length - 1} {...partContext} />
+            </> : groupProcess ? <>
               {completedAsks.map((message) => <AskToolCompletedSummary key={message.id} message={message} />)}
               <AssistantTurnParts parts={responses} {...partContext} />
               <TurnProcess
@@ -417,9 +391,7 @@ export const AssistantTurn = memo(function AssistantTurn({
             {section.proposal ? <PlanApprovalBar key={section.proposal.id} proposal={section.proposal} /> : null}
           </Fragment>;
         })}
-        {turnDispatchCards.length > 0 || teammateJoining ? (
-          <TeamDispatchCardsGroup cards={turnDispatchCards} joining={teammateJoining} />
-        ) : null}
+        {!timeline && teammateJoining ? <TeamDispatchCardsGroup cards={[]} joining /> : null}
         {generatedImages}
         {!isActive && metaMessage ? (
           <MessageMeta

@@ -2,16 +2,21 @@ import { act, createElement, Fragment } from "react";
 import { createRoot } from "react-dom/client";
 import { createInstance } from "i18next";
 import { I18nextProvider } from "react-i18next";
-import type { GoalProgressChangedEvent, GoalProgressSnapshot, GoalReportChangedEvent, GoalReportSummary, PlanProposal, TeamSnapshot } from "@pi-desktop/shared";
+import type { GoalProgressChangedEvent, GoalProgressSnapshot, GoalReportChangedEvent, GoalReportSummary, PlanProposal, TeamSnapshot, UiMessage } from "@pi-desktop/shared";
 import { catalogs } from "@pi-desktop/i18n";
 import { GoalProgressBar } from "../../apps/desktop/src/features/chat/composer/GoalProgressBar";
 import { TeamDispatchCardsGroup } from "../../apps/desktop/src/features/chat/transcript/TeamDispatchCard";
 import { api } from "../../apps/desktop/src/lib/api";
 import { useAppStore } from "../../apps/desktop/src/stores/app-store";
 import { ChatTranscript } from "../../apps/desktop/src/features/chat/transcript/ChatTranscript";
-import type { TeamDispatchCardItem } from "../../apps/desktop/src/lib/team-dispatch";
+import { buildTeamDispatchIndex, TeamDispatchContext, type TeamDispatchCardItem, type TeamDispatchIndex } from "../../apps/desktop/src/lib/team-dispatch";
+import { AssistantTurn } from "../../apps/desktop/src/features/chat/transcript/AssistantTurn";
+import type { AssistantTurnEntry, AssistantTurnPart } from "../../apps/desktop/src/lib/assistant-turns";
+import { installTranscriptSearchFocus } from "../../apps/desktop/src/hooks/use-transcript-search-focus";
 import "../../apps/desktop/src/styles/tokens.css";
 import "../../apps/desktop/src/styles/base.css";
+import "../../apps/desktop/src/styles/messages.css";
+import "../../apps/desktop/src/styles/ui-kit.css";
 import "../../apps/desktop/src/styles/goal-progress.css";
 import "../../apps/desktop/src/styles/team-dispatch.css";
 
@@ -259,14 +264,125 @@ globalThis.goalTeamRendererUiProbe = async () => {
     await act(async () => completedCard?.querySelector<HTMLButtonElement>('[data-testid="goal-report-card-open-btn"]')?.click());
     assert(openedTabs.length === openings + 1 && openedTabs.at(-1)?.sessionId === "report-session",
       "completed result retains its session-owned work panel action");
+    const msg = (id: string, content = id, extra: Partial<UiMessage> = {}): UiMessage => ({
+      id, role: "assistant", content, createdAt: "2026-10-07T00:00:00Z", status: "complete", ...extra,
+    });
+    const narration = (id: string, text: string): AssistantTurnPart => ({ kind: "message", message: msg(id, text) });
+    const thought = (id: string): AssistantTurnPart => ({ kind: "activity", items: [{ kind: "thinking", message: msg(id, "", { thinking: `Verified reasoning ${id}` }) }] });
+    const dispatchMessages = ["Alex", "Sam", "Tina"].map((name, index) => msg(`timeline-create-${index}`, "", {
+      role: "tool", toolName: "task_create", toolStatus: "success", toolCallId: `timeline-call-${index}`,
+      toolArgs: { subject: `Verified ${name} research`, ownerMemberName: name },
+      toolResult: { taskId: `timeline-task-${index}`, subject: `Verified ${name} research`, status: "completed", ownerMemberName: name },
+    }));
+    const dispatchPart: AssistantTurnPart = { kind: "activity", items: dispatchMessages.map(message => ({ kind: "tool", message })) };
+    const referenceEntry: AssistantTurnEntry = { kind: "assistant-turn", id: "timeline-turn", parts: [
+      thought("timeline-think-before"), narration("timeline-before", "I will dispatch three researchers to inspect the source."), dispatchPart,
+      thought("timeline-think-after-one"), thought("timeline-think-after-two"),
+      narration("timeline-after", "All three researchers returned verified findings. Here is the complete plan."),
+    ] };
+    const baseSnapshot = await api.getTeamSnapshot({ teamSessionId: "team-session" });
+    let timelineSnapshot: TeamSnapshot = {
+      ...baseSnapshot,
+      members: [...baseSnapshot.members, ...["Sam", "Tina"].map((name, index) => ({
+        ...baseSnapshot.members[0], name: `researcher-${index}`, memberSessionId: `timeline-member-${index}`,
+        presentation: { role: "researcher" as const, displayName: name },
+      }))],
+      tasks: [...baseSnapshot.tasks, ...dispatchMessages.map((message, index) => ({
+        ...baseSnapshot.tasks[0], taskId: `timeline-task-${index}`, subject: `Verified ${["Alex", "Sam", "Tina"][index]} research`,
+        status: "completed" as const, ownerMemberName: index === 0 ? "researcher" : `researcher-${index - 1}`,
+        ownerSessionId: index === 0 ? "member-session" : `timeline-member-${index - 1}`,
+      }))],
+    };
+    const timelineListeners = new Set<Parameters<typeof api.onTeamChanged>[0]>();
+    api.getTeamSnapshot = async () => timelineSnapshot;
+    api.onTeamChanged = listener => { timelineListeners.add(listener); return () => timelineListeners.delete(listener); };
+    const timelineIndex = buildTeamDispatchIndex(dispatchMessages, "team-session");
+    const renderTimeline = (entry = referenceEntry, isActive = false, proposals: readonly PlanProposal[] = [], withCards = true, index: TeamDispatchIndex = timelineIndex) =>
+      createElement(I18nextProvider, { i18n }, createElement(TeamDispatchContext.Provider, {
+        value: withCards ? index : { cardsByMessageId: new Map(), cardsByTaskId: new Map() },
+      }, createElement(AssistantTurn, { entry, isActive, proposals, runtimeActivity: { phase: "waiting-model", since: Date.now() } })));
+    const inOrder = (elements: Array<Element | null>) => elements.every((element, index) => Boolean(element) &&
+      (index === 0 || Boolean(elements[index - 1]!.compareDocumentPosition(element!) & Node.DOCUMENT_POSITION_FOLLOWING)));
+    await act(async () => { useAppStore.setState({ settings: { ...useAppStore.getState().settings, thinkingDisplayMode: "detailed", smoothStreaming: false } }); root.render(renderTimeline()); });
+    await until(() => container.querySelectorAll(".team-dispatch-card").length === 3, "three chronological dispatch cards");
+    assert(!container.querySelector(".turn-process"), "Team turn must not retain the whole-turn fold");
+    const thinkingRows = [...container.querySelectorAll(".tool-row.thinking")];
+    assert(thinkingRows.length === 3, "reference retains three separate thinking rows");
+    assert(inOrder([thinkingRows[0], container.querySelector('[data-message-id="timeline-before"]'),
+      ...container.querySelectorAll(".team-dispatch-card"), thinkingRows[1], thinkingRows[2],
+      container.querySelector('[data-message-id="timeline-after"]')]), "reference thinking/narration/card chronology");
+    for (const message of dispatchMessages) {
+      const card = container.querySelector(`[data-message-id="${message.id}"]`);
+      assert(card?.classList.contains("team-dispatch-card"), "absorbed tool must map to its card for search");
+      assert(card?.querySelectorAll("button").length === 1, "card retains one navigation control");
+      assert(!container.querySelector(`.tool-row[data-message-id="${message.id}"]`), "successful anchor raw row must be absorbed");
+    }
+    const openedBeforeTimeline = openedTabs.length;
+    await act(async () => container.querySelector<HTMLButtonElement>(".team-dispatch-card button")?.click());
+    assert(openedTabs.length === openedBeforeTimeline + 1, "timeline card opens exactly one task target");
+    assert(JSON.stringify(openedTabs.at(-1)?.tab.teamTarget).includes("timeline-task-0"), "timeline navigation keeps original task id");
+    const retainedCard = container.querySelector('.team-dispatch-card');
+    const retainedControl = retainedCard?.querySelector<HTMLButtonElement>('button');
+    retainedControl?.focus();
+    timelineSnapshot = { ...timelineSnapshot, revision: 2, tasks: timelineSnapshot.tasks.map(task =>
+      task.taskId === "timeline-task-0" ? { ...task, status: "in_progress" } : task) };
+    await act(async () => {
+      for (const notify of timelineListeners) notify({ teamSessionId: "team-session", revision: 2, reason: "task" });
+    });
+    await until(() => retainedCard?.getAttribute('data-state') === "in_progress", "live snapshot updates the timeline card");
+    assert(container.querySelector('.team-dispatch-card') === retainedCard, "status update keeps the anchored card DOM identity");
+    assert(retainedCard?.getAttribute('data-state') === "in_progress", "status update reaches the card in place");
+    assert(document.activeElement === retainedControl, "status update keeps the focused card control");
+    const cleanupSearch = installTranscriptSearchFocus({
+      target: { sessionId: "team-session", messageId: dispatchMessages[0].id, query: "ownerMemberName", requestId: 1 },
+      source: JSON.stringify(dispatchMessages[0].toolArgs), scroller: container, content: container,
+      position: { current: { requestId: 0, alignUntil: 0 } }, onNavigate: () => {},
+    });
+    assert(container.querySelector(".team-dispatch-card.transcript-search-source-match"), "source-only tool search highlights its card");
+    cleanupSearch?.();
+    await act(async () => { useAppStore.setState({ settings: { ...useAppStore.getState().settings, thinkingDisplayMode: "compact" } }); });
+    assert(!container.querySelector(".tool-row.thinking"), "Compact keeps completed thinking hidden");
+    assert(container.querySelector('[data-message-id="timeline-before"]') && container.querySelector('[data-message-id="timeline-after"]'), "Compact keeps every narration visible");
+    assert(container.querySelectorAll(".team-dispatch-card").length === 3, "Compact retains all task cards");
+    await act(async () => { useAppStore.setState({ settings: { ...useAppStore.getState().settings, thinkingDisplayMode: "detailed" } }); root.render(renderTimeline(referenceEntry, false, [], false)); });
+    assert(container.querySelector(".turn-process"), "ordinary Detailed turn keeps its whole-turn fold");
+    await act(async () => { useAppStore.setState({ settings: { ...useAppStore.getState().settings, thinkingDisplayMode: "compact" } }); });
+    assert(!container.querySelector(".turn-process") && container.querySelector('[data-message-id="timeline-before"]'), "ordinary Compact keeps the existing chronological path");
+    await act(async () => { useAppStore.setState({ settings: { ...useAppStore.getState().settings, thinkingDisplayMode: "detailed" } }); root.render(renderTimeline({ ...referenceEntry, parts: referenceEntry.parts.slice(0, 3) }, true)); });
+    assert(container.querySelector(".team-timeline-runtime[role=status]"), "cards-last active turn needs a real runtime tail");
+    assert(!container.querySelector(".tool-row-name.running, .tool-activity-label.running"), "earlier finished thinking must not look active");
+    const spawning = msg("timeline-spawn", "", { role: "tool", toolName: "spawn_teammate", toolStatus: "running" });
+    await act(async () => root.render(renderTimeline({ ...referenceEntry, parts: [...referenceEntry.parts, { kind: "activity", items: [{ kind: "tool", message: spawning }] }] }, true)));
+    assert(inOrder([container.querySelector('[data-message-id="timeline-after"]'), container.querySelector(".team-dispatch-joining")]), "joining row follows the true tail");
+    assert(!container.querySelector(".team-timeline-runtime"), "joining feedback does not duplicate runtime tail");
+    const failed = msg("timeline-failed", "Permission denied", { role: "tool", toolName: "task_create", toolStatus: "denied", isError: true });
+    await act(async () => root.render(renderTimeline({ ...referenceEntry, parts: [...referenceEntry.parts, { kind: "activity", items: [{ kind: "tool", message: failed }] }] })));
+    assert(container.querySelector('.tool-row[data-message-id="timeline-failed"]')?.textContent?.toLowerCase().includes("denied"), "failed non-anchor tool remains visibly discoverable");
+    const read = msg("timeline-read", "Read complete", { role: "tool", toolName: "Read", toolStatus: "success", toolArgs: { path: "source.ts" } });
+    await act(async () => root.render(renderTimeline({ ...referenceEntry, parts: [...referenceEntry.parts, { kind: "activity", items: [{ kind: "tool", message: read }, { kind: "tool", message: failed }] }] })));
+    assert(container.querySelector('.process-activity-group.grouped .turn-process-error'), "closed non-anchor group keeps a visible failure signal");
+    const submit = msg("timeline-submit", "", { role: "tool", toolName: "SubmitPlan", toolStatus: "success", toolCallId: "timeline-submit-call" });
+    const timelineProposal: PlanProposal = { ...oldProposal, kind: "plan", id: "timeline-proposal", title: "Timeline plan", status: "pending", turnId: referenceEntry.id, toolCallId: submit.toolCallId!, createdAt: submit.createdAt };
+    const sectionEntry: AssistantTurnEntry = { ...referenceEntry, parts: [...referenceEntry.parts,
+      { kind: "activity", items: [{ kind: "tool", message: submit }] }, narration("timeline-second-section", "Continuing after the plan checkpoint.")] };
+    await act(async () => root.render(renderTimeline(sectionEntry, false, [timelineProposal])));
+    assert(inOrder([container.querySelector('[data-message-id="timeline-after"]'), container.querySelector('[data-testid="plan-approval-bar"]'), container.querySelector('[data-message-id="timeline-second-section"]')]), "approval stays after its own section");
+    timelineSnapshot = { ...timelineSnapshot, revision: 3, tasks: timelineSnapshot.tasks.map(task =>
+      task.taskId === "timeline-task-0" ? { ...task, status: "completed" } : task) };
+    await act(async () => {
+      for (const notify of timelineListeners) notify({ teamSessionId: "team-session", revision: 3, reason: "task" });
+      root.render(renderTimeline());
+    });
+    assert(!container.querySelector(".team-dispatch-joining, .team-timeline-runtime"), "settled timeline has no live row");
     const screenshotProposal = { ...newProposal, executionId: "screenshot-execution" } as PlanProposal;
-    await act(async () => { root.render(renderAll(screenshotProposal, "screenshot-session", true)); });
+    await act(async () => { root.render(createElement(Fragment, null, renderAll(screenshotProposal, "screenshot-session", true), renderTimeline())); });
     await until(() => container.querySelector(".goal-progress-capsule-text")?.textContent?.trim() === "1/1", "ready progress for screenshot");
     await act(async () => container.querySelector<HTMLButtonElement>(".goal-progress-toggle-btn")?.click());
     await until(() => container.textContent?.includes("Screenshot step") === true, "expanded goal for screenshot");
     assert(Boolean(container.querySelector(".goal-progress-expanded-content")), "expanded step list must be visible in the screenshot");
     assert(container.querySelector(".goal-progress-toggle-btn")?.textContent?.trim() === "Show less", "expanded goal toggle must use the English catalog key");
     assert(Boolean(container.querySelector('[data-testid="goal-progress-bar"]')), "running goal progress should remain visible for the evidence capture");
+    await act(async () => root.render(renderTimeline()));
     preserveForScreenshot = true;
     globalThis.goalTeamRendererUiCleanup = () => { root.unmount(); container.remove(); };
   } finally {
@@ -283,5 +399,5 @@ globalThis.goalTeamRendererUiProbe = async () => {
     api.onHostStatus = originalHostStatus;
     useAppStore.setState({ openWorkPanelTabForSession: originalStoreMethod });
   }
-  return { ok: true, cardHeight, reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches, scenarios: ["goal execution and session switch", "cross-session event isolation", "stale report event", "out-of-order progress revisions", "ready report completion", "interruption without a result card or stuck progress", "completed report navigation", "single task navigation", "expert joining feedback"] };
+  return { ok: true, cardHeight, reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches, scenarios: ["goal execution and session switch", "cross-session event isolation", "stale report event", "out-of-order progress revisions", "ready report completion", "interruption without a result card or stuck progress", "completed report navigation", "single task navigation", "expert joining feedback", "Team chronological transcript", "Compact and ordinary turn preservation", "card search/navigation", "live tail and section approval"] };
 };
