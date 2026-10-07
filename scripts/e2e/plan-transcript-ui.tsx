@@ -111,7 +111,8 @@ globalThis.planTranscriptUiProbe = async () => {
             toolCallId: "submit-call", toolStatus: "success", toolResult: { submitted: true } }];
         proposal = { id: `proposal-${kind}-${action}`, sessionId, turnId: "turn-contract", toolCallId: "submit-call",
           kind, title: "KaneoPilot 项目仓库配置与 UI 简化施工（T1 & T2）",
-          markdown: "# Approved contract\r\n\r\n精确字节 `code`\r\n", plan: "# Approved contract", question: "Approve the supplied contract?",
+          markdown: "# Approved contract\r\n\r\n精确字节 `code`\r\n", plan: "# Approved contract",
+          question: action === "reject" ? "确认执行？" : "增加项目仓库配置，简化任务界面，并验证旧配置兼容和完整操作流程。确认按此计划执行？",
           artifact: { relativePath: `.pi/${kind}/fixture.md`, sha256: "fixture", sizeBytes: 19 },
           version: 1, status: "pending", createdAt: at(2), updatedAt: at(2) };
         await act(async () => useAppStore.setState({ activeSessionId: sessionId, sessions: [session],
@@ -119,6 +120,8 @@ globalThis.planTranscriptUiProbe = async () => {
           planCheckpoints: { [sessionId]: proposal } }));
         await render();
         await until(() => Boolean(card()?.querySelector(`.plan-approval-${action === "approve" ? "approve-main" : "reject"}`)), "pending approval");
+        assert(card()?.querySelector(".approval-summary-text")?.textContent === proposal.question,
+          `${mode}/${kind}: show the AI approval overview, including a short question, rather than repeating the title or full Markdown`);
         await act(async () => card()?.querySelector<HTMLButtonElement>(`.plan-approval-${action === "approve" ? "approve-main" : "reject"}`)?.click());
         await until(() => card()?.dataset.status === (action === "approve" ? "approved" : "rejected"), "resolved approval");
         assert(!card()?.querySelector(".plan-approval-approve-main"), "a resolved card cannot approve again");
@@ -157,6 +160,28 @@ globalThis.planTranscriptUiProbe = async () => {
     assert(!["fixed", "sticky"].includes(getComputedStyle(card()!).position), "handled cards must stay in normal message flow");
     cases.push("scrolls-with-message");
     scroller.scrollTop = 0;
+    const shortOverview = proposal.question;
+    const legacyQuestion = "请确认按此计划实施：**Node 22 + Fastify + SQLite**，实现用户管理和同源界面。".repeat(15);
+    proposal = { ...proposal, question: legacyQuestion };
+    await act(async () => useAppStore.setState({ planHistory: { [sessionId]: [proposal] } }));
+    await render();
+    await until(() => Boolean(card()?.querySelector(".approval-summary-toggle")), "legacy approval overview can expand");
+    const summary = card()?.querySelector<HTMLElement>(".approval-summary-text");
+    assert(summary && !summary.textContent?.includes("**"), "legacy Markdown emphasis is rendered, not printed as raw markup");
+    const collapsedHeight = summary.getBoundingClientRect().height;
+    assert(collapsedHeight <= Number.parseFloat(getComputedStyle(summary).lineHeight) * 3 + 1,
+      "long legacy approval overview is bounded to three lines");
+    await act(async () => card()?.querySelector<HTMLButtonElement>(".approval-summary-toggle")?.click());
+    assert(summary.getBoundingClientRect().height > collapsedHeight,
+      "expanding retains the complete original approval description");
+    assert(useAppStore.getState().planHistory[sessionId][0].question === legacyQuestion,
+      "presentation cannot rewrite the stored approval decision");
+    await act(async () => card()?.querySelector<HTMLButtonElement>(".approval-summary-toggle")?.click());
+    assert(summary.getBoundingClientRect().height <= collapsedHeight + 1, "legacy overview can collapse again");
+    cases.push("AI-overview-separate-from-contract-and-expandable-legacy-description");
+    proposal = { ...proposal, question: shortOverview };
+    await act(async () => useAppStore.setState({ planHistory: { [sessionId]: [proposal] } }));
+    await render();
     await act(async () => card()?.querySelector<HTMLButtonElement>('[data-testid="plan-open-artifact"]')?.click());
     assert(useAppStore.getState().workPanelContexts[sessionId]?.tabs.some((tab) => tab.resource === `.pi/${proposal.kind}/fixture.md`),
       "resolved cards must retain the original artifact opener");
@@ -222,6 +247,10 @@ globalThis.planTranscriptUiProbe = async () => {
       }
     }
     container.style.width = "900px";
+    proposal = { ...proposal, title: "用户管理系统实现计划",
+      question: "实现登录、用户管理与搜索分页，保留既定安全边界，并验证接口和完整操作流程。确认按此计划执行？" };
+    await act(async () => useAppStore.setState({ planHistory: { [sessionId]: [proposal] }, pendingPlans: { [sessionId]: proposal } }));
+    await render();
     await act(async () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
     return { ok: true, cases, resolutions: resolves };
   } catch (error) {

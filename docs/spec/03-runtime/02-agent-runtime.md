@@ -1528,6 +1528,20 @@ calls. Generated, test-only, and non-visual HTML files are excluded. When the
 tool is deferred, `ToolSearch` must activate it before the preview call.
 ### 7.2 Plan prompt requirements
 
+User-visible progress and tool descriptions use the user's language even with
+English technical sources or reasoning. Updates use one or two short factual
+sentences about completed/verified work and the next step, without internal phase
+names or repetitive waiting narration. These operational rules survive a custom
+persona; they do not translate stored history or change reasoning/provider settings.
+
+SubmitPlan and SubmitGoal ask the same Agent to summarize the complete contract
+in the existing question field: one or two plain-text sentences naming the outcome,
+essential scope/verification and approval decision, usually 60–120 Chinese characters
+or 30–60 words. No extra summary model call is made. Important unresolved scope,
+compatibility, data or cost decisions are clarified before submission; full agreed
+boundaries and details remain in authoritative Markdown. Tool field descriptions
+carry the same guidance; no hard length limit or protocol field is introduced.
+
 The Plan prompt tells the same Agent to understand the request, inspect the
 relevant repository/specification/test context, identify impacted files and
 risks, include focused validation and migration/recovery implications, surface

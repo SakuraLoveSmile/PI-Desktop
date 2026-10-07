@@ -9,7 +9,19 @@ import {
   getToolSummaryKey,
   getToolSummaryValue,
   isDelegationStartTool,
+  getCompactTeamToolLabelKey,
 } from "../src/lib/tool-display.ts";
+
+test("compact Team labels only recognize exact built-in tools without changing action classification", () => {
+  assert.equal(getCompactTeamToolLabelKey("task_create"), "chat.teamToolActions.createTask");
+  assert.equal(getCompactTeamToolLabelKey("spawn_teammate"), "chat.teamToolActions.spawn");
+  assert.equal(getCompactTeamToolLabelKey("wait_for_updates"), "chat.teamToolActions.wait");
+  for (const name of ["plugin.task_create", "functions.spawn_teammate", "plugin_wait_for_updates", "TaskCreate", undefined]) {
+    assert.equal(getCompactTeamToolLabelKey(name), undefined);
+  }
+  assert.equal(getToolAction("task_create"), "use");
+  assert.equal(getToolAction("spawn_teammate"), "use");
+});
 
 test("maps built-in tools to concise Codex-style actions", () => {
   assert.equal(getToolAction("Read"), "read");

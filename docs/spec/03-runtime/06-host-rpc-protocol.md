@@ -678,9 +678,12 @@ contract is being negotiated.
 
 - `goalReports.get` / `goalReports.list` / `goalReports.submitDraft` / `goalReports.invalidateDraft` /
   `goalReports.finalizeReport` / `goalReports.markFailed` / `goalReports.getAsset`
-  - `goalReports.finalizeReport` requires a terminal execution (`completed` or `interrupted`).
-    Attempting to finalize an execution that is in `queued`, `running`, or missing terminal state
+  - `goalReports.finalizeReport` and report Retry require the Host's persisted execution state `completed`.
+    Attempting to finalize/retry an execution that is `interrupted`, `queued`, `running`, or missing completion
     is rejected with `GOAL_EXECUTION_NOT_TERMINAL`, without writing report files or broadcasting ready.
+    Status overrides cannot promote an interrupted execution or overwrite a completed report as interrupted.
+    Rejection precedes draft removal or metadata updates, including retries of historical ready reports.
+    Interruption records execution status only; it does not publish a fallback completion report.
 - `goalProgress.get` — `{ executionId, sessionId? }` returns `{ progress: GoalProgressSnapshot | null }`.
 - `goalProgress.issueToken` — `{ executionId, sessionId, turnId }` generates and returns `{ writeToken }`
   bound to the running turn recorded in `goal_reports.turn_id` and the effective Goal execution
@@ -1026,7 +1029,7 @@ Plan still requires a persisted project. No global workspace fallback is used.
 type SubmitPlanParams = {
   title: string;
   markdown: string;
-  question: string;
+  question: string; // Same-Agent concise approval overview; complete details stay in markdown.
 };
 
 type ProposalKind = "plan" | "goal";
