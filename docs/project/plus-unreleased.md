@@ -2,6 +2,11 @@
 
 Upstream v0.15.6 → v0.16.1 has been merged.
 
+- Goal results appear only after execution completes. Interrupted Goals no longer
+  publish fallback reports or leave progress waiting for one, and report Retry
+  cannot manufacture a result for an incomplete execution. Existing interruption
+  records and artifacts are retained without showing completion cards.
+
 - Expert Team work is easier to follow: queued prompts can be folded, team
   progress and a searchable compact task board show stable member identities,
   live activity refreshes from Host state, and panorama zoom survives updates.

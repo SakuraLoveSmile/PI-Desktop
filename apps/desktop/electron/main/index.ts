@@ -694,6 +694,7 @@ const planRuntime = createPlanRuntime({
 });
 const {
   finishTurn,
+  lockExecutionInterruption,
   finishApprovedExecution,
   dispatchApprovedPlan,
   drainApprovedPlanExecutions,
@@ -710,7 +711,6 @@ const eventPersistence = createEventPersistence({
   activeToolCallKey,
   approvedExecutionIdsBySession,
   approvedExecutionTurns,
-  pendingExecutionFinishes,
   planSubmissionTurnIds,
   planSubmissionTurnKey,
   inflightCheckpointer,
@@ -718,6 +718,7 @@ const eventPersistence = createEventPersistence({
   addActiveTurnUsage,
   logger,
   finishTurn,
+  lockExecutionInterruption,
   isStaleTerminalEvent,
   finishApprovedExecution,
   emitAgentEvent: (envelope) => emitAgentEvent(envelope),
@@ -926,6 +927,7 @@ function registerIpc() {
     resolveAgentRuntimeLaunch,
     finishTurn,
     lockAbortReason,
+    lockExecutionInterruption,
     finishApprovedExecution,
     dispatchApprovedPlan,
     dispatchExecutionForProposal,

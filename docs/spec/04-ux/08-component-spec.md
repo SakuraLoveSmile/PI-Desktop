@@ -2764,9 +2764,12 @@ was met.
 
 The transcript card identifies the Goal and verdict and opens its report in the
 Work Panel. The transcript presents a Goal completion card only when the execution
-has reached a terminal state (`completed` or `interrupted`) and the report has settled
-as `ready` (or terminal `failed` with Retry available). In-flight drafts and pending
+has reached `completed` and the report has settled
+as `ready` (or publication `failed` with Retry available). Interrupted execution,
+including historical interrupted ready/failed reports, is excluded. In-flight drafts and pending
 executions are strictly suppressed from transcript card rendering and automatic Work Panel opening.
+Automatic opening waits for refreshed report metadata, matches its session/execution/report
+identity to the event, and rechecks the active session and listener lifetime after the read.
 A ready report presents the Goal snapshot, execution status,
 structured or fallback integrity, supported criteria and checks, evidence,
 changed files, limitations, and next steps. Fallback reports identify missing
@@ -2776,8 +2779,9 @@ The Work Panel distinguishes loading, pending persistence, ready, failed,
 unavailable, and disconnected reads. Failures use localized generic text and
 may include a validated Host error code; raw exception messages are not shown.
 Retry is available for recoverable report failures and calls the Host report
-retry operation without rerunning the Goal or making another provider call.
+retry operation only for completed executions, without rerunning the Goal or making another provider call.
 Report reads and retry remain scoped to the owning session.
+Historical report files and execution records are retained; they are not rewritten or deleted.
 
 ### 10B.3 Accessibility
 
@@ -2803,8 +2807,9 @@ item checklist.
 - **Collapsible Goal Bar:** Presents active execution status, single-line truncated goal title,
   and expand/collapse toggle. When expanded, reveals the full goal description and live item checklist
   with a maximum 144px internal scroll area. Folding preference is remembered per session.
-- **Terminal Removal:** The active goal bar is automatically dismissed as soon as the goal execution
-  is terminal (`completed` or `interrupted`) and its completion report is `ready`.
+- **Terminal Removal:** An interrupted execution dismisses the active goal bar immediately,
+  without waiting for a report that will not be generated. A completed execution dismisses
+  the bar after its report is `ready`.
 - **Status Fallback:** If progress items are uninitialized or in an error state, display descriptive
   state text (e.g. `Initializing…` or `Execution failed`) without rendering misleading `0/0` or `0%` counters.
 - **Narrow Width:** Designed with fluid responsive layout adapting down to 450px without horizontal scrolling.

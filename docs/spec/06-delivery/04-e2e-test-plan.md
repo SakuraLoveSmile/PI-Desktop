@@ -16647,6 +16647,15 @@ renderer's durable transcript reads. No real model or provider is contacted.
   its conclusion, execution status, evidence and limitations. A criterion is
   presented as met only when the structured report and durable evidence support
   it. A fallback report identifies unknown or missing evidence.
+- **Interrupted execution:** Stop/abort, graceful Goal stop, provider cancellation and
+  execution failure must settle the approved Goal as interrupted and never finalize a
+  result report. Deliver `agent_end` while the cancellation RPC is held; a locked abort
+  must not become completion. Keep the ordinary graceful-stop turn semantics intact.
+  Verify pending/draft executions, manual finalize/Retry and misleading status overrides
+  cannot publish an interrupted report or mutate its draft/metadata. Restart and verify
+  no report artifact/ready notification appeared. Loaded historical interruption reports
+  produce no transcript result card or automatic Work Panel opening; interrupted progress
+  disappears without waiting. Completed report navigation and persistence remain intact.
 - **Progress:** Approved Goal progress accepts pending/in-progress/completed/failed items.
   Unauthorized turns and stale revisions are rejected. A new execution ignores old report
   and progress responses; terminal settlement revokes writes, retains readable progress,
