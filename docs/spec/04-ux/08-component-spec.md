@@ -2836,8 +2836,10 @@ the Lead assigns tasks to specialized teammates via `task_create` and `task_upda
 
 ### Visual and Interaction Specification
 
-- **Persistent Slot:** Located outside the collapsible `TurnProcess` accordion in `AssistantTurn`,
-  ensuring constant visibility in both Compact mode and collapsed process turns.
+- **Timeline placement:** When a Team turn contains a dispatch-card anchor, its card renders at
+  that anchor in the turn's chronological timeline, replacing the raw anchor tool row. A Team turn
+  without an anchor keeps the existing rendering path. Ordinary non-Team turns keep their current
+  Detailed and Compact layouts. Compact mode continues to hide thinking content.
 - **Live Projection:** The existing Team snapshot is authoritative for the task subject,
   visual state and owner identity. `buildTeamTaskRows` supplies the same owner projection
   as Overview; identity text is the localized role followed by the display name
@@ -2856,7 +2858,8 @@ the Lead assigns tasks to specialized teammates via `task_create` and `task_upda
   from the inner left. Card groups retain a 12px gap. Motion is disabled under
   reduced-motion preferences; focus rings remain available.
 - **Deduplication & Anchoring:** Cards are indexed across transcript messages by `{teamSessionId, taskId}`
-  anchored to the initial `task_create` message ID; subsequent `task_update` events update the
+  anchored to the first indexed task message ID (`task_create`, or an initial `task_update`
+  when no create is loaded); subsequent `task_update` events update the
   card state in place without duplicating cards.
 - **Single Navigation Target:** Each card has exactly one focusable control, with an
   accessible name containing the subject and current status. Clicking anywhere on it
@@ -2867,13 +2870,35 @@ the Lead assigns tasks to specialized teammates via `task_create` and `task_upda
 ### Expert joining feedback
 
 The live Assistant turn shows a joining row while any `spawn_teammate` tool is
-running. It appears after the dispatch cards, including when no card exists yet,
-and disappears when every spawn tool finishes or the turn stops being active.
+running. When a dispatch-card anchor exists, the row follows the final live timeline segment;
+before the first card exists, it keeps the existing joining-only placement. It disappears when
+every spawn tool finishes or the turn stops being active.
 Historical turns never show stale joining feedback. The row has `role="status"`,
 a decorative 16px flag and localized `team.expertJoining` text (for example,
 `New expert joining…` or `新专家加入中…`), with a 24px minimum height, 6px icon/text
 gap and muted 13px text. Only the label pulses; reduced-motion preferences
 remove the animation. The indicator changes no Team runtime or persisted state.
+
+### Team turn timeline
+
+The chronological timeline is enabled per turn only when the dispatch index contains at least one
+card anchor in an activity item or message part. The dispatch index remains authoritative; tool
+names and results do not independently create cards. Without an anchor, the existing `AssistantTurn`
+rendering path is unchanged.
+
+Within an anchored Team turn, sections and parts retain their source order. A card replaces its raw
+anchor tool row at the dispatch position. Other tool rows remain available in their activity-group
+disclosure and preserve their relative order. Consecutive dispatches in one tool run share a card
+segment; thinking or hosted-search activity ends that run. Each task appears at most once per turn,
+including when later updates reference the same task. The section's plan approval remains at its
+existing position.
+
+Joining feedback follows the live tail after cards when the turn has an anchor. It remains at its
+existing joining-only position before any card exists. Runtime activity is shown only on the true
+live tail; a completed turn has no live indicator. Team turns with an anchor do not use a whole-turn
+`TurnProcess` disclosure. Ordinary non-Team turns retain their current Detailed and Compact
+behavior, and Compact continues to suppress thinking content. This projection adds no setting,
+message field, persisted state, IPC, or localized copy.
 
 ## 10C. Expert Team Work Panel
 
