@@ -223,6 +223,7 @@ pub fn enrol(
     Ok(())
 }
 pub fn validate_tool(db: &Database, session: &str, tool: &str) -> Result<()> {
+    super::authority::validate_lead_tool(db, session, tool)?;
     if purpose(db, session)?.is_some_and(|p| p.work_purpose == "plan_research")
         && !matches!(tool, "Read" | "Glob" | "Grep")
     {
@@ -232,12 +233,24 @@ pub fn validate_tool(db: &Database, session: &str, tool: &str) -> Result<()> {
     }
     Ok(())
 }
+/// Only an actual Lead mailbox turn consumes semantic Team input. A queue
+/// receipt or acknowledgement does not make queued content available to Lead.
+pub fn pending_messages_count(db: &Database, team: &str) -> Result<i64> {
+    Ok(db.conn().query_row(
+        "SELECT COUNT(*) FROM session_collaboration_messages
+         WHERE plugin_id=?1 AND target_session_id=?2 AND kind='message'
+           AND status='queued' AND turn_id IS NULL",
+        params![super::mailbox::team_plugin_origin(team), team],
+        |row| row.get(0),
+    )?)
+}
 pub fn projection(db: &Database, team: &str, caller: &str) -> Result<serde_json::Value> {
     validate_team_participant(db, team, caller)?;
     Ok(match get(db, team)? {
         None => serde_json::Value::Null,
         Some(s) => {
-            serde_json::json!({"planningId":s.planning_id,"teamSessionId":s.team_session_id,"roundId":s.round_id,"phase":s.phase,"workPurpose":"plan_research","reviewId":s.review_id,"totalExpectedTasks":s.expected_task_ids.len(),"completedResearchTasks":s.results.len(),"openQuestionsCount":s.open_questions.len(),"isReadyForPlanSubmission":ready(&s)&&s.phase=="aggregating"&&researchers_settled(db,&s)?,"proposalId":s.proposal_id,"results":s.results.values().collect::<Vec<_>>(),"updatedAt":s.updated_at})
+            let pending = pending_messages_count(db, team)?;
+            serde_json::json!({"planningId":s.planning_id,"teamSessionId":s.team_session_id,"roundId":s.round_id,"phase":s.phase,"workPurpose":"plan_research","reviewId":s.review_id,"totalExpectedTasks":s.expected_task_ids.len(),"completedResearchTasks":s.results.len(),"openQuestionsCount":s.open_questions.len(),"pendingMessagesCount":pending,"isReadyForPlanSubmission":ready(&s)&&s.phase=="aggregating"&&researchers_settled(db,&s)?&&pending==0,"proposalId":s.proposal_id,"results":s.results.values().collect::<Vec<_>>(),"updatedAt":s.updated_at})
         }
     })
 }
@@ -391,12 +404,24 @@ pub fn question(
     refresh(&mut state);
     save(db, &state)
 }
+#[allow(dead_code)] // Strict guard retained for callers without a yield contract.
 pub fn validate_submission(db: &Database, team: &str) -> Result<()> {
+    if submission_pending_messages(db, team)? != 0 {
+        return Err(anyhow!(
+            "TEAM_PLANNING_NOT_READY: queued Team input remains"
+        ));
+    }
+    Ok(())
+}
+/// Validate all existing submission invariants before permitting normal inbox
+/// deferral. Callers must hold the submission transaction through publication.
+pub fn submission_pending_messages(db: &Database, team: &str) -> Result<i64> {
     if sessions::session_execution_profile(db, team)?.as_deref() != Some("team")
         || sessions::session_mode(db, team)?.as_deref() != Some("plan")
     {
-        return Ok(());
+        return Ok(0);
     }
+    super::authority::validate_lead_tool(db, team, "SubmitPlan")?;
     let state = get(db, team)?
         .ok_or_else(|| anyhow!("TEAM_PLANNING_NOT_READY: declare planning strategy first"))?;
     if state.phase != "aggregating" || !ready(&state) || !researchers_settled(db, &state)? {
@@ -404,7 +429,7 @@ pub fn validate_submission(db: &Database, team: &str) -> Result<()> {
             "TEAM_PLANNING_NOT_READY: expected research or questions remain"
         ));
     }
-    Ok(())
+    pending_messages_count(db, team)
 }
 pub fn submitted(db: &Database, team: &str, proposal: &str) -> Result<()> {
     if let Some(mut state) = get(db, team)? {

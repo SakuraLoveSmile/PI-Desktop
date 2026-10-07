@@ -286,15 +286,36 @@ export function createTeamDeliveryService(deps: TeamDeliveryDependencies) {
   async function resumeTeam(teamSessionId: string): Promise<unknown> {
     const host = requireHost();
     const result = await withTeamLock(teamSessionId, async () => {
+      if (requireHost() !== host) {
+        throw deliveryError("HOST_UNAVAILABLE", "The Host changed during Team resume");
+      }
       const resumed = await host.call("team.resume", {
         teamSessionId,
         callerSessionId: teamSessionId,
       });
       const roster = await rosterFor(host, teamSessionId);
-      setTeamHold(deps.getBridge(), roster, false);
+      if (requireHost() !== host) {
+        throw deliveryError("HOST_UNAVAILABLE", "The Host changed during Team resume");
+      }
+      setTeamHold(deps.getBridge(), roster, roster.paused);
       return resumed;
     });
     await drainPending(teamSessionId);
+    await withTeamLock(teamSessionId, async () => {
+      if (requireHost() !== host) {
+        throw deliveryError("HOST_UNAVAILABLE", "The Host changed during Team resume");
+      }
+      const roster = await rosterFor(host, teamSessionId);
+      if (requireHost() !== host) {
+        throw deliveryError("HOST_UNAVAILABLE", "The Host changed during Team resume");
+      }
+      const bridge = deps.getBridge();
+      setTeamHold(bridge, roster, roster.paused);
+      if (!bridge || roster.paused) return;
+      for (const sessionId of [teamSessionId, ...roster.members.map((member) => member.memberSessionId)]) {
+        bridge.agentHost.kick(sessionId);
+      }
+    });
     return result;
   }
 

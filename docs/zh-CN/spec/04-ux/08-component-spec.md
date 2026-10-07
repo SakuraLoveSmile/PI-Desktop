@@ -3156,3 +3156,27 @@ default nor provider configuration. OAuth accounts remain in their separate sect
 
 项目删除说明和插件弹窗标题、安装结果中的长名称也在现有宽度内换行。
 项目指令、项目记忆和 OAuth 弹窗维持已有的边界处理。
+
+### Mandatory Expert Team behavior
+
+Expert Team always proposes and delegates to experts using the existing roster
+confirmation UI. No solo approval choice is offered. Standard profile remains
+the single-agent experience; historical solo records grant no authority.
+
+Expert Team Plan research runs automatically; it does not display a pending
+research-roster approval card or stop at a textual staffing proposal. Progress,
+actual experts and their findings remain visible. The existing final Plan
+approval card and Agent execution roster confirmation are preserved. Automatic
+launch audits are history, not user consent.
+
+A current active local Agent Team Lead with a new nonempty pending user-confirmed
+execution roster automatically opens the existing aggregate Team panel, even
+when Overview, a file, panorama or a closed work panel was selected. Automatic
+planning audits never display launch approval controls. Unrelated snapshot updates
+do not repeatedly steal focus; background, member, Plan and nonlocal sessions
+cannot open another session's panel.
+
+The Team snapshot exposes a pending review only while its leadTurnId matches the
+current Host-owned strategy scope. A completed Lead turn can still await valid
+confirmation; superseded pending reviews stay readable by ID but cannot reopen
+the current UI. Existing Team activity revisions refresh the shared reader.

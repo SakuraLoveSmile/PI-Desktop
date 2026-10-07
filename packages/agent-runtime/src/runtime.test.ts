@@ -6,6 +6,7 @@ import {
   getCurrentSystemMessage,
   toToolDeclaration,
   type AssistantMessage,
+  type Models,
 } from "@earendil-works/pi-ai";
 import { formatSessionMessage, type SessionMessageOrigin } from "@pi-desktop/shared";
 import { estimateContextTokens as estimateTranscriptTokens } from "@earendil-works/pi-ai/utils/estimate";
@@ -219,6 +220,85 @@ function createRuntime(
 }
 
 describe("DesktopAgentRuntime Team strategy wiring", () => {
+  it("preserves Team-profile Goal negotiation and restores consent on Agent transition", async () => {
+    const markdown = "# Goal\n\nReach the bounded result.\n\n## Acceptance criteria\nVerified.\n\n## Boundaries\nFixture only.\n";
+    const host = { call: vi.fn(async (method: string) => {
+      if (method === "team.authorizeLeadTool") throw new Error("TEAM_APPROVAL_REQUIRED");
+      if (method === "plans.submit") return { status: "pending", proposal: {
+        id: "goal-proposal", kind: "goal", title: "Fixture Goal", markdown, question: "Approve?",
+        artifact: { relativePath: ".pi/goal/fixture.md", sha256: "a".repeat(64), sizeBytes: markdown.length },
+      } };
+      return null;
+    }) };
+    const runtime = createRuntime({ mode: "goal", executionProfile: "team", turnId: "goal-turn",
+      teamContext: { teamSessionId: "session-1", callerSessionId: "session-1", isLead: true }, host });
+    try {
+      let agent = (runtime as unknown as { agent: Agent }).agent;
+      const submit = agent.state.tools.find(tool => tool.name === "SubmitGoal")!;
+      const result = await submit.execute("submit-goal", { title: "Fixture Goal", markdown, question: "Approve?" });
+      expect(result.details).toMatchObject({ proposal: { id: "goal-proposal" } });
+      expect(host.call.mock.calls.some(([method]) => method === "team.authorizeLeadTool")).toBe(false);
+      runtime.setMode("agent");
+      agent = (runtime as unknown as { agent: Agent }).agent;
+      const write = agent.state.tools.find(tool => tool.name === "Write")!;
+      await expect(write.execute("agent-write", { path: "fixture.txt", content: "no approval" })).rejects.toThrow("TEAM_APPROVAL_REQUIRED");
+    } finally { await runtime.dispose(); }
+  });
+
+  it("checks fresh Host approval before Lead tools, including skills and plugin tools", async () => {
+    let approved = false;
+    const executions: string[] = [];
+    const host = {
+      call: vi.fn(async (method: string, input?: Record<string, unknown>) => {
+        if (method === "team.authorizeLeadTool") {
+          expect(input).toMatchObject({ teamSessionId: "session-1", callerSessionId: "session-1" });
+          if (!approved) throw new Error("TEAM_APPROVAL_REQUIRED: trusted review is pending");
+          return { authorized: true };
+        }
+        if (method === "tools.execute") {
+          executions.push(String(input?.toolName));
+          return { ok: true, content: "Executed after confirmation" };
+        }
+        if (method === "project.instructions.resolve") return { entries: [] };
+        return null;
+      }),
+    };
+    const runtime = createRuntime({
+      executionProfile: "team", teamContext: {
+        teamSessionId: "session-1", callerSessionId: "session-1", isLead: true,
+      },
+      pluginTools: [{ name: "plugin_demo_run", description: "Fixture plugin", parameters: {} }],
+      pluginSkills: [{ id: "demo.skill", name: "Demo skill" }], host,
+    });
+    try {
+      const agent = (runtime as unknown as { agent: Agent }).agent;
+      const search = agent.state.tools.find(tool => tool.name === "ToolSearch");
+      if (search) {
+        await search.execute("discover-skill", { query: "Skill" });
+        await search.execute("discover-plugin", { query: "plugin_demo_run" });
+        await (runtime as unknown as { rebuiltAgentContext: () => Promise<void> }).rebuiltAgentContext();
+      }
+      for (const name of ["Write", "Bash", "Skill", "plugin_demo_run"]) {
+        const tool = agent.state.tools.find(candidate => candidate.name === name);
+        expect(tool, name).toBeDefined();
+        const input = name === "Write" ? { path: "pending.txt", content: "unapproved" }
+          : name === "Bash" ? { command: "echo unapproved" }
+          : name === "Skill" ? { id: "demo.skill" } : {};
+        await expect(tool!.execute(`pending-${name}`, input)).rejects.toThrow("TEAM_APPROVAL_REQUIRED");
+      }
+      expect(executions).toEqual([]);
+      const plugin = agent.state.tools.find(tool => tool.name === "plugin_demo_run")!;
+      approved = true;
+      await plugin.execute("confirmed-plugin", {});
+      expect(executions).toEqual(["plugin_demo_run"]);
+      approved = false;
+      await expect(plugin.execute("new-user-turn", {})).rejects.toThrow("TEAM_APPROVAL_REQUIRED");
+      expect(executions).toEqual(["plugin_demo_run"]);
+    } finally {
+      await runtime.dispose();
+    }
+  });
+
   it("binds each declaration and same-turn retry to the durable active turn", async () => {
     const host = {
       call: vi.fn(async (method: string, params?: Record<string, any>) => {
@@ -262,8 +342,9 @@ describe("DesktopAgentRuntime Team strategy wiring", () => {
                 id: `declare-${request}`,
                 name: "declare_team_strategy",
                 arguments: {
-                  strategy: "lead_only",
-                  reason: "One indivisible task",
+                  strategy: "delegate",
+                  members: [{ name: "worker", description: "Execute the bounded task" }],
+                  reason: "Expert Team requires delegation",
                 },
               }]
             : [{ type: "text", text: "done" }],
@@ -2750,6 +2831,153 @@ describe("DesktopAgentRuntime tool schema completeness (#864)", () => {
     ).toEqual([]);
 
     await runtime.dispose();
+  });
+});
+
+describe("DesktopAgentRuntime Team Plan mailbox yield", () => {
+  const deferred = { status: "deferred", reason: "team_messages_pending", pendingMessagesCount: 1 };
+  const args = { title: "Researched plan", markdown: "# Plan\n\nPreserve revisions.", question: "Approve?" };
+
+  function fixture(options: {
+    result?: unknown;
+    mode?: "plan" | "goal";
+    executionProfile?: "team" | "standard";
+    submitError?: Error;
+    onSubmit?: () => void;
+  } = {}) {
+    let submissions = 0;
+    const events: AgentEventEnvelope["event"][] = [];
+    const requests: AgentMessage[][] = [];
+    const host = { call: vi.fn(async (method: string, params?: Record<string, unknown>) => {
+      if (method === "team.authorizeLeadTool") return { authorized: true };
+      if (method === "plans.submit") {
+        options.onSubmit?.();
+        if (options.submitError) throw options.submitError;
+        if (++submissions === 1) return options.result ?? deferred;
+        return { status: "pending", proposal: {
+          id: "final-plan", title: params?.title, markdown: params?.markdown,
+          artifact: { relativePath: ".pi/plan/final-plan.md", sha256: "a".repeat(64), sizeBytes: 100 },
+        } };
+      }
+      return undefined;
+    }) };
+    const runtime = createRuntime({
+      host, mode: options.mode ?? "plan", executionProfile: options.executionProfile ?? "team",
+      teamContext: { teamSessionId: "session-1", callerSessionId: "session-1", isLead: true },
+      onEvent: envelope => events.push((envelope as AgentEventEnvelope).event),
+    });
+    const view = runtime as unknown as { agent: Agent; models: Pick<Models, "streamSimple"> };
+    view.models = { streamSimple: (_model, context) => {
+      requests.push([...context.messages]);
+      const content = context.messages.map(message => JSON.stringify(message)).join("\n");
+      const message = assistantMessage({ content: [{
+        type: "toolCall", id: `submit-mail-${requests.length}`,
+        name: options.mode === "goal" ? "SubmitGoal" : "SubmitPlan",
+        arguments: { ...args, markdown: content.includes("SOURCE_DETAIL_UNTRUNCATED")
+          ? `${args.markdown}\n\nSOURCE_DETAIL_UNTRUNCATED: preserve stale-revision checks.` : args.markdown },
+      }], stopReason: "toolUse" }) as unknown as AssistantMessage;
+      const stream = createAssistantMessageEventStream();
+      queueMicrotask(() => {
+        stream.push({ type: "start", partial: message });
+        stream.push({ type: "done", reason: "toolUse", message });
+        stream.end(message);
+      });
+      return stream;
+    } };
+    return { runtime, host, events, requests, view };
+  }
+
+  it("ends deferred aggregation normally and consumes the full expert continuation before publishing the only proposal", async () => {
+    const { runtime, host, events, requests } = fixture();
+    try {
+      await runtime.prompt("Synthesize the experts' results", "user-1", "aggregation-turn");
+      expect(requests).toHaveLength(1);
+      expect(runtime.getStatus().planningState).toBe("planning");
+      expect(runtime.getStatus().isRunning).toBe(false);
+      const state = runtime as unknown as { pendingSubmissionOutcome?: unknown; turnHadError: boolean };
+      expect(state.pendingSubmissionOutcome).toBeUndefined();
+      expect(state.turnHadError).toBe(false);
+      expect(events.filter(event => event.type === "agent_end")).toHaveLength(1);
+      expect(events.filter(event => event.type === "turn_end")).toHaveLength(1);
+      expect(events.some(event => event.type === "error")).toBe(false);
+      expect(events).toContainEqual(expect.objectContaining({ type: "tool_end", isError: false,
+        result: expect.objectContaining({ details: deferred, terminate: true }) }));
+      const fullReport = `Full research report\n${"Detailed evidence. ".repeat(1000)}SOURCE_DETAIL_UNTRUNCATED: preserve stale-revision checks.`;
+      await runtime.prompt({ text: fullReport, sessionMessage: {
+        messageId: "expert-mail", sourceSessionId: "researcher", sourceTitle: "Researcher",
+        targetSessionId: "session-1", kind: "message",
+      } }, "mail-user", "expert-continuation-turn");
+      expect(requests).toHaveLength(2);
+      const mailboxMessage = requests[1].find(message => message.role === "user" &&
+        JSON.stringify(message).includes("SOURCE_DETAIL_UNTRUNCATED"));
+      if (!mailboxMessage || mailboxMessage.role !== "user" || typeof mailboxMessage.content === "string") {
+        throw new Error("Missing expert mailbox message");
+      }
+      const framedText = mailboxMessage.content.find(block => block.type === "text");
+      if (!framedText || framedText.type !== "text") throw new Error("Missing mailbox text");
+      expect(JSON.parse(framedText.text.split("\n")[2]).content).toBe(fullReport);
+      expect(runtime.getStatus().planningState).toBe("awaiting_approval");
+      expect(host.call).toHaveBeenLastCalledWith("plans.submit", expect.objectContaining({
+        turnId: "expert-continuation-turn", markdown: expect.stringContaining("SOURCE_DETAIL_UNTRUNCATED"),
+      }));
+      expect(events.filter(event => event.type === "agent_end")).toHaveLength(2);
+      expect(events.some(event => event.type === "error")).toBe(false);
+    } finally { await runtime.dispose(); }
+  });
+
+  it.each([
+    { status: "deferred", reason: "other", pendingMessagesCount: 1 },
+    { ...deferred, pendingMessagesCount: 0 },
+    { ...deferred, pendingMessagesCount: 1.5 },
+    { ...deferred, pendingMessagesCount: "1" },
+    { ...deferred, proposal: {} },
+  ])("rejects malformed deferral %j through the ordinary submission error path", async result => {
+    const { runtime, events } = fixture({ result });
+    try {
+      await runtime.prompt("Submit", "user-1", "aggregation-turn");
+      expect(runtime.getStatus().planningState).toBe("planning");
+      expect(events.some(event => event.type === "error" && event.error.code === "PLAN_SUBMIT_FAILED")).toBe(true);
+      expect(events).toContainEqual(expect.objectContaining({ type: "tool_end", isError: true }));
+    } finally { await runtime.dispose(); }
+  });
+
+  it.each([{ executionProfile: "standard" as const }, { mode: "goal" as const }])(
+    "does not accept Team deferral outside Team Plan (%j)", async options => {
+      const { runtime, events } = fixture(options);
+      try {
+        await runtime.prompt("Submit", "user-1", "aggregation-turn");
+        expect(events.some(event => event.type === "error" && event.error.code === "PLAN_SUBMIT_FAILED")).toBe(true);
+      } finally { await runtime.dispose(); }
+    },
+  );
+
+  it("keeps Host submission failures observable instead of yielding successfully", async () => {
+    const { runtime, events } = fixture({ submitError: new Error("Host disconnected") });
+    try {
+      await runtime.prompt("Submit", "user-1", "aggregation-turn");
+      expect(events.some(event => event.type === "error" && event.error.code === "PLAN_SUBMIT_FAILED")).toBe(true);
+    } finally { await runtime.dispose(); }
+  });
+
+  it.each(["cancel", "mode", "turn", "epoch"] as const)("does not accept a deferred reply after %s changes", async change => {
+    let invalidate = () => {};
+    const { runtime, view } = fixture({ onSubmit: () => invalidate() });
+    const signal = new AbortController();
+    const state = runtime as unknown as { turnId?: string; turnEpoch: number; pendingSubmissionOutcome?: unknown; terminatingToolCalls: Set<string> };
+    invalidate = () => {
+      if (change === "cancel") signal.abort();
+      if (change === "mode") runtime.setMode("goal");
+      if (change === "turn") state.turnId = "next-turn";
+      if (change === "epoch") state.turnEpoch++;
+    };
+    try {
+      const tool = view.agent.state.tools.find(entry => entry.name === "SubmitPlan");
+      if (!tool) throw new Error("Missing SubmitPlan");
+      await expect(tool.execute("stale-submit", args, signal.signal)).rejects.toMatchObject({ name: "AbortError" });
+      expect(state.pendingSubmissionOutcome).toBeUndefined();
+      expect(state.terminatingToolCalls.has("stale-submit")).toBe(false);
+      expect(runtime.getStatus().planningState).not.toBe("awaiting_approval");
+    } finally { await runtime.dispose(); }
   });
 });
 
@@ -11398,4 +11626,289 @@ it("does not reuse stale plugin declarations when schema or permission metadata 
     expect(runtimeMatches(runtime, { pluginTools: [{ ...plugin, parameters: { type: "object", properties: { file: { type: "string" } } } }] })).toBe(false);
     expect(runtimeMatches(runtime, { pluginTools: [{ ...plugin, planSafeActions: ["inspect"] }] })).toBe(false);
   } finally { await runtime.dispose(); }
+});
+
+
+describe("DesktopAgentRuntime forced Team completion", () => {
+  const pendingReview = {
+    schemaVersion: 1, reviewId: "review-1", teamSessionId: "session-1",
+    leadTurnId: "team-turn", revision: 1, status: "pending", strategy: "delegate",
+    members: [{ name: "researcher", selection: { providerId: "local", modelId: "local-model" } }],
+  };
+
+  function fixture(options: {
+    mode?: "agent" | "plan" | "goal";
+    silent?: boolean;
+    executionProfile?: "team" | "standard";
+    isLead?: boolean;
+    initialReview?: unknown;
+    expertStarted?: boolean;
+    authorityError?: Error;
+    afterAuthority?: (runtime: DesktopAgentRuntime) => Promise<void> | void;
+    recoverToReview?: boolean;
+    recoverToResearch?: boolean;
+    beforeReview?: (runtime: DesktopAgentRuntime) => Promise<void> | void;
+  } = {}) {
+    let review = options.initialReview ?? null;
+    let expertStarted = options.expertStarted ?? false;
+    const events: AgentEventEnvelope["event"][] = [];
+    const requests: Array<{ turnId: string; prompt: string }> = [];
+    let runtime: DesktopAgentRuntime;
+    const host = { call: vi.fn(async (method: string, params?: Record<string, unknown>) => {
+      if (method === "team.getLaunchReview") {
+        await options.beforeReview?.(runtime);
+        return { review };
+      }
+      if (method === "team.authorizeLeadTool") {
+        if (params?.toolName === "TeamFinalAnswer") {
+          await options.afterAuthority?.(runtime);
+          if (options.authorityError) throw options.authorityError;
+        }
+        if (params?.toolName === "TeamFinalAnswer" && !expertStarted) {
+          throw Object.assign(new Error("TEAM_APPROVAL_REQUIRED: no expert participated"), {
+            code: "TEAM_APPROVAL_REQUIRED",
+          });
+        }
+        return { authorized: true };
+      }
+      if (method === "team.declareStrategy") {
+        review = options.recoverToResearch
+          ? { ...pendingReview, status: "confirmed", launchPolicy: "automatic_plan" }
+          : pendingReview;
+        return { decision: { strategy: "delegate", reason: "Required experts" }, review };
+      }
+      if (method === "team.createTask") return { task: { taskId: "research-task", ownerMemberName: "researcher", revision: 1 } };
+      if (method === "team.sendMessage") {
+        expertStarted = true;
+        return { message: { id: "dispatch-1", status: "delivered" } };
+      }
+      if (method === "team.getPlanning") return { phase: "aggregating", isReadyForPlanSubmission: true,
+        results: [{ taskId: "research-task", structuredResult: { summary: "Use CAS", findings: ["Revision checks exist"], risks: ["Stale edits"], recommendations: ["Preserve CAS"], verifiedSources: ["src/store.ts"] } }] };
+      if (method === "team.getRoster") return { teamSessionId: "session-1", members: [{ name: "researcher", phase: "completed" }] };
+      if (method === "team.getBoard") return { revision: 2, tasks: [{ taskId: "research-task", status: "completed" }] };
+      if (method === "plans.submit") return { status: "pending", proposal: { id: "implementation-plan", title: params?.title, markdown: params?.markdown, status: "pending", artifact: { relativePath: ".pi/plan/implementation-plan.md", sha256: "a".repeat(64), sizeBytes: 80 } } };
+      return undefined;
+    }) };
+    runtime = createRuntime({
+      mode: options.mode ?? "agent", executionProfile: options.executionProfile ?? "team", host,
+      teamContext: { teamSessionId: "session-1", callerSessionId: "session-1", isLead: options.isLead ?? true },
+      onEvent: (envelope) => events.push((envelope as AgentEventEnvelope).event),
+    });
+    const view = runtime as unknown as { agent: Agent; models: Pick<Models, "streamSimple">; turnId: string };
+    view.models = {
+      streamSimple: () => {
+        requests.push({ turnId: view.turnId, prompt: String(view.agent.state.systemPrompt) });
+        const researchSteps = [
+          { name: "declare_team_strategy", arguments: { strategy: "delegate", reason: "Read-only architecture research", members: [{ name: "researcher" }] } },
+          { name: "task_create", arguments: { subject: "Inspect state revision", ownerMemberName: "researcher" } },
+          { name: "send_message", arguments: { targetMemberName: "researcher", content: "Research task research-task and return structured findings" } },
+          { name: "team_status", arguments: {} },
+          { name: "SubmitPlan", arguments: { title: "Preserve revisions", markdown: "# Plan\n\nPreserve CAS based on src/store.ts expert research.", question: "Approve implementation?" } },
+        ];
+        const researchStep = options.recoverToResearch ? researchSteps[requests.length - 2] : undefined;
+        const declaration = options.recoverToReview && requests.length === 2;
+        const stopReason = declaration || researchStep ? "toolUse" : "stop";
+        const message = assistantMessage({
+          content: researchStep ? [{ type: "toolCall", id: `research-${requests.length}`, ...researchStep }] : declaration ? [{
+            type: "toolCall", id: "declare-recovery", name: "declare_team_strategy",
+            arguments: { strategy: "delegate", reason: "Required experts", members: [{ name: "researcher" }] },
+          }] : options.silent ? [] : [{ type: "text", text: review ? "Please confirm the experts." : "I completed everything alone." }],
+          stopReason,
+        }) as unknown as AssistantMessage;
+        const stream = createAssistantMessageEventStream();
+        queueMicrotask(() => {
+          stream.push({ type: "start", partial: message });
+          stream.push({ type: "done", reason: stopReason, message });
+          stream.end(message);
+        });
+        return stream;
+      },
+    };
+    return { runtime, host, events, requests };
+  }
+
+  it("recovers a no-tool Agent answer into a real pending delegate review without dispatch", async () => {
+    const { runtime, host, events, requests } = fixture({ recoverToReview: true });
+    try {
+      await runtime.prompt("Use the expert team", "user-1", "team-turn");
+      expect(requests).toHaveLength(3);
+      expect(requests.map((request) => request.turnId)).toEqual(["team-turn", "team-turn", "team-turn"]);
+      expect(requests[1].prompt).toContain("<team_completion_recovery>");
+      expect(host.call.mock.calls.filter(([method]) => method === "team.declareStrategy")).toHaveLength(1);
+      expect(host.call.mock.calls.some(([method]) => method === "team.sendMessage")).toBe(false);
+      const completed = events.filter((event) => event.type === "message_end" && event.message.status === "complete");
+      expect(completed.some((event) => event.type === "message_end" && event.message.content.includes("completed everything"))).toBe(false);
+      expect(events.filter((event) => event.type === "agent_end")).toHaveLength(1);
+      expect(events.some((event) => event.type === "error")).toBe(false);
+    } finally { await runtime.dispose(); }
+  });
+
+  it("recovers Plan into automatic research, actual dispatch, full findings and plan approval", async () => {
+    const { runtime, host, events, requests } = fixture({ mode: "plan", recoverToResearch: true });
+    try {
+      await runtime.prompt("Plan using experts automatically", "user-1", "team-turn");
+      expect(requests).toHaveLength(6);
+      expect(requests.every(request => request.turnId === "team-turn")).toBe(true);
+      expect(requests[1].prompt).toContain("Automatically declare");
+      expect(requests[1].prompt).not.toContain("explain the pending review");
+      expect(host.call).toHaveBeenCalledWith("team.createTask", expect.objectContaining({ ownerMemberName: "researcher" }));
+      expect(host.call).toHaveBeenCalledWith("team.sendMessage", expect.objectContaining({ target: "researcher", content: expect.stringContaining("research-task") }));
+      expect(host.call).toHaveBeenCalledWith("team.getPlanning", expect.objectContaining({ callerSessionId: "session-1" }));
+      expect(host.call).toHaveBeenCalledWith("plans.submit", expect.objectContaining({ kind: "plan", markdown: expect.stringContaining("expert research") }));
+      expect(host.call.mock.calls.some(([method]) => method === "team.confirmLaunchReview")).toBe(false);
+      expect(runtime.getStatus().planningState).toBe("awaiting_approval");
+      expect(events.some(event => event.type === "error")).toBe(false);
+    } finally { await runtime.dispose(); }
+  });
+
+  it("requires a fresh user-confirmed execution roster after Plan switches to Agent", async () => {
+    const { runtime, events, requests } = fixture({ mode: "plan", initialReview: {
+      ...pendingReview, status: "pending", launchPolicy: "automatic_plan",
+    } });
+    try {
+      runtime.setMode("agent");
+      await runtime.prompt("Execute the approved plan", "approval-user", "team-turn");
+      expect(requests).toHaveLength(2);
+      expect(requests[1].prompt).toContain("trusted user confirmation");
+      expect(events.some(event => event.type === "error" && event.error.code === "TEAM_APPROVAL_REQUIRED")).toBe(true);
+      expect(events.filter(event => event.type === "message_end" && event.message.status === "complete")).toHaveLength(0);
+    } finally { await runtime.dispose(); }
+  });
+
+  it("does not stop Plan research at a pending roster review", async () => {
+    const { runtime, host, events, requests } = fixture({ mode: "plan", initialReview: pendingReview });
+    try {
+      await runtime.prompt("Plan using experts automatically", "user-1", "team-turn");
+      expect(requests).toHaveLength(2);
+      expect(requests[1].prompt).toContain("Automatically declare");
+      expect(requests[1].prompt).not.toContain("explain the pending review");
+      expect(host.call.mock.calls.filter(([method, params]) => method === "team.authorizeLeadTool" && params?.toolName === "TeamFinalAnswer")).toHaveLength(2);
+      expect(events.some((event) => event.type === "error" && event.error.code === "TEAM_APPROVAL_REQUIRED")).toBe(true);
+      expect(events.filter((event) => event.type === "message_end" && event.message.status === "complete")).toHaveLength(0);
+    } finally { await runtime.dispose(); }
+  });
+
+  it("fails observably after one recovery when the model persists in no-tool answers", async () => {
+    const { runtime, events, requests } = fixture();
+    try {
+      await runtime.prompt("Use the expert team", "user-1", "team-turn");
+      expect(requests).toHaveLength(2);
+      expect(events).toContainEqual(expect.objectContaining({ type: "error", error: expect.objectContaining({ code: "TEAM_APPROVAL_REQUIRED" }) }));
+      expect(events.filter((event) => event.type === "message_end" && event.message.status === "complete")).toHaveLength(0);
+      expect(events).toContainEqual(expect.objectContaining({ type: "message_end", message: expect.objectContaining({ status: "error" }) }));
+      expect(events.filter((event) => event.type === "agent_end")).toHaveLength(1);
+    } finally { await runtime.dispose(); }
+  });
+
+  it.each([
+    { name: "approved but idle", review: { ...pendingReview, status: "confirmed" } },
+    { name: "stale pending", review: { ...pendingReview, leadTurnId: "previous-turn" } },
+    { name: "empty pending", review: { ...pendingReview, members: [] } },
+    { name: "legacy solo pending", review: { ...pendingReview, strategy: "lead_only" } },
+    { name: "other team pending", review: { ...pendingReview, teamSessionId: "other-team" } },
+  ])("rejects a $name review as completion authority", async ({ review }) => {
+    const { runtime, host, events, requests } = fixture({ initialReview: review });
+    try {
+      await runtime.prompt("Use the expert team", "user-1", "team-turn");
+      expect(requests).toHaveLength(2);
+      expect(host.call.mock.calls.filter(([method, params]) => method === "team.authorizeLeadTool" && params?.toolName === "TeamFinalAnswer")).toHaveLength(2);
+      expect(events.some((event) => event.type === "error" && event.error.code === "TEAM_APPROVAL_REQUIRED")).toBe(true);
+    } finally { await runtime.dispose(); }
+  });
+
+  it.each(["agent", "plan"] as const)("allows normal %s final output only after Host verifies actual expert participation", async (mode) => {
+    const { runtime, host, events, requests } = fixture({ mode, expertStarted: true });
+    try {
+      await runtime.prompt("Summarize the expert result", "mail-1", "mail-continuation-turn");
+      expect(requests).toHaveLength(1);
+      expect(host.call).toHaveBeenCalledWith("team.authorizeLeadTool", {
+        teamSessionId: "session-1", callerSessionId: "session-1", toolName: "TeamFinalAnswer",
+      });
+      expect(events.some((event) => event.type === "message_end" && event.message.status === "complete")).toBe(true);
+      expect(events.some((event) => event.type === "error")).toBe(false);
+    } finally { await runtime.dispose(); }
+  });
+
+  it("preserves silent trusted completion notices but enforces the next human turn", async () => {
+    const { runtime, events, requests, host } = fixture({ silent: true });
+    const completionOrigin: SessionMessageOrigin = {
+      messageId: "completion-1", sourceSessionId: "sender", sourceTitle: "Worker",
+      targetSessionId: "session-1", kind: "completion", replyToMessageId: "task-1",
+    };
+    try {
+      await runtime.prompt({ text: "Task completed", sessionMessage: completionOrigin }, "notice-user", "notice-turn");
+      expect(requests).toHaveLength(1);
+      expect(host.call.mock.calls.some(([method]) => method === "team.getLaunchReview")).toBe(false);
+      expect(events.some((event) => event.type === "error")).toBe(false);
+      events.length = 0;
+      await runtime.prompt("Use experts for this new task", "human-user", "team-turn");
+      expect(requests).toHaveLength(3);
+      expect(events.some((event) => event.type === "error" && event.error.code === "TEAM_APPROVAL_REQUIRED")).toBe(true);
+      expect(events.filter((event) => event.type === "message_end" && event.message.status === "complete")).toHaveLength(0);
+    } finally { await runtime.dispose(); }
+  });
+
+  it("does not exempt a nonempty final answer to a trusted completion notice", async () => {
+    const { runtime, events, requests } = fixture();
+    try {
+      await runtime.prompt({ text: "Task completed", sessionMessage: {
+        messageId: "completion-1", sourceSessionId: "sender", sourceTitle: "Worker", targetSessionId: "session-1",
+        kind: "completion", replyToMessageId: "task-1",
+      } }, "notice-user", "notice-turn");
+      expect(requests).toHaveLength(2);
+      expect(events.some((event) => event.type === "error" && event.error.code === "TEAM_APPROVAL_REQUIRED")).toBe(true);
+    } finally { await runtime.dispose(); }
+  });
+
+  it("surfaces a Host transport failure without model recovery or successful completion", async () => {
+    const { runtime, events, requests } = fixture({ authorityError: new Error("ECONNRESET") });
+    try {
+      await runtime.prompt("Use the expert team", "user-1", "team-turn");
+      expect(requests).toHaveLength(1);
+      expect(events).toContainEqual(expect.objectContaining({ type: "error", error: expect.objectContaining({ code: "NETWORK_ERROR", details: expect.objectContaining({ origin: "local" }) }) }));
+      expect(events.filter((event) => event.type === "message_end" && event.message.status === "complete")).toHaveLength(0);
+    } finally { await runtime.dispose(); }
+  });
+
+  it.each([
+    { mode: "agent" as const, change: "cancel" }, { mode: "agent" as const, change: "mode" },
+    { mode: "plan" as const, change: "cancel" }, { mode: "plan" as const, change: "mode" },
+  ])("rejects stale successful $mode expert authority after $change", async ({ mode, change }) => {
+    const { runtime, events, requests } = fixture({ mode, expertStarted: true, afterAuthority: async (activeRuntime) => {
+      if (change === "cancel") await activeRuntime.abort();
+      else activeRuntime.setMode("goal");
+    } });
+    try {
+      await runtime.prompt("Use the expert team", "user-1", "team-turn");
+      expect(requests).toHaveLength(1);
+      expect(events.some((event) => event.type === "message_end" && event.message.status === "aborted")).toBe(true);
+      expect(events.filter((event) => event.type === "message_end" && event.message.status === "complete")).toHaveLength(0);
+    } finally { await runtime.dispose(); }
+  });
+
+  it.each(["cancel", "mode"] as const)("does not recover or complete a stale authority reply after %s", async (change) => {
+    const { runtime, events, requests, host } = fixture({ beforeReview: async (activeRuntime) => {
+      if (change === "cancel") await activeRuntime.abort();
+      else activeRuntime.setMode("goal");
+    } });
+    try {
+      await runtime.prompt("Use the expert team", "user-1", "team-turn");
+      expect(requests).toHaveLength(1);
+      expect(host.call.mock.calls.some(([method, params]) => method === "team.authorizeLeadTool" && params?.toolName === "TeamFinalAnswer")).toBe(false);
+      expect(events.filter((event) => event.type === "message_end" && event.message.status === "complete")).toHaveLength(0);
+      expect(events.some((event) => event.type === "message_end" && event.message.status === "aborted")).toBe(true);
+    } finally { await runtime.dispose(); }
+  });
+
+  it.each([
+    { mode: "goal" as const }, { executionProfile: "standard" as const }, { isLead: false },
+  ])("preserves completion outside Team Agent/Plan lead (%j)", async (options) => {
+    const { runtime, host, events, requests } = fixture(options);
+    try {
+      await runtime.prompt("Answer normally", "user-1", "team-turn");
+      expect(requests).toHaveLength(1);
+      expect(host.call.mock.calls.some(([method]) => method === "team.getLaunchReview")).toBe(false);
+      expect(events.some((event) => event.type === "message_end" && event.message.status === "complete")).toBe(true);
+    } finally { await runtime.dispose(); }
+  });
 });

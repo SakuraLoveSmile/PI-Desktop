@@ -2007,6 +2007,68 @@ pub fn fork_session_through(
     title: Option<&str>,
     through_message_id: Option<&str>,
 ) -> Result<ForkSessionResult> {
+    fork_session_snapshot(
+        db,
+        source_id,
+        title,
+        through_message_id,
+        ForkSnapshotBoundary::UserAction,
+    )
+}
+
+#[derive(Clone, Copy)]
+enum ForkSnapshotBoundary<'a> {
+    UserAction,
+    AutomaticPlanPrompt(&'a str),
+}
+
+/// Host-only research snapshot anchored at the active Lead's persisted user
+/// prompt, excluding live assistant and tool records. No model-supplied anchor.
+pub(crate) fn fork_team_plan_research_session(
+    db: &Database,
+    source_id: &str,
+    title: Option<&str>,
+    lead_turn_id: &str,
+) -> Result<ForkSessionResult> {
+    let eligible: bool = db.conn().query_row(
+        "SELECT EXISTS(SELECT 1 FROM sessions s JOIN turns t ON t.session_id=s.id
+         WHERE s.id=?1 AND s.mode='plan' AND s.execution_profile='team'
+           AND t.id=?2 AND t.status='running'
+           AND NOT EXISTS(SELECT 1 FROM team_members m WHERE m.member_session_id=s.id))",
+        params![source_id, lead_turn_id],
+        |row| row.get(0),
+    )?;
+    if !eligible {
+        return Err(anyhow!(
+            "TEAM_UNAUTHORIZED: research snapshot requires the active Plan Lead turn"
+        ));
+    }
+    crate::team::authority::validate_review_scope(db, source_id, lead_turn_id)?;
+    let anchor: Option<String> = db.conn().query_row(
+        "SELECT id FROM messages WHERE session_id=?1 AND turn_id=?2 AND role='user' ORDER BY seq DESC LIMIT 1",
+        params![source_id,lead_turn_id], |row| row.get(0),
+    ).optional()?;
+    let Some(anchor) = anchor else {
+        return Err(anyhow!(
+            "TEAM_BUSY: current planning prompt is not persisted for a safe research snapshot"
+        ));
+    };
+    fork_session_snapshot(
+        db,
+        source_id,
+        title,
+        Some(&anchor),
+        ForkSnapshotBoundary::AutomaticPlanPrompt(lead_turn_id),
+    )
+}
+
+fn fork_session_snapshot(
+    db: &Database,
+    source_id: &str,
+    title: Option<&str>,
+    through_message_id: Option<&str>,
+    boundary: ForkSnapshotBoundary<'_>,
+) -> Result<ForkSessionResult> {
     let Some(source) = get_session(db, source_id)? else {
         return Ok(ForkSessionResult::NotFound);
     };
@@ -2028,10 +2090,10 @@ pub fn fork_session_through(
         };
         if running {
             let record = &source_records[position];
-            // An assistant message can be complete while its tool loop is still
-            // running. Reject any prefix containing rows owned by a live turn,
-            // not merely a streaming anchor. The RPC holds the host state lock
-            // across this check and publication, including transcript appends.
+            // User-action forks require a settled prefix. Host planning snapshots
+            // allow only the active user prompt as an exception; live assistant
+            // and tool rows never enter the child. The Host lock covers transcript
+            // appends through this check and publication.
             let settled_prefix: bool = db.conn().query_row(
                 "SELECT EXISTS (
                     SELECT 1 FROM messages anchor
@@ -2045,7 +2107,19 @@ pub fn fork_session_through(
                 params![source_id, message_id],
                 |row| row.get(0),
             )?;
-            if record.role != "assistant"
+            let allowed_anchor = match boundary {
+                ForkSnapshotBoundary::UserAction => record.role == "assistant" && settled_prefix,
+                ForkSnapshotBoundary::AutomaticPlanPrompt(turn) => {
+                    record.role == "user" && db.conn().query_row(
+                        "SELECT EXISTS(SELECT 1 FROM messages anchor
+                         WHERE anchor.session_id=?1 AND anchor.id=?2 AND anchor.turn_id=?3 AND anchor.role='user'
+                         AND NOT EXISTS(SELECT 1 FROM messages m JOIN turns t ON t.id=m.turn_id
+                             WHERE m.session_id=?1 AND t.status='running' AND m.seq<=anchor.seq AND m.id<>anchor.id))",
+                        params![source_id,message_id,turn], |row| row.get::<_, bool>(0),
+                    )?
+                }
+            };
+            if !allowed_anchor
                 || record.is_error
                 || !matches!(
                     record
@@ -2060,7 +2134,6 @@ pub fn fork_session_through(
                     .as_ref()
                     .and_then(|meta| meta.get("error"))
                     .is_some_and(|error| !error.is_null())
-                || !settled_prefix
             {
                 return Ok(ForkSessionResult::Busy);
             }
@@ -2377,7 +2450,7 @@ pub fn delete_session(db: &Database, id: &str) -> Result<bool> {
     let tx = db.conn().unchecked_transaction()?;
     crate::goal_progress::cleanup_session_conn(&tx, id)?;
     tx.execute(
-        "DELETE FROM kv WHERE ns IN ('team-planning-v1','team-member-purpose-v1') AND key=?1",
+        "DELETE FROM kv WHERE ns IN ('team-planning-v1','team-member-purpose-v1','team-strategy-scope-v1') AND key=?1",
         [id],
     )?;
     let n = tx.execute("DELETE FROM sessions WHERE id = ?1", params![id])?;
@@ -2402,7 +2475,7 @@ pub fn delete_session_with_team_cleanup(db: &Database, id: &str) -> Result<bool>
     crate::team::lifecycle::cleanup_team_on_lead_delete_conn(&tx, id)?;
     crate::goal_progress::cleanup_session_conn(&tx, id)?;
     tx.execute(
-        "DELETE FROM kv WHERE ns IN ('team-planning-v1','team-member-purpose-v1') AND key=?1",
+        "DELETE FROM kv WHERE ns IN ('team-planning-v1','team-member-purpose-v1','team-strategy-scope-v1') AND key=?1",
         [id],
     )?;
     let deleted = tx.execute("DELETE FROM sessions WHERE id=?1", [id])? > 0;
@@ -4099,7 +4172,11 @@ pub fn begin_turn(
     model_id: Option<&str>,
 ) -> Result<String> {
     crate::team::review::gate_team_member_turn(db, session_id, provider_id, model_id)?;
-    begin_turn_inner(db, session_id, provider_id, model_id)
+    with_savepoint(db.conn(), "team_activity", |_| {
+        let turn = begin_turn_inner(db, session_id, provider_id, model_id)?;
+        crate::team::authority::record_user_turn(db, session_id, &turn)?;
+        Ok(turn)
+    })
 }
 
 pub(crate) fn begin_turn_for_team_mail(

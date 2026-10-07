@@ -5547,7 +5547,7 @@ eleven-tool-round desktop paths are verified by
 ## 8. 可追溯性矩阵
 | 验收 | 应用场景 |
 |---|---|
-| C / Quality / Security — 经审批的只读专家团规划 | E2E-TEAM-approved-plan-research-and-execution |
+| C / Quality / Security — 自动只读专家团规划 | E2E-TEAM-approved-plan-research-and-execution, E2E-TEAM-automatic-plan-research |
 | C / Quality — 独立 Team 全景图／任务／成员标签页 | E2E-TEAM-panorama-and-member-tabs |
 | C / Quality — 实时派发卡片与单一任务目标 | E2E-TEAM-dispatch-card-live-status-and-joining |
 | C / E / F / Quality / Security — Session Todo checklist | E2E-CHAT-session-todo-checklist |
@@ -9615,8 +9615,8 @@ the latest destination. These assertions measure work counts, not device FPS.
 ## E2E-TEAM-approved-plan-research-and-execution
 
 - **前提：** 隔离的生产 Electron/Main/Host/侧车、两名研究成员、临时项目与本机 SSE 夹具；不访问用户数据或真实模型。
-- **步骤：** 取消审批、重启待审方案并确认新审批；创建两项归属明确的任务，实际 Read 并暂停第二份结果。尝试提前提交，随后结束全部研究回合、读取完整结果、提交、请求修订、拒绝重试并批准。通过普通权限卡允许执行 Write，检查文件精确字节。
-- **预期：** 确认前零研究调用；首份结果不能提交。研究工具保持只读，完整结果进入产物；审批可以恢复，正常执行权限保留，批准方案或删除团队不会提升研究成员权限。
+- **步骤：** 从输入框提交专家团规划请求，自动启动两名只读研究专家；创建归属明确的任务，实际 Read 并暂停第二份结果。提前提交必须失败，随后完成研究并提交。重启保留结果和已中断方案历史且不重放专家。修订、拒绝重试都自动研究；批准方案后自动显示执行名单确认，再允许 Ask Write 一次并核验文件。
+- **预期：** 规划不等待研究名单审批，必须有真实研究后才能提交方案；首份结果不能提前提交。研究保持只读，完整结果进入产物。执行阶段仍需用户名单确认及普通工具权限；批准方案或删除团队不会自行提升研究成员权限。
 - **规格：** `03-runtime/06-host-rpc-protocol.md`、`03-runtime/08-error-codes.md`、ADR plus-expert-team-collaboration。
 - **验收：** C / Quality / Security — 审批后的规划协作与权限隔离。
 - **里程碑：** 维护。
@@ -9625,5 +9625,68 @@ the latest destination. These assertions measure work counts, not device FPS.
 
 
 
-通过隔离 Team 夹具的真实输入框、可信审批、Host、侧车和本机模型服务验证：审批前无成员和模型调用；批准后建立两项归属明确的研究任务，暂停第二名研究员，第一份结果后仍有两项预期任务且不可提交。第二份结果和用户问题完成后提交；拒绝、修订、同次重试、批准后，Lead 按标准 Agent 权限写入隔离目录。批准后研究成员保持只读。
+通过隔离 Team 夹具的真实输入框、Host、侧车和本机模型服务验证：自动建立两名只读专家并派遣归属明确的研究任务，规划不出现待审批名单。第一份结果不能提交，完整结果后才提交。重启不重放研究；修订和重试自动研究。方案批准后自动显示执行名单确认，执行仍按标准 Agent 权限写入隔离目录。
 低层回归验证 lead_only、任务归属/删除/依赖、旧轮次、CAS、结果预算、幂等、普通完成绕过、revision、停止和重启后的问题清理、本地工具权限以及标准 Plan/Goal。集成命令为 PI_E2E_TEAM_PLANNING=1 node scripts/e2e-team.mjs，不调用真实模型或用户运行中的应用。
+
+### E2E-TEAM-forced-delegation
+
+Run node scripts/e2e-team-forced.mjs with isolated real Electron/Host/sidecar and
+localhost SSE. Reject lead_only and solo tool/submission bypass without state or
+workspace side effects, then verify same-turn delegate retry, trusted roster
+approval, actual expert execution/contribution and Lead integration. Idle members
+and queued messages cannot grant execution. Ordinary/Plan Team journeys preserve
+research, recovery, revision and current-roster authorization.
+
+A first tool-free final recovers once within the same durable user turn. A valid
+nonempty pending Agent roster may end awaiting launch confirmation. Plan
+recovery must instead continue automatic real research. Repeated refusal
+ends with an observable approval error, no side effects or successful completion;
+cancellation and mode changes invalidate recovery.
+
+Trusted completion notices retain silent acknowledgements only; any nonempty
+Team answer or subsequent human request still requires expert authority.
+
+Team queue regression: promote a user request with Send Now, observe Team Stop
+pauses all delivery and retains the queued request, then Resume through the UI.
+Without pending Team mail, the promoted request must start exactly once, require
+a fresh expert roster review and integrate a real approved expert contribution.
+
+### E2E-TEAM-automatic-plan-research
+
+- Preconditions: isolated production Electron/Main/Host/sidecar, temporary
+  project and localhost SSE; no real paid provider or user's running profile.
+- Steps: submit a Team Plan request from Composer; automatically declare and
+  materialize read-only researchers, create owned tasks and dispatch them in the
+  same Lead turn. Hold one result, inspect full findings, then release and submit.
+  Revise/retry without staffing approval; restart preserves results and interrupted
+  proposal history without provider replay. Approve the plan, confirm the Agent
+  execution roster, and allow its Ask-permission Write once.
+- Expected: zero research-launch confirmation actions, no pending planning roster
+  card and real expert Read/results before the plan proposal. Agent execution
+  still requires a user-confirmed roster and actual expert contribution. A Plan
+  no-tool final recovers into automatic research instead of waiting for approval.
+  Automatic Plan authority cannot authorize Agent work or mutate researcher files.
+- Specs: Host RPC launch policy, error codes, component spec and Expert Team ADR.
+- Acceptance: conversation, persistence, permissions and execution lifecycle.
+- Status: run on the current request candidate; record source/base and results.
+- Automation: `node scripts/e2e-team-planning.mjs` and
+  `node scripts/e2e-team-forced.mjs`; Host and runtime regression suites.
+
+### E2E-TEAM-plan-inbox-before-approval
+
+- Preconditions: isolated production Electron/Main/Host/AgentHost/sidecar, local
+  SSE provider and temporary workspace; no user profile or paid provider.
+- Steps: finish real structured research, then send a meaningful multilingual
+  supplementary report while Lead is busy. SubmitPlan normally defers; deliver
+  the exact message through its authenticated mailbox continuation. Queue an
+  ordinary user request while the final synthesis is held, then submit. Also
+  verify pure structured-result research with no duplicate completion sends.
+- Expected: no error/approval/file at deferral; full report preserved in the
+  final artifact, exactly one real message admission, no expert message left in
+  the composer when approval appears, and the user's queued request remains.
+  ACK alone never counts as consumed; cancelled messages are not blockers.
+- Specs: Host RPC PlanSubmitResult/inbox barrier and Expert Team ADR.
+- Acceptance: conversation, persistence, queue lifecycle and user-data retention.
+- Status: required on refreshed task candidate, record actual source/base.
+- Automation: `node scripts/e2e-team-planning.mjs`, Host planning/RPC and
+  real-stream runtime submission regressions.

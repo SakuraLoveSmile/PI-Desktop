@@ -74,6 +74,16 @@ describe("Team planning production sidecar boundary", () => {
     expect(calls).toHaveLength(4);
   });
 
+  it("forwards the read-only Lead authorization check without exposing confirmation", async () => {
+    const { call, calls } = harness();
+    const input = { teamSessionId: "lead", callerSessionId: "lead", toolName: "Skill" };
+    expect(await call("team.authorizeLeadTool", input)).toEqual({ method: "team.authorizeLeadTool", params: input });
+    expect(calls).toEqual([{ method: "team.authorizeLeadTool", params: input }]);
+    await expect(call("team.confirmLaunchReview", { teamSessionId: "lead", reviewId: "solo", expectedRevision: 1 }))
+      .rejects.toMatchObject({ code: -32601 });
+    expect(calls).toHaveLength(1);
+  });
+
   it("keeps trusted launch review actions outside the model-directed reverse proxy", async () => {
     const { call, calls } = harness();
     for (const method of ["team.updateLaunchReview", "team.confirmLaunchReview", "team.cancelLaunchReview", "tools.authorizeLocal"]) {

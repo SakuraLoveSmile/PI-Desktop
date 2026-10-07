@@ -293,6 +293,8 @@ Host 无通知 API 时仍每 1 s 复查。基线失败返回工具错误；复�
   变化都不会单独否定已持久化的回执。
 - `team.pause/resume({ teamSessionId, callerSessionId })` 仅允许 Lead 操作。Electron Main 会
   hold/resume 对应的 Agent Host 队列，并在恢复后排空待投递消息。
+  It then kicks resumed session queues so queued user work can continue without
+  pending Team mail; other lifecycle holds and active-turn admission remain intact.
 - `team.createTask` 和 `team.updateTask` 必须携带 `callerSessionId`；Host 在修改前校验成员
   身份、仅 Lead 可重新分配任务、任务所有权、CAS 修订版本和依赖约束。提供负责人时，成员
   会话 ID 和成员名称作为一组解析；Lead 可以重新分配或清除任务负责人。
@@ -1108,10 +1110,10 @@ schedule，Manual 转 Hourly 继续使用现有默认间隔行为。
 
 ### 专家团规划补充
 
-方案模式的 Lead 保留标准规划权限和协调工具。批准专家名单时，Host 在同一事务中保存研究轮次和已批准成员身份；Lead 不会获得研究成员身份。
+方案模式的 Lead 保留标准规划权限和协调工具。Host 自动启动只读专家，并在同一事务中保存研究轮次和研究成员身份，无需用户确认研究名单；Lead 不会获得研究成员身份。最终方案仍由用户审批。
 新增 team.getPlanning 返回 planningId、teamSessionId、roundId、phase、workPurpose、reviewId、totalExpectedTasks、completedResearchTasks、openQuestionsCount、isReadyForPlanSubmission、proposalId、results 与 updatedAt；没有轮次时返回 null。team_status 和 task_get 包含完整研究投影。
 team.submitResearchResult 绑定可信运行时身份和轮次，接受 taskId、expectedRevision 及 structuredResult；后者保存 summary、findings、risks、recommendations、verifiedSources。Host 校验批准身份、当前轮次、任务归属、删除状态、依赖和修订号，原子保存结果、完成任务并推进 Team revision。同内容重试幂等；普通 task_update 不能代替研究提交。单结果最多 32 KiB、整轮最多 128 KiB；各列表最多 32 项、每项 2,000 字节，摘要最多 4,000 字节。
-Lead 专用 openPlanningQuestion / closePlanningQuestion 使用 teamSessionId、callerSessionId、roundId 和 questionId；asktool 的取消、停止和进程恢复清除待回答阻塞。全部任务与问题完成后才能提交，lead_only 允许零研究任务。拒绝保留研究供修订；批准或定时执行沿用原有方案转换。关闭规划不会自动赋予研究成员写权限，必须重新批准 Agent 执行名单。
+Lead 专用 openPlanningQuestion / closePlanningQuestion 使用 teamSessionId、callerSessionId、roundId 和 questionId；asktool 的取消、停止和进程恢复清除待回答阻塞。全部任务与问题完成后才能提交，Team planning requires at least one approved expert research task。拒绝保留研究供修订；批准或定时执行沿用原有方案转换。关闭规划不会自动赋予研究成员写权限，必须重新批准 Agent 执行名单。
 侧车仅开放必要规划查询、结果和问题 RPC，不开放任意创建轮次或可信审批修改。父进程在本地工具拦截前调用内部 tools.authorizeLocal，Rust tools.execute 同样依据持久身份校验。Team 邮箱允许同团规划协作，插件 SessionTask 仍限 Agent。
 
 方案中断或到期后保留研究并恢复汇总，不重放任务。解散专家团在脱离事务内清理规划/成员用途 KV；研究成员保留转写、模型和权限选择，转为独立标准 Plan 会话；普通执行成员仍沿用原有独立 Agent 语义。
@@ -1119,3 +1121,61 @@ Lead 专用 openPlanningQuestion / closePlanningQuestion 使用 teamSessionId、
 批准研究任务时同时持久化成员会话模式为 Plan，旧运行时忽略新用途字段也不会获得普通 Agent 写工具；只有重新批准 Agent 执行分配才能恢复成员 Agent 模式。正常执行成员和标准 Plan/Goal 不变。
 
 收到结果不等于研究回合结束。就绪状态和 SubmitPlan 还要求全部已批准研究成员的运行回合结束，允许 Lead 自己的汇总回合仍在运行；现有 Team 活动 revision 在研究结算后唤醒 wait_for_updates。
+
+### Mandatory Expert Team delegation
+
+Team mode accepts only delegate with a nonempty reviewed roster. lead_only and
+historical solo confirmation cannot authorize work. Existing trusted roster
+review launches Agent execution experts; Plan research launches automatically
+without a pending roster approval. No solo approval is offered. Current-turn Host scope
+and actual bound expert dispatch are required for substantive Lead tools and
+Plan submission. Idle members/queued messages are insufficient. Read-only
+inspection and approved coordination stay available. Goal negotiation retains
+its existing permissions; Agent execution restores mandatory Team delegation.
+
+### Expert Team planning launch policy
+
+`TeamLaunchReview.launchPolicy?: "automatic_plan" | "user_confirmed"` is
+Host-owned; absent legacy values mean user-confirmed. Plan `team.declareStrategy`
+returns materialized researchers and a confirmed automatic launch audit without
+pending user approval or synthetic confirmation mail. Research remains read-only
+and the Lead must obtain full results before SubmitPlan. New revision/retry
+requests also launch automatically. User confirmation is required for the final
+Plan artifact and the subsequent Agent execution roster. An automatic Plan audit
+is rejected by confirmLaunchReview and never grants Agent execution authority.
+
+Automatic Plan `fork` context uses a Host-owned immutable snapshot through the
+current persisted user request plus settled prior history. Live assistant/tool
+rows are excluded. The generic running-session fork restriction is unchanged;
+member provenance, read-only purpose and failure rollback remain validated.
+
+The Team snapshot exposes a pending review only while its leadTurnId matches the
+current Host-owned strategy scope. A completed Lead turn can still await valid
+confirmation; superseded pending reviews stay readable by ID but cannot reopen
+the current UI. Existing Team activity revisions refresh the shared reader.
+
+### Team Plan inbox submission barrier
+
+The optional additive `TeamPlanningProjection.pendingMessagesCount` counts
+Team-origin `message` rows addressed to Lead with `status=queued` and no bound
+turn. Queue receipts and ACKs prove durable acceptance, not consumption. User
+queued prompts, other origins/targets, terminal/cancelled rows and already
+turn-bound messages are excluded. Messages are never discarded by text matching.
+
+Otherwise-ready Team Plan `plans.submit` returns
+`{status:"deferred",reason:"team_messages_pending",pendingMessagesCount:N}`
+while this inbox is nonempty. No artifact, proposal, version or `plans.changed`
+approval notification is published. The runtime terminates the current Lead turn
+normally without an error or awaiting-approval state. Existing FIFO continuation
+then supplies full authenticated message content to the Lead. The final ready
+submission returns the existing `{status:"pending",proposal}` contract.
+
+The final check and artifact/proposal publication share an IMMEDIATE SQLite
+transaction. Existing proposal retries retain their identity; missing research,
+questions, unsettled experts and normal permission/cancellation errors keep their
+existing semantics. Final research readiness also requires an empty unconsumed
+Team inbox. Standard Plan and Goal submissions do not use this Team-only yield.
+
+Structured research results already constitute the report. Researchers finish
+after submission without a required duplicate completion message; send_message
+remains available for substantive supplementary information or clarification.

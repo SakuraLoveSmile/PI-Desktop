@@ -2,6 +2,17 @@
 
 Upstream v0.15.6 → v0.16.1 has been merged.
 
+- Expert Team planning consumes supplementary expert messages before publishing
+  the plan, preventing research reports from remaining in the composer queue.
+  User-queued requests are retained; structured results need no duplicate report.
+
+- Expert Team now requires actual expert delegation, including simple requests.
+  Models cannot choose lead_only or authorize work through old solo approvals;
+  experts must actually start before substantive Lead execution. Planning
+  automatically launches read-only experts; roster confirmation is required only
+  when executing the plan.
+  Resuming a Team also restarts ordinary queued requests when no Team mail is pending.
+
 - Expert Team work is easier to follow: queued prompts can be folded, team
   progress and a searchable compact task board show stable member identities,
   live activity refreshes from Host state, and panorama zoom survives updates.

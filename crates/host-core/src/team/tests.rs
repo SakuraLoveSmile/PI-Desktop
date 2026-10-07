@@ -72,6 +72,7 @@ pub(super) fn start_test_turn(db: &Database, lead_session_id: &str, turn_id: &st
             rusqlite::params![turn_id, lead_session_id],
         )
         .unwrap();
+    super::authority::record_user_turn(db, lead_session_id, turn_id).unwrap();
 }
 
 pub(super) fn finish_test_turn(db: &Database, turn_id: &str) {

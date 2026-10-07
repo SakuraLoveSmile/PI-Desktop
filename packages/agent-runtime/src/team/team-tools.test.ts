@@ -30,6 +30,10 @@ describe("Expert Team tools and prompt (ADR 0304)", () => {
     expect(leadTools.length).toBe(10);
     const leadNames = leadTools.map((t) => t.name);
     expect(leadNames).toContain("declare_team_strategy");
+    expect(leadTools.find(tool => tool.name === "declare_team_strategy")?.parameters).toMatchObject({
+      required: expect.arrayContaining(["strategy", "reason", "members"]),
+      properties: { strategy: { const: "delegate" }, members: { minItems: 1 } },
+    });
     for (const expected of TEAM_TOOL_NAMES) {
       expect(leadNames).toContain(expected);
       expect(isTeamTool(expected)).toBe(true);
@@ -120,6 +124,24 @@ describe("Expert Team tools and prompt (ADR 0304)", () => {
     }));
   });
 
+  it("continues automatically after Plan researchers are materialized", async () => {
+    const host = createMockHost({
+      "team.declareStrategy": async () => ({
+        decision: { strategy: "delegate", reason: "Inspect architecture", memberSessionIds: ["research-session"] },
+        review: { reviewId: "automatic-review", status: "confirmed", launchPolicy: "automatic_plan",
+          members: [{ name: "researcher", selection: { providerId: "local", modelId: "fixture" } }] },
+      }),
+    });
+    const declaration = createTeamTools({ teamSessionId: "team-1", callerSessionId: "team-1", isLead: true,
+      getTurnId: () => "plan-turn", host }).find(tool => tool.name === "declare_team_strategy")!;
+    const result = await declaration.execute("declaration", { strategy: "delegate", reason: "Inspect architecture", members: [{ name: "researcher" }] });
+    expect(result.content[0]).toEqual({ type: "text", text: expect.stringContaining('"awaitingUserApproval":false') });
+    expect(result.content[0]).toEqual({ type: "text", text: expect.stringContaining("create owned research tasks") });
+    expect(result.content[0]).toEqual({ type: "text", text: expect.stringContaining("SubmitPlan") });
+    expect(teamSystemPrompt({ isLead: true, mode: "plan" })).toContain("Do not ask the user to approve");
+    expect(teamSystemPrompt({ isLead: true })).toContain("trusted user roster confirmation");
+  });
+
   it("reads the active durable turn on each call and reports a missing turn", async () => {
     const host = createMockHost({
       "team.declareStrategy": async (params) => ({
@@ -148,17 +170,17 @@ describe("Expert Team tools and prompt (ADR 0304)", () => {
     const declaration = tools.find((tool) => tool.name === "declare_team_strategy")!;
 
     const missingTurn = await declaration.execute("call-missing", {
-      strategy: "lead_only",
+      strategy: "delegate", members: [{ name: "worker" }],
       reason: "One indivisible task",
     });
     expect(missingTurn.details).toEqual({ error: "TURN_NOT_FOUND" });
     expect(host.call).not.toHaveBeenCalled();
 
     activeTurnId = "durable-turn-1";
-    await declaration.execute("call-1", { strategy: "lead_only", reason: "One task" });
-    await declaration.execute("call-1-retry", { strategy: "lead_only", reason: "One task" });
+    await declaration.execute("call-1", { strategy: "delegate", members: [{ name: "worker" }], reason: "One task" });
+    await declaration.execute("call-1-retry", { strategy: "delegate", members: [{ name: "worker" }], reason: "One task" });
     activeTurnId = "durable-turn-2";
-    await declaration.execute("call-2", { strategy: "lead_only", reason: "Another task" });
+    await declaration.execute("call-2", { strategy: "delegate", members: [{ name: "worker" }], reason: "Another task" });
 
     expect(host.call).toHaveBeenNthCalledWith(1, "team.declareStrategy", expect.objectContaining({
       leadTurnId: "durable-turn-1",
@@ -397,10 +419,11 @@ describe("Expert Team tools and prompt (ADR 0304)", () => {
   it("teamSystemPrompt tailors guidance for lead vs member", () => {
     const leadPrompt = teamSystemPrompt({ isLead: true });
     expect(leadPrompt).toContain("Lead of an Expert Team");
-    expect(leadPrompt).toContain("spawn_teammate");
+    expect(leadPrompt).toContain("task_create");
     expect(leadPrompt).toContain("Subagent `Task*` delegation is disabled");
-    expect(leadPrompt).toContain("separable work");
-    expect(leadPrompt).toContain("indivisible task");
+    expect(leadPrompt).toContain("always delegates");
+    expect(leadPrompt).toContain("trusted user roster confirmation");
+    expect(leadPrompt).toContain("Never choose lead_only or offer solo approval");
 
     const memberPrompt = teamSystemPrompt({ isLead: false, memberName: "Coder" });
     expect(memberPrompt).toContain('teammate "Coder"');
@@ -422,7 +445,11 @@ describe("planning research boundary", () => {
     expect(tools.map(t=>t.name)).toEqual(["send_message","wait_for_updates","task_update","task_list","task_get","team_status","submit_research_result"]);
     const submit=tools.find(t=>t.name==="submit_research_result")!;
     expect(submit.parameters).not.toHaveProperty("properties.planningId");
-    await submit.execute("result",{taskId:"research",expectedRevision:1,structuredResult:planning.results[0].structuredResult,planningId:"forged",roundId:"forged",callerSessionId:"lead"});
+    const reported = await submit.execute("result",{taskId:"research",expectedRevision:1,structuredResult:planning.results[0].structuredResult,planningId:"forged",roundId:"forged",callerSessionId:"lead"});
+    expect(reported.content[0]).toEqual({type:"text",text:expect.stringContaining("already been reported to the Lead")});
+    expect(reported.content[0]).toEqual({type:"text",text:expect.stringContaining("no completion message is needed")});
+    if (reported.content[0].type !== "text") throw new Error("Missing research result text");
+    expect(JSON.parse(reported.content[0].text).result).toEqual(planning.results[0]);
     expect(call).toHaveBeenCalledWith("team.submitResearchResult",expect.objectContaining({callerSessionId:"approved-member",planningId:"trusted-plan",roundId:"trusted-round"}));
     const status=await tools.find(t=>t.name==="team_status")!.execute("status",{});
     expect(status.content[0]).toEqual({type:"text",text:expect.stringContaining('"risks":["race"]')});
@@ -430,5 +457,21 @@ describe("planning research boundary", () => {
     expect(detail.content[0]).toEqual({type:"text",text:expect.stringContaining('"verifiedSources":["src/main.ts"]')});
     expect(teamSystemPrompt({isLead:true,mode:"plan"})).toContain("Lead and coordinator");
     expect(teamSystemPrompt({isLead:false,workPurpose:"plan_research"})).toContain("Read, Glob and Grep only");
+    expect(teamSystemPrompt({isLead:false,workPurpose:"plan_research"})).not.toContain("Send the Lead a completion message");
+  });
+
+  it("instructs a Lead to release its aggregation turn for pending mailbox work", async () => {
+    const planning = { pendingMessagesCount: 2, isReadyForPlanSubmission: false, results: [] };
+    const call = vi.fn(async (method: string) => {
+      if (method === "team.getRoster") return { teamSessionId: "lead", paused: false, members: [] };
+      if (method === "team.getBoard") return { teamSessionId: "lead", revision: 1, tasks: [] };
+      if (method === "team.getPlanning") return planning;
+      throw new Error(`Unexpected ${method}`);
+    });
+    const tools = createTeamTools({ teamSessionId: "lead", callerSessionId: "lead", isLead: true, host: { call } as unknown as RuntimeHost });
+    const status = await tools.find(tool => tool.name === "team_status")!.execute("status", {});
+    expect(status.content[0]).toEqual({ type: "text", text: expect.stringContaining("Finish the current aggregation turn") });
+    expect(status.details).toMatchObject({ planning });
+    expect(teamSystemPrompt({ isLead: true, mode: "plan" })).toContain("do not keep waiting while holding the Lead turn");
   });
 });

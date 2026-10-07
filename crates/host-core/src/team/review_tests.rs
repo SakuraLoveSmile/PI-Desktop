@@ -1,3 +1,4 @@
+use super::test_support::expert_proposal;
 use super::tests::{
     create_team_member, create_test_lead, ensure_test_route, finish_test_turn, start_test_turn,
     test_db,
@@ -72,9 +73,9 @@ fn strategy_declaration_requires_a_running_turn_owned_by_the_lead() {
                 team_session_id: &lead_id,
                 caller_session_id: &lead_id,
                 lead_turn_id: turn_id,
-                strategy: "lead_only",
+                strategy: "delegate",
                 reason: "No record should be written",
-                members: None,
+                members: Some(vec![expert_proposal("probe")]),
             },
         )
         .unwrap_err();
@@ -217,20 +218,20 @@ fn test_team_strategy_declaration_and_launch_review_lifecycle() {
             team_session_id: &lead_id,
             caller_session_id: &lead_id,
             lead_turn_id: "turn-1",
-            strategy: "lead_only",
+            strategy: "delegate",
             reason: "Indivisible task",
-            members: None,
+            members: Some(vec![expert_proposal("probe")]),
         },
     )
     .unwrap();
     finish_test_turn(&db, "turn-1");
-    assert_eq!(dec1.strategy.as_deref(), Some("lead_only"));
-    assert!(rev1.is_none());
+    assert_eq!(dec1.strategy.as_deref(), Some("delegate"));
+    assert_eq!(rev1.unwrap().status, "pending");
 
     let dec_read = get_execution_decision(&db, &lead_id, "turn-1")
         .unwrap()
         .unwrap();
-    assert_eq!(dec_read.strategy.as_deref(), Some("lead_only"));
+    assert_eq!(dec_read.strategy.as_deref(), Some("delegate"));
     assert_eq!(dec_read.reason.as_deref(), Some("Indivisible task"));
     assert_eq!(
         get_latest_execution_decision(&db, &lead_id)
@@ -246,9 +247,9 @@ fn test_team_strategy_declaration_and_launch_review_lifecycle() {
                 team_session_id: &lead_id,
                 caller_session_id: &lead_id,
                 lead_turn_id: "turn-1",
-                strategy: "lead_only",
+                strategy: "delegate",
                 reason: "Indivisible task",
-                members: None,
+                members: Some(vec![expert_proposal("probe")]),
             },
         )
         .unwrap()
@@ -262,9 +263,9 @@ fn test_team_strategy_declaration_and_launch_review_lifecycle() {
             team_session_id: &lead_id,
             caller_session_id: &lead_id,
             lead_turn_id: "turn-1",
-            strategy: "lead_only",
+            strategy: "delegate",
             reason: "Different input",
-            members: None,
+            members: Some(vec![expert_proposal("probe")]),
         },
     )
     .unwrap_err();
@@ -280,9 +281,9 @@ fn test_team_strategy_declaration_and_launch_review_lifecycle() {
             team_session_id: &lead_id,
             caller_session_id: &lead_id,
             lead_turn_id: "turn-unicode",
-            strategy: "lead_only",
+            strategy: "delegate",
             reason: &unicode,
-            members: None,
+            members: Some(vec![expert_proposal("probe")]),
         },
     )
     .unwrap();
@@ -820,4 +821,30 @@ fn team_member_configure_updates_session_and_roster_atomically_and_expires_route
     assert!(blocked
         .to_string()
         .contains("TEAM_MEMBER_MODEL_CHANGE_BLOCKED"));
+}
+
+#[test]
+fn solo_declaration_cannot_start_team_planning() {
+    let db = test_db();
+    let lead = create_test_lead(&db);
+    db.conn()
+        .execute("UPDATE sessions SET mode='plan' WHERE id=?1", [&lead])
+        .unwrap();
+    let turn = sessions::begin_turn(&db, &lead, None, None).unwrap();
+    let error = declare_team_strategy(
+        &db,
+        DeclareStrategyParams {
+            team_session_id: &lead,
+            caller_session_id: &lead,
+            lead_turn_id: &turn,
+            strategy: "lead_only",
+            reason: "Single task",
+            members: None,
+        },
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("TEAM_APPROVAL_REQUIRED"));
+    assert!(get_execution_decision(&db, &lead, &turn).unwrap().is_none());
+    assert!(get_launch_review(&db, &lead, None).unwrap().is_none());
+    assert!(super::planning::get(&db, &lead).unwrap().is_none());
 }

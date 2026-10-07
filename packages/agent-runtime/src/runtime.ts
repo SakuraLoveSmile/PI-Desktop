@@ -2,6 +2,7 @@ import { TOOL_ACTIVATION_SECTION, toolDeclarationPolicy, toolActivationSection, 
 import { orderSystemRows, SystemTranscriptJournal } from "./system-transcript-journal.js";
 import { planWorkspaceRequiredResult } from "./plan-workspace-error.js";
 import { accountModelStream } from "./request-usage.js";
+import { withTeamLeadApproval } from "./team/lead-tool-approval.js";
 import { modeToolDenial, retainModeToolDeclaration, withModeExecutionGuard } from "./mode-tool-access.js";
 import { restoreHostedSearchReplay } from "./hosted-search-replay.js";
 import { requestExtensionUi } from "./extensions/ui-request.js";
@@ -96,6 +97,7 @@ import type {
   SubagentThinkingLevel,
   ThinkingLevel,
   ToolTokenUsage,
+  TeamLaunchReview,
   UiMessage,
 } from "@pi-desktop/shared";
 import {
@@ -125,6 +127,7 @@ import {
   type TeamRuntimeContextProjection,
   type TeamPlanningProjection,
   type ProposalKind,
+  type PlanSubmitResult,
   type SubagentPermission,
 } from "@pi-desktop/shared";
 import { createStreamCoalescer, type StreamCoalescer } from "./stream-coalescer.js";
@@ -846,6 +849,25 @@ const SILENT_TURN_NUDGE = [
  * and no toolCall, so the runtime treats it as the final answer and ends the
  * run mid-task (#43). One automatic continue with this nudge, then stop.
  */
+const TEAM_COMPLETION_NUDGE = [
+  "<team_completion_recovery>",
+  "Expert Team mode requires actual expert participation; your previous final answer did not satisfy that requirement.",
+  "If this turn has no approved roster, call declare_team_strategy with strategy delegate and at least one expert, then explain the pending review and stop for trusted user confirmation.",
+  "If the roster is already approved, do not redeclare it: create owned tasks, dispatch to approved experts using send_message, and use wait_for_updates until an expert actually starts its assigned turn.",
+  "Do not finish alone, claim expert participation without Host evidence, or bypass the user review. Coordinate expert results before your final answer.",
+  "</team_completion_recovery>",
+].join("\n");
+
+const TEAM_PLAN_COMPLETION_NUDGE = [
+  "<team_completion_recovery>",
+  "Expert Team Plan mode requires actual read-only expert research; your previous final answer did not satisfy that requirement.",
+  "Automatically declare delegate with at least one researcher using declare_team_strategy if the current research roster is not ready. The Host materializes the researchers without user confirmation.",
+  "Do not ask the user to approve the research roster or stop to explain dispatch. Create owned research tasks, dispatch each taskId using send_message, and await actual research turns and full structured results with wait_for_updates, team_status and task_get.",
+  "Once all research results and questions settle, synthesize the implementation plan and call SubmitPlan. Execution roster confirmation belongs only to the later Agent execution phase.",
+  "Do not finish alone or claim expert participation without Host evidence.",
+  "</team_completion_recovery>",
+].join("\n");
+
 const PROGRESS_TURN_NUDGE = [
   "<progress_only_recovery>",
   "Your last message announced next steps but contained no tool call, so the autonomous run would have stopped mid-task.",
@@ -1868,6 +1890,11 @@ export class DesktopAgentRuntime {
   private progressTurnRerunAttempted = false;
   private progressTurnRerunInProgress = false;
   private suppressProgressTurnRunEnd = false;
+  /** One same-turn recovery when the Lead tries to finish without experts. */
+  private pendingTeamCompletionRerun?: { turnId: string | undefined; epoch: number; mode: Mode };
+  private teamCompletionRerunAttempted = false;
+  private teamCompletionRerunInProgress = false;
+  private suppressTeamCompletionRunEnd = false;
   private activeToolCalls = new Map<
     string,
     { toolName: string; args: unknown; startedAt: number }
@@ -3880,7 +3907,17 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         tool.name,
         withModeExecutionGuard(
           withExplicitRequired({
-            ...tool,
+            ...(this.executionProfile === "team" && this.teamContext?.isLead
+                && (this.mode === "agent" || this.mode === "plan")
+              ? withTeamLeadApproval(tool, {
+                  host: this.host,
+                  teamSessionId: this.teamContext.teamSessionId,
+                  callerSessionId: this.sessionId,
+                  getTurnId: () => this.turnId,
+                  currentModeDenial: () => this.isToolAllowedInMode(tool.name)
+                    ? undefined : modeToolDenial(tool.name, this.mode),
+                })
+              : tool),
             executionMode:
               tool.name === SUBAGENT_TOOL_NAME ? "parallel" : "sequential",
           }),
@@ -5684,7 +5721,19 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         }),
       }),
       executionMode: "sequential",
-      execute: async (toolCallId, params) => {
+      execute: async (toolCallId, params, signal) => {
+        const submission = { turnId: this.turnId, epoch: this.turnEpoch, mode: this.mode };
+        const isTeamPlanSubmission = kind === "plan" && submission.mode === "plan" &&
+          this.executionProfile === "team" && this.teamContext?.isLead === true;
+        const assertCurrentSubmission = () => {
+          if (!isTeamPlanSubmission) return;
+          signal?.throwIfAborted();
+          if (this.disposed || this.runCancelled || submission.turnId !== this.turnId ||
+            submission.epoch !== this.turnEpoch || submission.mode !== this.mode) {
+            throw new DOMException("The active submission turn changed.", "AbortError");
+          }
+        };
+        assertCurrentSubmission();
         const title =
           isRecord(params) && typeof params.title === "string"
             ? params.title.trim()
@@ -5710,7 +5759,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             isError: true,
           };
         }
-        let result: { status?: string; proposal?: PlanProposal };
+        let result: PlanSubmitResult;
         try {
           result = await this.host.call("plans.submit", {
             sessionId: this.sessionId,
@@ -5724,6 +5773,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             question,
           });
         } catch (error) {
+          assertCurrentSubmission();
           const recovery = planWorkspaceRequiredResult(error);
           if (recovery) return recovery;
           const errorCode =
@@ -5752,7 +5802,25 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
           };
         }
 
-        const proposal = result.proposal;
+        assertCurrentSubmission();
+        if (
+          isTeamPlanSubmission &&
+          result?.status === "deferred" && result.reason === "team_messages_pending" &&
+          typeof result.pendingMessagesCount === "number" &&
+          Number.isSafeInteger(result.pendingMessagesCount) && result.pendingMessagesCount > 0 &&
+          !("proposal" in result)
+        ) {
+          // Release the Lead's durable turn so its real mailbox FIFO can consume
+          // expert updates. This is a normal yield, not an approval or failure.
+          this.terminatingToolCalls.add(toolCallId);
+          return {
+            content: [{ type: "text", text: "Expert messages are pending. End this aggregation turn so the mailbox can consume their full contents, then synthesize and submit the complete plan." }],
+            details: result,
+            terminate: true,
+          };
+        }
+
+        const proposal = result.status === "pending" ? result.proposal : undefined;
         if (
           result.status !== "pending" ||
           !proposal ||
@@ -6191,6 +6259,10 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     this.allowSilentCompletion = false;
     this.silentTurnRerunInProgress = false;
     this.suppressSilentTurnRunEnd = false;
+    this.pendingTeamCompletionRerun = undefined;
+    this.teamCompletionRerunAttempted = false;
+    this.teamCompletionRerunInProgress = false;
+    this.suppressTeamCompletionRunEnd = false;
     this.pendingProgressTurnRerun = false;
     this.progressTurnRerunAttempted = false;
     this.progressTurnRerunInProgress = false;
@@ -6310,8 +6382,8 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
 
   /**
    * Run whatever recovery the finished loop armed for itself. Overflow, a
-   * retriable provider stream failure, a silent turn, and an autonomous
-   * progress-only turn all suppress their run's `turn_end` / `agent_end`
+   * retriable provider stream failure, a silent turn, an autonomous
+   * progress-only turn, and a rejected Team final answer all suppress their run's `turn_end` / `agent_end`
    * inside `message_end` and leave a `pending*` flag for the caller to act on
    * once the loop is idle. An entry point that skips this leaves the run with
    * no end events, no error, and no recovery — the turn simply stops, which is
@@ -6325,7 +6397,8 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       this.pendingProviderRetry ||
       this.pendingOverflow ||
       this.pendingSilentTurnRerun ||
-      this.pendingProgressTurnRerun
+      this.pendingProgressTurnRerun ||
+      this.pendingTeamCompletionRerun
     ) {
       if (this.pendingProviderRetry) {
         await this.retryPendingProviderFailure();
@@ -6377,6 +6450,10 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         await this.rerunSilentTurn();
         continue;
       }
+      if (this.pendingTeamCompletionRerun) {
+        await this.rerunTeamCompletionTurn();
+        continue;
+      }
       await this.rerunProgressOnlyTurn();
     }
     return true;
@@ -6416,6 +6493,40 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       this.applyPendingResumablePrompt();
       this.progressTurnRerunInProgress = false;
       this.suppressProgressTurnRunEnd = false;
+    }
+  }
+
+  private async rerunTeamCompletionTurn(): Promise<void> {
+    const pending = this.pendingTeamCompletionRerun;
+    if (!pending) return;
+    this.pendingTeamCompletionRerun = undefined;
+    this.suppressTeamCompletionRunEnd = false;
+    if (pending.epoch !== this.turnEpoch || pending.turnId !== this.turnId) return;
+    if (this.disposed || this.runCancelled || pending.mode !== this.mode) {
+      this.finalizeCurrentAssistant("aborted");
+      this.emit({ type: "turn_end" });
+      this.emit({ type: "agent_end", messageIds: [] });
+      return;
+    }
+    // Preserve preceding tools/results. Only the rejected final suffix is
+    // removed; continue() refuses an assistant-terminated transcript.
+    this.setAgentMessages(removeTrailingAssistantMessages(this.agent.state.messages));
+    const promptBefore = this.agentSystemPromptContent();
+    const promptWithNudge = `${promptBefore}\n\n${pending.mode === "plan" ? TEAM_PLAN_COMPLETION_NUDGE : TEAM_COMPLETION_NUDGE}`;
+    this.setAgentSystemPrompt(promptWithNudge);
+    this.teamCompletionRerunInProgress = true;
+    this.requestStartedAt = Date.now();
+    this.setAgentActivity({ phase: "recovering", since: Date.now() });
+    try {
+      await this.agent.continue();
+      await this.waitForIdleAndSteering();
+    } finally {
+      if (this.agentSystemPromptContent() === promptWithNudge) {
+        this.setAgentSystemPrompt(promptBefore);
+      }
+      this.applyPendingResumablePrompt();
+      this.teamCompletionRerunInProgress = false;
+      this.suppressTeamCompletionRunEnd = false;
     }
   }
 
@@ -7766,7 +7877,8 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
           this.providerRetryInProgress ||
           this.overflowRecoveryInProgress ||
           this.silentTurnRerunInProgress ||
-          this.progressTurnRerunInProgress
+          this.progressTurnRerunInProgress ||
+          this.teamCompletionRerunInProgress
         ) {
           break;
         }
@@ -7777,7 +7889,8 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
           this.providerRetryInProgress ||
           this.overflowRecoveryInProgress ||
           this.silentTurnRerunInProgress ||
-          this.progressTurnRerunInProgress
+          this.progressTurnRerunInProgress ||
+          this.teamCompletionRerunInProgress
         ) {
           break;
         }
@@ -7792,7 +7905,8 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             this.providerRetryInProgress ||
             this.overflowRecoveryInProgress ||
             this.silentTurnRerunInProgress ||
-            this.progressTurnRerunInProgress
+            this.progressTurnRerunInProgress ||
+            this.teamCompletionRerunInProgress
               ? this.currentAssistant
               : undefined;
           const initialText =
@@ -7822,6 +7936,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             this.overflowRecoveryInProgress = false;
             this.silentTurnRerunInProgress = false;
             this.progressTurnRerunInProgress = false;
+            this.teamCompletionRerunInProgress = false;
             this.emit({ type: "message_update", message: this.currentAssistant });
           } else {
             this.emit({ type: "message_start", message: this.currentAssistant });
@@ -7909,7 +8024,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             event.message,
             effectiveModelContextWindow(this.model) || DEFAULT_CONTEXT_WINDOW,
           );
-          const aborted = stopReason === "aborted" || localError?.causeName === "AbortError";
+          let aborted = stopReason === "aborted" || localError?.causeName === "AbortError";
           const failed = !aborted && (stopReason === "error" || overflow);
           const errorMessage =
             failed &&
@@ -7995,8 +8110,80 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             this.providerTransientRetryAttempt = 0;
             this.providerRateLimitRetryAttempt = 0;
           }
+          let teamCompletionFailed = false;
+          if (
+            !failed && !aborted && !messageRequestsTools(event.message) &&
+            !(this.allowSilentCompletion && responseText.trim().length === 0) &&
+            this.executionProfile === "team" && this.teamContext?.isLead &&
+            (this.mode === "agent" || this.mode === "plan")
+          ) {
+            const snapshot = { turnId: this.turnId, epoch: this.turnEpoch, mode: this.mode };
+            const stale = () => snapshot.turnId !== this.turnId || snapshot.epoch !== this.turnEpoch ||
+              snapshot.mode !== this.mode || this.disposed || this.runCancelled;
+            try {
+              const { review } = await this.host.call<{ review: TeamLaunchReview | null }>(
+                "team.getLaunchReview", { teamSessionId: this.teamContext.teamSessionId },
+              );
+              if (stale()) {
+                aborted = true;
+              } else if (!(snapshot.mode === "agent" && review &&
+                (review.launchPolicy ?? "user_confirmed") === "user_confirmed" &&
+                review.teamSessionId === this.teamContext.teamSessionId &&
+                review.leadTurnId === snapshot.turnId && review.status === "pending" &&
+                (review.strategy ?? "delegate") === "delegate" &&
+                Array.isArray(review.members) && review.members.length > 0)) {
+                const authority = await this.host.call<{ authorized: boolean }>("team.authorizeLeadTool", {
+                  teamSessionId: this.teamContext.teamSessionId,
+                  callerSessionId: this.teamContext.callerSessionId,
+                  toolName: "TeamFinalAnswer",
+                });
+                if (stale()) aborted = true;
+                else if (authority?.authorized !== true) {
+                  throw Object.assign(new Error("TEAM_APPROVAL_REQUIRED: Expert Team completion is not authorized"), {
+                    code: "TEAM_APPROVAL_REQUIRED",
+                  });
+                }
+              }
+            } catch (cause) {
+              if (stale()) {
+                aborted = true;
+              } else {
+                const error = classifyAgentError(cause);
+                const approvalRequired = error.code === "TEAM_APPROVAL_REQUIRED" ||
+                  (cause instanceof Error && cause.message.startsWith("TEAM_APPROVAL_REQUIRED"));
+                if (approvalRequired && !this.teamCompletionRerunAttempted) {
+                  this.teamCompletionRerunAttempted = true;
+                  this.pendingTeamCompletionRerun = snapshot;
+                  this.suppressTeamCompletionRunEnd = true;
+                  this.currentAssistant = {
+                    ...this.currentAssistant, content: nextText, status: "streaming",
+                    ...(nextThinking ? { thinking: nextThinking } : {}),
+                    ...(usage ? { usage } : {}),
+                  };
+                  this.emit({ type: "message_update", message: this.currentAssistant });
+                  this.streamStartedAt = undefined;
+                  break;
+                }
+                teamCompletionFailed = true;
+                classifiedError = {
+                  ...error,
+                  ...(approvalRequired ? {
+                    code: "TEAM_APPROVAL_REQUIRED",
+                    message: snapshot.mode === "plan"
+                      ? "Expert Team planning stopped because the Lead did not coordinate actual read-only expert research."
+                      : "Expert Team stopped because the Lead did not propose approved experts or coordinate actual expert participation.",
+                    retriable: true,
+                  } : {}),
+                  details: { ...error.details, origin: "local", stage: "team_completion" },
+                };
+              }
+            }
+            // An authority response belongs only to its captured turn.
+            if (snapshot.turnId !== this.turnId || snapshot.epoch !== this.turnEpoch) break;
+          }
           // Re-run an invisible answer once before surfacing a finished turn.
           const silence =
+            !teamCompletionFailed &&
             !failed &&
             !aborted &&
             responseText.trim().length === 0 &&
@@ -8053,6 +8240,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
           // Autonomous plan/goal: clearly forward-looking text without a tool
           // call is probably progress, not a final answer. Nudge once (#43).
           const progressOnlyTurn =
+            !teamCompletionFailed &&
             !failed &&
             !aborted &&
             !silentTurn &&
@@ -8108,7 +8296,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             this.suppressOverflowRunEnd = true;
             break;
           }
-          const emptyResponse = silentTurn;
+          const emptyResponse = silentTurn || teamCompletionFailed;
           const diagnosticError = classifiedError;
           const retryProviderAttempt =
             !overflow &&
@@ -8300,6 +8488,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
           this.suppressProviderRetryRunEnd ||
           this.suppressSilentTurnRunEnd ||
           this.suppressProgressTurnRunEnd ||
+          this.suppressTeamCompletionRunEnd ||
           this.keepTurnOpenForDelegates()
         )
           break;
@@ -8339,6 +8528,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
           this.suppressProviderRetryRunEnd ||
           this.suppressSilentTurnRunEnd ||
           this.suppressProgressTurnRunEnd ||
+          this.suppressTeamCompletionRunEnd ||
           this.keepTurnOpenForDelegates()
         )
           break;
@@ -8996,7 +9186,8 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     // Recovery owns the next request when the previous response failed. Its
     // continuation will consume steering after repairing the context/backoff.
     if (this.suppressOverflowRunEnd || this.suppressProviderRetryRunEnd ||
-        this.suppressSilentTurnRunEnd || this.suppressProgressTurnRunEnd) return;
+        this.suppressSilentTurnRunEnd || this.suppressProgressTurnRunEnd ||
+        this.suppressTeamCompletionRunEnd) return;
     while (this.pendingSteering.size && this.acceptingSteering && !this.runCancelled && !this.turnHadError) {
       this.steeringContinuation = true;
       try {
@@ -9009,7 +9200,8 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
           this.suppressOverflowRunEnd ||
           this.suppressProviderRetryRunEnd ||
           this.suppressSilentTurnRunEnd ||
-          this.suppressProgressTurnRunEnd
+          this.suppressProgressTurnRunEnd ||
+          this.suppressTeamCompletionRunEnd
         ) return;
       } finally {
         this.steeringContinuation = false;
