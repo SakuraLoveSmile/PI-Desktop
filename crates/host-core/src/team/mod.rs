@@ -15,6 +15,8 @@ pub mod mailbox;
 pub mod model;
 pub mod planning;
 #[cfg(test)]
+mod planning_assignment_tests;
+#[cfg(test)]
 mod planning_mail_tests;
 #[cfg(test)]
 mod planning_tests;
