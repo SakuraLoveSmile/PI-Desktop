@@ -108,7 +108,10 @@ export function createApprovedGoalFixture(projectPath) {
       const callsBeforeCancel = calls.length;
       await invoke("teamCancelLaunchReview", { teamSessionId: cancelled.id, reviewId: cancelReview.reviewId, expectedRevision: cancelReview.revision });
       await waitFor(async () => (await invoke("agentGetStatus", cancelled.id)).status.isRunning === false, "cancelled approved execution interrupted");
-      const cancelledTurn = (await invoke("turnGet", { sessionId: cancelled.id, turnId: cancelReview.leadTurnId }));
+      const cancelledTurn = await waitFor(async () => {
+        const turn = await invoke("turnGet", { sessionId: cancelled.id, turnId: cancelReview.leadTurnId });
+        return turn.status !== "running" ? turn : null;
+      }, "cancelled Host turn durably settled");
       assert.equal(cancelledTurn.status, "aborted", "review cancel completed Host turn");
       const cancelledReports = await waitFor(async () => { const { reports } = await invoke("goalReportList", { sessionId: cancelled.id }); return reports[0]?.executionStatus === "interrupted" ? reports : null; }, "cancelled Goal execution interrupted");
       assert.equal(cancelledReports.length, 1); assert.equal(cancelledReports[0].status, "pending", "cancelled Goal published completed report");
