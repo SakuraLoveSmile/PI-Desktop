@@ -55,7 +55,7 @@ const path = require("node:path");
 const { writeFileSync } = require("node:fs");
 app.setPath("userData", path.join(__dirname, "profile"));
 app.whenReady().then(async () => {
-  const window = new BrowserWindow({ show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
+  const window = new BrowserWindow({ show: false, width: 900, height: 1000, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
   window.webContents.on("console-message", (event) => console.error(event.message));
   try {
     await window.loadFile(path.join(__dirname, "index.html"));

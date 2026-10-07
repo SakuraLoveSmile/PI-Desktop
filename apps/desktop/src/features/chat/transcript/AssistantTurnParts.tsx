@@ -37,7 +37,7 @@ function partKey(part: AssistantTurnPart) {
   return `activity-${first.message.id}-${first.kind}${first.kind === "hostedSearch" ? `-${first.round.id}` : ""}`;
 }
 
-type PartContext = {
+export type PartContext = {
   isActive: boolean;
   activePart?: AssistantTurnPart;
   lastActivityPart?: AssistantTurnPart;

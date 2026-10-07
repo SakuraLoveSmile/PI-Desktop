@@ -410,6 +410,24 @@ export function createPlanningFixture(projectPath) {
       assert.equal(admittedReports.length, 1, "authenticated supplementary mailbox report was duplicated or not delivered");
       assert.ok(admittedReports[0].content.includes(supplementaryReport), "admitted report lost its full content");
       assert.equal(await readFile(join(projectPath, completeProposal.artifact.relativePath), "utf8"), completeProposal.markdown, "Host plan artifact differs from research synthesis");
+      await waitFor(() => evaluate(`document.querySelectorAll('.team-dispatch-card').length >= 2`), "real research dispatch cards rendered");
+      const timelineOrder = await evaluate(`(() => {
+        const cards = [...document.querySelectorAll('.team-dispatch-card')];
+        const turns = [...new Set(cards.map(card => card.closest('.assistant-turn')))];
+        const narration = [...document.querySelectorAll('.assistant-turn-fragment')].at(-1);
+        const approval = document.querySelector('[data-testid="plan-approval-bar"]');
+        return { cards: cards.length,
+          folded: turns.some(turn => turn?.querySelector('.turn-process')),
+          anchored: cards.every(card => !!card.getAttribute('data-message-id')),
+          beforeNarration: !!narration && cards.every(card => !!(card.compareDocumentPosition(narration) & Node.DOCUMENT_POSITION_FOLLOWING)),
+          approvalAfterSection: !!approval && !!narration && !!(narration.compareDocumentPosition(approval) & Node.DOCUMENT_POSITION_FOLLOWING) };
+      })()`);
+      assert.ok(timelineOrder.cards >= 2, "research task cards are missing from the transcript");
+      assert.equal(timelineOrder.folded, false, "card-bearing research turns retain the old whole-turn fold");
+      assert.equal(timelineOrder.anchored, true, "research cards lost their source-message search anchors");
+      assert.equal(timelineOrder.beforeNarration, true, "research cards must precede the Lead's final narration");
+      assert.equal(timelineOrder.approvalAfterSection, true, "plan approval must follow its submission section");
+      console.log("PASS E2E-TEAM-turn-renders-chronological-timeline: real research cards precede final narration, no whole-turn fold, source anchors and section approval retained");
       await saveScreenshot(sendCdp, "team-planning-complete-proposal.png");
       console.log("PASS Team Plan mailbox finalization: full structured results defer normally while authenticated extra report waits, FIFO consumes full multilingual report exactly once, final proposal preserves the user's queued follow-up");
       // Remove only the fixture user's own follow-up via the user-visible

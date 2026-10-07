@@ -25,7 +25,7 @@ function browser(t) {
   const rect = () => ({ top: 500 + shift - scroller.scrollTop });
   const text = { textContent: "Read needle here", parentElement: { closest: () => null } };
   const message = {
-    classList: { add: (name) => classes.add(name), remove: (name) => classes.delete(name) },
+    classList: { add: (name) => classes.add(name), remove: (name) => classes.delete(name), contains: (name) => classes.has(name) },
     querySelectorAll: () => [],
     closest: () => null,
     getBoundingClientRect: rect,
@@ -170,4 +170,17 @@ test("effect replay releases follow again without extending the alignment deadli
   assert.deepEqual(b.navigations, [true, false, true]);
   assert.equal(b.position.current.alignUntil, 3500);
   nextCleanup();
+});
+
+
+test("search highlights the card replacing a source-only tool payload and cleans up", (t) => {
+  const b = browser(t);
+  b.classes.add("team-dispatch-card");
+  globalThis.document.createTreeWalker = () => ({ nextNode: () => null });
+  const cleanup = b.install();
+  assert.equal(b.classes.has("transcript-search-source-match"), true);
+  assert.equal(b.classes.has("transcript-search-target"), true);
+  cleanup();
+  assert.equal(b.classes.has("transcript-search-source-match"), false);
+  assert.equal(b.classes.has("transcript-search-target"), false);
 });
