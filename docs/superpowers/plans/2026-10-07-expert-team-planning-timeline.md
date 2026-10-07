@@ -1,6 +1,6 @@
 # Expert Team Planning Timeline Plan
 
-Status: implementation in progress; task-candidate E2E pending. Revision `team-timeline-v1`, 2026-10-07, Asia/Taipei.
+Status: ready for user testing; local implementation and applicable checks complete. Revision `team-timeline-v1`, 2026-10-07, Asia/Taipei.
 
 ## Baseline
 
@@ -384,3 +384,54 @@ follows its section.
   after its click. The test helper now synchronizes with a committed browser
   frame and waits for the draft to clear after a single click before typing
   the next prompt. It does not retry submission or change product queue code.
+
+## Local delivery evidence (2026-10-07)
+
+Task candidate: `675b139113f0f50503737781d22686d3e8948542`
+
+Base main: `d7cbc5a3d93114b568cfa1243dd0c2fd92dbb4d1`
+
+E2E suites:
+
+- `node scripts/e2e-team.mjs`
+- `node scripts/e2e-team-planning.mjs`
+- `node scripts/e2e-goal-team-renderer-ui.mjs` (production component in Chromium,
+  same executable source as the candidate; mounted checks after the envelope fix)
+
+Result: PASS. The complete Team suite covers queued prompts, lifecycle,
+coexistence, Chinese presentation and the 320/450/620px, 100%/150%, light/dark
+layout matrix. The complete planning suite verifies the real tool envelopes,
+chronological cards, approval placement, automatic readonly research, restart,
+and approved execution. The mounted renderer checks source-only card search,
+one task control, live authoritative status updates without focus loss,
+ordinary Detailed/Compact layouts, failed singleton/group signals and live tails.
+
+Environment: macOS arm64, Node 22.23.2, Electron 43.6.0, local mock provider,
+separate temporary profiles/data/ports, existing host dependencies linked into
+this task, and the native Host binary from the unchanged base. No install was
+performed. Workspace JS was built locally; the unchanged agent-runtime JS build
+used `--composite false --declaration false --declarationMap false` because the
+linked pnpm layout triggers TS2742 during portable declaration generation.
+Desktop's normal typecheck and build passed. Docs uses the host's minimal
+`docs/node_modules` by link; the initial broad overlay made the whole-tree
+scanner exhaust its heap, and was replaced before the final 581-page check
+and VitePress build passed. These environment issues did not alter source code.
+
+Other checks: 200 focused assistant/transcript/plan/dispatch tests, 23 Plus
+changelog tests, Desktop typecheck/build, root Biome lint, style tokens,
+architecture, 85 locale pairs, docs build, agent-policy sync and whitespace
+checks passed. `AssistantTurn.tsx` shrank by 28 lines; the projection and
+renderer modules are under 500 lines. Independent review found no remaining
+blocker after the immutable streaming cache and real envelope regressions.
+
+Bounded synthetic profile: 2,000 source parts / 1,000 cards, cold 2.81ms,
+warm median 0.47ms, warm p95 2.10ms across 50 samples. This measures only pure
+projection cost on this machine, not UI frame rate or model latency.
+
+Real provider/model quality: NOT RUN; no paid provider authorization.
+`verify:ui:*`: NOT RUN; not requested. Existing isolated Chromium and native
+Electron suites above supply the applicable UI evidence. No installed app was
+used as a test profile. Delivery is local commits on `feat/team-planning-timeline`;
+no push, PR, merge or release is included. The final evidence-only documentation
+commit does not change the tested executable source. Screenshots and logs live
+in `.review-evidence/team-timeline-validation/` in the implementation worktree.
