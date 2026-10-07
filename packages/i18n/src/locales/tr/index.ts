@@ -2044,7 +2044,7 @@ sklm: {
       coordinationError: "Coordination failed during {{stage}}: {{message}}",
       missingProvider: "Kullanılamayan sağlayıcı ({{id}})",
       missingModel: "Kullanılamayan model ({{id}})",
-      status: { pending: "Bekliyor", confirmed: "Onaylandı", cancelled: "İptal edildi", interrupted: "Kesintiye uğradı" },
+      status: { pending: "Ekip onayı bekleniyor", confirmed: "Onaylandı", cancelled: "İptal edildi", interrupted: "Kesintiye uğradı" },
       thinkingLevel: { off: "Kapalı", minimal: "En düşük", low: "Düşük", medium: "Orta", high: "Yüksek", xhigh: "Çok yüksek", max: "En yüksek" },
       coordinationStage: { member_creation: "üye oluşturma", task_creation: "görev oluşturma", enqueue: "ileti kuyruğa ekleme", delivery: "ileti teslimi" },
     },
