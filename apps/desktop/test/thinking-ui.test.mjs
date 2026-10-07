@@ -284,7 +284,10 @@ test("detailed mode opens the last tool while compact keeps payloads collapsed",
   assert.match(transcriptDisclosureSource, /revealRequest\?: number/);
   assert.match(transcriptDisclosureSource, /const currentOpen = useRef\(open\)/);
   assert.match(transcriptDisclosureSource, /const setManualOpen = useCallback/);
-  assert.match(transcriptSource, /useAutomaticDisclosure\(\s*hasSubagentTopology \? live : visibleItems\.length <= 1/);
+  assert.match(
+    transcriptActivityGroupSource,
+    /useAutomaticDisclosure\(\s*!compact && \(hasSubagentTopology \? live : visibleItems\.length <= 1 \|\| live\),\s*revealRequest/,
+  );
   assert.match(
     transcriptSource,
     /<ThinkingRow[\s\S]*?autoOpen=\{live && item === lastItem\}/,
@@ -294,10 +297,14 @@ test("detailed mode opens the last tool while compact keeps payloads collapsed",
     /const autoOpenLatest =\s*!compact && isLast && item === lastItem/,
   );
   assert.match(transcriptSource, /<ToolRow[\s\S]*?autoOpen=\{autoOpenLatest\}/);
-  assert.match(transcriptToolRowSource, /const disclosure = useAutomaticDisclosure\(\s*autoOpen && !failed && status !== "denied",\s*revealRequest/);
+  assert.match(transcriptToolRowSource, /const disclosure = useAutomaticDisclosure\(\s*!compact && autoOpen && !failed && status !== "denied",\s*revealRequest/);
   assert.match(transcriptSource, /onClick=\{toggleDisclosure\}/);
   assert.match(transcriptSource, /onCollapse=\{collapseDisclosure\}/);
   assert.match(transcriptSource, /onUserInteraction=\{claimDisclosure\}/);
+  assert.match(
+    transcriptActivityGroupSource,
+    /const currentDetail = useMemo\(\(\) =>\s*live && !compact && !runtimeStatus && lastItem\s*\? activityItemDetail\(lastItem\) : ""/,
+  );
   assert.match(transcriptSource, /const tail = live && !open \? currentDetail : ""/);
 });
 
