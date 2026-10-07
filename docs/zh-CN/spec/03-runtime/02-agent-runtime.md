@@ -505,6 +505,8 @@ Plan/Goal 保留 Write/Edit 声明；已配置 subagent 时也保留 Task/TaskWa
 
 Team Plan 使用 Host 选择的 automatic_plan 策略和有效获批模型绑定，自动启动只读研究专家，不要求研究名单审批。完整结构化研究、专家回合与问题全部结束、Team 未消费收件箱为空，才允许 SubmitPlan。方案产物及后续 Agent 执行名单仍需用户批准。Goal 协商权限不变，转入 Agent 执行后恢复 Team 门禁；Team 不暴露 Task* 或插件 SessionTask。
 
+普通 Team Plan 主控调用 wait_for_updates 时，在首次读取和后续复查都识别入站 queued 且未绑定回合的专家消息，并正常结束当前回合，让现有认证邮箱 FIFO 消费完整内容，不依赖模型主动提交或结束。中间消息续接在还有报告时再次让出；最后一轮仅在 Host 就绪后汇总提交。消息内容、顺序、身份及用户后续请求均保留。让出绑定当前 turn/epoch，混合工具批次和扩展不能覆盖；取消、销毁及模式/回合变化使迟到让出失效。已批准执行仍走下述同回合收件箱。概要保持挂载，通过 Team 通知刷新任务归属、完成度与团队状态，不需要切页或等待主控结束。
+
 用户已批准的 Team Plan/Goal 执行在原始运行中 Host 回合内等待执行名单确认及专家结算，等待期间不能发出最终 agent_end、结束 Goal 执行 token 或完成批准记录。确认后继续同一获批契约，wait_for_updates 通过 Host 授权收件箱读取完整可信确认／专家结果；取消中断原执行，不重放专家或发布完成报告。专家启动仅授权实质工具，获批执行完成另要求当前派遣与专家回合结束、当前结果已消费。Plan 使用可信不可变 execution-turn 绑定，Goal 继续使用 goal_reports 精确回合证明；窄内部 RPC 契约见 06-host-rpc-protocol。
 
 仅批准 `approve` 和 `reject`。批准提交 `mode = agent`，

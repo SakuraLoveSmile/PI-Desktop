@@ -1159,3 +1159,8 @@ team.getLeadExecutionState 和 team.readExecutionInbox 接受 {teamSessionId,cal
 消费在同一事务将 eligible queued/unbound 消息设为 completed、移除对应 durable turn_queue 回执，并在独立 team-execution-inbox-v1 ledger 按 {teamSessionId,expectedTurnId} 保存消息 ID。不得设置 message.turn_id 或把原用户执行变成邮箱回合。team.executionInboxConsumed 携带 {teamSessionId,turnId,messageIds} 通知 Main，仅移除相应实时队列项，保留无关用户请求。同一执行重复读取可返回 ledger 消息；wait_for_updates 在所属运行回合抑制重复正文，恢复仍可获得完整结果。
 
 专家参与仍只授权实质 Lead 工具。获批执行的 TeamFinalAnswer 另拒绝尚 queued/running 的当前记录派遣或未消费的可信当前结果。结算门禁不把专家启动变成任务归属证明，也不要求当前派遣 scope 之外结果。Plan 研究的结构化结果／收件箱提交门禁保持独立；Goal 进度及唯一完成报告绑定原始执行身份。
+
+
+### 研究任务负责人校验与历史补派
+
+活跃 Plan 研究轮创建任务必须明确指定本轮批准的研究员 ownerMemberName 或 ownerSessionId。遗漏负责人或指定 Lead 时，Host 在写入任务和版本前返回 TEAM_RESEARCH_INVALID。主控 task_create schema 要求 ownerMemberName；send_message 只发送指令，不分配归属。旧未分配任务仍可读取，并由主控使用当前 expectedRevision 与批准负责人执行 task_update，在同一事务纳入研究轮；研究员不能自行认领，提交前必须重新读取版本。Agent 待办仍可无负责人创建。创建/更新被拒绝时属于工具调用失败，不能包装成带错误文本的成功结果。
