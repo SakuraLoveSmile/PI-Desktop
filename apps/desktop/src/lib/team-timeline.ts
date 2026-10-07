@@ -12,7 +12,9 @@ export type TeamTimeline = {
 };
 
 type ActivityPart = Extract<AssistantTurnPart, { kind: "activity" }>;
-const splitCache = new WeakMap<ActivityPart, Map<string, ActivityPart>>();
+// Transcript reuse preserves unchanged items while replacing a streaming source
+// part. Keep one latest piece per first item, without retaining old revisions.
+const splitCache = new WeakMap<AssistantActivityItem, ActivityPart>();
 
 function isAnchor(item: AssistantActivityItem, index: TeamDispatchIndex): boolean {
   return item.kind === "tool" && index.cardsByMessageId.has(item.message.id);
@@ -23,23 +25,16 @@ function firstMessageId(part: AssistantTurnPart): string {
 }
 
 function splitPiece(
-  source: ActivityPart,
   items: AssistantActivityItem[],
   endedAt: string | undefined,
 ): ActivityPart {
-  let pieces = splitCache.get(source);
-  if (!pieces) {
-    pieces = new Map();
-    splitCache.set(source, pieces);
-  }
-  const key = `${items[0].kind}:${items[0].message.id}`;
-  const previous = pieces.get(key);
+  const previous = splitCache.get(items[0]);
   if (
     previous && previous.endedAt === endedAt && previous.items.length === items.length &&
     previous.items.every((item, position) => item === items[position])
   ) return previous;
   const piece: ActivityPart = { kind: "activity", items, endedAt };
-  pieces.set(key, piece);
+  splitCache.set(items[0], piece);
   return piece;
 }
 
@@ -102,7 +97,7 @@ export function projectTeamTimeline(
           continue;
         }
         if (pending.length > 0) {
-          appendPart(splitPiece(part, pending, item.message.createdAt));
+          appendPart(splitPiece(pending, item.message.createdAt));
           pending = [];
         }
         const anchors: string[] = [];
@@ -114,7 +109,7 @@ export function projectTeamTimeline(
         }
         appendCards(anchors);
       }
-      if (pending.length > 0) appendPart(splitPiece(part, pending, part.endedAt));
+      if (pending.length > 0) appendPart(splitPiece(pending, part.endedAt));
     }
     return segments;
   });
