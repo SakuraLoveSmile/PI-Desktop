@@ -7,6 +7,13 @@ import {
   shouldAcceptGoalProgressSnapshot,
 } from "../src/lib/goal-progress-presentation.ts";
 
+test("interrupted goal progress does not wait for a completion report", () => {
+  assert.equal(shouldShowGoalProgressBar({
+    proposal: { kind: "goal", executionId: "interrupted", executionState: "interrupted" },
+    reportReady: false,
+  }), false);
+});
+
 test("execution changes hide previous progress, report readiness, and errors", () => {
   const previous = {
     executionId: "old-execution",

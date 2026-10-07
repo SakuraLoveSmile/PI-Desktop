@@ -114,9 +114,10 @@ test("tool errors stay local to their rows instead of failing the activity group
   assert.doesNotMatch(toolRow, /const hasFailure = items.some/);
   assert.doesNotMatch(toolRow, /processingFailedAfter/);
   assert.doesNotMatch(toolRow, /tool-activity-group[\s\S]*?failed/);
-  // Failures remain visible in the row header; automatic open is last-tool
-  // ownership, not error ownership.
-  assert.match(toolRow, /const disclosure = useAutomaticDisclosure\(\s*autoOpen && !failed && status !== "denied",\s*revealRequest,\s*disclosureKey\("tool"/);
+  // Failures remain visible in the row header; automatic open belongs only to
+  // eligible last tools in Detailed, never errors or Compact payloads.
+  assert.match(toolRow, /const failed = status === "error" \|\| run === "failed"/);
+  assert.match(toolRow, /const disclosure = useAutomaticDisclosure\(\s*!compact && autoOpen && !failed && status !== "denied",\s*revealRequest,\s*disclosureKey\("tool"/);
   assert.match(transcript, /bodyEvents: \{ onPointerDownCapture: claim, onFocusCapture: claim \}/);
   assert.match(toolRow, /status === "error"\s*\? t\("chat.toolFailed"\)/);
 });

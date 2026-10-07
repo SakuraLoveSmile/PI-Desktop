@@ -11,10 +11,10 @@ export function shouldShowGoalProgressBar({
   const isGoal = (proposal.executionKind ?? proposal.kind) === "goal";
   if (!isGoal) return false;
   if (!proposal.executionId) return false;
+  if (proposal.executionState === "interrupted") return false;
 
   const isTerminal =
-    proposal.executionState === "completed" ||
-    proposal.executionState === "interrupted";
+    proposal.executionState === "completed";
 
   if (isTerminal && reportReady) {
     return false;

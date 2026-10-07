@@ -83,6 +83,17 @@ const providerServer = createServer(async (req, res) => {
     const titleSystemPrompt = messages.find((message) => message.role === "system")?.content;
     const isTitleRequest = typeof titleSystemPrompt === "string" &&
       titleSystemPrompt.includes("descriptive session title summarizing the conversation");
+    if (!isTitleRequest && toolNames.includes("declare_team_strategy")) {
+      for (const name of ["Task", "TaskWait", "TaskList", "TaskStop", "SessionTask"]) {
+        assert.equal(toolNames.includes(name), false, `Team exposed ${name}`);
+      }
+      if (titleSystemPrompt?.includes("You are the Lead of an Expert Team.")) {
+        assert.match(titleSystemPrompt, /default[\s\S]*delegate|delegate[\s\S]*default/i,
+          "execution Lead receives delegate-by-default steering");
+        assert.match(titleSystemPrompt, /trivial[\s\S]*indivisible|indivisible[\s\S]*trivial/i,
+          "lead_only is limited to trivial indivisible work");
+      }
+    }
     let toolCall;
     let finalText;
     let thinkingText;
@@ -119,7 +130,7 @@ const providerServer = createServer(async (req, res) => {
       if (!priorToolNames.includes("declare_team_strategy")) {
         assert.ok(toolNames.includes("declare_team_strategy"), "approved Team execution lacks strategy declaration");
         toolCall = { name: "declare_team_strategy", args: {
-          strategy: "lead_only", reason: "The approved Plan can be executed by the Lead."
+          strategy: "lead_only", reason: "Acknowledging this fixture plan is trivial and indivisible; no expert work is needed."
         }};
       } else {
         finalText = "Approved Team plan execution finished.";
@@ -160,7 +171,7 @@ const providerServer = createServer(async (req, res) => {
       } else { finalText = "Approved work dispatched."; }
     } else if (userText.includes("Handle this without specialists")) {
       if (!priorToolNames.includes("declare_team_strategy") || !activeToolText.includes("lead_only")) {
-        toolCall = { name: "declare_team_strategy", args: { strategy: "lead_only", reason: "This short task needs no specialist." }};
+        toolCall = { name: "declare_team_strategy", args: { strategy: "lead_only", reason: "This fixed acknowledgement is trivial and indivisible; no expert work is needed." }};
       } else { finalText = "Handled by Lead only."; }
     } else if (userText.includes("Send the exact message TEAM_RESULT")) {
       thinkingText = "TEAM_MEMBER_THINKING: verify the fixed result before reporting.";
@@ -987,6 +998,44 @@ try {
   const toolbarMetrics = await evaluate(`Array.from(document.querySelectorAll('[data-panorama-toolbar] button')).map(button => ({ label: button.getAttribute('aria-label'), text: button.innerText.trim() }))`);
   assert.ok(toolbarMetrics.every(button => button.label && button.text === ''), `panorama toolbar must be icon-only with accessible labels: ${JSON.stringify(toolbarMetrics)}`);
   console.log(`PASS Panorama compact geometry/icons: ${JSON.stringify(panoramaMetrics)}`);
+  // Exercise legacy/model-provided text without changing persisted task data.
+  const longTextFixture = await evaluate(`(() => {
+    const selectors = ['.agent-panorama-node-title', '.agent-panorama-node-task'];
+    const results = [];
+    const originals = [];
+    for (const node of document.querySelectorAll('[data-panorama-node]')) {
+      const bounds = node.getBoundingClientRect();
+      for (const selector of selectors) {
+        const element = node.querySelector(selector);
+        if (!element) continue;
+        const original = element.textContent;
+        originals.push({ node: node.dataset.nodeId, selector, text: original });
+        for (const text of ['Recon: workspace state, toolchains, and constraints '.repeat(10), '简洁可维护性方案设计'.repeat(20), 'x'.repeat(500)]) {
+          element.textContent = text;
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          results.push({ node: node.dataset.nodeId, selector,
+            contained: rect.left >= bounds.left && rect.right <= bounds.right,
+            truncated: element.scrollWidth > element.clientWidth,
+            ellipsis: style.textOverflow === 'ellipsis' && style.overflow === 'hidden',
+          });
+        }
+        element.textContent = selector.endsWith('task')
+          ? 'Recon: workspace state, toolchains, and constraints for a new user management system'
+          : '调研员 Environment Scout with a very long expert identity';
+      }
+    }
+    return { metrics: results, originals };
+  })()`);
+  const longTextMetrics = longTextFixture.metrics;
+  assert.ok(longTextMetrics.length >= 12, "exercise root and child identity/task text");
+  assert.ok(longTextMetrics.every(item => item.contained && item.truncated && item.ellipsis),
+    `Long panorama titles must stay within each card: ${JSON.stringify(longTextMetrics)}`);
+  console.log(`Long-title evidence: ${await saveScreenshot(sendCdp, "team-panorama-long-titles.png")}`);
+  await evaluate(`(${JSON.stringify(longTextFixture.originals)}).forEach(({ node, selector, text }) => {
+    document.querySelector('[data-node-id="' + node + '"] ' + selector).textContent = text;
+  })`);
+  console.log("PASS Panorama long English, Chinese and unbroken titles remain inside root/child cards");
   for (let index = 0; index < 2; index += 1) {
     await evaluate(`Array.from(document.querySelectorAll('[data-panorama-tool] button')).find((button) => /zoom out/i.test(button.getAttribute('aria-label') ?? ''))?.click()`);
   }
@@ -1235,7 +1284,10 @@ try {
   await openTeamPanel(sendCdp, evaluate);
   await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-panel"] .team-member-card')`), "Team panel roster");
   const teamPanelText = await evaluate(`document.querySelector('[data-testid="team-panel"]')?.innerText ?? ''`);
-  assert.match(teamPanelText, /researcher/);
+  assert.match(teamPanelText, /Researcher Alex/);
+  assert.equal((await invoke("teamGetRoster", { teamSessionId: lead.id })).members
+    .find((item) => item.memberSessionId === member.memberSessionId)?.name, "researcher",
+  "localized display identity must not rename the routing handle");
   const screenshot = await sendCdp("Page.captureScreenshot", { format: "png" });
   screenshotPath = join(tempRoot, "team-panel.png");
   await writeFile(screenshotPath, Buffer.from(screenshot.data, "base64"));
@@ -1259,7 +1311,7 @@ try {
   await invoke("agentPrompt", {sessionId: lead.id, viewingSessionId: lead.id, content: "Handle this without specialists."});
   await waitFor(async () => (await invoke("teamGetExecutionDecision", {teamSessionId: lead.id})).decision?.strategy === "lead_only", "latest lead-only decision");
   await openTeamPanel(sendCdp, evaluate);
-  await waitFor(() => evaluate(`document.querySelector('[data-testid="team-panel"]')?.innerText.includes('This short task needs no specialist.')`), "lead-only reason visible");
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="team-panel"]')?.innerText.includes('This fixed acknowledgement is trivial and indivisible; no expert work is needed.')`), "lead-only reason visible");
   assert.equal((await invoke("teamGetRoster", {teamSessionId: lead.id})).members.length, 5);
   console.log("PASS Team strategy: Lead-only decision and reason visible without an extra expert");
 
