@@ -32,13 +32,20 @@ const server = createServer(async (req, res) => {
     }
     const first = scenario && isParent && !scenario.called;
     if (first) scenario.called = true;
-    const delta = first
-      ? { role: "assistant", tool_calls: [{ index: 0, id: `call_${++sequence}`, type: "function", function: { name: "Task", arguments: JSON.stringify(scenario.args) } }] }
+    const converge = scenario && isParent && !first && scenario.converge && !scenario.waited;
+    if (converge) scenario.waited = true;
+    const delegationId = converge ? payload.messages
+      .filter((m) => m.role === "tool")
+      .map((m) => String(m.content).match(/Delegation ([\w-]+) started:/)?.[1])
+      .find(Boolean) : undefined;
+    if (converge) assert.ok(delegationId, "Task returned a delegation ID for convergence");
+    const delta = first || converge
+      ? { role: "assistant", tool_calls: [{ index: 0, id: `call_${++sequence}`, type: "function", function: { name: first ? "Task" : "TaskWait", arguments: JSON.stringify(first ? scenario.args : { delegationIds: [delegationId] }) } }] }
       : { role: "assistant", content: "Fixture finished." };
     const base = { id: `chatcmpl-${++sequence}`, object: "chat.completion.chunk", created: 1, model: payload.model };
     res.writeHead(200, { "content-type": "text/event-stream" });
     res.write(`data: ${JSON.stringify({ ...base, choices: [{ index: 0, delta, finish_reason: null }] })}\n\n`);
-    res.write(`data: ${JSON.stringify({ ...base, choices: [{ index: 0, delta: {}, finish_reason: first ? "tool_calls" : "stop" }], usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 } })}\n\n`);
+    res.write(`data: ${JSON.stringify({ ...base, choices: [{ index: 0, delta: {}, finish_reason: first || converge ? "tool_calls" : "stop" }], usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 } })}\n\n`);
     res.end("data: [DONE]\n\n");
   } catch (error) {
     res.writeHead(500);
@@ -157,7 +164,7 @@ async function run(id, args, expectedModel, keys = ["fixture/allowed"], sessionI
   const marker = `scenario-${id}`;
   if (options.history) histories.set(sessionId, options.history);
   const before = requests.length;
-  scenarios.set(id, { marker, args: { ...args, task: `Complete fixture ${id}.` } });
+  scenarios.set(id, { marker, args: { ...args, task: `Complete fixture ${id}.` }, converge: options.converge });
   await rpc("agent.prompt", {
     sessionId, turnId: id, content: marker, mode: "agent", provider: model("parent"), thinkingLevel: "off",
     commandShell: { id: "bash", label: "Bash", dialect: "posix", available: true, isDefault: true },
@@ -171,9 +178,27 @@ async function run(id, args, expectedModel, keys = ["fixture/allowed"], sessionI
   const parent = captured.find((p) => p.tools?.some((t) => t.function?.name === "Task"));
   assert.ok(parent, "parent provider request reached local transport");
   const system = parent.messages.filter((m) => m.role === "system").map((m) => m.content).join("\n");
+  assert.match(system, /## Delegation[\s\S]*delegate-first/i,
+    "standard provider request receives delegate-first steering");
+  assert.match(parent.tools.find((t) => t.function?.name === "Task").function.description,
+    /delegate-first/i, "Task advertises the same delegation policy");
+  assert.ok(!parent.tools.some((t) => t.function?.name === "declare_team_strategy"),
+    "standard delegates must not expose Team coordination");
   assert.ok(!system.includes("`fixture/private`"), "private pin must not enter override catalog");
   assert.ok(parent.tools.find((t) => t.function?.name === "Task").function.description.includes(`Default model: fixture/${primaryModel}`));
   const delegates = captured.filter((p) => !p.tools?.some((t) => t.function?.name === "Task"));
+  if (options.converge) {
+    const waitCallIds = captured.flatMap((p) => p.messages
+      .filter((m) => m.role === "assistant")
+      .flatMap((m) => m.tool_calls ?? [])
+      .filter((call) => call.function?.name === "TaskWait")
+      .map((call) => call.id));
+    assert.ok(captured.some((p) => p.messages.some((m) => m.role === "tool" && waitCallIds.includes(m.tool_call_id)
+      && JSON.stringify(m.content).includes("Fixture finished."))),
+    "parent receives the child's report through TaskWait before ending");
+    assert.ok(delegates.every((p) => !p.tools?.some((t) => INHERIT_DENY_TOOLS.includes(t.function?.name))),
+      "delegates cannot recursively delegate");
+  }
   assert.ok(delegates.every((p) => p.fixtureAccount !== "private-account"), "resume must not send a request using another definition's private binding");
   if (expectedModel) assert.deepEqual(delegates.map((p) => p.model), options.expectedAttempts ?? [expectedModel]);
   else {
@@ -258,6 +283,7 @@ async function run(id, args, expectedModel, keys = ["fixture/allowed"], sessionI
   return rpc("agent.testRuntimeIdentity", { sessionId });
 }
 try {
+  await run("delegate-first-convergence", { agent: "explorer" }, "parent", [], "delegate-first-convergence", { converge: true });
   await run("private-cross-definition", { agent: "explorer", model: "fixture/private" });
   assert.deepEqual(resolutions, ["fixture/private"]);
   await run("definition-default", { agent: "reviewer" }, "private");
@@ -323,6 +349,7 @@ try {
     expectedStatus: "failed",
   });
   console.log("PASS E2E-166 changed opt-in rebuilds the sidecar runtime");
+  console.log("PASS E2E-DELEGATION-standard-delegates-to-subagents: provider steering, Task dispatch and settled child reports (deterministic fixture)");
 } finally {
   child.kill();
   await new Promise((resolve) => child.once("exit", resolve));
