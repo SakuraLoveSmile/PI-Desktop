@@ -554,8 +554,12 @@ async function submitComposerPrompt(sendCdp, evaluate, prompt) {
     }));
     return true;
   })()`);
+  // Synthetic input must reach React's committed handler before clicking a
+  // button that may still be enabled from the previous queued submission.
+  await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
   await waitFor(() => evaluate(`!!document.querySelector('.send-btn:not(:disabled)')`), "composer Send enabled");
   await evaluate(`document.querySelector('.send-btn')?.click()`);
+  await waitFor(() => evaluate(`!document.querySelector('.composer-input[contenteditable="true"]')?.textContent?.trim()`), "submitted composer draft cleared");
 }
 
 async function panoramaViewport(sendCdp, evaluate) {
