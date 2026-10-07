@@ -5547,6 +5547,8 @@ eleven-tool-round desktop paths are verified by
 ## 8. 可追溯性矩阵
 | 验收 | 应用场景 |
 |---|---|
+| E / 质量 — 标准 Agent 优先委派提示与 Task 报告汇总 | E2E-DELEGATION-standard-delegates-to-subagents |
+| C / E / 质量 — 专家团 Lead 委派提示、任务板流程与工具隔离 | E2E-TEAM-lead-delegates-to-experts |
 | C / Quality / Security — 经审批的只读专家团规划 | E2E-TEAM-approved-plan-research-and-execution |
 | C / Quality — 独立 Team 全景图／任务／成员标签页 | E2E-TEAM-panorama-and-member-tabs |
 | C / Quality — 实时派发卡片与单一任务目标 | E2E-TEAM-dispatch-card-live-status-and-joining |
@@ -9627,3 +9629,23 @@ the latest destination. These assertions measure work counts, not device FPS.
 
 通过隔离 Team 夹具的真实输入框、可信审批、Host、侧车和本机模型服务验证：审批前无成员和模型调用；批准后建立两项归属明确的研究任务，暂停第二名研究员，第一份结果后仍有两项预期任务且不可提交。第二份结果和用户问题完成后提交；拒绝、修订、同次重试、批准后，Lead 按标准 Agent 权限写入隔离目录。批准后研究成员保持只读。
 低层回归验证 lead_only、任务归属/删除/依赖、旧轮次、CAS、结果预算、幂等、普通完成绕过、revision、停止和重启后的问题清理、本地工具权限以及标准 Plan/Goal。集成命令为 PI_E2E_TEAM_PLANNING=1 node scripts/e2e-team.mjs，不调用真实模型或用户运行中的应用。
+
+### E2E-DELEGATION-standard-delegates-to-subagents
+
+- **前提：** 隔离的标准 Agent 会话、启用的 subagent 和确定性本地 mock provider；不使用真实 Provider 或用户数据。
+- **步骤：** 检查 provider 请求中的 delegate-first 提示与 Task 描述，派发一个 Task，并用其明确 delegation ID 调用 TaskWait，在主回合结束前获取报告。
+- **预期：** provider 收到优先委派指导，TaskWait 返回子任务报告；此流程不保证真实模型一定委派。
+- **覆盖：** `pnpm test:e2e:subagent-models`；`runtime.test.ts` 覆盖全部停用时的提示/工具目录、Team 工具隔离和 Plan/Goal 声明保留但执行拒绝。多 worker 同时派发及主 agent 同时处理独立工作未由这个场景运行；真实模型验证另标 NOT RUN，须获授权且可能产生费用。
+- **规格：** `03-runtime/02-agent-runtime.md`、`03-runtime/03-tools-and-permissions.md`、ADR 0089。
+- **验收：** 优先委派提示、Task 报告汇总及关联模式回归测试。
+- **阶段：** 维护。自动检查已定义，结果绑定实际候选提交。
+
+### E2E-TEAM-lead-delegates-to-experts
+
+- **前提：** 隔离的专家团执行会话、获批专家成员与确定性本地 provider；不使用真实 Provider 或用户数据。
+- **步骤：** 检查 Lead 默认 delegate、lead_only 例外及工具目录；运行获批任务板流程（一位活跃研究专家及其他空闲成员），检查琐碎不可拆分任务的 lead_only 理由。
+- **预期：** 默认委派专家，lead_only 只用于有理由的琐碎不可拆分任务；专家任务板工作流可执行，Team 不暴露 Task* 或 SessionTask，标准会话可并存。
+- **覆盖：** `pnpm test:e2e:team` 驱动隔离 Desktop/Host/sidecar 和本地 fixture。未覆盖多位活跃专家的独立并行任务；真实模型验证另标 NOT RUN，须获授权且可能产生费用。
+- **规格：** ADR plus-expert-team-collaboration、`03-runtime/03-tools-and-permissions.md`。
+- **验收：** Lead 提示策略、获批任务板流程及工具隔离。
+- **阶段：** 维护。自动检查已定义，结果绑定实际候选提交。
