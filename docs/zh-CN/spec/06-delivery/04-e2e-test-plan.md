@@ -5554,6 +5554,7 @@ eleven-tool-round desktop paths are verified by
 | C / E / Quality / Security — 已批准专家团 Goal 同回合执行与取消 | E2E-TEAM-approved-goal-same-turn-and-cancel |
 | C / Quality — 独立 Team 全景图／任务／成员标签页 | E2E-TEAM-panorama-and-member-tabs |
 | C / Quality — 实时派发卡片与单一任务目标 | E2E-TEAM-dispatch-card-live-status-and-joining |
+| C / Quality — 含行内派发卡片的 Team 回合时间线 | E2E-TEAM-turn-renders-chronological-timeline |
 | C / E / F / Quality / Security — Session Todo checklist | E2E-CHAT-session-todo-checklist |
 | C / E / Security / Quality — Live Voice 四阶段交互 | E2E-LIVE-VOICE-four-stage-ui |
 | C / F — Hourly task updates | E2E-SCHEDULED-manual-to-hourly |
@@ -9501,6 +9502,23 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **验收：** C / Quality — 当前 Team 状态与可访问的单目标导航。
 - **里程碑：** Post-MVP Expert Team visual parity，WP-A / WP-B。
 - **自动化：** `node scripts/e2e-goal-team-renderer-ui.mjs` 使用真实卡片并控制 API 边界；`node scripts/e2e-team.mjs` 覆盖隔离的 Desktop/Host/runtime Team 用户旅程。`team-dispatch.test.mjs` 覆盖运行／成功／错误／其他工具检测和活动回合渲染条件；renderer harness 覆盖只有加入提示时的显示与移除。
+
+### E2E-TEAM-turn-renders-chronological-timeline
+
+- **状态：** 任务候选的实现验证待完成。
+- **前提：** 隔离的 Electron/Chromium 候选、受控 assistant section 与派发索引 fixture、生产转录组件，以及英文／中文文案目录；不使用用户配置、真实 Provider 或付费 API。
+- **步骤：**
+  1. 渲染一个已结束的 Team 回合，依次包含思考行、叙述、三个成功派发的任务、两条后续思考行、叙述、另一条思考行和最终回答。确认 DOM 顺序与源顺序一致，三张卡位于派发位置，原始锚点工具行不再重复显示。
+  2. 在派发周围加入 `spawn_teammate`、`send_message`、`task_update` 和失败的 `task_create`。确认非锚点行仍可在原有活动组折叠详情中发现；失败创建不产生卡片，后续更新不会复制已有任务卡。
+  3. 确认带锚点的 Team 回合没有 `.turn-process`，每张卡只有一个可聚焦任务目标；搜索被吸收的锚点消息时会定位并高亮对应卡片。
+  4. 使用含两个 section 和 `PlanApprovalBar` 的规划回合，确认审批栏仍位于提交计划的 section 后方，且每个 section 保留各自的时间顺序。
+  5. 确认没有派发卡锚点的 Team 回合和普通非 Team 回合仍采用当前详细／精简渲染。精简模式隐藏思考内容，同时保留叙述和派发卡片。
+  6. 在活动的锚点回合中，确认 joining 行和运行阶段只出现在时间线真正的尾部。首张卡出现前仍支持原有的仅 joining 行位置，回合完成后该行消失；已结束回合没有实时行或过期动画。
+- **预期：** 含锚点的 Team 回合按时间顺序行内展示内容，卡片位于派发位置，且没有重复的原始锚点行。非锚点行仍可访问。无锚点 Team 与非 Team 回合保留现有模式行为；精简模式继续隐藏思考内容。计划审批位置、卡片单一导航、搜索定位和真正实时尾部状态均正确。
+- **规格：** `04-ux/08-component-spec.md` §10B.5 和 ADR `turn-process-and-thinking-display.md`。
+- **验收：** C / Quality — Team 转录时间线、卡片去重、模式兼容和实时尾部状态。
+- **里程碑：** Post-MVP Expert Team transcript，WP-A / WP-B。
+- **自动化：** `node scripts/e2e-goal-team-renderer-ui.mjs` 验证生产渲染顺序、卡片控件、搜索锚点和实时尾部条件；`node scripts/e2e-team-planning.mjs` 验证已批准规划用户路径及审批位置。单元覆盖位于 `apps/desktop/test/team-timeline.test.mjs`；现有转录和派发卡测试覆盖相关行为。记录确切任务候选和隔离 profile；真实 Provider 行为不属于此关卡。
 
 ### E2E-TEAM-live-overview-board-panorama-and-coexistence
 

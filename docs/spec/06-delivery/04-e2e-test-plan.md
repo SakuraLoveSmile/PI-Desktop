@@ -9465,6 +9465,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 | C / E / Quality / Security — Approved Team Goal same-turn execution and cancellation | E2E-TEAM-approved-goal-same-turn-and-cancel |
 | C / Quality — Independent Team panorama/task/member tabs | E2E-TEAM-panorama-and-member-tabs |
 | C / Quality — Live dispatch card and single task target | E2E-TEAM-dispatch-card-live-status-and-joining |
+| C / Quality — Chronological Team turn timeline with inline dispatch cards | E2E-TEAM-turn-renders-chronological-timeline |
 | C / E / F / Quality / Security — Session Todo checklist | E2E-CHAT-session-todo-checklist |
 | C / E / Security / Quality — Live Voice four-stage interaction | E2E-LIVE-VOICE-four-stage-ui |
 | C / F — Hourly task updates | E2E-SCHEDULED-manual-to-hourly |
@@ -16943,6 +16944,54 @@ current CAS revision. Legacy descriptions and reviews without presentation are r
   isolated Desktop/Host/runtime Team user path. `team-dispatch.test.mjs` covers
   running/success/error/other-tool detection and the active-turn render gate;
   the renderer harness covers joining-only appearance and removal.
+
+### E2E-TEAM-turn-renders-chronological-timeline
+
+- **Status:** Implementation validation pending for the task candidate.
+- **Preconditions:** Isolated Electron/Chromium candidate, controlled assistant
+  sections and dispatch-index fixtures, production transcript components, and
+  English/Chinese catalogs; no user profile, real provider or paid API.
+- **Steps:**
+  1. Render a settled Team turn with a thinking row, narration, three successful
+     task dispatches, two further thinking rows, narration, another thinking
+     row, and a final answer. Verify DOM order matches the source chronology,
+     three cards occupy the dispatch position, and their raw anchor tool rows
+     are absent.
+  2. Include `spawn_teammate`, `send_message`, `task_update`, and a failed
+     `task_create` around the dispatches. Verify non-anchor rows remain
+     discoverable in their existing activity-group disclosures, the failed
+     create has no card, and a later update does not duplicate its task card.
+  3. Verify the anchored Team turn has no `.turn-process`, each card has one
+     focusable task target, and transcript search for an absorbed anchor
+     highlights its card.
+  4. Keep a planning turn with two sections and a `PlanApprovalBar`; verify the
+     approval bar stays after the section that submitted the plan and each
+     section retains its own chronological parts.
+  5. Verify a Team turn with no dispatch-card anchor and an ordinary non-Team
+     turn retain their existing Detailed and Compact rendering. In Compact,
+     thinking content remains hidden while narration and dispatch cards remain.
+  6. During a live anchored turn, keep the joining row and runtime phase only
+     at the true timeline tail. Confirm joining-only placement still works
+     before the first card, then disappears on completion; a settled turn has
+     no live row or stale animation.
+- **Expected:** The anchor-bearing Team turn renders chronological inline
+  content and cards at their dispatch positions without duplicate raw anchor
+  rows. Non-anchor rows remain accessible. No-anchor Team and non-Team turns
+  preserve their existing mode-specific behavior; Compact thinking remains
+  hidden. Plan approval placement, single card navigation, search targeting,
+  and true-live-tail status remain correct.
+- **Specs:** `04-ux/08-component-spec.md` §10B.5 and ADR
+  `turn-process-and-thinking-display.md`.
+- **Acceptance:** C / Quality — chronological Team transcript, card deduplication,
+  mode compatibility and live-tail state.
+- **Milestone:** Post-MVP Expert Team transcript, WP-A / WP-B.
+- **Automation:** `node scripts/e2e-goal-team-renderer-ui.mjs` verifies production
+  renderer ordering, card controls, search anchor and live-tail conditions;
+  `node scripts/e2e-team-planning.mjs` verifies the approved-plan user path and
+  approval placement. Unit coverage is in `apps/desktop/test/team-timeline.test.mjs`;
+  the existing transcript and dispatch-card suites cover surrounding behavior.
+  Record the exact task candidate and isolated profile; real-provider quality is
+  outside this gate.
 
 ### E2E-TEAM-live-overview-board-panorama-and-coexistence
 

@@ -33,6 +33,17 @@ details; raw command/argument previews and technical result chips stay in those
 details. Exact native Team actions use localized labels without changing tool
 classification or security. Detailed behavior and stored messages remain intact.
 
+The 2026-10-07 Team timeline amendment applies only when the authoritative
+dispatch index contains a card anchor in a turn. In that turn, dispatch cards
+replace their raw anchor rows at the dispatch position, and Team content renders
+inline without a whole-turn `TurnProcess`. Ordinary non-Team rendering and the
+existing no-anchor Team path remain unchanged. Other tool rows keep their
+activity-group disclosures, Compact continues to hide thinking content, and
+joining/runtime feedback follows the true live tail after a card exists. Before
+the first card, joining keeps its existing standalone placement. The dispatch
+index remains the only source of card identity; no transcript, IPC, setting, or
+persistence contract changes.
+
 The process has three independent disclosure levels: the whole turn process, an
 ordinary activity group, and one item's details. An ordinary activity group
 contains one contiguous tool/search/thinking segment between progress paragraphs
@@ -115,3 +126,6 @@ The 2026-10-07 checks cover chronological Compact progress, localized native
 Team actions, full parameter/output expansion, search, failures and Detailed
 switching through focused tests and `scripts/e2e-transcript-render.mjs`. Model
 language guidance is validated separately from real model behavior.
+The Team timeline is specified by
+`E2E-TEAM-turn-renders-chronological-timeline`; renderer and planning-flow
+automation results are recorded against their task candidate.
