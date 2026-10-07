@@ -69,11 +69,17 @@ existing binaries. Exact pnpm wrapper commands are not claimed to pass.
 
 ## PR integration validation
 
-Pending creation and inspection of the fork PR's merge candidate. If its
-executable tree equals the tested task candidate, the recorded E2E results
-apply by executable-tree equivalence; documentation-only evidence changes do
-not require another full suite run. New executable changes require affected
-validation again before merge.
+Fork PR: https://github.com/SakuraLoveSmile/PI-Desktop/pull/48.
+
+Initial GitHub merge candidate: `4c3d15d0ba822ba5adfada5989ab74d201fcfd93`.
+Its tree exactly matched PR head `ea6d64992ca6a5858a04ef666f72d4282955c5e1`;
+compared with tested task candidate `bf04a7659`, only this evidence document
+was added. Thus executable-tree equivalence applies to all seven E2E results.
+The initial Docs check found two missing Chinese traceability rows; corresponding
+scenario descriptions and rows were synchronized and local documentation gates
+rerun. Later documentation-only commits do not change the tested executable
+tree. Recheck the final merge ref and CI before landing; new executable changes
+require affected validation again.
 
 ## Limits
 
