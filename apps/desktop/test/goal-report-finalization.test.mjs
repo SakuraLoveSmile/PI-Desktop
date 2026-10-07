@@ -161,7 +161,7 @@ async function lifecycleFixture(t, { kind = "goal", stopGate, abortGate, endTurn
       if (method === "session.endTurn") { endTurnEntered.resolve(); await endTurnGate?.promise; return { ok: true }; }
       if (method === "session.saveActiveRevision") return { saved: null };
       if (method === "goalReports.finalizeReport") return { report: { status: "ready" } };
-      if (["goalReports.bindExecutionTurn", "session.appendMessage", "session.saveInflight", "plans.finishExecution"].includes(method)) return { ok: true };
+      if (["plans.bindExecutionTurn", "goalReports.bindExecutionTurn", "session.appendMessage", "session.saveInflight", "plans.finishExecution"].includes(method)) return { ok: true };
       throw new Error(`Unexpected Host call: ${method}`);
     },
   };

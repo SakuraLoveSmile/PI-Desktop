@@ -27,7 +27,14 @@ process.env.HOME = fixtureHome;
 const planningFixture = process.env.PI_E2E_TEAM_PLANNING === "1"
   ? (await import("./e2e-team-planning.mjs")).createPlanningFixture(projectPath)
   : null;
+const forcedFixture = process.env.PI_E2E_TEAM_APPROVED_GOAL === "1"
+  ? (await import("./e2e-team-approved-goal.mjs")).createApprovedGoalFixture(projectPath)
+  : process.env.PI_E2E_TEAM_FORCED === "1"
+  ? (await import("./e2e-team-forced.mjs")).createForcedFixture(projectPath)
+  : null;
 const calls = [];
+let pendingExpertPrompt;
+let researcherSessionId;
 const titleRequests = [];
 const titleDiagnostics = [];
 const modelGates = {
@@ -40,6 +47,10 @@ let member;
 let fixtureError;
 let lastSendCdp;
 let memberGateUsed = false;
+let signalInitialExpertStart;
+const initialExpertStarted = new Promise(resolve => { signalInitialExpertStart = resolve; });
+let signalLightExpertStart;
+let lightExpertStarted = Promise.resolve();
 
 async function holdModelRequest(name) {
   const gate = modelGates[name];
@@ -51,6 +62,14 @@ async function holdModelRequest(name) {
 
 function releaseModelRequest(name) {
   modelGates[name].release?.();
+}
+function existingExpertProposal(reason) {
+  lightExpertStarted = new Promise(resolve => { signalLightExpertStart = resolve; });
+  assert.ok(researcherSessionId, "lightweight dispatch needs the real approved researcher");
+  return { strategy: "delegate", reason, members: [{ name: "researcher", memberSessionId: researcherSessionId,
+    description: "Inspect the assigned board task.", contextKind: "fresh",
+    presentation: { role: "researcher", displayName: "Alex" },
+  }] };
 }
 const providerServer = createServer(async (req, res) => {
   try {
@@ -67,7 +86,7 @@ const providerServer = createServer(async (req, res) => {
     const lastUser = [...messages].reverse().find((message) => message.role === "user");
     const lastUserIndex = lastUser ? messages.lastIndexOf(lastUser) : -1;
     const activeTurnMessages = messages.slice(lastUserIndex + 1);
-    const userText = typeof lastUser?.content === "string"
+    let userText = typeof lastUser?.content === "string"
       ? lastUser.content
       : Array.isArray(lastUser?.content)
         ? lastUser.content.map((part) => part.text ?? "").join("\n")
@@ -80,6 +99,13 @@ const providerServer = createServer(async (req, res) => {
       .map((message) => String(message.content ?? ""))
       .join("\n");
     const toolNames = (request.tools ?? []).map((tool) => tool.function?.name ?? tool.name);
+    const triggerText = userText;
+    const lightweightConfirmed = userText.includes("Team review") && userText.includes("confirmed") && Boolean(pendingExpertPrompt);
+    const lightweightResult = userText.includes("E2E_LIGHT_RESULT: assigned task inspected.");
+    if (lightweightResult && !planningFixture && !forcedFixture) {
+      assert.ok(pendingExpertPrompt, "expert result lost its fixture action");
+      userText = pendingExpertPrompt;
+    }
     const titleSystemPrompt = messages.find((message) => message.role === "system")?.content;
     const isTitleRequest = typeof titleSystemPrompt === "string" &&
       titleSystemPrompt.includes("descriptive session title summarizing the conversation");
@@ -88,10 +114,10 @@ const providerServer = createServer(async (req, res) => {
         assert.equal(toolNames.includes(name), false, `Team exposed ${name}`);
       }
       if (titleSystemPrompt?.includes("You are the Lead of an Expert Team.")) {
-        assert.match(titleSystemPrompt, /default[\s\S]*delegate|delegate[\s\S]*default/i,
-          "execution Lead receives delegate-by-default steering");
-        assert.match(titleSystemPrompt, /trivial[\s\S]*indivisible|indivisible[\s\S]*trivial/i,
-          "lead_only is limited to trivial indivisible work");
+        assert.match(titleSystemPrompt, /always delegates/,
+          "execution Lead receives mandatory delegation steering");
+        assert.match(titleSystemPrompt, /Never choose lead_only or offer solo approval/,
+          "Lead cannot offer solo handling");
       }
     }
     let toolCall;
@@ -106,8 +132,28 @@ const providerServer = createServer(async (req, res) => {
         : userText.includes("Create an approved Team execution plan")
           ? "Approved Team Assignment"
           : "Expert Team Delegation";
+    } else if (forcedFixture) {
+      ({ toolCall, finalText } = await forcedFixture.respond({ userText, priorToolNames, activeTurnMessages, activeToolText, toolNames, allMessages: messages }));
     } else if (planningFixture) {
-      ({ toolCall, finalText } = await planningFixture.respond({ userText, priorToolNames, activeTurnMessages, activeToolText, toolNames }));
+      ({ toolCall, finalText } = await planningFixture.respond({ userText, priorToolNames, activeTurnMessages, activeToolText, toolNames, allMessages: messages }));
+    } else if (lightweightConfirmed) {
+      if (!priorToolNames.includes("send_message")) {
+        toolCall = { name: "send_message", args: {
+          targetMemberName: "researcher", content: "E2E_LIGHT_WORK: inspect the assigned board task, then send E2E_LIGHT_RESULT to Lead.",
+        }};
+      } else {
+        await lightExpertStarted;
+        finalText = "Approved expert check is running.";
+      }
+    } else if (userText.includes("E2E_LIGHT_WORK")) {
+      signalLightExpertStart?.();
+      if (!priorToolNames.includes("task_get")) {
+        toolCall = { name: "task_get", args: { taskId: boardTaskId } };
+      } else if (!priorToolNames.includes("send_message")) {
+        toolCall = { name: "send_message", args: { targetMemberName: "Lead", content: "E2E_LIGHT_RESULT: assigned task inspected." }};
+      } else { finalText = "Assigned expert check complete."; }
+    } else if (!lightweightResult && priorToolNames.includes("declare_team_strategy") && activeToolText.includes("pending")) {
+      finalText = "Waiting for your expert launch approval.";
     } else if (userText.includes("Standard coexistence probe")) {
       assert.ok(toolNames.includes("Task"), "standard session lost its Task tool");
       assert.equal(toolNames.includes("declare_team_strategy"), false, "standard session exposed Team dispatch");
@@ -119,24 +165,16 @@ const providerServer = createServer(async (req, res) => {
       finalText = "STANDARD_CHILD_RESULT";
     } else if (userText.includes("Create an approved Team execution plan")) {
       assert.ok(toolNames.includes("SubmitPlan"), "Plan runtime lacks SubmitPlan");
-      toolCall = !priorToolNames.includes("declare_team_strategy")
-        ? { name: "declare_team_strategy", args: { strategy: "lead_only", reason: "This fixture plan needs no research." } }
-        : { name: "SubmitPlan", args: {
-        title: "Approved Team Assignment",
-        question: "Run this approved Team plan?",
+      assert.equal(toolNames.includes("declare_team_strategy"), false, "title-only Plan fixture should use standard profile");
+      toolCall = { name: "SubmitPlan", args: {
+        title: "Approved Team Assignment", question: "Run this approved Team plan?",
         markdown: "# Approved Team Assignment\n\n1. Coordinate the approved Team execution.\n2. Record the result for the Lead.\n",
       }};
     } else if (userText.includes("Approved plan title: Approved Team Assignment")) {
-      if (!priorToolNames.includes("declare_team_strategy")) {
-        assert.ok(toolNames.includes("declare_team_strategy"), "approved Team execution lacks strategy declaration");
-        toolCall = { name: "declare_team_strategy", args: {
-          strategy: "lead_only", reason: "Acknowledging this fixture plan is trivial and indivisible; no expert work is needed."
-        }};
-      } else {
-        finalText = "Approved Team plan execution finished.";
-      }
+      assert.equal(toolNames.includes("declare_team_strategy"), false, "standard title fixture became Team execution");
+      finalText = "Approved Team plan execution finished.";
     } else if (userText.includes("Please spawn one teammate")) {
-      if (!priorToolNames.includes("declare_team_strategy")) {
+      if (!lightweightResult && !priorToolNames.includes("declare_team_strategy")) {
         assert.ok(toolNames.includes("declare_team_strategy"), "Lead runtime lacks strategy declaration");
         toolCall = {
           name: "declare_team_strategy",
@@ -168,12 +206,17 @@ const providerServer = createServer(async (req, res) => {
         toolCall = { name: "send_message", args: {
           targetMemberName: "researcher", content: "Send the exact message TEAM_RESULT to Lead using send_message."
         }};
-      } else { finalText = "Approved work dispatched."; }
-    } else if (userText.includes("Handle this without specialists")) {
-      if (!priorToolNames.includes("declare_team_strategy") || !activeToolText.includes("lead_only")) {
-        toolCall = { name: "declare_team_strategy", args: { strategy: "lead_only", reason: "This fixed acknowledgement is trivial and indivisible; no expert work is needed." }};
-      } else { finalText = "Handled by Lead only."; }
+      } else {
+        await initialExpertStarted;
+        finalText = "Approved expert work is running.";
+      }
+    } else if (userText.includes("Handle the bounded check with the existing expert")) {
+      if (!lightweightResult && !priorToolNames.includes("declare_team_strategy")) {
+        pendingExpertPrompt = userText;
+        toolCall = { name: "declare_team_strategy", args: existingExpertProposal("An approved researcher must inspect this bounded check.") };
+      } else { finalText = "Handled with the approved expert contribution."; }
     } else if (userText.includes("Send the exact message TEAM_RESULT")) {
+      signalInitialExpertStart();
       thinkingText = "TEAM_MEMBER_THINKING: verify the fixed result before reporting.";
       if (!priorToolNames.includes("send_message")) {
         assert.ok(toolNames.includes("send_message"), "member runtime lacks send_message");
@@ -189,9 +232,9 @@ const providerServer = createServer(async (req, res) => {
         finalText = "TEAM_RESULT was sent to Lead.";
       }
     } else if (userText.includes("Mark the board fixture task completed")) {
-      if (!priorToolNames.includes("declare_team_strategy")) {
+      if (!lightweightResult && !priorToolNames.includes("declare_team_strategy")) {
         toolCall = { name: "declare_team_strategy", args: {
-          strategy: "lead_only", reason: "Updating one board item is a Lead-only operation."
+          ...existingExpertProposal("The researcher must inspect the board item before completion.")
         }};
       } else if (!priorToolNames.includes("task_update")) {
         assert.ok(toolNames.includes("task_update"), "Lead runtime lacks task_update");
@@ -204,18 +247,18 @@ const providerServer = createServer(async (req, res) => {
         finalText = "The E2E board fixture task is complete.";
       }
     } else if (userText.includes("Hold the Lead while the queue is inspected")) {
-      if (!priorToolNames.includes("declare_team_strategy")) {
+      if (!lightweightResult && !priorToolNames.includes("declare_team_strategy")) {
         toolCall = { name: "declare_team_strategy", args: {
-          strategy: "lead_only", reason: "The Lead can hold this short queue inspection."
+          ...existingExpertProposal("The researcher must inspect the queue context.")
         }};
       } else {
         await holdModelRequest("queue");
         finalText = "The Lead queue inspection turn is complete.";
       }
     } else if (userText.includes("Queue fixture prompt")) {
-      if (!priorToolNames.includes("declare_team_strategy")) {
+      if (!lightweightResult && !priorToolNames.includes("declare_team_strategy")) {
         toolCall = { name: "declare_team_strategy", args: {
-          strategy: "lead_only", reason: "This queued fixture prompt needs no specialist."
+          ...existingExpertProposal("The researcher must inspect this queued task.")
         }};
       } else {
         finalText = "Queued fixture prompt processed.";
@@ -237,7 +280,8 @@ const providerServer = createServer(async (req, res) => {
     } else {
       throw new Error(`Unexpected fake-model prompt: ${userText.slice(0, 240)}`);
     }
-    const call = { kind, userText, tool: toolCall?.name ?? null, model: request.model };
+    if (toolCall?.name === "declare_team_strategy" && researcherSessionId) pendingExpertPrompt = userText;
+    const call = { kind, userText, triggerText, tool: toolCall?.name ?? null, model: request.model };
     calls.push(call);
     if (kind === "title") titleRequests.push(call);
 
@@ -428,11 +472,11 @@ async function startApp() {
   return { sendCdp, evaluate, invoke };
 }
 
-async function openTeamPanel(sendCdp, evaluate) {
-  if (await evaluate(`!!document.querySelector('[data-testid="team-panel"]')`)) return;
+async function openTeamPanel(sendCdp, evaluate, requestedTeamSessionId) {
+  if (await evaluate(`!!document.querySelector('[data-testid="team-panel"]')`) && !requestedTeamSessionId) return;
   const existingTeamTab = await evaluate(`(() => {
     const tab = Array.from(document.querySelectorAll('[data-work-panel-tab-id]'))
-      .find((node) => /^team:[^:]+$/.test(node.getAttribute('data-work-panel-tab-id') ?? ''));
+      .find((node) => ${requestedTeamSessionId ? `node.getAttribute('data-work-panel-tab-id') === ${JSON.stringify(`team:${requestedTeamSessionId}`)}` : `/^team:[^:]+$/.test(node.getAttribute('data-work-panel-tab-id') ?? '')`});
     if (!tab) return false;
     tab.querySelector('.work-panel-tab-button')?.click();
     return tab.getAttribute('data-work-panel-tab-id');
@@ -462,7 +506,37 @@ async function openTeamPanel(sendCdp, evaluate) {
   await evaluate(`document.querySelector('[data-work-panel-launcher-item="team"]').click()`);
 }
 
+async function approveExpertReview(invoke, evaluate, sessionId, previousReviewId) {
+  const review = await waitFor(async () => {
+    const current = (await invoke("teamGetLaunchReview", { teamSessionId: sessionId })).review;
+    return current?.status === "pending" && (current.strategy ?? "delegate") === "delegate" && current.members.length > 0 &&
+      current.reviewId !== previousReviewId ? current : null;
+  }, "pending nonempty expert review");
+  await waitFor(async () => (await invoke("agentGetStatus", sessionId)).status?.isRunning === false, "expert proposer settled");
+  const previousTab = await evaluate(`document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id')`);
+  await openTeamPanel(lastSendCdp, evaluate);
+  await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-launch-review-confirm-btn"]:not(:disabled)')`), "team-panel expert confirmation");
+  await evaluate(`document.querySelector('[data-testid="team-launch-review-confirm-btn"]').click()`);
+  await waitFor(async () => (await invoke("teamGetLaunchReview", { teamSessionId: sessionId })).review?.status === "confirmed", "trusted expert confirmation committed");
+  if (previousTab) {
+    await evaluate(`document.querySelector(${JSON.stringify(`[data-work-panel-tab-id="${previousTab}"] .work-panel-tab-button`)})?.click()`);
+  }
+  return review.reviewId;
+}
+
 async function activateOverviewTab(sendCdp, evaluate) {
+  // Overview navigation is explicit user navigation. Each session owns its
+  // panel state, so a newly selected Standard session may start with it closed.
+  const panelState = await waitFor(() => evaluate(`(() => {
+    const panel=document.querySelector('[data-testid="work-panel"]');
+    const pressed=document.querySelector('.app-work-panel-toggle')?.getAttribute('aria-pressed');
+    if (!panel && pressed === 'false') return 'closed';
+    if (panel && panel.getAttribute('data-exiting') !== 'true' && pressed === 'true') return 'open';
+    return null;
+  })()`), "stable panel before explicit Overview navigation");
+  if (panelState === "closed") {
+    await evaluate(`document.querySelector('.app-work-panel-toggle').click()`);
+  }
   await waitFor(() => evaluate(`!!document.querySelector('[data-work-panel-tab-id="overview"] .work-panel-tab-button')`), "Overview tab");
   await evaluate(`document.querySelector('[data-work-panel-tab-id="overview"] .work-panel-tab-button').click()`);
   await waitFor(() => evaluate(`!!document.querySelector('[data-testid="overview-tab"]')`), "Overview surface");
@@ -875,8 +949,8 @@ try {
   });
   const { session: planLead } = await host.call("session.create", {
     title: "New Task",
-    mode: "plan",
-    executionProfile: "team",
+    mode: process.env.PI_E2E_TEAM_APPROVED_GOAL === "1" ? "goal" : "plan",
+    executionProfile: planningFixture || forcedFixture ? "team" : "standard",
     projectPath,
     providerId: provider.id,
     modelId: "team-fixture",
@@ -886,12 +960,24 @@ try {
     title: "Standard coexistence", mode: "agent", executionProfile: "standard", projectPath,
     providerId: provider.id, modelId: "team-fixture", permissionMode: "auto",
   });
+  const completionSessions = {};
+  if (forcedFixture) {
+    for (const kind of ["recover", "persistent", "planRecover"]) {
+      completionSessions[kind] = (await host.call("session.create", {
+        title: `Forced text ${kind}`, mode: kind === "planRecover" ? "plan" : "agent", executionProfile: "team", projectPath,
+        providerId: provider.id, modelId: "team-fixture", permissionMode: "auto",
+      })).session;
+    }
+  }
   assert.equal(lead.executionProfile, "team");
   await host.stop();
 
   let { sendCdp, evaluate, invoke } = await startApp();
 
-  if (planningFixture) {
+  if (forcedFixture) {
+    await forcedFixture.runJourney({ lead, planLead, completionSessions, invoke, evaluate, sendCdp, waitFor, calls,
+      submitComposerPrompt, openTeamPanel, saveScreenshot, startApp, stopApp });
+  } else if (planningFixture) {
     await planningFixture.runJourney({
       planLead, invoke, evaluate, sendCdp, waitFor, calls, projectPath,
       submitComposerPrompt, openTeamPanel, saveScreenshot, startApp, stopApp,
@@ -939,14 +1025,41 @@ try {
   await waitFor(async () => { const result = await invoke("agentGetStatus", lead.id); assert.equal(typeof result.status?.isRunning, "boolean"); return result.status.isRunning === false; }, "Lead settled before confirmation");
   await openTeamPanel(sendCdp, evaluate);
   await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-launch-review"]')`), "launch review UI");
-  assert.equal(await evaluate(`(() => {
+  // Presence precedes the Work Panel's width transition. Measure its final layout,
+  // otherwise the native selects can be wider than an intermediate entrance frame.
+  await waitFor(() => evaluate(`(() => {
+    const panel = document.querySelector('[data-testid="work-panel"]');
+    return !!panel && panel.getAnimations().every(animation =>
+      animation.playState !== 'running' && !animation.pending);
+  })()`), "Team panel entrance animation completed before bounds check");
+  await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
+  const reviewBounds = await evaluate(`(() => {
     const card = document.querySelector('[data-testid="launch-review-member-researcher"]');
     const bounds = card.getBoundingClientRect();
-    return Array.from(card.querySelectorAll('select')).every(select => {
+    const rectOf = node => node?.getBoundingClientRect().toJSON() ?? null;
+    const selects = Array.from(card.querySelectorAll('select')).map(select => {
       const rect = select.getBoundingClientRect();
-      return rect.left >= bounds.left && rect.right <= bounds.right;
-    }) && card.scrollWidth <= card.clientWidth;
-  })()`), true, "review controls must fit the narrow Team panel");
+      const style = getComputedStyle(select);
+      return { rect: rect.toJSON(), width: style.width, minWidth: style.minWidth,
+        maxWidth: style.maxWidth, boxSizing: style.boxSizing, transform: style.transform,
+        fits: rect.left >= bounds.left && rect.right <= bounds.right };
+    });
+    return { fits: selects.every(select => select.fits) && card.scrollWidth <= card.clientWidth,
+      card: { rect: bounds.toJSON(), clientWidth: card.clientWidth, scrollWidth: card.scrollWidth },
+      selects, panel: rectOf(document.querySelector('[data-testid="work-panel"]')),
+      review: rectOf(document.querySelector('[data-testid="team-launch-review"]')),
+      page: { innerWidth, innerHeight, scrollX, scrollY,
+        selectedSession: document.querySelector('[data-sidebar-session-row] .thread-item-main[aria-current="page"]')?.closest('[data-sidebar-session-row]')?.getAttribute('data-sidebar-session-row'),
+        activeTab: document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id'),
+        exiting: document.querySelector('[data-testid="work-panel"]')?.getAttribute('data-exiting') },
+      animations: document.getAnimations().map(animation => ({
+        state: animation.playState, currentTime: animation.currentTime,
+        target: animation.effect?.target?.className ?? null,
+        timing: animation.effect?.getComputedTiming(),
+      })) };
+  })()`);
+  console.log("TEAM_REVIEW_BOUNDS", JSON.stringify(reviewBounds));
+  assert.equal(reviewBounds.fits, true, "review controls must fit the narrow Team panel");
   const pendingImage = await sendCdp("Page.captureScreenshot", {format: "png"});
   await writeFile(join(tempRoot, "team-launch-review-pending.png"), Buffer.from(pendingImage.data, "base64"));
   await evaluate(`(() => {const selects=document.querySelectorAll('[data-testid="launch-review-member-researcher"] select'); const model=selects[1]; model.value='team-approved'; model.dispatchEvent(new Event('change',{bubbles:true}));})()`);
@@ -1145,6 +1258,8 @@ try {
   assert.equal(teamRoster.members.length, 5);
   await waitFor(async () => (await invoke("agentGetStatus", lead.id)).status?.isRunning === false, "Lead idle before board fixture");
   await waitFor(async () => (await invoke("teamGetBoard", { teamSessionId: lead.id })).tasks.length >= 6, "six Team board tasks", 60_000);
+  researcherSessionId = teamRoster.members.find(item => item.name === "researcher")?.memberSessionId;
+  assert.ok(researcherSessionId);
   const board = await invoke("teamGetBoard", { teamSessionId: lead.id });
   assert.equal(board.teamSessionId, lead.id);
   boardTaskId = board.tasks[0]?.taskId;
@@ -1153,6 +1268,7 @@ try {
   await activateOverviewTab(sendCdp, evaluate);
   await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.completed === '0' && document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.total === '6'`), "Overview baseline before live task mutation");
   await invoke("agentPrompt", { sessionId: lead.id, viewingSessionId: lead.id, content: "Mark the board fixture task completed." });
+  await approveExpertReview(invoke, evaluate, lead.id);
   await waitFor(() => modelGates.taskUpdate.entered, "task update held after Host mutation");
   const updatedBoard = await invoke("teamGetBoard", { teamSessionId: lead.id });
   assert.equal(updatedBoard.tasks.find((task) => task.taskId === boardTaskId)?.status, "completed", "completed board fixture did not persist");
@@ -1231,6 +1347,7 @@ try {
   await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-panel"]')`), "Team aggregate after board");
   console.log("PASS Team Overview/board: live task progress, compact list, filter/search and detail/back");
   await submitComposerPrompt(sendCdp, evaluate, "Hold the Lead while the queue is inspected.");
+  const queueReviewId = await approveExpertReview(invoke, evaluate, lead.id);
   await waitFor(() => modelGates.queue.entered, "controlled Lead turn for queue actions");
   for (let index = 1; index <= 8; index += 1) {
     await submitComposerPrompt(sendCdp, evaluate, `Queue fixture prompt ${index}`);
@@ -1261,11 +1378,24 @@ try {
     await waitFor(() => evaluate(`document.querySelectorAll('[data-testid="queued-prompt"]').length === ${count - 1}`), "remove surplus queue fixture");
   }
   await evaluate(`document.querySelector('.composer-queued-prompt-send-now')?.click()`);
+  await waitFor(async () => {
+    const entries = (await invoke("agentQueueList", { sessionId: lead.id })).entries;
+    return entries.some(entry => entry.content === "Queue fixture prompt 1" && entry.priority === 1);
+  }, "Send Now promotes the durable queued task");
+  await waitFor(async () => (await invoke("teamGetRoster", { teamSessionId: lead.id })).paused, "Send Now graceful Stop pauses the Team");
   releaseModelRequest("queue");
-  await waitFor(() => calls.some(call => call.userText.includes('Queue fixture prompt 1') && call.tool === null), "queue Send Now executes the retained prompt");
+  await waitFor(async () => (await invoke("agentGetStatus", lead.id)).status?.isRunning === false, "held Team turn settles before Resume");
+  const pausedQueue = (await invoke("agentQueueList", { sessionId: lead.id })).entries;
+  assert.ok(pausedQueue.some(entry => entry.content === "Queue fixture prompt 1" && entry.priority === 1), "paused Team consumed the promoted task");
+  await openTeamPanel(sendCdp, evaluate);
+  await waitFor(() => evaluate(`Array.from(document.querySelectorAll('[data-testid="team-panel"] .team-panel-actions button')).some(button => /resume/i.test(button.innerText))`), "Team Resume after Send Now Stop");
+  await evaluate(`Array.from(document.querySelectorAll('[data-testid="team-panel"] .team-panel-actions button')).find(button => /resume/i.test(button.innerText)).click()`);
+  await waitFor(async () => !(await invoke("teamGetRoster", { teamSessionId: lead.id })).paused, "Team resumed before queued task approval");
+  await approveExpertReview(invoke, evaluate, lead.id, queueReviewId);
+  await waitFor(() => calls.some(call => call.userText.includes('Queue fixture prompt 1') && call.triggerText?.includes('E2E_LIGHT_RESULT') && call.tool === null), "queue Send Now integrates the assigned expert result");
   await waitFor(async () => (await invoke("agentGetStatus", lead.id)).status?.isRunning === false, "queue execution settled");
   await waitFor(() => evaluate(`!document.querySelector('.composer-queue-heading')`), "empty queue disclosure removed");
-  console.log("PASS Queue user path: eight rows, scoped folding, bounded scroll, move up/down, remove, edit and Send Now");
+  console.log("PASS Team queue user path: eight rows, scoped folding, move/remove/edit, promoted Send Now pauses, Resume starts fresh expert approval");
   await evaluate(`document.querySelector('[data-sidebar-session-row="${standardSession.id}"] button.thread-item-main')?.click()`);
   await waitFor(() => evaluate(`!!document.querySelector('[data-sidebar-session-row="${standardSession.id}"].active') && !document.querySelector('.composer-contract-chip')`), "standard session selected");
   await submitComposerPrompt(sendCdp, evaluate, "Standard coexistence probe: delegate one read-only task and report the result.");
@@ -1307,13 +1437,17 @@ try {
   console.log(`Evidence image: ${screenshotPath}`);
 
   await evaluate(`document.querySelector('[data-sidebar-session-row="${lead.id}"] button.thread-item-main')?.click()`);
-  await waitFor(async () => { const result = await invoke("agentGetStatus", lead.id); assert.equal(typeof result.status?.isRunning, "boolean"); return result.status.isRunning === false; }, "Lead idle for lead-only turn");
-  await invoke("agentPrompt", {sessionId: lead.id, viewingSessionId: lead.id, content: "Handle this without specialists."});
-  await waitFor(async () => (await invoke("teamGetExecutionDecision", {teamSessionId: lead.id})).decision?.strategy === "lead_only", "latest lead-only decision");
+  await waitFor(async () => { const result = await invoke("agentGetStatus", lead.id); assert.equal(typeof result.status?.isRunning, "boolean"); return result.status.isRunning === false; }, "Lead idle for bounded expert turn");
+  await invoke("agentPrompt", {sessionId: lead.id, viewingSessionId: lead.id, content: "Handle the bounded check with the existing expert."});
+  await approveExpertReview(invoke, evaluate, lead.id);
+  await waitFor(async () => (await invoke("teamGetExecutionDecision", {teamSessionId: lead.id})).decision?.strategy === "delegate", "latest forced expert decision");
   await openTeamPanel(sendCdp, evaluate);
-  await waitFor(() => evaluate(`document.querySelector('[data-testid="team-panel"]')?.innerText.includes('This fixed acknowledgement is trivial and indivisible; no expert work is needed.')`), "lead-only reason visible");
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="team-panel"]')?.innerText.includes('An approved researcher must inspect this bounded check.')`), "expert delegation reason visible");
+  await waitFor(() => calls.some(call => call.userText.includes('Handle the bounded check with the existing expert') && call.triggerText?.includes('E2E_LIGHT_RESULT') && call.tool === null), "bounded task integrates the actual expert contribution");
+  await waitFor(async () => (await invoke("agentGetStatus", lead.id)).status?.isRunning === false, "bounded expert-backed Lead turn settled");
+  await waitFor(async () => (await invoke("agentGetStatus", researcherSessionId)).status?.isRunning === false, "bounded assigned expert settled");
   assert.equal((await invoke("teamGetRoster", {teamSessionId: lead.id})).members.length, 5);
-  console.log("PASS Team strategy: Lead-only decision and reason visible without an extra expert");
+  console.log("PASS Team strategy: delegation remains mandatory and reuses the approved expert without duplicating members");
 
   socket.close();
   socket = null;
@@ -1324,9 +1458,13 @@ try {
     callerSessionId: lead.id,
   });
   assert.equal(pauseResult.team.paused, true);
+  // Seed paused mail from an already approved expert. An idle Lead has no
+  // running user-approved turn and must not bypass the strategy gate via RPC.
+  const pausedSender = teamRoster.members.find(item => item.name === "reviewer");
+  assert.ok(pausedSender?.memberSessionId, "paused mailbox fixture needs an approved peer");
   const queued = await host.call("team.sendMessage", {
     teamSessionId: lead.id,
-    callerSessionId: lead.id,
+    callerSessionId: pausedSender.memberSessionId,
     target: "researcher",
     content: "DELIVER_AFTER_RESUME",
     idempotencyKey: "team-e2e-paused-message",
@@ -1393,6 +1531,9 @@ try {
   throw error;
 } finally {
   planningFixture?.releaseResearch();
+  forcedFixture?.release();
+  signalInitialExpertStart?.();
+  signalLightExpertStart?.();
   socket?.close();
   await stopApp();
   await host.stop();

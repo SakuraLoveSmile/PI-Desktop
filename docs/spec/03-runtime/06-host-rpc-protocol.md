@@ -401,10 +401,15 @@ to later refresh and inference; the vendor picker does not collect them.
   Team event. A renderer can ignore an older revision and refresh its scoped
   snapshot; prompts, task descriptions, and transcripts are not event payload.
 - `team.declareStrategy` accepts optional member presentation on proposed
-  review data. It creates or updates a pending review, never a member session.
-  The trusted Desktop review path selects effective member bindings and
-  confirms the revision before Host creation/dispatch. Direct mutation entry
-  points reject unconfirmed work; `spawn_teammate` does not accept presentation.
+  review data. Host derives launch policy from session mode: Plan declarations
+  atomically materialize read-only researchers and a `confirmed` audit with
+  `launchPolicy: "automatic_plan"`, without user review or a confirmation-mail
+  continuation. The current Lead turn continues owned task creation/dispatch.
+  Agent declarations remain pending with `launchPolicy: "user_confirmed"`;
+  trusted Desktop confirmation binds routes before execution. Missing legacy
+  policy means user-confirmed. Automatic Plan authority cannot authorize Agent
+  tools; direct mutations still require the current valid scope and actual expert
+  turns before substantive work. `spawn_teammate` does not accept presentation.
 - `team.getMessage({ teamSessionId, callerSessionId, messageId })` reads one
   durable Team mailbox row. The Lead can read every row; a member can read only
   a row it sent or received. Unknown and cross-Team ids return `null`.
@@ -436,7 +441,9 @@ unchanged.
   because either session's permission setting changed after turn admission.
 - `team.pause/resume({ teamSessionId, callerSessionId })` are Lead-only
   transitions. Electron Main holds or resumes the corresponding Agent Host
-  queues and drains pending mail after resume.
+  queues and drains pending mail after resume. It then kicks each resumed session
+  so idle ordinary user queues continue even when no Team mail is pending.
+  Other lifecycle holds and active-turn admission still prevent execution.
 - `team.createTask` and `team.updateTask` require `callerSessionId`; Host checks
   membership, Lead-only reassignment, task ownership, CAS revision, and
   dependency constraints before mutation. When supplied, the owner session and
@@ -621,7 +628,9 @@ contract is being negotiated.
   that kind's mode with a compare-and-swap update and emits `plans.changed`
   carrying the `kind`. An unrecognized `kind` fails with `INVALID_PARAMS`
 - `plans.submit` — writes the host-owned artifact under the kind's directory and
-  creates a pending proposal whose `kind` is persisted on the row
+  creates a pending proposal whose `kind` is persisted on the row. Team Plan
+  submissions with otherwise-ready research but queued Lead inbox messages
+  return normal `deferred` status instead of publishing an approval fence.
 - `plans.pending` — returns pending approval rows plus bounded proposal history,
   the session planning
   state, and the `kind` of the contract being negotiated (the pending row's kind,
@@ -1500,13 +1509,14 @@ staging files; remote objects remain intact.
 Plan Team Leads retain standard Plan permissions and coordination tools.
 `team.getRuntimeContext` returns research purpose and planning/round IDs only
 for confirmed research members; Lead context never has research purpose.
-Trusted launch-review confirmation and the planning round commit atomically.
+Automatic Plan roster launch and the planning round commit atomically, without
+user staffing confirmation. The final Plan approval remains user-controlled.
 Task create/update enrolls research tasks in the same transaction as assignment.
 
 `team.getPlanning({ teamSessionId, callerSessionId })` returns null without a
 round, otherwise planningId, teamSessionId, roundId, phase, workPurpose,
 reviewId, totalExpectedTasks, completedResearchTasks, openQuestionsCount,
-isReadyForPlanSubmission, proposalId, results and updatedAt. Results contain
+isReadyForPlanSubmission, pendingMessagesCount, proposalId, results and updatedAt. Results contain
 full bounded structuredResult (summary, findings, risks, recommendations and
 verifiedSources), task identity, owner identity, submitted task revision and
 timestamp. `team_status` and `task_get` include this projection.
@@ -1524,8 +1534,8 @@ cannot bypass research submission.
 Lead-only `team.openPlanningQuestion` and `team.closePlanningQuestion` require
 teamSessionId, callerSessionId, roundId and questionId. The runtime brackets
 asktool waits including cancellation; stop/restart clears cancelled blockers.
-SubmitPlan is gated on all expected results and settled questions; lead_only
-requires no research tasks. Same submission retries return the same proposal.
+SubmitPlan is gated on all expected results and settled questions; mandatory
+Team planning requires at least one approved expert research task. Same submission retries return the same proposal.
 Rejection reopens aggregation preserving results; approve/schedule uses existing
 Plan transitions and closes planning. Researchers remain read-only until a new
 Agent execution review explicitly authorizes them.
@@ -1552,3 +1562,122 @@ Result receipt alone does not settle a researcher turn. Readiness and SubmitPlan
 also require every approved research member's active turn to end. The Lead's
 own active synthesis turn is permitted; existing Team activity revisions wake
 wait_for_updates after research settlement.
+
+### Mandatory Expert Team delegation
+
+Expert Team requires `delegate` with at least one named expert. `lead_only` is
+rejected before persistence, including attempts to replay historical solo
+approvals. Missing review strategy remains delegate for legacy roster reviews;
+legacy solo decisions and empty reviews cannot be confirmed or grant authority.
+Agent rosters launch only through trusted `team.confirmLaunchReview`; Plan
+research rosters launch automatically with `automatic_plan` policy. Model
+proxies cannot confirm/cancel/edit reviews.
+
+`team.authorizeLeadTool({teamSessionId,callerSessionId,toolName})` checks current
+Host identity and current-turn launch policy before runtime-native tools; it returns
+`{authorized:true}` or a structured denial. Read-only discovery/clarification is
+available before review. Approved coordination creates tasks and dispatches
+current experts. Substantive Lead actions require a recorded current dispatch
+whose expert mailbox turn has actually started or completed successfully; an
+idle member or queued message is not participation. Cancelled/failed turns and
+old dispatches cannot be reused. This predicate does not prove task ownership
+or a completed execution contribution. Plan submission independently requires
+owned tasks and complete structured research.
+Builtin/local tools and direct Team mutations independently check these rules.
+New user turns require fresh delegation under the mode-specific launch policy; real approved mailbox
+continuations inherit the scope. Goal negotiation retains existing permissions;
+Agent execution restores the Team gate. No database migration is needed.
+
+### Expert Team planning launch policy
+
+`TeamLaunchReview.launchPolicy?: "automatic_plan" | "user_confirmed"` is
+Host-owned; absent legacy values mean user-confirmed. Plan `team.declareStrategy`
+returns materialized researchers and a confirmed automatic launch audit without
+pending user approval or synthetic confirmation mail. Research remains read-only
+and the Lead must obtain full results before SubmitPlan. New revision/retry
+requests also launch automatically. User confirmation is required for the final
+Plan artifact and the subsequent Agent execution roster. An automatic Plan audit
+is rejected by confirmLaunchReview and never grants Agent execution authority.
+
+Automatic Plan `fork` context uses a Host-owned immutable snapshot through the
+current persisted user request plus settled prior history. Live assistant/tool
+rows are excluded. The generic running-session fork restriction is unchanged;
+member provenance, read-only purpose and failure rollback remain validated.
+
+The Team snapshot exposes a pending review only while its leadTurnId matches the
+current Host-owned strategy scope. A completed Lead turn can still await valid
+confirmation; superseded pending reviews stay readable by ID but cannot reopen
+the current UI. Existing Team activity revisions refresh the shared reader.
+
+### Team Plan inbox submission barrier
+
+The optional additive `TeamPlanningProjection.pendingMessagesCount` counts
+Team-origin `message` rows addressed to Lead with `status=queued` and no bound
+turn. Queue receipts and ACKs prove durable acceptance, not consumption. User
+queued prompts, other origins/targets, terminal/cancelled rows and already
+turn-bound messages are excluded. Messages are never discarded by text matching.
+
+Otherwise-ready Team Plan `plans.submit` returns
+`{status:"deferred",reason:"team_messages_pending",pendingMessagesCount:N}`
+while this inbox is nonempty. No artifact, proposal, version or `plans.changed`
+approval notification is published. The runtime terminates the current Lead turn
+normally without an error or awaiting-approval state. Existing FIFO continuation
+then supplies full authenticated message content to the Lead. The final ready
+submission returns the existing `{status:"pending",proposal}` contract.
+
+The final check and artifact/proposal publication share an IMMEDIATE SQLite
+transaction. Existing proposal retries retain their identity; missing research,
+questions, unsettled experts and normal permission/cancellation errors keep their
+existing semantics. Final research readiness also requires an empty unconsumed
+Team inbox. Standard Plan and Goal submissions do not use this Team-only yield.
+
+Structured research results already constitute the report. Researchers finish
+after submission without a required duplicate completion message; send_message
+remains available for substantive supplementary information or clarification.
+
+### Approved Team execution-turn binding and inbox
+
+Approved Team Plan/Goal execution retains its exact running Host turn through
+execution-roster confirmation and expert settlement. It does not emit final
+agent_end, complete the approval or end the Goal token while waiting.
+Confirmation resumes the approved contract; cancellation interrupts it without
+publishing a completed Goal report or replaying expert/model work.
+
+The trusted dispatcher calls plans.bindExecutionTurn
+({executionId,sessionId,turnId}) only for an approved running Plan with that
+session's exact running turn. For Team it also requires current Lead/review
+scope. Host stores immutable {sessionId,turnId} under plan-execution-turn-v1
+keyed by executionId. Identical retries are idempotent; invalid/stale bindings
+return PLAN_EXECUTION_STALE and changed bindings PLAN_EXECUTION_CONFLICT.
+This RPC is not model-callable and is excluded from the sidecar reverse proxy.
+Goal preserves its existing goal_reports executionId/turn_id exact-turn proof.
+Neither execution kind accepts a still-running approval as authority for a
+later unrelated turn. Existing schema/process ownership remains unchanged.
+
+team.getLeadExecutionState and team.readExecutionInbox accept
+{teamSessionId,callerSessionId,expectedTurnId}; only the current Lead may call,
+with current strategy/review scope and the exact approved Plan/Goal turn proof.
+These are narrowly exposed internal model-proxy RPCs, not new model tools.
+State returns {active,turnId,reviewStatus}; a stale execution is inactive.
+Inbox returns {active,turnId,messages} and rejects stale consumption with
+TEAM_PLANNING_STALE. Before confirmation it returns no consumable messages.
+Eligible messages are the authenticated current review confirmation and current
+approved experts' results, bound by persisted source-turn/dispatch identity.
+
+Inbox consumption marks eligible queued unbound messages completed, retires
+associated durable turn_queue receipts and persists message IDs in the separate
+team-execution-inbox-v1 ledger for {teamSessionId,expectedTurnId}, in one
+transaction. It does not set message.turn_id or give the original user execution
+mailbox provenance. The team.executionInboxConsumed notification carries
+{teamSessionId,turnId,messageIds} so Main removes only corresponding live queue
+entries. Unrelated user requests remain queued. Re-reading in the same execution
+may return ledger messages again; wait_for_updates suppresses duplicate content
+within its owned runtime turn while preserving full results across recovery.
+
+Participation still authorizes substantive Lead tools. TeamFinalAnswer for an
+approved execution additionally rejects completion while recorded current
+expert dispatches are queued/running or their authenticated results remain
+unconsumed. This separate settlement barrier does not turn participation into
+proof of task ownership or require results beyond the current dispatch scope.
+Plan research's structured result/inbox submission barrier is separate. Goal
+progress and its sole completion report retain the original execution identity.

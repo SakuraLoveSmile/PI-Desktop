@@ -562,11 +562,34 @@ prompt steering rather than a runtime guarantee. With all subagents disabled,
 the delegation prompt section and `Task*` tools are absent. In Plan and Goal,
 declared `Task*` schemas remain unavailable under the existing execution gate.
 
-Expert Team execution uses the separate Team catalog. Its Lead defaults to
-`delegate`, assigning separable workflow tasks to experts through the task
-board; `lead_only` is limited to trivial indivisible work and requires a reason.
-Team approval and review remain in force. Team turns do not expose `Task*` or
-plugin `SessionTask`.
+Expert Team uses the separate Team catalog and requires `delegate` with at
+least one expert even for trivial requests; Host rejects every `lead_only`.
+Agent execution requires trusted user roster confirmation. Before substantive
+Lead actions (including Write/Edit/Bash), runtime-native and Host-local tools
+recheck current Host authority: an approved dispatched expert turn must have
+actually started. Idle members and queued messages cannot grant authority.
+The gate does not itself require task ownership or a completed contribution.
+Tool permissions, cancellation and mode checks continue to apply after authority.
+A nonempty final reply uses the same gate; one recovery is allowed in the same
+durable turn, then repeated refusal ends with an observable approval error.
+An ordinary unapproved Agent turn with a valid pending roster may explain that
+user confirmation is needed. An already-approved Team Plan/Goal execution
+instead suspends inside the same Host turn until trusted roster confirmation,
+then consumes full authenticated results with wait_for_updates. Expert-start
+authority only unlocks substantive tools; completion additionally requires
+recorded expert dispatches/turns settled and their current results consumed.
+No final agent_end or Goal execution-token release is permitted while waiting.
+The internal inbox reads are narrow, Host-authorized model-proxy operations;
+trusted plans.bindExecutionTurn is never exposed to the model reverse proxy.
+
+Team Plan automatically launches read-only experts under Host-derived
+`automatic_plan` authority with valid approved model bindings; a Plan final
+cannot substitute an awaiting-staffing response for real research. SubmitPlan
+separately requires complete structured research, settled expert turns/questions
+and no unconsumed Team inbox. User approval remains required for the artifact
+and subsequent Agent roster; automatic Plan authority cannot authorize Agent
+work. Goal negotiation retains existing permissions. Team turns do not expose
+`Task*` or plugin `SessionTask`.
 
 A definition declares the tools its delegate may call. By default those names
 are drawn only from the seven working tools `Read`, `Glob`, `Grep`,

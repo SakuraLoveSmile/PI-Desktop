@@ -1,5 +1,12 @@
 use super::*;
 
+/// A valid Team Plan may yield until queued expert input enters a Lead turn.
+#[derive(Debug)]
+pub enum PlanSubmissionResult {
+    Submitted(Box<PlanProposal>),
+    TeamMessagesPending { pending_messages_count: i64 },
+}
+
 pub const PLAN_MAX_MARKDOWN_BYTES: usize = 512 * 1024;
 pub const PLAN_REVISION_DRAFT_MAX_REFERENCES: usize = 32;
 pub const PLAN_REVISION_DRAFT_MAX_TEXT_BYTES: usize = 512 * 1024;

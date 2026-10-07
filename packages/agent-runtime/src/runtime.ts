@@ -2,6 +2,10 @@ import { TOOL_ACTIVATION_SECTION, toolDeclarationPolicy, toolActivationSection, 
 import { orderSystemRows, SystemTranscriptJournal } from "./system-transcript-journal.js";
 import { planWorkspaceRequiredResult } from "./plan-workspace-error.js";
 import { accountModelStream } from "./request-usage.js";
+import { withTeamLeadApproval } from "./team/lead-tool-approval.js";
+import { TeamLeadExecutionGuard, teamPlanSubmission } from "./team/lead-execution-guard.js";
+import { recoverFinalAnswer, messageRequestsTools, isProgressOnlyAssistantTurn, SILENT_TURN_NUDGE, PROGRESS_TURN_NUDGE } from "./final-answer-recovery.js";
+export { isProgressOnlyAssistantTurn } from "./final-answer-recovery.js";
 import { modeToolDenial, retainModeToolDeclaration, withModeExecutionGuard } from "./mode-tool-access.js";
 import { restoreHostedSearchReplay } from "./hosted-search-replay.js";
 import { requestExtensionUi } from "./extensions/ui-request.js";
@@ -126,6 +130,7 @@ import {
   type TeamRuntimeContextProjection,
   type TeamPlanningProjection,
   type ProposalKind,
+  type PlanSubmitResult,
   type SubagentPermission,
 } from "@pi-desktop/shared";
 import { createStreamCoalescer, type StreamCoalescer } from "./stream-coalescer.js";
@@ -829,35 +834,6 @@ function pathInstructionScope(path: string): string {
 }
 
 /**
- * Appended for one automatic re-run after a turn that produced nothing the
- * user can see. Two shapes were observed: a wholly empty response, and a
- * finished conclusion written into reasoning while the visible text stayed
- * empty. The same nudge covers both, because both need the same next move.
- */
-const SILENT_TURN_NUDGE = [
-  "<no_output_recovery>",
-  "Your previous turn ended with no visible text and no tool call, so the user saw nothing happen.",
-  "Your reasoning is never shown to the user. If you already reached the answer, state it now in plain text.",
-  "Otherwise continue the unfinished work, starting with one sentence about what you are doing.",
-  "</no_output_recovery>",
-].join("\n");
-
-/**
- * Autonomous plan/goal execution: collaboration prompts ask the model to
- * narrate progress ("Writing it now.") then call a tool. Models often emit
- * that narration as a finished assistant message with `finish_reason: stop`
- * and no toolCall, so the runtime treats it as the final answer and ends the
- * run mid-task (#43). One automatic continue with this nudge, then stop.
- */
-const PROGRESS_TURN_NUDGE = [
-  "<progress_only_recovery>",
-  "Your last message announced next steps but contained no tool call, so the autonomous run would have stopped mid-task.",
-  "Continue the approved plan now: either call the tools for the work you just described, or write the final self-contained completion report.",
-  "Do not announce intent without a tool call in the same message.",
-  "</progress_only_recovery>",
-].join("\n");
-
-/**
  * Some OpenAI-style models emit their internal parallel-call wrapper as
  * assistant text (`to=multi_tool_use.parallel code:{"tool_uses":[…]}`) instead
  * of real tool calls. PI-Desktop has no such tool, so the whole batch lands as
@@ -1084,40 +1060,6 @@ export type RuntimeMatchConfig = {
  * the user sees the tool activity. */
 function trustedExtensionIds(specs: TrustedExtensionSpec[]): string {
   return specs.map((spec) => spec.id).sort().join("\n");
-}
-
-function messageRequestsTools(message: unknown): boolean {
-  const content = isRecord(message) ? message.content : undefined;
-  return (
-    Array.isArray(content) &&
-    content.some((part) => isRecord(part) && part.type === "toolCall")
-  );
-}
-
-const PROGRESS_FORWARD_INTENT_PATTERNS = [
-  /\b(?:about to|going to|will|next|then|still(?: need| have to)?|remaining|left to|working on|writing|reading|updating|implementing|checking|running|creating|fixing|reviewing|proceed(?:ing)?|continu(?:e|ing)|starting|moving on)\b/i,
-  /(?:接下来|下一步|还需要|仍需|剩下|正在|将要|继续|开始)/i,
-];
-const PROGRESS_TERMINAL_LEAD =
-  /^(?:done|all done|complete(?:d)?|finished|implemented|resolved|verified|successful(?:ly)?|the (?:approved )?(?:plan|goal) is complete)\b/i;
-
-function hasProgressForwardIntent(text: string): boolean {
-  return PROGRESS_FORWARD_INTENT_PATTERNS.some((pattern) => pattern.test(text));
-}
-
-/** Clearly forward-looking visible assistant text without a toolCall. */
-export function isProgressOnlyAssistantTurn(message: unknown): boolean {
-  if (!isRecord(message) || message.role !== "assistant") return false;
-  if (messageRequestsTools(message)) return false;
-  const content = isRecord(message) ? message.content : undefined;
-  const text = assistantContent(content).text.trim();
-  if (!text || !hasProgressForwardIntent(text)) return false;
-  if (!PROGRESS_TERMINAL_LEAD.test(text)) return true;
-
-  // A report can mention a completed step and still announce the next one.
-  // Only recover a terminal-looking lead when a later clause carries the
-  // forward intent that distinguishes it from a normal final report.
-  return hasProgressForwardIntent(text.replace(PROGRESS_TERMINAL_LEAD, ""));
 }
 
 function boundedText(value: string, maxChars: number): string {
@@ -1871,6 +1813,7 @@ export class DesktopAgentRuntime {
   private progressTurnRerunAttempted = false;
   private progressTurnRerunInProgress = false;
   private suppressProgressTurnRunEnd = false;
+  private readonly teamLeadExecution = new TeamLeadExecutionGuard();
   private activeToolCalls = new Map<
     string,
     { toolName: string; args: unknown; startedAt: number }
@@ -3826,7 +3769,7 @@ export class DesktopAgentRuntime {
           roundId: this.teamContext?.roundId,
           isLead: this.teamContext?.isLead ?? false,
           host: this.host,
-          getTurnId: () => this.turnId,
+          getTurnId: () => this.turnId, approvedExecution: () => this.autonomousExecution,
           abortActiveTurn: this.teamContext?.abortActiveTurn,
         })
       : [];
@@ -3880,7 +3823,17 @@ export class DesktopAgentRuntime {
         tool.name,
         withModeExecutionGuard(
           withExplicitRequired({
-            ...tool,
+            ...(this.executionProfile === "team" && this.teamContext?.isLead
+                && (this.mode === "agent" || this.mode === "plan")
+              ? withTeamLeadApproval(tool, {
+                  host: this.host,
+                  teamSessionId: this.teamContext.teamSessionId,
+                  callerSessionId: this.sessionId,
+                  getTurnId: () => this.turnId,
+                  currentModeDenial: () => this.isToolAllowedInMode(tool.name)
+                    ? undefined : modeToolDenial(tool.name, this.mode),
+                })
+              : tool),
             executionMode:
               tool.name === SUBAGENT_TOOL_NAME ? "parallel" : "sequential",
           }),
@@ -5666,7 +5619,12 @@ export class DesktopAgentRuntime {
         }),
       }),
       executionMode: "sequential",
-      execute: async (toolCallId, params) => {
+      execute: async (toolCallId, params, signal) => {
+        const submission = teamPlanSubmission(kind === "plan" && this.mode === "plan" &&
+          this.executionProfile === "team" && this.teamContext?.isLead === true,
+          () => ({ turnId: this.turnId, epoch: this.turnEpoch, mode: this.mode,
+            inactive: this.disposed || this.runCancelled }), signal);
+        submission.assertCurrent();
         const title =
           isRecord(params) && typeof params.title === "string"
             ? params.title.trim()
@@ -5692,7 +5650,7 @@ export class DesktopAgentRuntime {
             isError: true,
           };
         }
-        let result: { status?: string; proposal?: PlanProposal };
+        let result: PlanSubmitResult;
         try {
           result = await this.host.call("plans.submit", {
             sessionId: this.sessionId,
@@ -5706,6 +5664,7 @@ export class DesktopAgentRuntime {
             question,
           });
         } catch (error) {
+          submission.assertCurrent();
           const recovery = planWorkspaceRequiredResult(error);
           if (recovery) return recovery;
           const errorCode =
@@ -5734,7 +5693,14 @@ export class DesktopAgentRuntime {
           };
         }
 
-        const proposal = result.proposal;
+        submission.assertCurrent();
+        const deferredSubmission = submission.deferredResult(result);
+        if (deferredSubmission) {
+          this.terminatingToolCalls.add(toolCallId);
+          return deferredSubmission;
+        }
+
+        const proposal = result.status === "pending" ? result.proposal : undefined;
         if (
           result.status !== "pending" ||
           !proposal ||
@@ -6173,6 +6139,7 @@ export class DesktopAgentRuntime {
     this.allowSilentCompletion = false;
     this.silentTurnRerunInProgress = false;
     this.suppressSilentTurnRunEnd = false;
+    this.teamLeadExecution.reset();
     this.pendingProgressTurnRerun = false;
     this.progressTurnRerunAttempted = false;
     this.progressTurnRerunInProgress = false;
@@ -6252,48 +6219,36 @@ export class DesktopAgentRuntime {
     }
   }
 
-  /**
-   * Re-run the request that came back silent, once, with SILENT_TURN_NUDGE
-   * appended. The nudge goes on `agent.state.systemPrompt` rather than through
-   * `prepareNextTurn`, because that hook only shapes turns inside a live run
-   * and this run has already ended; `continue()` rebuilds its context from
-   * state. It is restored afterwards unless a path-scoped instruction reload
-   * rewrote the prompt in the meantime — that rebuild is newer, so it wins.
-   */
   private async rerunSilentTurn(): Promise<void> {
     if (!this.pendingSilentTurnRerun) return;
     this.pendingSilentTurnRerun = false;
     this.suppressSilentTurnRunEnd = false;
-
-    // agentLoopContinue refuses a transcript ending in an assistant message,
-    // and this one carries nothing worth resending anyway.
-    const messages = removeTrailingAssistantMessages(this.agent.state.messages);
-    this.setAgentMessages(messages);
-
-    const promptBefore = this.agentSystemPromptContent();
-    const promptWithNudge = `${promptBefore}\n\n${SILENT_TURN_NUDGE}`;
-    this.setAgentSystemPrompt(promptWithNudge);
-    this.silentTurnRerunInProgress = true;
-    this.requestStartedAt = Date.now();
-    this.setAgentActivity({ phase: "recovering", since: Date.now() });
-    try {
-      if (this.disposed) throw new Error("runtime disposed");
-      await this.agent.continue();
-      await this.waitForIdleAndSteering();
-    } finally {
-      if (this.agentSystemPromptContent() === promptWithNudge) {
-        this.setAgentSystemPrompt(promptBefore);
-      }
-      this.applyPendingResumablePrompt();
-      this.silentTurnRerunInProgress = false;
-      this.suppressSilentTurnRunEnd = false;
-    }
+    await recoverFinalAnswer(SILENT_TURN_NUDGE, {
+      prepare: () => this.setAgentMessages(removeTrailingAssistantMessages(this.agent.state.messages)),
+      getPrompt: () => this.agentSystemPromptContent(),
+      setPrompt: prompt => this.setAgentSystemPrompt(prompt),
+      start: () => {
+        this.silentTurnRerunInProgress = true;
+        this.requestStartedAt = Date.now();
+        this.setAgentActivity({ phase: "recovering", since: Date.now() });
+      },
+      continue: async () => {
+        if (this.disposed) throw new Error("runtime disposed");
+        await this.agent.continue();
+        await this.waitForIdleAndSteering();
+      },
+      restore: () => {
+        this.applyPendingResumablePrompt();
+        this.silentTurnRerunInProgress = false;
+        this.suppressSilentTurnRunEnd = false;
+      },
+    });
   }
 
   /**
    * Run whatever recovery the finished loop armed for itself. Overflow, a
-   * retriable provider stream failure, a silent turn, and an autonomous
-   * progress-only turn all suppress their run's `turn_end` / `agent_end`
+   * retriable provider stream failure, a silent turn, an autonomous
+   * progress-only turn, and a rejected Team final answer all suppress their run's `turn_end` / `agent_end`
    * inside `message_end` and leave a `pending*` flag for the caller to act on
    * once the loop is idle. An entry point that skips this leaves the run with
    * no end events, no error, and no recovery — the turn simply stops, which is
@@ -6307,7 +6262,8 @@ export class DesktopAgentRuntime {
       this.pendingProviderRetry ||
       this.pendingOverflow ||
       this.pendingSilentTurnRerun ||
-      this.pendingProgressTurnRerun
+      this.pendingProgressTurnRerun ||
+      this.teamLeadExecution.pending
     ) {
       if (this.pendingProviderRetry) {
         await this.retryPendingProviderFailure();
@@ -6359,46 +6315,55 @@ export class DesktopAgentRuntime {
         await this.rerunSilentTurn();
         continue;
       }
+      if (this.teamLeadExecution.pending) {
+        await this.rerunTeamCompletionTurn();
+        continue;
+      }
       await this.rerunProgressOnlyTurn();
     }
     return true;
   }
 
-  /**
-   * Continue once after an autonomous progress-only assistant message
-   * (text, no toolCall). Mirrors `rerunSilentTurn` but keeps the visible
-   * text and only appends PROGRESS_TURN_NUDGE (#43).
-   */
   private async rerunProgressOnlyTurn(): Promise<void> {
     if (!this.pendingProgressTurnRerun) return;
     this.pendingProgressTurnRerun = false;
     this.suppressProgressTurnRunEnd = false;
+    await recoverFinalAnswer(PROGRESS_TURN_NUDGE, {
+      prepare: () => this.setAgentMessages(removeTrailingAssistantMessages(this.agent.state.messages)),
+      getPrompt: () => this.agentSystemPromptContent(),
+      setPrompt: prompt => this.setAgentSystemPrompt(prompt),
+      start: () => {
+        this.progressTurnRerunInProgress = true;
+        this.requestStartedAt = Date.now();
+        this.setAgentActivity({ phase: "recovering", since: Date.now() });
+      },
+      continue: async () => {
+        if (this.disposed) throw new Error("runtime disposed");
+        this.suppressProgressTurnRunEnd = false;
+        await this.agent.continue();
+        await this.waitForIdleAndSteering();
+      },
+      restore: () => {
+        this.applyPendingResumablePrompt();
+        this.progressTurnRerunInProgress = false;
+        this.suppressProgressTurnRunEnd = false;
+      },
+    });
+  }
 
-    // pi-agent-core refuses `continue()` when the transcript ends in an
-    // assistant message. The progress text is already visible in the reused
-    // bubble, so it must not be sent back as model context.
-    const messages = removeTrailingAssistantMessages(this.agent.state.messages);
-    this.setAgentMessages(messages);
-
-    const promptBefore = this.agentSystemPromptContent();
-    const promptWithNudge = `${promptBefore}\n\n${PROGRESS_TURN_NUDGE}`;
-    this.setAgentSystemPrompt(promptWithNudge);
-    this.progressTurnRerunInProgress = true;
-    this.requestStartedAt = Date.now();
-    this.setAgentActivity({ phase: "recovering", since: Date.now() });
-    try {
-      if (this.disposed) throw new Error("runtime disposed");
-      this.suppressProgressTurnRunEnd = false;
-      await this.agent.continue();
-      await this.waitForIdleAndSteering();
-    } finally {
-      if (this.agentSystemPromptContent() === promptWithNudge) {
-        this.setAgentSystemPrompt(promptBefore);
-      }
-      this.applyPendingResumablePrompt();
-      this.progressTurnRerunInProgress = false;
-      this.suppressProgressTurnRunEnd = false;
-    }
+  private async rerunTeamCompletionTurn(): Promise<void> {
+    await this.teamLeadExecution.recover({
+      host: this.host, team: this.teamContext!,
+      state: () => ({ turnId: this.turnId, epoch: this.turnEpoch, mode: this.mode,
+        inactive: this.disposed || this.runCancelled }),
+      abort: error => { this.terminateParentTurn(); this.runCancelled = true; this.autonomousExecution = false; this.goalReportDraftManager = undefined; this.clearGoalProgressTool(); this.finalizeCurrentAssistant("aborted"); this.emit({ type: "error", error: error ?? { code: "TURN_ABORTED", message: "Approved Team execution interrupted.", retriable: false } }); this.emit({ type: "turn_end" }); this.emit({ type: "agent_end", messageIds: [] }); },
+      prepare: () => this.setAgentMessages(removeTrailingAssistantMessages(this.agent.state.messages)),
+      getPrompt: () => this.agentSystemPromptContent(),
+      setPrompt: prompt => this.setAgentSystemPrompt(prompt),
+      start: () => { this.requestStartedAt = Date.now(); this.setAgentActivity({ phase: "recovering", since: Date.now() }); },
+      continue: async () => { await this.agent.continue(); await this.waitForIdleAndSteering(); },
+      restore: () => this.applyPendingResumablePrompt(),
+    });
   }
 
   private cleanupActiveToolProgress(): void {
@@ -7748,7 +7713,8 @@ export class DesktopAgentRuntime {
           this.providerRetryInProgress ||
           this.overflowRecoveryInProgress ||
           this.silentTurnRerunInProgress ||
-          this.progressTurnRerunInProgress
+          this.progressTurnRerunInProgress ||
+          this.teamLeadExecution.inProgress
         ) {
           break;
         }
@@ -7759,7 +7725,8 @@ export class DesktopAgentRuntime {
           this.providerRetryInProgress ||
           this.overflowRecoveryInProgress ||
           this.silentTurnRerunInProgress ||
-          this.progressTurnRerunInProgress
+          this.progressTurnRerunInProgress ||
+          this.teamLeadExecution.inProgress
         ) {
           break;
         }
@@ -7774,7 +7741,8 @@ export class DesktopAgentRuntime {
             this.providerRetryInProgress ||
             this.overflowRecoveryInProgress ||
             this.silentTurnRerunInProgress ||
-            this.progressTurnRerunInProgress
+            this.progressTurnRerunInProgress ||
+            this.teamLeadExecution.inProgress
               ? this.currentAssistant
               : undefined;
           const initialText =
@@ -7804,6 +7772,7 @@ export class DesktopAgentRuntime {
             this.overflowRecoveryInProgress = false;
             this.silentTurnRerunInProgress = false;
             this.progressTurnRerunInProgress = false;
+            this.teamLeadExecution.inProgress = false;
             this.emit({ type: "message_update", message: this.currentAssistant });
           } else {
             this.emit({ type: "message_start", message: this.currentAssistant });
@@ -7891,7 +7860,7 @@ export class DesktopAgentRuntime {
             event.message,
             effectiveModelContextWindow(this.model) || DEFAULT_CONTEXT_WINDOW,
           );
-          const aborted = stopReason === "aborted" || localError?.causeName === "AbortError";
+          let aborted = stopReason === "aborted" || localError?.causeName === "AbortError";
           const failed = !aborted && (stopReason === "error" || overflow);
           const errorMessage =
             failed &&
@@ -7977,8 +7946,30 @@ export class DesktopAgentRuntime {
             this.providerTransientRetryAttempt = 0;
             this.providerRateLimitRetryAttempt = 0;
           }
+          let teamCompletionFailed = false;
+          if (
+            !failed && !aborted && !messageRequestsTools(event.message) &&
+            !(this.allowSilentCompletion && responseText.trim().length === 0) &&
+            this.executionProfile === "team" && this.teamContext?.isLead &&
+            (this.mode === "agent" || this.mode === "plan")
+          ) {
+            const completion = await this.teamLeadExecution.authorizeCompletion(this.host, this.teamContext,
+              () => ({ turnId: this.turnId, epoch: this.turnEpoch, mode: this.mode,
+                inactive: this.disposed || this.runCancelled }), this.autonomousExecution);
+            if (completion.kind === "superseded") break;
+            if (completion.kind === "stale") aborted = true;
+            if (completion.kind === "recover") {
+              this.currentAssistant = { ...this.currentAssistant, content: nextText, status: "streaming",
+                ...(nextThinking ? { thinking: nextThinking } : {}), ...(usage ? { usage } : {}) };
+              this.emit({ type: "message_update", message: this.currentAssistant });
+              this.streamStartedAt = undefined;
+              break;
+            }
+            if (completion.kind === "error") { teamCompletionFailed = true; classifiedError = completion.error; }
+          }
           // Re-run an invisible answer once before surfacing a finished turn.
           const silence =
+            !teamCompletionFailed &&
             !failed &&
             !aborted &&
             responseText.trim().length === 0 &&
@@ -8035,6 +8026,7 @@ export class DesktopAgentRuntime {
           // Autonomous plan/goal: clearly forward-looking text without a tool
           // call is probably progress, not a final answer. Nudge once (#43).
           const progressOnlyTurn =
+            !teamCompletionFailed &&
             !failed &&
             !aborted &&
             !silentTurn &&
@@ -8090,7 +8082,7 @@ export class DesktopAgentRuntime {
             this.suppressOverflowRunEnd = true;
             break;
           }
-          const emptyResponse = silentTurn;
+          const emptyResponse = silentTurn || teamCompletionFailed;
           const diagnosticError = classifiedError;
           const retryProviderAttempt =
             !overflow &&
@@ -8282,6 +8274,7 @@ export class DesktopAgentRuntime {
           this.suppressProviderRetryRunEnd ||
           this.suppressSilentTurnRunEnd ||
           this.suppressProgressTurnRunEnd ||
+          this.teamLeadExecution.suppressRunEnd ||
           this.keepTurnOpenForDelegates()
         )
           break;
@@ -8321,6 +8314,7 @@ export class DesktopAgentRuntime {
           this.suppressProviderRetryRunEnd ||
           this.suppressSilentTurnRunEnd ||
           this.suppressProgressTurnRunEnd ||
+          this.teamLeadExecution.suppressRunEnd ||
           this.keepTurnOpenForDelegates()
         )
           break;
@@ -8978,7 +8972,8 @@ export class DesktopAgentRuntime {
     // Recovery owns the next request when the previous response failed. Its
     // continuation will consume steering after repairing the context/backoff.
     if (this.suppressOverflowRunEnd || this.suppressProviderRetryRunEnd ||
-        this.suppressSilentTurnRunEnd || this.suppressProgressTurnRunEnd) return;
+        this.suppressSilentTurnRunEnd || this.suppressProgressTurnRunEnd ||
+        this.teamLeadExecution.suppressRunEnd) return;
     while (this.pendingSteering.size && this.acceptingSteering && !this.runCancelled && !this.turnHadError) {
       this.steeringContinuation = true;
       try {
@@ -8991,7 +8986,8 @@ export class DesktopAgentRuntime {
           this.suppressOverflowRunEnd ||
           this.suppressProviderRetryRunEnd ||
           this.suppressSilentTurnRunEnd ||
-          this.suppressProgressTurnRunEnd
+          this.suppressProgressTurnRunEnd ||
+          this.teamLeadExecution.suppressRunEnd
         ) return;
       } finally {
         this.steeringContinuation = false;
@@ -9003,6 +8999,7 @@ export class DesktopAgentRuntime {
     this.acceptingSteering = false;
     this.gracefulStopRequested = false;
     this.runCancelled = true;
+    this.teamLeadExecution.cancel();
     this.clearGoalProgressTool();
     this.steeringWaitAbort?.abort();
     this.extensionRunner?.cancelPending();
@@ -9017,6 +9014,7 @@ export class DesktopAgentRuntime {
 
   /** Ask pi-agent-core to stop after the current assistant/tool turn. */
   requestGracefulStop(): { requested: boolean } {
+    if (this.teamLeadExecution.suppressRunEnd) { void this.abort(); return { requested: true }; }
     if (this.disposed || !this.agent.state.isStreaming) {
       return { requested: false };
     }
@@ -9030,6 +9028,7 @@ export class DesktopAgentRuntime {
       sessionId: this.sessionId,
       isRunning:
         this.agent.state.isStreaming ||
+        this.teamLeadExecution.suppressRunEnd ||
         this.compactionInProgress ||
         this.agentActivity !== undefined ||
         (!this.turnHadError && !this.runCancelled && this.runningDelegations().length > 0),
@@ -9055,6 +9054,7 @@ export class DesktopAgentRuntime {
     this.disposed = true;
     this.acceptingSteering = false;
     this.runCancelled = true;
+    this.teamLeadExecution.cancel();
     this.steeringWaitAbort?.abort();
     this.resolvePendingAskTools();
     this.abortRunningDelegations();

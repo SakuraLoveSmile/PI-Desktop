@@ -132,6 +132,21 @@ export function createTeamDeliveryService(deps: TeamDeliveryDependencies) {
     }
     if (!bridge) throw deliveryError("AGENT_UNAVAILABLE", "The Agent runtime is unavailable");
 
+    // Approved Plan/Goal owns a single Lead turn. Never admit its incoming
+    // expert mail as a second prompt, which would invalidate execution tokens.
+    const activeTurn = deps.activeTurns.get(teamSessionId);
+    if (message.targetSessionId === teamSessionId && activeTurn) {
+      const execution = await host.call<{ active: boolean; turnId?: string }>("team.getLeadExecutionState", {
+        teamSessionId, callerSessionId: teamSessionId, expectedTurnId: activeTurn,
+      });
+      if (requireHost() !== host || deps.activeTurns.get(teamSessionId) !== activeTurn) {
+        throw deliveryError("TEAM_DELIVERY_PENDING", "Lead execution changed during delivery");
+      }
+      if (execution.active && execution.turnId === activeTurn) {
+        return { messageId, targetSessionId: teamSessionId, accepted: true, deliveryStatus: "queued", inTurn: true };
+      }
+    }
+
     if (message.status !== "queued") {
       if (message.deliveryStatus !== "acknowledged") {
         const result = await host.call<{ acknowledged: boolean }>("team.ackMessage", {
@@ -286,15 +301,36 @@ export function createTeamDeliveryService(deps: TeamDeliveryDependencies) {
   async function resumeTeam(teamSessionId: string): Promise<unknown> {
     const host = requireHost();
     const result = await withTeamLock(teamSessionId, async () => {
+      if (requireHost() !== host) {
+        throw deliveryError("HOST_UNAVAILABLE", "The Host changed during Team resume");
+      }
       const resumed = await host.call("team.resume", {
         teamSessionId,
         callerSessionId: teamSessionId,
       });
       const roster = await rosterFor(host, teamSessionId);
-      setTeamHold(deps.getBridge(), roster, false);
+      if (requireHost() !== host) {
+        throw deliveryError("HOST_UNAVAILABLE", "The Host changed during Team resume");
+      }
+      setTeamHold(deps.getBridge(), roster, roster.paused);
       return resumed;
     });
     await drainPending(teamSessionId);
+    await withTeamLock(teamSessionId, async () => {
+      if (requireHost() !== host) {
+        throw deliveryError("HOST_UNAVAILABLE", "The Host changed during Team resume");
+      }
+      const roster = await rosterFor(host, teamSessionId);
+      if (requireHost() !== host) {
+        throw deliveryError("HOST_UNAVAILABLE", "The Host changed during Team resume");
+      }
+      const bridge = deps.getBridge();
+      setTeamHold(bridge, roster, roster.paused);
+      if (!bridge || roster.paused) return;
+      for (const sessionId of [teamSessionId, ...roster.members.map((member) => member.memberSessionId)]) {
+        bridge.agentHost.kick(sessionId);
+      }
+    });
     return result;
   }
 
@@ -335,6 +371,25 @@ export function createTeamDeliveryService(deps: TeamDeliveryDependencies) {
     const input = params && typeof params === "object" && !Array.isArray(params)
       ? params as Record<string, unknown>
       : {};
+    if (method === "team.executionInboxConsumed") {
+      const team = typeof input.teamSessionId === "string" ? input.teamSessionId : undefined;
+      const turn = typeof input.turnId === "string" ? input.turnId : undefined;
+      const messageIds = input.messageIds;
+      if (!team || !turn || deps.activeTurns.get(team) !== turn || !Array.isArray(messageIds)) return;
+      await withTeamLock(team, async () => {
+        const bridge = deps.getBridge();
+        if (!bridge || deps.activeTurns.get(team) !== turn) return;
+        for (const id of messageIds) {
+          if (typeof id !== "string") continue;
+          const message = await findMessage(requireHost(), team, id);
+          if (message.targetSessionId !== team || message.status !== "completed" || message.turnId) continue;
+          for (const entry of bridge.agentHost.queue.list(team)) {
+            if (entry.sessionMessageId === id) await bridge.agentHost.queue.remove(team, entry.id);
+          }
+        }
+      });
+      return;
+    }
     if (method === "team.messageQueued" || method === "team.queueChanged") {
       const teamSessionId = typeof input.teamSessionId === "string" ? input.teamSessionId : undefined;
       await drainPending(teamSessionId);

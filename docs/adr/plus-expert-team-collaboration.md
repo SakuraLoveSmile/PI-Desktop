@@ -107,7 +107,8 @@ ledger to team peers:
 ## Launch approval amendment (2026-10-01)
 
 The Team Lead declares a strategy using its current Host-owned turn identity.
-A delegation proposal creates a pending review only. Trusted Desktop review
+Agent execution delegation creates a pending review. Plan research uses the
+automatic planning launch policy described below. Trusted Desktop review
 operations select provider/model/thinking bindings and atomically confirm the
 batch before new expert sessions, execution assignments or work messages can
 be admitted. The dispatch catalog remains `TEAM_TOOL_NAMES`, while the
@@ -136,9 +137,10 @@ The immutable `TeamMember.name` remains the Host routing and messaging handle.
 Optional `{ role, displayName }` presentation belongs to a proposed member on
 `declare_team_strategy`, then to the serialized `TeamLaunchReviewMember`. It is
 plain display data and grants no execution capability. The review screen keeps
-it while provider/model/thinking choices are edited. No member session, task
-assignment, or mailbox work is created before confirmation. Confirmation
-persists presentation in the existing KV namespace
+it while provider/model/thinking choices are edited. In Agent execution, no
+member session, task assignment, or mailbox work is created before trusted
+confirmation. Automatic Plan research follows the separate launch policy below.
+Confirmation persists presentation in the existing KV namespace
 `team-member-presentation-v1`, keyed by member session ID, in the same Host
 transaction as approved creation/review state. Missing presentation on an old
 review remains valid. This adds no SQLite schema migration and does not add a
@@ -199,10 +201,12 @@ Host-owned sessions, KV metadata, and Team tables.
 
 Team is an execution profile, independent of the Plan/Agent operating state.
 A Plan Lead keeps ordinary Plan permissions and the Team coordination tools.
-It declares `lead_only` for indivisible work or proposes experts through the
-existing trusted launch review. Confirmation creates the planning round,
-approved research identities, and the existing Lead continuation in one Host
-transaction. No researcher runs before review confirmation.
+It declares at least one research expert; Host launches the read-only roster
+automatically in the same declaration transaction, without asking the user to
+confirm research assignments. Team mode requires delegate; lead_only is not an
+execution option. The automatic launch creates the planning round and research
+identities. The current Lead turn creates owned tasks and dispatches the experts;
+no synthetic user-confirmation mailbox continuation is generated.
 
 The Host records research purpose per approved member, planning ID and round
 ID in versioned KV metadata. A Lead is never a research member. Research members
@@ -223,7 +227,8 @@ verified sources are retained and returned to the Lead. A result is at most
 2,000 bytes and the summary at most 4,000 bytes.
 
 The Lead can submit only after every enrolled task and clarification settles;
-lead-only planning permits zero research tasks. SubmitPlan retries with the
+mandatory Team planning requires at least one approved expert research task
+and no unconsumed Team inbox messages. SubmitPlan retries with the
 same identity and content return the original proposal. Rejection retains
 research for revision; approval/scheduling closes Lead planning through existing
 Plan transitions. Cancelled clarification waits and process recovery clear
@@ -242,17 +247,133 @@ Confirmed researchers also persist session mode Plan as a compatibility
 boundary. Only a subsequently confirmed Agent execution review restores Agent
 mode. Existing execution members and standard Plan/Goal are unaffected.
 
-## Execution delegation policy amendment (2026-10-07)
+## Historical execution delegation policy amendment (2026-10-07)
 
-For an Expert Team execution turn, the Lead defaults to `delegate`: it breaks
-separable workflow work into task-board assignments for appropriate experts.
-`lead_only` is reserved for trivial, indivisible work and must include an
-explicit reason. The Lead must not keep a separable workflow for itself. This
-is prompt guidance; it does not add a Host-side hard requirement that every
-turn dispatch a task.
+This prompt-only Team policy was merged in PR #48. The user subsequently
+authorized the mandatory policy below on 2026-10-07, which supersedes this
+section for Team sessions. Standard Agent delegate-first guidance is unchanged.
 
-Plan/Goal Team research keeps its existing `lead_only` option and trusted
-launch-review flow; this amendment changes only Expert Team execution policy.
-Team approval and review requirements, member permissions, task ownership,
-and the flat hierarchy are unchanged. Team turns continue to hide standard
-`Task*` subagent tools and plugin `SessionTask`.
+The earlier execution policy guided the Lead to assign separable workflow work
+through task-board experts. It allowed `lead_only` only for trivial, indivisible
+work with an explicit reason and added no Host hard gate. Plan/Goal research
+retained its then-existing solo option and launch-review flow. Team turns hid
+standard `Task*` tools and plugin `SessionTask`.
+
+Those solo exceptions and research staffing approvals are historical, not the
+current Team contract. The mandatory amendment below replaces them while
+preserving task ownership, ordinary permissions and the flat hierarchy.
+
+## Mandatory expert delegation amendment (developed 2026-10-06, adopted 2026-10-07)
+
+Selecting Expert Team requires actual expert delegation, including small tasks.
+The model declaration accepts only delegate with at least one expert. Host rejects
+lead_only before persistence; old solo decisions/reviews remain history and cannot
+authorize execution or be confirmed. There is no solo approval UI. The existing
+expert roster review remains the trusted Agent execution launch boundary.
+Plan research is launched automatically by Host under a separate read-only policy.
+
+Current user-turn and genuine mailbox identities protect the approved roster.
+Coordination can create owned tasks and dispatch experts after automatic Plan
+launch or trusted Agent roster approval;
+substantive Lead tools additionally require an actual current expert turn from a
+recorded dispatch. Creating an idle member or queueing a message is insufficient.
+This participation predicate proves an approved expert turn started; it does
+not prove task ownership or a completed execution contribution. Lead integration
+can run alongside the started expert; final research submission
+still requires complete results. Runtime-native tools recheck Host authority and
+cancellation/turn/mode after await. Direct Team mutation RPCs cannot reuse old
+rosters. A tool-free final reply passes the same authority check, except a current
+ordinary Agent nonempty pending roster may explain that user launch confirmation
+is needed. An already-approved Plan/Goal execution instead retains its original
+Host turn while waiting for the roster and expert results, as amended below. Plan has no pending-review completion exception: it continues automatic
+research and must collect real expert results before submitting the plan.
+An unauthorized final triggers one recovery within the same durable turn; another
+unauthorized final ends with an observable approval error, never completion.
+A trusted completion notice may retain its existing silent acknowledgement
+contract; it does not authorize a nonempty answer or a new user task.
+Goal negotiation retains its existing contract permissions and Agent
+execution restores Team delegation. No SQL migration or process ownership change.
+
+## Automatic research launch amendment
+
+Expert Team Plan requests, including revision and retry, automatically launch
+read-only specialists. The model does not present a staffing proposal as a
+question or wait for research roster approval. The final Plan artifact keeps its
+normal user review/approval. After plan approval switches the Lead to Agent, the
+execution roster still requires explicit user confirmation before expert work.
+
+The additive `TeamLaunchReview.launchPolicy` distinguishes `automatic_plan` from
+`user_confirmed` (missing legacy values mean user-confirmed). An automatic Plan
+record is `confirmed` as a durable launch audit, not evidence of user consent.
+It cannot be confirmed through the user-confirmation RPC and cannot authorize
+Agent execution. Host derives the policy from authoritative session mode, never
+from model input. Materialization reuses existing route validation, permission
+ceilings, atomic research metadata and roster bounds. Old reviews stay readable;
+only current active Plan retries can upgrade legacy pending research, and stale
+pending research records cannot obstruct a fresh automatic round.
+
+No SQL migration, new approval RPC or researcher write capability is introduced.
+Actual expert participation, complete structured research readiness, paused-Team
+queue holds, cancellation and startup no-replay semantics remain authoritative.
+
+Automatic Plan `fork` context uses a Host-owned immutable snapshot through the
+current persisted user request plus settled prior history. Live assistant/tool
+rows are excluded. The generic running-session fork restriction is unchanged;
+member provenance, read-only purpose and failure rollback remain validated.
+
+## Planning inbox settlement amendment
+
+A completed structured research task does not prove that its free-text Team
+messages were consumed. Host readiness and final Plan publication also require
+zero queued, unbound Team messages to Lead. ACKs and queue receipts are distinct
+from consumption. These messages may contain meaningful information and are not
+classified as redundant by text, language, sender or available research results.
+
+A Team-only normal submission deferral releases the Lead turn so the existing
+mailbox FIFO can deliver full content in genuine authenticated continuations.
+It publishes no approval or error. The final submission follows only after inbox
+consumption; user queued requests remain unchanged. This research-submission
+deferral introduces no consumption RPC, message deletion, memory-queue bypass,
+SQL schema or ownership change. The separate approved-execution inbox below
+uses narrowly authorized internal RPCs and a distinct consumption ledger.
+Researchers no longer receive a mandatory duplicate completion-report prompt.
+
+## Approved execution turn and inbox amendment (2026-10-07)
+
+A user-approved Team Plan/Goal execution remains in its original running Host
+turn while the execution roster awaits trusted confirmation and while assigned
+experts work. A pending-roster explanation suspends that approved execution;
+it must not emit final agent_end, mark execution completed or release the Goal
+execution token. Ordinary unapproved Agent turns retain their pending-review
+completion exception. Confirmation resumes the exact approved contract without
+renegotiation or a detached user/mailbox turn. Cancellation interrupts the
+original execution without publishing a completion report or replaying experts.
+
+The narrow internal model-proxy reads team.getLeadExecutionState and
+team.readExecutionInbox require current Lead identity, expectedTurnId, the
+current review scope and exact approved execution-turn proof. Plan dispatchers
+bind the running execution through trusted-only plans.bindExecutionTurn
+({executionId,sessionId,turnId}). Its immutable plan-execution-turn-v1 KV record
+accepts identical retries, rejects rebinding and requires a running approved
+Plan and its exact running session turn. The model reverse proxy does not
+expose that binding RPC. Goal uses its existing goal_reports exact turn proof;
+a still-running approval alone cannot authorize a later ordinary turn.
+
+wait_for_updates returns full authenticated confirmation/expert message content
+within the original execution. Host records consumption in a separate
+team-execution-inbox-v1 ledger, completes eligible queued messages and retires
+their durable queue receipts atomically. It never assigns the original user
+turn as message.turn_id or changes that turn's mailbox provenance. The
+team.executionInboxConsumed notification removes corresponding Main live queue
+entries, preserving unrelated queued user requests. Read retries may return
+already-consumed ledger messages for the same execution; the runtime suppresses
+duplicates within that turn. Other-member, stale-turn and unbound executions
+cannot consume this inbox.
+
+Expert participation still unlocks substantive Lead tools; it does not prove
+completed work or task ownership. Approved execution completion additionally
+waits for recorded expert dispatches/turns to settle and for authenticated
+results from those current dispatches to be consumed. GoalProgress and
+SubmitGoalReport remain attached to the same Goal execution, yielding one
+completed report only after successful completion. Plan research submission
+continues to use its separate structured-result and research inbox barriers.

@@ -143,3 +143,76 @@ fn lead_profile_cannot_be_downgraded_with_team_data_and_empty_team_cleans_atomic
     );
     assert!(get_team(&db, &empty_lead_id).unwrap().is_none());
 }
+
+#[test]
+fn pending_snapshot_review_is_actionable_only_in_the_current_user_scope() {
+    let db = test_db();
+    let lead = create_test_lead(&db);
+    let first = sessions::begin_turn(&db, &lead, None, None).unwrap();
+    let declare = |turn: &str| {
+        super::declare_team_strategy(
+            &db,
+            super::DeclareStrategyParams {
+                team_session_id: &lead,
+                caller_session_id: &lead,
+                lead_turn_id: turn,
+                strategy: "delegate",
+                reason: "Current execution roster",
+                members: Some(vec![super::test_support::expert_proposal("expert")]),
+            },
+        )
+    };
+    let (_, first_review) = declare(&first).unwrap();
+    let first_review = first_review.unwrap();
+    assert_eq!(
+        get_team_snapshot(&db, &lead)
+            .unwrap()
+            .review
+            .unwrap()
+            .review_id,
+        first_review.review_id
+    );
+    sessions::end_turn(&db, &first, "completed", None, None, false).unwrap();
+    let completed = get_team_snapshot(&db, &lead).unwrap();
+    assert_eq!(
+        completed.review.as_ref().unwrap().review_id,
+        first_review.review_id,
+        "an idle Lead may still await confirmation for its current request"
+    );
+    let next = sessions::begin_turn(&db, &lead, None, None).unwrap();
+    let current = get_team_snapshot(&db, &lead).unwrap();
+    assert!(
+        current.revision > completed.revision,
+        "new user scope publishes a newer activity revision"
+    );
+    assert!(
+        current.review.is_none(),
+        "old pending approval must not be actionable in a new request"
+    );
+    assert_eq!(
+        super::get_launch_review(&db, &lead, Some(&first_review.review_id))
+            .unwrap()
+            .unwrap()
+            .status,
+        "pending",
+        "history is preserved without mutation"
+    );
+    assert!(super::confirm_launch_review(
+        &db,
+        &lead,
+        &first_review.review_id,
+        first_review.revision
+    )
+    .is_err());
+    let (_, next_review) = declare(&next).unwrap();
+    let next_review = next_review.unwrap();
+    let snapshot = get_team_snapshot(&db, &lead).unwrap();
+    assert_eq!(snapshot.review.unwrap().review_id, next_review.review_id);
+    assert_eq!(
+        super::get_launch_review(&db, &lead, Some(&first_review.review_id))
+            .unwrap()
+            .unwrap()
+            .status,
+        "pending"
+    );
+}

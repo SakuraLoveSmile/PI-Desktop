@@ -196,14 +196,14 @@ test("unready runtime retries and stale due results cannot claim through a new h
   assert.deepEqual(await pending, { nextDueAt: null, retrySoon: true });
 });
 
-test("deadline wakeup reaches the approved execution boundary once through real runtime wiring", async (t) => {
+for (const kind of ["plan", "goal"]) test(`deadline wakeup binds the approved ${kind} turn before execution through real runtime wiring`, async (t) => {
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
-  const execution = { id: "execution", proposalId: "proposal", sessionId: "session", kind: "plan", state: "queued",
+  const execution = { id: "execution", proposalId: "proposal", sessionId: "session", kind, state: "queued",
     plan: "# Plan", title: "Plan", question: "Proceed?", targetPermissionMode: "ask",
     artifact: { relativePath: "plan.md", sha256: "hash", sizeBytes: 6 } };
   const calls = []; const launches = []; const host = hostFixture();
   let claimed = false;
-  host.call = async (method) => {
+  host.call = async (method, params) => {
     calls.push(method);
     if (method === "plans.dueSchedules") return { nextDueAt: claimed ? null : (Date.now() < 2_000 ? 2_000 : null),
       schedules: !claimed && Date.now() >= 2_000 ? [{ proposalId: "proposal", sessionId: "session" }] : [] };
@@ -212,6 +212,11 @@ test("deadline wakeup reaches the approved execution boundary once through real 
     if (method === "settings.get") return {};
     if (method === "session.get") return { session: { id: "session" } };
     if (method === "session.beginTurn") return { turnId: "execution-turn" };
+    if (method === (kind === "plan" ? "plans.bindExecutionTurn" : "goalReports.bindExecutionTurn")) {
+      assert.deepEqual(params, { executionId: "execution", ...(kind === "plan" ? { sessionId: "session" } : {}), turnId: "execution-turn" });
+      assert.equal(launches.length, 0);
+      return { ok: true };
+    }
     throw new Error(`Unexpected method ${method}`);
   };
   const activeTurns = new Map();
@@ -232,10 +237,49 @@ test("deadline wakeup reaches the approved execution boundary once through real 
   assert.equal(launches.length, 1); assert.equal(launches[0][0], "agent.executeApprovedPlan");
   assert.equal(launches[0][1].turnId, "execution-turn");
   assert.equal(launches[0][1].execution.id, "execution");
+  assert.equal(calls.filter((method) => method === (kind === "plan" ? "plans.bindExecutionTurn" : "goalReports.bindExecutionTurn")).length, 1);
   assert.equal(activeTurns.get("session"), "execution-turn");
   assert.equal(startedApprovedExecutions.has("execution"), true);
   host.notify(); await advance(t, 200); assert.equal(launches.length, 1);
   assert.equal(calls.filter((method) => method === "plans.claimSchedule").length, 1);
+});
+
+const { createSessionCoordination } = await import("../electron/main/runtime/session-coordination.ts");
+for (const kind of ["plan", "goal"]) test(`failed ${kind} execution binding interrupts its owned turn without sidecar launch`, async () => {
+  const execution = { id: "execution", proposalId: "proposal", sessionId: "session", kind, state: "queued",
+    plan: "# Plan", title: "Plan", question: "Proceed?", targetPermissionMode: "ask",
+    artifact: { relativePath: "plan.md", sha256: "hash", sizeBytes: 6 } };
+  const calls = [];
+  const host = { async call(method, params) {
+    calls.push({ method, params });
+    if (method === "plans.claimExecution") return { execution: { ...execution, state: "running" } };
+    if (method === "settings.get") return {};
+    if (method === "session.get") return { session: { id: "session" } };
+    if (method === "session.beginTurn") return { turnId: "execution-turn" };
+    if (method === (kind === "plan" ? "plans.bindExecutionTurn" : "goalReports.bindExecutionTurn")) {
+      throw { errorCode: "PLAN_EXECUTION_STALE" };
+    }
+    return { ok: true };
+  } };
+  const coordination = createSessionCoordination({ activeTurns: new Map(), getMainWindow: () => null, getViewingSessionId: () => null });
+  let launched = false;
+  const runtime = createPlanRuntime({
+    runtimeState: { host, sidecar: { async call() { launched = true; return { accepted: true }; } } },
+    planState: { approvedExecutionDrain: null }, coordination, logger: { app() {} }, isQuitting: () => false,
+    scheduledRunsBySession: new Map(), activeToolCalls: new Map(), planSubmissionTurnIds: new Set(),
+    startedApprovedExecutions: new Set(), finishedApprovedExecutions: new Set(), dispatchingApprovedExecutions: new Set(),
+    claimedExecutionSessions: new Map(), approvedExecutionIdsBySession: new Map(), approvedExecutionTurns: new Map(),
+    inFlightExecutionFinishes: new Set(), pendingExecutionFinishes: new Map(),
+    announceTurnEnded() {}, emitAgentEvent() {}, sendToRenderer() {}, acquireSessionOperation: coordination.acquireSessionOperation,
+    resolveAgentRuntimeLaunch: async () => ({ providerId: "fake", modelId: "fake", sidecarParams: { sessionId: "session" } }),
+  });
+  await runtime.dispatchApprovedPlan(execution);
+  assert.equal(launched, false);
+  assert.equal(coordination.activeTurns.has("session"), false);
+  assert.deepEqual(calls.find((call) => call.method === "session.endTurn")?.params,
+    { turnId: "execution-turn", status: "error", errorCode: "PLAN_EXECUTION_STALE", createNotification: true });
+  assert.deepEqual(calls.find((call) => call.method === "plans.finishExecution")?.params,
+    { executionId: "execution", status: "interrupted", errorCode: "PLAN_EXECUTION_STALE" });
 });
 
 const { createRuntimeLifecycle } = await import("../electron/main/runtime/lifecycle.ts");

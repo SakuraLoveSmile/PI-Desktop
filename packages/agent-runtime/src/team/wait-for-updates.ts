@@ -7,9 +7,11 @@ interface WaitForUpdatesOptions {
   teamSessionId: string;
   callerSessionId: string;
   host: RuntimeHost;
+  getTurnId?: () => string | undefined;
+  approvedExecution?: () => boolean;
 }
 
-function result(details: Record<string, string | number | boolean>): AgentToolResult {
+function result(details: NonNullable<AgentToolResult["details"]>): AgentToolResult {
   return {
     content: [{ type: "text", text: JSON.stringify(details) }],
     details,
@@ -26,6 +28,7 @@ function errorResult(error: unknown): AgentToolResult {
 
 export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool {
   const { teamSessionId, callerSessionId, host } = opts;
+  const consumed = new Set<string>();
   return {
     name: "wait_for_updates",
     label: "Wait for Updates",
@@ -39,6 +42,17 @@ export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool
       })),
     }),
     execute: async (_toolCallId, params, signal): Promise<AgentToolResult> => {
+      const expectedTurnId = opts.getTurnId?.();
+      const readInbox = async () => {
+        if (!opts.approvedExecution?.() || !expectedTurnId) return undefined;
+        const inbox = await host.call<{ turnId: string; messages: Array<{ id: string; content: string }> }>("team.readExecutionInbox", {
+          teamSessionId, callerSessionId, expectedTurnId,
+        });
+        signal?.throwIfAborted();
+        if (opts.getTurnId?.() !== expectedTurnId || inbox.turnId !== expectedTurnId) throw new Error("TEAM_PLANNING_STALE: approved execution changed");
+        const messages = inbox.messages.filter(message => !consumed.has(message.id));
+        return messages.length ? result({ updated: true, reason: "execution_inbox", messages }) : undefined;
+      };
       const p = params as { timeoutSeconds?: number };
       const timeoutMs = Math.min(Math.max(Number(p.timeoutSeconds) || 10, 1), 60) * 1000;
       const deadline = Date.now() + timeoutMs;
@@ -61,6 +75,15 @@ export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool
         const finish = (value: AgentToolResult) => {
           if (settled) return;
           settled = true;
+          const details = value.details;
+          if (details && typeof details === "object" && "reason" in details &&
+              details.reason === "execution_inbox" && "messages" in details && Array.isArray(details.messages)) {
+            for (const message of details.messages) {
+              if (message && typeof message === "object" && "id" in message && typeof message.id === "string") {
+                consumed.add(message.id);
+              }
+            }
+          }
           clearTimeout(deadlineTimer);
           clearTimeout(fallbackTimer);
           clearTimeout(notificationTimer);
@@ -115,6 +138,8 @@ export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool
           clearTimeout(notificationTimer);
           notificationTimer = undefined;
           try {
+            const inbox = await readInbox();
+            if (inbox && !settled) { finish(inbox); return; }
             const current = await readState();
             if (settled) return;
             if (Date.now() >= deadline) {
@@ -166,7 +191,15 @@ export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool
             unsubscribe?.();
             return;
           }
-          void readState().then((initial) => {
+          const initialize = async () => {
+            // The listener and total deadline own every read, including inbox
+            // consumption. An idle call must still subscribe synchronously.
+            if (opts.approvedExecution?.() && expectedTurnId) {
+              const inbox = await readInbox();
+              if (settled) return;
+              if (inbox) { finish(inbox); return; }
+            }
+            const initial = await readState();
             if (settled) return;
             if (Date.now() >= deadline) {
               finishDeadline();
@@ -175,7 +208,8 @@ export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool
             baseline = initial;
             if (dirty) void recheck();
             else scheduleFallback();
-          }, (error: unknown) => finish(errorResult(error)));
+          };
+          void initialize().catch((error: unknown) => finish(errorResult(error)));
         } catch (error) {
           finish(errorResult(error));
         }
