@@ -7,6 +7,12 @@ import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { RuntimeHost } from "../host-client.js";
 import { createWaitForUpdatesTool } from "./wait-for-updates.js";
 import {
+  TEAM_TASK_SUBJECT_GUIDANCE,
+  TEAM_STRATEGY_REASON_GUIDANCE,
+  TEAM_MEMBER_DESCRIPTION_GUIDANCE,
+  TEAM_MEMBER_DISPLAY_NAME_GUIDANCE,
+} from "./team-prompt.js";
+import {
   type TeamTaskRecord,
   type TeamMemberRecord,
   type TeamBoardProjection,
@@ -46,7 +52,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
         description: "Whether the Lead handles this turn alone ('lead_only') or delegates to expert teammates ('delegate').",
       }),
       reason: Type.String({
-        description: "Reasoning for the strategy choice (up to 1000 chars).",
+        description: TEAM_STRATEGY_REASON_GUIDANCE,
         minLength: 1,
         maxLength: MAX_TEAM_STRATEGY_REASON_CHARS,
       }),
@@ -54,11 +60,11 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
         Type.Array(
           Type.Object({
             name: Type.String({
-              description: "Permanent alphanumeric/underscore name for this proposed expert.",
+              description: "Permanent, stable English alphanumeric/underscore routing handle for this proposed expert. Do not translate it; use presentation.displayName for display.",
               minLength: 1,
               maxLength: 64,
             }),
-            description: Type.Optional(Type.String({ description: "Expert role or specialty description." })),
+            description: Type.Optional(Type.String({ description: TEAM_MEMBER_DESCRIPTION_GUIDANCE })),
             contextKind: Type.Optional(
               Type.Union([Type.Literal("fresh"), Type.Literal("fork")], {
                 description: "Context initialization: 'fresh' (default) or 'fork'.",
@@ -74,7 +80,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
                   Type.Literal("planner"),
                   Type.Literal("collaborator"),
                 ]),
-                displayName: Type.String({ minLength: 1, maxLength: 64 }),
+                displayName: Type.String({ description: TEAM_MEMBER_DISPLAY_NAME_GUIDANCE, minLength: 1, maxLength: 64 }),
               }),
             ),
             selection: Type.Optional(
@@ -410,7 +416,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
     description: "Create a new shared task on the team task board.",
     parameters: Type.Object({
       subject: Type.String({
-        description: "Brief title or summary of the task.",
+        description: TEAM_TASK_SUBJECT_GUIDANCE,
       }),
       description: Type.Optional(
         Type.String({ description: "Detailed task requirements." }),
@@ -489,7 +495,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
         description:
           "The revision of the task you are updating (CAS revision check).",
       }),
-      subject: Type.Optional(Type.String()),
+      subject: Type.Optional(Type.String({ description: TEAM_TASK_SUBJECT_GUIDANCE })),
       description: Type.Optional(Type.String()),
       status: Type.Optional(
         Type.Union([

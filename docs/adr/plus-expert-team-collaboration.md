@@ -241,3 +241,18 @@ execution members retain the existing standalone Agent behavior.
 Confirmed researchers also persist session mode Plan as a compatibility
 boundary. Only a subsequently confirmed Agent execution review restores Agent
 mode. Existing execution members and standard Plan/Goal are unaffected.
+
+## Execution delegation policy amendment (2026-10-07)
+
+For an Expert Team execution turn, the Lead defaults to `delegate`: it breaks
+separable workflow work into task-board assignments for appropriate experts.
+`lead_only` is reserved for trivial, indivisible work and must include an
+explicit reason. The Lead must not keep a separable workflow for itself. This
+is prompt guidance; it does not add a Host-side hard requirement that every
+turn dispatch a task.
+
+Plan/Goal Team research keeps its existing `lead_only` option and trusted
+launch-review flow; this amendment changes only Expert Team execution policy.
+Team approval and review requirements, member permissions, task ownership,
+and the flat hierarchy are unchanged. Team turns continue to hide standard
+`Task*` subagent tools and plugin `SessionTask`.

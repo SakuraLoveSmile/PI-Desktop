@@ -4,6 +4,9 @@ use serde_json::json;
 use super::*;
 use crate::db::Database;
 
+#[path = "tests/completion_eligibility.rs"]
+mod completion_eligibility;
+
 fn create_test_db() -> (tempfile::TempDir, Database) {
     let dir = tempfile::tempdir().unwrap();
     let db_path = dir.path().join("pi.sqlite");
@@ -199,22 +202,16 @@ fn test_finalize_fallback_when_no_draft() {
     seed_goal_execution(&db, session_id, execution_id);
     db.conn()
         .execute(
-            "UPDATE plan_approvals SET execution_state = 'interrupted' WHERE execution_id = ?1",
+            "UPDATE plan_approvals SET execution_state = 'completed' WHERE execution_id = ?1",
             params![execution_id],
         )
         .unwrap();
     bind_execution_turn(&db, execution_id, "turn-fb").unwrap();
 
-    let summary = finalize_report(
-        &db,
-        execution_id,
-        10,
-        Some("interrupted"),
-        Some("USER_ABORT"),
-    )
-    .unwrap();
+    let summary =
+        finalize_report(&db, execution_id, 10, Some("completed"), Some("USER_ABORT")).unwrap();
     assert_eq!(summary.status, "ready");
-    assert_eq!(summary.verdict, "blocked");
+    assert_eq!(summary.verdict, "unknown");
     assert_eq!(summary.integrity, "fallback");
 
     // A fallback report is a SUCCESSFUL `ready` read. Its `integrity.kind` is
@@ -224,15 +221,15 @@ fn test_finalize_fallback_when_no_draft() {
     assert_eq!(read.state, REPORT_STATE_READY);
     assert_eq!(read.integrity.as_deref(), Some("fallback"));
     assert_ne!(read.integrity.as_deref(), Some("structured"));
-    assert_eq!(read.verdict.as_deref(), Some("blocked"));
+    assert_eq!(read.verdict.as_deref(), Some("unknown"));
     let report_val = read.report.expect("fallback report body");
     assert_eq!(report_val["schemaVersion"], 1);
     assert_eq!(report_val["integrity"]["kind"], "fallback");
-    assert_eq!(report_val["execution"]["status"], "interrupted");
+    assert_eq!(report_val["execution"]["status"], "completed");
     assert_eq!(report_val["execution"]["errorCode"], "USER_ABORT");
     let summary = list_reports(&db, session_id).unwrap().remove(0);
     assert_eq!(summary.status, "ready");
-    assert_eq!(summary.execution_status.as_deref(), Some("interrupted"));
+    assert_eq!(summary.execution_status.as_deref(), Some("completed"));
 }
 
 #[test]

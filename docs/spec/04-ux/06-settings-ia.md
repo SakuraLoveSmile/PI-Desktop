@@ -277,11 +277,14 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   to Off, and has no follow-the-session entry. Settings search indexes the card,
   its switch, the template row, the default-model row, and the reasoning row.
 - **Thinking display mode** uses a menu select with Detailed (default) and
-  Compact. Both modes use one whole-process disclosure. Detailed starts the
-  process open, keeps reasoning visible, opens the active multi-item activity
-  group, and closes an untouched group when it completes; Compact starts the
-  process and groups closed, keeps tool/search payloads closed, shows only an
-  active thinking indicator, and hides finished reasoning. Singleton activity
+  Compact. Detailed uses one whole-process disclosure, starts the process
+  open, keeps reasoning visible, opens the active multi-item activity group,
+  and closes an untouched group when it completes. Compact keeps progress and
+  final answers in chronological order without a whole-turn wrapper, starts
+  activity groups closed, and keeps tool/search payloads closed until explicitly
+  expanded. Raw commands, arguments and technical results stay in those details;
+  full command copying remains available after expansion. Compact shows only an
+  active thinking indicator and hides finished reasoning. Singleton activity
   uses its item disclosure directly in either mode. The global preference
   persists as `thinkingDisplayMode` in host-owned settings; missing values use
   Detailed. It affects presentation only, not model reasoning configuration,

@@ -21,6 +21,7 @@ import { disclosureKey } from "./disclosure";
 import {
   formatToolDuration,
   getToolAction,
+  getCompactTeamToolLabelKey,
   getToolDisplayName,
   getToolSummary,
   getToolSummaryValue,
@@ -48,6 +49,7 @@ import {
   type SubagentTiming,
 } from "../../../lib/subagent-topology";
 import { useAppStore } from "../../../stores/app-store";
+import { resolveThinkingDisplayMode } from "../../../lib/turn-process";
 import { Markdown } from "../../../components/Markdown";
 import { ReviewChangeCard } from "../../../components/ReviewChangeCard";
 import { ToolChips, ToolDetailBlocks } from "../../../components/ToolDetails";
@@ -175,6 +177,9 @@ function HostToolRow({
   delegationTimings,
 }: ToolRowProps) {
   const { t } = useTranslation();
+  const compact = useAppStore(
+    (state) => resolveThinkingDisplayMode(state.settings?.thinkingDisplayMode) === "compact",
+  );
   const detailsId = useId();
   const root = useAppStore((s) => s.workspace?.path);
   const openTarget = useOpenPreviewTarget();
@@ -193,7 +198,7 @@ function HostToolRow({
   // denial stay in the row head without expanding the payload automatically.
   const revealRequest = useMessageRevealRequest(message.id);
   const disclosure = useAutomaticDisclosure(
-    autoOpen && !failed && status !== "denied",
+    !compact && autoOpen && !failed && status !== "denied",
     revealRequest,
     disclosureKey("tool", message.id),
   );
@@ -208,7 +213,8 @@ function HostToolRow({
     collapseDisclosure();
   }, [collapseDisclosure, onUserInteraction]);
   const actionLabel = t(
-    status === "running" ? TOOL_RUNNING_KEYS[action] : TOOL_ACTION_KEYS[action],
+    (compact ? getCompactTeamToolLabelKey(message.toolName) : undefined) ??
+      (status === "running" ? TOOL_RUNNING_KEYS[action] : TOOL_ACTION_KEYS[action]),
   );
   const rawName = getToolDisplayName(message.toolName) || t("chat.tool");
   const argSummary = getToolSummary(message.toolName, message.toolArgs);
@@ -250,17 +256,25 @@ function HostToolRow({
   const presentation = useRef<{
     message: UiMessage;
     nestedReport: boolean | undefined;
+    compact: boolean;
     blocks: ReturnType<typeof buildToolPresentation>;
   } | null>(null);
   if (variant !== "topology" && open && hasDetails && disclosure.parentVisible &&
-    (presentation.current?.message !== message || presentation.current?.nestedReport !== nestedReport)) {
+    (presentation.current?.message !== message || presentation.current?.nestedReport !== nestedReport || presentation.current?.compact !== compact)) {
+    const outputBlocks = buildToolPresentation(message, {
+      hideSummaryArg: true,
+      ...(nestedReport ? { hideDelegateReport: true } : {}),
+    });
     presentation.current = {
       message,
       nestedReport,
-      blocks: buildToolPresentation(message, {
-        hideSummaryArg: true,
-        ...(nestedReport ? { hideDelegateReport: true } : {}),
-      }),
+      compact,
+      // Compact headers intentionally omit arguments. Keep every original
+      // input reachable in the disclosure alongside the structured output.
+      blocks: compact
+        ? [...buildToolPresentation({ toolArgs: message.toolArgs }),
+          ...outputBlocks.filter((block) => block.role !== "input")]
+        : outputBlocks,
     };
   }
   const blocks = variant !== "topology" && open && hasDetails ? presentation.current?.blocks : null;
@@ -287,6 +301,9 @@ function HostToolRow({
   // running it has no roster yet, and `delegationIds` would otherwise reach the
   // head as a JSON blob of UUIDs (D268).
   const summary = lifecycle ? rosterSummary : argSummary;
+  const visibleSummary = compact
+    ? previewTarget?.kind === "file" ? summary : ""
+    : summary;
   const statusLabel = creating
     ? t("chat.subagentCreating")
     : outcome
@@ -438,9 +455,9 @@ function HostToolRow({
                 {duration ? ` · ${duration}` : ""}
               </span>
             </span>
-            {summary ? (
+            {visibleSummary ? (
               <span className="subagent-topology-node-summary" title={summary}>
-                {summary}
+                {visibleSummary}
               </span>
             ) : null}
             {delegate?.items.length ? (
@@ -490,7 +507,7 @@ function HostToolRow({
                 {agentName}
               </span>
             ) : null}
-            {summary ? (
+            {visibleSummary ? (
               <span
                 className={`tool-row-summary${previewTarget ? " linked" : ""}`}
                 title={
@@ -516,10 +533,10 @@ function HostToolRow({
                     : undefined
                 }
               >
-                {summary}
+                {visibleSummary}
               </span>
             ) : null}
-            <ToolChips chips={chips} />
+            {!compact && <ToolChips chips={chips} />}
             {runHead && statusLabel ? (
               <span
                 className={`tool-row-state ${statusTone}`}
@@ -553,7 +570,7 @@ function HostToolRow({
               </span>
             )}
           </button>
-          {runHead && command ? <ToolCommandCopy command={command} /> : null}
+          {!compact && runHead && command ? <ToolCommandCopy command={command} /> : null}
           {runHead && caret ? (
             // Redundant for the keyboard — the header itself is the disclosure —
             // so it is a pointer target only and stays out of the reading order.
@@ -580,6 +597,8 @@ function HostToolRow({
             onCollapse={collapseRow}
           />
           <ToolDetailBlocks blocks={blocks} plain={runHead} />
+          {compact && runHead && command ? <ToolCommandCopy command={command} /> : null}
+          {compact && <ToolChips chips={chips} />}
         </div>
       ) : null}
       {!imagesInTurn && <GeneratedImages message={message} />}

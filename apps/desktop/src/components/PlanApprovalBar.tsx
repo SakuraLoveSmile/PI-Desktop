@@ -24,6 +24,7 @@ import {
 } from "./icons";
 import { Button, Input, Select, SettingsToggle, TooltipButton } from "./ui";
 import { PlanMarkdownActions } from "./PlanMarkdownActions";
+import { ApprovalSummary } from "./ApprovalSummary";
 import { AnchoredMenu } from "./settings/AnchoredMenu";
 
 const APPROVAL_MODES: readonly GlobalPermissionMode[] = [
@@ -291,9 +292,9 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
           <IconFileText size={15} aria-hidden />
           {proposal.title.trim() || copy("untitled")}
         </h2>
-        <p className="plan-approval-summary">
-          {(proposal.question.trim().length > 20 ? proposal.question : proposal.title).trim()}
-        </p>
+        <div className="plan-approval-summary">
+          <ApprovalSummary text={proposal.question.trim() || proposal.title.trim()} />
+        </div>
         {statusLabel ? (
           <p className="plan-approval-schedule-status" role="status">
             {statusLabel}

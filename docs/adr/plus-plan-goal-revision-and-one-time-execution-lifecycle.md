@@ -51,6 +51,13 @@ Overview, resolved AskTool summaries, and Detailed/Compact transcript display
 are projections of existing session, transcript, artifact, and settings data;
 they do not become alternate persistence owners.
 
+Goal completion reports are published only after Host-owned execution completion.
+An interrupted execution records its terminal state without producing a result or
+fallback report. Report Retry cannot bypass this completion gate. Runtime stop
+intent is frozen before asynchronous cancellation can race with a generic end
+event; ordinary graceful-stop turn semantics remain distinct from Goal completion.
+Historical report artifacts are retained and no persisted-format migration is required.
+
 ## Consequences
 
 - Every actionable request is scoped by proposal/session/turn/tool-call/version.

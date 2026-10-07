@@ -3002,12 +3002,13 @@ identify the platform validation still needed.
   tool/search, thinking, failed tool, and denied tool. 6) Switch to Compact and
   inspect the active-thinking, failure/recovery and completed states. 7) Remount
   rows within the retained pane, then reload the renderer and reopen the session.
-- **Expected**: Both modes use one whole-process disclosure and keep the trailing
-  answer outside it. Detailed keeps active and completed processes open; the
+- **Expected**: Detailed uses one whole-process disclosure and keeps the trailing
+  answer outside it; untouched completed processes close by default. The
   active multi-item group opens, then closes on completion only if untouched.
-  Compact starts processes/groups and all payloads closed, hides reasoning text,
-  and keeps an untouched active process open after a failed/denied tool through
-  later recovery. A singleton has no group wrapper. Detailed auto-opens a payload
+  Compact keeps progress text and answers in chronological order, starts groups
+  and all payloads closed, and hides reasoning text, raw command/JSON previews and
+  technical chips. Failed/denied status stays visible and full details can expand.
+  A singleton has no group wrapper. Detailed auto-opens a payload
   only when the literal final item of the last activity group is an eligible
   tool/search; it never scans backward past thinking, and failure/denial guards
   keep that leaf closed. Parent, child and sibling choices are independent;
@@ -6961,9 +6962,12 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   question. 2) Inspect the new `.pi/plan/*.md` file byte-for-byte and the
   `plan_approvals` row. 3) Inspect the card's title and artifact opener; confirm
   the opener uses the bundled file view when it is launchable and the host
-  file tab otherwise (D452), and that the question/description,
-  validity/deadline, and status are absent with only Approve and Reject
-  offered. 4) Open the approval mode menu, choose Auto,
+  file tab otherwise (D452). Confirm the card shows the supplied concise approval
+  overview even when shorter than 20 characters, never the complete Markdown.
+  A long legacy description stays within three preview lines and can expand/collapse
+  without rewriting approval data; Markdown emphasis is formatted safely. Copy and
+  download retain exact artifact bytes. Validity/deadline stay absent; execution or
+  schedule status appears when applicable. 4) Open the approval mode menu, choose Auto,
   and verify the next approval defaults to Auto. 5) Reject the
   proposal. 6) Confirm durable mode is Plan, live state is editable `planning`,
   the approval gate is cleared, and a later prompt is accepted. 7) Let the
@@ -9454,6 +9458,8 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 | Acceptance | Scenarios |
 |---|---|
+| E / Quality — Standard Agent delegate-first prompt and Task report convergence | E2E-DELEGATION-standard-delegates-to-subagents |
+| C / E / Quality — Expert Team Lead delegation prompt, board workflow and catalog isolation | E2E-TEAM-lead-delegates-to-experts |
 | C / Quality / Security — Approved read-only Team planning | E2E-TEAM-approved-plan-research-and-execution |
 | C / Quality — Independent Team panorama/task/member tabs | E2E-TEAM-panorama-and-member-tabs |
 | C / Quality — Live dispatch card and single task target | E2E-TEAM-dispatch-card-live-status-and-joining |
@@ -15960,14 +15966,16 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   selection, failure/denial/recovery, retained-pane remounts and a legacy search
   reveal. Repeat in Compact with permission/question/plan/goal cards, a stopped
   partial answer, an assistant error and delegated child work.
-- **Expected:** Both modes use one whole-process disclosure and leave the final
+- **Expected:** Detailed uses one whole-process disclosure and leaves the final
   answer, assistant errors, stopped trailing text and pending actions outside it.
   Detailed starts active processes open; untouched processes collapse at
   completion, while explicit user choices persist. The active multi-item group
-  is open and an untouched group closes on completion. Compact starts processes
-  and groups closed, hides reasoning, and keeps payloads closed; an untouched
-  active process with a recorded failed/denied tool stays open through recovery
-  and closes on completion. Singletons have no group. Detailed auto-opens only
+  is open and an untouched group closes on completion. Compact keeps Chinese
+  assistant progress and the final answer in chronological order through later
+  tools. Localized groups/actions remain visible with payloads closed; English
+  reasoning, commands and JSON stay out of the default preview. Explicit expansion
+  reveals full tool parameters/results, and failure/denial status stays visible.
+  Singletons have no group. Detailed auto-opens only
   an eligible literal final tool/search item of the last activity group; it does
   not scan past thinking, and failed/denied leaves stay closed. Parent/child/
   sibling states remain independent, pane-owned user choices survive updates,
@@ -16647,6 +16655,15 @@ renderer's durable transcript reads. No real model or provider is contacted.
   its conclusion, execution status, evidence and limitations. A criterion is
   presented as met only when the structured report and durable evidence support
   it. A fallback report identifies unknown or missing evidence.
+- **Interrupted execution:** Stop/abort, graceful Goal stop, provider cancellation and
+  execution failure must settle the approved Goal as interrupted and never finalize a
+  result report. Deliver `agent_end` while the cancellation RPC is held; a locked abort
+  must not become completion. Keep the ordinary graceful-stop turn semantics intact.
+  Verify pending/draft executions, manual finalize/Retry and misleading status overrides
+  cannot publish an interrupted report or mutate its draft/metadata. Restart and verify
+  no report artifact/ready notification appeared. Loaded historical interruption reports
+  produce no transcript result card or automatic Work Panel opening; interrupted progress
+  disappears without waiting. Completed report navigation and persistence remain intact.
 - **Progress:** Approved Goal progress accepts pending/in-progress/completed/failed items.
   Unauthorized turns and stale revisions are rejected. A new execution ignores old report
   and progress responses; terminal settlement revokes writes, retains readable progress,
@@ -16889,6 +16906,11 @@ renderer's durable transcript reads. No real model or provider is contacted.
   at the API boundary); `cargo test -p host-core --locked team` and the
   `team_rpc_full_journey` contract test. Real-model quality is outside this gate.
 
+The review component fixture also uses the Chinese catalog, concise supplied
+reason/responsibility and a proposed display identity. Confirm the visible role/name
+is localized while updates/confirm/cancel still use the unchanged routing handle and
+current CAS revision. Legacy descriptions and reviews without presentation are retained.
+
 ### E2E-TEAM-dispatch-card-live-status-and-joining
 
 - **Status:** Implementation validation pending for the visual-parity task candidate.
@@ -16930,7 +16952,7 @@ renderer's durable transcript reads. No real model or provider is contacted.
   3. Start one approved Plan/Goal execution and capture the fake title-summary request. Replay the same execution event and reload the renderer. Verify one request total, no member title request, and that a manual rename or newer execution wins over a delayed title result.
   4. Queue eight ordinary Composer prompts. Fold and expand the queue, then execute an existing row action. Verify the mailbox and Composer queue remain separate and disclosure does not send or remove work by itself.
   5. From Overview, measure the 48px progress/header chrome and 50px task rows at 100% font scale. Check dashed separators and one right chevron per summary. Collapse/reopen the Ad-hocs group and whole progress section; verify visible rows and extra status/activity disappear and return. Confirm Team status/proposals stay inside progress, while a standard session retains its separate Progress disclosure. Open a progress row in its own task tab without changing the selected Lead or replacing the aggregate tab; re-click the row and verify its existing tab activates. Select the aggregate tab to return. Open the compact board, filter and search, enter task detail, then return with filter/query/scroll preserved. Confirm cancelled tasks remain reachable through All and completed tasks never display as blocked.
-  6. Open the separate Team panorama tab and verify its localized label/tooltip. Check 276×86px nodes and 32px avatars, zoom to 80%, pan, and deliver a controlled Team revision with new member objects/status. Verify the transform and subsequent drag remain continuous. Open a child focus task or member in its own tab, then select the retained panorama tab and verify its viewport survives. Explicit Fit and Reset still work.
+  6. Open the separate Team panorama tab and verify its localized label/tooltip. Check 276×86px nodes and 32px avatars. Exercise long English, Chinese and unbroken identity/task text on root and child nodes: each stays within its card with single-line ellipsis, while full hover text remains available. Then zoom to 80%, pan, and deliver a controlled Team revision with new member objects/status. Verify the transform and subsequent drag remain continuous. Open a child focus task or member in its own tab, then select the retained panorama tab and verify its viewport survives. Explicit Fit and Reset still work.
   7. Expand the Lead sidebar group, select a member, collapse/reopen and reload. Verify one visible Lead group plus the real member sessions, stable identities, individual actions, and unchanged session IDs/transcripts.
   8. Open a standard Agent session and run its ordinary Task delegate path. Compare its history/counts with the Team sessions and board. Switch back, pause, queue Team mail, reload, and Resume; verify held mail is delivered once and standard delegates remain separate.
 - **Expected**: Local Desktop surfaces render the same current Team revision, including review/decision. Only confirmed strategy data dispatches. Member activity comes from Host turns, not task status. Navigation and display identity remain stable without selecting another main session. Standard subagents, Team members, Composer prompts and Team mail remain distinct. Title or UI failure does not change execution success.
@@ -17254,3 +17276,59 @@ ordinary-completion bypass, Team revision notifications, stop/restart question
 cleanup, local tool interception and unchanged standard Plan/Goal behavior.
 Run `PI_E2E_TEAM_PLANNING=1 node scripts/e2e-team.mjs` for the integration path;
 never use a real provider or the user's running application as its fixture.
+
+### E2E-DELEGATION-standard-delegates-to-subagents
+
+- **Preconditions**: Isolated standard Agent session with one enabled subagent
+  fixture and a deterministic local mock provider. No real provider or user data.
+- **Steps**: Start a separable task. Inspect the provider request for the
+  delegate-first Delegation guidance and Task tool description. Have the mock
+  model start one Task and then call TaskWait with that delegation's explicit
+  ID; inspect the returned child report before the parent turn ends.
+- **Expected**: The provider receives delegate-first guidance, and the Task
+  description advertises the same policy. The child report is returned through
+  TaskWait. This proves prompt steering and a representative single-delegate
+  path, not a guarantee that a real model will delegate.
+- **Coverage**: `pnpm test:e2e:subagent-models` exercises provider prompt/tool
+  assertions, one Task launch, and explicit-ID TaskWait report convergence.
+  `packages/agent-runtime/src/runtime.test.ts` covers the disabled-standard
+  prompt/catalog state, Team catalog isolation, and retained Plan/Goal
+  declarations with execution denied. Multi-worker parallel dispatch while the
+  parent continues independent work is NOT RUN by this scenario. Real-model
+  behavior validation is separately NOT RUN; it requires provider
+  authorization and may incur cost.
+- **Specs**: `03-runtime/02-agent-runtime.md`,
+  `03-runtime/03-tools-and-permissions.md`, ADR 0089.
+- **Acceptance criterion**: Standard Agent delegate-first prompt and Task report
+  convergence, plus the linked runtime mode/catalog regression coverage.
+- **Milestone**: Maintenance.
+- **Status**: Automated checks are defined above; record task-candidate results
+  against the exact tested commit.
+
+### E2E-TEAM-lead-delegates-to-experts
+
+- **Preconditions**: Isolated Expert Team execution session, approved expert
+  members, and the deterministic local provider in the Team fixture. No real
+  provider or user data.
+- **Steps**: Start the Team execution journey and inspect the provider request
+  for Lead delegate-by-default and lead_only guidance. Inspect the declared
+  Team tool catalog. Run the approved board workflow with one active researcher
+  and idle peers, then exercise a trivial lead-only task and inspect its reason.
+- **Expected**: The Lead prompt defaults to delegate and limits lead_only to
+  trivial indivisible work with a reason. The approved Team board workflow
+  admits the assigned researcher, and Task*, SessionTask remain absent from the
+  Team catalog. Standard session behavior remains available alongside Team.
+- **Coverage**: `pnpm test:e2e:team` uses the isolated Desktop/Host/sidecar
+  fixture and deterministic provider to assert prompt/catalog guidance, run the
+  approved board path with one active researcher and idle peers, verify the
+  lead_only reason, and check standard-session coexistence. The fixture does
+  not run multiple active experts for independent parallel assignments. Real
+  model behavior validation is separately NOT RUN; it requires provider
+  authorization and may incur cost.
+- **Specs**: ADR plus-expert-team-collaboration,
+  `03-runtime/03-tools-and-permissions.md`.
+- **Acceptance criterion**: Expert Team Lead prompt policy, approved task-board
+  path, and catalog isolation.
+- **Milestone**: Maintenance.
+- **Status**: Automated checks are defined above; record task-candidate results
+  against the exact tested commit.
