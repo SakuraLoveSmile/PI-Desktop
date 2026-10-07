@@ -70,8 +70,17 @@ export function createApprovedGoalFixture(projectPath) {
       assert.equal(pendingReports[0].executionStatus, null, "pending review prematurely completed execution");
       const executionId = pendingReports[0].executionId;
       const pendingTurn = await invoke("turnGet", { sessionId: goal.id, turnId: originalTurn }); assert.equal(pendingTurn.status, "running");
+      await waitFor(() => evaluate(`!!document.querySelector('.composer-contract-chip[data-mode="goal"]')`), "approved execution preserves Goal contract presentation");
+      await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-launch-review-confirm-btn"]:not(:disabled)')`), "expert review automatically revealed for Goal execution");
+      await waitFor(() => evaluate(`document.querySelector('[data-testid="team-review-waiting-indicator"]')?.innerText.includes('Waiting for team confirmation')`), "transcript explains staffing wait");
+      await waitFor(() => evaluate(`document.querySelector('.goal-progress-capsule')?.innerText === 'Waiting for team confirmation'`), "Goal capsule explains staffing wait instead of preparing");
+      await evaluate(`document.querySelector('[data-work-panel-tab-id="overview"] .work-panel-tab-button').click()`);
+      await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-tab"] .work-panel-overview-status strong')?.innerText === 'Waiting for team confirmation'`), "Overview explains staffing wait");
+      await evaluate(`document.querySelector('[data-testid="team-review-waiting-indicator"] button').click()`);
+      await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-launch-review-confirm-btn"]:not(:disabled)')`), "transcript action reopens expert review");
+      assert.equal((await invoke("agentGetStatus", goal.id)).status.currentTurnId, originalTurn);
+      assert.equal(expertStarted, false, "view navigation cannot authorize experts");
       await saveScreenshot(sendCdp, "team-approved-goal-pending-review.png");
-      await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-launch-review-confirm-btn"]:not(:disabled)')`), "expert review confirm");
       await evaluate(`document.querySelector('[data-testid="team-launch-review-confirm-btn"]').click()`);
       await waitFor(() => expertStarted, "real Host-owned expert turn");
       const member = (await invoke("teamGetRoster", { teamSessionId: goal.id })).members.find(member => member.name === "goal_expert"); assert.ok(member);

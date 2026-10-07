@@ -2058,7 +2058,7 @@ sklm: {
       coordinationError: "在 {{stage}} 階段協調失敗：{{message}}",
       missingProvider: "提供者無法使用（{{id}}）",
       missingModel: "模型無法使用（{{id}}）",
-      status: { pending: "待處理", confirmed: "已確認", cancelled: "已取消", interrupted: "已中斷" },
+      status: { pending: "等待團隊確認", confirmed: "已確認", cancelled: "已取消", interrupted: "已中斷" },
       thinkingLevel: { off: "關閉", minimal: "最少", low: "低", medium: "中", high: "高", xhigh: "很高", max: "最高" },
       coordinationStage: { member_creation: "建立成員", task_creation: "建立任務", enqueue: "訊息排入佇列", delivery: "訊息傳遞" },
     },

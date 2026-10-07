@@ -2039,7 +2039,7 @@ sklm: {
       coordinationError: "Échec de la coordination à l’étape {{stage}} : {{message}}",
       missingProvider: "Fournisseur indisponible ({{id}})",
       missingModel: "Modèle indisponible ({{id}})",
-      status: { pending: "En attente", confirmed: "Confirmée", cancelled: "Annulée", interrupted: "Interrompue" },
+      status: { pending: "En attente de confirmation de l’équipe", confirmed: "Confirmée", cancelled: "Annulée", interrupted: "Interrompue" },
       thinkingLevel: { off: "Désactivé", minimal: "Minimal", low: "Faible", medium: "Moyen", high: "Élevé", xhigh: "Très élevé", max: "Maximum" },
       coordinationStage: { member_creation: "création des membres", task_creation: "création des tâches", enqueue: "mise en file des messages", delivery: "livraison des messages" },
     },

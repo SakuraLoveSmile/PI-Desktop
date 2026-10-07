@@ -54,6 +54,7 @@ import {
 import { TranscriptSearchContext } from "../../../lib/transcript-search-context";
 import { useAppStore } from "../../../stores/app-store";
 import { resolveThinkingDisplayMode } from "../../../lib/turn-process";
+import { usePendingTeamExecutionReview } from "../../../hooks/useTeamExecutionReview";
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 
@@ -219,6 +220,8 @@ export const ActivityGroup = memo(function ActivityGroup({
   turnDelegationStatuses,
   turnDelegationTimings,
 }: ActivityGroupProps) {
+  const activeSessionId = useAppStore((state) => isActive ? state.activeSessionId : undefined);
+  const pendingTeamReview = usePendingTeamExecutionReview(activeSessionId, isActive);
   const compact = useAppStore(
     (state) => resolveThinkingDisplayMode(state.settings?.thinkingDisplayMode) === "compact",
   );
@@ -289,7 +292,9 @@ export const ActivityGroup = memo(function ActivityGroup({
     lastItem?.kind === "thinking" &&
     lastItem.message.status === "streaming";
   const onlyThinking = useMemo(() => items.every((item) => item.kind === "thinking"), [items]);
-  const label = hasSubagentTopology
+  const label = pendingTeamReview
+    ? t("team.review.status.pending")
+    : hasSubagentTopology
     ? t(
         live
           ? "chat.subagentsWorking"
@@ -312,7 +317,9 @@ export const ActivityGroup = memo(function ActivityGroup({
           : // History reloads keep no end timestamp for pure-thinking groups.
             t("chat.thinking", { defaultValue: "Thinking" })
         : t("chat.processedFor", { time: elapsed });
-  const runtimeStatus = runtimeActivity
+  const runtimeStatus = pendingTeamReview
+    ? t("team.review.status.pending")
+    : runtimeActivity
     ? runActivityLabel(runtimeActivity, t as Translate)
     : "";
   const currentDetail = useMemo(() =>
@@ -344,7 +351,7 @@ export const ActivityGroup = memo(function ActivityGroup({
 
   if (!hasSubagentTopology) {
     return (
-      <ProcessActivityGroup items={visibleItems} active={isActive} disclosure={disclosure}>
+      <ProcessActivityGroup items={visibleItems} active={isActive} activeStatusLabel={pendingTeamReview ? t("team.review.status.pending") : undefined} disclosure={disclosure}>
         {renderedItems}
       </ProcessActivityGroup>
     );

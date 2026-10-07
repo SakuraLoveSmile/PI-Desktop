@@ -163,7 +163,9 @@ test("active turns show immediate and phase-specific feedback without a progress
   assert.match(store, /event\.type === "status"/);
   // The tail status lane is part of the layout for the whole running turn, so
   // the indicators coming and going cannot resize the transcript (issue #323).
-  assert.match(transcript, /const runtimeStatusLane = transcriptRunning;/);
+  // The running lane stays mounted; an ordinary Agent review can also remain
+  // reachable after the Lead's explanatory turn has ended.
+  assert.match(transcript, /const runtimeStatusLane = transcriptRunning \|\| showTeamReview;/);
   assert.match(transcript, /\{runtimeStatusLane \? \(/);
   assert.match(transcript, /className="transcript-runtime-status"/);
   assert.match(

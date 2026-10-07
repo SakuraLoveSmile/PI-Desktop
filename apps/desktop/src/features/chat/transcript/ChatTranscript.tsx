@@ -4,13 +4,14 @@ import type { PlanProposal, PlanningState, UiMessage } from "@pi-desktop/shared"
 import { proposalKindForMode } from "@pi-desktop/shared";
 import { ConversationMinimap } from "../../../components/ConversationMinimap";
 import { PermissionCard } from "../../../components/PermissionCard";
-import { TooltipButton } from "../../../components/ui";
+import { Button, TooltipButton } from "../../../components/ui";
 import { TurnOutcomeCard } from "../../../components/TurnOutcomeCard";
 import { GoalReportCard } from "../../../components/GoalReportCard";
 import { PlanApprovalBar } from "../../../components/PlanApprovalBar";
-import { goalReportWorkPanelTab } from "../../../lib/work-panel-tabs";
+import { goalReportWorkPanelTab, teamWorkPanelTab } from "../../../lib/work-panel-tabs";
 import { shouldPresentGoalReportInTranscript } from "../../../lib/goal-report-presentation";
-import { IconArrowDown } from "../../../components/icons";
+import { IconArrowDown, IconChevronRight } from "../../../components/icons";
+import { usePendingTeamExecutionReview } from "../../../hooks/useTeamExecutionReview";
 import { useAppStore } from "../../../stores/app-store";
 import type { PendingPermission } from "../../../lib/pending-permissions";
 import { TRANSCRIPT_SKELETON_ROWS } from "../../../lib/transcript-settle";
@@ -105,6 +106,7 @@ function TranscriptBody({
   const showToast = useAppStore((state) => state.showToast);
   const settings = useAppStore((state) => state.settings);
   const transcriptRunning = isRunning && !readingWindow;
+  const pendingTeamReview = usePendingTeamExecutionReview(sessionId, !readingWindow);
   const latestTurnResult = useAppStore((state) =>
     sessionId ? state.latestTurnResults[sessionId] : undefined,
   );
@@ -200,22 +202,26 @@ function TranscriptBody({
     !pendingPermission &&
     !askPending &&
     !approvalPending;
-  const showRunActivity = showStatus && hasSpecializedActivity;
+  const showTeamReview = Boolean(pendingTeamReview) && !pendingPermission && !askPending && !approvalPending;
+  const showRunActivity = showStatus && !pendingTeamReview && hasSpecializedActivity;
   const showWorking =
     showStatus &&
+    !pendingTeamReview &&
     planningState !== "planning" &&
     !hasSpecializedActivity;
   const showPlanning =
     showStatus &&
+    !pendingTeamReview &&
     planningState === "planning" &&
     !hasSpecializedActivity;
 
   // The tail status lane is part of the layout for the whole running turn: the
   // indicators below mount and clear with the turn's phase, and a lane that
   // came and went with them would resize `.thread-content` and push the rows
-  // the user is already reading (issue #323). An idle transcript renders no
-  // lane at all, so a finished transcript keeps its exact layout.
-  const runtimeStatusLane = transcriptRunning;
+  // the user is already reading (issue #323). A pending Team review keeps its
+  // entry reachable even after an ordinary Agent's explanatory turn ends.
+  // A finished transcript without a pending review renders no lane.
+  const runtimeStatusLane = transcriptRunning || showTeamReview;
 
   /*
     The background menu answers the right-clicks no row claimed: the space below
@@ -378,6 +384,21 @@ function TranscriptBody({
           ) : null}
           {runtimeStatusLane ? (
             <div className="transcript-runtime-status">
+              {showTeamReview && pendingTeamReview ? (
+                <div className="working-indicator" role="status" aria-live="polite" data-testid="team-review-waiting-indicator">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label={t("chat.teamToolActions.strategy")}
+                    onClick={() => {
+                      if (sessionId) openWorkPanelTabForSession(sessionId, teamWorkPanelTab(pendingTeamReview.teamSessionId));
+                    }}
+                  >
+                    {t("team.review.status.pending")}
+                    <IconChevronRight size={12} aria-hidden />
+                  </Button>
+                </div>
+              ) : null}
               {showRunActivity && specializedActivity ? (
                 <RunActivityIndicator activity={specializedActivity} />
               ) : null}
