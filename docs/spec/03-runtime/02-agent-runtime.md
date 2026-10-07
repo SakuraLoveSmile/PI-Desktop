@@ -701,6 +701,19 @@ Plan artifact and subsequent Agent execution roster still require user approval.
 Goal negotiation retains its existing permissions; Agent execution restores
 the Team gate. Team tools remain separate from `Task*` and plugin `SessionTask`.
 
+For an ordinary Team Plan Lead, `wait_for_updates` checks for queued, unbound
+inbound Team messages both at its initial read and later rechecks. It normally
+ends the current Lead turn to release the existing authenticated mailbox FIFO,
+without requiring the model to submit a plan or voluntarily finish. Intermediate
+mailbox continuations yield again while reports remain; the last continuation
+can synthesize and submit only after Host readiness permits it. Full message
+content, ordering, identities and user follow-ups are retained. The yield is
+bound to the current turn/epoch and survives sibling tool calls and extension
+hooks; cancellation, disposal, or mode/turn changes invalidate a late yield.
+Approved execution uses the separate same-turn inbox below and never this yield.
+Overview stays mounted and refreshes task ownership/completion and Team state
+from Team notifications; it does not require a tab switch or a completed Lead turn.
+
 An approved Team Plan/Goal execution waits for execution-roster confirmation
 and expert settlement inside its original running Host turn. It must not emit
 final agent_end, end the Goal execution token or complete the approval while

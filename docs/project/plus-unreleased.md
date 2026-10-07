@@ -2,6 +2,11 @@
 
 Upstream v0.15.6 → v0.16.1 has been merged.
 
+- Expert Team research tasks require an explicit researcher assignment before
+  dispatch, preventing completed research from getting stuck on an unassigned
+  task. Failed assignments are reported as tool errors; existing unassigned
+  tasks can still be repaired by the Lead without losing their content.
+
 - Standard Agent sessions with enabled subagents are prompted to delegate
   substantial separable work first. Standard Agent keeps its small-task and
   user-participation exceptions; this guidance is unchanged by the Team policy.
@@ -21,6 +26,11 @@ Upstream v0.15.6 → v0.16.1 has been merged.
   publish fallback reports or leave progress waiting for one, and report Retry
   cannot manufacture a result for an incomplete execution. Existing interruption
   records and artifacts are retained without showing completion cards.
+
+- Waiting Team Plan Leads automatically release their turn when expert reports
+  are queued, so authenticated messages drain in order without manual Send now.
+  Full reports and user follow-ups are retained; approved Plan/Goal execution
+  keeps its original turn. Overview progress continues to refresh in place.
 
 - Expert Team planning consumes supplementary expert messages before publishing
   the plan, preventing research reports from remaining in the composer queue.
