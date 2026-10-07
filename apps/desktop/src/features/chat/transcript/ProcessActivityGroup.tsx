@@ -10,11 +10,13 @@ import { DisclosureScope, type useAutomaticDisclosure } from "./disclosure";
 export function ProcessActivityGroup({
   items,
   active,
+  activeStatusLabel,
   disclosure,
   children,
 }: {
   items: readonly AssistantActivityItem[];
   active: boolean;
+  activeStatusLabel?: string;
   disclosure: ReturnType<typeof useAutomaticDisclosure>;
   children: ReactNode;
 }) {
@@ -42,7 +44,7 @@ export function ProcessActivityGroup({
           {summary.thinking > 0 && summary.tools > 0 ? (
             <span className="tool-activity-count">{t("chat.activityIncludesThinking")}</span>
           ) : null}
-          {active ? <span className="tool-activity-count">{t("chat.running")}</span> : null}
+          {active ? <span className="tool-activity-count">{activeStatusLabel ?? t("chat.running")}</span> : null}
           {summary.issues > 0 ? (
             <span className="turn-process-error">
               <IconCircleAlert size={14} aria-hidden />

@@ -16,6 +16,7 @@ import {
 import { delegateAgentName } from "../../features/chat/transcript/model";
 import { delegateTaskDescription } from "../../lib/subagent-transcript";
 import { useTeamSnapshot } from "../../hooks/useTeamSnapshot";
+import { usePendingTeamExecutionReview } from "../../hooks/useTeamExecutionReview";
 import { useOverviewMetadata } from "../../hooks/useOverviewMetadata";
 import { getPanoramaViewport, savePanoramaViewport } from "../../lib/panorama-memory";
 import { localizedTeamSnapshotError, buildTeamTaskRows, localTeamSessionId, selectOverviewTaskRows } from "../../lib/team-presentation";
@@ -56,6 +57,7 @@ function messageReferences(messages: UiMessage[]): OverviewItem[] {
 export function OverviewTab() {
   const { t } = useTranslation();
   const activeSessionId = useAppStore((state) => state.activeSessionId);
+  const pendingTeamReview = usePendingTeamExecutionReview(activeSessionId);
   const sessions = useAppStore((state) => state.sessions);
   const providers = useAppStore((state) => state.providers);
   const messages = useAppStore((state) => state.messages);
@@ -255,13 +257,15 @@ export function OverviewTab() {
     <>
       <div className="work-panel-overview-status">
         <span>{t("panel.overview.statusLabel")}</span>
-        <strong>{t(`panel.overview.status.${status}`, { defaultValue: status })}</strong>
+        <strong>{pendingTeamReview ? t("team.review.status.pending") : t(`panel.overview.status.${status}`, { defaultValue: status })}</strong>
       </div>
       {proposals.length > 0 ? proposals.map((proposal) => (
         <div className="work-panel-overview-row" key={proposal.id}>
           <span className="work-panel-overview-row-label">{proposalLabel(proposal)}</span>
           <span className="work-panel-overview-row-detail">
-            {t(`panel.overview.status.${proposalStatus(proposal)}`, { defaultValue: proposalStatus(proposal) })}
+            {pendingTeamReview && proposal.id === checkpoint?.id && isActivePlanExecution(proposal)
+              ? t("team.review.status.pending")
+              : t(`panel.overview.status.${proposalStatus(proposal)}`, { defaultValue: proposalStatus(proposal) })}
           </span>
         </div>
       )) : (

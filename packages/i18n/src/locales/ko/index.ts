@@ -2054,7 +2054,7 @@ sklm: {
       coordinationError: "Coordination failed during {{stage}}: {{message}}",
       missingProvider: "사용할 수 없는 제공자 ({{id}})",
       missingModel: "사용할 수 없는 모델 ({{id}})",
-      status: { pending: "대기 중", confirmed: "확인됨", cancelled: "취소됨", interrupted: "중단됨" },
+      status: { pending: "팀 확인 대기 중", confirmed: "확인됨", cancelled: "취소됨", interrupted: "중단됨" },
       thinkingLevel: { off: "끄기", minimal: "최소", low: "낮음", medium: "보통", high: "높음", xhigh: "매우 높음", max: "최대" },
       coordinationStage: { member_creation: "팀원 생성", task_creation: "작업 생성", enqueue: "메시지 대기열 등록", delivery: "메시지 전달" },
     },

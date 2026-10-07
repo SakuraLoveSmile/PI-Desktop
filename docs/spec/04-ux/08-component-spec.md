@@ -4763,12 +4763,15 @@ actual experts and their findings remain visible. The existing final Plan
 approval card and Agent execution roster confirmation are preserved. Automatic
 launch audits are history, not user consent.
 
-A current active local Agent Team Lead with a new nonempty pending user-confirmed
-execution roster automatically opens the existing aggregate Team panel, even
+A current active local Team Lead in Agent mode or an active approved Plan/Goal
+execution with a new nonempty pending user-confirmed execution roster automatically opens the existing aggregate Team panel, even
 when Overview, a file, panorama or a closed work panel was selected. Automatic
 planning audits never display launch approval controls. Unrelated snapshot updates
-do not repeatedly steal focus; background, member, Plan and nonlocal sessions
-cannot open another session's panel.
+do not repeatedly steal focus; background, member, unapproved Plan/Goal research
+and nonlocal sessions cannot open another session's panel. The displayed contract
+mode remains Plan/Goal during approved execution; it is not the runtime mode.
+Both automatic reveal and the aggregate review card use the active execution
+checkpoint rather than requiring the displayed session mode to be Agent.
 
 The Team snapshot exposes a pending review only while its leadTurnId matches the
 current Host-owned strategy scope. A completed Lead turn can still await valid
@@ -4776,7 +4779,11 @@ confirmation; superseded pending reviews stay readable by ID but cannot reopen
 the current UI. Existing Team activity revisions refresh the shared reader.
 
 An approved Team Plan/Goal execution stays running while its execution roster
-awaits confirmation. The review UI must not imply that the execution already
+awaits confirmation. Transcript activity, the Goal progress capsule and Overview
+display waiting for team
+confirmation instead of processing/preparing/running, with a transcript action
+that reopens the existing roster review after navigating away. This does not
+clear the running execution or authorize experts. The review UI must not imply that the execution already
 completed or require a new user request to continue. Confirm resumes the same
 execution and Cancel interrupts it without a completed Goal report. Expert
 updates and Goal progress remain attached to the original approved execution.

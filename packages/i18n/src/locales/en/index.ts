@@ -2098,7 +2098,7 @@ sklm: {
       missingProvider: "Unavailable provider ({{id}})",
       missingModel: "Unavailable model ({{id}})",
       status: {
-        pending: "Pending",
+        pending: "Waiting for team confirmation",
         confirmed: "Confirmed",
         cancelled: "Cancelled",
         interrupted: "Interrupted",

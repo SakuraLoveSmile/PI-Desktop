@@ -17462,7 +17462,11 @@ a fresh expert roster review and integrate a real approved expert contribution.
   contract with Auto via the approval card. Let the model propose a nonempty
   execution roster and try to finish awaiting confirmation. Assert the original
   Host turn remains running, exactly one Goal report is pending with no completed
-  executionStatus, and no expert started. Confirm through the real Team button,
+  executionStatus, and no expert started. The displayed contract remains Goal;
+  the aggregate Team confirmation card opens automatically despite that mode.
+  Assert the Goal capsule shows waiting for team confirmation instead of preparing.
+  Navigate to Overview and assert waiting for team confirmation; use the
+  transcript review action to reopen the card. Confirm through the real Team button,
   hold the expert and verify GoalProgress updates remain effective for the same
   executionId/currentTurnId. Release the expert to Read the source, complete its
   task and send full verification content. Lead consumes the authenticated
