@@ -410,6 +410,10 @@ export function createPlanningFixture(projectPath) {
       assert.equal(admittedReports.length, 1, "authenticated supplementary mailbox report was duplicated or not delivered");
       assert.ok(admittedReports[0].content.includes(supplementaryReport), "admitted report lost its full content");
       assert.equal(await readFile(join(projectPath, completeProposal.artifact.relativePath), "utf8"), completeProposal.markdown, "Host plan artifact differs from research synthesis");
+      // Dispatches belong to an earlier research turn; read that history via
+      // the same minimap control the user uses before inspecting its cards.
+      await evaluate(`document.querySelector('.minimap-marker.history')?.click()`);
+      await waitFor(() => evaluate(`document.querySelectorAll('.team-dispatch-card').length >= 2`), "research dispatch history loaded");
       const timelineOrder = await evaluate(`(() => {
         const cards = [...document.querySelectorAll('.team-dispatch-card')];
         const turns = [...new Set(cards.map(card => card.closest('.assistant-turn')))];
