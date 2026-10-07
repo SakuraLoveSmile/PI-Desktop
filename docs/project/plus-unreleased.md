@@ -2,6 +2,10 @@
 
 Upstream v0.15.6 → v0.16.1 has been merged.
 
+- Standard Agent sessions with enabled subagents are prompted to delegate
+  substantial separable work first. Expert Team Leads are prompted to assign
+  separable work to experts while retaining the existing approval flow.
+
 - Expert Team work is easier to follow: queued prompts can be folded, team
   progress and a searchable compact task board show stable member identities,
   live activity refreshes from Host state, and panorama zoom survives updates.
