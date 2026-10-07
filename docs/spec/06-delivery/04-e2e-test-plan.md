@@ -9461,7 +9461,8 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 | E / Quality — Standard Agent delegate-first prompt and Task report convergence | E2E-DELEGATION-standard-delegates-to-subagents |
 | C / E / Quality — Mandatory Team delegation, expert-start gate and catalog isolation | E2E-TEAM-lead-delegates-to-experts, E2E-TEAM-forced-delegation |
 | C / Quality / Security — Automatic read-only Team planning | E2E-TEAM-approved-plan-research-and-execution, E2E-TEAM-automatic-plan-research |
-| C / Quality / Security — Team Plan inbox settlement | E2E-TEAM-plan-inbox-before-approval |
+| C / Quality / Security — Research task ownership and legacy recovery | E2E-TEAM-research-owner-required |
+| C / Quality / Security — Team Plan inbox settlement | E2E-TEAM-plan-inbox-before-approval, E2E-TEAM-wait-inbox-yield-and-live-overview |
 | C / E / Quality / Security — Approved Team Goal same-turn execution and cancellation | E2E-TEAM-approved-goal-same-turn-and-cancel |
 | C / Quality — Independent Team panorama/task/member tabs | E2E-TEAM-panorama-and-member-tabs |
 | C / Quality — Live dispatch card and single task target | E2E-TEAM-dispatch-card-live-status-and-joining |
@@ -17494,3 +17495,45 @@ a fresh expert roster review and integrate a real approved expert contribution.
 - **Status:** Required on the current candidate; record Task candidate, Base
   main, E2E suites, Result and Environment. Real-model behavior is NOT RUN.
   Historical candidate results do not prove this newly added journey.
+
+
+### E2E-TEAM-research-owner-required
+
+- Preconditions: isolated production Electron/Main/Host/sidecar, temporary
+  workspace and deterministic localhost SSE provider; no live profile or paid API.
+- Steps: declare two automatic Plan researchers; attempt `task_create` without
+  `ownerMemberName`, observe the actionable failure, then create explicitly owned
+  tasks, dispatch both researchers, read sources and submit structured results.
+- Expected: the rejected task is absent from the board; both owned tasks complete
+  and the Lead reaches Plan approval without waiting for unassigned work.
+  Host regression tests also cover Lead CAS recovery of legacy unassigned tasks,
+  rejection of researcher self-assignment and stale submission revisions, and
+  continued support for unassigned Agent backlog tasks.
+- Specs: [Host RPC planning](../03-runtime/06-host-rpc-protocol.md#expert-team-planning-local-host).
+- Acceptance: assignment, persistence, researcher permission and plan readiness.
+- Automation: `node scripts/e2e-team-planning.mjs`, Host planning/RPC regressions
+  and runtime Team tool tests.
+- Status: run on the refreshed request candidate; real-model behavior is NOT RUN.
+
+
+### E2E-TEAM-wait-inbox-yield-and-live-overview
+
+- Preconditions: isolated built Electron/Main/Host/sidecar, temporary workspace,
+  deterministic localhost provider and explicit worker/Lead gates; no live profile.
+- Steps: create owned research and keep Overview selected. Hold the Lead while
+  the expert reads a source, submits a structured result, and sends four distinct
+  full reports. Observe Overview completion before the Lead ends. Queue a user
+  follow-up after the four reports, then let the model call only wait_for_updates;
+  each intermediate report continuation also waits while other reports remain.
+- Expected: waiting automatically ends the ordinary Plan Lead turn without
+  error or approval. All four authenticated messages enter exactly once in FIFO
+  order, the final artifact preserves all content, exactly one plan is submitted,
+  and the ordinary user follow-up remains queued. Overview refreshes in place.
+  Approved Plan/Goal executions retain their original turn and execution binding.
+- Specs: 02-agent-runtime, 06-host-rpc-protocol and Expert Team ADR.
+- Acceptance: live Overview, mailbox lifecycle, authenticated provenance and
+  user-queue retention.
+- Automation: `node scripts/e2e-team-planning.mjs`, runtime wait/mixed-batch
+  regressions and renderer snapshot-hook behavioral checks;
+  `node scripts/e2e-team-approved-goal.mjs` protects approved execution.
+- Status: run on refreshed request candidate; paid/live model calls are NOT RUN.

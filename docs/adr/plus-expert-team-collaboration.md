@@ -338,6 +338,16 @@ SQL schema or ownership change. The separate approved-execution inbox below
 uses narrowly authorized internal RPCs and a distinct consumption ledger.
 Researchers no longer receive a mandatory duplicate completion-report prompt.
 
+The same normal mailbox yield also applies when an ordinary Plan Lead calls
+`wait_for_updates` with already pending inbound reports, or reports arrive
+while it waits. Relying on the model to submit or finish leaves the active turn
+holding its own FIFO closed. Runtime binds the yield to the current turn/epoch,
+ends even mixed tool batches, and retains pending steering. Each intermediate
+mailbox continuation can yield again; no report is discarded or treated as
+consumed by its queue ACK. Approved Plan/Goal execution remains in its original
+Host turn and uses the distinct execution-inbox path.
+
+
 ## Approved execution turn and inbox amendment (2026-10-07)
 
 A user-approved Team Plan/Goal execution remains in its original running Host

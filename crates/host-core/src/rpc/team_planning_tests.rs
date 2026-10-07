@@ -57,6 +57,40 @@ async fn planning_rpc_preserves_submission_retry_revision_and_execution_permissi
     }
     let denied=call("team.createTask",json!({"teamSessionId":lead,"callerSessionId":members[0]["memberSessionId"],"subject":"Forged task"})).await.unwrap_err();
     assert_eq!(denied.data.unwrap()["errorCode"], "TEAM_RESEARCH_READ_ONLY");
+    let revision = {
+        let st = state.lock().await;
+        crate::team::get_team(&st.db, lead)
+            .unwrap()
+            .unwrap()
+            .revision
+    };
+    for owner in [
+        None,
+        Some(("ownerSessionId", lead)),
+        Some(("ownerMemberName", "Lead")),
+    ] {
+        let mut params =
+            json!({"teamSessionId":lead,"callerSessionId":lead,"subject":"Unassigned research"});
+        if let Some((key, owner)) = owner {
+            params[key] = json!(owner);
+        }
+        let denied = call("team.createTask", params).await.unwrap_err();
+        assert_eq!(denied.data.unwrap()["errorCode"], "TEAM_RESEARCH_INVALID");
+        assert!(denied.message.contains("ownerMemberName"));
+    }
+    {
+        let st = state.lock().await;
+        assert!(crate::team::list_team_tasks(&st.db, lead)
+            .unwrap()
+            .is_empty());
+        assert_eq!(
+            crate::team::get_team(&st.db, lead)
+                .unwrap()
+                .unwrap()
+                .revision,
+            revision
+        );
+    }
     let mut tasks = vec![];
     for member in members {
         tasks.push(call("team.createTask",json!({"teamSessionId":lead,"callerSessionId":lead,"ownerMemberName":member["name"],"subject":"Research source"})).await.unwrap());

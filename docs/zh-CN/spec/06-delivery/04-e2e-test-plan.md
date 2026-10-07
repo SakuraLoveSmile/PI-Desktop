@@ -5550,7 +5550,8 @@ eleven-tool-round desktop paths are verified by
 | E / 质量 — 标准 Agent 优先委派提示与 Task 报告汇总 | E2E-DELEGATION-standard-delegates-to-subagents |
 | C / E / 质量 — 专家团强制委派、专家启动门禁与工具隔离 | E2E-TEAM-lead-delegates-to-experts, E2E-TEAM-forced-delegation |
 | C / Quality / Security — 自动只读专家团规划 | E2E-TEAM-approved-plan-research-and-execution, E2E-TEAM-automatic-plan-research |
-| C / Quality / Security — 专家团规划收件箱收敛 | E2E-TEAM-plan-inbox-before-approval |
+| C / Quality / Security — 研究任务归属与历史补派 | E2E-TEAM-research-owner-required |
+| C / Quality / Security — 专家团规划收件箱收敛 | E2E-TEAM-plan-inbox-before-approval, E2E-TEAM-wait-inbox-yield-and-live-overview |
 | C / E / Quality / Security — 已批准专家团 Goal 同回合执行与取消 | E2E-TEAM-approved-goal-same-turn-and-cancel |
 | C / Quality — 独立 Team 全景图／任务／成员标签页 | E2E-TEAM-panorama-and-member-tabs |
 | C / Quality — 实时派发卡片与单一任务目标 | E2E-TEAM-dispatch-card-live-status-and-joining |
@@ -9714,3 +9715,24 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **规格：** 02-agent-runtime、03-tools-and-permissions、06-host-rpc-protocol、08-component-spec 及 Expert Team ADR。
 - **自动化：** `node scripts/e2e-team-approved-goal.mjs`（复用隔离 Team fixture，PI_E2E_TEAM_APPROVED_GOAL=1）。
 - **状态：** 当前候选必跑，记录 Task candidate／Base main／E2E suites／Result／Environment。真实模型行为 NOT RUN；不得用历史候选结果代替本次新增流程证据。
+
+
+### E2E-TEAM-research-owner-required
+
+- **前提：** 隔离生产 Electron/Main/Host/sidecar、临时工作区与确定性本机 provider，不使用真实用户数据或付费 API。
+- **步骤：** 自动声明两位 Plan 研究员；遗漏 ownerMemberName 创建任务，确认明确失败；补上负责人后创建任务、派发、读取源码并提交结构化结果。
+- **预期：** 被拒绝的任务不进入任务板；两项研究完成，主控进入方案审批，不再等待未分配任务。Host 回归同时证明历史未分配任务能由主控按当前版本补派，研究员不能自行认领，旧版本提交被拒绝，Agent 待分配任务仍受支持。
+- **规格：** 06-host-rpc-protocol 的专家团规划契约。
+- **验收：** 任务归属、持久化、研究权限与方案就绪。
+- **自动化：** node scripts/e2e-team-planning.mjs、Host 规划/RPC 回归及 runtime Team 工具测试。
+- **状态：** 在最新请求候选运行；真实模型行为未验证。
+
+### E2E-TEAM-wait-inbox-yield-and-live-overview
+
+- **前提：** 隔离已构建 Electron/Main/Host/sidecar、临时工作区、本机 provider 与显式研究员/主控同步点，不访问真实 profile。
+- **步骤：** 创建有负责人的研究任务并保持概要打开。主控暂停时，研究员读取源码、提交结构化结果并发送四份不同的完整报告；在主控结束前观察概要完成数更新。把用户后续请求排在报告之后，再让模型只调用 wait_for_updates；中间消息续接回合在仍有报告时继续等待。
+- **预期：** 普通 Plan 主控自动正常让出回合，不产生错误或提前审批。四份认证消息按 FIFO 各消费一次，最终方案保留全部内容且只提交一次；用户请求继续排队。概要原地刷新。已批准的 Plan/Goal 保持原执行回合和绑定。
+- **规格：** 02-agent-runtime、06-host-rpc-protocol 和 Expert Team ADR。
+- **验收：** 实时概要、收件箱生命周期、认证来源与用户队列保留。
+- **自动化：** node scripts/e2e-team-planning.mjs、runtime 等待/混合批次回归、renderer hook 行为检查；node scripts/e2e-team-approved-goal.mjs 保护获批执行。
+- **状态：** 在最新请求候选运行，不调用真实或付费模型。

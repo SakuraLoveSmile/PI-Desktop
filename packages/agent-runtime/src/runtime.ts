@@ -1848,6 +1848,8 @@ export class DesktopAgentRuntime {
     message?: string;
   };
   private terminatingToolCalls = new Set<string>();
+  /** A scoped normal yield, including batches with other non-terminating tools. */
+  private pendingTeamInboxYield?: () => boolean;
   private fullEntries: MessageEntry[];
   private executionContextStartIndex: number | null = null;
   private readonly systemJournal = new SystemTranscriptJournal();
@@ -2151,6 +2153,9 @@ export class DesktopAgentRuntime {
       // queued renderer prompt ends a completed turn at the next boundary,
       // without treating an error or abort as a graceful stop.
       finishTurn: async ({ message }) => {
+        if (this.pendingTeamInboxYield?.()) {
+          return { action: "end" };
+        }
         if (this.pendingSubmissionOutcome?.turnEpoch === this.turnEpoch) {
           return { action: "end" };
         }
@@ -2386,6 +2391,9 @@ export class DesktopAgentRuntime {
     const fromExtensions = await this.extensionToolResult(context, own);
     if (!fromExtensions) return own;
     const merged: AfterToolCallResult = { ...(own ?? {}), ...fromExtensions };
+    if (context.toolCall.name === "wait_for_updates" && own?.terminate) {
+      merged.terminate = true;
+    }
     if (this.isSubmissionTool(context.toolCall.name)) {
       if (own?.isError || context.isError) {
         merged.isError = true;
@@ -3768,8 +3776,24 @@ export class DesktopAgentRuntime {
           planningId: this.teamContext?.planningId,
           roundId: this.teamContext?.roundId,
           isLead: this.teamContext?.isLead ?? false,
+          mode: this.mode,
           host: this.host,
           getTurnId: () => this.turnId, approvedExecution: () => this.autonomousExecution,
+          captureInboxYield: () => {
+            const turnId = this.turnId;
+            const epoch = this.turnEpoch;
+            const team = this.teamContext;
+            const current = () => Boolean(turnId) && this.turnId === turnId && this.turnEpoch === epoch &&
+              this.teamContext === team && team?.isLead === true && this.executionProfile === "team" &&
+              this.mode === "plan" && !this.autonomousExecution && !this.disposed && !this.runCancelled;
+            if (!current()) return undefined;
+            return toolCallId => {
+              if (!current()) return false;
+              this.terminatingToolCalls.add(toolCallId);
+              this.pendingTeamInboxYield = current;
+              return true;
+            };
+          },
           abortActiveTurn: this.teamContext?.abortActiveTurn,
         })
       : [];
@@ -6150,6 +6174,7 @@ export class DesktopAgentRuntime {
     this.mutationRecoveryGraces.clear();
     this.pendingMutationTermination = undefined;
     this.pendingSubmissionOutcome = undefined;
+    this.pendingTeamInboxYield = undefined;
     this.terminatingToolCalls.clear();
     this.turnHadError = false;
   }
@@ -8286,6 +8311,14 @@ export class DesktopAgentRuntime {
         });
         break;
       case "agent_end": {
+        if (this.pendingTeamInboxYield?.()) {
+          this.pendingTeamInboxYield = undefined;
+          this.acceptingSteering = false;
+          this.retainPendingSteering();
+          this.clearAgentActivity();
+          this.emit({ type: "agent_end", messageIds: [] });
+          break;
+        }
         if (this.pendingSubmissionOutcome?.turnEpoch === this.turnEpoch) {
           const outcome = this.pendingSubmissionOutcome;
           this.pendingSubmissionOutcome = undefined;
@@ -9065,6 +9098,7 @@ export class DesktopAgentRuntime {
     this.mutationRecoveryGraces.clear();
     this.pendingMutationTermination = undefined;
     this.pendingSubmissionOutcome = undefined;
+    this.pendingTeamInboxYield = undefined;
     this.terminatingToolCalls.clear();
     this.delegateToolCalls.clear();
     this.appendedDelegationRowIds.clear();
