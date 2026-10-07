@@ -216,9 +216,7 @@ fn confirmation_reuse_rejects_another_pending_review_without_mutating_state() {
 
     let error =
         confirm_launch_review(&db, &lead_id, &review.review_id, review.revision).unwrap_err();
-    assert!(error
-        .to_string()
-        .contains("TEAM_MEMBER_MODEL_CHANGE_BLOCKED"));
+    assert!(error.to_string().contains("TEAM_REVIEW_REVISION_CONFLICT"));
     let after = sessions::get_session(&db, &member.member_session_id)
         .unwrap()
         .unwrap()

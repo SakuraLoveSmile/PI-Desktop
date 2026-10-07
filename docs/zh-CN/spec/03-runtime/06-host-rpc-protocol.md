@@ -293,6 +293,8 @@ Host 无通知 API 时仍每 1 s 复查。基线失败返回工具错误；复�
   变化都不会单独否定已持久化的回执。
 - `team.pause/resume({ teamSessionId, callerSessionId })` 仅允许 Lead 操作。Electron Main 会
   hold/resume 对应的 Agent Host 队列，并在恢复后排空待投递消息。
+  It then kicks resumed session queues so queued user work can continue without
+  pending Team mail; other lifecycle holds and active-turn admission remain intact.
 - `team.createTask` 和 `team.updateTask` 必须携带 `callerSessionId`；Host 在修改前校验成员
   身份、仅 Lead 可重新分配任务、任务所有权、CAS 修订版本和依赖约束。提供负责人时，成员
   会话 ID 和成员名称作为一组解析；Lead 可以重新分配或清除任务负责人。
@@ -1108,10 +1110,10 @@ schedule，Manual 转 Hourly 继续使用现有默认间隔行为。
 
 ### 专家团规划补充
 
-方案模式的 Lead 保留标准规划权限和协调工具。批准专家名单时，Host 在同一事务中保存研究轮次和已批准成员身份；Lead 不会获得研究成员身份。
-新增 team.getPlanning 返回 planningId、teamSessionId、roundId、phase、workPurpose、reviewId、totalExpectedTasks、completedResearchTasks、openQuestionsCount、isReadyForPlanSubmission、proposalId、results 与 updatedAt；没有轮次时返回 null。team_status 和 task_get 包含完整研究投影。
+方案模式的 Lead 保留标准规划权限和协调工具。Host 自动启动只读专家，并在同一事务中保存研究轮次和研究成员身份，无需用户确认研究名单；Lead 不会获得研究成员身份。最终方案仍由用户审批。
+新增 team.getPlanning 返回 planningId、teamSessionId、roundId、phase、workPurpose、reviewId、totalExpectedTasks、completedResearchTasks、openQuestionsCount、isReadyForPlanSubmission、pendingMessagesCount、proposalId、results 与 updatedAt；没有轮次时返回 null。team_status 和 task_get 包含完整研究投影。
 team.submitResearchResult 绑定可信运行时身份和轮次，接受 taskId、expectedRevision 及 structuredResult；后者保存 summary、findings、risks、recommendations、verifiedSources。Host 校验批准身份、当前轮次、任务归属、删除状态、依赖和修订号，原子保存结果、完成任务并推进 Team revision。同内容重试幂等；普通 task_update 不能代替研究提交。单结果最多 32 KiB、整轮最多 128 KiB；各列表最多 32 项、每项 2,000 字节，摘要最多 4,000 字节。
-Lead 专用 openPlanningQuestion / closePlanningQuestion 使用 teamSessionId、callerSessionId、roundId 和 questionId；asktool 的取消、停止和进程恢复清除待回答阻塞。全部任务与问题完成后才能提交，lead_only 允许零研究任务。拒绝保留研究供修订；批准或定时执行沿用原有方案转换。关闭规划不会自动赋予研究成员写权限，必须重新批准 Agent 执行名单。
+Lead 专用 openPlanningQuestion / closePlanningQuestion 使用 teamSessionId、callerSessionId、roundId 和 questionId；asktool 的取消、停止和进程恢复清除待回答阻塞。全部任务与问题完成后才能提交，专家团规划要求至少一个获批专家研究任务。拒绝保留研究供修订；批准或定时执行沿用原有方案转换。关闭规划不会自动赋予研究成员写权限，必须重新批准 Agent 执行名单。
 侧车仅开放必要规划查询、结果和问题 RPC，不开放任意创建轮次或可信审批修改。父进程在本地工具拦截前调用内部 tools.authorizeLocal，Rust tools.execute 同样依据持久身份校验。Team 邮箱允许同团规划协作，插件 SessionTask 仍限 Agent。
 
 方案中断或到期后保留研究并恢复汇总，不重放任务。解散专家团在脱离事务内清理规划/成员用途 KV；研究成员保留转写、模型和权限选择，转为独立标准 Plan 会话；普通执行成员仍沿用原有独立 Agent 语义。
@@ -1119,3 +1121,41 @@ Lead 专用 openPlanningQuestion / closePlanningQuestion 使用 teamSessionId、
 批准研究任务时同时持久化成员会话模式为 Plan，旧运行时忽略新用途字段也不会获得普通 Agent 写工具；只有重新批准 Agent 执行分配才能恢复成员 Agent 模式。正常执行成员和标准 Plan/Goal 不变。
 
 收到结果不等于研究回合结束。就绪状态和 SubmitPlan 还要求全部已批准研究成员的运行回合结束，允许 Lead 自己的汇总回合仍在运行；现有 Team 活动 revision 在研究结算后唤醒 wait_for_updates。
+
+### 专家团强制委派
+
+专家团只接受至少一位专家的 delegate，持久化前拒绝所有 lead_only；旧单独执行记录、空名单和旧批准不能确认或赋予 authority。Agent 通过可信 team.confirmLaunchReview 启动执行专家；Plan 使用 automatic_plan 自动启动只读研究。模型代理不能确认、取消或编辑审批。
+
+team.authorizeLeadTool({teamSessionId,callerSessionId,toolName}) 在运行时原生工具前核验当前 Host 身份与当前回合启动策略，返回 {authorized:true} 或结构化拒绝。审批前允许只读发现与澄清；获批协调允许创建任务及派遣当前专家。实质 Lead 操作要求当前记录派遣的专家邮箱回合已启动或成功结束，空闲成员和排队消息不算参与。失败、取消回合与旧派遣不能复用。该谓词不证明任务归属或完成贡献；Plan 提交另需归属明确的任务和完整结构化研究。
+
+内置／本地工具及直接 Team 修改各自检查这些规则。新用户回合需按模式重新委派，真实获批邮箱续接继承对应 scope。Goal 协商保留现有权限，Agent 执行恢复 Team 门禁，不需要数据库迁移。
+
+### 专家团规划启动策略
+
+TeamLaunchReview.launchPolicy?: "automatic_plan" | "user_confirmed" 由 Host 拥有，缺失的旧值表示 user_confirmed。Plan 的 team.declareStrategy 返回已建立的研究成员及 confirmed 自动启动审计，不创建待审批名单或合成确认消息。研究只读，SubmitPlan 前必须获得完整结果；修订和重试也自动启动。最终方案与后续 Agent 执行名单仍需用户确认。confirmLaunchReview 拒绝自动 Plan 审计，自动研究不能授权 Agent 执行。
+
+自动 Plan fork 上下文使用 Host 拥有的不可变快照，包含当前已持久化用户请求及之前已结算历史，排除正在写入的 assistant/tool 行。普通运行中会话的 fork 限制不变，成员来源、只读用途和失败回滚仍校验。
+
+Team 快照只在 leadTurnId 匹配当前 Host 策略 scope 时暴露待审批名单。已完成 Lead 回合仍可等待有效确认；旧名单可按 ID 读取，但不能重开当前 UI。现有 Team 活动 revision 刷新共用读模型。
+
+### 专家团 Plan 收件箱提交门禁
+
+可选新增 TeamPlanningProjection.pendingMessagesCount 只统计目标为 Lead、status=queued 且没有绑定回合的 Team-origin message。入队回执和 ACK 只证明持久接收，不证明消费。用户排队请求、其他来源／目标、终态／取消行、已绑定回合消息不计入。消息不得按文字相似性丢弃。
+
+研究已就绪但收件箱非空时，plans.submit 返回 {status:"deferred",reason:"team_messages_pending",pendingMessagesCount:N}，不创建产物、提案、版本或 plans.changed 审批通知。运行时正常结束当前 Lead 回合，不显示错误或等待审批；既有 FIFO 续接提供完整可信消息。最终就绪时返回既有 {status:"pending",proposal}。
+
+最终检查与产物／提案发布共用 IMMEDIATE SQLite 事务。已有提交重试保留身份，缺失研究、未结束问题／专家回合及普通权限／取消错误维持现有语义。最终研究就绪也要求未消费收件箱为空。标准 Plan/Goal 不使用此 Team 专用让出流程。
+
+结构化研究结果本身即为报告。成员提交后可结束，无需重复发送完成消息；send_message 仍可发送有意义的补充或澄清。
+
+### 已批准专家团执行回合绑定及收件箱
+
+已批准 Team Plan/Goal 执行在原始运行中 Host 回合内等待执行名单确认及专家结算，不提前发出最终 agent_end、完成批准记录或结束 Goal token。确认继续同一批准契约；取消中断原执行，不发布完成 Goal 报告或重放专家／模型工作。
+
+可信 dispatcher 调用 plans.bindExecutionTurn({executionId,sessionId,turnId})，要求 approved/running Plan 及该会话精确的 running turn；Team 另需当前 Lead／review scope。Host 在 plan-execution-turn-v1 KV 以 executionId 保存不可变 {sessionId,turnId}，相同重试幂等，失效绑定返回 PLAN_EXECUTION_STALE，变更绑定返回 PLAN_EXECUTION_CONFLICT。此 RPC 不对模型开放，侧车反向代理不允许调用。Goal 保留 goal_reports 的 executionId／turn_id 精确证明；仍在运行的 approval 不能授权后续普通回合。不改变 schema 或进程所有权。
+
+team.getLeadExecutionState 和 team.readExecutionInbox 接受 {teamSessionId,callerSessionId,expectedTurnId}，只允许当前 Lead，要求当前策略／review scope 和精确批准执行回合证明；是窄内部模型代理 RPC，不是新增模型工具。state 返回 {active,turnId,reviewStatus}，旧执行 inactive。inbox 返回 {active,turnId,messages}，旧消费返回 TEAM_PLANNING_STALE，名单确认前没有可消费消息。仅消费可信当前名单确认及当前获批派遣专家的结果，以持久 source-turn／dispatch 身份校验。
+
+消费在同一事务将 eligible queued/unbound 消息设为 completed、移除对应 durable turn_queue 回执，并在独立 team-execution-inbox-v1 ledger 按 {teamSessionId,expectedTurnId} 保存消息 ID。不得设置 message.turn_id 或把原用户执行变成邮箱回合。team.executionInboxConsumed 携带 {teamSessionId,turnId,messageIds} 通知 Main，仅移除相应实时队列项，保留无关用户请求。同一执行重复读取可返回 ledger 消息；wait_for_updates 在所属运行回合抑制重复正文，恢复仍可获得完整结果。
+
+专家参与仍只授权实质 Lead 工具。获批执行的 TeamFinalAnswer 另拒绝尚 queued/running 的当前记录派遣或未消费的可信当前结果。结算门禁不把专家启动变成任务归属证明，也不要求当前派遣 scope 之外结果。Plan 研究的结构化结果／收件箱提交门禁保持独立；Goal 进度及唯一完成报告绑定原始执行身份。

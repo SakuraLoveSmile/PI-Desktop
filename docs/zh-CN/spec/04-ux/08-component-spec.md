@@ -3156,3 +3156,15 @@ default nor provider configuration. OAuth accounts remain in their separate sect
 
 项目删除说明和插件弹窗标题、安装结果中的长名称也在现有宽度内换行。
 项目指令、项目记忆和 OAuth 弹窗维持已有的边界处理。
+
+### 专家团强制委派行为
+
+专家团始终提出并委派专家执行，使用现有执行名单确认 UI。不提供 lead_only 选择；旧单独执行记录不赋予 authority。standard 继续使用普通 Agent/subagent 路径。
+
+Team Plan 自动运行只读研究，不显示待审批研究名单，也不在文字人员提案处停止。进度、实际专家和研究结果保持可见。最终 Plan 批准卡和 Agent 执行名单确认保留；自动启动审计是历史记录，不是用户同意。
+
+当前活动的本地 Agent Team Lead 产生新非空 user_confirmed 待审批执行名单时，自动打开已有的汇总 Team 面板，即使之前选择了概览、文件、全景或关闭工作面板。自动规划审计不显示启动审批控件。不相关快照更新不会反复抢焦点；后台、成员、Plan 和非本地会话不能打开其他会话面板。
+
+Team 快照只在 leadTurnId 匹配当前 Host 策略 scope 时暴露待审批名单。已完成的 Lead 回合仍可等待有效确认；旧名单按 ID 保持可读，但不能重开当前 UI。现有 Team 活动 revision 刷新共用读模型。
+
+已批准 Team Plan/Goal 执行在等待执行名单确认期间保持运行；审批 UI 不得暗示执行已完成，也不需要新用户请求才能继续。确认恢复同一执行，取消中断原执行且不显示完成 Goal 报告。专家更新和 Goal 进度仍绑定原始获批执行。

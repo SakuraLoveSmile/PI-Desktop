@@ -197,6 +197,12 @@ pub struct TeamLaunchReview {
     pub lead_turn_id: String,
     pub revision: i64,
     pub status: String, // "pending" | "confirmed" | "cancelled" | "interrupted"
+    /// Host-owned authorization source; missing legacy records require user consent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub launch_policy: Option<String>,
+    /// Missing in legacy reviews means delegate.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub strategy: Option<String>,
     pub members: Vec<TeamLaunchReviewMember>,
 }
 

@@ -382,9 +382,10 @@ export function detectWriteScopeOverlaps(
 /**
  * The coordination decision a Lead records for one of its turns.
  *
- * `lead_only` means the work really is indivisible; `delegate` means experts
- * are needed, and the user must confirm the proposed roster and routes before
- * any expert session, model call or dispatch starts.
+ * Expert Team accepts only `delegate` with at least one reviewed expert.
+ * `lead_only` remains readable for historical records but cannot authorize new
+ * Team work. Solo work requires the standard execution profile. Approval alone
+ * does not prove participation: an approved expert must actually start work.
  */
 export type TeamStrategyKind = "lead_only" | "delegate";
 
@@ -435,10 +436,11 @@ export type TeamLaunchReviewMember = Omit<TeamProposedMember, "contextKind" | "s
 };
 
 /**
- * Host-owned editable draft of one proposed dispatch batch.
+ * Host-owned proposal for one Team strategy scope.
  *
- * The user edits model selections and confirms it; only then may members be
- * created and work be enqueued. Persisted per Lead turn, never as a member.
+ * Plan research launches automatically; Agent execution requires trusted user
+ * confirmation. Confirmed automatic research is not user consent and cannot
+ * authorize Agent execution. Actual expert participation remains required.
  */
 export type TeamLaunchReview = {
   schemaVersion: typeof TEAM_LAUNCH_REVIEW_SCHEMA_VERSION;
@@ -447,6 +449,10 @@ export type TeamLaunchReview = {
   leadTurnId: string;
   revision: number;
   status: TeamLaunchReviewStatus;
+  /** Host-owned policy. Missing legacy records require user confirmation. */
+  launchPolicy?: "automatic_plan" | "user_confirmed";
+  /** Missing in legacy reviews means delegate. Historical solo reviews remain readable. */
+  strategy?: TeamStrategyKind;
   members: TeamLaunchReviewMember[];
 };
 
@@ -491,10 +497,12 @@ export type TeamExecutionDecision = {
   coordinationError?: TeamCoordinationError;
 };
 
-/** Tool input for the Lead-only declaration; the runtime binds identity. */
-export type DeclareTeamStrategyArgs =
-  | { strategy: "lead_only"; reason: string }
-  | { strategy: "delegate"; reason: string; members: TeamProposedMember[] };
+/** Forced expert delegation input; the runtime binds identity. */
+export type DeclareTeamStrategyArgs = {
+  strategy: "delegate";
+  reason: string;
+  members: TeamProposedMember[];
+};
 
 export type TeamWorkPurpose = "execute" | "plan_research";
 export type TeamRuntimeContextProjection = {
@@ -532,6 +540,7 @@ export type TeamPlanningProjection = {
   totalExpectedTasks: number;
   completedResearchTasks: number;
   openQuestionsCount: number;
+  pendingMessagesCount?: number;
   isReadyForPlanSubmission: boolean;
   proposalId: string | null;
   results: TeamResearchResult[];

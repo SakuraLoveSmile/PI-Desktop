@@ -228,3 +228,12 @@ export type PlanResolutionResult = {
   targetPermissionMode?: GlobalPermissionMode;
   execution?: PlanExecution;
 };
+
+/** Normal Team Plan yield; no approval or artifact exists until inbox consumption. */
+export type PlanSubmitResult =
+  | { status: "pending"; proposal: PlanProposal }
+  | {
+      status: "deferred";
+      reason: "team_messages_pending";
+      pendingMessagesCount: number;
+    };

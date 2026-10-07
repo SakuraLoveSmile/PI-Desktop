@@ -175,20 +175,22 @@ pub struct CreateMemberParams<'a> {
 }
 
 pub fn create_team_member(db: &Database, params: CreateMemberParams<'_>) -> Result<TeamMember> {
-    create_team_member_impl(db, params, true)
+    create_team_member_impl(db, params, true, None)
 }
 
 pub(super) fn create_approved_team_member(
     db: &Database,
     params: CreateMemberParams<'_>,
+    automatic_plan_turn: Option<&str>,
 ) -> Result<TeamMember> {
-    create_team_member_impl(db, params, false)
+    create_team_member_impl(db, params, false, automatic_plan_turn)
 }
 
 fn create_team_member_impl(
     db: &Database,
     params: CreateMemberParams<'_>,
     require_approval: bool,
+    automatic_plan_turn: Option<&str>,
 ) -> Result<TeamMember> {
     let CreateMemberParams {
         team_session_id,
@@ -254,12 +256,12 @@ fn create_team_member_impl(
     // 5. Create or fork member session
     let now = now_ms();
     let member_session_id = if context_kind == "fork" {
-        let fork_res = sessions::fork_session_through(
-            db,
-            team_session_id,
-            Some(&format!("{name} ({team_session_id})")),
-            None,
-        )?;
+        let fork_title = format!("{name} ({team_session_id})");
+        let fork_res = if let Some(turn) = automatic_plan_turn {
+            sessions::fork_team_plan_research_session(db, team_session_id, Some(&fork_title), turn)?
+        } else {
+            sessions::fork_session_through(db, team_session_id, Some(&fork_title), None)?
+        };
         match fork_res {
             ForkSessionResult::Created(detail) => detail.summary.id,
             ForkSessionResult::Busy => return Err(anyhow!("TEAM_BUSY: lead session is busy")),

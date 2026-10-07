@@ -312,6 +312,39 @@ describe("wait_for_updates", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it.each(["abort", "deadline"])("retains replayable inbox results after a late %s response", async (ending) => {
+    const h = harness();
+    const blocked = deferred<unknown>();
+    const messages = [{ id: "mail-1", content: "Verified expert result" }];
+    h.setReader(async () => {
+      expect(h.listeners.size).toBe(1);
+      return blocked.promise;
+    });
+    const tool = createWaitForUpdatesTool({
+      teamSessionId: "team-1", callerSessionId: "member-1", host: h.host,
+      getTurnId: () => "turn-1", approvedExecution: () => true,
+    });
+    const controller = new AbortController();
+    const pending = tool.execute("first", { timeoutSeconds: 1 }, controller.signal);
+    expect(h.listeners.size).toBe(1);
+    if (ending === "abort") {
+      controller.abort();
+      expect((await pending).details).toEqual({ updated: false, reason: "aborted" });
+    } else {
+      await vi.advanceTimersByTimeAsync(1000);
+      expect((await pending).details).toEqual({ error: "Timed out reading team update baseline" });
+    }
+    blocked.resolve({ turnId: "turn-1", messages });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.listeners.size).toBe(0);
+    h.setReader(async () => ({ turnId: "turn-1", messages }));
+    expect((await tool.execute("retry", {})).details).toEqual({
+      updated: true, reason: "execution_inbox", messages,
+    });
+    expect(h.listeners.size).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it.each(["team.getBoard", "team.listMessages"])("cleans up after a failed %s baseline", async (failure) => {
     const h = harness();
     h.setReader(async (method) => {

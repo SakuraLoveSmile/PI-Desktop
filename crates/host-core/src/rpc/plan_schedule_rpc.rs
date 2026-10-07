@@ -46,6 +46,24 @@ async fn handle_with_clock(
     now_ms: impl Fn() -> i64,
 ) -> Result<Value, JsonRpcError> {
     match method {
+        "plans.bindExecutionTurn" => {
+            let required = |key: &str| {
+                params
+                    .get(key)
+                    .and_then(Value::as_str)
+                    .filter(|value| !value.trim().is_empty())
+                    .ok_or_else(|| rpc_err(1002, format!("{key} required"), "INVALID_PARAMS"))
+            };
+            let st = state.lock().await;
+            plans::bind_execution_turn(
+                &st.db,
+                required("executionId")?,
+                required("sessionId")?,
+                required("turnId")?,
+            )
+            .map_err(plan_rpc_err)?;
+            Ok(json!({ "ok": true }))
+        }
         "plans.markMissedSchedules" => {
             let (proposal_ids, proposals) = {
                 let st = state.lock().await;

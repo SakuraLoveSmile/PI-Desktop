@@ -54,7 +54,7 @@ pub struct DeclareStrategyParams<'a> {
     pub team_session_id: &'a str,
     pub caller_session_id: &'a str,
     pub lead_turn_id: &'a str,
-    pub strategy: &'a str, // "lead_only" | "delegate"
+    pub strategy: &'a str, // new declarations must use "delegate"
     pub reason: &'a str,
     pub members: Option<Vec<TeamProposedMember>>,
 }
@@ -80,10 +80,8 @@ pub fn declare_team_strategy(
 
     validate_team_lead(db, team_session_id)?;
 
-    if strategy != "lead_only" && strategy != "delegate" {
-        return Err(anyhow!(
-            "INVALID_PARAMS: strategy must be 'lead_only' or 'delegate'"
-        ));
+    if strategy != "delegate" {
+        return Err(anyhow!("TEAM_APPROVAL_REQUIRED: Expert Team requires delegate with at least one expert; switch to standard for solo work"));
     }
     if lead_turn_id.trim().is_empty() {
         return Err(anyhow!("INVALID_PARAMS: leadTurnId must not be empty"));
@@ -99,6 +97,7 @@ pub fn declare_team_strategy(
         "members": &members,
     });
 
+    let automatic_plan = sessions::session_mode(db, team_session_id)?.as_deref() == Some("plan");
     let decision_key = format!("{}:{}", team_session_id, lead_turn_id);
     let input_key = format!("{}:{}:input", team_session_id, lead_turn_id);
     let existing_decision_raw = db.kv_get(TEAM_EXECUTION_DECISION_NS, &decision_key)?;
@@ -118,6 +117,40 @@ pub fn declare_team_strategy(
             } else {
                 None
             };
+            if automatic_plan {
+                if let Some(review) = existing_review.as_ref().filter(|r| r.status == "pending") {
+                    super::authority::validate_review_scope(db, team_session_id, lead_turn_id)?;
+                    let active: bool = db.conn().query_row("SELECT EXISTS(SELECT 1 FROM turns WHERE id=?1 AND session_id=?2 AND status='running')", params![lead_turn_id, team_session_id], |row| row.get(0))?;
+                    if !active {
+                        return Err(anyhow!("TEAM_TURN_INVALID: automatic planning retry requires an active Lead turn"));
+                    }
+                    let tx = db.conn().unchecked_transaction()?;
+                    retire_obsolete_pending_reviews(db, &tx, team_session_id, lead_turn_id)?;
+                    let mut automatic = review.clone();
+                    automatic.launch_policy = Some("automatic_plan".into());
+                    let value = serde_json::to_value(&automatic)?;
+                    kv_set_tx(
+                        &tx,
+                        TEAM_LAUNCH_REVIEW_NS,
+                        &format!("{team_session_id}:{}", review.review_id),
+                        &value,
+                    )?;
+                    kv_set_tx(&tx, TEAM_LAUNCH_REVIEW_NS, &review.review_id, &value)?;
+                    let (review, decision) = materialize_launch_review(
+                        db,
+                        team_session_id,
+                        &review.review_id,
+                        review.revision,
+                        true,
+                        Some(&tx),
+                    )?;
+                    tx.commit()?;
+                    for member in &decision.member_session_ids {
+                        sessions::commit_team_fork_staging_marker(db, member);
+                    }
+                    return Ok((decision, Some(review)));
+                }
+            }
             return Ok((existing, existing_review));
         } else {
             return Err(anyhow!(
@@ -140,57 +173,16 @@ pub fn declare_team_strategy(
         ));
     }
 
-    if strategy == "lead_only" {
-        let decision = TeamExecutionDecision {
-            schema_version: TEAM_EXECUTION_DECISION_SCHEMA_VERSION,
-            team_session_id: team_session_id.to_string(),
-            lead_turn_id: lead_turn_id.to_string(),
-            strategy: Some("lead_only".to_string()),
-            reason: Some(bounded_reason.clone()),
-            updated_at: now_iso(),
-            task_ids: vec![],
-            member_session_ids: vec![],
-            message_ids: vec![],
-            review_ids: None,
-            coordination_error: None,
-        };
-
-        let tx = db.conn().unchecked_transaction()?;
-        kv_set_tx(
-            &tx,
-            TEAM_EXECUTION_DECISION_NS,
-            &decision_key,
-            &serde_json::to_value(&decision)?,
-        )?;
-        kv_set_tx(
-            &tx,
-            TEAM_EXECUTION_DECISION_NS,
-            &input_key,
-            &requested_input,
-        )?;
-        kv_set_tx(
-            &tx,
-            TEAM_EXECUTION_DECISION_NS,
-            &format!("{team_session_id}:latest"),
-            &json!(lead_turn_id),
-        )?;
-        super::planning::start(db, team_session_id, "lead_only", None, vec![])?;
-        bump_team_revision_tx(&tx, team_session_id)?;
-        tx.commit()?;
-
-        return Ok((decision, None));
-    }
-
-    // strategy == "delegate"
+    // Execution waits for user consent; Plan research is launched by the Host.
+    super::authority::reject_approved_continuation(db, team_session_id, lead_turn_id)?;
     let lead_summary = sessions::get_session(db, team_session_id)?
         .ok_or_else(|| anyhow!("TEAM_NOT_FOUND: lead session not found"))?
         .summary;
-    let (default_provider_id, default_model_id) = default_member_route(db, team_session_id)?;
     let default_thinking_level = lead_summary.thinking_level;
     let proposed_members = members.unwrap_or_default();
     if proposed_members.is_empty() {
         return Err(anyhow!(
-            "INVALID_PARAMS: delegate strategy requires at least one proposed member"
+            "INVALID_PARAMS: Expert Team requires delegate with at least one expert; switch to standard for solo work"
         ));
     }
     if proposed_members.len() > MAX_TEAM_MEMBERS {
@@ -203,6 +195,7 @@ pub fn declare_team_strategy(
     let mut review_members = Vec::new();
 
     for proposed in proposed_members {
+        let (default_provider_id, default_model_id) = default_member_route(db, team_session_id)?;
         validate_member_name(&proposed.name)?;
         let mut canonical_name = proposed.name.clone();
         if let Some(member_sid) = proposed.member_session_id.as_deref() {
@@ -279,6 +272,15 @@ pub fn declare_team_strategy(
         lead_turn_id: lead_turn_id.to_string(),
         revision: 1,
         status: "pending".to_string(),
+        launch_policy: Some(
+            if automatic_plan {
+                "automatic_plan"
+            } else {
+                "user_confirmed"
+            }
+            .into(),
+        ),
+        strategy: Some(strategy.to_string()),
         members: review_members,
     };
 
@@ -286,7 +288,7 @@ pub fn declare_team_strategy(
         schema_version: TEAM_EXECUTION_DECISION_SCHEMA_VERSION,
         team_session_id: team_session_id.to_string(),
         lead_turn_id: lead_turn_id.to_string(),
-        strategy: Some("delegate".to_string()),
+        strategy: Some(strategy.to_string()),
         reason: Some(bounded_reason.clone()),
         updated_at: now_iso(),
         task_ids: vec![],
@@ -331,9 +333,60 @@ pub fn declare_team_strategy(
         &json!(lead_turn_id),
     )?;
     bump_team_revision_tx(&tx, team_session_id)?;
+    let (decision, review) = if automatic_plan {
+        retire_obsolete_pending_reviews(db, &tx, team_session_id, lead_turn_id)?;
+        let (review, decision) =
+            materialize_launch_review(db, team_session_id, &review_id, 1, true, Some(&tx))?;
+        (decision, review)
+    } else {
+        (decision, review)
+    };
     tx.commit()?;
+    if automatic_plan {
+        for member in &decision.member_session_ids {
+            sessions::commit_team_fork_staging_marker(db, member);
+        }
+    }
 
     Ok((decision, Some(review)))
+}
+
+// A new user scope makes older proposals obsolete. Retain their bodies, but
+// prevent an abandoned review from blocking automatic reuse of a researcher.
+fn retire_obsolete_pending_reviews(
+    db: &Database,
+    tx: &Transaction<'_>,
+    team: &str,
+    current_turn: &str,
+) -> Result<()> {
+    let mut stmt = db
+        .conn()
+        .prepare("SELECT key,value_json FROM kv WHERE ns=?1")?;
+    let rows = stmt.query_map([TEAM_LAUNCH_REVIEW_NS], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    })?;
+    let mut updates = Vec::new();
+    for row in rows {
+        let (key, raw) = row?;
+        let value: serde_json::Value = serde_json::from_str(&raw)?;
+        if !value.is_object() {
+            continue;
+        }
+        let mut review: TeamLaunchReview = serde_json::from_value(value)?;
+        if review.team_session_id == team
+            && review.lead_turn_id != current_turn
+            && review.status == "pending"
+        {
+            review.status = "interrupted".into();
+            review.revision += 1;
+            updates.push((key, serde_json::to_value(review)?));
+        }
+    }
+    drop(stmt);
+    for (key, value) in updates {
+        kv_set_tx(tx, TEAM_LAUNCH_REVIEW_NS, &key, &value)?;
+    }
+    Ok(())
 }
 
 pub fn get_execution_decision(
@@ -498,8 +551,42 @@ pub fn confirm_launch_review(
     review_id: &str,
     expected_revision: i64,
 ) -> Result<(TeamLaunchReview, TeamExecutionDecision)> {
+    materialize_launch_review(
+        db,
+        team_session_id,
+        review_id,
+        expected_revision,
+        false,
+        None,
+    )
+}
+
+fn materialize_launch_review(
+    db: &Database,
+    team_session_id: &str,
+    review_id: &str,
+    expected_revision: i64,
+    automatic: bool,
+    parent_tx: Option<&Transaction<'_>>,
+) -> Result<(TeamLaunchReview, TeamExecutionDecision)> {
     let existing = get_launch_review(db, team_session_id, Some(review_id))?
         .ok_or_else(|| anyhow!("TEAM_NOT_FOUND: launch review '{review_id}' not found"))?;
+
+    if automatic {
+        if existing.launch_policy.as_deref() != Some("automatic_plan")
+            || sessions::session_mode(db, team_session_id)?.as_deref() != Some("plan")
+        {
+            return Err(anyhow!(
+                "TEAM_APPROVAL_REQUIRED: automatic launch is limited to Plan research"
+            ));
+        }
+    } else if existing.launch_policy.as_deref() == Some("automatic_plan")
+        || sessions::session_mode(db, team_session_id)?.as_deref() == Some("plan")
+    {
+        return Err(anyhow!(
+            "TEAM_APPROVAL_REQUIRED: automatic Plan research is not an execution approval"
+        ));
+    }
 
     let decision_key = format!("{}:{}", team_session_id, existing.lead_turn_id);
     let decision: TeamExecutionDecision = db
@@ -519,6 +606,12 @@ pub fn confirm_launch_review(
             review_ids: Some(vec![review_id.to_string()]),
             coordination_error: None,
         });
+
+    if existing.strategy.as_deref().unwrap_or("delegate") != "delegate"
+        || existing.members.is_empty()
+    {
+        return Err(anyhow!("TEAM_APPROVAL_REQUIRED: Expert Team requires delegate with at least one expert; switch to standard for solo work"));
+    }
 
     // Idempotent duplicate confirm
     if existing.status == "confirmed" {
@@ -549,9 +642,24 @@ pub fn confirm_launch_review(
         ));
     }
 
+    super::authority::validate_review_scope(db, team_session_id, &existing.lead_turn_id)?;
+    let strategy = existing.strategy.as_deref().unwrap_or("delegate");
+    if decision.strategy.as_deref() != Some(strategy) {
+        return Err(anyhow!(
+            "TEAM_REVIEW_REVISION_CONFLICT: review strategy is inconsistent"
+        ));
+    }
+
     let mut created_member_session_ids = Vec::new();
     let confirmation = (|| -> Result<(TeamLaunchReview, TeamExecutionDecision)> {
-        let tx = db.conn().unchecked_transaction()?;
+        let owned_tx = if parent_tx.is_none() {
+            Some(db.conn().unchecked_transaction()?)
+        } else {
+            None
+        };
+        let tx = parent_tx
+            .or(owned_tx.as_ref())
+            .ok_or_else(|| anyhow!("missing launch transaction"))?;
         let current = get_launch_review(db, team_session_id, Some(review_id))?
             .ok_or_else(|| anyhow!("TEAM_NOT_FOUND: launch review '{review_id}' not found"))?;
         if current.status != "pending" || current.revision != expected_revision {
@@ -625,6 +733,7 @@ pub fn confirm_launch_review(
                         model_id: Some(&member.selection.model_id),
                         provider_id: Some(&member.selection.provider_id),
                     },
+                    automatic.then_some(current.lead_turn_id.as_str()),
                 )?;
                 created_member_session_ids.push(created.member_session_id.clone());
                 created.member_session_id
@@ -638,7 +747,7 @@ pub fn confirm_launch_review(
             )?;
             if let Some(presentation) = &member.presentation {
                 kv_set_tx(
-                    &tx,
+                    tx,
                     "team-member-presentation-v1",
                     &session_id,
                     &serde_json::to_value(presentation)?,
@@ -650,7 +759,7 @@ pub fn confirm_launch_review(
         super::planning::start(
             db,
             team_session_id,
-            "delegate",
+            strategy,
             Some(review_id),
             member_session_ids.clone(),
         )?;
@@ -661,60 +770,64 @@ pub fn confirm_launch_review(
         decision.updated_at = now_iso();
         let review_value = serde_json::to_value(&confirmed_review)?;
         kv_set_tx(
-            &tx,
+            tx,
             TEAM_LAUNCH_REVIEW_NS,
             &format!("{}:{}", team_session_id, review_id),
             &review_value,
         )?;
-        kv_set_tx(&tx, TEAM_LAUNCH_REVIEW_NS, review_id, &review_value)?;
+        kv_set_tx(tx, TEAM_LAUNCH_REVIEW_NS, review_id, &review_value)?;
         kv_set_tx(
-            &tx,
+            tx,
             TEAM_EXECUTION_DECISION_NS,
             &decision_key,
             &serde_json::to_value(&decision)?,
         )?;
 
-        let confirmation_content = format!(
-            "Team review {} confirmed. Approved members: {}.",
-            review_id,
-            member_names.join(", ")
-        );
-        let confirmation_key = format!("team-review:{}:confirmed", review_id);
-        let sender_session_id = decision
-            .member_session_ids
-            .first()
-            .map(|session_id| session_id.as_str())
-            .unwrap_or(team_session_id);
-        let message = send_team_message(
-            db,
-            SendMessageParams {
-                team_session_id,
-                caller_session_id: sender_session_id,
-                target_identifier: "Lead",
-                content: &confirmation_content,
-                idempotency_key: Some(&confirmation_key),
-            },
-        )?;
+        if !automatic {
+            let confirmation_content = format!(
+                "Team review {} confirmed. Approved members: {}.",
+                review_id,
+                member_names.join(", ")
+            );
+            let confirmation_key = format!("team-review:{}:confirmed", review_id);
+            let sender_session_id = decision.member_session_ids.first().ok_or_else(|| {
+                anyhow!("TEAM_APPROVAL_REQUIRED: Expert Team requires at least one approved expert")
+            })?;
+            let message = send_team_message(
+                db,
+                SendMessageParams {
+                    team_session_id,
+                    caller_session_id: sender_session_id,
+                    target_identifier: "Lead",
+                    content: &confirmation_content,
+                    idempotency_key: Some(&confirmation_key),
+                },
+            )?;
 
-        if !decision.message_ids.contains(&message.id) {
-            decision.message_ids.push(message.id);
+            if !decision.message_ids.contains(&message.id) {
+                decision.message_ids.push(message.id);
+            }
+            decision.updated_at = now_iso();
+            kv_set_tx(
+                tx,
+                TEAM_EXECUTION_DECISION_NS,
+                &decision_key,
+                &serde_json::to_value(&decision)?,
+            )?;
         }
-        decision.updated_at = now_iso();
-        kv_set_tx(
-            &tx,
-            TEAM_EXECUTION_DECISION_NS,
-            &decision_key,
-            &serde_json::to_value(&decision)?,
-        )?;
-        bump_team_revision_tx(&tx, team_session_id)?;
-        tx.commit()?;
+        bump_team_revision_tx(tx, team_session_id)?;
+        if let Some(tx) = owned_tx {
+            tx.commit()?;
+        }
         Ok((confirmed_review, decision))
     })();
 
     match confirmation {
         Ok(confirmed) => {
-            for session_id in &created_member_session_ids {
-                sessions::commit_team_fork_staging_marker(db, session_id);
+            if parent_tx.is_none() {
+                for session_id in &created_member_session_ids {
+                    sessions::commit_team_fork_staging_marker(db, session_id);
+                }
             }
             Ok(confirmed)
         }

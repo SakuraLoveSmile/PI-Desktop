@@ -106,3 +106,11 @@ the isolated existing Electron suites above were run instead. The repaired
 DMG build artifacts are not a new release from this PR. Source dirty worktrees
 and archive branches remain recoverable pending the separate behavior choice
 and any explicit destructive cleanup instruction.
+
+## Subsequent policy authorization (2026-10-07)
+
+After PR #48, the user explicitly authorized integrating the preserved
+forced-Team worktree into main through a new PR. This supersedes the deferred
+policy decision above, not the historical test results or candidate recorded
+in this report. Current integration validation is recorded separately. The
+original forced-Team worktree remains preserved.

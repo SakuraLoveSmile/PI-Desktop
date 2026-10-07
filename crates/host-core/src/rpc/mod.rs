@@ -1793,6 +1793,7 @@ async fn handle_request(
         | "plans.cancelSchedule"
         | "plans.markScheduleMissed"
         | "plans.markRevisionFailed"
+        | "plans.bindExecutionTurn"
         | "session.getTurn" => plan_schedule_rpc::handle(state, method, params, tx).await,
         method if method.starts_with("session.collaboration.") => {
             let st = state.lock().await;
@@ -3660,13 +3661,13 @@ async fn handle_request(
                 .unwrap_or(plans::KIND_PLAN);
             let kind = plans::normalize_kind(kind)
                 .ok_or_else(|| rpc_err(1002, "kind must be 'plan' or 'goal'", "INVALID_PARAMS"))?;
-            let proposal = {
+            let submission = {
                 let guard = state.lock().await;
                 let st = &*guard;
                 let (workspace, artifact_workspace_kind) =
                     resolve_plan_submission_workspace(st, session_id, kind)?;
                 st.plans
-                    .submit(
+                    .submit_or_defer(
                         &st.db,
                         crate::plans::PlanSubmitParams {
                             workspace_root: &workspace,
@@ -3681,6 +3682,18 @@ async fn handle_request(
                         },
                     )
                     .map_err(plan_rpc_err)?
+            };
+            let proposal = match submission {
+                plans::PlanSubmissionResult::Submitted(proposal) => proposal,
+                plans::PlanSubmissionResult::TeamMessagesPending {
+                    pending_messages_count,
+                } => {
+                    return Ok(json!({
+                        "status": "deferred",
+                        "reason": "team_messages_pending",
+                        "pendingMessagesCount": pending_messages_count
+                    }));
+                }
             };
             emit_notification(
                 &tx,
@@ -11019,6 +11032,19 @@ mod image_generation_settings_tests {
         .await
         .unwrap();
         assert_eq!(roster["members"].as_array().unwrap().len(), 1);
+
+        // Claim the actual approved mailbox continuation before mutations.
+        {
+            let st = state.lock().await;
+            crate::session_collaboration::begin_turn(
+                &st.db,
+                team_id,
+                approved["decision"]["messageIds"][0].as_str().unwrap(),
+                None,
+                None,
+            )
+            .unwrap();
+        }
 
         // 4. Create and update task
         let task_res = handle_request(
