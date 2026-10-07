@@ -1,6 +1,6 @@
 import { Type } from "@earendil-works/pi-ai";
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
-import type { TeamBoardProjection } from "@pi-desktop/shared";
+import type { TeamBoardProjection, TeamMessageRecord } from "@pi-desktop/shared";
 import type { RuntimeHost } from "../host-client.js";
 
 interface WaitForUpdatesOptions {
@@ -9,6 +9,8 @@ interface WaitForUpdatesOptions {
   host: RuntimeHost;
   getTurnId?: () => string | undefined;
   approvedExecution?: () => boolean;
+  /** Capture an ordinary Plan Lead turn and yield only while it still owns the wait. */
+  captureInboxYield?: () => ((toolCallId: string) => boolean) | undefined;
 }
 
 function result(details: NonNullable<AgentToolResult["details"]>): AgentToolResult {
@@ -41,8 +43,9 @@ export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool
         maximum: 60,
       })),
     }),
-    execute: async (_toolCallId, params, signal): Promise<AgentToolResult> => {
+    execute: async (toolCallId, params, signal): Promise<AgentToolResult> => {
       const expectedTurnId = opts.getTurnId?.();
+      const yieldInbox = opts.approvedExecution?.() ? undefined : opts.captureInboxYield?.();
       const readInbox = async () => {
         if (!opts.approvedExecution?.() || !expectedTurnId) return undefined;
         const inbox = await host.call<{ turnId: string; messages: Array<{ id: string; content: string }> }>("team.readExecutionInbox", {
@@ -101,13 +104,22 @@ export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool
           // Keep the read single-flight even when one RPC rejects before its peer settles.
           const [board, mailbox] = await Promise.allSettled([
             host.call<TeamBoardProjection>("team.getBoard", { teamSessionId, callerSessionId }),
-            host.call<{ messages: unknown[] }>("team.listMessages", {
+            host.call<{ messages: TeamMessageRecord[] }>("team.listMessages", {
               teamSessionId, callerSessionId, sessionId: callerSessionId,
             }),
           ]);
           if (board.status === "rejected") throw board.reason;
           if (mailbox.status === "rejected") throw mailbox.reason;
-          return { revision: board.value.revision, count: mailbox.value.messages.length };
+          const pendingCount = mailbox.value.messages.filter(message =>
+            message.targetSessionId === callerSessionId && message.sourceSessionId !== callerSessionId &&
+            message.status === "queued" && message.turnId == null).length;
+          return { revision: board.value.revision, count: mailbox.value.messages.length, pendingCount };
+        };
+        const yieldPendingInbox = (pendingCount: number): boolean => {
+          if (!pendingCount || settled || signal?.aborted || Date.now() >= deadline ||
+              opts.approvedExecution?.() || !yieldInbox?.(toolCallId)) return false;
+          finish({ ...result({ updated: true, reason: "pending_mailbox_messages", count: pendingCount }), terminate: true });
+          return true;
         };
         const scheduleFallback = () => {
           if (settled) return;
@@ -147,6 +159,7 @@ export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool
               return;
             }
             successfulRecheck = true;
+            if (yieldPendingInbox(current.pendingCount)) return;
             if (current.revision !== baseline.revision) {
               finish(result({ updated: true, reason: "task_board_changed", revision: current.revision }));
             } else if (current.count !== baseline.count) {
@@ -206,6 +219,7 @@ export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool
               return;
             }
             baseline = initial;
+            if (yieldPendingInbox(initial.pendingCount)) return;
             if (dirty) void recheck();
             else scheduleFallback();
           };

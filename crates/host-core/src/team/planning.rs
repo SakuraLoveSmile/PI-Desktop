@@ -171,6 +171,32 @@ fn refresh(state: &mut PlanningState) {
     .into();
     state.updated_at = now_ms().to_string();
 }
+/// Research tasks must be assigned before dispatch; ordinary Agent boards can
+/// still contain unassigned tasks, including legacy tasks awaiting Lead repair.
+pub fn validate_task_creation_owner(
+    db: &Database,
+    team: &str,
+    owner: Option<&str>,
+    owner_name: Option<&str>,
+) -> Result<()> {
+    if sessions::session_mode(db, team)?.as_deref() != Some("plan") {
+        return Ok(());
+    }
+    if get(db, team)?.is_some_and(|state| {
+        matches!(
+            state.phase.as_str(),
+            "researching" | "aggregating" | "clarifying"
+        )
+    }) && ((owner.is_none() && owner_name.is_none())
+        || owner == Some(team)
+        || owner_name.is_some_and(|name| name.eq_ignore_ascii_case("Lead")))
+    {
+        return Err(anyhow!(
+            "TEAM_RESEARCH_INVALID: set ownerMemberName to an approved researcher when creating a Plan research task; sending a message does not assign it. Use task_update with ownerMemberName and expectedRevision to repair an existing unassigned task"
+        ));
+    }
+    Ok(())
+}
 /// Enrol before any result can arrive, in the same task transaction.
 pub fn enrol(
     db: &Database,

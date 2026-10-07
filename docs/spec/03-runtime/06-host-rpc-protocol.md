@@ -1512,6 +1512,18 @@ for confirmed research members; Lead context never has research purpose.
 Automatic Plan roster launch and the planning round commit atomically, without
 user staffing confirmation. The final Plan approval remains user-controlled.
 Task create/update enrolls research tasks in the same transaction as assignment.
+During an active Plan research round, task creation requires an explicit approved
+researcher owner (`ownerMemberName` or `ownerSessionId`). Missing ownership or
+Lead ownership is rejected with `TEAM_RESEARCH_INVALID` before any task or
+revision is persisted. The Plan Lead's `task_create` schema requires
+`ownerMemberName`; `send_message` delivers instructions but never assigns tasks.
+Existing unassigned tasks remain readable and can be recovered by the Lead using
+`task_update` with the current `expectedRevision` and approved researcher owner;
+this atomically enrolls the task in the round. Researchers cannot self-assign,
+and must read the new revision before submitting results. Agent backlog tasks
+may still be created without an owner. Rejected create/update calls remain
+failed tool calls, rather than successful results containing error text.
+
 
 `team.getPlanning({ teamSessionId, callerSessionId })` returns null without a
 round, otherwise planningId, teamSessionId, roundId, phase, workPurpose,

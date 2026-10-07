@@ -21,6 +21,13 @@ export function createPlanningFixture(projectPath) {
   const supplementaryReport = "补充调查结论：删除用户需要保留审计记录，避免账户关联数据丢失。TP_MAIL_RISK: preserve audit history when deleting a user.";
   const queuedUserPrompt = "TP_USER_QUEUED: keep my follow-up until I choose what to do with the plan.";
   const structuredGates = ["ONE", "TWO"].map(id => ({ id, entered: false, release: null }));
+  const inboxReports = [1, 2, 3, 4].map(id => `TP_INBOX_REPORT_${id}: 完整研究结论 ${id}，保留认证来源与用户后续请求。`);
+  let releaseInboxLead;
+  let releaseInboxWorker;
+  const inboxLeadGate = new Promise(resolve => { releaseInboxLead = resolve; });
+  const inboxWorkerGate = new Promise(resolve => { releaseInboxWorker = resolve; });
+  let inboxLeadEntered = false;
+  let inboxWorkerEntered = false;
   let pendingExpertAction;
   let actionSequence = 0;
   let actionTaskSubject;
@@ -65,24 +72,67 @@ export function createPlanningFixture(projectPath) {
   };
 
   return {
-    releaseResearch() { releaseSecond?.(); releaseFinalize?.(); releaseSupplementary?.(); releaseActionResult?.(); structuredGates.forEach(gate => gate.release?.()); signalFinalizing?.(); signalResearchStart?.(); signalActionStart?.(); },
+    releaseResearch() { releaseInboxLead?.(); releaseInboxWorker?.(); releaseSecond?.(); releaseFinalize?.(); releaseSupplementary?.(); releaseActionResult?.(); structuredGates.forEach(gate => gate.release?.()); signalFinalizing?.(); signalResearchStart?.(); signalActionStart?.(); },
     async respond({ userText, priorToolNames, activeTurnMessages, activeToolText, toolNames, allMessages }) {
       const has = (name) => priorToolNames.includes(name);
       const answer = (finalText) => ({ finalText });
       const tool = (name, args = {}) => ({ toolCall: { name, args } });
+      if (userText.includes("TP_INBOX_WAIT_LEAD")) {
+        if (!has("declare_team_strategy")) return tool("declare_team_strategy", {
+          strategy: "delegate", reason: "Verify automatic inbox settlement while the Lead keeps waiting.",
+          members: [{ name: "inbox_researcher", description: "Read the source and report four distinct findings.", contextKind: "fresh" }],
+        });
+        if (!has("task_create")) return tool("task_create", { subject: "TP_INBOX_TASK", ownerMemberName: "inbox_researcher" });
+        if (!has("send_message")) return tool("send_message", { targetMemberName: "inbox_researcher", content: "TP_INBOX_WAIT_WORKER: inspect the source, submit your result, then send four distinct supplementary findings." });
+        inboxLeadEntered = true;
+        await inboxLeadGate;
+        // The model never chooses to finish or submit here. Runtime must yield
+        // on already queued mail rather than treat it as a wait baseline.
+        return tool("wait_for_updates", { timeoutSeconds: 60 });
+      }
+      if (userText.includes("TP_INBOX_WAIT_WORKER")) {
+        if (!has("team_status")) return tool("team_status");
+        const task = statusFrom(activeTurnMessages)?.tasks.find(item => item.subject === "TP_INBOX_TASK");
+        assert.ok(task);
+        if (!has("Read")) {
+          inboxWorkerEntered = true;
+          await inboxWorkerGate;
+          return tool("Read", { path: "source-ONE.md" });
+        }
+        if (!has("submit_research_result")) return tool("submit_research_result", {
+          taskId: task.taskId, expectedRevision: task.revision,
+          structuredResult: { summary: "TP_INBOX_VERIFIED", findings: ["Read source ONE"], risks: [], recommendations: [], verifiedSources: ["source-ONE.md"] },
+        });
+        const sent = priorToolNames.filter(name => name === "send_message").length;
+        if (sent < inboxReports.length) return tool("send_message", { targetMemberName: "Lead", content: inboxReports[sent] });
+        return answer("All four distinct supplementary findings are reported.");
+      }
+      if (inboxReports.some(report => userText.includes(report))) {
+        if (!has("team_status")) return tool("team_status");
+        const planning = statusFrom(activeTurnMessages)?.planning;
+        assert.ok(planning);
+        if (planning.pendingMessagesCount > 0) return tool("wait_for_updates", { timeoutSeconds: 60 });
+        assert.equal(planning.isReadyForPlanSubmission, true);
+        for (const report of inboxReports) assert.ok(JSON.stringify(allMessages).includes(report), "inbox continuation lost full report content");
+        return tool("SubmitPlan", { title: "Inbox Wait Recovery", question: "Approve the complete recovered research?", markdown: `# Inbox Wait Recovery\n\n${inboxReports.join("\n\n")}\n` });
+      }
       if (userText.includes("TP_STRUCTURED_ONLY_LEAD")) {
         assert.ok(toolNames.includes("wait_for_updates"), "structured-only Lead cannot await actual research updates");
         if (!has("declare_team_strategy")) return tool("declare_team_strategy", {
           strategy: "delegate", reason: "Verify two sources without duplicate completion mail.",
           members: ["one", "two"].map(id => ({ name: `structured_${id}`, description: "Return the complete structured research result.", contextKind: "fresh", presentation: { role: "researcher", displayName: id === "one" ? "Alex" : "Tina" } })),
         });
-        const created = priorToolNames.filter(name => name === "task_create").length;
+        const attempted = priorToolNames.filter(name => name === "task_create").length;
+        if (attempted === 0) return tool("task_create", { subject: "TP_UNASSIGNED_REJECTED" });
+        assert.match(activeToolText, /ownerMemberName/, "missing research owner did not produce an actionable error");
+        const created = attempted - 1;
         if (created < 2) return tool("task_create", { subject: `TP_STRUCTURED_${created === 0 ? "ONE" : "TWO"}`, ownerMemberName: created === 0 ? "structured_one" : "structured_two", writeScopes: [] });
         const sent = priorToolNames.filter(name => name === "send_message").length;
         if (sent < 2) return tool("send_message", { targetMemberName: sent === 0 ? "structured_one" : "structured_two", content: sent === 0 ? "TP_STRUCTURED_WORK_ONE" : "TP_STRUCTURED_WORK_TWO" });
         if (priorToolNames.at(-1) !== "team_status") return tool("team_status");
         const status = statusFrom(activeTurnMessages);
         assert.equal(status?.planning?.pendingMessagesCount, 0, "structured-only research created duplicate completion mail");
+        assert.equal(status.tasks.some(task => task.subject === "TP_UNASSIGNED_REJECTED"), false, "rejected assignment persisted an unowned task");
         if (!status.planning.isReadyForPlanSubmission) return tool("wait_for_updates", { timeoutSeconds: 2 });
         assert.equal(status.planning.completedResearchTasks, 2);
         assert.deepEqual(status.planning.results.map(item => item.structuredResult.summary).sort(), ["TP_STRUCTURED_VERIFIED_ONE", "TP_STRUCTURED_VERIFIED_TWO"]);
@@ -531,7 +581,9 @@ export function createPlanningFixture(projectPath) {
       assert.ok(structuredBoard.tasks.every(task => task.status === "completed"));
       assert.deepEqual((await invoke("agentQueueList", { sessionId: structuredLead.id })).entries, [], "structured-only proposal left queued expert messages");
       const structuredSession = (await invoke("sessionGet", { id: structuredLead.id })).session;
-      assert.equal(structuredSession.messages.some(message => message.toolStatus === "error" || message.error), false, "normal structured-only planning showed an error");
+      const assignmentErrors = structuredSession.messages.filter(message => message.toolStatus === "error" || message.error);
+      assert.equal(assignmentErrors.length, 1, "expected exactly the deliberate missing-owner failure");
+      assert.equal(assignmentErrors[0].toolName, "task_create", "unexpected error outside task assignment recovery");
       assert.equal(structuredSession.messages.filter(message => message.sessionMessage).length, 0, "structured-only planning depended on unsolicited completion mail");
       assert.equal(calls.some(call => /TP_STRUCTURED_WORK_(ONE|TWO)/.test(call.userText) && call.tool === "send_message"), false, "structured-only expert sent a duplicate completion report");
       const structuredReview = (await invoke("teamGetLaunchReview", { teamSessionId: structuredLead.id })).review;
@@ -539,7 +591,48 @@ export function createPlanningFixture(projectPath) {
       assert.equal(structuredReview.status, "confirmed");
       assert.equal(await evaluate(`!!document.querySelector('[data-testid="team-launch-review"]')`), false, "structured-only Plan research asked for launch approval");
       await saveScreenshot(sendCdp, "team-planning-structured-only-proposal.png");
-      console.log("PASS Team Plan default structured-only path: two automatic readonly experts submit full results without send_message; real wait_for_updates/team_status reaches a clean pending proposal with no research queue or errors");
+      console.log("PASS Team Plan default structured-only path: two automatic readonly experts submit full results without send_message; real wait_for_updates/team_status reaches a clean pending proposal after correcting the rejected missing-owner assignment, with no research queue");
+
+      const inboxLead = (await invoke("sessionCreate", {
+        title: "Inbox wait recovery", mode: "plan", executionProfile: "team", projectPath,
+        providerId: planLead.providerId, modelId: planLead.modelId, permissionMode: "auto",
+      })).session;
+      await sendCdp("Page.reload");
+      await waitFor(() => evaluate(`!!document.querySelector('[data-sidebar-session-row="${inboxLead.id}"]')`), "inbox recovery session visible");
+      await evaluate(`document.querySelector('[data-sidebar-session-row="${inboxLead.id}"] button.thread-item-main').click()`);
+      await prompt("TP_INBOX_WAIT_LEAD: keep waiting for expert reports without voluntarily ending the turn or submitting a plan.");
+      await waitFor(() => inboxLeadEntered && inboxWorkerEntered, "busy Lead and read-only researcher held at explicit sync points");
+      await context.activateOverviewTab(sendCdp, evaluate);
+      const progress = '[data-testid="overview-team-progress"] section.team-progress';
+      await waitFor(() => evaluate(`document.querySelector('${progress}')?.dataset.total === '1' && document.querySelector('${progress}')?.dataset.completed === '0'`), "mounted Overview shows assigned pending research");
+      releaseInboxWorker();
+      const queued = await waitFor(async () => {
+        const entries = (await invoke("agentQueueList", { sessionId: inboxLead.id })).entries;
+        return entries.filter(entry => entry.sessionMessageId).length === 4 ? entries : null;
+      }, "four authenticated reports queued behind the busy Lead");
+      for (const report of inboxReports) assert.equal(queued.filter(entry => entry.content.includes(report)).length, 1);
+      await waitFor(async () => {
+        const roster = (await invoke("teamGetRoster", { teamSessionId: inboxLead.id })).members;
+        return (await invoke("agentGetStatus", roster[0].memberSessionId)).status?.isRunning === false;
+      }, "reporting researcher settled");
+      await waitFor(() => evaluate(`document.querySelector('${progress}')?.dataset.completed === '1'`), "Overview updates in place before the Lead turn ends");
+      const inboxUserPrompt = "TP_INBOX_USER_FOLLOWUP: retain this user request after all expert reports.";
+      await prompt(inboxUserPrompt);
+      await waitFor(async () => (await invoke("agentQueueList", { sessionId: inboxLead.id })).entries.some(entry => entry.content === inboxUserPrompt), "user FIFO retained behind expert reports");
+      releaseInboxLead();
+      const recovered = await waitFor(async () => (await invoke("plansPending", { sessionId: inboxLead.id })).plans.find(plan => plan.title === "Inbox Wait Recovery"), "waiting Lead automatically yields and all mailbox continuations settle");
+      await waitFor(async () => (await invoke("agentGetStatus", inboxLead.id)).status?.isRunning === false, "recovered Lead settled");
+      for (const report of inboxReports) assert.ok(recovered.markdown.includes(report));
+      const queueAfter = (await invoke("agentQueueList", { sessionId: inboxLead.id })).entries;
+      assert.deepEqual(queueAfter.map(entry => entry.content), [inboxUserPrompt]);
+      const recoveredSession = (await invoke("sessionGet", { id: inboxLead.id })).session;
+      const admitted = recoveredSession.messages.filter(message => message.role === "user" && message.sessionMessage);
+      assert.deepEqual(admitted.map(message => message.sessionMessage.messageId), queued.map(entry => entry.sessionMessageId), "full report continuations must preserve FIFO identity exactly once");
+      assert.equal(recoveredSession.messages.filter(message => message.toolName === "SubmitPlan").length, 1);
+      assert.equal(recoveredSession.messages.some(message => message.toolStatus === "error" || message.error), false);
+      await saveScreenshot(sendCdp, "team-overview-live-inbox-recovery.png");
+      console.log("PASS mounted Overview refreshes before Lead settles; four queued expert reports automatically yield from wait_for_updates, consume full FIFO contents exactly once, publish one plan and retain the user follow-up");
+
     },
   };
 }
