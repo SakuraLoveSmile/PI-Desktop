@@ -4723,3 +4723,35 @@ thinking/process/tool rows to expandable summaries. Errors, approvals, AskTool
 summaries, Plan/Goal cards, search targets, copy, and expansion to full detail
 remain available. The control changes presentation only and retains detailed as
 the compatibility default when the setting is absent.
+
+### Mandatory Expert Team behavior
+
+Selecting Expert Team requires proposed experts and actual delegation, even for
+small tasks. Plan research dispatches automatically. Agent execution uses the
+existing expert roster review with confirm/launch and cancel. There is no Lead-only confirmation card or opt-out proposal in Team
+mode. Standard profile remains the separate single-agent experience. Historical
+solo reasons may remain visible as records and never become execution permission.
+
+Expert Team Plan research runs automatically; it does not display a pending
+research-roster approval card or stop at a textual staffing proposal. Progress,
+actual experts and their findings remain visible. The existing final Plan
+approval card and Agent execution roster confirmation are preserved. Automatic
+launch audits are history, not user consent.
+
+A current active local Agent Team Lead with a new nonempty pending user-confirmed
+execution roster automatically opens the existing aggregate Team panel, even
+when Overview, a file, panorama or a closed work panel was selected. Automatic
+planning audits never display launch approval controls. Unrelated snapshot updates
+do not repeatedly steal focus; background, member, Plan and nonlocal sessions
+cannot open another session's panel.
+
+The Team snapshot exposes a pending review only while its leadTurnId matches the
+current Host-owned strategy scope. A completed Lead turn can still await valid
+confirmation; superseded pending reviews stay readable by ID but cannot reopen
+the current UI. Existing Team activity revisions refresh the shared reader.
+
+An approved Team Plan/Goal execution stays running while its execution roster
+awaits confirmation. The review UI must not imply that the execution already
+completed or require a new user request to continue. Confirm resumes the same
+execution and Cancel interrupts it without a completed Goal report. Expert
+updates and Goal progress remain attached to the original approved execution.

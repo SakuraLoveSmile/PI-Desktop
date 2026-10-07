@@ -3,6 +3,7 @@
 //! The error mapping and `team.changed` helpers are shared with the session
 //! and project arms that stay in the parent module.
 
+use rusqlite::OptionalExtension;
 use std::sync::Arc;
 
 use serde_json::{json, Value};
@@ -130,6 +131,30 @@ pub(super) fn team_id_for_participant(
         return Ok(Some(session_id.to_string()));
     }
     Ok(None)
+}
+
+fn authorize_lead_mutation(
+    db: &crate::db::Database,
+    team: &str,
+    caller: &str,
+) -> Result<(), JsonRpcError> {
+    crate::team::validate_team_participant(db, team, caller).map_err(team_rpc_err)?;
+    if caller == team {
+        crate::team::authority::require_confirmed_strategy(db, team).map_err(team_rpc_err)?;
+    }
+    Ok(())
+}
+
+fn authorize_lead_expert(
+    db: &crate::db::Database,
+    team: &str,
+    caller: &str,
+    target: &str,
+) -> Result<(), JsonRpcError> {
+    if caller == team && target != team && target != "Lead" {
+        crate::team::authority::validate_current_expert(db, team, target).map_err(team_rpc_err)?;
+    }
+    Ok(())
 }
 
 pub(super) async fn handle(
@@ -297,10 +322,12 @@ pub(super) async fn handle(
                 .get("callerSessionId")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "callerSessionId required", "INVALID_PARAMS"))?;
+            authorize_lead_mutation(&st.db, team_id, caller_id)?;
             let name = params
                 .get("name")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "name required", "INVALID_PARAMS"))?;
+            authorize_lead_expert(&st.db, team_id, caller_id, name)?;
             let description = params.get("description").and_then(|v| v.as_str());
             let context_kind = params.get("contextKind").and_then(|v| v.as_str());
             let model_id = params.get("modelId").and_then(|v| v.as_str());
@@ -329,6 +356,7 @@ pub(super) async fn handle(
                 .get("callerSessionId")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "callerSessionId required", "INVALID_PARAMS"))?;
+            authorize_lead_mutation(&st.db, team_id, caller_id)?;
             let subject = params
                 .get("subject")
                 .and_then(|v| v.as_str())
@@ -353,6 +381,13 @@ pub(super) async fn handle(
                 });
             let owner_session_id = params.get("ownerSessionId").and_then(|v| v.as_str());
             let owner_member_name = params.get("ownerMemberName").and_then(|v| v.as_str());
+            if let Some(owner) = params
+                .get("ownerSessionId")
+                .and_then(Value::as_str)
+                .or_else(|| params.get("ownerMemberName").and_then(Value::as_str))
+            {
+                authorize_lead_expert(&st.db, team_id, caller_id, owner)?;
+            }
             let task = crate::team::create_team_task(
                 &st.db,
                 crate::team::CreateTaskParams {
@@ -380,6 +415,7 @@ pub(super) async fn handle(
                 .get("callerSessionId")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "callerSessionId required", "INVALID_PARAMS"))?;
+            authorize_lead_mutation(&st.db, team_id, caller_id)?;
             let task_id = params
                 .get("taskId")
                 .and_then(|v| v.as_str())
@@ -410,6 +446,13 @@ pub(super) async fn handle(
                         .collect::<Vec<_>>()
                 });
             let deleted = params.get("deleted").and_then(|v| v.as_bool());
+            if let Some(owner) = params
+                .get("ownerSessionId")
+                .and_then(Value::as_str)
+                .or_else(|| params.get("ownerMemberName").and_then(Value::as_str))
+            {
+                authorize_lead_expert(&st.db, team_id, caller_id, owner)?;
+            }
             let task = crate::team::update_team_task(
                 &st.db,
                 crate::team::UpdateTaskParams {
@@ -440,16 +483,32 @@ pub(super) async fn handle(
                 .get("callerSessionId")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "callerSessionId required", "INVALID_PARAMS"))?;
+            authorize_lead_mutation(&st.db, team_id, caller_id)?;
             let target_id = params
                 .get("target")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "target required", "INVALID_PARAMS"))?;
+            authorize_lead_expert(&st.db, team_id, caller_id, target_id)?;
             let content = params
                 .get("content")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "content required", "INVALID_PARAMS"))?;
             let idempotency_key = params.get("idempotencyKey").and_then(|v| v.as_str());
             let previous_revision = team_revision(&st.db, team_id)?;
+            let delivery_tx = st
+                .db
+                .conn()
+                .unchecked_transaction()
+                .map_err(|e| team_rpc_err(e.into()))?;
+            let existed = if let Some(key) = idempotency_key {
+                st.db.conn().query_row(
+                    "SELECT id FROM session_collaboration_messages WHERE plugin_id=?1 AND source_session_id=?2 AND idempotency_key=?3",
+                    rusqlite::params![crate::team::team_plugin_origin(team_id), caller_id, key],
+                    |row| row.get::<_, String>(0),
+                ).optional().map_err(|e| team_rpc_err(e.into()))?.is_some()
+            } else {
+                false
+            };
             let msg = crate::team::send_team_message(
                 &st.db,
                 crate::team::SendMessageParams {
@@ -461,6 +520,11 @@ pub(super) async fn handle(
                 },
             )
             .map_err(team_rpc_err)?;
+            if caller_id == team_id {
+                crate::team::authority::record_dispatch(&st.db, team_id, &msg, existed)
+                    .map_err(team_rpc_err)?;
+            }
+            delivery_tx.commit().map_err(|e| team_rpc_err(e.into()))?;
             send_notification(
                 &tx,
                 "team.messageQueued",
@@ -474,6 +538,33 @@ pub(super) async fn handle(
                 "mailbox",
             )?;
             Ok(json!({ "message": msg }))
+        }
+        "team.getLeadExecutionState" | "team.readExecutionInbox" => {
+            let team = params
+                .get("teamSessionId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+            let caller = params
+                .get("callerSessionId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "callerSessionId required", "INVALID_PARAMS"))?;
+            let expected = params
+                .get("expectedTurnId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "expectedTurnId required", "INVALID_PARAMS"))?;
+            let state = crate::team::execution_inbox::state(&st.db, team, caller, expected)
+                .map_err(team_rpc_err)?;
+            if method == "team.getLeadExecutionState" {
+                return Ok(json!(state));
+            }
+            let messages = crate::team::execution_inbox::read(&st.db, team, caller, expected)
+                .map_err(team_rpc_err)?;
+            send_notification(
+                &tx,
+                "team.executionInboxConsumed",
+                json!({"teamSessionId": team, "turnId": expected, "messageIds": messages.iter().map(|m| &m.id).collect::<Vec<_>>()}),
+            );
+            Ok(json!({"active": state.active, "turnId": state.turn_id, "messages": messages}))
         }
         "team.listMessages" => {
             let team_id = params
@@ -724,6 +815,34 @@ pub(super) async fn handle(
             }
             .map_err(team_rpc_err)?;
             Ok(json!({ "decision": decision }))
+        }
+        "team.authorizeLeadTool" => {
+            let team_id = params
+                .get("teamSessionId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+            let caller = params
+                .get("callerSessionId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "callerSessionId required", "INVALID_PARAMS"))?;
+            let tool = params
+                .get("toolName")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "toolName required", "INVALID_PARAMS"))?;
+            crate::team::validate_team_lead(&st.db, team_id).map_err(team_rpc_err)?;
+            if caller != team_id
+                || crate::team::get_team_member_by_session_id(&st.db, team_id)
+                    .map_err(team_rpc_err)?
+                    .is_some()
+            {
+                return Err(rpc_err(
+                    1002,
+                    "only the Team lead can authorize lead tools",
+                    "TEAM_UNAUTHORIZED",
+                ));
+            }
+            crate::team::planning::validate_tool(&st.db, team_id, tool).map_err(team_rpc_err)?;
+            Ok(json!({"authorized": true}))
         }
         "team.getLaunchReview" => {
             let team_id = params

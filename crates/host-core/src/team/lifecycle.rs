@@ -172,7 +172,7 @@ pub(crate) fn cleanup_team_on_lead_delete_conn(
     }
 
     conn.execute(
-        "DELETE FROM kv WHERE ns='team-planning-v1' AND key=?1",
+        "DELETE FROM kv WHERE ns IN ('team-planning-v1','team-strategy-scope-v1') AND key=?1",
         [lead_session_id],
     )?;
     conn.execute(
@@ -251,6 +251,19 @@ pub fn get_team_snapshot(
         [format!("team:{team_session_id}")],
         |row| row.get::<_, i64>(0),
     )?;
+    let review = match super::review::get_launch_review(db, team_session_id, None)? {
+        Some(review)
+            if review.status == "pending"
+                && !super::authority::review_belongs_to_current_scope(
+                    db,
+                    team_session_id,
+                    &review.lead_turn_id,
+                )? =>
+        {
+            None
+        }
+        review => review,
+    };
     Ok(super::model::TeamSnapshot {
         team_session_id: team_session_id.to_string(),
         revision: team.revision,
@@ -261,7 +274,7 @@ pub fn get_team_snapshot(
         scope_overlaps: board.scope_overlaps,
         lead_phase,
         queued_message_count,
-        review: super::review::get_launch_review(db, team_session_id, None)?,
+        review,
         decision: super::review::get_latest_execution_decision(db, team_session_id)?,
     })
 }

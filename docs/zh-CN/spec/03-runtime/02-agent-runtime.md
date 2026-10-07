@@ -497,6 +497,16 @@ Plan 和 Goal 是两种 **合约模式** (D198)。他们共用一个耐用的
 在 `plan_approvals` 中构造 title/question，并将活动状态移至
 `awaiting_approval`。
 
+Plan/Goal 保留 Write/Edit 声明；已配置 subagent 时也保留 Task/TaskWait/TaskList/TaskStop 声明，但现有模式执行门禁仍拒绝这些调用，不修改文件或启动委派。
+
+标准 Agent 启用至少一个 subagent 时，对可分离的重要工作优先用 Task 派发，再由 TaskWait 汇总。几次工具调用的小任务及需要用户参与的步骤仍由主 agent 处理；不递归、不辩论、最多一次可选评审。此为提示词指导，不保证真实模型委派。全部停用时不包含委派提示和 Task* 工具。
+
+专家团使用独立 Team 工具目录：即使琐碎任务也必须 delegate 至少一位专家；Host 拒绝全部 lead_only 和旧的单独执行批准。Lead 的实质工具及非空最终回复需要当前获批派遣的专家回合已实际启动，空闲成员和仅排队消息不足以解锁。该门禁不证明任务归属或专家已完成贡献。
+
+Team Plan 使用 Host 选择的 automatic_plan 策略和有效获批模型绑定，自动启动只读研究专家，不要求研究名单审批。完整结构化研究、专家回合与问题全部结束、Team 未消费收件箱为空，才允许 SubmitPlan。方案产物及后续 Agent 执行名单仍需用户批准。Goal 协商权限不变，转入 Agent 执行后恢复 Team 门禁；Team 不暴露 Task* 或插件 SessionTask。
+
+用户已批准的 Team Plan/Goal 执行在原始运行中 Host 回合内等待执行名单确认及专家结算，等待期间不能发出最终 agent_end、结束 Goal 执行 token 或完成批准记录。确认后继续同一获批契约，wait_for_updates 通过 Host 授权收件箱读取完整可信确认／专家结果；取消中断原执行，不重放专家或发布完成报告。专家启动仅授权实质工具，获批执行完成另要求当前派遣与专家回合结束、当前结果已消费。Plan 使用可信不可变 execution-turn 绑定，Goal 继续使用 goal_reports 精确回合证明；窄内部 RPC 契约见 06-host-rpc-protocol。
+
 仅批准 `approve` 和 `reject`。批准提交 `mode = agent`，
 显式权限模式、执行 ID 和 `execution_state = queued`
 一个主机事务中的相同 `plan_approvals` 行。的

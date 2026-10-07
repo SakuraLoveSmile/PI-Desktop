@@ -686,7 +686,32 @@ guidance retains the no-recursion, no-debate, and at-most-one-optional-review
 limits; it steers the model but does not guarantee delegation. With all
 subagents disabled, neither the delegation prompt section nor `Task*` tools
 are included. Expert Team execution uses its Lead-to-expert task-board policy
-and isolated Team tool catalog instead of standard subagent delegation.
+and isolated Team tool catalog instead of standard subagent delegation. Team
+requires `delegate` with at least one expert, including trivial tasks; Host
+rejects `lead_only` and historical solo approvals. Substantive Lead tools and
+nonempty final replies require a current approved expert dispatch whose turn
+has actually started. Idle members or queued messages are insufficient. This
+participation gate does not prove task ownership or completed expert work.
+
+Team Plan research automatically launches read-only experts using Host-selected
+`automatic_plan` authority and valid approved model bindings, without staffing
+approval. Complete structured research, settled researcher turns/questions and
+an empty unconsumed Team inbox are separately required before SubmitPlan. The
+Plan artifact and subsequent Agent execution roster still require user approval.
+Goal negotiation retains its existing permissions; Agent execution restores
+the Team gate. Team tools remain separate from `Task*` and plugin `SessionTask`.
+
+An approved Team Plan/Goal execution waits for execution-roster confirmation
+and expert settlement inside its original running Host turn. It must not emit
+final agent_end, end the Goal execution token or complete the approval while
+waiting. Confirmation resumes the same approved contract. wait_for_updates
+consumes full authenticated confirmation/expert content in that turn through
+Host-authorized execution inbox reads; cancellation interrupts it without
+expert replay or a completion report. Expert-start authority permits
+substantive tools, while approved execution completion separately requires
+settled current dispatches and consumed current expert results. Plan requires
+a trusted immutable execution-turn binding; Goal retains goal_reports exact
+turn proof. See 06-host-rpc-protocol for the narrow internal RPC contracts.
 
 Plan/Goal entry remains available without a project workspace. A submission
 requires a persisted session workspace for its approval artifact: the project

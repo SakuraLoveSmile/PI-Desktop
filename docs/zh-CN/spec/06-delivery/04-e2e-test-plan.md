@@ -5548,8 +5548,10 @@ eleven-tool-round desktop paths are verified by
 | 验收 | 应用场景 |
 |---|---|
 | E / 质量 — 标准 Agent 优先委派提示与 Task 报告汇总 | E2E-DELEGATION-standard-delegates-to-subagents |
-| C / E / 质量 — 专家团 Lead 委派提示、任务板流程与工具隔离 | E2E-TEAM-lead-delegates-to-experts |
-| C / Quality / Security — 经审批的只读专家团规划 | E2E-TEAM-approved-plan-research-and-execution |
+| C / E / 质量 — 专家团强制委派、专家启动门禁与工具隔离 | E2E-TEAM-lead-delegates-to-experts, E2E-TEAM-forced-delegation |
+| C / Quality / Security — 自动只读专家团规划 | E2E-TEAM-approved-plan-research-and-execution, E2E-TEAM-automatic-plan-research |
+| C / Quality / Security — 专家团规划收件箱收敛 | E2E-TEAM-plan-inbox-before-approval |
+| C / E / Quality / Security — 已批准专家团 Goal 同回合执行与取消 | E2E-TEAM-approved-goal-same-turn-and-cancel |
 | C / Quality — 独立 Team 全景图／任务／成员标签页 | E2E-TEAM-panorama-and-member-tabs |
 | C / Quality — 实时派发卡片与单一任务目标 | E2E-TEAM-dispatch-card-live-status-and-joining |
 | C / E / F / Quality / Security — Session Todo checklist | E2E-CHAT-session-todo-checklist |
@@ -9617,8 +9619,8 @@ the latest destination. These assertions measure work counts, not device FPS.
 ## E2E-TEAM-approved-plan-research-and-execution
 
 - **前提：** 隔离的生产 Electron/Main/Host/侧车、两名研究成员、临时项目与本机 SSE 夹具；不访问用户数据或真实模型。
-- **步骤：** 取消审批、重启待审方案并确认新审批；创建两项归属明确的任务，实际 Read 并暂停第二份结果。尝试提前提交，随后结束全部研究回合、读取完整结果、提交、请求修订、拒绝重试并批准。通过普通权限卡允许执行 Write，检查文件精确字节。
-- **预期：** 确认前零研究调用；首份结果不能提交。研究工具保持只读，完整结果进入产物；审批可以恢复，正常执行权限保留，批准方案或删除团队不会提升研究成员权限。
+- **步骤：** 从输入框提交专家团规划请求，自动启动两名只读研究专家；创建归属明确的任务，实际 Read 并暂停第二份结果。提前提交必须失败，随后完成研究并提交。重启保留结果和已中断方案历史且不重放专家。修订、拒绝重试都自动研究；批准方案后自动显示执行名单确认，再允许 Ask Write 一次并核验文件。
+- **预期：** 规划不等待研究名单审批，必须有真实研究后才能提交方案；首份结果不能提前提交。研究保持只读，完整结果进入产物。执行阶段仍需用户名单确认及普通工具权限；批准方案或删除团队不会自行提升研究成员权限。
 - **规格：** `03-runtime/06-host-rpc-protocol.md`、`03-runtime/08-error-codes.md`、ADR plus-expert-team-collaboration。
 - **验收：** C / Quality / Security — 审批后的规划协作与权限隔离。
 - **里程碑：** 维护。
@@ -9627,7 +9629,7 @@ the latest destination. These assertions measure work counts, not device FPS.
 
 
 
-通过隔离 Team 夹具的真实输入框、可信审批、Host、侧车和本机模型服务验证：审批前无成员和模型调用；批准后建立两项归属明确的研究任务，暂停第二名研究员，第一份结果后仍有两项预期任务且不可提交。第二份结果和用户问题完成后提交；拒绝、修订、同次重试、批准后，Lead 按标准 Agent 权限写入隔离目录。批准后研究成员保持只读。
+通过隔离 Team 夹具的真实输入框、Host、侧车和本机模型服务验证：自动建立两名只读专家并派遣归属明确的研究任务，规划不出现待审批名单。第一份结果不能提交，完整结果后才提交。重启不重放研究；修订和重试自动研究。方案批准后自动显示执行名单确认，执行仍按标准 Agent 权限写入隔离目录。
 低层回归验证 lead_only、任务归属/删除/依赖、旧轮次、CAS、结果预算、幂等、普通完成绕过、revision、停止和重启后的问题清理、本地工具权限以及标准 Plan/Goal。集成命令为 PI_E2E_TEAM_PLANNING=1 node scripts/e2e-team.mjs，不调用真实模型或用户运行中的应用。
 
 ### E2E-DELEGATION-standard-delegates-to-subagents
@@ -9642,10 +9644,55 @@ the latest destination. These assertions measure work counts, not device FPS.
 
 ### E2E-TEAM-lead-delegates-to-experts
 
-- **前提：** 隔离的专家团执行会话、获批专家成员与确定性本地 provider；不使用真实 Provider 或用户数据。
-- **步骤：** 检查 Lead 默认 delegate、lead_only 例外及工具目录；运行获批任务板流程（一位活跃研究专家及其他空闲成员），检查琐碎不可拆分任务的 lead_only 理由。
-- **预期：** 默认委派专家，lead_only 只用于有理由的琐碎不可拆分任务；专家任务板工作流可执行，Team 不暴露 Task* 或 SessionTask，标准会话可并存。
-- **覆盖：** `pnpm test:e2e:team` 驱动隔离 Desktop/Host/sidecar 和本地 fixture。未覆盖多位活跃专家的独立并行任务；真实模型验证另标 NOT RUN，须获授权且可能产生费用。
+- **前提：** 隔离的专家团执行会话和确定性本地 provider；不访问真实 Provider 或用户数据。
+- **步骤：** 检查 Lead 强制 delegate 提示和 Team 工具目录；拒绝 lead_only，再提出非空执行名单并由用户确认。创建专家任务并派遣，检查空闲成员或仅排队消息不能解锁 Lead 工作；专家回合实际启动后验证 Lead 集成及标准会话并存。
+- **预期：** 所有 Team 工作均要求专家，包括琐碎任务；Task* 和 SessionTask 不出现在 Team 工具目录。门禁只证明获批专家回合已启动，不证明任务归属或专家已完成贡献；完整规划结果另由研究提交门禁保证。
+- **覆盖：** `node scripts/e2e-team.mjs`、`node scripts/e2e-team-forced.mjs` 和 Host/runtime 回归。fixture 中检查的专家产物是用户流程证据，不代表门禁强制专家完成。真实模型验证为 NOT RUN，须获授权且可能产生费用。
 - **规格：** ADR plus-expert-team-collaboration、`03-runtime/03-tools-and-permissions.md`。
-- **验收：** Lead 提示策略、获批任务板流程及工具隔离。
-- **阶段：** 维护。自动检查已定义，结果绑定实际候选提交。
+- **验收：** 强制委派、可信执行审批、专家启动前的工作门禁及工具隔离。
+- **阶段：** 维护。结果绑定实际候选提交；PR #48 的旧提示词测试仅作为历史记录。
+
+### E2E-TEAM-forced-delegation
+
+- **前提：** 已构建的隔离生产 Electron/Main/Host/sidecar、临时工作区与本机 SSE provider；不访问真实 provider 或用户 profile。
+- **步骤：** 模型尝试 lead_only 和独立 Write/Bash/SubmitPlan，确认拒绝且不创建 decisions/reviews/members/tasks/files/proposals。同一 Agent 回合重试 delegate，审核非空名单并明确确认；Plan 重试自动启动只读研究。
+- **预期：** 首次无工具最终回复在同一持久用户回合恢复一次；普通未批准 Agent 的有效待确认名单可结束并解释需要用户确认；已批准 Plan/Goal 执行在原回合挂起等待确认，Plan 必须继续自动真实研究。重复拒绝委派以可见审批错误结束，不产生副作用或成功完成；取消与模式变化使恢复无效。
+- **门禁：** 空闲成员和排队派遣不能授权实质 Lead 操作。验证获批专家回合已实际启动，再单独观察 fixture 专家贡献与 Lead 集成。门禁本身不强制任务归属或完成贡献；Plan 仍需完整结构化研究结果。
+- **覆盖：** 真实审批名单派遣、取消／恢复、可信邮箱续接、修订／重试自动研究及标准 Plan 兼容。
+- **自动化：** `node scripts/e2e-team-forced.mjs`，结合普通 Team／planning 用户流程。
+- **状态：** 在当前任务候选执行，记录实际提交、基线和结果；真实模型质量另标 NOT RUN。
+
+可信完成通知仅保留静默确认契约；任何非空 Team 回复或后续用户请求仍需专家 authority。
+
+队列回归：用 Send Now 提升用户请求，Team Stop 暂停所有投递并保留请求，再由 UI Resume。无待投递 Team 邮件时，请求恰好启动一次，要求新的执行名单审批，并验证真实获批专家的 fixture 贡献。
+
+### E2E-TEAM-automatic-plan-research
+
+- **前提：** 隔离生产 Electron/Main/Host/sidecar、临时项目和本机 SSE；不调用付费 provider 或用户应用。
+- **步骤：** 从输入框提交 Team Plan；同一 Lead 回合自动建立只读研究专家、创建归属明确任务并派遣。暂停一份结果，检查完整 findings 后释放并提交。修订／重试无需名单审批，重启保留结果和中断历史且不重放 provider。批准方案，再确认 Agent 执行名单，允许 Ask Write 一次。
+- **预期：** 无研究名单确认操作或待审批卡，提案前真实专家执行 Read 并提交研究。Agent 仍需用户确认执行名单与实际专家启动；fixture 单独验证专家贡献。Plan 无工具最终回复恢复到自动研究，不能等待人员审批。自动 Plan authority 不能授权 Agent 工作或研究成员写文件。
+- **规格：** Host RPC launchPolicy、错误码、组件规格和 Expert Team ADR。
+- **验收：** 对话、持久化、权限与执行生命周期。
+- **状态：** 当前请求候选执行，记录源提交／基线与结果。
+- **自动化：** `node scripts/e2e-team-planning.mjs`、`node scripts/e2e-team-forced.mjs` 以及 Host/runtime 回归。
+
+### E2E-TEAM-plan-inbox-before-approval
+
+- **前提：** 隔离生产 Electron/Main/Host/AgentHost/sidecar、本地 SSE 与临时目录；不使用用户 profile 或付费 provider。
+- **步骤：** 完成真实结构化研究，Lead 忙时发送有意义的多语言补充。SubmitPlan 正常让出，通过可信邮箱续接投递原文；最终汇总暂停时再排队普通用户请求，然后提交。另验证纯结构化研究不发送重复完成报告。
+- **预期：** 让出时无错误／审批／文件；补充完整保留于最终产物，只有一次真实消息准入，审批出现时输入框没有遗留专家消息，用户排队请求仍保留。ACK 不等于消费，已取消消息不阻塞。
+- **规格：** Host RPC PlanSubmitResult／inbox barrier 及 Expert Team ADR。
+- **验收：** 对话、持久化、队列生命周期与用户数据保留。
+- **状态：** 最新任务候选必跑，记录实际提交／基线。
+- **自动化：** `node scripts/e2e-team-planning.mjs`、Host planning/RPC 和真实流 runtime 提交回归。
+
+### E2E-TEAM-approved-goal-same-turn-and-cancel
+
+- **前提：** 已构建的隔离生产 Electron/Main/Host/sidecar、临时项目、真实专家会话及确定性本机 SSE provider。不访问用户 profile、真实 provider 或付费服务。
+- **步骤：** 从真实输入框协商 Team Goal，使用批准卡选择 Auto 并批准契约。模型提出非空专家执行名单并试图结束等待；确认原 Host turn 仍 running，只有一个 pending Goal report，executionStatus 尚未完成且没有专家启动。通过真实 Team 确认按钮批准名单，暂停真实专家，验证 GoalProgress 在原 executionId 生效、原 currentTurnId 不变。释放专家实际 Read、完成任务并发送完整验证结果；Lead 通过 wait_for_updates 在原回合消费结果，更新进度并提交结构化 Goal report。
+- **预期：** 只有一次执行、一次 SubmitGoalReport 和一个 completed／met／structured 报告；进度 revision 从 1 到 2，专家报告完整可见，原 Host turn 最后才 completed。确认／专家消息不成为新用户回合，不重复 mailbox kickoff，也不更换 executionId 或 token。
+- **取消路径：** 创建另一个 Team Goal，从真实输入框协商并批准，名单 pending 时通过可信 Main 取消。原 turn 必须 aborted，executionStatus interrupted；不启动专家、不再调用 provider、不发布已完成报告。历史 pending 报告记录可保留，不能被当作完成报告展示。
+- **关联契约：** trusted plans.bindExecutionTurn 的不可变精确 Plan-turn 绑定、Goal 的 goal_reports 精确证明、execution inbox 独立消费 ledger、不写 message.turn_id、不对模型开放绑定 RPC，另由 Host／runtime／代理回归覆盖。
+- **规格：** 02-agent-runtime、03-tools-and-permissions、06-host-rpc-protocol、08-component-spec 及 Expert Team ADR。
+- **自动化：** `node scripts/e2e-team-approved-goal.mjs`（复用隔离 Team fixture，PI_E2E_TEAM_APPROVED_GOAL=1）。
+- **状态：** 当前候选必跑，记录 Task candidate／Base main／E2E suites／Result／Environment。真实模型行为 NOT RUN；不得用历史候选结果代替本次新增流程证据。

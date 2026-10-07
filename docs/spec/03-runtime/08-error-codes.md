@@ -383,7 +383,7 @@ with teammates, shared task boards, and peer mailboxes.
 | `TEAM_MAILBOX_FULL` | yes | the recipient has reached the queued Team message limit |
 | `TEAM_MESSAGE_PAYLOAD_TOO_LARGE` | no | the Team message exceeds the 64 KiB payload limit |
 | `TEAM_DELIVERY_PENDING` | yes | the Host has not yet persisted a durable recipient queue or turn receipt |
-| `TEAM_APPROVAL_REQUIRED` | no | a launch review must be confirmed before expert teammates can start |
+| `TEAM_APPROVAL_REQUIRED` | no | current Team launch authority or actual approved expert start is missing; Agent requires user confirmation, Plan research launches automatically |
 | `TEAM_REVIEW_REVISION_CONFLICT` | yes | the launch review revision changed after the caller read it |
 | `TEAM_MODEL_SELECTION_INVALID` | no | a proposed provider/model/thinking route cannot be launched |
 | `TEAM_MEMBER_MODEL_CHANGE_BLOCKED` | no | the member holds an active turn or queued work on its route |
@@ -588,3 +588,11 @@ expected findings/questions remain, `TEAM_PLANNING_STALE` for an old round,
 invalid/budget-exceeding findings or ordinary completion bypass, and
 `TEAM_RESEARCH_READ_ONLY` for a researcher attempting a non-inspection tool.
 These codes survive both Rust RPC and the Host-sidecar proxy.
+
+Approved Team execution completion can also return TEAM_APPROVAL_REQUIRED while
+current expert dispatches/turns or full incoming results remain unsettled.
+Execution inbox reads use TEAM_UNAUTHORIZED for non-Lead identity and
+TEAM_PLANNING_STALE for invalid exact-turn consumption. Trusted Plan execution
+binding returns PLAN_EXECUTION_STALE for invalid execution/session/turn scope
+and PLAN_EXECUTION_CONFLICT for a different immutable binding; identical retries
+remain idempotent. Cancelled roster waits interrupt execution, not complete it.

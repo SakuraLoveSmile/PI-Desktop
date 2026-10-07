@@ -208,7 +208,21 @@ impl PlanManager {
         Ok(())
     }
 
+    #[allow(dead_code)] // Compatibility entry point for callers requiring a proposal.
     pub fn submit(&self, db: &Database, params: PlanSubmitParams<'_>) -> Result<PlanProposal> {
+        match self.submit_or_defer(db, params)? {
+            PlanSubmissionResult::Submitted(proposal) => Ok(*proposal),
+            PlanSubmissionResult::TeamMessagesPending { .. } => Err(anyhow!(
+                "TEAM_PLANNING_NOT_READY: queued Team input remains"
+            )),
+        }
+    }
+
+    pub fn submit_or_defer(
+        &self,
+        db: &Database,
+        params: PlanSubmitParams<'_>,
+    ) -> Result<PlanSubmissionResult> {
         let PlanSubmitParams {
             workspace_root,
             session_id,
@@ -250,6 +264,13 @@ impl PlanManager {
         if !live_turn_belongs_to_session(db, session_id, turn_id)? {
             return Err(plan_error("PLAN_APPROVAL_STALE"));
         }
+        // Acquire the writer lock before checking the inbox and hold it through
+        // artifact publication and proposal insertion. A concurrent Team send
+        // cannot slip between the final readiness check and the approval fence.
+        let tx = rusqlite::Transaction::new_unchecked(
+            db.conn(),
+            rusqlite::TransactionBehavior::Immediate,
+        )?;
         if kind == KIND_PLAN {
             if let Some(state) = crate::team::planning::get(db, session_id)? {
                 if state.phase == "submitted" {
@@ -261,13 +282,19 @@ impl PlanManager {
                                 && proposal.question == question.trim()
                                 && proposal.markdown == markdown
                             {
-                                return Ok(proposal);
+                                return Ok(PlanSubmissionResult::Submitted(Box::new(proposal)));
                             }
                         }
                     }
                 }
             }
-            crate::team::planning::validate_submission(db, session_id)?;
+            let pending_messages_count =
+                crate::team::planning::submission_pending_messages(db, session_id)?;
+            if pending_messages_count != 0 {
+                return Ok(PlanSubmissionResult::TeamMessagesPending {
+                    pending_messages_count,
+                });
+            }
         }
         let has_pending: bool = db.conn().query_row(
             "SELECT EXISTS(
@@ -286,7 +313,6 @@ impl PlanManager {
         let id = Uuid::new_v4().to_string();
         let now = now_ms();
         let insert_result = (|| -> Result<()> {
-            let tx = db.conn().unchecked_transaction()?;
             tx.prepare_cached(
                 "INSERT INTO plan_approvals (
                  request_id, session_id, turn_id, tool_call_id, kind, plan_json,
@@ -350,7 +376,9 @@ impl PlanManager {
             let _ = fs::remove_file(path);
             return Err(error);
         }
-        get_proposal(db, &id)?.ok_or_else(|| plan_error("PLAN_NOT_FOUND"))
+        get_proposal(db, &id)?
+            .map(|proposal| PlanSubmissionResult::Submitted(Box::new(proposal)))
+            .ok_or_else(|| plan_error("PLAN_NOT_FOUND"))
     }
 
     pub fn pending_for_session(

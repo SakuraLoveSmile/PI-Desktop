@@ -137,6 +137,18 @@ export class PlanExecutionDispatcher {
           mode: "agent",
         });
         turnId = await this.options.runtime.beginTurn(execution.sessionId, launch.providerId, launch.modelId);
+        if (execution.kind === "plan") {
+          await host.call("plans.bindExecutionTurn", {
+            executionId: execution.id,
+            sessionId: execution.sessionId,
+            turnId,
+          });
+        } else if (execution.kind === "goal") {
+          await host.call("goalReports.bindExecutionTurn", {
+            executionId: execution.id,
+            turnId,
+          });
+        }
         this.approvedExecutionIdsBySession.set(execution.sessionId, execution.id);
         this.executionTurns.set(execution.id, { sessionId: execution.sessionId, turnId });
         this.started.add(execution.id);

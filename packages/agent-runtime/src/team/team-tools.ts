@@ -24,7 +24,8 @@ import {
   type TeamLaunchReview,
   DECLARE_TEAM_STRATEGY_TOOL_NAME,
   MAX_TEAM_STRATEGY_REASON_CHARS,
-  type TeamWorkPurpose, type TeamPlanningProjection, type StructuredResearchResult,
+  MAX_TEAM_MEMBERS,
+  type TeamWorkPurpose, type TeamPlanningProjection, type StructuredResearchResult, type TeamResearchResult,
   SUBMIT_RESEARCH_RESULT_TOOL_NAME,
 } from "@pi-desktop/shared";
 
@@ -37,6 +38,7 @@ export interface TeamToolsOptions {
   roundId?: string;
   host: RuntimeHost;
   getTurnId?: () => string | undefined;
+  approvedExecution?: () => boolean;
   abortActiveTurn?: (memberSessionId: string) => Promise<boolean>;
 }
 
@@ -46,18 +48,17 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
     name: DECLARE_TEAM_STRATEGY_TOOL_NAME,
     label: "Declare Team Strategy",
     description:
-      "Declare the coordination strategy for this turn: either 'lead_only' for indivisible work, or 'delegate' to propose expert teammates. Only available to the Team Lead.",
+      "Expert Team mode requires expert delegation. Declare at least one named expert with a role and context. In Plan mode, the Host automatically starts a read-only research roster without user confirmation; immediately assign owned tasks and dispatch researchers. In Agent execution mode, stop for trusted user launch review before dispatch. Solo execution and lead_only are unavailable.",
     parameters: Type.Object({
-      strategy: Type.Union([Type.Literal("lead_only"), Type.Literal("delegate")], {
-        description: "Whether the Lead handles this turn alone ('lead_only') or delegates to expert teammates ('delegate').",
+      strategy: Type.Literal("delegate", {
+        description: "Required delegation strategy. Expert Team mode does not permit lead_only.",
       }),
       reason: Type.String({
         description: TEAM_STRATEGY_REASON_GUIDANCE,
         minLength: 1,
         maxLength: MAX_TEAM_STRATEGY_REASON_CHARS,
       }),
-      members: Type.Optional(
-        Type.Array(
+      members: Type.Array(
           Type.Object({
             name: Type.String({
               description: "Permanent, stable English alphanumeric/underscore routing handle for this proposed expert. Do not translate it; use presentation.displayName for display.",
@@ -91,8 +92,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
               }),
             ),
           }),
-          { description: "Proposed expert members (required for 'delegate' strategy)." },
-        ),
+          { description: "At least one proposed expert is required in Expert Team mode.", minItems: 1, maxItems: MAX_TEAM_MEMBERS },
       ),
     }),
     execute: async (_toolCallId, params): Promise<AgentToolResult> => {
@@ -137,6 +137,18 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
                 reason: result.decision.reason,
                 reviewId: result.review?.reviewId,
                 status: result.review?.status ?? "none",
+                launchPolicy: result.review?.launchPolicy ?? "user_confirmed",
+                awaitingUserApproval: result.review?.status === "pending",
+                ...(result.review?.status === "pending" ? {
+                  nextStep: opts.approvedExecution?.()
+                    ? "Explain the proposal and keep this approved execution open while waiting for trusted roster confirmation. After confirmation use wait_for_updates to consume authenticated Team messages in this same execution; dispatch owned expert tasks and await their full results before completion."
+                    : "Explain the proposal and stop this turn. Wait for trusted user review confirmation before executing work or submitting a plan.",
+                } : result.review?.status === "confirmed" ? {
+                  nextStep: result.review.launchPolicy === "automatic_plan"
+                    ? "The read-only researchers are ready automatically. Do not ask for roster confirmation or stop to explain dispatch: create owned research tasks, send_message each taskId to its researcher, and await full structured research results. Synthesize settled findings and questions, then call SubmitPlan for user approval of the implementation plan."
+                    : "The user confirmed the execution roster. Create owned tasks and dispatch the approved experts; await actual expert participation before substantive execution or completion.",
+                } : {}),
+                memberSessionIds: result.decision.memberSessionIds,
                 members: result.review?.members?.map(
                   (m: { name: string; selection: { modelId: string; providerId: string } }) => ({
                     name: m.name,
@@ -688,6 +700,9 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
               type: "text",
               text: JSON.stringify({
                 planning,
+                ...(isLead && planning && (planning.pendingMessagesCount ?? 0) > 0 ? {
+                  nextStep: "Expert messages are pending. Finish the current aggregation turn to let the mailbox consume their full contents; do not keep waiting while holding the Lead turn. Resume synthesis after those messages are consumed, then call SubmitPlan.",
+                } : {}),
                 teamSessionId: roster.teamSessionId,
                 paused: roster.paused,
                 revision: board.revision,
@@ -727,8 +742,8 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
     })}),
     execute: async (_id,params) => {
       const p=params as {taskId:string;expectedRevision:number;structuredResult:StructuredResearchResult};
-      const result=await host.call("team.submitResearchResult",{teamSessionId,callerSessionId,planningId:opts.planningId,roundId:opts.roundId,taskId:p.taskId,expectedRevision:p.expectedRevision,structuredResult:p.structuredResult});
-      return {content:[{type:"text",text:JSON.stringify(result)}],details:result};
+      const result=await host.call<{result:TeamResearchResult}>("team.submitResearchResult",{teamSessionId,callerSessionId,planningId:opts.planningId,roundId:opts.roundId,taskId:p.taskId,expectedRevision:p.expectedRevision,structuredResult:p.structuredResult});
+      return {content:[{type:"text",text:JSON.stringify({...result,nextStep:"Your structured research result has already been reported to the Lead. Finish this research turn. Use send_message only for meaningful additional updates or questions; no completion message is needed."})}],details:result};
     },
   };
   if (opts.workPurpose === "plan_research") return [sendMessageTool,waitForUpdatesTool,taskUpdateTool,taskListTool,taskGetTool,teamStatusTool,submitResearchTool];

@@ -330,7 +330,8 @@ export function createHostRuntime({
     } else if (
       method === "team.messageQueued" ||
       method === "team.queueChanged" ||
-      method === "team.interruptRequested"
+      method === "team.interruptRequested" ||
+      method === "team.executionInboxConsumed"
     ) {
       void onTeamNotification?.(method, params).catch((error: unknown) => {
         logger.app("runtime", "warn", "Team host notification handling failed", {

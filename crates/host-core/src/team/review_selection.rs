@@ -48,6 +48,29 @@ pub(super) fn require_approved_member(
             if review.status != "confirmed" {
                 continue;
             }
+            if review.launch_policy.as_deref() == Some("automatic_plan") {
+                let Some(purpose) = super::planning::purpose(db, member_session_id)? else {
+                    continue;
+                };
+                let Some(planning) = super::planning::get(db, team_session_id)? else {
+                    continue;
+                };
+                if purpose.work_purpose != "plan_research"
+                    || purpose.planning_id != planning.planning_id
+                    || purpose.round_id != planning.round_id
+                    || !planning
+                        .approved_member_ids
+                        .iter()
+                        .any(|id| id == member_session_id)
+                    || sessions::session_mode(db, member_session_id)?.as_deref() != Some("plan")
+                {
+                    continue;
+                }
+            } else if review.launch_policy.as_deref().unwrap_or("user_confirmed")
+                != "user_confirmed"
+            {
+                continue;
+            }
             for (index, member) in review.members.iter().enumerate() {
                 if decision.member_session_ids.get(index).map(String::as_str)
                     != Some(member_session_id)
