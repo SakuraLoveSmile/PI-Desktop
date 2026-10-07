@@ -272,7 +272,8 @@ globalThis.goalTeamRendererUiProbe = async () => {
     const dispatchMessages = ["Alex", "Sam", "Tina"].map((name, index) => msg(`timeline-create-${index}`, "", {
       role: "tool", toolName: "task_create", toolStatus: "success", toolCallId: `timeline-call-${index}`,
       toolArgs: { subject: `Verified ${name} research`, ownerMemberName: name },
-      toolResult: { taskId: `timeline-task-${index}`, subject: `Verified ${name} research`, status: "completed", ownerMemberName: name },
+      toolResult: { content: [{ type: "text", text: "Host-created research task" }],
+        details: { taskId: `timeline-task-${index}`, subject: `Verified ${name} research`, status: "completed", ownerMemberName: name } },
     }));
     const dispatchPart: AssistantTurnPart = { kind: "activity", items: dispatchMessages.map(message => ({ kind: "tool", message })) };
     const referenceEntry: AssistantTurnEntry = { kind: "assistant-turn", id: "timeline-turn", parts: [
