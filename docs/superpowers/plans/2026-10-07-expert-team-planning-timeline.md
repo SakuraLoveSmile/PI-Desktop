@@ -379,3 +379,8 @@ follows its section.
   index function/types, Team runtime and IPC contracts remain unchanged.
   The renderer probe now uses the same envelope, and the E2E waits for real
   cards directly instead of adding an irrelevant history-loading step.
+
+- The generic Team E2E queue's eighth synthetic input remained in the editor
+  after its click. The test helper now synchronizes with a committed browser
+  frame and waits for the draft to clear after a single click before typing
+  the next prompt. It does not retry submission or change product queue code.
