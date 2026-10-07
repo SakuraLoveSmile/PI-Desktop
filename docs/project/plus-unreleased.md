@@ -3,8 +3,8 @@
 Upstream v0.15.6 → v0.16.1 has been merged.
 
 - Standard Agent sessions with enabled subagents are prompted to delegate
-  substantial separable work first. Expert Team Leads are prompted to assign
-  separable work to experts while retaining the existing approval flow.
+  substantial separable work first. Standard Agent keeps its small-task and
+  user-participation exceptions; this guidance is unchanged by the Team policy.
 
 - Expert Team panorama cards contain long task titles without overlap. New
   task titles are guided to stay concise and match the user's language; Chinese
@@ -21,6 +21,24 @@ Upstream v0.15.6 → v0.16.1 has been merged.
   publish fallback reports or leave progress waiting for one, and report Retry
   cannot manufacture a result for an incomplete execution. Existing interruption
   records and artifacts are retained without showing completion cards.
+
+- Expert Team planning consumes supplementary expert messages before publishing
+  the plan, preventing research reports from remaining in the composer queue.
+  User-queued requests are retained; structured results need no duplicate report.
+
+- Expert Team now requires actual expert delegation, including simple requests.
+  Models cannot choose lead_only or authorize work through old solo approvals;
+  an approved expert turn must actually start before substantive Lead execution.
+  This gate does not itself require task ownership or a completed contribution. Planning
+  automatically launches read-only experts; roster confirmation is required only
+  when executing the plan.
+  Resuming a Team also restarts ordinary queued requests when no Team mail is pending.
+
+- Approved Team Plan/Goal executions stay in their original running turn through
+  execution-roster confirmation and expert results. Full authenticated updates
+  are consumed there; Goal progress and its unique completion report retain
+  their execution identity. Cancelling roster review interrupts that execution
+  without publishing a completed report or replaying expert work.
 
 - Expert Team work is easier to follow: queued prompts can be folded, team
   progress and a searchable compact task board show stable member identities,

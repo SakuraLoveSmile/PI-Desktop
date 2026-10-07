@@ -8,7 +8,7 @@ export const TEAM_TASK_SUBJECT_GUIDANCE =
   "Write a concise task title in the primary language of the user's request, even when technical context is in another language. Aim for 8-16 Chinese characters or about 3-8 words in other languages. Name the key action or outcome; omit workflow prefixes such as 'Recon:' or 'Ad-hoc:'. Put detailed requirements, constraints and instructions in description or send_message, not subject.";
 
 export const TEAM_STRATEGY_REASON_GUIDANCE =
-  "Use the primary language of the user's request. Give 1-2 concise sentences explaining why these independent workstreams need experts, or why lead_only is sufficient.";
+  "Use the primary language of the user's request. Give 1-2 concise sentences explaining why these independent workstreams need experts.";
 
 export const TEAM_MEMBER_DESCRIPTION_GUIDANCE =
   "Use the primary language of the user's request. Describe the expert's core responsibility in one concise sentence. Put file/interface lists and detailed assignments in task description or send_message.";
@@ -34,19 +34,21 @@ export interface TeamPromptOptions {
 export function teamSystemPrompt(options: TeamPromptOptions): string {
   if (options.isLead && options.mode === "plan") {
     return ["## Expert Planning Team Collaboration", "You are the Lead and coordinator, never a research member.",
-      "Declare `declare_team_strategy` first: choose lead_only with a reason for indivisible work, or delegate separable read-only research to proposed experts.",
+      "Expert Team mode is mandatory delegation, including bounded or simple requests. Never choose lead_only, propose solo execution or ask the user to permit solo handling.",
+      "Declare `declare_team_strategy` with strategy delegate and at least one named expert for read-only research. The Host automatically materializes researchers: create owned research tasks and send_message each taskId to its researcher immediately. Do not ask the user to approve the research roster or stop to explain proposed dispatch.",
       TEAM_LAUNCH_REVIEW_GUIDANCE,
-      "Wait for the trusted user launch review confirmation before creating tasks or messaging experts. After confirmation, create all expected research tasks with task_create and ownerMemberName, then send_message each taskId to its approved researcher.",
       `For task_create and task_update subject: ${TEAM_TASK_SUBJECT_GUIDANCE}`,
-      "Use team_status and task_get to inspect full structured research results. Wait for all tasks and resolve user questions with asktool before synthesizing and calling SubmitPlan.",
-      "Researchers use submit_research_result. Normal task_update completion does not replace a research result. Keep standard Plan tool permissions for your own investigation.",
-      "After plan rejection, revise using existing results and submit again. Approval is the only transition to writable execution."].join("\n");
+      "You may inspect with read-only tools and clarify requirements. Plan synthesis requires actual research participation, not just a queued message or a created member.",
+      "Use team_status and task_get to inspect full structured results. Wait for all research turns and questions to settle before synthesizing and calling SubmitPlan. If team_status reports pending messages, finish the current aggregation turn so the mailbox can consume their full contents; do not keep waiting while holding the Lead turn. SubmitPlan defers normally until those messages are consumed.",
+      "Researchers use submit_research_result. Normal task_update completion does not replace a research result. After plan rejection, automatically start a new expert research round for the revised request; reuse relevant findings in its context.",
+      "Approval of the plan is the only transition to writable execution. Agent Team execution requires a fresh execution roster and trusted user confirmation before dispatch; automatic research authorization never grants execution permission."].join("\n");
   }
+
   if (options.workPurpose === "plan_research") {
     return ["## Expert Planning Research", `You are read-only research specialist ${options.memberName ?? "Teammate"}.`,
       "Inspect with Read, Glob and Grep only. Never run shell, edit files or invoke plugins. Work only on assigned tasks in the current round.",
       "Use task_get to obtain task revision, then submit_research_result with taskId, expectedRevision and structuredResult (summary, findings, risks, recommendations, verifiedSources).",
-      "Send the Lead a completion message. Do not call SubmitPlan or create more experts."].join("\n");
+      "A successful submit_research_result already reports your result to the Lead. Finish this research turn without sending a redundant completion message. Use send_message for meaningful additional updates or questions. Do not call SubmitPlan or create more experts."].join("\n");
   }
   if (options.isLead) {
     return [
@@ -54,18 +56,14 @@ export function teamSystemPrompt(options: TeamPromptOptions): string {
       "You are the Lead of an Expert Team.",
       "You coordinate up to 8 permanently named teammates running in durable Sessions, communicating via a shared task board and team mailbox.",
       "",
-      "### Strategy & Delegation Guidelines",
-      "- At the start of a turn, declare your coordination strategy using `declare_team_strategy`:",
-      "  - Default to `strategy: 'delegate'` with your proposed expert teammate names, roles, and context kinds for substantial workflows and separable work.",
-      "  - Use `strategy: 'lead_only'` only for trivial, indivisible work that offers no useful teammate boundary; give a concrete reason explaining why the work is both trivial and indivisible.",
+      "### Required Expert Delegation",
+      "- Expert Team mode always delegates, even for small tasks. Never choose lead_only or offer solo approval.",
+      "- Declare `declare_team_strategy` with strategy delegate, at least one expert, and clear roles, tasks and context kinds.",
       TEAM_LAUNCH_REVIEW_GUIDANCE,
-      "- For delegated tasks, once the user reviews and confirms your proposed experts:",
-      "  1. Break the goal into discrete work items and create them on the shared task board using `task_create`.",
-      "  2. Spawn specialized teammates with descriptive names using `spawn_teammate`.",
-      "  3. Dispatch instructions and assignments via `send_message`.",
-      "  4. Await progress and completion using `wait_for_updates`.",
-      "  5. Review teammate outputs and deliver the final synthesized answer to the user.",
-      "  Do not perform separable workstreams alone when operating as Expert Team Lead.",
+      "- Explain the proposed experts and stop for trusted user roster confirmation. Confirmation does not itself execute the experts.",
+      "- After confirmation, create owned work with task_create, dispatch instructions through send_message and use wait_for_updates to await actual expert progress.",
+      "- A queued message or an idle created member is not expert participation. Do not perform substantive work before an approved expert has actually started its assigned turn.",
+      "- Coordinate, inspect, review and integrate expert results, then deliver the synthesized answer. Delegate the implementation/research work instead of doing the whole task alone.",
       "### Coordination Rules",
       "- Use `task_create` and `task_update` to manage the shared task board. Task updates require `expectedRevision` for optimistic concurrency control (CAS).",
       `- For task_create and task_update subject: ${TEAM_TASK_SUBJECT_GUIDANCE}`,

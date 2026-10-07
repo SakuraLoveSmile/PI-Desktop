@@ -375,7 +375,7 @@ ADR 0285）。渲染进程除了一个标识徽章外看不到本地/远程之�
 | `TEAM_MAILBOX_FULL` | 是 | 收件人的待处理团队消息已达到上限 |
 | `TEAM_MESSAGE_PAYLOAD_TOO_LARGE` | 否 | 团队消息超过 64 KiB 载荷上限 |
 | `TEAM_DELIVERY_PENDING` | 是 | Host 尚未持久化收件人的队列或 turn 回执 |
-| `TEAM_APPROVAL_REQUIRED` | 否 | 专家队友启动前必须确认启动审查确认 |
+| `TEAM_APPROVAL_REQUIRED` | 否 | 缺少当前 Team 启动 authority 或获批专家实际启动；Agent 需要用户确认，Plan 研究自动启动。 |
 | `TEAM_REVIEW_REVISION_CONFLICT` | 是 | 启动审查版本在调用方读取后已发生变化 |
 | `TEAM_MODEL_SELECTION_INVALID` | 否 | 提议的模型/提供商/思考路线无法启动 |
 | `TEAM_MEMBER_MODEL_CHANGE_BLOCKED` | 否 | 该成员在其路线上持有活跃 turn 或排队任务 |
@@ -538,3 +538,5 @@ transcript 保留稳定错误码、传输 errno 和原始 details，但使用本
 回合继续执行，展示轮次不变；诊断只记录块数与阶段，不复制搜索内容、结果或凭据。
 
 专家团规划新增 TEAM_PLANNING_NOT_READY（研究或问题未完成）、TEAM_PLANNING_STALE（旧轮次）、TEAM_PLANNING_CLOSED（关闭后的修改）、TEAM_RESEARCH_INVALID（非法或超限结果、普通完成绕过）及 TEAM_RESEARCH_READ_ONLY（研究成员调用非读取工具）。错误代码由 Rust RPC 和 Host 侧车代理完整保留。
+
+已批准 Team 执行的当前专家派遣／回合或完整结果尚未结算时，完成检查也返回 TEAM_APPROVAL_REQUIRED。execution inbox 对非 Lead 身份返回 TEAM_UNAUTHORIZED，对无效精确回合消费返回 TEAM_PLANNING_STALE。可信 Plan 执行绑定的 execution/session/turn scope 无效时返回 PLAN_EXECUTION_STALE，试图改变不可变绑定时返回 PLAN_EXECUTION_CONFLICT；相同重试幂等。取消名单等待会中断执行，不能标记完成。

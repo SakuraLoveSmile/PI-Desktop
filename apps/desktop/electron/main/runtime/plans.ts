@@ -562,18 +562,18 @@ async function dispatchApprovedPlan(rawExecution: unknown): Promise<void> {
       turnId,
     });
     startedApprovedExecutions.add(execution.id);
+    if (execution.kind === "plan") {
+      await runtimeState.host.call("plans.bindExecutionTurn", {
+        executionId: execution.id,
+        sessionId: execution.sessionId,
+        turnId,
+      });
+    }
     if (execution.kind === "goal") {
-      try {
-        await runtimeState.host.call("goalReports.bindExecutionTurn", {
-          executionId: execution.id,
-          turnId,
-        });
-      } catch (bindErr) {
-        logger.app("runtime", "warn", "failed to bind goal report execution turn", {
-          sessionId: execution.sessionId,
-          data: { executionId: execution.id, turnId, error: String(bindErr) },
-        });
-      }
+      await runtimeState.host.call("goalReports.bindExecutionTurn", {
+        executionId: execution.id,
+        turnId,
+      });
     }
     const accepted = await runtimeState.sidecar.call<{ accepted: boolean }>(
       "agent.executeApprovedPlan",

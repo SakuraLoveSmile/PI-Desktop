@@ -89,6 +89,7 @@ const HOST_PROXY_ALLOWED = new Set([
   "team.createMember",
   "team.createTask",
   "team.declareStrategy",
+  "team.authorizeLeadTool",
   "team.getBoard",
   "team.getExecutionDecision",
   "team.getLaunchReview",
@@ -99,6 +100,8 @@ const HOST_PROXY_ALLOWED = new Set([
   "team.closePlanningQuestion",
   "team.interruptMember",
   "team.listMessages",
+  "team.getLeadExecutionState",
+  "team.readExecutionInbox",
   "team.sendMessage",
   "team.updateTask",
 ]);

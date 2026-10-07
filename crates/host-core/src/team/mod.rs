@@ -1,13 +1,21 @@
 #![allow(unused_imports)]
 #[cfg(test)]
 mod admission_tests;
+pub(crate) mod authority;
+#[cfg(test)]
+mod authority_tests;
 pub mod board;
+pub mod execution_inbox;
+#[cfg(test)]
+mod execution_inbox_tests;
 pub mod lifecycle;
 #[cfg(test)]
 mod lifecycle_tests;
 pub mod mailbox;
 pub mod model;
 pub mod planning;
+#[cfg(test)]
+mod planning_mail_tests;
 #[cfg(test)]
 mod planning_tests;
 pub mod review;
@@ -17,6 +25,8 @@ mod review_tests;
 pub mod roster;
 #[cfg(test)]
 mod roster_tests;
+#[cfg(test)]
+mod test_support;
 #[cfg(test)]
 mod tests;
 

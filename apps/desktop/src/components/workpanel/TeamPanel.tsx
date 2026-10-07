@@ -8,6 +8,8 @@ import type {
 import { api } from "../../lib/api";
 import { requestedView, type TeamDetailView } from "../../lib/team-panel-view";
 import { useTeamSnapshot } from "../../hooks/useTeamSnapshot";
+import { userTeamLaunchReview } from "../../hooks/useTeamExecutionReview";
+import { useAppStore } from "../../stores/app-store";
 import {
   buildTeamTaskRows,
   localizedTeamSnapshotError,
@@ -58,6 +60,9 @@ export function TeamPanel({
 }: TeamPanelProps) {
   const { t } = useTranslation();
   const { snapshot, loading, error: snapshotError, refresh, lastSuccessAt } = useTeamSnapshot(teamSessionId);
+  const leadMode = useAppStore((state) =>
+    state.sessions.find((session) => session.id === teamSessionId)?.mode);
+  const review = leadMode === "plan" ? undefined : userTeamLaunchReview(snapshot?.review);
   const error = snapshotError ? localizedTeamSnapshotError(snapshotError, t) : snapshotError;
   const [resuming, setResuming] = useState(false);
   const [view, setView] = useState<TeamDetailView>(() => requestedView({ taskId: initialTaskId, memberSessionId: initialMemberSessionId, view: initialView }));
@@ -315,12 +320,12 @@ export function TeamPanel({
           ) : null}
         </aside>
       )}
-      {snapshot?.review && (
+      {review && (
         <TeamLaunchReviewPanel
-          key={`${teamSessionId}:${snapshot.review.reviewId}`}
+          key={`${teamSessionId}:${review.reviewId}`}
           teamSessionId={teamSessionId}
-          review={snapshot.review}
-          decision={snapshot.decision}
+          review={review}
+          decision={snapshot?.decision}
           onReviewChanged={() => void loadData()}
         />
       )}

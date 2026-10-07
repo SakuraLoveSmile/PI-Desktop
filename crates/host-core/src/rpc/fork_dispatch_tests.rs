@@ -54,6 +54,7 @@ const PLAN_SCHEDULE_METHODS: &[&str] = &[
     "plans.cancelSchedule",
     "plans.markScheduleMissed",
     "plans.markRevisionFailed",
+    "plans.bindExecutionTurn",
     "session.getTurn",
 ];
 

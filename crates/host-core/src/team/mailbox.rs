@@ -233,6 +233,15 @@ pub fn send_team_message(db: &Database, params: SendMessageParams<'_>) -> Result
             ],
         )?;
         if inserted > 0 {
+            if caller_session_id != team_session_id {
+                if let Some(turn) = sessions::running_turn_id(db, caller_session_id)? {
+                    db.kv_set(
+                        "team-message-source-turn-v1",
+                        &message_id,
+                        &serde_json::json!(turn),
+                    )?;
+                }
+            }
             super::lifecycle::bump_team_revision_conn(conn, team_session_id)?;
         }
         Ok(())
