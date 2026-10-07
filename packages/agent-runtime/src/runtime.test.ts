@@ -7602,6 +7602,68 @@ describe("DesktopAgentRuntime subagents", () => {
     );
   }
 
+  it("uses delegate-first guidance and subagent tools in the standard profile", async () => {
+    const runtime = createRuntime({ executionProfile: "standard", subagents: [explorer] });
+    try {
+      const agent = (runtime as unknown as { agent: Agent }).agent;
+      expect(agent.state.systemPrompt).toContain("## Delegation");
+      expect(agent.state.systemPrompt).toContain("delegate-first");
+      expect(agent.state.systemPrompt).toContain("TaskWait");
+      expect(agent.state.systemPrompt).toContain("a few tool calls");
+      expect(agent.state.systemPrompt).toContain("user participation");
+      expect(agent.state.systemPrompt).toContain("No recursive delegation, duplicate work, or agent debates.");
+      expect(agent.state.systemPrompt).toContain("at most one optional review pass");
+      const task = agent.state.tools.find((tool) => tool.name === "Task");
+      expect(task?.description).toContain("delegate-first");
+      expect(task?.description).not.toContain("Prefer doing the work yourself");
+      const names = agent.state.tools.map((tool) => tool.name);
+      for (const name of ["declare_team_strategy", "spawn_teammate", "send_message", "wait_for_updates", "interrupt_agent", "task_create", "task_update", "task_list", "task_get", "team_status"]) {
+        expect(names).not.toContain(name);
+      }
+    } finally {
+      await runtime.dispose();
+    }
+  });
+
+  it("omits delegation guidance and Task tools when no subagent is enabled", async () => {
+    // The Host passes only enabled definitions to the runtime.
+    const runtime = createRuntime({ executionProfile: "standard", subagents: [] });
+    try {
+      const agent = (runtime as unknown as { agent: Agent }).agent;
+      expect(agent.state.systemPrompt).not.toContain("## Delegation");
+      expect(agent.state.systemPrompt).not.toContain("delegate-first");
+      const names = agent.state.tools.map((tool) => tool.name);
+      for (const name of ["Task", "TaskWait", "TaskList", "TaskStop"]) {
+        expect(names).not.toContain(name);
+      }
+    } finally {
+      await runtime.dispose();
+    }
+  });
+
+  it("uses Team experts without Task or SessionTask declarations", async () => {
+    const runtime = createRuntime({
+      executionProfile: "team",
+      subagents: [explorer],
+      pluginTools: [{ name: "SessionTask", description: "Delegate to a session.", parameters: {} }],
+      teamContext: { teamSessionId: "team-1", callerSessionId: "session-1", isLead: true },
+    });
+    try {
+      const agent = (runtime as unknown as { agent: Agent }).agent;
+      // SessionTask is a deferred plugin tool, so inspect the entire catalog.
+      const catalog = (runtime as unknown as { toolCatalog: Map<string, unknown> }).toolCatalog;
+      for (const name of ["Task", "TaskWait", "TaskList", "TaskStop", "SessionTask"]) {
+        expect(catalog.has(name)).toBe(false);
+      }
+      expect(agent.state.tools.map((tool) => tool.name)).toContain("declare_team_strategy");
+      expect(agent.state.systemPrompt).not.toContain("## Delegation");
+      expect(agent.state.systemPrompt).toContain("Default to `strategy: 'delegate'`");
+      expect(agent.state.systemPrompt).toContain("only for trivial, indivisible work");
+    } finally {
+      await runtime.dispose();
+    }
+  });
+
   it("offers Task as a core Agent-mode tool that advertises every definition", async () => {
     const runtime = createRuntime({ subagents: [explorer, pinned] });
     const tool = taskTool(runtime);
@@ -7816,7 +7878,7 @@ describe("DesktopAgentRuntime subagents", () => {
     await runtime.dispose();
   });
 
-  it("withholds undefined delegates but rejects declared Task execution in contract modes", async () => {
+  it("withholds undefined delegates but rejects all declared Task tools in contract modes", async () => {
     const withoutDefinitions = createRuntime();
     expect(taskTool(withoutDefinitions)).toBeUndefined();
     await withoutDefinitions.dispose();
@@ -7825,10 +7887,20 @@ describe("DesktopAgentRuntime subagents", () => {
     // with Bash or Edit would drive straight through them.
     for (const mode of ["plan", "goal"] as const) {
       const runtime = createRuntime({ mode, subagents: [explorer] });
-      expect(taskTool(runtime)).toBeDefined();
-      await expect(taskTool(runtime).execute("blocked-task", { agent: "explorer", task: "Inspect." }))
-        .rejects.toThrow(`not allowed in ${mode}`);
-      await runtime.dispose();
+      const previousRuns = subagentRuns.calls.length;
+      try {
+        const agent = (runtime as unknown as { agent: Agent }).agent;
+        for (const name of ["Task", "TaskWait", "TaskList", "TaskStop"]) {
+          const tool = agent.state.tools.find((entry) => entry.name === name);
+          expect(tool).toBeDefined();
+          expect(tool?.description).toContain(`not allowed in ${mode}`);
+          await expect(tool?.execute(`blocked-${name}`, { agent: "explorer", task: "Inspect." }))
+            .rejects.toThrow(`not allowed in ${mode}`);
+        }
+        expect(subagentRuns.calls).toHaveLength(previousRuns);
+      } finally {
+        await runtime.dispose();
+      }
     }
   });
 

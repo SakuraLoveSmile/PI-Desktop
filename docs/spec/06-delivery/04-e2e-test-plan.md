@@ -9454,6 +9454,8 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 | Acceptance | Scenarios |
 |---|---|
+| E / Quality — Standard Agent delegate-first prompt and Task report convergence | E2E-DELEGATION-standard-delegates-to-subagents |
+| C / E / Quality — Expert Team Lead delegation prompt, board workflow and catalog isolation | E2E-TEAM-lead-delegates-to-experts |
 | C / Quality / Security — Approved read-only Team planning | E2E-TEAM-approved-plan-research-and-execution |
 | C / Quality — Independent Team panorama/task/member tabs | E2E-TEAM-panorama-and-member-tabs |
 | C / Quality — Live dispatch card and single task target | E2E-TEAM-dispatch-card-live-status-and-joining |
@@ -17254,3 +17256,59 @@ ordinary-completion bypass, Team revision notifications, stop/restart question
 cleanup, local tool interception and unchanged standard Plan/Goal behavior.
 Run `PI_E2E_TEAM_PLANNING=1 node scripts/e2e-team.mjs` for the integration path;
 never use a real provider or the user's running application as its fixture.
+
+### E2E-DELEGATION-standard-delegates-to-subagents
+
+- **Preconditions**: Isolated standard Agent session with one enabled subagent
+  fixture and a deterministic local mock provider. No real provider or user data.
+- **Steps**: Start a separable task. Inspect the provider request for the
+  delegate-first Delegation guidance and Task tool description. Have the mock
+  model start one Task and then call TaskWait with that delegation's explicit
+  ID; inspect the returned child report before the parent turn ends.
+- **Expected**: The provider receives delegate-first guidance, and the Task
+  description advertises the same policy. The child report is returned through
+  TaskWait. This proves prompt steering and a representative single-delegate
+  path, not a guarantee that a real model will delegate.
+- **Coverage**: `pnpm test:e2e:subagent-models` exercises provider prompt/tool
+  assertions, one Task launch, and explicit-ID TaskWait report convergence.
+  `packages/agent-runtime/src/runtime.test.ts` covers the disabled-standard
+  prompt/catalog state, Team catalog isolation, and retained Plan/Goal
+  declarations with execution denied. Multi-worker parallel dispatch while the
+  parent continues independent work is NOT RUN by this scenario. Real-model
+  behavior validation is separately NOT RUN; it requires provider
+  authorization and may incur cost.
+- **Specs**: `03-runtime/02-agent-runtime.md`,
+  `03-runtime/03-tools-and-permissions.md`, ADR 0089.
+- **Acceptance criterion**: Standard Agent delegate-first prompt and Task report
+  convergence, plus the linked runtime mode/catalog regression coverage.
+- **Milestone**: Maintenance.
+- **Status**: Automated checks are defined above; record task-candidate results
+  against the exact tested commit.
+
+### E2E-TEAM-lead-delegates-to-experts
+
+- **Preconditions**: Isolated Expert Team execution session, approved expert
+  members, and the deterministic local provider in the Team fixture. No real
+  provider or user data.
+- **Steps**: Start the Team execution journey and inspect the provider request
+  for Lead delegate-by-default and lead_only guidance. Inspect the declared
+  Team tool catalog. Run the approved board workflow with one active researcher
+  and idle peers, then exercise a trivial lead-only task and inspect its reason.
+- **Expected**: The Lead prompt defaults to delegate and limits lead_only to
+  trivial indivisible work with a reason. The approved Team board workflow
+  admits the assigned researcher, and Task*, SessionTask remain absent from the
+  Team catalog. Standard session behavior remains available alongside Team.
+- **Coverage**: `pnpm test:e2e:team` uses the isolated Desktop/Host/sidecar
+  fixture and deterministic provider to assert prompt/catalog guidance, run the
+  approved board path with one active researcher and idle peers, verify the
+  lead_only reason, and check standard-session coexistence. The fixture does
+  not run multiple active experts for independent parallel assignments. Real
+  model behavior validation is separately NOT RUN; it requires provider
+  authorization and may incur cost.
+- **Specs**: ADR plus-expert-team-collaboration,
+  `03-runtime/03-tools-and-permissions.md`.
+- **Acceptance criterion**: Expert Team Lead prompt policy, approved task-board
+  path, and catalog isolation.
+- **Milestone**: Maintenance.
+- **Status**: Automated checks are defined above; record task-candidate results
+  against the exact tested commit.

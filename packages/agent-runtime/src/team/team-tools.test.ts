@@ -400,11 +400,19 @@ describe("Expert Team tools and prompt (ADR 0304)", () => {
     expect(leadPrompt).toContain("spawn_teammate");
     expect(leadPrompt).toContain("Subagent `Task*` delegation is disabled");
     expect(leadPrompt).toContain("separable work");
-    expect(leadPrompt).toContain("indivisible task");
+    expect(leadPrompt).toContain("Default to `strategy: 'delegate'`");
+    expect(leadPrompt).toContain("only for trivial, indivisible work");
+    expect(leadPrompt).toContain("concrete reason");
+    expect(leadPrompt).toContain("Do not perform separable workstreams alone");
 
     const memberPrompt = teamSystemPrompt({ isLead: false, memberName: "Coder" });
     expect(memberPrompt).toContain('teammate "Coder"');
     expect(memberPrompt).toContain("Teammates cannot spawn other teammates");
+    expect(memberPrompt).not.toContain("lead_only");
+    expect(memberPrompt).not.toContain("declare_team_strategy");
+    const planningPrompt = teamSystemPrompt({ isLead: true, mode: "plan" });
+    expect(planningPrompt).toContain("Wait for the trusted user launch review confirmation");
+    expect(planningPrompt).toContain("Approval is the only transition to writable execution.");
   });
 });
 
