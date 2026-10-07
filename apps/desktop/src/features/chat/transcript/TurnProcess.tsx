@@ -13,6 +13,7 @@ import {
   turnProcessTiming,
 } from "../../../lib/turn-process";
 import { useAppStore } from "../../../stores/app-store";
+import { usePendingTeamExecutionReview } from "../../../hooks/useTeamExecutionReview";
 import {
   IconChevronRight,
   IconCircleAlert,
@@ -39,6 +40,8 @@ export function TurnProcess({
   children: ReactNode;
 }) {
   const { t } = useTranslation();
+  const activeSessionId = useAppStore((state) => isActive ? state.activeSessionId : undefined);
+  const pendingTeamReview = usePendingTeamExecutionReview(activeSessionId, isActive);
   const mode = useAppStore((state) => resolveThinkingDisplayMode(state.settings?.thinkingDisplayMode));
   const search = useContext(TranscriptSearchContext);
   const revealRequest = useMemo(() => search && processContainsMessage(processParts, search.messageId)
@@ -78,7 +81,7 @@ export function TurnProcess({
       >
         <span className="tool-activity-icon" aria-hidden><IconSparkles size={14} /></span>
         <span className={`tool-activity-label${isActive ? " running" : ""}`}>
-          {t(isActive ? thinkingNow ? "chat.thinkingFor" : "chat.processingFor" : "chat.processedFor", {
+          {t(pendingTeamReview ? "team.review.status.pending" : isActive ? thinkingNow ? "chat.thinkingFor" : "chat.processingFor" : "chat.processedFor", {
             time: formatToolDuration(seconds),
           })}
         </span>

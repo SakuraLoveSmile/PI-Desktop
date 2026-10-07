@@ -2039,7 +2039,7 @@ sklm: {
       coordinationError: "Error de coordinación durante {{stage}}: {{message}}",
       missingProvider: "Proveedor no disponible ({{id}})",
       missingModel: "Modelo no disponible ({{id}})",
-      status: { pending: "Pendiente", confirmed: "Confirmada", cancelled: "Cancelada", interrupted: "Interrumpida" },
+      status: { pending: "Esperando confirmación del equipo", confirmed: "Confirmada", cancelled: "Cancelada", interrupted: "Interrumpida" },
       thinkingLevel: { off: "Desactivado", minimal: "Mínimo", low: "Bajo", medium: "Medio", high: "Alto", xhigh: "Muy alto", max: "Máximo" },
       coordinationStage: { member_creation: "creación de miembros", task_creation: "creación de tareas", enqueue: "puesta en cola de mensajes", delivery: "entrega de mensajes" },
     },

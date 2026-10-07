@@ -2039,7 +2039,7 @@ sklm: {
       coordinationError: "Koordination in Phase {{stage}} fehlgeschlagen: {{message}}",
       missingProvider: "Anbieter nicht verfügbar ({{id}})",
       missingModel: "Modell nicht verfügbar ({{id}})",
-      status: { pending: "Ausstehend", confirmed: "Bestätigt", cancelled: "Abgebrochen", interrupted: "Unterbrochen" },
+      status: { pending: "Warten auf Teambestätigung", confirmed: "Bestätigt", cancelled: "Abgebrochen", interrupted: "Unterbrochen" },
       thinkingLevel: { off: "Aus", minimal: "Minimal", low: "Niedrig", medium: "Mittel", high: "Hoch", xhigh: "Sehr hoch", max: "Maximum" },
       coordinationStage: { member_creation: "Mitgliedererstellung", task_creation: "Aufgabenerstellung", enqueue: "Nachrichtenwarteschlange", delivery: "Nachrichtenzustellung" },
     },

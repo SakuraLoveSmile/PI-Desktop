@@ -1990,7 +1990,7 @@ export const ptBR = {
       coordinationError: "Coordination failed during {{stage}}: {{message}}",
       missingProvider: "Provedor indisponível ({{id}})",
       missingModel: "Modelo indisponível ({{id}})",
-      status: { pending: "Pendente", confirmed: "Confirmada", cancelled: "Cancelada", interrupted: "Interrompida" },
+      status: { pending: "Aguardando confirmação da equipe", confirmed: "Confirmada", cancelled: "Cancelada", interrupted: "Interrompida" },
       thinkingLevel: { off: "Desativado", minimal: "Mínimo", low: "Baixo", medium: "Médio", high: "Alto", xhigh: "Muito alto", max: "Máximo" },
       coordinationStage: { member_creation: "criação de membros", task_creation: "criação de tarefas", enqueue: "enfileiramento de mensagens", delivery: "entrega de mensagens" },
     },

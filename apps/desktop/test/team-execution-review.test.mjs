@@ -93,6 +93,7 @@ async function fixture(session = lead(), proposal = review()) {
   const state = {
     ready: true, page: "chat", sessions: [session], activeSessionId: session.id,
     workPanelOpen: false, workPanelTabs: [], activeWorkPanelTabId: null,
+    planCheckpoints: {},
     refreshSessions: async () => {},
     openWorkPanelTabForSession(sessionId, tab) {
       opened.push({ sessionId, tab });
@@ -129,7 +130,8 @@ async function fixture(session = lead(), proposal = review()) {
   const tabs = await load("../src/lib/work-panel-tabs.ts");
   const hook = await load("../src/hooks/useTeamExecutionReview.ts", {
     react: harness.react, "../lib/team-presentation": presentation,
-    "../lib/work-panel-tabs": tabs, "../stores/app-store": { useAppStore: store },
+    "../lib/work-panel-tabs": tabs, "../lib/plan-mode-state": await load("../src/lib/plan-mode-state.ts"),
+    "../stores/app-store": { useAppStore: store },
     "./useTeamSnapshot": sharedHook,
   });
   return {
@@ -166,6 +168,21 @@ test("a current execution review opens the closed aggregate Team tab once", asyn
     assert.equal(f.opened.length, 2);
     assert.equal(f.state.activeWorkPanelTabId, "team:lead-a");
   } finally { f.cleanup(); }
+});
+
+test("approved Plan and Goal execution reveal staffing consent while preserving contract mode", async () => {
+  for (const mode of ["plan", "goal"]) {
+    const f = await fixture(lead("lead-a", { mode }));
+    try {
+      f.render(); await settle(); f.render();
+      assert.equal(f.opened.length, 0, "negotiation cannot reveal execution consent");
+      f.state.planCheckpoints["lead-a"] = { kind: mode, status: "approved", executionState: "running" };
+      f.render(); await settle(); f.render();
+      assert.equal(f.opened.length, 1, `${mode} execution must reveal the pending roster`);
+      assert.equal(f.state.activeWorkPanelTabId, "team:lead-a");
+      assert.equal(f.state.sessions[0].mode, mode, "contract presentation stays intact");
+    } finally { f.cleanup(); }
+  }
 });
 
 test("current legacy pending approval is revealed on renderer reload", async () => {
@@ -255,6 +272,7 @@ test("TeamPanel preserves user approval history but never renders automatic rese
     const view = await load("../src/lib/team-panel-view.ts");
     let current = snapshot();
     let currentMode = "agent";
+    let checkpoint;
     const { TeamPanel } = await load("../src/components/workpanel/TeamPanel.tsx", {
       react, "react/jsx-runtime": { jsx, jsxs: jsx },
       "react-i18next": { useTranslation: () => ({ t: (key) => key }) },
@@ -262,7 +280,7 @@ test("TeamPanel preserves user approval history but never renders automatic rese
       "../../hooks/useTeamSnapshot": { useTeamSnapshot: () => ({ snapshot: current, refresh: async () => {} }) },
       "../../hooks/useTeamExecutionReview": f.hook,
       "../../stores/app-store": {
-        useAppStore: (selector) => selector({ sessions: [lead("lead-a", { mode: currentMode })] }),
+        useAppStore: (selector) => selector({ sessions: [lead("lead-a", { mode: currentMode })], planCheckpoints: { "lead-a": checkpoint } }),
       },
       "../../lib/team-presentation": presentation,
       "./TeamLaunchReviewPanel": { TeamLaunchReviewPanel: reviewPanel },
@@ -285,6 +303,21 @@ test("TeamPanel preserves user approval history but never renders automatic rese
       current = snapshot(review({ launchPolicy: "automatic_plan", status }));
       assert.equal(findReview(TeamPanel({ teamSessionId: "lead-a" })), undefined);
     }
+    for (const mode of ["plan", "goal"]) {
+      currentMode = mode;
+      checkpoint = { kind: mode, status: "approved", executionState: "running" };
+      current = snapshot(review());
+      assert.equal(findReview(TeamPanel({ teamSessionId: "lead-a" })).props.review.status, "pending",
+        `${mode} execution must render its confirmation card`);
+      current = snapshot(review({ launchPolicy: "automatic_plan", status: "confirmed" }));
+      assert.equal(findReview(TeamPanel({ teamSessionId: "lead-a" })), undefined);
+    }
+    currentMode = "goal";
+    checkpoint = { kind: "goal", status: "approved", executionState: "completed" };
+    current = snapshot(review({ status: "confirmed" }));
+    assert.equal(findReview(TeamPanel({ teamSessionId: "lead-a" })).props.review.status, "confirmed",
+      "completed Goal keeps its existing consent history");
+    checkpoint = undefined;
     currentMode = "plan";
     for (const launchPolicy of [undefined, "user_confirmed", "automatic_plan"]) {
       current = snapshot(review({ launchPolicy }));

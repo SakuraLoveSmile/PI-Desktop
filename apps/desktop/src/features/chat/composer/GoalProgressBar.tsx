@@ -3,6 +3,8 @@ import { useTranslation } from "react-i18next";
 import type { GoalReportChangedEvent, PlanProposal } from "@pi-desktop/shared";
 import { api } from "../../../lib/api";
 import { IconChevronDown, IconChevronRight } from "../../../components/icons";
+import { usePendingTeamExecutionReview } from "../../../hooks/useTeamExecutionReview";
+import { useAppStore } from "../../../stores/app-store";
 import {
   shouldShowGoalProgressBar,
   resolveGoalCapsuleState,
@@ -20,6 +22,11 @@ export type GoalProgressBarProps = {
 
 export function GoalProgressBar({ sessionId, proposal }: GoalProgressBarProps) {
   const { t } = useTranslation();
+  const currentExecution = useAppStore((state) => state.planCheckpoints[sessionId]);
+  const isCurrentExecution = proposal.sessionId === sessionId &&
+    currentExecution?.id === proposal.id && currentExecution.executionId === proposal.executionId &&
+    currentExecution.executionState === "running" && proposal.executionState === "running";
+  const pendingTeamReview = usePendingTeamExecutionReview(sessionId, isCurrentExecution);
   const [expanded, setExpanded] = useState<boolean>(() => {
     return sessionCollapsePreferences.get(sessionId) ?? false;
   });
@@ -183,7 +190,9 @@ export function GoalProgressBar({ sessionId, proposal }: GoalProgressBarProps) {
   const items = progress?.items ?? [];
 
   const stateBadgeText =
-    proposal.executionState === "queued"
+    pendingTeamReview
+      ? t("team.review.status.pending")
+      : proposal.executionState === "queued"
       ? t("chat.scheduleExecutionState.queued", "排队中")
       : proposal.executionState === "interrupted"
       ? t("chat.scheduleExecutionState.interrupted", "已中断")
@@ -201,7 +210,11 @@ export function GoalProgressBar({ sessionId, proposal }: GoalProgressBarProps) {
     <div className="goal-progress-stack" data-testid="goal-progress-bar">
       {/* Centered Progress Capsule */}
       <div className="goal-progress-capsule" role="status" aria-live="polite">
-        {capsuleState.kind === "error" || capsuleState.kind === "initializing" ? (
+        {pendingTeamReview && capsuleState.kind !== "error" ? (
+          <span className="goal-progress-status-text">
+            {t("team.review.status.pending")}
+          </span>
+        ) : capsuleState.kind === "error" || capsuleState.kind === "initializing" ? (
           <span className="goal-progress-status-text">
             {capsuleState.message}
           </span>
