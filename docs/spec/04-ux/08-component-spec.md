@@ -2973,12 +2973,18 @@ message was delivered based only on mailbox enqueue state.
 
 ### Overview chrome and task progress
 
-All session Overview disclosures use 48px headers with secondary, normal-weight
-14px text, 12px left inset and dashed default-border separators. Native disclosure
+All session Overview disclosures use 48px headers with primary, medium-weight
+14px text, 16px left inset and solid subtle-border separators. Native disclosure
 markers are replaced by one decorative 16px right-hand chevron, rotating left
 when closed; reduced-motion preferences remove the transition. The subagent
 summary retains its existing panorama control between its label and chevron.
-The metadata header remains above the scroll area.
+The metadata header remains above the scroll area without shrinking. Its icon
+and title share a compact row; project and model occupy full-width metadata
+rows, followed by mode and message count side by side. Long values truncate
+within their columns. References use compact rounded options with a raised
+selected surface, retaining the existing pressed-state semantics and labels.
+Artifact text flexes within its row so long paths cannot displace trailing
+status badges. Disclosure headers expose an inset keyboard focus outline.
 
 Team sessions show one progress section (`进展` / `進展`) with a panorama link,
 arrow, divider and independent 24px disclosure control. The section publishes
