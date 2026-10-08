@@ -2315,7 +2315,7 @@ The named tools cover the common Agent workflow:
 
 - `pi_app_info`
 - `pi_project_get`, `pi_project_list`, `pi_project_open`, `pi_project_clear`
-- `pi_session_list`, `pi_session_create`, `pi_session_get`,
+- `pi_session_list`, `pi_session_create`, `pi_session_get`, `pi_session_get_chunk`,
   `pi_session_rename`, `pi_session_fork`, `pi_session_delete`,
   `pi_session_configure`
 - `pi_agent_prompt`, `pi_agent_status`, `pi_turn_get`, `pi_agent_stop`,
@@ -2390,6 +2390,30 @@ transcript survive when its unbounded `ContextCompactionRecord` (`summary` /
 `retainedTail` / `details.modifiedFiles`) alone caused the overflow. Results
 already under the limit retain their full compaction details, and the desktop's
 own session detail is unchanged.
+
+For a single message that still exceeds that envelope, the additive read-only
+`pi_session_get_chunk` accepts `{id: string, messageBefore?: nonnegative integer,
+offset?: nonnegative integer, expectedSha256?: string}`. Offset defaults to zero;
+all integers must be safe integers. Unknown arguments are rejected. Every call
+invokes the existing `session/get` handler with `{id, messageBefore?,
+messageLimit: 1}` and no `contentLimit`. The result must identify the requested
+session and include valid physical `messageStart`/`messageEnd` coordinates,
+message count and `hasMoreBefore`/`hasMoreAfter` flags for that one-message page.
+It serializes the complete page as JSON UTF-8 bytes without compaction projection
+or transcript shortening. Pages over 16 MiB fail with `MCP_RESULT_LIMIT`.
+
+The direct result is `{sessionId, offset, nextOffset, totalBytes, sha256,
+encoding: "base64", chunk}`. The decoded chunk is at most 64 KiB; `nextOffset`
+is the next byte offset, or explicit `null` at the end. The SHA-256 covers the
+complete UTF-8 byte sequence. For every offset greater than zero the caller
+must supply the previous SHA-256 as `expectedSha256` (64 lowercase hexadecimal
+characters). Each call reads and hashes the page again; a changed hash fails
+with `CONFLICT`, without retry, cache, or partial result. Out-of-range offsets
+and invalid arguments fail with `INVALID_PARAMS`; mismatched identity or invalid
+physical pagination fails with `INVALID_RESULT`. Clients must validate byte
+counts, offsets, the full hash, and decoded session identity before adopting any
+evidence. Existing `pi_session_get`, authentication, permission and persistence
+contracts are unchanged; old callers need no migration.
 
 The six `session/collaboration/*` operations are first-party-plugin-only: they
 require an authenticated plugin tool invocation context, so they appear in
