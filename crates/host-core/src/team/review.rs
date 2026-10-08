@@ -236,72 +236,13 @@ pub fn declare_team_strategy(
         } else {
             get_team_member_by_name(db, team_session_id, &canonical_name)?
         };
-        let existing_config = reused_member
-            .as_ref()
-            .map(|member| super::expert_config::member_snapshot(db, &member.member_session_id))
-            .transpose()?
-            .flatten();
-        if let (Some(requested), Some(existing)) = (&proposed.preset_id, &existing_config) {
-            if requested != &existing.preset_id {
-                return Err(anyhow!(
-                    "TEAM_MODEL_SELECTION_INVALID: an existing member's expert preset is immutable"
-                ));
-            }
-        }
-        // Existing members keep their approved snapshot; defaults apply only to
-        // new members and are never a live link from settings to a session.
-        let role_config = if reused_member.is_none() {
-            proposed
-                .preset_id
-                .as_ref()
-                .map(|preset| super::expert_config::resolve(db, team_session_id, preset))
-                .transpose()?
-        } else {
-            None
-        };
-        let expert_config = if reused_member.is_some() {
-            existing_config
-        } else {
-            proposed.preset_id.as_ref().map(|preset| {
-                super::expert_config::ExpertTeamConfigSnapshot {
-                    preset_id: preset.clone(),
-                    tools: role_config.as_ref().and_then(|config| config.tools.clone()),
-                    instructions: role_config
-                        .as_ref()
-                        .and_then(|config| config.instructions.clone()),
-                }
-            })
-        };
-        let mut sel = proposed.selection.unwrap_or_default();
-        if sel.provider_id.is_some() != sel.model_id.is_some() {
-            return Err(anyhow!("TEAM_MODEL_SELECTION_INVALID: provider and model overrides must be supplied together"));
-        }
-        if let Some(config) = role_config {
-            if config.provider_id.is_some() {
-                sel.provider_id = config.provider_id;
-                sel.model_id = config.model_id;
-            }
-            if config.thinking_level.is_some() {
-                sel.thinking_level = config.thinking_level;
-            }
-        }
-        if let Some(member) = reused_member.as_ref().filter(|_| expert_config.is_some()) {
-            let summary = sessions::get_session(db, &member.member_session_id)?
-                .ok_or_else(|| anyhow!("TEAM_NOT_FOUND: reused member session not found"))?
-                .summary;
-            sel.provider_id = Some(summary.provider_id.ok_or_else(|| {
-                anyhow!("TEAM_MODEL_SELECTION_INVALID: confirmed expert provider is missing")
-            })?);
-            sel.model_id = Some(summary.model_id.ok_or_else(|| {
-                anyhow!("TEAM_MODEL_SELECTION_INVALID: confirmed expert model is missing")
-            })?);
-            sel.thinking_level = Some(summary.thinking_level);
-        }
-        if sel.provider_id.is_some() != sel.model_id.is_some() {
-            return Err(anyhow!(
-                "TEAM_MODEL_SELECTION_INVALID: provider and model overrides must be supplied together"
-            ));
-        }
+        let (sel, expert_config) = super::expert_config::resolve_launch_config(
+            db,
+            team_session_id,
+            proposed.preset_id.as_ref(),
+            proposed.selection,
+            reused_member.as_ref(),
+        )?;
         let provider_id = sel
             .provider_id
             .unwrap_or_else(|| default_provider_id.clone());
