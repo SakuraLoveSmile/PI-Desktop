@@ -968,3 +968,14 @@ the current window width:
 | Card radius | ~14px elevated stroke |
 | Toggle | **32×20** thumb 16, neutral accent on (not green) |
 | Open-target pill | leading VS Code glyph |
+
+## Plus project memory recording
+
+Project archive's existing Project memory editor adds a shared recording switch
+after its description. The switch defaults off and persists immediately; note
+edits continue using the existing single Save action. Turning recording off
+retains saved notes for chat context. All existing card layout, add/edit/remove
+actions and compact/narrow scrolling behavior remain. Conflicts retain drafts
+and offer an explicit reload; if the project changes group ownership, editing
+is disabled until the current project identity is refreshed. No separate memory
+source lists or automatic background extraction are introduced.

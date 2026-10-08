@@ -2668,3 +2668,14 @@ window, and the owner's own failure code arrives through the main window, which
 is the frame that ran the action. A widget action never changes call state by
 itself: it is forwarded to the owner frame, and the resulting state reaches the
 widget through the same authoritative view the owner receives.
+
+## Plus project memory editor IPC
+
+`projectMemoryEditorGet`, `projectMemoryEditorSave`, and
+`projectAutoMemorySetEnabled` map to the Host project-context RPCs. Save carries
+`projectPath, expectedOwner, expectedMemory, entries`; the opt-in switch carries
+`projectPath, expectedOwner, enabled`. The editor retains the current layout and
+shared controls, adds an immediately persisted default-off recording switch,
+and stages note edits until Save. Failed CAS preserves the draft and exposes an
+explicit reload action that warns that it discards unsaved changes. Async results
+from a previous project/editor instance cannot update the current dialog.

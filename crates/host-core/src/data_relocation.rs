@@ -367,7 +367,7 @@ fn relocate_database(roots: &Roots) -> Result<()> {
     }
     if column_exists(&transaction, "kv", "value_json")? {
         let rows = {
-            let mut statement = transaction.prepare("SELECT ns, key, value_json FROM kv WHERE ns IN ('app','ui','projectGroups','projectMemory','projectInstructions')")?;
+            let mut statement = transaction.prepare("SELECT ns, key, value_json FROM kv WHERE ns IN ('app','ui','projectGroups','projectMemory','projectInstructions','projectAutoMemory')")?;
             let rows = statement
                 .query_map([], |row| {
                     Ok((
@@ -383,6 +383,11 @@ fn relocate_database(roots: &Roots) -> Result<()> {
             let next_key = if matches!(namespace.as_str(), "projectMemory" | "projectInstructions")
             {
                 roots.remap(&key).unwrap_or_else(|| key.clone())
+            } else if namespace == "projectAutoMemory" {
+                key.strip_prefix("path:")
+                    .and_then(|path| roots.remap(path))
+                    .map(|path| format!("path:{path}"))
+                    .unwrap_or_else(|| key.clone())
             } else {
                 key.clone()
             };
