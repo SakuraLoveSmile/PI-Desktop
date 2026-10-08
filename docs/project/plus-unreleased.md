@@ -2,6 +2,11 @@
 
 Upstream v0.15.6 → v0.16.1 has been merged.
 
+- Successful and failed task notifications both appear in the durable inbox.
+  The bell badge now counts every unread persisted task notification, matching
+  the Dock/taskbar badge; selection, mark-all-read, and clear stay synchronized
+  with Host persistence across reloads.
+
 - AskTool questions keep paragraphs and wide tables readable instead of
   squeezing them into vertical strips. Tables scroll inside the card and long
   questions leave answer choices and submission controls available.
