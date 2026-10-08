@@ -1,6 +1,9 @@
 mod config_sync_rpc;
 mod goal_rpc;
 mod plan_schedule_rpc;
+mod project_auto_memory;
+mod project_code_search;
+mod project_history;
 mod scheduled_rpc;
 mod scheduled_tools;
 #[cfg(test)]
@@ -1984,6 +1987,15 @@ async fn handle_request(
                 .get("entries")
                 .ok_or_else(|| rpc_err(1002, "entries required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
+            if let Some(group) = st
+                .db
+                .list_project_groups()
+                .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?
+                .into_iter()
+                .find(|group| group.id == id)
+            {
+                project_auto_memory::ensure_legacy_write_allowed(&st.db, &group.primary_path)?;
+            }
             let memory = st
                 .db
                 .set_project_group_memory(id, entries)
@@ -2165,8 +2177,23 @@ async fn handle_request(
             st.db
                 .delete_project_memory(&path)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            st.db
+                .delete_path_auto_memory(&path)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "removed": removed, "sessionsRemoved": sessions_removed }))
         }
+        "project.memory.editor.get"
+        | "project.memory.editor.save"
+        | "project.autoMemory.setEnabled"
+        | "project.autoMemory.agentList"
+        | "project.autoMemory.agentUpsert"
+        | "project.autoMemory.agentDelete" => {
+            project_auto_memory::handle(state, method, params).await
+        }
+        "project.history.search" | "project.history.context" => {
+            project_history::handle(state, method, params).await
+        }
+        "project.codeSearch" => project_code_search::handle(state, params).await,
         "project.memory.get" => {
             let path = params
                 .get("path")
@@ -2185,6 +2212,7 @@ async fn handle_request(
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "path required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
+            project_auto_memory::ensure_legacy_write_allowed(&st.db, path)?;
             if let Some(entries) = params.get("entries") {
                 let memory = st
                     .db

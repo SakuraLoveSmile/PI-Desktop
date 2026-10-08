@@ -934,6 +934,22 @@
   width: min(100%, 760px);
 }
 
+.project-auto-memory-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.project-memory-dialog-error {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs-plus);
+}
+
 .project-memory-dialog-description,
 .project-memory-dialog-hint {
   margin: 0;

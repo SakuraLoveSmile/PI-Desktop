@@ -17620,3 +17620,42 @@ decisions preserve session/request identity. Pending decisions cannot repeat;
 failed decisions remain retryable and known/unknown reasons remain honest.
 Only external clipboard and resolution boundaries are fixtures; no actual
 user permission is granted or denied. Save a native screenshot for visual QA.
+
+### E2E-PLUS-project-context: Record memory, recall sources, and search current code
+
+- **Preconditions**: Isolated data/profile and two local projects; built candidate
+  Host and Node sidecar; deterministic loopback model (no paid provider).
+- **Steps**: Open Project memory, enable recording, ask to remember a stable
+  package-manager preference. Continue a fresh user turn. Attempt a stale editor
+  save, then explicitly reload. Search historical verification and read the
+  returned session/message source. Search a code marker; edit/create/rename/delete
+  matching files and change ignore rules, repeating search. Disable recording,
+  switch project, restart both processes, and ask about the saved preference.
+  Inspect/clear the code cache, then search again. Repeat memory edit/forget after
+  moving a secondary root out of and back into its group.
+- **Expected**: Recording defaults off. Enabled Agent writes are durable; no
+  background model/embedding request is made. Disabled recording retains saved
+  context and removes writes. Stale snapshot/entry CAS is `CONFLICT`, changed owner
+  is `PROJECT_CHANGED`; failures never overwrite notes or silently lose drafts.
+  Root reattachment cannot duplicate or resurrect forgotten group notes. History
+  stays within current group membership, cites stable source IDs and excludes
+  deleted/native sessions. CodeSearch stays within the caller session root,
+  returns path/line excerpts, reconciles file/ignore changes and flags partial
+  coverage. Sensitive files and escaping symlinks are excluded; bounds are
+  explicit. Clear only affects that root's derived cache and is denied in
+  Plan/Goal. Parent binding spoofing and restricted expert-tool access are denied.
+  Grep's existing behavior is unchanged.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`, `02-agent-runtime.md`,
+  `04-data-storage.md`, `06-host-rpc-protocol.md`; `04-ux/06-settings-ia.md`.
+- **Acceptance**: C (runtime tools), D (editor), F (persistence), Localization.
+- **Milestone**: Plus.
+- **Automation**: `node scripts/e2e-project-context.mjs` (real sidecar/proxy/Host,
+  controlled HTTP model); `node scripts/e2e-code-index.mjs` (real Host/filesystem);
+  `node scripts/e2e-project-auto-memory.mjs` (real editor/production CSS in
+  isolated Electron, fixture IPC). Host unit tests cover CAS, group lifecycle,
+  relocation, config-sync eligibility and mode/expert permissions.
+- **Status**: Implemented; current-run results recorded in the delivery evidence.
+
+| Plus scenario | User path | Automated entry |
+| --- | --- | --- |
+| E2E-PLUS-project-context | Remember → later turn/restart recall → source lookup → current code search | project-context, code-index, project-auto-memory scripts |
