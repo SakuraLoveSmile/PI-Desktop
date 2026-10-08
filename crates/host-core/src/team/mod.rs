@@ -8,6 +8,9 @@ pub mod board;
 pub mod execution_inbox;
 #[cfg(test)]
 mod execution_inbox_tests;
+pub mod expert_config;
+#[cfg(test)]
+mod expert_config_tests;
 pub mod lifecycle;
 #[cfg(test)]
 mod lifecycle_tests;

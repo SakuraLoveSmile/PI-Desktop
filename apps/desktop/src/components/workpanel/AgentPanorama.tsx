@@ -10,6 +10,7 @@ import {
   IconChevronLeft,
   IconRefresh,
   IconX,
+  IconCircleSlash,
 } from "../icons";
 import { Button, TooltipButton } from "../ui";
 import { PixelAvatar } from "./team/PixelAvatar";
@@ -20,8 +21,10 @@ import {
   PANORAMA_NODE_WIDTH,
   usePanoramaViewport,
   type PanoramaViewport,
+  type PanoramaLayout,
 } from "./agent-panorama-viewport";
 import "../../styles/agent-panorama.css";
+import { createDependencyPanoramaLayout, type PanoramaDependency } from "./agent-panorama-graph";
 
 export type PanoramaNodeStatus =
   | "running"
@@ -30,7 +33,9 @@ export type PanoramaNodeStatus =
   | "paused"
   | "idle"
   | "todo"
-  | "blocked";
+  | "blocked"
+  | "cancelled"
+  | "provisioning";
 
 export type PanoramaNode = {
   id: string;
@@ -50,6 +55,7 @@ export type AgentPanoramaProps = {
   title?: string;
   rootNode: PanoramaNode;
   childNodes: PanoramaNode[];
+  dependencyEdges?: PanoramaDependency[];
   onBack?: () => void;
   onSelectNode?: (id: string) => void;
   emptyMessage?: string;
@@ -66,6 +72,7 @@ export function AgentPanorama({
   title,
   rootNode,
   childNodes,
+  dependencyEdges,
   onBack,
   onSelectNode,
   emptyMessage,
@@ -79,8 +86,10 @@ export function AgentPanorama({
 }: AgentPanoramaProps) {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
-  const topologyKey = JSON.stringify(childNodes.map(({ id }) => id));
-  const layout = useMemo(() => createPanoramaLayout(childNodes.map(({ id }) => id)), [topologyKey]);
+  const topologyKey = JSON.stringify({ root: rootNode.id, children: childNodes.map(({ id }) => id), dependencyEdges });
+  const layout: PanoramaLayout & { edges?: PanoramaDependency[] } = useMemo(() => dependencyEdges
+    ? createDependencyPanoramaLayout(rootNode.id, childNodes.map(({ id }) => id), dependencyEdges)
+    : createPanoramaLayout(childNodes.map(({ id }) => id)), [topologyKey]);
   const viewportController = usePanoramaViewport({
     scopeKey: viewportScopeKey,
     active: !loading && !error,
@@ -113,6 +122,8 @@ export function AgentPanorama({
       idle: t("team.phase.idle"),
       todo: t("team.taskStatus.pending"),
       blocked: t("team.readiness.blocked"),
+      cancelled: t("team.taskStatus.cancelled"),
+      provisioning: t("team.phase.provisioning"),
     };
 
     const Glyph = {
@@ -123,6 +134,8 @@ export function AgentPanorama({
       blocked: IconCircleDashed,
       idle: IconCircle,
       todo: IconCircle,
+      cancelled: IconCircleSlash,
+      provisioning: IconCircleDashed,
     }[status] ?? IconCircle;
 
     return (
@@ -160,8 +173,11 @@ export function AgentPanorama({
     );
   }
 
-  const rootCenterX = layout.root.x + PANORAMA_NODE_WIDTH / 2;
-  const rootBottomY = layout.root.y + PANORAMA_NODE_HEIGHT;
+  const positions = new Map([
+    [rootNode.id, layout.root],
+    ...layout.children.map((position) => [position.id, position] as const),
+  ]);
+  const edges = layout.edges ?? layout.children.map(({ id }) => ({ from: rootNode.id, to: id }));
   const rootIdentity = rootNode.roleLabel
     ? `${rootNode.roleLabel} ${rootNode.name}`
     : rootNode.name;
@@ -242,13 +258,17 @@ export function AgentPanorama({
           height={layout.height}
           aria-hidden="true"
         >
-          {layout.children.map((childPos) => {
-            const childCenterX = childPos.x + PANORAMA_NODE_WIDTH / 2;
-            const childTopY = childPos.y;
-            const d = panoramaEdgePath(rootCenterX, rootBottomY, childCenterX, childTopY);
+          {edges.map(({ from, to }) => {
+            const parentPos = positions.get(from);
+            const childPos = positions.get(to);
+            if (!parentPos || !childPos) return null;
+            const d = panoramaEdgePath(parentPos.x + PANORAMA_NODE_WIDTH / 2,
+              parentPos.y + PANORAMA_NODE_HEIGHT, childPos.x + PANORAMA_NODE_WIDTH / 2, childPos.y);
             return (
               <path
-                key={`edge-${childPos.id}`}
+                key={JSON.stringify([from, to])}
+                data-edge-from={from}
+                data-edge-to={to}
                 d={d}
                 className="agent-panorama-edge"
               />

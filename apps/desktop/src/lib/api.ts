@@ -28,6 +28,7 @@ import type {
   PendingInteractiveRequests,
   AgentInstructionFile,
   AppSettings,
+  ExpertTeamSettings,
   ExpectedMarketplace,
   CommandShellCatalog,
   AppVersionInfo,
@@ -394,7 +395,9 @@ export function normalizeSettings(settings: AppSettings): AppSettings {
   };
 }
 
-export function validateSettingsWrite(settings: AppSettings): AppSettings {
+export type SettingsWrite = Partial<AppSettings> & { expertTeamExpected?: ExpertTeamSettings | null };
+
+export function validateSettingsWrite<T extends Partial<AppSettings>>(settings: T): T {
   if (
     settings.thinkingDisplayMode !== undefined &&
     settings.thinkingDisplayMode !== "detailed" &&
@@ -737,8 +740,15 @@ export const api = {
     invoke<void>(IPC.invoke.storageClearCache, input),
   removeStorageBackup: (input: { language: string }) =>
     invoke<void>(IPC.invoke.storageRemoveBackup, input),
-  setSettings: (settings: AppSettings) =>
-    invoke(IPC.invoke.settingsSet, validateSettingsWrite(settings)),
+  setSettings: (settings: SettingsWrite) => {
+    const patch = { ...settings };
+    // Only the dedicated team editor owns this field. Legacy full-settings
+    // writers must not replay a stale team snapshot while saving preferences.
+    if (!Object.prototype.hasOwnProperty.call(settings, "expertTeamExpected")) {
+      delete patch.expertTeam;
+    }
+    return invoke(IPC.invoke.settingsSet, validateSettingsWrite(patch));
+  },
   configSyncGetState: () => invoke<ConfigSyncState>(IPC.invoke.configSyncGetState),
   configSyncConfigure: (input: ConfigSyncConfigureInput) =>
     invoke<ConfigSyncState>(IPC.invoke.configSyncConfigure, input),

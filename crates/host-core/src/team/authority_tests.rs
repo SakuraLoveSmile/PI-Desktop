@@ -12,6 +12,7 @@ fn proposal(db: &crate::db::Database, lead: &str, turn: &str) -> TeamLaunchRevie
             strategy: "delegate",
             reason: "One focused expert task",
             members: Some(vec![TeamProposedMember {
+                preset_id: None,
                 name: "expert".into(),
                 description: None,
                 context_kind: None,

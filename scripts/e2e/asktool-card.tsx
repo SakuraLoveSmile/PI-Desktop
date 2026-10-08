@@ -67,7 +67,15 @@ const QUESTIONS: FixtureQuestion[] = [
   },
 ];
 
-export async function asktoolCardProbe() {
+const TABLE_QUESTION = `我计划派出下列六位专家，请确认阵容：
+
+| 显示名 | 路由名 | 角色 | 职责 | 文件 | 校验 | 独立复核 | 依赖顺序 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+${["林枫", "周野", "陈肃", "许航", "苏晴", "何喋"].map((name, i) => `| ${name} | expert_${i} | developer | 用户管理数据校验、认证会话及错误处理 | \`app/repositories/very_long_user_repository_filename.py\` | 统一十四种错误码与 HTTP 状态映射 | \`tests/test_service.py\` 完整复核 | 基础模块之后验证 |`).join("\n")}
+
+确认仅用于记录选择，提交后才继续。`;
+
+export async function asktoolCardProbe({ keepEvidence = false } = {}) {
   await i18n.init({ lng: "en", resources: { en: { translation: en } } });
   const initial = useAppStore.getState();
   const originalResolve = api.resolveAskTool;
@@ -110,8 +118,8 @@ export async function asktoolCardProbe() {
   // question independent of the active locale.
   const questionText = () =>
     element(".asktool-question").textContent ?? "";
-  const mount = (requestId: string) => {
-    const request = askRequest(requestId, QUESTIONS);
+  const mount = (requestId: string, questions = QUESTIONS) => {
+    const request = askRequest(requestId, questions);
     useAppStore.setState({
       pendingAsks: { [SESSION_ID]: [request] },
     });
@@ -250,16 +258,66 @@ export async function asktoolCardProbe() {
       `custom text survives, saw ${JSON.stringify(resolutions[3]!.answers)}`,
     );
 
+    const layouts = [];
+    const tableQuestions = [{ question: TABLE_QUESTION, options: ["确认阵容", "调整后确认"] }];
+    for (const theme of ["dark", "light"]) {
+      document.documentElement.setAttribute("data-theme", theme);
+      for (const width of [1000, 640, 320]) {
+        host.style.width = `${width}px`;
+        mount(`ask-table-${theme}-${width}`, tableQuestions);
+        await frame();
+        const card = element(".asktool-card");
+        const table = element('[role="table"]');
+        const scroll = table.parentElement!;
+        const rows = [...table.querySelectorAll('[role="row"]')];
+        const header = [...rows[0]!.children] as HTMLElement[];
+        assert(rows.length === 7 && header.length === 8, "rich table preserves its full row/column structure");
+        assert(card.getBoundingClientRect().width <= width + 1, "card exceeds available column width");
+        assert(scroll.clientWidth < scroll.scrollWidth, "wide table must scroll inside the question");
+        assert(header.every(cell => cell.getBoundingClientRect().width >= 120), "table columns collapsed into character strips");
+        for (const row of rows.slice(1)) {
+          [...row.children].forEach((cell, index) => {
+            assert(Math.abs(cell.getBoundingClientRect().left - header[index]!.getBoundingClientRect().left) < 1, "table cells do not align with headers");
+          });
+        }
+        scroll.scrollLeft = scroll.scrollWidth;
+        assert(header.at(-1)!.getBoundingClientRect().right <= scroll.getBoundingClientRect().right + 2, "last column cannot be reached by horizontal scrolling");
+        assert(element(".asktool-options").getBoundingClientRect().top < innerHeight, "long question hides answer options below the viewport");
+        layouts.push({ theme, width, columnWidth: header[0]!.getBoundingClientRect().width });
+      }
+    }
+    flushSync(() => options()[0]!.click());
+    flushSync(() => headerButtons().primary.click());
+    await until(() => resolutions.length === 5, "table question resolves through existing controls");
+    assert(JSON.stringify(resolutions[4]!.answers) === JSON.stringify([["确认阵容"]]), "layout changed the submitted answer");
+    const richLabel = "**确认阵容**\n\n| 操作 | 详细范围 |\n| --- | --- |\n| 确认 | `app/repositories/very_long_user_repository_filename.py` |";
+    mount("ask-rich-table-option", [{ question: "Choose the exact rich label", options: [richLabel] }]);
+    await frame();
+    const optionScroll = element<HTMLButtonElement>(".asktool-option").querySelector<HTMLElement>(".asktool-rich-table-scroll")!;
+    assert(optionScroll.scrollWidth > optionScroll.clientWidth, "rich option table must scroll within its button");
+    assert(element(".asktool-card").getBoundingClientRect().width <= 321, "rich option table widened the card");
+    flushSync(() => options()[0]!.click());
+    flushSync(() => headerButtons().primary.click());
+    await until(() => resolutions.length === 6, "rich table option submits");
+    assert(JSON.stringify(resolutions[5]!.answers) === JSON.stringify([[richLabel]]), "rich option answer must preserve its original Markdown label");
+    if (keepEvidence) {
+      document.documentElement.setAttribute("data-theme", "dark");
+      host.style.width = "100%";
+      mount("ask-table-evidence", tableQuestions);
+      await frame();
+    }
     assert(errors.length === 0, `render errors: ${errors.map(String)}`);
-    return { ok: true, resolutions: resolutions.length };
+    return { ok: true, resolutions: resolutions.length, layouts };
   } catch (error) {
     return {
       ok: false,
       error: error instanceof Error ? (error.stack ?? error.message) : String(error),
     };
   } finally {
-    flushSync(() => root.unmount());
-    host.remove();
+    if (!keepEvidence) {
+      flushSync(() => root.unmount());
+      host.remove();
+    }
     api.resolveAskTool = originalResolve;
     useAppStore.setState({
       pendingAsks: initial.pendingAsks,

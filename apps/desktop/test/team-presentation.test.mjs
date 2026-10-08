@@ -47,7 +47,7 @@ test("snapshot errors localize only the existing domain error codes", () => {
   assert.equal(localizedTeamSnapshotError("", translate), "");
 });
 
-test("Team progress presents ad-hoc tasks, state labels and extra activity in one disclosure", async () => {
+test("Team progress presents numbered tasks, state labels and extra activity in one disclosure", async () => {
   const server = await createServer({
     root: fileURLToPath(new URL("..", import.meta.url)), configFile: false,
     server: { middlewareMode: true, hmr: false, ws: false }, appType: "custom",
@@ -66,7 +66,7 @@ test("Team progress presents ad-hoc tasks, state labels and extra activity in on
     }
     const i18n = createInstance();
     await i18n.init({ lng: "en", resources: { en: { translation: { team: {
-      taskProgress: "Task progress", adHocGroup: "Ad-hocs", adHocTaskTitle: "Ad-hoc: {{subject}}",
+      taskProgress: "Task progress", numberedTask: "Task {{number}}: {{subject}}",
       openTaskWithStatus: "Open task {{subject}} ({{status}})",
       waitingForDependencies: "Waiting for dependencies", roles: { researcher: "Researcher" },
     } } } } });
@@ -82,11 +82,11 @@ test("Team progress presents ad-hoc tasks, state labels and extra activity in on
       })));
     const html = render(true);
     assert.match(html, /data-completed="0" data-total="1"/);
-    assert.match(html, /Ad-hocs/);
-    assert.match(html, /Ad-hoc: Task blocked/);
+    assert.doesNotMatch(html, /team-progress-group-toggle/);
+    assert.match(html, /Task 1: Task blocked/);
     assert.match(html, /Open task Task blocked \(Waiting for dependencies\)/);
     assert.match(html, /data-state="blocked"/);
-    assert.match(html, /width="12" height="12"/);
+    assert.match(html, /width="20" height="20"/);
     assert.match(html, /Researcher Alex/);
     assert.match(html, /Lead activity/);
     assert.doesNotMatch(html, /team-progress-count/);

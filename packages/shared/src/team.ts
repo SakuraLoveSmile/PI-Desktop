@@ -7,6 +7,7 @@
  */
 
 import type { SessionThinkingLevel } from "./types.js";
+import type { ExpertTeamConfigSnapshot, ExpertTeamPresetId } from "./expert-team-settings.js";
 
 export const MAX_TEAM_MEMBERS = 8;
 export const MAX_TEAM_TASKS = 256;
@@ -417,6 +418,7 @@ export type TeamMemberSelection = {
  */
 export type TeamProposedMember = {
   name: string;
+  presetId?: ExpertTeamPresetId;
   description?: string;
   /** Defaults to `fresh` when omitted. */
   contextKind?: TeamContextKind;
@@ -431,6 +433,7 @@ export const TEAM_LAUNCH_REVIEW_SCHEMA_VERSION = 1;
 export type TeamLaunchReviewStatus = "pending" | "confirmed" | "cancelled" | "interrupted";
 
 export type TeamLaunchReviewMember = Omit<TeamProposedMember, "contextKind" | "selection"> & {
+  expertConfig?: ExpertTeamConfigSnapshot;
   contextKind: TeamContextKind;
   selection: TeamMemberSelection;
 };
@@ -506,6 +509,7 @@ export type DeclareTeamStrategyArgs = {
 
 export type TeamWorkPurpose = "execute" | "plan_research";
 export type TeamRuntimeContextProjection = {
+  expertConfig?: ExpertTeamConfigSnapshot;
   teamSessionId: string;
   callerSessionId: string;
   isLead: boolean;

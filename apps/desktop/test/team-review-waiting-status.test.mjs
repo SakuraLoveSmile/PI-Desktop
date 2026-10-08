@@ -24,7 +24,7 @@ function fixture() {
     planCheckpoints: { lead: execution }, planHistory: {}, planningStates: {},
     runningSessions: { lead: true }, sessionOutcomes: {}, latestTurnResults: {},
     goalReports: {}, agentStatuses: { lead: { activity: { phase: "preparing", since: 1 } } },
-    sessionCompactions: {}, activeWorkPanelTabId: null, workPanelTabs: [],
+    sessionCompactions: {}, sessionTodos: {}, activeWorkPanelTabId: null, workPanelTabs: [],
     openWorkPanelTabForSession: (sessionId, tab) => opened.push({ sessionId, tab }),
     showToast() {}, openFileInWorkPanel() {}, openSubagentTab() {},
   };
@@ -174,6 +174,10 @@ test("active process summaries wait for review while completed historical groups
 
 test("Overview presents the active execution as waiting and preserves completed proposal history", () => {
   const f = fixture();
+  f.state.sessionTodos.lead = { sessionId: "lead", revision: 1, updatedAt: 1, todos: [
+    { content: "Inspect current execution", status: "completed", priority: "medium" },
+    { content: "Wait for expert review", status: "in_progress", priority: "high" },
+  ] };
   f.state.planHistory.lead = [
     { id: "old", sessionId: "lead", title: "Earlier", kind: "plan", status: "approved", executionState: "completed" },
     { id: "queued", sessionId: "lead", title: "Later", kind: "plan", status: "approved", executionState: "queued" },
@@ -184,10 +188,14 @@ test("Overview presents the active execution as waiting and preserves completed 
   assert.match(waiting, /panel.overview.status.completed/);
   assert.match(waiting, /panel.overview.status.queued/);
   assert.doesNotMatch(waiting, /panel.overview.status.running/);
+  assert.match(waiting, /Inspect current execution.*chat.todo.status.completed/);
+  assert.match(waiting, /Wait for expert review.*chat.todo.status.in_progress/);
   f.snapshot.review.status = "confirmed";
   const running = f.render(overview());
   assert.match(running, /panel.overview.status.running/);
   assert.doesNotMatch(running, new RegExp(pendingLabel));
+  assert.match(running, /Inspect current execution.*chat.todo.status.completed/);
+  assert.match(running, /Wait for expert review.*chat.todo.status.in_progress/);
 });
 
 test("the current Goal capsule waits for review then restores its preparing and running labels", () => {

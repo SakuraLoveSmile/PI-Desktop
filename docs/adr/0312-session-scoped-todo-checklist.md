@@ -26,11 +26,16 @@ serves the complete committed snapshot through `todos.get`. Electron Main
 forwards the notification through the existing IPC bridge, and the renderer
 keeps snapshots keyed by session id while rejecting stale revisions.
 
-The Composer TodoDock is a non-focusing, session-aware presentation surface.
-It shows bounded progress and at most eight ordered rows. Remote RACP sessions
-remain local-only for this vertical slice because RACP v1 has no Todo snapshot
-operation; the renderer skips local recovery for those session ids rather than
-reading the local database.
+The Work Panel Overview owns the session-aware checklist presentation. Its
+2026-10-08 UI amendment places a default-expanded ordered inline list first in
+Overview, with full task text and localized status. It replaces the Composer
+progress trigger and popup. Live updates preserve focus and expansion; session
+changes open the selected session's own list. Empty snapshots hide the section.
+Recovery still reads Host state on mount and backend restoration; global push
+updates remain session-keyed in the existing store. Remote RACP sessions remain
+local-only for this vertical slice because RACP v1 has no Todo snapshot operation;
+the renderer skips local recovery for those ids rather than reading SQLite.
+
 
 ## Consequences
 
@@ -45,5 +50,5 @@ reading the local database.
 
 Host-core tests cover migration, validation, transaction rollback, restart,
 revision ordering, fork isolation, cascade deletion, and RPC authorization.
-Renderer type checks and TodoDock interaction tests cover revision filtering,
+Renderer type checks and Overview checklist interaction tests cover revision filtering,
 remote-session degradation, session switching, expansion, and bounded display.

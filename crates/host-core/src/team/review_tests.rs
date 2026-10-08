@@ -119,6 +119,7 @@ fn review_cannot_alias_an_existing_member_session_under_a_different_name() {
             strategy: "delegate",
             reason: "Try to rename an immutable member",
             members: Some(vec![TeamProposedMember {
+                preset_id: None,
                 name: "writer".to_string(),
                 description: None,
                 context_kind: Some("fresh".to_string()),
@@ -304,6 +305,7 @@ fn test_team_strategy_declaration_and_launch_review_lifecycle() {
             reason: "Complex multi-file refactoring",
             members: Some(vec![
                 TeamProposedMember {
+                    preset_id: None,
                     name: "architect".to_string(),
                     description: Some("System architecture".to_string()),
                     context_kind: Some("fresh".to_string()),
@@ -316,6 +318,7 @@ fn test_team_strategy_declaration_and_launch_review_lifecycle() {
                     }),
                 },
                 TeamProposedMember {
+                    preset_id: None,
                     name: "tester".to_string(),
                     description: Some("Testing suites".to_string()),
                     context_kind: Some("fresh".to_string()),
@@ -439,6 +442,7 @@ fn test_team_strategy_declaration_and_launch_review_lifecycle() {
             strategy: "delegate",
             reason: "Another batch",
             members: Some(vec![TeamProposedMember {
+                preset_id: None,
                 name: "analyst".to_string(),
                 description: None,
                 context_kind: None,
@@ -478,6 +482,7 @@ fn member_presentation_survives_review_confirmation_and_snapshot_hydration() {
             strategy: "delegate",
             reason: "Delegate a research task",
             members: Some(vec![TeamProposedMember {
+                preset_id: None,
                 name: "research-alex".to_string(),
                 description: Some("Research specialist".to_string()),
                 context_kind: None,
@@ -577,6 +582,7 @@ fn failed_confirmation_rolls_back_session_roster_message_and_review_state() {
             strategy: "delegate",
             reason: "Exercise confirmation rollback",
             members: Some(vec![TeamProposedMember {
+                preset_id: None,
                 name: "atomic-worker".to_string(),
                 description: None,
                 context_kind: Some("fresh".to_string()),
@@ -791,6 +797,7 @@ fn team_member_configure_updates_session_and_roster_atomically_and_expires_route
             strategy: "delegate",
             reason: "Review the existing worker route",
             members: Some(vec![TeamProposedMember {
+                preset_id: None,
                 name: "config-worker".to_string(),
                 description: None,
                 context_kind: Some("fresh".to_string()),

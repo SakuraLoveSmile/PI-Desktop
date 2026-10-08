@@ -74,3 +74,34 @@ test("asktool rich content never creates live links, images, or raw HTML", () =>
   assert.match(html, /diagram/);
   assert.doesNotMatch(html, /<a\b|<img\b|<script\b|href=|src=/i);
 });
+
+test("asktool renders wide tables as aligned row groups inside the question content", () => {
+  const html = renderToStaticMarkup(
+    createElement(AskToolRichText, {
+      source: [
+        "Please confirm these assignments.",
+        "",
+        "| Name | Route | Role | Responsibility | Tests | Validation | Dependencies |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
+        "| Alice | foundation_dev | Research | `app/validation/password_policy.py` | Unit | [Review](https://example.invalid) | None |",
+        "| Bob | service_dev | Implementation | `app/service/user_management.py` | Integration | ![diagram](https://example.invalid/x.png) | Alice |",
+        "",
+        "The researchers work in parallel.",
+      ].join("\n"),
+    }),
+  );
+  assert.equal((html.match(/role="table"/g) ?? []).length, 1);
+  assert.equal((html.match(/role="rowgroup"/g) ?? []).length, 2);
+  assert.equal((html.match(/role="row"/g) ?? []).length, 3);
+  assert.equal((html.match(/role="columnheader"/g) ?? []).length, 7);
+  assert.equal((html.match(/role="cell"/g) ?? []).length, 14);
+  assert.match(html, /asktool-rich-table-scroll/);
+  assert.match(html, /asktool-rich-table-cell-content[^>]*><code[^>]*>app\/validation\/password_policy\.py/);
+  assert.ok(html.indexOf("Please confirm") < html.indexOf('role="table"'));
+  assert.ok(html.indexOf("The researchers") > html.lastIndexOf('role="cell"'));
+  assert.doesNotMatch(html, /<(?:table|thead|tbody|tr|th|td|a|img|input)\b|href=|src=/i);
+  assert.match(
+    cardSource,
+    /<span className="asktool-question-content">\s*<AskToolRichText source=\{current\.question\} \/>\s*<\/span>/,
+  );
+});

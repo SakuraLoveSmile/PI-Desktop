@@ -257,7 +257,9 @@
 
 .agent-panorama-status-badge.status-idle,
 .agent-panorama-status-badge.status-todo,
-.agent-panorama-status-badge.status-blocked {
+.agent-panorama-status-badge.status-blocked,
+.agent-panorama-status-badge.status-cancelled,
+.agent-panorama-status-badge.status-provisioning {
   color: var(--ds-text-muted);
 }
 

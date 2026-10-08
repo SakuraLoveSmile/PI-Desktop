@@ -323,6 +323,12 @@
    production `AskToolCard` in a real Chromium page and clicks through the
    header actions.
 
+- Rich-layout regression: keep introduction, an eight-column six-expert table
+  and trailing paragraph vertically ordered at 1000/640/320px in dark/light.
+  Columns remain aligned and readable; horizontal scrolling reaches the last
+  column without widening the card, and long question content keeps choices
+  visible. Selecting and submitting still returns the original option label.
+
 ### E2E-POWER-keep-awake-setting
 
 - **Preconditions:** An isolated desktop profile with the setting absent; no
@@ -9417,24 +9423,22 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   `pnpm test:e2e:settings-scroll`; full renderer-driven password persistence
   assertions and checkpoint-level local recovery fault injection remain.
 
-**E2E-CHAT-session-todo-checklist: TodoWrite to session-aware TodoDock**
+**E2E-CHAT-session-todo-checklist: TodoWrite to Overview session checklist**
 
-- **Preconditions**: An isolated local Electron profile with a deterministic
-  Agent/host fixture, two Desktop sessions, and no real provider or paid API.
-- **Steps**: Start a multi-step Agent turn that calls `TodoWrite` with ordered
-  pending and `in_progress` items. Observe the TodoDock above the Composer,
-  expand it, switch sessions, and confirm the checklist stays session-scoped.
-  Complete and cancel items, confirm the bounded eight-row display and the
-  all-cancelled label, then clear the checklist and reload/restart the host.
-  Deliver an out-of-order older `todos.changed` event and confirm it cannot
-  replace the newer snapshot. Exercise invalid payload, Plan/Goal, delegated,
-  and remote-session paths.
-- **Expected**: Host SQLite is authoritative; each successful full replacement
-  advances revision, including clear, and emits one committed `todos.changed`
-  snapshot. Invalid or unauthorized writes do not mutate or emit. TodoDock
-  renders plain text, does not take focus, resets expansion on session changes,
-  rejects stale events, and skips local recovery for `remote:` sessions because
-  RACP v1 has no Todo snapshot operation.
+- **Preconditions**: Isolated Electron profile, deterministic Agent stream, real
+  SQLite Host, two Desktop sessions, no real provider or paid API.
+- **Steps**: Start an Agent turn that discovers/calls TodoWrite. Open the actual
+  Overview and inspect its default-expanded ordered checklist. Collapse/reopen,
+  apply a committed status/count update, inspect ten complete rows at 320px in
+  dark/light themes, and switch sessions. Complete/cancel/clear tasks, confirm
+  the all-cancelled label, and recover state after Host restart and first-read
+  failure. Deliver an older todos.changed event and verify the revision fence.
+- **Expected**: Host SQLite is authoritative. Successful full replacements,
+  including clear, advance revision and publish a committed snapshot. The
+  Overview section displays full plain text and localized status, updates live
+  without taking focus or resetting expansion, and scrolls with the panel.
+  Empty lists disappear; switching sessions reveals only the selected list.
+  Remote/native sessions skip local recovery. Composer has no session checklist.
 - **Specs**: `03-runtime/03-tools-and-permissions.md`,
   `03-runtime/04-data-storage.md`, `03-runtime/06-host-rpc-protocol.md`,
   `04-ux/08-component-spec.md`, ADR 0312.
@@ -17537,3 +17541,82 @@ a fresh expert roster review and integrate a real approved expert contribution.
   regressions and renderer snapshot-hook behavioral checks;
   `node scripts/e2e-team-approved-goal.mjs` protects approved execution.
 - Status: run on refreshed request candidate; paid/live model calls are NOT RUN.
+
+### Goal report Canvas presentation
+
+Run `node scripts/e2e-goal-report-canvas.mjs` from the request worktree. This
+isolated Electron renderer uses the production GoalReportTab and controlled
+Host API responses, never a live provider or user profile. It covers loading to
+ready, all metrics at 1040/782/320px in dark/light themes, reading order, semantic
+timeline and tables, missing evidence resolution, complete screenshot aspect
+ratio and preview, changed-report fallback/contradiction, failed read and retry.
+The probe saves a native screenshot for reference comparison. Fixture values
+are visual examples and must not be presented as real task verification.
+
+Complement with `node --test apps/desktop/test/goal-report-canvas-rendering.test.mjs
+apps/desktop/test/goal-report-presentation.test.mjs` for optional v1 data, empty
+states, execution timing, gallery states, and Host-derived metric tones.
+
+### Goal and session progress source clarity
+
+`node scripts/e2e-goal-team-renderer-ui.mjs` verifies that the Goal count belongs
+to the title disclosure, pointer expansion/collapse exposes a labeled task list,
+and independent session todos retain their own labeled count and inline Overview list. The
+isolated renderer fixture also checks narrow layout, existing out-of-order
+Goal updates, session switching, report completion, and interrupted execution.
+No live model or user profile is used.
+
+### Session checklist relocation to Overview
+
+`node scripts/e2e-todo-checklist.mjs` mounts the actual OverviewTab with real
+SQLite Host sessions and production API/store/checklist wiring. Verify empty
+state, default-expanded ordered tasks, disclosure collapse/reopen, live statuses,
+320px dark/light wrapping, cancelled count, stale revision rejection, session
+switch, backend restart and first-read recovery. The external model stream is
+deterministic and no real provider or user profile is accessed. Task rows scroll
+with Overview; the Composer has no Session checklist mounting or popup.
+
+### Expert Team configuration and Overview reference alignment
+
+- node scripts/e2e-expert-team-settings.mjs mounts the production SettingsPage:
+  new navigation, all six roles, provider/model/thinking/tools/instructions,
+  save/reopen, project inheritance/isolation/reset, failure draft retention,
+  interleaved CAS conflicts, missing model/project recovery, navigation during
+  an outstanding read, dark cards and narrow light editor. Host API is the
+  controlled external boundary; no model or user profile is used.
+- node scripts/e2e-expert-team-config.mjs uses a real isolated SQLite/stdio Host
+  and the shared schema to verify settings persistence, user/project resolution,
+  route binding, proposal/confirmation/runtime context, tool denials, restart,
+  invalid setting atomicity, CAS conflicts and unrelated preferences. No
+  provider endpoint is called.
+- node scripts/e2e-overview-reference.mjs mounts production Overview and Team
+  panorama with a controlled Team snapshot. It verifies live updates, numbered
+  task navigation, Spec/file links, reference tabs, task dependency cards/edges,
+  repeated owners, collapse, zoom/fit and narrow light layout. Native captures
+  compare the actual candidate to the supplied reference.
+- node --test apps/desktop/test/settings-ipc-partial-write.test.mjs protects
+  full committed Main network/menu/developer policy after partial writes and
+  guarantees no side effects on rejected configuration. Host/runtime/component
+  regressions supplement these public user paths.
+
+### Team startup isolation from standard Task configuration
+
+Exercise production resolveAgentRuntimeLaunch with controlled external Host,
+filesystem and vendor inputs. Team Lead/member routes must not read ordinary
+Task registry/switches or touch an unavailable delegate-only vendor account;
+only the Team's own auth binding and Host context remain required. Standard
+launches must still return enabled definitions, pins and opt-in model routes.
+Runtime reuse tests change ordinary definitions/model keys and assert Team
+reuse but standard refresh; changing Team policy/model/profile still refreshes.
+Fixtures use isolated files and no actual provider or running Desktop profile.
+
+### Permission card long-path layout
+
+node scripts/e2e-permission-card-layout.mjs exercises the production permission
+card and CSS in isolated Electron. It uses long absolute paths at 720/560/320/
+240px in dark/light themes, checks complete wrapped project text and controls
+inside the card, copies the exact requested path, and verifies all three
+decisions preserve session/request identity. Pending decisions cannot repeat;
+failed decisions remain retryable and known/unknown reasons remain honest.
+Only external clipboard and resolution boundaries are fixtures; no actual
+user permission is granted or denied. Save a native screenshot for visual QA.

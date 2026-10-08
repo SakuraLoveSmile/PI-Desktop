@@ -249,11 +249,17 @@ test("app quit waits for one idempotent teardown before allowing the follow-up q
 });
 
 test("settings writes validate without applying read defaults", () => {
+  const rendererWriteSource = apiSource.slice(
+    apiSource.indexOf("setSettings:"),
+    apiSource.indexOf("configSyncGetState:"),
+  );
   assert.match(mainSource, /validateSettingsWrite\(settings\)/);
   assert.match(mainSource, /host\.call(?:<AppSettings>)?\("settings\.set", validatedSettings\)/);
   assert.doesNotMatch(mainSource, /host\.call\("settings\.set", normalizedSettings\)/);
   assert.match(apiSource, /export function validateSettingsWrite/);
-  assert.match(apiSource, /invoke\(IPC\.invoke\.settingsSet, validateSettingsWrite\(settings\)\)/);
+  assert.match(rendererWriteSource, /const patch = \{ \.\.\.settings \};/);
+  assert.match(rendererWriteSource, /invoke\(IPC\.invoke\.settingsSet, validateSettingsWrite\(patch\)\)/);
+  assert.doesNotMatch(rendererWriteSource, /normalizeSettings\(/);
   assert.match(mainSource, /hasOwnProperty\.call\(value, "defaultCommandShell"\)/);
   assert.match(mainSource, /COMMAND_SHELL_INVALID/);
   assert.match(apiSource, /hasOwnProperty\.call\(value, "defaultCommandShell"\)/);
