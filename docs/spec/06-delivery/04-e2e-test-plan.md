@@ -4902,6 +4902,12 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 #### E2E-064: Durable notification inbox records terminal task outcomes
 
+- **Success-only/shared-count regression coverage**:
+  `node scripts/e2e-notification-inbox.mjs` uses isolated SQLite and Electron
+  to cover persisted-list restoration after renderer reload, both outcome
+  kinds, All/Unread, row navigation, read/clear actions, and native Dock count
+  readback on macOS. No real provider or native notification banner is used.
+
 - **Preconditions**: Two durable sessions exist; a deterministic provider can
   complete one turn, fail one turn with a stable error code, and abort one
   turn; notification inbox starts empty.
@@ -4918,10 +4924,12 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   eligible terminal turns. 11) Use Mark all read, then Clear. 12) While a
   native task banner and a renderer refresh are still in flight, deliver a
   delayed `notification.changed` payload for a cleared/read durable id and a
-  duplicate payload for an id that is already present. 13) On Windows, create
-  one unread successful outcome while the bell has no failure rows. Open the
-  empty bell popover, use Mark all read, then create another success and use
-  Clear. 14) Create enough unread outcomes for a two-digit count and inspect
+  duplicate payload for an id that is already present. 13) In the isolated
+  profile, create one success-only unread outcome, restart the app, open All
+  and Unread, then select its row. 14) Create one completed and one failed
+  unread row; compare All and Unread, mark one row read, and verify only that
+  row leaves Unread. Use Mark all read, then create another unread row and use
+  Clear. 15) Create enough unread outcomes for a two-digit count and inspect
   the taskbar overlay before and after marking all outcomes read.
 - **Expected**: A's visible-current completion creates no row or terminal
   sidebar mark. Restoring/focusing the app with A already visible clears A's
@@ -4945,9 +4953,14 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   duplicate, delayed, and historical rows do not replay it. On Windows, the
   taskbar overlay is a smooth black circular badge with a centered white system-font numeral. Its visual weight matches common
   Windows taskbar badges for both single- and two-digit counts. A success-only
-  outcome increments the taskbar badge without adding a bell row or bell
-  count; both toolbar actions remain enabled when relevant and clear the
-  taskbar badge. The badge also clears when no unread outcomes remain. The
+  outcome persists across app reload, appears in both All and Unread, and
+  increments the bell and taskbar/Dock badges to one. Selecting that row marks
+  it read and navigates to its session; Mark all read and Clear each clear the
+  unread count, and Clear removes the durable row without changing the session.
+  With mixed completed and failed rows, All shows both kinds and Unread shows
+  exactly rows whose `readAt` is null; marking one row read removes only that
+  row from Unread and decrements both badges. The badge clears when no unread
+  outcomes remain. The
   underlying taskbar button keeps the
   PI-Desktop `P` icon and PI-Desktop name while the overlay is present.
 - **Specs linked**: `03-runtime/04-data-storage.md`,

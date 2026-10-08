@@ -4468,11 +4468,16 @@ Sidebar footer                                        Popover (360px max)
   outcome's session is already visible in the chat marks that session's
   matching durable notifications read; it does not mark outcomes belonging to
   other sessions.
+- The bell badge uses the store's Host-derived `unreadNotificationCount` for
+  every durable task notification, matching the Dock/taskbar unread count.
+  `All` shows completed and failed rows regardless of read state; `Unread`
+  filters only on `readAt == null`. Both rows and count refresh from the same
+  persisted Host state after app reload.
 - Mark all read is idempotent and preserves rows; it dismisses every outstanding
   task-native banner. Clear deletes every inbox row, dismisses all task-native
-  banners, and leaves sessions, transcripts, and turns intact. These actions
-  remain available for successful completions hidden from the failure-only
-  bell list, so the taskbar unread badge can be cleared from the popover.
+  banners, and leaves sessions, transcripts, and turns intact. Row selection,
+  Mark all read, and Clear update Host-persisted read/clear state and refresh
+  both the bell and Dock/taskbar unread counts.
 - `notification.changed` updates the visible list and badge only for a new
   durable id. A duplicate id, or a delayed event for an acknowledged/cleared
   row, is ignored. Opening the
@@ -4508,9 +4513,10 @@ Sidebar footer                                        Popover (360px max)
 
 ### 20.6 Constraints
 
-- The list contains only `task.completed` and `task.failed` records produced
-  from unseen terminal agent turns. Visible-current results and `aborted` turns
-  are intentionally silent.
+- The list contains all retained `task.completed` and `task.failed` records
+  produced from unseen terminal agent turns. Visible-current results and
+  `aborted` turns are intentionally silent. `Unread` is exactly the subset
+  whose `readAt` is null; the bell and Dock/taskbar count that same subset.
 - At most 200 newest rows are retained globally. There is no pagination,
   scheduled notification source, durable permission-notification source,
   preferences page, notification permission prompt, or cloud sync. Interactive
