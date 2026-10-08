@@ -853,10 +853,19 @@ export const ptBR = {
       subagents: "Subagentes",
       import: "Importar",
       projects: "Projetos",
+      memory: "Memória",
       sync: "Sincronização",
       remoteHosts: "Hosts remotos",
       info: "Sobre",
       voice: "Voz"
+    },
+    memory: {
+      title: "Memória",
+      description:
+        "Gerencie as memórias salvas e o registro automático por projeto. Projetos do mesmo grupo compartilham memórias; os demais permanecem separados.",
+      projectsTitle: "Memória do projeto",
+      empty: "Ainda não há projetos. Crie ou abra um projeto no Arquivo de projetos primeiro.",
+      loadFailed: "Não foi possível carregar a lista de projetos. Tente novamente.",
     },
     general: "Geral",
     ai: "IA",

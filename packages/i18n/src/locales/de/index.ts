@@ -871,10 +871,18 @@ sklm: {
       "subagents": "Subagenten",
       "import": "Importieren Sie",
       "projects": "Projekte",
+      "memory": "Erinnerungen",
       "sync": "Cloud-Synchronisierung",
       "remoteHosts": "Remote-Hosts",
       "info": "Informationen",
       "voice": "Sprache"
+    },
+    "memory": {
+      "title": "Erinnerungen",
+      "description": "Gespeicherte Erinnerungen und automatische Aufzeichnung nach Projekt verwalten. Projekte derselben Gruppe teilen Erinnerungen; andere Projekte bleiben getrennt.",
+      "projectsTitle": "Projekterinnerungen",
+      "empty": "Noch keine Projekte. Erstellen oder öffnen Sie zuerst ein Projekt im Projektarchiv.",
+      "loadFailed": "Die Projektliste konnte nicht geladen werden. Bitte versuchen Sie es erneut."
     },
     "configSync": {
       title: "Cloud sync",

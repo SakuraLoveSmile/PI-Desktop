@@ -887,10 +887,19 @@ sklm: {
       subagents: "子智能体",
       import: "导入",
       projects: "项目",
+      memory: "记忆",
       sync: "云同步",
       remoteHosts: "远程主机",
       info: "信息",
       voice: "语音",
+    },
+    memory: {
+      title: "记忆",
+      description:
+        "按项目管理已保存的记忆与自动记录。项目组内共享记忆，其他项目互不影响。",
+      projectsTitle: "项目记忆",
+      empty: "还没有项目，请先在项目归档中创建或打开项目。",
+      loadFailed: "项目列表加载失败，请重试。",
     },
     configSync: {
       title: "云同步",

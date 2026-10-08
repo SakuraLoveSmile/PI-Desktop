@@ -876,10 +876,19 @@ sklm: {
       subagents: "서브에이전트",
       import: "가져오기",
       projects: "프로젝트",
+      memory: "메모리",
       sync: "클라우드 동기화",
       remoteHosts: "원격 호스트",
       info: "정보",
       voice: "음성",
+    },
+    memory: {
+      title: "메모리",
+      description:
+        "프로젝트별로 저장된 메모리와 자동 기록을 관리합니다. 같은 그룹의 프로젝트는 메모리를 공유하고, 다른 프로젝트에는 영향을 주지 않습니다.",
+      projectsTitle: "프로젝트 메모리",
+      empty: "아직 프로젝트가 없습니다. 먼저 프로젝트 보관함에서 프로젝트를 만들거나 여세요.",
+      loadFailed: "프로젝트 목록을 불러오지 못했습니다. 다시 시도하세요.",
     },
     configSync: {
       title: "Cloud sync",

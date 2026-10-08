@@ -389,7 +389,8 @@
 }
 
 /* On reads through the fill alone (D297); the tint says which kind. */
-.ext-tool-opt.is-on {
+.ext-tool-opt.is-on,
+.ext-tool-opt.active {
   background: color-mix(in oklab, var(--ds-accent) 14%, transparent);
   color: var(--ds-text-primary);
 }

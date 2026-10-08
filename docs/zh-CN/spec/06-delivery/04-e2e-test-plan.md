@@ -9822,7 +9822,8 @@ with Overview; the Composer has no Session checklist mounting or popup.
   new navigation, all six roles, provider/model/thinking/tools/instructions,
   save/reopen, project inheritance/isolation/reset, failure draft retention,
   interleaved CAS conflicts, missing model/project recovery, navigation during
-  an outstanding read, dark cards and narrow light editor. Host API is the
+  an outstanding read, shared Subagents row/glyph/badge/action styles in both
+  themes, and narrow editor containment. Host API is the
   controlled external boundary; no model or user profile is used.
 - node scripts/e2e-expert-team-config.mjs uses a real isolated SQLite/stdio Host
   and the shared schema to verify settings persistence, user/project resolution,
@@ -9863,20 +9864,29 @@ user permission is granted or denied. Save a native screenshot for visual QA.
 
 ### E2E-PLUS-project-context: Record memory, recall sources, and search current code
 
-- **Preconditions**: Isolated data/profile and two local projects; built candidate
+- **Preconditions**: Isolated data/profile with two project groups; one group has
+  multiple local roots. Built candidate
   Host and Node sidecar; deterministic loopback model (no paid provider).
-- **Steps**: Open Project memory, enable recording, ask to remember a stable
-  package-manager preference. Continue a fresh user turn. Attempt a stale editor
+- **Steps**: Open Settings > Memory with developer mode off. Verify the project
+  groups are listed, an empty list links to Project archive, and a failed list
+  read can be retried. Open a group's memory editor, add and save a note, edit it,
+  remove it, then enable automatic recording and ask the Agent to remember a
+  stable package-manager preference. Continue a fresh user turn. Attempt a stale editor
   save, then explicitly reload. Search historical verification and read the
   returned session/message source. Search a code marker; edit/create/rename/delete
   matching files and change ignore rules, repeating search. Disable recording,
   switch project, restart both processes, and ask about the saved preference.
   Inspect/clear the code cache, then search again. Repeat memory edit/forget after
   moving a secondary root out of and back into its group.
-- **Expected**: Recording defaults off. Enabled Agent writes are durable; no
-  background model/embedding request is made. Disabled recording retains saved
+- **Expected**: Memory is a regular Workspace settings destination and remains
+  visible with developer mode off. The settings list uses Host project groups and
+  the existing editor; it does not create a second storage path. Recording
+  defaults off. Enabled Agent writes are durable; no background model/embedding request is made. Disabled recording retains saved
   context and removes writes. Stale snapshot/entry CAS is `CONFLICT`, changed owner
   is `PROJECT_CHANGED`; failures never overwrite notes or silently lose drafts.
+  Opening the same group from Project archive shows the same notes. Notes and
+  recording settings are shared across roots in one group and isolated from the
+  other group.
   Root reattachment cannot duplicate or resurrect forgotten group notes. History
   stays within current group membership, cites stable source IDs and excludes
   deleted/native sessions. CodeSearch stays within the caller session root,
@@ -9892,9 +9902,17 @@ user permission is granted or denied. Save a native screenshot for visual QA.
 - **Automation**: `node scripts/e2e-project-context.mjs` (real sidecar/proxy/Host,
   controlled HTTP model); `node scripts/e2e-code-index.mjs` (real Host/filesystem);
   `node scripts/e2e-project-auto-memory.mjs` (real editor/production CSS in
-  isolated Electron, fixture IPC). Host unit tests cover CAS, group lifecycle,
-  relocation, config-sync eligibility and mode/expert permissions.
-- **Status**: Implemented; current-run results recorded in the delivery evidence.
+  isolated Electron, fixture IPC); `node scripts/e2e-settings-memory.mjs`
+  (`pnpm test:e2e:settings-memory`) mounts the
+  production SettingsPage and ProjectMemoryDialog with React and production CSS
+  in isolated Electron, using fixture IPC only. The settings test covers
+  navigation, project-group listing, empty/error retry, editor opening, and
+  editing/recording controls; it does not exercise real Host persistence.
+  Host unit tests cover CAS, group lifecycle, relocation, config-sync eligibility
+  and mode/expert permissions. Existing real Host/loopback runs are prior evidence
+  and are not a claim that they were rerun for this change.
+- **Status**: Settings renderer candidate validated with isolated fixture IPC;
+  real Host behavior is unchanged and was not rerun for this navigation change.
 
 | Plus scenario | User path | Automated entry |
 | --- | --- | --- |

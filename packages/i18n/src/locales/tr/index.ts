@@ -876,10 +876,19 @@ sklm: {
       subagents: "Alt ajanlar",
       import: "İçe aktar",
       projects: "Projeler",
+      memory: "Bellek",
       sync: "Bulut senkronizasyonu",
       remoteHosts: "Uzak ana bilgisayarlar",
       info: "Bilgi",
       voice: "Ses",
+    },
+    memory: {
+      title: "Bellek",
+      description:
+        "Kaydedilen anıları ve otomatik kaydı projeye göre yönetin. Aynı gruptaki projeler belleği paylaşır; diğer projeler ayrı kalır.",
+      projectsTitle: "Proje belleği",
+      empty: "Henüz proje yok. Önce Proje arşivinden bir proje oluşturun veya açın.",
+      loadFailed: "Proje listesi yüklenemedi. Yeniden deneyin.",
     },
     configSync: {
       title: "Bulut senkronizasyonu",

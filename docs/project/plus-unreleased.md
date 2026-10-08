@@ -2,6 +2,12 @@
 
 Upstream v0.15.6 → v0.16.1 has been merged.
 
+- Added a Memory destination in Settings to list project groups and open their
+  existing shared memory editor.
+
+- Expert Team uses the same compact capability rows, glyphs, badges and edit
+  actions as Subagents, with shared scope controls and consistent form spacing.
+
 - Successful and failed task notifications both appear in the durable inbox.
   The bell badge now counts every unread persisted task notification, matching
   the Dock/taskbar badge; selection, mark-all-read, and clear stay synchronized
