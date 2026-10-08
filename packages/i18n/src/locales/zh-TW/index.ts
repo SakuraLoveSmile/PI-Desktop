@@ -887,10 +887,19 @@ sklm: {
       subagents: "子智慧體",
       import: "匯入",
       projects: "專案",
+      memory: "記憶",
       sync: "雲端同步",
       remoteHosts: "遠端主機",
       info: "資訊",
       voice: "語音",
+    },
+    memory: {
+      title: "記憶",
+      description:
+        "依專案管理已儲存的記憶與自動記錄。同一專案群組會共用記憶，其他專案互不影響。",
+      projectsTitle: "專案記憶",
+      empty: "目前沒有專案，請先在專案封存中建立或開啟專案。",
+      loadFailed: "無法載入專案清單，請重試。",
     },
     configSync: {
       title: "雲端同步",

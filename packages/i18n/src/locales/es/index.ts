@@ -869,10 +869,18 @@ sklm: {
       "subagents": "Subagentes",
       "import": "Importar",
       "projects": "Proyectos",
+      "memory": "Memoria",
       "sync": "Sincronización en la nube",
       "remoteHosts": "Hosts remotos",
       "info": "Información",
       "voice": "Voz"
+    },
+    "memory": {
+      "title": "Memoria",
+      "description": "Administra los recuerdos guardados y el registro automático por proyecto. Los proyectos del mismo grupo comparten memoria; los demás permanecen separados.",
+      "projectsTitle": "Memoria del proyecto",
+      "empty": "Aún no hay proyectos. Primero crea o abre uno en el archivo de proyectos.",
+      "loadFailed": "No se pudo cargar la lista de proyectos. Inténtalo de nuevo."
     },
     "configSync": {
       title: "Cloud sync",

@@ -22,7 +22,8 @@ for the session-bound project path and passes it to the agent runtime. The
 runtime renders it after project instructions as explicitly user-provided
 context and compares it when deciding whether an idle runtime can be reused.
 
-The memory editor is exposed from the Project archive row menu. Creating a
+The memory editor is exposed from Settings > Memory and the Project archive
+row menu. Both entry points use the same host-owned collection. Creating a
 project keeps the creation surface compact and shows that project memory is
 available later; it does not add a memory mode selector whose semantics the
 application does not implement.

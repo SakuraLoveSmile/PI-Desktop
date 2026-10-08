@@ -35,16 +35,22 @@
   8. **子智能体** — Lucide `Bot`（内置与自建的并行工作智能体）
   9. **导入** — Lucide `Download`（从其他工具引入会话和模型配置）
   10. **项目** — Lucide `Archive`（持久项目索引）
-  11. **云同步** — Lucide `CloudDownload`（加密的可移植配置备份与双向同步；仅开发者模式）
-  12. **远程主机** — Lucide `Globe`（SSH 引导与配对清单；仅开发者模式）
-  13. **信息** — Lucide `Info`（版本、日志、更新、开发人员）
+  11. **记忆** — Lucide `BookOpen`（已保存的项目记忆与自动记录）
+  12. **云同步** — Lucide `CloudDownload`（加密的可移植配置备份与双向同步；仅开发者模式）
+  13. **远程主机** — Lucide `Globe`（SSH 引导与配对清单；仅开发者模式）
+  14. **信息** — Lucide `Info`（版本、日志、更新、开发人员）
   图标具有装饰性（通过 SVG 默认设置为 `aria-hidden`）并保持单色
   带有导轨标签；不要在此处重复使用 refresh/rotate 字形。
 - 目录仍是保持相同顺序的可搜索扁平列表。为便于扫描，目的地分为四个带标题
   的视觉分组：“偏好”（常规、AI、快捷键）、“智能体”（指令、模型、技能、
-  MCP、子智能体）、“工作区”（导入、项目）和“系统”（云同步、远程主机、信息；前两项仅开发者模式可见）。标题使用柔和
+  MCP、子智能体）、“工作区”（导入、项目、记忆）和“系统”（云同步、远程主机、信息；前两项仅开发者模式可见）。标题使用柔和
   的非交互文字，分组之间只使用留白，不绘制分割线；搜索过滤后，空分组及其
   标题一并隐藏。
+- **记忆**是普通的工作区设置入口，在所有构建中可用且不受开发者模式限制。页面
+  通过 Settings 卡片列出 Host 返回的项目组，并以项目组作为记忆共享单元。每行打开
+  对应项目组现有的项目记忆编辑器；空列表可跳转到项目归档，列表加载失败可重试。
+  此页面不会增加第二个编辑器，也不改变存储或 API。项目归档保留原有的项目记忆入口，
+  两个入口打开同一个编辑器。
 - **云同步**是仅开发者可用的实验性目的地：其导轨行、页面和设置搜索命中仅在
   `AppSettings.developerMode` 为 `true` 时存在。开发者模式关闭时该行是缺失而不是
   禁用，设置搜索不会返回它的命中，导轨位置停在该项时会回落到常规。该行和页面标题
@@ -433,13 +439,15 @@ Token 用量**不是设置目的地**（D335 / ADR 0173）。已完成回合历�
 | 切换 | **32×20** 拇指 16，中性重音（非绿色） |
 | 开放靶点药丸 | 前导 VS Code 字形 |
 
+## 专家团与子智能体视觉一致性
+
+专家团与子智能体共用 `AgentCapabilityPage`、`CapabilityPanel`、`CapabilityGroupHeader` 和 `CapabilityRow`：紧凑列表、低对比 Bot 图标、共享徽标及行尾图标操作。范围选择保留用户/项目标签语义，采用共享分段控件样式。页面与内置角色说明通过共享帮助控件查看。专家角色保留内联编辑与字段继承，模型/思考字段、表单间距及操作区使用现有 Settings 控件和 token。保存、重置、范围切换、错误处理和并发更新保护保持原样；子智能体保留现有列表与编辑面板。
+
 ## Plus project memory recording
 
-Project archive's existing Project memory editor adds a shared recording switch
-after its description. The switch defaults off and persists immediately; note
-edits continue using the existing single Save action. Turning recording off
-retains saved notes for chat context. All existing card layout, add/edit/remove
-actions and compact/narrow scrolling behavior remain. Conflicts retain drafts
-and offer an explicit reload; if the project changes group ownership, editing
-is disabled until the current project identity is refreshed. No separate memory
-source lists or automatic background extraction are introduced.
+设置 > 记忆会列出项目组，并打开项目归档中已有的同一个项目记忆编辑器。项目组是共享
+单元：同一组中的项目共用已保存的记忆和自动记录设置，其他项目组彼此独立。编辑器的
+共享记录开关位于说明文字之后，默认关闭并立即保存；记忆条目仍使用现有的单一保存操作。
+关闭记录后，已保存的记忆仍会用于对话上下文。保留现有卡片布局、添加/编辑/移除操作及
+紧凑和窄窗口滚动行为。冲突时保留草稿并提供明确的重新加载操作；如果项目更改了所属组，
+则在刷新当前项目身份之前禁用编辑。不会另建记忆存储、编辑器、来源列表或后台自动提取。
