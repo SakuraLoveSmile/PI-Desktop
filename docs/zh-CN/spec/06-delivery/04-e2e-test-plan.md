@@ -5659,6 +5659,7 @@ eleven-tool-round desktop paths are verified by
 | 基线后本地自动化 | E2E-220 |
 | B / F / Quality / Security — Manual model-list intent and the macOS Local Network trigger | E2E-MAC-local-network-manual-discovery |
 | 基线后本地自动化（MCP `pi_session_get` 超大 compaction） | E2E-MCP-session-get-projects-large-compaction |
+| Post-baseline local automation (lossless MCP single-message chunks) | E2E-MCP-session-get-chunk |
 | MVP 后远程控制 | E2E-221、E2E-222、E2E-223、E2E-224、E2E-225、E2E-226、E2E-227、E2E-228、E2E-229、E2E-230、E2E-231、E2E-232 |
 | 受信任扩展（R7 v1） | E2E-DIALOG-long-text-boundaries、E2E-241、E2E-242、E2E-HOOKS-cancel-and-dispose、E2E-243、E2E-244、E2E-245、E2E-PLUGIN-imported-pi-package-skills、E2E-PLUGIN-import-extension-installs-dependencies、E2E-PLUGIN-import-extension-reports-missing-dependency、E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list |
 | 受信任扩展（R7 v1 npm 恢复） | E2E-PLUGIN-import-extension-recovers-missing-npm |
@@ -7860,6 +7861,41 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
   和 `load_error` 行为保留为独立验证面。
 
 
+#### E2E-MCP-session-get-chunk
+
+- **Native producer regression coverage**: The same isolated script drives a real
+  Node AgentSidecar over stdio, the production session IPC and authenticated MCP.
+  A large Unicode native Pi transcript is reconstructed losslessly; older/empty/
+  clamped pages, restart hash stability and unchanged source JSONL bytes are
+  checked. Ordinary native pagination exposes the existing physical end/after
+  metadata required by the chunk consumer. No user session or provider is used.
+
+- **Preconditions**: Start an isolated local MCP listener with a durable
+  one-message transcript page whose complete JSON exceeds the ordinary 512 KiB
+  control result envelope. No model/provider or user profile is required.
+- **Steps**: 1) Authenticate and initialize. 2) Confirm `tools/list` advertises
+  `pi_session_get_chunk` with a read risk and the documented schema. 3) Observe
+  the ordinary `pi_session_get` truncation envelope. 4) Read chunk offset zero,
+  then continue using `nextOffset` and `expectedSha256`. 5) Decode and combine
+  base64 bytes, verify total length/hash and JSON session identity. 6) Change
+  the page between chunks; test invalid arguments, foreign identity, invalid
+  physical pagination, offset bounds, and a page larger than 16 MiB.
+- **Expected**: The complete Unicode transcript survives byte-for-byte. Each
+  read uses authoritative `session/get` with `messageLimit: 1` and no content
+  limit. Each chunk is at most 64 KiB, the final `nextOffset` is explicit null,
+  and every continuation re-reads the page. Changed content fails with
+  `CONFLICT` without retry or partial evidence; invalid inputs/results and the
+  total limit fail explicitly. Ordinary reads and auth boundaries remain intact.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` §13d
+- **Acceptance**: C (sessions), Quality
+- **Milestone**: M6+
+- **Status**: Authenticated local HTTP contract covered by
+  `apps/desktop/test/mcp-control.test.mjs`. Run
+  `PI_DESKTOP_HOST_BIN=<compatible host binary> node scripts/e2e-mcp-session-chunk.mjs`
+  for the real isolated Host, production session IPC and authenticated MCP
+  journey, including older-message pagination and restart. Installed-app
+  evidence and any model execution must be reported separately.
+
 #### E2E-234：工作区安全拒绝名单与忽略层
 
 - **前提条件**：一个项目包含 `.env`、`.env.example`、`server.pem`、`keys/id_rsa`、
@@ -9863,3 +9899,8 @@ user permission is granted or denied. Save a native screenshot for visual QA.
 | Plus scenario | User path | Automated entry |
 | --- | --- | --- |
 | E2E-PLUS-project-context | Remember → later turn/restart recall → source lookup → current code search | project-context, code-index, project-auto-memory scripts |
+
+Overview layout validation also checks long titles, project paths and model names at
+320/360/570px in both themes. Metadata retains positive visible width and no
+header/resources/references horizontal overflow is introduced. Selected reference
+options retain pressed states and switching behavior.

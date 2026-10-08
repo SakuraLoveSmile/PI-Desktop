@@ -13664,6 +13664,13 @@ are withdrawn with ADR 0165.
 
 #### E2E-MCP-session-get-chunk
 
+- **Native producer regression coverage**: The same isolated script drives a real
+  Node AgentSidecar over stdio, the production session IPC and authenticated MCP.
+  A large Unicode native Pi transcript is reconstructed losslessly; older/empty/
+  clamped pages, restart hash stability and unchanged source JSONL bytes are
+  checked. Ordinary native pagination exposes the existing physical end/after
+  metadata required by the chunk consumer. No user session or provider is used.
+
 - **Preconditions**: Start an isolated local MCP listener with a durable
   one-message transcript page whose complete JSON exceeds the ordinary 512 KiB
   control result envelope. No model/provider or user profile is required.
