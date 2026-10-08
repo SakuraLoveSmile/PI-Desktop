@@ -2021,3 +2021,14 @@ decision displays its reason without implying that experts were called.
 只有 owner 验证成功后才会创建 `MessagePort`，之后由 preload 中继到 renderer 窗口。owner 在首个 `hello` 中回送每通电话独有的 nonce；Main 仅在 call ID 和 nonce 均匹配时接受该端口一次。二进制帧包含有界 PCM 音频、采集 epoch、释放确认、播放游标和协议就绪信号。它不是通用 IPC 隧道：不会传输 Provider 凭证、任意命令、工作区路径、Agent 消息或持久化字幕。通话结束或 owner 丢失时会关闭端口。
 
 停靠挂件窗口不是通话 owner，也不可能成为 owner：它在所有经过 owner 校验的通道上都会像任何其他 renderer 一样被以 `PERMISSION_DENIED` 拒绝。Main 只在该窗口作为发送方时响应它的两条通道；owner 自身的错误码经由主窗口传入，因为执行操作的是该 frame。挂件操作本身不会改变通话状态：它被转发给 owner frame，结果状态再通过 owner 收到的同一份权威视图回到挂件。
+
+## Plus project memory editor IPC
+
+`projectMemoryEditorGet`, `projectMemoryEditorSave`, and
+`projectAutoMemorySetEnabled` map to the Host project-context RPCs. Save carries
+`projectPath, expectedOwner, expectedMemory, entries`; the opt-in switch carries
+`projectPath, expectedOwner, enabled`. The editor retains the current layout and
+shared controls, adds an immediately persisted default-off recording switch,
+and stages note edits until Save. Failed CAS preserves the draft and exposes an
+explicit reload action that warns that it discards unsaved changes. Async results
+from a previous project/editor instance cannot update the current dialog.

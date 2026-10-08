@@ -432,3 +432,14 @@ Token 用量**不是设置目的地**（D335 / ADR 0173）。已完成回合历�
 | 卡半径 | ~14px 升高行程 |
 | 切换 | **32×20** 拇指 16，中性重音（非绿色） |
 | 开放靶点药丸 | 前导 VS Code 字形 |
+
+## Plus project memory recording
+
+Project archive's existing Project memory editor adds a shared recording switch
+after its description. The switch defaults off and persists immediately; note
+edits continue using the existing single Save action. Turning recording off
+retains saved notes for chat context. All existing card layout, add/edit/remove
+actions and compact/narrow scrolling behavior remain. Conflicts retain drafts
+and offer an explicit reload; if the project changes group ownership, editing
+is disabled until the current project identity is refreshed. No separate memory
+source lists or automatic background extraction are introduced.
