@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { PlanProposal, UiMessage } from "@pi-desktop/shared";
+import type { PlanProposal } from "@pi-desktop/shared";
 import { useAppStore } from "../../stores/app-store";
 import { IconChevronDown, IconBot, IconFileText, IconInfo, IconWorkflow } from "../icons";
 import { AgentPanorama, type PanoramaNode, type PanoramaNodeStatus } from "./AgentPanorama";
@@ -23,6 +23,8 @@ import { localizedTeamSnapshotError, buildTeamTaskRows, localTeamSessionId, sele
 import { TeamTaskProgress } from "./team/TeamTaskProgress";
 import { Button } from "../ui";
 import { isActivePlanExecution } from "../../lib/plan-mode-state";
+import { SessionTodoChecklist } from "./SessionTodoChecklist";
+import { recordedOverviewResources, type RecordedResource, type OverviewReferences } from "./overview-recorded-resources";
 
 type OverviewItem = {
   id: string;
@@ -42,17 +44,6 @@ function proposalStatus(proposal: PlanProposal): string {
   return proposal.status;
 }
 
-function messageReferences(messages: UiMessage[]): OverviewItem[] {
-  const items: OverviewItem[] = [];
-  for (const message of messages) {
-    for (const attachment of message.attachments ?? []) {
-      const id = `${message.id}:${attachment.ref}`;
-      if (items.some((item) => item.id === id)) continue;
-      items.push({ id, label: attachment.name || attachment.ref, path: attachment.ref });
-    }
-  }
-  return items;
-}
 
 export function OverviewTab() {
   const { t } = useTranslation();
@@ -74,6 +65,7 @@ export function OverviewTab() {
   const activeTabId = useAppStore((state) => state.activeWorkPanelTabId);
   const tabs = useAppStore((state) => state.workPanelTabs);
   const activeTab = tabs.find((t) => t.id === activeTabId);
+  const [referenceKind, setReferenceKind] = useState<keyof OverviewReferences>("skills");
   const [viewMode, setViewMode] = useState<"overview" | "panorama">("overview");
 
   useEffect(() => {
@@ -110,14 +102,11 @@ export function OverviewTab() {
         proposal,
       });
     }
-    for (const item of messageReferences(messages)) {
-      if (item.path && items.some((candidate) => candidate.path === item.path)) continue;
-      items.push(item);
-    }
     return items;
-  }, [messages, proposals]);
+  }, [proposals]);
 
-  const references = useMemo(() => messageReferences(messages), [messages]);
+  const resources = useMemo(() => recordedOverviewResources(messages), [messages]);
+  const references = resources.references[referenceKind];
   const openItem = async (item: OverviewItem) => {
     if (!item.path) return;
     if (!item.proposal) {
@@ -293,6 +282,7 @@ export function OverviewTab() {
       </header>
 
       <div className="work-panel-overview-scroll">
+        <SessionTodoChecklist key={session.id} sessionId={session.id} />
         {isTeam && teamSessionId && (
           <section className="work-panel-overview-section work-panel-overview-team-progress" data-testid="overview-team-progress">
             {teamError && <div className="team-error-banner" role="status">
@@ -300,7 +290,7 @@ export function OverviewTab() {
               <Button size="sm" onClick={() => void refreshTeam()}>{t("team.retry")}</Button>
             </div>}
             {teamData ? <TeamTaskProgress
-              rows={selectOverviewTaskRows(teamRows)}
+              rows={selectOverviewTaskRows(teamRows, 6)}
               extra={progressContent}
               completed={teamData.tasks.filter((task) => !task.deleted && task.status === "completed").length}
               total={teamData.tasks.filter((task) => !task.deleted).length}
@@ -379,22 +369,29 @@ export function OverviewTab() {
             <IconChevronDown size={16} className="work-panel-overview-chevron" aria-hidden />
           </summary>
           <div className="work-panel-overview-section-body">
-            {artifactItems.length > 0 ? artifactItems.map((item) => (
-              <button
-                className="work-panel-overview-file"
-                key={item.id}
-                type="button"
-                title={item.path ?? item.label}
-                onClick={() => void openItem(item)}
-                disabled={!item.path}
-              >
-                <IconFileText size={15} aria-hidden />
-                <span className="work-panel-overview-file-copy">
-                  <span className="work-panel-overview-file-label">{item.label}</span>
-                  {item.detail && <span className="work-panel-overview-file-detail">{item.detail}</span>}
-                </span>
-              </button>
-            )) : (
+            {[
+              { kind: "specs", items: artifactItems },
+              { kind: "changedFiles", items: resources.changedFiles },
+              { kind: "attachments", items: resources.attachments.filter((item) => !artifactItems.some((artifact) => artifact.path === item.path)) },
+            ].map(({ kind, items }) => items.length > 0 ? (
+              <div className="work-panel-overview-artifact-group" key={kind} data-artifact-kind={kind}>
+                <div className="work-panel-overview-group-heading">
+                  <span>{t(`panel.overview.${kind}`)}</span><span>{items.length}</span>
+                </div>
+                {kind === "changedFiles" && <p className="work-panel-overview-resource-note">{t("panel.overview.recordedChangesNote")}</p>}
+                {items.map((item: OverviewItem | RecordedResource) => (
+                  <Button variant="ghost" className="work-panel-overview-file" key={item.id}
+                    title={item.path ?? item.label} onClick={() => void openItem(item)} disabled={!item.path}>
+                    <IconFileText size={15} aria-hidden />
+                    <span className="work-panel-overview-file-copy">
+                      <span className="work-panel-overview-file-label">{item.label}</span>
+                      {"detail" in item && item.detail && <span className="work-panel-overview-file-detail">{item.detail}</span>}
+                    </span>
+                  </Button>
+                ))}
+              </div>
+            ) : null)}
+            {artifactItems.length === 0 && resources.changedFiles.length === 0 && resources.attachments.length === 0 && (
               <p className="work-panel-overview-empty-copy">{t("panel.overview.noArtifacts")}</p>
             )}
           </div>
@@ -406,18 +403,22 @@ export function OverviewTab() {
             <IconChevronDown size={16} className="work-panel-overview-chevron" aria-hidden />
           </summary>
           <div className="work-panel-overview-section-body">
-            {references.length > 0 ? references.map((reference) => (
-              <button
-                className="work-panel-overview-reference"
-                key={reference.id}
-                type="button"
-                onClick={() => reference.path && openFileInWorkPanel(reference.path)}
-              >
-                {reference.label}
-              </button>
-            )) : (
-              <p className="work-panel-overview-empty-copy">{t("panel.overview.noReferences")}</p>
-            )}
+            <div className="work-panel-overview-reference-tabs" aria-label={t("panel.overview.references")}>
+              {(["skills", "memory", "mcp"] as const).map((kind) => (
+                <Button variant="ghost" className="work-panel-overview-reference-tab" key={kind}
+                  aria-pressed={referenceKind === kind} onClick={() => setReferenceKind(kind)}>
+                  {t(`panel.overview.${kind}`)}
+                </Button>
+              ))}
+            </div>
+            <ul className="work-panel-overview-reference-list" aria-label={t(`panel.overview.${referenceKind}`)}>
+              {references.map((reference) => <li className="work-panel-overview-recorded-reference" key={reference.id}>
+                <IconWorkflow size={15} aria-hidden /><span>{reference.label}</span>
+              </li>)}
+            </ul>
+            {references.length === 0 && <p className="work-panel-overview-empty-copy">
+              {t(`panel.overview.noRecorded${referenceKind === "mcp" ? "Mcp" : referenceKind === "skills" ? "Skills" : "Memory"}`)}
+            </p>}
           </div>
         </details>
       </div>

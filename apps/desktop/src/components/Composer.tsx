@@ -31,7 +31,6 @@ import {
 } from "../lib/session-thinking";
 import { ComposerAutocomplete } from "./ComposerAutocomplete";
 import { AskToolCard } from "./AskToolCard";
-import { TodoDock } from "./TodoDock";
 import {
   COMPOSER_MAX_VISIBLE_ROWS,
   COMPOSER_MIN_HEIGHT_PX,
@@ -591,7 +590,6 @@ export function Composer({
       data-composer-dock={variant}
     >
       <div className="composer-stack">
-        {activeSessionId ? <TodoDock sessionId={activeSessionId} /> : null}
         {pendingAsk ? (
           <AskToolCard key={pendingAsk.requestId} request={pendingAsk} queued={queuedAsks} />
         ) : null}
@@ -711,9 +709,11 @@ export function Composer({
             workSessionLabel={activeSessionSummary?.title}
           />
         </div>
-        {composerContextUsage ? (
-          <ComposerUsageFooter {...composerContextUsage} />
-        ) : null}
+        <div className="composer-bottom-footer">
+          {composerContextUsage ? (
+            <ComposerUsageFooter {...composerContextUsage} />
+          ) : null}
+        </div>
       </div>
     </div>
   );

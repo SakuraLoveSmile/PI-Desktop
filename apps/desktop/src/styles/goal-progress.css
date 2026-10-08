@@ -12,25 +12,17 @@
   box-sizing: border-box;
 }
 
-/* Centered progress capsule: 30-32px height, 10px radius */
+/* The progress count belongs to the same disclosure as the Goal title. */
 .goal-progress-capsule {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  height: 32px;
-  min-height: 30px;
-  max-height: 32px;
-  border-radius: var(--radius-sm);
-  background: var(--ds-tile);
-  border: 1px solid var(--ds-border-subtle);
-  padding: 0 14px;
-  color: var(--ds-text-primary);
+  gap: 6px;
+  flex-shrink: 0;
+  color: var(--ds-text-secondary);
   font-size: var(--text-xs);
-  box-sizing: border-box;
-  user-select: none;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
+
+.goal-progress-scope { white-space: nowrap; }
 
 .goal-progress-ring {
   display: block;
@@ -121,24 +113,20 @@
   color: var(--ds-text-primary);
 }
 
-.goal-progress-toggle-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  border-radius: var(--radius-3xs);
-  background: transparent;
-  border: none;
-  cursor: pointer;
+.goal-progress-bar-header.btn {
+  height: auto;
+  min-height: 36px;
+  border: 0;
+  border-radius: 0;
+  text-align: left;
   color: var(--ds-text-secondary);
-  font-size: var(--text-xs);
-  flex-shrink: 0;
-  transition: color 0.15s ease, background-color 0.15s ease;
 }
-
-.goal-progress-toggle-btn:hover {
-  color: var(--ds-text-primary);
-  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
+.goal-progress-bar-header.btn:active:not(:disabled) { transform: none; }
+.goal-progress-bar-header.btn:focus-visible { outline: 2px solid var(--ds-focus); outline-offset: -2px; }
+.goal-progress-bar-header > svg { flex-shrink: 0; }
+@media (max-width: 480px) {
+  .goal-progress-bar-left { flex-wrap: wrap; gap: 4px 8px; }
+  .goal-progress-bar-title { flex-basis: 100%; }
 }
 
 /* Expanded content: max 144px internal scrolling */

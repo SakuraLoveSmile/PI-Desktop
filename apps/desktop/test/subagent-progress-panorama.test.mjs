@@ -82,7 +82,8 @@ test("OverviewTab integrates AgentPanorama and toggles between overview and pano
 test("Team panorama owns the canvas separately from the aggregate panel", () => {
   assert.match(teamPanoramaSource, /AgentPanorama/);
   assert.match(teamPanoramaSource, /team\.lead/);
-  assert.match(teamPanoramaSource, /memberFocusTask/);
+  assert.match(teamPanoramaSource, /projectTeamPanorama/);
+  assert.match(teamPanoramaSource, /dependencyEdges=/);
   assert.match(teamPanoramaSource, /teamWorkPanelTab\(/);
   assert.doesNotMatch(teamPanoramaSource, /onBack=/);
   assert.doesNotMatch(teamPanelSource, /AgentPanorama|view\.kind === "panorama"/);

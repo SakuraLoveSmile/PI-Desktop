@@ -4,7 +4,6 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createInstance } from "i18next";
 import { I18nextProvider } from "react-i18next";
-import { catalogs } from "@pi-desktop/i18n";
 import { IPC } from "@pi-desktop/shared";
 import { createServer } from "vite";
 import { fileURLToPath } from "node:url";
@@ -35,18 +34,19 @@ async function harness() {
     root: fileURLToPath(new URL("..", import.meta.url)),
     configFile: false,
     plugins: [{ name: "todo-effect-scheduler", enforce: "pre", transform(source, id) {
-      if (!id.endsWith("/TodoDock.tsx") && !id.endsWith("/useSessionTodosRecovery.ts")) return;
-      return source.replace(/import \{ useEffect(?:, useState)? \} from "react";/,
-        id.endsWith("/TodoDock.tsx")
-          ? 'import { useState } from "react"; const useEffect = globalThis.__todoRecoveryEffect;'
-          : 'const useEffect = globalThis.__todoRecoveryEffect;');
+      if (!id.endsWith("/useSessionTodosRecovery.ts")) return;
+      return source.replace('import { useEffect } from "react";',
+        'const useEffect = globalThis.__todoRecoveryEffect;');
     } }],
     server: { middlewareMode: true, hmr: false, ws: false },
     esbuild: { jsx: "automatic" }, appType: "custom",
     optimizeDeps: { noDiscovery: true, include: [] },
   });
-  const { TodoDock } = await server.ssrLoadModule("/src/components/TodoDock.tsx");
+  const { SessionTodoChecklist } = await server.ssrLoadModule("/src/components/workpanel/SessionTodoChecklist.tsx");
   const { useAppStore } = await server.ssrLoadModule("/src/stores/app-store.ts");
+  const { catalogs } = await server.ssrLoadModule(
+    fileURLToPath(new URL("../../../packages/i18n/src/index.ts", import.meta.url)),
+  );
   const { api } = await server.ssrLoadModule("/src/lib/api.ts");
   const offTodos = api.onTodosChanged(useAppStore.getState().applyTodosChanged);
   useAppStore.setState({ sessionTodos: {} });
@@ -56,7 +56,7 @@ async function harness() {
   const render = (sessionId) => {
     effects.length = 0;
     Object.assign(useAppStore.getInitialState(), { sessionTodos: useAppStore.getState().sessionTodos });
-    const html = renderToStaticMarkup(createElement(I18nextProvider, { i18n }, createElement(TodoDock, { sessionId })));
+    const html = renderToStaticMarkup(createElement(I18nextProvider, { i18n }, createElement(SessionTodoChecklist, { sessionId })));
     mounted = effects.map((effect, index) => {
       const old = mounted[index];
       if (old && effect.deps.every((dep, i) => Object.is(dep, old.deps[i]))) return old;
@@ -90,7 +90,7 @@ const snapshot = (sessionId, revision, content = "Recovered work") => ({
   todos: [{ content, status: "pending", priority: "medium" }],
 });
 
-test("TodoDock recovers a failed first read when the host returns without a session switch", async (t) => {
+test("SessionTodoChecklist recovers a failed first read when the host returns without a session switch", async (t) => {
   const diagnostics = t.mock.method(console, "error", () => undefined);
   const recoveryErrors = () => diagnostics.mock.calls.filter(call => call.arguments[0] === "Session checklist recovery failed");
   const h = await harness();
@@ -104,19 +104,22 @@ test("TodoDock recovers a failed first read when the host returns without a sess
     h.emit(IPC.event.hostStatus, { ok: true, component: "host" });
     await h.settle();
     assert.deepEqual(h.reads, ["session-a", "session-a"]);
-    assert.match(h.render("session-a"), /Recovered work/);
+    assert.match(h.render("session-a"), />Session checklist 0\/1</);
+    assert.equal(h.store.getState().sessionTodos["session-a"].todos[0].content, "Recovered work");
   } finally { await h.close(); }
 });
 
-test("TodoDock re-reads cached sessions on activation and restart without snapshot-driven requests", async () => {
+test("SessionTodoChecklist re-reads cached sessions on activation and restart without snapshot-driven requests", async () => {
   const h = await harness();
   try {
     h.store.getState().applyTodosChanged(snapshot("session-a", 1, "Cached work"));
     let revision = 2;
     h.setRead(async (id) => snapshot(id, revision++, "Current host work"));
-    assert.match(h.render("session-a"), /Cached work/);
+    assert.match(h.render("session-a"), />Session checklist 0\/1</);
+    assert.equal(h.store.getState().sessionTodos["session-a"].todos[0].content, "Cached work");
     await h.settle();
-    assert.match(h.render("session-a"), /Current host work/);
+    assert.match(h.render("session-a"), />Session checklist 0\/1</);
+    assert.equal(h.store.getState().sessionTodos["session-a"].todos[0].content, "Current host work");
     assert.deepEqual(h.reads, ["session-a"]);
     h.render("session-b");
     await h.settle();
@@ -132,7 +135,7 @@ test("TodoDock re-reads cached sessions on activation and restart without snapsh
   } finally { await h.close(); }
 });
 
-test("TodoDock keeps newer events and drops old-host and switched-session reads", async () => {
+test("SessionTodoChecklist keeps newer events and drops old-host and switched-session reads", async () => {
   const h = await harness();
   const pending = [];
   h.setRead((id) => new Promise((resolve) => pending.push({ id, resolve })));
@@ -150,7 +153,8 @@ test("TodoDock keeps newer events and drops old-host and switched-session reads"
     h.emit(IPC.event.todosChanged, snapshot("session-a", 4, "New push"));
     pending[2].resolve(snapshot("session-a", 3, "Stale read"));
     await h.settle();
-    assert.match(h.render("session-a"), /New push/);
+    assert.match(h.render("session-a"), />Session checklist 0\/1</);
+    assert.equal(h.store.getState().sessionTodos["session-a"].todos[0].content, "New push");
     h.render("session-b");
     h.render("session-a");
     pending[3].resolve(snapshot("session-b", 1));
@@ -166,7 +170,7 @@ test("TodoDock keeps newer events and drops old-host and switched-session reads"
   } finally { await h.close(); }
 });
 
-test("TodoDock never reads the local host for remote or native sessions", async () => {
+test("SessionTodoChecklist never reads the local host for remote or native sessions", async () => {
   const h = await harness();
   try {
     h.render("remote:server:session-a");
@@ -178,7 +182,7 @@ test("TodoDock never reads the local host for remote or native sessions", async 
   } finally { await h.close(); }
 });
 
-test("TodoDock rejects a mismatched snapshot and ignores pending work after unmount", async (t) => {
+test("SessionTodoChecklist rejects a mismatched snapshot and ignores pending work after unmount", async (t) => {
   const diagnostics = t.mock.method(console, "error", () => undefined);
   const recoveryErrors = () => diagnostics.mock.calls.filter(call => call.arguments[0] === "Session checklist recovery failed");
   const h = await harness();

@@ -89,7 +89,11 @@ export function PermissionCard({
         />
       </div>
       {permission.reason ? (
-        <div className="permission-card-reason">{permission.reason}</div>
+        <div className="permission-card-reason">
+          {permission.reason === "Accesses a path outside the session workspace"
+            ? t("permission.outsideWorkspace")
+            : permission.reason}
+        </div>
       ) : null}
       {argBlocks.length > 0 ? (
         <div className="permission-card-args">
@@ -97,7 +101,7 @@ export function PermissionCard({
         </div>
       ) : null}
       <div className="permission-card-meta">
-        <span title={workspace}>
+        <span className="permission-card-workspace" title={workspace}>
           {t("permission.workspace", {
             workspace: workspace || t("permission.temporarySession"),
           })}

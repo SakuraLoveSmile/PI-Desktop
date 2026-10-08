@@ -197,3 +197,13 @@ after a full Host/app restart.
 9. host restart interrupts pending/queued/running work without replay or stale
    action and keeps already-approved interrupted sessions in Agent; no terminal
    card restoration is required after restart
+
+### Long-path permission card presentation
+
+The project context is a shrinkable, wrapping text region inside the permission
+card. Complete workspace and requested paths remain available without causing
+horizontal card overflow. Header and decision controls remain usable in narrow
+columns. The known Host reason for accessing outside the session workspace is
+localized by the renderer; unknown/custom policy reasons remain unchanged.
+This does not alter permission risk, request/session identity, grant scope,
+queue order, copy content, or resolution behavior.

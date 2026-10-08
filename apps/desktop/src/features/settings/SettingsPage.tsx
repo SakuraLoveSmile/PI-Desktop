@@ -64,6 +64,7 @@ import { CloseBehaviorSection, DeveloperSection } from "./developer-sections";
 import { PluginScenicThemesDestination } from "../../components/settings/PluginScenicThemesDestination";
 import { ConfigSyncPage } from "../../components/settings/ConfigSyncPage";
 import { StorageSettingsSection } from "./StorageSettingsSection";
+import { ExpertTeamSettingsPage } from "./ExpertTeamSettingsPage";
 
 type SettingsTab = ReturnType<typeof useAppStore.getState>["settingsTab"];
 
@@ -221,9 +222,9 @@ export function SettingsPage() {
 
   const saveSettings = async (patch: Partial<AppSettings>) => {
     if (!settings) return;
-    const nextSettings = { ...settings, ...patch };
-    await api.setSettings(nextSettings);
-    useAppStore.setState({ settings: nextSettings });
+    await api.setSettings(patch);
+    const confirmedSettings = await api.getSettings();
+    useAppStore.setState({ settings: confirmedSettings });
     await refreshProviders();
   };
 
@@ -245,6 +246,7 @@ export function SettingsPage() {
       skills: <IconBookOpen size={14} />,
       mcp: <IconServer size={14} />,
       subagents: <IconBot size={14} />,
+      expertTeam: <IconBot size={14} />,
       import: <IconDownload size={14} />,
       projects: <IconArchive size={14} />,
       sync: <IconCloudDown size={14} />,
@@ -290,7 +292,7 @@ export function SettingsPage() {
 
   const activeNavItem = navItems.find((item) => item.id === tab);
   const activeTitleKey = activeNavItem?.titleKey ?? "settings.title";
-  const tabNeedsSettings = ["general", "ai", "shortcuts", "agent"].includes(tab);
+  const tabNeedsSettings = ["general", "ai", "shortcuts", "agent", "expertTeam"].includes(tab);
 
   return (
     <div className="settings-shell settings-shell-full">
@@ -652,6 +654,7 @@ export function SettingsPage() {
 
           {tab === "import" && <ImportSection />}
 
+          {tab === "expertTeam" && settings && <ExpertTeamSettingsPage />}
           {tab === "projects" && <ProjectsPage />}
 
           {tab === "sync" && !tabHidden && <ConfigSyncPage />}

@@ -198,6 +198,124 @@
   padding: 0 0 12px;
 }
 
+.work-panel-overview-artifact-group + .work-panel-overview-artifact-group { margin-top: 16px; }
+.work-panel-overview-group-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-block: 4px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-md);
+}
+.work-panel-overview-resource-note {
+  margin: 2px 0 6px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-sm);
+}
+.work-panel-overview-reference-tabs { display: flex; gap: 16px; margin-bottom: 10px; }
+.work-panel-overview-reference-tab.btn {
+  padding: 0 0 8px;
+  min-height: 32px;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-base);
+}
+.work-panel-overview-reference-tab.btn[aria-pressed="true"] {
+  border-bottom-color: var(--ds-success);
+  color: var(--ds-text-primary);
+}
+.work-panel-overview-reference-list { margin: 0; padding: 0; list-style: none; }
+.work-panel-overview-recorded-reference {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-block: 6px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-base);
+  overflow-wrap: anywhere;
+}
+.work-panel-overview-file.btn { justify-content: flex-start; height: auto; }
+
+.session-todo-checklist-header {
+  display: flex;
+  width: 100%;
+  min-height: 48px;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-normal);
+  text-align: left;
+}
+
+.session-todo-checklist-header:active:not(:disabled) {
+  transform: none;
+}
+
+.session-todo-checklist-header[aria-expanded="false"] .work-panel-overview-chevron {
+  transform: rotate(-90deg);
+}
+
+.session-todo-checklist-list {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  margin: 0;
+  list-style: none;
+}
+
+.session-todo-checklist-row {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 0;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.session-todo-checklist-symbol {
+  display: grid;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+}
+
+.session-todo-checklist-row-completed .session-todo-checklist-symbol {
+  color: var(--ds-success);
+}
+
+.session-todo-checklist-row-in_progress .session-todo-checklist-symbol {
+  color: var(--ds-accent);
+}
+
+.session-todo-checklist-row-in_progress .session-todo-checklist-content {
+  color: var(--ds-text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.session-todo-checklist-row-cancelled {
+  color: var(--ds-text-muted);
+}
+
+.session-todo-checklist-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  overflow-wrap: anywhere;
+}
+
+.session-todo-checklist-status {
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs);
+}
+
 .work-panel-overview-status,
 .work-panel-overview-row {
   display: flex;

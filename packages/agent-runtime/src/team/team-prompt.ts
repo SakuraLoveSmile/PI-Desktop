@@ -2,7 +2,11 @@
  * System prompt additions for Expert Team Lead and Teammates (ADR 0304).
  */
 
-import type { TeamWorkPurpose } from "@pi-desktop/shared";
+import type { ExpertTeamConfigSnapshot, TeamWorkPurpose } from "@pi-desktop/shared";
+import { expertInstructionsPrompt } from "./expert-policy.js";
+
+export const TEAM_EXPERT_PRESET_GUIDANCE =
+  "Optionally select members[].presetId to use a built-in configured expert: researcher (investigation and analysis), fullstack (implementation), qa (tests and build verification), reviewer (code review and risks), ui (browser/UI verification), or debugger (failure reproduction and root-cause diagnosis). Omit presetId for a generic legacy expert. The Host resolves configured models, tool limits and instructions; never supply those settings as model-authored fields. Plan research remains read-only regardless of preset.";
 
 export const TEAM_TASK_SUBJECT_GUIDANCE =
   "Write a concise task title in the primary language of the user's request, even when technical context is in another language. Aim for 8-16 Chinese characters or about 3-8 words in other languages. Name the key action or outcome; omit workflow prefixes such as 'Recon:' or 'Ad-hoc:'. Put detailed requirements, constraints and instructions in description or send_message, not subject.";
@@ -17,6 +21,7 @@ export const TEAM_MEMBER_DISPLAY_NAME_GUIDANCE =
   "Use a short, user-readable name in the primary language of the user's request; personal names such as Alex or Sam are allowed. Keep technical scope and routing handles out of the display name.";
 
 const TEAM_LAUNCH_REVIEW_GUIDANCE = [
+  TEAM_EXPERT_PRESET_GUIDANCE,
   `For declare_team_strategy reason: ${TEAM_STRATEGY_REASON_GUIDANCE}`,
   `For members[].description: ${TEAM_MEMBER_DESCRIPTION_GUIDANCE}`,
   `For presentation.displayName: ${TEAM_MEMBER_DISPLAY_NAME_GUIDANCE}`,
@@ -29,9 +34,17 @@ export interface TeamPromptOptions {
   isLead: boolean;
   memberName?: string;
   teamSessionId?: string;
+  expertConfig?: ExpertTeamConfigSnapshot;
 }
 
 export function teamSystemPrompt(options: TeamPromptOptions): string {
+  return [
+    teamCollaborationPrompt(options),
+    ...(!options.isLead ? [expertInstructionsPrompt(options.expertConfig)] : []),
+  ].filter(Boolean).join("\n\n");
+}
+
+function teamCollaborationPrompt(options: TeamPromptOptions): string {
   if (options.isLead && options.mode === "plan") {
     return ["## Expert Planning Team Collaboration", "You are the Lead and coordinator, never a research member.",
       "Expert Team mode is mandatory delegation, including bounded or simple requests. Never choose lead_only, propose solo execution or ask the user to permit solo handling.",

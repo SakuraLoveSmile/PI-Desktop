@@ -7,6 +7,7 @@ use crate::{db::Database, session_collaboration, sessions};
 
 pub(super) fn expert_proposal(name: &str) -> TeamProposedMember {
     TeamProposedMember {
+        preset_id: None,
         name: name.into(),
         description: None,
         context_kind: None,

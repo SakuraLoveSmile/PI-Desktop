@@ -29,7 +29,7 @@ const hostProcessSource = await readFile(
   "utf8",
 );
 
-test("every launch resolves the subagent catalog and its pinned models", () => {
+test("standard launches resolve the subagent catalog and its pinned models", () => {
   assert.match(sessionLaunchSource, /loadSubagentDefinitions,/);
   assert.match(sessionLaunchSource, /resolveSubagentProviders,/);
   // The catalog is re-read per prompt, registry documents included, so an edit

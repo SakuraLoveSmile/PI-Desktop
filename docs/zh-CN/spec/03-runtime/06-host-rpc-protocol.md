@@ -1164,3 +1164,27 @@ team.getLeadExecutionState 和 team.readExecutionInbox 接受 {teamSessionId,cal
 ### 研究任务负责人校验与历史补派
 
 活跃 Plan 研究轮创建任务必须明确指定本轮批准的研究员 ownerMemberName 或 ownerSessionId。遗漏负责人或指定 Lead 时，Host 在写入任务和版本前返回 TEAM_RESEARCH_INVALID。主控 task_create schema 要求 ownerMemberName；send_message 只发送指令，不分配归属。旧未分配任务仍可读取，并由主控使用当前 expectedRevision 与批准负责人执行 task_update，在同一事务纳入研究轮；研究员不能自行认领，提交前必须重新读取版本。Agent 待办仍可无负责人创建。创建/更新被拒绝时属于工具调用失败，不能包装成带错误文本的成功结果。
+
+### Expert preset configuration and launch snapshots
+
+settings.get/set retain their current transport and add optional AppSettings
+expertTeam schemaVersion=1, userDefaults and projectOverrides. Scope values are
+partial per-role model/provider/thinking/tools/instructions bindings. Host
+validates shape, limits, known presets/tools and canonical project identity.
+Malformed settings do not partially persist.
+
+Team proposed members may carry presetId from researcher/fullstack/qa/reviewer/
+ui/debugger. Launch reviews and member runtime context optionally carry the
+resolved expertConfig snapshot. No presetId means the legacy launch behavior.
+Host confirmation persists the new member policy in the same transaction as
+its route; reused members preserve existing policy. Role tool policy is an
+additional restriction at runtime and Host tool authorization, never a grant.
+
+Expert configuration mutations additionally supply expertTeamExpected, the
+previous complete expertTeam object or null for first creation. Host compares
+this condition under its settings mutex, rejects conflicts, and strips the
+metadata before storage. A changed expert configuration without the condition
+is rejected; unchanged legacy roundtrips remain readable. Ordinary renderer
+settings writes omit expertTeam unless submitted by this dedicated CAS editor.
+Main applies the complete committed Host settings to network/menu/developer
+side effects, so a partial request cannot reset unrelated runtime policy.
