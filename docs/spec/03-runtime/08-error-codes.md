@@ -385,6 +385,7 @@ with teammates, shared task boards, and peer mailboxes.
 | `TEAM_DELIVERY_PENDING` | yes | the Host has not yet persisted a durable recipient queue or turn receipt |
 | `TEAM_APPROVAL_REQUIRED` | no | current Team launch authority or actual approved expert start is missing; Agent requires user confirmation, Plan research launches automatically |
 | `TEAM_REVIEW_REVISION_CONFLICT` | yes | the launch review revision changed after the caller read it |
+| `TEAM_CONFIG_CONFLICT` | yes | expert preset settings changed after the caller read them; reload before retry |
 | `TEAM_MODEL_SELECTION_INVALID` | no | a proposed provider/model/thinking route cannot be launched |
 | `TEAM_MEMBER_MODEL_CHANGE_BLOCKED` | no | the member holds an active turn or queued work on its route |
 | `TEAM_LEAD_CONFIGURATION_BLOCKED` | no | a Lead with durable Team data cannot change to the standard profile |

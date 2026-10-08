@@ -60,6 +60,8 @@
 /* Decision cards are soft tiles (D297): risk rides in the tint and the risk
    pill rather than a coloured rail. */
 .permission-card {
+  min-width: 0;
+  box-sizing: border-box;
   width: min(100%, var(--chat-prose-max-width, 720px));
   margin: 10px 0;
   padding: 14px 16px;
@@ -68,6 +70,8 @@
 }
 
 .asktool-card {
+  box-sizing: border-box;
+  min-width: 0;
   width: min(100%, var(--chat-prose-max-width, 720px));
   margin: 8px 0;
   padding: 10px 12px;
@@ -164,12 +168,30 @@
 .asktool-question {
   display: flex;
   align-items: baseline;
+  min-width: 0;
   gap: 8px;
   margin: 8px 0 0;
   color: var(--ds-text-primary);
   font-size: var(--text-sm);
   font-weight: var(--font-weight-medium);
   line-height: var(--leading-snug);
+}
+
+.asktool-question-content {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  max-height: min(420px, 40vh);
+  max-height: min(420px, 40dvh);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+}
+
+.asktool-question-content > * + * {
+  margin-top: 8px;
 }
 
 .asktool-options {
@@ -208,6 +230,8 @@
 
 .asktool-option-copy {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  flex: 1;
   min-width: 0;
   gap: 2px;
 }
@@ -218,9 +242,7 @@
 .asktool-rich-list-item,
 .asktool-rich-quote,
 .asktool-rich-pre,
-.asktool-rich-table,
-.asktool-rich-table-row,
-.asktool-rich-table-cell {
+.asktool-rich-table-scroll {
   display: block;
   margin: 0;
 }
@@ -280,13 +302,46 @@
   background: var(--ds-text-faint);
 }
 
+.asktool-rich-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.asktool-rich-table {
+  display: table;
+  width: max-content;
+  border-collapse: collapse;
+}
+
+.asktool-rich-table-head {
+  display: table-header-group;
+  font-weight: var(--font-weight-semibold);
+}
+
+.asktool-rich-table-body {
+  display: table-row-group;
+}
+
+.asktool-rich-table-footer {
+  display: table-footer-group;
+}
+
 .asktool-rich-table-row {
-  display: flex;
-  gap: 6px;
+  display: table-row;
 }
 
 .asktool-rich-table-cell {
-  min-width: 0;
+  display: table-cell;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--ds-tile-deep);
+  vertical-align: top;
+}
+
+.asktool-rich-table-cell-content {
+  display: block;
+  min-width: 8rem;
+  max-width: 20rem;
   overflow-wrap: anywhere;
 }
 
@@ -1184,6 +1239,7 @@
 }
 
 .permission-card-header {
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 12px;
 }
@@ -1235,6 +1291,7 @@
 }
 
 .permission-card-reason {
+  overflow-wrap: anywhere;
   margin-top: 4px;
   color: var(--ds-text-muted);
   font-size: var(--text-sm);
@@ -1254,15 +1311,12 @@
   font-size: var(--text-xs);
 }
 
-.permission-card-meta > span:first-child {
+.permission-card-workspace {
+  flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.permission-card-meta > span:last-child {
-  flex: none;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .permission-card-actions {

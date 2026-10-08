@@ -11,6 +11,7 @@ import {
   TEAM_STRATEGY_REASON_GUIDANCE,
   TEAM_MEMBER_DESCRIPTION_GUIDANCE,
   TEAM_MEMBER_DISPLAY_NAME_GUIDANCE,
+  TEAM_EXPERT_PRESET_GUIDANCE,
 } from "./team-prompt.js";
 import {
   type TeamTaskRecord,
@@ -50,7 +51,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
     name: DECLARE_TEAM_STRATEGY_TOOL_NAME,
     label: "Declare Team Strategy",
     description:
-      "Expert Team mode requires expert delegation. Declare at least one named expert with a role and context. In Plan mode, the Host automatically starts a read-only research roster without user confirmation; immediately assign owned tasks and dispatch researchers. In Agent execution mode, stop for trusted user launch review before dispatch. Solo execution and lead_only are unavailable.",
+      "Expert Team mode requires expert delegation. Declare at least one named expert with a role and context. In Plan mode, the Host automatically starts a read-only research roster without user confirmation; immediately assign owned tasks and dispatch researchers. In Agent execution mode, stop for trusted user launch review before dispatch. Solo execution and lead_only are unavailable. " + TEAM_EXPERT_PRESET_GUIDANCE,
     parameters: Type.Object({
       strategy: Type.Literal("delegate", {
         description: "Required delegation strategy. Expert Team mode does not permit lead_only.",
@@ -68,6 +69,10 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
               maxLength: 64,
             }),
             description: Type.Optional(Type.String({ description: TEAM_MEMBER_DESCRIPTION_GUIDANCE })),
+            presetId: Type.Optional(Type.Union([
+              Type.Literal("researcher"), Type.Literal("fullstack"), Type.Literal("qa"),
+              Type.Literal("reviewer"), Type.Literal("ui"), Type.Literal("debugger"),
+            ], { description: TEAM_EXPERT_PRESET_GUIDANCE })),
             contextKind: Type.Optional(
               Type.Union([Type.Literal("fresh"), Type.Literal("fork")], {
                 description: "Context initialization: 'fresh' (default) or 'fork'.",

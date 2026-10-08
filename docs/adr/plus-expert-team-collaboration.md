@@ -387,3 +387,56 @@ results from those current dispatches to be consumed. GoalProgress and
 SubmitGoalReport remain attached to the same Goal execution, yielding one
 completed report only after successful completion. Plan research submission
 continues to use its separate structured-result and research inbox barriers.
+
+## Amendment: Expert presets and scoped launch configuration (2026-10-08)
+
+Expert Team settings use six explicit presets: researcher, fullstack, qa,
+reviewer, ui, and debugger. These presets are independent of the existing
+five-value presentation role and of ordinary Task subagent definitions.
+An optional presetId on a proposed member identifies the configuration;
+arbitrary member names do not infer policy. Legacy proposals remain valid.
+
+The existing Host settings KV stores optional expertTeam schema v1 with user
+defaults and canonical-project-path overrides. Project values override user
+values per field; omitted fields inherit. A model/provider route remains a
+pair, validated using the existing member route gate. A pinned preset route
+precedes a model-proposed route; trusted launch review can explicitly edit it.
+No credentials enter the preset, and Config Sync does not export this local
+configuration. There is no new IPC or SQLite table migration.
+
+Host declaration resolves settings into the review. Confirmation atomically
+snapshots tools and additional instructions for each new member. Existing
+members retain their previously confirmed policy, including absent legacy
+policy, and a different preset cannot silently replace it. Later settings or
+Composer edits do not change an already confirmed member. Member/team deletion
+removes the accompanying snapshot; recovery reads the durable policy.
+
+An omitted tools field inherits the existing execution profile; an explicit
+subset can select only the existing assignable business tools. It narrows
+execution and never grants permission. Runtime catalog, discovery and execution
+checks enforce it, with a Host native-tool guard as a second boundary. Required
+Team coordination/result controls remain available. Plan research keeps its
+stricter read-only ceiling. Additional role instructions append to the existing
+Team context without replacing product/security/approval instructions.
+
+This preserves Renderer → Main → Host/Runtime ownership and backwards-readable
+reviews and member records. The added contract is prospective configuration,
+not a mutation of an in-flight Team or its historical evidence.
+
+Expert edits use optimistic compare-and-set in the existing settings.set
+transport. The expected expertTeam snapshot is non-persisted metadata checked
+under the Host settings mutex. The editor can rebase once if only another role
+changed; same-role edits preserve the draft and require explicit reopen. Old
+full application snapshots cannot mutate this new field without the expected
+condition. Renderer ordinary preferences omit it, and Main applies full
+committed settings for native side effects rather than the partial request.
+
+### Startup isolation amendment (2026-10-08)
+
+The Main launch resolver selects the execution profile before ordinary Task
+configuration. Only standard sessions discover ordinary delegates and resolve
+their model/credential catalogs. Team launches receive empty ordinary
+delegation data and keep their own model and Host context. Runtime reuse under
+Team ignores unused Task inputs, while standard retains its previous freshness
+checks. This removes configuration-induced Team rebuilding without changing
+the process model, Team consent, member snapshots or active-turn safety.

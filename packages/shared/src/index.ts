@@ -11,6 +11,7 @@ export * from "./composer-trigger.js";
 export * from "./session-link.js";
 export * from "./fuzzy.js";
 export * from "./mcp-control-settings.js";
+export * from "./expert-team-settings.js";
 export * from "./mcp-import.js";
 export * from "./mcp-catalog.js";
 export * from "./mcp-catalog-builtin.js";

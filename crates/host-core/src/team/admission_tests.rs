@@ -26,6 +26,7 @@ fn propose_reuse_review(
             strategy: "delegate",
             reason: "Review an existing member route",
             members: Some(vec![TeamProposedMember {
+                preset_id: None,
                 name: member.name.clone(),
                 description: member.description.clone(),
                 context_kind: Some(member.context_kind.clone()),
@@ -336,6 +337,7 @@ fn unrelated_fresh_member_review_does_not_block_existing_member_configuration() 
             strategy: "delegate",
             reason: "Add a separate worker",
             members: Some(vec![TeamProposedMember {
+                preset_id: None,
                 name: "new-worker".to_string(),
                 description: None,
                 context_kind: Some("fresh".to_string()),

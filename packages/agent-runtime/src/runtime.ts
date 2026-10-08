@@ -149,6 +149,7 @@ import {
 } from "./agent-messages.js";
 import { withExplicitRequired } from "./tool-schema.js";
 import { createTeamTools, teamSystemPrompt } from "./team/index.js";
+import { expertToolDenial } from "./team/expert-policy.js";
 import { buildSessionContext } from "./session-context.js";
 import { entriesFromExecutionStart } from "./approved-execution-context.js";
 import { prepareCompaction } from "./pi-runtime-compaction-plan.js";
@@ -1052,7 +1053,7 @@ export type RuntimeMatchConfig = {
   /** Resolved keys explicitly opted into Task.model selection; pins alone grant no override. */
   subagentModelKeys?: string[];
   teamContext?: Pick<NonNullable<AgentRuntimeOptions["teamContext"]>,
-    "teamSessionId" | "callerSessionId" | "isLead" | "memberName" | "workPurpose" | "planningId" | "roundId">;
+    "teamSessionId" | "callerSessionId" | "isLead" | "memberName" | "workPurpose" | "planningId" | "roundId" | "expertConfig">;
 };
 
 /** Tool calls ride in the assistant content array as `type: "toolCall"`. A
@@ -2318,6 +2319,7 @@ export class DesktopAgentRuntime {
               teamSystemPrompt({
                 mode: this.mode,
                 workPurpose: this.teamContext?.workPurpose,
+                expertConfig: this.teamContext?.expertConfig,
                 isLead: this.teamContext?.isLead ?? false,
                 memberName: this.teamContext?.memberName,
                 teamSessionId: this.teamContext?.teamSessionId ?? "",
@@ -2497,6 +2499,8 @@ export class DesktopAgentRuntime {
   private async beforeToolCall(
     context: BeforeToolCallContext,
   ): Promise<BeforeToolCallResult | undefined> {
+    const expertDenial = expertToolDenial(this.teamContext?.expertConfig, context.toolCall.name);
+    if (expertDenial) return { block: true, reason: expertDenial };
     if (this.deferredToolNames.has(context.toolCall.name) && !this.activeDeferredToolNames.has(context.toolCall.name)) {
       return { block: true, reason: `Call ${TOOL_SEARCH_NAME} to activate ${context.toolCall.name} before using it. A tool declaration does not grant execution permission.` };
     }
@@ -2607,13 +2611,13 @@ export class DesktopAgentRuntime {
         safeJson(config.customSystemPrompt ?? null) &&
       (this.projectMemory ?? "") === (config.projectMemory?.trim() ?? "") &&
       (this.projectPath ?? "") === (config.projectPath?.trim() ?? "") &&
-      // Editing `~/.agents/subagents/*.md` must reach the next prompt. Definition
-      // bodies are part of the `Task` tool's behavior, so unlike skills they
-      // are compared in full.
-      safeJson(this.subagents) === safeJson(config.subagents ?? []) &&
-      safeJson(this.subagentProviders) === safeJson(config.subagentProviders ?? {}) &&
-      safeJson([...this.subagentModelKeys].sort()) ===
-        safeJson([...new Set(config.subagentModelKeys ?? [])].sort()) &&
+      // Only standard sessions compare Task inputs; Team reuse follows Host context.
+      (this.executionProfile === "team" || (
+        safeJson(this.subagents) === safeJson(config.subagents ?? []) &&
+        safeJson(this.subagentProviders) === safeJson(config.subagentProviders ?? {}) &&
+        safeJson([...this.subagentModelKeys].sort()) ===
+          safeJson([...new Set(config.subagentModelKeys ?? [])].sort())
+      )) &&
       safeJson(this.teamContext ?? null) === safeJson(config.teamContext ?? null) &&
       // Enabling or disabling a trusted extension retires the runtime so the
       // next prompt reloads the set (spec 16 §4.3).
@@ -3835,7 +3839,7 @@ export class DesktopAgentRuntime {
   private rebuildToolCatalog(): void {
     const catalog = new Map<string, AgentTool>();
     for (const tool of this.buildToolDefinitions()) {
-      if (!this.isToolAllowedInMode(tool.name) && (this.teamContext?.workPurpose === "plan_research" || !retainModeToolDeclaration(tool.name))) continue;
+      if (!this.isToolAllowedInMode(tool.name) && (this.teamContext?.workPurpose === "plan_research" || expertToolDenial(this.teamContext?.expertConfig, tool.name) || !retainModeToolDeclaration(tool.name))) continue;
       // The execution mode is decided here, in one place, so no tool can grow
       // an accidental parallel batch: everything is sequential except `Task`.
       // pi runs a whole batch sequentially when it holds one sequential tool,
@@ -3855,13 +3859,13 @@ export class DesktopAgentRuntime {
                   callerSessionId: this.sessionId,
                   getTurnId: () => this.turnId,
                   currentModeDenial: () => this.isToolAllowedInMode(tool.name)
-                    ? undefined : modeToolDenial(tool.name, this.mode),
+                    ? undefined : expertToolDenial(this.teamContext?.expertConfig, tool.name) ?? modeToolDenial(tool.name, this.mode),
                 })
               : tool),
             executionMode:
               tool.name === SUBAGENT_TOOL_NAME ? "parallel" : "sequential",
           }),
-          () => this.isToolAllowedInMode(tool.name) ? undefined : modeToolDenial(tool.name, this.mode),
+          () => this.isToolAllowedInMode(tool.name) ? undefined : expertToolDenial(this.teamContext?.expertConfig, tool.name) ?? modeToolDenial(tool.name, this.mode),
         ),
       );
     }
@@ -3916,6 +3920,7 @@ export class DesktopAgentRuntime {
   }
 
   private isToolAllowedInMode(name: string): boolean {
+    if (expertToolDenial(this.teamContext?.expertConfig, name)) return false;
     if (this.teamContext?.workPurpose === "plan_research") {
       return new Set(["Read", "Glob", "Grep", "send_message", "wait_for_updates", "task_update", "task_list", "task_get", "team_status", SUBMIT_RESEARCH_RESULT_TOOL_NAME]).has(name);
     }

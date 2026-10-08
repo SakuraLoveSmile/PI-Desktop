@@ -29,6 +29,7 @@ pub(super) fn setup() -> (crate::db::Database, String, Vec<TeamMember>) {
                 ["backend", "frontend"]
                     .into_iter()
                     .map(|name| TeamProposedMember {
+                        preset_id: None,
                         name: name.into(),
                         description: None,
                         context_kind: None,

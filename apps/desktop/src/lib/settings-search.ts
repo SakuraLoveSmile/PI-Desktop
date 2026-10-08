@@ -14,6 +14,7 @@ export type SettingsTabId =
   | "skills"
   | "mcp"
   | "subagents"
+  | "expertTeam"
   | "import"
   | "projects"
   | "sync"
@@ -249,6 +250,19 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "extensions.subagents.presetFixerName",
       "extensions.subagents.presetUiDesignerName",
       "extensions.subagents.tools",
+    ],
+  },
+  {
+    id: "expertTeam",
+    labelKey: "settings.expertTeam.title",
+    titleKey: "settings.expertTeam.title",
+    group: "agent",
+    keywordKeys: [
+      "settings.expertTeam.builtinTitle",
+      "settings.expertTeam.model",
+      "settings.expertTeam.thinking",
+      "settings.expertTeam.tools",
+      "settings.expertTeam.instructions",
     ],
   },
   {

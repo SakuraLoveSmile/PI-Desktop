@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Button, TooltipButton } from "../../ui";
 import { IconArrowUpRight, IconChevronDown } from "../../icons";
@@ -32,9 +32,7 @@ export function TeamTaskProgress({
   extra?: ReactNode;
 }) {
   const { t } = useTranslation();
-  const [groupOpen, setGroupOpen] = useState(true);
   const bodyId = useId();
-  const groupId = useId();
   return (
     <section className="team-progress" aria-label={t("team.taskProgress")}
       data-completed={completed} data-total={total}>
@@ -54,22 +52,15 @@ export function TeamTaskProgress({
       <div id={bodyId} className="team-progress-body" hidden={!expanded}>
         {total > 0 ? (
           <>
-            <TooltipButton className="team-progress-group-toggle" tooltip={t("team.adHocGroup")}
-              ariaLabel={t("team.adHocGroup")} aria-expanded={groupOpen} aria-controls={groupId}
-              onClick={() => setGroupOpen((open) => !open)}>
-              <span>{t("team.adHocGroup")}</span>
-              <span className="team-progress-group-count">{total}</span>
-              <IconChevronDown size={14} aria-hidden />
-            </TooltipButton>
-            <ol id={groupId} className="team-progress-rows" hidden={!groupOpen}>
-              {rows.map(({ task, state, owner }) => (
+            <ol className="team-progress-rows">
+              {rows.map(({ task, ordinal, state, owner }) => (
                 <li key={task.taskId}>
                   <TooltipButton className="team-progress-row" tooltip={task.subject}
                     ariaLabel={t("team.openTaskWithStatus", { subject: task.subject, status: t(taskStateLabelKey(state)) })}
                     onClick={() => onOpenTask(task.taskId, task.subject)}>
                     <TaskStateGlyph state={state} />
-                    <span className="team-progress-task">{t("team.adHocTaskTitle", { subject: task.subject })}</span>
-                    {owner ? <MemberIdentity member={owner} avatarSize={12} />
+                    <span className="team-progress-task">{t("team.numberedTask", { number: ordinal, subject: task.subject })}</span>
+                    {owner ? <MemberIdentity member={owner} avatarSize={20} />
                       : <span className="team-person">{t("team.unassigned")}</span>}
                   </TooltipButton>
                 </li>

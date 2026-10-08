@@ -114,6 +114,7 @@ pub(super) fn create_team_member(
             strategy: "delegate",
             reason: "Test fixture approval",
             members: Some(vec![TeamProposedMember {
+                preset_id: None,
                 name: name.to_string(),
                 description: description.map(str::to_string),
                 context_kind: context_kind.map(str::to_string),

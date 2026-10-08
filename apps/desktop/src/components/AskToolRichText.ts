@@ -8,9 +8,18 @@ type RichNodeProps = {
   checked?: boolean;
 };
 
-function spanBlock(className: string) {
+function spanBlock(className: string, role?: string) {
   return ({ children }: RichNodeProps) =>
-    createElement("span", { className }, children);
+    createElement("span", { className, role }, children);
+}
+
+function tableCell(role: "cell" | "columnheader") {
+  return ({ children }: RichNodeProps) =>
+    createElement(
+      "span",
+      { className: "asktool-rich-table-cell", role },
+      createElement("span", { className: "asktool-rich-table-cell-content" }, children),
+    );
 }
 
 type AskToolListKind = "ordered" | "unordered";
@@ -75,13 +84,18 @@ const safeMarkdownComponents: Components = {
   ol: ({ children }) => createElement(AskToolList, { kind: "ordered" }, children),
   p: spanBlock("asktool-rich-paragraph"),
   pre: spanBlock("asktool-rich-pre"),
-  table: spanBlock("asktool-rich-table"),
-  tbody: spanBlock("asktool-rich-table-row"),
-  td: spanBlock("asktool-rich-table-cell"),
-  tfoot: spanBlock("asktool-rich-table-row"),
-  th: spanBlock("asktool-rich-table-cell"),
-  thead: spanBlock("asktool-rich-table-row"),
-  tr: spanBlock("asktool-rich-table-row"),
+  table: ({ children }) =>
+    createElement(
+      "span",
+      { className: "asktool-rich-table-scroll" },
+      createElement("span", { className: "asktool-rich-table", role: "table" }, children),
+    ),
+  tbody: spanBlock("asktool-rich-table-body", "rowgroup"),
+  td: tableCell("cell"),
+  tfoot: spanBlock("asktool-rich-table-footer", "rowgroup"),
+  th: tableCell("columnheader"),
+  thead: spanBlock("asktool-rich-table-head", "rowgroup"),
+  tr: spanBlock("asktool-rich-table-row", "row"),
   ul: ({ children }) => createElement(AskToolList, { kind: "unordered" }, children),
 };
 

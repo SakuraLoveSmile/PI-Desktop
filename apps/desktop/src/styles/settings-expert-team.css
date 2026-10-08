@@ -1,0 +1,30 @@
+.expert-team-settings { display: grid; gap: 24px; }
+.expert-team-settings-description,
+.expert-team-builtins-copy p,
+.expert-team-role-card > p { margin: 0; color: var(--ds-text-muted); line-height: var(--leading-relaxed); }
+.expert-team-scope-tabs.settings-segment { overflow-x: auto; max-width: 100%; gap: 22px; background: transparent; border: 0; border-radius: 0; padding: 0; }
+.expert-team-scope-tabs .settings-segment-item { flex: 0 0 auto; padding: 10px 0; border-radius: 0; background: transparent; border-bottom: 2px solid transparent; }
+.expert-team-scope-tabs .settings-segment-item.active { background: transparent; border-bottom-color: var(--ds-text-primary); box-shadow: none; }
+.expert-team-current-project { color: var(--ds-text-muted); font-size: var(--text-xs); }
+.expert-team-builtins-copy { display: grid; gap: 10px; }
+.expert-team-builtins-copy h3 { margin: 0; font-size: var(--text-base); font-weight: var(--font-weight-semibold); }
+.expert-team-project-path { color: var(--ds-text-muted); font-size: var(--text-xs); overflow-wrap: anywhere; }
+.expert-team-role-list { display: grid; gap: 18px; }
+.expert-team-role-list > .settings-card-block { margin: 0; }
+.expert-team-role-card { display: grid; gap: 8px; padding: 18px 20px; }
+.expert-team-role-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.expert-team-role-heading h4 { margin: 0; }
+.expert-team-role-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; color: var(--ds-text-muted); font-size: var(--text-xs); overflow-wrap: anywhere; }
+.expert-team-role-editor { display: grid; gap: 18px; padding-top: 18px; margin-top: 8px; border-top: 1px solid var(--ds-border-default); }
+.expert-team-model-fields { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; }
+.expert-team-role-editor .field { min-width: 0; }
+.expert-team-role-editor .field-textarea { width: 100%; margin-top: 10px; }
+.expert-team-tools.settings-segment { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.expert-team-editor-actions { display: flex; justify-content: space-between; gap: 12px; }
+.expert-team-error,
+.expert-team-load-error { color: var(--ds-error); margin: 0; }
+.expert-team-load-error { display: flex; align-items: center; gap: 12px; }
+@media (max-width: 640px) {
+  .expert-team-model-fields { grid-template-columns: minmax(0, 1fr); }
+  .expert-team-role-card { padding: 14px; }
+}

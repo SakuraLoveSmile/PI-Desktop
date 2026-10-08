@@ -146,6 +146,8 @@ pub struct TeamMemberSelectionPartial {
 #[serde(rename_all = "camelCase")]
 pub struct TeamProposedMember {
     pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preset_id: Option<super::expert_config::ExpertTeamPresetId>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -162,6 +164,10 @@ pub struct TeamProposedMember {
 #[serde(rename_all = "camelCase")]
 pub struct TeamLaunchReviewMember {
     pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preset_id: Option<super::expert_config::ExpertTeamPresetId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expert_config: Option<super::expert_config::ExpertTeamConfigSnapshot>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     pub context_kind: String,
