@@ -15,6 +15,7 @@ import { IPC } from "../packages/shared/src/protocol.ts";
 import { createSession } from "./e2e/session.mjs";
 import { resolveHostBinary } from "./e2e/host.mjs";
 import { withScenario } from "./e2e/fixture.mjs";
+import { AgentSidecar } from "../packages/host-runtime/dist/agent-sidecar.js";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 register(pathToFileURL(join(root, "apps/desktop/test/helpers/ts-import-hooks.mjs")));
@@ -84,11 +85,36 @@ async function main() {
   const tempRoot = await mkdtemp(join(tmpdir(), "pi-e2e-session-chunk-"));
   try {
     await withScenario("E2E-MCP-SESSION-CHUNK", async (ctx) => {
+      const home = join(ctx.scenarioRoot, "native-home");
+      const agentDir = join(home, ".pi", "agent");
+      const nativeRoot = join(agentDir, "sessions", "fixture");
+      await mkdir(nativeRoot, { recursive: true });
+      const nativeFile = join(nativeRoot, "native.jsonl");
+      const nativeContent = "原生审查证据🦜".repeat(80_000);
+      const nativeEntries = [
+        { type: "session", version: 3, id: "native-chunk-fixture", timestamp: "2026-10-08T06:00:00Z", cwd: ctx.workspace },
+        { type: "message", id: "native-older", parentId: null, timestamp: "2026-10-08T06:00:01Z",
+          message: { role: "user", content: "Earlier native evidence", timestamp: 1 } },
+        { type: "custom", id: "native-context", parentId: "native-older", timestamp: "2026-10-08T06:00:02Z",
+          customType: "fixture", data: { preserved: true } },
+        { type: "message", id: "native-large", parentId: "native-context", timestamp: "2026-10-08T06:00:03Z",
+          message: { role: "assistant", content: [{ type: "text", text: nativeContent }], timestamp: 3,
+            provider: "fixture", model: "fixture", stopReason: "stop" } },
+      ];
+      const nativeBytes = Buffer.from(nativeEntries.map(entry => JSON.stringify(entry)).join("\n") + "\n");
+      fs.writeFileSync(nativeFile, nativeBytes);
+      const launchNative = () => new AgentSidecar({
+        launch: { command: process.execPath, args: [join(root, "packages/agent-runtime/dist/sidecar.js")],
+          cwd: ctx.scenarioRoot, env: { ...process.env, HOME: home, PI_CODING_AGENT_DIR: agentDir,
+            PI_DESKTOP_DATA_DIR: ctx.dataDir } },
+        onStderr: text => { if (process.env.DEBUG_SESSION_CHUNK) process.stderr.write(text); },
+      });
+      let sidecar;
       const handlers = new Map();
       const { registerSessionIpc } = loadSessionIpc();
       registerSessionIpc({
         registrar: { handle: (channel, handler) => handlers.set(channel, handler) },
-        getHost: () => ctx.host, getSidecar: () => null, dataDir: ctx.dataDir,
+        getHost: () => ctx.host, getSidecar: () => sidecar, dataDir: ctx.dataDir,
         activeTurns: new Map(), sessionProjects: new Map(),
         persistenceOutbox: { dropSession() {} }, logger: { app() {} },
         plugins: { broadcastEvent() {} },
@@ -106,6 +132,9 @@ async function main() {
         },
       });
       try {
+        sidecar = launchNative();
+        const [native] = (await sidecar.call("native.session.list", {})).sessions;
+        assert.ok(native?.id.startsWith("native-pi:"));
         const info = await server.start();
         const initialized = await post(info.url, info.token, { jsonrpc: "2.0", id: 1, method: "initialize" });
         const headers = { "Mcp-Session-Id": initialized.response.headers.get("mcp-session-id") };
@@ -158,7 +187,59 @@ async function main() {
         assert.equal(afterRestart.isError, undefined);
         assert.equal(afterRestart.structuredContent.sha256, sha256);
         console.log(`PASS E2E-MCP-SESSION-CHUNK: real isolated Host + production session IPC + authenticated MCP; ${totalBytes} UTF-8 bytes, ${parts.length} chunks; older page + restart`);
-      } finally { await server.stop(); }
+        const nativeBaseline = await call("pi_session_get", { id: native.id, messageLimit: 1 });
+        assert.equal(nativeBaseline.isError, undefined, JSON.stringify(nativeBaseline.structuredContent));
+        assert.equal(nativeBaseline.structuredContent.truncated, true);
+        let nativeOffset = 0; let nativeHash; let nativeTotal; const nativeParts = [];
+        do {
+          const result = await call("pi_session_get_chunk", { id: native.id, offset: nativeOffset,
+            ...(nativeHash ? { expectedSha256: nativeHash } : {}) });
+          assert.equal(result.isError, undefined, JSON.stringify(result.structuredContent));
+          const chunk = result.structuredContent;
+          nativeHash ??= chunk.sha256; nativeTotal ??= chunk.totalBytes;
+          assert.equal(chunk.sha256, nativeHash); assert.equal(chunk.totalBytes, nativeTotal);
+          assert.equal(chunk.sessionId, native.id); assert.equal(chunk.offset, nativeOffset);
+          const part = Buffer.from(chunk.chunk, "base64");
+          assert.ok(part.length > 0 && part.length <= 64 * 1024);
+          assert.equal(nativeOffset + part.length, chunk.nextOffset ?? nativeTotal);
+          nativeParts.push(part); nativeOffset = chunk.nextOffset;
+        } while (nativeOffset !== null);
+        const nativePageBytes = Buffer.concat(nativeParts);
+        assert.equal(nativePageBytes.length, nativeTotal);
+        assert.equal(createHash("sha256").update(nativePageBytes).digest("hex"), nativeHash);
+        const nativePage = JSON.parse(nativePageBytes.toString("utf8")).session;
+        assert.equal(nativePage.messageCount, 2);
+        assert.equal(nativePage.messageStart, 1); assert.equal(nativePage.messageEnd, 2);
+        assert.equal(nativePage.hasMoreBefore, true); assert.equal(nativePage.hasMoreAfter, false);
+        assert.equal(nativePage.messages[0].content, nativeContent);
+        const nativeOlder = await call("pi_session_get_chunk", { id: native.id, messageBefore: nativePage.messageStart });
+        assert.equal(nativeOlder.isError, undefined);
+        const nativeOlderPage = JSON.parse(Buffer.from(nativeOlder.structuredContent.chunk, "base64").toString("utf8")).session;
+        assert.equal(nativeOlderPage.messages[0].content, "Earlier native evidence");
+        assert.equal(nativeOlderPage.messageStart, 0); assert.equal(nativeOlderPage.messageEnd, 1);
+        assert.equal(nativeOlderPage.hasMoreBefore, false); assert.equal(nativeOlderPage.hasMoreAfter, true);
+        const nativeEmpty = await call("pi_session_get_chunk", { id: native.id, messageBefore: nativeOlderPage.messageStart });
+        assert.equal(nativeEmpty.isError, undefined);
+        const nativeEmptyPage = JSON.parse(Buffer.from(nativeEmpty.structuredContent.chunk, "base64").toString("utf8")).session;
+        assert.deepEqual(nativeEmptyPage.messages, []);
+        assert.equal(nativeEmptyPage.messageStart, 0); assert.equal(nativeEmptyPage.messageEnd, 0);
+        assert.equal(nativeEmptyPage.hasMoreBefore, false); assert.equal(nativeEmptyPage.hasMoreAfter, true);
+        const nativeClamped = await call("pi_session_get_chunk", { id: native.id, messageBefore: 20, expectedSha256: nativeHash });
+        assert.equal(nativeClamped.isError, undefined);
+        assert.equal(nativeClamped.structuredContent.sha256, nativeHash);
+        await sidecar.dispose();
+        sidecar = launchNative();
+        const [reopenedNative] = (await sidecar.call("native.session.list", {})).sessions;
+        assert.equal(reopenedNative.id, native.id);
+        const nativeRestarted = await call("pi_session_get_chunk", { id: native.id, messageBefore: 2, expectedSha256: nativeHash });
+        assert.equal(nativeRestarted.isError, undefined);
+        assert.equal(nativeRestarted.structuredContent.sha256, nativeHash);
+        assert.deepEqual(fs.readFileSync(nativeFile), nativeBytes);
+        console.log(`PASS E2E-MCP-SESSION-CHUNK-NATIVE: real isolated sidecar + production session IPC + authenticated MCP; ${nativeTotal} UTF-8 bytes, ${nativeParts.length} chunks; older/empty/clamped pages + sidecar restart; JSONL unchanged`);
+      } finally {
+        try { await server.stop(); }
+        finally { await sidecar?.dispose(); }
+      }
     }, binary, tempRoot);
   } finally { await rm(tempRoot, { recursive: true, force: true }); }
 }

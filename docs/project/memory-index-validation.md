@@ -1,5 +1,8 @@
 # Plus project context validation — 2026-10-08
 
+> Historical pre-integration evidence. Later integration commits and package
+> qualification supersede the original uncommitted-delivery status below.
+
 T1 (automatic project memory), T2 (source-linked historical recall), and T3
 (local literal code search) are ready for user evaluation. No release, install,
 commit, push, or merge was performed. The primary checkout remains clean.
