@@ -240,6 +240,9 @@ import type { ProjectInstructions } from "./project-instructions.js";
 import { projectInstructionsPrompt } from "./project-instructions-prompt.js";
 import type { CustomSystemPrompt } from "./custom-system-prompt.js";
 import { projectMemoryPrompt } from "./project-memory-prompt.js";
+import { autoMemoryPrompt, createAutoMemoryTool, loadAutoMemory } from "./project-auto-memory.js";
+import { createProjectHistoryTool } from "./project-history.js";
+import { buildCodeSearchTool } from "./code-search.js";
 import {
   pluginSkillsPrompt,
   pluginSkillsPromptSections,
@@ -774,6 +777,7 @@ const AGENT_CORE_TOOL_NAMES = new Set([
   // model has to go looking for is one it will not use. Registration keeps its
   // own gate: the tool only exists when the catalog is non-empty.
   SKILL_TOOL_NAME,
+  "ProjectMemory",
 ]);
 const MAX_ON_DEMAND_TOOL_PROMPT_ENTRIES = 64;
 const MAX_TOOL_SEARCH_RESULT_NAMES = 24;
@@ -1737,6 +1741,9 @@ export class DesktopAgentRuntime {
   private baseProjectInstructions?: ProjectInstructions;
   private projectInstructions?: ProjectInstructions;
   private projectMemory?: string;
+  private turnProjectMemory?: string;
+  private autoMemoryEnabled = false;
+  private projectMemoryRefreshAbort?: AbortController;
   /** Per-prompt claims prevent repeated path-resolution RPCs for one directory. */
   private pathInstructionClaims = new Map<
     string,
@@ -1930,6 +1937,7 @@ export class DesktopAgentRuntime {
     this.baseProjectInstructions = opts.projectInstructions;
     this.projectInstructions = opts.projectInstructions;
     this.projectMemory = opts.projectMemory?.trim() || undefined;
+    this.turnProjectMemory = this.projectPath ? this.projectMemory : undefined;
     this.compactionEnabled = compactionEnabled(opts.compactionSettings);
     this.compactionStrategy = resolveCompactionStrategy(opts.compactionStrategy);
 
@@ -2298,7 +2306,8 @@ export class DesktopAgentRuntime {
 
   private composeSystemPrompt(): string {
     const projectPrompt = projectInstructionsPrompt(this.projectInstructions);
-    const memoryPrompt = projectMemoryPrompt(this.projectMemory);
+    const memoryPrompt = projectMemoryPrompt(this.projectPath ? this.turnProjectMemory : this.projectMemory);
+    const automaticPrompt = this.autoMemoryEnabled && this.mode === "agent" ? autoMemoryPrompt() : undefined;
     const optionalToolsPrompt = this.optionalToolsPrompt();
     const resumablePrompt =
       this.subagents.length > 0
@@ -2329,12 +2338,41 @@ export class DesktopAgentRuntime {
         ...(optionalToolsPrompt ? [optionalToolsPrompt] : []),
         ...(projectPrompt ? [projectPrompt] : []),
         ...(memoryPrompt ? [memoryPrompt] : []),
+        ...(automaticPrompt ? [automaticPrompt] : []),
         ...(resumablePrompt ? [resumablePrompt] : []),
       ].join("\n\n")),
     };
     const composed = Object.values(this.composedSections).filter(Boolean).join("\n\n");
     this.composedSystemPrompt = composed;
     return composed;
+  }
+
+  private async refreshAutoMemoryForTurn(): Promise<void> {
+    if (!this.projectPath) return;
+    const epoch = this.turnEpoch;
+    const controller = new AbortController();
+    this.projectMemoryRefreshAbort = controller;
+    let enabled = false;
+    let content: string | undefined;
+    try {
+      const state = await loadAutoMemory(this.host, this.sessionId, controller.signal);
+      enabled = state.autoRecordEnabled;
+      content = state.memory.content;
+    } catch (error) {
+      // Do not log memory bytes, host parameters, or capability tokens.
+      if (!controller.signal.aborted) console.warn("project memory unavailable for this turn", {
+        kind: error instanceof Error ? error.name : typeof error,
+      });
+    } finally {
+      if (this.projectMemoryRefreshAbort === controller) this.projectMemoryRefreshAbort = undefined;
+    }
+    if (this.runCancelled || this.disposed || this.turnEpoch !== epoch) return;
+    this.autoMemoryEnabled = enabled;
+    // Refresh failures must never reuse notes the user may have deleted.
+    this.turnProjectMemory = content;
+    this.rebuildToolCatalog();
+    this.setAgentTools(this.activeTools());
+    this.setAgentSystemPrompt(this.composeSystemPrompt());
   }
 
   /**
@@ -3454,7 +3492,7 @@ export class DesktopAgentRuntime {
           failureKey !== undefined &&
           typeof result.errorCode === "string" &&
           RECOVERABLE_MUTATION_ERROR_CODES.has(result.errorCode)
-            ? `${failureKey} ${result.errorCode}`
+            ? `${failureKey}\0${result.errorCode}`
             : undefined;
         const grantedRecoveryGrace =
           graceKey !== undefined && !this.mutationRecoveryGraces.has(graceKey);
@@ -3484,7 +3522,7 @@ export class DesktopAgentRuntime {
           if (succeededKey !== undefined) {
             this.mutationFailureCounts.delete(succeededKey);
             for (const key of this.mutationRecoveryGraces) {
-              if (key.startsWith(`${succeededKey} `)) {
+              if (key.startsWith(`${succeededKey}\0`)) {
                 this.mutationRecoveryGraces.delete(key);
               }
             }
@@ -3816,8 +3854,34 @@ export class DesktopAgentRuntime {
     const goalProgressTools = this.goalProgressManager
       ? [this.goalProgressManager.buildTool()]
       : [];
+    const memoryEpoch = this.turnEpoch;
+    const projectTools = this.projectPath ? [
+      createProjectHistoryTool(this.host, this.sessionId),
+      buildCodeSearchTool({ host: this.host, sessionId: this.sessionId, boundPath: this.projectPath }),
+    ].map(tool => ({
+      ...tool,
+      execute: async (...args: Parameters<AgentTool["execute"]>) => {
+        const ensureCurrent = () => {
+          if (this.disposed || this.runCancelled || this.turnEpoch !== memoryEpoch || args[2]?.aborted) {
+            throw new Error("Project context request is no longer active");
+          }
+        };
+        ensureCurrent();
+        const params: unknown = args[1];
+        if (tool.name === "CodeSearch" && this.mode !== "agent" && params && typeof params === "object" &&
+          "action" in params && params.action === "clear") {
+          throw new Error(`Clearing the code index is not allowed in ${this.mode} mode`);
+        }
+        const result = await tool.execute(...args);
+        ensureCurrent();
+        return result;
+      },
+    })) : [];
     return [
       ...builtins,
+      ...projectTools,
+      ...(this.autoMemoryEnabled && this.mode === "agent" ? [createAutoMemoryTool(this.host, this.sessionId,
+        () => this.autoMemoryEnabled && this.mode === "agent" && !this.disposed && !this.runCancelled && this.turnEpoch === memoryEpoch)] : []),
       askTool,
       ...filteredPluginTools,
       ...skillTools,
@@ -3937,6 +4001,8 @@ export class DesktopAgentRuntime {
       "BrowserPreview",
       "Bash",
       ASK_TOOL_NAME,
+      "ProjectHistory",
+      "CodeSearch",
       CONTEXT_COMPACTION_TOOL_NAME,
       SUBMIT_TOOL_NAMES[kind],
     ]).has(name);
@@ -3945,6 +4011,7 @@ export class DesktopAgentRuntime {
   private isCoreTool(name: string): boolean {
     return (
       name === CONTEXT_COMPACTION_TOOL_NAME ||
+      name === "ProjectHistory" || name === "CodeSearch" ||
       retainModeToolDeclaration(name) ||
       MODE_TRANSITION_TOOL_NAMES.has(name) ||
       // The whole delegation lifecycle stays in the core set rather than the
@@ -8569,6 +8636,11 @@ export class DesktopAgentRuntime {
     this.requestStartedAt = Date.now();
     this.setMode("agent");
     this.autonomousExecution = true;
+    if (this.projectPath) await this.refreshAutoMemoryForTurn();
+    try { ensureExecutionIsCurrent(); } catch (error) {
+      this.terminateParentTurn();
+      throw error;
+    }
     // The transcript stays complete, but execution sees only its approved
     // contract and subsequent work, never planning turns from another model.
     // The system state is transcript rows too, so entriesFromExecutionStart
@@ -8796,6 +8868,7 @@ export class DesktopAgentRuntime {
     this.abortDelegationsFromPreviousTurns();
     this.requestStartedAt = Date.now();
     this.setAgentActivity({ phase: "starting", since: Date.now() });
+    const promptEpoch = this.turnEpoch;
     try {
       const content = promptContent(modelInput);
       const incomingUserMessage: AgentMessage = {
@@ -8803,6 +8876,11 @@ export class DesktopAgentRuntime {
         content,
         timestamp: Date.now(),
       };
+      if (this.projectPath) await this.refreshAutoMemoryForTurn();
+      if (this.runCancelled || this.disposed || this.turnEpoch !== promptEpoch) {
+        this.keepPreflightUserMessage(incomingUserMessage);
+        throw turnAbortedError("Turn aborted while loading project memory");
+      }
       if (this.automaticCompactionNeeded([incomingUserMessage])) {
         const compacted = await this.runCompaction("threshold", false);
         if (!compacted) {
@@ -9037,6 +9115,7 @@ export class DesktopAgentRuntime {
     this.acceptingSteering = false;
     this.gracefulStopRequested = false;
     this.runCancelled = true;
+    this.projectMemoryRefreshAbort?.abort();
     this.teamLeadExecution.cancel();
     this.clearGoalProgressTool();
     this.steeringWaitAbort?.abort();
@@ -9092,6 +9171,7 @@ export class DesktopAgentRuntime {
     this.disposed = true;
     this.acceptingSteering = false;
     this.runCancelled = true;
+    this.projectMemoryRefreshAbort?.abort();
     this.teamLeadExecution.cancel();
     this.steeringWaitAbort?.abort();
     this.resolvePendingAskTools();

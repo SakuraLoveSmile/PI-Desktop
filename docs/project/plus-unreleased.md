@@ -105,3 +105,10 @@ Upstream v0.15.6 → v0.16.1 has been merged.
 - One-time Plan/Goal schedules allow up to two minutes of delay while the app
   stays running, including sleep/resume. Longer delays are marked missed and
   require Run now confirmation; restarting the app still never catches up.
+
+- Project memory supports opt-in Agent recording and updates, with safe concurrent
+  editing and per-turn refresh. Saved notes remain readable when recording is off.
+- ProjectHistory recalls source-linked discussions from saved chats in the same
+  logical project. CodeSearch provides local literal code search and a disposable
+  persistent text cache, with live file reconciliation and explicit partial coverage.
+  Neither feature adds background model or embedding calls.
