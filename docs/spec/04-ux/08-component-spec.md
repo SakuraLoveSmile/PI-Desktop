@@ -2796,6 +2796,22 @@ retry operation only for completed executions, without rerunning the Goal or mak
 Report reads and retry remain scoped to the owning session.
 Historical report files and execution records are retained; they are not rewritten or deleted.
 
+### Canvas report presentation
+
+The ready Goal report uses the supplied Canvas reference as a scoped reading
+surface: a centered 960px document, 16px title, 18px section headings, 14px body,
+all metrics visible in a responsive grid, vertical step timeline, compact
+semantic file/check tables, full uncropped screenshots, and conclusion/limits
+callouts. Order is header/metrics, summary, steps, files, verification, gallery,
+and conclusion/limitations/next steps. Narrow tables scroll inside their frame.
+Dark report colors follow the reference; light mode uses existing theme tokens.
+
+Rendering continues to consume the durable v1 Host report, without executing
+supplied JSX or changing persistence. Model claims and Host observations remain
+separate; metric success styling requires linked passing Host observations.
+Missing evidence resolution is unknown, and contradictions, fallback integrity,
+interrupted status, unavailable images, and retry remain explicit.
+
 ### 10B.3 Accessibility
 
 - The transcript card is a labeled region; its open action has a localized
@@ -3216,29 +3232,23 @@ reasoning-level control.
   file-reference names), expose independent Remove and Send now actions, and
   increase the dock height measured by `--composer-dock-height`.
 
-### 11.3a Session TodoDock
+### 11.3a Overview session checklist
 
-- The Composer stack places TodoDock above Plan/Goal approval surfaces when the
-  active session has a non-empty host-owned checklist. An empty checklist does
-  not reserve layout space.
-- The collapsed header shows completed/active progress and the current
-  `in_progress` content. A checklist whose items are all cancelled has a clear
-  cancelled label instead of a misleading `0/0 completed` count.
-- The disclosure is keyboard accessible, does not take focus on updates, resets
-  closed when the active session changes, and shows at most eight ordered rows.
-  The list stays mounted while collapsed so opening and closing can animate with
-  a bounded height/opacity transition; collapsed content is `aria-hidden` and
-  reduced-motion users receive an immediate state change. Completed rows use a
-  success-tinted tile with a check icon, in-progress rows use the accent tint,
-  and cancelled rows are muted; each status symbol has a localized accessible
-  name and each row renders plain text.
-- Renderer snapshots are keyed by session id. A `todos.changed` event with an
-  older or equal revision is ignored. Session activation and host recovery
-  re-read the authoritative snapshot, including already cached checklists; a
-  failed initial read cannot permanently hide the dock after host recovery.
-  Recovery is skipped for `remote:` and `native-pi:` sessions, which do not own
-  a local Desktop checklist. Remote Todo parity requires an additive RACP
-  contract.
+- A non-empty session checklist appears as the first section in the Work Panel
+  Overview scroll area. The Composer footer has no session checklist trigger.
+- The header names the Session checklist and its completed/total count. A shared
+  Button disclosure starts expanded and exposes `aria-expanded`. The ordered
+  inline list includes every task with full wrapped text and localized status;
+  the existing Overview scroll makes long lists reachable without nested popups.
+- Cancelled tasks are excluded from the denominator; an all-cancelled list shows
+  cancellation instead of 0/0. Rows are read-only and retain distinct statuses.
+- Live snapshot updates preserve expansion and focus. A session switch starts
+  its own expanded checklist; empty snapshots remove the section. Goal progress
+  remains near the Composer and consumes a separate execution snapshot.
+- Host SQLite remains authoritative. Session activation and host recovery read
+  the committed snapshot, including cached data. Store revision fences reject
+  stale events and recovery responses. Unsupported remote/native sessions skip
+  local recovery; moving the presentation does not add an IPC or RACP contract.
 
 ### 11.4 States
 
@@ -4731,6 +4741,18 @@ file references. Missing data uses a short empty state. Artifact rows open the
 existing trusted Markdown/file preview; the tab never invents progress,
 memory, terminal output, or historical facts.
 
+### AskTool rich question layout
+
+The question number sits beside one flexible content block. Markdown paragraphs,
+lists and tables flow vertically inside it; long questions scroll within
+`min(420px, 40dvh)` so answer choices and header actions remain available.
+Rich tables use aligned header/body rows, with readable 8–20rem cell content
+widths and horizontal scrolling confined to the question or option content.
+Long paths wrap within cells rather than reducing whole columns to character
+strips. Button-safe span projections retain table roles and do not introduce
+live links, images, HTML or nested interactive controls. Selection, skipped
+answers and submitted option-label values are unchanged.
+
 ### 13.2 Resolved AskTool summary
 
 After a successful AskTool resolution, the transcript keeps the interactive
@@ -4787,3 +4809,41 @@ clear the running execution or authorize experts. The review UI must not imply t
 completed or require a new user request to continue. Confirm resumes the same
 execution and Cancel interrupts it without a completed Goal report. Expert
 updates and Goal progress remain attached to the original approved execution.
+
+### Progress source clarity (2026-10-08)
+
+Goal execution progress and the session Todo checklist are independent Host
+resources and their counts must not be merged. The Goal ring/count is inline
+with its title in one shared Button disclosure, labeled Goal progress, with
+expanded state and a labeled Goal task list. There is no detached centered
+progress capsule. At narrow widths the title wraps onto a second row. The
+Overview section explicitly says Session checklist and keeps its independent
+inline ordered list. Both lists retain live updates and existing recovery/lifecycle
+semantics; this presentation supersedes the earlier centered-capsule geometry.
+
+### Expert Team settings and reference-aligned Overview (2026-10-08)
+
+Settings exposes an Expert Team destination under Agent configuration. The page
+uses user/project scope tabs and six built-in role cards. Each role edits an
+optional configured provider/model pair, supported thinking level, assignable
+tool subset, and additional instructions. Reset restores inheritance for the
+selected scope. Missing/unavailable routes and save conflicts remain visible.
+Saved settings affect newly declared preset-bound experts; existing members and
+confirmed reviews retain their snapshots.
+
+Team Overview presents numbered tasks in creation order with state glyphs and
+owner portrait/role/name below each title. Links open the actual task, board or
+Team panorama. The existing session checklist stays in Overview. Artifacts
+separate real Spec files, successful Write/Edit paths in the loaded transcript,
+and user attachments. This recorded-change list is not a complete Git diff;
+unknown line statistics are omitted. Skills/Memory/MCP reference tabs show only
+recorded session usage; configured resources do not imply use. Memory without
+an authenticated usage record has an explicit empty state.
+
+Team panorama presents one card per actual task, including repeated owners,
+and tiers/curved edges follow recorded task dependencies. Lead remains at top.
+No synthetic workflow dependencies or fabricated success are introduced.
+Pixel portraits, state footers, dotted background and zoom/fit/reset controls
+follow the supplied visual reference. Ordinary subagent panorama retains its
+existing layout. Live state, stale/error feedback, navigation and per-scope
+viewport restoration remain intact.

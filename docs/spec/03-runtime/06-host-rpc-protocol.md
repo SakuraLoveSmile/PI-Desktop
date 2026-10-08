@@ -1693,3 +1693,27 @@ unconsumed. This separate settlement barrier does not turn participation into
 proof of task ownership or require results beyond the current dispatch scope.
 Plan research's structured result/inbox submission barrier is separate. Goal
 progress and its sole completion report retain the original execution identity.
+
+### Expert preset configuration and launch snapshots
+
+settings.get/set retain their current transport and add optional AppSettings
+expertTeam schemaVersion=1, userDefaults and projectOverrides. Scope values are
+partial per-role model/provider/thinking/tools/instructions bindings. Host
+validates shape, limits, known presets/tools and canonical project identity.
+Malformed settings do not partially persist.
+
+Team proposed members may carry presetId from researcher/fullstack/qa/reviewer/
+ui/debugger. Launch reviews and member runtime context optionally carry the
+resolved expertConfig snapshot. No presetId means the legacy launch behavior.
+Host confirmation persists the new member policy in the same transaction as
+its route; reused members preserve existing policy. Role tool policy is an
+additional restriction at runtime and Host tool authorization, never a grant.
+
+Expert configuration mutations additionally supply expertTeamExpected, the
+previous complete expertTeam object or null for first creation. Host compares
+this condition under its settings mutex, rejects conflicts, and strips the
+metadata before storage. A changed expert configuration without the condition
+is rejected; unchanged legacy roundtrips remain readable. Ordinary renderer
+settings writes omit expertTeam unless submitted by this dedicated CAS editor.
+Main applies the complete committed Host settings to network/menu/developer
+side effects, so a partial request cannot reset unrelated runtime policy.

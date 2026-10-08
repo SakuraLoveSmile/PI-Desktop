@@ -195,6 +195,13 @@ pub(super) async fn handle(
                     "memberName": member_name,
                     "workPurpose": purpose.as_ref().map(|p|p.work_purpose.as_str()).unwrap_or("execute"),
                 });
+                if let Some(config) =
+                    crate::team::expert_config::member_snapshot(&st.db, session_id)
+                        .map_err(team_rpc_err)?
+                {
+                    context["expertConfig"] = serde_json::to_value(config)
+                        .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+                }
                 if let Some(purpose) = purpose.filter(|p| p.work_purpose == "plan_research") {
                     context["planningId"] = json!(purpose.planning_id);
                     context["roundId"] = json!(purpose.round_id);

@@ -267,6 +267,9 @@ export function createSessionLaunchRuntime({
     } = {},
   ) {
     if (!runtimeState.host) throw new Error("host unavailable");
+    const executionProfile = normalizeExecutionProfile(
+      overrides.executionProfile ?? session.executionProfile ?? "standard",
+    );
     await modelsDevCatalog.ensureLoaded();
     const commandShell = (await resolveEffectiveCommandShell()).effective!;
     const providers = await runtimeState.host!.call<{ providers: RuntimeProvider[] }>(
@@ -467,144 +470,151 @@ export function createSessionLaunchRuntime({
         description: skill.description,
       })),
     ];
-    // Subagents (ADR 0062): definitions are re-read per launch so editing
-    // `~/.agents/subagents` or the registry takes effect on the next prompt, and every
-    // pinned model is resolved here because credentials and the models.dev catalog
-    // live on this side. The user's own definitions (D202) are scope-filtered like the
-    // skills above; a delegate the model can see is one it will try to call.
-    const subagentCatalog = await loadSubagentDefinitions(projectPath, {
-      userDocuments: await activeUserSubagentDocuments(projectPath),
-      // A switched-off builtin is dropped from what this prompt may delegate to.
-      disabledBuiltins: await disabledBuiltinSubagents(),
-    });
-    const subagentBindings = await resolveSubagentProviders({
-      definitions: subagentCatalog.definitions,
-      providers: providers.providers,
-      getSecret: async (id: string) =>
-        (await runtimeState.host!.call<{ value?: string }>("providers.getSecret", { id })).value,
-      resolveVendorBinding: (pinned, pinnedModelId) =>
-        vendorOAuth.bindingFor(pinned.id, pinnedModelId),
-      resolveModel: async (pinned, pinnedModelId) => {
-        const catalogModelConfig = catalogModelConfigFor(modelsDevCatalog, {
-          providerId: pinned.id,
-          vendorKey: pinned.vendorKey,
-          baseUrl: pinned.baseUrl,
-          apiStyle: pinned.apiStyle,
-          modelId: pinnedModelId,
-        });
-        const configuredProvider = providers.providers.find(
-          (candidate) => candidate.id === pinned.id,
-        );
-        return configuredProvider
-          ? effectiveSubagentModelConfig(
-              configuredProvider,
-              pinnedModelId,
-              catalogModelConfig,
-            )
-          : {
-              modelConfig: catalogModelConfig,
-              capabilities: capabilitiesFromModelConfig(catalogModelConfig),
-            };
-      },
-    });
-    // Delegation model catalog: every model binding flagged
-    // `availableForSubagents` is pre-resolved so the system prompt can list
-    // them and the parent agent can pass them to `Task.model` without an
-    // extra RPC round-trip. Statically pinned entries from definitions take
-    // precedence — they were resolved above with stricter diagnostics.
+    // Team turns use Host-owned experts, never the ordinary Task catalog.
+    // Keep unused definitions, model resolution and credentials out of launch.
+    let subagentCatalog: Awaited<ReturnType<typeof loadSubagentDefinitions>> = {
+      definitions: [], builtins: [], diagnostics: [],
+    };
+    let subagentBindings: Awaited<ReturnType<typeof resolveSubagentProviders>> = {
+      providers: {}, diagnostics: [],
+    };
     const subagentModelKeys: string[] = [];
-    for (const row of providers.providers) {
-      if (!row.enabled) continue;
-      for (const binding of row.models ?? []) {
-        if (!binding.availableForSubagents) continue;
-        let key = `${row.vendorKey ?? row.name}/${binding.id}`;
-        // Two provider rows can share a vendor alias. Opting in one row must
-        // not authorize the credential-bearing pin resolved from another row.
-        if (subagentBindings.providers[key]?.id && subagentBindings.providers[key].id !== row.id) {
-          key = `${row.id}/${binding.id}`;
-        }
-        if (subagentBindings.providers[key]) {
-          subagentModelKeys.push(key);
-          continue; // already resolved, and independently opted in
-        }
-        const isVendorAccount = row.authKind === OAUTH_AUTH_KIND;
-        let apiKey = "";
-        if (!isVendorAccount && row.authKind !== "none") {
-          try {
-            apiKey =
-              (
-                await runtimeState.host!.call<{ value?: string }>("providers.getSecret", {
-                  id: row.id,
-                })
-              ).value ?? "";
-          } catch {
-            continue; // skip if secret unavailable
+    if (executionProfile === "standard") {
+      // Subagents (ADR 0062): definitions are re-read per launch so editing
+      // `~/.agents/subagents` or the registry takes effect on the next prompt, and every
+      // pinned model is resolved here because credentials and the models.dev catalog
+      // live on this side. The user's own definitions (D202) are scope-filtered like the
+      // skills above; a delegate the model can see is one it will try to call.
+      subagentCatalog = await loadSubagentDefinitions(projectPath, {
+        userDocuments: await activeUserSubagentDocuments(projectPath),
+        // A switched-off builtin is dropped from what this prompt may delegate to.
+        disabledBuiltins: await disabledBuiltinSubagents(),
+      });
+      subagentBindings = await resolveSubagentProviders({
+        definitions: subagentCatalog.definitions,
+        providers: providers.providers,
+        getSecret: async (id: string) =>
+          (await runtimeState.host!.call<{ value?: string }>("providers.getSecret", { id })).value,
+        resolveVendorBinding: (pinned, pinnedModelId) =>
+          vendorOAuth.bindingFor(pinned.id, pinnedModelId),
+        resolveModel: async (pinned, pinnedModelId) => {
+          const catalogModelConfig = catalogModelConfigFor(modelsDevCatalog, {
+            providerId: pinned.id,
+            vendorKey: pinned.vendorKey,
+            baseUrl: pinned.baseUrl,
+            apiStyle: pinned.apiStyle,
+            modelId: pinnedModelId,
+          });
+          const configuredProvider = providers.providers.find(
+            (candidate) => candidate.id === pinned.id,
+          );
+          return configuredProvider
+            ? effectiveSubagentModelConfig(
+                configuredProvider,
+                pinnedModelId,
+                catalogModelConfig,
+              )
+            : {
+                modelConfig: catalogModelConfig,
+                capabilities: capabilitiesFromModelConfig(catalogModelConfig),
+              };
+        },
+      });
+      // Delegation model catalog: every model binding flagged
+      // `availableForSubagents` is pre-resolved so the system prompt can list
+      // them and the parent agent can pass them to `Task.model` without an
+      // extra RPC round-trip. Statically pinned entries from definitions take
+      // precedence — they were resolved above with stricter diagnostics.
+      for (const row of providers.providers) {
+        if (!row.enabled) continue;
+        for (const binding of row.models ?? []) {
+          if (!binding.availableForSubagents) continue;
+          let key = `${row.vendorKey ?? row.name}/${binding.id}`;
+          // Two provider rows can share a vendor alias. Opting in one row must
+          // not authorize the credential-bearing pin resolved from another row.
+          if (subagentBindings.providers[key]?.id && subagentBindings.providers[key].id !== row.id) {
+            key = `${row.id}/${binding.id}`;
           }
-          if (!apiKey) continue;
-        }
-        let catalogModelConfig: Parameters<typeof modelConfigWithBinding>[0];
-        if (isVendorAccount) {
-          const vb = await vendorOAuth.bindingFor(row.id, binding.id);
-          if (!vb) continue;
-          catalogModelConfig =
-            vb.modelConfig ?? catalogModelConfigFor(modelsDevCatalog, {
+          if (subagentBindings.providers[key]) {
+            subagentModelKeys.push(key);
+            continue; // already resolved, and independently opted in
+          }
+          const isVendorAccount = row.authKind === OAUTH_AUTH_KIND;
+          let apiKey = "";
+          if (!isVendorAccount && row.authKind !== "none") {
+            try {
+              apiKey =
+                (
+                  await runtimeState.host!.call<{ value?: string }>("providers.getSecret", {
+                    id: row.id,
+                  })
+                ).value ?? "";
+            } catch {
+              continue; // skip if secret unavailable
+            }
+            if (!apiKey) continue;
+          }
+          let catalogModelConfig: Parameters<typeof modelConfigWithBinding>[0];
+          if (isVendorAccount) {
+            const vb = await vendorOAuth.bindingFor(row.id, binding.id);
+            if (!vb) continue;
+            catalogModelConfig =
+              vb.modelConfig ?? catalogModelConfigFor(modelsDevCatalog, {
+                providerId: row.id,
+              vendorKey: row.vendorKey,
+                baseUrl: vb.baseUrl ?? row.baseUrl,
+                apiStyle: vb.apiStyle ?? row.apiStyle,
+                modelId: binding.id,
+              });
+          } else {
+            catalogModelConfig = catalogModelConfigFor(modelsDevCatalog, {
               providerId: row.id,
-            vendorKey: row.vendorKey,
-              baseUrl: vb.baseUrl ?? row.baseUrl,
-              apiStyle: vb.apiStyle ?? row.apiStyle,
+              vendorKey: row.vendorKey,
+              baseUrl: row.baseUrl,
+              apiStyle: row.apiStyle,
               modelId: binding.id,
             });
-        } else {
-          catalogModelConfig = catalogModelConfigFor(modelsDevCatalog, {
-            providerId: row.id,
-            vendorKey: row.vendorKey,
-            baseUrl: row.baseUrl,
-            apiStyle: row.apiStyle,
+          }
+          const effective = effectiveSubagentModelConfig(
+            row,
+            binding.id,
+            catalogModelConfig,
+          );
+          const mc = effective.modelConfig;
+          const caps = effective.capabilities;
+          subagentBindings.providers[key] = {
+            id: row.id,
+            name: row.name,
+            ...(row.vendorKey ? { vendorKey: row.vendorKey } : {}),
+            ...(row.baseUrl ? { baseUrl: row.baseUrl } : {}),
             modelId: binding.id,
-          });
+            apiKey,
+            ...(row.authKind ? { authKind: row.authKind } : {}),
+            ...(row.apiStyle ? { apiStyle: row.apiStyle } : {}),
+            ...optionalProviderHeaders(row.headers),
+            supportsReasoning: caps.supportsReasoning,
+            supportedThinkingLevels: [...caps.supportedThinkingLevels],
+            ...(mc ? { modelConfig: mc } : {}),
+          };
+          subagentModelKeys.push(key);
         }
-        const effective = effectiveSubagentModelConfig(
-          row,
-          binding.id,
-          catalogModelConfig,
-        );
-        const mc = effective.modelConfig;
-        const caps = effective.capabilities;
-        subagentBindings.providers[key] = {
-          id: row.id,
-          name: row.name,
-          ...(row.vendorKey ? { vendorKey: row.vendorKey } : {}),
-          ...(row.baseUrl ? { baseUrl: row.baseUrl } : {}),
-          modelId: binding.id,
-          apiKey,
-          ...(row.authKind ? { authKind: row.authKind } : {}),
-          ...(row.apiStyle ? { apiStyle: row.apiStyle } : {}),
-          ...optionalProviderHeaders(row.headers),
-          supportsReasoning: caps.supportsReasoning,
-          supportedThinkingLevels: [...caps.supportedThinkingLevels],
-          ...(mc ? { modelConfig: mc } : {}),
-        };
-        subagentModelKeys.push(key);
       }
-    }
 
-    const subagentDiagnostics = [
-      ...subagentCatalog.diagnostics,
-      ...subagentBindings.diagnostics,
-    ];
-    if (subagentDiagnostics.length > 0) {
-      logger.app("session", "warn", "subagent definitions have problems", {
-        sessionId,
-        data: { diagnostics: subagentDiagnostics },
-      });
+      const subagentDiagnostics = [
+        ...subagentCatalog.diagnostics,
+        ...subagentBindings.diagnostics,
+      ];
+      if (subagentDiagnostics.length > 0) {
+        logger.app("session", "warn", "subagent definitions have problems", {
+          sessionId,
+          data: { diagnostics: subagentDiagnostics },
+        });
+      }
     }
     // Bind the vendor-account rows this turn is allowed to sign requests with:
     // the session's own provider plus any row a pinned subagent resolved to. The
     // sidecar may then ask main for request auth, but only for a row named here,
     // and the set is rewritten on every launch.
-    const executionProfile = normalizeExecutionProfile(
-      overrides.executionProfile ?? session.executionProfile ?? "standard",
-    );
     const teamContext = executionProfile === "team"
       ? await runtimeState.host!.call<import("@pi-desktop/shared").TeamRuntimeContextProjection | null>("team.getRuntimeContext", { sessionId })
       : undefined;

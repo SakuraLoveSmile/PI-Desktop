@@ -96,7 +96,7 @@ export function registerSettingsIpc({
       .preventScreenSleep === "boolean") {
       applyPreventScreenSleep(validatedSettings as { preventScreenSleep: boolean });
     }
-    await applyNetworkProxyFromAppSettings(validatedSettings);
+    await applyNetworkProxyFromAppSettings(result);
     if (sidecar) {
       try {
         await sidecar.call("sidecar.configure", {
@@ -109,14 +109,14 @@ export function registerSettingsIpc({
       }
     }
     applyApplicationMenuSettings(
-      validatedSettings as {
+      result as {
         language?: unknown;
         theme?: unknown;
         keybindings?: unknown;
         developerMode?: unknown;
       } | null,
     );
-    applyDeveloperMode(validatedSettings as { developerMode?: unknown } | null);
+    applyDeveloperMode(result);
     return result;
   });
 

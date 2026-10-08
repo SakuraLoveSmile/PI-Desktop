@@ -88,8 +88,12 @@ app.whenReady().then(async () => {
   try {
     await window.loadFile(path.join(__dirname, "index.html"));
     await window.webContents.executeJavaScript("window.addEventListener('error', event => console.error(event.error?.stack ?? event.message)); window.addEventListener('unhandledrejection', event => console.error(event.reason?.stack ?? String(event.reason)));");
-    const result = await window.webContents.executeJavaScript("globalThis.asktoolCardProbe()");
+    const result = await window.webContents.executeJavaScript("globalThis.asktoolCardProbe(" + JSON.stringify({ keepEvidence: Boolean(process.env.PI_DESKTOP_ASKTOOL_EVIDENCE) }) + ")");
     console.log("ASKTOOL_CARD_PROBE " + JSON.stringify(result));
+    if (process.env.PI_DESKTOP_ASKTOOL_EVIDENCE && result.ok) {
+      const screenshot = await window.webContents.capturePage();
+      require("node:fs").writeFileSync(process.env.PI_DESKTOP_ASKTOOL_EVIDENCE, screenshot.toPNG());
+    }
     app.quit();
   } catch (error) {
     console.error("ASKTOOL_CARD_PROBE " + JSON.stringify({ ok: false, error: error?.stack ?? String(error) }));

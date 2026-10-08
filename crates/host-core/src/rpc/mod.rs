@@ -4,6 +4,8 @@ mod plan_schedule_rpc;
 mod scheduled_rpc;
 mod scheduled_tools;
 #[cfg(test)]
+mod team_expert_config_tests;
+#[cfg(test)]
 mod team_planning_tests;
 mod team_rpc;
 mod todos;
@@ -2305,12 +2307,53 @@ async fn handle_request(
             Ok(settings)
         }
         "settings.set" => {
+            let mut params = params;
             validate_settings_value(&params)?;
             let mut st = state.lock().await;
             let stored = st
                 .db
                 .get_setting("app")
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            if let Some(config) = params.get("expertTeam") {
+                crate::team::expert_config::validate_settings(&st.db, config)
+                    .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
+            }
+            let current_expert = stored
+                .as_ref()
+                .and_then(|app| app.get("expertTeam"))
+                .unwrap_or(&Value::Null);
+            if let Some(expected) = params.get("expertTeamExpected") {
+                if params.get("expertTeam").is_none() {
+                    return Err(rpc_err(
+                        1002,
+                        "expertTeamExpected requires an expertTeam write",
+                        "INVALID_PARAMS",
+                    ));
+                }
+                if !expected.is_null() {
+                    crate::team::expert_config::parse(expected)
+                        .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
+                }
+                if expected != current_expert {
+                    return Err(rpc_err(
+                        1008,
+                        "expert configuration changed since it was read",
+                        "TEAM_CONFIG_CONFLICT",
+                    ));
+                }
+            } else if params
+                .get("expertTeam")
+                .is_some_and(|config| config != current_expert)
+            {
+                return Err(rpc_err(
+                    1008,
+                    "expertTeamExpected is required to change expert configuration",
+                    "TEAM_CONFIG_CONFLICT",
+                ));
+            }
+            if let Some(object) = params.as_object_mut() {
+                object.remove("expertTeamExpected");
+            }
             let incoming_shell = params.get("defaultCommandShell").and_then(Value::as_str);
             let current_effective_shell = effective_command_shell_id(stored.as_ref());
             if incoming_shell.is_some_and(|shell| current_effective_shell.as_deref() != Some(shell))
@@ -3956,6 +3999,8 @@ async fn handle_request(
                 .ok_or_else(|| rpc_err(1002, "toolName required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
             crate::team::planning::validate_tool(&st.db, session, tool).map_err(team_rpc_err)?;
+            crate::team::expert_config::validate_tool(&st.db, session, tool)
+                .map_err(team_rpc_err)?;
             let mode = sessions::session_mode(&st.db, session)
                 .map_err(team_rpc_err)?
                 .ok_or_else(|| rpc_err(1007, "session not found", "SESSION_NOT_FOUND"))?;
@@ -3976,6 +4021,8 @@ async fn handle_request(
             {
                 let st = state.lock().await;
                 crate::team::planning::validate_tool(&st.db, &p.session_id, &p.tool_name)
+                    .map_err(team_rpc_err)?;
+                crate::team::expert_config::validate_tool(&st.db, &p.session_id, &p.tool_name)
                     .map_err(team_rpc_err)?;
             }
 

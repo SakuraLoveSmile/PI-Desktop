@@ -1857,3 +1857,19 @@ retries and images retain physical account/model attribution. Nested immediate
 parent and owning Task remain distinct. The migration does not add coding-agent
 AgentSession, Codemode or virtual routing. See the coding-agent design review for
 future adoption conditions.
+
+### Standard delegation and Team startup isolation
+
+The effective execution profile is resolved before ordinary Task discovery.
+Team Lead/member launches do not read the user subagent registry or builtin
+switches, load Task definitions, resolve their pinned/fallback models, expand
+availableForSubagents bindings, or register unused delegate OAuth bindings.
+Their ordinary delegation fields are empty. Team still resolves its own model
+and obtains the authoritative Host team context; missing context fails closed.
+
+Standard launches retain existing per-prompt discovery, model selection,
+credentials, availability filtering and diagnostics. An idle Team runtime
+ignores ordinary Task configuration when deciding reuse, including legacy
+callers that pass it; actual changes to its model, profile or Host expert policy
+still invalidate reuse. Standard reuse still compares all Task configuration.
+This separation does not permit Task inside Team or change active-turn guards.

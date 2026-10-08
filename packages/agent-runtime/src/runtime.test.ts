@@ -7932,6 +7932,46 @@ describe("DesktopAgentRuntime subagents", () => {
     );
   }
 
+  it("keeps a Team runtime reusable when ordinary subagent definitions and models change", async () => {
+    const teamContext = { teamSessionId: "team-1", callerSessionId: "session-1", isLead: true };
+    const runtime = createRuntime({ executionProfile: "team", teamContext, subagents: [explorer],
+      subagentProviders: { "unused/old-model": provider }, subagentModelKeys: ["unused/old-model"] });
+    try {
+      const config = { executionProfile: "team" as const, teamContext };
+      expect(runtimeMatches(runtime, config)).toBe(true);
+      expect(runtimeMatches(runtime, { ...config, subagents: [] })).toBe(true);
+      expect(runtimeMatches(runtime, { ...config, subagentProviders: { "unused/new-model": { ...provider, modelId: "new-model" } } })).toBe(true);
+      expect(runtimeMatches(runtime, { ...config, subagentModelKeys: ["unused/new-model"] })).toBe(true);
+    } finally { await runtime.dispose(); }
+  });
+
+  it("still refreshes a standard runtime when ordinary subagent configuration changes", async () => {
+    const runtime = createRuntime({ executionProfile: "standard", subagents: [explorer],
+      subagentProviders: { "unused/old-model": provider }, subagentModelKeys: ["unused/old-model"] });
+    try {
+      expect(runtimeMatches(runtime)).toBe(true);
+      expect(runtimeMatches(runtime, { subagents: [] })).toBe(false);
+      expect(runtimeMatches(runtime, { subagentProviders: {} })).toBe(false);
+      expect(runtimeMatches(runtime, { subagentModelKeys: [] })).toBe(false);
+    } finally { await runtime.dispose(); }
+  });
+
+  it("still refreshes Team runtime for its own profile, binding or Host expert policy changes", async () => {
+    const teamContext = { teamSessionId: "team-1", callerSessionId: "session-1", isLead: false,
+      memberName: "qa", expertConfig: { presetId: "qa" as const, tools: ["Read"], instructions: "Original" } };
+    const runtime = createRuntime({ executionProfile: "team", teamContext, subagents: [explorer] });
+    try {
+      const config = { executionProfile: "team" as const, teamContext };
+      expect(runtimeMatches(runtime, config)).toBe(true);
+      expect(runtimeMatches(runtime, { ...config, executionProfile: "standard" })).toBe(false);
+      expect(runtimeMatches(runtime, { ...config, provider: { ...provider, modelId: "changed-model" } })).toBe(false);
+      expect(runtimeMatches(runtime, { ...config, teamContext: { ...teamContext,
+        expertConfig: { ...teamContext.expertConfig, tools: ["Read", "Write"] } } })).toBe(false);
+      expect(runtimeMatches(runtime, { ...config, teamContext: { ...teamContext,
+        expertConfig: { ...teamContext.expertConfig, instructions: "Changed" } } })).toBe(false);
+    } finally { await runtime.dispose(); }
+  });
+
   it("uses delegate-first guidance and subagent tools in the standard profile", async () => {
     const runtime = createRuntime({ executionProfile: "standard", subagents: [explorer] });
     try {

@@ -4,6 +4,7 @@ import { createInstance } from "i18next";
 import { I18nextProvider } from "react-i18next";
 import type { GoalProgressChangedEvent, GoalProgressSnapshot, GoalReportChangedEvent, GoalReportSummary, PlanProposal, TeamSnapshot, UiMessage } from "@pi-desktop/shared";
 import { catalogs } from "@pi-desktop/i18n";
+import { SessionTodoChecklist } from "../../apps/desktop/src/components/workpanel/SessionTodoChecklist";
 import { GoalProgressBar } from "../../apps/desktop/src/features/chat/composer/GoalProgressBar";
 import { TeamDispatchCardsGroup } from "../../apps/desktop/src/features/chat/transcript/TeamDispatchCard";
 import { api } from "../../apps/desktop/src/lib/api";
@@ -18,6 +19,8 @@ import "../../apps/desktop/src/styles/base.css";
 import "../../apps/desktop/src/styles/messages.css";
 import "../../apps/desktop/src/styles/ui-kit.css";
 import "../../apps/desktop/src/styles/goal-progress.css";
+import "../../apps/desktop/src/styles/composer.css";
+import "../../apps/desktop/src/styles/work-panel.css";
 import "../../apps/desktop/src/styles/team-dispatch.css";
 
 declare global { var goalTeamRendererUiProbe: () => Promise<unknown>; }
@@ -57,7 +60,7 @@ function progress(executionId: string, revision: number, label: string, status: 
 
 globalThis.goalTeamRendererUiProbe = async () => {
   const i18n = createInstance();
-  await i18n.init({ lng: "en", resources: { en: { translation: catalogs.en } } });
+  await i18n.init({ lng: "en", resources: { en: { translation: catalogs.en }, "zh-CN": { translation: catalogs["zh-CN"] } } });
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
@@ -69,6 +72,7 @@ globalThis.goalTeamRendererUiProbe = async () => {
   const initialProgressUsed = new Set<string>();
   const reportReads = new Map<string, ReturnType<typeof deferred<{ report: { status: string } | null }>>>();
   const laterProgress: Array<ReturnType<typeof deferred<{ progress: GoalProgressSnapshot | null }>>> = [];
+  const originalGetTodos = api.getTodos;
   const originalGetGoalProgress = api.getGoalProgress;
   const originalGetGoalReport = api.getGoalReport;
   const originalProgressListener = api.onGoalProgressChanged;
@@ -183,6 +187,16 @@ globalThis.goalTeamRendererUiProbe = async () => {
     assert(Boolean(container.querySelector('[data-testid="goal-progress-bar"]')), "old report readiness must not hide the new running goal");
     await act(async () => initialProgress.get("execution-new")?.resolve({ progress: progress("execution-new", 1, "Current work", "pending") }));
     await until(() => container.textContent?.includes("Current work") === true, "new goal progress");
+    const disclosure = container.querySelector<HTMLButtonElement>(".goal-progress-bar-header")!;
+    assert(disclosure.textContent?.includes("Goal progress"), "Goal progress must name its scope");
+    assert(disclosure.contains(container.querySelector(".goal-progress-capsule")), "Goal count must share the title disclosure instead of floating separately");
+    assert(disclosure.getAttribute("aria-expanded") === "true", "Goal disclosure exposes expanded state");
+    assert(container.querySelector('[role="list"][aria-label="Goal task list"]'), "expanded Goal tasks have distinct list semantics");
+    await act(async () => disclosure.click());
+    assert(!container.querySelector(".goal-progress-items-container"), "clicking the progress row closes the task list");
+    await act(async () => disclosure.click());
+    assert(container.querySelector(".goal-progress-items-container"), "clicking the progress row reopens the task list");
+
 
     const progressHandlers = [...(progressListeners.get("current") ?? [])];
     await act(async () => progressHandlers[0]?.({ sessionId: "goal-session", executionId: "execution-new", revision: 2 }));
@@ -381,9 +395,33 @@ globalThis.goalTeamRendererUiProbe = async () => {
     await act(async () => container.querySelector<HTMLButtonElement>(".goal-progress-toggle-btn")?.click());
     await until(() => container.textContent?.includes("Screenshot step") === true, "expanded goal for screenshot");
     assert(Boolean(container.querySelector(".goal-progress-expanded-content")), "expanded step list must be visible in the screenshot");
-    assert(container.querySelector(".goal-progress-toggle-btn")?.textContent?.trim() === "Show less", "expanded goal toggle must use the English catalog key");
+    assert(container.querySelector(".goal-progress-toggle-btn")?.getAttribute("aria-label")?.endsWith("Show less"), "expanded goal toggle must use the English catalog key");
     assert(Boolean(container.querySelector('[data-testid="goal-progress-bar"]')), "running goal progress should remain visible for the evidence capture");
-    await act(async () => root.render(renderTimeline()));
+    api.getTodos = async (sessionId) => ({ sessionId, revision: 1, updatedAt: 1, todos: [
+      { content: "Review modified files and update unit tests", status: "in_progress", priority: "medium" },
+      ...Array.from({ length: 3 }, (_, index) => ({ content: `Session task ${index + 2}`, status: "pending" as const, priority: "medium" as const })),
+    ] });
+    await act(async () => { root.render(createElement(I18nextProvider, { i18n },
+      createElement("div", { className: "composer-stack", style: { maxWidth: 760, margin: "24px auto", padding: 16 } },
+        createElement(GoalProgressBar, { sessionId: "screenshot-session", proposal: { ...screenshotProposal, sessionId: "screenshot-session", title: "Current Goal with its own execution tasks" } }),
+        createElement("div", { className: "composer-shell", style: { minHeight: 100, padding: 16 } }, "Composer"),
+        createElement("aside", { className: "work-panel-overview" }, createElement(SessionTodoChecklist, { sessionId: "screenshot-session" })),
+      ))); });
+    await until(() => !!container.querySelector(".session-todo-checklist-header"), "independent session checklist recovers beside Goal progress");
+    assert(container.querySelector(".session-todo-checklist-header")?.textContent?.includes("Session checklist 0/4"), "session count must explicitly identify its scope");
+    assert(container.querySelector(".goal-progress-bar-header")?.textContent?.includes("Goal progress"), "both progress sources retain distinct labels");
+    assert(container.querySelectorAll(".session-todo-checklist-row").length === 4, "Overview session tasks do not merge with Goal tasks");
+    await act(async () => container.querySelector<HTMLButtonElement>(".session-todo-checklist-header")!.click());
+    assert(!container.querySelector(".session-todo-checklist-list"), "Overview session list collapses independently");
+    await act(async () => container.querySelector<HTMLButtonElement>(".session-todo-checklist-header")!.click());
+    assert(container.querySelectorAll(".session-todo-checklist-row").length === 4, "Overview session list reopens independently");
+    for (const theme of ["light", "dark"]) for (const width of [320, 760]) {
+      document.documentElement.setAttribute("data-theme", theme);
+      container.style.width = `${width}px`;
+      await act(async () => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+      assert(container.querySelector(".goal-progress-bar")!.scrollWidth <= width, "compact Goal progress must fit narrow width");
+    }
+    await act(async () => i18n.changeLanguage("zh-CN"));
     preserveForScreenshot = true;
     globalThis.goalTeamRendererUiCleanup = () => { root.unmount(); container.remove(); };
   } finally {
@@ -391,6 +429,7 @@ globalThis.goalTeamRendererUiProbe = async () => {
       await act(async () => root.unmount());
       container.remove();
     }
+    api.getTodos = originalGetTodos;
     api.getGoalProgress = originalGetGoalProgress;
     api.getGoalReport = originalGetGoalReport;
     api.onGoalProgressChanged = originalProgressListener;
@@ -400,5 +439,5 @@ globalThis.goalTeamRendererUiProbe = async () => {
     api.onHostStatus = originalHostStatus;
     useAppStore.setState({ openWorkPanelTabForSession: originalStoreMethod });
   }
-  return { ok: true, cardHeight, reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches, scenarios: ["goal execution and session switch", "cross-session event isolation", "stale report event", "out-of-order progress revisions", "ready report completion", "interruption without a result card or stuck progress", "completed report navigation", "single task navigation", "expert joining feedback", "Team chronological transcript", "Compact and ordinary turn preservation", "card search/navigation", "live tail and section approval"] };
+  return { ok: true, cardHeight, reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches, scenarios: ["goal execution and session switch", "cross-session event isolation", "stale report event", "out-of-order progress revisions", "ready report completion", "interruption without a result card or stuck progress", "completed report navigation", "single task navigation", "distinct Goal/session counts and disclosures", "320px light/dark progress layout", "expert joining feedback", "Team chronological transcript", "Compact and ordinary turn preservation", "card search/navigation", "live tail and section approval"] };
 };

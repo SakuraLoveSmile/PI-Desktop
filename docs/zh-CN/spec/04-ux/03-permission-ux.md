@@ -192,3 +192,13 @@ approved/completed，或中断的终端卡。这样的卡可能会保留
 9. 主机重启中断pending/queued/running工作，无重放或陈旧
    操作并在 Agent 中保留已批准的中断会话；没有终端
    重启后需要卡恢复
+
+### Long-path permission card presentation
+
+The project context is a shrinkable, wrapping text region inside the permission
+card. Complete workspace and requested paths remain available without causing
+horizontal card overflow. Header and decision controls remain usable in narrow
+columns. The known Host reason for accessing outside the session workspace is
+localized by the renderer; unknown/custom policy reasons remain unchanged.
+This does not alter permission risk, request/session identity, grant scope,
+queue order, copy content, or resolution behavior.

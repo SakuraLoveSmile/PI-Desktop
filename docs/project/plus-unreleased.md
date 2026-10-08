@@ -2,6 +2,37 @@
 
 Upstream v0.15.6 → v0.16.1 has been merged.
 
+- AskTool questions keep paragraphs and wide tables readable instead of
+  squeezing them into vertical strips. Tables scroll inside the card and long
+  questions leave answer choices and submission controls available.
+
+- Goal completion reports adopt the Canvas reference layout with visible metrics,
+  a step timeline, compact delivery/verification tables, full screenshots, and
+  conclusion callouts. Existing Host report data and retry behavior are retained;
+  missing evidence remains unknown and Host contradictions stay visible.
+
+- Permission cards wrap long workspace paths inside their bounds and retain
+  readable controls in narrow columns. The outside-workspace reason follows
+  the UI language; actual permission decisions and scope remain unchanged.
+
+- Expert Team startup skips ordinary Task subagent configuration and delegate
+  model/auth catalogs. Changing ordinary subagent settings no longer rebuilds
+  an idle Team runtime; standard delegation and Team policy refresh remain
+  unchanged.
+
+- Expert Team settings configure six built-in expert presets at user or project
+  scope. Newly confirmed experts snapshot their model, thinking, tool subset
+  and additional instructions; existing members retain their prior policy.
+- Team Overview groups recorded tasks, Specs, changed paths and references;
+  its panorama shows individual tasks and their real dependency stages with
+  repeated expert identities instead of only each member's current task.
+
+- Composer progress identifies independent Goal progress and the session
+  checklist. Goal counts and titles share one expandable row instead of a
+  detached capsule; the session checklist moves to Overview as an expanded,
+  read-only task list with live statuses. The Composer footer no longer displays
+  a second checklist progress count.
+
 - Expert Team research tasks require an explicit researcher assignment before
   dispatch, preventing completed research from getting stuck on an unassigned
   task. Failed assignments are reported as tool errors; existing unassigned

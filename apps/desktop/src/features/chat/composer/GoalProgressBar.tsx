@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { GoalReportChangedEvent, PlanProposal } from "@pi-desktop/shared";
 import { api } from "../../../lib/api";
+import { Button } from "../../../components/ui";
 import { IconChevronDown, IconChevronRight } from "../../../components/icons";
 import { usePendingTeamExecutionReview } from "../../../hooks/useTeamExecutionReview";
 import { useAppStore } from "../../../stores/app-store";
@@ -22,6 +23,7 @@ export type GoalProgressBarProps = {
 
 export function GoalProgressBar({ sessionId, proposal }: GoalProgressBarProps) {
   const { t } = useTranslation();
+  const listId = useId();
   const currentExecution = useAppStore((state) => state.planCheckpoints[sessionId]);
   const isCurrentExecution = proposal.sessionId === sessionId &&
     currentExecution?.id === proposal.id && currentExecution.executionId === proposal.executionId &&
@@ -208,108 +210,85 @@ export function GoalProgressBar({ sessionId, proposal }: GoalProgressBarProps) {
 
   return (
     <div className="goal-progress-stack" data-testid="goal-progress-bar">
-      {/* Centered Progress Capsule */}
-      <div className="goal-progress-capsule" role="status" aria-live="polite">
-        {pendingTeamReview && capsuleState.kind !== "error" ? (
-          <span className="goal-progress-status-text">
-            {t("team.review.status.pending")}
-          </span>
-        ) : capsuleState.kind === "error" || capsuleState.kind === "initializing" ? (
-          <span className="goal-progress-status-text">
-            {capsuleState.message}
-          </span>
-        ) : (
-          <>
-            <svg
-              width={16}
-              height={16}
-              viewBox="0 0 16 16"
-              className="goal-progress-ring"
-              aria-hidden="true"
-            >
-              <circle
-                cx={8}
-                cy={8}
-                r={6}
-                fill="none"
-                stroke="color-mix(in oklab, var(--ds-text-primary) 15%, transparent)"
-                strokeWidth={2}
-              />
-              <circle
-                cx={8}
-                cy={8}
-                r={6}
-                fill="none"
-                stroke="var(--ds-success)"
-                strokeWidth={2}
-                strokeDasharray={circumference}
-                strokeDashoffset={dashOffset}
-                strokeLinecap="round"
-                transform="rotate(-90 8 8)"
-                className="goal-progress-ring-circle"
-              />
-            </svg>
-            <span className="goal-progress-capsule-text">
-              <span className="goal-progress-completed-num">
-                {capsuleState.completedCount}
-              </span>
-              <span className="goal-progress-total-num">
-                /{capsuleState.totalCount}
-              </span>
-            </span>
-          </>
-        )}
-      </div>
-
       {/* Collapsible Goal Bar */}
       <div className="goal-progress-bar">
-        <div className="goal-progress-bar-header">
-          <div className="goal-progress-bar-left">
-            <span
-              className="goal-progress-badge"
-              data-state={proposal.executionState}
-            >
-              {stateBadgeText}
+        <Button
+          type="button"
+          variant="ghost"
+          className="goal-progress-bar-header goal-progress-toggle-btn"
+          onClick={toggleExpanded}
+          aria-expanded={expanded}
+          aria-controls={listId}
+          aria-label={`${t("goal.progressLabel")} · ${proposal.title} · ${expanded ? t("chat.subagentTaskCollapse") : t("chat.subagentTaskExpand")}`}
+        >
+          <span className="goal-progress-bar-left">
+            <span className="goal-progress-capsule" role="status" aria-live="polite">
+              <span className="goal-progress-scope">{t("goal.progressLabel")}</span>
+              {pendingTeamReview && capsuleState.kind !== "error" ? (
+                <span className="goal-progress-status-text">
+                  {t("team.review.status.pending")}
+                </span>
+              ) : capsuleState.kind === "error" || capsuleState.kind === "initializing" ? (
+                <span className="goal-progress-status-text">
+                  {capsuleState.message}
+                </span>
+              ) : (
+                <>
+                  <svg
+                    width={16}
+                    height={16}
+                    viewBox="0 0 16 16"
+                    className="goal-progress-ring"
+                    aria-hidden="true"
+                  >
+                    <circle
+                      cx={8}
+                      cy={8}
+                      r={6}
+                      fill="none"
+                      stroke="color-mix(in oklab, var(--ds-text-primary) 15%, transparent)"
+                      strokeWidth={2}
+                    />
+                    <circle
+                      cx={8}
+                      cy={8}
+                      r={6}
+                      fill="none"
+                      stroke="var(--ds-success)"
+                      strokeWidth={2}
+                      strokeDasharray={circumference}
+                      strokeDashoffset={dashOffset}
+                      strokeLinecap="round"
+                      transform="rotate(-90 8 8)"
+                      className="goal-progress-ring-circle"
+                    />
+                  </svg>
+                  <span className="goal-progress-capsule-text">
+                    <span className="goal-progress-completed-num">
+                      {capsuleState.completedCount}
+                    </span>
+                    <span className="goal-progress-total-num">
+                      /{capsuleState.totalCount}
+                    </span>
+                  </span>
+                </>
+              )}
             </span>
-            <span
-              className="goal-progress-bar-title"
-              title={proposal.title}
-            >
-              {proposal.title}
-            </span>
-          </div>
-          <button
-            type="button"
-            className="goal-progress-toggle-btn"
-            onClick={toggleExpanded}
-            aria-label={
-              expanded
-                ? t("chat.subagentTaskCollapse")
-                : t("chat.subagentTaskExpand")
-            }
-          >
-            <span>
-              {expanded
-                ? t("chat.subagentTaskCollapse")
-                : t("chat.subagentTaskExpand")}
-            </span>
-            {expanded ? (
-              <IconChevronDown size={14} aria-hidden />
-            ) : (
-              <IconChevronRight size={14} aria-hidden />
-            )}
-          </button>
-        </div>
+            <span className="goal-progress-bar-title" title={proposal.title}>{proposal.title}</span>
+          </span>
+          <span className="goal-progress-badge" data-state={proposal.executionState}>{stateBadgeText}</span>
+          {expanded ? <IconChevronDown size={14} aria-hidden /> : <IconChevronRight size={14} aria-hidden />}
+        </Button>
 
         {expanded ? (
-          <div className="goal-progress-expanded-content">
+          <div id={listId} className="goal-progress-expanded-content">
             <div className="goal-progress-body-text">
               {proposal.markdown || proposal.plan}
             </div>
             {items.length > 0 ? (
-              <div className="goal-progress-items-container">
+              <div className="goal-progress-items-container" role="list" aria-label={t("goal.progressListLabel")}>
                 {items.map((item) => (
-                  <div className="goal-progress-item-entry" key={item.id}>
+                  <div className="goal-progress-item-entry" role="listitem" key={item.id}>
                     <span
                       className="goal-progress-item-dot"
                       data-status={item.status}

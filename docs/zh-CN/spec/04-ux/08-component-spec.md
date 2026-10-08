@@ -1971,6 +1971,22 @@ approved/completed，或中断的终端卡；终端卡可能会保留
 报告失败提供 Retry 操作，通过 Host 报告重试接口恢复，不重跑 Goal，也不再次调用提供商。
 读取和重试均受限于所属会话。
 
+### Canvas report presentation
+
+The ready Goal report uses the supplied Canvas reference as a scoped reading
+surface: a centered 960px document, 16px title, 18px section headings, 14px body,
+all metrics visible in a responsive grid, vertical step timeline, compact
+semantic file/check tables, full uncropped screenshots, and conclusion/limits
+callouts. Order is header/metrics, summary, steps, files, verification, gallery,
+and conclusion/limitations/next steps. Narrow tables scroll inside their frame.
+Dark report colors follow the reference; light mode uses existing theme tokens.
+
+Rendering continues to consume the durable v1 Host report, without executing
+supplied JSX or changing persistence. Model claims and Host observations remain
+separate; metric success styling requires linked passing Host observations.
+Missing evidence resolution is unknown, and contradictions, fallback integrity,
+interrupted status, unavailable images, and retry remain explicit.
+
 ### 10B.3 辅助功能
 
 - 对话卡片是具有本地化名称的区域，打开操作具有明确的可访问名称。
@@ -2125,12 +2141,23 @@ MainChat 底部的输入区域，用于撰写和发送提示。支持多行输�
   不再绑定焦点、草稿或 IME 状态的计时器。可见文案通过带 key 的透明度渐变切换，
   同时保留 textarea 原生 `placeholder` 值以支持辅助技术。
 
-**11.3a 会话 TodoDock**
+### 11.3a Overview session checklist
 
-- 当活动会话拥有非空的主机清单时，TodoDock 位于 Composer 栈中并显示在 Plan/Goal 批准表面上方；空清单不占布局空间。
-- 收起标题显示完成/活动进度和当前 `in_progress` 内容；全部取消时显示明确的取消状态，不显示误导性的 `0/0 completed`。
-- 展开控件可键盘操作，不因更新抢焦点；切换活动会话时保持收起，最多显示八条有序行。列表在收起时仍保持挂载，通过有界的高度/透明度过渡播放展开和收起动画；收起内容设置为 `aria-hidden`，开启减少动画时立即切换状态。完成项使用带 check icon 的成功色区块，进行中使用强调色区块，取消项降低对比度；每个状态符号都有本地化辅助名称，行内容按纯文本渲染。
-- 渲染器按 session id 保存快照并忽略旧或相同 revision。激活会话和主机恢复时重新读取权威快照，包括已缓存清单；首次读取失败不能导致主机恢复后清单持续隐藏。`remote:` 和 `native-pi:` 会话不拥有本地 Desktop 清单，跳过本地 `todos.get` 恢复；远程 Todo 对等能力留待新增 RACP 契约。
+- A non-empty session checklist appears as the first section in the Work Panel
+  Overview scroll area. The Composer footer has no session checklist trigger.
+- The header names the Session checklist and its completed/total count. A shared
+  Button disclosure starts expanded and exposes `aria-expanded`. The ordered
+  inline list includes every task with full wrapped text and localized status;
+  the existing Overview scroll makes long lists reachable without nested popups.
+- Cancelled tasks are excluded from the denominator; an all-cancelled list shows
+  cancellation instead of 0/0. Rows are read-only and retain distinct statuses.
+- Live snapshot updates preserve expansion and focus. A session switch starts
+  its own expanded checklist; empty snapshots remove the section. Goal progress
+  remains near the Composer and consumes a separate execution snapshot.
+- Host SQLite remains authoritative. Session activation and host recovery read
+  the committed snapshot, including cached data. Store revision fences reject
+  stale events and recovery responses. Unsupported remote/native sessions skip
+  local recovery; moving the presentation does not add an IPC or RACP contract.
 
 ### 11.4 状态
 | 状态 | 外观 | 行动 |
@@ -3176,3 +3203,46 @@ Team Plan 自动运行只读研究，不显示待审批研究名单，也不在�
 Team 快照只在 leadTurnId 匹配当前 Host 策略 scope 时暴露待审批名单。已完成的 Lead 回合仍可等待有效确认；旧名单按 ID 保持可读，但不能重开当前 UI。现有 Team 活动 revision 刷新共用读模型。
 
 已批准 Team Plan/Goal 执行在等待执行名单确认期间保持运行；审批 UI 不得暗示执行已完成，也不需要新用户请求才能继续。确认恢复同一执行，取消中断原执行且不显示完成 Goal 报告。专家更新和 Goal 进度仍绑定原始获批执行。
+
+
+### AskTool 富文本问题布局
+
+问题编号旁只保留一个可伸缩正文块，段落、列表和表格纵向排列。长问题在 min(420px,40dvh) 内滚动，保证选项与顶部操作可用。表格列头和正文对齐，单元格内容保持 8–20rem 可读宽度；超宽部分只在问题或选项内容内横向滚动。长路径在格内折行，不能把整列压成字符竖条。安全 span 投影保留表格角色，不创建真实链接、图片、HTML 或嵌套交互控件。选择、跳过和提交原标签的行为保持不变。
+
+### Progress source clarity (2026-10-08)
+
+Goal execution progress and the session Todo checklist are independent Host
+resources and their counts must not be merged. The Goal ring/count is inline
+with its title in one shared Button disclosure, labeled Goal progress, with
+expanded state and a labeled Goal task list. There is no detached centered
+progress capsule. At narrow widths the title wraps onto a second row. The
+Overview section explicitly says Session checklist and keeps its independent
+inline ordered list. Both lists retain live updates and existing recovery/lifecycle
+semantics; this presentation supersedes the earlier centered-capsule geometry.
+
+### Expert Team settings and reference-aligned Overview (2026-10-08)
+
+Settings exposes an Expert Team destination under Agent configuration. The page
+uses user/project scope tabs and six built-in role cards. Each role edits an
+optional configured provider/model pair, supported thinking level, assignable
+tool subset, and additional instructions. Reset restores inheritance for the
+selected scope. Missing/unavailable routes and save conflicts remain visible.
+Saved settings affect newly declared preset-bound experts; existing members and
+confirmed reviews retain their snapshots.
+
+Team Overview presents numbered tasks in creation order with state glyphs and
+owner portrait/role/name below each title. Links open the actual task, board or
+Team panorama. The existing session checklist stays in Overview. Artifacts
+separate real Spec files, successful Write/Edit paths in the loaded transcript,
+and user attachments. This recorded-change list is not a complete Git diff;
+unknown line statistics are omitted. Skills/Memory/MCP reference tabs show only
+recorded session usage; configured resources do not imply use. Memory without
+an authenticated usage record has an explicit empty state.
+
+Team panorama presents one card per actual task, including repeated owners,
+and tiers/curved edges follow recorded task dependencies. Lead remains at top.
+No synthetic workflow dependencies or fabricated success are introduced.
+Pixel portraits, state footers, dotted background and zoom/fit/reset controls
+follow the supplied visual reference. Ordinary subagent panorama retains its
+existing layout. Live state, stale/error feedback, navigation and per-scope
+viewport restoration remain intact.

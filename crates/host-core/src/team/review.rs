@@ -231,12 +231,18 @@ pub fn declare_team_strategy(
             ));
         }
 
-        let sel = proposed.selection.unwrap_or_default();
-        if sel.provider_id.is_some() != sel.model_id.is_some() {
-            return Err(anyhow!(
-                "TEAM_MODEL_SELECTION_INVALID: provider and model overrides must be supplied together"
-            ));
-        }
+        let reused_member = if let Some(id) = proposed.member_session_id.as_deref() {
+            get_team_member_by_session_id(db, id)?
+        } else {
+            get_team_member_by_name(db, team_session_id, &canonical_name)?
+        };
+        let (sel, expert_config) = super::expert_config::resolve_launch_config(
+            db,
+            team_session_id,
+            proposed.preset_id.as_ref(),
+            proposed.selection,
+            reused_member.as_ref(),
+        )?;
         let provider_id = sel
             .provider_id
             .unwrap_or_else(|| default_provider_id.clone());
@@ -249,6 +255,10 @@ pub fn declare_team_strategy(
 
         review_members.push(TeamLaunchReviewMember {
             name: canonical_name,
+            preset_id: expert_config
+                .as_ref()
+                .map(|config| config.preset_id.clone()),
+            expert_config,
             description: proposed.description,
             context_kind,
             member_session_id: proposed.member_session_id,
@@ -745,6 +755,16 @@ fn materialize_launch_review(
                 &member.selection.model_id,
                 &member.selection.thinking_level,
             )?;
+            if created_member_session_ids.contains(&session_id) {
+                if let Some(config) = &member.expert_config {
+                    kv_set_tx(
+                        tx,
+                        super::expert_config::MEMBER_CONFIG_NS,
+                        &session_id,
+                        &serde_json::to_value(config)?,
+                    )?;
+                }
+            }
             if let Some(presentation) = &member.presentation {
                 kv_set_tx(
                     tx,

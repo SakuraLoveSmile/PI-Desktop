@@ -1,0 +1,109 @@
+#!/usr/bin/env node
+/** Real GoalReportTab/Chromium user path and Canvas reference style coverage. */
+import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { createRequire } from "node:module";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { resolveElectronBinary } from "./e2e/boot.mjs";
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const require = createRequire(join(root, "packages/agent-runtime/package.json"));
+const { build } = require("esbuild");
+const desktopRequire = createRequire(join(root, "apps/desktop/package.json"));
+const { compile } = desktopRequire("tailwindcss");
+const { electronBinary } = resolveElectronBinary(root);
+const temp = await mkdtemp(join(tmpdir(), "pi-goal-report-canvas-"));
+const evidenceDir = process.env.PI_REPORT_EVIDENCE_DIR || join(root, ".review-evidence");
+const evidenceBase = join(evidenceDir, "goal-report-canvas.png");
+const evidencePath = existsSync(evidenceBase)
+  ? join(evidenceDir, `goal-report-canvas-${Date.now()}.png`)
+  : evidenceBase;
+try {
+  await build({
+    entryPoints: [join(root, "scripts/e2e/goal-report-canvas.tsx")],
+    outfile: join(temp, "renderer.js"),
+    bundle: true,
+    platform: "browser",
+    format: "iife",
+    jsx: "automatic",
+    loader: { ".woff": "file", ".woff2": "file", ".ttf": "file", ".svg": "dataurl" },
+    define: { "process.env.NODE_ENV": '"development"' },
+    alias: {
+      "@pi-desktop/i18n": join(root, "packages/i18n/src/index.ts"),
+      react: join(root, "apps/desktop/node_modules/react"),
+      "react-dom": join(root, "apps/desktop/node_modules/react-dom"),
+    },
+    nodePaths: [join(root, "apps/desktop/node_modules")],
+  });
+  // Match the production CSS pipeline: esbuild leaves @theme tokens inert.
+  const stylesheet = join(temp, "renderer.css");
+  const compiledCss = await compile(await readFile(stylesheet, "utf8"));
+  await writeFile(stylesheet, compiledCss.build([]));
+  await writeFile(
+    join(temp, "index.html"),
+    '<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src \'self\'; style-src \'self\' \'unsafe-inline\'; img-src \'self\' data: blob:"><link rel="stylesheet" href="renderer.css"><title>Canvas Goal completion report</title><body><script src="renderer.js"></script>',
+  );
+  await writeFile(
+    join(temp, "main.cjs"),
+    `
+const { app, BrowserWindow } = require("electron");
+const path = require("node:path");
+const { writeFileSync } = require("node:fs");
+app.setPath("userData", path.join(__dirname, "profile"));
+app.whenReady().then(async () => {
+  const window = new BrowserWindow({ show: false, width: 782, height: 1000, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
+  window.webContents.on("console-message", (event) => console.error(event.message));
+  try {
+    await window.loadFile(path.join(__dirname, "index.html"));
+    const result = await window.webContents.executeJavaScript("globalThis.goalReportCanvasProbe()");
+    await window.webContents.executeJavaScript("new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
+    const screenshot = await window.capturePage();
+    writeFileSync(process.env.PI_E2E_EVIDENCE_PATH, screenshot.toPNG());
+    await window.webContents.executeJavaScript("document.querySelector('[data-testid=goal-report-files]').scrollIntoView(); new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
+    writeFileSync(process.env.PI_E2E_EVIDENCE_PATH.replace(/\\.png$/, "-details.png"), (await window.capturePage()).toPNG());
+    await window.webContents.executeJavaScript("globalThis.goalReportCanvasSetWidth(782, 'light')");
+    writeFileSync(process.env.PI_E2E_EVIDENCE_PATH.replace(/\\.png$/, "-light.png"), (await window.capturePage()).toPNG());
+    await window.webContents.executeJavaScript("globalThis.goalReportCanvasCleanup?.()");
+    console.log("GOAL_REPORT_CANVAS_PROBE " + JSON.stringify(result));
+    app.quit();
+  } catch (error) {
+    console.error("GOAL_REPORT_CANVAS_PROBE " + JSON.stringify({ ok: false, error: String(error) }));
+    app.exit(1);
+  }
+});
+`,
+  );
+  const env = { ...process.env };
+  delete env.ELECTRON_RUN_AS_NODE;
+  env.PI_E2E_EVIDENCE_PATH = evidencePath;
+  await mkdir(evidenceDir, { recursive: true });
+  const child = spawn(electronBinary, [join(temp, "main.cjs")], {
+    env,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let output = "";
+  for (const stream of [child.stdout, child.stderr]) stream.on("data", (data) => { output += data; });
+  const timeout = setTimeout(() => child.kill("SIGKILL"), 45_000);
+  let code;
+  try {
+    code = await new Promise((resolve, reject) => {
+      child.once("error", reject);
+      child.once("close", resolve);
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+  const line = output.split(/\r?\n/).find((value) => value.startsWith("GOAL_REPORT_CANVAS_PROBE "));
+  assert(line, `renderer returned no probe result (exit=${code}): ${output.slice(-3000)}`);
+  const result = JSON.parse(line.slice("GOAL_REPORT_CANVAS_PROBE ".length));
+  console.log("GOAL_REPORT_CANVAS_PROBE " + JSON.stringify(result));
+  console.log(`GOAL_REPORT_CANVAS_SCREENSHOT ${evidencePath}`);
+  assert.equal(code, 0, output.slice(-6000));
+  assert.equal(result.ok, true);
+} finally {
+  await rm(temp, { recursive: true, force: true });
+}

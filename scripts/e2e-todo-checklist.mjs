@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Real SQLite/stdiorpc host and production TodoDock in an isolated Electron renderer. */
+/** Real SQLite/stdiorpc host and production Overview checklist in an isolated Electron renderer. */
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
@@ -17,7 +17,7 @@ const { build } = createRequire(join(root, "packages/agent-runtime/package.json"
 const temp = await mkdtemp(join(tmpdir(), "pi-todo-checklist-"));
 try {
   await build({ entryPoints: [join(root, "scripts/e2e/todo-checklist.tsx")],
-    outfile: join(temp, "renderer.js"), bundle: true, platform: "browser", format: "esm", jsx: "automatic",
+    outfile: join(temp, "renderer.js"), bundle: true, platform: "browser", format: "esm", jsx: "automatic", loader: { ".svg": "dataurl" },
     define: { "process.env.NODE_ENV": '"production"', "import.meta.env.DEV": "false" },
     alias: { "@pi-desktop/i18n": join(root, "packages/i18n/src/index.ts"),
       "@pi-desktop/shared": join(root, "packages/shared/src/index.ts"),
@@ -49,7 +49,7 @@ contextBridge.exposeInMainWorld("todoFixture", { action: (name, input) => ipcRen
   await writeFile(join(temp, "main.cjs"), `
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("node:path");
-const channels = ${JSON.stringify({ get: IPC.invoke.todosGet, changed: IPC.event.todosChanged, host: IPC.event.hostStatus })};
+const channels = ${JSON.stringify({ get: IPC.invoke.todosGet, session: IPC.invoke.sessionGet, changed: IPC.event.todosChanged, host: IPC.event.hostStatus })};
 app.setPath("userData", path.join(__dirname, "profile"));
 let DesktopAgentRuntime, createAssistantMessageEventStream, host, win, failRead = false, suppressEvents = false, readCount = 0, readFailures = 0;
 function forwardNotifications() {
@@ -71,6 +71,7 @@ app.whenReady().then(async () => {
     win.webContents.on("console-message", (event) => console.error(event.message));
     forwardNotifications();
     ipcMain.handle("fixture:invoke", async (_event, channel, input) => {
+      if (channel === channels.session) return { ok: true, data: await host.call("session.get", input, 10000) };
       if (channel !== channels.get) throw new Error("Unexpected fixture IPC: " + channel);
       readCount++;
       if (failRead) { failRead = false; readFailures++; return { ok: false, error: { code: "HOST_NOT_READY", message: "Injected first read failure" } }; }
@@ -124,6 +125,7 @@ app.whenReady().then(async () => {
         case "event": win.webContents.send(channels.changed, input); return;
         case "failRead": failRead = true; return;
         case "suppressEvents": suppressEvents = input; return;
+        case "viewport": win.setContentSize(input.width, input.height); return;
         case "readCount": return readCount;
         case "readFailures": return readFailures;
         default: throw new Error("Unknown action: " + name);
@@ -131,7 +133,11 @@ app.whenReady().then(async () => {
     });
     const watchdog = setTimeout(async () => { console.error("Todo checklist scenario timed out"); await host.stop(); app.exit(1); }, 50000);
     await win.loadFile(path.join(__dirname, "index.html"));
-    const result = await win.webContents.executeJavaScript("window.todoChecklistProbe()");
+    const result = await win.webContents.executeJavaScript("window.todoChecklistProbe(" + JSON.stringify({ keepEvidence: Boolean(process.env.PI_DESKTOP_TODO_EVIDENCE) }) + ")");
+    if (process.env.PI_DESKTOP_TODO_EVIDENCE) {
+      const image = await win.webContents.capturePage();
+      require("node:fs").writeFileSync(process.env.PI_DESKTOP_TODO_EVIDENCE, image.toPNG());
+    }
     console.log("TODO_CHECKLIST " + JSON.stringify(result));
     clearTimeout(watchdog);
     await host.stop(); app.exit(0);
