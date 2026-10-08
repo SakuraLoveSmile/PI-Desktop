@@ -278,7 +278,7 @@ schedule. Renaming an Hourly task does not restart its interval.
 | 命令面板 | Cmd/Ctrl+K（也根据 D014 的 Cmd/Ctrl+Shift+P） | 内置+插件命令 |
 | 模型菜单 | Composer 右侧模型 × 推理芯片 | 配置的 provider/model 选择 + 设置条目 (D091) |
 | 个人资料菜单 | 侧边栏页脚 | 设置/日志/主题循环 (D041) |
-| 通知收件箱 | 侧边栏页脚响铃 | All/Unread 视图、仅任务 failure 行（顺利完成的不显示，D295）、标记为全部读取和清除操作 (D130/D117) |
+| 通知收件箱 | 侧边栏页脚响铃 | All/Unread 展示持久化的成功与失败任务；铃铛使用 Host 派生的全部未读计数，与 Dock/任务栏徽标一致；支持全部已读和清除 (D130/D117/D295) |
 | Toast | 事件（插件 toast、后端恢复、复制） | 顶部中心；默认 4 秒，错误 8 秒 |
 | 项目切换菜单 | 空首页带下划线的项目名 | 侧边栏已打开项目 + 搜索 + 克隆 Git 项目 + 打开项目 |
 
@@ -329,10 +329,10 @@ schedule. Renaming an Hourly task does not restart its interval.
 - Completed/failed 转不可见→ host-core 附加一个持久的
   收件箱行。结果显示在可见的、集中的当前聊天和每个
   `aborted` 转不追加。后台会话和任何回合结束时
-  窗口未聚焦仍在追加。侧边栏页脚铃铛只列出 `task.failed` 行，徽章也只
-  统计未读的失败；顺利完成的记录仍持久保存，用于侧边栏结果徽标和原生通知，
-  但永不出现在收件箱里（D295）。选择一行标记其已读取并激活其绑定
-  project/session。
+  窗口未聚焦仍在追加。侧边栏页脚铃铛列出所有保留的 `task.completed` 和
+  `task.failed` 行；徽章使用 Host 派生的全部持久记录未读数，与 Dock/任务栏徽标
+  一致。“全部”包含已读和未读行，“未读”只按 `readAt == null` 过滤。
+  选择一行会标记已读并激活其绑定 project/session。
   仅当
   应用程序窗口未获得焦点，单击它会在激活之前使窗口获得焦点
   同一次会议（D117）。接收持久通知或本机通知
