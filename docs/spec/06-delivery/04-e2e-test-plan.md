@@ -17594,6 +17594,10 @@ with Overview; the Composer has no Session checklist mounting or popup.
   task navigation, Spec/file links, reference tabs, task dependency cards/edges,
   repeated owners, collapse, zoom/fit and narrow light layout. Native captures
   compare the actual candidate to the supplied reference.
+  Overview layout also exercises long titles, project paths and model names at
+  320/360/570px in both themes: metadata values retain positive visible width,
+  and header/resources/references introduce no horizontal overflow. Selected
+  reference options retain their existing pressed states and switching path.
 - node --test apps/desktop/test/settings-ipc-partial-write.test.mjs protects
   full committed Main network/menu/developer policy after partial writes and
   guarantees no side effects on rejected configuration. Host/runtime/component

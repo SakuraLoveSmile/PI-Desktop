@@ -153,11 +153,30 @@ globalThis.overviewReferenceProbe = async () => {
     const zoom = Number(host.querySelector("[data-panorama-canvas]")?.getAttribute("data-panorama-zoom"));
     await click('[aria-label="放大"]');
     assert(Number(host.querySelector("[data-panorama-canvas]")?.getAttribute("data-panorama-zoom")) > zoom, "zoom control works");
-    await globalThis.overviewReferenceShow("overview", 360, "light");
-    assert(host.scrollWidth <= host.clientWidth, "narrow Overview has no page overflow");
+    await act(async () => useAppStore.setState({ sessions: [{ ...session,
+      title: "Long session title ".repeat(20), projectPath: `/fixture/${"long-project-path/".repeat(20)}`,
+      modelId: "long-model-name-".repeat(20),
+    }] }));
+    for (const theme of ["dark", "light"] as const) {
+      for (const width of [320, 360, 570]) {
+        await globalThis.overviewReferenceShow("overview", width, theme);
+        const header = host.querySelector<HTMLElement>(".work-panel-overview-header")!;
+        const scroller = host.querySelector<HTMLElement>(".work-panel-overview-scroll")!;
+        assert(host.scrollWidth <= host.clientWidth, `${theme} ${width}px Overview has no page overflow`);
+        assert(header.scrollWidth <= header.clientWidth, "long metadata stays inside the header");
+        assert(scroller.scrollWidth <= scroller.clientWidth, "resources and references stay inside the scroll area");
+        const bounds = header.getBoundingClientRect();
+        for (const value of header.querySelectorAll("dd")) {
+          const rect = value.getBoundingClientRect();
+          assert(rect.width > 0 && rect.left >= bounds.left && rect.right <= bounds.right,
+            "every metadata value remains visible within the header");
+        }
+      }
+    }
+    await act(async () => useAppStore.setState({ sessions: [session] }));
     await globalThis.overviewReferenceShow("overview");
     globalThis.overviewReferenceCleanup = () => { root.unmount(); host.remove(); Object.assign(api, originals); useAppStore.setState(previousState, true); };
-    return { ok: true, tasks: 13, dependencyEdges: dependencies.reduce((count, row) => count + row.length, 0), checks: "task/board/panorama navigation, live update, collapse, references, resources, narrow light, repeated owners" };
+    return { ok: true, tasks: 13, dependencyEdges: dependencies.reduce((count, row) => count + row.length, 0), checks: "task/board/panorama navigation, live update, collapse, references, resources, long metadata at 320/360/570px dark/light, repeated owners" };
   } catch (error) {
     await act(async () => root.unmount()); host.remove(); Object.assign(api, originals); useAppStore.setState(previousState, true);
     throw error;
