@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
 
+use super::model::{TeamMember, TeamMemberSelectionPartial};
 use crate::{db::Database, sessions};
 
 pub const CONFIGURABLE_TOOLS: &[&str] = &[
@@ -272,6 +273,81 @@ pub fn member_snapshot(db: &Database, member: &str) -> Result<Option<ExpertTeamC
         .map(serde_json::from_value)
         .transpose()
         .map_err(Into::into)
+}
+
+/// Resolve a new expert's settings or retain an existing member's approved policy.
+/// Defaults are captured at declaration; reused sessions keep their confirmed route.
+pub(super) fn resolve_launch_config(
+    db: &Database,
+    team: &str,
+    preset_id: Option<&ExpertTeamPresetId>,
+    selection: Option<TeamMemberSelectionPartial>,
+    reused_member: Option<&TeamMember>,
+) -> Result<(TeamMemberSelectionPartial, Option<ExpertTeamConfigSnapshot>)> {
+    let existing_config = reused_member
+        .map(|member| member_snapshot(db, &member.member_session_id))
+        .transpose()?
+        .flatten();
+    if let (Some(requested), Some(existing)) = (preset_id, &existing_config) {
+        if requested != &existing.preset_id {
+            return Err(anyhow!(
+                "TEAM_MODEL_SELECTION_INVALID: an existing member's expert preset is immutable"
+            ));
+        }
+    }
+    // Existing members keep their approved snapshot; defaults apply only to
+    // new members and are never a live link from settings to a session.
+    let role_config = if reused_member.is_none() {
+        preset_id
+            .map(|preset| resolve(db, team, preset))
+            .transpose()?
+    } else {
+        None
+    };
+    let expert_config = if reused_member.is_some() {
+        existing_config
+    } else {
+        preset_id.map(|preset| ExpertTeamConfigSnapshot {
+            preset_id: preset.clone(),
+            tools: role_config.as_ref().and_then(|config| config.tools.clone()),
+            instructions: role_config
+                .as_ref()
+                .and_then(|config| config.instructions.clone()),
+        })
+    };
+    let mut sel = selection.unwrap_or_default();
+    if sel.provider_id.is_some() != sel.model_id.is_some() {
+        return Err(anyhow!(
+            "TEAM_MODEL_SELECTION_INVALID: provider and model overrides must be supplied together"
+        ));
+    }
+    if let Some(config) = role_config {
+        if config.provider_id.is_some() {
+            sel.provider_id = config.provider_id;
+            sel.model_id = config.model_id;
+        }
+        if config.thinking_level.is_some() {
+            sel.thinking_level = config.thinking_level;
+        }
+    }
+    if let Some(member) = reused_member.filter(|_| expert_config.is_some()) {
+        let summary = sessions::get_session(db, &member.member_session_id)?
+            .ok_or_else(|| anyhow!("TEAM_NOT_FOUND: reused member session not found"))?
+            .summary;
+        sel.provider_id = Some(summary.provider_id.ok_or_else(|| {
+            anyhow!("TEAM_MODEL_SELECTION_INVALID: confirmed expert provider is missing")
+        })?);
+        sel.model_id = Some(summary.model_id.ok_or_else(|| {
+            anyhow!("TEAM_MODEL_SELECTION_INVALID: confirmed expert model is missing")
+        })?);
+        sel.thinking_level = Some(summary.thinking_level);
+    }
+    if sel.provider_id.is_some() != sel.model_id.is_some() {
+        return Err(anyhow!(
+            "TEAM_MODEL_SELECTION_INVALID: provider and model overrides must be supplied together"
+        ));
+    }
+    Ok((sel, expert_config))
 }
 
 /// Narrow a member's tool surface without changing any other permission gate.
