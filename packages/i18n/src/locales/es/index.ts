@@ -1,6 +1,7 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const es = {
+  contextInsights: en.contextInsights,
   "app": {
     "shellName": "Pi-Desktop-Plus",
     "tagline": "Socio de codificación de IA local",
@@ -869,10 +870,18 @@ sklm: {
       "subagents": "Subagentes",
       "import": "Importar",
       "projects": "Proyectos",
+      "memory": "Memoria",
       "sync": "Sincronización en la nube",
       "remoteHosts": "Hosts remotos",
       "info": "Información",
       "voice": "Voz"
+    },
+    "memory": {
+      "title": "Memoria",
+      "description": "Administra los recuerdos guardados y el registro automático por proyecto. Los proyectos del mismo grupo comparten memoria; los demás permanecen separados.",
+      "projectsTitle": "Memoria del proyecto",
+      "empty": "Aún no hay proyectos. Primero crea o abre uno en el archivo de proyectos.",
+      "loadFailed": "No se pudo cargar la lista de proyectos. Inténtalo de nuevo."
     },
     "configSync": {
       title: "Cloud sync",
@@ -1810,6 +1819,13 @@ sklm: {
     "memoryEntryContent": "¿Qué debería recordar este proyecto?",
     "memoryRemove": "Eliminar memoria",
     "memoryHint": "Se usa en los chats de este proyecto. Manténgalo breve y factual.",
+    memoryProjectChanged: "Este proyecto ahora pertenece a otro grupo. Cierra este diálogo y actualiza la lista de proyectos antes de editar. Tu borrador se conserva.",
+    "memoryConflict": "La memoria guardada o el proyecto ha cambiado. Tu borrador se conserva. Recarga la memoria guardada antes de volver a guardar.",
+    "memoryRequestFailed": "No se pudo cargar o actualizar la memoria del proyecto. Tu borrador se conserva. Reintenta o recarga la memoria guardada.",
+    "memoryReload": "Recargar memoria guardada",
+    "memoryReloadDiscard": "Recargar y descartar borrador",
+    "autoMemoryToggle": "Guardar recuerdos automáticamente",
+    "autoMemoryDescription": "Al activarlo, el asistente puede guardar automáticamente las preferencias duraderas del proyecto que expresas claramente. Desactivarlo solo detiene el guardado y las actualizaciones automáticas; los recuerdos guardados siguen usándose en los chats del proyecto hasta que los edites o elimines. El interruptor se aplica al instante; los cambios esperan a Guardar.",
     "memorySave": "Guardar memoria",
     "memorySaving": "Guardando…",
     "noSearchResults": "Ningún proyecto coincide con su búsqueda",

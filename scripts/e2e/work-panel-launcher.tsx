@@ -69,7 +69,8 @@ globalThis.workPanelLauncherProbe = async () => {
         const list = host.querySelector<HTMLElement>(".work-panel-launcher-list");
         const launcher = host.querySelector<HTMLElement>(".work-panel-launcher");
         assert(list && launcher, "launcher missing");
-        assert(rows().length === 4, "available tools were lost");
+        assert(rows().length === 5, "available tools were lost");
+        assert(host.querySelector('[data-work-panel-launcher-item="context"]'), "native Context Insights entry was lost during integration");
         assert(list.clientWidth <= 380, "cards exceeded the reference content width");
         assert(launcher.scrollWidth <= launcher.clientWidth, "launcher overflows horizontally");
         const bounds = list.getBoundingClientRect();
@@ -96,7 +97,7 @@ globalThis.workPanelLauncherProbe = async () => {
     flushSync(() => button.click());
   };
   click(".work-panel-new-tab");
-  assert(rows().length === 4, "New tab did not show the same tools");
+  assert(rows().length === 5, "New tab did not show the same tools");
   click('[data-work-panel-launcher-item="review"]');
   assert(useAppStore.getState().activeWorkPanelTabId === "review", "card did not select Review");
   assert(!rows().length && host.querySelector(".work-tab-empty"), "Review did not replace the launcher");
@@ -106,7 +107,7 @@ globalThis.workPanelLauncherProbe = async () => {
   click(".work-panel-tab-close");
   assert(useAppStore.getState().workPanelOpen, "closing the final tab collapsed the panel");
   click(".work-panel-new-tab");
-  assert(rows().length === 4, "launcher could not be reopened");
+  assert(rows().length === 5, "launcher could not be reopened");
   await i18n.changeLanguage("zh-CN");
   flushSync(() => useAppStore.setState({ pluginViews: useAppStore.getState().pluginViews.filter((view) => view.pluginId !== "fixture") }));
   globalThis.showLauncher(671, 739, "dark");

@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Policy-Sync: 2026-09-26.1
+Policy-Sync: 2026-10-08.1
 
 Mandatory rules for AI coding agents working in PI-Desktop.
 
@@ -214,7 +214,8 @@ development workspaces.
 * use local `main` as a temporary integration branch
 * reuse another task's worktree
 * modify another agent's branch
-* delete another agent's branch or worktree
+* delete another agent's branch or worktree outside an explicitly
+  user-authorized batch cleanup
 * reset or discard unrelated work
 * include unrelated changes in your task
 * depend on uncommitted work from another worktree
@@ -311,6 +312,41 @@ the latest `origin/main`. Do not open or update a PR that is behind
 A task-candidate E2E result is valid only when its tested commit and
 base revision are known. The PR integration gate then protects against
 `main` changing between local candidate validation and final merge.
+
+
+### Verified merge and cleanup
+
+Post-merge cleanup is mandatory and part of delivery. After a user-authorized
+merge is verified, complete cleanup in the same task without asking for another
+approval for that task's own resources. Cleanup does not authorize a merge,
+push, remote-branch deletion, or removal of another task's resources.
+
+1. Verify the expected commits or equivalent integrated changes are present
+   in the intended `main`, and the required integration checks passed. For
+   local-only delivery, verify local `main`; for remote delivery, also verify
+   remote `main` and safely synchronize local `main`.
+2. Before removal, preserve any remaining dirty/untracked work and needed
+   ignored artifacts (packages, screenshots, local configuration) in a
+   verified, recoverable archive. Do not discard unsaved data or force-delete
+   an unmerged branch to make cleanup pass.
+3. Remove or archive all worktrees owned by this request, prune stale Git
+   registrations, and remove their empty container directories only after
+   verifying they contain no other files beyond worktree-name markers. Use
+   the managed archive operation for managed worktrees when available.
+4. Delete the verified merged task branch and obsolete integration branches.
+   Do not keep backup snapshots as normal local branches. Store recovery
+   snapshots in archive refs (outside `refs/heads/`) or verified backup files,
+   preserving their commits before retiring visible temporary branch refs.
+5. Check `git worktree list`, the local branch list, and the request's physical
+   worktree paths. Report cleanup results separately from merge results;
+   do not claim cleanup is complete while task worktrees, empty containers,
+   or temporary backup branches still remain in their normal locations.
+
+Preserve the primary checkout, active/unmerged work, needed archives, and
+resources outside this request. Another task's resources may be retired only
+when the user explicitly includes them in an authorized batch cleanup. If
+cleanup is blocked, report the exact remaining path/ref and recovery state;
+do not silently leave it behind or weaken the data-safety boundary.
 
 ---
 

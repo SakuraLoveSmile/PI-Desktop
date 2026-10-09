@@ -1,6 +1,7 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const ko = {
+  contextInsights: en.contextInsights,
   app: {
     shellName: "Pi-Desktop-Plus",
     tagline: "로컬 AI 코딩 파트너",
@@ -876,10 +877,19 @@ sklm: {
       subagents: "서브에이전트",
       import: "가져오기",
       projects: "프로젝트",
+      memory: "메모리",
       sync: "클라우드 동기화",
       remoteHosts: "원격 호스트",
       info: "정보",
       voice: "음성",
+    },
+    memory: {
+      title: "메모리",
+      description:
+        "프로젝트별로 저장된 메모리와 자동 기록을 관리합니다. 같은 그룹의 프로젝트는 메모리를 공유하고, 다른 프로젝트에는 영향을 주지 않습니다.",
+      projectsTitle: "프로젝트 메모리",
+      empty: "아직 프로젝트가 없습니다. 먼저 프로젝트 보관함에서 프로젝트를 만들거나 여세요.",
+      loadFailed: "프로젝트 목록을 불러오지 못했습니다. 다시 시도하세요.",
     },
     configSync: {
       title: "Cloud sync",
@@ -1824,6 +1834,13 @@ sklm: {
     memoryEntryContent: "이 프로젝트가 기억해야 할 내용은 무엇인가요?",
     memoryRemove: "메모리 삭제",
     memoryHint: "이 프로젝트의 채팅에 사용됩니다. 간결하고 사실적으로 작성하세요.",
+    memoryProjectChanged: "이 프로젝트가 다른 그룹에 속하게 되었습니다. 편집하기 전에 대화 상자를 닫고 프로젝트 목록을 새로 고치세요. 초안은 보존됩니다.",
+    "memoryConflict": "저장된 기억 또는 프로젝트가 변경되었습니다. 초안은 보존됩니다. 다시 저장하기 전에 저장된 기억을 다시 불러오세요.",
+    "memoryRequestFailed": "프로젝트 기억을 불러오거나 업데이트할 수 없습니다. 초안은 보존됩니다. 다시 시도하거나 저장된 기억을 다시 불러오세요.",
+    "memoryReload": "저장된 기억 다시 불러오기",
+    "memoryReloadDiscard": "다시 불러오고 초안 버리기",
+    autoMemoryToggle: "기억 자동 기록",
+    autoMemoryDescription: "켜면 명확히 표현한 장기 프로젝트 선호 사항을 도우미가 자동으로 기록할 수 있습니다. 끄면 자동 기록과 업데이트만 중지되며, 저장된 기억은 직접 수정하거나 삭제할 때까지 프로젝트 채팅에서 계속 사용됩니다. 스위치는 즉시 적용되고 기억 수정은 저장할 때 적용됩니다.",
     memorySave: "메모리 저장",
     memorySaving: "저장 중…",
     noSearchResults: "검색과 일치하는 프로젝트 없음",

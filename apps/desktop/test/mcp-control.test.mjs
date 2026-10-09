@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -972,4 +973,157 @@ test("pi_turn_get reads a turn's durable state and never leaks a cross-session t
   assert.equal(missingTurnId.body.result.isError, true);
   assert.equal(missingTurnId.body.result.structuredContent.error.code, "INVALID_PARAMS");
   assert.equal(calls.some((entry) => !entry.args[0].turnId), false);
+});
+
+
+async function chunkFixture(t, readPage) {
+  const calls = [];
+  const server = new McpControlServer({
+    dataDir: mkdtempSync(join(tmpdir(), "pi-mcp-session-chunk-")),
+    port: 0,
+    channels: { sessionGet: fixtureChannels.sessionGet },
+    invoke: async (channel, args) => {
+      calls.push({ channel, args });
+      return readPage(args[0]);
+    },
+  });
+  t.after(() => server.stop());
+  const info = await server.start();
+  const initialized = await post(info.url, info.token, { jsonrpc: "2.0", id: 1, method: "initialize" });
+  const headers = { "Mcp-Session-Id": initialized.response.headers.get("mcp-session-id") };
+  let id = 2;
+  const rpc = (method, params = {}) => post(info.url, info.token, { jsonrpc: "2.0", id: id++, method, params }, headers);
+  const call = async (args, name = "pi_session_get_chunk") => {
+    const response = await rpc("tools/call", { name, arguments: args });
+    return response.body.result;
+  };
+  return { calls, rpc, call };
+}
+
+const chunkPage = (content = "review evidence") => ({ session: {
+  id: "session-chunk", messages: [{ id: "message-last", role: "assistant", content }],
+  messageStart: 2, messageEnd: 3, hasMoreBefore: true, hasMoreAfter: false,
+} });
+
+test("session chunk tool reconstructs an oversized Unicode page through authenticated HTTP", async (t) => {
+  const page = chunkPage("评审证据🦜".repeat(120_000));
+  const fixture = await chunkFixture(t, () => page);
+  const listed = (await fixture.rpc("tools/list")).body.result.tools;
+  const schema = listed.find((tool) => tool.name === "pi_session_get_chunk").inputSchema;
+  assert.deepEqual(schema.required, ["id"]);
+  assert.equal(schema.additionalProperties, false);
+  assert.equal(schema.properties.offset.minimum, 0);
+  assert.equal(schema.properties.expectedSha256.pattern, "^[a-f0-9]{64}$");
+  const ordinary = await fixture.call({ id: page.session.id, messageLimit: 1 }, "pi_session_get");
+  assert.equal(ordinary.structuredContent.truncated, true, "baseline single-message page exceeds MCP envelope");
+  fixture.calls.length = 0;
+  const parts = [];
+  let offset = 0;
+  let sha256;
+  let totalBytes;
+  do {
+    const result = await fixture.call({ id: page.session.id, messageBefore: 3, offset,
+      ...(sha256 ? { expectedSha256: sha256 } : {}) });
+    assert.equal(result.isError, undefined);
+    const chunk = result.structuredContent;
+    assert.deepEqual(JSON.parse(result.content[0].text), chunk);
+    assert.equal(chunk.sessionId, page.session.id);
+    assert.equal(chunk.offset, offset);
+    assert.equal(chunk.encoding, "base64");
+    assert.ok(chunk.totalBytes <= 16 * 1024 * 1024);
+    const bytes = Buffer.from(chunk.chunk, "base64");
+    assert.ok(bytes.length > 0 && bytes.length <= 64 * 1024);
+    parts.push(bytes);
+    sha256 ??= chunk.sha256;
+    totalBytes ??= chunk.totalBytes;
+    assert.equal(chunk.sha256, sha256);
+    assert.equal(chunk.totalBytes, totalBytes);
+    assert.ok(Object.hasOwn(chunk, "nextOffset"));
+    if (chunk.nextOffset !== null) assert.equal(chunk.nextOffset, offset + bytes.length);
+    else assert.equal(offset + bytes.length, totalBytes);
+    offset = chunk.nextOffset;
+  } while (offset !== null);
+  const bytes = Buffer.concat(parts);
+  assert.equal(bytes.length, totalBytes);
+  assert.equal(createHash("sha256").update(bytes).digest("hex"), sha256);
+  assert.deepEqual(JSON.parse(bytes.toString("utf8")), page);
+  assert.ok(fixture.calls.length > 1);
+  for (const call of fixture.calls) assert.deepEqual(call, {
+    channel: fixtureChannels.sessionGet,
+    args: [{ id: page.session.id, messageBefore: 3, messageLimit: 1 }],
+  });
+});
+
+test("session chunks reject changed pages without retrying or returning partial evidence", async (t) => {
+  let page = chunkPage("original".repeat(20_000));
+  const fixture = await chunkFixture(t, () => page);
+  const first = (await fixture.call({ id: page.session.id })).structuredContent;
+  page = chunkPage("modified".repeat(20_000));
+  const before = fixture.calls.length;
+  const changed = await fixture.call({ id: page.session.id, offset: first.nextOffset, expectedSha256: first.sha256 });
+  assert.equal(changed.isError, true);
+  assert.equal(changed.structuredContent.error.code, "CONFLICT");
+  assert.equal(changed.structuredContent.chunk, undefined);
+  assert.equal(fixture.calls.length, before + 1);
+});
+
+test("session chunk arguments are validated before reading the host", async (t) => {
+  const fixture = await chunkFixture(t, () => chunkPage());
+  const invalid = [
+    {}, { id: " " }, { id: 123 }, { id: "session-chunk", offset: -1 },
+    { id: "session-chunk", offset: 1.2 }, { id: "session-chunk", offset: Number.MAX_SAFE_INTEGER + 1 },
+    { id: "session-chunk", messageBefore: -1 }, { id: "session-chunk", messageBefore: "3" },
+    { id: "session-chunk", offset: 1 }, { id: "session-chunk", expectedSha256: "A".repeat(64) },
+    { id: "session-chunk", expectedSha256: "a".repeat(63) },
+    { id: "session-chunk", contentLimit: 12 }, { id: "session-chunk", messageLimit: 2 },
+  ];
+  for (const input of invalid) {
+    const result = await fixture.call(input);
+    assert.equal(result.isError, true, JSON.stringify(input));
+    assert.equal(result.structuredContent.error.code, "INVALID_PARAMS");
+  }
+  assert.equal(fixture.calls.length, 0);
+});
+
+test("session chunks validate real session identity and physical one-message pagination", async (t) => {
+  let page = chunkPage();
+  const fixture = await chunkFixture(t, () => page);
+  const invalid = [
+    { ...page.session, id: "foreign-session" },
+    { ...page.session, messageStart: undefined },
+    { ...page.session, messageEnd: 2.5 },
+    { ...page.session, messageStart: 1 },
+    { ...page.session, messages: [] },
+    { ...page.session, hasMoreBefore: false },
+    { ...page.session, hasMoreAfter: undefined },
+    { ...page.session, messageStart: 3, messageEnd: 4 },
+  ];
+  for (const session of invalid) {
+    page = { session };
+    const result = await fixture.call({ id: "session-chunk", messageBefore: 3 });
+    assert.equal(result.isError, true);
+    assert.equal(result.structuredContent.error.code, "INVALID_RESULT");
+  }
+  page = { session: { id: "session-chunk", messages: [], messageStart: 0, messageEnd: 0,
+    hasMoreBefore: false, hasMoreAfter: true } };
+  const empty = await fixture.call({ id: "session-chunk", messageBefore: 0 });
+  assert.equal(empty.isError, undefined);
+  assert.equal(empty.structuredContent.nextOffset, null);
+  assert.deepEqual(JSON.parse(Buffer.from(empty.structuredContent.chunk, "base64").toString("utf8")), page);
+});
+
+test("session chunks enforce total byte and offset limits without raising the ordinary envelope cap", async (t) => {
+  let page = chunkPage("🦜".repeat(5 * 1024 * 1024));
+  const fixture = await chunkFixture(t, () => page);
+  const oversized = await fixture.call({ id: page.session.id });
+  assert.equal(oversized.isError, true);
+  assert.equal(oversized.structuredContent.error.code, "MCP_RESULT_LIMIT");
+  page = chunkPage();
+  const first = (await fixture.call({ id: page.session.id })).structuredContent;
+  const outside = await fixture.call({ id: page.session.id, offset: first.totalBytes, expectedSha256: first.sha256 });
+  assert.equal(outside.isError, true);
+  assert.equal(outside.structuredContent.error.code, "INVALID_PARAMS");
+  const terminal = await fixture.call({ id: page.session.id, offset: first.totalBytes - 1, expectedSha256: first.sha256 });
+  assert.equal(terminal.structuredContent.nextOffset, null);
+  assert.equal(Buffer.from(terminal.structuredContent.chunk, "base64").length, 1);
 });

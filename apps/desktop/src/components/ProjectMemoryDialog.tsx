@@ -1,39 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { useBlockingOverlay } from "../lib/blocking-overlay";
-import type { ProjectMemory, ProjectMemoryEntry } from "@pi-desktop/shared";
-import { api } from "../lib/api";
-import { Button, Input, Textarea, TooltipButton } from "./ui";
+import { Button, Input, SettingsToggle, Textarea, TooltipButton } from "./ui";
 import { IconClose, IconPlus, IconSparkles, IconTrash } from "./icons";
 
-function newEntry(): ProjectMemoryEntry {
-  const id =
-    globalThis.crypto?.randomUUID?.() ??
-    "memory-" + Date.now() + "-" + Math.random().toString(36).slice(2);
-  return { id, title: "", content: "" };
-}
-
-function entriesFromMemory(memory: ProjectMemory): ProjectMemoryEntry[] {
-  if (memory.entries) return memory.entries;
-  return memory.content.trim()
-    ? [{ id: "legacy-project-memory", title: "", content: memory.content.trim() }]
-    : [];
-}
-
-function normalizeEntries(entries: ProjectMemoryEntry[]): ProjectMemoryEntry[] {
-  return entries
-    .map((entry) => ({
-      id: entry.id.trim(),
-      title: entry.title.trim(),
-      content: entry.content.trim(),
-    }))
-    .filter((entry) => entry.content.length > 0);
-}
-
-function entriesEqual(left: ProjectMemoryEntry[], right: ProjectMemoryEntry[]) {
-  return JSON.stringify(left) === JSON.stringify(right);
-}
+import { useProjectMemoryEditor } from "./useProjectMemoryEditor";
 
 export function ProjectMemoryDialog({
   project,
@@ -48,29 +20,9 @@ export function ProjectMemoryDialog({
 }) {
   useBlockingOverlay();
   const { t } = useTranslation();
-  const [memory, setMemory] = useState<ProjectMemory | null>(null);
-  const [entries, setEntries] = useState<ProjectMemoryEntry[]>([]);
-  const [savedEntries, setSavedEntries] = useState<ProjectMemoryEntry[]>([]);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    const load = project.groupId && !project.legacy
-      ? api.getProjectGroupMemory(project.groupId)
-      : api.getProjectMemory(project.path);
-    void load.then((result) => {
-      if (cancelled) return;
-      const loadedEntries = entriesFromMemory(result.memory);
-      setMemory(result.memory);
-      setEntries(loadedEntries);
-      setSavedEntries(loadedEntries);
-    }).catch((error) => {
-      if (!cancelled) onError(error);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [project.groupId, project.legacy, project.path]);
+  const { editor, cards: entries, saving, dirty, failure, autoRecordEnabled,
+    updateCard: updateEntry, removeCard, addCard, save, setEnabled, reload,
+  } = useProjectMemoryEditor(project, onSaved, onError);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -80,32 +32,6 @@ export function ProjectMemoryDialog({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [onClose, saving]);
 
-  const updateEntry = (id: string, patch: Partial<ProjectMemoryEntry>) => {
-    setEntries((current) =>
-      current.map((entry) => (entry.id === id ? { ...entry, ...patch } : entry)),
-    );
-  };
-
-  const save = async () => {
-    const normalized = normalizeEntries(entries);
-    setSaving(true);
-    try {
-      const result = project.groupId && !project.legacy
-        ? await api.saveProjectGroupMemory(project.groupId, normalized)
-        : await api.saveProjectMemory(project.path, normalized);
-      const saved = entriesFromMemory(result.memory);
-      setMemory(result.memory);
-      setEntries(saved);
-      setSavedEntries(saved);
-      onSaved();
-    } catch (error) {
-      onError(error);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const dirty = memory !== null && !entriesEqual(entries, savedEntries);
   const dialog = (
     <div
       className="overlay project-instructions-dialog-overlay"
@@ -141,6 +67,26 @@ export function ProjectMemoryDialog({
           </TooltipButton>
         </div>
         <p className="project-memory-dialog-description">{t("project.memoryDescription")}</p>
+        <div className="project-auto-memory-toggle">
+          <span>{t("project.autoMemoryToggle")}</span>
+          <SettingsToggle
+            label={t("project.autoMemoryToggle")}
+            checked={autoRecordEnabled}
+            disabled={editor === null || saving}
+            busy={saving}
+            onChange={() => void setEnabled(!autoRecordEnabled)}
+          />
+        </div>
+        <p className="project-memory-dialog-hint">{t("project.autoMemoryDescription")}</p>
+        {failure ? (
+          <div className="project-memory-dialog-error" role="alert">
+            <span>{t(failure === "projectChanged" ? "project.memoryProjectChanged" :
+              failure === "conflict" ? "project.memoryConflict" : "project.memoryRequestFailed")}</span>
+            <Button variant="ghost" size="sm" disabled={saving} onClick={() => void reload()}>
+              {t(dirty ? "project.memoryReloadDiscard" : "project.memoryReload")}
+            </Button>
+          </div>
+        ) : null}
         <div className="project-memory-dialog-toolbar">
           <span className="project-memory-dialog-count">
             {t("project.memoryCount", { count: entries.length })}
@@ -149,15 +95,15 @@ export function ProjectMemoryDialog({
             type="button"
             size="sm"
             variant="ghost"
-            disabled={memory === null || saving}
-            onClick={() => setEntries((current) => [...current, newEntry()])}
+            disabled={editor === null || saving}
+            onClick={addCard}
           >
             <IconPlus size={14} aria-hidden />
             {t("project.memoryAdd")}
           </Button>
         </div>
         {entries.length > 0 ? (
-          <div className="project-memory-dialog-list" role="list">
+          <div className="project-memory-dialog-list" role="list" aria-label={t("project.editMemory")}>
             {entries.map((entry, index) => (
               <article className="project-memory-card" key={entry.id} role="listitem">
                 <div className="project-memory-card-head">
@@ -167,19 +113,17 @@ export function ProjectMemoryDialog({
                   <Input
                     value={entry.title}
                     placeholder={t("project.memoryEntryTitle")}
-                    aria-label={t("project.memoryEntryTitle")}
-                    disabled={memory === null || saving}
+                    aria-label={`${t("project.memoryEntryTitle")} ${index + 1}`}
+                    disabled={editor === null || saving}
                     onChange={(event) => updateEntry(entry.id, { title: event.target.value })}
                   />
                   <TooltipButton
                     type="button"
                     className="project-memory-remove"
                     tooltip={t("project.memoryRemove")}
-                    ariaLabel={t("project.memoryRemove")}
-                    disabled={saving}
-                    onClick={() =>
-                      setEntries((current) => current.filter((item) => item.id !== entry.id))
-                    }
+                    ariaLabel={`${t("project.memoryRemove")} ${index + 1}`}
+                    disabled={editor === null || saving}
+                    onClick={() => removeCard(entry.id)}
                   >
                     <IconTrash size={15} />
                   </TooltipButton>
@@ -188,8 +132,8 @@ export function ProjectMemoryDialog({
                   className="project-memory-entry-content"
                   value={entry.content}
                   placeholder={t("project.memoryEntryContent")}
-                  aria-label={t("project.memoryEntryContent")}
-                  disabled={memory === null || saving}
+                  aria-label={`${t("project.memoryEntryContent")} ${index + 1}`}
+                  disabled={editor === null || saving}
                   onChange={(event) => updateEntry(entry.id, { content: event.target.value })}
                 />
               </article>
@@ -203,8 +147,8 @@ export function ProjectMemoryDialog({
               type="button"
               size="sm"
               variant="ghost"
-              disabled={memory === null || saving}
-              onClick={() => setEntries([newEntry()])}
+              disabled={editor === null || saving}
+              onClick={addCard}
             >
               <IconPlus size={14} aria-hidden />
               {t("project.memoryAdd")}
@@ -216,7 +160,7 @@ export function ProjectMemoryDialog({
           <Button variant="ghost" disabled={saving} onClick={onClose}>
             {t("settings.cancel")}
           </Button>
-          <Button variant="primary" disabled={!dirty || saving} onClick={() => void save()}>
+          <Button variant="primary" disabled={editor === null || !dirty || saving} onClick={() => void save()}>
             {saving ? t("project.memorySaving") : t("project.memorySave")}
           </Button>
         </div>

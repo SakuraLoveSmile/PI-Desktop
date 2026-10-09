@@ -1,3 +1,4 @@
+import { openContextInsightsDialog } from "../features/context-entry/dialog-state";
 import i18n from "i18next";
 import { api } from "./api";
 import { useAppStore } from "../stores/app-store";
@@ -16,6 +17,10 @@ export async function runPaletteCommand(commandId: string): Promise<void> {
       break;
     case "builtin.agent.compact":
       await store.compactContext();
+      break;
+    case "builtin.context.inspect":
+      if (store.activeSessionId) openContextInsightsDialog(store.activeSessionId);
+      else store.setPage("contextInsights");
       break;
     case "builtin.mode.agent":
     case "builtin.mode.plan":

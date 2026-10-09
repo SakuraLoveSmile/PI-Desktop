@@ -187,6 +187,14 @@ export class TurnEventPipeline {
     const event = envelope.event;
     const sessionId = envelope.sessionId;
     const turnId = this.options.ownership.activeTurnId(sessionId);
+    if (event.type === "context_insights") {
+      if (!event.request && !event.diagnosticEvent) return;
+      void this.persistence.append({ sessionId, contextInsights: {
+        ...(event.request ? { request: event.request } : {}),
+        ...(event.diagnosticEvent ? { event: event.diagnosticEvent } : {}),
+      } });
+      return;
+    }
     const usage = usageForEvent(envelope);
     if (usage) {
       if (ownsUsageTurn(envelope, turnId)) this.addTurnUsage(sessionId, usage);

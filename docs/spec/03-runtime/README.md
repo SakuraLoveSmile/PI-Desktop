@@ -26,3 +26,5 @@
 
 - [Image generation and editing](21-image-generation.md)
 - [Portable configuration sync](22-config-sync.md)
+
+- [Context Insights](context-insights.md) — native captured-request diagnostics.
