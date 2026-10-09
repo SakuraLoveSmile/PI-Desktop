@@ -304,6 +304,31 @@ describe("SubagentRun event forwarding", () => {
   });
 });
 
+describe("SubagentRun child convergence", () => {
+  it("integrates child reports at idle before returning a successful report", async () => {
+    const collect = vi.fn().mockResolvedValueOnce("Child report: lexer checked.").mockResolvedValue(undefined);
+    const cleanup = vi.fn();
+    const { run } = createRun({ collectDelegationReports: collect, abortDelegations: cleanup });
+    const prompt = vi.fn(async (text: string) => {
+      run.handleEvent({ type: "message_end", message: assistantMessage({ content: [{ type: "text", text: text.startsWith("Child report") ? "Integrated lexer findings." : "Initial parent report." }] }) });
+    });
+    run.agent = { prompt, waitForIdle: vi.fn(), abort: vi.fn() };
+    const result = await (run as unknown as SubagentRun).run();
+    expect(prompt).toHaveBeenCalledWith("Child report: lexer checked.");
+    expect(result).toMatchObject({ status: "completed", report: "Integrated lexer findings." });
+    expect(cleanup).toHaveBeenCalledOnce();
+  });
+
+  it("cancels owned descendants when its own run fails", async () => {
+    const cleanup = vi.fn();
+    const { run } = createRun({ abortDelegations: cleanup });
+    run.agent = { prompt: vi.fn().mockRejectedValue(new Error("provider failed")), waitForIdle: vi.fn(), abort: vi.fn() };
+    const result = await (run as unknown as SubagentRun).run();
+    expect(result.status).toBe("failed");
+    expect(cleanup).toHaveBeenCalledOnce();
+  });
+});
+
 describe("SubagentRun reporting", () => {
   it("keeps the last non-empty assistant text as the report", () => {
     const { run } = createRun();

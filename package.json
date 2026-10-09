@@ -57,6 +57,8 @@
     "test:e2e:window-resize-native": "node scripts/e2e-window-controls.mjs --native-edge-drag",
     "test:e2e:work-panel-reorder": "node scripts/e2e-work-panel-reorder.mjs",
     "test:e2e:supervision": "node scripts/e2e-supervision.mjs",
+    "test:e2e:subagent-settings": "node scripts/e2e-subagent-settings.mjs",
+    "test:e2e:subagent-recursion": "node scripts/e2e-subagent-recursion.mjs",
     "test:e2e:subagents": "node scripts/e2e-subagents.mjs",
     "test:e2e:subagent-models": "node scripts/e2e-subagent-models.mjs",
     "check:marketplace": "node scripts/check-marketplace-catalog.mjs",

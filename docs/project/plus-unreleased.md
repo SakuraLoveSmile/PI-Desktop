@@ -15,10 +15,11 @@ Upstream v0.15.6 → v0.16.1 has been merged.
   readable controls in narrow columns. The outside-workspace reason follows
   the UI language; actual permission decisions and scope remain unchanged.
 
-- Expert Team startup skips ordinary Task subagent configuration and delegate
-  model/auth catalogs. Changing ordinary subagent settings no longer rebuilds
-  an idle Team runtime; standard delegation and Team policy refresh remain
-  unchanged.
+- Standard agents and execution experts actively delegate separable work.
+  Their subagents can delegate again within Settings → Subagents depth and
+  running-count limits. Branch-scoped controls and cancellation preserve
+  ancestor permissions and expert tool restrictions; Team Leads and research
+  keep their existing orchestration boundaries.
 
 - Expert Team settings configure six built-in expert presets at user or project
   scope. Newly confirmed experts snapshot their model, thinking, tool subset

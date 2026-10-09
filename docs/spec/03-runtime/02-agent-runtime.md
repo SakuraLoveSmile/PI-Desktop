@@ -678,15 +678,34 @@ no editing, delegation, fake user message or transcript deletion occurs.
 Other deferred/plugin tools keep their existing visibility rules. See
 [the declaration/permission decision](../../adr/plan-tool-declarations-and-execution-denials.md).
 
-In standard Agent mode with at least one enabled subagent, the system prompt
-uses delegate-first guidance for separable, substantial work: dispatch suitable
-independent tasks with `Task`, then converge through `TaskWait`. The parent
-handles work needing only a few tool calls and work requiring user input. The
-guidance retains the no-recursion, no-debate, and at-most-one-optional-review
-limits; it steers the model but does not guarantee delegation. With all
-subagents disabled, neither the delegation prompt section nor `Task*` tools
-are included. Expert Team execution uses its Lead-to-expert task-board policy
-and isolated Team tool catalog instead of standard subagent delegation. Team
+Standard Agent sessions and Agent-mode execution experts use the same
+proactive delegation policy: identify meaningful independent work, assign
+bounded owned tasks, dispatch them in parallel, continue independent parent
+work, and converge before delivery. Trivial indivisible work and user decisions
+stay with the parent. Child agents may apply the same policy within the
+configured depth and running-count limits; no agent debates or duplicate work.
+This steers the model but does not force a model call for every request.
+
+Settings `subagentMaxDepth` (integer 0–8, default 1) counts the root as depth 0.
+Depth 0 disables delegation; depth 1 permits direct children only. Settings
+`subagentMaxConcurrency` (integer 1–32, default 10) caps all running descendants
+in a single root runtime, including parents waiting for their children. Each
+Team execution expert owns an independent root tree with the same settings.
+Exceeding a limit returns an observable tool error, never an implicit queue.
+Limits are snapshotted at launch; changing them invalidates idle runtime reuse.
+Missing or invalid legacy settings use defaults; no data migration is needed.
+
+Descendant work tools cannot exceed the parent tool scope or Host-approved
+expert tool policy; nested permission scope cannot elevate the ancestor.
+TaskWait/TaskList/TaskStop and resume are scoped to the caller's direct children.
+Child settlement converges its descendants; cancellation, failure and disposal
+stop the affected subtree. Nested tool rows keep their actual spawning Task
+parent id for live and reloaded attribution. Descendant usage is counted once.
+
+With no enabled definitions or depth 0, the delegation prompt and Task tools
+are absent. Plan/Goal keep existing execution denials; Team research remains
+read-only with no delegation. Team Lead retains the Team task-board catalog
+instead of Task. Team
 requires `delegate` with at least one expert, including trivial tasks; Host
 rejects `lead_only` and historical solo approvals. Substantive Lead tools and
 nonempty final replies require a current approved expert dispatch whose turn
@@ -1510,7 +1529,7 @@ execution activation rules:
   `# Skills` section and a user-typed `/skill-id` both ask the model to call
   it, and a tool that is missing from the schema cannot be called at all
 - Agent: `Task`, `TaskWait`, `TaskList`, and `TaskStop` as well, whenever the
-  subagent catalog is non-empty (§5f) — prompted for delegate-first orchestration
+  subagent catalog is non-empty and configured depth allows delegation (§5f) — prompted for delegate-first orchestration
   of separable, substantial work, and worth the extra schemas per request
 - Plan: `Read`, `Glob`, `Grep`, `BrowserPreview`, and `Bash`
 - both modes: `ToolSearch` when at least one deferred capability exists
@@ -1858,18 +1877,13 @@ parent and owning Task remain distinct. The migration does not add coding-agent
 AgentSession, Codemode or virtual routing. See the coding-agent design review for
 future adoption conditions.
 
-### Standard delegation and Team startup isolation
+### Standard delegation and Team expert startup
 
-The effective execution profile is resolved before ordinary Task discovery.
-Team Lead/member launches do not read the user subagent registry or builtin
-switches, load Task definitions, resolve their pinned/fallback models, expand
-availableForSubagents bindings, or register unused delegate OAuth bindings.
-Their ordinary delegation fields are empty. Team still resolves its own model
-and obtains the authoritative Host team context; missing context fails closed.
-
-Standard launches retain existing per-prompt discovery, model selection,
-credentials, availability filtering and diagnostics. An idle Team runtime
-ignores ordinary Task configuration when deciding reuse, including legacy
-callers that pass it; actual changes to its model, profile or Host expert policy
-still invalidate reuse. Standard reuse still compares all Task configuration.
-This separation does not permit Task inside Team or change active-turn guards.
+The effective profile and authoritative Host Team context are resolved before
+Task discovery. Team Leads and planning researchers do not read the ordinary
+subagent registry, builtin switches or delegate model/auth bindings. Missing
+Team context fails closed. Standard agents and execution experts load the same
+scope-filtered definitions, opted-in models, pins, fallback bindings and
+availability diagnostics on launch. Their idle reuse compares these catalogs
+and runtime limits as well as model/profile/expert policy. Team Leads retain
+their existing catalog isolation and mandatory expert participation gate.

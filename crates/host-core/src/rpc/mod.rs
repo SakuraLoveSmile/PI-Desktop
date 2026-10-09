@@ -4,6 +4,8 @@ mod plan_schedule_rpc;
 mod scheduled_rpc;
 mod scheduled_tools;
 #[cfg(test)]
+mod subagent_settings_tests;
+#[cfg(test)]
 mod team_expert_config_tests;
 #[cfg(test)]
 mod team_planning_tests;
@@ -941,6 +943,22 @@ fn validate_settings_value(value: &Value) -> Result<(), JsonRpcError> {
     let Some(object) = value.as_object() else {
         return Ok(());
     };
+    for (key, min, max) in [
+        ("subagentMaxDepth", 0, 8),
+        ("subagentMaxConcurrency", 1, 32),
+    ] {
+        if object.get(key).is_some_and(|value| {
+            !value
+                .as_u64()
+                .is_some_and(|number| (min..=max).contains(&number))
+        }) {
+            return Err(rpc_err(
+                1002,
+                format!("{key} must be an integer between {min} and {max}"),
+                "INVALID_PARAMS",
+            ));
+        }
+    }
     if let Some(policy) = object.get("networkPolicy").filter(|v| !v.is_null()) {
         let Some(policy) = policy.as_object() else {
             return Err(rpc_err(

@@ -115,7 +115,7 @@ import {
   hostedSearchFromMessage,
   isCommandShellOption,
   isToolsOutputParams,
-  MAX_SUBAGENT_CONCURRENCY,
+  normalizeSubagentLimits,
   normalizeAskToolOption,
   normalizeSubagentName,
   proposalKindForMode,
@@ -149,6 +149,7 @@ import {
 } from "./agent-messages.js";
 import { withExplicitRequired } from "./tool-schema.js";
 import { createTeamTools, teamSystemPrompt } from "./team/index.js";
+import { nestedDelegationPermission, type DelegationOwnerContext } from "./delegation-owner.js";
 import { expertToolDenial } from "./team/expert-policy.js";
 import { buildSessionContext } from "./session-context.js";
 import { entriesFromExecutionStart } from "./approved-execution-context.js";
@@ -544,6 +545,8 @@ export type DelegationStatus =
  * resolves when the delegate settles; `abort` stops the delegate's agent.
  */
 export type DelegationRecord = {
+  ownerId?: string;
+  depth?: number;
   delegationId: string;
   /** Original Task transcript snapshot, available after its immediate result. */
   taskMessage?: UiMessage;
@@ -589,6 +592,8 @@ export type DelegationRecord = {
 function delegationSummary(record: DelegationRecord): Record<string, unknown> {
   return {
     delegationId: record.delegationId,
+    ...(record.ownerId ? { ownerId: record.ownerId } : {}),
+    ...(record.depth !== undefined ? { depth: record.depth } : {}),
     agent: record.agentName,
     modelId: record.modelId,
     thinkingLevel: record.thinkingLevel,
@@ -1021,6 +1026,8 @@ export type AgentRuntimeOptions = {
   subagentProviders?: Record<string, RuntimeProviderConfig>;
   /** Resolved keys explicitly opted into Task.model selection; pins alone grant no override. */
   subagentModelKeys?: string[];
+  subagentMaxDepth?: number;
+  subagentMaxConcurrency?: number;
   executionProfile?: ExecutionProfile;
   teamContext?: TeamRuntimeContextProjection & {
     abortActiveTurn?: (memberSessionId: string) => Promise<boolean>;
@@ -1052,6 +1059,8 @@ export type RuntimeMatchConfig = {
   subagentProviders?: Record<string, RuntimeProviderConfig>;
   /** Resolved keys explicitly opted into Task.model selection; pins alone grant no override. */
   subagentModelKeys?: string[];
+  subagentMaxDepth?: number;
+  subagentMaxConcurrency?: number;
   teamContext?: Pick<NonNullable<AgentRuntimeOptions["teamContext"]>,
     "teamSessionId" | "callerSessionId" | "isLead" | "memberName" | "workPurpose" | "planningId" | "roundId" | "expertConfig">;
 };
@@ -1683,6 +1692,7 @@ export class DesktopAgentRuntime {
   private extensionProviderHeaders?: Record<string, string>;
   /** Subagent definitions offered through the `Task` tool (ADR 0062). */
   private subagents: SubagentDefinition[];
+  private subagentLimits: ReturnType<typeof normalizeSubagentLimits>;
   private subagentProviders: Record<string, RuntimeProviderConfig>;
   private subagentModelKeys: Set<string>;
   /** On-demand Task.model grants; never mixed into launch opt-in matching. */
@@ -1915,6 +1925,7 @@ export class DesktopAgentRuntime {
     this.pluginSkills = [...(opts.pluginSkills ?? [])].sort((left, right) => left.id.localeCompare(right.id));
     this.trustedExtensionSpecs = opts.trustedExtensions ?? [];
     this.subagents = opts.subagents ?? [];
+    this.subagentLimits = normalizeSubagentLimits(opts);
     this.subagentProviders = opts.subagentProviders ?? {};
     this.subagentModelKeys = new Set(opts.subagentModelKeys ?? []);
     this.subagentOverrideProviders = {};
@@ -1956,7 +1967,7 @@ export class DesktopAgentRuntime {
       "Before each tool batch, briefly state its purpose. Keep the user informed during long work. The final response must state the outcome, verification, and remaining blockers. Never claim actions or checks you did not perform.",
       USER_VISIBLE_PROGRESS_GUIDANCE,
       // Delegation steering (ADR 0089).
-      ...(this.executionProfile !== "team" && this.subagents.length
+      ...(this.canDelegate() && this.subagents.length
         ? [
             DELEGATION_SYSTEM_PROMPT,
             ...(this.subagentModelSummary()
@@ -2612,12 +2623,13 @@ export class DesktopAgentRuntime {
       (this.projectMemory ?? "") === (config.projectMemory?.trim() ?? "") &&
       (this.projectPath ?? "") === (config.projectPath?.trim() ?? "") &&
       // Only standard sessions compare Task inputs; Team reuse follows Host context.
-      (this.executionProfile === "team" || (
+      (!this.canDelegate() && this.executionProfile === "team" || (
         safeJson(this.subagents) === safeJson(config.subagents ?? []) &&
         safeJson(this.subagentProviders) === safeJson(config.subagentProviders ?? {}) &&
         safeJson([...this.subagentModelKeys].sort()) ===
           safeJson([...new Set(config.subagentModelKeys ?? [])].sort())
       )) &&
+      safeJson(this.subagentLimits) === safeJson(normalizeSubagentLimits(config)) &&
       safeJson(this.teamContext ?? null) === safeJson(config.teamContext ?? null) &&
       // Enabling or disabling a trusted extension retires the runtime so the
       // next prompt reloads the set (spec 16 §4.3).
@@ -3454,7 +3466,7 @@ export class DesktopAgentRuntime {
           failureKey !== undefined &&
           typeof result.errorCode === "string" &&
           RECOVERABLE_MUTATION_ERROR_CODES.has(result.errorCode)
-            ? `${failureKey} ${result.errorCode}`
+            ? `${failureKey}\0${result.errorCode}`
             : undefined;
         const grantedRecoveryGrace =
           graceKey !== undefined && !this.mutationRecoveryGraces.has(graceKey);
@@ -3484,7 +3496,7 @@ export class DesktopAgentRuntime {
           if (succeededKey !== undefined) {
             this.mutationFailureCounts.delete(succeededKey);
             for (const key of this.mutationRecoveryGraces) {
-              if (key.startsWith(`${succeededKey} `)) {
+              if (key.startsWith(`${succeededKey}\0`)) {
                 this.mutationRecoveryGraces.delete(key);
               }
             }
@@ -3764,7 +3776,7 @@ export class DesktopAgentRuntime {
     // Expert Team sessions delegate through the Team tools below instead of `Task`.
     const isTeam = this.executionProfile === "team";
     const subagentTools =
-      !isTeam && this.subagents.length
+      this.canDelegate() && this.subagents.length
         ? [
             this.buildSubagentTool(),
             this.buildSubagentWaitTool(),
@@ -4131,7 +4143,7 @@ export class DesktopAgentRuntime {
    * exact inheritance case avoids turning that harmless echo into a false
    * "model is not available" tool error while keeping other overrides gated.
    */
-  private isSessionModelOverride(key: string): boolean {
+  private isSessionModelOverride(key: string, inheritedProvider = this.provider): boolean {
     const slash = key.indexOf("/");
     if (slash < 1) return false;
     const requestedProvider = key
@@ -4140,10 +4152,10 @@ export class DesktopAgentRuntime {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "");
     const requestedModel = key.slice(slash + 1).trim().toLowerCase();
-    if (!requestedProvider || requestedModel !== this.provider.modelId.toLowerCase()) {
+    if (!requestedProvider || requestedModel !== inheritedProvider.modelId.toLowerCase()) {
       return false;
     }
-    return [this.provider.id, this.provider.vendorKey, this.provider.name]
+    return [inheritedProvider.id, inheritedProvider.vendorKey, inheritedProvider.name]
       .filter((value): value is string => Boolean(value))
       .some(
         (value) =>
@@ -4348,19 +4360,21 @@ export class DesktopAgentRuntime {
   private resolveResumeChain(
     resume: string,
     agentName: string,
+    ownerId?: string,
   ):
     | { ok: true; chain: DelegationChain }
     | { ok: false; message: string } {
     const lookup = this.delegationChains.resolveResume({
       resume,
       agentName,
+      ownerId,
       runningDelegationIds: this.runningDelegationIds(),
     });
     if (lookup.ok) return lookup;
     const error = lookup.error;
     switch (error.kind) {
       case "unknown":
-        return { ok: false, message: this.unknownResumeMessage(resume) };
+        return { ok: false, message: this.unknownResumeMessage(resume, ownerId) };
       case "running":
         return {
           ok: false,
@@ -4387,10 +4401,11 @@ export class DesktopAgentRuntime {
     }
   }
 
-  private unknownResumeMessage(resume: string): string {
+  private unknownResumeMessage(resume: string, ownerId?: string): string {
     return this.delegationChains.unknownResumeError(
       resume,
       this.delegationChains.resumableList({
+        ownerId,
         runningDelegationIds: this.runningDelegationIds(),
       }),
     );
@@ -4400,10 +4415,11 @@ export class DesktopAgentRuntime {
    * A chain resolved but has nothing to replay. The caller drops it first, so
    * the id can never be advertised as reusable in its own error (ADR 0279 §4).
    */
-  private noHistoryResumeMessage(resume: string): string {
+  private noHistoryResumeMessage(resume: string, ownerId?: string): string {
     return this.delegationChains.noHistoryResumeError(
       resume,
       this.delegationChains.resumableList({
+        ownerId,
         runningDelegationIds: this.runningDelegationIds(),
       }),
     );
@@ -4418,6 +4434,7 @@ export class DesktopAgentRuntime {
   private async resumedChainProvider(
     chain: DelegationChain,
     definition: SubagentDefinition,
+    inheritedProvider = this.provider,
   ): Promise<RuntimeProviderConfig | undefined> {
     const modelId = chain.latestModelId?.trim().toLowerCase();
     if (!modelId) return undefined;
@@ -4430,15 +4447,16 @@ export class DesktopAgentRuntime {
     const matches = (candidate: RuntimeProviderConfig | undefined) =>
       candidate?.modelId.trim().toLowerCase() === modelId;
     if (chain.latestModelKey) {
+      const inheritedKey = `${inheritedProvider.id}/${inheritedProvider.modelId}`;
       const keyed = binding(chain.latestModelKey) ??
-        await this.resolveSubagentModel(chain.latestModelKey);
+        (chain.latestModelKey === inheritedKey ? inheritedProvider : await this.resolveSubagentModel(chain.latestModelKey));
       // A known binding must not silently become a different account with the
       // same model id after its grant disappears.
       return matches(keyed) ? keyed : undefined;
     }
     return [
-      this.subagentProvider(definition),
-      this.provider,
+      definition.model ? this.subagentProvider(definition) : inheritedProvider,
+      inheritedProvider,
       ...[...keys].map(binding),
     ].find(matches);
   }
@@ -4493,7 +4511,51 @@ export class DesktopAgentRuntime {
    * the system prompt, because the two change together: a project adding an
    * agent file changes the tool, and nothing else about the prompt.
    */
-  private buildSubagentTool(): AgentTool {
+  private canDelegate(): boolean {
+    return this.subagentLimits.maxDepth > 0 && (this.executionProfile !== "team" ||
+      (this.teamContext?.isLead === false && this.teamContext.workPurpose !== "plan_research"));
+  }
+
+  private rootDelegationOwner(): DelegationOwnerContext {
+    return {
+      depth: 0,
+      tools: [...this.toolCatalog.values()].filter(tool => this.isToolAllowedInMode(tool.name) &&
+        !isTeamTool(tool.name) && tool.name !== DECLARE_TEAM_STRATEGY_TOOL_NAME &&
+        tool.name !== SUBMIT_RESEARCH_RESULT_TOOL_NAME && tool.name !== SUBMIT_GOAL_REPORT_TOOL_NAME &&
+        tool.name !== UPDATE_GOAL_PROGRESS_TOOL_NAME),
+      permission: "inherit",
+      provider: () => this.provider,
+      thinkingLevel: () => this.thinkingLevel,
+    };
+  }
+
+  private ownedDelegations(ownerId?: string): DelegationRecord[] {
+    return [...this.delegations.values()].filter(record => record.ownerId === ownerId);
+  }
+
+  private abortOwnedDelegations(ownerId: string): void {
+    for (const record of this.ownedDelegations(ownerId)) {
+      if (record.status === "running") record.abort();
+    }
+  }
+
+  private async collectOwnedDelegationReports(owner: DelegationOwnerContext): Promise<string | undefined> {
+    const pending = this.ownedDelegations(owner.ownerId).filter(record => !record.reportDelivered &&
+      record.status !== "aborted" && record.status !== "stopped");
+    if (!pending.length || owner.signal?.aborted) return undefined;
+    await this.waitForDelegations(pending, pending.length, null, owner.signal);
+    if (owner.signal?.aborted) return undefined;
+    const formatted = formatDelegationResults(pending.map(record => ({
+      delegationId: record.delegationId, agent: record.agentName, status: record.status,
+      report: record.result?.report ?? `(${record.status} without a report)`,
+    })), DELEGATION_RESUME_PROMPT);
+    for (const record of pending) {
+      if (formatted.includedDelegationIds.has(record.delegationId)) record.reportDelivered = true;
+    }
+    return formatted.text;
+  }
+
+  private buildSubagentTool(scopedOwner?: DelegationOwnerContext): AgentTool {
     const names = this.subagents.map((definition) => definition.name);
     const catalog = this.subagents
       .map((definition) => {
@@ -4538,6 +4600,15 @@ export class DesktopAgentRuntime {
       // here so the intent survives a tool built outside that path.
       executionMode: "parallel",
       execute: async (toolCallId, params) => {
+        const owner = scopedOwner ?? this.rootDelegationOwner();
+        if (!this.isToolAllowedInMode(SUBAGENT_TOOL_NAME) || !this.canDelegate()) {
+          return this.subagentToolError(toolCallId, modeToolDenial(SUBAGENT_TOOL_NAME, this.mode));
+        }
+        if (owner.signal?.aborted || owner.depth >= this.subagentLimits.maxDepth) {
+          return this.subagentToolError(toolCallId,
+            owner.signal?.aborted ? "The delegation owner has stopped." :
+              `Delegation depth limit ${this.subagentLimits.maxDepth} reached at depth ${owner.depth}. Complete this work yourself.`);
+        }
         const requested = isRecord(params) ? String(params.agent ?? "") : "";
         const definition = this.subagents.find(
           (candidate) => candidate.name === normalizeSubagentName(requested),
@@ -4577,15 +4648,15 @@ export class DesktopAgentRuntime {
         let provider: RuntimeProviderConfig | undefined;
         if (modelOverride) {
           if (this.isDefinitionPinOverride(definition, modelOverride)) {
-            provider = this.subagentProvider(definition);
+            provider = definition.model ? this.subagentProvider(definition) : owner.provider();
             if (!provider) {
               return this.subagentToolError(
                 toolCallId,
                 `The ${definition.name} subagent pins ${definition.model?.providerId}/${definition.model?.modelId}, which is not configured in PI-Desktop. Do this work yourself or delegate to another subagent.`,
               );
             }
-          } else if (this.isSessionModelOverride(modelOverride)) {
-            provider = this.provider;
+          } else if (this.isSessionModelOverride(modelOverride, owner.provider())) {
+            provider = owner.provider();
           } else {
             provider = this.subagentModelKeys.has(modelOverride)
               ? this.subagentProviders[modelOverride]
@@ -4609,7 +4680,7 @@ export class DesktopAgentRuntime {
             );
           }
         } else {
-          provider = this.subagentProvider(definition);
+          provider = definition.model ? this.subagentProvider(definition) : owner.provider();
           if (!provider) {
             return this.subagentToolError(
               toolCallId,
@@ -4619,10 +4690,10 @@ export class DesktopAgentRuntime {
         }
         const declaredToolNames = resolveSubagentToolNames(
           definition,
-          [...this.toolCatalog.keys()],
+          owner.tools.map(tool => tool.name),
         );
         const tools = declaredToolNames
-          .map((name) => this.toolCatalog.get(name))
+          .map((name) => owner.tools.find(tool => tool.name === name))
           .filter((tool): tool is AgentTool => tool !== undefined);
         if (tools.length === 0) {
           return this.subagentToolError(
@@ -4634,7 +4705,7 @@ export class DesktopAgentRuntime {
         // The delegate runs in the background (ADR 0089): `Task` returns
         // immediately with a delegation id, and TaskWait converges later.
         const resumeLookup = resume
-          ? this.resolveResumeChain(resume, definition.name)
+          ? this.resolveResumeChain(resume, definition.name, owner.ownerId)
           : undefined;
         if (resume && resumeLookup && !resumeLookup.ok) {
           return this.subagentToolError(toolCallId, resumeLookup.message);
@@ -4647,20 +4718,20 @@ export class DesktopAgentRuntime {
         // lifecycle details, because refusing would strand the chain forever.
         const resumeEpoch = this.turnEpoch;
         const resumedProvider = resumedChain
-          ? await this.resumedChainProvider(resumedChain, definition)
+          ? await this.resumedChainProvider(resumedChain, definition, owner.provider())
           : undefined;
-        if (this.disposed || this.runCancelled || this.turnHadError || resumeEpoch !== this.turnEpoch) {
+        if (this.disposed || this.runCancelled || this.turnHadError || owner.signal?.aborted || resumeEpoch !== this.turnEpoch) {
           return this.subagentToolError(toolCallId, "The parent turn ended before delegation could resume.");
         }
         // Authorization may yield while a parallel Task starts this chain.
         if (resume) {
-          const current = this.resolveResumeChain(resume, definition.name);
+          const current = this.resolveResumeChain(resume, definition.name, owner.ownerId);
           if (!current.ok) return this.subagentToolError(toolCallId, current.message);
         }
-        if (this.runningDelegations().length >= MAX_SUBAGENT_CONCURRENCY) {
+        if (this.runningDelegations().length >= this.subagentLimits.maxConcurrency) {
           return this.subagentToolError(
             toolCallId,
-            `${MAX_SUBAGENT_CONCURRENCY} subagents are already running for this session. Wait for some with TaskWait or stop them with TaskStop before delegating more.`,
+            `${this.subagentLimits.maxConcurrency} subagents are already running for this session. Wait for some with TaskWait or stop them with TaskStop before delegating more.`,
           );
         }
         if (resumedProvider) provider = resumedProvider;
@@ -4681,7 +4752,7 @@ export class DesktopAgentRuntime {
           }
           return this.subagentToolError(
             toolCallId,
-            this.noHistoryResumeMessage(resume),
+            this.noHistoryResumeMessage(resume, owner.ownerId),
           );
         }
         const delegationId = randomUUID();
@@ -4691,7 +4762,7 @@ export class DesktopAgentRuntime {
             ? "omit"
             : clampThinkingLevel(
                 provider,
-                definition.thinkingLevel ?? this.thinkingLevel,
+                definition.thinkingLevel ?? owner.thinkingLevel(),
               );
         // Only TaskStop, user Stop, dispose, and a parent fatal error abort a
         // delegate (D328 / D352). The Task tool call returns immediately; tying
@@ -4710,6 +4781,7 @@ export class DesktopAgentRuntime {
         const chain = this.delegationChains.start({
           delegateSessionId: resumedChain?.delegateSessionId ?? delegationId,
           delegationId,
+          ownerId: owner.ownerId,
           toolCallId,
           agentName: definition.name,
           originalTask: resumedChain?.originalTask ?? task,
@@ -4720,6 +4792,8 @@ export class DesktopAgentRuntime {
         });
         const record: DelegationRecord = {
           delegationId,
+          ownerId: owner.ownerId,
+          depth: owner.depth + 1,
           taskTurnId: this.turnId,
           agentName: definition.name,
           modelId: provider.modelId,
@@ -4728,7 +4802,7 @@ export class DesktopAgentRuntime {
           startedAt,
           completion,
           resolveCompletion,
-          abort: () => controller.abort(),
+          abort: () => { controller.abort(); this.abortOwnedDelegations(chain.delegateSessionId); },
           stopRequested: false,
           turns: 0,
           toolCalls: 0,
@@ -4743,7 +4817,20 @@ export class DesktopAgentRuntime {
         this.delegations.set(delegationId, record);
         let subagentRun: SubagentRun;
         try {
-          const scopedTools = this.scopeDelegateTools(tools, definition);
+          const permission = owner.depth === 0 ? definition.permission ?? DEFAULT_SUBAGENT_PERMISSION :
+            nestedDelegationPermission(owner.permission, definition.permission);
+          let currentProvider = provider;
+          let currentThinkingLevel = thinkingLevel;
+          const childOwner: DelegationOwnerContext = {
+            ownerId: chain.delegateSessionId, depth: owner.depth + 1, tools, permission,
+            provider: () => currentProvider, thinkingLevel: () => currentThinkingLevel, signal: abortSignal,
+          };
+          const lifecycleTools = childOwner.depth < this.subagentLimits.maxDepth
+            ? [this.buildSubagentTool(childOwner), this.buildSubagentWaitTool(childOwner),
+                this.buildSubagentListTool(childOwner), this.buildSubagentStopTool(childOwner)].map(tool =>
+                  withModeExecutionGuard(withExplicitRequired(tool), () => this.isToolAllowedInMode(tool.name)
+                    ? undefined : modeToolDenial(tool.name, this.mode))) : [];
+          const scopedTools = [...this.scopeDelegateTools(tools, definition, permission), ...lifecycleTools];
           subagentRun = new SubagentRun({
             definition,
             sessionId: this.sessionId,
@@ -4759,8 +4846,10 @@ export class DesktopAgentRuntime {
               key: subagentModelKey(pin),
               provider: this.subagentProviders[subagentModelKey(pin)],
             })),
-            inheritedThinkingLevel: this.thinkingLevel,
+            inheritedThinkingLevel: owner.thinkingLevel(),
             onModelChange: (next, level) => {
+              currentProvider = next;
+              currentThinkingLevel = level;
               record.modelId = next.modelId;
               record.thinkingLevel = level;
               this.delegationChains.retarget(record.delegateSessionId, {
@@ -4772,12 +4861,24 @@ export class DesktopAgentRuntime {
             systemPrompt: composeSubagentSystemPrompt({
               definition,
               guidance: this.subagentGuidance(definition),
-              toolNames: declaredToolNames,
+              toolNames: scopedTools.map(tool => tool.name),
             }),
             tools: scopedTools,
+            collectDelegationReports: () => this.collectOwnedDelegationReports(childOwner),
+            abortDelegations: () => this.abortOwnedDelegations(chain.delegateSessionId),
             onEvent: (envelope) => {
               this.noteDelegationActivity(record, envelope);
               this.onEvent(envelope);
+              // Publish after the immediate tool_end, so a fast nested run's
+              // terminal snapshot cannot be overwritten by its start result.
+              if (envelope.event.type === "tool_end" && isRecord(envelope.event.result)) {
+                const details = envelope.event.result.details;
+                const child = isRecord(details) && typeof details.delegationId === "string"
+                  ? this.delegations.get(details.delegationId) : undefined;
+                if (child?.ownerId === record.delegateSessionId && child.status !== "running") {
+                  this.publishDelegationSettlement(child);
+                }
+              }
             },
             // A host failure inside a delegate reaches its tool-error channel
             // through the same bookkeeping the parent uses.
@@ -4817,8 +4918,9 @@ export class DesktopAgentRuntime {
           runPromise = Promise.reject(error);
         }
         void runPromise
-          .then((result) => this.settleDelegation(record, result))
+          .then((result) => { this.abortOwnedDelegations(chain.delegateSessionId); this.settleDelegation(record, result); })
           .catch((error: unknown) => {
+            this.abortOwnedDelegations(chain.delegateSessionId);
             this.settleDelegation(record, {
               agentName: definition.name,
               modelId: provider.modelId,
@@ -4848,6 +4950,8 @@ export class DesktopAgentRuntime {
           ],
           details: {
             delegationId,
+            ...(owner.ownerId ? { ownerId: owner.ownerId } : {}),
+            depth: owner.depth + 1,
             agent: definition.name,
             status: "running",
             startedAt,
@@ -4866,8 +4970,8 @@ export class DesktopAgentRuntime {
   private scopeDelegateTools(
     tools: AgentTool[],
     definition: SubagentDefinition,
+    scope = definition.permission ?? DEFAULT_SUBAGENT_PERMISSION,
   ): AgentTool[] {
-    const scope = definition.permission ?? DEFAULT_SUBAGENT_PERMISSION;
     if (scope === DEFAULT_SUBAGENT_PERMISSION) return tools;
     return tools.map((tool) => ({
       ...tool,
@@ -4888,6 +4992,14 @@ export class DesktopAgentRuntime {
     result: SubagentRunResult,
   ): void {
     if (record.status !== "running") return;
+    const unresolved = this.ownedDelegations(record.delegateSessionId).filter(child => child.status === "running");
+    if (result.status === "completed" && unresolved.length) {
+      for (const child of unresolved) child.abort();
+      result = { ...result, status: "failed", error: {
+        code: "SUBAGENT_DESCENDANTS_UNRESOLVED",
+        message: "The delegate ended before its children confirmed termination. Their cancellation was requested.",
+      } };
+    }
     record.status =
       record.stopRequested && result.status === "aborted"
         ? "stopped"
@@ -4925,10 +5037,13 @@ export class DesktopAgentRuntime {
     const original = record.taskMessage.toolResult;
     const details = isRecord(original) && isRecord(original.details) ? original.details : undefined;
     if (record.status === "running" && details?.modelId === record.modelId && details?.thinkingLevel === record.thinkingLevel) return;
+    const message = settledDelegationMessage(record.taskMessage, delegationSummary(record));
+    const historyIndex = this.transcriptHistory.findIndex(row => row.id === message.id);
+    if (historyIndex >= 0) this.transcriptHistory[historyIndex] = message;
     this.emit(
       {
         type: "message_end",
-        message: settledDelegationMessage(record.taskMessage, delegationSummary(record)),
+        message,
       },
       record.taskTurnId,
     );
@@ -4961,7 +5076,7 @@ export class DesktopAgentRuntime {
 
   private currentTurnDelegations(): DelegationRecord[] {
     return this.runningDelegations().filter(
-      (record) => record.startedEpoch === this.turnEpoch,
+      (record) => record.ownerId === undefined && record.startedEpoch === this.turnEpoch,
     );
   }
 
@@ -4976,7 +5091,7 @@ export class DesktopAgentRuntime {
   private pendingCurrentTurnDelegations(): DelegationRecord[] {
     return [...this.delegations.values()].filter(
       (record) =>
-        record.startedEpoch === this.turnEpoch &&
+        record.ownerId === undefined && record.startedEpoch === this.turnEpoch &&
         !record.reportDelivered &&
         record.status !== "stopped" &&
         record.status !== "aborted",
@@ -5087,6 +5202,15 @@ export class DesktopAgentRuntime {
     if (this.appendedDelegationRowIds.has(key)) return;
     this.appendedDelegationRowIds.add(key);
     this.transcriptHistory.push(tagged);
+    if (tagged.role === "tool" && tagged.toolName === SUBAGENT_TOOL_NAME && isRecord(tagged.toolResult)) {
+      const details = tagged.toolResult.details;
+      const child = isRecord(details) && typeof details.delegationId === "string"
+        ? this.delegations.get(details.delegationId) : undefined;
+      if (child?.ownerId === record.delegateSessionId) {
+        child.taskMessage = tagged;
+        child.taskTurnId = envelope.turnId ?? this.turnId;
+      }
+    }
     if (tagged.role === "tool" && isReadOnlyToolName(tagged.toolName ?? "")) {
       const { files, lineCount } = extractReadFiles([tagged]);
       this.delegationChains.noteReads(record.delegateSessionId, files, lineCount);
@@ -5098,7 +5222,7 @@ export class DesktopAgentRuntime {
     const call = this.delegateToolCalls.get(event.toolCallId);
     const ts = new Date(envelope.ts ?? Date.now()).toISOString();
     return {
-      id: `delegate-tool-${event.toolCallId}`,
+      id: event.toolCallId,
       role: "tool",
       content: "",
       createdAt: ts,
@@ -5250,7 +5374,7 @@ export class DesktopAgentRuntime {
   }
 
   /** `TaskWait`: converge on running delegations (ADR 0089). */
-  private buildSubagentWaitTool(): AgentTool {
+  private buildSubagentWaitTool(owner?: DelegationOwnerContext): AgentTool {
     return {
       name: SUBAGENT_WAIT_TOOL_NAME,
       label: "Task Wait",
@@ -5303,9 +5427,9 @@ export class DesktopAgentRuntime {
 
         const targets = ids.length
           ? ids
-              .map((id) => this.delegations.get(id))
+              .map((id) => this.ownedDelegations(owner?.ownerId).find(record => record.delegationId === id))
               .filter((record): record is DelegationRecord => record !== undefined)
-          : this.runningDelegations();
+          : this.ownedDelegations(owner?.ownerId).filter(record => record.status === "running");
         if (targets.length === 0) {
           const text = ids.length
             ? "None of the requested delegation ids exist in this session. Call TaskList to see them."
@@ -5315,13 +5439,13 @@ export class DesktopAgentRuntime {
             details: { delegations: [] },
           };
         }
-        const unknownIds = ids.filter((id) => !this.delegations.has(id));
+        const unknownIds = ids.filter((id) => !this.ownedDelegations(owner?.ownerId).some(record => record.delegationId === id));
         const targetCompleted =
           mode === "all"
             ? targets.length
             : Math.min(Math.max(minCompleted, 1), targets.length);
         const deadline = Date.now() + timeoutSeconds * 1000;
-        this.beginDelegationWait(targets);
+        if (!owner) this.beginDelegationWait(targets);
         let timedOut = false;
         try {
           timedOut = await this.waitForDelegations(
@@ -5331,7 +5455,7 @@ export class DesktopAgentRuntime {
             signal,
           );
         } finally {
-          this.endDelegationWait();
+          if (!owner) this.endDelegationWait();
         }
         // A settled report included in this bounded result reached the parent;
         // the idle resume must not deliver it a second time. Omitted reports
@@ -5409,6 +5533,7 @@ export class DesktopAgentRuntime {
   ): Promise<boolean> {
     const settledCount = () =>
       targets.filter((record) => record.status !== "running").length;
+    if (signal?.aborted) return Promise.resolve(true);
     if (settledCount() >= targetCompleted) return Promise.resolve(false);
     return new Promise<boolean>((resolve) => {
       let done = false;
@@ -5437,7 +5562,7 @@ export class DesktopAgentRuntime {
   }
 
   /** `TaskList`: report on the session's delegations (ADR 0089). */
-  private buildSubagentListTool(): AgentTool {
+  private buildSubagentListTool(owner?: DelegationOwnerContext): AgentTool {
     return {
       name: SUBAGENT_LIST_TOOL_NAME,
       label: "Task List",
@@ -5446,7 +5571,7 @@ export class DesktopAgentRuntime {
       parameters: Type.Object({}),
       executionMode: "sequential",
       execute: async () => {
-        const delegations = [...this.delegations.values()].sort(
+        const delegations = this.ownedDelegations(owner?.ownerId).sort(
           (left, right) => left.startedAt - right.startedAt,
         );
         const text =
@@ -5464,7 +5589,7 @@ export class DesktopAgentRuntime {
   }
 
   /** `TaskStop`: stop running delegations (ADR 0089). */
-  private buildSubagentStopTool(): AgentTool {
+  private buildSubagentStopTool(owner?: DelegationOwnerContext): AgentTool {
     return {
       name: SUBAGENT_STOP_TOOL_NAME,
       label: "Task Stop",
@@ -5486,12 +5611,12 @@ export class DesktopAgentRuntime {
             : [];
         const targets = ids.length
           ? ids
-              .map((id) => this.delegations.get(id))
+              .map((id) => this.ownedDelegations(owner?.ownerId).find(record => record.delegationId === id))
               .filter(
                 (record): record is DelegationRecord =>
                   record !== undefined && record.status === "running",
               )
-          : this.runningDelegations();
+          : this.ownedDelegations(owner?.ownerId).filter(record => record.status === "running");
         for (const record of targets) {
           record.stopRequested = true;
           record.abort();
