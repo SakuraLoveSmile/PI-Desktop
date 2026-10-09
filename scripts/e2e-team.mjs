@@ -41,6 +41,7 @@ const modelGates = {
   member: { entered: false, release: null },
   queue: { entered: false, release: null },
   taskUpdate: { entered: false, release: null },
+  taskMutation: { entered: false, release: null },
 };
 let boardTaskId;
 let member;
@@ -237,6 +238,7 @@ const providerServer = createServer(async (req, res) => {
           ...existingExpertProposal("The researcher must inspect the board item before completion.")
         }};
       } else if (!priorToolNames.includes("task_update")) {
+        await holdModelRequest("taskMutation");
         assert.ok(toolNames.includes("task_update"), "Lead runtime lacks task_update");
         assert.ok(boardTaskId, "E2E board task id was not initialized");
         toolCall = { name: "task_update", args: {
@@ -1272,10 +1274,27 @@ try {
   await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.completed === '0' && document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.total === '7'`), "Overview baseline before live task mutation");
   await invoke("agentPrompt", { sessionId: lead.id, viewingSessionId: lead.id, content: "Mark the board fixture task completed." });
   await approveExpertReview(invoke, evaluate, lead.id);
+  await waitFor(() => modelGates.taskMutation.entered, "task mutation held before execution");
+  // Approval may navigate to the Team tab. Mount Overview before releasing
+  // the mutation so this asserts live refresh, not a fresh snapshot read.
+  await activateOverviewTab(sendCdp, evaluate);
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.completed === '0'`), "Overview mounted before gated mutation");
+  releaseModelRequest("taskMutation");
   await waitFor(() => modelGates.taskUpdate.entered, "task update held after Host mutation");
   const updatedBoard = await invoke("teamGetBoard", { teamSessionId: lead.id });
   assert.equal(updatedBoard.tasks.find((task) => task.taskId === boardTaskId)?.status, "completed", "completed board fixture did not persist");
+  try {
   await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.completed === '1' && document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.total === '7'`), "mounted Overview refreshes before the running turn settles");
+  } catch (error) {
+    console.error("TEAM_PROGRESS_REFRESH", JSON.stringify(await evaluate(`(() => {
+      const section = document.querySelector('[data-testid="overview-team-progress"] section.team-progress');
+      return { completed: section?.dataset.completed, total: section?.dataset.total,
+        activeTab: document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id'),
+        text: document.querySelector('[data-testid="overview-team-progress"]')?.innerText,
+        error: document.querySelector('.team-error-banner')?.innerText };
+    })()`)));
+    throw error;
+  }
   releaseModelRequest("taskUpdate");
   await waitFor(async () => (await invoke("agentGetStatus", lead.id)).status?.isRunning === false, "Lead settled after task completion fixture");
   await evaluate(`document.querySelector('[data-work-panel-tab-id="${liveTaskTabId}"] .work-panel-tab-button')?.click()`);
@@ -1314,7 +1333,7 @@ try {
   })()`);
   assert.ok(Math.abs(overviewMetrics.header - 48) <= 2, `Team progress header geometry: ${JSON.stringify(overviewMetrics)}`);
   assert.ok(Math.abs(overviewMetrics.row - 68) <= 2, `Team progress row geometry: ${JSON.stringify(overviewMetrics)}`);
-  assert.ok(overviewMetrics.summaries.every(summary => Math.abs(summary.height - 48) <= 2 && summary.chevrons === 1 && summary.border === 'dashed'), `Overview chrome geometry: ${JSON.stringify(overviewMetrics)}`);
+  assert.ok(overviewMetrics.summaries.every(summary => Math.abs(summary.height - 48) <= 2 && summary.chevrons === 1 && summary.border === 'solid'), `Overview chrome geometry: ${JSON.stringify(overviewMetrics)}`);
   assert.equal(overviewMetrics.extraInside, true, "Team status must stay inside progress");
   assert.equal(overviewMetrics.separateProgress, false, "Team Overview must not repeat the ordinary progress disclosure");
   await evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-toggle')?.click()`);
