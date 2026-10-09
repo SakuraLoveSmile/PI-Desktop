@@ -22,7 +22,9 @@ mod migrations;
 mod model;
 mod plugin_providers_migration;
 mod plus_schema;
+mod project_auto_memory;
 mod project_groups;
+mod project_memory_editor;
 mod repositories;
 mod schema;
 mod session_collaboration_migration;
@@ -37,6 +39,7 @@ pub(crate) use migrations::{
 pub(crate) use model::PlanWorkRow;
 pub use model::{Database, ProjectMemoryEntryRecord, ProjectMemoryRecord, ProjectRecord};
 pub use project_groups::{ProjectGroupContextRecord, ProjectGroupRecord, ProjectGroupRoot};
+pub(crate) use project_memory_editor::ProjectMemoryConflict;
 pub(crate) use repositories::{
     canonical_project_path, normalize_project_path, project_display_name,
     strip_obsolete_plan_approval_permission_mode, upsert_project_row, MAX_PROJECT_MEMORY_BYTES,

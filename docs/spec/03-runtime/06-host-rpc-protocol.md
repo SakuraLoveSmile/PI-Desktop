@@ -1717,3 +1717,27 @@ is rejected; unchanged legacy roundtrips remain readable. Ordinary renderer
 settings writes omit expertTeam unless submitted by this dedicated CAS editor.
 Main applies the complete committed Host settings to network/menu/developer
 side effects, so a partial request cannot reset unrelated runtime policy.
+
+## Plus project context RPCs
+
+| Method | Parameters | Result |
+| --- | --- | --- |
+| `project.memory.editor.get` | `path` | `{editor: {owner, memory, autoRecordEnabled}}` |
+| `project.memory.editor.save` | `path, expectedOwner, expectedMemory, entries` | `{editor}` after owner/snapshot CAS |
+| `project.autoMemory.setEnabled` | `path, expectedOwner, enabled` | `{autoRecordEnabled}` |
+| `project.autoMemory.agentList` | trusted `sessionId, boundPath` | `{memory, autoRecordEnabled}` |
+| `project.autoMemory.agentUpsert` | binding plus optional `id`, `title`, `content`, update's `expectedTitle, expectedContent` | current runtime memory state |
+| `project.autoMemory.agentDelete` | binding plus `id, expectedTitle, expectedContent` | current runtime memory state |
+| `project.history.search` | binding plus literal `query` (1–500 characters), optional `limit` (1–20, default 10) | `{hits, hasMore}` |
+| `project.history.context` | binding plus `targetSessionId, messageId`, optional `query` | `{sessionId, title, messages, truncated}` |
+| `project.codeSearch` | binding plus optional `action` (`search` default, `status`, `clear`), search `query` (1–500 characters), optional `limit` (1–50, default 20) | `{hits, truncated, index}` |
+
+Agent RPCs resolve the stored session project and reject a stale/mismatched
+`boundPath`. The parent proxy additionally requires its opaque launch binding,
+rewrites the path from trusted session launch state and forwards only approved
+fields. Agent memory writes require opt-in and Agent execution mode; Plan/Goal
+are read-only, including code-cache clear. Invalid input and CAS/owner conflicts
+are observable errors; no partial memory save is published. History search is
+scoped before pagination. Context reads enforce the same current group membership
+and exclude deleted sources. Code index scanning runs outside the async worker
+and binding is rechecked after the blocking operation.

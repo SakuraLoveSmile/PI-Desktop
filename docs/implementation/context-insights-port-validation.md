@@ -1,5 +1,8 @@
 # Context Insights port: local validation
 
+> Historical task-only validation. The local-main integration record below
+> supersedes the original uncommitted-candidate delivery state.
+
 Date: 2026-10-09. Delivery state: `待体验` (local validation complete; user acceptance pending).
 
 ## Result and route
@@ -111,3 +114,19 @@ not shipped product assets. The final harness is
 - Validation used macOS and deterministic local endpoints. Real-provider
   pricing/cache behavior, physical devices, Windows/Linux UI, publication and
   installation have not been claimed or tested in this request.
+
+
+## Local-main integration — 2026-10-09
+
+The user authorized merging this request into local main. The original feature
+commit is `7dfc20b49`; the integration candidate incorporates existing local
+main `af6e6ce675a2f49077055c0e9d9c22b89213a194` (including project memory,
+code search and confirmed-roster recovery). The only content conflict was the
+unreleased changelog; both sets of entries are preserved. The Context Browser
+also recognizes the existing ProjectMemory, ProjectHistory and CodeSearch tools
+as built-ins, with an observable attribution regression test.
+
+Candidate validation and final merge identity are recorded in the local
+integration archive. No remote publication or installation is part of this
+local-main request. Only this request's worktree and branch are retired after
+verified integration, with recoverable source and validation artifacts retained.

@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { isIP } from "node:net";
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
@@ -14,6 +14,8 @@ export type McpJsonSchema = {
   additionalProperties?: boolean;
   items?: McpJsonSchema;
   enum?: string[];
+  minimum?: number;
+  pattern?: string;
 };
 
 export type McpControlRisk = "read" | "write" | "dangerous";
@@ -111,6 +113,8 @@ const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_PORT = 37_123;
 const MAX_REQUEST_BYTES = 2 * 1024 * 1024;
 const MAX_RESULT_CHARS = 512 * 1024;
+const SESSION_CHUNK_BYTES = 64 * 1024;
+const MAX_SESSION_PAGE_BYTES = 16 * 1024 * 1024;
 const MAX_ARGUMENT_ITEMS = 32;
 const MAX_MCP_SESSIONS = 32;
 const SHUTDOWN_CLOSE_MS = 1_000;
@@ -1234,7 +1238,7 @@ export class McpControlServer {
           capabilities: { tools: { listChanged: false } },
           serverInfo: { name: this.serverName, version: this.version },
           instructions:
-            "Local Pi-Desktop-Plus control plane. Named tools cover project/session/Agent/workspace. Dangerous operations, including session/configure permissionMode, require confirm=true. confirm is an agent acknowledgement, not a desktop user prompt. Poll pi_session_get or pi_agent_status for live progress and pi_turn_get for a turn's durable terminal state; this server does not stream SSE.",
+            "Local Pi-Desktop-Plus control plane. Named tools cover project/session/Agent/workspace. Dangerous operations, including session/configure permissionMode, require confirm=true. confirm is an agent acknowledgement, not a desktop user prompt. Poll pi_session_get or pi_agent_status for live progress and pi_turn_get for a turn's durable terminal state. Use pi_session_get_chunk for a single-message page that exceeds the ordinary result limit; this server does not stream SSE.",
         }),
         sessionId,
       };
@@ -1344,7 +1348,87 @@ export class McpControlServer {
         argumentShape: operation.argumentShape,
       })),
     };
-    return [generic, describe, ...common];
+    const sessionGet = this.operationById.get("session/get");
+    const chunkTools: McpTool[] = sessionGet ? [{
+      name: "pi_session_get_chunk",
+      description: "Read a lossless one-message session page in 64 KiB UTF-8 byte chunks (maximum 16 MiB). Reuse sha256 as expectedSha256 for every continuation; changed pages fail without retry. Risk: read.",
+      inputSchema: objectSchema({
+        id: stringSchema("Session id."),
+        messageBefore: { type: "integer", minimum: 0 },
+        offset: { type: "integer", minimum: 0, description: "Byte offset, default 0." },
+        expectedSha256: { type: "string", pattern: "^[a-f0-9]{64}$", description: "Required for offsets greater than zero." },
+      }, ["id"]),
+      execute: (raw) => this.readSessionChunk(sessionGet, raw),
+    }] : [];
+    return [generic, describe, ...common, ...chunkTools];
+  }
+
+  private async readSessionChunk(operation: McpControlOperation, raw: unknown): Promise<unknown> {
+    const input = asObject(raw);
+    const invalid = (message: string): never => {
+      throw Object.assign(new Error(message), { code: "INVALID_PARAMS" });
+    };
+    const keys = new Set(["id", "messageBefore", "offset", "expectedSha256"]);
+    if (Object.keys(input).some((key) => !keys.has(key))) invalid("unknown session chunk argument");
+    if (typeof input.id !== "string" || !input.id.trim()) invalid("id must be a nonblank string");
+    for (const key of ["messageBefore", "offset"] as const) {
+      if (input[key] !== undefined && (!Number.isSafeInteger(input[key]) || (input[key] as number) < 0)) {
+        invalid(`${key} must be a nonnegative safe integer`);
+      }
+    }
+    const offset = input.offset === undefined ? 0 : input.offset as number;
+    if (input.expectedSha256 !== undefined &&
+      (typeof input.expectedSha256 !== "string" || !/^[a-f0-9]{64}$/.test(input.expectedSha256))) {
+      invalid("expectedSha256 must be 64 lowercase hexadecimal characters");
+    }
+    if (offset > 0 && input.expectedSha256 === undefined) invalid("continuation requires expectedSha256");
+    const query = {
+      id: input.id,
+      ...(input.messageBefore === undefined ? {} : { messageBefore: input.messageBefore }),
+      messageLimit: 1,
+    };
+    // Invoke the authoritative IPC read every time. No cache can hide a page
+    // change between chunks, and no contentLimit may shorten the evidence.
+    const page = await this.invokeOperation(operation, [query]);
+    if (!page || typeof page !== "object" || Array.isArray(page)) {
+      throw Object.assign(new Error("session chunk page is invalid"), { code: "INVALID_RESULT" });
+    }
+    const rawSession = (page as Record<string, unknown>).session;
+    if (!rawSession || typeof rawSession !== "object" || Array.isArray(rawSession)) {
+      throw Object.assign(new Error("session chunk page has no session"), { code: "INVALID_RESULT" });
+    }
+    const session = rawSession as Record<string, unknown>;
+    const start = session.messageStart;
+    const end = session.messageEnd;
+    if (session.id !== input.id || !Number.isSafeInteger(start) || !Number.isSafeInteger(end) ||
+      (start as number) < 0 || (end as number) < (start as number) ||
+      start !== Math.max(0, (end as number) - 1) ||
+      !Array.isArray(session.messages) || session.messages.length !== (end as number) - (start as number) ||
+      typeof session.hasMoreBefore !== "boolean" || session.hasMoreBefore !== ((start as number) > 0) ||
+      typeof session.hasMoreAfter !== "boolean" ||
+      (input.messageBefore !== undefined && ((end as number) > (input.messageBefore as number) ||
+        ((end as number) < (input.messageBefore as number) && session.hasMoreAfter)))) {
+      throw Object.assign(new Error("session chunk page identity or physical pagination is invalid"), { code: "INVALID_RESULT" });
+    }
+    const bytes = Buffer.from(JSON.stringify(page), "utf8");
+    if (bytes.length > MAX_SESSION_PAGE_BYTES) {
+      throw Object.assign(new Error("session chunk page exceeds 16 MiB"), { code: "MCP_RESULT_LIMIT" });
+    }
+    const sha256 = createHash("sha256").update(bytes).digest("hex");
+    if (input.expectedSha256 !== undefined && input.expectedSha256 !== sha256) {
+      throw Object.assign(new Error("session chunk page changed"), { code: "CONFLICT" });
+    }
+    if (offset >= bytes.length) invalid("offset is outside the session page");
+    const next = Math.min(offset + SESSION_CHUNK_BYTES, bytes.length);
+    return {
+      sessionId: session.id,
+      offset,
+      nextOffset: next < bytes.length ? next : null,
+      totalBytes: bytes.length,
+      sha256,
+      encoding: "base64",
+      chunk: bytes.subarray(offset, next).toString("base64"),
+    };
   }
 
   private async invokeOperation(operation: McpControlOperation, args: readonly unknown[]): Promise<unknown> {

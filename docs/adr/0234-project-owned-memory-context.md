@@ -22,7 +22,8 @@ for the session-bound project path and passes it to the agent runtime. The
 runtime renders it after project instructions as explicitly user-provided
 context and compares it when deciding whether an idle runtime can be reused.
 
-The memory editor is exposed from the Project archive row menu. Creating a
+The memory editor is exposed from Settings > Memory and the Project archive
+row menu. Both entry points use the same host-owned collection. Creating a
 project keeps the creation surface compact and shows that project memory is
 available later; it does not add a memory mode selector whose semantics the
 application does not implement.
@@ -41,3 +42,19 @@ application does not implement.
 - ADR 0249 adds an explicit host-owned logical project-group identity and root
   membership model. Path-scoped records remain the compatibility behavior for
   legacy single-root projects.
+
+## Plus amendment: opt-in agent updates and on-demand recall
+
+The user editor and Agent now share the same Host-owned collection. Agent writes
+are default-off and prohibited in Plan/Goal; per-entry CAS and editor snapshot
+CAS protect concurrent edits. Per-turn refresh replaces launch-only freshness.
+This keeps Rust persistence ownership and the labelled user-context boundary.
+Project-scoped history retrieval and a disposable local text cache complement
+memory without moving database ownership to Electron or adding a model service.
+
+The memory implementation adapts contributor hui455's upstream PR #951
+(head `aa36735d8d55dd314dfedf94b05e3b3f5528caf8`) to the Plus branch, preserving
+its unified collection and opt-in design. Workspace cache design references
+PR #697 by muzimu217 (`ceb8908dac02794f2d071e720ea74ce26a60a014`); this version
+adds a separate literal CodeSearch tool and does not take over Grep's results
+or claim the upstream feature was merged.
