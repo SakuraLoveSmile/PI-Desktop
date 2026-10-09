@@ -174,6 +174,28 @@ async fn expert_settings_rpc_roundtrip_snapshot_and_host_tool_denials() {
     assert_eq!(context["expertConfig"]["presetId"], "researcher");
     assert_eq!(context["expertConfig"]["instructions"], "Project research");
     assert_eq!(context["expertConfig"]["tools"], json!(["Read"]));
+    let editor = call("project.memory.editor.get", json!({"path": path}))
+        .await
+        .unwrap();
+    call(
+        "project.autoMemory.setEnabled",
+        json!({"path": path, "expectedOwner": editor["editor"]["owner"], "enabled": true}),
+    )
+    .await
+    .unwrap();
+    for (method, args) in [
+        (
+            "project.codeSearch",
+            json!({"sessionId": member, "boundPath": path, "query": "fixture"}),
+        ),
+        (
+            "project.autoMemory.agentUpsert",
+            json!({"sessionId": member, "boundPath": path, "content": "Not research"}),
+        ),
+    ] {
+        let denied = call(method, args).await.unwrap_err();
+        assert_eq!(denied.data.unwrap()["errorCode"], "TEAM_RESEARCH_READ_ONLY");
+    }
     for tool in ["Grep", "mcp_read", "plugin_execute", "read"] {
         for (method, args) in [
             (

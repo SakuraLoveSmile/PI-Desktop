@@ -28,10 +28,11 @@ const TEAM_PLAN_COMPLETION_NUDGE = [
   "</team_completion_recovery>",
 ].join("\n");
 
-/** Owns the single bounded recovery for a Lead final answer lacking participation. */
+/** Owns bounded recovery before and after trusted execution-roster confirmation. */
 export class TeamLeadExecutionGuard {
   pending?: LeadTurn;
   attempted = false;
+  private confirmedAttempted = false;
   inProgress = false;
   suppressRunEnd = false;
   private waitingForReview = false;
@@ -44,6 +45,7 @@ export class TeamLeadExecutionGuard {
     this.waitingForReview = false;
     this.pending = undefined;
     this.attempted = false;
+    this.confirmedAttempted = false;
     this.inProgress = false;
     this.suppressRunEnd = false;
   }
@@ -54,9 +56,15 @@ export class TeamLeadExecutionGuard {
     const superseded = () => snapshot.turnId !== state().turnId || snapshot.epoch !== state().epoch;
     const stale = () => superseded() || snapshot.mode !== state().mode || state().inactive;
     let outcome: Completion = { kind: "authorized" };
+    let confirmedRoster = false;
     try {
       const { review } = await host.call<{ review: TeamLaunchReview | null }>(
         "team.getLaunchReview", { teamSessionId: team.teamSessionId });
+      confirmedRoster = snapshot.mode === "agent" && !!review &&
+        (review.launchPolicy ?? "user_confirmed") === "user_confirmed" &&
+        review.teamSessionId === team.teamSessionId && review.leadTurnId === snapshot.turnId &&
+        review.status === "confirmed" && (review.strategy ?? "delegate") === "delegate" &&
+        Array.isArray(review.members) && review.members.length > 0;
       if (approvedExecution && !stale()) {
         const active = await host.call<{ active: boolean; reviewStatus?: string }>("team.getLeadExecutionState", {
           ...team, expectedTurnId: snapshot.turnId,
@@ -67,9 +75,12 @@ export class TeamLeadExecutionGuard {
           this.suppressRunEnd = true;
           return { kind: "recover" };
         }
+        // This Host state is bound to expectedTurnId. Confirmation can commit
+        // between the review read and this execution-state read.
+        if (!stale() && active?.active && active.reviewStatus === "confirmed") confirmedRoster = true;
       }
       if (stale()) outcome = { kind: "stale" };
-      else if (!(snapshot.mode === "agent" && review &&
+      else if (approvedExecution || !(snapshot.mode === "agent" && review &&
         (review.launchPolicy ?? "user_confirmed") === "user_confirmed" &&
         review.teamSessionId === team.teamSessionId && review.leadTurnId === snapshot.turnId &&
         review.status === "pending" && (review.strategy ?? "delegate") === "delegate" &&
@@ -90,8 +101,12 @@ export class TeamLeadExecutionGuard {
         const error = classifyAgentError(cause);
         const approvalRequired = error.code === "TEAM_APPROVAL_REQUIRED" ||
           (cause instanceof Error && cause.message.startsWith("TEAM_APPROVAL_REQUIRED"));
-        if (approvalRequired && !this.attempted) {
-          this.attempted = true;
+        // Confirmation may arrive while the declaration response is ending,
+        // after the preapproval nudge was already spent. It starts a distinct
+        // dispatch phase, but never substitutes for Host participation proof.
+        if (approvalRequired && !(confirmedRoster ? this.confirmedAttempted : this.attempted)) {
+          if (confirmedRoster) this.confirmedAttempted = true;
+          else this.attempted = true;
           this.pending = snapshot;
           this.suppressRunEnd = true;
           return { kind: "recover" };

@@ -117,6 +117,51 @@ describe("NativePiSessionService", () => {
       messageStart: 1,
       messageEnd: 2,
       hasMoreBefore: true,
+      hasMoreAfter: false,
+    });
+  });
+
+  it("pages native history with complete stable boundaries without rewriting JSONL", async () => {
+    const f = fixture();
+    const service = new NativePiSessionService({ agentDir: f.agentDir, sessionRoot: f.sessionRoot });
+    const [summary] = await service.list();
+    const before = readFileSync(f.file);
+    expect(service.detail(summary.id)).toMatchObject({
+      messageCount: 2, messageStart: 0, messageEnd: 2,
+      hasMoreBefore: false, hasMoreAfter: false,
+    });
+
+    const newest = service.detail(summary.id, { messageLimit: 1 });
+    expect(newest).toMatchObject({
+      messages: [{ id: "branch", content: "active branch" }],
+      messageStart: 1, messageEnd: 2, hasMoreBefore: true, hasMoreAfter: false,
+    });
+    const newestBytes = JSON.stringify(newest);
+    expect(JSON.stringify(service.detail(summary.id, { messageLimit: 1 }))).toBe(newestBytes);
+    expect(JSON.stringify(service.detail(summary.id, {
+      messageBefore: 20, messageLimit: 1,
+    }))).toBe(newestBytes);
+
+    const older = service.detail(summary.id, { messageBefore: newest?.messageStart, messageLimit: 1 });
+    expect(older).toMatchObject({
+      messages: [{ id: "u1", content: "hello" }],
+      messageStart: 0, messageEnd: 1, hasMoreBefore: false, hasMoreAfter: true,
+    });
+    expect(service.detail(summary.id, { messageBefore: older?.messageStart, messageLimit: 1 })).toMatchObject({
+      messages: [], messageStart: 0, messageEnd: 0,
+      hasMoreBefore: false, hasMoreAfter: true,
+    });
+    expect(readFileSync(f.file)).toEqual(before);
+  });
+
+  it("returns an empty native history page with zero boundaries", async () => {
+    const f = fixture();
+    writeFileSync(f.file, `${f.text.split("\n")[0]}\n`);
+    const service = new NativePiSessionService({ agentDir: f.agentDir, sessionRoot: f.sessionRoot });
+    const [summary] = await service.list();
+    expect(service.detail(summary.id, { messageLimit: 1 })).toMatchObject({
+      messages: [], messageCount: 0, messageStart: 0, messageEnd: 0,
+      hasMoreBefore: false, hasMoreAfter: false,
     });
   });
 

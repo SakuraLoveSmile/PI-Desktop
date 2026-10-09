@@ -528,3 +528,16 @@ test("Task relationships select their own captured context using the recorded ca
   );
   assert.deepEqual(model.selectAgentRequests(requests, "missing"), []);
 });
+
+
+test("integrated project memory, history and code tools retain builtin attribution", () => {
+  const captured = request("integrated-tools");
+  captured.entries = ["ProjectMemory", "ProjectHistory", "CodeSearch"].map((name) => ({
+    id: name, category: "tools", label: name, content: "{}", estimatedTokens: 1,
+    originalChars: 2, truncated: false,
+  }));
+  const html = renderToStaticMarkup(createElement(I18nextProvider, { i18n },
+    createElement(ContextBrowser, { request: captured, loading: false, toolSort: "name", onToolSort() {} })));
+  assert.equal((html.match(/Built-in/g) ?? []).length, 3);
+  assert.doesNotMatch(html, /Source unavailable/);
+});

@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { createInstance } from "i18next";
 import { I18nextProvider } from "react-i18next";
 import { catalogs } from "@pi-desktop/i18n";
+import { fallbackBuiltinDefinitions } from "@pi-desktop/shared";
 import type { AppSettings, ExpertTeamPresetId, ProviderPublic } from "@pi-desktop/shared";
 import { api } from "../../apps/desktop/src/lib/api";
 import { SettingsPage } from "../../apps/desktop/src/features/settings/SettingsPage";
@@ -15,7 +16,8 @@ import "../../apps/desktop/src/styles/providers.css";
 import "../../apps/desktop/src/styles/overlays.css";
 
 declare global {
-  var expertTeamSettingsProbe: () => Promise<unknown>;
+  var expertTeamSettingsProbe: (options?: { preview?: boolean; locale?: "zh-CN" | "en"; theme?: "light" | "dark" }) => Promise<unknown>;
+  var expertTeamSettingsStyleProbe: (theme: "light" | "dark") => Promise<unknown>;
   var expertTeamSettingsCleanup: (() => void) | undefined;
   var expertTeamSettingsViewportProbe: () => Promise<unknown>;
 }
@@ -62,6 +64,8 @@ function textContrast(element: Element, background: string): number {
   if (!context) throw new Error("Color verification context unavailable");
   const luminance = (color: string) => {
     context.clearRect(0, 0, 1, 1);
+    context.fillStyle = background;
+    context.fillRect(0, 0, 1, 1);
     context.fillStyle = color;
     context.fillRect(0, 0, 1, 1);
     const rgb = [...context.getImageData(0, 0, 1, 1).data].slice(0, 3).map((channel) => {
@@ -75,19 +79,22 @@ function textContrast(element: Element, background: string): number {
   return (Math.max(foreground, backdrop) + 0.05) / (Math.min(foreground, backdrop) + 0.05);
 }
 
-globalThis.expertTeamSettingsProbe = async () => {
+globalThis.expertTeamSettingsProbe = async (options = {}) => {
+  const locale = options.locale ?? "zh-CN";
+  const theme = options.theme ?? "dark";
   const i18n = createInstance();
-  await i18n.init({ lng: "zh-CN", resources: { "zh-CN": { translation: catalogs["zh-CN"] }, en: { translation: catalogs.en } } });
+  await i18n.init({ lng: locale, resources: { "zh-CN": { translation: catalogs["zh-CN"] }, en: { translation: catalogs.en } } });
   const t = (key: string) => i18n.t(key);
-  document.documentElement.dataset.theme = "dark";
+  document.documentElement.dataset.theme = theme;
   document.documentElement.dataset.platform = "darwin";
   const container = document.createElement("div");
   container.style.height = "100vh";
   document.body.append(container);
   const root = createRoot(container);
   const original = { getSettings: api.getSettings, setSettings: api.setSettings, listProjects: api.listProjects,
-    listPluginScenicThemesDestinations: api.listPluginScenicThemesDestinations, onPluginChanged: api.onPluginChanged };
-  const initial: AppSettings = { language: "zh-CN", theme: "dark", defaultMode: "agent", enterToSend: true,
+    listPluginScenicThemesDestinations: api.listPluginScenicThemesDestinations, onPluginChanged: api.onPluginChanged,
+    listUserSubagents: api.listUserSubagents, subagentCatalog: api.subagentCatalog };
+  const initial: AppSettings = { language: locale, theme, defaultMode: "agent", enterToSend: true,
     expertTeam: { schemaVersion: 1, userDefaults: {}, projectOverrides: {} } };
   let stored = structuredClone(initial);
   let writeCount = 0;
@@ -117,6 +124,16 @@ globalThis.expertTeamSettingsProbe = async () => {
     { id: 1, path: "/fixture/StarTool", name: "StarTool", pinned: false, createdAt: 1, lastOpenedAt: 1 },
     { id: 2, path: "/fixture/Music", name: "Music", pinned: false, createdAt: 1, lastOpenedAt: 1 },
   ] });
+  api.listUserSubagents = async () => ({ subagents: [{
+    id: "fixture-reviewer", name: locale === "zh-CN" ? "代码审查助手" : "Code review helper", level: "global",
+    description: locale === "zh-CN" ? "审查代码改动，核实行为、安全和测试覆盖。" : "Review changes for behavior, safety and test coverage.",
+    enabled: true, tools: ["Read", "Glob", "Grep"], path: "/fixture/.agents/subagents/fixture-reviewer.md",
+    sizeBytes: 120, createdAt: "", updatedAt: "",
+  }] });
+  api.subagentCatalog = async () => {
+    const builtins = fallbackBuiltinDefinitions().map((definition) => ({ ...definition, enabled: true }));
+    return { subagents: builtins, builtins, diagnostics: [], projectPath: "/fixture/StarTool" };
+  };
   api.listPluginScenicThemesDestinations = async () => [];
   api.onPluginChanged = () => () => {};
   const mount = async () => {
@@ -157,9 +174,72 @@ globalThis.expertTeamSettingsProbe = async () => {
     await roleAction(role, "save");
     await until(() => !roleCard(role).querySelector(".expert-team-role-editor"), "saved editor closes");
   };
+  globalThis.expertTeamSettingsCleanup = () => {
+    root.unmount(); container.remove(); Object.assign(api, original);
+  };
+  globalThis.expertTeamSettingsStyleProbe = async (nextTheme) => {
+    stored = { ...stored, theme: nextTheme, expertTeam: {
+      ...stored.expertTeam!, userDefaults: { ...stored.expertTeam!.userDefaults, researcher: { instructions: "Fixture review guidance." } },
+    } };
+    await act(async () => {
+      useAppStore.setState({ settings: structuredClone(stored) });
+      document.documentElement.dataset.theme = nextTheme;
+    });
+    const rail = document.querySelector(".settings-nav-scroll")!;
+    await click(findButton(rail, t("settings.expertTeam.title")));
+    await until(() => document.querySelectorAll(".expert-team-settings .agent-capability-row").length === 6, "six shared expert rows");
+    await settleVisualTransitions();
+    const content = document.querySelector<HTMLElement>(".settings-content")!;
+    assert(content.scrollWidth <= content.clientWidth + 1, "Expert settings cannot overflow horizontally");
+    const expert = roleCard("researcher");
+    assert(expert.querySelector('[role="listitem"] .agent-capability-glyph svg'), "Expert row must use shared Bot glyph");
+    assert(!expert.querySelector('[role="switch"]'), "Expert styling cannot add an enable switch");
+    const expertAction = findButton(expert, t("settings.expertTeam.edit"));
+    assert(expertAction.classList.contains("settings-icon-button") && expertAction.querySelector("svg"), "Expert edit remains reachable as shared icon action");
+    assert(expertAction.getAttribute("aria-label")?.includes(t("settings.expertTeam.edit")), "Expert icon edit must have an accessible label");
+    const readStyle = (parent: ParentNode) => {
+      const selectors = { row: ".agent-capability-row", glyph: ".agent-capability-glyph", badge: ".agent-capability-badge", action: ".settings-icon-button" };
+      return Object.fromEntries(Object.entries(selectors).map(([part, selector]) => {
+        const element = parent.querySelector(selector);
+        assert(element, `Shared ${part} must exist`);
+        const style = getComputedStyle(element!);
+        const properties = part === "row" ? ["display", "gap", "paddingTop", "paddingLeft", "borderRadius", "backgroundColor"]
+          : part === "glyph" ? ["width", "height", "borderRadius", "color"]
+          : part === "badge" ? ["fontSize", "borderRadius", "color", "backgroundColor"]
+          : ["width", "height", "borderRadius", "color"];
+        return [part, Object.fromEntries(properties.map((key) => [key, style[key as keyof CSSStyleDeclaration]]))];
+      }));
+    };
+    const expertStyle = readStyle(expert);
+    const scopeTabs = document.querySelector('[role="tablist"]');
+    assert(scopeTabs?.querySelector('[role="tab"][aria-selected="true"]'), "Scope keeps selectable tab semantics");
+    await edit("researcher");
+    await settleVisualTransitions();
+    const card = expert.getBoundingClientRect();
+    for (const field of expert.querySelectorAll<HTMLElement>(".settings-menu-select-anchor, textarea")) {
+      const rect = field.getBoundingClientRect();
+      assert(rect.right <= card.right + 1 && rect.left >= card.left - 1, "Editor controls remain inside shared panel");
+    }
+    await roleAction("researcher", "cancel");
+    await click(findButton(rail, t("settings.nav.subagents")));
+    await until(() => document.querySelector(".agent-subagents-page .agent-capability-row") !== null, "Subagents through real Settings navigation");
+    await settleVisualTransitions();
+    const subagents = document.querySelector(".agent-subagents-page")!;
+    const subagentStyle = readStyle(subagents);
+    assert(JSON.stringify(expertStyle) === JSON.stringify(subagentStyle), `Shared geometry and colors must match ${nextTheme}: ${JSON.stringify({ expertStyle, subagentStyle })}`);
+    assert(content.scrollWidth <= content.clientWidth + 1, "Subagent settings cannot overflow horizontally");
+    const background = getComputedStyle(document.documentElement).getPropertyValue("--ds-bg-primary");
+    const labels = [...document.querySelectorAll(".settings-nav-item, .agent-capability-name, .agent-capability-badge")];
+    const minimumContrast = Math.min(...labels.map((element) => textContrast(element, background)));
+    assert(minimumContrast >= 3, `Shared labels must remain readable in ${nextTheme}: ${minimumContrast}`);
+    await click(findButton(rail, t("settings.expertTeam.title")));
+    await until(() => document.querySelectorAll(".expert-team-settings .agent-capability-row").length === 6, "Expert team return navigation");
+    return { ok: true, theme: nextTheme, viewport: window.innerWidth, minimumContrast, sharedStyles: expertStyle };
+  };
   try {
     await mount();
-    assert(document.querySelectorAll(".expert-team-role-card").length === 6, "Six built-in roles must match reference");
+    if (options.preview) return { ok: true, preview: true, locale, theme };
+    assert(document.querySelectorAll('[data-testid^="expert-team-role-"]').length === 6, "Six built-in roles must match reference");
     const rail = document.querySelector(".settings-nav-scroll");
     assert(rail && findButton(rail, t("settings.expertTeam.title")), "Explicit expert team navigation must be reachable");
     await click(findButton(rail!, t("settings.expertTeam.title")));
@@ -258,7 +338,7 @@ globalThis.expertTeamSettingsProbe = async () => {
     stored.expertTeam!.projectOverrides["/fixture/DeletedProject"] = { debugger: { instructions: "Old project configuration" } };
     await mount();
     await scope("DeletedProject");
-    assert(document.querySelector(".expert-team-project-path")?.textContent === "/fixture/DeletedProject", "Removed project scope must stay visible with exact identity");
+    assert(document.querySelector(".expert-team-settings .agent-capability-group-path")?.textContent === "/fixture/DeletedProject", "Removed project scope must stay visible with exact identity");
     await click(findButton(document.querySelector(".expert-team-settings")!, t("settings.expertTeam.removeProjectOverrides")));
     await until(() => stored.expertTeam?.projectOverrides["/fixture/DeletedProject"] === undefined, "deleted project config removal");
     assert(stored.expertTeam?.userDefaults.researcher?.modelId === "fixture-model", "Project removal cannot delete user role defaults");
@@ -303,7 +383,10 @@ globalThis.expertTeamSettingsProbe = async () => {
         ...document.querySelectorAll(".settings-nav-item, .expert-team-scope-tabs .settings-segment-item"), cancel,
       ].map((element) => ({ label: element.textContent?.trim(), contrast: textContrast(element, background) }));
       assert(readability.every((item) => item.contrast >= 3), `Stable light labels must remain readable: ${JSON.stringify(readability)}`);
-      return { ok: true, theme: "light", viewport: window.innerWidth, minimumLabelContrast: Math.min(...readability.map((item) => item.contrast)) };
+      await roleAction("researcher", "cancel");
+      const styles = [];
+      for (const nextTheme of ["light", "dark"] as const) styles.push(await globalThis.expertTeamSettingsStyleProbe(nextTheme));
+      return { ok: true, viewport: window.innerWidth, minimumLabelContrast: Math.min(...readability.map((item) => item.contrast)), styles };
     };
     return { ok: true, checks, writes: writeCount };
   } finally {

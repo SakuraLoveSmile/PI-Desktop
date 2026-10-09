@@ -150,7 +150,7 @@ export function ContextBrowser({
                       {category === "tools" && (
                         <span>
                           {t(
-                            /^(Read|Write|Edit|Glob|Grep|Bash|Task|AskTool|SubmitPlan|new_context)$/i.test(
+                            /^(Read|Write|Edit|Glob|Grep|Bash|Task|AskTool|SubmitPlan|ProjectMemory|ProjectHistory|CodeSearch|new_context)$/i.test(
                               entry.label,
                             )
                               ? "contextInsights.sourceBuiltin"
