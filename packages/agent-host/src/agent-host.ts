@@ -233,6 +233,8 @@ export class AgentHost {
    * the turn as aborted or stopped, so `agent_end` becomes `turn.interrupted`.
    */
   ingest(envelope: AgentEventEnvelope, meta: { interrupted?: boolean } = {}): void {
+    // Assembled contexts stay on the local diagnostics path, never RACP.
+    if (envelope.event.type === "context_insights") return;
     const state = this.state(envelope.sessionId);
     const event = envelope.event;
     const turnId = envelope.turnId ? this.resolveTurnId(state, envelope.turnId) : state.activeTurnId;

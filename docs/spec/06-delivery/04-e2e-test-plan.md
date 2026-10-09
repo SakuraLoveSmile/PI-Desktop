@@ -8,6 +8,31 @@
 
 ## 1. Goals
 
+### E2E-CONTEXT-INSIGHTS-native-port
+
+- **Preconditions:** Request worktree containing current remote-main base,
+  shared compatible host dependencies, isolated data/profile/workspace and
+  deterministic provider fixture. No running user Desktop or paid API.
+- **Steps:** Open Context Insights from the sidebar, filter usage and session
+  cards, select a session, open its Work Panel Context tab and invoke `/context`.
+  Submit a fixture turn with tool calls; inspect request composition, schemas,
+  actual usage, raw/Markdown content and trend selection. Switch sessions while
+  a detail read is pending, trigger the existing compaction path, refresh, restart
+  the Host, and remove the fixture session. Exercise retention and malformed
+  read/write inputs at the Host boundary.
+- **Expected:** Inspection never submits a provider call. Actual dispatched
+  contents and usage remain distinct from estimates; uncaptured/omitted/truncated
+  data is labelled. Stale detail reads cannot cross session/request ownership.
+  Captures survive restart and disappear with session deletion. Late writes fail
+  closed. Overview reads omit large contents; bounded history does not replace
+  authoritative billing. Existing chat, compaction and permission behavior stays
+  intact. Keyboard/focus, English/Chinese and narrow-panel reading remain usable.
+- **Specs:** [Context Insights](../03-runtime/context-insights.md),
+  [Builtin commands](../04-ux/04-builtin-commands.md).
+- **Status:** Implementation and task-candidate verification tracked separately;
+  no real-provider, published-release or user acceptance is inferred.
+
+
 ### E2E-STORAGE-custom-location-and-maintenance
 
 - **Preconditions:** Dedicated request worktree, current remote-main base, shared

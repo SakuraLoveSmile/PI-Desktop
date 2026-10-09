@@ -506,7 +506,7 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
                   >
                     <IconSliders size={15} className="search-item-icon" />
                     <span className="search-item-title">
-                      {highlightMatch(command.title, query)}
+                      {highlightMatch(command.id === "builtin.context.inspect" ? t("contextInsights.title") : command.title, query)}
                     </span>
                     {command.source === "plugin" && (
                       <span className="search-item-badge">{t("plugins.title")}</span>
