@@ -30,6 +30,30 @@
 - **Milestone:** Post-MVP maintenance.
 - **Status:** Automated fixture coverage; record exact task-candidate results.
 
+### E2E-CONTEXT-INSIGHTS-native-port
+
+- **Preconditions:** Request worktree containing current remote-main base,
+  shared compatible host dependencies, isolated data/profile/workspace and
+  deterministic provider fixture. No running user Desktop or paid API.
+- **Steps:** Open Context Insights from the sidebar, filter usage and session
+  cards, select a session, open its Work Panel Context tab and invoke `/context`.
+  Submit a fixture turn with tool calls; inspect request composition, schemas,
+  actual usage, raw/Markdown content and trend selection. Switch sessions while
+  a detail read is pending, trigger the existing compaction path, refresh, restart
+  the Host, and remove the fixture session. Exercise retention and malformed
+  read/write inputs at the Host boundary.
+- **Expected:** Inspection never submits a provider call. Actual dispatched
+  contents and usage remain distinct from estimates; uncaptured/omitted/truncated
+  data is labelled. Stale detail reads cannot cross session/request ownership.
+  Captures survive restart and disappear with session deletion. Late writes fail
+  closed. Overview reads omit large contents; bounded history does not replace
+  authoritative billing. Existing chat, compaction and permission behavior stays
+  intact. Keyboard/focus, English/Chinese and narrow-panel reading remain usable.
+- **Specs:** [Context Insights](../03-runtime/context-insights.md),
+  [Builtin commands](../04-ux/04-builtin-commands.md).
+- **Status:** Implementation and task-candidate verification tracked separately;
+  no real-provider, published-release or user acceptance is inferred.
+
 
 ### E2E-STORAGE-custom-location-and-maintenance
 
@@ -4925,6 +4949,12 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 #### E2E-064: Durable notification inbox records terminal task outcomes
 
+- **Success-only/shared-count regression coverage**:
+  `node scripts/e2e-notification-inbox.mjs` uses isolated SQLite and Electron
+  to cover persisted-list restoration after renderer reload, both outcome
+  kinds, All/Unread, row navigation, read/clear actions, and native Dock count
+  readback on macOS. No real provider or native notification banner is used.
+
 - **Preconditions**: Two durable sessions exist; a deterministic provider can
   complete one turn, fail one turn with a stable error code, and abort one
   turn; notification inbox starts empty.
@@ -4941,10 +4971,12 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   eligible terminal turns. 11) Use Mark all read, then Clear. 12) While a
   native task banner and a renderer refresh are still in flight, deliver a
   delayed `notification.changed` payload for a cleared/read durable id and a
-  duplicate payload for an id that is already present. 13) On Windows, create
-  one unread successful outcome while the bell has no failure rows. Open the
-  empty bell popover, use Mark all read, then create another success and use
-  Clear. 14) Create enough unread outcomes for a two-digit count and inspect
+  duplicate payload for an id that is already present. 13) In the isolated
+  profile, create one success-only unread outcome, restart the app, open All
+  and Unread, then select its row. 14) Create one completed and one failed
+  unread row; compare All and Unread, mark one row read, and verify only that
+  row leaves Unread. Use Mark all read, then create another unread row and use
+  Clear. 15) Create enough unread outcomes for a two-digit count and inspect
   the taskbar overlay before and after marking all outcomes read.
 - **Expected**: A's visible-current completion creates no row or terminal
   sidebar mark. Restoring/focusing the app with A already visible clears A's
@@ -4968,9 +5000,14 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   duplicate, delayed, and historical rows do not replay it. On Windows, the
   taskbar overlay is a smooth black circular badge with a centered white system-font numeral. Its visual weight matches common
   Windows taskbar badges for both single- and two-digit counts. A success-only
-  outcome increments the taskbar badge without adding a bell row or bell
-  count; both toolbar actions remain enabled when relevant and clear the
-  taskbar badge. The badge also clears when no unread outcomes remain. The
+  outcome persists across app reload, appears in both All and Unread, and
+  increments the bell and taskbar/Dock badges to one. Selecting that row marks
+  it read and navigates to its session; Mark all read and Clear each clear the
+  unread count, and Clear removes the durable row without changing the session.
+  With mixed completed and failed rows, All shows both kinds and Unread shows
+  exactly rows whose `readAt` is null; marking one row read removes only that
+  row from Unread and decrements both badges. The badge clears when no unread
+  outcomes remain. The
   underlying taskbar button keeps the
   PI-Desktop `P` icon and PI-Desktop name while the overlay is present.
 - **Specs linked**: `03-runtime/04-data-storage.md`,
@@ -9593,6 +9630,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 | Post-MVP | E2E-PLUGIN-pi-npm-skill-discovery, E2E-022A, E2E-022B, E2E-022C, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M (plugin roadmap R2/R3/R6) |
 | Post-baseline local automation | E2E-220 |
 | Post-baseline local automation (MCP `pi_session_get` large compaction) | E2E-MCP-session-get-projects-large-compaction |
+| Post-baseline local automation (lossless MCP single-message chunks) | E2E-MCP-session-get-chunk |
 | Post-MVP remote control | E2E-221, E2E-222, E2E-223, E2E-224, E2E-225, E2E-226, E2E-227, E2E-228, E2E-229, E2E-230, E2E-231, E2E-232 |
 | Trusted extensions (R7 v1) | E2E-DIALOG-long-text-boundaries, E2E-241, E2E-242, E2E-HOOKS-prompt-chain, E2E-HOOKS-cancel-and-dispose, E2E-TRUSTED-EXTENSION-custom-agent-stream-and-binding, E2E-243, E2E-244, E2E-245, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency, E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list |
 | Trusted extensions (R7 v1 npm recovery) | E2E-PLUGIN-import-extension-recovers-missing-npm |
@@ -10850,7 +10888,9 @@ This test plan spec is accepted when:
      shows the title "New" and Review plus Browser/in-scope plugin-view rows —
      not a blank area below the title bar.
   2) Tab into the available rows and confirm each takes a visible focus ring
-     and that hovering a row shows only a background fill.
+     and that hovering a card changes its background fill without moving it.
+     Confirm a centered compass above a single column of rounded, outlined
+     cards (at most 380px wide, at least 56px tall, separated by 14px).
   3) Activate Browser or a plugin view and confirm its singleton tab is created
      and selected; the empty body and its view list disappear.
   4) Click `+` to create a New launcher tab, activate the same view from its
@@ -10864,6 +10904,11 @@ This test plan spec is accepted when:
   New launcher lists the same Review/plugin-view entries as its `+`-created
   page; a row creates or selects that singleton view. Each `+` click creates a
   separate closable New tab. Closing the final tab leaves the panel open on New.
+  Long contributed labels wrap inside their cards; short panels scroll
+  vertically and never overflow horizontally. The isolated production-renderer
+  journey in `node scripts/e2e-work-panel-launcher.mjs` checks card geometry,
+  both themes, English/Chinese, and New → Review → New → singleton reuse.
+  It does not validate native plugin content.
   The no-tab empty body is not exposed as a `tabpanel`; explicit New tabs are
   labelled tabpanels. Their rows are buttons in a `role="group"` labelled
   Tools. Panel empty states share the app's empty-state
@@ -13671,6 +13716,41 @@ are withdrawn with ADR 0165.
   `apps/desktop/test/mcp-control.test.mjs` exercises authenticated JSON-RPC
   `tools/call` for both oversized and under-limit `pi_session_get` results. The
   separate full Electron-to-Host journey remains release qualification.
+
+#### E2E-MCP-session-get-chunk
+
+- **Native producer regression coverage**: The same isolated script drives a real
+  Node AgentSidecar over stdio, the production session IPC and authenticated MCP.
+  A large Unicode native Pi transcript is reconstructed losslessly; older/empty/
+  clamped pages, restart hash stability and unchanged source JSONL bytes are
+  checked. Ordinary native pagination exposes the existing physical end/after
+  metadata required by the chunk consumer. No user session or provider is used.
+
+- **Preconditions**: Start an isolated local MCP listener with a durable
+  one-message transcript page whose complete JSON exceeds the ordinary 512 KiB
+  control result envelope. No model/provider or user profile is required.
+- **Steps**: 1) Authenticate and initialize. 2) Confirm `tools/list` advertises
+  `pi_session_get_chunk` with a read risk and the documented schema. 3) Observe
+  the ordinary `pi_session_get` truncation envelope. 4) Read chunk offset zero,
+  then continue using `nextOffset` and `expectedSha256`. 5) Decode and combine
+  base64 bytes, verify total length/hash and JSON session identity. 6) Change
+  the page between chunks; test invalid arguments, foreign identity, invalid
+  physical pagination, offset bounds, and a page larger than 16 MiB.
+- **Expected**: The complete Unicode transcript survives byte-for-byte. Each
+  read uses authoritative `session/get` with `messageLimit: 1` and no content
+  limit. Each chunk is at most 64 KiB, the final `nextOffset` is explicit null,
+  and every continuation re-reads the page. Changed content fails with
+  `CONFLICT` without retry or partial evidence; invalid inputs/results and the
+  total limit fail explicitly. Ordinary reads and auth boundaries remain intact.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` §13d
+- **Acceptance**: C (sessions), Quality
+- **Milestone**: M6+
+- **Status**: Authenticated local HTTP contract covered by
+  `apps/desktop/test/mcp-control.test.mjs`. Run
+  `PI_DESKTOP_HOST_BIN=<compatible host binary> node scripts/e2e-mcp-session-chunk.mjs`
+  for the real isolated Host, production session IPC and authenticated MCP
+  journey, including older-message pagination and restart. Installed-app
+  evidence and any model execution must be reported separately.
 
 #### E2E-234: Workspace security denylist and ignore layers
 
@@ -17609,7 +17689,8 @@ with Overview; the Composer has no Session checklist mounting or popup.
   new navigation, all six roles, provider/model/thinking/tools/instructions,
   save/reopen, project inheritance/isolation/reset, failure draft retention,
   interleaved CAS conflicts, missing model/project recovery, navigation during
-  an outstanding read, dark cards and narrow light editor. Host API is the
+  an outstanding read, shared Subagents row/glyph/badge/action styles in both
+  themes, and narrow editor containment. Host API is the
   controlled external boundary; no model or user profile is used.
 - node scripts/e2e-expert-team-config.mjs uses a real isolated SQLite/stdio Host
   and the shared schema to verify settings persistence, user/project resolution,
@@ -17621,6 +17702,10 @@ with Overview; the Composer has no Session checklist mounting or popup.
   task navigation, Spec/file links, reference tabs, task dependency cards/edges,
   repeated owners, collapse, zoom/fit and narrow light layout. Native captures
   compare the actual candidate to the supplied reference.
+  Overview layout also exercises long titles, project paths and model names at
+  320/360/570px in both themes: metadata values retain positive visible width,
+  and header/resources/references introduce no horizontal overflow. Selected
+  reference options retain their existing pressed states and switching path.
 - node --test apps/desktop/test/settings-ipc-partial-write.test.mjs protects
   full committed Main network/menu/developer policy after partial writes and
   guarantees no side effects on rejected configuration. Host/runtime/component
@@ -17656,3 +17741,76 @@ expert dispatch, task/member navigation, messages, queue, pause/restart/resume
 and locale reload checks while omitting the full font/theme/resize matrix.
 The default command retains that matrix. A core-only pass must be reported
 separately and never presented as full layout acceptance.
+
+
+### E2E-TEAM-fast-confirmation-after-recovery
+
+- Preconditions: isolated production Electron/Main/Host/sidecar, temporary
+  profile/workspace and localhost deterministic provider; no paid or live API.
+- Steps: emit a text-only Lead answer, use the preapproval recovery to declare
+  an expert, hold the declaration's final response, confirm in the Team panel,
+  then release that response. The postconfirmation correction creates an owned
+  task and dispatches the approved expert, who reads a source and returns results.
+- Expected: the original turn completes without TEAM_APPROVAL_REQUIRED; the
+  expert task completes and its full result reaches the Lead. Persistent
+  no-dispatch answers fail after one postconfirmation correction. Stale and
+  foreign reviews retain the existing participation gate.
+- Automation: `PI_E2E_TEAM_FAST_APPROVAL=1 node scripts/e2e-team-forced.mjs`
+  and the runtime forced-Team-completion regression tests.
+- Specs: [Team runtime](../03-runtime/02-agent-runtime.md).
+
+### E2E-PLUS-project-context: Record memory, recall sources, and search current code
+
+- **Preconditions**: Isolated data/profile with two project groups; one group has
+  multiple local roots. Built candidate
+  Host and Node sidecar; deterministic loopback model (no paid provider).
+- **Steps**: Open Settings > Memory with developer mode off. Verify the project
+  groups are listed, an empty list links to Project archive, and a failed list
+  read can be retried. Open a group's memory editor, add and save a note, edit it,
+  remove it, then enable automatic recording and ask the Agent to remember a
+  stable package-manager preference. Continue a fresh user turn. Attempt a stale editor
+  save, then explicitly reload. Search historical verification and read the
+  returned session/message source. Search a code marker; edit/create/rename/delete
+  matching files and change ignore rules, repeating search. Disable recording,
+  switch project, restart both processes, and ask about the saved preference.
+  Inspect/clear the code cache, then search again. Repeat memory edit/forget after
+  moving a secondary root out of and back into its group.
+- **Expected**: Memory is a regular Workspace settings destination and remains
+  visible with developer mode off. The settings list uses Host project groups and
+  the existing editor; it does not create a second storage path. Recording
+  defaults off. Enabled Agent writes are durable; no
+  background model/embedding request is made. Disabled recording retains saved
+  context and removes writes. Stale snapshot/entry CAS is `CONFLICT`, changed owner
+  is `PROJECT_CHANGED`; failures never overwrite notes or silently lose drafts.
+  Opening the same group from Project archive shows the same notes. Notes and
+  recording settings are shared across roots in one group and isolated from the
+  other group. Root reattachment cannot duplicate or resurrect forgotten group notes. History
+  stays within current group membership, cites stable source IDs and excludes
+  deleted/native sessions. CodeSearch stays within the caller session root,
+  returns path/line excerpts, reconciles file/ignore changes and flags partial
+  coverage. Sensitive files and escaping symlinks are excluded; bounds are
+  explicit. Clear only affects that root's derived cache and is denied in
+  Plan/Goal. Parent binding spoofing and restricted expert-tool access are denied.
+  Grep's existing behavior is unchanged.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`, `02-agent-runtime.md`,
+  `04-data-storage.md`, `06-host-rpc-protocol.md`; `04-ux/06-settings-ia.md`.
+- **Acceptance**: C (runtime tools), D (editor), F (persistence), Localization.
+- **Milestone**: Plus.
+- **Automation**: `node scripts/e2e-project-context.mjs` (real sidecar/proxy/Host,
+  controlled HTTP model); `node scripts/e2e-code-index.mjs` (real Host/filesystem);
+  `node scripts/e2e-project-auto-memory.mjs` (real editor/production CSS in
+  isolated Electron, fixture IPC); `node scripts/e2e-settings-memory.mjs`
+  (`pnpm test:e2e:settings-memory`) mounts the
+  production SettingsPage and ProjectMemoryDialog with React and production CSS
+  in isolated Electron, using fixture IPC only. The settings test covers
+  navigation, project-group listing, empty/error retry, editor opening, and
+  editing/recording controls; it does not exercise real Host persistence.
+  Host unit tests cover CAS, group lifecycle, relocation, config-sync eligibility
+  and mode/expert permissions. Existing real Host/loopback runs are prior evidence
+  and are not a claim that they were rerun for this change.
+- **Status**: Settings renderer candidate validated with isolated fixture IPC;
+  real Host behavior is unchanged and was not rerun for this navigation change.
+
+| Plus scenario | User path | Automated entry |
+| --- | --- | --- |
+| E2E-PLUS-project-context | Remember → later turn/restart recall → source lookup → current code search | project-context, code-index, project-auto-memory scripts |

@@ -74,6 +74,7 @@ import type {
   ProjectGroupRecord,
   ProjectMemory,
   ProjectMemoryEntry,
+  ProjectMemoryEditor,
   ProjectWorkspace,
   ScheduledTask,
   ProviderCreateInput,
@@ -565,6 +566,10 @@ function normalizePlansChangedEvent(value: unknown): PlanningStateEvent {
 }
 
 export const api = {
+  getContextInsights: (sessionId: string, options?: { includeContent?: boolean; requestId?: string }) =>
+    invoke<import("@pi-desktop/shared").ContextInsightsSnapshot>(
+      IPC.invoke.contextInsightsGet, { sessionId, ...options },
+    ),
   getVersion: () => invoke<AppVersionInfo>(IPC.invoke.appGetVersion),
   health: () => invoke<HostHealth>(IPC.invoke.appHealth),
   getOnboarding: () => invoke<OnboardingState>(IPC.invoke.appGetOnboarding),
@@ -935,6 +940,15 @@ export const api = {
     invoke<{ folders: string[]; canceled?: boolean }>(IPC.invoke.projectPickFolders),
   getProjectMemory: (projectPath: string) =>
     invoke<{ memory: ProjectMemory }>(IPC.invoke.projectMemoryGet, { projectPath }),
+  getProjectMemoryEditor: (projectPath: string) =>
+    invoke<{ editor: ProjectMemoryEditor }>(IPC.invoke.projectMemoryEditorGet, { projectPath }),
+  saveProjectMemoryEditor: (projectPath: string, input: {
+    expectedOwner: string;
+    expectedMemory: ProjectMemory;
+    entries: ProjectMemoryEntry[];
+  }) => invoke<{ editor: ProjectMemoryEditor }>(IPC.invoke.projectMemoryEditorSave, { projectPath, ...input }),
+  setProjectAutoMemoryEnabled: (projectPath: string, expectedOwner: string, enabled: boolean) =>
+    invoke<{ autoRecordEnabled: boolean }>(IPC.invoke.projectAutoMemorySetEnabled, { projectPath, expectedOwner, enabled }),
   saveProjectMemory: (projectPath: string, entries: ProjectMemoryEntry[]) =>
     invoke<{ memory: ProjectMemory }>(IPC.invoke.projectMemorySave, {
       projectPath,
@@ -1648,6 +1662,12 @@ export const api = {
     if (!window.piDesktop?.on) return () => undefined;
     return window.piDesktop.on(IPC.event.browserPreview, (payload) =>
       listener(payload as { sessionId: string; path?: string; url?: string }),
+    );
+  },
+  onContextInsightsChanged: (listener: (event: { sessionId: string }) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.contextInsightsChanged, (payload) =>
+      listener(payload as { sessionId: string }),
     );
   },
   onAgentEvent: (listener: (event: AgentEventEnvelope) => void) => {

@@ -124,12 +124,15 @@ export function delegateSummaryModels(
   model: Model<Api>,
   sessionId: string,
   onUsage?: UsageObserver,
+  diagnostics?: Parameters<typeof withCompactionRequestHeaders>[5],
 ): Models {
   return withCompactionRequestHeaders(
     createProviderModels(provider, model),
     provider,
     sessionId,
     onUsage,
+    undefined,
+    diagnostics,
   );
 }
 

@@ -3,6 +3,7 @@ mod agent_capabilities;
 mod artifacts;
 mod audit;
 mod config_sync;
+mod context_insights;
 mod data_relocation;
 mod db;
 mod goal_progress;
@@ -36,6 +37,7 @@ mod turn_queue;
 mod user_skills;
 mod user_subagents;
 mod workspace;
+mod workspace_index;
 
 use std::sync::Arc;
 use tokio::sync::Mutex;

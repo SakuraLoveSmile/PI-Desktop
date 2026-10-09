@@ -712,6 +712,15 @@ nonempty final replies require a current approved expert dispatch whose turn
 has actually started. Idle members or queued messages are insufficient. This
 participation gate does not prove task ownership or completed expert work.
 
+A Lead has one bounded no-participation recovery before approval and one
+independent recovery after a trusted, nonempty delegate roster is confirmed for
+that same original Agent turn. Fast confirmation during the declaration reply
+must not exhaust the dispatch recovery just because the preapproval correction
+was already used. Confirmation does not authorize completion: Host still checks
+actual expert participation, and continued no-dispatch replies fail after the
+single postconfirmation correction. Stale reviews, other teams and automatic
+Plan rosters cannot acquire this execution-phase recovery.
+
 Team Plan research automatically launches read-only experts using Host-selected
 `automatic_plan` authority and valid approved model bindings, without staffing
 approval. Complete structured research, settled researcher turns/questions and
@@ -736,8 +745,11 @@ from Team notifications; it does not require a tab switch or a completed Lead tu
 An approved Team Plan/Goal execution waits for execution-roster confirmation
 and expert settlement inside its original running Host turn. It must not emit
 final agent_end, end the Goal execution token or complete the approval while
-waiting. Confirmation resumes the same approved contract. wait_for_updates
-consumes full authenticated confirmation/expert content in that turn through
+waiting. Confirmation resumes the same approved contract.
+An earlier pending review snapshot cannot authorize completion if confirmation
+commits before the execution-state read: Host final authorization still runs,
+and the bound confirmed execution receives its dispatch recovery when needed.
+wait_for_updates consumes full authenticated confirmation/expert content in that turn through
 Host-authorized execution inbox reads; cancellation interrupts it without
 expert replay or a completion report. Expert-start authority permits
 substantive tools, while approved execution completion separately requires
@@ -1887,3 +1899,35 @@ scope-filtered definitions, opted-in models, pins, fallback bindings and
 availability diagnostics on launch. Their idle reuse compares these catalogs
 and runtime limits as well as model/profile/expert policy. Team Leads retain
 their existing catalog isolation and mandatory expert participation gate.
+
+## Plus project context tools
+
+Project-bound Desktop sessions expose `ProjectHistory` and `CodeSearch`; native
+Pi sessions and projectless sessions do not acquire these capabilities. Both
+read tools remain available in Agent, Plan and Goal. CodeSearch's explicit
+`clear` action is unavailable in Plan/Goal. Results are historical or filesystem
+evidence, never higher-priority instructions. The model must verify old facts
+against current code and must disclose incomplete search coverage.
+
+Automatic project recording is opt-in and defaults off. At each user turn and
+approved-plan execution, the runtime refreshes the Host-owned project/group
+memory once. A failed refresh clears the old projection and write guidance and
+reports the failure; cancellation/disposal discards late responses. Enabling
+recording exposes `ProjectMemory` (list/upsert/delete) in Agent mode only. Turning
+it off revokes writes while retaining read context. No extraction model or
+embedding provider is called. Requests capture a trusted session binding in the
+runtime's Host closure and the parent sidecar proxy verifies it before forwarding.
+
+ProjectHistory searches literal phrases in the current logical project's saved
+Desktop sessions. Search returns at most 20 sessions, two matching excerpts per
+session and stable session/message IDs. Read validates that the source remains
+in the same group and returns at most five user/assistant messages, each capped
+at 2,000 characters. Deleted chats are excluded; native Pi history is not mixed
+in without a Host-owned project identity.
+
+CodeSearch performs case-insensitive literal search in the session's root (not
+the foreground workspace or arbitrary model-selected roots), returns paths,
+line numbers and bounded text, and supports explicit status/clear actions. Each
+search reconciles current files and ignore rules, hashes eligible content, then
+verifies candidate contents live. This first version provides a persistent text
+cache, not semantic retrieval or a promised speedup. Grep remains unchanged.

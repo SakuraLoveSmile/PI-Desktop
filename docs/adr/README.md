@@ -142,7 +142,7 @@ Each ADR includes:
 | 0103 | Compact context usage summary | Accepted (amends 0047) |
 | 0104 | Plugin-contributed work panel views | Accepted |
 | 0105 | Ship Files as a bundled plugin; keep Review in the host | Superseded by 0241 |
-| 0106 | Keep only five core builtin commands | Accepted |
+| 0106 | Keep only five core builtin commands | Accepted; count amended by [native Context Insights](context-insights-native-port.md) |
 | 0107 | Make current-session task notification suppression atomic | Accepted |
 | 0108 | Remove the built-in interactive terminal | Accepted |
 | 0109 | Open Files entries with the OS-associated application | Accepted |
@@ -366,3 +366,5 @@ Each ADR includes:
 | image-generation-capability | [Image generation as a configured Agent capability](image-generation-capability.md) | Accepted |
 | retained-browser-pages-per-tab | [Retain a host-owned browser page per resource tab](retained-browser-pages-per-tab.md) | Accepted |
 | 0318 | [Publish native Linux arm64 artifacts](0318-linux-arm64-release-lane.md) | Accepted (D638) |
+
+- [Native Context Insights](context-insights-native-port.md) — plugin-first feasibility, native data ownership and sixth inspection command.

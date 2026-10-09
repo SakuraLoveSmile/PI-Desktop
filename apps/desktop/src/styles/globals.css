@@ -40,4 +40,6 @@
 @import "./plugins.css";
 @import "./extensions.css";
 @import "./plugin-launcher.css";
+@import "../features/context-insights/styles.css";
+@import "../features/context-entry/dialog.css";
 @import "./responsive.css";

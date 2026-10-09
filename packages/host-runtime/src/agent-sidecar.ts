@@ -61,6 +61,12 @@ const HOST_PROXY_ALLOWED = new Set([
   "plans.submit",
   "plans.pending",
   "plans.abort",
+  "project.autoMemory.agentList",
+  "project.autoMemory.agentUpsert",
+  "project.autoMemory.agentDelete",
+  "project.history.search",
+  "project.history.context",
+  "project.codeSearch",
   // Goal report draft writes are scoped by the Host-approved execution id
   // captured in the runtime context; report reads/retry remain Main-only.
   "goalReports.submitDraft",
@@ -183,6 +189,7 @@ export class AgentSidecar {
   // The embedding host registers this binding from the host-owned session
   // record immediately before starting a runtime turn.
   private projectInstructionRoots = new Map<string, string>();
+  private projectContextBindings = new Map<string, { id: string; path: string }>();
   private vendorAuthResolver: VendorAuthResolver | null = null;
   private trustedExtensionBridge: TrustedExtensionSidecarBridge | null = null;
   // Vendor-account rows this session was launched with. The sidecar can only
@@ -351,10 +358,15 @@ export class AgentSidecar {
     const root = projectPath?.trim();
     if (root) this.projectInstructionRoots.set(id, root);
     else this.projectInstructionRoots.delete(id);
+    if (!root) this.projectContextBindings.delete(id);
+    else if (this.projectContextBindings.get(id)?.path !== root) {
+      this.projectContextBindings.set(id, { id: randomUUID(), path: root });
+    }
   }
 
   clearProjectInstructionRoot(sessionId: string): void {
     this.projectInstructionRoots.delete(sessionId.trim());
+    this.projectContextBindings.delete(sessionId.trim());
   }
 
   setVendorAuthResolver(resolver: VendorAuthResolver): void {
@@ -535,6 +547,31 @@ export class AgentSidecar {
           );
           return;
         }
+        if (method.startsWith("project.autoMemory.agent") || method === "project.history.search" ||
+          method === "project.history.context" || method === "project.codeSearch") {
+          if (!this.host) throw new Error("host unavailable");
+          const sessionId = typeof params.sessionId === "string" ? params.sessionId : "";
+          const binding = this.projectContextBindings.get(sessionId);
+          if (!binding || params.projectContextBindingId !== binding.id) {
+            throw new Error("project context requires a bound project session");
+          }
+          const host = this.host;
+          const fields = method === "project.autoMemory.agentUpsert"
+            ? ["id", "title", "content", "expectedTitle", "expectedContent"]
+            : method === "project.autoMemory.agentDelete" ? ["id", "expectedTitle", "expectedContent"]
+            : method === "project.history.search" ? ["query", "limit"]
+            : method === "project.history.context" ? ["targetSessionId", "messageId", "query"]
+            : method === "project.codeSearch" ? ["action", "query", "limit"] : [];
+          const result = await host.call(method, {
+            sessionId, boundPath: binding.path,
+            ...Object.fromEntries(fields.filter(field => params[field] !== undefined).map(field => [field, params[field]])),
+          });
+          if (this.disposed || this.host !== host || this.projectContextBindings.get(sessionId) !== binding) {
+            throw new Error("project context binding changed during request");
+          }
+          this.writeToChild(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result }) + "\n");
+          return;
+        }
         if (method === "provider.resolveAuth") {
           const result = await this.resolveVendorAuth(params);
           this.writeToChild(
@@ -640,6 +677,15 @@ export class AgentSidecar {
 
   async call<T = unknown>(method: string, params: unknown = {}): Promise<T> {
     if (this.closed) throw new Error("agent sidecar is unavailable");
+    if ((method === "agent.prompt" || method === "agent.executeApprovedPlan" || method === "agent.compact") &&
+      params && typeof params === "object" && !Array.isArray(params)) {
+      const values = params as Record<string, unknown>;
+      const binding = this.projectContextBindings.get(String(values.sessionId ?? ""));
+      params = { ...values, projectContextBindingId: binding?.id };
+    }
+    if (method === "agent.disposeSession" && params && typeof params === "object" && !Array.isArray(params)) {
+      this.clearProjectInstructionRoot(String((params as Record<string, unknown>).sessionId ?? ""));
+    }
     const id = randomUUID();
     const timeoutMs = rpcTimeoutMs(method, params);
     const payload = JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n";
@@ -674,6 +720,7 @@ export class AgentSidecar {
 
   async dispose(): Promise<void> {
     this.disposed = true;
+    this.projectContextBindings.clear();
     this.projectInstructionRoots.clear();
     this.vendorAuthBindings.clear();
     this.closeTransport(new Error("agent sidecar disposed"));
