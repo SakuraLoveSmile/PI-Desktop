@@ -77,7 +77,7 @@ window.subagentSettingsProbe = async () => {
     ["subagentMaxDepth", "", "2"], ["subagentMaxConcurrency", "0", "4"], ["subagentMaxConcurrency", "33", "4"]]) {
     const before = writes.length;
     await enter(name, value);
-    assert(field(name).value === expected && writes.length === before, "Invalid input reverts without an IPC write");
+    assert(field(name).value === expected && writes.length === before, `Invalid input reverts without an IPC write: ${JSON.stringify({ name, value, expected, actual: field(name).value, before, writes })}`);
   }
   assert(useAppStore.getState().toasts.some(toast => toast.variant === "error"), "Invalid values report an error");
   checks.push("invalid-empty-fractional-and-out-of-range-revert");

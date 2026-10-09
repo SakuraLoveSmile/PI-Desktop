@@ -59,11 +59,12 @@ app.whenReady().then(async () => {
     win.webContents.focus();
     win.webContents.sendInputEvent({ type: "keyDown", keyCode: "Backspace" });
     win.webContents.sendInputEvent({ type: "keyUp", keyCode: "Backspace" });
-    if (value) win.webContents.insertText(value);
+    if (value) await win.webContents.insertText(value);
     await win.webContents.executeJavaScript("new Promise(resolve => requestAnimationFrame(resolve))");
     const keyCode = commit === "Enter" ? "Enter" : "Tab";
     win.webContents.sendInputEvent({ type: "keyDown", keyCode });
     win.webContents.sendInputEvent({ type: "keyUp", keyCode });
+    await win.webContents.executeJavaScript("new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
   });
   win.webContents.on("console-message", (event) => console.error(event.message));
   try {
