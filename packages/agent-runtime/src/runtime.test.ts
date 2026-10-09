@@ -11861,6 +11861,8 @@ describe("DesktopAgentRuntime forced Team completion", () => {
     afterAuthority?: (runtime: DesktopAgentRuntime) => Promise<void> | void;
     approvedActive?: boolean;
     recoverToReview?: boolean;
+    confirmBeforeFinal?: boolean;
+    recoverToDispatch?: boolean;
     recoverToResearch?: boolean;
     beforeReview?: (runtime: DesktopAgentRuntime) => Promise<void> | void;
     executionState?: (query: number) => Promise<void>;
@@ -11896,7 +11898,7 @@ describe("DesktopAgentRuntime forced Team completion", () => {
       if (method === "team.declareStrategy") {
         review = options.recoverToResearch
           ? { ...pendingReview, status: "confirmed", launchPolicy: "automatic_plan" }
-          : pendingReview;
+          : options.confirmBeforeFinal ? { ...pendingReview, status: "confirmed" } : pendingReview;
         return { decision: { strategy: "delegate", reason: "Required experts" }, review };
       }
       if (method === "team.createTask") return { task: { taskId: "research-task", ownerMemberName: "researcher", revision: 1 } };
@@ -11929,7 +11931,8 @@ describe("DesktopAgentRuntime forced Team completion", () => {
           { name: "team_status", arguments: {} },
           { name: "SubmitPlan", arguments: { title: "Preserve revisions", markdown: "# Plan\n\nPreserve CAS based on src/store.ts expert research.", question: "Approve implementation?" } },
         ];
-        const researchStep = options.recoverToResearch ? researchSteps[requests.length - 2] : undefined;
+        const researchStep = options.recoverToResearch ? researchSteps[requests.length - 2]
+          : options.recoverToDispatch ? researchSteps.slice(1, 3)[requests.length - (options.initialReview ? 2 : 4)] : undefined;
         const declaration = options.recoverToReview && requests.length === 2;
         const stopReason = declaration || researchStep ? "toolUse" : "stop";
         const message = assistantMessage({
@@ -12031,6 +12034,48 @@ describe("DesktopAgentRuntime forced Team completion", () => {
       expect(completed.some((event) => event.type === "message_end" && event.message.content.includes("completed everything"))).toBe(false);
       expect(events.filter((event) => event.type === "agent_end")).toHaveLength(1);
       expect(events.some((event) => event.type === "error")).toBe(false);
+    } finally { await runtime.dispose(); }
+  });
+
+  it("dispatches after fast confirmation even when preapproval recovery was consumed", async () => {
+    const { runtime, host, events, requests } = fixture({ recoverToReview: true,
+      confirmBeforeFinal: true, recoverToDispatch: true });
+    try {
+      await runtime.prompt("Use the expert team", "user-1", "team-turn");
+      expect(requests).toHaveLength(6);
+      expect(requests.every(request => request.turnId === "team-turn")).toBe(true);
+      expect(host.call.mock.calls.filter(([method]) => method === "team.declareStrategy")).toHaveLength(1);
+      expect(host.call).toHaveBeenCalledWith("team.createTask", expect.objectContaining({ ownerMemberName: "researcher" }));
+      expect(host.call).toHaveBeenCalledWith("team.sendMessage", expect.objectContaining({ target: "researcher" }));
+      expect(events.some(event => event.type === "error")).toBe(false);
+      expect(events.filter(event => event.type === "agent_end")).toHaveLength(1);
+      expect(events.some(event => event.type === "message_end" && event.message.status === "complete")).toBe(true);
+    } finally { await runtime.dispose(); }
+  });
+
+  it("does not complete approved execution when confirmation commits between Host reads", async () => {
+    let confirm: (status: string) => void;
+    const { runtime, host, events, requests, changeExecution } = fixture({ initialReview: pendingReview,
+      approvedActive: true, recoverToDispatch: true, executionState: async query => { if (query === 1) confirm("confirmed"); } });
+    confirm = changeExecution;
+    const execution: PlanExecution = { id: "approved-1", proposalId: "proposal-1", sessionId: "session-1", kind: "plan", plan: "# Approved", title: "Approved", question: "Proceed?", artifact: { relativePath: ".pi/plan/approved.md", sha256: "abc", sizeBytes: 10 }, targetPermissionMode: "auto", state: "running" };
+    try {
+      await runtime.executeApprovedPlan(execution, "team-turn");
+      expect(requests).toHaveLength(4);
+      expect(host.call).toHaveBeenCalledWith("team.sendMessage", expect.objectContaining({ target: "researcher" }));
+      expect(events.some(event => event.type === "error")).toBe(false);
+      expect(events.filter(event => event.type === "agent_end")).toHaveLength(1);
+    } finally { await runtime.dispose(); }
+  });
+
+  it("bounds confirmed-roster recovery when the Lead still refuses to dispatch", async () => {
+    const { runtime, events, requests } = fixture({ recoverToReview: true, confirmBeforeFinal: true });
+    try {
+      await runtime.prompt("Use the expert team", "user-1", "team-turn");
+      expect(requests).toHaveLength(4);
+      expect(events.some(event => event.type === "error" && event.error.code === "TEAM_APPROVAL_REQUIRED")).toBe(true);
+      expect(events.filter(event => event.type === "message_end" && event.message.status === "complete" && event.message.content)).toHaveLength(0);
+      expect(events.filter(event => event.type === "agent_end")).toHaveLength(1);
     } finally { await runtime.dispose(); }
   });
 

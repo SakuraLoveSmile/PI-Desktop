@@ -2,6 +2,11 @@
 
 Upstream v0.15.6 → v0.16.1 has been merged.
 
+- Expert Team confirmation during the Lead's declaration reply keeps one
+  bounded opportunity to dispatch the approved experts, even if the initial
+  no-tool answer already needed correction. Actual expert participation is
+  still required before a successful final answer.
+
 - AskTool questions keep paragraphs and wide tables readable instead of
   squeezing them into vertical strips. Tables scroll inside the card and long
   questions leave answer choices and submission controls available.

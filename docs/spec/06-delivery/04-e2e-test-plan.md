@@ -17620,3 +17620,20 @@ decisions preserve session/request identity. Pending decisions cannot repeat;
 failed decisions remain retryable and known/unknown reasons remain honest.
 Only external clipboard and resolution boundaries are fixtures; no actual
 user permission is granted or denied. Save a native screenshot for visual QA.
+
+
+### E2E-TEAM-fast-confirmation-after-recovery
+
+- Preconditions: isolated production Electron/Main/Host/sidecar, temporary
+  profile/workspace and localhost deterministic provider; no paid or live API.
+- Steps: emit a text-only Lead answer, use the preapproval recovery to declare
+  an expert, hold the declaration's final response, confirm in the Team panel,
+  then release that response. The postconfirmation correction creates an owned
+  task and dispatches the approved expert, who reads a source and returns results.
+- Expected: the original turn completes without TEAM_APPROVAL_REQUIRED; the
+  expert task completes and its full result reaches the Lead. Persistent
+  no-dispatch answers fail after one postconfirmation correction. Stale and
+  foreign reviews retain the existing participation gate.
+- Automation: `PI_E2E_TEAM_FAST_APPROVAL=1 node scripts/e2e-team-forced.mjs`
+  and the runtime forced-Team-completion regression tests.
+- Specs: [Team runtime](../03-runtime/02-agent-runtime.md).
