@@ -1,3 +1,4 @@
+import { contextRequestObserver } from "./context-insights.js";
 import { accountModelStream, type UsageObserver } from "./request-usage.js";
 import {
   buildProviderModel,
@@ -37,6 +38,10 @@ export function subagentModelBinding(opts: {
   sessionId: string;
   maxTokens?: number;
   onUsage?: UsageObserver;
+  turnId?: string;
+  agentName?: string;
+  parentToolCallId?: string;
+  onContext?: (request: import("@pi-desktop/shared").ContextInsightsRequest) => void;
 }, retry: SubagentProviderRetryState) {
   // A definition may cap the delegate's own output (issue #171). The
   // catalog's published limit keeps applying otherwise, so this is an
@@ -102,14 +107,26 @@ export function subagentModelBinding(opts: {
         m,
         context,
         requestOptions,
-        (retryOptions) => accountModelStream(m, () =>
-          omitThinking
-            ? models.stream(omitThinkingModel, context, retryOptions)
-            : models.streamSimple(m, context, retryOptions), {
-              providerId: opts.provider.id,
-              nativeCost: opts.provider.modelConfig?.nativeCost,
-              onUsage: opts.onUsage,
-            }),
+        (retryOptions) => {
+          const observer = opts.onContext ? contextRequestObserver(m, context, { providerId: opts.provider.id,
+            turnId: opts.turnId, step: 0, mode: "agent", purpose: "subagent", agentName: opts.agentName,
+            parentToolCallId: opts.parentToolCallId }, opts.onContext,
+            () => ({ providerStatus: retry.status, aborted: retryOptions.signal?.aborted })) : undefined;
+          const observedOptions = observer ? { ...retryOptions, onPayload: async (payload: unknown, requestModel: typeof m) => {
+            const replacement = await retryOptions.onPayload?.(payload, requestModel);
+            observer.onPayload(replacement === undefined ? payload : replacement);
+            return replacement;
+          } } : retryOptions;
+          return accountModelStream(m, () =>
+            omitThinking
+              ? models.stream(omitThinkingModel, context, observedOptions)
+              : models.streamSimple(m, context, observedOptions), {
+                providerId: opts.provider.id,
+                nativeCost: opts.provider.modelConfig?.nativeCost,
+                onUsage: opts.onUsage,
+                ...observer,
+              });
+        },
         {
           claim: (error, phase) => retry.claim(error, phase),
           headers: () => retry.headers,

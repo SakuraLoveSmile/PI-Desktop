@@ -1,6 +1,7 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const ko = {
+  contextInsights: en.contextInsights,
   app: {
     shellName: "Pi-Desktop-Plus",
     tagline: "로컬 AI 코딩 파트너",

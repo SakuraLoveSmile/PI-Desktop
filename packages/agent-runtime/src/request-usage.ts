@@ -38,28 +38,49 @@ export function accountModelResult(
 export function accountModelStream(
   model: Pick<Model<Api>, "id" | "provider">,
   createStream: () => AssistantMessageEventStream,
-  options: { providerId?: string; costStatus?: UsageProvenance["costStatus"]; nativeCost?: Model<Api>["cost"]; onUsage?: UsageObserver } = {},
+  options: { providerId?: string; costStatus?: UsageProvenance["costStatus"]; nativeCost?: Model<Api>["cost"]; onUsage?: UsageObserver; onRequest?: (identity: UsageProvenance) => void; onResult?: (message: AssistantMessage, identity: UsageProvenance, durationMs: number) => void; onError?: (identity: UsageProvenance, durationMs: number) => void } = {},
 ): AssistantMessageEventStream {
   const costStatus = options.costStatus === "reported" ? "reported"
     : nativeCostStatus(options.nativeCost) ?? options.costStatus;
   const identity = { ...requestUsageIdentity(model, options.providerId),
     ...(costStatus ? { costStatus } : {}) };
-  const stream = createStream();
+  const startedAt = Date.now();
+  options.onRequest?.(identity);
+  let stream: AssistantMessageEventStream;
+  try { stream = createStream(); } catch (error) {
+    options.onError?.(identity, Math.max(0, Date.now() - startedAt));
+    throw error;
+  }
   let reported = false;
-  const account = (message: AssistantMessage): AssistantMessage => accountModelResult(message, identity, (usage) => {
+  let settled = false;
+  const account = (message: AssistantMessage): AssistantMessage => {
+    const result = accountModelResult(message, identity, (usage) => {
     if (reported) return;
     reported = true;
     options.onUsage?.(usage);
-  });
+    });
+    if (!settled) {
+      settled = true;
+      options.onResult?.(result, identity, Math.max(0, Date.now() - startedAt));
+    }
+    return result;
+  };
+  const failure = () => {
+    if (settled) return;
+    settled = true;
+    options.onError?.(identity, Math.max(0, Date.now() - startedAt));
+  };
   return new Proxy(stream, {
     get(target, property, receiver) {
-      if (property === "result") return async () => account(await target.result());
+      if (property === "result") return async () => {
+        try { return account(await target.result()); } catch (error) { failure(); throw error; }
+      };
       if (property === Symbol.asyncIterator) return async function* () {
-        for await (const event of target) {
+        try { for await (const event of target) {
           if (event.type === "done") account(event.message);
           if (event.type === "error") account(event.error);
           yield event;
-        }
+        } } catch (error) { failure(); throw error; }
       };
       return Reflect.get(target, property, receiver);
     },

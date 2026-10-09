@@ -2734,6 +2734,56 @@ async fn handle_request(
             .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "session": session }))
         }
+        "contextInsights.get" => {
+            let id = params
+                .get("sessionId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_ARGUMENT"))?;
+            let include_content = params
+                .get("includeContent")
+                .and_then(Value::as_bool)
+                .unwrap_or(true);
+            let request_id = params.get("requestId").and_then(Value::as_str);
+            let st = state.lock().await;
+            crate::context_insights::get(&st.db, id, include_content, request_id).map_err(|error| {
+                rpc_err(
+                    1002,
+                    error.to_string(),
+                    if error.to_string().starts_with("NOT_FOUND:") {
+                        "NOT_FOUND"
+                    } else if error.to_string().starts_with("INVALID_ARGUMENT:") {
+                        "INVALID_ARGUMENT"
+                    } else {
+                        "INTERNAL"
+                    },
+                )
+            })
+        }
+        "contextInsights.record" => {
+            let id = params
+                .get("sessionId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_ARGUMENT"))?;
+            let st = state.lock().await;
+            let recorded = crate::context_insights::record(
+                &st.db,
+                id,
+                params.get("request"),
+                params.get("event"),
+            )
+            .map_err(|error| {
+                let message = error.to_string();
+                let code = if message.starts_with("INVALID_ARGUMENT:") {
+                    "INVALID_ARGUMENT"
+                } else if message.starts_with("LIMIT_EXCEEDED:") {
+                    "LIMIT_EXCEEDED"
+                } else {
+                    "INTERNAL"
+                };
+                rpc_err(1002, message, code)
+            })?;
+            Ok(json!({ "recorded": recorded }))
+        }
         "todos.get" => {
             let session_id = params
                 .get("sessionId")

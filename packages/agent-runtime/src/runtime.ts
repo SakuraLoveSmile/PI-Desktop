@@ -1,3 +1,4 @@
+import { contextRequestObserver } from "./context-insights.js";
 import { TOOL_ACTIVATION_SECTION, toolDeclarationPolicy, toolActivationSection, restoredToolActivation, syncToolActivation, type ToolDeclarationPolicy } from "./fixed-tool-declarations.js";
 import { orderSystemRows, SystemTranscriptJournal } from "./system-transcript-journal.js";
 import { planWorkspaceRequiredResult } from "./plan-workspace-error.js";
@@ -1656,6 +1657,7 @@ export class DesktopAgentRuntime {
   private models: Models;
   private model: Model<Api>;
   private turnId?: string;
+  private contextInsightsStep = 0;
   private disposed = false;
   readonly sessionId: string;
   private mode: Mode;
@@ -2077,18 +2079,32 @@ export class DesktopAgentRuntime {
           ]),
         };
         const usageTurnId = this.turnId;
+        const contextInsightsStep = ++this.contextInsightsStep;
         const retryStream = createProviderRetryStream(
           m,
           context,
           attemptOptions,
-          (retryOptions) => accountModelStream(m, () =>
+          (retryOptions) => {
+            const observer = contextRequestObserver(m, context, { providerId: this.provider.id,
+              turnId: usageTurnId, step: contextInsightsStep, mode: this.mode },
+              request => this.emit({ type: "context_insights", request }, usageTurnId),
+              () => ({ providerStatus: this.providerResponseStatus, requestBytes: this.providerRequestBytes,
+                aborted: retryOptions.signal?.aborted }));
+            const observedOptions = { ...retryOptions, onPayload: async (payload: unknown, requestModel: Model<Api>) => {
+              const replacement = await retryOptions.onPayload?.(payload, requestModel);
+              observer.onPayload(replacement === undefined ? payload : replacement);
+              return replacement;
+            } };
+            return accountModelStream(m, () =>
             this.thinkingLevel === "omit"
-              ? this.models.stream(omitThinkingModel(m), context, retryOptions)
-              : this.models.streamSimple(m, context, retryOptions), {
+              ? this.models.stream(omitThinkingModel(m), context, observedOptions)
+              : this.models.streamSimple(m, context, observedOptions), {
                 providerId: this.provider.id,
                 nativeCost: this.provider.modelConfig?.nativeCost,
                 onUsage: (usage) => this.emit({ type: "usage", usage }, usageTurnId),
-              }),
+                ...observer,
+              });
+          },
           {
             claim: (error, phase) => this.claimProviderRetry(error, phase),
             headers: () => this.providerRetryHeaders,
@@ -5971,6 +5987,15 @@ export class DesktopAgentRuntime {
   }
 
   private emit(event: AgentEventEnvelope["event"], turnId?: string, ts = Date.now()) {
+    if (event.type === "compaction_end") {
+      this.onEvent({ sessionId: this.sessionId, turnId: turnId ?? this.turnId, ts,
+        event: { type: "context_insights", diagnosticEvent: {
+          id: randomUUID(), at: ts, type: "compaction", turnId: turnId ?? this.turnId,
+          label: `${event.reason}: ${event.ok ? "completed" : "failed"}${event.fallback ? " (retained tail)" : ""}`,
+          ...(event.tokensBefore !== undefined ? { tokensBefore: event.tokensBefore } : {}),
+          ...(event.tokensAfter !== undefined ? { tokensAfter: event.tokensAfter } : {}),
+        } } });
+    }
     this.onEvent({
       sessionId: this.sessionId,
       turnId: turnId ?? this.turnId,
@@ -7202,6 +7227,7 @@ export class DesktopAgentRuntime {
       reason,
       ok: true,
       tokensBefore: checkpoint.tokensBefore,
+      tokensAfter: compactedBudget.tokens,
       firstKeptMessageId: checkpoint.firstKeptMessageId,
       willRetry,
       ...(fallback ? { fallback } : {}),
@@ -7338,6 +7364,7 @@ export class DesktopAgentRuntime {
           ...shape,
         });
       },
+      { turnId: usageTurnId, mode: this.mode, onContext: request => this.emit({ type: "context_insights", request }, usageTurnId) },
     );
     try {
       const result = await compact(

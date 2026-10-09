@@ -2,6 +2,12 @@
 
 Upstream v0.15.6 → v0.16.1 has been merged.
 
+- Context Insights brings a cross-session usage overview, a session work-panel
+  dashboard, and `/context` inspection. Captured model requests expose prompt
+  composition, tool schemas, messages, usage, changes and file activity. Earlier
+  uncaptured requests remain explicitly unavailable; conversation data and
+  compaction policy are unchanged.
+
 - AskTool questions keep paragraphs and wide tables readable instead of
   squeezing them into vertical strips. Tables scroll inside the card and long
   questions leave answer choices and submission controls available.

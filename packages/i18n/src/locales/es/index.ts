@@ -1,6 +1,7 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const es = {
+  contextInsights: en.contextInsights,
   "app": {
     "shellName": "Pi-Desktop-Plus",
     "tagline": "Socio de codificación de IA local",

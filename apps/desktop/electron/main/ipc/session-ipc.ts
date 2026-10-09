@@ -2,6 +2,7 @@ import { shell } from "electron";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { mkdirSync } from "node:fs";
 import {
+  emptyContextInsights,
   ErrorCodes,
   IPC,
   modelConfigImportKey,
@@ -249,6 +250,17 @@ export function registerSessionIpc({
       };
     },
   );
+  handle(IPC.invoke.contextInsightsGet, async (input: { sessionId?: unknown; includeContent?: unknown; requestId?: unknown }) => {
+    if (!host) throw new Error("host unavailable");
+    if (!input || typeof input.sessionId !== "string" || !input.sessionId.trim() || input.sessionId.length > 256
+      || (input.includeContent !== undefined && typeof input.includeContent !== "boolean")
+      || (input.requestId !== undefined && (typeof input.requestId !== "string" || !input.requestId.trim() || input.requestId.length > 256))) {
+      throw Object.assign(new Error("Invalid context diagnostics input"), { errorCode: ErrorCodes.INVALID_ARGUMENT });
+    }
+    if (input.sessionId.startsWith("native-pi:")) return emptyContextInsights(input.sessionId);
+    await persistenceOutbox.flush(() => host);
+    return host.call("contextInsights.get", input);
+  });
   handle(
     IPC.invoke.sessionGet,
     async (
