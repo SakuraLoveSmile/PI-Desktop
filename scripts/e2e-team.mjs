@@ -1506,7 +1506,7 @@ try {
   const resumedScreenshot = await sendCdp("Page.captureScreenshot", { format: "png" });
   await writeFile(join(tempRoot, "team-panel-resumed.png"), Buffer.from(resumedScreenshot.data, "base64"));
   console.log("PASS Team lifecycle: queued mail stayed idle through restart while paused, then delivered once after Resume");
-  await verifyTeamLayoutMatrix(sendCdp, evaluate, "en");
+  if (process.env.PI_E2E_TEAM_CORE_ONLY !== "1") await verifyTeamLayoutMatrix(sendCdp, evaluate, "en");
   await invoke("settingsSet", { language: "zh-CN" });
   await sendCdp("Page.reload");
   await waitFor(() => evaluate(`!!document.querySelector('[data-sidebar-session-row="${lead.id}"]') && document.body.innerText.includes('新建任务')`), "Chinese shell after renderer reload");
@@ -1516,7 +1516,8 @@ try {
   await activateOverviewTab(sendCdp, evaluate);
   await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"]')?.innerText.includes('进展')`), "Chinese compact Team progress");
   await saveScreenshot(sendCdp, "team-overview-zh-CN.png");
-  await verifyTeamLayoutMatrix(sendCdp, evaluate, "zh-CN");
+  if (process.env.PI_E2E_TEAM_CORE_ONLY !== "1") await verifyTeamLayoutMatrix(sendCdp, evaluate, "zh-CN");
+  else console.log("NOT RUN Team layout matrix: core-only gate covers execution/lifecycle; panel drag/layout is unchanged by this candidate.");
   assert.equal(titleRequests.length, 3, "renderer reload must not duplicate title requests");
   console.log("PASS Chinese Team presentation: compact progress and identities survive renderer reload without another title request");
   }
