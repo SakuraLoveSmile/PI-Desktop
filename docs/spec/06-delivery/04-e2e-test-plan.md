@@ -17046,10 +17046,12 @@ current CAS revision. Legacy descriptions and reviews without presentation are r
 - **Steps:**
   1. Keep an aggregate tab open. Open panorama and check its stable tab ID,
      users icon, localized label and matching hover title.
-  2. Click a member with a focus task and verify its own task tab, captured
-     subject, message-circle icon and active Lead session. Select the panorama
-     tab, then click a member without tasks and verify its own member tab and
-     display-name label. The root is not clickable.
+  2. With dispatched tasks, verify one panorama node per task id and click a
+     task to open its own task tab, captured subject, message-circle icon and
+     active Lead session. Open its owner to the independent member tab, then
+     return through the member's focus task. Idle members do not create task
+     stages. A roster with no tasks uses the member fallback projection (covered
+     by overview-reference-alignment). The root is not clickable.
   3. Open a task from Overview or a dispatch card, then repeat the same action;
      verify one tab per target and activation of the existing target.
   4. Switch among aggregate, task/member and panorama tabs. Verify aggregate

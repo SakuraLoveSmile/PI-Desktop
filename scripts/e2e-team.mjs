@@ -1165,16 +1165,15 @@ try {
   await evaluate(`document.querySelector('[data-work-panel-tab-id="team:${lead.id}:panorama"] .work-panel-tab-button')?.click()`);
   await waitFor(() => evaluate(`!!document.querySelector('[data-panorama-canvas]')`), "return to panorama tab");
   assert.deepEqual(await panoramaViewport(sendCdp, evaluate), manualViewport, "manual viewport changed after member detail/back");
+  // With dispatched tasks, panorama targets are task ids, not roster ids.
+  // Empty-roster-task fallback is covered by overview-reference-alignment.
   const idleMember = activeSnapshot.members.find((item) => item.name === "executor");
   assert.ok(idleMember, "fixture requires a member without assigned tasks");
-  await evaluate(`document.querySelector('[data-node-id="${idleMember.memberSessionId}"].is-clickable')?.click()`);
-  await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-member-tab"]')`), "member without focus task opens member tab");
-  assert.equal(await evaluate(`document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id')`), `team:${lead.id}:member:${idleMember.memberSessionId}`);
-  assert.equal(await evaluate(`document.querySelector('[data-work-panel-tab-id].active .work-panel-tab-button')?.innerText.trim()`), "Sam");
-  assert.equal(await evaluate(`document.querySelector('[data-work-panel-tab-id].active .work-panel-tab-button')?.getAttribute('title')`), "Sam");
-  await evaluate(`document.querySelector('[data-work-panel-tab-id="team:${lead.id}:panorama"] .work-panel-tab-button')?.click()`);
-  await waitFor(() => evaluate(`!!document.querySelector('[data-panorama-canvas]')`), "panorama retained after member navigation");
-  assert.deepEqual(await panoramaViewport(sendCdp, evaluate), manualViewport, "member navigation must preserve panorama viewport");
+  const taskNodeIds = await evaluate(`Array.from(document.querySelectorAll('.agent-panorama-node.is-clickable')).map(node => node.getAttribute('data-node-id'))`);
+  assert.deepEqual([...taskNodeIds].sort(), activeSnapshot.tasks.filter(task => !task.deleted).map(task => task.taskId).sort(),
+    "dispatched panorama exposes each task exactly once");
+  assert.equal(taskNodeIds.includes(idleMember.memberSessionId), false, "idle roster members do not create fake task stages");
+  assert.deepEqual(await panoramaViewport(sendCdp, evaluate), manualViewport, "task projection retains manual viewport");
   await assertNoPageHorizontalOverflow(sendCdp, evaluate);
   assert.deepEqual(await panoramaViewport(sendCdp, evaluate), manualViewport, "manual viewport changed after resizing");
   console.log("PASS Panorama: 80% zoom, in-flight refresh retains canvas, continuous drag, independent detail/panorama tabs and resize preserve viewport");
