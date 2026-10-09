@@ -46,11 +46,12 @@ export class DelegationChainRegistry {
 
   resolveResume(options: {
     resume: string;
+    ownerId?: string;
     agentName: string;
     runningDelegationIds: ReadonlySet<string>;
   }): { ok: true; chain: DelegationChain } | { ok: false; error: ChainLookupError } {
     const chain = this.lookup(options.resume);
-    if (!chain) return { ok: false, error: { kind: "unknown" } };
+    if (!chain || chain.ownerId !== options.ownerId) return { ok: false, error: { kind: "unknown" } };
     if (chain.agentName !== options.agentName) {
       return {
         ok: false,
@@ -83,6 +84,7 @@ export class DelegationChainRegistry {
 
   start(options: {
     delegateSessionId: string;
+    ownerId?: string;
     delegationId: string;
     toolCallId: string;
     agentName: string;
@@ -110,6 +112,7 @@ export class DelegationChainRegistry {
         }
       : {
           delegateSessionId: options.delegateSessionId,
+          ...(options.ownerId ? { ownerId: options.ownerId } : {}),
           toolCallIds: [options.toolCallId],
           delegationIds: [options.delegationId],
           agentName: options.agentName,
@@ -173,17 +176,34 @@ export class DelegationChainRegistry {
   }
 
   drop(delegateSessionId: string): void {
-    const chain = this.chains.get(delegateSessionId);
-    if (!chain) return;
-    this.chains.delete(delegateSessionId);
-    for (const id of chain.delegationIds) this.byDelegationId.delete(id);
+    const subtree = new Map<string, DelegationChain>();
+    const pending = [delegateSessionId];
+    while (pending.length) {
+      const id = pending.pop()!;
+      if (subtree.has(id)) continue;
+      const chain = this.chains.get(id);
+      if (!chain) continue;
+      subtree.set(id, chain);
+      for (const child of this.chains.values()) {
+        if (child.ownerId === id) pending.push(child.delegateSessionId);
+      }
+    }
+    // Keep every live descendant's owner until it settles; settlement retries
+    // eviction. Dropping only the parent would create inaccessible owner groups.
+    if ([...subtree.values()].some(chain => chain.latestStatus === "running")) return;
+    for (const chain of subtree.values()) {
+      this.chains.delete(chain.delegateSessionId);
+      for (const id of chain.delegationIds) this.byDelegationId.delete(id);
+    }
   }
 
   resumableList(options: {
+    ownerId?: string;
     runningDelegationIds: ReadonlySet<string>;
   }): ResumableChain[] {
     const listed: ResumableChain[] = [];
     for (const chain of this.chains.values()) {
+      if (chain.ownerId !== options.ownerId) continue;
       const latest = chain.latestDelegationId;
       if (!latest) continue;
       if (options.runningDelegationIds.has(latest)) continue;
@@ -236,9 +256,10 @@ export class DelegationChainRegistry {
   private evictOverflow(): void {
     const byAgent = new Map<string, DelegationChain[]>();
     for (const chain of this.chains.values()) {
-      const group = byAgent.get(chain.agentName) ?? [];
+      const key = `${chain.ownerId ?? "root"}:${chain.agentName}`;
+      const group = byAgent.get(key) ?? [];
       group.push(chain);
-      byAgent.set(chain.agentName, group);
+      byAgent.set(key, group);
     }
     for (const group of byAgent.values()) {
       // A working chain is never evicted: dropping it would strand the delegate
@@ -251,6 +272,11 @@ export class DelegationChainRegistry {
       for (const stale of settled.slice(MAX_RESUMABLE_CHAINS_PER_AGENT)) {
         this.drop(stale.delegateSessionId);
       }
+    }
+    // Truncated hydrated history can contain an orphan; once its subtree is
+    // settled it cannot be resumed by any available owner and need not linger.
+    for (const chain of this.chains.values()) {
+      if (chain.ownerId && !this.chains.has(chain.ownerId)) this.drop(chain.delegateSessionId);
     }
   }
 }

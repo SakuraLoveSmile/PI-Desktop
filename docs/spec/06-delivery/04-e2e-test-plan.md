@@ -8,6 +8,29 @@
 
 ## 1. Goals
 
+### E2E-SUBAGENT-bounded-recursive-execution
+
+- **Preconditions:** Dedicated current-main candidate; built runtime/Host,
+  isolated temporary HOME, workspace and data; deterministic local model fixture.
+- **Steps:** Dispatch a child and grandchild; converge their reports. Repeat with
+  depth 1 and depth 0, a full tree-wide running cap, sibling-scoped lifecycle and
+  resume ids, a read-only parent delegating a writing definition, cancellation
+  during nested work, and an execution expert with a restricted tool snapshot.
+  Confirm Lead/research isolation and save/reload limits through Settings.
+- **Expected:** Meaningful assignments are supported at every allowed level;
+  over-limit calls fail visibly; controls cannot reach sibling branches or
+  elevate tool/permission scope. Parent delivery settles descendants, Stop
+  cleans the subtree, attribution uses actual parent Task ids, usage is counted
+  once, and experts retain their owned Team identity.
+- **Coverage:** `pnpm test:e2e:subagent-recursion` plus runtime user-path,
+  launch, `pnpm test:e2e:subagent-settings`, settings persistence and Host validation regression suites. Local model
+  fixtures validate mechanics; they do not prove real-model delegation frequency.
+- **Specs:** runtime §5f and tools/permissions §10.2; ADR 0089 amendment.
+- **Acceptance:** Candidate result and environment recorded in delivery notes.
+- **Milestone:** Post-MVP maintenance.
+- **Status:** Automated fixture coverage; record exact task-candidate results.
+
+
 ### E2E-STORAGE-custom-location-and-maintenance
 
 - **Preconditions:** Dedicated request worktree, current remote-main base, shared
@@ -9462,6 +9485,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 | Acceptance | Scenarios |
 |---|---|
+| C / E / Security / Quality — Bounded recursive standard/expert delegation and persisted settings | E2E-SUBAGENT-bounded-recursive-execution |
 | E / Quality — Standard Agent delegate-first prompt and Task report convergence | E2E-DELEGATION-standard-delegates-to-subagents |
 | C / E / Quality — Mandatory Team delegation, expert-start gate and catalog isolation | E2E-TEAM-lead-delegates-to-experts, E2E-TEAM-forced-delegation |
 | C / Quality / Security — Automatic read-only Team planning | E2E-TEAM-approved-plan-research-and-execution, E2E-TEAM-automatic-plan-research |
@@ -17348,7 +17372,7 @@ never use a real provider or the user's running application as its fixture.
 - **Coverage**: `pnpm test:e2e:subagent-models` exercises provider prompt/tool
   assertions, one Task launch, and explicit-ID TaskWait report convergence.
   `packages/agent-runtime/src/runtime.test.ts` covers the disabled-standard
-  prompt/catalog state, Team catalog isolation, and retained Plan/Goal
+  prompt/catalog state, Team Lead/research isolation and expert delegation, and retained Plan/Goal
   declarations with execution denied. Multi-worker parallel dispatch while the
   parent continues independent work is NOT RUN by this scenario. Real-model
   behavior validation is separately NOT RUN; it requires provider
@@ -17371,7 +17395,8 @@ never use a real provider or the user's running application as its fixture.
   cannot unlock substantive Lead actions. Start the approved expert turn, then
   verify Lead integration and standard-session coexistence.
 - **Expected**: All Team work, including trivial requests, requires an expert.
-  Task* and SessionTask remain absent. The authority gate proves an approved
+  Lead Task* and SessionTask remain absent; execution experts may use bounded
+  Task delegation. The authority gate proves an approved
   expert turn started, not task ownership or a completed contribution. Complete
   Plan research is enforced by its separate submission barrier.
 - **Coverage**: `node scripts/e2e-team.mjs`, `node scripts/e2e-team-forced.mjs`

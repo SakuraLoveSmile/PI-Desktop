@@ -116,6 +116,8 @@ type RuntimeParams = {
   trustedExtensions?: TrustedExtensionSpec[];
   /** Delegates this session may spawn through `Task` (ADR 0062). */
   subagents?: SubagentDefinition[];
+  subagentMaxDepth?: number;
+  subagentMaxConcurrency?: number;
   /** Provider bindings for pinned models, keyed by `subagentModelKey`. */
   subagentProviders?: Record<string, RuntimeProviderConfig>;
   /** Opted-in override keys, separate from definition-only pinned bindings. */
@@ -240,6 +242,8 @@ async function runtimeFor(
     subagents,
     subagentProviders,
     subagentModelKeys,
+    subagentMaxDepth: params.subagentMaxDepth,
+    subagentMaxConcurrency: params.subagentMaxConcurrency,
     projectInstructions: params.projectInstructions,
     customSystemPrompt: params.customSystemPrompt,
     projectMemory: params.projectMemory,
@@ -315,6 +319,8 @@ async function runtimeFor(
     subagents,
     subagentProviders,
     subagentModelKeys,
+    subagentMaxDepth: params.subagentMaxDepth,
+    subagentMaxConcurrency: params.subagentMaxConcurrency,
     projectPath: params.projectPath,
     customSystemPrompt: params.customSystemPrompt,
     projectInstructions: params.projectInstructions,

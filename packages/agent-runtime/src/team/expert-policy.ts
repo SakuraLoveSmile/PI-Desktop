@@ -8,6 +8,7 @@ const SYSTEM_TOOLS: ReadonlySet<string> = new Set([
   "task_get", "team_status", "submit_research_result", "SubmitGoalReport",
   "UpdateGoalProgress", "asktool", "new_context", "EnterPlanMode",
   "EnterGoalMode", "SubmitPlan", "SubmitGoal", "ToolSearch",
+  "Task", "TaskWait", "TaskList", "TaskStop",
 ]);
 
 /** A Host snapshot can only restrict the existing runtime catalog. */

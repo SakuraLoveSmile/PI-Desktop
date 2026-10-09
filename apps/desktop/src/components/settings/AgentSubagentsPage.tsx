@@ -41,6 +41,7 @@ import {
   IconTrash,
 } from "../icons";
 import { TooltipButton } from "../ui";
+import { SubagentRuntimeSettings } from "./SubagentRuntimeSettings";
 const GLOBAL_SUBAGENTS_PATH = "~/.agents/subagents";
 
 type SubagentEditorState = {
@@ -60,6 +61,7 @@ function builtinDisplayName(
 
 export function AgentSubagentsPage() {
   const { t } = useTranslation();
+  const settings = useAppStore((state) => state.settings);
   const showToast = useAppStore((state) => state.showToast);
   const {
     data: { owned, builtins },
@@ -410,6 +412,7 @@ export function AgentSubagentsPage() {
         />
       }
     >
+      <SubagentRuntimeSettings settings={settings} />
       <CapabilityPanel
         loading={loading}
         refreshing={refreshing}

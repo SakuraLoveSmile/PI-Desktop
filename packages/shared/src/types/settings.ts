@@ -25,6 +25,10 @@ export type ThemePreference = "system" | "light" | "dark" | `plugin:${string}`;
 export type CloseBehavior = "ask" | "tray" | "quit";
 
 export type AppSettings = {
+  /** Maximum Task nesting: root is 0, direct children are 1. Absent means 1; 0 disables Task. */
+  subagentMaxDepth?: number;
+  /** Maximum active Task delegates per root session. Absent means 10. */
+  subagentMaxConcurrency?: number;
   expertTeam?: import("../expert-team-settings.js").ExpertTeamSettings;
   imageGeneration?: import("../image-generation.js").ImageGenerationBinding | null;
   /** All models marked for image generation; absent falls back to imageGeneration. */
