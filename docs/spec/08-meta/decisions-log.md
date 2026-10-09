@@ -3377,7 +3377,7 @@ D193, and D194.
 - No protocol, storage, or runtime behavior changes. See ADR 0152 and
   E2E-046/E2E-099/US-UI-17.
 
-## 2026-09-04 — Notification inbox lists failures only (D295)
+## 2026-09-04 — Notification inbox lists failures only (D295, superseded)
 
 - The sidebar-footer inbox renders only `task.failed` rows, and its unread
   badge counts only unread failures. Routine successful completions had
@@ -3390,6 +3390,17 @@ D193, and D194.
   completions are read or removed together with the visible failures. No
   protocol or storage changes. Supersedes only the "task completion rows"
   clause of D117.
+
+### Current rule (supersedes D295 inbox filtering)
+
+- `All` shows retained `task.completed` and `task.failed` rows; `Unread` filters
+  only by `readAt == null`. The bell uses the Host-derived
+  `unreadNotificationCount` for all durable rows, matching the Dock/taskbar
+  badge. Selection, mark-all-read, and clear continue to use Host persistence.
+- D295's failure-only inbox filter caused a visible unread badge with an empty
+  bell list when only successful task notifications were unread. This correction
+  changes renderer presentation/count selection only; Host persistence, IPC, and
+  native notification delivery are unchanged.
 
 ## 2026-09-04 — Extensions page draws no dividers (D296)
 

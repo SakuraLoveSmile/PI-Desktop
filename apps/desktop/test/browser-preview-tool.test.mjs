@@ -29,15 +29,19 @@ test("sidecar routes main-local tools before the host-core proxy", () => {
     sidecarSource,
     /method === "tools\.execute"\s*\?\s*this\.localTools\.get/,
   );
-  // Host availability is only required on the proxy path, after local
-  // dispatch — a local tool must work even if host-core is restarting.
-  const proxyBranch = sidecarSource.slice(
+  // Other method-specific handlers can require a Host earlier. Local tools
+  // still select their own executor, with Host authorization before execution.
+  const hostProxy = sidecarSource.slice(
     sidecarSource.indexOf('msg.method === "host.proxy"'),
   );
+  const localDispatch = hostProxy.indexOf("const localTool =");
+  assert.ok(localDispatch >= 0);
+  const proxyBranch = hostProxy.slice(localDispatch);
   assert.ok(
     proxyBranch.indexOf("this.localTools.get") <
       proxyBranch.indexOf('throw new Error("host unavailable")'),
   );
+  assert.ok(proxyBranch.indexOf('"tools.authorizeLocal"') < proxyBranch.indexOf("this.runLocalTool("));
 });
 
 test("main serves BrowserPreview from its originating session workspace", () => {

@@ -17,6 +17,7 @@ export type SettingsTabId =
   | "expertTeam"
   | "import"
   | "projects"
+  | "memory"
   | "sync"
   | "remoteHosts"
   | "voice"
@@ -291,6 +292,18 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "project.archive",
       "project.restore",
       "project.delete",
+    ],
+  },
+  {
+    id: "memory",
+    labelKey: "settings.nav.memory",
+    titleKey: "settings.memory.title",
+    group: "workspace",
+    keywordKeys: [
+      "settings.memory.projectsTitle",
+      "project.autoMemoryToggle",
+      "project.memoryAdd",
+      "project.memoryRemove",
     ],
   },
   {

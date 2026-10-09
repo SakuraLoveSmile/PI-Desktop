@@ -87,11 +87,18 @@ The rules below govern every change to the PI-Desktop codebase and documentation
   (R7). If a gate, authentication, permissions, or required review prevents
   integration, report the actual blocker and remaining work; the requested
   integration is not Done.
-- Worktree cleanup is mandatory and immediate. As soon as the request branch is
-  integrated into remote `main` (or the user-authorized local-only delivery is
-  complete), remove the worktree and delete the merged branch. A merged request
-  must not leave a worktree on disk. Remove only your own worktree and branch,
-  and only after verifying the merge commits are present in `main`.
+- Post-merge cleanup follows `AGENTS.md` §5 "Verified merge and cleanup".
+  After verifying the user-authorized local or remote integration and its
+  checks, automatically clean this request's worktrees and merged branches in
+  the same task; no separate cleanup approval is needed for its own resources.
+  Preserve dirty/untracked contents and needed ignored artifacts in verified
+  recovery archives first. Prune registrations and retire empty parent/name
+  marker containers, obsolete integration branches and visible snapshot branches.
+  Backup commits belong in archive refs outside `refs/heads/` or verified files.
+  Check Git worktrees, local branches and physical paths, and report any blocker
+  by its exact path/ref. Preserve the primary checkout, active/unmerged work,
+  archives and unrelated tasks; batch cleanup needs explicit user scope, and
+  remote-branch deletion is not implied.
 - If the user requests a launch after delivery, build and start the app from
   the integrated `main` checkout and its development environment.
 
@@ -516,6 +523,7 @@ git merge --ff-only origin/main
 git worktree remove <worktree-path>
 git branch -d <type>/<short-description>
 git worktree prune
+# Only when the user explicitly authorized remote-branch deletion:
 git push origin --delete <type>/<short-description>
 ```
 
@@ -530,11 +538,14 @@ Do not merge the request branch into local `main` to create an E2E candidate
 or to open a PR. Local-only delivery (no remote PR/MR) stays on the request
 branch until the user explicitly asks to integrate it.
 
-The worktree must be clean before removal; commit or discard the request's own
-leftover changes first. Use `git branch -d` rather than `-D` so an unmerged
-branch refuses to delete. If `git worktree remove` reports the worktree as dirty
-or locked, resolve that state instead of forcing removal, and never remove
-another request's worktree.
+Before direct removal, the worktree must be clean. Preserve any remaining
+changes and needed ignored artifacts in a verified recoverable archive;
+cleanup does not authorize committing or discarding them. A managed archive
+operation may preserve the contents and retire the checkout instead. Use
+`git branch -d` rather than `-D` so an unmerged branch refuses to delete.
+If removal reports the worktree as dirty or locked, resolve that state without
+forcing removal. Other requests' resources require an explicitly authorized
+batch cleanup. Follow `AGENTS.md` §5 for verification and reporting.
 
 ---
 

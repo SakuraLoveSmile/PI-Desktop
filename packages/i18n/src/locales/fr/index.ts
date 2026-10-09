@@ -868,10 +868,18 @@ sklm: {
       "subagents": "Sous-agents",
       "import": "Importation",
       "projects": "Projets",
+      "memory": "Mémoire",
       "sync": "Synchronisation cloud",
       "remoteHosts": "Hôtes distants",
       "info": "Informations",
       "voice": "Voix"
+    },
+    "memory": {
+      "title": "Mémoire",
+      "description": "Gérez les souvenirs enregistrés et l'enregistrement automatique par projet. Les projets d'un même groupe partagent leur mémoire ; les autres restent séparés.",
+      "projectsTitle": "Mémoire du projet",
+      "empty": "Aucun projet pour le moment. Créez ou ouvrez d'abord un projet dans les archives de projets.",
+      "loadFailed": "Impossible de charger la liste des projets. Réessayez."
     },
     "configSync": {
       title: "Cloud sync",
@@ -1809,6 +1817,13 @@ sklm: {
     "memoryEntryContent": "Que doit retenir ce projet ?",
     "memoryRemove": "Supprimer la mémoire",
     "memoryHint": "Utilisée dans les chats de ce projet. Restez concis et factuel.",
+    memoryProjectChanged: "Ce projet appartient maintenant à un autre groupe. Fermez cette fenêtre et actualisez la liste des projets avant de modifier. Votre brouillon est conservé.",
+    "memoryConflict": "La mémoire enregistrée ou le projet a changé. Votre brouillon est conservé. Rechargez la mémoire enregistrée avant de sauvegarder.",
+    "memoryRequestFailed": "Impossible de charger ou de mettre à jour la mémoire du projet. Votre brouillon est conservé. Réessayez ou rechargez la mémoire enregistrée.",
+    "memoryReload": "Recharger la mémoire enregistrée",
+    "memoryReloadDiscard": "Recharger et abandonner le brouillon",
+    "autoMemoryToggle": "Enregistrer les souvenirs automatiquement",
+    "autoMemoryDescription": "Après activation, le logiciel peut enregistrer automatiquement les préférences durables du projet clairement exprimées. Désactiver ce réglage arrête seulement enregistrement et mises à jour automatiques ; les souvenirs enregistrés restent utilisés dans les chats du projet avant modification ou suppression par vos soins. Le réglage prend effet immédiatement ; les modifications attendent Enregistrer.",
     "memorySave": "Enregistrer la mémoire",
     "memorySaving": "Enregistrement…",
     "noSearchResults": "Aucun projet ne correspond à votre recherche",

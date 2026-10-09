@@ -871,10 +871,18 @@ sklm: {
       "subagents": "Subagenten",
       "import": "Importieren Sie",
       "projects": "Projekte",
+      "memory": "Erinnerungen",
       "sync": "Cloud-Synchronisierung",
       "remoteHosts": "Remote-Hosts",
       "info": "Informationen",
       "voice": "Sprache"
+    },
+    "memory": {
+      "title": "Erinnerungen",
+      "description": "Gespeicherte Erinnerungen und automatische Aufzeichnung nach Projekt verwalten. Projekte derselben Gruppe teilen Erinnerungen; andere Projekte bleiben getrennt.",
+      "projectsTitle": "Projekterinnerungen",
+      "empty": "Noch keine Projekte. Erstellen oder öffnen Sie zuerst ein Projekt im Projektarchiv.",
+      "loadFailed": "Die Projektliste konnte nicht geladen werden. Bitte versuchen Sie es erneut."
     },
     "configSync": {
       title: "Cloud sync",
@@ -1812,6 +1820,13 @@ sklm: {
     "memoryEntryContent": "Was soll sich dieses Projekt merken?",
     "memoryRemove": "Speicher entfernen",
     "memoryHint": "Wird in Chats dieses Projekts verwendet. Halten Sie ihn kurz und sachlich.",
+    memoryProjectChanged: "Dieses Projekt gehört jetzt zu einer anderen Gruppe. Schließen Sie den Dialog und aktualisieren Sie die Projektliste vor dem Bearbeiten. Ihr Entwurf bleibt erhalten.",
+    "memoryConflict": "Die gespeicherten Erinnerungen oder das Projekt haben sich geändert. Ihr Entwurf bleibt erhalten. Laden Sie die gespeicherten Erinnerungen vor dem Speichern neu.",
+    "memoryRequestFailed": "Projekterinnerungen konnten nicht geladen oder aktualisiert werden. Ihr Entwurf bleibt erhalten. Versuchen Sie es erneut oder laden Sie die gespeicherten Erinnerungen neu.",
+    "memoryReload": "Gespeicherte Erinnerungen neu laden",
+    "memoryReloadDiscard": "Neu laden und Entwurf verwerfen",
+    "autoMemoryToggle": "Erinnerungen automatisch speichern",
+    "autoMemoryDescription": "Wenn aktiviert, kann der Assistent klar geäußerte dauerhafte Projektpräferenzen automatisch speichern. Das Ausschalten stoppt nur das automatische Speichern und Aktualisieren; gespeicherte Erinnerungen werden weiterhin in Projektchats verwendet, bis Sie sie bearbeiten oder löschen. Der Schalter gilt sofort; Änderungen an Erinnerungen erst nach Speichern.",
     "memorySave": "Speicher sichern",
     "memorySaving": "Wird gespeichert…",
     "noSearchResults": "Keine Projekte entsprechen Ihrer Suche",
