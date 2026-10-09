@@ -17647,3 +17647,12 @@ decisions preserve session/request identity. Pending decisions cannot repeat;
 failed decisions remain retryable and known/unknown reasons remain honest.
 Only external clipboard and resolution boundaries are fixtures; no actual
 user permission is granted or denied. Save a native screenshot for visual QA.
+
+### Targeted Team execution gate
+
+For execution/lifecycle changes with no Team panel layout changes,
+`PI_E2E_TEAM_CORE_ONLY=1 node scripts/e2e-team.mjs` runs the same approval,
+expert dispatch, task/member navigation, messages, queue, pause/restart/resume
+and locale reload checks while omitting the full font/theme/resize matrix.
+The default command retains that matrix. A core-only pass must be reported
+separately and never presented as full layout acceptance.
