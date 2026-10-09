@@ -545,23 +545,31 @@ async function activateOverviewTab(sendCdp, evaluate) {
 }
 
 async function submitComposerPrompt(sendCdp, evaluate, prompt) {
-  const promptLiteral = JSON.stringify(prompt);
   await waitFor(() => evaluate(`!!document.querySelector('.composer-input[contenteditable="true"]')`), "editable composer");
   await evaluate(`(() => {
     const editor = document.querySelector('.composer-input[contenteditable="true"]');
     editor.focus();
-    editor.textContent = ${promptLiteral};
-    editor.dispatchEvent(new InputEvent('input', {
-      bubbles: true, inputType: 'insertText', data: ${promptLiteral}
-    }));
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    selection.removeAllRanges();
+    selection.addRange(range);
     return true;
   })()`);
-  // Synthetic input must reach React's committed handler before clicking a
-  // button that may still be enabled from the previous queued submission.
+  await sendCdp("Input.insertText", { text: prompt });
   await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
   await waitFor(() => evaluate(`!!document.querySelector('.send-btn:not(:disabled)')`), "composer Send enabled");
   await evaluate(`document.querySelector('.send-btn')?.click()`);
-  await waitFor(() => evaluate(`!document.querySelector('.composer-input[contenteditable="true"]')?.textContent?.trim()`), "submitted composer draft cleared");
+  try {
+    await waitFor(() => evaluate(`!document.querySelector('.composer-input[contenteditable="true"]')?.textContent?.trim()`), "submitted composer draft cleared");
+  } catch (error) {
+    console.error("TEAM_COMPOSER_SUBMIT", JSON.stringify({ prompt, state: await evaluate(`({
+      draft: document.querySelector('.composer-input[contenteditable="true"]')?.textContent,
+      queueCount: document.querySelectorAll('[data-testid="queued-prompt"]').length,
+      errors: Array.from(document.querySelectorAll('[role="alert"]')).map(element => element.innerText)
+    })`) }));
+    throw error;
+  }
 }
 
 async function panoramaViewport(sendCdp, evaluate) {
@@ -1369,7 +1377,7 @@ try {
   await waitFor(() => modelGates.queue.entered, "controlled Lead turn for queue actions");
   for (let index = 1; index <= 8; index += 1) {
     await submitComposerPrompt(sendCdp, evaluate, `Queue fixture prompt ${index}`);
-    await waitFor(() => evaluate(`document.querySelectorAll('[data-testid="queued-prompt"]').length === ${index}`), `queue row ${index}`);
+    await waitFor(() => evaluate(`document.querySelectorAll('[data-testid="queued-prompt"]').length === ${index} && !document.querySelector('[data-testid="queued-prompt"] .composer-queued-prompt-remove:disabled')`), `Host-confirmed queue row ${index}`);
   }
   await evaluate(`document.querySelector('.composer-queue-heading')?.click()`);
   await waitFor(() => evaluate(`document.querySelector('.composer-queue-heading')?.getAttribute('aria-expanded') === 'false'`), "queue folded with eight waiting prompts");
@@ -1389,7 +1397,7 @@ try {
   await evaluate(`document.querySelectorAll('.composer-queued-prompt-edit')[1]?.click()`);
   await waitFor(() => evaluate(`document.querySelector('.composer-input')?.textContent === 'Queue fixture prompt 2' && document.querySelectorAll('[data-testid="queued-prompt"]').length === 6`), "queue Edit returns the draft");
   await submitComposerPrompt(sendCdp, evaluate, "Queue fixture prompt 2 edited");
-  await waitFor(() => evaluate(`document.querySelectorAll('[data-testid="queued-prompt"]').length === 7`), "edited queue prompt reinserted");
+  await waitFor(() => evaluate(`document.querySelectorAll('[data-testid="queued-prompt"]').length === 7 && !document.querySelector('[data-testid="queued-prompt"] .composer-queued-prompt-remove:disabled')`), "edited queue prompt confirmed");
   await saveScreenshot(sendCdp, "team-queue-expanded.png");
   for (let count = 7; count > 1; count -= 1) {
     await evaluate(`document.querySelectorAll('.composer-queued-prompt-remove')[${count - 1}]?.click()`);
