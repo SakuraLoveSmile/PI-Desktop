@@ -130,3 +130,13 @@ Candidate validation and final merge identity are recorded in the local
 integration archive. No remote publication or installation is part of this
 local-main request. Only this request's worktree and branch are retired after
 verified integration, with recoverable source and validation artifacts retained.
+
+The executable candidate `3c90ac89fb466a7e5fb0cd995f18afc358253d61` passed
+workspace TypeScript builds, Desktop typecheck and production build, 3936
+Desktop tests (one existing skip), 959 Rust tests, formatting, Clippy, configured
+lint and repository policy guards. Native Context Insights E2E passed 34/34;
+real project-context process E2E and fast-confirmed Team approval E2E also
+passed using isolated state and deterministic local model fixtures. The Context
+E2E verified unchanged executable hashes throughout its run. This final report
+update changes documentation only; the merged executable tree is identical to
+the tested candidate. No paid or production provider was used.
