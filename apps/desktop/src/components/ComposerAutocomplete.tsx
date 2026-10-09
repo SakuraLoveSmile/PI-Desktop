@@ -118,7 +118,7 @@ export function ComposerAutocomplete({
             <span className="composer-ac-hint">{item.command.argumentHint}</span>
           ) : null}
           {item.command.description ? (
-            <span className="composer-ac-desc">{item.command.description}</span>
+            <span className="composer-ac-desc">{item.command.id === "builtin.context.inspect" ? t("contextInsights.title") : item.command.description}</span>
           ) : null}
         </button>
       );

@@ -1,0 +1,2 @@
+.context-insights-dialog { width: min(1080px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto; }
+.context-insights-dialog-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }

@@ -2757,6 +2757,10 @@ Markdown 源码，不是 `text/html` 负载；对禁用行内 HTML 的外部编�
 
 #### E2E-064：持久通知收件箱记录终端任务结果
 
+- **成功通知／共享计数回归覆盖**：`node scripts/e2e-notification-inbox.mjs` 使用隔离
+  SQLite 与 Electron，覆盖渲染器刷新后的持久列表恢复、成功／失败、“全部”／“未读”、
+  行导航、已读／清除操作及 macOS 原生 Dock 计数回读；不调用真实 provider 或发送原生横幅。
+
 - **先决条件**：存在两个持久会话；确定性提供商可以
   完成一回合，失败一回合并出现稳定的错误代码，以及中止一回合
   转；通知收件箱开始为空。
@@ -2768,7 +2772,7 @@ Markdown 源码，不是 `text/html` 负载；对禁用行内 HTML 的外部编�
   row 读取并确认其会话没有终端侧边栏标记，然后
   close/reopen 弹出窗口并重新启动应用程序。 8) 选择其他会话
   从其带有终端标记的侧边栏行。 9) 用205生成一个主机装置
-  符合资格的终端回合。 10) 使用“标记全部已读”，然后“清除”。 11) 当本机任务横幅和渲染器刷新仍在进行时，投递一个针对已清除/已读 durable id 的延迟 `notification.changed` 负载，以及一个已存在 id 的重复负载。
+  符合资格的终端回合。 10) 使用“标记全部已读”，然后“清除”。 11) 当本机任务横幅和渲染器刷新仍在进行时，投递一个针对已清除/已读 durable id 的延迟 `notification.changed` 负载，以及一个已存在 id 的重复负载。12) 在隔离 profile 中仅创建一条成功未读记录，重启应用，打开“全部”和“未读”，再选择该行。13) 创建一条成功和一条失败的未读记录，比较“全部”和“未读”，标记其中一条已读并确认仅该行从“未读”消失。标记全部已读，再创建一条未读通知并清除。14) 生成足以显示两位数的未读计数，检查任务栏徽标在标记全部已读前后的状态。
 - **预期**：A 的可见当前完成不会创建任何行。正好两行
   存在，最新的优先：未聚焦的 A 完成和背景 B 失败，
 带有本地化标签、快照会话标题和 B 的稳定代码。
@@ -2781,7 +2785,7 @@ Markdown 源码，不是 `text/html` 负载；对禁用行内 HTML 的外部编�
   保留零个未读行。选择其他会话会清除其
   终端侧边栏标记并标记其任务通知已读；都没有标记
   刷新或重启后返回。清除仅清空收件箱并离开
-  会议、回合和成绩单完好无损。清除/已读也会关闭所有待处理的任务本机通知；重复 durable id 不会产生第二个横幅或行，清除前的延迟事件不能复活已清除项目；清除后真正的新回合仍只产生一行和一个横幅。
+  会议、回合和成绩单完好无损。清除/已读也会关闭所有待处理的任务本机通知；重复 durable id 不会产生第二个横幅或行，清除前的延迟事件不能复活已清除项目；清除后真正的新回合仍只产生一行和一个横幅。仅成功的记录在重启后仍出现在“全部”和“未读”，铃铛与 Dock/任务栏计数均为 1；选择该行会导航到对应会话并将两处计数清零。混合记录时“全部”展示成功与失败，“未读”精确等于 `readAt == null` 的行；单独读取一行只从“未读”移除该行并同步减一，标记全部已读和清除也会同步清零，清除不更改会话。所有步骤只使用隔离 SQLite 与 Electron fixture，不调用真实 provider。
 - **链接规格**：`03-runtime/04-data-storage.md`，
   `03-runtime/06-host-rpc-protocol.md`、`03-runtime/01-ipc-protocol.md`、
   `04-ux/07-ui-design-system.md`、`04-ux/08-component-spec.md`、
@@ -5655,6 +5659,7 @@ eleven-tool-round desktop paths are verified by
 | 基线后本地自动化 | E2E-220 |
 | B / F / Quality / Security — Manual model-list intent and the macOS Local Network trigger | E2E-MAC-local-network-manual-discovery |
 | 基线后本地自动化（MCP `pi_session_get` 超大 compaction） | E2E-MCP-session-get-projects-large-compaction |
+| Post-baseline local automation (lossless MCP single-message chunks) | E2E-MCP-session-get-chunk |
 | MVP 后远程控制 | E2E-221、E2E-222、E2E-223、E2E-224、E2E-225、E2E-226、E2E-227、E2E-228、E2E-229、E2E-230、E2E-231、E2E-232 |
 | 受信任扩展（R7 v1） | E2E-DIALOG-long-text-boundaries、E2E-241、E2E-242、E2E-HOOKS-cancel-and-dispose、E2E-243、E2E-244、E2E-245、E2E-PLUGIN-imported-pi-package-skills、E2E-PLUGIN-import-extension-installs-dependencies、E2E-PLUGIN-import-extension-reports-missing-dependency、E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list |
 | 受信任扩展（R7 v1 npm 恢复） | E2E-PLUGIN-import-extension-recovers-missing-npm |
@@ -7856,6 +7861,41 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
   和 `load_error` 行为保留为独立验证面。
 
 
+#### E2E-MCP-session-get-chunk
+
+- **Native producer regression coverage**: The same isolated script drives a real
+  Node AgentSidecar over stdio, the production session IPC and authenticated MCP.
+  A large Unicode native Pi transcript is reconstructed losslessly; older/empty/
+  clamped pages, restart hash stability and unchanged source JSONL bytes are
+  checked. Ordinary native pagination exposes the existing physical end/after
+  metadata required by the chunk consumer. No user session or provider is used.
+
+- **Preconditions**: Start an isolated local MCP listener with a durable
+  one-message transcript page whose complete JSON exceeds the ordinary 512 KiB
+  control result envelope. No model/provider or user profile is required.
+- **Steps**: 1) Authenticate and initialize. 2) Confirm `tools/list` advertises
+  `pi_session_get_chunk` with a read risk and the documented schema. 3) Observe
+  the ordinary `pi_session_get` truncation envelope. 4) Read chunk offset zero,
+  then continue using `nextOffset` and `expectedSha256`. 5) Decode and combine
+  base64 bytes, verify total length/hash and JSON session identity. 6) Change
+  the page between chunks; test invalid arguments, foreign identity, invalid
+  physical pagination, offset bounds, and a page larger than 16 MiB.
+- **Expected**: The complete Unicode transcript survives byte-for-byte. Each
+  read uses authoritative `session/get` with `messageLimit: 1` and no content
+  limit. Each chunk is at most 64 KiB, the final `nextOffset` is explicit null,
+  and every continuation re-reads the page. Changed content fails with
+  `CONFLICT` without retry or partial evidence; invalid inputs/results and the
+  total limit fail explicitly. Ordinary reads and auth boundaries remain intact.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` §13d
+- **Acceptance**: C (sessions), Quality
+- **Milestone**: M6+
+- **Status**: Authenticated local HTTP contract covered by
+  `apps/desktop/test/mcp-control.test.mjs`. Run
+  `PI_DESKTOP_HOST_BIN=<compatible host binary> node scripts/e2e-mcp-session-chunk.mjs`
+  for the real isolated Host, production session IPC and authenticated MCP
+  journey, including older-message pagination and restart. Installed-app
+  evidence and any model execution must be reported separately.
+
 #### E2E-234：工作区安全拒绝名单与忽略层
 
 - **前提条件**：一个项目包含 `.env`、`.env.example`、`server.pem`、`keys/id_rsa`、
@@ -9782,7 +9822,8 @@ with Overview; the Composer has no Session checklist mounting or popup.
   new navigation, all six roles, provider/model/thinking/tools/instructions,
   save/reopen, project inheritance/isolation/reset, failure draft retention,
   interleaved CAS conflicts, missing model/project recovery, navigation during
-  an outstanding read, dark cards and narrow light editor. Host API is the
+  an outstanding read, shared Subagents row/glyph/badge/action styles in both
+  themes, and narrow editor containment. Host API is the
   controlled external boundary; no model or user profile is used.
 - node scripts/e2e-expert-team-config.mjs uses a real isolated SQLite/stdio Host
   and the shared schema to verify settings persistence, user/project resolution,
@@ -9820,3 +9861,64 @@ decisions preserve session/request identity. Pending decisions cannot repeat;
 failed decisions remain retryable and known/unknown reasons remain honest.
 Only external clipboard and resolution boundaries are fixtures; no actual
 user permission is granted or denied. Save a native screenshot for visual QA.
+
+### E2E-PLUS-project-context: Record memory, recall sources, and search current code
+
+- **Preconditions**: Isolated data/profile with two project groups; one group has
+  multiple local roots. Built candidate
+  Host and Node sidecar; deterministic loopback model (no paid provider).
+- **Steps**: Open Settings > Memory with developer mode off. Verify the project
+  groups are listed, an empty list links to Project archive, and a failed list
+  read can be retried. Open a group's memory editor, add and save a note, edit it,
+  remove it, then enable automatic recording and ask the Agent to remember a
+  stable package-manager preference. Continue a fresh user turn. Attempt a stale editor
+  save, then explicitly reload. Search historical verification and read the
+  returned session/message source. Search a code marker; edit/create/rename/delete
+  matching files and change ignore rules, repeating search. Disable recording,
+  switch project, restart both processes, and ask about the saved preference.
+  Inspect/clear the code cache, then search again. Repeat memory edit/forget after
+  moving a secondary root out of and back into its group.
+- **Expected**: Memory is a regular Workspace settings destination and remains
+  visible with developer mode off. The settings list uses Host project groups and
+  the existing editor; it does not create a second storage path. Recording
+  defaults off. Enabled Agent writes are durable; no background model/embedding request is made. Disabled recording retains saved
+  context and removes writes. Stale snapshot/entry CAS is `CONFLICT`, changed owner
+  is `PROJECT_CHANGED`; failures never overwrite notes or silently lose drafts.
+  Opening the same group from Project archive shows the same notes. Notes and
+  recording settings are shared across roots in one group and isolated from the
+  other group.
+  Root reattachment cannot duplicate or resurrect forgotten group notes. History
+  stays within current group membership, cites stable source IDs and excludes
+  deleted/native sessions. CodeSearch stays within the caller session root,
+  returns path/line excerpts, reconciles file/ignore changes and flags partial
+  coverage. Sensitive files and escaping symlinks are excluded; bounds are
+  explicit. Clear only affects that root's derived cache and is denied in
+  Plan/Goal. Parent binding spoofing and restricted expert-tool access are denied.
+  Grep's existing behavior is unchanged.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`, `02-agent-runtime.md`,
+  `04-data-storage.md`, `06-host-rpc-protocol.md`; `04-ux/06-settings-ia.md`.
+- **Acceptance**: C (runtime tools), D (editor), F (persistence), Localization.
+- **Milestone**: Plus.
+- **Automation**: `node scripts/e2e-project-context.mjs` (real sidecar/proxy/Host,
+  controlled HTTP model); `node scripts/e2e-code-index.mjs` (real Host/filesystem);
+  `node scripts/e2e-project-auto-memory.mjs` (real editor/production CSS in
+  isolated Electron, fixture IPC); `node scripts/e2e-settings-memory.mjs`
+  (`pnpm test:e2e:settings-memory`) mounts the
+  production SettingsPage and ProjectMemoryDialog with React and production CSS
+  in isolated Electron, using fixture IPC only. The settings test covers
+  navigation, project-group listing, empty/error retry, editor opening, and
+  editing/recording controls; it does not exercise real Host persistence.
+  Host unit tests cover CAS, group lifecycle, relocation, config-sync eligibility
+  and mode/expert permissions. Existing real Host/loopback runs are prior evidence
+  and are not a claim that they were rerun for this change.
+- **Status**: Settings renderer candidate validated with isolated fixture IPC;
+  real Host behavior is unchanged and was not rerun for this navigation change.
+
+| Plus scenario | User path | Automated entry |
+| --- | --- | --- |
+| E2E-PLUS-project-context | Remember → later turn/restart recall → source lookup → current code search | project-context, code-index, project-auto-memory scripts |
+
+Overview layout validation also checks long titles, project paths and model names at
+320/360/570px in both themes. Metadata retains positive visible width and no
+header/resources/references horizontal overflow is introduced. Selected reference
+options retain pressed states and switching behavior.

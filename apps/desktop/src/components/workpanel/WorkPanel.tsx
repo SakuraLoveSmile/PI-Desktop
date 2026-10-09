@@ -53,6 +53,7 @@ import { SubagentTranscriptTab } from "./SubagentTranscriptTab";
 import { GoalReportTab } from "./GoalReportTab";
 import { TeamWorkPanelSurface } from "./team/TeamWorkPanelSurface";
 import { teamTabIcon, teamTabLabel } from "./team/team-work-panel-tab";
+import { ContextInsightsDashboard } from "../../features/context-insights/ContextInsightsDashboard";
 import { OverviewTab } from "./OverviewTab";
 import {
   MAIN_PANE_MIN_WIDTH,
@@ -65,6 +66,7 @@ import {
 } from "../../lib/work-panel-resize";
 
 const TAB_ICONS = {
+  context: IconMap,
   overview: IconMap,
   new: IconPlus,
   review: IconDiff,
@@ -125,6 +127,7 @@ function tabLabel(
     // back to its id rather than leaving the tab blank until it closes.
     return view?.title ?? tab.resource ?? t("panel.tabs.plugin");
   }
+  if (tab.kind === "context") return t("contextInsights.title");
   if (tab.kind === "new") return t("panel.new.title");
   if (tab.kind === "subagent") return tab.label ?? t("panel.tabs.subagent");
   if (tab.kind === "goalReport") return tab.label ?? t("panel.tabs.goalReport");
@@ -140,9 +143,9 @@ function workPanelTools(
   teamAvailable: boolean = false,
   teamSessionId?: string,
 ): WorkPanelTool[] {
-  // Review is the only host-owned launcher. Files, Browser, and every future
-  // tool are plugin-contributed views, so their list stays data-driven.
+  // Native context diagnostics and review coexist with plugin-contributed tools.
   return [
+    { id: "context", tab: toolWorkPanelTab("context"), label: t("contextInsights.title"), icon: IconMap },
     {
       id: "review",
       tab: toolWorkPanelTab("review"),
@@ -961,6 +964,12 @@ export function WorkPanel({
           </div>
         </header>
         <div className="work-panel-body">
+          {activeTab?.kind === "context" && activeSessionId && (
+            <div key={activeSessionId} className="work-panel-tabpane" role="tabpanel"
+              id={`work-panel-surface-${activeTab.id}`} aria-labelledby={`work-panel-tab-${activeTab.id}`}>
+              <ContextInsightsDashboard sessionId={activeSessionId} compact />
+            </div>
+          )}
           {activeTab?.kind === "overview" && (
             <div
               key={activeTab.id}

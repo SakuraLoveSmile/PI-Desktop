@@ -335,6 +335,8 @@ export class SubagentRun {
             preflightModel,
             this.opts.sessionId,
             usage => this.recordUsage(usage),
+            { turnId: this.opts.turnId, agentName: this.opts.definition.name, parentToolCallId: this.opts.parentToolCallId,
+              onContext: request => this.emit({ type: "context_insights", request }) },
           ),
         systemPrompt: preflightSystemPrompt,
         tools: preflightTools,
@@ -441,6 +443,9 @@ export class SubagentRun {
       sessionId: this.opts.sessionId,
       maxTokens: this.opts.definition.maxTokens,
       onUsage: usage => this.recordUsage(usage),
+      turnId: this.opts.turnId, agentName: this.opts.definition.name,
+      parentToolCallId: this.opts.parentToolCallId,
+      onContext: request => this.emit({ type: "context_insights", request }),
     }, this.retryState);
   }
 
@@ -454,6 +459,12 @@ export class SubagentRun {
       ...(systemMessage ? [systemMessage] : []),
       ...outcome.messages.filter((message) => message.role !== "system"),
     ];
+    this.emit({ type: "context_insights", diagnosticEvent: {
+      id: randomUUID(), at: Date.now(), turnId: this.opts.turnId,
+      type: outcome.kind === "compacted" ? "compaction" : "prune",
+      label: `${this.opts.definition.name}: ${outcome.kind === "compacted" ? "checkpoint" : "retained-tail degradation"}`,
+      tokensBefore: outcome.tokensBefore, tokensAfter: contextBudgetFor(this.agent.state.model, outcome.messages).tokens,
+    } });
     if (outcome.kind === "compacted") {
       this.contextCompactions += 1;
     } else {
@@ -483,6 +494,8 @@ export class SubagentRun {
           this.agent.state.model,
           this.opts.sessionId,
           usage => this.recordUsage(usage),
+          { turnId: this.opts.turnId, agentName: this.opts.definition.name, parentToolCallId: this.opts.parentToolCallId,
+            onContext: request => this.emit({ type: "context_insights", request }) },
         ),
       thinkingLevel: this.agent.state.thinkingLevel,
       signal: signal ?? this.runSignal(),

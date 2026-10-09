@@ -55,6 +55,17 @@ fn register_contains(db: &Database) -> Result<()> {
 /// case mappings use a literal scan to avoid the FTS tokenizer's older Unicode
 /// tables dropping characters handled by the host/renderer lowercase rules.
 pub fn search(db: &Database, query: &str, offset: i64) -> Result<SearchPage> {
+    search_scoped(db, query, offset, None)
+}
+
+/// Apply project ownership before pagination so unrelated projects cannot
+/// consume a scoped page or leak snippets into an agent's historical context.
+pub fn search_scoped(
+    db: &Database,
+    query: &str,
+    offset: i64,
+    roots: Option<&[String]>,
+) -> Result<SearchPage> {
     let query = query.trim();
     if query.is_empty() {
         return Ok(SearchPage {
@@ -96,20 +107,29 @@ pub fn search(db: &Database, query: &str, offset: i64) -> Result<SearchPage> {
          LEFT JOIN team_members member ON member.member_session_id = s.id
          LEFT JOIN matched ON matched.session_id = s.id
          WHERE s.deleted_at IS NULL AND (matched.count > 0 OR metadata_match)
+           AND (?4 IS NULL OR p.path IN (SELECT value FROM json_each(?4)))
          ORDER BY s.updated_at DESC, s.id ASC LIMIT 31 OFFSET ?3"
     );
     let mut hits = db
         .conn()
         .prepare_cached(&sql)?
-        .query_map(params![query, quoted, offset], |row| {
-            Ok(SessionMatch {
-                session: sessions::summary_from_row(row)?,
-                project_name: row.get(12)?,
-                message_count: row.get(16)?,
-                metadata_match: row.get(17)?,
-                matches: vec![],
-            })
-        })?
+        .query_map(
+            params![
+                query,
+                quoted,
+                offset,
+                roots.map(serde_json::to_string).transpose()?
+            ],
+            |row| {
+                Ok(SessionMatch {
+                    session: sessions::summary_from_row(row)?,
+                    project_name: row.get(12)?,
+                    message_count: row.get(16)?,
+                    metadata_match: row.get(17)?,
+                    matches: vec![],
+                })
+            },
+        )?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     let next_offset = (hits.len() > 30).then(|| offset.saturating_add(30));
     hits.truncate(30);

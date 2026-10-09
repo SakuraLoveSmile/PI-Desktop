@@ -56,6 +56,9 @@ export function createEventPersistence({
   persistAgentEvent: (envelope: AgentEventEnvelope) => UiMessage | undefined;
 } {
   const inflightSnapshots = new Map<string, UiMessage>();
+  persistenceOutbox.setContextInsightsAcknowledgedHandler(sessionId => {
+    emitAgentEvent({ sessionId, ts: Date.now(), event: { type: "context_insights" } });
+  });
 function subagentTagged(message: UiMessage, envelope: AgentEventEnvelope): UiMessage {
   return tagMessageToolLineage(message, envelope);
 }
@@ -64,6 +67,17 @@ function subagentTagged(message: UiMessage, envelope: AgentEventEnvelope): UiMes
 function persistAgentEvent(envelope: AgentEventEnvelope): UiMessage | undefined {
   const event = envelope.event;
   const turnId = activeTurns.get(envelope.sessionId);
+  if (event.type === "context_insights") {
+    const identity = event.request?.id ?? event.diagnosticEvent?.id;
+    if (identity) void persistenceOutbox.enqueue({
+      key: `context:${envelope.sessionId}:${identity}`, sessionId: envelope.sessionId,
+      contextInsights: { ...(event.request ? { request: event.request } : {}),
+        ...(event.diagnosticEvent ? { event: event.diagnosticEvent } : {}) },
+    }, () => runtimeState.host).catch((error: unknown) => {
+      logger.app("persistence", "warn", "context diagnostics enqueue failed", { sessionId: envelope.sessionId, data: String(error) });
+    });
+    return;
+  }
   const usage = usageForEvent(envelope);
   if (usage) {
     if (ownsUsageTurn(envelope, turnId)) addActiveTurnUsage(envelope.sessionId, usage);
