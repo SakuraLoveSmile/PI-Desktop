@@ -330,7 +330,7 @@ export function ComposerPlusMenu({
                 <div className="flex-1 text-left min-w-0 truncate">
                   <div className="font-medium text-sm truncate">/{cmd.name}</div>
                   <div className="text-xs text-muted truncate">
-                    {cmd.description || cmd.title}
+                    {cmd.id === "builtin.context.inspect" ? t("contextInsights.title") : cmd.description || cmd.title}
                   </div>
                 </div>
               </button>
@@ -359,7 +359,7 @@ export function ComposerPlusMenu({
                 <div className="flex-1 text-left min-w-0 truncate">
                   <div className="font-medium text-sm truncate">/{cmd.name}</div>
                   <div className="text-xs text-muted truncate">
-                    {cmd.description || cmd.title}
+                    {cmd.id === "builtin.context.inspect" ? t("contextInsights.title") : cmd.description || cmd.title}
                   </div>
                 </div>
               </button>

@@ -6,6 +6,7 @@
 import { randomUUID } from "node:crypto";
 import type { ModelAuth } from "@earendil-works/pi-ai";
 import { ParentHostProxy } from "./parent-host-proxy.js";
+import { bindProjectContextHost } from "./project-context-host.js";
 import { visionFromModelConfig } from "./model-capabilities.js";
 import { hydrateAttachmentHistory } from "./attachment-history.js";
 import { classifyAgentError } from "./agent-errors.js";
@@ -63,6 +64,7 @@ async function getNativePiService() {
 }
 
 const runtimes: RuntimeMap = new Map();
+const runtimeProjectBindings = new WeakMap<DesktopAgentRuntime, string | undefined>();
 const hostProxy = new ParentHostProxy();
 const testRuntimeIds = new WeakMap<DesktopAgentRuntime, string>();
 function testRuntimeIdentity(sessionId: string) {
@@ -125,6 +127,8 @@ type RuntimeParams = {
   scratchDir?: string;
   /** Session-bound workspace root supplied by Electron main. */
   projectPath?: string;
+  /** Parent-issued capability for this session's registered project root. */
+  projectContextBindingId?: string;
   customSystemPrompt?: CustomSystemPrompt;
   projectInstructions?: ProjectInstructions;
   projectMemory?: string;
@@ -230,7 +234,7 @@ async function runtimeFor(
       errorCode: "AGENT_BUSY",
     });
   }
-  const reusable = existing?.matches({
+  const reusable = existing && runtimeProjectBindings.get(existing) === params.projectContextBindingId && existing.matches({
     mode,
     executionProfile,
     teamContext: params.teamContext,
@@ -300,7 +304,7 @@ async function runtimeFor(
     }
   }
   const runtime = new DesktopAgentRuntime({
-    host: hostProxy,
+    host: bindProjectContextHost(hostProxy, sessionId, params.projectContextBindingId),
     sessionId,
     mode,
     executionProfile,
@@ -333,6 +337,7 @@ async function runtimeFor(
     onDiagnostic: (diagnostic) => notify("agent.diagnostic", diagnostic),
   });
   runtimes.set(sessionId, runtime);
+  runtimeProjectBindings.set(runtime, params.projectContextBindingId);
   // Load failures are diagnostics, never a failed prompt (spec 16 §4.4).
   await runtime.loadTrustedExtensions().catch(() => undefined);
   if (provider.extensionAgentKey) {

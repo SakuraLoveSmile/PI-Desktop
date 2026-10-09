@@ -7,6 +7,7 @@ type MessageAppend = {
   sessionId: string;
   message?: unknown;
   usage?: unknown;
+  contextInsights?: { request?: unknown; event?: unknown };
   turnId?: string;
 };
 
@@ -24,6 +25,7 @@ export class PersistenceOutbox {
   private readonly tempPath: string;
   private readonly logger: OutboxLogger;
   private entries: MessageAppend[] = [];
+  private contextInsightsAcknowledged?: (sessionId: string) => void;
   private flushing: Promise<void> | null = null;
   private persistChain = Promise.resolve();
   private readonly loaded: Promise<void>;
@@ -33,6 +35,10 @@ export class PersistenceOutbox {
     this.tempPath = `${this.path}.tmp`;
     this.logger = logger;
     this.loaded = this.load();
+  }
+
+  setContextInsightsAcknowledgedHandler(handler: (sessionId: string) => void): void {
+    this.contextInsightsAcknowledged = handler;
   }
 
   async enqueue(
@@ -92,15 +98,21 @@ export class PersistenceOutbox {
       const currentHost = getHost();
       if (!currentHost || !currentHost.isAvailable()) return;
       try {
-        await currentHost.call(current.usage ? "session.recordUsage" : "session.appendMessage", {
+        const result = await currentHost.call<{ recorded?: boolean }>(current.contextInsights ? "contextInsights.record" : current.usage ? "session.recordUsage" : "session.appendMessage", {
           sessionId: current.sessionId,
-          ...(current.usage ? { usage: current.usage } : { message: current.message }),
+          ...(current.contextInsights ? current.contextInsights : current.usage ? { usage: current.usage } : { message: current.message }),
           turnId: current.turnId,
         });
+        if (current.contextInsights && result?.recorded) {
+          try { this.contextInsightsAcknowledged?.(current.sessionId); }
+          catch { this.logger("warn", "context diagnostics acknowledgement notification failed", { sessionId: current.sessionId }); }
+        }
       } catch (error) {
         // A duplicate message id means the host already has the row; drop it
         // and keep draining (D318/#560).
-        if (isDuplicateMessageIdError(error)) {
+        if (current.contextInsights && isPermanentDiagnosticError(error)) {
+          this.logger("warn", "context diagnostics rejected; dropping diagnostic only", { key: current.key, sessionId: current.sessionId });
+        } else if (isDuplicateMessageIdError(error)) {
           this.logger("warn", "session persistence flush skipped duplicate message id", {
             key: current.key,
             data: String(error),
@@ -149,7 +161,7 @@ export class PersistenceOutbox {
             entry &&
             typeof entry.key === "string" &&
             typeof entry.sessionId === "string" &&
-            ("message" in entry || ("usage" in entry && typeof entry.turnId === "string"))
+            ("message" in entry || "contextInsights" in entry || ("usage" in entry && typeof entry.turnId === "string"))
           );
         });
       }
@@ -201,4 +213,11 @@ function isPoisonMessageError(error: unknown): boolean {
  */
 function isForeignKeyError(error: unknown): boolean {
   return /FOREIGN KEY constraint failed/i.test(String(error));
+}
+
+function isPermanentDiagnosticError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const nested = Reflect.get(error, "data");
+  const code = Reflect.get(error, "errorCode") ?? (nested && typeof nested === "object" ? Reflect.get(nested, "errorCode") : undefined);
+  return typeof code === "string" && ["INVALID_ARGUMENT", "INVALID_PARAMS", "LIMIT_EXCEEDED", "NOT_FOUND", "PERMISSION_DENIED"].includes(code);
 }

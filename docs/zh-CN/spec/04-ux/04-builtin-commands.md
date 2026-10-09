@@ -4,7 +4,7 @@
 
 ## 1. 目标
 
-定义无需插件即可使用的五条第一方命令。它们也会出现在输入框的 `/` 菜单中。
+定义无需插件即可使用的六条第一方命令。它们也会出现在输入框的 `/` 菜单中。
 
 快捷键：**Cmd/Ctrl + Shift + P**（D014）
 
@@ -16,20 +16,21 @@ builtin.<domain>.<action>
 
 ## 3. 核心内置目录
 
-内置 registry 有意只包含以下五条命令。插件命令会动态扩展可搜索的命令列表；
+内置 registry 有意只包含以下六条命令。插件命令会动态扩展可搜索的命令列表；
 应用导航、项目管理、设置、插件管理和诊断不属于内置命令契约。
 
 | id | 标题 | 关键词 | 类别 | 风险 | 行为 |
 |---|---|---|---|---|---|
 | `builtin.session.new` | 新建任务 | new、chat、task | Session | 低 | 复用当前分组最新空会话，否则立即露出空首页并创建持久空会话，然后聚焦输入框 |
 | `builtin.agent.compact` | 压缩对话上下文 | compact、context、tokens | Session | 低 | 为当前空闲会话创建模型上下文检查点 |
+| `builtin.context.inspect` | Context Insights | context, tokens, insights | Session | low | open a read-only captured-context dialog for the active session; open the overview when no session is selected |
 | `builtin.mode.agent` | 切换到 Agent | mode、agent | Session | 低 | 将空闲会话模式设为 Agent |
 | `builtin.mode.plan` | 切换到 Plan | mode、plan、planning | Session | 低 | 将空闲会话模式设为 Plan |
 | `builtin.mode.goal` | 切换到 Goal | mode、goal、objective、autonomous | Session | 低 | 将空闲会话模式设为 Goal |
 
 ## 4. 可见性与执行规则
 
-- 五个 ID 构成完整的第一方 registry。移除的 ID 不会出现在命令面板结果中，
+- 六个 ID 构成完整的第一方 registry。移除的 ID 不会出现在命令面板结果中，
   也不再有渲染器 dispatch case；插件命令仍可独立发现。
 - `New Task` 使用当前项目或临时分组。若该组最新会话为空则选中复用；否则
   在第一帧露出空首页并创建持久空会话。同一分组内该操作是幂等的。
@@ -55,7 +56,7 @@ type CommandExecutionResult =
 
 ## 6. 验收
 
-1. 内置 registry 恰好包含五个唯一且带前缀的 ID。
+1. 内置 registry 恰好包含六个唯一且带前缀的 ID。
 2. 命令面板搜索可匹配每条命令的标题和关键词。
 3. 模式切换命令立即更新空闲会话模式；Plan、Goal 和 Agent 使用同一个 pi Agent。
 4. Compact 在空闲时可用，在活动回合/检查点期间返回 `AGENT_BUSY`。
@@ -71,6 +72,7 @@ type CommandExecutionResult =
 |---|---|
 | `/new` | `builtin.session.new` |
 | `/compact` | `builtin.agent.compact` |
+| `/context` | `builtin.context.inspect` |
 | `/agent-mode` | `builtin.mode.agent` |
 | `/plan-mode` | `builtin.mode.plan` |
 | `/goal-mode` | `builtin.mode.goal` |
@@ -106,3 +108,9 @@ Skill ID 作为斜杠名称，显示 Skill 名称和描述，并单独归入 **�
 
 只有空草稿的第 1 个字符会被改写。出现在草稿其他位置的「、」属于普通标点，始终不会
 被改动；该别名对 `@` 文件菜单没有影响。
+
+## Context inspection
+
+`/context` never starts a model call or changes context. It opens the active
+session's captured request browser. With no active session it opens Context
+Insights. See [Context Insights](../../../spec/03-runtime/context-insights.md).

@@ -1,4 +1,5 @@
 import { type CSSProperties, lazy, type ReactNode, Suspense, useEffect } from "react";
+import { ContextInsightsDialog } from "../context-entry/ContextInsightsDialog";
 import { ConversationTopbar } from "../../components/ConversationTopbar";
 import { ExtensionPromptHost } from "../../components/ExtensionPromptDialog";
 import { PluginRendererHost } from "../../plugins/renderer-host/PluginRendererHost";
@@ -22,6 +23,10 @@ import { workPanelLayout } from "../../lib/work-panel-resize";
 import { LiveVoiceStatusHost } from "../voice/live/LiveVoiceStatusHost";
 import { CollapsedTitlebarActions, RoutePending } from "./chrome";
 import { useAppShellRuntime } from "./useAppShellRuntime";
+
+const ContextInsightsPage = lazy(() =>
+  import("../context-insights/ContextInsightsPage").then((module) => ({ default: module.ContextInsightsPage })),
+);
 
 const SettingsPage = lazy(() =>
   import("../../pages/SettingsPage").then((module) => ({
@@ -272,7 +277,9 @@ export function AppShell() {
                 )}
 
                 <Suspense fallback={<RoutePending />}>
-                  {page === "scheduled" ? (
+                  {page === "contextInsights" ? (
+                    <div className="route-surface route-page"><ContextInsightsPage /></div>
+                  ) : page === "scheduled" ? (
                     <div className="route-surface route-page">
                       <ScheduledPage />
                     </div>
@@ -347,6 +354,7 @@ export function AppShell() {
         <LiveVoiceStatusHost />
         <PluginRendererHost />
         <ExtensionPromptHost />
+        <ContextInsightsDialog />
         {page === "settings" ? <UpdateBanner /> : null}
       </>
     );

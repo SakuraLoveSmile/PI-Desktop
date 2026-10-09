@@ -88,6 +88,7 @@ import {
   IconCopy,
   IconCircleAlert,
   IconNewSession,
+  IconMap,
   IconFolder,
   IconMore,
   IconNewProject,
@@ -2784,6 +2785,11 @@ export function Sidebar({
               aria-pressed={page === "scheduled"}
             >
               <IconClock size={14} aria-hidden />
+            </TooltipButton>
+            <TooltipButton type="button" className={`footer-action ${page === "contextInsights" ? "active" : ""}`}
+              data-nav="context-insights" tooltip={t("contextInsights.title")} ariaLabel={t("contextInsights.title")}
+              onClick={() => setPage("contextInsights")} aria-pressed={page === "contextInsights"}>
+              <IconMap size={14} aria-hidden />
             </TooltipButton>
             <NotificationCenter onBeforeOpen={() => closeMenus(false)} />
           </div>

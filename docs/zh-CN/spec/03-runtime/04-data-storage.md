@@ -1458,3 +1458,32 @@ An unknown price is distinct from a known zero price; partial known costs remain
 on the individual operations. Late usage targets its captured turn and does not
 revive it or debit the currently active turn. Immediate nested parent and owning
 Task remain separate optional transcript/event fields.
+
+## Plus automatic memory and code index storage
+
+Automatic memory uses existing project/group memory collections and their
+32-KiB derived-context limit. The opt-in flag lives in Host `kv` namespace
+`projectAutoMemory`, keyed by `path:<canonical-path>` or `group:<id>`; it does not
+advance the shared schema. User and agent entries share the existing collection.
+Agent updates/deletions compare the entry's last title/content; editor Save
+compares the owner and complete loaded memory snapshot before atomic replacement.
+Conflicts preserve persisted notes and the user's unsaved editor draft. Legacy
+plain-text and entries-v1 values remain readable. While automatic recording is
+on, legacy batch RPCs without a snapshot are rejected to prevent lost updates.
+Existing project-memory configuration-sync eligibility remains unchanged; the
+local opt-in flag is not implicitly exported. Data relocation remaps path flags
+with the same relocated project paths.
+
+The disposable code cache is Rust-owned `<data>/index/index.db`, separate from
+`pi.sqlite`, with per-root rows and FTS5 trigram candidate indexing. Opening it
+is lazy: a missing/broken cache does not prevent Host startup; an index request
+reports errors instead of fabricating successful empty results. Clear deletes
+only the caller root's derived rows and never workspace files or memory.
+
+Search limits are 10,000 files, 1 MiB per file, 64 MiB total content, a five-second
+scan budget, at most 50 returned hits (default 20), 240-character line excerpts
+and a 32-KiB result budget. Budget skips, binary/unreadable files or observed
+filesystem changes yield `partial` coverage with `truncated: true`; zero hits in
+such a result cannot prove absence. Status reports the last completed scan, not
+a fresh filesystem validation. Sensitive-file exclusions and shared ignore
+rules apply before indexing; symlinks cannot expand the session root.

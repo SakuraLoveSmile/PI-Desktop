@@ -57,6 +57,14 @@ const claude = claudeRaw ? normalize(claudeRaw) : "";
 /** @type {{ id: string, anyOf: string[] }[]} */
 const REQUIRED_ANCHORS = [
   {
+    id: "verified-merge-cleanup",
+    anyOf: ["Post-merge cleanup is mandatory and part of delivery"],
+  },
+  {
+    id: "backup-ref-hygiene",
+    anyOf: ["Do not keep backup snapshots as normal local branches"],
+  },
+  {
     id: "worktree-isolation",
     anyOf: ["1 request = 1 branch + 1 dedicated worktree"],
   },

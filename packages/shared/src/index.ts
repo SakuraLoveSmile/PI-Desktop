@@ -85,3 +85,5 @@ export * from "./team.js";
 
 export type { ExpectedMarketplace, MarketReview } from "./types/plugins.js";
 export type { MarketPluginSummary, MarketPluginDetail } from "./types/marketplace.js";
+
+export * from "./context-insights.js";
