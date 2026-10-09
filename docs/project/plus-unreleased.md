@@ -7,6 +7,17 @@ Upstream v0.15.6 → v0.16.1 has been merged.
   no-tool answer already needed correction. Actual expert participation is
   still required before a successful final answer.
 
+- Added a Memory destination in Settings to list project groups and open their
+  existing shared memory editor.
+
+- Expert Team uses the same compact capability rows, glyphs, badges and edit
+  actions as Subagents, with shared scope controls and consistent form spacing.
+
+- Successful and failed task notifications both appear in the durable inbox.
+  The bell badge now counts every unread persisted task notification, matching
+  the Dock/taskbar badge; selection, mark-all-read, and clear stay synchronized
+  with Host persistence across reloads.
+
 - AskTool questions keep paragraphs and wide tables readable instead of
   squeezing them into vertical strips. Tables scroll inside the card and long
   questions leave answer choices and submission controls available.
@@ -110,3 +121,10 @@ Upstream v0.15.6 → v0.16.1 has been merged.
 - One-time Plan/Goal schedules allow up to two minutes of delay while the app
   stays running, including sleep/resume. Longer delays are marked missed and
   require Run now confirmation; restarting the app still never catches up.
+
+- Project memory supports opt-in Agent recording and updates, with safe concurrent
+  editing and per-turn refresh. Saved notes remain readable when recording is off.
+- ProjectHistory recalls source-linked discussions from saved chats in the same
+  logical project. CodeSearch provides local literal code search and a disposable
+  persistent text cache, with live file reconciliation and explicit partial coverage.
+  Neither feature adds background model or embedding calls.

@@ -1885,3 +1885,35 @@ ignores ordinary Task configuration when deciding reuse, including legacy
 callers that pass it; actual changes to its model, profile or Host expert policy
 still invalidate reuse. Standard reuse still compares all Task configuration.
 This separation does not permit Task inside Team or change active-turn guards.
+
+## Plus project context tools
+
+Project-bound Desktop sessions expose `ProjectHistory` and `CodeSearch`; native
+Pi sessions and projectless sessions do not acquire these capabilities. Both
+read tools remain available in Agent, Plan and Goal. CodeSearch's explicit
+`clear` action is unavailable in Plan/Goal. Results are historical or filesystem
+evidence, never higher-priority instructions. The model must verify old facts
+against current code and must disclose incomplete search coverage.
+
+Automatic project recording is opt-in and defaults off. At each user turn and
+approved-plan execution, the runtime refreshes the Host-owned project/group
+memory once. A failed refresh clears the old projection and write guidance and
+reports the failure; cancellation/disposal discards late responses. Enabling
+recording exposes `ProjectMemory` (list/upsert/delete) in Agent mode only. Turning
+it off revokes writes while retaining read context. No extraction model or
+embedding provider is called. Requests capture a trusted session binding in the
+runtime's Host closure and the parent sidecar proxy verifies it before forwarding.
+
+ProjectHistory searches literal phrases in the current logical project's saved
+Desktop sessions. Search returns at most 20 sessions, two matching excerpts per
+session and stable session/message IDs. Read validates that the source remains
+in the same group and returns at most five user/assistant messages, each capped
+at 2,000 characters. Deleted chats are excluded; native Pi history is not mixed
+in without a Host-owned project identity.
+
+CodeSearch performs case-insensitive literal search in the session's root (not
+the foreground workspace or arbitrary model-selected roots), returns paths,
+line numbers and bounded text, and supports explicit status/clear actions. Each
+search reconciles current files and ignore rules, hashes eligible content, then
+verifies candidate contents live. This first version provides a persistent text
+cache, not semantic retrieval or a promised speedup. Grep remains unchanged.

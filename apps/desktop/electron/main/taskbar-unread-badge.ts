@@ -20,7 +20,7 @@ const REFRESH_AFTER_INVOKE = new Set<string>([
 
 /**
  * Main-owned shell badge for unread durable task notifications.
- * Uses host unreadCount (completed + failed). Does not change D295 bell filtering.
+ * Uses host unreadCount (completed + failed), matching the notification center.
  *
  * `desiredCount` is what we last learned from the host; `appliedCount` is what we
  * successfully painted onto the OS shell. Windows overlay needs a live BrowserWindow,

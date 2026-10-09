@@ -5,9 +5,7 @@ import type { WebContents } from "electron";
  * OS shell badge for durable task outcomes.
  *
  * Count = ALL unread `task.completed` + `task.failed` rows (host
- * `notification.list` unreadCount). This is intentionally different from the
- * D295 bell inbox in `notification-inbox.ts`, which still lists and badges
- * failures only.
+ * `notification.list` unreadCount), matching the notification center.
  *
  * Display policy: counts 1–99 show the real digit string; counts ≥100 show
  * "99+" so a Windows overlay stays readable.

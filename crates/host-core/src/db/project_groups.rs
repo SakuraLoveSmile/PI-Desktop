@@ -157,6 +157,7 @@ impl Database {
     pub fn delete_project_group_record(&self, id: &str) -> Result<()> {
         self.kv_delete(GROUP_NAMESPACE, id)?;
         self.kv_delete(GROUP_MEMORY_NAMESPACE, id)?;
+        self.delete_group_auto_memory(id)?;
         self.kv_delete(GROUP_INSTRUCTIONS_NAMESPACE, id)?;
         Ok(())
     }
@@ -218,7 +219,12 @@ impl Database {
             legacy: false,
             detached_paths: Vec::new(),
         };
+        let transaction = self.conn.unchecked_transaction()?;
+        self.merge_auto_memory_into_group(&canonical_paths, &group.id)?;
         self.kv_set(GROUP_NAMESPACE, &group.id, &serde_json::to_value(&group)?)?;
+        self.merge_path_memories_into_group(&canonical_paths, &group.id)?;
+        self.migrate_legacy_auto_entries(&canonical_paths[0])?;
+        transaction.commit()?;
         Ok(group)
     }
 
@@ -259,7 +265,6 @@ impl Database {
         }
         let mut ordered = vec![primary.clone()];
         ordered.extend(selected.into_iter().filter(|path| path != &primary));
-
         let removed = current
             .roots
             .iter()
@@ -328,6 +333,8 @@ impl Database {
             legacy: false,
             detached_paths,
         };
+        let transaction = self.conn.unchecked_transaction()?;
+        self.merge_auto_memory_into_group(&ordered, &group.id)?;
         if current.legacy {
             // A legacy project may already have path-scoped memory. Merge the
             // memory of every selected legacy root into the new group so
@@ -353,6 +360,11 @@ impl Database {
             }
             if !merged_entries.is_empty() {
                 let content = render_project_memory_entries(&merged_entries);
+                if content.len() > MAX_PROJECT_MEMORY_BYTES {
+                    return Err(anyhow!(
+                        "project memory exceeds {MAX_PROJECT_MEMORY_BYTES} bytes"
+                    ));
+                }
                 self.kv_set(
                     GROUP_MEMORY_NAMESPACE,
                     &group.id,
@@ -366,6 +378,8 @@ impl Database {
             }
         }
         self.kv_set(GROUP_NAMESPACE, &group.id, &serde_json::to_value(&group)?)?;
+        self.migrate_legacy_auto_entries(&ordered[0])?;
+        transaction.commit()?;
         Ok(group)
     }
 
@@ -463,6 +477,30 @@ impl Database {
         }
         group.name = name.to_string();
         Ok(group)
+    }
+
+    fn merge_path_memories_into_group(&self, paths: &[String], group_id: &str) -> Result<()> {
+        if paths.is_empty() {
+            return Ok(());
+        }
+        let existing = self.get_project_group_memory(group_id)?;
+        let mut entries = super::project_memory_editor::memory_entries(&existing);
+        for (index, path) in paths.iter().enumerate() {
+            let memory = self.get_project_memory(path)?;
+            for mut entry in super::project_memory_editor::memory_entries(&memory) {
+                entry.id = format!("root-{index}-{}", entry.id);
+                if entries.iter().any(|stored| stored.id == entry.id) {
+                    entry.id = Uuid::new_v4().to_string();
+                }
+                entries.push(entry);
+            }
+        }
+        if !entries.is_empty() {
+            // The existing writer enforces the 32 KiB bound. A failed merge
+            // rolls back group creation without removing any source memory.
+            self.set_project_group_memory(group_id, &serde_json::to_value(entries)?)?;
+        }
+        Ok(())
     }
 
     pub fn get_project_group_memory(&self, id: &str) -> Result<ProjectMemoryRecord> {
