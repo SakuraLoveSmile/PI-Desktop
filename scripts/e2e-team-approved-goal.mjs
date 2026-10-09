@@ -73,7 +73,7 @@ export function createApprovedGoalFixture(projectPath) {
       await waitFor(() => evaluate(`!!document.querySelector('.composer-contract-chip[data-mode="goal"]')`), "approved execution preserves Goal contract presentation");
       await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-launch-review-confirm-btn"]:not(:disabled)')`), "expert review automatically revealed for Goal execution");
       await waitFor(() => evaluate(`document.querySelector('[data-testid="team-review-waiting-indicator"]')?.innerText.includes('Waiting for team confirmation')`), "transcript explains staffing wait");
-      await waitFor(() => evaluate(`document.querySelector('.goal-progress-capsule')?.innerText === 'Waiting for team confirmation'`), "Goal capsule explains staffing wait instead of preparing");
+      await waitFor(() => evaluate(`document.querySelector('.goal-progress-status-text')?.innerText === 'Waiting for team confirmation'`), "Goal capsule explains staffing wait instead of preparing");
       await evaluate(`document.querySelector('[data-work-panel-tab-id="overview"] .work-panel-tab-button').click()`);
       await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-tab"] .work-panel-overview-status strong')?.innerText === 'Waiting for team confirmation'`), "Overview explains staffing wait");
       await evaluate(`document.querySelector('[data-testid="team-review-waiting-indicator"] button').click()`);

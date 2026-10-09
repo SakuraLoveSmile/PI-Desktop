@@ -693,6 +693,15 @@ nonempty final replies require a current approved expert dispatch whose turn
 has actually started. Idle members or queued messages are insufficient. This
 participation gate does not prove task ownership or completed expert work.
 
+A Lead has one bounded no-participation recovery before approval and one
+independent recovery after a trusted, nonempty delegate roster is confirmed for
+that same original Agent turn. Fast confirmation during the declaration reply
+must not exhaust the dispatch recovery just because the preapproval correction
+was already used. Confirmation does not authorize completion: Host still checks
+actual expert participation, and continued no-dispatch replies fail after the
+single postconfirmation correction. Stale reviews, other teams and automatic
+Plan rosters cannot acquire this execution-phase recovery.
+
 Team Plan research automatically launches read-only experts using Host-selected
 `automatic_plan` authority and valid approved model bindings, without staffing
 approval. Complete structured research, settled researcher turns/questions and
@@ -717,8 +726,11 @@ from Team notifications; it does not require a tab switch or a completed Lead tu
 An approved Team Plan/Goal execution waits for execution-roster confirmation
 and expert settlement inside its original running Host turn. It must not emit
 final agent_end, end the Goal execution token or complete the approval while
-waiting. Confirmation resumes the same approved contract. wait_for_updates
-consumes full authenticated confirmation/expert content in that turn through
+waiting. Confirmation resumes the same approved contract.
+An earlier pending review snapshot cannot authorize completion if confirmation
+commits before the execution-state read: Host final authorization still runs,
+and the bound confirmed execution receives its dispatch recovery when needed.
+wait_for_updates consumes full authenticated confirmation/expert content in that turn through
 Host-authorized execution inbox reads; cancellation interrupts it without
 expert replay or a completion report. Expert-start authority permits
 substantive tools, while approved execution completion separately requires
