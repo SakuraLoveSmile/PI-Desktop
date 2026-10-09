@@ -10826,7 +10826,9 @@ This test plan spec is accepted when:
      shows the title "New" and Review plus Browser/in-scope plugin-view rows —
      not a blank area below the title bar.
   2) Tab into the available rows and confirm each takes a visible focus ring
-     and that hovering a row shows only a background fill.
+     and that hovering a card changes its background fill without moving it.
+     Confirm a centered compass above a single column of rounded, outlined
+     cards (at most 380px wide, at least 56px tall, separated by 14px).
   3) Activate Browser or a plugin view and confirm its singleton tab is created
      and selected; the empty body and its view list disappear.
   4) Click `+` to create a New launcher tab, activate the same view from its
@@ -10840,6 +10842,11 @@ This test plan spec is accepted when:
   New launcher lists the same Review/plugin-view entries as its `+`-created
   page; a row creates or selects that singleton view. Each `+` click creates a
   separate closable New tab. Closing the final tab leaves the panel open on New.
+  Long contributed labels wrap inside their cards; short panels scroll
+  vertically and never overflow horizontally. The isolated production-renderer
+  journey in `node scripts/e2e-work-panel-launcher.mjs` checks card geometry,
+  both themes, English/Chinese, and New → Review → New → singleton reuse.
+  It does not validate native plugin content.
   The no-tab empty body is not exposed as a `tabpanel`; explicit New tabs are
   labelled tabpanels. Their rows are buttons in a `role="group"` labelled
   Tools. Panel empty states share the app's empty-state
