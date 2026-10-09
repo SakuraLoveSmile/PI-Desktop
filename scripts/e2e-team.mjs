@@ -160,6 +160,10 @@ const providerServer = createServer(async (req, res) => {
       assert.equal(toolNames.includes("declare_team_strategy"), false, "standard session exposed Team dispatch");
       if (!priorToolNames.includes("Task")) {
         toolCall = { name: "Task", args: { agent: "explorer", task: "Return STANDARD_CHILD_RESULT as your final response." } };
+      } else if (!priorToolNames.includes("TaskWait")) {
+        const delegationId = /Delegation\s+([a-z0-9-]+)\s+started/i.exec(activeToolText)?.[1];
+        assert.ok(delegationId, "standard Task must return a delegation handle");
+        toolCall = { name: "TaskWait", args: { delegationIds: [delegationId] } };
       } else { finalText = "STANDARD_PARENT_RESULT"; }
     } else if (userText.includes("STANDARD_CHILD_RESULT")) {
       assert.equal(toolNames.includes("declare_team_strategy"), false, "ordinary delegate became a Team member");
@@ -1429,8 +1433,8 @@ try {
   await waitFor(async () => (await invoke("agentGetStatus", standardSession.id)).status?.isRunning === false, "ordinary Task parent settled");
   await activateOverviewTab(sendCdp, evaluate);
   assert.equal(await evaluate(`Array.from(document.querySelectorAll('[data-testid="overview-tab"] details > summary')).some(summary => summary.innerText.trim() === 'Progress')`), true, "ordinary session keeps its progress disclosure");
-  const standardDetail = await invoke("sessionGet", { id: standardSession.id });
-  assert.ok(standardDetail.session.messages.some(message => message.content?.includes('STANDARD_PARENT_RESULT')));
+  await waitFor(async () => (await invoke("sessionGet", { id: standardSession.id })).session.messages
+    .some(message => message.content?.includes('STANDARD_PARENT_RESULT')), "ordinary parent result persisted after convergence");
   assert.equal((await invoke("teamGetRoster", {teamSessionId: lead.id})).members.length, 5, "ordinary delegate changed the Team roster");
   await evaluate(`document.querySelector('[data-sidebar-session-row="${lead.id}"] button.thread-item-main')?.click()`);
   await waitFor(() => evaluate(`!!document.querySelector('[data-session-pane="${lead.id}"][data-visible="true"]')`), "Lead restored after ordinary delegate");
