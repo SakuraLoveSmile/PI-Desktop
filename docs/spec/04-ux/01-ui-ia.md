@@ -106,8 +106,11 @@ destination, chat as the home surface, tools and permissions inline.
   work-panel toggle one button group, spaced by that same gap, while the trigger
   keeps a distinct hit target. Clicking `+` creates and activates
   a unique New launcher tab; its body presents the same data-driven Review and
-  plugin-view rows as buttons, so the user chooses a destination in the page
-  instead of opening a dropdown. Selecting a row replaces that launcher tab with
+  plugin-view rows as centered, outlined cards below a decorative compass.
+  The list stays within 380px, with 56px minimum card height, 14px gaps, and
+  wrapping labels; short panels scroll vertically. Available entries and their
+  existing order remain data-driven, without placeholder tools. The user chooses
+  a destination in the page instead of opening a dropdown. Selecting a row replaces that launcher tab with
   the destination or activates an existing singleton. File paths stay distinct
   while plugin views deduplicate by view reference. The viewport-fixed toggle
   and `Cmd/Ctrl + J` both toggle the active session's retained panel context —

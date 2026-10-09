@@ -2,6 +2,10 @@
 
 Upstream v0.15.6 → v0.16.1 has been merged.
 
+- The right work-panel launcher uses a centered compass and rounded tool cards.
+  Existing tool destinations and plugin availability are preserved; long labels
+  wrap and short panels scroll without clipping the cards.
+
 - AskTool questions keep paragraphs and wide tables readable instead of
   squeezing them into vertical strips. Tables scroll inside the card and long
   questions leave answer choices and submission controls available.

@@ -29,13 +29,14 @@ import type { PluginViewMeta } from "@pi-desktop/shared";
 import { pluginViewIcon, pluginViewInitial } from "../../lib/plugin-view-icons";
 import { useAppStore } from "../../stores/app-store";
 import type { WorkPanelTab } from "../../stores/app-store";
-import { cx } from "../ui";
+import { Button, cx } from "../ui";
 import { TooltipButton } from "../ui";
 import type { IconProps } from "../icons";
 import {
   IconBot,
   IconCheckCheck,
   IconClose,
+  IconCompass,
   IconDiff,
   IconFileText,
   IconMap,
@@ -1065,6 +1066,9 @@ export function WorkPanel({
               }
             >
               <div className="work-panel-launcher">
+                <div className="work-panel-launcher-emblem" aria-hidden="true">
+                  <IconCompass size={44} />
+                </div>
                 <div className="work-panel-launcher-title">{t("panel.new.title")}</div>
                 <div
                   className="work-panel-launcher-list"
@@ -1072,7 +1076,8 @@ export function WorkPanel({
                   aria-label={t("panel.toolsAndPanels")}
                 >
                   {tools.map((item) => (
-                    <button
+                    <Button
+                      variant="ghost"
                       key={item.id}
                       type="button"
                       className="work-panel-launcher-row"
@@ -1085,11 +1090,11 @@ export function WorkPanel({
                       }
                     >
                       <span className="work-panel-launcher-icon" aria-hidden>
-                        <ToolIcon item={item} />
+                        <ToolIcon item={item} size={20} />
                       </span>
                       <span className="work-panel-launcher-label">{item.label}</span>
                       {item.shortcut ? <kbd>{item.shortcut}</kbd> : null}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
