@@ -317,6 +317,8 @@ async fn bounded_queue_rejects_overflow_and_recovers_after_cancellation() {
             assert_eq!(error.code(), "HOST_OVERLOADED");
             let capacity = serde_json::to_value(error.diagnostics().unwrap()).unwrap();
             assert_eq!(capacity["host"]["queued"], 64);
+            assert!(!error.message().contains("65 queued"));
+            assert!(error.message().contains("host: 4 in-flight, 64 queued"));
             assert_eq!(capacity["host"]["shellQueued"], 64);
             assert_eq!(capacity["session"]["queued"], 0);
             assert_eq!(capacity["holders"].as_array().unwrap().len(), 4);
