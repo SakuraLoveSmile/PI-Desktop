@@ -617,14 +617,6 @@ export function Composer({
           dismissDroppedDirectories={dismissDroppedDirectories}
         />
         <ComposerImageAttachments controller={draft.imagePreview} onRemove={draft.removeImage} disabled={inputBlocked} />
-        {planCheckpoint &&
-        (planCheckpoint.executionKind ?? planCheckpoint.kind) === "goal" &&
-        activeSessionId ? (
-          <GoalProgressBar
-            sessionId={activeSessionId}
-            proposal={planCheckpoint}
-          />
-        ) : null}
         <div
           ref={composerShellRef}
           className={`composer-shell${inputBlocked ? " is-gated" : ""}${
@@ -635,6 +627,14 @@ export function Composer({
           onDragLeave={onComposerDragLeave}
           onDrop={onComposerDrop}
         >
+          {planCheckpoint &&
+          (planCheckpoint.executionKind ?? planCheckpoint.kind) === "goal" &&
+          activeSessionId ? (
+            <GoalProgressBar
+              sessionId={activeSessionId}
+              proposal={planCheckpoint}
+            />
+          ) : null}
           {inputFocused ? (
             <ComposerAutocomplete
               anchorRef={composerShellRef}

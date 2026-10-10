@@ -693,7 +693,7 @@ export const tr = {
   goal: {
     progressLabel: "Hedef ilerlemesi",
     progressListLabel: "Hedef görev listesi",
-    progressInitializing: "Hazırlanıyor…",
+    progressInitializing: "İlerleme yükleniyor…",
     progressFailed: "İlerleme bilgisi kullanılamıyor",
     planning: "Hedef tanımlanıyor",
     approvalRegion: "Hedef onayı",

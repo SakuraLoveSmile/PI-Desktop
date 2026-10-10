@@ -377,6 +377,63 @@ export async function sessionActivityIntegrationProbe() {
     reportFailed = false;
     reportListener?.({ sessionId: "activity-a", executionId: "overview-goal", proposalId: plan.id, reportId: "overview-report", status: "ready" });
     await until(() => rail()?.querySelector('.session-activity-goal-report')?.textContent === i18n.t('panel.activity.goal.reportFallback'), 'Fallback preview did not recover');
+    const inlineGoal: PlanProposal = { ...goalPlan, id: 'inline-goal-plan', executionId: 'inline-goal-execution', executionState: 'running' };
+    const readProgressBeforeInline = api.getGoalProgress;
+    const readReportBeforeInline = api.getGoalReport;
+    let resolveInlineProgress!: (value: Awaited<ReturnType<typeof api.getGoalProgress>>) => void;
+    const firstInlineProgress = new Promise<Awaited<ReturnType<typeof api.getGoalProgress>>>((resolve) => { resolveInlineProgress = resolve; });
+    let firstInlineRead = true;
+    let inlineListener: Parameters<typeof api.onGoalProgressChanged>[0] | undefined;
+    const inlineSnapshot = { schemaVersion: 1 as const, sessionId: 'activity-a', proposalId: inlineGoal.id,
+      executionId: inlineGoal.executionId!, revision: 1, updatedAt: 1,
+      items: [{ id: 'inline-done', label: 'Recorded completed step', status: 'completed' as const },
+        { id: 'inline-next', label: 'Recorded next step', status: 'pending' as const }] };
+    api.getGoalProgress = async params => {
+      if (params.executionId !== inlineGoal.executionId) return readProgressBeforeInline(params);
+      if (firstInlineRead) { firstInlineRead = false; return firstInlineProgress; }
+      return { progress: inlineSnapshot };
+    };
+    api.getGoalReport = async params => params.executionId === inlineGoal.executionId
+      ? { state: 'pending', report: null } : readReportBeforeInline(params);
+    api.onGoalProgressChanged = listener => { inlineListener = listener; return () => { inlineListener = undefined; }; };
+    set({ planCheckpoints: { 'activity-a': inlineGoal } });
+    const inlineBar = () => host.querySelector<HTMLElement>('.composer-shell > .goal-progress-stack');
+    await until(() => Boolean(inlineBar()), 'Goal progress did not mount inside the actual Composer input card');
+    check(inlineBar()?.querySelectorAll('[role="status"]').length === 1, 'Goal has one live status inside the input card');
+    check(inlineBar()?.querySelector('[role="status"]')?.textContent === i18n.t('goal.progressInitializing'), 'First read shows loading only');
+    const goalSurface = inlineBar()!.querySelector<HTMLElement>('.goal-progress-bar')!;
+    const goalStyle = getComputedStyle(goalSurface);
+    check(goalStyle.borderTopWidth === '0px' && goalStyle.borderBottomWidth === '1px' && goalStyle.borderRadius === '0px', 'Goal uses only the input-card divider');
+    resolveInlineProgress({ progress: null });
+    await until(() => inlineBar()?.querySelector('[role="status"]')?.textContent === i18n.t('chat.scheduleExecutionState.running'), 'Empty successful read did not show Running');
+    check(Boolean(inlineBar()?.querySelector('.goal-progress-indeterminate')) && !inlineBar()?.querySelector('.goal-progress-completed-num'), 'Running without a snapshot uses an indeterminate indicator without a fake count');
+    inlineListener?.({ sessionId: 'activity-a', executionId: inlineGoal.executionId!, revision: 1 });
+    await until(() => inlineBar()?.querySelector('.goal-progress-completed-num')?.textContent === '1', 'Real progress did not replace the indeterminate indicator');
+    check(inlineBar()?.querySelector('[role="status"]')?.getAttribute('aria-label')?.includes('1/2'), 'True Goal count remains announced');
+    click(inlineBar()?.querySelector('.goal-progress-toggle-btn'));
+    await until(() => Boolean(inlineBar()?.querySelector('[role="list"]')), 'Inline Goal did not expand its recorded task list');
+    click(inlineBar()?.querySelector('.goal-progress-toggle-btn'));
+    check(!inlineBar()?.querySelector('[role="list"]'), 'Inline Goal task list collapses without detaching the input');
+    const inlineWidth = host.style.width;
+    const inlineScale = document.documentElement.style.getPropertyValue('--font-scale');
+    for (const inlineTheme of ['dark', 'light']) {
+      document.documentElement.setAttribute('data-theme', inlineTheme);
+      host.style.width = '760px';
+      document.documentElement.style.setProperty('--font-scale', '1.4');
+      await until(() => inlineBar()!.getBoundingClientRect().width < 600, 'Inline Goal did not enter its narrow reading column');
+      const inlineShell = inlineBar()!.parentElement!;
+      check(inlineShell.scrollWidth <= inlineShell.clientWidth + 1, `${inlineTheme}: inline Goal has no overflow with enlarged text`);
+      const inlineStatus = inlineBar()!.querySelector<HTMLElement>('[role="status"]')!;
+      check(inlineStatus.getBoundingClientRect().right <= inlineShell.getBoundingClientRect().right + 1,
+        `${inlineTheme}: the single Goal status remains inside the narrow input card`);
+    }
+    host.style.width = inlineWidth;
+    document.documentElement.style.setProperty('--font-scale', inlineScale || '1');
+    document.documentElement.setAttribute('data-theme', 'dark');
+    checks.push('E2E-GOAL-inline-input-status');
+    api.getGoalProgress = readProgressBeforeInline;
+    api.getGoalReport = readReportBeforeInline;
+    api.onGoalProgressChanged = () => () => {};
     for (const group of ["plans", "agents", "processes"]) {
       const heading = rail()?.querySelector(`[data-activity-group="${group}"] .session-activity-disclosure`);
       if (heading?.getAttribute('aria-expanded') === 'false') click(heading);

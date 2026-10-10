@@ -9765,3 +9765,11 @@ Overview layout validation also checks long titles, project paths and model name
 320/360/570px in both themes. Metadata retains positive visible width and no
 header/resources/references horizontal overflow is introduced. Selected reference
 options retain pressed states and switching behavior.
+
+#### E2E-GOAL-inline-input-status
+
+在聊天输入区执行已批准目标：目标披露条与编辑器位于同一输入卡，只有分隔线。
+首次进度读取未完成时只显示加载状态；读取为空后只显示执行中和不确定态，
+不显示准备中或 0/0。发布真实条目，验证计数、披露开关、待专家确认、读取错误、
+会话切换和报告就绪移除。窄窗口与放大字号下仍可访问标题和状态。
+定时任务指令编辑器的原有卡片与最小高度不变。

@@ -7,8 +7,6 @@
   flex-direction: column;
   align-items: center;
   width: 100%;
-  margin-bottom: 8px;
-  gap: 6px;
   box-sizing: border-box;
 }
 
@@ -51,17 +49,29 @@
   color: var(--ds-text-secondary);
 }
 
-.goal-progress-status-text {
-  color: var(--ds-text-secondary);
-  font-size: var(--text-xs);
+.goal-progress-indeterminate {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--ds-border-subtle);
+  border-top-color: var(--ds-goal);
+  border-radius: var(--radius-round);
+  box-sizing: border-box;
+  animation: goal-progress-spin 1s linear infinite;
+}
+
+@keyframes goal-progress-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .goal-progress-indeterminate { animation: none; }
+  .goal-progress-ring-circle { transition: none; }
 }
 
 /* Collapsible Goal Bar */
 .goal-progress-bar {
   width: 100%;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--ds-border-subtle);
-  background: var(--ds-tile);
+  border-bottom: 1px solid var(--ds-border-subtle);
   overflow: hidden;
   box-sizing: border-box;
 }

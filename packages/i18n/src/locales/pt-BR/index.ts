@@ -682,7 +682,7 @@ export const ptBR = {
   goal: {
     progressLabel: "Progresso da meta",
     progressListLabel: "Lista de tarefas da meta",
-    progressInitializing: "Preparando…",
+    progressInitializing: "Carregando progresso…",
     progressFailed: "Progresso indisponível",
     planning: "Definindo objetivo",
     approvalRegion: "Aprovação do objetivo",

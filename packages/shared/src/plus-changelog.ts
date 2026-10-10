@@ -9,6 +9,7 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
+        "Goal progress is integrated into the input card with one status; running without a snapshot no longer appears as preparing.",
         "Keep Overview outputs, references and delegated tasks complete across long sessions and restarts; reconcile Goal reports and expert task outcomes with recorded execution.",
         "Require Expert Team delegation for every task; launch read-only Plan research automatically while keeping execution roster approval.",
         "Track live progress for approved Goals and review their completion reports.",
@@ -24,6 +25,7 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
+        "目标进度并入输入卡，只显示一份状态；执行中尚无快照时不再显示准备中。",
         "概要在长会话和重启后仍保留产出、来源与委派任务；目标报告和专家任务结果会与记录的执行状态对账。",
         "专家团所有任务都需委派专家；规划自动启动只读研究，执行名单仍需用户批准。",
         "跟踪已批准目标的实时进度，并查看完成报告。",
@@ -39,6 +41,7 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
+        "目標進度整合至輸入卡，只顯示一份狀態；執行中尚無快照時不再顯示準備中。",
         "概要在長工作階段與重新啟動後仍保留產出、來源與委派任務；目標報告和專家任務結果會與記錄的執行狀態核對。",
         "專家團所有任務都需委派專家；規劃自動啟動唯讀研究，執行名單仍需使用者核准。",
         "追蹤已核准目標的即時進度，並檢視完成報告。",
@@ -54,6 +57,7 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
+        "Hedef ilerlemesi tek durumla giriş kartına entegre edildi; anlık görüntü olmadan çalışan işler artık hazırlanıyor olarak görünmez.",
         "Uzun oturumlarda ve yeniden başlatmada Genel Bakış çıktıları, kaynakları ve devredilen görevleri korur; hedef raporları ve uzman sonuçları kaydedilen yürütmeyle eşleştirilir.",
         "Uzman Ekipte her görev için yetki devri zorunludur; salt okunur Plan araştırması otomatik başlar, yürütme kadrosu onayı korunur.",
         "Onaylanan hedeflerin canlı ilerlemesini takip edin ve tamamlanma raporlarını görüntüleyin.",
@@ -69,6 +73,7 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
+        "Der Zielfortschritt ist mit einem Status in die Eingabekarte integriert; laufende Aufgaben ohne Fortschrittsdaten erscheinen nicht mehr als Vorbereitung.",
         "Die Übersicht bewahrt Ergebnisse, Quellen und delegierte Aufgaben in langen Sitzungen und nach Neustarts; Zielberichte und Expertenresultate werden mit der aufgezeichneten Ausführung abgeglichen.",
         "Expertenteams delegieren jede Aufgabe; schreibgeschützte Plan-Recherche startet automatisch, das Ausführungsteam bleibt genehmigungspflichtig.",
         "Verfolgen Sie den Live-Fortschritt genehmigter Ziele und sehen Sie sich Abschlussberichte an.",
@@ -84,6 +89,7 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
+        "El progreso del objetivo se integra en la tarjeta de entrada con un solo estado; la ejecución sin datos de progreso ya no aparece como preparación.",
         "La vista general conserva resultados, fuentes y tareas delegadas en sesiones largas y tras reinicios; los informes de objetivos y los resultados de expertos se concilian con la ejecución registrada.",
         "Los equipos de expertos delegan todas las tareas; la investigación de Plan de solo lectura se inicia automáticamente y el equipo de ejecución requiere aprobación.",
         "Sigue el progreso en directo de los objetivos aprobados y consulta sus informes de finalización.",
@@ -99,6 +105,7 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
+        "La progression de l’objectif est intégrée à la carte de saisie avec un seul état ; une exécution sans données de progression n’apparaît plus comme une préparation.",
         "La vue d’ensemble conserve les résultats, sources et tâches déléguées dans les longues sessions et après redémarrage ; les rapports d’objectifs et résultats des experts sont rapprochés de l’exécution enregistrée.",
         "Les équipes d'experts délèguent chaque tâche ; la recherche Plan en lecture seule démarre automatiquement et l'équipe d'exécution reste soumise à approbation.",
         "Suivez la progression en direct des objectifs approuvés et consultez leurs rapports d'achèvement.",
@@ -114,6 +121,7 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
+        "목표 진행 상황을 입력 카드에 통합하고 상태를 한 번만 표시합니다. 진행 데이터 없이 실행 중인 작업이 준비 중으로 표시되지 않습니다.",
         "긴 세션과 재시작 후에도 개요의 산출물, 출처, 위임 작업을 유지하며 목표 보고서와 전문가 결과를 기록된 실행 상태와 대조합니다.",
         "전문가 팀은 모든 작업을 위임합니다. Plan의 읽기 전용 연구는 자동으로 시작되며 실행 명단은 사용자 승인이 필요합니다.",
         "승인된 목표의 실시간 진행 상황을 추적하고 완료 보고서를 확인하세요.",
@@ -129,6 +137,7 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
+        "O progresso do objetivo foi integrado ao cartão de entrada com um único estado; execuções sem dados de progresso não aparecem mais como preparação.",
         "A visão geral preserva resultados, fontes e tarefas delegadas em sessões longas e após reinícios; relatórios de objetivos e resultados de especialistas são conciliados com a execução registrada.",
         "Equipes de especialistas delegam todas as tarefas; a pesquisa somente leitura do Plan inicia automaticamente e a equipe de execução exige aprovação.",
         "Acompanhe o progresso em tempo real de metas aprovadas e consulte os relatórios de conclusão.",

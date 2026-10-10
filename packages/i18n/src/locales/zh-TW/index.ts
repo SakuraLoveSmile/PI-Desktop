@@ -688,7 +688,7 @@ export const zhTW = {
   goal: {
     progressLabel: "目標進度",
     progressListLabel: "目標任務清單",
-    progressInitializing: "準備中…",
+    progressInitializing: "載入進度…",
     progressFailed: "進度讀取失敗",
     planning: "正在明確目標",
     approvalRegion: "目標審批",
