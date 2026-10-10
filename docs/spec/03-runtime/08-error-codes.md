@@ -88,6 +88,13 @@ process resources returns `PROCESS_RESOURCE_EXHAUSTED`. Host-core's control
 stdio is isolated from Tokio's dynamic blocking pool so the latter condition
 does not turn temporary thread pressure into a host process exit.
 
+For shell admission, `HOST_OVERLOADED` includes `content.capacity` with host
+and requesting-session in-flight/queued counts, shell-only counts and safe Bash
+holder session identities (see RPC §2.1). The error suggests `wait_for_updates`
+instead of `sleep` polling and explains that managed background commands retain
+the same shell slot until they stop. It never includes command text or paths.
+The code, retryability and 30-second admission deadline remain unchanged.
+
 ### 3.2 Agent / session
 
 | code | retriable | meaning |

@@ -89,6 +89,12 @@ type AppError = {
 stdio 与 Tokio 的动态阻塞池隔离，因此后一种情况
 不会将临时线程压力转变为主机进程退出。
 
+对于 shell 准入，`HOST_OVERLOADED` 的 `content.capacity` 提供 host 和请求
+会话的运行/排队数量、shell 数量及安全的 Bash 占用会话标识（见 RPC §2.1）。
+错误建议使用 `wait_for_updates` 代替 `sleep` 轮询，并说明后台命令会一直
+占用同一 shell 槽直至结束。不包含命令或路径。错误码、可重试语义与
+30 秒准入等待时限不变。
+
 ### 3. 2 Agent/会话
 
 | 代码 | 可重审的 | 意义 |

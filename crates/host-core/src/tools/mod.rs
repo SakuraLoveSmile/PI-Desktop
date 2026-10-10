@@ -3020,7 +3020,7 @@ pub fn builtin_tool_defs() -> Value {
                 "Run a non-interactive shell command in the workspace. stdout keeps its first {}KB, stderr its \
                  last {}KB, and anything over budget is spilled to a file named in the truncation marker. \
                  Use Read/Glob/Grep for reading and searching instead of shell equivalents; when a shell search \
-                 is genuinely needed prefer `rg` and exclude build output.",
+                 is genuinely needed prefer `rg` and exclude build output. Do not poll with sleep; in an Expert Team use wait_for_updates for teammate replies. Background processes and long sleep hold shell slots until they stop; for long commands use run_in_background and check process status without shell polling.",
                 BUDGET_SHELL.max_bytes / 1024,
                 BUDGET_SHELL_ERR.max_bytes / 1024
             ),
