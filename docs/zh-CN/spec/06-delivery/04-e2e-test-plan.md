@@ -9835,3 +9835,21 @@ options retain pressed states and switching behavior.
 - **覆盖：** `scripts/e2e-background-bash-limit.mjs`，Rust 后台 RPC、运行时
   schema/载荷、团队等待生命周期与启动绑定代理回归。
 - **状态：** 记录候选执行结果；Windows 仍需平台验收。
+
+### E2E-TEAM-write-scope-warning
+
+- **前置条件：** 候选 Host/runtime，隔离 Git/profile，真实批准 builder、mailbox
+  和任务 turn 绑定；不调用模型。
+- **步骤：** 声明 owned 范围，在 HEAD A 派发；交付前提交 HEAD B、重放派发，解析
+  成员输入并保存认证历史。开始任务，范围内 Write、范围外 Write/Edit、失败 Edit，
+  读取 team_status；清空 scopes 后再次写入。成员回复通过原批准 Goal turn 的
+  wait_for_updates 消费并携带发送时 HEAD。
+- **预期：** 范围内和空 scopes 无告警；范围外仍成功且返回 TEAM_WRITE_SCOPE_WARNING，
+  仅两次成功范围外调用计数。目录相似前缀不扩大范围。重放保留 A，成员模型与历史
+  均可见；伪造来源 HEAD 由 Host 覆盖。失败/Bash/scratch 不计数。
+- **自动化：** node scripts/e2e-team-write-scope.mjs 使用真实 Host stdio、生产 team
+  工具、消息解析/格式化和临时原生 Git；Rust 覆盖软链接、任务绑定、重复计数和统计
+  故障可见，runtime 测试检查成功告警文本和详情。
+- **规格：** 团队协作决策 docs/adr/plus-expert-team-collaboration.md 的建议性范围修订（2026-10-11）及 03-runtime/06-host-rpc-protocol。
+- **验收：** P1 共享树协作；不拒绝写入，不增加 RPC 或迁移。
+- **状态：** 隔离 Host 和 runtime 契约夹具自动化。

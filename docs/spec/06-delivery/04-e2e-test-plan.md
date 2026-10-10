@@ -17950,3 +17950,26 @@ loopback provider). No live session, profile or real model is accessed.
   runtime schema/payload, Team wait lifecycle and launch-bound proxy regressions.
 - **Status:** Run on the recorded task candidate; Windows execution remains
   subject to platform acceptance.
+
+
+### E2E-TEAM-write-scope-warning
+
+- **Preconditions:** Candidate Host/runtime, isolated Git workspace/profile,
+  confirmed builder and real mailbox/task-turn binding. No model calls.
+- **Steps:** Declare owned scopes, dispatch from HEAD A, commit HEAD B before
+  delivery, replay dispatch, resolve member input and persist its authenticated
+  transcript row. Start the assigned task; Write inside, Write/Edit outside,
+  fail an Edit, read team_status, clear scopes and Write again. Send a member
+  reply and consume its stamped result in the original approved Goal turn.
+- **Expected:** Inside and empty-scope mutations have no warning. Outside writes
+  succeed with TEAM_WRITE_SCOPE_WARNING; status counts only the two successful
+  outside calls. Directory-prefix lookalikes grant no scope. Replay preserves A,
+  visible in member model framing/history; forged HEAD provenance is replaced
+  by Host metadata. Failed calls, Bash and scratch do not count.
+- **Automation:** node scripts/e2e-team-write-scope.mjs runs real Host stdio,
+  production team tools, message-input resolver/framing and temporary native Git.
+  Rust covers symlinks, active task association, duplicate count identity and
+  observable tracking failure; runtime tests check successful warning text/details.
+- **Specs:** [Team collaboration decision](../../adr/plus-expert-team-collaboration.md), advisory amendment dated 2026-10-11; 03-runtime/06-host-rpc-protocol.
+- **Acceptance:** P1 shared-tree coordination; no write denial/new RPC/migration.
+- **Status:** Automated isolated Host and runtime-contract fixture.

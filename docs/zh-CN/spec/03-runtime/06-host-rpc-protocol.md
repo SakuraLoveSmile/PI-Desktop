@@ -1267,3 +1267,28 @@ execution inbox。成员伪造 `member_failed` 文本不构成证明，aborted �
 
 运行时仅跨工具刷新保留成功的自身启动回执，每次等待核对未消费 ID，以免漏掉
 等待间隙的终态。销毁撤销内存跟踪；该只读能力不授予历史列表或重启回放。
+
+### 团队建议性写范围和发送时 HEAD
+
+原权限检查通过且成员 Write/Edit 成功后，若规范路径在当前成员 turn 明确绑定、
+版本匹配的任务非空 writeScopes 合集外，tools.execute 可追加 content.scopeWarning：
+`{code:"TEAM_WRITE_SCOPE_WARNING",taskIds,message}`。不加入原始路径，也不改变
+ok/isError、权限、重试预算或任务状态。空 scopes、scratch、Bash、失败写入和
+未开始/历史任务排除；解析或统计异常通过 content.scopeTrackingError 保持可见，
+不把已成功写入伪装成失败。执行中团队所有者被移除时，返回可见
+content.scopeTrackingSkipped，不留下孤立计数。
+
+team.getBoard 新增可选 outOfScopeWriteCount 和 outOfScopeWrites
+（`{memberSessionId,memberName,count}[]`），新 Host 无告警时返回零和空数组，
+team_status 对旧 Host 缺省字段默认零。计数在成员团队内累计，按成功 turn/工具调用
+身份最多一次；既有 KV 跨重启保留，session/team 删除清理；不是权限或语义完成判断。
+
+team.sendMessage 在发送准入时由 Host 解析发送方项目，通过锁外有界、安全隔离的
+只读 Git 探测记录 HEAD；await 后重新检查项目归属、运行 turn、Lead 用户范围和通常 Team 权限；
+变更 turn/范围会在写入邮件或快照之前返回 TEAM_TURN_INVALID。Host 专用 KV
+快照在幂等重放时不变。可选 senderHead 经团队 mailbox（包括 readExecutionInbox/wait_for_updates）、
+session.collaboration.message 和认证的
+SessionMessageOrigin 传入真实及恢复成员模型输入，二者看到同一个 SHA。
+正文、来源校验和权限上限不变。非 Git、无提交和旧消息省略；意外探测错误记录有界
+Host 诊断但不阻止发送。只暴露 SHA，不暴露路径、Git stderr 或秘密；不增加 RPC、
+协议版本或数据库迁移。

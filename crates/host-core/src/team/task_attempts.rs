@@ -84,6 +84,25 @@ pub(crate) fn validate_caller_turn(conn: &Connection, session: &str, expected: &
     Ok(())
 }
 
+/// Only tasks explicitly started in this member turn, at their current revision.
+pub(super) fn active_task_ids(
+    conn: &Connection,
+    team: &str,
+    member: &str,
+    turn: &str,
+) -> Result<Vec<String>> {
+    let mut statement = conn.prepare_cached("SELECT t.task_id FROM team_tasks t JOIN kv k
+      ON k.ns=?1 AND json_extract(k.value_json,'$.teamSessionId')=t.team_session_id
+        AND json_extract(k.value_json,'$.taskId')=t.task_id
+      WHERE t.team_session_id=?2 AND t.owner_session_id=?3 AND t.deleted=0 AND t.status='in_progress'
+        AND json_extract(k.value_json,'$.turnSessionId')=?3 AND json_extract(k.value_json,'$.turnId')=?4
+        AND json_extract(k.value_json,'$.ownerSessionId')=?3
+        AND json_extract(k.value_json,'$.taskRevision')=t.revision
+        AND json_extract(k.value_json,'$.settledStatus') IS NULL ORDER BY t.task_id")?;
+    let rows = statement.query_map(params![NS, team, member, turn], |r| r.get(0))?;
+    Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+}
+
 pub(super) fn update(
     conn: &Connection,
     current: &TeamTask,

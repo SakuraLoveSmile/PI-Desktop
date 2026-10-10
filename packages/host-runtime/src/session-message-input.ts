@@ -71,6 +71,7 @@ export async function resolveSessionMessageInput(
       sourceTitle: message.sourceTitle,
       targetSessionId: message.targetSessionId,
       kind: message.kind,
+      ...(message.senderHead ? { senderHead: message.senderHead } : {}),
       ...(message.replyToMessageId ? { replyToMessageId: message.replyToMessageId } : {}),
     },
   };

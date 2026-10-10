@@ -822,6 +822,16 @@
         "E2E-SESSION-activity-full-history-ui"
       ],
       "safety": "Real isolated Rust Host and Electron renderer through the production IPC/reader/Overview; tail-only transcript and synthetic persisted evidence, no user profile or provider."
+    },
+    {
+      "id": "team-write-scope",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-write-scope.mjs",
+      "tier": "nightly",
+      "safety": "Isolated real Host, runtime tool/message boundaries and temporary Git; no model calls or user profile.",
+      "scenarioIds": [
+        "E2E-TEAM-write-scope-warning"
+      ]
     }
   ]
 }

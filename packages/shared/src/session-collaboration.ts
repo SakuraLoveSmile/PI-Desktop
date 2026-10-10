@@ -3,6 +3,8 @@ export type SessionMessageKind = "task" | "message" | "completion";
 export type SessionMessageStatus = "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
 
 export type SessionMessageOrigin = {
+  /** Host-only Git commit identity captured at Team message send time. */
+  senderHead?: string;
   messageId: string;
   sourceSessionId: string;
   sourceTitle: string;
@@ -15,6 +17,7 @@ export type SessionMessageOrigin = {
 export type SessionReference = { sessionId: string; title: string; available?: boolean };
 
 export type SessionCollaborationMessage = {
+  senderHead?: string;
   id: string;
   pluginId: string;
   sourceSessionId: string;

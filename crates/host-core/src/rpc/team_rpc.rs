@@ -3,7 +3,6 @@
 //! The error mapping and `team.changed` helpers are shared with the session
 //! and project arms that stay in the parent module.
 
-use rusqlite::OptionalExtension;
 use std::sync::Arc;
 
 use serde_json::{json, Value};
@@ -110,7 +109,7 @@ pub(super) fn send_team_changed(
     Ok(())
 }
 
-fn team_revision(
+pub(super) fn team_revision(
     db: &crate::db::Database,
     team_session_id: &str,
 ) -> Result<Option<i64>, JsonRpcError> {
@@ -119,7 +118,7 @@ fn team_revision(
         .map(|team| team.revision))
 }
 
-fn send_team_changed_if_revision_changed(
+pub(super) fn send_team_changed_if_revision_changed(
     db: &crate::db::Database,
     tx: &mpsc::UnboundedSender<String>,
     team_session_id: &str,
@@ -154,7 +153,7 @@ pub(super) fn team_id_for_participant(
     Ok(None)
 }
 
-fn authorize_lead_mutation(
+pub(super) fn authorize_lead_mutation(
     db: &crate::db::Database,
     team: &str,
     caller: &str,
@@ -166,7 +165,7 @@ fn authorize_lead_mutation(
     Ok(())
 }
 
-fn authorize_lead_expert(
+pub(super) fn authorize_lead_expert(
     db: &crate::db::Database,
     team: &str,
     caller: &str,
@@ -184,7 +183,9 @@ pub(super) async fn handle(
     params: Value,
     tx: mpsc::UnboundedSender<String>,
 ) -> Result<Value, JsonRpcError> {
+    let dispatch_head = super::team_dispatch_head::capture(&state, method, &params).await?;
     let st = state.lock().await;
+    super::team_dispatch_head::validate(&st.db, dispatch_head.as_ref())?;
     match method {
         "team.getRuntimeContext" => {
             let session_id = params
@@ -517,71 +518,7 @@ pub(super) async fn handle(
             send_team_changed(&st.db, &tx, team_id, "task")?;
             Ok(json!({ "task": task }))
         }
-        "team.sendMessage" => {
-            let team_id = params
-                .get("teamSessionId")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
-            let caller_id = params
-                .get("callerSessionId")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| rpc_err(1002, "callerSessionId required", "INVALID_PARAMS"))?;
-            authorize_lead_mutation(&st.db, team_id, caller_id)?;
-            let target_id = params
-                .get("target")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| rpc_err(1002, "target required", "INVALID_PARAMS"))?;
-            authorize_lead_expert(&st.db, team_id, caller_id, target_id)?;
-            let content = params
-                .get("content")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| rpc_err(1002, "content required", "INVALID_PARAMS"))?;
-            let idempotency_key = params.get("idempotencyKey").and_then(|v| v.as_str());
-            let previous_revision = team_revision(&st.db, team_id)?;
-            let delivery_tx = st
-                .db
-                .conn()
-                .unchecked_transaction()
-                .map_err(|e| team_rpc_err(e.into()))?;
-            let existed = if let Some(key) = idempotency_key {
-                st.db.conn().query_row(
-                    "SELECT id FROM session_collaboration_messages WHERE plugin_id=?1 AND source_session_id=?2 AND idempotency_key=?3",
-                    rusqlite::params![crate::team::team_plugin_origin(team_id), caller_id, key],
-                    |row| row.get::<_, String>(0),
-                ).optional().map_err(|e| team_rpc_err(e.into()))?.is_some()
-            } else {
-                false
-            };
-            let msg = crate::team::send_team_message(
-                &st.db,
-                crate::team::SendMessageParams {
-                    team_session_id: team_id,
-                    caller_session_id: caller_id,
-                    target_identifier: target_id,
-                    content,
-                    idempotency_key,
-                },
-            )
-            .map_err(team_rpc_err)?;
-            if caller_id == team_id {
-                crate::team::authority::record_dispatch(&st.db, team_id, &msg, existed)
-                    .map_err(team_rpc_err)?;
-            }
-            delivery_tx.commit().map_err(|e| team_rpc_err(e.into()))?;
-            send_notification(
-                &tx,
-                "team.messageQueued",
-                json!({ "teamSessionId": team_id, "messageId": msg.id }),
-            );
-            send_team_changed_if_revision_changed(
-                &st.db,
-                &tx,
-                team_id,
-                previous_revision,
-                "mailbox",
-            )?;
-            Ok(json!({ "message": msg }))
-        }
+        "team.sendMessage" => super::team_mailbox::send(&st, &params, &tx, dispatch_head.as_ref()),
         "team.getLeadExecutionState" | "team.readExecutionInbox" => {
             let team = params
                 .get("teamSessionId")
