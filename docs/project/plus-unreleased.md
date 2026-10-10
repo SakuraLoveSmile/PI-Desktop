@@ -74,6 +74,12 @@ Upstream v0.15.6 → v0.16.1 has been merged.
   ignores obsolete provider thinking overrides and accepts omit consistently
   while retaining provider/model availability and explicit binding checks.
 
+- Ordinary Expert Team task completion waits for its associated execution turn
+  to finish successfully. Failed or aborted attempts update only their exact
+  tasks, preserving earlier completed work. Retry, stale events and restart
+  recovery cannot leave premature completion claims green; structured Plan
+  research submissions retain their existing result contract.
+
 - AskTool questions keep paragraphs and wide tables readable instead of
   squeezing them into vertical strips. Tables scroll inside the card and long
   questions leave answer choices and submission controls available.

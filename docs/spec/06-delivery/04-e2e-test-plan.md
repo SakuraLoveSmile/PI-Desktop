@@ -17029,6 +17029,33 @@ renderer's durable transcript reads. No real model or provider is contacted.
   persistence and restart contracts are covered by `mcp-control-settings.test.mjs`.
 
 
+### E2E-TEAM-task-completion
+
+- **Preconditions:** Isolated Host data/workspace, configured no-auth fixture
+  route, approved Team roster; no live provider or user profile.
+- **Steps:** Enter the actual approved mailbox turn, create owned tasks, and
+  use the production runtime task_update tool against real Host RPC. Claim
+  completion in an active member turn, then settle it with
+  MUTATION_RETRY_BUDGET_EXHAUSTED. Start an explicit retry, reject the old caller
+  turn, claim completion and settle successfully. Deliver duplicate old ends.
+- **Expected:** Running completion claims stay in_progress. The failed task is
+  failed; prior completed and unstarted tasks retain their states. Retry cannot
+  become completed before successful settlement, and the Host publishes the
+  changed Team snapshot. Old tool/terminal identities cannot overwrite retry.
+- **Additional regression coverage:** Abort/startup interruption cancels exact
+  attempts; metadata edits preserve pending claims; reset, reassignment,
+  deletion and session/Team cleanup clear associations; failed transactions
+  roll back claims with task/turn changes. Success without a claim does not
+  auto-complete. Plan structured result submission retains its existing contract.
+- **Automation:** Build the candidate Host and agent-runtime, then run
+  `node scripts/e2e-team-task-completion.mjs` (stdio Host + production runtime
+  tools; the terminal error is a controlled RPC input, not a live model failure).
+  Runtime mutation-budget tests cover the error event producer; Host attempt
+  tests cover durable settlement and recovery. Existing Team presentation and
+  dispatch tests cover failed/cancelled/completed board display.
+- **Specs:** 03-runtime/04-data-storage, 06-host-rpc-protocol; ADR
+  plus-expert-team-collaboration task completion amendment.
+
 ### E2E-TEAM-reviewed-launch
 
 - **Preconditions:** Isolated Desktop profile and workspace, local fake provider,
