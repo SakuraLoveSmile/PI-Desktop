@@ -22,7 +22,7 @@ type InputItem = {
 type ProviderRequest = {
   tools: Array<{
     name?: string;
-    parameters?: { properties?: Record<string, { type?: string }>; required?: string[] };
+    parameters?: { properties?: Record<string, { type?: string; description?: string }>; required?: string[] };
   }>;
   input: InputItem[];
 };
@@ -123,12 +123,16 @@ it.each([
   expect(f.requests).toHaveLength(2);
   const bash = f.requests[0].tools.find((tool) => tool.name === "Bash");
   expect(bash?.parameters?.properties?.run_in_background).toMatchObject({ type: "boolean" });
+  expect(bash?.parameters?.properties?.run_in_background?.description).toContain("default 60 seconds");
+  expect(bash?.parameters?.properties?.run_in_background?.description).toContain("21600");
+  expect(bash?.parameters?.properties?.timeout?.description).toContain("defaults to 60 seconds");
+  expect(bash?.parameters?.properties?.timeout?.description).toContain("run_in_background");
   expect(bash?.parameters?.required ?? []).not.toContain("run_in_background");
   expect(f.calls.filter((call) => call.method === "tools.execute")).toEqual([{
     method: "tools.execute",
     params: {
       sessionId: "background-fixture", turnId: expect.any(String), toolCallId: "call_bash|fc_bash", toolName: "Bash",
-      args: expectedArgs, mode: "agent", expectedCommandShellId: "bash", expectedCommandShellDialect: "posix", timeoutMs: 60000,
+      args: expectedArgs, mode: "agent", expectedCommandShellId: "bash", expectedCommandShellDialect: "posix", ...("run_in_background" in expectedArgs && expectedArgs.run_in_background === true ? {} : { timeoutMs: 60000 }),
     },
   }]);
   expect(f.requests[1].input.filter((item) => item.type === "function_call" && item.call_id === "call_bash"))
@@ -172,4 +176,11 @@ it("rejects an unconvertible string background flag before Host execution and re
   expect(f.events.some((event) => event.event.type === "agent_end")).toBe(true);
   expect(f.runtime.getStatus().isRunning).toBe(false);
   expect(f.outputSubscriptions()).toBe(0);
+});
+
+it("keeps an explicit background timeout in seconds and forwards its exact millisecond limit", async () => {
+  const f = await fixture({ command, run_in_background: true, timeout: 60 });
+  expect(f.calls.find(call => call.method === "tools.execute")?.params).toMatchObject({
+    args: { timeout: 60 }, timeoutMs: 60000,
+  });
 });

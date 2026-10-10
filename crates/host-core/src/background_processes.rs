@@ -328,6 +328,7 @@ pub struct ApprovedJob {
     pub args: Value,
     pub options: BashExecutionOptions,
     pub permit: ToolPermit,
+    pub timeout_is_default: bool,
 }
 pub async fn start(
     state: Arc<Mutex<AppState>>,
@@ -391,7 +392,12 @@ pub async fn start(
             Err(error) => tracing::error!(%error,"background output lock poisoned"),
         }
         let started = Instant::now();
-        let result = tools::execute_tool_with_path_access(
+        let timeout_ms = job
+            .options
+            .timeout_ms
+            .unwrap_or(tools::DEFAULT_BASH_TIMEOUT_MS);
+        let timeout_is_default = job.timeout_is_default;
+        let mut result = tools::execute_tool_with_path_access(
             Some(&job.workspace),
             job.scratch.as_deref(),
             "Bash",
@@ -404,6 +410,7 @@ pub async fn start(
             },
         )
         .await;
+        annotate_timeout(&mut result, timeout_ms, timeout_is_default);
         let mut st = task_state.lock().await;
         let status = if st.shutting_down {
             "interrupted"
@@ -449,9 +456,45 @@ pub async fn start(
     Ok(summary)
 }
 
+/// Stored in the existing result envelope; historical records retain their unknown provenance.
+fn annotate_timeout(result: &mut tools::ToolsExecuteResult, timeout_ms: u64, is_default: bool) {
+    if result.error_code.as_deref() != Some("TOOL_TIMEOUT") {
+        return;
+    }
+    let seconds = timeout_ms as f64 / 1000.0;
+    let source = if is_default { "default" } else { "explicit" };
+    result.content["error"] = json!(format!(
+        "Background Bash timed out after the {source} {seconds} second limit. For long runs, pass timeout in seconds (1-21600); the default remains 60 seconds."
+    ));
+    result.content["timeoutMs"] = json!(timeout_ms);
+    result.content["timeoutIsDefault"] = json!(is_default);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn background_timeout_provenance_keeps_default_and_explicit_limits_distinct() {
+        for (limit, default) in [(60_000, true), (60_000, false), (90_000, false)] {
+            let mut result = tools::ToolsExecuteResult {
+                tool_call_id: "job".into(),
+                ok: false,
+                is_error: Some(true),
+                content: json!({"error":"bash timed out", "stdout":"retained"}),
+                duration_ms: limit,
+                denied: None,
+                error_code: Some("TOOL_TIMEOUT".into()),
+                command_shell_id: None,
+            };
+            annotate_timeout(&mut result, limit, default);
+            assert_eq!(result.content["timeoutMs"], limit);
+            assert_eq!(result.content["timeoutIsDefault"], default);
+            let source = if default { "default" } else { "explicit" };
+            assert!(result.content["error"].as_str().unwrap().contains(source));
+            assert_eq!(result.content["stdout"], "retained");
+        }
+    }
 
     #[test]
     fn background_output_flushes_suppressed_output_after_silence() {

@@ -142,6 +142,28 @@ async fn background_nonzero_timeout_and_bounded_output_spill() {
         .await;
     assert_eq!(timed["process"]["status"], "timed_out");
     assert_eq!(timed["stdout"], "before-timeout");
+    let message = timed["errorMessage"].as_str().unwrap();
+    assert!(message.contains("explicit 1 second"), "{message}");
+    assert!(
+        message.contains("timeout") && message.contains("21600"),
+        "{message}"
+    );
+    let id = timed["process"]["id"].as_str().unwrap();
+    let persisted: String = f
+        .state
+        .lock()
+        .await
+        .db
+        .conn
+        .query_row(
+            "SELECT result_json FROM background_processes WHERE id=?1",
+            [id],
+            |r| r.get(0),
+        )
+        .unwrap();
+    let persisted: Value = serde_json::from_str(&persisted).unwrap();
+    assert_eq!(persisted["content"]["timeoutMs"], 1000);
+    assert_eq!(persisted["content"]["timeoutIsDefault"], false);
     let large=f.start("large","head -c 120000 /dev/zero | tr '\\0' x; head -c 120000 /dev/zero | tr '\\0' y >&2; printf tail >&2",5000).await;
     let id = large["content"]["backgroundProcessId"].as_str().unwrap();
     let large = f.terminal(id).await;
@@ -727,4 +749,16 @@ async fn background_stop_reaches_owner_when_stopping_write_is_rejected() {
             "Stop must reach the process owner despite a rejected status write"
         );
     }
+}
+
+#[test]
+fn historical_background_timeout_records_do_not_invent_limit_provenance() {
+    let f = Fixture::new("auto");
+    let st = f.state.blocking_lock();
+    let old = json!({"errorCode":"TOOL_TIMEOUT","content":{"error":"bash timed out"}}).to_string();
+    st.db.conn.execute("INSERT INTO background_processes(id,session_id,tool_call_id,command,cwd,status,started_at,result_json) VALUES('old-timeout',?1,'old-timeout','old','/','timed_out','2026-10-09T00:00:00Z',?2)",rusqlite::params![f.session,old]).unwrap();
+    let detail = jobs::read(&st, &f.session, "old-timeout").unwrap();
+    assert_eq!(detail["errorMessage"], "bash timed out");
+    assert!(detail.get("timeoutMs").is_none());
+    assert!(detail["process"].get("timeoutIsDefault").is_none());
 }

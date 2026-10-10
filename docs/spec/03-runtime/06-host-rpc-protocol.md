@@ -1905,3 +1905,15 @@ member names, assigned open task IDs, and the count and identities of unconsumed
 current-expert results; the next action remains `wait_for_updates`. Settlement is
 bound to the Host-proven original execution turn, never inferred from a historical
 session approval. Post-execution mail does not extend Goal lifecycle authority.
+
+
+Background timeout visibility (2026-10-11): the existing `errorMessage` on a
+`TOOL_TIMEOUT` read states the applied default/explicit limit and the seconds
+parameter guidance. The persisted tool-result content records `timeoutMs` and
+`timeoutIsDefault`; older rows are not backfilled with invented provenance.
+No summary field, migration, RPC or event field is added. Sidecar reads use the
+existing opaque project launch binding, forward only `{sessionId,id}`, and
+recheck binding generation plus the returned process owner after the await.
+Only `read` is admitted; sidecar `list` and `stop` remain unavailable.
+Team waits return the scoped terminal detail after an existing changed event;
+output/start events only trigger a read and do not finish the wait.

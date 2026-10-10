@@ -35,6 +35,13 @@
       "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
     },
     {
+      "id": "background-bash-limit",
+      "family": "shell",
+      "script": "scripts/e2e-background-bash-limit.mjs",
+      "tier": "nightly",
+      "safety": "Production Host/sidecar with isolated temporary data and local commands; no real provider calls."
+    },
+    {
       "id": "capability-move",
       "family": "extensions",
       "script": "scripts/e2e-capability-move.mjs",

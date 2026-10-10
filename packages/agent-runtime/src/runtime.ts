@@ -1,3 +1,4 @@
+import { backgroundBashDescription, bashTimeoutPayload } from "./background-bash.js";
 import { contextRequestObserver } from "./context-insights.js";
 import { TOOL_ACTIVATION_SECTION, toolDeclarationPolicy, toolActivationSection, restoredToolActivation, syncToolActivation, type ToolDeclarationPolicy } from "./fixed-tool-declarations.js";
 import { orderSystemRows, SystemTranscriptJournal } from "./system-transcript-journal.js";
@@ -3319,7 +3320,7 @@ export class DesktopAgentRuntime {
       Bash: {
         command: Type.String(),
         run_in_background: Type.Optional(Type.Boolean({
-          description: "Start a Host-managed background process and return its ID immediately. It remains visible in the session activity panel until stopped or completed. The command timeout still applies.",
+          description: backgroundBashDescription,
         })),
         timeout: Type.Optional(
           Type.Number({
@@ -3328,7 +3329,7 @@ export class DesktopAgentRuntime {
             // runtime read the intent instead of burning the turn (D273 / D329).
             maximum: MAX_ACCEPTED_COMMAND_TIMEOUT,
             description:
-              `Optional command timeout in seconds from 1 to ${MAX_COMMAND_TIMEOUT_SECONDS}; defaults to 60 seconds.`,
+              `Optional command timeout in seconds from 1 to ${MAX_COMMAND_TIMEOUT_SECONDS}; defaults to 60 seconds. Pass timeout for long runs, including run_in_background.`,
           }),
         ),
       },
@@ -3459,7 +3460,7 @@ export class DesktopAgentRuntime {
                 ? {
                     expectedCommandShellId: this.commandShell.id,
                     expectedCommandShellDialect: this.commandShell.dialect,
-                    timeoutMs,
+                    ...bashTimeoutPayload(params, timeoutMs),
                   }
                 : {}),
               ...(toolName.startsWith("plugin_")

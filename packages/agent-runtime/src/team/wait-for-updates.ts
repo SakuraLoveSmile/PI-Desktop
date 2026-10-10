@@ -1,3 +1,4 @@
+import { BackgroundProcessUpdates } from "./background-process-updates.js";
 import { Type } from "@earendil-works/pi-ai";
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { TeamBoardProjection, TeamMessageRecord } from "@pi-desktop/shared";
@@ -31,11 +32,12 @@ function errorResult(error: unknown): AgentToolResult {
 export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool {
   const { teamSessionId, callerSessionId, host } = opts;
   const consumed = new Set<string>();
+  const background = new BackgroundProcessUpdates(host, callerSessionId);
   return {
     name: "wait_for_updates",
     label: "Wait for Updates",
     description:
-      "Wait for teammate updates (mailbox messages, task board updates) with a timeout in seconds.",
+      "Wait for teammate updates (mailbox messages, task board updates) or an owned background process ending, with a timeout in seconds.",
     parameters: Type.Object({
       timeoutSeconds: Type.Optional(Type.Number({
         description: "Timeout in seconds (1-60, default 10).",
@@ -79,6 +81,13 @@ export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool
           if (settled) return;
           settled = true;
           const details = value.details;
+          if (details && typeof details === "object" && "backgroundProcess" in details) {
+            const detail = details.backgroundProcess;
+            if (detail && typeof detail === "object" && "process" in detail && detail.process &&
+                typeof detail.process === "object" && "id" in detail.process && typeof detail.process.id === "string") {
+              background.consume(detail.process.id);
+            }
+          }
           if (details && typeof details === "object" && "reason" in details &&
               details.reason === "execution_inbox" && "messages" in details && Array.isArray(details.messages)) {
             for (const message of details.messages) {
@@ -152,6 +161,15 @@ export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool
           try {
             const inbox = await readInbox();
             if (inbox && !settled) { finish(inbox); return; }
+            let backgroundProcess;
+            try {
+              backgroundProcess = await background.read(signal, () => !settled && (!expectedTurnId || opts.getTurnId?.() === expectedTurnId));
+            } catch (error) {
+              if (!settled) finish(errorResult(error));
+              return;
+            }
+            if (settled) return;
+            if (backgroundProcess) { finish(result({ updated: true, reason: "background_process_completed", backgroundProcess })); return; }
             const current = await readState();
             if (settled) return;
             if (Date.now() >= deadline) {
@@ -190,9 +208,11 @@ export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool
         try {
           // Subscribe before reading the baseline so a concurrent mutation wakes us.
           unsubscribe = host.onNotification?.((method, payload) => {
-            if (settled || (method !== "team.changed" && method !== "team.messageQueued") ||
-                !payload || typeof payload !== "object" ||
-                !("teamSessionId" in payload) || payload.teamSessionId !== teamSessionId) return;
+            if (settled) return;
+            const processChanged = background.changed(method, payload);
+            const teamChanged = (method === "team.changed" || method === "team.messageQueued") &&
+              payload && typeof payload === "object" && "teamSessionId" in payload && payload.teamSessionId === teamSessionId;
+            if (!processChanged && !teamChanged) return;
             clearTimeout(notificationTimer);
             notificationTimer = setTimeout(() => {
               notificationTimer = undefined;
@@ -220,7 +240,7 @@ export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool
             }
             baseline = initial;
             if (yieldPendingInbox(initial.pendingCount)) return;
-            if (dirty) void recheck();
+            if (dirty || background.hasPending()) void recheck();
             else scheduleFallback();
           };
           void initialize().catch((error: unknown) => finish(errorResult(error)));
