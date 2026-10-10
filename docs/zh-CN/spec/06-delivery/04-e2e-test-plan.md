@@ -9772,3 +9772,14 @@ options retain pressed states and switching behavior.
 - `E2E-TEAM-completion-error-keeps-host-reason`：真实宿主拒绝经运行时 guard 和三次具体原因提示，第四次拒绝的终态错误与宿主原因完全相同。
 
 自动执行 `scripts/e2e-goal-report.mjs`（隔离真实 Host RPC 和运行时工具／guard）及 `scripts/e2e-team-approved-goal.mjs`（隔离 Electron、回环假 provider）。不访问真实会话、profile 或模型。
+
+### E2E-RUNTIME-edit-accepts-tag-with-legacy-arguments
+
+- **前提：** 候选源码构建的 Host 二进制、隔离临时数据和工作区；不使用提供商或运行中的 Desktop。
+- **步骤：** 读取文件，不带 `ops`，同时传 `tag`、`old_string`、`new_string` 编辑。
+  再只传 `tag` + `ops`、以及混合旧式字段编辑。尝试零处/多处旧文本匹配、缺少操作和没有正文的冒号 PUT。
+- **预期：** 旧式替换应用一次；`ops` 优先，普通锚定编辑保留原有检查。零处/多处匹配拒绝且不写入。
+  两种形态错误包含 `PUT 48.=48:` 与 `+replacement` 行，并说明 `new_string` 仅在 `ops` 缺省时读取。
+  三次失败终止仍由既有 mutation-guard 测试覆盖。
+- **覆盖：** `node scripts/e2e-edit-legacy.mjs`，`PI_DESKTOP_HOST_BIN` 指向任务候选；Host Edit 和 runtime mutation-guard 测试。
+- **规格：** runtime 规格 18 §2.1 / §11；D273 修订。

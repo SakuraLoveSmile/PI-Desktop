@@ -5222,3 +5222,11 @@ Markdown 源码，不是 `text/html` 负载；对禁用行内 HTML 的外部编�
   服务器对自身工具声明的风险标注不被信任，绝不降低审批路径。
 - 通过 `plugins.execute` 的分发、只读模式处理与 `mcp_` 命名空间不变。见 ADR
   `mcp-tool-approval-risk` 与 E2E-MCP-tool-requires-approval。
+
+## 2026-10-11 —— 旧式 Edit 容忍同时提供 tag（D273 修订）
+
+- `ops` 缺省且旧式文本字段齐全时，忽略提供的 `tag`，保留既有唯一匹配转换。
+  零处或多处匹配仍报 `EDIT_LEGACY_MATCH_FAILED`；提供 `ops` 时锚定操作优先。
+- 缺少操作或 PUT 正文时，错误包含 `PUT 48.=48:` 与 `+replacement` 行，并说明
+  `new_string` 仅在 `ops` 缺省时读取。
+- 不改 tag 链、权限、持久化和重试预算；锚定 Edit 保留原有版本及读取来源校验。

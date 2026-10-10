@@ -16,7 +16,7 @@
 | Local permission approval | No automatic deadline; explicit decision or cancellation required |
 | allow-session scope | toolName |
 | Bash style | non-interactive; selected host catalog shell with streamed output |
-| Edit contract | line-anchored ops + whole-file `tag`; no `old_string`/`new_string` (ADR 0087) |
+| Edit contract | line-anchored ops + whole-file `tag`; legacy `old_string`/`new_string` tolerated only without `ops` (D273) |
 | asktool | interactive multi-question tool; no validity deadline; skipped answers become empty output fields |
 
 ## 1. Goal
