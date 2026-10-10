@@ -34,7 +34,6 @@ import {
   useTranscriptMenu,
 } from "./TranscriptMenu";
 import { conversationMenuItems } from "./menu-items";
-import { ThinkingDisplayControl } from "./ThinkingDisplayControl";
 import { buildPlanTranscriptIndex } from "../../../lib/plan-transcript";
 import { PlanTranscriptContext } from "../../../lib/plan-transcript-context";
 import { buildTeamDispatchIndex, TeamDispatchContext } from "../../../lib/team-dispatch";
@@ -104,7 +103,6 @@ function TranscriptBody({
   const openTranscriptMenu = useTranscriptMenu();
   const { copyText, selectText } = useChatTextActions();
   const showToast = useAppStore((state) => state.showToast);
-  const settings = useAppStore((state) => state.settings);
   const transcriptRunning = isRunning && !readingWindow;
   const pendingTeamReview = usePendingTeamExecutionReview(sessionId, !readingWindow);
   const latestTurnResult = useAppStore((state) =>
@@ -275,22 +273,6 @@ function TranscriptBody({
       ref={wrapRef}
       data-transcript-settling={veilCovering ? "true" : undefined}
     >
-      {settings ? (
-        <div className="transcript-display-toolbar">
-          <ThinkingDisplayControl
-            mode={settings.thinkingDisplayMode}
-            onChange={async (thinkingDisplayMode) => {
-              const next = { ...settings, thinkingDisplayMode };
-              try {
-                await api.setSettings(next);
-                useAppStore.setState({ settings: next });
-              } catch (error) {
-                showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
-              }
-            }}
-          />
-        </div>
-      ) : null}
       {/* The minimap measures row positions against a rendered scroller. A
         * hidden pane has none, so measuring there would cache junk offsets and
         * reuse them on reveal. It is out of flow and re-measures on mount, so

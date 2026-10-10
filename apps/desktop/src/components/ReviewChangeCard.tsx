@@ -17,7 +17,7 @@ const STATUS_MARKS: Record<ReviewChangeStatus, string> = {
   deleted: "D",
 };
 
-function DiffBody({ message, compact }: { message: UiMessage; compact: boolean }) {
+function DiffBody({ message, compact, readOnly }: { message: UiMessage; compact: boolean; readOnly: boolean }) {
   const { t } = useTranslation();
   const change = reviewChangeFromMessage(message);
   const rollback = useAppStore((state) => state.rollbackWorkspaceChange);
@@ -26,7 +26,7 @@ function DiffBody({ message, compact }: { message: UiMessage; compact: boolean }
   if (!change) return null;
 
   const runRollback = async () => {
-    if (!change.reversible || change.state === "rolledBack" || rollingBack) return;
+    if (readOnly || !change.reversible || change.state === "rolledBack" || rollingBack) return;
     setRollingBack(true);
     // A conflict or an unavailable snapshot is already reported through the
     // store's toast; this card owns the rollback action only.
@@ -68,7 +68,7 @@ function DiffBody({ message, compact }: { message: UiMessage; compact: boolean }
             <IconCheck size={13} />
             {t("panel.review.rolledBack")}
           </span>
-        ) : change.reversible ? (
+        ) : change.reversible && !readOnly ? (
           <button
             type="button"
             className="review-change-rollback"
@@ -93,9 +93,11 @@ function DiffBody({ message, compact }: { message: UiMessage; compact: boolean }
 export const ReviewChangeCard = memo(function ReviewChangeCard({
   message,
   compact = false,
+  readOnly = false,
 }: {
   message: UiMessage;
   compact?: boolean;
+  readOnly?: boolean;
 }) {
   const { t } = useTranslation();
   const change = reviewChangeFromMessage(message);
@@ -159,7 +161,7 @@ export const ReviewChangeCard = memo(function ReviewChangeCard({
       </button>
       {open ? (
         <div className="review-change-card-body" id={detailsId}>
-          <DiffBody message={message} compact={compact} />
+          <DiffBody message={message} compact={compact} readOnly={readOnly} />
         </div>
       ) : null}
     </section>

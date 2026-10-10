@@ -3,6 +3,7 @@ import { reuseReferences } from "../../../lib/transcript-summary";
 import { ActivityItems } from "./ActivityItems";
 import { DisclosureScope, disclosureKey } from "./disclosure";
 import { ProcessActivityGroup } from "./ProcessActivityGroup";
+import { CompactSubagentActivity } from "./CompactSubagentActivity";
 import {
   memo,
   useContext,
@@ -351,10 +352,16 @@ export const ActivityGroup = memo(function ActivityGroup({
 
   if (!hasSubagentTopology) {
     return (
-      <ProcessActivityGroup items={visibleItems} active={isActive} activeStatusLabel={pendingTeamReview ? t("team.review.status.pending") : undefined} disclosure={disclosure}>
+      <ProcessActivityGroup items={visibleItems} compact={compact} active={isActive} activeStatusLabel={runtimeStatus || undefined} disclosure={disclosure}>
         {renderedItems}
       </ProcessActivityGroup>
     );
+  }
+
+  if (compact) {
+    return <CompactSubagentActivity items={visibleItems} delegateItems={delegateItems}
+      delegationStatuses={delegationStatuses} delegationTimings={delegationTimings}
+      isLast={isLast} isActive={isActive} activeStatusLabel={runtimeStatus} />;
   }
 
   return (

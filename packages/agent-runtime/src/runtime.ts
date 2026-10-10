@@ -3315,6 +3315,9 @@ export class DesktopAgentRuntime {
       },
       Bash: {
         command: Type.String(),
+        run_in_background: Type.Optional(Type.Boolean({
+          description: "Start a Host-managed background process and return its ID immediately. It remains visible in the session activity panel until stopped or completed. The command timeout still applies.",
+        })),
         timeout: Type.Optional(
           Type.Number({
             minimum: MIN_COMMAND_TIMEOUT_SECONDS,

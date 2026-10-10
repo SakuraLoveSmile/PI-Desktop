@@ -1,3 +1,6 @@
+mod background_processes_rpc;
+#[cfg(test)]
+mod background_processes_tests;
 mod config_sync_rpc;
 mod goal_rpc;
 mod plan_schedule_rpc;
@@ -6,6 +9,7 @@ mod project_code_search;
 mod project_history;
 mod scheduled_rpc;
 mod scheduled_tools;
+mod session_notes_rpc;
 #[cfg(test)]
 mod subagent_settings_tests;
 #[cfg(test)]
@@ -491,6 +495,16 @@ pub async fn serve(state: Arc<Mutex<AppState>>) -> Result<()> {
             tracing::warn!(error = %error, "RPC request task failed during shutdown");
         }
     }
+    let background_jobs = {
+        let mut st = state.lock().await;
+        std::mem::take(&mut st.background_jobs)
+    };
+    for (_, task) in background_jobs {
+        if let Err(error) = task.await {
+            tracing::error!(%error,"background process task failed during shutdown");
+        }
+    }
+
     drop(tx);
     if !writer_done {
         input_error = match tokio::time::timeout(STDOUT_WRITER_SHUTDOWN, writer_done_rx).await {
@@ -2103,6 +2117,22 @@ async fn handle_request(
             // directory and is still writing to that session's transcript, so
             // the bulk delete waits until every attached session is idle.
             for id in &session_ids {
+                if crate::background_processes::has_pending_finalization(&st, id) {
+                    return Err(rpc_err(
+                        1008,
+                        "background process result has not been saved; read its details to retry",
+                        "BACKGROUND_PROCESS_PERSISTENCE_FAILED",
+                    ));
+                }
+                if crate::background_processes::has_active(&st.db, id)
+                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                {
+                    return Err(rpc_err(
+                        1008,
+                        "stop background processes before removing this project",
+                        "SESSION_HAS_BACKGROUND_PROCESSES",
+                    ));
+                }
                 if sessions::session_has_running_turn(&st.db, id)
                     .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
                 {
@@ -2890,6 +2920,22 @@ async fn handle_request(
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
+            if crate::background_processes::has_pending_finalization(&st, id) {
+                return Err(rpc_err(
+                    1008,
+                    "background process result has not been saved; read its details to retry",
+                    "BACKGROUND_PROCESS_PERSISTENCE_FAILED",
+                ));
+            }
+            if crate::background_processes::has_active(&st.db, id)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+            {
+                return Err(rpc_err(
+                    1008,
+                    "stop background processes before deleting this session",
+                    "SESSION_HAS_BACKGROUND_PROCESSES",
+                ));
+            }
             let team_before_delete = crate::team::get_team(&st.db, id).map_err(team_rpc_err)?;
             crate::team::can_delete_session(&st.db, id).map_err(|error| {
                 let message = error.to_string();
@@ -3288,6 +3334,24 @@ async fn handle_request(
             let mut st = state.lock().await;
             if !st.allow_plugin_delete(plugin_id) {
                 return Err(rpc_err(1006, "plugin delete rate exceeded", "RATE_LIMITED"));
+            }
+            if let Some(session_id) = params.get("sessionId").and_then(Value::as_str) {
+                if crate::background_processes::has_active(&st.db, session_id)
+                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                {
+                    // Preserve plugin ownership validation before reporting a lifecycle conflict.
+                    plugin_sessions::get(&st.db, plugin_id, &params)
+                        .map_err(plugin_session_rpc_err)?;
+                    if crate::background_processes::has_pending_finalization(&st, session_id) {
+                        return Err(rpc_err(1008,"background process result has not been saved; read its details to retry","BACKGROUND_PROCESS_PERSISTENCE_FAILED"));
+                    }
+
+                    return Err(rpc_err(
+                        1008,
+                        "stop background processes before deleting this session",
+                        "SESSION_HAS_BACKGROUND_PROCESSES",
+                    ));
+                }
             }
             plugin_sessions::delete(&st.db, plugin_id, &params).map_err(plugin_session_rpc_err)
         }
@@ -4077,6 +4141,12 @@ async fn handle_request(
             scheduled_rpc::handle(&st, method, params)
         }
 
+        method if method.starts_with("backgroundProcesses.") => {
+            background_processes_rpc::handle(state.clone(), method, &params).await
+        }
+        method if method.starts_with("sessionNotes.") => {
+            session_notes_rpc::handle(state.clone(), method, &params).await
+        }
         "tools.list" => {
             let mut definitions = tools::builtin_tool_defs();
             if let Some(items) = definitions.as_array_mut() {
@@ -4114,6 +4184,22 @@ async fn handle_request(
             let p: ToolsExecuteParams = serde_json::from_value(params.clone())
                 .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
             let execution_timeout_ms = tools::effective_timeout_ms(&p.tool_name, p.timeout_ms);
+            let background = if p.tool_name == "Bash" {
+                match p.args.get("run_in_background") {
+                    None => false,
+                    Some(Value::Bool(value)) => *value,
+                    Some(_) => {
+                        return Err(rpc_err(
+                            1002,
+                            "run_in_background must be a boolean",
+                            "INVALID_PARAMS",
+                        ))
+                    }
+                }
+            } else {
+                false
+            };
+            let mut background_owned = false;
             {
                 let st = state.lock().await;
                 crate::team::planning::validate_tool(&st.db, &p.session_id, &p.tool_name)
@@ -4181,6 +4267,18 @@ async fn handle_request(
                     .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
                     .ok_or_else(|| rpc_err(1007, "session not found", "SESSION_NOT_FOUND"))?
             };
+
+            if p.tool_name == "Bash" {
+                let st = state.lock().await;
+                if let Some(process) =
+                    crate::background_processes::duplicate_view(&st, &p.session_id, &p.tool_call_id)
+                        .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                {
+                    return Ok(
+                        json!({"toolCallId":p.tool_call_id,"ok":true,"isError":false,"content":{"backgroundProcessId":process.id,"status":process.status,"message":"Background process already accepted; no duplicate command was started."},"durationMs":0,"denied":false}),
+                    );
+                }
+            }
 
             // Register before permission evaluation so tools.abort can cancel
             // an approval wait as well as an already-spawned process.
@@ -4592,7 +4690,50 @@ async fn handle_request(
                         timeout_ms: execution_timeout_ms,
                         cancellation,
                         output_tx: Some(tx.clone()),
+                        background_output: None,
                     });
+                }
+
+                if background {
+                    let workspace = ws_path.clone().ok_or_else(|| {
+                        rpc_err(1002, "workspace required", "WORKSPACE_REQUIRED")
+                    })?;
+                    let options = bash_options
+                        .ok_or_else(|| rpc_err(1000, "Bash options missing", "INTERNAL"))?;
+                    let process = crate::background_processes::start(
+                        state.clone(),
+                        tx.clone(),
+                        crate::background_processes::ApprovedJob {
+                            workspace,
+                            scratch: scratch_path.clone(),
+                            args: p.args.clone(),
+                            options,
+                            permit: _tool_permit,
+                        },
+                    )
+                    .await
+                    .map_err(|e| rpc_err(1008, e.to_string(), "BACKGROUND_PROCESS_START_FAILED"))?;
+                    // The detached execution now owns cancellation and admission.
+                    background_owned = true;
+                    let st = state.lock().await;
+                    let _ = audit::append(
+                        &st.db,
+                        "background_process_start",
+                        Some(&p.session_id),
+                        json!({
+                            "id": process.id, "toolCallId": p.tool_call_id,
+                            "prompted": prompted, "permissionWaitMs": permission_wait_ms,
+                        }),
+                    );
+                    return Ok(json!({
+                        "toolCallId": p.tool_call_id, "ok": true, "isError": false,
+                        "content": {
+                            "backgroundProcessId": process.id, "status": "starting",
+                            "message": "Background process accepted. Read its output and terminal status through the background process manager.",
+                        },
+                        "durationMs": call_started.elapsed().as_millis() as u64,
+                        "denied": false, "commandShellId": command_shell_id,
+                    }));
                 }
 
                 let mut result = if p.tool_name == "TodoWrite" {
@@ -4714,7 +4855,9 @@ async fn handle_request(
                 serde_json::to_value(result).map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))
             }
             .await;
-            clear_bash_cancellation(&state, &p).await;
+            if !background_owned {
+                clear_bash_cancellation(&state, &p).await;
+            }
             outcome
         }
 

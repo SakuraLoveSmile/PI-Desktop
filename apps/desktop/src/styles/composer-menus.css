@@ -9,7 +9,7 @@
   /* Codex elevated-primary: #212121f5 / gray-800 96% (not flat solid) */
   background: var(--ds-bg-elevated-primary);
   box-shadow: var(--ds-shadow-composer);
-  border: 0;
+  border: 1px solid var(--ds-border-subtle);
   outline: 0;
 }
 
@@ -107,11 +107,10 @@
     One label per row plus two capability icons: wide enough for that and no
     wider, so the panel stays a menu rather than a second window.
   */
-  width: min(280px, calc(100vw - 24px));
+  width: min(348px, calc(100vw - 24px));
   background: var(--ds-bg-elevated-opaque);
-  background: color-mix(in oklab, var(--ds-bg-elevated-opaque) 96%, transparent);
-  backdrop-filter: saturate(1.6) blur(40px);
-  -webkit-backdrop-filter: saturate(1.6) blur(40px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
@@ -248,16 +247,13 @@
   background: var(--ds-border-subtle);
 }
 
-.composer-model-thinking-menu .composer-model-search {
-  margin: 3px 3px 5px;
-}
 
 .composer-model-thinking-menu .composer-plus-item {
-  min-height: 28px;
-  padding: 5px 8px;
+  min-height: 56px;
+  padding: 10px 12px;
 }
 
-/* Reasoning slider (issue #417): the menu root carries the slider itself, so a
+/* Reasoning slider (issue #417): the model list carries the slider itself, so a
    level is one drag instead of opening a list of levels.
 
    Stop/label alignment contract: the rail and the labels are full-width
@@ -509,8 +505,13 @@
   padding: 8px 10px 6px;
 }
 
-/* Provider→models groups: the list scrolls on its own so the search field and
-   provider headings stay reachable with many discovered models. */
+/* Provider headings stay reachable while the complete model list scrolls. */
+.composer-model-thinking-menu .composer-model-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .composer-model-list {
   max-height: 280px;
   overflow-y: auto;
@@ -533,9 +534,8 @@
 
 .composer-model-thinking-menu .composer-model-group-label {
   background: var(--ds-bg-elevated-opaque);
-  background: color-mix(in oklab, var(--ds-bg-elevated-opaque) 96%, transparent);
-  backdrop-filter: saturate(1.6) blur(40px);
-  -webkit-backdrop-filter: saturate(1.6) blur(40px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
@@ -557,20 +557,13 @@
   font-weight: var(--font-weight-normal);
 }
 
-/*
-  The full wire id is the identity, and it stays whole: a long route name wraps
-  instead of hiding the part that distinguishes two configured models. The id,
-  its friendly name and the badges share one line — id first, name next, badges
-  on the trailing edge — because the stacked column that preceded it pushed
-  every row's content into the left half of the menu and left the rest empty.
-*/
+/* Model names and real provider/capability metadata occupy separate lines. */
 .composer-model-option-main {
   display: flex;
   min-width: 0;
   flex: 1;
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: baseline;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 2px 8px;
 }
 
@@ -603,9 +596,8 @@
 .composer-model-option-meta {
   display: flex;
   flex: 0 0 auto;
-  /* Pinned to the row's trailing edge: the capability icons and the window are
-     what a row shows on the right. */
-  margin-left: auto;
+  max-width: 100%;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
 }
@@ -649,36 +641,37 @@
   color: var(--ds-accent) !important;
 }
 
-.composer-model-search {
-  display: flex;
+
+
+
+
+.composer-model-option-icon {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
   align-items: center;
-  gap: 6px;
-  height: 28px;
-  margin: 4px 3px 5px;
-  padding: 0 8px;
-  border-radius: var(--radius-sm);
-  background: var(--ds-bg-inset);
+  justify-content: center;
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--radius-md);
   color: var(--ds-text-muted);
 }
 
-.composer-model-search svg {
-  flex: 0 0 auto;
-}
-
-.composer-model-search input {
+.composer-model-option-provider {
   min-width: 0;
-  flex: 1;
-  height: 100%;
-  border: 0;
-  background: transparent;
-  outline: none;
-  color: var(--ds-text-primary);
-  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs);
 }
 
-.composer-model-search input::placeholder {
-  color: var(--ds-text-muted);
+.composer-model-settings.btn {
+  width: 100%;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  color: var(--ds-text-secondary);
 }
+
 
 .composer-model-empty {
   padding: 12px 8px;
@@ -774,6 +767,12 @@
   opacity: 1;
   pointer-events: auto;
   visibility: visible;
+}
+
+.composer-profile-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .composer-item-icon {

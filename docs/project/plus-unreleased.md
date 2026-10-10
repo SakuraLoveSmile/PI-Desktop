@@ -27,6 +27,28 @@ Upstream v0.15.6 → v0.16.1 has been merged.
   The bell badge now counts every unread persisted task notification, matching
   the Dock/taskbar badge; selection, mark-all-read, and clear stay synchronized
   with Host persistence across reloads.
+- The input footer exposes a clickable context progress track with the existing
+  used/remaining preference, actual usage detail and guarded manual compaction.
+  Missing usage is marked unavailable instead of showing a fabricated percent.
+
+- The Composer adopts a neutral outlined four-line input, separated execution
+  profile options and an upward Send button. Model selection opens directly to
+  real configured model rows with provider/capability metadata, retains reasoning
+  controls, and links to existing model Settings. Subagent progress and read-only
+  execution details reuse the existing task and work-panel components.
+
+- A session activity rail groups real plans, agents, background commands,
+  outputs and sources. Narrow chats use the same controls in the work panel.
+  Detailed/Compact now lives only in Settings. Quick Notes UI is removed, with
+  existing saved data retained for compatibility. Bash can launch approved managed
+  background commands whose output and stop controls remain available across
+  turns; Host restart marks unfinished jobs interrupted without replay.
+
+
+- Compact conversations emphasize readable progress and answers with larger
+  prose and clearer spacing. Tool segments, including single calls, collapse
+  into localized read/edit/command/search counts with visible issue counts;
+  original details, search reveal and Detailed mode remain available.
 
 - AskTool questions keep paragraphs and wide tables readable instead of
   squeezing them into vertical strips. Tables scroll inside the card and long
@@ -140,3 +162,22 @@ Upstream v0.15.6 → v0.16.1 has been merged.
   persistent text cache, with live file reconciliation and explicit partial coverage.
   Neither feature adds background model or embedding calls.
 - OpenCode Zen Muse Spark 1.3 Contributor Free now uses its Responses API instead of falling back to Chat Completions. Other publishers, explicit API metadata and client identity are preserved.
+### Composer metadata and compact agent rows
+
+The composer footer shows the current session's project, local/remote host, and known local Git branch. Unavailable project/branch metadata is omitted; remote sessions never borrow a local branch. Model menus list all models without a search field. Generation speed, full-turn token totals, cache metrics and context details are available from the bottom-right context meter. Subagent entries use transparent gradient-avatar rows with name, task, localized status and measured elapsed time; clicking a row opens read-only details, with no panorama entry. Validate model keyboard selection, footer metadata, context details and agent navigation in the isolated composer/transcript fixtures, including narrow layouts.
+
+### Recorded outputs, delegate details and project Skill suggestions
+
+Output rows display file basenames with a file-type icon plate and a full-path tooltip. They retain existing file navigation, omit status badges and use the current neutral theme. Delegate details show the recorded agent identity/state, bounded expandable task prompts, and collapsed contiguous thinking/tool groups with real counts. Follow-up turns, Markdown, search and scroll remain available; delegate errors/reviews have no Continue, dismiss or rollback mutation controls.
+
+Self-evolution suggestions are generated only through an explicit action in an idle, local, writable project conversation. The normal session send workflow requests evidence-based reusable lessons as a bounded `skill-suggestions` JSON fence. Only settled top-level assistant responses are accepted; malformed, oversized, nested and untrusted-role blocks do not become suggestions. Suggestions remain transcript-backed across reloads. Each draft opens the existing Skill editor for review before using `skills.create` at the captured owning project path; it is disabled by default, may be enabled by the reviewer, and never overwrites an existing skill. No project, partial loaded history, running/queued execution, approvals, imported/remote/read-only conversations and Team members disable generation/creation. Session/project changes close the editor and prevent stale saves. Generation uses the configured model when the user explicitly requests it; no background generation occurs.
+
+Acceptance covers file names/navigation, delegate prompt/group disclosure and absence of mutation actions, generation through the real send workflow, review edits, duplicate-save locking, failed-save draft preservation, late generation/save during session switches, parser validation and isolated Host project-Skill creation/list/read/no-overwrite. The reference pinned card is a progress-summary example; it does not imply automatic memory generation. Quick Notes is not exposed in the current UI; previously stored data is retained.
+
+### Skills and MCP sidebar with suggestion dialog
+
+The sidebar uses a flat Skills & MCP heading and a title-only icon list of recorded Skill/MCP references plus pending suggestions. References are removed from the separate Sources list; web sources remain there. Same-kind/name references are deduplicated, and a pending same-name Skill uses one row. The pending count is a compact rectangular action opening an opaque, viewport-bounded anchored dialog headed Self-evolution suggestions. Rows show a name and a two-line description; hover, keyboard focus and touch reveal Create/Ignore actions. Create opens the existing project Skill review editor before saving. Ignore hides only that recorded suggestion in the sidebar/count/dialog.
+
+Ignore preferences are renderer-owned UI preferences under an independent version-1 key, identified by owning session, source message, name and content fingerprint. They survive remount/reload, do not alter task messages or Skill files, and keep only the latest 200 identities. A regenerated source or revised content is independent. Invalid/unavailable storage is visible and failed writes do not remove a row. Escape/outside pointer closes the dialog; Escape returns focus to its count; changing sessions closes it without opening another owner's editor.
+
+Validate count-to-dialog, keyboard/hover actions, project review/save, Ignore/count/list updates, remount persistence, session/content isolation, recorded references and viewport bounds. Preview examples are synthetic.

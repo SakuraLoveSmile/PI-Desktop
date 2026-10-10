@@ -1,3 +1,4 @@
+import { SessionActivity } from "../features/chat/activity/SessionActivity";
 import { memo, useMemo } from "react";
 import { ChatTranscript } from "./ChatTranscript";
 import { useAppStore } from "../stores/app-store";
@@ -22,9 +23,11 @@ import { TranscriptDisclosureProvider } from "../features/chat/transcript/disclo
 export const SessionPane = memo(function SessionPane({
   sessionId,
   visible,
+  activityVisible = false,
 }: {
   sessionId: string;
   visible: boolean;
+  activityVisible?: boolean;
 }) {
   const transcript = useTranscriptView(sessionId);
   const loadTranscriptPage = useAppStore((state) => state.loadTranscriptPage);
@@ -84,6 +87,10 @@ export const SessionPane = memo(function SessionPane({
           planningState={transcript.historical ? undefined : planningState}
           paneVisible={visible}
         />
+        <div className="session-pane-activity" aria-hidden={!visible || !activityVisible} inert={!visible || !activityVisible}>
+          <SessionActivity sessionId={sessionId} messages={transcript.messages} visible={visible && activityVisible}
+            rangeLimited={transcript.hasMoreBefore || transcript.hasMoreAfter || transcript.historical} />
+        </div>
       </TranscriptDisclosureProvider>
     </div>
   );

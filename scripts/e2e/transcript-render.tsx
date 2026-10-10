@@ -1,3 +1,6 @@
+import { sessionActivityRailProbe } from "./session-activity-rail";
+import { sessionActivityIntegrationProbe } from "./session-activity-integration";
+import { transcriptReadabilityProbe } from "./transcript-readability";
 import { transcriptLongHistoryProbe as runLongHistoryProbe } from "./transcript-long-history";
 import { transcriptEditProbe } from "./transcript-edit";
 import { turnProcessProbe } from "./turn-process";
@@ -24,6 +27,11 @@ import { useAppStore } from "../../apps/desktop/src/stores/app-store";
 
 declare global {
   var __activityGroupRenders: string[];
+  var sessionActivityRailProbe: typeof sessionActivityRailProbe;
+  var sessionActivityIntegrationProbe: typeof sessionActivityIntegrationProbe;
+  var cleanupSessionActivityIntegrationProbe: () => void;
+  var cleanupReadabilityProbe: () => void;
+  var transcriptReadabilityProbe: typeof transcriptReadabilityProbe;
   var transcriptRenderProbe: () => Promise<unknown>;
   var transcriptRuntimeSlotProbe: () => Promise<unknown>;
   var smoothTextThrottleProbe: () => Promise<unknown>;
@@ -33,6 +41,9 @@ declare global {
 }
 
 globalThis.transcriptLongHistoryProbe = runLongHistoryProbe;
+globalThis.transcriptReadabilityProbe = transcriptReadabilityProbe;
+globalThis.sessionActivityRailProbe = sessionActivityRailProbe;
+globalThis.sessionActivityIntegrationProbe = sessionActivityIntegrationProbe;
 
 function assert(value: unknown, message: string): asserts value {
   if (!value) throw new Error(message);

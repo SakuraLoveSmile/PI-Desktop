@@ -56,14 +56,14 @@ test("responsive rules preserve the semantic model trigger and action controls",
   assert.match(composerSource, /className="stop-btn"/);
 });
 
-test("composer toolbar applies dense control row with tight left cluster and right-anchored actions", () => {
+test("composer toolbar spaces left controls and keeps actions right-anchored", () => {
   assert.match(
     styles,
     /\.composer-toolbar\s*\{[\s\S]*?display:\s*flex;[\s\S]*?align-items:\s*center;[\s\S]*?gap:\s*8px;/,
   );
   assert.match(
     styles,
-    /\.composer-left\s*\{[\s\S]*?display:\s*flex;[\s\S]*?align-items:\s*center;[\s\S]*?gap:\s*4px;[\s\S]*?flex:\s*0 1 auto;/,
+    /\.composer-left\s*\{[\s\S]*?display:\s*flex;[\s\S]*?align-items:\s*center;[\s\S]*?gap:\s*8px;[\s\S]*?flex:\s*0 1 auto;/,
   );
   assert.match(
     styles,

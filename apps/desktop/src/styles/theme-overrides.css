@@ -52,7 +52,7 @@
   background-image: none;
   box-shadow: var(--ds-shadow-composer);
   outline: none;
-  border: 0;
+  border: 1px solid var(--ds-border-subtle);
 }
 
 /* Home and thread-docked composers share the base shell metrics. The home

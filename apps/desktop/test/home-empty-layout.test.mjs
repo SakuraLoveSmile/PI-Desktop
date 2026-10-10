@@ -129,14 +129,14 @@ test("home and docked composers share visual shell metrics", () => {
   assert.doesNotMatch(styles, /\.composer-input-home\b/);
   assert.match(
     styles,
-    /\.composer-input-wrap\s*\{[\s\S]*?padding:\s*10px 12px 0;[\s\S]*?min-height:\s*44px;/,
+    /\.composer-input-wrap\s*\{[\s\S]*?padding:\s*16px 16px 0;[\s\S]*?min-height:\s*44px;/,
   );
   assert.match(
     styles,
-    /\.composer-input\s*\{[\s\S]*?min-height:\s*28px;[\s\S]*?font-size:\s*var\(--text-base\);/,
+    /\.composer-input\s*\{[\s\S]*?min-height:\s*4lh;[\s\S]*?font-size:\s*var\(--text-base\);/,
   );
   assert.match(
     styles,
-    /\.composer-toolbar\s*\{[\s\S]*?padding:\s*4px 8px 8px;/,
+    /\.composer-toolbar\s*\{[\s\S]*?padding:\s*8px 10px 10px;/,
   );
 });

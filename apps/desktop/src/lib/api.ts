@@ -1,4 +1,8 @@
 import type {
+  SessionQuickNote,
+  BackgroundProcessSummary,
+  BackgroundProcessDetail,
+  BackgroundProcessesChanged,
   ScheduledTaskRun,
   ActivationScope,
   AgentCapabilityMove,
@@ -631,6 +635,27 @@ export const api = {
     })),
   getSessionCollaboration: (sessionId: string) =>
     invoke<SessionCollaborationSummary>(IPC.invoke.sessionCollaboration, { sessionId }),
+  getSessionQuickNote: (sessionId: string) =>
+    invoke<{ note: SessionQuickNote }>(IPC.invoke.sessionNotesGet, { sessionId }),
+  saveSessionQuickNote: (sessionId: string, content: string, expectedRevision: number) =>
+    invoke<{ note: SessionQuickNote }>(IPC.invoke.sessionNotesSet, { sessionId, content, expectedRevision }),
+  listBackgroundProcesses: (sessionId: string) =>
+    invoke<{ processes: BackgroundProcessSummary[] }>(IPC.invoke.backgroundProcessesList, { sessionId }),
+  readBackgroundProcess: (sessionId: string, id: string) =>
+    invoke<BackgroundProcessDetail>(IPC.invoke.backgroundProcessesRead, { sessionId, id }),
+  stopBackgroundProcess: (sessionId: string, id: string) =>
+    invoke<{ process: BackgroundProcessSummary }>(IPC.invoke.backgroundProcessesStop, { sessionId, id }),
+  onBackgroundProcessesChanged: (listener: (event: BackgroundProcessesChanged) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.backgroundProcessesChanged, (payload) => {
+      if (!payload || typeof payload !== "object" || Array.isArray(payload)) return;
+      const event = payload as Record<string, unknown>;
+      if (typeof event.sessionId === "string" && typeof event.id === "string" &&
+          typeof event.revision === "number" && Number.isSafeInteger(event.revision) && event.revision > 0) {
+        listener({ sessionId: event.sessionId, id: event.id, revision: event.revision });
+      }
+    });
+  },
   deleteSession: (id: string) => invoke(IPC.invoke.sessionDelete, id),
   getSessionScratchPath: (sessionId: string) =>
     invoke<{ path: string }>(IPC.invoke.sessionGetScratchPath, { sessionId }),
