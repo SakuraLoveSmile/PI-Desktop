@@ -2388,16 +2388,24 @@ identify the platform validation still needed.
 - **Steps**: 1) On empty home, record the welcome placeholder and wait longer
   than 4 seconds to confirm it is unchanged. 2) Open conversation A, record
   its guidance, type and clear text, focus and blur the textarea, and wait;
-  confirm the copy is unchanged. 3) Switch to conversation B and then back to
-  A, recording each guidance change. 4) Switch between home and a conversation
-  and inspect the command/file and keyboard hints. 5) Type `/` and inspect the
+  confirm the copy is unchanged. 3) Start a turn with no text or file draft and
+  confirm the follow-up/steer hint appears. Check Enter-to-send on and off, and
+  verify the displayed send and steer shortcuts on macOS and Windows/Linux.
+  Add a draft while the turn is active and confirm contextual guidance returns.
+  4) Switch to conversation B and then back to A, recording each guidance
+  change. 5) Switch between home and a conversation and inspect the command/file
+  and keyboard hints. 6) Type `/` and inspect the
   slash menu. Include Skills with long English/CJK descriptions, short/no
   descriptions, a separate title/argument hint, and an exceptionally long slash
   name; also inspect a long filename in `@` mode. Repeat at 800px and 1680px
-  viewport widths with 320px and 640px composer widths. 6) Switch to zh-CN and
+  viewport widths with 320px and 640px composer widths. 7) Switch to zh-CN and
   repeat the context-switch checks.
 - **Expected**: The initially rendered context starts with its welcome copy and stays stable until
-  the page/session context changes. Each context switch advances to the next
+  the page/session context changes. While a turn is active and the draft has no
+  text or file references, the localized follow-up/steer hint replaces it. The
+  send shortcut follows the Enter-to-send preference and platform; the steer
+  shortcut is Option+Enter on macOS and Alt+Enter on Windows/Linux. Adding a
+  draft restores the contextual hint. Each context switch advances to the next
   localized command/file or keyboard hint with an opacity fade; no timer-driven
   changes occur. The keyboard hint includes Shift+Enter and a submit hint, while the
   command/file hint includes `/` and `@`. The slash menu still contains `/new`,
@@ -2418,8 +2426,10 @@ identify the platform validation still needed.
 - **Status**: Source-covered (`composer-placeholder-context.test.mjs`);
   slash-menu layout covered by `pnpm test:e2e:composer-autocomplete` after
   `pnpm build:js` (real React/Chromium and production CSS, deterministic command
-  fixtures; no provider required). Full provider/session scenario Draft;
-  branch runs do not replace post-integration E2E
+  fixtures; no provider required). The running-empty two-line Composer path is
+  covered by `E2E-COMPOSER-compact-running-input` in the transcript-render
+  fixture. Full provider/session scenario Draft; branch runs do not replace
+  post-integration E2E.
 
 #### E2E-089: Composer model menu opens upward and switches model
 
@@ -2471,7 +2481,7 @@ identify the platform validation still needed.
   slot remains reachable. Both mode menus are visible and pointer-accessible,
   and each selection updates its trigger. The execution-profile labels
   `智能体` and `专家团` remain fully visible at desktop and narrow composer widths.
-  Home and thread-docked composers match, with four-line empty input, a neutral
+  Home and thread-docked composers match, with two-line empty input, a neutral
   outline and unseparated toolbar. Profile menu options have at least 6px vertical
   separation; switching profiles preserves model, reasoning and permission.
   The task-progress card and activity rail both open the existing read-only
@@ -9820,7 +9830,12 @@ This test plan spec is accepted when:
 - The selected guidance stays unchanged until the page/session context changes;
   switching context advances to localized `/`/`@` command/file guidance and the
   keyboard hint `Shift+Enter for newline · Use Send to submit`, with an opacity fade.
-- Waiting, focusing, editing, clearing, or composing does not change the copy.
+- While a turn is active and there is no text or file draft, the localized
+  follow-up/steer hint replaces the contextual guidance. Its send shortcut
+  follows the Enter-to-send preference and platform; the steer shortcut is
+  Option+Enter on macOS and Alt+Enter on Windows/Linux. Adding a draft restores
+  contextual guidance. Waiting, focusing, editing, or clearing while idle does
+  not change the copy.
 - Placeholder ink is legible on light and dark floating plates.
 
 ### US-UI-31 Home empty vertical stack (D111/D204/D206)

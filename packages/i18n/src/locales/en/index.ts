@@ -467,6 +467,7 @@ export const en = {
     placeholderHome: "Ask anything",
     placeholderHint: "Type / for commands · @ for files",
     placeholderHomeHint: "Type / for commands · @ for files",
+    placeholderRunning: "{{sendShortcut}} to send a follow-up · {{steerShortcut}} to steer now",
     placeholderShortcut: "Shift+Enter for newline · Use Send to submit",
     addFiles: "Add files",
     filesAttached: "Added {{count}} item(s) to the draft",

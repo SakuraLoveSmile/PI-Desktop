@@ -309,6 +309,7 @@ export const ko = {
     placeholderHome: "무엇이든 물어보세요",
     placeholderHint: "명령은 / · 파일은 @ 입력",
     placeholderHomeHint: "명령은 / · 파일은 @ 입력",
+    placeholderRunning: "{{sendShortcut}} 후속 메시지 보내기 · {{steerShortcut}} 지금 방향 전환",
     placeholderShortcut: "줄바꿈은 Shift+Enter · 보내기를 눌러 제출",
     addFiles: "파일 추가",
     filesAttached: "초안에 항목 {{count}}개 추가됨",

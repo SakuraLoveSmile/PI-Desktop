@@ -8,6 +8,7 @@ import { ChatSurface } from "../../apps/desktop/src/components/ChatSurface";
 import { SubagentTranscriptTab } from "../../apps/desktop/src/components/workpanel/SubagentTranscriptTab";
 import { Button } from "../../apps/desktop/src/components/ui";
 import { OverviewTab } from "../../apps/desktop/src/components/workpanel/OverviewTab";
+import { ScheduledEditor } from "../../apps/desktop/src/features/scheduled/ScheduledEditor";
 import { useAppStore } from "../../apps/desktop/src/stores/app-store";
 import { createTranscriptReadingRuntime } from "../../apps/desktop/src/stores/runtime/transcript-reading-runtime";
 import { api } from "../../apps/desktop/src/lib/api";
@@ -116,7 +117,44 @@ export async function sessionActivityIntegrationProbe() {
     const editor=()=>host.querySelector<HTMLElement>('.composer-input');
     const input=(content:string)=>{const field=editor();if(!field)throw new Error('Missing composer editor');flushSync(()=>{field.textContent=content;field.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:content}));});};
     check(Boolean(host.querySelector('.stop-btn')),'running empty draft retains stop');
+    const runningPlaceholder = i18n.t('chat.placeholderRunning', { sendShortcut: 'Enter', steerShortcut: '⌥Enter' });
+    check(editor()?.getAttribute('aria-placeholder') === runningPlaceholder
+      && host.querySelector('.composer-placeholder')?.textContent === runningPlaceholder, 'running empty draft exposes follow-up and steering shortcuts visually and accessibly');
+    const emptyInputStyle = getComputedStyle(editor()!);
+    const inputLineHeight = Number.parseFloat(emptyInputStyle.lineHeight);
+    const emptyInputHeight = editor()!.getBoundingClientRect().height;
+    check(Math.abs(Number.parseFloat(emptyInputStyle.minHeight) - inputLineHeight * 2) < 1
+      && Math.abs(emptyInputHeight - inputLineHeight * 2) < 1, 'empty chat draft starts at two input lines');
+    set({ settings: { ...useAppStore.getState().settings!, enterToSend: false } });
+    check(editor()?.getAttribute('aria-placeholder') === i18n.t('chat.placeholderRunning', { sendShortcut: '⌘Enter', steerShortcut: '⌥Enter' }), 'running placeholder follows the configured send shortcut');
+    set({ settings: { ...useAppStore.getState().settings!, enterToSend: true } });
+    input(Array.from({ length: 12 }, (_, index) => `Draft line ${index + 1}`).join('\n'));
+    await until(() => editor()!.scrollHeight > editor()!.clientHeight, 'long draft did not scroll');
+    check(editor()!.getBoundingClientRect().height > emptyInputHeight
+      && Math.abs(editor()!.getBoundingClientRect().height - inputLineHeight * 7) < 1
+      && getComputedStyle(editor()!).overflowY === 'auto', 'long draft grows to seven lines before scrolling');
+    input('');
+    check(Math.abs(editor()!.getBoundingClientRect().height - emptyInputHeight) < 1
+      && getComputedStyle(editor()!).overflowY === 'hidden'
+      && host.querySelector('.composer-placeholder')?.textContent === runningPlaceholder, 'clearing the draft restores two lines and the running hint');
+    const scheduledHost = document.createElement('div');
+    scheduledHost.style.cssText = 'position:fixed;left:0;top:0;width:600px;z-index:2;background:var(--ds-bg-primary);';
+    document.body.append(scheduledHost);
+    const scheduledRoot = createRoot(scheduledHost, { onUncaughtError: error => errors.push(error) });
+    try {
+      flushSync(() => scheduledRoot.render(<I18nextProvider i18n={i18n}><ScheduledEditor projects={[]} currentWorkspacePath="/isolated/music" busy={false} save={async () => { throw new Error('Scheduled layout probe must not save a task'); }} cancel={() => {}} /></I18nextProvider>));
+      const scheduledInput = scheduledHost.querySelector<HTMLTextAreaElement>('.scheduled-instruction-input')!;
+      check(scheduledInput instanceof HTMLTextAreaElement && !scheduledInput.closest('.composer-dock')
+        && getComputedStyle(scheduledInput).minHeight === '104px'
+        && getComputedStyle(scheduledInput).maxHeight === 'none'
+        && scheduledInput.getBoundingClientRect().height >= 104, 'real ScheduledEditor retains its 104 pixel minimum outside the chat compact rule');
+    } finally {
+      flushSync(() => scheduledRoot.unmount());
+      scheduledHost.remove();
+    }
     input('请按这个方案继续修改，并保留现有缓存。');
+    check(editor()?.getAttribute('aria-placeholder') !== runningPlaceholder
+      && !host.querySelector('.composer-placeholder'), 'nonempty running draft restores the contextual placeholder contract');
     await until(()=>Boolean(host.querySelector<HTMLButtonElement>('.send-btn:not(:disabled)')),'Running draft did not expose send');
     check(!host.querySelector('.stop-btn'),'running draft retains steering send slot');
     const left=host.querySelector('.composer-left')!;const right=host.querySelector('.composer-right')!;
@@ -406,6 +444,19 @@ export async function sessionActivityIntegrationProbe() {
     if (outputHeading?.getAttribute('aria-expanded') === 'false') click(outputHeading);
     const changedRow = rail()?.querySelector('[data-activity-item-id="change:/isolated/music/docs/0001-deadline-based-timer.md"]');
     check(changedRow?.textContent?.includes(i18n.t("panel.activity.writeCount", { count: 2 })) && changedRow?.querySelector('.session-activity-line-changes')?.textContent === "+3−1", 'merged output displays complete Host review evidence');
+    input('');
+    set({ isRunning: true, runningSessions: { 'activity-a': true } });
+    host.style.width = '498px';
+    await until(() => host.querySelector('.chat-surface')?.getAttribute('data-activity-visible') === 'false', 'compact composer narrow layout did not release the rail');
+    await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    const narrowShell = host.querySelector('.composer-shell')!.getBoundingClientRect();
+    const narrowHint = host.querySelector('.composer-placeholder')!.getBoundingClientRect();
+    check(host.scrollWidth <= host.clientWidth && narrowHint.left >= narrowShell.left
+      && narrowHint.right <= narrowShell.right && narrowHint.height <= inputLineHeight * 2 + 1
+      && editor()?.getAttribute('aria-placeholder') === runningPlaceholder, '498 pixel empty composer keeps its running hint within the two-line input card');
+    checks.push('E2E-COMPOSER-compact-running-input');
+    host.style.width = '1100px';
+    await until(() => Boolean(rail()), 'compact composer screenshot did not restore the wide rail');
     await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
     globalThis.cleanupSessionActivityIntegrationProbe=cleanup;return {ok:true,checks};
   }catch(error){cleanup();throw error;}

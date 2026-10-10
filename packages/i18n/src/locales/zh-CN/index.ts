@@ -462,6 +462,7 @@ export const zhCN = {
     placeholderHome: "随便问问",
     placeholderHint: "输入 / 使用命令 · @ 引用文件",
     placeholderHomeHint: "输入 / 使用命令 · @ 引用文件",
+    placeholderRunning: "{{sendShortcut}} 发送后续消息 · {{steerShortcut}} 立即转向",
     placeholderShortcut: "Shift+Enter 换行 · 点击发送提交",
     addFiles: "添加文件",
     filesAttached: "已将 {{count}} 项加入草稿",

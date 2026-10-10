@@ -331,6 +331,11 @@
   cursor: text;
 }
 
+/* Compact chat drafts without changing the shared scheduled-editor surface. */
+.composer-dock .composer-input {
+  min-height: 2lh;
+}
+
 /* Atomic inline attachment chip inside the editable draft. */
 .composer-chip {
   display: inline-flex;
