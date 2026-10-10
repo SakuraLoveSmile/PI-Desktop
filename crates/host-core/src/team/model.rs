@@ -98,11 +98,15 @@ pub struct TeamBoardProjection {
     pub tasks: Vec<TeamTask>,
     pub readiness: Vec<TeamTaskReadiness>,
     pub scope_overlaps: Vec<WriteScopeOverlap>,
+    pub out_of_scope_write_count: u64,
+    pub out_of_scope_writes: Vec<super::write_scopes::MemberWriteCount>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TeamMessage {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sender_head: Option<String>,
     pub id: String,
     pub team_session_id: String,
     pub source_session_id: String,

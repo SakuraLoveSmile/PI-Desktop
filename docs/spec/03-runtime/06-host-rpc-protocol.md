@@ -1878,3 +1878,39 @@ complete canonical history, independently of display windows. The bounded v1
 page and monotonic Task settlement contracts are defined in
 [Complete session activity projection](session-activity-projection.md).
 No protocol-version/schema bump, model call or new plugin capability is added.
+
+
+### Team advisory write scopes and send-time HEAD
+
+After an otherwise authorized, successful member Write/Edit, `tools.execute`
+may append `content.scopeWarning` with
+`{code:"TEAM_WRITE_SCOPE_WARNING",taskIds,message}` when the canonical path is
+outside the union of non-empty `writeScopes` on tasks explicitly associated
+with the current member turn at their current revision. No raw path is added.
+Warnings never change ok/isError, permissions, retry budgets or task status.
+Empty scopes, scratch, Bash, failed mutations and unstarted/historical tasks
+are excluded. Advisory resolution/storage errors remain visible through
+`content.scopeTrackingError` without falsifying a successful mutation. A Team
+owner detached during execution leaves a visible `content.scopeTrackingSkipped`
+notice and no orphan count.
+
+`team.getBoard` adds optional `outOfScopeWriteCount` and `outOfScopeWrites`
+(`{memberSessionId,memberName,count}[]`); new Hosts return zero/empty if clean,
+and `team_status` defaults missing legacy fields to zero. Counts are cumulative
+for the member in its team, at most once per successful turn/tool-call identity.
+Existing KV preserves them across restart; session/team deletion cleans them.
+These counts are neither permissions nor semantic completion verdicts.
+
+`team.sendMessage` captures the sender's Host-resolved project HEAD at send
+admission outside the state lock through a bounded, hardened read-only Git
+probe. Caller project, running-turn identity, Lead user scope and normal Team authority
+are revalidated after await; changed turns/scopes return TEAM_TURN_INVALID
+before a message or stamp is written.
+The Host-only KV stamp is immutable on idempotent replay. Optional `senderHead`
+appears in Team mailbox projections (including readExecutionInbox/wait_for_updates),
+`session.collaboration.message` and authenticated SessionMessageOrigin,
+so live and restored member framing show the same SHA. Message body, provenance
+validation and permission ceilings remain unchanged. Non-Git/unborn/legacy
+messages omit it; unexpected probe errors log a bounded Host diagnostic without
+blocking dispatch. Only SHA is exposed, not paths, Git stderr or secrets.
+No new RPC, protocol version or schema migration is introduced.

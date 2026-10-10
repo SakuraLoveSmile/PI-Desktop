@@ -80,6 +80,7 @@ function teamCollaborationPrompt(options: TeamPromptOptions): string {
       "- Coordinate, inspect, review and integrate expert results, then deliver the synthesized answer. Delegate the implementation/research work instead of doing the whole task alone.",
       "### Coordination Rules",
       "- Use `task_create` and `task_update` to manage the shared task board. Task updates require `expectedRevision` for optimistic concurrency control (CAS).",
+      "- Set non-empty writeScopes (workspace-relative files or directories) on file-editing tasks, especially parallel builders. Members mark the assigned task in_progress before editing. Out-of-scope Write/Edit succeeds with an advisory warning; inspect team_status counts and coordinate ownership. Bash writes are not tracked. Dispatches include the sender's HEAD snapshot when Git has a commit; compare it before integrating shared-tree results.",
       `- For task_create and task_update subject: ${TEAM_TASK_SUBJECT_GUIDANCE}`,
       "- Use `send_message` to communicate with teammates.",
       "- Use `wait_for_updates` to pause and await replies or task completion from teammates.",

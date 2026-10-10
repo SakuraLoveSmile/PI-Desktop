@@ -5,6 +5,7 @@ pub(crate) mod authority;
 #[cfg(test)]
 mod authority_tests;
 pub mod board;
+pub(crate) mod dispatch_head;
 pub mod execution_inbox;
 #[cfg(test)]
 mod execution_inbox_tests;
@@ -42,6 +43,7 @@ pub(crate) mod task_attempts;
 mod test_support;
 #[cfg(test)]
 mod tests;
+pub(crate) mod write_scopes;
 
 /// Canonical Team tables, applied by the Plus schema track
 /// (`db::plus_schema`). Idempotent (`IF NOT EXISTS`) so every Plus step and

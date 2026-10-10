@@ -1,0 +1,75 @@
+#!/usr/bin/env node
+// Real Host and runtime tool/message contracts; isolated Git, no provider calls.
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createTeamTools } from "../packages/agent-runtime/dist/team/team-tools.js";
+import { resolveSessionMessageInput } from "../packages/host-runtime/dist/session-message-input.js";
+import { formatSessionMessage } from "../packages/shared/dist/session-collaboration.js";
+import { resolveHostBinary } from "./e2e/host.mjs";
+import { withScenario } from "./e2e/fixture.mjs";
+import { resolvePlan } from "./e2e/plan.mjs";
+
+const temporaryRoot = await mkdtemp(join(tmpdir(),"pi-team-write-scope-"));
+try {
+  await withScenario("E2E-TEAM-write-scope-warning", async ({host,workspace}) => {
+    const git = (...args) => execFileSync("git",args,{cwd:workspace,encoding:"utf8",env:{...process.env,GIT_CONFIG_GLOBAL:process.platform==="win32"?"NUL":"/dev/null",GIT_CONFIG_NOSYSTEM:"1",GIT_AUTHOR_NAME:"Fixture",GIT_AUTHOR_EMAIL:"fixture@example.invalid",GIT_COMMITTER_NAME:"Fixture",GIT_COMMITTER_EMAIL:"fixture@example.invalid"}}).trim();
+    git("init","-q");
+    await writeFile(join(workspace,"seed.txt"),"initial\n");
+    git("add","seed.txt");git("-c","core.hooksPath=/dev/null","commit","-qm","Initial fixture");
+    const initialHead = git("rev-parse","HEAD");
+    const {provider} = await host.call("providers.create",{name:"Scope fixture",vendorKey:"custom",authKind:"none",apiStyle:"chat_completions",baseUrl:"http://127.0.0.1:9/v1",defaultModelId:"fixture",models:[{id:"fixture",thinkingLevels:["off"]}]});
+    const {session:lead} = await host.call("session.create",{title:"Scope fixture",mode:"agent",executionProfile:"team",projectPath:workspace,providerId:provider.id,modelId:"fixture"});
+    await host.call("session.configure",{id:lead.id,mode:"agent",permissionMode:"auto"});
+    const {turnId:declarationTurn} = await host.call("session.beginTurn",{sessionId:lead.id});
+    await host.call("plans.enter",{sessionId:lead.id,turnId:declarationTurn,toolCallId:"goal-enter",requestedMode:"goal",kind:"goal"});
+    const {proposal} = await host.call("plans.submit",{sessionId:lead.id,turnId:declarationTurn,toolCallId:"goal-submit",kind:"goal",title:"Scope fixture",markdown:"# Verify scopes\n\n- Keep mutations successful.\n",question:"Approve fixture?"});
+    const {execution} = await resolvePlan(host,proposal,"approve","auto");
+    await host.call("plans.claimExecution",{executionId:execution.id});
+    await host.call("goalReports.bindExecutionTurn",{executionId:execution.id,turnId:declarationTurn});
+    const {review} = await host.call("team.declareStrategy",{teamSessionId:lead.id,callerSessionId:lead.id,leadTurnId:declarationTurn,strategy:"delegate",reason:"Verify advisory shared-tree attribution",members:[{name:"builder",contextKind:"fresh"}]});
+    const {decision} = await host.call("team.confirmLaunchReview",{teamSessionId:lead.id,reviewId:review.reviewId,expectedRevision:review.revision});
+    const memberId = decision.memberSessionIds[0];
+    const leadTurn = declarationTurn;
+    await host.call("team.readExecutionInbox",{teamSessionId:lead.id,callerSessionId:lead.id,expectedTurnId:leadTurn});
+    const {task} = await host.call("team.createTask",{teamSessionId:lead.id,callerSessionId:lead.id,subject:"Write assigned source",ownerMemberName:"builder",writeScopes:["owned"]});
+    const request = {teamSessionId:lead.id,callerSessionId:lead.id,target:"builder",content:"Write the assigned source",idempotencyKey:"scope-dispatch",senderHead:"forged"};
+    const {message:dispatch} = await host.call("team.sendMessage",request);
+    await writeFile(join(workspace,"seed.txt"),"later\n");git("add","seed.txt");git("-c","core.hooksPath=/dev/null","commit","-qm","Later fixture");
+    assert.notEqual(git("rev-parse","HEAD"),initialHead);
+    const replay = await host.call("team.sendMessage",request);assert.equal(replay.message.id,dispatch.id);
+    const input = await resolveSessionMessageInput(host,{sessionId:memberId,sessionMessageId:dispatch.id});
+    assert.equal(input.content,request.content);assert.equal(input.origin.senderHead,initialHead);
+    assert.ok(formatSessionMessage(input.content,input.origin).includes(initialHead),"Member model framing must include send-time HEAD");
+    const {turnId:memberTurn} = await host.call("session.beginTurn",{sessionId:memberId,sessionMessageId:dispatch.id});
+    await host.call("session.appendMessage",{sessionId:memberId,turnId:memberTurn,message:{id:"dispatch-input",role:"user",content:input.content,createdAt:new Date().toISOString(),sessionMessage:{...input.origin,senderHead:"forged"}}});
+    const memberSession = (await host.call("session.get",{id:memberId})).session;
+    assert.equal(memberSession.messages.find(message=>message.id==="dispatch-input").sessionMessage.senderHead,initialHead,"Host replaces forged origin with immutable dispatch stamp");
+    const {task:active} = await host.call("team.updateTask",{teamSessionId:lead.id,callerSessionId:memberId,callerTurnId:memberTurn,taskId:task.taskId,expectedRevision:task.revision,status:"in_progress"});
+    const mutate = (id,path) => host.call("tools.execute",{sessionId:memberId,turnId:memberTurn,toolCallId:id,toolName:"Write",mode:"agent",args:{path,content:"first\n"}});
+    const inside = await mutate("inside","owned/source.txt");assert.equal(inside.ok,true);assert.equal(inside.content.scopeWarning,undefined);
+    const outside = await mutate("outside","owned-other/source.txt");assert.equal(outside.ok,true);assert.equal(outside.content.scopeWarning.code,"TEAM_WRITE_SCOPE_WARNING");assert.deepEqual(outside.content.scopeWarning.taskIds,[task.taskId]);
+    assert.equal(await readFile(join(workspace,"owned-other/source.txt"),"utf8"),"first\n");
+    const edited = await host.call("tools.execute",{sessionId:memberId,turnId:memberTurn,toolCallId:"edit-outside",toolName:"Edit",mode:"agent",args:{path:"owned-other/source.txt",old_string:"first",new_string:"second"}});
+    assert.equal(edited.ok,true);assert.equal(edited.content.scopeWarning.code,"TEAM_WRITE_SCOPE_WARNING");
+    const failed = await host.call("tools.execute",{sessionId:memberId,turnId:memberTurn,toolCallId:"failed-edit",toolName:"Edit",mode:"agent",args:{path:"owned-other/source.txt",old_string:"missing",new_string:"never"}});
+    assert.equal(failed.ok,false);assert.equal(failed.content.scopeWarning,undefined);
+    const runtimeTools = createTeamTools({teamSessionId:lead.id,callerSessionId:lead.id,isLead:true,host,getTurnId:()=>leadTurn});
+    const status = await runtimeTools.find(tool=>tool.name==="team_status").execute("status",{});
+    const visible = JSON.parse(status.content[0].text);assert.equal(visible.outOfScopeWriteCount,2);assert.equal(visible.outOfScopeWrites[0].memberSessionId,memberId);
+    await host.call("team.updateTask",{teamSessionId:lead.id,callerSessionId:memberId,callerTurnId:memberTurn,taskId:task.taskId,expectedRevision:active.revision,writeScopes:[]});
+    const unrestricted = await mutate("unrestricted","other.txt");assert.equal(unrestricted.ok,true);assert.equal(unrestricted.content.scopeWarning,undefined);
+    const board = await host.call("team.getBoard",{teamSessionId:lead.id,callerSessionId:lead.id});assert.equal(board.outOfScopeWriteCount,2);
+    const resultHead = git("rev-parse","HEAD");
+    const {message:reply} = await host.call("team.sendMessage",{teamSessionId:lead.id,callerSessionId:memberId,target:"Lead",content:"Scope result verified"});
+    const executionTools = createTeamTools({teamSessionId:lead.id,callerSessionId:lead.id,isLead:true,host,getTurnId:()=>leadTurn,approvedExecution:()=>true});
+    const consumed = await executionTools.find(tool=>tool.name==="wait_for_updates").execute("read-result-head",{});
+    const inboxReply = JSON.parse(consumed.content[0].text).messages.find(message=>message.id===reply.id);
+    assert.equal(inboxReply.senderHead,resultHead,"Original approved execution wait must carry authenticated member send-time HEAD");
+    await host.call("session.endTurn",{turnId:memberTurn,status:"completed",createNotification:false});
+    await host.call("session.endTurn",{turnId:leadTurn,status:"completed",createNotification:false});
+    console.log("PASS E2E-TEAM-write-scope-warning: real dispatch/task turn, successful Write/Edit warnings, counts, failed/empty scope exclusion, immutable send-time HEAD and member model/history framing");
+  },resolveHostBinary(),temporaryRoot);
+} finally { await rm(temporaryRoot,{recursive:true,force:true}); }
