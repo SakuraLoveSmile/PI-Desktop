@@ -781,10 +781,11 @@ identify the platform validation still needed.
 
 - **Preconditions**: Isolated Host/profile and local shell fixtures; no provider.
 - **Steps**: Hold four shell slots and queue twelve calls. Run independent Read
-  and Write successfully, then let another Bash call hit the real 30-second
-  admission deadline. Release the fixture gate and drain all accepted work.
+  and Write successfully, then drain this burst. In a separate phase, hold four
+  shell slots and let another Bash call hit the real 30-second admission deadline.
+  Release the fixture gate and drain all accepted work.
 - **Expected**: Rejected Bash never starts. `HOST_OVERLOADED` retains retryable
-  semantics; `content.capacity` shows host 4 in-flight/13 queued and requesting
+  semantics; `content.capacity` shows host 4 in-flight/1 queued and requesting
   session 0 in-flight/1 queued at rejection, with four safe Bash session holders.
   Text names `wait_for_updates`, long `sleep`, and background retention of the
   same capacity. No command/path appears. Rejected admission is removed from the
