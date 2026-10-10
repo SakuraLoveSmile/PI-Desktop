@@ -7,11 +7,23 @@
 import { Type } from "@earendil-works/pi-ai";
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import {
+  type GoalProgressSnapshot,
   type SubmitGoalReportDraftInput,
   validateGoalReportDraft,
 } from "@pi-desktop/shared";
 
 export const SUBMIT_GOAL_REPORT_TOOL_NAME = "SubmitGoalReport" as const;
+
+// Only known inspection/accounting tools preserve evidence. Shell, delegation,
+// plugin, and unknown tools remain conservative even if a call looks read-only.
+const DRAFT_PRESERVING_TOOLS = new Set([
+  SUBMIT_GOAL_REPORT_TOOL_NAME,
+  "TodoWrite", "UpdateGoalProgress", "ToolSearch", "Read", "Glob", "Grep",
+]);
+
+export function invalidatesGoalReportDraft(toolName: string): boolean {
+  return !DRAFT_PRESERVING_TOOLS.has(toolName);
+}
 
 export type GoalReportFailureCode =
   | "REPORT_DRAFT_PERSIST_FAILED"
@@ -32,6 +44,7 @@ export function persistGoalReportFailure(
 export type GoalReportDraftManagerOptions = {
   executionId: string;
   sessionId: string;
+  getProgressSnapshot?: () => GoalProgressSnapshot | null | undefined;
   onDraftSubmitted?: (draft: SubmitGoalReportDraftInput) => Promise<void> | void;
   onDraftInvalidated?: () => Promise<void> | void;
   onDraftPersistenceFailure?: (error: unknown) => Promise<void> | void;
@@ -41,6 +54,8 @@ export type GoalReportDraftManagerOptions = {
 export class GoalReportDraftManager {
   private currentDraft: SubmitGoalReportDraftInput | null = null;
   private invalidated = false;
+  private pendingInvalidation?: Promise<void>;
+  private evidenceRevision = 0;
 
   constructor(private readonly options: GoalReportDraftManagerOptions) {}
 
@@ -53,22 +68,39 @@ export class GoalReportDraftManager {
   }
 
   isDraftValid(): boolean {
-    return !this.invalidated && this.currentDraft !== null;
+    return !this.invalidated && this.currentDraft !== null &&
+      (this.currentDraft.verdict !== "met" || !this.hasIncompleteProgress());
+  }
+
+  private hasIncompleteProgress(): boolean {
+    return this.options.getProgressSnapshot?.()?.items.some((item) => item.status !== "completed") ?? false;
   }
 
   /**
-   * Invalidate draft if subsequent ordinary tools or steering inputs occur after submission.
+   * Invalidate draft if subsequent evidence-changing tools or steering inputs occur.
    */
   async invalidate(): Promise<void> {
+    // Steering can arrive while the first submission is still being persisted,
+    // before there is a local draft to clear.
+    this.evidenceRevision += 1;
     if (this.currentDraft !== null) {
       this.currentDraft = null;
       this.invalidated = true;
       if (this.options.onDraftInvalidated) {
+        const invalidating = this.options.onDraftInvalidated;
+        const pending = Promise.resolve().then(async () => {
+          try {
+            await invalidating();
+          } catch (error) {
+            await this.options.onDraftInvalidationFailure?.(error);
+            throw error;
+          }
+        });
+        this.pendingInvalidation = pending;
         try {
-          await this.options.onDraftInvalidated();
-        } catch (error) {
-          await this.options.onDraftInvalidationFailure?.(error);
-          throw error;
+          await pending;
+        } finally {
+          if (this.pendingInvalidation === pending) this.pendingInvalidation = undefined;
         }
       }
     }
@@ -81,7 +113,9 @@ export class GoalReportDraftManager {
       description:
         "Submit a structured completion report for the approved Goal task. " +
         "Call this once when all verification is complete and you have prepared the summary, " +
-        "metrics, criteria checklist, steps, and verification evidence.",
+        "metrics, criteria checklist, steps, and verification evidence. " +
+        "Reconcile UpdateGoalProgress before claiming the goal is met. " +
+        "Evidence-changing tools after submission invalidate the draft and require resubmission.",
       parameters: Type.Object({
         summary: Type.String({
           description: "High-level summary of the outcome reached and verified.",
@@ -208,7 +242,7 @@ export class GoalReportDraftManager {
         ),
       }),
       executionMode: "sequential",
-      execute: async (_toolCallId: string, params: any): Promise<AgentToolResult<any>> => {
+      execute: async (_toolCallId: string, params: unknown): Promise<AgentToolResult<unknown>> => {
         const validation = validateGoalReportDraft(params);
         if (!validation.ok) {
           return {
@@ -217,9 +251,32 @@ export class GoalReportDraftManager {
           };
         }
 
+        // Host RPC requests can execute concurrently. A delayed invalidation
+        // must finish before a replacement is written, or it could erase it.
+        const evidenceRevision = this.evidenceRevision;
+        await this.pendingInvalidation;
+
+        if (validation.value.verdict === "met" && this.hasIncompleteProgress()) {
+          const error = "UpdateGoalProgress before submitting a met report: progress still contains pending, in_progress, or failed items. Use partial or blocked when work remains incomplete.";
+          return {
+            content: [{ type: "text", text: `Draft validation failed: ${error}` }],
+            details: { ok: false, error },
+          };
+        }
+
         try {
           await this.options.onDraftSubmitted?.(validation.value);
         } catch (error) {
+          if (error !== null && typeof error === "object" && "errorCode" in error &&
+              error.errorCode === "INVALID_ARGUMENT") {
+            this.currentDraft = null;
+            this.invalidated = true;
+            const message = error instanceof Error ? error.message : "Host rejected the report draft. Reconcile UpdateGoalProgress and retry SubmitGoalReport.";
+            return {
+              content: [{ type: "text", text: `Draft validation failed: ${message}` }],
+              details: { ok: false, error: message },
+            };
+          }
           this.currentDraft = null;
           this.invalidated = true;
           await this.options.onDraftPersistenceFailure?.(error);
@@ -230,11 +287,24 @@ export class GoalReportDraftManager {
         this.currentDraft = validation.value;
         this.invalidated = false;
 
+        if (this.evidenceRevision !== evidenceRevision) {
+          this.invalidated = true;
+          // Finish any older delete before removing the now-persisted stale
+          // submission, so a later replacement cannot be deleted out of order.
+          await this.pendingInvalidation;
+          await this.invalidate();
+          const error = "Goal report draft was invalidated by new evidence or user steering during submission. Reconcile UpdateGoalProgress and call SubmitGoalReport again.";
+          return {
+            content: [{ type: "text", text: error }],
+            details: { ok: false, error },
+          };
+        }
+
         return {
           content: [
             {
               type: "text",
-              text: "Goal report draft recorded successfully. It will be finalized when the execution completes.",
+              text: "Goal report draft recorded successfully. It will be finalized when the execution completes. Further evidence-changing tools (including Bash, Write, Edit, delegation, and unknown tools) or user steering invalidate this draft; call SubmitGoalReport again afterward. Known read-only tools, TodoWrite, ToolSearch, and UpdateGoalProgress preserve it, but progress must remain consistent with a met verdict.",
             },
           ],
           details: { ok: true },
