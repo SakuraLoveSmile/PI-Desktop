@@ -3562,8 +3562,9 @@ async fn handle_request_inner(
                         .get("recoverInflight")
                         .and_then(|v| v.as_bool())
                         .unwrap_or(false),
-                )
-                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+                );
+                team_rpc::send_pending_member_failure(&st.db, &tx, turn_id)?;
+                let result = result.map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
                 if result.updated {
                     let turn_session_id: Option<String> = st
                         .db

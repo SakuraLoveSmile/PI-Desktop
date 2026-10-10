@@ -9765,3 +9765,25 @@ Overview layout validation also checks long titles, project paths and model name
 320/360/570px in both themes. Metadata retains positive visible width and no
 header/resources/references horizontal overflow is introduced. Selected reference
 options retain pressed states and switching behavior.
+
+
+### E2E-TEAM-member-failure-wakes-lead
+
+- **前置条件：** 本候选 Host/runtime 构建，隔离数据和工作目录；配置无认证 loopback
+  路由但不调用模型，也不访问用户 profile。
+- **步骤：** 批准 Goal 团队，先成功结束一次专家贡献；lead 等待时让成员在任务预完成
+  后失败，消费通知前尝试完成，再通过真实 wait 工具消费。重放终结，检查失败任务。
+  lead 结束后让下一成员 turn 失败；将真实 Host 通知交给生产 Main 投递服务与真实
+  Agent Host/Host 持久化队列，重放通知；另让成员 abort。
+- **预期：** 恰好一次完整 `member_failed`，包含成员、净化错误码、建议重试标记、任务 ID；
+  未读通知阻止完成，消费后 settled 闸门通过但仍要求成功参与。等待及空闲 lead 均唤醒，
+  重复事件不重复启动，abort 不通知，非法错误文本不泄漏路径。
+- **自动化：** `node scripts/e2e-team-member-failure.mjs`，真实 Host stdio、runtime wait、
+  Main 投递与 Agent Host 队列；仅模型 runtime port 替身启动真实认证 mailbox turn。
+  Rust 补事务回滚、伪造正文/证明、保留键和删除清理；假时钟 runtime 测试补完整正文及计时器。
+- **规格：** 03-runtime/06-host-rpc-protocol；Team ADR 的失败邮件修订。
+
+
+提交后检查点 I/O 失败仍保留原错误，并对已落盘且尚在 queued 状态的失败邮件发出既有
+唤醒事件。终结重放可以再次唤醒同一 pending 邮件，但不新建第二条；已消费或 running
+的邮件不再发出事件。
