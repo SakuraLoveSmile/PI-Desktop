@@ -2,6 +2,12 @@
 
 Upstream v0.15.6 → v0.16.1 has been merged.
 
+- Expert Team launch review offers runnable provider/model routes and compatible
+  thinking choices. Route changes adjust unsupported effort, and individual
+  expert edits no longer resend another expert's stale route. Host approval
+  ignores obsolete provider thinking overrides and accepts omit consistently
+  while retaining provider/model availability and explicit binding checks.
+
 - AskTool questions keep paragraphs and wide tables readable instead of
   squeezing them into vertical strips. Tables scroll inside the card and long
   questions leave answer choices and submission controls available.

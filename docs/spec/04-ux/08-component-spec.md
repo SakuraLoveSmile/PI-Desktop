@@ -2954,6 +2954,16 @@ names in the user's language. Detailed file/interface assignments belong in task
 and messages. This adds no translation request, persisted rewrite or authorization
 change; legacy English descriptions remain available as their original text.
 
+Launch review provider choices include only enabled, authenticated (or no-auth)
+providers with configured models, matching the runnable-model picker. Missing
+stored routes remain visible for repair and are not silently replaced. Thinking
+choices use the selected model's existing Composer capability resolver and
+include the localized omit option. Switching provider/model retains a compatible
+thinking choice; otherwise it selects the first offered canonical level and
+saves that visible selection with the new route. A member edit submits only that
+member, so another stale route does not prevent repair. Host confirmation still
+validates every proposed expert.
+
 The Team Overview shows compact task progress with a five-row limit and direct
 task, board, and panorama navigation. The board uses a compact filter/search
 list; descriptions, dependencies, write scopes, diagnostics, results, and

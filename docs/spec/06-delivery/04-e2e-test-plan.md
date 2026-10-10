@@ -16914,6 +16914,15 @@ renderer's durable transcript reads. No real model or provider is contacted.
   at the API boundary); `cargo test -p host-core --locked team` and the
   `team_rpc_full_journey` contract test. Real-model quality is outside this gate.
 
+The review route regression covers disabled/empty providers, per-model thinking
+choices, localized omit, provider/model changes that adjust incompatible effort,
+and editing one expert while another has an unavailable route. The actual
+isolated Electron component uses production selection wiring with mocks only at
+the API/store boundary. Host route tests cover declared review → selection edit
+→ confirmation → persisted expert session for obsolete compatibility overrides,
+omit on off-only bindings and generic empty bindings; missing/disabled routes and
+unsupported explicit levels stay rejected. These fixtures make no paid calls.
+
 The review component fixture also uses the Chinese catalog, concise supplied
 reason/responsibility and a proposed display identity. Confirm the visible role/name
 is localized while updates/confirm/cancel still use the unchanged routing handle and
