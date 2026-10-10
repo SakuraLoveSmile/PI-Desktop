@@ -47,6 +47,8 @@ docs/image/pi_logo.webp
 *.swp
 *.log
 coverage/
+.artifacts/
+.review-evidence/
 .cache/
 .turbo/
 

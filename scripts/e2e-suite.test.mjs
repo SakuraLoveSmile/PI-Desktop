@@ -71,6 +71,20 @@ test("candidate identity fingerprints directory symlinks without following their
     git(["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false",
       "commit", "--quiet", "--allow-empty", "-m", "Fixture"]);
     git(["update-ref", "refs/remotes/origin/main", "HEAD"]);
+    await writeFile(join(repository, ".gitignore"), await readFile(new URL("../.gitignore", import.meta.url), "utf8"));
+    git(["add", ".gitignore"]);
+    git(["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false",
+      "commit", "--quiet", "-m", "Fixture ignore policy"]);
+    const beforeEvidence = await candidateIdentity(repository);
+    assert.equal(beforeEvidence.dirty, false);
+    await mkdir(join(repository, ".artifacts"));
+    await mkdir(join(repository, ".review-evidence"));
+    await writeFile(join(repository, ".artifacts", "result.json"), "generated report");
+    await writeFile(join(repository, ".review-evidence", "screenshot.png"), "generated screenshot");
+    const afterEvidence = await candidateIdentity(repository);
+    assert.equal(afterEvidence.dirty, false, "generated evidence must leave a clean source checkout");
+    assert.equal(afterEvidence.workspaceDiffSha256, beforeEvidence.workspaceDiffSha256,
+      "generated reports and screenshots must not appear as candidate source changes");
     const linked = join(repository, "target");
     await symlink(firstTarget, linked, process.platform === "win32" ? "junction" : "dir");
     const before = await candidateIdentity(repository);
