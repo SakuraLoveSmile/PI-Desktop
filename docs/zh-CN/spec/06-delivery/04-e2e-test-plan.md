@@ -9765,3 +9765,14 @@ Overview layout validation also checks long titles, project paths and model name
 320/360/570px in both themes. Metadata retains positive visible width and no
 header/resources/references horizontal overflow is introduced. Selected reference
 options retain pressed states and switching behavior.
+
+### E2E-RUNTIME-edit-accepts-tag-with-legacy-arguments
+
+- **前提：** 候选源码构建的 Host 二进制、隔离临时数据和工作区；不使用提供商或运行中的 Desktop。
+- **步骤：** 读取文件，不带 `ops`，同时传 `tag`、`old_string`、`new_string` 编辑。
+  再只传 `tag` + `ops`、以及混合旧式字段编辑。尝试零处/多处旧文本匹配、缺少操作和没有正文的冒号 PUT。
+- **预期：** 旧式替换应用一次；`ops` 优先，普通锚定编辑保留原有检查。零处/多处匹配拒绝且不写入。
+  两种形态错误包含 `PUT 48.=48:` 与 `+replacement` 行，并说明 `new_string` 仅在 `ops` 缺省时读取。
+  三次失败终止仍由既有 mutation-guard 测试覆盖。
+- **覆盖：** `node scripts/e2e-edit-legacy.mjs`，`PI_DESKTOP_HOST_BIN` 指向任务候选；Host Edit 和 runtime mutation-guard 测试。
+- **规格：** runtime 规格 18 §2.1 / §11；D273 修订。

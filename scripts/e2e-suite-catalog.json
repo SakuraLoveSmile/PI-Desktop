@@ -14,6 +14,13 @@
   ],
   "suites": [
     {
+      "id": "edit-legacy",
+      "family": "runtime-provider",
+      "script": "scripts/e2e-edit-legacy.mjs",
+      "tier": "nightly",
+      "safety": "Isolated temporary Host/workspace and real tools RPC; no provider, Desktop instance or user profile."
+    },
+    {
       "id": "agent-live",
       "family": "runtime-provider",
       "script": "scripts/e2e-agent-live.mjs",

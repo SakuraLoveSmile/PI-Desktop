@@ -7421,3 +7421,13 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 - Dispatch over `plugins.execute`, read-only-mode handling and the `mcp_`
   namespace are unchanged. See ADR `mcp-tool-approval-risk` and
   E2E-MCP-tool-requires-approval.
+
+## 2026-10-11 — Legacy Edit tolerates a supplied tag (D273 amendment)
+
+- When `ops` is absent and both legacy text fields are supplied, ignore a supplied
+  `tag` and retain the existing unique-match conversion. Zero or multiple matches
+  still fail with `EDIT_LEGACY_MATCH_FAILED`; supplied `ops` takes precedence.
+- Missing operations or PUT body rows include `PUT 48.=48:` with a `+replacement`
+  row and explain that `new_string` is read only when `ops` is absent.
+- No tag-chain, permission, persistence or retry-budget change; anchored Edit
+  still performs its existing version and provenance checks.

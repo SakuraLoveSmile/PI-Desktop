@@ -17851,3 +17851,19 @@ keyboard selection, opaque surfaces and narrow footer geometry in the real rende
 RPC tests execute native Git against temporary repositories; renderer interaction
 fixtures mock only the external Host/session API edge and use the real store and
 components. They do not establish SSH server connectivity or a packaged release.
+
+### E2E-RUNTIME-edit-accepts-tag-with-legacy-arguments
+
+- **Preconditions:** Candidate-built Host binary, isolated temporary data and workspace;
+  no provider or running Desktop instance.
+- **Steps:** Read a file, Edit with `tag` + `old_string` + `new_string` and no `ops`;
+  then Edit with `tag` + `ops` alone and with mixed legacy fields. Attempt missing
+  and repeated old text, missing operations and a colon PUT without body rows.
+- **Expected:** Legacy edit applies once; `ops` wins and ordinary anchored edits
+  retain their checks. Missing/multiple legacy matches reject without writing.
+  Both shape errors include `PUT 48.=48:` with a `+replacement` row and explain
+  that `new_string` is read only when `ops` is absent. Three-failure runtime
+  mutation termination remains covered by the existing mutation-guard suite.
+- **Coverage:** `node scripts/e2e-edit-legacy.mjs` with `PI_DESKTOP_HOST_BIN`
+  pointing to the task candidate; Host Edit tests and runtime mutation-guard tests.
+- **Specs:** runtime spec 18 §2.1 / §11; D273 amendment.

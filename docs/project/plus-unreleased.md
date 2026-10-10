@@ -2,6 +2,11 @@
 
 Upstream v0.15.6 → v0.16.1 has been merged.
 
+- Edit accepts legacy `old_string` / `new_string` alongside a supplied `tag` when
+  `ops` is absent. Unique-match safety and the three-failure retry budget remain;
+  anchored `ops` still takes precedence. Missing-operation/body errors show a
+  correct PUT example and explain which parameters are used.
+
 - Overview adds actionable attention for approvals, failures, timeouts and
   degraded reports, separates live status from artifacts, and groups Team members
   independently. Loaded-history notices and paging are per group. Repeated file
