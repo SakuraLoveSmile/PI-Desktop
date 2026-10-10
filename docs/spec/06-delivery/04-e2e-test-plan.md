@@ -16677,6 +16677,20 @@ renderer's durable transcript reads. No real model or provider is contacted.
   and progress responses; terminal settlement revokes writes, retains readable progress,
   and session deletion removes it. Failed Team operations do not change dispatch cards;
   successful task updates to failed remain visible. Member and task links open their own detail.
+- **Draft consistency regression:** Submit a report, then call TodoWrite,
+  UpdateGoalProgress, ToolSearch, and known read-only tools; the structured draft
+  survives. Evidence-changing/unknown tools or steering require resubmission.
+  Successful execution without a valid draft gets one report-only continuation,
+  no duplicate terminal lifecycle, and no recovery on abort/error. A second
+  missing draft falls back without further model calls.
+  Submit `met` while Goal progress has pending/in-progress/failed items and
+  verify rejection; update the actual checklist to completed and resubmit.
+  Honest partial/blocked reports remain valid. Change progress after a `met`
+  draft and verify it cannot publish a contradictory completion claim.
+  Invalidate a draft with mixed progress and verify fallback retains the same
+  execution's items, marks unresolved work explicitly, and yields partial
+  rather than unknown when completed work exists. Empty/no-progress fallback
+  remains unknown; no fallback auto-completes the progress snapshot.
 - **Recovery and failure:** Ready reports remain readable after restart.
   Invalid or failed draft persistence never publishes a stale or misleading
   ready report. A late draft submission after `ready` or `failed` is rejected

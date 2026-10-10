@@ -7,6 +7,9 @@ use crate::db::Database;
 #[path = "tests/completion_eligibility.rs"]
 mod completion_eligibility;
 
+#[path = "tests/progress_reconciliation.rs"]
+mod progress_reconciliation;
+
 fn create_test_db() -> (tempfile::TempDir, Database) {
     let dir = tempfile::tempdir().unwrap();
     let db_path = dir.path().join("pi.sqlite");

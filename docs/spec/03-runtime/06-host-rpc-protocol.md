@@ -687,6 +687,12 @@ contract is being negotiated.
 
 - `goalReports.get` / `goalReports.list` / `goalReports.submitDraft` / `goalReports.invalidateDraft` /
   `goalReports.finalizeReport` / `goalReports.markFailed` / `goalReports.getAsset`
+  - `goalReports.submitDraft` rejects a `met` claim when the latest matching Goal progress
+    contains any item not marked completed. Expected draft validation failures return
+    `INVALID_ARGUMENT` (RPC code 1002), with correction guidance, and do not mark the
+    report as a persistence failure. Reconcile progress and retry; honest partial/blocked
+    claims and legacy callers without a progress snapshot remain supported.
+    Finalization rechecks progress so a later update cannot publish a stale `met` claim.
   - `goalReports.finalizeReport` and report Retry require the Host's persisted execution state `completed`.
     Attempting to finalize/retry an execution that is `interrupted`, `queued`, `running`, or missing completion
     is rejected with `GOAL_EXECUTION_NOT_TERMINAL`, without writing report files or broadcasting ready.
