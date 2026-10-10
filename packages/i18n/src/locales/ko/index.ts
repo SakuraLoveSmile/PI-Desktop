@@ -2150,6 +2150,10 @@ sklm: {
 
   panel: {
     activity: {
+      aggregateLoading: "전체 세션 활동을 읽는 중…",
+      aggregateUnavailable: "전체 활동을 읽을 수 없어 불러온 메시지를 표시합니다.",
+      aggregateLimited: "일부 활동 기록이 표시 한도를 초과합니다.",
+      aggregateRetry: "전체 활동 다시 읽기",
       needsAttention: "확인 필요",
       liveStatus: "실시간 상태",
       artifacts: "결과물",

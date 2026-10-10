@@ -82,6 +82,11 @@
 - [06-release-runbook.md](/zh-CN/spec/06-delivery/06-release-runbook)
 - [07-remote-control-rollout.md](/zh-CN/spec/06-delivery/07-remote-control-rollout)
 
+- [07-test-maintenance.md](/zh-CN/spec/06-delivery/07-test-maintenance)
+- [08-scenario-index.md](/zh-CN/spec/06-delivery/08-scenario-index)
+- [会话活动投影](/zh-CN/spec/03-runtime/session-activity-projection)
+- [上下文洞察](/zh-CN/spec/03-runtime/context-insights)
+
 ## 7. 插件
 - [README.md](/zh-CN/spec/07-plugins/README)
 - [01-plugin-system.md](/zh-CN/spec/07-plugins/01-plugin-system)

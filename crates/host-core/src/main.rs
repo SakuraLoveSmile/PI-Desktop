@@ -26,6 +26,7 @@ mod rpc;
 mod scheduled;
 mod scratch;
 mod secrets;
+mod session_activity;
 mod session_collaboration;
 mod session_notes;
 mod session_search;

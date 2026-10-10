@@ -19,7 +19,7 @@ export function activityPlans(sessionId: string | undefined, pending?: PlanPropo
   });
 }
 
-export type ActivitySubagent = { delegationId: string; agentName: string; task: string; status: SubagentOutcome; timing?: SubagentTiming };
+export type ActivitySubagent = { delegationId: string; toolCallId?: string; messageId?: string; agentName: string; task: string; status: SubagentOutcome; timing?: SubagentTiming };
 
 /** Loaded transcript records, not a claim that unseen history has no work. */
 export function activitySubagents(messages: readonly UiMessage[], running: boolean): ActivitySubagent[] {
@@ -34,7 +34,7 @@ export function activitySubagents(messages: readonly UiMessage[], running: boole
     if (seen.has(delegationId)) continue;
     seen.add(delegationId);
     const timing = subagentItemTiming({ kind: "tool", message }, timings);
-    result.push({ delegationId, agentName: delegateAgentName(message), task: delegateTaskDescription(message), status: subagentOutcome(message, statuses), ...(timing ? { timing } : {}) });
+    result.push({ delegationId, messageId: message.id, ...(message.toolCallId ? { toolCallId: message.toolCallId } : {}), agentName: delegateAgentName(message), task: delegateTaskDescription(message), status: subagentOutcome(message, statuses), ...(timing ? { timing } : {}) });
   }
   return result;
 }

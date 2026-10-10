@@ -10,6 +10,7 @@ mod project_code_search;
 mod project_history;
 mod scheduled_rpc;
 mod scheduled_tools;
+mod session_activity_rpc;
 mod session_notes_rpc;
 #[cfg(test)]
 mod subagent_settings_tests;
@@ -1798,7 +1799,67 @@ fn parse_capability_target(
         .map_err(|error| capability_err(error.to_string()))
 }
 
+// Notify only after canonical persistence/turn state succeeds, never on the earlier
+// agent stream event. Readers can therefore refresh without racing a queued write.
 async fn handle_request(
+    state: Arc<Mutex<AppState>>,
+    method: &str,
+    params: Value,
+    tx: mpsc::UnboundedSender<String>,
+) -> Result<Value, JsonRpcError> {
+    let changes_activity = matches!(
+        method,
+        "session.appendMessage"
+            | "session.replaceMessages"
+            | "session.truncateFrom"
+            | "session.saveRevision"
+            | "session.activateRevision"
+            | "session.beginTurn"
+            | "session.endTurn"
+    );
+    let mut owner = changes_activity
+        .then(|| {
+            params
+                .get("sessionId")
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+        })
+        .flatten();
+    let turn_id = if changes_activity && owner.is_none() {
+        params
+            .get("turnId")
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+    } else {
+        None
+    };
+    let result = handle_request_inner(state.clone(), method, params, tx.clone()).await;
+    if result.is_ok() && changes_activity {
+        if owner.is_none() {
+            if let Some(turn_id) = turn_id {
+                let st = state.lock().await;
+                owner = st
+                    .db
+                    .conn()
+                    .query_row("SELECT session_id FROM turns WHERE id=?1", [turn_id], |r| {
+                        r.get(0)
+                    })
+                    .optional()
+                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            }
+        }
+        if let Some(session_id) = owner {
+            send_notification(
+                &tx,
+                "sessionActivity.changed",
+                json!({"sessionId": session_id}),
+            );
+        }
+    }
+    result
+}
+
+async fn handle_request_inner(
     state: Arc<Mutex<AppState>>,
     method: &str,
     params: Value,
@@ -1821,6 +1882,7 @@ async fn handle_request(
     }
 
     match method {
+        "sessionActivity.get" => session_activity_rpc::handle(state, &params).await,
         method if method.starts_with("team.") => team_rpc::handle(state, method, params, tx).await,
         method if method.starts_with("goalReports.") || method.starts_with("goalProgress.") => {
             goal_rpc::handle(state, method, params, tx).await

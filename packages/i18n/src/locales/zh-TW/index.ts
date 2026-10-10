@@ -2176,6 +2176,10 @@ sklm: {
   panel: {
     title: "工作面板",
     activity: {
+      aggregateLoading: "正在讀取全對話活動…",
+      aggregateUnavailable: "暫時無法讀取全對話活動，目前顯示已載入訊息。",
+      aggregateLimited: "部分活動記錄超出顯示限制。",
+      aggregateRetry: "重試讀取全對話活動",
       needsAttention: "需要關注",
       liveStatus: "即時狀態",
       artifacts: "產物",

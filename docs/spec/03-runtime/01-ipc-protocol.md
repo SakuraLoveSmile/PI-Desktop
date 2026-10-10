@@ -2703,3 +2703,12 @@ shared controls, adds an immediately persisted default-off recording switch,
 and stages note edits until Save. Failed CAS preserves the draft and exposes an
 explicit reload action that warns that it discards unsaved changes. Async results
 from a previous project/editor instance cannot update the current dialog.
+
+### Complete session activity projection
+
+`pi-desktop/sessionActivity/get` invokes `sessionActivity.get` with explicit local
+`sessionId` and a safe nonnegative `offset`. The allowlisted
+`pi-desktop/sessionActivity/event/changed` forwards the post-commit Host change
+notification. Both are additive; the preload's existing whitelist guards apply.
+The payload, legacy fallback and ownership rules are defined in
+[Complete session activity projection](session-activity-projection.md).

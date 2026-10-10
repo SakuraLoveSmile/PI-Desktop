@@ -1,0 +1,33 @@
+name: Quarterly test maintenance audit
+
+on:
+  schedule:
+    - cron: '0 5 1 1,4,7,10 *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Rank test maintenance candidates without deleting coverage
+        run: |
+          if [ -f docs/testing/regression-evidence.json ]; then
+            node scripts/audit-test-maintenance.mjs --evidence docs/testing/regression-evidence.json --output test-maintenance-audit.json
+          else
+            node scripts/audit-test-maintenance.mjs --output test-maintenance-audit.json
+          fi
+      - uses: actions/upload-artifact@v6
+        with:
+          name: test-maintenance-audit
+          path: test-maintenance-audit.json
+          retention-days: 90

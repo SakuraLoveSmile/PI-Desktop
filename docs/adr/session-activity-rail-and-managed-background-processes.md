@@ -22,9 +22,13 @@ the work panel is closed. Otherwise the same controls remain reachable in the
 activity view of the existing work panel. Hidden retained panes neither read
 Host resources nor act on the current session implicitly.
 
-Reuse one pure plan/delegation projection with Overview. Files and references
-come from recorded actions in the loaded reading range, never assistant claims
-or enabled-plugin inventories. Range-limited history is explicitly identified.
+Plans retain their existing shared projection. The complete-session amendment
+uses a read-only Host projection of canonical recorded delegates/files/sources,
+with bounded revision-consistent pages. Renderer-window projection remains an
+explicit unsupported/error fallback. Assistant claims and enabled-plugin
+inventories never become evidence. Host persistence/services retain ownership;
+no SQLite access moves to the renderer and no storage migration is introduced.
+See [projection contract](../spec/03-runtime/session-activity-projection.md).
 Captured web links allow HTTP(S) without embedded credentials and retain the
 existing host browser permissions. Resources open a session-scoped work-panel
 context even if an asynchronous artifact resolution finishes after a switch.

@@ -1,6 +1,6 @@
-# Composer native Git workspace navigation
+# ADR: Composer native Git workspace navigation
 
-Status: Accepted (local implementation)
+- Status: Accepted (local implementation)
 
 ## Context
 

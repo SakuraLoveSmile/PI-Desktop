@@ -120,6 +120,14 @@ After implementation (or alongside it):
 - [ ] Unit tests added or updated when the change's risk makes them necessary.
 - [ ] Integration tests added or updated when an IPC/RPC contract change or
   cross-component regression risk makes them necessary.
+- [ ] New tests assert behavior or stable contracts, not repository source/CSS
+  text; `pnpm check:test-quality -- --base <base>` passes against the actual base.
+- [ ] Retired source assertions lower their checked-in inventory; replacement
+  coverage is recorded and obsolete tests/scenario IDs are removed in the same PR.
+- [ ] Runtime domain tests/helpers stay within the 800-line per-file budget.
+- [ ] Pure copy/i18n/style exemptions record affected-surface verification and
+  residual risk; they do not exempt interaction, responsive, accessibility,
+  runtime-rule, or content-layout changes.
 - [ ] The smallest necessary targeted local checks passed, or local validation
   was assessed as unnecessary with no separate approval or waiver required.
 - [ ] Relevant E2E suites were selected and passed on a candidate that contains

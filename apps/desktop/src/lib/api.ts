@@ -1,6 +1,8 @@
 import type {
   GitWorkspaceRequest, GitWorkspaceMutation, GitWorkspaceSnapshot, GitWorktree,
   SessionQuickNote,
+  SessionActivityPage,
+  SessionActivityChanged,
   BackgroundProcessSummary,
   BackgroundProcessDetail,
   BackgroundProcessesChanged,
@@ -644,6 +646,14 @@ export const api = {
     invoke<{ git: GitWorkspaceSnapshot }>(IPC.invoke.workspaceGitCreateBranch, request),
   createWorkspaceWorktree: (request: GitWorkspaceMutation) =>
     invoke<{ git: GitWorkspaceSnapshot; worktree: GitWorktree }>(IPC.invoke.workspaceGitCreateWorktree, request),
+  getSessionActivity: (sessionId: string, offset = 0) =>
+    invoke<{ activity: SessionActivityPage }>(IPC.invoke.sessionActivityGet, { sessionId, offset }),
+  onSessionActivityChanged: (listener: (event: SessionActivityChanged) => void) => {
+    if (!window.piDesktop?.on) return () => {};
+    return window.piDesktop.on(IPC.event.sessionActivityChanged, (payload) => {
+      if (payload && typeof payload === "object" && "sessionId" in payload && typeof payload.sessionId === "string") listener({ sessionId: payload.sessionId });
+    });
+  },
   getSessionQuickNote: (sessionId: string) =>
     invoke<{ note: SessionQuickNote }>(IPC.invoke.sessionNotesGet, { sessionId }),
   saveSessionQuickNote: (sessionId: string, content: string, expectedRevision: number) =>

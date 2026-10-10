@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Policy-Sync: 2026-10-08.1
+Policy-Sync: 2026-10-10.1
 
 Instructions for Claude Code CLI and Claude Cowork on PI-Desktop.
 
@@ -229,6 +229,28 @@ Before coding, decide "direct change" vs "refactor first". Refactor (or make it 
 | Docs / no-logic config | Verify links, paths, commands, facts; no unit tests required |
 
 "Diff is small", "no time", "typecheck passed", "manually clicked through" are not reasons to skip tests. When you skip, state the basis, alternative verification you ran, and residual risk.
+
+Assert behavior or stable contracts, not repository source/CSS text. Freeze new
+source/CSS regex assertions with `pnpm check:test-quality -- --base <base>`:
+per-file, per-case signature inventories only decrease against the established
+base. Initial bootstrap uses the maintenance spec's immutable trusted
+pre-governance snapshot.
+Fixture reads and regex on executed component output remain allowed. Never
+increase or reset the baseline; lower it after retirement using `--write-baseline`
+against the same base. Runtime domain tests and helpers in
+`packages/agent-runtime/src/runtime-tests/`, plus old `runtime.test.ts`, stay
+within an 800-line file budget.
+
+Pure copy, i18n, documentation, and visual styling need no new tests when they
+change no runtime rule, interaction, responsive usability, accessibility, or
+content layout; verify the affected surface and state basis and residual risk.
+Bug fixes still require a behavioral regression test. Remove superseded tests
+and obsolete scenario IDs in the same PR after mapping replacement coverage;
+do not delete live coverage to meet budgets. Quarterly run
+`pnpm audit:test-maintenance` and review high-churn suites using actual
+regression-catching evidence. Missing evidence means unknown. The audit never
+deletes tests automatically. See
+[test maintenance](docs/spec/06-delivery/07-test-maintenance.md).
 
 ### Delivery report
 

@@ -1,0 +1,37 @@
+name: Nightly fixture E2E
+
+on:
+  schedule:
+    - cron: '23 18 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-nightly-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  catalog:
+    runs-on: ubuntu-latest
+    outputs:
+      families: ${{ steps.matrix.outputs.families }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - id: matrix
+        run: echo "families=$(node scripts/e2e-suite.mjs --matrix)" >> "$GITHUB_OUTPUT"
+  family:
+    needs: catalog
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        family: ${{ fromJSON(needs.catalog.outputs.families) }}
+    uses: ./.github/workflows/e2e-run.yml
+    with:
+      tier: nightly
+      family: ${{ matrix.family }}

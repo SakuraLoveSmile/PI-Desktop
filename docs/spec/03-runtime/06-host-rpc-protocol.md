@@ -1838,3 +1838,12 @@ as LFS conversion) are rejected for checkout mutations rather than silently
 producing repository-format files. Metadata remains readable without executing
 hooks or filters. A globally installed but unused filter does not block an
 ordinary repository.
+
+### Complete session activity summaries
+
+The additive `sessionActivity.get({sessionId,offset?,limit?})` and post-commit
+`sessionActivity.changed({sessionId})` serve the owning local Desktop session's
+complete canonical history, independently of display windows. The bounded v1
+page and monotonic Task settlement contracts are defined in
+[Complete session activity projection](session-activity-projection.md).
+No protocol-version/schema bump, model call or new plugin capability is added.

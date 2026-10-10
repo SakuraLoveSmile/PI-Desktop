@@ -1,4 +1,4 @@
-# 04. 数据存储（共享架构 v19，Plus 轨道 v4）
+# 04. 数据存储（共享架构 v19，Plus 轨道 v5）
 
 > **翻译说明：** 本页是与 [英文源规格](/spec/03-runtime/04-data-storage) 一一对应的机器辅助翻译。代码、协议字段和标识符保持原文；如翻译与英文源事实有歧义，以英文版本为准。
 
@@ -183,7 +183,7 @@ PRAGMA auto_vacuum = INCREMENTAL; -- set at creation, before any table
 ```
 
 - 共享架构版本位于 `PRAGMA user_version`（当前 v19 = `19`）中。Plus 专有结构
-  单独由 `plus_schema_meta` 版本化（当前 Plus 轨道 v4，第 7.1 节）。v1 `meta`
+  单独由 `plus_schema_meta` 版本化（当前 Plus 轨道 v5，第 7.1 节）。v1 `meta`
   桌子不见了。
 - host-core 是**单一作者**；语句使用 `prepare_cached`；每个
   多行写入在一个事务中运行。
@@ -704,6 +704,20 @@ Expert Team 状态由 Host 存在三个表中（ADR plus-expert-team-collaborati
   fresh/fork 上下文、生命周期阶段、模型绑定和错误。
 - `team_tasks` 保存有 revision 的共享任务板、所有者、依赖、建议写入范围、
   状态和软删除标记。
+
+普通 Agent Team 任务的 Host 执行归属使用增量 `team-task-attempt-v1` KV 命名空间。
+key 将 `[teamSessionId, taskId]` 编码为 JSON tuple；v1 value 保存 `schemaVersion`、
+Team/任务身份、所有者、关联回合/会话、任务 revision、完成声明和结束状态。
+只有显式任务状态更新建立关联；打开新回合不会绑定全部已拥有任务，不回填历史任务。
+
+活动中的完成声明持久化为 `in_progress`，而不是 `completed`。
+匹配回合的终态 CAS 原子结算精确的当前 attempt：回合 completed 且已有完成声明才标 completed；
+error 标 failed；aborted 标 cancelled。没有完成声明的成功回合仍保留未完成任务。
+任务/Team revision 随变化推进以拒绝陈旧请求。元数据编辑保留有效声明；显式重置、改派、
+删除或接受结构化 Plan 研究结果会清掉声明。failed/cancelled 标记阻止迟到完成声明，
+直到显式重试或新的活动验证回合。启动恢复在已有中止事务里取消匹配的中断 attempt，
+Team/会话清理删除这些记录。没有 attempt 的任务保留遗留语义；此版本化 KV 增量不改变
+SQL schema 或 Plus 轨道版本。
 
 属于 Team 的 member session 不允许删除。删除 Lead 时会以一个事务将成员重置为
 `standard` 并移除 Team 状态；成员 session 及其转录仍作为独立会话保留。
@@ -1272,7 +1286,7 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
 `PRAGMA user_version` 专用于与上游 PI-Desktop 共享的迁移链，只在合入上游迁移时才会前进
 （ADR plus-schema-version-track）。Plus 专有结构运行在同一数据库内的第二条轨道上，
 因此合入上游永远不会重编号，也不会与 Plus 数据冲突。Plus 步骤有序、仅增量且幂等。
-它们位于 `crates/host-core/src/db/plus_schema.rs`，当前轨道版本为 4：
+它们位于 `crates/host-core/src/db/plus_schema.rs`，当前轨道版本为 5：
 
 | 步骤 | 增加 |
 |---|---|
@@ -1280,6 +1294,7 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
 | P2 | `sessions.execution_profile` 以及 `teams`、`team_members`、`team_tasks` 表 |
 | P3 | `plan_approvals` 上的执行 provider/model 绑定和修订意图字段，以及 `plan_execution_schedules` 表 |
 | P4 | `plan_approvals.execution_kind`，对已批准的提案按 `kind` 回填 |
+| P5 | 会话拥有的 `session_quick_notes` 和 `background_processes` 表 |
 
 P1 到 P4 是早期 fork 构建以 `user_version` 20 到 23 发布的 Plus 专有变更。每个步骤在改动前都会先探测，
 因此来自任一未发布 v20 形态（仅 Goal reports，或仅 workspace kind）的数据库都能保留数据完成升级，
@@ -1294,7 +1309,7 @@ P1 到 P4 是早期 fork 构建以 `user_version` 20 到 23 发布的 Plus 专�
   （`DB_SCHEMA_TOO_NEW`，见进程模型中的启动结果一节）。
 - **旧版 fork 数据库。** 含有 Plus 结构、没有 `plus_schema_meta` 且 `user_version` 为 20 到 23
   的数据库由早期 fork 构建写入。在经过校验的 `pi.sqlite.legacy-v<N>.bak` 之后，一个事务应用全部
-  Plus 步骤、写入 meta（轨道 4，共享 19），并把 `user_version` 设为 19。失败则回滚事务，
+  Plus 步骤、写入 meta（轨道 5，当前共享迁移链），并把 `user_version` 设为 19。失败则回滚事务，
   旧版数据库保持原样。
 - **较旧的 fork 构建。** 较旧的 fork 构建打开已对账的数据库时，会重新运行自己幂等的步骤，
   并把 `user_version` 留在 20 到 23。本构建下一次打开时先保留 `pi.sqlite.repair-v<N>.bak`，
@@ -1487,3 +1502,17 @@ filesystem changes yield `partial` coverage with `truncated: true`; zero hits in
 such a result cannot prove absence. Status reports the last completed scan, not
 a fresh filesystem validation. Sensitive-file exclusions and shared ignore
 rules apply before indexing; symlinks cannot expand the session root.
+
+### 会话活动存储（Plus P5）
+
+`session_quick_notes` 以会话为键，保存原样内容、revision 和更新时间，删除会话时级联删除。
+写入必须携带 expected revision；陈旧写入返回 NOTE_CONFLICT 及当前快照。
+笔记不进入转录/模型输入，不复制到 fork。内容最多 64KiB UTF-8，空格/换行计入。
+
+`background_processes` 保留会话/工具调用身份、命令、工作目录、生命周期/时间/退出元数据
+和有界 stdout/stderr。唯一的会话/工具调用约束防止重复启动。
+Host 启动将未完成记录标 interrupted；持久化 PID 不授权进程控制，命令不自动恢复。
+存在活动记录时拒绝删除。终态写入失败时保留进程本地最终快照及输出、可见诊断，
+每个有范围的资源请求仅尝试修复一次。Host 硬退出无法保留未写入快照。
+P5 不推进共享 PRAGMA user_version。当前可执行共享迁移由
+`crates/host-core/src/db.rs` 拥有；上文旧共享 v19 示例是历史记录。

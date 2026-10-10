@@ -39,3 +39,54 @@ export type BackgroundProcessesChanged = { sessionId: string; id: string; revisi
 export function backgroundProcessIsActive(status: BackgroundProcessStatus): boolean {
   return status === "starting" || status === "running" || status === "stopping";
 }
+
+/** Bounded, versioned projection of the owning session's complete canonical transcript. */
+export type SessionActivityResource = { id: string; label: string; path?: string; messageId?: string };
+export type SessionActivitySnapshot = {
+  version: 1;
+  sessionId: string;
+  limited: boolean;
+  revision: string;
+  totals: Record<"subagents" | "changedFiles" | "websites" | "attachments" | "skills" | "memory" | "mcp", number>;
+  subagents: { delegationId: string; agentName: string; task: string; messageId?: string; toolCallId?: string | null;
+    status: "running" | "completed" | "timed_out" | "aborted" | "failed" | "stopped" | "denied";
+    timing?: { startedAt?: number; completedAt?: number } }[];
+  changedFiles: (SessionActivityResource & { path: string; changeCount: number;
+    lastChangedAt?: string; addedLines?: number; removedLines?: number; groupLabel?: string })[];
+  websites: { id: string; label: string; url: string; domain: string; sourceCount: number }[];
+  attachments: SessionActivityResource[];
+  references: { skills: SessionActivityResource[]; memory: SessionActivityResource[]; mcp: SessionActivityResource[] };
+};
+export type SessionActivityChanged = { sessionId: string };
+
+export type SessionActivityPage = SessionActivitySnapshot & { hasMore: boolean; nextOffset: number | null };
+
+/** Validate the additive transport boundary before a page enters renderer state. */
+export function isSessionActivityPage(value: unknown): value is SessionActivityPage {
+  const record = (item: unknown): item is Record<string, unknown> => Boolean(item && typeof item === "object" && !Array.isArray(item));
+  const string = (item: unknown): item is string => typeof item === "string";
+  const integer = (item: unknown): item is number => typeof item === "number" && Number.isSafeInteger(item) && item >= 0;
+  const optionalString = (item: unknown) => item === undefined || string(item);
+  const optionalInteger = (item: unknown) => item === undefined || integer(item);
+  const resource = (item: unknown): boolean => record(item) && string(item.id) && string(item.label) && optionalString(item.path) && optionalString(item.messageId);
+  const list = (item: unknown, valid: (item: unknown) => boolean): boolean => Array.isArray(item) && item.length <= 50 && item.every(valid);
+  if (!record(value) || value.version !== 1 || !string(value.sessionId) || !string(value.revision) || !/^[a-f0-9]{64}$/.test(value.revision)
+    || typeof value.limited !== "boolean" || typeof value.hasMore !== "boolean" || !record(value.references) || !record(value.totals)
+    || (value.hasMore ? !integer(value.nextOffset) : value.nextOffset !== null)) return false;
+  for (const key of ["subagents", "changedFiles", "websites", "attachments", "skills", "memory", "mcp"]) if (!integer(value.totals[key])) return false;
+  const statuses = ["running", "completed", "timed_out", "aborted", "failed", "stopped", "denied"];
+  return list(value.subagents, (item) => record(item) && string(item.delegationId) && string(item.agentName) && string(item.task)
+    && string(item.status) && statuses.includes(item.status) && optionalString(item.messageId)
+    && (item.toolCallId === null || optionalString(item.toolCallId)) && (item.timing === undefined || record(item.timing)
+      && optionalInteger(item.timing.startedAt) && optionalInteger(item.timing.completedAt)))
+    && list(value.changedFiles, (item) => resource(item) && record(item) && string(item.path) && integer(item.changeCount)
+      && optionalInteger(item.addedLines) && optionalInteger(item.removedLines) && optionalString(item.lastChangedAt) && optionalString(item.groupLabel))
+    && list(value.attachments, resource) && list(value.references.skills, resource) && list(value.references.memory, resource) && list(value.references.mcp, resource)
+    && list(value.websites, (item) => {
+      if (!record(item) || !string(item.id) || !string(item.label) || !string(item.url) || !string(item.domain) || !integer(item.sourceCount)) return false;
+      try {
+        const url = new URL(item.url);
+        return ["http:", "https:"].includes(url.protocol) && Boolean(url.hostname) && !url.username && !url.password && url.hostname === item.domain;
+      } catch { return false; }
+    });
+}
