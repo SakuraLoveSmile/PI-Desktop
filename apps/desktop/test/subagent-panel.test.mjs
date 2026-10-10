@@ -83,11 +83,15 @@ test("the work panel renders the delegation tab like every other resource", () =
   assert.doesNotMatch(appSource, /subagentPanelOpen/);
 });
 
-test("the delegation tab renders a message list with a read-only composer", () => {
+test("the delegation tab renders expandable task prompts and answers with a read-only composer", () => {
   assert.match(tabSource, /data-testid="subagent-transcript-tab"/);
   assert.match(tabSource, /buildSubagentTranscript\(messages, delegationId\)/);
-  assert.match(tabSource, /className="message-row user"/);
-  assert.match(tabSource, /className="message-user-text selectable"/);
+  assert.match(tabSource, /transcriptResult\.turns\.map\(\(turn, turnIndex\)/);
+  assert.match(tabSource, /<SubagentTaskPrompt task=\{turn\.task\} identity=\{`\$\{delegationId\}-\$\{turnIndex\}`\}/);
+  assert.match(tabSource, /useAutomaticDisclosure\(false, undefined, disclosureKey\("subagent-task", identity\)\)/);
+  assert.match(tabSource, /className="subagent-task-preview selectable"/);
+  assert.match(tabSource, /aria-expanded=\{disclosure\.open\} aria-controls=\{detailsId\} onClick=\{disclosure\.toggle\}/);
+  assert.match(tabSource, /chat\.subagentTaskCollapse[\s\S]*?chat\.subagentTaskExpand/);
   assert.match(tabSource, /className="message-row assistant"/);
   assert.match(tabSource, /data-message-id=\{row\.message\.id\}/);
   assert.match(tabSource, /<Textarea/);

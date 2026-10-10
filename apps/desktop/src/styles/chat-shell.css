@@ -499,9 +499,9 @@
   background: color-mix(in oklab, var(--ds-text-primary) 20%, transparent);
 }
 
-.chat-surface[data-chat-resizing="true"] .thread-content,
-.chat-surface[data-chat-resizing="true"] .composer-stack,
-.chat-surface[data-chat-resizing="true"] .home-stack-inner {
+.chat-session-main[data-chat-resizing="true"] .thread-content,
+.chat-session-main[data-chat-resizing="true"] .composer-stack,
+.chat-session-main[data-chat-resizing="true"] .home-stack-inner {
   transition: none;
 }
 

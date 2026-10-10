@@ -119,7 +119,7 @@ test("each retained session keeps its own mounted pane", () => {
   // already-painted pane instead of re-pointing one transcript (ADR 0137).
   assert.match(
     chatSurface,
-    /retainedSessionIds\.map\(\(id\) => \(\s*<SessionPane\s*key=\{id\}\s*sessionId=\{id\}\s*visible=\{visible && id === visibleSessionId\}\s*\/>/,
+    /retainedSessionIds\.map\(\(id\) => \(\s*<SessionPane\s*key=\{id\}\s*sessionId=\{id\}\s*visible=\{visible && id === visibleSessionId\}\s*activityVisible=\{activityVisible\}\s*\/>/,
   );
   assert.match(chatSurface, /const visibleSessionId = retainedSessionIds\[0\]/);
   // The retention bound lives in a pure module, so eviction is unit-testable
@@ -211,7 +211,7 @@ test("a cold switch keeps the visible pane legible instead of dimming it", () =>
   // left. The transcript keeps full contrast: the dim was itself a visible flash.
   assert.match(
     styles,
-    /\.chat-surface\.session-switching > \.composer-dock\s*\{\s*pointer-events: none;\s*\}/,
+    /\.chat-surface\.session-switching \.chat-session-main > \.composer-dock\s*\{\s*pointer-events: none;\s*\}/,
   );
   assert.doesNotMatch(styles, /session-switching[\s\S]{0,200}?opacity: 0\.82/);
   assert.match(

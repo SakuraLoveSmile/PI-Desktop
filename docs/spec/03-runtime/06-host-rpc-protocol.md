@@ -363,6 +363,9 @@ to later refresh and inference; the vendor picker does not collect them.
   data stay with the session. Blank ids or paths are `INVALID_PARAMS`, an
   unknown session is `NOT_FOUND`, and a session with a running turn is
   `CONFLICT` so a live agent never switches instruction roots mid-turn.
+  Active managed background jobs return `SESSION_HAS_BACKGROUND_PROCESSES`;
+  an unsaved terminal job returns `BACKGROUND_PROCESS_PERSISTENCE_FAILED`.
+  Stop jobs and persist terminal state before moving their owning session.
   Additive RPC; no protocol version bump.
 - `session.appendMessage`
 - `session.saveInflightMessage` — Electron-main-only checkpoint of the
@@ -1756,6 +1759,9 @@ is idempotent for settled jobs. Cross-session IDs cannot read or stop another
 owner. `backgroundProcesses.changed({sessionId,id,revision})` invalidates visible
 reads; no command output is broadcast with the event. Explicit stopping remains
 effective if its state write fails, while the storage error is reported.
+
+Output notifications include a trailing flush within the existing 250 ms
+  throttle, so output followed by silence remains visible before termination.
 
 Background start is the existing authorized `tools.execute` Bash path with
 `args.run_in_background: true`; the immediate result is a launch receipt, not

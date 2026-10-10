@@ -32,6 +32,7 @@ WHEN EXISTS (SELECT 1 FROM background_processes WHERE session_id=OLD.id AND stat
 BEGIN SELECT RAISE(ABORT, 'SESSION_HAS_BACKGROUND_PROCESSES'); END;
 ";
 const OUTPUT_LIMIT: usize = 64 * 1024;
+const OUTPUT_CHANGED_INTERVAL: Duration = Duration::from_millis(250);
 const SELECT: &str = "SELECT id,session_id,tool_call_id,command,cwd,status,started_at,ended_at,exit_code FROM background_processes";
 pub type JobRegistry = HashMap<String, tokio::task::JoinHandle<()>>;
 pub type OutputRegistry = HashMap<String, Arc<StdMutex<BackgroundOutput>>>;
@@ -210,6 +211,7 @@ pub struct BackgroundOutput {
     session: String,
     id: String,
     revision: u64,
+    dirty: bool,
     last_changed: Instant,
     tx: mpsc::UnboundedSender<String>,
 }
@@ -223,6 +225,7 @@ impl BackgroundOutput {
             session,
             id,
             revision: 0,
+            dirty: false,
             last_changed: Instant::now(),
             tx,
         }
@@ -252,14 +255,19 @@ impl BackgroundOutput {
             text.push_str(&chunk[..end]);
             *truncated |= end < chunk.len();
         }
-        if self.last_changed.elapsed() >= Duration::from_millis(250) {
-            self.changed();
-        }
+        self.dirty = true;
+        self.flush_due();
     }
     pub fn changed(&mut self) {
         self.revision = self.revision.saturating_add(1);
+        self.dirty = false;
         self.last_changed = Instant::now();
         let _ = self.tx.send(json!({"jsonrpc":"2.0","method":"backgroundProcesses.changed","params":{"sessionId":self.session,"id":self.id,"revision":self.revision}}).to_string()+"\n");
+    }
+    pub fn flush_due(&mut self) {
+        if self.dirty && self.last_changed.elapsed() >= OUTPUT_CHANGED_INTERVAL {
+            self.changed();
+        }
     }
     fn fields(&self) -> Value {
         json!({"stdout":self.stdout,"stderr":self.stderr,"stdoutTruncated":self.stdout_truncated,"stderrTruncated":self.stderr_truncated})
@@ -439,4 +447,51 @@ pub async fn start(
     });
     st.background_jobs.insert(summary.id.clone(), task);
     Ok(summary)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn background_output_flushes_suppressed_output_after_silence() {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let mut output = BackgroundOutput::new("session".into(), "process".into(), tx);
+        // Pin the throttle window without waiting for wall-clock time.
+        output.last_changed = Instant::now() + Duration::from_secs(1);
+        output.push(false, "early stdout");
+        output.push(true, "early stderr");
+        output.flush_due();
+        assert!(rx.try_recv().is_err());
+
+        output.last_changed = Instant::now() - Duration::from_millis(250);
+        output.flush_due();
+        let event: Value = serde_json::from_str(&rx.try_recv().unwrap()).unwrap();
+        assert_eq!(event["method"], "backgroundProcesses.changed");
+        assert_eq!(event["params"]["sessionId"], "session");
+        assert_eq!(event["params"]["id"], "process");
+        assert_eq!(event["params"]["revision"], 1);
+        assert_eq!(output.fields()["stdout"], "early stdout");
+        assert_eq!(output.fields()["stderr"], "early stderr");
+
+        output.last_changed = Instant::now() - Duration::from_millis(250);
+        output.flush_due();
+        assert!(rx.try_recv().is_err(), "clean ticks must not emit events");
+    }
+
+    #[test]
+    fn background_output_lifecycle_notification_flushes_pending_output() {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let mut output = BackgroundOutput::new("session".into(), "process".into(), tx);
+        output.last_changed = Instant::now() + Duration::from_secs(1);
+        output.push(false, "last output");
+        output.changed();
+        let event: Value = serde_json::from_str(&rx.try_recv().unwrap()).unwrap();
+        assert_eq!(event["params"]["revision"], 1);
+        assert_eq!(output.fields()["stdout"], "last output");
+
+        output.last_changed = Instant::now() - Duration::from_millis(250);
+        output.flush_due();
+        assert!(rx.try_recv().is_err());
+    }
 }

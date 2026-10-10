@@ -88,3 +88,9 @@ Real production Host E2E covers child/grandchild cleanup under stop, EOF,
 application dispose and forced Host loss, plus interrupted recovery and notes
 across restart. Real React/Chromium tests cover interaction, hidden-pane reads,
 stale responses, saved/dirty/conflict note states and responsive activity access.
+
+## Integration lifecycle checks
+
+A session cannot move projects while it owns an active background job or an
+unsaved terminal job. Output throttling includes a trailing flush, preserving
+visibility when a command emits briefly and then remains silent.

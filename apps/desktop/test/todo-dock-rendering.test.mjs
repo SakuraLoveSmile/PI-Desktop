@@ -137,5 +137,5 @@ test("SessionTodoChecklist uses Overview scrolling and removes the composer foot
   assert.match(css, /\.session-todo-checklist-copy\s*\{[\s\S]*?overflow-wrap:\s*anywhere;/);
   assert.doesNotMatch(css.match(/\.session-todo-checklist-list\s*\{[^}]*\}/)?.[0] ?? "", /max-height|overflow/);
   assert.doesNotMatch(composer, /TodoDock|SessionTodoChecklist/);
-  assert.match(overview, /<div className="work-panel-overview-scroll">\s*<SessionTodoChecklist key=\{session.id\} sessionId=\{session.id\}/);
+  assert.match(overview, /<div className="work-panel-overview-scroll">\s*<Button[^>]*onClick=\{\(\) => openWorkPanelTabForSession\(session\.id, overviewWorkPanelTab\("activity"\)\)\}[\s\S]*?<\/Button>\s*<SessionTodoChecklist key=\{session.id\} sessionId=\{session.id\}/);
 });
