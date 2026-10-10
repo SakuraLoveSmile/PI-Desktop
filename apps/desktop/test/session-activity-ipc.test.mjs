@@ -26,3 +26,12 @@ test('malformed and unsupported resource requests never reach Host',()=>{
  assert.throws(()=>handlers.get(IPC.invoke.backgroundProcessesStop)({sessionId:'a',id:''}));
  assert.equal(calls.length,0);
 });
+
+test('complete session activity IPC forwards a bounded cursor and rejects foreign or malformed reads', async()=>{
+  const {handlers,calls}=setup();
+  await handlers.get(IPC.invoke.sessionActivityGet)({sessionId:'owned',offset:50});
+  assert.deepEqual(calls,[{method:'sessionActivity.get',params:{sessionId:'owned',offset:50}}]);
+  for(const offset of [-1,0.5,'50',NaN]) assert.throws(()=>handlers.get(IPC.invoke.sessionActivityGet)({sessionId:'owned',offset}));
+  for(const sessionId of ['',null,'remote:a','native-pi:a']) assert.throws(()=>handlers.get(IPC.invoke.sessionActivityGet)({sessionId}));
+  assert.equal(calls.length,1);
+});

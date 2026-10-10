@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { createElement } from "react";
+import { slotSsr } from "./helpers/slot-ssr.mjs";
 import { readComposerSource } from "./helpers/composer-source.mjs";
 import { readMainSource } from "./helpers/main-source.mjs";
 import { loadStyles } from "./helpers/styles.mjs";
@@ -44,31 +46,37 @@ test("fork tools use the branch icon", () => {
 });
 
 test("tool rows render structured blocks instead of dumping JSON", async () => {
-  const detailsSource = await readFile(
-    new URL("../src/components/ToolDetails.tsx", import.meta.url),
-    "utf8",
-  );
   const permissionSource = await readFile(
     new URL("../src/components/PermissionCard.tsx", import.meta.url),
     "utf8",
   );
-  // No JSON stringify path is left in either surface.
-  assert.doesNotMatch(transcriptSource, /getToolSections|hasToolSections/);
-  assert.doesNotMatch(permissionSource, /JSON\.stringify|formatToolValue/);
+  // Keep the lazy-render and permission wiring constraints until their actual
+  // interaction coverage replaces them; SSR does not execute these effects.
   assert.match(transcriptSource, /buildToolPresentation\(message, \{\n\s+hideSummaryArg: true,/);
-  // Formatting remains lazy and the cached blocks are read only while visible.
   assert.match(transcriptSource, /if \(variant !== "topology" && open && hasDetails && disclosure\.parentVisible/);
   assert.match(transcriptSource, /const blocks = variant !== "topology" && open && hasDetails \? presentation\.current\?\.blocks : null/);
-  assert.match(transcriptSource, /<ToolChips chips=\{chips\} \/>/);
-  assert.match(transcriptSource, /<ToolDetailBlocks blocks=\{blocks\} plain=\{runHead\} \/>/);
   assert.match(permissionSource, /<ToolDetailBlocks blocks=\{argBlocks\} \/>/);
-  // Code bodies share the transcript highlighter rather than a second cache.
-  assert.match(detailsSource, /<HighlightedCode code=\{block\.text\} lang=\{block\.lang\} \/>/);
-  // Diffs reuse the review card rails; hits and paths open in the work panel.
-  assert.match(detailsSource, /className="diff-hunk"/);
-  assert.match(detailsSource, /openTarget\(\{ kind: "file", path: rel \}\)/);
 });
 
+test("tool rows render structured stdout and stderr with copy controls", async (t) => {
+  const ssr = await slotSsr(t);
+  const { buildToolPresentation } = await ssr.load("/src/lib/tool-presentation.ts");
+  const { ToolDetailBlocks } = await ssr.load("/src/components/ToolDetails.tsx");
+  const blocks = buildToolPresentation({
+    toolName: "Bash",
+    toolArgs: { command: "fixture-command" },
+    toolResult: { details: { stdout: "build complete", stderr: "fixture warning", exitCode: 0 } },
+  }, { hideSummaryArg: true });
+  const markup = ssr.render(createElement(ToolDetailBlocks, { blocks }));
+  assert.match(markup, /build complete/);
+  assert.match(markup, /fixture warning/);
+  assert.equal([...markup.matchAll(/aria-label="Copy [^"]+"/g)].length, 2);
+  assert.doesNotMatch(markup, /&quot;stdout&quot;|&quot;exitCode&quot;/);
+  const plainMarkup = ssr.render(createElement(ToolDetailBlocks, { blocks, plain: true }));
+  assert.match(plainMarkup, /build complete/);
+  assert.match(plainMarkup, /fixture warning/);
+  assert.doesNotMatch(plainMarkup, /aria-label="Copy [^"]+"/);
+});
 test("tool block bodies stay bounded and role-coded", () => {
   for (const selector of [
     "\\.tool-row-chips",

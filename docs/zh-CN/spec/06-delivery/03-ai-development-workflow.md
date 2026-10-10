@@ -312,12 +312,7 @@ git fetch origin main
 git worktree add -b <type>/<short-description> <worktree-path> origin/main
 ```
 
-如果在干净的主工作树中签出 `main`，则 `git switch main` 加上
-`git pull --ff-only origin main` 应在 `git worktree add` 之前运行。如果
-主工作树不干净或者位于另一个分支上，保持其不变并且
-直接从获取的 `origin/main` 创建请求工作树。从来没有
-仅仅为了满足这一点而丢弃、隐藏、移动或覆盖不相关的工作
-序列。
+直接从获取的 `origin/main` 创建请求工作树。主检出和本地 `main` 是协调面，不要为了开始任务同步、合并或处理无关的本地分叉。保留原有提交和改动；在任务自己的工作树更新远程 `main` 候选。
 
 环境重用是特定于资源的。包管理器存储和语言
 工具链通常会自动共享。忽略本地配置或
@@ -451,3 +446,35 @@ D164 与 D260。 GitHub 发行说明并不能替代。
 - [ ] 在 R6.1 的临时类型限制生效期间，外部贡献只接受 `perf` 与 `fix` 类型的 pull request。
 
 - [ ] 更新所有索引（NAV、交付自述文件、规格自述文件、文档自述文件、董事会）。
+
+
+## Test quality, executable inventory and retirement
+
+Behavior and stable contracts are the test boundary. Do not add tests that read
+repository source/CSS and assert implementation text with regular expressions.
+Regex assertions on actual rendered or protocol output remain valid. Bug fixes
+need a red repro or explicit baseline and a regression test. Pure style, copy
+and i18n changes may omit new tests when existing/static validation proves the
+unchanged behavior; record the reason and residual risk instead of adding a
+quantity quota.
+
+`node scripts/check-test-quality.mjs --base <actual-base>` compares the AST
+source-provenance inventory and per-file/case signatures. Source/CSS assertions
+may only decrease; fixture reads are excluded. Retiring allowances requires
+`--write-baseline` and cannot introduce growth or later reuse retired capacity.
+Runtime domain tests and shared helpers under `src/runtime-tests` have an
+800-line per-file budget. These are maintenance limits, not coverage targets.
+
+PR CI runs five isolated smokes; the nightly fixture workflow runs the other
+automatic scene families. The [test plan](04-e2e-test-plan.md#10-ci-tiers-and-fixture-boundaries)
+and [generated index](08-scenario-index.md) describe actual commands and manual
+boundaries. Never count a skipped or catalog-only scenario as passed acceptance.
+Document-only scenarios do not require IDs. English and Chinese executable
+indexes come from one source, not a hand-maintained mirrored matrix.
+
+When behavior is replaced, delete its obsolete tests and executable IDs in the
+same change. The quarterly maintenance audit reports recent churn for review;
+without evidence that a test caught regressions, that fact remains unknown.
+High churn alone never authorizes deleting a test. Policy changes synchronize
+AGENTS/CLAUDE and their Policy-Sync token; `pnpm check:agent-policy` remains the
+mechanical gate.

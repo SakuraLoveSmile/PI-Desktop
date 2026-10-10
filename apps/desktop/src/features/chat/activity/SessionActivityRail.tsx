@@ -19,7 +19,7 @@ export type SessionActivityRailProps = {
   sessionId: string; visible: boolean; plans: ActivityRailItem[]; agents: ActivityRailItem[];
   outputs: ActivityRailItem[]; sources: ActivityRailItem[]; teamMembers?: ActivityRailItem[];
   attentionItems?: ActivityAttentionItem[]; processes: BackgroundProcessSummary[]; processesLoading: boolean;
-  plansAttentionReady?: boolean; agentsNotice?: ReactNode; teamNotice?: ReactNode; showTeamMembers?: boolean; processesError?: string | null;
+  plansAttentionReady?: boolean; agentsNotice?: ReactNode; resourcesNotice?: ReactNode; teamNotice?: ReactNode; showTeamMembers?: boolean; processesError?: string | null;
   onRefreshProcesses: () => void; onOpenProcess: (id: string) => void;
   suggestions?: ReactNode; processDetails?: ReactNode; rangeLimited?: boolean; groupsRangeLimited?: boolean;
   supported?: boolean; onLoadEarlier?: () => void; onReturnToLatest?: () => void;
@@ -33,7 +33,7 @@ export function SessionActivityRail(props: SessionActivityRailProps) {
 // Dismissal is a renderer-lifetime view preference, never a Host mutation.
 const hiddenEndedProcesses = new Map<string, Set<string>>();
 
-function SessionActivityRailContent({ sessionId, visible, agentsNotice, teamNotice, showTeamMembers = false, plans, agents, outputs, sources, processes,
+function SessionActivityRailContent({ sessionId, visible, agentsNotice, resourcesNotice, teamNotice, showTeamMembers = false, plans, agents, outputs, sources, processes,
   processesLoading, processesError, onRefreshProcesses, onOpenProcess, suggestions, processDetails,
   rangeLimited = false, groupsRangeLimited = rangeLimited, supported = true, plansAttentionReady = true,
   attentionItems = [], teamMembers = [], onLoadEarlier, onReturnToLatest, historyLoading = false, hasMoreBefore = false }: SessionActivityRailProps) {
@@ -138,7 +138,7 @@ function SessionActivityRailContent({ sessionId, visible, agentsNotice, teamNoti
     </ActivityRailGroup>
     {suggestions}
     <p className="session-activity-section-label session-activity-artifacts-label">{t("panel.activity.artifacts")}</p>
-    <ActivityRailGroup sessionId={sessionId} group="outputs" trackAttention={visible} label={t("panel.activity.outputs")} items={outputs} initialOpen={false}>{rangeNotice}{rows(outputs, "output", "outputs", "emptyOutputs")}</ActivityRailGroup>
-    <ActivityRailGroup sessionId={sessionId} group="sources" trackAttention={visible} label={t("panel.activity.sources")} items={sources} initialOpen={false}>{rangeNotice}{rows(sources, "source", "sources", "emptySources")}</ActivityRailGroup>
+    <ActivityRailGroup sessionId={sessionId} group="outputs" trackAttention={visible} label={t("panel.activity.outputs")} items={outputs} initialOpen={false}>{rangeNotice}{resourcesNotice}{rows(outputs, "output", "outputs", "emptyOutputs")}</ActivityRailGroup>
+    <ActivityRailGroup sessionId={sessionId} group="sources" trackAttention={visible} label={t("panel.activity.sources")} items={sources} initialOpen={false}>{rangeNotice}{resourcesNotice}{rows(sources, "source", "sources", "emptySources")}</ActivityRailGroup>
   </aside>;
 }

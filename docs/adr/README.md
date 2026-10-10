@@ -20,6 +20,9 @@ Each ADR includes:
 
 | ID | Title | Status |
 |---|---|---|
+| composer-native-git-workspaces | [Composer native Git workspace navigation](composer-native-git-workspaces.md) | Accepted (local implementation) |
+| context-insights-native-port | [Native Context Insights](context-insights-native-port.md) | Accepted for implementation under the requested plugin-first port |
+| session-activity-rail-and-managed-background-processes | [Session activity rail, managed background processes and Quick Notes](session-activity-rail-and-managed-background-processes.md) | Accepted |
 | chronological-system-transcript | [Preserve chronological model system state](chronological-system-transcript.md) | Accepted |
 | mcp-tool-approval-risk | [User MCP tools keep the normal approval path](mcp-tool-approval-risk.md) | Accepted |
 | models-dev-catalog-authority | [models.dev owns published model metadata](models-dev-catalog-authority.md) | Accepted for implementation |
@@ -366,5 +369,3 @@ Each ADR includes:
 | image-generation-capability | [Image generation as a configured Agent capability](image-generation-capability.md) | Accepted |
 | retained-browser-pages-per-tab | [Retain a host-owned browser page per resource tab](retained-browser-pages-per-tab.md) | Accepted |
 | 0318 | [Publish native Linux arm64 artifacts](0318-linux-arm64-release-lane.md) | Accepted (D638) |
-
-- [Native Context Insights](context-insights-native-port.md) — plugin-first feasibility, native data ownership and sixth inspection command.

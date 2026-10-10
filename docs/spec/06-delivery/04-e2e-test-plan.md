@@ -1,7 +1,7 @@
 # 04. E2E Test Plan
 
 > Scope: MVP acceptance scenarios plus current shipped product increments for PI-Desktop
-> Status: Accepted (protocol/Electron automation is active; full desktop Playwright remains planned)
+> Status: Accepted (protocol/Electron automation is active; scene-family nightly fixtures and PR smokes are active)
 > Cross-references: [acceptance-criteria](02-acceptance-criteria.md) · [milestones](01-mvp-milestones.md) · [ai-development-workflow](03-ai-development-workflow.md) · [change-checklist](05-change-checklist.md)
 
 ---
@@ -616,7 +616,7 @@ levels does not waive the relevant E2E gate.
 |---|---|---|
 | **Vitest** | Unit + integration (TS side) | Active (`pnpm test`, shared package) |
 | **Rust #[test]** | Host-core unit tests | Active (`cargo test -p host-core`) |
-| **Protocol smoke** | Host RPC + tools + plugins headless | Active (`test:e2e`, 22 checks) |
+| **PR fixture smoke** | Boot, loopback message, approvals, durable restart and crash recovery | Active (`test:e2e:smoke`, five suites) |
 | **Electron probes** | Boot bridge, session-list responsiveness, and crash supervision | Active (`test:e2e:boot`, `test:e2e:supervision`) |
 | **Playwright** | Full UI-driven journeys | Planned (post-M5) |
 
@@ -631,10 +631,10 @@ levels does not waive the relevant E2E gate.
 | Requirement | Detail |
 |---|---|
 | Platform | macOS arm64 and Intel x64, Windows x64, and Linux x64 and arm64 release targets (D126/D285, D638 / ADR 0318) |
-| Profile | Clean `~/.pi-desktop` profile (no prior config) |
+| Profile | Fresh temporary data, HOME and Chromium user-data directory |
 | Fixtures | Sample project directory (`examples/fixtures/sample-project/`) |
 | Sample plugin | `examples/plugins/hello` loaded from local path |
-| Provider | At least one provider with a valid key (test account) |
+| Provider | Loopback synthetic provider; real account only with explicit authorization |
 | Display | Headless-capable Electron or real display |
 
 ---
@@ -644,7 +644,7 @@ levels does not waive the relevant E2E gate.
 Each scenario is documented in this format:
 
 ```markdown
-### E2E-<ID>: <title>
+### <title> (optional stable executable ID)
 
 - **Preconditions**: what must be true before steps start
 - **Steps**: ordered list of user / system actions
@@ -652,7 +652,7 @@ Each scenario is documented in this format:
 - **Specs linked**: relevant spec file(s)
 - **Acceptance criterion**: which A–H letter(s) this verifies
 - **Milestone**: M1–M6 target
-- **Status**: Draft | Documented | Partially automated | Automated | Passed
+- **Coverage / gaps**: executable test reference or manual acceptance boundary
 ```
 
 ---
@@ -691,12 +691,12 @@ and record the reason. Clean CI and release runners may install from lockfiles.
 Use the root `package.json` as the source of truth for executable commands.
 The minimum selection is:
 
-- Cross-cutting runtime, host, or IPC: `pnpm test:e2e`.
-- Electron startup, preload, or window lifecycle: `pnpm test:e2e` and
+- Cross-cutting runtime, host, or IPC: `pnpm test:e2e:smoke`.
+- Electron startup, preload, or window lifecycle: `pnpm test:e2e:smoke` and
   `pnpm test:e2e:boot`.
   The boot probe checks that unmodified Ctrl+R is consumed by the app shell
   before Chromium can reload the renderer.
-- Session-list refresh or model capability lookup: `pnpm test:e2e` and
+- Session-list refresh or model capability lookup: `pnpm test:e2e:smoke` and
   `pnpm test:e2e:boot`, including the synthetic large-list responsiveness check.
 - Settings/composer/plugin search theme surfaces: `pnpm build:js` followed by
   `pnpm test:e2e:theme-surfaces`.
@@ -704,26 +704,26 @@ The minimum selection is:
 - Composer slash-menu name/description layout: `pnpm build:js` followed by
   `pnpm test:e2e:composer-autocomplete`.
 - Transcript render boundaries and cross-part delegation display: `pnpm test:e2e:transcript`.
-- Plan host/runtime behavior: `pnpm test:e2e` and `pnpm test:e2e:plan`.
+- Plan host/runtime behavior: `pnpm test:e2e:smoke` and `pnpm test:e2e:plan`.
 - Plan UI behavior: `pnpm test:e2e:plan` and `pnpm test:e2e:plan-ui`.
-- Host supervision, crash recovery, or restart behavior: `pnpm test:e2e` and
+- Host supervision, crash recovery, or restart behavior: `pnpm test:e2e:smoke` and
   `pnpm test:e2e:supervision`.
-- Subagent lifecycle: `pnpm test:e2e` and `pnpm test:e2e:subagents`.
+- Subagent lifecycle: `pnpm test:e2e:smoke` and `pnpm test:e2e:subagents`.
 - Imported-extension dependency installation or registry-boundary changes: `pnpm test:e2e:plugin-import-deps`.
 - Trusted extension or plugin-extension changes: `pnpm test:e2e:trusted-extensions`.
 - Session collaboration / Session Orchestrator: `pnpm test:e2e:collaboration`.
 - Completion-notice silence or the silent-turn contract (D193 / D446): `pnpm test:e2e:session-completion`.
 - Changes spanning multiple surfaces use the union of the applicable suites.
 
-`pnpm test:e2e` is the default cross-system smoke suite for host RPC, IPC,
+`pnpm test:e2e:smoke` is the default cross-system smoke suite for host RPC, IPC,
 agent execution, plugins, persistence integration, and shared runtime
 contracts. A required suite that cannot run because of a missing display,
 platform, credential, hardware resource, or other environment capability must
 be recorded as `NOT RUN` with its reason, alternative validation, and remaining
 risk. The pull request may still be opened with that record so the change can
 be validated in a capable environment, but the gate is not satisfied and
-delivery remains incomplete until the suite passes against the integrated
-`main` that carries the change.
+delivery remains incomplete until the suite passes against a candidate containing the latest `origin/main`
+and the change.
 
 Required results must apply to the executable commit the gate ran on, and any
 later commit that changes the landed executable content requires a rerun of
@@ -738,7 +738,7 @@ A failed required E2E blocks the branch push, the pull request, and declaring
 the integrated delivery complete until the failure is classified as an
 implementation regression, test regression, environment failure, or known
 flaky infrastructure. Fix the product or test defect and rerun the affected
-suite against the integrated `main`. Do not delete scenarios, weaken
+suite against the refreshed task or PR integration candidate. Do not delete scenarios, weaken
 assertions, or add retries that hide a deterministic failure. When a scenario
 is not automated on the required platform, keep its status documented and
 identify the platform validation still needed.
@@ -9525,190 +9525,62 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   desktop and host. Host-core and targeted renderer tests are companion checks,
   not substitutes for the Electron journey.
 
-## 8. Traceability Matrix
+## 8. Generated executable traceability
 
-| Acceptance | Scenarios |
-|---|---|
-| C / E / Security / Quality — Bounded recursive standard/expert delegation and persisted settings | E2E-SUBAGENT-bounded-recursive-execution |
-| C / E / Quality / Security — Session activity, persistent notes and managed process lifecycle | E2E-CHAT-session-activity |
-| E / Quality — Standard Agent delegate-first prompt and Task report convergence | E2E-DELEGATION-standard-delegates-to-subagents |
-| C / E / Quality — Mandatory Team delegation, expert-start gate and catalog isolation | E2E-TEAM-lead-delegates-to-experts, E2E-TEAM-forced-delegation |
-| C / Quality / Security — Automatic read-only Team planning | E2E-TEAM-approved-plan-research-and-execution, E2E-TEAM-automatic-plan-research |
-| C / Quality / Security — Research task ownership and legacy recovery | E2E-TEAM-research-owner-required |
-| C / Quality / Security — Team Plan inbox settlement | E2E-TEAM-plan-inbox-before-approval, E2E-TEAM-wait-inbox-yield-and-live-overview |
-| C / E / Quality / Security — Approved Team Goal same-turn execution and cancellation | E2E-TEAM-approved-goal-same-turn-and-cancel |
-| C / Quality — Independent Team panorama/task/member tabs | E2E-TEAM-panorama-and-member-tabs |
-| C / Quality — Live dispatch card and single task target | E2E-TEAM-dispatch-card-live-status-and-joining |
-| C / Quality — Chronological Team turn timeline with inline dispatch cards | E2E-TEAM-turn-renders-chronological-timeline |
-| C / E / F / Quality / Security — Session Todo checklist | E2E-CHAT-session-todo-checklist |
-| C / E / Security / Quality — Live Voice four-stage interaction | E2E-LIVE-VOICE-four-stage-ui |
-| C / F — Hourly task updates | E2E-SCHEDULED-manual-to-hourly |
-| C / F / Quality — Saved project isolation | E2E-SCHEDULED-manual-workspace-binding |
-| C / F / Quality — Desktop automations | E2E-SCHEDULED-desktop-automation-lifecycle |
-| F / Security / Quality — Portable configuration sync | E2E-CONFIG-SYNC-webdav-portable-configuration |
-| A / C — Unicode stdio framing | E2E-RPC-unicode-separators |
-| C / G / Quality — Plugins navigation | E2E-NAV-plugins-button-goes-back |
-| C / D / Quality — Sidebar row states | E2E-LAYOUT-sidebar-row-states |
-| A / C / Quality — Sidebar material and settings return | E2E-LAYOUT-sidebar-settings |
-| C / Quality — Destination loading and focus | E2E-087b |
-| A / H / Quality — Renderer process crash recovery | E2E-RUNTIME-renderer-crash-recovery |
-| C / F / Quality — Project folder with chats detaches and deletes safely | E2E-048c |
-| B / F / Security — Provider copy | E2E-PROVIDER-copy-config-without-credentials |
-| B / F / Quality — Selected model order | E2E-MODEL-selected-order-persists |
-| E / F / Quality — MCP server timeout override | E2E-261 |
-| A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079, E2E-092, E2E-097, E2E-143, E2E-150, E2E-168, E2E-204 |
-| A / C / F / Quality — Tray session navigation | E2E-TRAY-bounded-session-navigation |
-| B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080, E2E-082, E2E-102c, E2E-102d, E2E-102e, E2E-151, E2E-154, E2E-163, E2E-166, E2E-172, E2E-174, E2E-197, E2E-005G, E2E-005J, E2E-199, E2E-201, E2E-202, E2E-203, E2E-205, E2E-206, E2E-209 |
-| C — Conversation & stream | E2E-PLAN-chronological-card-and-markdown-export, E2E-CHAT-long-history-stream-keeps-responsive, E2E-CHAT-running-status-survives-output-pauses, E2E-008, E2E-008d, E2E-008e, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-011d, E2E-011e, E2E-011g, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-088b, E2E-089, E2E-090, E2E-COMPOSER-narrow-controls, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102g, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-121, E2E-218, E2E-259, E2E-219, E2E-AGENTS-001, E2E-142, E2E-144, E2E-145, E2E-146, E2E-146a, E2E-147, E2E-151, E2E-154, E2E-155, E2E-158, E2E-159, E2E-161, E2E-162, E2E-166, E2E-172, E2E-173, E2E-174, E2E-177, E2E-178, E2E-179, E2E-180, E2E-182, E2E-183, E2E-187, E2E-198, E2E-199, E2E-202, E2E-203, E2E-207, E2E-208, E2E-CHAT-content-width-handles, E2E-250, E2E-102i, E2E-PLUGIN-session-orchestrator-real-workers, E2E-SUBAGENT-settlement-updates-before-parent-poll, E2E-SUBAGENT-resume-a-settled-delegation |
-| C — Conversation & stream (composer drafts) | E2E-011c, E2E-011c-1, E2E-COMPOSER-input-history |
-| D — Workspace | E2E-012, E2E-013, E2E-022B, E2E-024I, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068, E2E-075, E2E-078, E2E-153, E2E-158, E2E-182, E2E-187, E2E-252 |
-| D — Workspace (project ordering) | E2E-253 |
-| E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102d, E2E-102e, E2E-102g, E2E-103, E2E-105, E2E-106, E2E-107, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-119, E2E-121, E2E-122, E2E-142, E2E-145, E2E-147, E2E-155, E2E-158, E2E-166, E2E-181, E2E-PLUGIN-imported-pi-package-skills |
-| F — Persistence | E2E-020, E2E-021, E2E-021a, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-096, E2E-098, E2E-102, E2E-102b, E2E-102c, E2E-102d, E2E-102g, E2E-102i, E2E-103, E2E-AGENTS-001, E2E-061a, E2E-073a, E2E-104, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-118, E2E-119, E2E-120, E2E-121, E2E-123, E2E-142, E2E-146, E2E-146a, E2E-148, E2E-151, E2E-158, E2E-160, E2E-168, E2E-171, E2E-177, E2E-178, E2E-183, E2E-186, E2E-005J, E2E-PLUGIN-session-orchestrator-real-workers |
-| F — Persistence (project ordering) | E2E-251 |
-| G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024AA, E2E-024E, E2E-024W, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M, E2E-024N, E2E-024O, E2E-024P, E2E-025, E2E-026, E2E-105, E2E-117, E2E-120, E2E-122, E2E-123, E2E-024Q, E2E-148, E2E-152, E2E-153, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-imported-pi-package-wrapper, E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency, E2E-PLUGIN-global-shortcut-owns-only-its-own-command, E2E-PLUGIN-permission-gate-for-real-time-capabilities, E2E-PLUGIN-background-audio-and-realtime-connection, E2E-PLUGIN-fs-root-follows-the-calling-session |
-| H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042, E2E-096, E2E-098, E2E-104, E2E-107, E2E-108, E2E-109, E2E-110, E2E-113, E2E-115, E2E-116, E2E-118, E2E-121, E2E-146, E2E-146a, E2E-155, E2E-159, E2E-176, E2E-194, E2E-195 |
-| Security | E2E-028, E2E-029, E2E-030, E2E-024J, E2E-024K, E2E-024M, E2E-049, E2E-068, E2E-086, E2E-102c, E2E-102d, E2E-102e, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-113, E2E-115, E2E-116, E2E-117, E2E-119, E2E-121, E2E-122, E2E-123, E2E-142, E2E-148, E2E-151, E2E-153, E2E-158, E2E-187, E2E-196c, E2E-196b, E2E-196, E2E-PLUGIN-fs-root-follows-the-calling-session |
-| Quality | E2E-CHAT-long-history-stream-keeps-responsive, E2E-CHAT-running-status-survives-output-pauses, E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-103, E2E-AGENTS-001, E2E-021a, E2E-024N, E2E-059a, E2E-060b, E2E-060c, E2E-061a, E2E-073a, E2E-111, E2E-114, E2E-117, E2E-118, E2E-119, E2E-120, E2E-122, E2E-123, E2E-142, E2E-143, E2E-144, E2E-145, E2E-146, E2E-147, E2E-148, E2E-150, E2E-151, E2E-153, E2E-155, E2E-158, E2E-159, E2E-160, E2E-161, E2E-162, E2E-163, E2E-168, E2E-172, E2E-173, E2E-174, E2E-011g, E2E-176, E2E-177, E2E-178, E2E-179, E2E-180, E2E-181, E2E-182, E2E-183, E2E-186, E2E-187, E2E-194, E2E-195, E2E-196a, E2E-196b, E2E-196c, E2E-198, E2E-199, E2E-200, E2E-196, E2E-201, E2E-204, E2E-202, E2E-203, E2E-205, E2E-206, E2E-207, E2E-208, E2E-209, E2E-210, E2E-UPDATE-preference-and-once-only-reminder, E2E-218, E2E-259, E2E-219, E2E-250, E2E-252, E2E-102i, E2E-SUBAGENT-settlement-updates-before-parent-poll, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-fs-root-follows-the-calling-session, E2E-SUBAGENT-resume-a-settled-delegation |
-| Quality (project ordering) | E2E-253 |
-| C — Conversation & stream (IME slash alias) | E2E-255 |
-| E — Tools & permissions (Skill residency) | E2E-254 |
-| Quality (Skill residency and IME slash alias) | E2E-254, E2E-255 |
-| C — Conversation & stream (import visibility) | E2E-257 |
-| F — Persistence (import visibility) | E2E-257 |
-| G — Plugins (import visibility) | E2E-257 |
-| Quality (import visibility) | E2E-257 |
-| Quality (Windows updater cache) | E2E-260 |
-| G — Plugins (Session Orchestrator) | E2E-PLUGIN-session-orchestrator-real-workers |
-| Security (Session Orchestrator) | E2E-PLUGIN-session-orchestrator-real-workers |
-| Quality (Session Orchestrator) | E2E-PLUGIN-session-orchestrator-real-workers |
-| C — Conversation & stream (Session list responsiveness) | E2E-SESSION-list-refresh-keeps-desktop-responsive |
-| Quality (Session list responsiveness) | E2E-SESSION-list-refresh-keeps-desktop-responsive |
-| Security (imported extension dependencies) | E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency |
-| Quality (imported extension dependencies) | E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency |
-| F / G / Security / Quality — Imported extension npm recovery | E2E-PLUGIN-import-extension-recovers-missing-npm |
-| G — Plugins (desktop tool dispatch budget) | E2E-PLUGIN-slow-tool-is-not-cut-off-by-host-dispatch |
-| C — Conversation & stream (Independent session communication) | E2E-SESSION-independent-top-level-communication |
-| D — Plugin security (Independent session communication) | E2E-SESSION-independent-top-level-communication |
-| G — Plugins (Independent session communication) | E2E-SESSION-independent-top-level-communication |
-| Quality (Independent session communication) | E2E-SESSION-independent-top-level-communication, E2E-SESSION-hover-card-model-and-links |
-| C — Conversation & stream (Hover card model and links) | E2E-SESSION-hover-card-model-and-links |
-| C — Conversation & stream (Chat file references) | E2E-CHAT-shorthand-file-ref-opens-the-matching-file, E2E-CHAT-file-ref-opens-the-surface-that-owns-it |
-| C / Quality / Security (Conversation MP4 attachments) | E2E-CHAT-mp4-attachment-opens-in-system-player |
-| G — Plugins (Chat file references) | E2E-CHAT-file-ref-opens-the-surface-that-owns-it, E2E-PLUGIN-file-view-collapse-persists |
-| Quality (Chat file references) | E2E-CHAT-shorthand-file-ref-opens-the-matching-file, E2E-CHAT-file-ref-opens-the-surface-that-owns-it, E2E-PLUGIN-file-view-collapse-persists |
-| G — Plugins (project folder roots) | E2E-PLUGIN-file-view-switches-folder-per-project |
-| Security (project folder roots) | E2E-PLUGIN-file-view-switches-folder-per-project |
-| Quality (project folder roots) | E2E-PLUGIN-file-view-switches-folder-per-project |
-| D — Workspace (project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
-| F — Persistence (project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
-| Quality (project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
-| Quality (two-click delete) | E2E-SESSION-two-click-delete-arms-first |
-| Security (plugin real-time capabilities) | E2E-PLUGIN-global-shortcut-owns-only-its-own-command, E2E-PLUGIN-permission-gate-for-real-time-capabilities, E2E-PLUGIN-background-audio-and-realtime-connection |
-| C — Conversation & stream (disclosure reading position) | E2E-CHAT-disclosure-toggle-keeps-reading-position |
-| E — Tools & permissions (disclosure reading position) | E2E-CHAT-disclosure-toggle-keeps-reading-position |
-| E — Tools & permissions (capability level move) | E2E-CAPABILITY-move-across-levels |
-| F — Persistence (capability level move) | E2E-CAPABILITY-move-across-levels |
-| Quality (capability level move) | E2E-CAPABILITY-move-across-levels |
+The [executable scenario index](08-scenario-index.md) replaces the handwritten
+ID-to-script matrix. It is generated from executable test/result calls and the
+annotated suite catalog, with direct source links, scene families, run tiers and
+explicit manual/excluded boundaries. It never claims a suite passed.
 
-| Milestone | Scenarios |
-|---|---|
-| Post-MVP experimental interaction maintenance | E2E-LIVE-VOICE-four-stage-ui |
-| M1 | E2E-001, E2E-002, E2E-003, E2E-028, E2E-029 |
-| M2 | E2E-004, E2E-005, E2E-006, E2E-007, E2E-008, E2E-008d, E2E-008e, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-011d, E2E-011e, E2E-011g, E2E-020, E2E-021, E2E-021a, E2E-027, E2E-031, E2E-036, E2E-037, E2E-042, E2E-087, E2E-088, E2E-088b, E2E-089, E2E-090, E2E-COMPOSER-narrow-controls, E2E-COMPOSER-input-history, E2E-144, E2E-005J, E2E-201, E2E-202, E2E-207, E2E-206 |
-| M3 | E2E-012, E2E-013, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040 |
-| M4 | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026, E2E-030, E2E-038 |
-| M5 | E2E-CHAT-long-history-stream-keeps-responsive, E2E-CHAT-running-status-survives-output-pauses, E2E-008a, E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-AGENTS-001, E2E-059a, E2E-060b, E2E-060c, E2E-061a, E2E-073a, E2E-094, E2E-095, E2E-143, E2E-145, E2E-146, E2E-146a, E2E-147, E2E-177, E2E-178, E2E-180, E2E-181, E2E-182, E2E-183, E2E-186, E2E-187, E2E-194, E2E-195, E2E-204, E2E-208, E2E-CHAT-content-width-handles, E2E-250, E2E-252, E2E-102i |
-| M5 (project ordering) | E2E-253 |
-| M2 (IME slash alias) | E2E-255 |
-| M5 (Skill residency) | E2E-254 |
-| M6 | E2E-104, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-103, E2E-172 |
-| M6+ | E2E-121, E2E-122, E2E-148, E2E-150, E2E-151, E2E-154, E2E-155, E2E-158, E2E-159, E2E-160, E2E-161, E2E-162, E2E-163, E2E-166, E2E-168, E2E-173, E2E-174, E2E-176, E2E-179, E2E-196a, E2E-196b, E2E-196c, E2E-198, E2E-199, E2E-200, E2E-202, E2E-203, E2E-205, E2E-209, E2E-210, E2E-UPDATE-preference-and-once-only-reminder, E2E-212, E2E-213, E2E-214, E2E-215, E2E-216, E2E-217, E2E-218, E2E-259, E2E-219, E2E-257, E2E-SUBAGENT-settlement-updates-before-parent-poll, E2E-PLUGIN-fs-root-follows-the-calling-session, E2E-SUBAGENT-resume-a-settled-delegation |
-| M6+ (Session Orchestrator) | E2E-PLUGIN-session-orchestrator-real-workers |
-| M6+ (Selected model order) | E2E-MODEL-selected-order-persists |
-| M6+ (MCP server timeout override) | E2E-261 |
-| M6+ (Destination loading and focus) | E2E-087b |
-| M6+ (Session list responsiveness) | E2E-SESSION-list-refresh-keeps-desktop-responsive |
-| M6+ (Windows updater cache) | E2E-260 |
-| M6+ (Independent session communication) | E2E-SESSION-independent-top-level-communication, E2E-SESSION-hover-card-model-and-links |
-| M5 (Chat file references) | E2E-CHAT-shorthand-file-ref-opens-the-matching-file, E2E-CHAT-file-ref-opens-the-surface-that-owns-it |
-| M5 (Conversation MP4 attachments) | E2E-CHAT-mp4-attachment-opens-in-system-player |
-| M6+ (Chat file references) | E2E-PLUGIN-file-view-collapse-persists |
-| M6+ (project folder roots) | E2E-PLUGIN-file-view-switches-folder-per-project |
-| Post-MVP | E2E-PLUGIN-pi-npm-skill-discovery, E2E-022A, E2E-022B, E2E-022C, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M (plugin roadmap R2/R3/R6) |
-| Post-baseline local automation | E2E-220 |
-| Post-baseline local automation (MCP `pi_session_get` large compaction) | E2E-MCP-session-get-projects-large-compaction |
-| Post-baseline local automation (lossless MCP single-message chunks) | E2E-MCP-session-get-chunk |
-| Post-MVP remote control | E2E-221, E2E-222, E2E-223, E2E-224, E2E-225, E2E-226, E2E-227, E2E-228, E2E-229, E2E-230, E2E-231, E2E-232 |
-| Trusted extensions (R7 v1) | E2E-DIALOG-long-text-boundaries, E2E-241, E2E-242, E2E-HOOKS-prompt-chain, E2E-HOOKS-cancel-and-dispose, E2E-TRUSTED-EXTENSION-custom-agent-stream-and-binding, E2E-243, E2E-244, E2E-245, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency, E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list |
-| Trusted extensions (R7 v1 npm recovery) | E2E-PLUGIN-import-extension-recovers-missing-npm |
-| Post-MVP regression coverage (plugin tool dispatch) | E2E-PLUGIN-slow-tool-is-not-cut-off-by-host-dispatch |
-| M6+ (Project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
-| M6+ (Two-click delete) | E2E-SESSION-two-click-delete-arms-first |
-| C — Conversation & stream (model fallback) | E2E-SUBAGENT-ordered-model-fallback-preserves-work |
-| Quality (model fallback isolation) | E2E-SUBAGENT-ordered-model-fallback-preserves-work |
-| C — Conversation & stream (legacy subagent turn limit) | E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored |
-| Quality (legacy subagent turn limit) | E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored |
-| M6+ (disclosure reading position) | E2E-CHAT-disclosure-toggle-keeps-reading-position |
-| M6+ (capability level move) | E2E-CAPABILITY-move-across-levels |
-| E — Tools & permissions (builtin subagent defaults) | E2E-SUBAGENT-settings-lists-builtin-defaults |
-| Quality (builtin subagent defaults) | E2E-SUBAGENT-settings-lists-builtin-defaults |
-| C — Conversation & stream (opaque floating surfaces) | E2E-CHAT-opaque-floating-decision-and-retry-surfaces |
-| Quality (opaque floating surfaces) | E2E-CHAT-opaque-floating-decision-and-retry-surfaces |
-| M6 (opaque floating surfaces) | E2E-CHAT-opaque-floating-decision-and-retry-surfaces |
-| B — Model config (catalog window provenance) | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
-| B / F / Quality / Security — Manual model-list intent and the macOS Local Network trigger | E2E-MAC-local-network-manual-discovery |
-| F — Persistence (catalog window provenance) | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
-| Quality (catalog window provenance) | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
-| M6+ (catalog window provenance) | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
-| C — Conversation & stream (delegate context budget) | E2E-SUBAGENT-context-overflow-compacts-before-failing, E2E-SUBAGENT-context-overflow-reports-actionable-failure, E2E-SUBAGENT-resume-seeds-within-context-budget |
-| Quality (delegate context budget) | E2E-SUBAGENT-context-overflow-compacts-before-failing, E2E-SUBAGENT-context-overflow-reports-actionable-failure, E2E-SUBAGENT-resume-seeds-within-context-budget |
-| M6+ (delegate context budget) | E2E-SUBAGENT-context-overflow-compacts-before-failing, E2E-SUBAGENT-context-overflow-reports-actionable-failure, E2E-SUBAGENT-resume-seeds-within-context-budget |
-| C / F / Quality — The context estimate stays safe (calibration) | E2E-CONTEXT-estimate-calibration-stays-safe |
-| C — Conversation & stream (unique tool-call ids) | E2E-RUNTIME-unique-tool-call-ids-per-request |
-| F — Persistence (stored model binding array) | E2E-PROVIDER-stored-binding-array-reads-entry-by-entry |
-| Quality (stored model binding array) | E2E-PROVIDER-stored-binding-array-reads-entry-by-entry |
-| Quality (unique tool-call ids) | E2E-RUNTIME-unique-tool-call-ids-per-request |
-| C — Conversation & stream (loop context ownership) | E2E-RUNTIME-loop-context-ownership |
-| Quality (loop context ownership) | E2E-RUNTIME-loop-context-ownership |
-| G — Plugin host lifecycle (crash report) | E2E-PLUGIN-crash-report-names-the-exit-code |
-| Quality (crash report) | E2E-PLUGIN-crash-report-names-the-exit-code |
+Descriptive acceptance requirements below stay authoritative. A document-only
+case does not need an ID; an existing historical ID remains citable. Retiring or
+replacing executable behavior removes its test and generated ID in the same
+change. Run `node scripts/generate-scenario-index.mjs` and its `--check` gate;
+do not edit either locale's generated index by hand.
 
-The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
-Codex parity decisions in [decisions-log §D](../08-meta/decisions-log.md)
-rather than the A–H criteria; their gold source is the capture suite.
+## 9. Maintaining scenarios
 
-The release artifact paths are covered by E2E-192, E2E-192a, E2E-196a,
-E2E-196b, E2E-196c, and E2E-200 (Quality, M6+).
+1. Describe changed user/protocol behavior, preconditions and expected results.
+   Document-only cases need no numeric ID or boilerplate status block.
+2. Keep durable IDs in executable test/result names or annotate dynamically
+   assembled result IDs in `scripts/e2e-suite-catalog.json`.
+3. Add every E2E entrypoint to a scene family and either automated or explicitly
+   manual tier; preserve an established alias when it remains useful.
+4. Regenerate both locale indexes together. CI rejects catalog or index drift.
+5. Delete superseded tests and executable IDs in the same change; historical
+   acceptance requirements remain unless the product contract also retires.
 
----
+## 10. CI tiers and fixture boundaries
 
-## 9. How AI Must Update This Doc
+`node scripts/e2e-suite.mjs --tier smoke` runs five required PR paths:
+Electron boot/preload/IPC, a real sidecar message through a loopback SSE model,
+Write denial/one-time approval, durable conversation recovery after Host restart,
+and built-Desktop crash supervision/RPC recovery. No live-model case is counted
+as smoke coverage. The existing script bodies, production wiring and common
+Host/fixture/boot helpers are reused.
 
-When adding or changing a feature that affects user-visible or protocol-visible behavior:
+Nightly CI dispatches the remaining automatic suites by the catalog's scene
+families with a clean build, Rust Host, sidecar bundle, Xvfb, window manager and
+Electron native dependencies. Use `--family <name>` or `--suite <id>` to run the
+same candidate subset locally; `--list` explains selection, `--matrix` supplies
+the CI families. Compatibility script aliases remain. Missing/failed smoke
+checks fail CI; an unexpected `SKIP` fails the dispatcher. Catalogued excluded
+cases are recorded separately and never establish their acceptance.
 
-1. **Add a new scenario** using the template in §6. Assign the next available ID
-   (`E2E-<N>`). IDs retired by ADR 0268 are never reused.
-2. **Link it** to the relevant acceptance criterion (A–H) and milestone (M1–M6
-   or M6+ for the current product increment).
-3. **Set status** to `Draft` unless an automated test already exists.
-4. **Update the traceability matrix** in §8.
-5. **Commit** the update as part of the change (per [ai-development-workflow](03-ai-development-workflow.md) R3).
+The dispatcher provides a fresh HOME/XDG/temp state and an allowlisted tool and
+display environment; provider credentials, personal profiles, preview overrides
+and arbitrary `NODE_OPTIONS` are not inherited. Only the explicit candidate
+Host binary survives. Automatic model endpoints are local fixtures. Manual
+real-provider, long-chat, npm-installer and interactive Windows suites cannot be
+launched through the automatic dispatcher. Run them directly only with explicit
+account/cost/network/device authorization and record their separate evidence.
+`verify:ui:*` is never a fixture-suite dependency or unattended command.
 
----
-
-## 10. Future Automation Mapping
-
-When E2E automation is implemented (post-M5):
-
-- Each `Draft` scenario → Playwright test file.
-- Scenario ID becomes test case name: `e2e-001-app-launches`.
-- Fixtures and test data paths defined in a `tests/e2e/fixtures/` directory.
-- CI gate: all E2E scenarios must pass before release.
-
-Automation section will be expanded in a future ADR when the tooling decision is finalized.
-
----
+The reusable workflow builds the Host before the JS workspace/Desktop and
+sidecar, then verifies the index and runs the selected executable suites. Clean
+CI installs from the lockfile; local request worktrees still reuse provisioned
+dependencies and caches. All results identify the candidate commit/base and
+environment; a scheduled workflow definition is not proof of a hosted run.
 
 ## 11. Acceptance Criteria
 
@@ -9717,8 +9589,8 @@ This test plan spec is accepted when:
 - [ ] All MVP acceptance criteria (A–H) have at least one E2E scenario.
 - [ ] All security acceptance items have at least one E2E scenario.
 - [ ] Every scenario links to at least one spec document.
-- [ ] Traceability matrix is complete (scenarios ↔ acceptance ↔ milestones).
-- [ ] Scenario template is defined and all entries follow it.
+- [ ] Generated executable index is current; manual acceptance gaps are explicit.
+- [ ] Scenarios state preconditions, actions and observable expectations without mandatory document-only IDs.
 - [ ] AI update rules are documented and cross-linked to workflow spec.
 - [ ] Environment requirements match baseline (native macOS arm64/Intel x64,
   clean profile).
@@ -10298,7 +10170,7 @@ This test plan spec is accepted when:
   `03-runtime/04-data-storage.md`, `04-ux/08-component-spec.md` §3.9, ADR 0251
 - **Acceptance criterion**: D (workspace), F (persistence), Quality
 - **Milestone**: M6+
-- **Status**: Partially automated — `pnpm test:e2e` covers the host contract
+- **Status**: Partially automated — `pnpm test:e2e:smoke` covers the host contract
   (project row, owned sessions, on-disk transcripts and scratch, project
   memory, isolation from other projects, the running-task refusal, the
   group-root refusal, and the idempotent unknown path), and

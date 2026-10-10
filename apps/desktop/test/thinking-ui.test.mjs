@@ -10,6 +10,9 @@ import {
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { register } from "node:module";
+register(new URL("./helpers/ts-import-hooks.mjs", import.meta.url));
+const { messageHasTranscriptContent } = await import("../src/lib/chat-launch-error.ts");
 import { loadStyles } from "./helpers/styles.mjs";
 
 const composerSource = await readComposerSource();
@@ -327,12 +330,11 @@ test("activity headers omit the redundant status capsule", () => {
   assert.match(stylesSource, /\.run-activity-indicator\[data-phase="waiting-subagents"\]/);
 });
 
-test("thinking-only assistant streams open the transcript surface", () => {
-  assert.match(launchErrorSource, /typeof message\.thinking === "string"/);
-  assert.match(launchErrorSource, /hasContent \|\| hasThinking/);
-  assert.match(appSource, /messageHasTranscriptContent\(message\)/);
+test("thinking-only assistant streams contain visible transcript content", () => {
+  assert.equal(messageHasTranscriptContent({ role: "assistant", content: "", thinking: "Checking the result" }), true);
+  assert.equal(messageHasTranscriptContent({ role: "assistant", content: "", thinking: "  " }), false);
+  assert.equal(messageHasTranscriptContent({ role: "assistant", content: "", thinking: "", error: { code: "MODEL_NOT_CONFIGURED" } }), true);
 });
-
 test("provider settings persist model-local limits and thinking configuration", () => {
   assert.match(settingsSource, /useProviderModels/);
   assert.match(settingsSource, /bindingFromModelInfo/);

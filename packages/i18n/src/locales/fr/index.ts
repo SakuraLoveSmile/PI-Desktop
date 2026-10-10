@@ -2134,6 +2134,10 @@ sklm: {
 
   "panel": {
     "activity": {
+      aggregateLoading: "Lecture de l’activité complète de la session…",
+      aggregateUnavailable: "Activité complète indisponible ; affichage des messages chargés.",
+      aggregateLimited: "Certains enregistrements dépassent les limites d’affichage.",
+      aggregateRetry: "Réessayer l’activité complète",
       needsAttention: "Attention requise",
       liveStatus: "État en direct",
       artifacts: "Résultats",

@@ -6,6 +6,8 @@ import { useAppStore } from "../../../stores/app-store";
 import { useTranscriptView } from "../../../hooks/use-transcript-view";
 import type { GoalActivityReportState } from "../../../stores/runtime/goal-activity-runtime";
 import type { ActivityAttentionItem } from "./activity-rail-types";
+import { useSessionActivity } from "../../../hooks/useSessionActivity";
+import { mergeActivitySubagents } from "../../../stores/runtime/session-activity-runtime";
 import { useTeamSnapshot } from "../../../hooks/useTeamSnapshot";
 import { localTeamSessionId } from "../../../lib/team-presentation";
 import { resolvePlanArtifactPath } from "../../../lib/plan-artifact";
@@ -45,8 +47,20 @@ export function SessionActivity({ sessionId, messages, visible, rangeLimited }: 
     setReportStates((current) => current[key] === reportState ? current : { ...current, [key]: reportState });
   }, [sessionId]);
   const plans = useMemo(() => activityPlans(sessionId, pending, checkpoint, history), [sessionId, pending, checkpoint, history]);
-  const resources = useMemo(() => activityResources(messages), [messages]);
-  const subagents = useMemo(() => activitySubagents(messages, running), [messages, running]);
+  const aggregate = useSessionActivity(sessionId, visible && supported);
+  const loadedResources = useMemo(() => activityResources(messages), [messages]);
+  const resources = aggregate.snapshot ?? loadedResources;
+  const loadedSubagents = useMemo(() => activitySubagents(messages, running), [messages, running]);
+  const subagents = useMemo(() => aggregate.snapshot
+    ? mergeActivitySubagents(aggregate.snapshot.subagents, loadedSubagents) : loadedSubagents,
+  [aggregate.snapshot, loadedSubagents]);
+  const aggregateNotice = supported && (aggregate.error || aggregate.loading || aggregate.snapshot?.limited) ?
+    <div className="session-activity-range-notice" role={aggregate.error ? "alert" : "status"}>
+      {aggregate.error ? <>{!aggregate.snapshot && <p>{t("panel.activity.aggregateUnavailable")}</p>}<p>{aggregate.error}</p>
+        <Button variant="ghost" size="sm" onClick={() => void aggregate.refresh()}>{t("panel.activity.aggregateRetry")}</Button></>
+        : aggregate.loading ? <p>{t("panel.activity.aggregateLoading")}</p>
+        : <p>{t("panel.activity.aggregateLimited")}</p>}
+    </div> : undefined;
   const planRows: ActivityRailItem[] = plans.map((proposal) => {
     const onOpen = proposal.artifact?.relativePath ? () => {
       void resolvePlanArtifactPath(proposal).then((resolved) => {
@@ -146,7 +160,8 @@ export function SessionActivity({ sessionId, messages, visible, rangeLimited }: 
     showTeamMembers={Boolean(teamId)} teamNotice={team.error ? <div role="alert" className="session-activity-error">
       <p>{t("team.staleData")}: {team.error}</p><Button variant="ghost" size="sm" onClick={() => void team.refresh()}>{t("panel.activity.retry")}</Button>
     </div> : team.loading && !team.snapshot ? <p role="status" className="session-activity-empty">{t("panel.activity.loading")}</p> : undefined}
-    supported={supported} rangeLimited={rangeLimited} hasMoreBefore={transcript.hasMoreBefore} historyLoading={transcript.loading}
+    agentsNotice={aggregateNotice} resourcesNotice={aggregateNotice}
+    supported={supported} rangeLimited={rangeLimited} groupsRangeLimited={!aggregate.snapshot && rangeLimited} hasMoreBefore={transcript.hasMoreBefore} historyLoading={transcript.loading}
     onLoadEarlier={() => { if (visible && useAppStore.getState().activeSessionId === sessionId) void useAppStore.getState().loadTranscriptPage(sessionId, "before"); }}
     onReturnToLatest={transcript.historical || transcript.hasMoreAfter ? () => useAppStore.getState().returnToLatestTranscript(sessionId) : undefined}
     processDetails={selectedProcess ? <BackgroundProcessDetails key={selectedProcess} sessionId={sessionId} id={selectedProcess}

@@ -3515,8 +3515,8 @@ transcript and Overview history.
   level, and stale completions cannot overwrite a newer choice. Reopening
   starts directly at the current level. Reduced motion disables travel.
   This replaces the earlier timer-driven settle pulse.
-  Search and provider-labelled rows remain in the same popup as the reasoning
-  slider. `omit` remains a supported session thinking level and sends no
+  Provider-labelled rows remain in the direct list beside the reasoning
+  slider, without a search field. `omit` remains a supported session thinking level and sends no
   provider thinking override (ADR 0295).
   Model-row reasoning badges use published reasoning metadata; vision badges
   use the effective image-input capability for the row's provider binding
@@ -3540,9 +3540,9 @@ transcript and Overview history.
 - Switching provider preserves an available level, otherwise uses the nearest
   supported level (upward first, then downward); a non-reasoning provider
   persists `off`.
-- The combined menu closes on outside mousedown or Escape. In a submenu,
-  Up/Down moves the highlighted row, Enter selects from the model search/list,
-  and Left returns to the root.
+- The combined menu closes on outside mousedown or Escape. Up/Down moves the
+  highlighted row and Enter selects from the direct model list; there is no
+  intermediate root menu.
 - The permission chip remains visible beside the mode selector. Agent and Plan
   show the effective Ask / Accept edits / Auto posture. Goal keeps the same
   geometry but is fixed to the localized Auto label and cannot open a menu;
@@ -3901,13 +3901,13 @@ there is no separate top-bar model selector.
 | Configured | shows the current model and reasoning level, clickable from the Composer |
 | No provider | muted model text with a settings entry in the Composer menu |
 | Running | remains available for next-turn configuration |
-| Dropdown open | model and reasoning entries open in-place submenus |
+| Dropdown open | direct model list and current model reasoning controls share one popup |
 
 ### 12.4 Interactions
 
-- Click: opens the Composer menu with model and reasoning entries
+- Click: opens the direct model list with the current model's reasoning controls
 - Cached provider models are available on the first open after restart; opening
-  the menu begins hydration before the Model submenu is entered, and a
+  the menu begins hydration when the direct list opens, and a
   background refresh updates the list without clearing it first
 - Select: switches model for current session
 - On the home/new-session draft, selecting a model also updates the Composer's
@@ -4861,11 +4861,11 @@ surfaces expose an activity entry in the existing work panel; normal Overview
 also links to it. There is no extra width reservation when that panel is open.
 The titlebar reading inset remains after the display switch is removed.
 
-Plans and recorded delegations use the same projection as Overview; successful
-Write/Edit records and attachments form Outputs, and recorded skills/MCP and
-captured HTTP(S) links form Sources. Missing loaded history is marked as a
-range limitation, not proof that a session has no work. Navigation captures the
-owning session. Team data loading/errors remain observable.
+Plans retain their existing shared projection. Recorded delegations, successful
+Write/Edit records, attachments and captured HTTP(S) sources use the Host's
+[complete canonical session projection](../03-runtime/session-activity-projection.md),
+independent of the renderer transcript window. Navigation captures the owning
+session. Team and aggregate loading/errors remain observable.
 
 Background rows come from the Host registry, not historical Bash success or
 shell `&`. Clicking opens command, working directory, bounded stdout/stderr,
@@ -4893,10 +4893,14 @@ not a guessed delay.
 Live status (plans, delegated agents, team members and processes) is separated
 from artifacts (outputs and sources). Team members use a distinct group with
 recorded role labels; its loading/error state is not mixed into delegated agents.
-Each transcript-derived group marks an incomplete reading range as Only loaded
-messages and provides the existing bounded Load earlier action and, when needed,
-Return to latest. Counts are projections of loaded records, not session-wide
-Host totals; no new Host aggregation contract is introduced.
+Each recorded-activity group uses full Host totals after all revision-consistent
+summary pages have loaded. The complete projection is read only while visible,
+refreshes after canonical writes and Host restart, and preserves a known full
+snapshot on transient errors with an explicit retry. Unsupported Hosts and
+initial read failures explicitly mark the loaded-message fallback; only that
+fallback uses Only loaded messages, Load earlier and Return to latest notices.
+A Host summary limit has a separate notice and is not presented as repairable
+by loading earlier renderer messages.
 
 Successful Write/Edit records for the same literal path form one output with a
 write count, latest recorded change time/message, and directory grouping. Exact
@@ -4906,8 +4910,9 @@ Host ReviewChange; binary/truncated, unknown or legacy replacement snippets do
 not produce fabricated line totals. Attachments/artifacts sharing a displayed
 path do not duplicate its row. Open, locate in transcript and copy path are
 independent sibling actions with project/session-owned navigation. Sources are
-grouped by safe HTTP(S) hostname and show captured citation occurrences within
-the loaded messages; the first safe URL remains the opening destination.
+grouped by safe HTTP(S) hostname and show captured citation occurrences across
+the complete canonical transcript; the first safe URL remains the opening
+destination. Loaded-window fallback states preserve the previous evidence rules.
 
 Activity lists initially display five records and provide Show all/Show less.
 Expanding for an attention target does not prevent a subsequent manual collapse.

@@ -541,3 +541,14 @@ transcript 保留稳定错误码、传输 errno 和原始 details，但使用本
 专家团规划新增 TEAM_PLANNING_NOT_READY（研究或问题未完成）、TEAM_PLANNING_STALE（旧轮次）、TEAM_PLANNING_CLOSED（关闭后的修改）、TEAM_RESEARCH_INVALID（非法或超限结果、普通完成绕过）及 TEAM_RESEARCH_READ_ONLY（研究成员调用非读取工具）。错误代码由 Rust RPC 和 Host 侧车代理完整保留。
 
 已批准 Team 执行的当前专家派遣／回合或完整结果尚未结算时，完成检查也返回 TEAM_APPROVAL_REQUIRED。execution inbox 对非 Lead 身份返回 TEAM_UNAUTHORIZED，对无效精确回合消费返回 TEAM_PLANNING_STALE。可信 Plan 执行绑定的 execution/session/turn scope 无效时返回 PLAN_EXECUTION_STALE，试图改变不可变绑定时返回 PLAN_EXECUTION_CONFLICT；相同重试幂等。取消名单等待会中断执行，不能标记完成。
+
+### Plus 会话活动
+
+| code | retriable | 含义 |
+|---|---|---|
+| `NOTE_CONFLICT` | yes | Quick Note revision 改变；保留草稿，保存前重新加载 |
+| `SESSION_NOTES_UNSUPPORTED` | no | 原生或远程会话不提供 Quick Notes |
+| `BACKGROUND_PROCESS_NOT_FOUND` | no | 托管进程不属于请求的会话 |
+| `BACKGROUND_PROCESS_START_FAILED` | yes | 已授权后台执行器无法启动 |
+| `BACKGROUND_PROCESS_PERSISTENCE_FAILED` | yes | 托管进程状态无法存储；修复存储后重试 |
+| `SESSION_HAS_BACKGROUND_PROCESSES` | yes | 删除或移动会话前停止活动托管进程 |

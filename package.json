@@ -97,7 +97,15 @@
     "test:e2e:project-context": "node scripts/e2e-project-context.mjs",
     "test:e2e:project-auto-memory": "node scripts/e2e-project-auto-memory.mjs",
     "test:e2e:settings-memory": "node scripts/e2e-settings-memory.mjs",
-    "test:e2e:code-index": "node scripts/e2e-code-index.mjs"
+    "test:e2e:code-index": "node scripts/e2e-code-index.mjs",
+    "check:test-quality": "node scripts/check-test-quality.mjs",
+    "test:e2e:smoke": "node scripts/e2e-suite.mjs --tier smoke",
+    "test:e2e:family": "node scripts/e2e-suite.mjs",
+    "test:e2e:nightly": "node scripts/e2e-suite.mjs --tier nightly",
+    "check:e2e-catalog": "node scripts/generate-scenario-index.mjs --check",
+    "docs:scenarios": "node scripts/generate-scenario-index.mjs",
+    "check:runtime-tests": "node packages/agent-runtime/node_modules/typescript/bin/tsc -p packages/agent-runtime/tsconfig.runtime-tests.json",
+    "audit:test-maintenance": "node scripts/audit-test-maintenance.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.13",

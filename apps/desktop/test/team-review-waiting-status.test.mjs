@@ -36,6 +36,8 @@ function fixture() {
   const context = () => ({ Provider: passthrough });
   const react = {
     memo: (component) => component, useMemo: (factory) => factory(),
+    useCallback: (callback) => callback,
+    useSyncExternalStore: (_subscribe, getSnapshot) => ({ ...getSnapshot(), ...progressView }),
     useRef: (current) => ({ current }), useContext: () => null,
     useEffect() {}, useId: () => "detail", createContext: context,
     useState: (initial) => {

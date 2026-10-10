@@ -79,6 +79,9 @@
 - [06-release-runbook.md](06-delivery/06-release-runbook.md)
 - [07-remote-control-rollout.md](06-delivery/07-remote-control-rollout.md)
 
+- [07-test-maintenance.md](06-delivery/07-test-maintenance.md)
+- [08-scenario-index.md](06-delivery/08-scenario-index.md)
+
 ## 7. Plugins
 - [README.md](07-plugins/README.md)
 - [01-plugin-system.md](07-plugins/01-plugin-system.md)
@@ -108,3 +111,4 @@
 - [../adr/README.md](../adr/README.md)
 
 - [Context Insights](03-runtime/context-insights.md) — captured requests, provider payloads, retention and native inspection.
+- [Session Activity Projection](03-runtime/session-activity-projection.md) — complete canonical session summaries and paged Host reads.

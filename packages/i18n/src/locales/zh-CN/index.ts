@@ -2336,6 +2336,10 @@ sklm: {
   panel: {
     title: "工作面板",
     activity: {
+      aggregateLoading: "正在读取全会话活动…",
+      aggregateUnavailable: "暂时无法读取全会话活动，当前显示已加载消息。",
+      aggregateLimited: "部分活动记录超出显示限制。",
+      aggregateRetry: "重试读取全会话活动",
       needsAttention: "需要关注",
       liveStatus: "实时状态",
       artifacts: "产物",

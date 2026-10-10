@@ -2393,6 +2393,10 @@ sklm: {
   panel: {
     title: "Work panel",
     activity: {
+      aggregateLoading: "Reading complete session activity…",
+      aggregateUnavailable: "Complete session activity unavailable; showing loaded messages.",
+      aggregateLimited: "Some recorded activity exceeds display limits.",
+      aggregateRetry: "Retry complete activity",
       needsAttention: "Needs attention",
       liveStatus: "Live status",
       artifacts: "Artifacts",

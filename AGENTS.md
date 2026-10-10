@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Policy-Sync: 2026-10-08.1
+Policy-Sync: 2026-10-10.1
 
 Mandatory rules for AI coding agents working in PI-Desktop.
 
@@ -682,6 +682,30 @@ you skip, state the basis, the alternative verification you ran, and
 the residual risk in delivery.
 
 ### Test level and quality
+
+Assert behavior or stable contracts, not repository source/CSS text. Freeze new
+source/CSS regex assertions: `pnpm check:test-quality -- --base <base>` enforces
+a per-file, per-case signature inventory that only decreases against the
+established base revision. Initial bootstrap uses the immutable trusted
+pre-governance snapshot described in the maintenance spec. Fixture reads and
+regex assertions on executed component output
+remain allowed. Never increase or reset the baseline to pass a change; after
+retirement lower it with `--write-baseline` against the same base. Runtime domain
+tests and helpers under `packages/agent-runtime/src/runtime-tests/` have an
+800-line file budget; the old `runtime.test.ts` is subject to the same budget.
+
+Pure copy, i18n, documentation, and visual styling need no new tests when they
+change no runtime rule, interaction, responsive usability, accessibility, or
+content layout. Verify the affected surface and explain the exemption and
+residual risk. Bug fixes still require a behavioral regression test.
+
+When behavior or a scenario is replaced, remove the superseded tests and
+obsolete scenario IDs in the same PR after mapping their acceptance coverage
+to the replacement. Do not delete live coverage merely to meet a budget.
+Quarterly, run `pnpm audit:test-maintenance` and review high-churn suites against
+actual regression-catching evidence. Missing evidence means unknown, not that
+a test caught no regressions. The audit prioritizes review; it never deletes
+tests automatically. See [test maintenance](docs/spec/06-delivery/07-test-maintenance.md).
 
 * Pure compute / selection / validation / state → fast unit tests.
 * Public boundaries → contract tests.

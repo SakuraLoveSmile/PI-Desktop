@@ -45,6 +45,9 @@ jobs:
         # Workspace dependency builds already run tsc; Vite does not check the app.
         run: pnpm --filter @pi-desktop/desktop typecheck
 
+      - name: Typecheck runtime regression tests
+        run: pnpm check:runtime-tests
+
       - name: Lint
         run: pnpm lint
 
@@ -53,11 +56,25 @@ jobs:
           ARCHITECTURE_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
         run: node scripts/check-architecture.mjs
 
+      - name: Check test quality ratchet and generated scenario index
+        env:
+          TEST_QUALITY_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
+        run: |
+          node scripts/check-test-quality.mjs
+          node scripts/generate-scenario-index.mjs --check
+          node --test scripts/e2e-suite.test.mjs scripts/scenario-index.test.mjs scripts/test/*.test.mjs
+
       - name: Unit-test the Pi patch checks
         run: node --test scripts/pi-patch-hash.test.mjs
 
       - name: Unit tests
         run: pnpm -r --if-present test
+
+  e2e-smoke:
+    name: Isolated launch / message / approval / restart smoke
+    uses: ./.github/workflows/e2e-run.yml
+    with:
+      tier: smoke
 
   rust:
     name: Rust host-core format / lint / test

@@ -26,6 +26,12 @@ export function registerSessionActivityIpc({ handle, getHost }: Dependencies): v
     if (!host) throw new Error("host unavailable");
     return host.call(method, params);
   };
+  handle(IPC.invoke.sessionActivityGet, (value: unknown) => {
+    const params = input(value);
+    const offset = params.offset ?? 0;
+    if (typeof offset !== "number" || !Number.isSafeInteger(offset) || offset < 0) throw new Error("invalid activity offset");
+    return call("sessionActivity.get", { sessionId: sessionIdOf(params), offset });
+  });
   handle(IPC.invoke.sessionNotesGet, (value: unknown) => {
     const params = input(value);
     return call("sessionNotes.get", { sessionId: sessionIdOf(params) });

@@ -2086,6 +2086,10 @@ export const ptBR = {
 
   panel: {
     activity: {
+      aggregateLoading: "Lendo a atividade completa da sessão…",
+      aggregateUnavailable: "Atividade completa indisponível; mostrando mensagens carregadas.",
+      aggregateLimited: "Alguns registros excedem os limites de exibição.",
+      aggregateRetry: "Tentar ler a atividade completa novamente",
       needsAttention: "Requer atenção",
       liveStatus: "Estado em tempo real",
       artifacts: "Resultados",

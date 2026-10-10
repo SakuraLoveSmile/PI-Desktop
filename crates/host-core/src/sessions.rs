@@ -11,6 +11,7 @@ use std::sync::{Mutex, OnceLock};
 
 use crate::transcripts::{self, CompactionRecord, MessageRecord, RevisionRecord};
 
+mod delegation_updates;
 mod fork_files;
 mod model_system;
 mod usage;
@@ -2620,6 +2621,7 @@ pub fn append_message(
     let message = crate::session_collaboration::prepare_append(db, session_id, message, turn_id)?;
     let session_created = ensure_session_for_append(db, session_id)?;
     let (mut record, text) = ui_to_record(&message);
+    let provided_turn_id = turn_id;
     let had_turn_reference = turn_id.is_some();
     let turn_id = valid_turn_reference(db, session_id, turn_id)?;
     let stale_turn_reference = had_turn_reference && turn_id.is_none();
@@ -2645,6 +2647,7 @@ pub fn append_message(
                 params![session_id, record.id, text, record.is_error],
             )?;
         } else {
+            delegation_updates::refresh(db, session_id, &message, provided_turn_id)?;
             return Ok(());
         }
     } else {
@@ -2653,6 +2656,16 @@ pub fn append_message(
                 let original_id = record.id.clone();
                 record.id = namespaced_message_id(session_id, &record.id);
                 if message_indexed(db, session_id, &record.id)? {
+                    // A replay arrives with the original provider identity, while the
+                    // canonical receipt belongs to this session's namespaced index row.
+                    let mut canonical_message = message.clone();
+                    canonical_message.id = record.id.clone();
+                    delegation_updates::refresh(
+                        db,
+                        session_id,
+                        &canonical_message,
+                        provided_turn_id,
+                    )?;
                     return Ok(());
                 }
                 // Old hosts wrote JSONL then failed UNIQUE. Replaying that
