@@ -34,6 +34,9 @@ try {
   const approved = await host.call("team.confirmLaunchReview", {
     teamSessionId: session.id, reviewId: declaration.review.reviewId, expectedRevision: declaration.review.revision,
   });
+  await host.call("session.beginTurn", {
+    sessionId: session.id, sessionMessageId: approved.decision.messageIds[0],
+  });
   const dispatch = await host.call("team.sendMessage", {
     teamSessionId: session.id, callerSessionId: session.id, target: "observer", content: "Observe the isolated command test.",
   });

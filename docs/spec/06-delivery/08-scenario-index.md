@@ -216,9 +216,8 @@ IDs come from executable result/test calls and annotated dynamic suites. Documen
 | E2E-PROJECT-delete-removes-project-and-owned-sessions-unknown-path | [scripts/e2e-smoke.mjs:639](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-smoke.mjs#L639) |
 | E2E-PROJECT-SKILL-CREATE | [scripts/e2e-skill-market.mjs:274](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-skill-market.mjs#L274) |
 | E2E-PROJECT-SKILL-NO-OVERWRITE | [scripts/e2e-skill-market.mjs:281](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-skill-market.mjs#L281) |
+| E2E-RUNTIME-background-bash-timeout-is-visible | [scripts/e2e-background-bash-limit.mjs:128](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-background-bash-limit.mjs#L128) |
 | E2E-RUNTIME-edit-accepts-tag-with-legacy-arguments | [scripts/e2e-edit-legacy.mjs:15](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-edit-legacy.mjs#L15) |
-
-| E2E-RUNTIME-background-bash-timeout-is-visible | [scripts/e2e-background-bash-limit.mjs:125](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-background-bash-limit.mjs#L125) |
 | E2E-runtime-module | [scripts/e2e-smoke.mjs:831](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-smoke.mjs#L831) |
 | E2E-RUNTIME-shell-capacity-diagnostics | [scripts/e2e-tool-admission.mjs:183](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-tool-admission.mjs#L183); [scripts/e2e-suite-catalog.json (tool-admission)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
 | E2E-SESSION-activity-aggregate | [scripts/e2e-suite-catalog.json (session-activity-aggregate)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
@@ -232,7 +231,6 @@ IDs come from executable result/test calls and annotated dynamic suites. Documen
 | E2E-SKILL-MARKET-SIZE-LIMIT | [scripts/e2e-skill-market.mjs:198](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-skill-market.mjs#L198) |
 | E2E-system-transcript | [scripts/e2e-system-transcript.mjs:44](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-system-transcript.mjs#L44) |
 | E2E-TEAM-completion-error-keeps-host-reason | [scripts/e2e-goal-report.mjs:129](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-goal-report.mjs#L129); [scripts/e2e-suite-catalog.json (goal-report)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
-
 | E2E-TEAM-member-failure-wakes-lead | [scripts/e2e-team-member-failure.mjs:18](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-team-member-failure.mjs#L18); [scripts/e2e-suite-catalog.json (team-member-failure)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
 | E2E-TEAM-task-completion | [scripts/e2e-team-task-completion.mjs:14](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-team-task-completion.mjs#L14) |
 | E2E-TEAM-turn-renders-chronological-timeline | [scripts/e2e-team-planning.mjs:480](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-team-planning.mjs#L480) |
