@@ -4674,6 +4674,7 @@ async fn handle_request_inner(
                             tool = %p.tool_name,
                             session_id = %p.session_id,
                             error_code = error.code(),
+                            capacity = ?error.diagnostics(),
                             "tool admission rejected"
                         );
                         let mut result = json!({
@@ -4688,6 +4689,9 @@ async fn handle_request_inner(
                             "denied": false,
                             "errorCode": error.code()
                         });
+                        if let Some(capacity) = error.diagnostics() {
+                            result["content"]["capacity"] = json!(capacity);
+                        }
                         if let Some(shell_id) = permission_shell_id.as_deref() {
                             result["commandShellId"] = json!(shell_id);
                         }

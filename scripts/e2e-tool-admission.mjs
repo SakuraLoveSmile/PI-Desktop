@@ -71,7 +71,7 @@ async function main() {
           mode: "agent",
           expectedCommandShellId: shell.id,
           expectedCommandShellDialect: shell.dialect,
-        }, 15_000).then(
+        }, 60_000).then(
           (result) => ({ result }),
           (error) => ({ error }),
         ));
@@ -109,6 +109,39 @@ async function main() {
         assertToolSuccess(write, "admission-independent-write");
         assert(await readFile(join(workspace, "written-fixture.txt"), "utf8") === "independent write fixture\n",
           "Write did not persist the independent fixture");
+        // Keep the real 30-second admission deadline. This fixture deliberately
+        // holds four shell slots; it never runs a provider or a live session.
+        const rejectedMarker = join(workspace, "rejected-command-started");
+        const overloaded = await host.call("tools.execute", {
+          sessionId: independentSession.id,
+          toolCallId: "admission-diagnostic",
+          toolName: "Bash",
+          args: { command: gateCommand(shell.dialect, rejectedMarker, gate) },
+          mode: "agent",
+          expectedCommandShellId: shell.id,
+          expectedCommandShellDialect: shell.dialect,
+        }, 40_000);
+        assert(overloaded.ok === false && overloaded.errorCode === "HOST_OVERLOADED",
+          "expected structured admission rejection: " + shortJson(overloaded));
+        const { capacity, error } = overloaded.content;
+        assert(capacity.host.inFlight === 4 && capacity.host.queued === 13 &&
+          capacity.host.shellInFlight === 4 && capacity.host.shellQueued === 13,
+          "incorrect host counts at rejection: " + shortJson(capacity));
+        assert(capacity.session.inFlight === 0 && capacity.session.queued === 1 &&
+          capacity.session.shellInFlight === 0 && capacity.session.shellQueued === 1,
+          "incorrect requesting-session counts: " + shortJson(capacity));
+        assert(capacity.holders.length === 4 && capacity.holders.every((holder) =>
+          holder.tool === "Bash" && holder.inFlight === 1 &&
+          shellSessions.slice(0, 4).some((session) => session.id === holder.sessionId)),
+          "incorrect shell holder identities: " + shortJson(capacity));
+        assert(error.includes("wait_for_updates") && error.includes("sleep") &&
+          error.includes("background execution uses the same capacity"),
+          "admission guidance missing: " + shortJson(overloaded));
+        assert(!existsSync(rejectedMarker), "rejected command was started");
+        assert(!JSON.stringify(overloaded.content).includes(workspace) &&
+          !JSON.stringify(overloaded.content).includes(rejectedMarker),
+          "capacity diagnostic leaked command or workspace data");
+        console.log("PASS E2E-RUNTIME-shell-capacity-diagnostics: rejection preserves counts, safe holders and actionable guidance");
         const afterIndependent = (await host.call("app.health")).toolBudget;
         assert(afterIndependent.active === 4 && afterIndependent.queued === 12,
           "independent work did not release its capacity: " + shortJson(afterIndependent));
