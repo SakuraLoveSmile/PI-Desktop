@@ -17861,6 +17861,8 @@ components. They do not establish SSH server connectivity or a packaged release.
   Start an owned background command with an explicit one-second limit while
   waiting. Repeat with normal exit and with no timeout override (60 seconds).
   Inspect the returned scoped terminal detail and reread the stored result.
+  Complete a launch before the first wait, then complete a known running job
+  between two waits; each terminal outcome is delivered once.
 - **Expected:** Timeout reports the exact explicit/default limit and tells the
   model to pass timeout in seconds (1–21,600). Default remains 60 seconds.
   Exit/timeout wakes the existing wait through production HostProcess and

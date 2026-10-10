@@ -215,7 +215,7 @@ IDs come from executable result/test calls and annotated dynamic suites. 文档�
 | E2E-PROJECT-delete-removes-project-and-owned-sessions-unknown-path | [scripts/e2e-smoke.mjs:639](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-smoke.mjs#L639) |
 | E2E-PROJECT-SKILL-CREATE | [scripts/e2e-skill-market.mjs:274](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-skill-market.mjs#L274) |
 | E2E-PROJECT-SKILL-NO-OVERWRITE | [scripts/e2e-skill-market.mjs:281](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-skill-market.mjs#L281) |
-| E2E-RUNTIME-background-bash-timeout-is-visible | [scripts/e2e-background-bash-limit.mjs:128](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-background-bash-limit.mjs#L128) |
+| E2E-RUNTIME-background-bash-timeout-is-visible | [scripts/e2e-background-bash-limit.mjs:171](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-background-bash-limit.mjs#L171) |
 | E2E-runtime-module | [scripts/e2e-smoke.mjs:831](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-smoke.mjs#L831) |
 | E2E-SESSION-activity-aggregate | [scripts/e2e-suite-catalog.json (session-activity-aggregate)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
 | E2E-SESSION-activity-full-history-ui | [scripts/e2e-suite-catalog.json (session-activity-history)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |

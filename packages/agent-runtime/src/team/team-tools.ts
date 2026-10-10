@@ -2,6 +2,7 @@
  * DSH 9 Expert Team Agent Tools (ADR 0304).
  */
 
+import type { BackgroundProcessUpdates } from "./background-process-updates.js";
 import { Type } from "@earendil-works/pi-ai";
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { RuntimeHost } from "../host-client.js";
@@ -39,6 +40,7 @@ export interface TeamToolsOptions {
   planningId?: string;
   roundId?: string;
   host: RuntimeHost;
+  backgroundProcesses?: BackgroundProcessUpdates;
   getTurnId?: () => string | undefined;
   approvedExecution?: () => boolean;
   captureInboxYield?: () => ((toolCallId: string) => boolean) | undefined;
