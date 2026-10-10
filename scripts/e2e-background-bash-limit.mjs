@@ -2,7 +2,7 @@
 /** Production Host, sidecar proxy and wait tool; isolated state and local commands, no provider calls. */
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { mkdtemp, mkdir, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,6 +25,8 @@ try {
     title: "Background limit fixture", mode: "agent", executionProfile: "team", projectPath: workspace,
     permissionMode: "auto", providerId: provider.id, modelId: "fixture",
   });
+  const configured = await host.call("session.configure", { id: session.id, mode: "agent", permissionMode: "auto" });
+  assert.equal(configured.session.permissionMode, "auto");
   const { turnId } = await host.call("session.beginTurn", { sessionId: session.id });
   const declaration = await host.call("team.declareStrategy", {
     teamSessionId: session.id, callerSessionId: session.id, leadTurnId: turnId, strategy: "delegate",
@@ -47,20 +49,26 @@ try {
 
   const proxyUrl = new URL("../packages/agent-runtime/dist/parent-host-proxy.js", import.meta.url).href;
   const bindingUrl = new URL("../packages/agent-runtime/dist/project-context-host.js", import.meta.url).href;
+  const trackerUrl = new URL("../packages/agent-runtime/dist/team/background-process-updates.js", import.meta.url).href;
   const waitUrl = new URL("../packages/agent-runtime/dist/team/wait-for-updates.js", import.meta.url).href;
   const child = `import { createInterface } from 'node:readline';
     const { ParentHostProxy } = await import(${JSON.stringify(proxyUrl)});
     const { bindProjectContextHost } = await import(${JSON.stringify(bindingUrl)});
     const { createWaitForUpdatesTool } = await import(${JSON.stringify(waitUrl)});
-    const proxy = new ParentHostProxy(); let wait;
+    const { BackgroundProcessUpdates } = await import(${JSON.stringify(trackerUrl)});
+    const proxy = new ParentHostProxy(); let wait, background;
     createInterface({input:process.stdin}).on('line', async line => {
       const message = JSON.parse(line); if (proxy.handleParentMessage(message)) return;
       try {
         if (message.method === 'agent.prompt') {
           const { sessionId, projectContextBindingId } = message.params;
-          wait = createWaitForUpdatesTool({teamSessionId:sessionId, callerSessionId:sessionId,
-            host:bindProjectContextHost(proxy,sessionId,projectContextBindingId)});
+          const host = bindProjectContextHost(proxy,sessionId,projectContextBindingId);
+          background = new BackgroundProcessUpdates(host,sessionId);
+          wait = createWaitForUpdatesTool({teamSessionId:sessionId, callerSessionId:sessionId,host,backgroundProcesses:background});
           console.log(JSON.stringify({id:message.id,result:{ready:true}}));
+        } else if (message.method === 'fixture.accept') {
+          background.captureReceipt()(message.params.receipt);
+          console.log(JSON.stringify({id:message.id,result:{accepted:true}}));
         } else if (message.method === 'fixture.wait') {
           const pending = wait.execute(message.id,{timeoutSeconds:message.params.timeoutSeconds});
           console.log(JSON.stringify({method:"fixture.wait.started",params:{}}));
@@ -84,9 +92,34 @@ try {
       expectedCommandShellDialect: shell.dialect, ...(timeoutMs === undefined ? {} : { timeoutMs }),
     });
     assert.equal(result.ok, true);
+    await sidecar.call("fixture.accept", { receipt: result });
     return result.content.backgroundProcessId;
   };
-  const sleeping = `${JSON.stringify(process.execPath)} -e "setInterval(()=>{},1000)"`;
+  const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
+  const nodeScript = source => `${quote(process.execPath)} -e ${quote(source)}`;
+  const sleeping = nodeScript("setInterval(()=>{},1000)");
+  const terminal = id => new Promise((resolve, reject) => {
+    let checking = false, dirty = false, settled = false;
+    const finish = (error, detail) => {
+      if (settled) return;
+      settled = true; clearTimeout(timer); unsubscribe();
+      if (error) reject(error); else resolve(detail);
+    };
+    const check = async () => {
+      if (checking || settled) { dirty = true; return; }
+      checking = true; dirty = false;
+      try {
+        const detail = await host.call("backgroundProcesses.read", { sessionId: session.id, id });
+        if (!["starting", "running", "stopping"].includes(detail.process.status)) finish(undefined, detail);
+      } catch (error) { finish(error); }
+      finally { checking = false; if (dirty && !settled) void check(); }
+    };
+    const unsubscribe = host.onNotification((method, params) => {
+      if (method === "backgroundProcesses.changed" && params.sessionId === session.id && params.id === id) void check();
+    });
+    const timer = setTimeout(() => finish(new Error("Terminal read deadline exceeded")), 15000);
+    void check();
+  });
   const waiting = async timeoutSeconds => {
     let acknowledge;
     const ready = new Promise(resolve => { acknowledge = resolve; });
@@ -105,12 +138,22 @@ try {
   assert.ok(explicit.backgroundProcess.errorMessage.includes("explicit 1 second"));
   assert.ok(explicit.backgroundProcess.errorMessage.includes("1-21600"));
 
-  const { pending: completionWait } = await waiting(60);
-  const completedId = await launch(`${JSON.stringify(process.execPath)} -e "process.stdout.write('completed')"`, 5000);
-  const completed = (await completionWait).details;
+  const completedId = await launch(nodeScript("process.stdout.write('completed')"), 5000);
+  await terminal(completedId);
+  const completed = (await sidecar.call("fixture.wait", { timeoutSeconds: 10 })).details;
   assert.equal(completed.backgroundProcess.process.id, completedId);
   assert.equal(completed.backgroundProcess.process.status, "completed");
   assert.equal(completed.backgroundProcess.stdout, "completed");
+
+  const release = join(workspace, "release");
+  const betweenId = await launch(nodeScript(`const fs=require('node:fs');setInterval(()=>{if(fs.existsSync(${JSON.stringify(release)}))process.exit(0)},25)`), 5000);
+  const firstWait = (await sidecar.call("fixture.wait", { timeoutSeconds: 1 })).details;
+  assert.equal(firstWait.reason, "timeout");
+  await writeFile(release, "release");
+  await terminal(betweenId);
+  const between = (await sidecar.call("fixture.wait", { timeoutSeconds: 10 })).details;
+  assert.equal(between.backgroundProcess.process.id, betweenId);
+  assert.equal(between.backgroundProcess.process.status, "completed");
 
   const defaultId = await launch(sleeping);
   let defaultDetail;
@@ -125,7 +168,7 @@ try {
   const reopened = await host.call("backgroundProcesses.read", { sessionId: session.id, id: defaultId });
   assert.equal(reopened.errorMessage, defaultDetail.errorMessage);
   assert.ok(reopened.errorMessage.includes("timeout in seconds"));
-  console.log("PASS E2E-RUNTIME-background-bash-timeout-is-visible - explicit/default limit, completed/timeout wake through production sidecar proxy and scoped read");
+  console.log("PASS E2E-RUNTIME-background-bash-timeout-is-visible - explicit/default limit, active wait wake and launch/between-wait gap recovery through production sidecar proxy");
   console.log(`Candidate Host: ${fileURLToPath(new URL("../", import.meta.url))} | ${host.binaryPath}`);
 } finally {
   await sidecar?.dispose();

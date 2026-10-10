@@ -714,6 +714,11 @@ reads the process through `backgroundProcesses.read`, and returns a terminal
 outcome as `reason: background_process_completed` with `backgroundProcess`
 detail, including timeout guidance. Running/output changes do not finish the
 wait. This does not enqueue mailbox messages or start an idle Lead turn.
+A session-owned runtime tracker registers successful background launch receipts
+and reconciles only those unconsumed IDs at every wait, including completions
+before the first wait or between waits. Tool catalog rebuilds retain the tracker;
+runtime disposal releases it. No historical background list is queried. This
+in-memory receipt tracking does not promise replay after runtime replacement.
 The read is protected by the trusted launch binding and process/session owner
 checks. Errors remain visible; cancellation, deadline or a replaced turn never
 consumes a late outcome, so a later wait can receive it. Team inbox delivery,

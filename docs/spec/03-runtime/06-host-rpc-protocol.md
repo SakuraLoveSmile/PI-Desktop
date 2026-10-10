@@ -1917,3 +1917,8 @@ recheck binding generation plus the returned process owner after the await.
 Only `read` is admitted; sidecar `list` and `stop` remain unavailable.
 Team waits return the scoped terminal detail after an existing changed event;
 output/start events only trigger a read and do not finish the wait.
+
+The runtime tracks only successful owned launch receipts across tool rebuilds;
+each wait reconciles their unconsumed IDs to avoid missing terminal events
+between waits. Disposal revokes the in-memory tracker. Historical listing and
+restart replay are not granted by this read capability.
