@@ -11369,6 +11369,23 @@ mod image_generation_settings_tests {
         .unwrap();
         assert_eq!(task_res["task"]["subject"], "Inspect repository structure");
 
+        let stale_update = handle_request(
+            state.clone(),
+            "team.updateTask",
+            json!({
+                "teamSessionId": team_id,
+                "callerSessionId": team_id,
+                "expectedCallerTurnId": turn_id,
+                "taskId": "task-1",
+                "expectedRevision": 1,
+                "status": "completed"
+            }),
+            tx.clone(),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(stale_update.data.unwrap()["errorCode"], "TEAM_TURN_INVALID");
+
         let update_res = handle_request(
             state.clone(),
             "team.updateTask",

@@ -1598,6 +1598,25 @@ unsupported explicit binding levels retain `TEAM_MODEL_SELECTION_INVALID`.
 Trusted review edits may update a single member; confirmation always revalidates
 the entire review before creating or updating any expert session.
 
+### Ordinary Team task completion claims
+
+`team.updateTask` may include optional `expectedCallerTurnId`, captured by the
+runtime rather than exposed as a model parameter. Host checks it against the
+caller's current running turn under the mutation lock; a stale identity returns
+`TEAM_TURN_INVALID` before changing the task. Legacy clients omitting it remain
+compatible.
+
+An explicit in-progress/completed update associates the task with its active
+owner turn, or the reporting caller's running turn when the owner is idle.
+A completed request returns `task.status = in_progress` until that exact turn
+ends successfully. The runtime explains that the claim was recorded and must
+not be resubmitted merely because the status is still in-progress. Error and
+abort settle associated attempts as failed and cancelled respectively, with a
+Team activity notification for the refreshed board. Duplicate/stale terminals
+cannot change retries; historical/unassociated tasks remain untouched. A normal
+turn end never completes a task lacking a completion claim. Accepted immutable
+Plan research results retain their existing atomic result/completion contract.
+
 ### Mandatory Expert Team delegation
 
 Expert Team requires `delegate` with at least one named expert. `lead_only` is

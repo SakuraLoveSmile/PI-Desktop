@@ -498,7 +498,10 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
     name: "task_update",
     label: "Update Task",
     description:
-      "Update an existing task on the team task board with optimistic concurrency check (expectedRevision).",
+      "Update an existing task on the team task board with optimistic concurrency check (expectedRevision). " +
+      "For active execution, completed records a completion claim: the task stays in_progress until the associated turn ends successfully. " +
+      "Do not repeat the completion update merely because the returned status is still in_progress. An execution error fails the associated task; aborting cancels it. " +
+      "Reopen failed or cancelled work as in_progress in a new turn before retrying. Structured Plan research uses submit_research_result instead.",
     parameters: Type.Object({
       taskId: Type.String({ description: "ID of the task to update." }),
       expectedRevision: Type.Number({
@@ -533,11 +536,13 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
         ownerMemberName?: string | null;
         deleted?: boolean;
       };
+      const expectedCallerTurnId = opts.getTurnId?.();
       const result = await host.call<{ task: TeamTaskRecord }>(
         "team.updateTask",
         {
           teamSessionId,
           callerSessionId,
+          ...(expectedCallerTurnId ? { expectedCallerTurnId } : {}),
           taskId: p.taskId,
           expectedRevision: p.expectedRevision,
           subject: p.subject,
@@ -554,7 +559,11 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
         content: [
           {
             type: "text",
-            text: JSON.stringify({ task: result.task }),
+            text: JSON.stringify({ task: result.task,
+              ...(p.status === "completed" && result.task.status === "in_progress" ? {
+                nextStep: "Completion claim recorded; the task will complete after its associated turn ends successfully. Do not repeat this update. Finish with the observed outcome and evidence; further failures can still fail the task.",
+              } : {}),
+            }),
           },
         ],
         details: result.task,

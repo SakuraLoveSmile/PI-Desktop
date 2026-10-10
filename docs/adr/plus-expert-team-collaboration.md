@@ -451,3 +451,29 @@ Lead; subagents do not become Team members or bypass staffing approval.
 Descendant work retains the expert's durable session/turn, tool snapshot and
 permission ceiling. Lead and planning-research Task isolation is retained.
 See ADR 0089's bounded recursive delegation amendment for trade-offs.
+
+
+## Task completion and turn outcome amendment (2026-10-10)
+
+An ordinary task_update completion claim previously wrote completed immediately.
+A later mutation-budget or provider error could end the same expert turn while
+its task stayed green. Member lifecycle and task-board lifecycle have different
+owners; projecting every failed member's historical tasks as failed would lose
+valid past work and still leave the durable board inconsistent.
+
+The Host therefore records a versioned, exact task/turn association on explicit
+status updates using its existing KV boundary. Completion claimed in active
+execution remains in_progress until that associated turn's successful terminal
+CAS. Failure/abort settles only the current revision/owner-matched attempt;
+metadata changes preserve it, and reset/reassignment/deletion clear it. No turn
+start implicitly claims all owned tasks and no successful turn auto-completes
+work without a completion declaration. Startup abort recovery uses the same
+transactional settlement rule. This adds no SQL column or process boundary.
+
+The runtime pins the optional caller turn on task-update RPC and explains the
+provisional result so the model need not repeat it. Existing clients and
+historical unassociated tasks retain compatibility. Accepted structured Plan
+research results keep their distinct atomic result/submission completion
+contract and clear any ordinary attempt. The behavior contract and recovery
+cases live in the storage/RPC specs and executable regressions; this decision
+is not evidence that a model satisfied a task's semantic acceptance criteria.
