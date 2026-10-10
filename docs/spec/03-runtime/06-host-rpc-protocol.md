@@ -429,6 +429,37 @@ to later refresh and inference; the vendor picker does not collect them.
   `inherit` against the current default) and stores it as the message ceiling;
   `session.beginTurn` enforces that ceiling before a recipient turn starts.
 
+A member turn that wins terminal settlement with `status: "error"` atomically
+adds one Host-authored mailbox notice. It retains the existing ledger
+`kind: "message"` and string `content` envelope; the content is JSON:
+`{kind:"member_failed",memberName,errorCode,retriable,taskIds,suggestedAction}`.
+The error is a sanitized code, never raw text, a path or credentials. Task ids
+include open owned tasks and tasks failed by that exact settled attempt.
+`retriable` is conservative advisory guidance: only unambiguous transient codes
+(`HOST_OVERLOADED`, `HOST_UNAVAILABLE`, `PROVIDER_RATE_LIMITED`, `TIMEOUT`)
+are true; other/unknown failures require inspection before explicit re-dispatch.
+It does not authorize an automatic retry.
+
+The Host reserves `member-turn-failed:<turnId>` idempotency keys; model calls to
+`team.sendMessage` using this prefix return `TEAM_UNAUTHORIZED`. The terminal
+CAS, notice, Host-only source proof and Team revision commit together. Replay
+cannot add a notice; completion and user abort/cancel add none. After commit,
+existing `team.messageQueued` wakes waiting Leads and Main's existing durable
+Team delivery admits idle Leads without changing Agent Host queue semantics.
+Restart recovers undelivered notices through the existing pending-mail drain.
+
+For an approved execution, the notice has `team-message-source-turn-v1` plus a
+Host-owned `team-member-failure-v1` proof. Only this proof permits an error-ended
+current dispatch result to enter the execution inbox; arbitrary member text
+claiming `member_failed` is not proof, and aborted turns remain excluded.
+The unread notice blocks completion until `wait_for_updates` consumes its full
+body. Consuming a failure does not count as successful expert participation.
+
+Host failure delivery also survives post-commit checkpoint I/O errors: the error
+remains observable, while the already durable queued notice emits its existing
+wake event. A terminal replay may re-notify that same pending row; no second
+notice is inserted, and a consumed/running notice is not emitted again.
+
 The `wait_for_updates` tool subscribes before reading its baseline and wakes on
 matching `team.changed` / `team.messageQueued` notifications, debounced for
 100 ms. It rechecks every 5 s as a bounded fallback, or every 1 s when the Host

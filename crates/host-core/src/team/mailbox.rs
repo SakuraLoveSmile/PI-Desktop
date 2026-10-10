@@ -162,6 +162,7 @@ pub fn send_team_message(db: &Database, params: SendMessageParams<'_>) -> Result
             }
         }
     }
+    super::member_failure::validate_message_key(idempotency_key)?;
     let permission_ceiling =
         validate_participant_permissions(db, caller_session_id, &target_session_id)?;
 

@@ -655,6 +655,16 @@
       "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
     },
     {
+      "id": "team-member-failure",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-member-failure.mjs",
+      "tier": "nightly",
+      "safety": "Isolated real Host, production runtime wait/Main delivery/Agent Host queue; runtime port fake, no model calls or user profile.",
+      "scenarioIds": [
+        "E2E-TEAM-member-failure-wakes-lead"
+      ]
+    },
+    {
       "id": "team-task-completion",
       "family": "goals-team",
       "script": "scripts/e2e-team-task-completion.mjs",
