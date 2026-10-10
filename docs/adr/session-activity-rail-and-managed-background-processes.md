@@ -112,3 +112,9 @@ not list/stop. Terminal outcomes wake an already running wait without mailbox
 insertion, automatic Lead turns, new RPCs or a storage migration. The consequence
 is that models can distinguish a default timeout from their explicit override
 and wait without occupying a shell slot; long jobs still require `timeout`.
+
+A runtime-owned receipt tracker survives tool rebuilds and reconciles known
+unconsumed launches at the beginning of each wait. It has no permanent event
+listener and is cleared by runtime disposal. This closes launch-to-wait and
+between-wait gaps without querying history or granting restart replay. Stale,
+failed or cancelled launch responses cannot register into a replacement turn.
