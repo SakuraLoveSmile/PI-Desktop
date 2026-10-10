@@ -1256,3 +1256,11 @@ execution inbox。成员伪造 `member_failed` 文本不构成证明，aborted �
 提交后检查点 I/O 失败仍保留原错误，并对已落盘且尚在 queued 状态的失败邮件发出既有
 唤醒事件。终结重放可以再次唤醒同一 pending 邮件，但不新建第二条；已消费或 running
 的邮件不再发出事件。
+
+
+后台超时可见性（2026-10-11）：`TOOL_TIMEOUT` 读取的已有 `errorMessage`
+说明实际默认/显式限制及秒数参数。已有持久化工具结果内容记录 `timeoutMs`
+和 `timeoutIsDefault`，不为旧记录补造来源。不新增概要字段、迁移、RPC 或事件
+字段。Sidecar 使用已有可信项目启动绑定，只转发 `{sessionId,id}`，并在 await
+后复核绑定代际和返回进程归属。只开放 `read`，`list` 与 `stop` 仍不可调用。
+团队等待由已有 changed 事件触发读取并返回终态详情；输出/启动事件不结束等待。

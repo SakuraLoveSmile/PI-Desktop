@@ -98,3 +98,17 @@ stale responses, saved/dirty/conflict note states and responsive activity access
 A session cannot move projects while it owns an active background job or an
 unsaved terminal job. Output throttling includes a trailing flush, preserving
 visibility when a command emits briefly and then remains silent.
+
+
+## 2026-10-11 amendment: timeout visibility and existing Team waits
+
+Keep the default 60-second limit, event shape and Host-owned runner. Persist
+limit/default provenance in the existing terminal tool result and expose it
+through the existing error message. Old rows retain unknown provenance.
+Team waits consume existing session-scoped process invalidations through a
+launch-bound read, with stale-response checks; this grants no process mutation
+or cross-session access. The existing sidecar proxy admits only this bound read,
+not list/stop. Terminal outcomes wake an already running wait without mailbox
+insertion, automatic Lead turns, new RPCs or a storage migration. The consequence
+is that models can distinguish a default timeout from their explicit override
+and wait without occupying a shell slot; long jobs still require `timeout`.

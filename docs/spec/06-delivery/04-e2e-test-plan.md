@@ -17928,3 +17928,23 @@ loopback provider). No live session, profile or real model is accessed.
 - **Coverage:** `node scripts/e2e-edit-legacy.mjs` with `PI_DESKTOP_HOST_BIN`
   pointing to the task candidate; Host Edit tests and runtime mutation-guard tests.
 - **Specs:** runtime spec 18 §2.1 / §11; D273 amendment.
+
+
+### E2E-RUNTIME-background-bash-timeout-is-visible
+
+- **Preconditions:** Candidate Host/runtime/sidecar built from the recorded task
+  revision; isolated temporary data/workspace and a no-call provider fixture.
+- **Steps:** Establish an approved Team and successful expert participation.
+  Start an owned background command with an explicit one-second limit while
+  waiting. Repeat with normal exit and with no timeout override (60 seconds).
+  Inspect the returned scoped terminal detail and reread the stored result.
+- **Expected:** Timeout reports the exact explicit/default limit and tells the
+  model to pass timeout in seconds (1–21,600). Default remains 60 seconds.
+  Exit/timeout wakes the existing wait through production HostProcess and
+  AgentSidecar transports; live output does not finish it. No mailbox insertion,
+  real model call, process mutation capability or cross-session read is added.
+  Old terminal messages remain readable without fabricated default metadata.
+- **Coverage:** `scripts/e2e-background-bash-limit.mjs`; Rust background RPC,
+  runtime schema/payload, Team wait lifecycle and launch-bound proxy regressions.
+- **Status:** Run on the recorded task candidate; Windows execution remains
+  subject to platform acceptance.

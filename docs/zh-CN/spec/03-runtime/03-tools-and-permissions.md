@@ -588,3 +588,24 @@ sidecar 不附加覆盖，委托使用会话的有效权限模式；因此父会
 ## 图片生成与编辑
 
 `GenerateImages` 是仅供 Agent 使用的高风险能力，可信桌面执行请求前必须由 host-core 授权。即使处于 Auto，Plan/Goal 仍被拒绝。取消、限制和结果语义见[图片生成规格](/zh-CN/spec/03-runtime/21-image-generation)。
+
+
+## 托管后台 Bash：超时与等待（2026-10-11）
+
+`Bash` 的 `run_in_background` 默认为 false。后台命令沿用前台命令的权限、
+模式与团队策略、工作区、原生 shell、容量限制和进程树所有权。启动回执只返回
+进程 ID 和当前状态，不声称命令成功退出。默认超时仍为 60 秒；长命令应传
+`timeout`（秒，1–21,600）。两个参数的描述均明确这一限制。
+
+后台缺省超时不传 transport `timeoutMs`，由宿主应用同一默认值并保留来源。
+显式覆盖（包括 60 秒）保持显式；前台传输不变。`TOOL_TIMEOUT` 的已有持久化
+结果内容记录 `timeoutMs` 和 `timeoutIsDefault`；已有 `errorMessage` 说明实际
+限制是默认还是显式，并提示长命令传秒数。旧记录保持原消息，不猜测缺失来源。
+
+已有 `backgroundProcesses.changed` 仍只广播身份和修订号。团队
+`wait_for_updates` 只响应自身会话的事件，经 `backgroundProcesses.read` 读取
+终态，返回 `reason: background_process_completed` 和 `backgroundProcess`
+详情（含超时说明）。运行中输出不会结束等待；不新增邮箱消息，也不启动空闲
+Lead 回合。读取必须通过可信启动绑定与进程/会话归属检查。错误保持可见；
+取消、到期或回合更换后的迟到结果不会被消费，后续等待仍可收到。团队收件箱、
+权限、容量和取消语义不变。
