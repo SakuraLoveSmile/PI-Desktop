@@ -217,7 +217,7 @@ IDs come from executable result/test calls and annotated dynamic suites. Documen
 | E2E-PROJECT-SKILL-NO-OVERWRITE | [scripts/e2e-skill-market.mjs:281](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-skill-market.mjs#L281) |
 | E2E-RUNTIME-edit-accepts-tag-with-legacy-arguments | [scripts/e2e-edit-legacy.mjs:15](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-edit-legacy.mjs#L15) |
 | E2E-runtime-module | [scripts/e2e-smoke.mjs:831](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-smoke.mjs#L831) |
-| E2E-RUNTIME-shell-capacity-diagnostics | [scripts/e2e-tool-admission.mjs:144](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-tool-admission.mjs#L144); [scripts/e2e-suite-catalog.json (tool-admission)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
+| E2E-RUNTIME-shell-capacity-diagnostics | [scripts/e2e-tool-admission.mjs:183](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-tool-admission.mjs#L183); [scripts/e2e-suite-catalog.json (tool-admission)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
 | E2E-SESSION-activity-aggregate | [scripts/e2e-suite-catalog.json (session-activity-aggregate)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
 | E2E-SESSION-activity-full-history-ui | [scripts/e2e-suite-catalog.json (session-activity-history)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
 | E2E-SESSION-independent-top-level-communication | [scripts/e2e-session-collaboration.mjs:162](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-session-collaboration.mjs#L162) |
