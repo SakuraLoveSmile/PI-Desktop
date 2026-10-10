@@ -2746,6 +2746,22 @@ async fn handle_request(
                 .filter(|value| !value.is_empty())
                 .ok_or_else(|| rpc_err(1002, "projectPath required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
+            if crate::background_processes::has_pending_finalization(&st, session_id) {
+                return Err(rpc_err(
+                    1008,
+                    "background process result has not been saved; read its details to retry",
+                    "BACKGROUND_PROCESS_PERSISTENCE_FAILED",
+                ));
+            }
+            if crate::background_processes::has_active(&st.db, session_id)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+            {
+                return Err(rpc_err(
+                    1008,
+                    "stop background processes before moving this session",
+                    "SESSION_HAS_BACKGROUND_PROCESSES",
+                ));
+            }
             let session = match sessions::move_session_project(&st.db, session_id, project_path)
                 .map_err(plan_rpc_err)?
             {

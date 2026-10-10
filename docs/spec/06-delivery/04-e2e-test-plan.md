@@ -17849,7 +17849,10 @@ prove account/region eligibility or call a real model.
   no note reads/writes. Confirm flat suggestion headers/counts. Start an approved background
   Bash job, inspect live streams, stop it and attempt a foreign-session stop.
   Exercise nonzero/timeout/start failure, capped output, storage-write refusal,
-  an old active job with 100 newer terminal jobs, and deletion prechecks. Test
+  an old active job with 100 newer terminal jobs, and deletion/move prechecks.
+  Verify short startup output followed by silence refreshes before completion.
+  Attempt moving an idle-turn session while its background job runs: refuse,
+  then stop/persist the job and verify moving succeeds. Test
   Host EOF, graceful app dispose and forced loss with owned child/grandchild
   markers, then restart. Keep a detail panel open during Host recovery. Open
   the activity work-panel fallback at a narrow chat width.
