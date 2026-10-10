@@ -70,7 +70,6 @@ function fixture() {
     TranscriptMenuProvider: passthrough, useTranscriptMenu: () => () => {},
     useChatTextActions: () => ({ copyText() {}, selectText() {} }),
   });
-  stub("features/chat/transcript/ThinkingDisplayControl", { ThinkingDisplayControl: empty });
   stub("features/chat/transcript/AssistantTurn", { TranscriptHistory: empty, TranscriptTail: empty });
   stub("features/chat/transcript/hooks/useTranscriptScroll", { useTranscriptScroll: () => ({
     historyEntries: [], transcriptEntries: [], minimapMessages: [], veilPhase: "off",
@@ -85,6 +84,8 @@ function fixture() {
   // Render the status-bearing components and their pure transforms unchanged.
   // Only Host/store, DOM timing and unrelated renderer surfaces are replaced.
   function load(file) {
+    // Styles are verified in real Chromium, outside this status-only renderer.
+    if (file.endsWith(".css")) return {};
     if (modules.has(file)) return modules.get(file);
     const filename = [file, `${file}.ts`, `${file}.tsx`].find(existsSync);
     assert.ok(filename, `missing source module ${file}`);

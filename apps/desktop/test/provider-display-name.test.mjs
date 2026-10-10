@@ -120,5 +120,5 @@ test("the Composer keeps resolving its heading through the same helper", async (
     "../src/features/chat/composer/hooks/useComposerModelMenu.ts",
   );
   assert.match(source, /providerDisplayName: providerDisplayName\(candidate\)/);
-  assert.match(source, /providerSearchText: providerSearchText\(candidate\)/);
+  assert.doesNotMatch(source, /providerSearchText/);
 });

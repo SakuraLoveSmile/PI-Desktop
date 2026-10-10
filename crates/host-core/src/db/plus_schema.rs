@@ -18,7 +18,7 @@ use std::ops::RangeInclusive;
 
 /// Plus track version produced by this build. Add the step to [`STEPS`]
 /// together with every bump.
-pub(crate) const PLUS_SCHEMA_VERSION: i64 = 4;
+pub(crate) const PLUS_SCHEMA_VERSION: i64 = 5;
 
 /// `user_version` a legacy fork database is reset to: the last number the
 /// fork shared with upstream before it used v20..=v23 for Plus-only changes.
@@ -31,8 +31,10 @@ pub(super) const LEGACY_FORK_VERSIONS: RangeInclusive<i64> = 20..=23;
 
 /// Tables only the Plus track creates. Their presence proves a Plus build
 /// touched the file; keep in sync with [`STEPS`] (a test enforces it).
-pub(super) const PLUS_TABLES: [&str; 5] = [
+pub(super) const PLUS_TABLES: [&str; 7] = [
     "goal_reports",
+    "session_quick_notes",
+    "background_processes",
     "plan_execution_schedules",
     "team_members",
     "team_tasks",
@@ -66,7 +68,7 @@ type Step = fn(&Connection) -> Result<()>;
 /// the Plus-only changes that earlier fork builds shipped as v20..=v23 of the
 /// shared chain. Every step must stay idempotent: [`apply_pending`] replays
 /// all of them to re-verify a database an upstream step may have rebuilt.
-const STEPS: [Step; PLUS_SCHEMA_VERSION as usize] = [step_p1, step_p2, step_p3, step_p4];
+const STEPS: [Step; PLUS_SCHEMA_VERSION as usize] = [step_p1, step_p2, step_p3, step_p4, step_p5];
 
 /// Meta row of a database a Plus-aware build has opened.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -149,6 +151,13 @@ fn step_p4(conn: &Connection) -> Result<()> {
                AND execution_kind IS NULL;",
         )?;
     }
+    Ok(())
+}
+
+/// P5: session-owned notes and managed background command history.
+fn step_p5(conn: &Connection) -> Result<()> {
+    conn.execute_batch(crate::session_notes::SCHEMA)?;
+    conn.execute_batch(crate::background_processes::SCHEMA)?;
     Ok(())
 }
 

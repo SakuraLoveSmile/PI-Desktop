@@ -83,17 +83,14 @@ test("the work panel renders the delegation tab like every other resource", () =
   assert.doesNotMatch(appSource, /subagentPanelOpen/);
 });
 
-test("the delegation tab renders a message list with a read-only composer", () => {
+test("the delegation tab renders a message list without an input placeholder", () => {
   assert.match(tabSource, /data-testid="subagent-transcript-tab"/);
   assert.match(tabSource, /buildSubagentTranscript\(messages, delegationId\)/);
-  assert.match(tabSource, /className="message-row user"/);
-  assert.match(tabSource, /className="message-user-text selectable"/);
+  assert.match(tabSource, /<SubagentTaskPrompt/);
+  assert.match(tabSource, /className="subagent-task-preview selectable"/);
   assert.match(tabSource, /className="message-row assistant"/);
   assert.match(tabSource, /data-message-id=\{row\.message\.id\}/);
-  assert.match(tabSource, /<Textarea/);
-  assert.match(tabSource, /disabled/);
-  assert.match(tabSource, /rows=\{2\}/);
-  assert.match(tabSource, /placeholder=\{t\("panel\.subagentReadOnly"\)\}/);
+  assert.doesNotMatch(tabSource, /subagent-transcript-composer|<Textarea/);
   // Display-only: no send path may exist in the composer.
   assert.doesNotMatch(tabSource, /onSubmit|onSend|api\.send/);
 });

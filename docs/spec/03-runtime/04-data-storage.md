@@ -1,4 +1,4 @@
-# 04. Data Storage (Shared schema v19, Plus track v4)
+# 04. Data Storage (Shared schema v19, Plus track v5)
 
 ## 0. Ownership decision
 
@@ -324,7 +324,7 @@ PRAGMA auto_vacuum = INCREMENTAL; -- set at creation, before any table
 
 - The shared schema version lives in `PRAGMA user_version` (current v19 = `19`).
   Plus-only structures are versioned separately in `plus_schema_meta` (current
-  Plus track v4, section 7.1). The v1 `meta` table is gone.
+  Plus track v5, section 7.1). The v1 `meta` table is gone.
 - host-core is the **single writer**; statements use `prepare_cached`; every
   multi-row write runs in one transaction.
 - Boot maintenance runs before RPC service: one transaction marks every
@@ -1650,7 +1650,7 @@ and moves only when upstream migrations are merged (ADR
 plus-schema-version-track). Plus-only structures run on a second track in the
 same database, so merging upstream never renumbers or collides with Plus data.
 Plus steps are ordered, additive, and idempotent. They live in
-`crates/host-core/src/db/plus_schema.rs`, and the current track version is 4:
+`crates/host-core/src/db/plus_schema.rs`, and the current track version is 5:
 
 | Step | Adds |
 |---|---|
@@ -1658,6 +1658,7 @@ Plus steps are ordered, additive, and idempotent. They live in
 | P2 | `sessions.execution_profile` and the `teams`, `team_members`, and `team_tasks` tables |
 | P3 | execution provider/model bindings and revision intent fields on `plan_approvals`, and the `plan_execution_schedules` table |
 | P4 | `plan_approvals.execution_kind`, backfilled from `kind` for approved proposals |
+| P5 | session-owned `session_quick_notes` and `background_processes` tables |
 
 P1 to P4 are the Plus-only changes earlier fork builds shipped as
 `user_version` 20 to 23. Every step probes before it changes anything, so a
@@ -1678,7 +1679,7 @@ edited.
 - **Legacy fork database.** A database with Plus structures, no
   `plus_schema_meta`, and `user_version` 20 to 23 was written by an earlier fork
   build. After a verified `pi.sqlite.legacy-v<N>.bak`, one transaction applies
-  every Plus step, writes the meta (track 4, shared 19), and sets
+  every Plus step, writes the meta (track 5, current shared chain), and sets
   `user_version` to 19. A failure rolls the transaction back and leaves the
   legacy database as it was.
 - **Older fork build.** An older fork build that opens a reconciled database
@@ -1937,3 +1938,22 @@ An unknown price is distinct from a known zero price; partial known costs remain
 on the individual operations. Late usage targets its captured turn and does not
 revive it or debit the currently active turn. Immediate nested parent and owning
 Task remain separate optional transcript/event fields.
+
+### Session activity storage (Plus P5)
+
+`session_quick_notes` is keyed by session, stores exact content, revision and
+update time, and cascades on session deletion. Writes require the expected
+revision; stale writers receive NOTE_CONFLICT with the current snapshot. Notes
+are not transcript/model input and are not copied into a fork. Maximum content
+is 64KiB UTF-8, including whitespace and newlines.
+
+`background_processes` keeps session/tool-call identity, command, working
+directory, lifecycle/timing/exit metadata and bounded stdout/stderr. The unique
+session/tool-call constraint prevents duplicate launches. Unfinished records
+become interrupted at Host startup; persisted PIDs never grant control and no
+command resumes automatically. Deletion is refused while active rows exist.
+Terminal writes that fail keep a process-local finalization snapshot with output,
+visible diagnostics and one repair attempt per scoped resource request. Hard
+Host loss cannot preserve this unwritten snapshot. P5 does not advance the
+shared PRAGMA user_version. Current executable shared migration ownership is
+`crates/host-core/src/db.rs`; older shared-v19 examples above are historical.

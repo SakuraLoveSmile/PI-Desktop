@@ -81,6 +81,7 @@
 }
 
 .session-pane {
+  position: relative;
   display: flex;
   min-height: 0;
   flex: 1;
@@ -103,7 +104,7 @@
 /* A cold switch keeps the current pane fully legible: only the progress track
  * marks the wait, and the composer is what goes inert, so a prompt cannot be
  * sent to the session being left. */
-.chat-surface.session-switching > .composer-dock {
+.chat-surface.session-switching .chat-session-main > .composer-dock {
   pointer-events: none;
 }
 
@@ -487,14 +488,14 @@
 }
 
 .chat-width-handle.is-resizing::before,
-.chat-surface[data-chat-resizing="true"] .chat-width-handle::before {
+.chat-session-main[data-chat-resizing="true"] .chat-width-handle::before {
   opacity: 1;
   height: 56px;
   background: color-mix(in oklab, var(--ds-text-primary) 32%, transparent);
 }
 
 :root[data-theme="light"] .chat-width-handle.is-resizing::before,
-:root[data-theme="light"] .chat-surface[data-chat-resizing="true"] .chat-width-handle::before {
+:root[data-theme="light"] .chat-session-main[data-chat-resizing="true"] .chat-width-handle::before {
   background: color-mix(in oklab, var(--ds-text-primary) 20%, transparent);
 }
 
@@ -980,4 +981,52 @@
     padding-top: 18px;
     padding-bottom: 18px;
   }
+}
+
+/* The activity rail occupies existing free space, never the chat width floor. */
+.chat-session-main {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.chat-surface[data-activity-visible="true"] > .chat-session-main {
+  margin-inline-end: 264px;
+}
+
+.session-pane-activity {
+  display: none;
+  position: absolute;
+  inset-inline-start: 100%;
+  width: 264px;
+  top: var(--ds-toolbar-height);
+  bottom: 16px;
+  padding: 8px 16px 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.chat-surface[data-activity-visible="true"] .session-pane-activity {
+  display: block;
+}
+
+/* Removing the mode toolbar must retain the titlebar's safe reading inset. */
+.chat-session-main .thread-wrap {
+  padding-top: var(--ds-toolbar-height);
+}
+
+.session-activity-access {
+  position: absolute;
+  top: calc(var(--ds-toolbar-height) + 4px);
+  inset-inline-end: 16px;
+  z-index: 4;
+  color: var(--ds-text-muted);
+  font-size: var(--text-sm);
+}
+
+.chat-session-main:has(> .session-activity-access) .thread-wrap {
+  padding-top: calc(var(--ds-toolbar-height) + 32px);
 }

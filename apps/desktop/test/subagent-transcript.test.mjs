@@ -228,9 +228,12 @@ test("the nested run is visibly one level inside the call", () => {
   assert.match(messagesCss, /\.tool-row-agent \{/);
 });
 
-test("every Task row renders as one accessible delegation topology", () => {
-  // One delegation gets the same card as a fan-out: the compact row hid the
-  // outcome, runtime and step count the card states outright.
+test("every Task row renders as an accessible delegation activity row", async () => {
+  const [rowSource, presentationSource] = await Promise.all([
+    readFile(new URL("../src/features/chat/activity/SubagentActivityRow.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/features/chat/activity/subagent-row-presentation.ts", import.meta.url), "utf8"),
+  ]);
+  // One delegation and a fan-out share the same real task/status/timing row.
   assert.match(
     transcriptSource,
     /const hasSubagentTopology = delegateItems\.length > 0/,
@@ -239,15 +242,25 @@ test("every Task row renders as one accessible delegation topology", () => {
     transcriptSource,
     /<SubagentTopology\s+key="subagent-topology"\s+items=\{delegateItems\}\s+delegationStatuses=\{delegationStatuses\}\s+delegationTimings=\{delegationTimings\}\s+onUserInteraction=\{onUserInteraction\}\s*\/>/,
   );
-  assert.match(transcriptSource, /className="subagent-tasks-card" aria-labelledby=/);
+  assert.match(transcriptSource, /className="subagent-tasks-card" aria-label=\{t\("chat\.taskProgress"\)\}/);
   assert.match(transcriptSource, /className="subagent-tasks-list"/);
   assert.match(transcriptSource, /role="list"/);
-  assert.match(transcriptSource, /className="subagent-tasks-action-btn"/);
-  assert.match(transcriptSource, /className=\{`subagent-tasks-row status-\$\{outcome\}`\}/);
+  assert.doesNotMatch(transcriptSource, /viewPanorama|overviewWorkPanelTab|subagent-tasks-action-btn/);
+  assert.match(transcriptSource, /<SubagentActivityRow id=\{row\.delegationId\}/);
+  assert.match(transcriptSource, /statusLabel=\{t\(`panel\.activity\.status\.\$\{row\.status\}`\)\} timing=\{row\.timing\}/);
+  assert.match(transcriptSource, /subagentItemTiming\(item, timings\)/);
+  assert.match(rowSource, /<TooltipButton type="button"/);
+  assert.match(rowSource, /data-delegation-id=\{id\}/);
+  assert.match(rowSource, /subagent-activity-avatar/);
+  assert.match(rowSource, /tooltip=\{title\}/);
+  assert.match(presentationSource, /delegationTimingBounds\(\[item\], timings\)/);
   assert.match(transcriptSource, /role="listitem"/);
+  assert.match(transcriptSource, /const ownerSessionId = useSlotSessionId\(\)/);
+  assert.match(transcriptSource, /ownerSessionId === activeSessionId/);
+  assert.match(transcriptSource, /openWorkPanelTabForSession\(ownerSessionId, subagentWorkPanelTab\(row\.delegationId, row\.agentName\)\)/);
   assert.match(
     transcriptSource,
-    /openSubagentTab\(delegationId, agentName\)/,
+    /openSubagentTab\(row\.delegationId, row\.agentName\)/,
   );
   assert.match(
     transcriptSource,
@@ -407,4 +420,67 @@ test("the delegation card keeps inset from its tile and stays live off the tail 
     messagesCss,
     /\.tool-activity-group\.has-subagents \.tool-activity-body > \.tool-row \{[^}]*margin-left: 16px/,
   );
+});
+
+
+test("subagent details present task, chronological process groups and resumed answers read-only", async () => {
+  const { createServer } = await import("vite");
+  const { createElement } = await import("react");
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const { createInstance } = await import("i18next");
+  const { I18nextProvider } = await import("react-i18next");
+  const { catalogs } = await import("@pi-desktop/i18n");
+  const server = await createServer({
+    root: new URL("..", import.meta.url).pathname,
+    configFile: false,
+    server: { middlewareMode: true, hmr: false, ws: false },
+    esbuild: { jsx: "automatic" },
+    appType: "custom",
+    optimizeDeps: { noDiscovery: true, include: [] },
+  });
+  try {
+    const { SubagentTranscriptTab } = await server.ssrLoadModule("/src/components/workpanel/SubagentTranscriptTab.tsx");
+    const { useAppStore } = await server.ssrLoadModule("/src/stores/app-store.ts");
+    const i18n = createInstance();
+    await i18n.init({ lng: "en", resources: { en: { translation: catalogs.en } } });
+    const base = { createdAt: "2026-10-10T00:00:00Z", status: "complete", content: "" };
+    const messages = [
+      { ...base, id: "task", role: "tool", toolName: "Task", toolCallId: "call", toolArgs: { agent: "architect", task: "Inspect project architecture.\n".repeat(12) }, toolResult: { delegationId: "delegate", status: "running" } },
+      { ...base, id: "think", role: "assistant", parentToolCallId: "call", agentName: "architect", thinking: "Check package APIs." },
+      { ...base, id: "read", role: "tool", parentToolCallId: "call", toolName: "Read", toolCallId: "read-call", toolArgs: { path: "README.md" }, toolResult: "Project README" },
+      { ...base, id: "edit", role: "tool", parentToolCallId: "call", toolName: "Edit", toolStatus: "success", toolCallId: "edit-call", toolResult: { details: { root: "workspace", review: { version: 1, snapshotId: "snapshot", messageId: "edit", path: "README.md", operation: "edit", status: "modified", state: "active", additions: 1, deletions: 0, reversible: true, hunks: [] } } } },
+      { ...base, id: "progress", role: "assistant", parentToolCallId: "call", content: "**Architecture evidence** verified." },
+      { ...base, id: "search", role: "tool", parentToolCallId: "call", toolName: "Grep", toolCallId: "search-call", toolArgs: { pattern: "architecture" }, toolResult: "Match" },
+      { ...base, id: "answer", role: "assistant", parentToolCallId: "call", content: "First result." },
+      { ...base, id: "resume", role: "tool", toolName: "Task", toolCallId: "resumed-call", toolArgs: { task: "Verify follow-up requirement.", resume: "delegate" }, toolResult: { delegationId: "delegate", status: "running" } },
+      { ...base, id: "error", role: "assistant", parentToolCallId: "resumed-call", content: "Follow-up result.", error: { code: "INTERNAL", message: "Verification failed." } },
+    ];
+    const seed = useAppStore.getInitialState();
+    const before = { activeSessionId: seed.activeSessionId, retainedSessionIds: seed.retainedSessionIds, messages: seed.messages, settings: seed.settings, transcriptViews: seed.transcriptViews };
+    Object.assign(seed, { activeSessionId: "s", retainedSessionIds: ["s"], messages, transcriptViews: {}, settings: { ...seed.settings, thinkingDisplayMode: "detailed" } });
+    const render = () => renderToStaticMarkup(createElement(I18nextProvider, { i18n }, createElement(SubagentTranscriptTab, { delegationId: "delegate" })));
+    try {
+      const html = render();
+      assert.match(html, /subagent-detail-header/);
+      assert.match(html, /subagent-activity-avatar/);
+      assert.match(html, /architect/);
+      assert.equal((html.match(/subagent-task-disclosure/g) ?? []).length, 2);
+      assert.match(html, /subagent-task-toggle[^>]*aria-expanded="false"/);
+      assert.match(html, /1 thinking step/);
+      assert.match(html, /2 tool actions/);
+      assert.match(html, /review-change-card/);
+      assert.equal((html.match(/subagent-process-summary/g) ?? []).length, 2);
+      assert.match(html, /subagent-process-summary[^>]*aria-expanded="false"/);
+      assert.ok(html.indexOf("Architecture evidence") < html.indexOf('data-message-id="search"'));
+      assert.ok(html.indexOf("First result.") < html.indexOf("Verify follow-up requirement."));
+      assert.match(html, /Follow-up result/);
+      assert.match(html, /Verification failed/);
+      assert.doesNotMatch(html, /subagent-transcript-composer|<textarea/);
+      assert.doesNotMatch(html, /send-btn|Send message|viewPanorama|>Continue<|Dismiss error message|review-change-rollback"/);
+      seed.transcriptViews = { s: { messages, focus: { messageId: "read", requestId: 1, query: "README", kind: "search" } } };
+      const revealed = render();
+      assert.match(revealed, /subagent-process-summary[^>]*aria-expanded="true"/);
+      assert.match(revealed, /data-message-id="read"/);
+    } finally { Object.assign(seed, before); }
+  } finally { await server.close(); }
 });

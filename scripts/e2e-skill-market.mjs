@@ -17,7 +17,7 @@
  */
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -261,6 +261,25 @@ try {
       !!created?.skill && diskOk && !!row,
       row ? JSON.stringify({ id: row.id, name: row.name, source: row.source }) : "not listed",
     );
+    const projectPath = join(home, "isolated-project");
+    mkdirSync(projectPath);
+    const projectSkill = await host.call("skills.create", { skill: {
+      name: "reviewed-task-lesson", description: "Use the verified project task lesson.",
+      body: "# Verified lesson\n\nKeep the captured project scope when saving.",
+      level: "project", projectPath, enabled: false,
+      scope: { mode: "projects", projects: [projectPath] },
+    } });
+    const projectList = await host.call("skills.list", { level: "project", projectPath });
+    const projectDocument = readFileSync(projectSkill.skill.path, "utf8");
+    record("E2E-PROJECT-SKILL-CREATE", projectSkill.skill.path.startsWith(projectPath)
+      && projectDocument.includes("Keep the captured project scope")
+      && projectList.skills.some(skill => skill.id === projectSkill.skill.id && !skill.enabled),
+      "reviewed draft persists in isolated project and remains disabled");
+    let duplicateRejected = false;
+    try { await host.call("skills.create", { skill: { name: "reviewed-task-lesson", description: "Replacement", body: "Must not overwrite", level: "project", projectPath } }); }
+    catch { duplicateRejected = true; }
+    record("E2E-PROJECT-SKILL-NO-OVERWRITE", duplicateRejected && readFileSync(projectSkill.skill.path, "utf8") === projectDocument);
+
   }
 } catch (error) {
   record("E2E-SKILL-MARKET-INSTALL", false, error.message);
