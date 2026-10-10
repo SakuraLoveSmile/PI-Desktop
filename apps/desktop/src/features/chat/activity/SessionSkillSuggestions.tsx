@@ -1,14 +1,15 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { UiMessage } from "@pi-desktop/shared";
-import { IconChevronDown, IconWrench } from "../../../components/icons";
-import { Button } from "../../../components/ui";
+import { IconChevronDown, IconEyeOff, IconWrench } from "../../../components/icons";
+import { Button, TooltipButton } from "../../../components/ui";
 import { AnchoredMenu } from "../../../components/settings/AnchoredMenu";
 import { SkillEditorSheet, skillDraftError, type SkillDraft } from "../../../components/settings/SkillEditorSheet";
 import { api } from "../../../lib/api";
 import { useAppStore } from "../../../stores/app-store";
 import { SESSION_SKILL_SUGGESTIONS_PROMPT, sessionSkillSuggestions, skillSuggestionProject, type SessionSkillSuggestion } from "./session-skill-suggestions";
 import { ignoreSkillSuggestion, isSkillSuggestionIgnored, readIgnoredSkillSuggestions, skillSuggestionIdentity, type IgnoredSkillSuggestion } from "./skill-suggestion-preferences";
+import { useActivityDisclosure } from "./use-activity-disclosure";
 import "./session-skill-suggestions.css";
 
 export type SessionSkillSuggestionsProps = {
@@ -27,7 +28,8 @@ export function SessionSkillSuggestions(props: SessionSkillSuggestionsProps) {
 function SessionSkillSuggestionsContent({ sessionId, messages, visible, supported, rangeLimited = false, references = [] }: SessionSkillSuggestionsProps) {
   const { t } = useTranslation();
   const bodyId = useId();
-  const [expanded, setExpanded] = useState(true);
+  const disclosure = useActivityDisclosure(sessionId, "skills", true, [], false);
+  const [showAllReferences, setShowAllReferences] = useState(false);
   const [open, setOpen] = useState(false);
   const [preferences, setPreferences] = useState<{ ignored: IgnoredSkillSuggestion[]; failed: boolean }>(() => {
     try { return { ignored: readIgnoredSkillSuggestions(window.localStorage), failed: false }; }
@@ -53,6 +55,11 @@ function SessionSkillSuggestionsContent({ sessionId, messages, visible, supporte
     referenceNames.add(key);
     return true;
   });
+  const inlineItems = [
+    ...suggestions.map((suggestion) => ({ id: `suggestion:${suggestion.name}`, kind: "suggestion" as const, suggestion })),
+    ...recordedReferences.map((reference) => ({ id: reference.id, kind: "reference" as const, reference })),
+  ];
+  const visibleInlineItems = showAllReferences ? inlineItems : inlineItems.slice(0, 5);
 
   useEffect(() => {
     mounted.current = true;
@@ -132,8 +139,8 @@ function SessionSkillSuggestionsContent({ sessionId, messages, visible, supporte
 
   return <section className="session-skill-suggestions" hidden={!visible}>
     <div className="session-skill-suggestions-heading">
-      <Button variant="ghost" className="session-skill-suggestions-toggle" aria-expanded={expanded} aria-controls={bodyId}
-        onClick={() => setExpanded((value) => !value)}>
+      <Button variant="ghost" className="session-skill-suggestions-toggle" aria-expanded={disclosure.open} aria-controls={bodyId}
+        onClick={disclosure.toggle}>
         <span>{t("panel.activity.skills.sectionTitle")}</span><IconChevronDown size={13} aria-hidden />
       </Button>
       <AnchoredMenu open={open && visible} onClose={() => setOpen(false)} align="end" role="dialog"
@@ -167,29 +174,47 @@ function SessionSkillSuggestionsContent({ sessionId, messages, visible, supporte
             </div>
           </div>
           <span className="session-skill-suggestion-description">{suggestion.description}</span>
+          <div className="session-skill-suggestion-rationale">
+            <span>{t("panel.activity.skills.whyRecommended")}</span>
+            <span className="session-skill-suggestion-reason">{suggestion.reason ?? t("panel.activity.skills.reasonUnavailable")}</span>
+          </div>
         </li>)}</ul> : <p className="session-activity-empty">{t("panel.activity.skills.empty")}</p>}
         <Button size="sm" className="session-skill-suggestions-generate" disabled={!projectPath || generating || saving}
           onClick={() => { void generate(); }}>{t("panel.activity.skills.generate")}</Button>
       </AnchoredMenu>
     </div>
-    {expanded && <div id={bodyId} className="session-skill-suggestions-body">
-      <ul className="session-skill-references">
-        {suggestions.map((suggestion) => <li key={`suggestion:${suggestion.name}`}>
-          <Button variant="ghost" className="session-skill-reference" title={suggestion.name} onClick={() => setOpen(true)}>
-            <span className="session-skill-reference-icon"><IconWrench size={17} aria-hidden /></span>
-            <span className="session-skill-reference-name">{suggestion.name}</span>
-          </Button>
-        </li>)}
-        {recordedReferences.map((reference) => <li key={reference.id}>
-          {reference.onOpen ? <Button variant="ghost" className="session-skill-reference" title={reference.label} onClick={reference.onOpen}>
-            <span className="session-skill-reference-icon"><IconWrench size={17} aria-hidden /></span>
-            <span className="session-skill-reference-name">{reference.label}</span>
-          </Button> : <div className="session-skill-reference" title={reference.label}>
-            <span className="session-skill-reference-icon"><IconWrench size={17} aria-hidden /></span>
-            <span className="session-skill-reference-name">{reference.label}</span>
-          </div>}
-        </li>)}
-      </ul>
+    {disclosure.open && <div id={bodyId} className="session-skill-suggestions-body">
+      {inlineItems.length ? <>
+        <ul className="session-skill-references">
+          {visibleInlineItems.map((item) => <li key={item.id} className="session-skill-reference-row">
+            {item.kind === "suggestion" ? <>
+              <Button variant="ghost" className="session-skill-reference" title={item.suggestion.name} onClick={() => setOpen(true)}>
+                <span className="session-skill-reference-icon"><IconWrench size={17} aria-hidden /></span>
+                <span className="session-skill-reference-name">{item.suggestion.name}</span>
+              </Button>
+              <TooltipButton type="button" className="btn btn-ghost icon-btn icon-btn-square session-skill-reference-ignore" tooltip={t("panel.activity.skills.ignore")}
+                disabled={generating || saving} onClick={(event) => {
+                  const row = event.currentTarget.closest("li");
+                  const section = event.currentTarget.closest(".session-skill-suggestions");
+                  const nextFocus = row?.nextElementSibling?.querySelector<HTMLElement>("button:not([disabled])") ??
+                    row?.previousElementSibling?.querySelector<HTMLElement>("button:not([disabled])") ??
+                    section?.querySelector<HTMLElement>(".session-skill-suggestions-toggle");
+                  if (ignore(item.suggestion)) nextFocus?.focus();
+                }}><IconEyeOff size={14} aria-hidden /></TooltipButton>
+            </> : item.reference.onOpen ? <Button variant="ghost" className="session-skill-reference" title={item.reference.label} onClick={item.reference.onOpen}>
+              <span className="session-skill-reference-icon"><IconWrench size={17} aria-hidden /></span>
+              <span className="session-skill-reference-name">{item.reference.label}</span>
+            </Button> : <div className="session-skill-reference" title={item.reference.label}>
+              <span className="session-skill-reference-icon"><IconWrench size={17} aria-hidden /></span>
+              <span className="session-skill-reference-name">{item.reference.label}</span>
+            </div>}
+          </li>)}
+        </ul>
+        {inlineItems.length > 5 && <Button variant="ghost" className="session-skill-references-toggle" aria-expanded={showAllReferences}
+          onClick={() => setShowAllReferences((value) => !value)}>
+          {showAllReferences ? t("panel.activity.skills.showLess") : t("panel.activity.skills.showAll", { count: inlineItems.length })}
+        </Button>}
+      </> : <p className="session-activity-empty">{t("panel.activity.skills.empty")}</p>}
       {preferences.failed && !open && <p role="alert" className="session-activity-error">{t("panel.activity.skills.preferencesFailed")}</p>}
     </div>}
     {visible && editor && editor.projectPath === projectPath && <SkillEditorSheet draft={editor.draft}

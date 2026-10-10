@@ -2,6 +2,20 @@
 
 Upstream v0.15.6 → v0.16.1 has been merged.
 
+- Overview adds actionable attention for approvals, failures, timeouts and
+  degraded reports, separates live status from artifacts, and groups Team members
+  independently. Loaded-history notices and paging are per group. Repeated file
+  changes and source domains are combined with recorded counts; complete Host
+  review evidence supplies line totals. Lists have a five-row preview, independent
+  file actions, and direct recommendation Ignore with recorded rationale.
+
+- Overview activity groups now show counts and status summaries, remember each
+  session's disclosure choices, and reopen for new active/error records. Agent
+  identity/status and task/timing use separate lines. Background commands have
+  readable titles and a terminal-record group with view-only Clear; timeout is
+  distinct from failure. Goal rows share the Composer's authoritative progress
+  and show report readiness/degradation with direct report navigation.
+
 - The right work-panel launcher uses a centered compass and rounded tool cards.
   Existing tool destinations and plugin availability are preserved; long labels
   wrap and short panels scroll without clipping the cards.

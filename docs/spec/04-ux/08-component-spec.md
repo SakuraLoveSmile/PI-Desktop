@@ -4813,10 +4813,37 @@ available. Missing preferences retain Detailed.
 
 The accepted right rail groups Plan, Subagents, Background processes, Outputs,
 Sources without a framed card. Group headers are muted and
-independently expandable; agents show a stable round avatar and an accessible
-status glyph, command rows show a small terminal tile, and long labels have a
+independently expandable; Overview agents show an accessible state glyph,
+while transcript agents retain their avatar. Command rows show a small terminal tile, and long labels have a
 full tooltip. Outputs/Sources start folded, other activity groups start open,
-and the suggestion list opens explicitly. Group choices belong to the retained pane.
+and the suggestion list opens explicitly. Each group displays its record count
+and active/failure/timeout summary. Disclosure choices persist per session and
+group across session switches and renderer reloads. A newly active or failed
+record/status transition opens its group; an explicit collapse stays respected
+until a new attention event.
+
+Overview agent rows show identity and an unprefixed status badge on the first
+line, with a truncated task summary and elapsed time on the second. Transcript
+agent rows retain their existing presentation. Background titles use literal
+script/tool names and recognized ports, never shell execution; tooltips preserve
+the full command. Terminal processes are grouped under Ended N with a Clear
+action. Clear only hides those records for the renderer lifetime, including
+session switches; Host history/logs and running jobs are unchanged. Reload
+restores the recorded history. Tool timeout uses warning/clock styling distinct
+from failed/error styling.
+
+Goal plan rows show the authoritative completed/total count, execution state and
+report state (pending, generating, ready, fallback, failed or unavailable).
+Overview and the Composer Goal capsule share one session/execution-scoped Host
+reader. Missing counts are unavailable, not fabricated zeroes; fallback reports
+stay explicitly degraded. The title opens the existing Goal artifact; the report
+badge opens that execution's report in its owning session. Late/cross-session
+reads and older progress revisions cannot overwrite current state. The reader
+unsubscribes when its final visible consumer leaves and refreshes on Host restart
+or focus. Collapsing Plans keeps its Goal observers mounted so a new report
+failure can reopen the group. Hidden/uninitialized readers do not erase known
+attention state; the same recorded failure after remount does not undo a manual
+collapse. A ready completed report hides the capsule but remains in Overview.
 
 The rail reserves 264px when the actual chat surface is at least 820px wide and
 the work panel is closed. It never overlays the transcript or composer. Narrow
@@ -4843,6 +4870,45 @@ and storage contracts preserve previously saved notes without loading or saving
 them from the current interface. Self-evolution headers use the same flat text
 and disclosure arrow as the other groups, including hover/focus. The suggestion count is a compact rectangular action
 opening an anchored suggestion dialog.
+The Overview starts with Needs attention when the owning session has pending
+permission/plan approvals, failed activities, timed-out processes or failed/
+fallback Goal reports. Each entry opens the relevant group and reveals its target,
+including rows past the five-item preview and folded terminal process records.
+Generated activity entries scroll/focus their visible row; approval entries return
+to the latest transcript and focus the pending approval, without answering it.
+Report entries open the owning Goal report without stealing focus back from the
+report destination. Target focus follows actual nested disclosure DOM updates,
+not a guessed delay.
+
+Live status (plans, delegated agents, team members and processes) is separated
+from artifacts (outputs and sources). Team members use a distinct group with
+recorded role labels; its loading/error state is not mixed into delegated agents.
+Each transcript-derived group marks an incomplete reading range as Only loaded
+messages and provides the existing bounded Load earlier action and, when needed,
+Return to latest. Counts are projections of loaded records, not session-wide
+Host totals; no new Host aggregation contract is introduced.
+
+Successful Write/Edit records for the same literal path form one output with a
+write count, latest recorded change time/message, and directory grouping. Exact
+literal paths are preserved without guessing filesystem aliases or case rules.
+Additions/deletions appear only when every operation has a matching, complete
+Host ReviewChange; binary/truncated, unknown or legacy replacement snippets do
+not produce fabricated line totals. Attachments/artifacts sharing a displayed
+path do not duplicate its row. Open, locate in transcript and copy path are
+independent sibling actions with project/session-owned navigation. Sources are
+grouped by safe HTTP(S) hostname and show captured citation occurrences within
+the loaded messages; the first safe URL remains the opening destination.
+
+Activity lists initially display five records and provide Show all/Show less.
+Expanding for an attention target does not prevent a subsequent manual collapse.
+Tail actions appear on hover or keyboard focus and remain visible on coarse
+pointers. Empty states explain which recorded actions populate each group.
+Skill suggestions remain manually generated, show their recorded task-evidence reason as
+Why recommended (older suggestions explicitly mark a missing reason), and expose one-click Ignore beside the inline name. Ignore
+persists only the existing source-specific renderer preference and keeps failures
+visible; it does not install or remove a Skill. Long reference lists also use the
+five-row preview.
+
 See [the session activity ADR](../../adr/session-activity-rail-and-managed-background-processes.md).
 
 ### Mandatory Expert Team behavior
@@ -4930,7 +4996,7 @@ The composer footer shows the current session's project, local/remote host, and 
 
 Output rows display file basenames with a file-type icon plate and a full-path tooltip. They retain existing file navigation, omit status badges and use the current neutral theme. Delegate details show the recorded agent identity/state, bounded expandable task prompts, and collapsed contiguous thinking/tool groups with real counts. Follow-up turns, Markdown, search and scroll remain available; delegate errors/reviews have no Continue, dismiss or rollback mutation controls.
 
-Self-evolution suggestions are generated only through an explicit action in an idle, local, writable project conversation. The normal session send workflow requests evidence-based reusable lessons as a bounded `skill-suggestions` JSON fence. Only settled top-level assistant responses are accepted; malformed, oversized, nested and untrusted-role blocks do not become suggestions. Suggestions remain transcript-backed across reloads. Each draft opens the existing Skill editor for review before using `skills.create` at the captured owning project path; it is disabled by default, may be enabled by the reviewer, and never overwrites an existing skill. No project, partial loaded history, running/queued execution, approvals, imported/remote/read-only conversations and Team members disable generation/creation. Session/project changes close the editor and prevent stale saves. Generation uses the configured model when the user explicitly requests it; no background generation occurs.
+Self-evolution suggestions are generated only through an explicit action in an idle, local, writable project conversation. The normal session send workflow requests evidence-based reusable lessons as a bounded `skill-suggestions` JSON fence. New drafts include a bounded `reason` string separate from the use-case description; the parser accepts older name/description/body-only records without inventing a reason. Only settled top-level assistant responses are accepted; malformed, oversized, nested and untrusted-role blocks do not become suggestions. Suggestions remain transcript-backed across reloads. Each draft opens the existing Skill editor for review before using `skills.create` at the captured owning project path; it is disabled by default, may be enabled by the reviewer, and never overwrites an existing skill. No project, partial loaded history, running/queued execution, approvals, imported/remote/read-only conversations and Team members disable generation/creation. Session/project changes close the editor and prevent stale saves. Generation uses the configured model when the user explicitly requests it; no background generation occurs.
 
 Acceptance covers file names/navigation, delegate prompt/group disclosure and absence of mutation actions, generation through the real send workflow, review edits, duplicate-save locking, failed-save draft preservation, late generation/save during session switches, parser validation and isolated Host project-Skill creation/list/read/no-overwrite. The reference pinned card is a progress-summary example; it does not imply automatic memory generation. Quick Notes is not exposed in the current UI; previously stored data is retained.
 

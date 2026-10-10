@@ -81,6 +81,15 @@ function state(overrides = {}) {
     planCheckpoints: {}, queuedPrompts: {}, ...overrides };
 }
 
+test("recorded recommendation reasons are bounded and legacy suggestions remain readable", () => {
+  const reason = "The verified adapter task repeated this API mismatch and checked the installed exports.";
+  assert.deepEqual(sessionSkillSuggestions([message(block([{ ...suggestion, reason: ` ${reason} ` }]))]).suggestions, [{ ...suggestion, reason }]);
+  assert.deepEqual(sessionSkillSuggestions([message(block([suggestion]))]).suggestions, [suggestion]);
+  for (const invalidReason of [123, null, " ", "x".repeat(801)]) {
+    assert.equal(sessionSkillSuggestions([message(block([{ ...suggestion, reason: invalidReason }]))]).invalid, true);
+  }
+});
+
 test("generation and saving always resolve the session's exact project rather than a global workspace", () => {
   assert.equal(skillSuggestionProject(state({ workspace: { path: "/different-project" } }), "owner", true, false), "/project-owner");
   assert.equal(skillSuggestionProject(state({ sessions: [{ id: "owner" }] }), "owner", true, false), null);

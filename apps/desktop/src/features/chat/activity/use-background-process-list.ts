@@ -4,10 +4,13 @@ import { api } from "../../../lib/api";
 
 /** Visible-session reads coalesce notifications and reject stale completions. */
 export function useBackgroundProcessList(sessionId: string, enabled: boolean) {
-  const [state, setState] = useState<{ processes: BackgroundProcessSummary[]; loading: boolean; error: string | null }>({ processes: [], loading: false, error: null });
+  const [state, setState] = useState<{ processes: BackgroundProcessSummary[]; loading: boolean; error: string | null }>({ processes: [], loading: enabled, error: null });
+  const owner = useRef(sessionId);
   const reader = useRef<(() => void) | null>(null);
   useEffect(() => {
-    setState({ processes: [], loading: enabled, error: null });
+    const sameSession = owner.current === sessionId;
+    owner.current = sessionId;
+    setState((current) => ({ processes: sameSession ? current.processes : [], loading: enabled, error: null }));
     if (!enabled) { reader.current = null; return; }
     let disposed = false;
     let inFlight = false;
@@ -39,5 +42,5 @@ export function useBackgroundProcessList(sessionId: string, enabled: boolean) {
     };
   }, [sessionId, enabled]);
   const refresh = useCallback(() => reader.current?.(), []);
-  return { ...state, refresh };
+  return { ...state, processes: owner.current === sessionId ? state.processes : [], refresh };
 }

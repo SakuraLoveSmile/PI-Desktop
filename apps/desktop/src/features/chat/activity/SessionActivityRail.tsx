@@ -1,137 +1,144 @@
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { BackgroundProcessSummary } from "@pi-desktop/shared";
-import { IconCheck, IconChevronDown, IconCircleAlert, IconClock, IconFileText, IconLink, IconListChecks, IconRefresh, IconTerminal, IconX } from "../../../components/icons";
-import { Button, Tooltip, TooltipButton } from "../../../components/ui";
-import type { SubagentTiming } from "../../../lib/subagent-topology";
-import { SubagentActivityRow } from "./SubagentActivityRow";
+import { IconCircleAlert, IconInfo, IconRefresh, IconTerminal } from "../../../components/icons";
+import { Button, TooltipButton } from "../../../components/ui";
 import { subagentTimingIsLive } from "./subagent-row-presentation";
 import { useSubagentClock } from "./use-subagent-clock";
+import { ActivityStatus } from "./ActivityStatus";
+import { activityFailures, backgroundProcessTitle, processActivityGroups } from "./activity-rail-presentation";
+import { ActivityRailGroup, type ActivityReveal } from "./ActivityRailGroup";
+import { ActivityLimitedList, ActivityOutputRows, ActivityRailRow } from "./ActivityRailRows";
+import type { ActivityAttentionItem, ActivityRailItem } from "./activity-rail-types";
 import "./session-activity-rail.css";
 
-export type ActivityRailItem = {
-  id: string;
-  label: string;
-  path?: string;
-  detail?: string;
-  status?: string;
-  statusLabel?: string;
-  timing?: SubagentTiming;
-  onOpen?: () => void;
-};
+export { ActivityStatus } from "./ActivityStatus";
+export type { ActivityAttentionItem, ActivityRailItem } from "./activity-rail-types";
 
 export type SessionActivityRailProps = {
-  sessionId: string;
-  visible: boolean;
-  plans: ActivityRailItem[];
-  agents: ActivityRailItem[];
-  outputs: ActivityRailItem[];
-  sources: ActivityRailItem[];
-  processes: BackgroundProcessSummary[];
-  processesLoading: boolean;
-  agentsNotice?: ReactNode;
-  processesError?: string | null;
-  onRefreshProcesses: () => void;
-  onOpenProcess: (id: string) => void;
-  suggestions?: ReactNode;
-  processDetails?: ReactNode;
-  rangeLimited?: boolean;
-  supported?: boolean;
+  sessionId: string; visible: boolean; plans: ActivityRailItem[]; agents: ActivityRailItem[];
+  outputs: ActivityRailItem[]; sources: ActivityRailItem[]; teamMembers?: ActivityRailItem[];
+  attentionItems?: ActivityAttentionItem[]; processes: BackgroundProcessSummary[]; processesLoading: boolean;
+  plansAttentionReady?: boolean; agentsNotice?: ReactNode; teamNotice?: ReactNode; showTeamMembers?: boolean; processesError?: string | null;
+  onRefreshProcesses: () => void; onOpenProcess: (id: string) => void;
+  suggestions?: ReactNode; processDetails?: ReactNode; rangeLimited?: boolean; groupsRangeLimited?: boolean;
+  supported?: boolean; onLoadEarlier?: () => void; onReturnToLatest?: () => void;
+  historyLoading?: boolean; hasMoreBefore?: boolean;
 };
 
-function ActivityGroup({ label, initialOpen = true, children, action }: {
-  label: string; initialOpen?: boolean; children: ReactNode; action?: ReactNode;
-}) {
-  const [open, setOpen] = useState(initialOpen);
-  const id = useId();
-  return <section className="session-activity-group">
-    <div className="session-activity-heading">
-      <Button variant="ghost" className="session-activity-disclosure" aria-expanded={open}
-        aria-controls={id} onClick={() => setOpen((value) => !value)}>
-        {label}<IconChevronDown size={13} aria-hidden />
-      </Button>
-      {action}
-    </div>
-    <div id={id} hidden={!open} className="session-activity-group-body">{open && children}</div>
-  </section>;
-}
-
-export function ActivityStatus({ status, label, compact = false }: {
-  status: string; label: string; compact?: boolean;
-}) {
-  const error = ["failed", "error", "denied", "timed_out", "interrupted", "blocked"].includes(status);
-  const stopped = ["stopped", "aborted", "cancelled"].includes(status);
-  const completed = ["completed", "complete", "success", "done"].includes(status);
-  const active = ["running", "starting", "stopping", "working"].includes(status);
-  return <span className="session-activity-status" data-tone={error ? "error" : stopped ? "muted" : completed || active ? "success" : "muted"}
-    data-active={active} aria-label={label}>
-    {error ? <IconCircleAlert size={12} aria-hidden /> : stopped ? <IconX size={12} aria-hidden />
-      : completed ? <IconCheck size={12} aria-hidden /> : active ? <span className="session-activity-status-dot" aria-hidden />
-      : <IconClock size={12} aria-hidden />}
-    {!compact && <span>{label}</span>}
-  </span>;
-}
-
-function ActivityRow({ item, kind, now }: { item: ActivityRailItem; kind: "plan" | "agent" | "output" | "source"; now: number }) {
-  if (kind === "agent") return <SubagentActivityRow id={item.id} name={item.label} task={item.detail}
-    status={item.status} statusLabel={item.statusLabel} timing={item.timing} now={now} onOpen={item.onOpen}
-    className="session-activity-row session-activity-agent" />;
-  const outputPath = item.path ?? item.label;
-  const outputName = kind === "output" ? outputPath.split(/[\\/]/).filter(Boolean).at(-1) ?? item.label : item.label;
-  const fileKind = outputName.toLowerCase().endsWith(".md") || outputName.toLowerCase().endsWith(".mdx") ? "markdown"
-    : outputName.toLowerCase().endsWith(".txt") ? "text" : "file";
-  const title = [kind === "output" ? outputPath : item.label, item.detail, item.statusLabel].filter(Boolean).join(" · ");
-  const content = <>
-    <span className={`session-activity-icon${kind === "output" ? " session-activity-file-icon" : ""}`}
-      data-file-kind={kind === "output" ? fileKind : undefined} aria-hidden>{kind === "plan" ? <IconListChecks size={15} />
-      : kind === "source" ? <IconLink size={15} /> : kind === "output" && fileKind === "markdown" ? <svg className="session-activity-markdown-mark" viewBox="0 0 20 20" aria-hidden><rect x="2" y="2" width="16" height="16" rx="2" fill="currentColor" /><path d="M5 12V7l2.5 3L10 7v5M14 7v6m-2-2 2 2 2-2" fill="none" stroke="var(--ds-bg-primary)" strokeWidth="1.5" strokeLinejoin="round" /></svg> : <IconFileText size={15} />}</span>
-    <span className="session-activity-label">{outputName}{kind !== "output" && item.detail ? ` · ${item.detail}` : ""}</span>
-    {kind !== "output" && item.status && item.statusLabel && <ActivityStatus status={item.status} label={item.statusLabel} compact />}
-  </>;
-  return item.onOpen
-    ? <TooltipButton type="button" className={`session-activity-row${kind === "output" ? " session-activity-output" : ""}`} tooltip={title} onClick={item.onOpen} data-activity-id={item.id}>{content}</TooltipButton>
-    : <Tooltip label={title} className={`session-activity-row session-activity-readonly${kind === "output" ? " session-activity-output" : ""}`}>{content}</Tooltip>;
-}
-
 export function SessionActivityRail(props: SessionActivityRailProps) {
-  // A new session owns its own disclosure choices; hiding retains the shell's data ownership.
   return <SessionActivityRailContent key={props.sessionId} {...props} />;
 }
 
-function SessionActivityRailContent({ sessionId, visible, agentsNotice, plans, agents, outputs, sources, processes,
+// Dismissal is a renderer-lifetime view preference, never a Host mutation.
+const hiddenEndedProcesses = new Map<string, Set<string>>();
+
+function SessionActivityRailContent({ sessionId, visible, agentsNotice, teamNotice, showTeamMembers = false, plans, agents, outputs, sources, processes,
   processesLoading, processesError, onRefreshProcesses, onOpenProcess, suggestions, processDetails,
-  rangeLimited = false, supported = true }: SessionActivityRailProps) {
+  rangeLimited = false, groupsRangeLimited = rangeLimited, supported = true, plansAttentionReady = true,
+  attentionItems = [], teamMembers = [], onLoadEarlier, onReturnToLatest, historyLoading = false, hasMoreBefore = false }: SessionActivityRailProps) {
   const { t } = useTranslation();
-  const now = useSubagentClock(visible && agents.some((item) => subagentTimingIsLive(item.status, item.timing)));
-  const rows = (items: ActivityRailItem[], kind: Parameters<typeof ActivityRow>[0]["kind"]) => items.length
-    ? items.map((item) => <ActivityRow key={item.id} item={item} kind={kind} now={now} />)
-    : <p className="session-activity-empty">{t("panel.activity.empty")}</p>;
-  const sessionProcesses = processes.filter((process) => process.sessionId === sessionId);
-  return <aside hidden={!visible} inert={!visible} className="session-activity-rail" data-session-id={sessionId} aria-label={t("panel.activity.title")}>
-    {rangeLimited && <p className="session-activity-notice">{t("panel.activity.rangeLimited")}</p>}
-    <ActivityGroup label={t("panel.activity.plans")}>{rows(plans, "plan")}</ActivityGroup>
-    <ActivityGroup label={t("panel.activity.subagents")}>
-      {agentsNotice}{rows(agents, "agent")}</ActivityGroup>
-    <ActivityGroup label={t("panel.activity.processes")} action={supported &&
-      <TooltipButton type="button" className="session-activity-action" tooltip={t("panel.activity.refresh")}
-        disabled={processesLoading} onClick={onRefreshProcesses}><IconRefresh size={13} aria-hidden /></TooltipButton>}>
+  const rail = useRef<HTMLElement>(null);
+  const [reveal, setReveal] = useState<ActivityReveal>();
+  const [hiddenProcessIds, setHiddenProcessIds] = useState(() => hiddenEndedProcesses.get(sessionId) ?? new Set<string>());
+  const now = useSubagentClock(visible && [...agents, ...teamMembers].some((item) => subagentTimingIsLive(item.status, item.timing)));
+  const { active: activeProcesses, ended: endedProcesses } = processActivityGroups(processes, sessionId, hiddenProcessIds);
+  const sessionProcesses = [...activeProcesses, ...endedProcesses];
+  const failures = (items: ActivityRailItem[], group: ActivityAttentionItem["group"]) => activityFailures(items).map((item) => ({
+    id: `${group}:${item.id}`, itemId: item.id, group,
+    label: item.attentionStatus ? t(item.attentionStatus === "timed_out" ? "panel.activity.attentionTimeout" : "panel.activity.attentionFailure", { label: item.label })
+      : `${item.label} · ${item.statusLabel ?? t("panel.activity.status.failed")}`,
+  }));
+  const issues: ActivityAttentionItem[] = [...attentionItems];
+  for (const item of [...failures(plans, "plans"), ...failures(agents, "agents"), ...failures(teamMembers, "team-members"),
+    ...activityFailures(sessionProcesses).map((process) => ({ id: `processes:${process.id}`, itemId: process.id, group: "processes" as const,
+      label: `${backgroundProcessTitle(process.command)} · ${t(`panel.activity.status.${process.status}`)}` }))]) {
+    if (!issues.some((issue) => issue.group === item.group && issue.itemId === item.itemId)) issues.push(item);
+  }
+  useEffect(() => {
+    if (!reveal || !visible || reveal.focus === false) return;
+    let frame = 0;
+    const focusTarget = () => {
+      const group = [...(rail.current?.querySelectorAll<HTMLElement>("[data-activity-group]") ?? [])]
+        .find((node) => node.dataset.activityGroup === reveal.group);
+      const row = reveal.itemId ? [...(group?.querySelectorAll<HTMLElement>("[data-activity-item-id]") ?? [])]
+        .find((node) => node.dataset.activityItemId === reveal.itemId) : undefined;
+      if ((reveal.itemId && !row) || (row ?? group)?.closest("[hidden]")) return;
+      const target = row?.querySelector<HTMLElement>("button, [tabindex='0']") ?? row ?? group;
+      if (!target) return;
+      observer.disconnect();
+      target.scrollIntoView({ block: "nearest" });
+      target.focus({ preventScroll: true });
+    };
+    // Revealing an ended row may require several nested disclosures to commit.
+    const observer = new MutationObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(focusTarget);
+    });
+    if (rail.current) observer.observe(rail.current, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden"] });
+    frame = requestAnimationFrame(focusTarget);
+    return () => { observer.disconnect(); cancelAnimationFrame(frame); };
+  }, [reveal, visible]);
+  const openAttention = (item: ActivityAttentionItem) => {
+    setReveal((current) => ({ group: item.group, itemId: item.itemId, sequence: (current?.sequence ?? 0) + 1, focus: !item.onOpen }));
+    item.onOpen?.();
+  };
+  const rangeNotice = groupsRangeLimited && <div className="session-activity-range-notice">
+    <span>{t("panel.activity.loadedMessagesOnly")}</span>
+    <Button variant="ghost" size="sm" disabled={historyLoading || !hasMoreBefore || !onLoadEarlier} onClick={onLoadEarlier}>{t("panel.activity.loadEarlier")}</Button>
+    {onReturnToLatest && <Button variant="ghost" size="sm" onClick={onReturnToLatest} disabled={historyLoading}>{t("panel.activity.returnToLatest")}</Button>}
+  </div>;
+  const rows = (items: ActivityRailItem[], kind: "plan" | "agent" | "output" | "source", group: string, emptyKey: string) => items.length
+    ? <ActivityLimitedList sessionId={sessionId} group={group} items={items} reveal={reveal} keepMounted={kind === "plan"}
+      renderItem={(item) => <ActivityRailRow item={item} kind={kind} now={now} />}
+      renderItems={kind === "output" ? (visibleItems) => <ActivityOutputRows items={visibleItems} now={now} /> : undefined} />
+    : <p className="session-activity-empty">{t(`panel.activity.${emptyKey}`)}</p>;
+  const processRow = (process: BackgroundProcessSummary) => {
+    const title = backgroundProcessTitle(process.command);
+    const open = () => onOpenProcess(process.id);
+    return <div className="session-activity-row-shell">
+      <TooltipButton type="button" className="session-activity-row session-activity-process" data-process-id={process.id}
+        tooltip={`${process.command}\n${process.cwd}`} ariaLabel={`${t("panel.activity.openProcess")} · ${title} · ${t(`panel.activity.status.${process.status}`)}`} onClick={open}>
+        <span className="session-activity-icon" aria-hidden><IconTerminal size={15} /></span>
+        <span className="session-activity-label session-activity-command">{title}</span>
+        <ActivityStatus status={process.status} label={t(`panel.activity.status.${process.status}`)} />
+      </TooltipButton>
+      <span className="session-activity-tail-actions"><TooltipButton type="button" className="session-activity-action" tooltip={t("panel.activity.details")} onClick={open}><IconInfo size={14} aria-hidden /></TooltipButton></span>
+    </div>;
+  };
+  const clearEnded = () => {
+    const next = new Set([...hiddenProcessIds, ...endedProcesses.map((process) => process.id)]);
+    hiddenEndedProcesses.set(sessionId, next); setHiddenProcessIds(next);
+  };
+  return <aside ref={rail} hidden={!visible} inert={!visible} className="session-activity-rail" data-session-id={sessionId} aria-label={t("panel.activity.title")}>
+    {issues.length > 0 && <section className="session-activity-attention" aria-label={t("panel.activity.needsAttention")}>
+      <div className="session-activity-attention-title"><IconCircleAlert size={14} aria-hidden /><span>{t("panel.activity.needsAttention")}</span><span>{issues.length}</span></div>
+      <ActivityLimitedList sessionId={sessionId} group="attention" items={issues} renderItem={(item) =>
+        <Button variant="ghost" className="session-activity-attention-link" onClick={() => openAttention(item)}>{item.label}</Button>} />
+    </section>}
+    <p className="session-activity-section-label">{t("panel.activity.liveStatus")}</p>
+    <ActivityRailGroup sessionId={sessionId} group="plans" reveal={reveal} keepMounted trackAttention={visible} preserveAttention={!plansAttentionReady} label={t("panel.activity.plans")} items={plans}>{rows(plans, "plan", "plans", "emptyPlans")}</ActivityRailGroup>
+    <ActivityRailGroup sessionId={sessionId} group="agents" reveal={reveal} trackAttention={visible} label={t("panel.activity.subagents")} items={agents}>
+      {rangeNotice}{agentsNotice}{rows(agents, "agent", "agents", "emptyAgents")}</ActivityRailGroup>
+    {(showTeamMembers || teamMembers.length > 0) && <ActivityRailGroup sessionId={sessionId} group="team-members" reveal={reveal} trackAttention={visible && !teamNotice} label={t("panel.activity.teamMembers")} items={teamMembers}>
+      {teamNotice}{rows(teamMembers, "agent", "team-members", "emptyTeamMembers")}</ActivityRailGroup>}
+    <ActivityRailGroup sessionId={sessionId} group="processes" reveal={reveal} trackAttention={visible && !processesLoading && !processesError} label={t("panel.activity.processes")} items={sessionProcesses} action={supported &&
+      <TooltipButton type="button" className="session-activity-action" tooltip={t("panel.activity.refresh")} disabled={processesLoading} onClick={onRefreshProcesses}><IconRefresh size={13} aria-hidden /></TooltipButton>}>
       {!supported ? <p className="session-activity-empty">{t("panel.activity.unsupported")}</p> : <>
         {processesLoading && <p className="session-activity-empty" role="status">{t("panel.activity.loading")}</p>}
-        {processesError && <div className="session-activity-error" role="alert"><p>{processesError}</p>
-          <Button variant="ghost" size="sm" onClick={onRefreshProcesses}>{t("panel.activity.retry")}</Button></div>}
-        {sessionProcesses.map((process) => <TooltipButton key={process.id} type="button" className="session-activity-row session-activity-process"
-          data-process-id={process.id} tooltip={`${process.command}\n${process.cwd}`} ariaLabel={`${t("panel.activity.openProcess")} · ${process.command} · ${t(`panel.activity.status.${process.status}`)}`}
-          onClick={() => onOpenProcess(process.id)}>
-          <span className="session-activity-icon" aria-hidden><IconTerminal size={15} /></span>
-          <span className="session-activity-label session-activity-command">{process.command}</span>
-          <ActivityStatus status={process.status} label={t(`panel.activity.status.${process.status}`)} />
-        </TooltipButton>)}
-        {!processesLoading && !processesError && sessionProcesses.length === 0 && <p className="session-activity-empty">{t("panel.activity.empty")}</p>}
-        {processDetails}
+        {processesError && <div className="session-activity-error" role="alert"><p>{processesError}</p><Button variant="ghost" size="sm" onClick={onRefreshProcesses}>{t("panel.activity.retry")}</Button></div>}
+        <ActivityLimitedList sessionId={sessionId} group="processes" items={activeProcesses} reveal={reveal} renderItem={processRow} />
+        {endedProcesses.length > 0 && <ActivityRailGroup sessionId={sessionId} group="ended-processes" reveal={reveal} trackAttention={visible && !processesLoading && !processesError} initialOpen={false}
+          label={t("panel.activity.endedProcesses", { count: endedProcesses.length })} items={endedProcesses} showSummary={false}
+          action={<Button variant="ghost" size="sm" className="session-activity-clear-ended" aria-label={t("panel.activity.clearEndedProcesses")} onClick={clearEnded}>{t("panel.activity.clearEndedProcesses")}</Button>}>
+          <ActivityLimitedList sessionId={sessionId} group="ended-processes" items={endedProcesses} reveal={reveal} renderItem={processRow} />
+        </ActivityRailGroup>}
+        {!processesLoading && !processesError && sessionProcesses.length === 0 && <p className="session-activity-empty">{t("panel.activity.emptyProcesses")}</p>}{processDetails}
       </>}
-    </ActivityGroup>
+    </ActivityRailGroup>
     {suggestions}
-    <ActivityGroup label={t("panel.activity.outputs")} initialOpen={false}>{rows(outputs, "output")}</ActivityGroup>
-    <ActivityGroup label={t("panel.activity.sources")} initialOpen={false}>{rows(sources, "source")}</ActivityGroup>
+    <p className="session-activity-section-label session-activity-artifacts-label">{t("panel.activity.artifacts")}</p>
+    <ActivityRailGroup sessionId={sessionId} group="outputs" trackAttention={visible} label={t("panel.activity.outputs")} items={outputs} initialOpen={false}>{rangeNotice}{rows(outputs, "output", "outputs", "emptyOutputs")}</ActivityRailGroup>
+    <ActivityRailGroup sessionId={sessionId} group="sources" trackAttention={visible} label={t("panel.activity.sources")} items={sources} initialOpen={false}>{rangeNotice}{rows(sources, "source", "sources", "emptySources")}</ActivityRailGroup>
   </aside>;
 }

@@ -172,6 +172,18 @@ app.whenReady().then(async () => {
     if (process.env.PI_SESSION_ACTIVITY_SCREENSHOT) {
       await require("node:fs/promises").writeFile(process.env.PI_SESSION_ACTIVITY_SCREENSHOT, (await window.webContents.capturePage()).toPNG());
     }
+    if (process.env.PI_SESSION_ACTIVITY_LIGHT_SCREENSHOT) {
+      const theme = await window.webContents.executeJavaScript("document.documentElement.getAttribute('data-theme')");
+      await window.webContents.executeJavaScript("document.documentElement.setAttribute('data-theme', 'light'); new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
+      await window.webContents.executeJavaScript("Promise.all(document.getAnimations().filter(animation => animation.effect?.getComputedTiming().iterations !== Infinity).map(animation => animation.finished))");
+      await require("node:fs/promises").writeFile(process.env.PI_SESSION_ACTIVITY_LIGHT_SCREENSHOT, (await window.webContents.capturePage()).toPNG());
+      await window.webContents.executeJavaScript(theme === null ? "document.documentElement.removeAttribute('data-theme')" : "document.documentElement.setAttribute('data-theme', " + JSON.stringify(theme) + ")");
+    }
+    if (process.env.PI_SESSION_ACTIVITY_ARTIFACTS_SCREENSHOT) {
+      await window.webContents.executeJavaScript("(() => { const rail = document.querySelector('.session-pane[data-visible=true] .session-activity-rail'); const scroll = rail?.closest('.session-activity-scroll, .session-pane-activity'); if (scroll) scroll.scrollTop = scroll.scrollHeight; })(); new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
+      await window.webContents.executeJavaScript("Promise.all(document.getAnimations().filter(animation => animation.effect?.getComputedTiming().iterations !== Infinity).map(animation => animation.finished))");
+      await require("node:fs/promises").writeFile(process.env.PI_SESSION_ACTIVITY_ARTIFACTS_SCREENSHOT, (await window.webContents.capturePage()).toPNG());
+    }
     if (process.env.PI_COMPOSER_SCREENSHOT_DIR) {
       const fs = require("node:fs/promises");
       await fs.mkdir(process.env.PI_COMPOSER_SCREENSHOT_DIR, { recursive: true });

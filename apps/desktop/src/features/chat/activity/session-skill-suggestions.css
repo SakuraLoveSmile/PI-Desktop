@@ -18,13 +18,21 @@
 .session-skill-suggestions-toggle span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .session-skill-suggestions-body { margin-top: 8px; }
 .session-skill-references { margin: 0; padding: 0; list-style: none; }
+.session-skill-reference-row { display: flex; align-items: center; min-width: 0; gap: 4px; }
 .session-skill-reference,
 .session-skill-reference.btn {
   display: flex; align-items: center; width: 100%; min-width: 0; min-height: 40px;
   padding: 4px 0; gap: 10px; text-align: left; color: var(--ds-text-secondary);
   border: 0; border-radius: var(--radius-xs); background: transparent;
 }
+.session-skill-reference-row > .session-skill-reference { flex: 1; }
 .session-skill-reference.btn:hover { background: var(--ds-bg-hover); color: var(--ds-text-primary); }
+.session-skill-reference-ignore {
+  flex: 0 0 var(--ds-control-size); opacity: 0; color: var(--ds-text-muted);
+}
+.session-skill-reference-row:hover .session-skill-reference-ignore,
+.session-skill-reference-row:focus-within .session-skill-reference-ignore { opacity: 1; }
+.session-skill-reference-ignore:hover { color: var(--ds-text-primary); }
 .session-skill-reference-icon {
   display: flex; align-items: center; justify-content: center; flex: 0 0 30px;
   width: 30px; height: 30px; border-radius: var(--radius-2xs); background: var(--ds-bg-tertiary);
@@ -62,7 +70,15 @@
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
   overflow-wrap: anywhere;
 }
+.session-skill-suggestion-rationale { display: grid; gap: 3px; color: var(--ds-text-muted); font-size: var(--text-xs); }
+.session-skill-suggestion-rationale .session-skill-suggestion-description { color: var(--ds-text-secondary); }
+.session-skill-references-toggle.btn {
+  min-height: 26px; padding: 3px 0; border: 0; border-radius: 0;
+  color: var(--ds-text-muted); font-size: var(--text-sm);
+}
+.session-skill-references-toggle.btn:hover { background: transparent; color: var(--ds-text-primary); }
 .session-skill-suggestions-generate.btn { margin-top: 10px; }
 @media (hover: none) {
   .session-skill-suggestion-actions { opacity: 1; }
+  .session-skill-reference-ignore { opacity: 1; }
 }

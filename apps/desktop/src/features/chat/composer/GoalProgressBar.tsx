@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { GoalReportChangedEvent, PlanProposal } from "@pi-desktop/shared";
-import { api } from "../../../lib/api";
+import type { PlanProposal } from "@pi-desktop/shared";
+import { useGoalActivity } from "../../../hooks/useGoalActivity";
 import { Button } from "../../../components/ui";
 import { IconChevronDown, IconChevronRight } from "../../../components/icons";
 import { usePendingTeamExecutionReview } from "../../../hooks/useTeamExecutionReview";
@@ -9,9 +9,6 @@ import { useAppStore } from "../../../stores/app-store";
 import {
   shouldShowGoalProgressBar,
   resolveGoalCapsuleState,
-  selectExecutionProgressState,
-  shouldAcceptGoalProgressSnapshot,
-  type GoalProgressViewState,
 } from "../../../lib/goal-progress-presentation";
 
 const sessionCollapsePreferences = new Map<string, boolean>();
@@ -32,17 +29,7 @@ export function GoalProgressBar({ sessionId, proposal }: GoalProgressBarProps) {
   const [expanded, setExpanded] = useState<boolean>(() => {
     return sessionCollapsePreferences.get(sessionId) ?? false;
   });
-  const executionId = proposal.executionId ?? "";
-  const stateKey = `${sessionId}\u0000${executionId}`;
-  const [progressState, setProgressState] = useState<GoalProgressViewState>(() => ({
-    executionId: stateKey,
-    progress: null,
-    reportReady: false,
-    error: null,
-    loading: Boolean(executionId),
-  }));
-  const currentState = selectExecutionProgressState(progressState, stateKey);
-  const { progress, loading, error, reportReady } = currentState;
+  const { progress, loading, error, reportReady } = useGoalActivity(sessionId, proposal.executionId);
 
   useEffect(() => {
     setExpanded(sessionCollapsePreferences.get(sessionId) ?? false);
@@ -55,125 +42,6 @@ export function GoalProgressBar({ sessionId, proposal }: GoalProgressBarProps) {
       return next;
     });
   };
-
-  // Poll / subscribe to report status and progress snapshot
-  useEffect(() => {
-    if (!executionId) {
-      setProgressState({
-        executionId: stateKey,
-        progress: null,
-        reportReady: false,
-        error: null,
-        loading: false,
-      });
-      return;
-    }
-
-    let isMounted = true;
-    let progressRequestSequence = 0;
-    const resetState = () => setProgressState({
-      executionId: stateKey,
-      progress: null,
-      reportReady: false,
-      error: null,
-      loading: true,
-    });
-    resetState();
-
-    // Check existing report status
-    api.getGoalReport({ sessionId, executionId })
-      .then((res) => {
-        if (isMounted && res?.report?.status === "ready") {
-          setProgressState((state) => state.executionId === stateKey
-            ? { ...state, reportReady: true }
-            : state);
-        }
-      })
-      .catch(() => {
-        // Report might not exist yet
-      });
-
-    // Check existing progress
-    const initialRequestSequence = ++progressRequestSequence;
-    api.getGoalProgress({ sessionId, executionId })
-      .then((res) => {
-        if (isMounted && initialRequestSequence === progressRequestSequence) {
-          const candidate = res?.progress ?? null;
-          const incoming = candidate?.executionId === executionId && candidate.sessionId === sessionId
-            ? candidate
-            : null;
-          setProgressState((state) => {
-            if (state.executionId !== stateKey) return state;
-            return {
-              ...state,
-              progress: shouldAcceptGoalProgressSnapshot(state.progress, incoming)
-                ? incoming
-                : state.progress,
-              error: null,
-              loading: false,
-            };
-          });
-        }
-      })
-      .catch((err: unknown) => {
-        if (isMounted && initialRequestSequence === progressRequestSequence) {
-          setProgressState((state) => state.executionId === stateKey
-            ? { ...state, error: err instanceof Error ? err.message : String(err), loading: false }
-            : state);
-        }
-      });
-
-    // Subscribe to report changes
-    const unsubReport = api.onGoalReportChanged((event: GoalReportChangedEvent) => {
-      if (!isMounted) return;
-      if (event?.sessionId === sessionId && event?.executionId === executionId && event?.status === "ready") {
-        setProgressState((state) => state.executionId === stateKey
-          ? { ...state, reportReady: true }
-          : state);
-      }
-    });
-
-    // Subscribe to progress changes
-    const unsubProgress = api.onGoalProgressChanged((event) => {
-      if (!isMounted) return;
-      if (event?.sessionId === sessionId && event?.executionId === executionId) {
-        const requestSequence = ++progressRequestSequence;
-        api.getGoalProgress({ sessionId, executionId })
-          .then((res) => {
-            if (isMounted && requestSequence === progressRequestSequence) {
-              const candidate = res?.progress ?? null;
-              const incoming = candidate?.executionId === executionId && candidate.sessionId === sessionId
-                ? candidate
-                : null;
-              setProgressState((state) => {
-                if (state.executionId !== stateKey) return state;
-                return {
-                  ...state,
-                  progress: shouldAcceptGoalProgressSnapshot(state.progress, incoming)
-                    ? incoming
-                    : state.progress,
-                  error: null,
-                  loading: false,
-                };
-              });
-            }
-          })
-          .catch((err: unknown) => {
-            if (isMounted && requestSequence === progressRequestSequence) {
-              setProgressState((state) => state.executionId === stateKey
-                ? { ...state, error: err instanceof Error ? err.message : String(err) }
-                : state);
-            }
-          });
-      }
-    });
-
-    return () => {
-      isMounted = false;
-      unsubReport();
-      unsubProgress();
-    };
-  }, [sessionId, executionId, stateKey]);
 
   if (!shouldShowGoalProgressBar({ proposal, reportReady })) {
     return null;
