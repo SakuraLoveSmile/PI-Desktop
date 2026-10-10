@@ -1212,3 +1212,30 @@ are observable errors; no partial memory save is published. History search is
 scoped before pagination. Context reads enforce the same current group membership
 and exclude deleted sources. Code index scanning runs outside the async worker
 and binding is rechecked after the blocking operation.
+
+
+### 成员失败通知（2026-10-11）
+
+成员 turn 以 `error` 赢得终结 CAS 时，Host 在同一事务写入一条 lead 邮件，
+沿用 ledger 的 `kind: "message"` 和字符串 `content`；内容为 JSON：
+`{kind:"member_failed",memberName,errorCode,retriable,taskIds,suggestedAction}`。
+只携带净化的错误码，不携带原始错误、路径或凭据。任务 ID 包括成员尚未结束的
+任务，以及此次精确 attempt 刚转为 failed 的任务。
+`retriable` 仅是保守建议：`HOST_OVERLOADED`、`HOST_UNAVAILABLE`、`PROVIDER_RATE_LIMITED`、
+`TIMEOUT` 为 true，其余/未知错误先检查，再明确重新派发，不授权自动重试。
+
+`member-turn-failed:<turnId>` 为 Host 保留的幂等键；模型通过 `team.sendMessage`
+使用此前缀会返回 `TEAM_UNAUTHORIZED`。终结 CAS、邮件、可信来源证明和 Team revision
+同时提交；重复终结不重复通知，成功、用户 abort/cancel 不生成通知。
+提交后沿用 `team.messageQueued` 唤醒等待中的 lead；空闲 lead 由 Main 现有持久化队列
+投递路径唤醒，不改变 Agent Host 队列语义。重启沿用 pending-mail drain 恢复未投递邮件。
+
+批准执行中的通知同时带 `team-message-source-turn-v1` 和 Host 专属
+`team-member-failure-v1` 证明；仅此证明允许当前 dispatch 的 error turn 结果进入
+execution inbox。成员伪造 `member_failed` 文本不构成证明，aborted 来源仍被排除。
+未读失败通知阻止完成，直到 `wait_for_updates` 消费完整内容；消费失败不算成功专家参与。
+
+
+提交后检查点 I/O 失败仍保留原错误，并对已落盘且尚在 queued 状态的失败邮件发出既有
+唤醒事件。终结重放可以再次唤醒同一 pending 邮件，但不新建第二条；已消费或 running
+的邮件不再发出事件。

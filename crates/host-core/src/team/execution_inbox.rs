@@ -174,8 +174,9 @@ fn current_expert_result(
     };
     for dispatch in &decision.message_ids {
         let matches: bool = db.conn().query_row("SELECT EXISTS(SELECT 1 FROM session_collaboration_messages m JOIN turns t ON t.id=m.turn_id AND t.session_id=m.target_session_id
-            WHERE m.id=?1 AND m.turn_id=?2 AND m.source_session_id=?3 AND m.target_session_id=?4 AND t.status IN ('running','completed'))",
-            params![dispatch, source, decision.team_session_id, message.source_session_id], |r|r.get(0))?;
+            WHERE m.id=?1 AND m.turn_id=?2 AND m.source_session_id=?3 AND m.target_session_id=?4 AND (t.status IN ('running','completed') OR (t.status='error' AND EXISTS(
+              SELECT 1 FROM kv k WHERE k.ns=?5 AND k.key=?6 AND json_extract(k.value_json,'$')=t.id))))",
+            params![dispatch, source, decision.team_session_id, message.source_session_id, super::member_failure::PROOF_NS, message.id], |r|r.get(0))?;
         if matches {
             return Ok(true);
         }

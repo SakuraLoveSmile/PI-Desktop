@@ -16901,6 +16901,35 @@ renderer's durable transcript reads. No real model or provider is contacted.
   persistence and restart contracts are covered by `mcp-control-settings.test.mjs`.
 
 
+### E2E-TEAM-member-failure-wakes-lead
+
+- **Preconditions:** Candidate Host and runtime build; isolated Host data and
+  workspace, a configured no-auth loopback route that is never invoked.
+- **Steps:** Approve a Goal Team roster, settle one successful contribution,
+  then fail a member after a provisional task claim while the Lead waits.
+  Attempt completion before reading the notice. Consume it through the production
+  wait tool, replay the terminal event, and inspect the failed task. End the Lead,
+  fail a later dispatched member turn, and feed the actual Host notification to
+  production Main delivery with the real Agent Host/durable Host queue. Replay
+  the notification and abort another member turn.
+- **Expected:** Exactly one full `member_failed` notice names the member, error
+  code, advisory retry classification and affected task. Unread notice blocks
+  completion; consumed notice permits the settled gate while preserving the
+  separate successful-participation rule. Existing notification wakes the wait
+  and idle Lead; duplicate terminal/notification cannot create another prompt.
+  User abort creates no failure notice. Invalid error text cannot leak paths.
+  A post-commit checkpoint I/O error remains observable while the durable notice
+  still wakes an idle Lead. Replayed terminals re-notify only the same queued
+  row; after consumption/admission no additional wake event is emitted.
+- **Automation:** `node scripts/e2e-team-member-failure.mjs` (real Host stdio,
+  production runtime wait/Main delivery/Agent Host queue; the model runtime port
+  is a fake that starts an authenticated Host mailbox turn). Rust additionally
+  covers transaction rollback, counterfeit body/proof rejection, reserved keys
+  and deletion cleanup; runtime fake-clock tests cover complete body and timers.
+- **Specs:** 03-runtime/06-host-rpc-protocol;
+  [Team collaboration decision](../../adr/plus-expert-team-collaboration.md),
+  Host-authored member failure amendment.
+
 ### E2E-TEAM-task-completion
 
 - **Preconditions:** Isolated Host data/workspace, configured no-auth fixture
