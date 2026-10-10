@@ -375,7 +375,7 @@ ADR 0285）。渲染进程除了一个标识徽章外看不到本地/远程之�
 | `TEAM_MAILBOX_FULL` | 是 | 收件人的待处理团队消息已达到上限 |
 | `TEAM_MESSAGE_PAYLOAD_TOO_LARGE` | 否 | 团队消息超过 64 KiB 载荷上限 |
 | `TEAM_DELIVERY_PENDING` | 是 | Host 尚未持久化收件人的队列或 turn 回执 |
-| `TEAM_APPROVAL_REQUIRED` | 否 | 缺少当前 Team 启动 authority 或获批专家实际启动；Agent 需要用户确认，Plan 研究自动启动。 |
+| `TEAM_APPROVAL_REQUIRED` | 否 | 缺少当前 Team 启动 authority、获批专家实际启动或获批执行结算；Agent 需要用户确认，Plan 研究自动启动。 |
 | `TEAM_REVIEW_REVISION_CONFLICT` | 是 | 启动审查版本在调用方读取后已发生变化 |
 | `TEAM_CONFIG_CONFLICT` | yes | expert preset settings changed after the caller read them; reload before retry |
 | `TEAM_MODEL_SELECTION_INVALID` | 否 | 提议的模型/提供商/思考路线无法启动 |
@@ -552,3 +552,7 @@ transcript 保留稳定错误码、传输 errno 和原始 details，但使用本
 | `BACKGROUND_PROCESS_START_FAILED` | yes | 已授权后台执行器无法启动 |
 | `BACKGROUND_PROCESS_PERSISTENCE_FAILED` | yes | 托管进程状态无法存储；修复存储后重试 |
 | `SESSION_HAS_BACKGROUND_PROCESSES` | yes | 删除或移动会话前停止活动托管进程 |
+
+### Team Goal 结算拒绝（2026-10-11）
+
+获批 Team 执行仍有排队／运行派遣或未消费专家结果时，`TEAM_APPROVAL_REQUIRED` 也会在 `SubmitGoalReport` 主体之前拒绝。消息标明派遣、成员、分配的未完成任务和未消费数量。已确认名单最多三次带该原因的完成恢复提示，再次拒绝保留宿主原文（正常传输分类／脱敏后），阶段保持 `team_completion`。不得替换成缺少名单的说明，也不得把工具主体之前的授权拒绝归为草稿持久化失败。

@@ -37,7 +37,7 @@ const STREAM_TERMINATION_PATTERN =
  * by the Google Generative AI adapter" (issue #1072). */
 const UNSUPPORTED_ADAPTER_OPTION_PATTERN = /is not supported by the .{0,60}adapter/i;
 
-function redactSensitiveErrorText(message: string): string {
+export function redactSensitiveErrorText(message: string): string {
   return message
     .replace(
       /(["']?authorization["']?\s*[:=]\s*["']?\s*bearer\s+)[^\s,"'}]+/gi,

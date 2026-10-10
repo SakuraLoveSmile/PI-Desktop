@@ -173,13 +173,14 @@ IDs come from executable result/test calls and annotated dynamic suites. 文档�
 | E2E-DELEGATION-standard-delegates-to-subagents | [scripts/e2e-subagent-models.mjs:352](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-subagent-models.mjs#L352) |
 | E2E-fatal | [scripts/e2e-smoke.mjs:836](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-smoke.mjs#L836) |
 | E2E-fixed-tool-declarations | [scripts/e2e-fixed-tool-declarations.mjs:50](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-fixed-tool-declarations.mjs#L50) |
-| E2E-GOAL-REPORT-001 | [scripts/e2e-goal-report.mjs:67](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-goal-report.mjs#L67) |
-| E2E-GOAL-REPORT-002 | [scripts/e2e-goal-report.mjs:250](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-goal-report.mjs#L250) |
-| E2E-GOAL-REPORT-003 | [scripts/e2e-goal-report.mjs:381](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-goal-report.mjs#L381) |
-| E2E-GOAL-REPORT-004 | [scripts/e2e-goal-report.mjs:439](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-goal-report.mjs#L439) |
-| E2E-GOAL-REPORT-005 | [scripts/e2e-goal-report.mjs:498](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-goal-report.mjs#L498) |
-| E2E-GOAL-REPORT-006 | [scripts/e2e-goal-report.mjs:572](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-goal-report.mjs#L572) |
-| E2E-GOAL-REPORT-007 | [scripts/e2e-goal-report.mjs:322](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-goal-report.mjs#L322) |
+| E2E-GOAL-REPORT-001 | [scripts/e2e-goal-report.mjs:143](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-goal-report.mjs#L143) |
+| E2E-GOAL-REPORT-002 | [scripts/e2e-goal-report.mjs:326](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-goal-report.mjs#L326) |
+| E2E-GOAL-REPORT-003 | [scripts/e2e-goal-report.mjs:457](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-goal-report.mjs#L457) |
+| E2E-GOAL-REPORT-004 | [scripts/e2e-goal-report.mjs:515](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-goal-report.mjs#L515) |
+| E2E-GOAL-REPORT-005 | [scripts/e2e-goal-report.mjs:574](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-goal-report.mjs#L574) |
+| E2E-GOAL-REPORT-006 | [scripts/e2e-goal-report.mjs:648](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-goal-report.mjs#L648) |
+| E2E-GOAL-REPORT-007 | [scripts/e2e-goal-report.mjs:398](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-goal-report.mjs#L398) |
+| E2E-GOAL-report-waits-for-settled-team | [scripts/e2e-goal-report.mjs:75](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-goal-report.mjs#L75); [scripts/e2e-suite-catalog.json (goal-report)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
 | E2E-GOAL-UI-001 | [scripts/e2e-goal-report-ui.mjs:64](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-goal-report-ui.mjs#L64) |
 | E2E-GOAL-UI-002 | [scripts/e2e-goal-report-ui.mjs:225](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-goal-report-ui.mjs#L225) |
 | E2E-GOAL-UI-003 | [scripts/e2e-goal-report-ui.mjs:263](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-goal-report-ui.mjs#L263) |
@@ -225,6 +226,7 @@ IDs come from executable result/test calls and annotated dynamic suites. 文档�
 | E2E-SKILL-MARKET-NET-BOUNDARY | [scripts/e2e-skill-market.mjs:173](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-skill-market.mjs#L173) |
 | E2E-SKILL-MARKET-SIZE-LIMIT | [scripts/e2e-skill-market.mjs:198](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-skill-market.mjs#L198) |
 | E2E-system-transcript | [scripts/e2e-system-transcript.mjs:44](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-system-transcript.mjs#L44) |
+| E2E-TEAM-completion-error-keeps-host-reason | [scripts/e2e-goal-report.mjs:129](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-goal-report.mjs#L129); [scripts/e2e-suite-catalog.json (goal-report)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
 | E2E-TEAM-task-completion | [scripts/e2e-team-task-completion.mjs:14](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-team-task-completion.mjs#L14) |
 | E2E-TEAM-turn-renders-chronological-timeline | [scripts/e2e-team-planning.mjs:480](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-team-planning.mjs#L480) |
 | E2E-TURN-GET | [scripts/e2e-turn-get.mjs:90](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-turn-get.mjs#L90) |

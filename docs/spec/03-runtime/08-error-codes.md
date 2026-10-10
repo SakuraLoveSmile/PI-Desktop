@@ -383,7 +383,7 @@ with teammates, shared task boards, and peer mailboxes.
 | `TEAM_MAILBOX_FULL` | yes | the recipient has reached the queued Team message limit |
 | `TEAM_MESSAGE_PAYLOAD_TOO_LARGE` | no | the Team message exceeds the 64 KiB payload limit |
 | `TEAM_DELIVERY_PENDING` | yes | the Host has not yet persisted a durable recipient queue or turn receipt |
-| `TEAM_APPROVAL_REQUIRED` | no | current Team launch authority or actual approved expert start is missing; Agent requires user confirmation, Plan research launches automatically |
+| `TEAM_APPROVAL_REQUIRED` | no | current Team launch authority, actual approved expert start, or approved execution settlement is missing; Agent requires user confirmation, Plan research launches automatically |
 | `TEAM_REVIEW_REVISION_CONFLICT` | yes | the launch review revision changed after the caller read it |
 | `TEAM_CONFIG_CONFLICT` | yes | expert preset settings changed after the caller read them; reload before retry |
 | `TEAM_MODEL_SELECTION_INVALID` | no | a proposed provider/model/thinking route cannot be launched |
@@ -608,3 +608,14 @@ remain idempotent. Cancelled roster waits interrupt execution, not complete it.
 | `BACKGROUND_PROCESS_START_FAILED` | yes | Authorized background runner could not start |
 | `BACKGROUND_PROCESS_PERSISTENCE_FAILED` | yes | Managed process state could not be stored; restore storage and retry |
 | `SESSION_HAS_BACKGROUND_PROCESSES` | yes | Stop active managed jobs before deleting or moving their session |
+
+### Team Goal settlement denials (2026-10-11)
+
+`TEAM_APPROVAL_REQUIRED` also rejects `SubmitGoalReport` before its body runs when
+an approved Team execution has queued/running dispatches or unconsumed expert
+results. The message identifies dispatches, members, assigned open tasks and the
+unconsumed count. Confirmed rosters receive three bounded completion nudges that
+include that reason; the following rejection retains the Host message verbatim
+(after normal transport classification/redaction), with `stage: team_completion`.
+The runtime must not replace it with a missing-roster explanation or classify
+the pre-tool authorization denial as draft-persistence failure.

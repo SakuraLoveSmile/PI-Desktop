@@ -80,6 +80,14 @@ pub(crate) fn validate_lead_tool(db: &Database, session: &str, tool: &str) -> Re
     ) {
         return Ok(());
     }
+    // A report must explain queued work even before the first expert starts.
+    // Final-answer participation and non-execution authority keep their order.
+    if tool == "SubmitGoalReport" {
+        let turn = sessions::running_turn_id(db, session)?.unwrap_or_default();
+        if super::execution_inbox::state(db, session, session, &turn)?.active {
+            super::execution_inbox::require_settled(db, &decision)?;
+        }
+    }
     require_expert_participation(db, &decision)?;
     if tool == "TeamFinalAnswer" {
         let turn = sessions::running_turn_id(db, session)?.unwrap_or_default();

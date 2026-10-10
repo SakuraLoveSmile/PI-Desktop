@@ -246,3 +246,182 @@ fn goal_token_and_report_binding_survive_inbox_and_terminal_completion_invalidat
             .is_err()
     );
 }
+
+#[test]
+fn goal_report_waits_for_dispatches_and_results_in_original_execution() {
+    let (db, lead, turn) = fixture();
+    db.conn().execute("UPDATE plan_approvals SET kind='goal', artifact_relative_path='.pi/goal/goal.md',artifact_sha256='abc',artifact_size_bytes=1 WHERE execution_id='execution'", []).unwrap();
+    crate::goal_reports::bind_execution_turn(&db, "execution", &turn).unwrap();
+    let review = declare_team_strategy(
+        &db,
+        DeclareStrategyParams {
+            team_session_id: &lead,
+            caller_session_id: &lead,
+            lead_turn_id: &turn,
+            strategy: "delegate",
+            reason: "Goal expert",
+            members: Some(vec![super::test_support::expert_proposal("expert")]),
+        },
+    )
+    .unwrap()
+    .1
+    .unwrap();
+    let (_, decision) =
+        confirm_launch_review(&db, &lead, &review.review_id, review.revision).unwrap();
+    read(&db, &lead, &lead, &turn).unwrap();
+    assert!(
+        super::authority::validate_lead_tool(&db, &lead, "SubmitGoalReport")
+            .unwrap_err()
+            .to_string()
+            .contains("dispatch an approved expert")
+    );
+    create_team_task(
+        &db,
+        CreateTaskParams {
+            team_session_id: &lead,
+            caller_session_id: &lead,
+            task_id: Some("goal-task"),
+            subject: "Verify source",
+            description: None,
+            blocked_by: None,
+            write_scopes: None,
+            owner_session_id: None,
+            owner_member_name: Some("expert"),
+        },
+    )
+    .unwrap();
+    let dispatch = send_team_message(
+        &db,
+        SendMessageParams {
+            team_session_id: &lead,
+            caller_session_id: &lead,
+            target_identifier: "expert",
+            content: "Verify source",
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    super::authority::record_dispatch(&db, &lead, &dispatch, false).unwrap();
+    let queued_only = super::authority::validate_lead_tool(&db, &lead, "SubmitGoalReport")
+        .unwrap_err()
+        .to_string();
+    assert!(
+        queued_only.contains("expert")
+            && queued_only.contains(&dispatch.id)
+            && queued_only.contains("goal-task"),
+        "{queued_only}"
+    );
+    let member_turn = session_collaboration::begin_turn(
+        &db,
+        &decision.member_session_ids[0],
+        &dispatch.id,
+        None,
+        None,
+    )
+    .unwrap();
+    assert!(state(&db, &lead, &lead, &turn).unwrap().active);
+    let running = super::authority::validate_lead_tool(&db, &lead, "SubmitGoalReport")
+        .unwrap_err()
+        .to_string();
+    assert!(
+        running.contains("expert")
+            && running.contains(&dispatch.id)
+            && running.contains("goal-task"),
+        "{running}"
+    );
+    let queued = send_team_message(
+        &db,
+        SendMessageParams {
+            team_session_id: &lead,
+            caller_session_id: &lead,
+            target_identifier: "expert",
+            content: "Second check",
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    super::authority::record_dispatch(&db, &lead, &queued, false).unwrap();
+    let rejected = super::authority::validate_lead_tool(&db, &lead, "SubmitGoalReport")
+        .unwrap_err()
+        .to_string();
+    assert!(
+        rejected.contains(&queued.id) && rejected.contains(&dispatch.id),
+        "{rejected}"
+    );
+    db.conn()
+        .execute(
+            "UPDATE session_collaboration_messages SET status='cancelled' WHERE id=?1",
+            [&queued.id],
+        )
+        .unwrap();
+    // Settlement does not grant participation to failed experts or task claims.
+    db.conn()
+        .execute(
+            "UPDATE turns SET status='failed' WHERE id=?1",
+            [&member_turn],
+        )
+        .unwrap();
+    db.conn().execute("UPDATE team_tasks SET status='completed' WHERE team_session_id=?1 AND task_id='goal-task'", [&lead]).unwrap();
+    assert!(
+        super::authority::validate_lead_tool(&db, &lead, "SubmitGoalReport")
+            .unwrap_err()
+            .to_string()
+            .contains("dispatch an approved expert")
+    );
+    db.conn()
+        .execute(
+            "UPDATE turns SET status='running' WHERE id=?1",
+            [&member_turn],
+        )
+        .unwrap();
+    db.conn().execute("UPDATE team_tasks SET status='pending' WHERE team_session_id=?1 AND task_id='goal-task'", [&lead]).unwrap();
+    let result = send_team_message(
+        &db,
+        SendMessageParams {
+            team_session_id: &lead,
+            caller_session_id: &decision.member_session_ids[0],
+            target_identifier: "Lead",
+            content: "Verified source",
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    sessions::end_turn(&db, &member_turn, "completed", None, None, false).unwrap();
+    session_collaboration::settle_turn(&db, &member_turn).unwrap();
+    // Member mail wakes wait_for_updates inside the original Goal turn, not a new turn.
+    assert!(state(&db, &lead, &lead, &turn).unwrap().active);
+    assert_eq!(
+        sessions::running_turn_id(&db, &lead).unwrap().as_deref(),
+        Some(turn.as_str())
+    );
+    let unconsumed = super::authority::validate_lead_tool(&db, &lead, "SubmitGoalReport")
+        .unwrap_err()
+        .to_string();
+    assert!(
+        unconsumed.contains("1 unconsumed") && unconsumed.contains("expert"),
+        "{unconsumed}"
+    );
+    assert!(read(&db, &lead, &lead, &turn)
+        .unwrap()
+        .iter()
+        .any(|m| m.id == result.id));
+    super::authority::validate_lead_tool(&db, &lead, "SubmitGoalReport").unwrap();
+    super::authority::validate_lead_tool(&db, &lead, "TeamFinalAnswer").unwrap();
+    sessions::end_turn(&db, &turn, "completed", None, None, false).unwrap();
+    let later = send_team_message(
+        &db,
+        SendMessageParams {
+            team_session_id: &lead,
+            caller_session_id: &decision.member_session_ids[0],
+            target_identifier: "Lead",
+            content: "Later followup",
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    let continuation =
+        session_collaboration::begin_turn(&db, &lead, &later.id, None, None).unwrap();
+    assert!(!state(&db, &lead, &lead, &continuation).unwrap().active);
+    // Ordinary post-execution mail has no Goal token or new execution authority.
+    super::authority::validate_lead_tool(&db, &lead, "TeamFinalAnswer").unwrap();
+}

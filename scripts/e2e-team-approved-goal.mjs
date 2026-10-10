@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export function createApprovedGoalFixture(projectPath) {
-  let expertStarted = false, expertRead = false, resultSeen = false;
+  let expertStarted = false, expertRead = false, resultSeen = false, reportRejected = false;
   let releaseExpert, signalStarted;
   const started = new Promise(resolve => { signalStarted = resolve; });
   const markdown = "# Approved Team Goal\n\n## Acceptance criteria\n- Expert reads approved-goal-source.md and returns APPROVED_GOAL_VERIFIED.\n";
@@ -39,12 +39,19 @@ export function createApprovedGoalFixture(projectPath) {
         if (!has("task_create")) return tool("task_create", { subject: "Verify approved Goal source", ownerMemberName: "goal_expert", writeScopes: [] });
         if (!has("send_message")) return tool("send_message", { targetMemberName: "goal_expert", content: "APPROVED_GOAL_EXPERT_WORK: read your assigned approved-goal-source.md and return its full verified result." });
         await started;
+        const reportCount = priorToolNames.filter(name => name === "SubmitGoalReport").length;
+        if (!reportCount) return tool("SubmitGoalReport", report);
+        if (!resultSeen) {
+          assert.match(activeToolText, /TEAM_APPROVAL_REQUIRED/);
+          assert.match(activeToolText, /goal_expert/);
+          reportRejected = true;
+        }
         const progressCount = priorToolNames.filter(name => name === "UpdateGoalProgress").length;
         if (!progressCount) return tool("UpdateGoalProgress", { items: [{ id: "expert", label: "Verify approved source", status: "in_progress" }] });
         if (!activeToolText.includes("APPROVED_GOAL_VERIFIED")) return tool("wait_for_updates", { timeoutSeconds: 60 });
         assert.ok(expertRead); resultSeen = true;
         if (progressCount === 1) return tool("UpdateGoalProgress", { items: [{ id: "expert", label: "Verify approved source", status: "completed" }] });
-        if (!has("SubmitGoalReport")) return tool("SubmitGoalReport", report);
+        if (reportCount === 1) return tool("SubmitGoalReport", report);
         return { finalText: "APPROVED_GOAL_COMPLETE: verified with the approved expert in the original execution." };
       }
       if (userText.includes("AG_APPROVED_GOAL")) return tool("SubmitGoal", { title: "Approved Team Goal", markdown, question: "Approve expert source verification?" });
@@ -87,10 +94,15 @@ export function createApprovedGoalFixture(projectPath) {
       await waitFor(async () => (await invoke("goalProgressGet", { sessionId: goal.id, executionId: executionId })).progress?.revision === 1, "progress remains bound while expert works");
       assert.equal((await invoke("agentGetStatus", goal.id)).status.currentTurnId, originalTurn);
       assert.equal((await invoke("goalReportList", { sessionId: goal.id })).reports[0].status, "pending");
+      assert.ok(reportRejected, "running expert report was not rejected before persistence");
       releaseExpert();
       await waitFor(() => resultSeen, "full expert result consumed in original turn");
       await waitFor(async () => (await invoke("agentGetStatus", goal.id)).status.isRunning === false, "unique Goal completion");
-      const reports = (await invoke("goalReportList", { sessionId: goal.id })).reports; assert.equal(reports.length, 1);
+      const reports = await waitFor(async () => {
+        const { reports } = await invoke("goalReportList", { sessionId: goal.id });
+        return reports[0]?.status === "ready" ? reports : null;
+      }, "Goal report durably finalized after run end");
+      assert.equal(reports.length, 1);
       const reportResult = (await invoke("goalReportGet", { sessionId: goal.id, executionId: reports[0].executionId })).report;
       assert.equal(reportResult.verdict, "met"); assert.equal(reportResult.execution.status, "completed"); assert.equal(reportResult.integrity.kind, "structured");
       const progress = (await invoke("goalProgressGet", { sessionId: goal.id, executionId: reports[0].executionId })).progress; assert.equal(progress.revision, 2); assert.equal(progress.items[0].status, "completed");
@@ -98,7 +110,7 @@ export function createApprovedGoalFixture(projectPath) {
       const detail = (await invoke("sessionGet", { id: goal.id })).session;
       assert.equal(detail.messages.filter(message => message.role === "user").length, 1, "confirmation or expert mail escaped into detached prompt");
       assert.equal(calls.filter(call => call.kind !== "title" && call.userText.includes("Team review") && call.userText.includes("confirmed")).length, 0, "duplicate mailbox kickoff");
-      assert.equal(detail.messages.filter(message => message.toolName === "SubmitGoalReport").length, 1);
+      assert.equal(detail.messages.filter(message => message.toolName === "SubmitGoalReport").length, 2);
       await saveScreenshot(sendCdp, "team-approved-goal-completed.png");
       console.log("PASS approved Team Goal: negotiation, same running execution through review/expert, effective progress, full in-turn result, unique structured report/completion");
       const cancelled = (await invoke("sessionCreate", { title: "Cancelled Team Goal", mode: "goal", executionProfile: "team", projectPath, providerId: goal.providerId, modelId: goal.modelId, permissionMode: "auto" })).session;
