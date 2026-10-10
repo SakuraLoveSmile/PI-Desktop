@@ -309,6 +309,7 @@ export const tr = {
     placeholderHome: "Bir şey sorun",
     placeholderHint: "Komutlar için / · dosyalar için @ yazın",
     placeholderHomeHint: "Komutlar için / · dosyalar için @ yazın",
+    placeholderRunning: "{{sendShortcut}} ile takip mesajı gönder · {{steerShortcut}} ile hemen yönlendir",
     placeholderShortcut: "Yeni satır için Shift+Enter · göndermek için Gönder",
     addFiles: "Dosya ekle",
     filesAttached: "Taslağa {{count}} öğe eklendi",

@@ -300,6 +300,7 @@ export const de = {
     "placeholderHome": "Fragen Sie alles",
     "placeholderHint": "Geben Sie / für Befehle · @ für Dateien ein",
     "placeholderHomeHint": "Geben Sie / für Befehle · @ für Dateien ein",
+    "placeholderRunning": "{{sendShortcut}} für eine Folgenachricht · {{steerShortcut}} zum sofortigen Umlenken",
     "placeholderShortcut": "Umschalt+Eingabetaste für Zeilenumbruch · Verwenden Sie Senden, um zu senden",
     "addFiles": "Dateien hinzufügen und mehr",
     "filesAttached": "{{count}} Element(e) zum Entwurf hinzugefügt",

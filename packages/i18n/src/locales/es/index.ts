@@ -300,6 +300,7 @@ export const es = {
     "placeholderHome": "Pregunte cualquier cosa",
     "placeholderHint": "Escriba / para comandos · @ para archivos",
     "placeholderHomeHint": "Escriba / para comandos · @ para archivos",
+    "placeholderRunning": "{{sendShortcut}} para enviar un mensaje de seguimiento · {{steerShortcut}} para redirigir ahora",
     "placeholderShortcut": "Mayús+Entrar para nueva línea · Utilice Enviar para enviar",
     "addFiles": "Agregar archivos y más",
     "filesAttached": "Se agregaron {{count}} elementos al borrador",

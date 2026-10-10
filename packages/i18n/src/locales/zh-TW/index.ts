@@ -302,6 +302,7 @@ export const zhTW = {
     placeholderHome: "隨便問問",
     placeholderHint: "輸入 / 使用命令 · @ 引用檔案",
     placeholderHomeHint: "輸入 / 使用命令 · @ 引用檔案",
+    placeholderRunning: "{{sendShortcut}} 傳送後續訊息 · {{steerShortcut}} 立即轉向",
     placeholderShortcut: "Shift+Enter 換行 · 點擊發送提交",
     addFiles: "新增檔案等內容",
     filesAttached: "已將 {{count}} 項加入草稿",

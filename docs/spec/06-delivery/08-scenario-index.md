@@ -168,6 +168,7 @@ IDs come from executable result/test calls and annotated dynamic suites. Documen
 | E2E-ACTIVITY-PROCESSES | [scripts/e2e-session-activity.mjs:258](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-session-activity.mjs#L258) |
 | E2E-CI-approval | [scripts/e2e-suite-catalog.json (approval)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
 | E2E-CI-restart | [scripts/e2e-suite-catalog.json (restart)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
+| E2E-COMPOSER-compact-running-input | [scripts/e2e-suite-catalog.json (transcript-render)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
 | E2E-DELEGATION-standard-delegates-to-subagents | [scripts/e2e-subagent-models.mjs:352](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-subagent-models.mjs#L352) |
 | E2E-fatal | [scripts/e2e-smoke.mjs:836](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-smoke.mjs#L836) |
 | E2E-fixed-tool-declarations | [scripts/e2e-fixed-tool-declarations.mjs:50](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-fixed-tool-declarations.mjs#L50) |

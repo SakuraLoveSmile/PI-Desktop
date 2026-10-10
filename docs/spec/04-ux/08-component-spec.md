@@ -3153,7 +3153,7 @@ reasoning-level control.
 ```text
 +----------------------------------------------------------+
 | queued prompts, attachments and approval controls (when present) |
-| input (four empty lines, grows through seven visible lines)       |
+| input (two empty lines, grows through seven visible lines)        |
 | placeholder: welcome → command/file hint → keyboard hint          |
 | [+] [Agent/Expert Team ▾] [model · reasoning ▾] [Plan/Goal]         |
 |                                  [plugin] [enhance] [Live] [↑/⏹] |
@@ -3163,7 +3163,7 @@ reasoning-level control.
 
 ### 11.3 Layout
 
-- Height: four input lines before draft growth, through seven visible lines,
+- Height: two input lines before draft growth, through seven visible lines,
   then the editor scrolls internally
 - Workspace context: no project, Local, or branch rail is rendered or
   reserved above the shell in either home or thread-docked mode (D095)
@@ -3258,8 +3258,9 @@ reasoning-level control.
   of remaining visible beneath the floating shell or through its rounded outer
   corners, and the conversation pane's own surface stays visible behind the
   dock (issue #728, D624).
-- Empty draft height: `.composer-input` uses `min-height: 4lh`, with 16px
-  input inset and an unseparated bottom toolbar, in both Composer variants.
+- Empty draft height: the Composer dock uses `min-height: 2lh` and grows through
+  seven visible lines before scrolling internally, with 16px input inset and an
+  unseparated bottom toolbar. The Scheduled editor keeps its existing height.
 - Scroll stability: The thread scrollport reserves one stable trailing gutter,
   so the transcript does not shift when overflow appears while the minimap
   does not create a matching blank strip on the left.
@@ -3270,6 +3271,10 @@ reasoning-level control.
   shortcut hint. The selected copy stays stable while the page/session context
   is unchanged. Switching home/session views or active conversations advances
   to the next hint; there is no timer tied to focus, draft, or IME state. The
+  running empty Composer (no text or file draft) instead shows the localized
+  follow-up/steer hint. Its send shortcut reflects the Enter-to-send preference
+  and platform (`Enter` or `⌘/Ctrl+Enter`); the steer shortcut is `⌥/Alt+Enter`.
+  Adding a draft restores the contextual guidance. The
   visible copy is a keyed opacity fade while the native `placeholder` value
   remains in the textarea for assistive technology.
 - Queue rows: while a session is running, each accepted prompt is held in a
@@ -4724,7 +4729,8 @@ Conversation overflow                    Composer draft (unsent)
 6. PermissionCard shows tool name, risk, args, and three action buttons per [03-permission-ux.md](03-permission-ux.md)
 7. Composer: Enter sends when Enter-to-send is on; when it is off, Cmd/Ctrl+Enter
    sends and Enter inserts a newline; Shift+Enter always inserts a newline;
-   draft grows from one through seven visible lines then scrolls, and the single
+   empty Composer input starts at two lines and a draft grows through seven
+   visible lines then scrolls, and the single
    submit slot shows Send for a non-empty draft or an idle/empty draft, and Stop
    only for a running empty draft
 8. Composer model × reasoning chip shows the provider/model pair; remains
