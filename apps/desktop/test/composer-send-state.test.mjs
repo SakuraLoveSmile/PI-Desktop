@@ -69,14 +69,13 @@ test("composer send/stop button follows draft content and the visible session's 
   assert.match(submitSlot, /stopGenerating/);
   assert.match(submitSlot, /onClick=\{\(\) => void abort\(\)\}/);
   assert.doesNotMatch(composerRight, /\{runActive \? \(/);
-  const composerLeft = toolbar.match(/<div className="composer-left">[\s\S]*?<\/div>/)?.[0] ?? "";
-  const modelIndex = composerLeft.indexOf("<ComposerModelPicker");
+  const modelIndex = composerRight.indexOf("<ComposerModelPicker");
   const enhanceIndex = composerRight.indexOf("composer-enhance-btn");
   const submitIndex = Math.max(
     composerRight.indexOf('className="stop-btn"'),
     composerRight.indexOf('className="send-btn"'),
   );
-  assert.ok(modelIndex >= 0, "model picker should be in the left toolbar");
+  assert.ok(modelIndex >= 0 && modelIndex < enhanceIndex, "model picker should precede enhancement in the right toolbar");
   assert.ok(
     enhanceIndex >= 0 && enhanceIndex < submitIndex,
     "The enhancement action should sit before the submit slot",

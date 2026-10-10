@@ -17821,6 +17821,28 @@ prove account/region eligibility or call a real model.
 
 The composer footer shows the current session's project, local/remote host, and known local Git branch. Unavailable project/branch metadata is omitted; remote sessions never borrow a local branch. Model menus list all models without a search field. Generation speed, full-turn token totals, cache metrics and context details are available from the bottom-right context meter. Subagent entries use transparent gradient-avatar rows with name, task, localized status and measured elapsed time; clicking a row opens read-only details, with no panorama entry. Validate model keyboard selection, footer metadata, context details and agent navigation in the isolated composer/transcript fixtures, including narrow layouts.
 
+### E2E-COMPOSER-toolbar-footer
+
+- **Preconditions:** Built candidate, isolated Composer fixture, production
+  renderer components and CSS, and deterministic session/Goal snapshots. No user
+  profile or model provider.
+- **Steps:** Inspect the complete Composer toolbar and activate the combined
+  model × reasoning control. Verify the menu opens from its trigger and remains
+  usable by keyboard. Compare the left and right plugin control slots before
+  and after opening it. Switch between Goal planning and approved Goal execution;
+  also inspect Plan mode. Check the Send and running-empty Stop controls, the
+  context meter footer, and the shared model picker in ScheduledEditor.
+- **Expected:** The combined model × reasoning control sits on the right as one
+  button, with the existing anchored menu and plugin slot sides/order preserved.
+  The Goal contract picker remains during planning and is hidden during Goal
+  execution; Plan remains available. Send and Stop share a 32px rounded-square
+  footprint. The context meter visibly includes `chat.usageContextLabel`.
+  ScheduledEditor retains its existing picker placement and behavior. Narrow
+  layouts keep controls within the Composer without overlap.
+- **Specs:** `04-ux/08-component-spec.md` §11.
+- **Automation:** `node scripts/e2e-transcript-render.mjs`.
+- **Status:** Record results against the exact task candidate and base revision.
+
 ### Recorded outputs, delegate details and project Skill suggestions
 
 Output rows display file basenames with a file-type icon plate and a full-path tooltip. They retain existing file navigation, omit status badges and use the current neutral theme. Delegate details show the recorded agent identity/state, bounded expandable task prompts, and collapsed contiguous thinking/tool groups with real counts. Follow-up turns, Markdown, search and scroll remain available; delegate errors/reviews have no Continue, dismiss or rollback mutation controls.

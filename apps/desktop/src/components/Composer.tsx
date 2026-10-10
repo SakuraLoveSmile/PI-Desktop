@@ -681,6 +681,7 @@ export function Composer({
             displayMode={displayMode}
             executionProfile={executionProfile}
             planningLive={planningLive}
+            goalExecutionActive={executionActive}
             providerId={provider?.id}
             modelId={modelId}
             thinkingLevel={thinkingLevel}

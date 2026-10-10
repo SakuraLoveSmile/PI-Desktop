@@ -9765,3 +9765,12 @@ Overview layout validation also checks long titles, project paths and model name
 320/360/570px in both themes. Metadata retains positive visible width and no
 header/resources/references horizontal overflow is introduced. Selected reference
 options retain pressed states and switching behavior.
+
+### E2E-COMPOSER-toolbar-footer
+
+- **前提条件：** 已构建候选版本、隔离的 Composer fixture、生产 renderer 组件与 CSS，以及确定性的会话/Goal 快照。不使用用户 profile 或模型提供商。
+- **步骤：** 检查完整 Composer 工具栏并打开组合的模型 × 推理控件；确认菜单锚定在触发按钮上，且键盘操作有效。对比打开菜单前后的左右插件控件槽位。切换 Goal 规划与已批准的 Goal 执行，也检查 Plan 模式。检查发送与运行中空草稿的停止控件、上下文量表页脚，以及 ScheduledEditor 中共用的模型选择器。
+- **预期：** 组合的模型 × 推理控件作为一个按钮位于右侧，原有锚定菜单和插件槽位的位置/顺序保持不变。Goal 规划期间仍显示合约选择器，Goal 执行期间隐藏；Plan 控件仍可用。发送与停止按钮共用 32px 圆角方形尺寸。上下文量表旁可见 `chat.usageContextLabel`。ScheduledEditor 保持原有模型选择器位置与行为。窄布局中控件留在 Composer 内，不重叠。
+- **规格：** `04-ux/08-component-spec.md` §11。
+- **自动化：** `node scripts/e2e-transcript-render.mjs`。
+- **状态：** 对照确切的任务候选和基线版本记录结果。

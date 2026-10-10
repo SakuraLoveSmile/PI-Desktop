@@ -517,12 +517,12 @@
 
 .stop-btn {
   display: inline-flex;
-  height: 28px;
-  width: 28px;
-  flex: 0 0 28px;
+  height: 32px;
+  width: 32px;
+  flex: 0 0 32px;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-sm);
   background: color-mix(in oklab, var(--ds-text-primary) 16%, transparent);
   color: var(--ds-text-primary);
   transition:
