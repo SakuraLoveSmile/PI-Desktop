@@ -2,6 +2,31 @@
 
 Upstream v0.15.6 → v0.16.1 has been merged.
 
+- The right work-panel launcher uses a centered compass and rounded tool cards.
+  Existing tool destinations and plugin availability are preserved; long labels
+  wrap and short panels scroll without clipping the cards.
+
+- Context Insights brings a cross-session usage overview, a session work-panel
+  dashboard, and `/context` inspection. Captured model requests expose prompt
+  composition, tool schemas, messages, usage, changes and file activity. Earlier
+  uncaptured requests remain explicitly unavailable; conversation data and
+  compaction policy are unchanged.
+
+- Expert Team confirmation during the Lead's declaration reply keeps one
+  bounded opportunity to dispatch the approved experts, even if the initial
+  no-tool answer already needed correction. Actual expert participation is
+  still required before a successful final answer.
+
+- Added a Memory destination in Settings to list project groups and open their
+  existing shared memory editor.
+
+- Expert Team uses the same compact capability rows, glyphs, badges and edit
+  actions as Subagents, with shared scope controls and consistent form spacing.
+
+- Successful and failed task notifications both appear in the durable inbox.
+  The bell badge now counts every unread persisted task notification, matching
+  the Dock/taskbar badge; selection, mark-all-read, and clear stay synchronized
+  with Host persistence across reloads.
 - The input footer exposes a clickable context progress track with the existing
   used/remaining preference, actual usage detail and guarded manual compaction.
   Missing usage is marked unavailable instead of showing a fabricated percent.
@@ -38,10 +63,11 @@ Upstream v0.15.6 → v0.16.1 has been merged.
   readable controls in narrow columns. The outside-workspace reason follows
   the UI language; actual permission decisions and scope remain unchanged.
 
-- Expert Team startup skips ordinary Task subagent configuration and delegate
-  model/auth catalogs. Changing ordinary subagent settings no longer rebuilds
-  an idle Team runtime; standard delegation and Team policy refresh remain
-  unchanged.
+- Standard agents and execution experts actively delegate separable work.
+  Their subagents can delegate again within Settings → Subagents depth and
+  running-count limits. Branch-scoped controls and cancellation preserve
+  ancestor permissions and expert tool restrictions; Team Leads and research
+  keep their existing orchestration boundaries.
 
 - Expert Team settings configure six built-in expert presets at user or project
   scope. Newly confirmed experts snapshot their model, thinking, tool subset
@@ -129,6 +155,13 @@ Upstream v0.15.6 → v0.16.1 has been merged.
   stays running, including sleep/resume. Longer delays are marked missed and
   require Run now confirmation; restarting the app still never catches up.
 
+- Project memory supports opt-in Agent recording and updates, with safe concurrent
+  editing and per-turn refresh. Saved notes remain readable when recording is off.
+- ProjectHistory recalls source-linked discussions from saved chats in the same
+  logical project. CodeSearch provides local literal code search and a disposable
+  persistent text cache, with live file reconciliation and explicit partial coverage.
+  Neither feature adds background model or embedding calls.
+- OpenCode Zen Muse Spark 1.3 Contributor Free now uses its Responses API instead of falling back to Chat Completions. Other publishers, explicit API metadata and client identity are preserved.
 ### Composer metadata and compact agent rows
 
 The composer footer shows the current session's project, local/remote host, and known local Git branch. Unavailable project/branch metadata is omitted; remote sessions never borrow a local branch. Model menus list all models without a search field. Generation speed, full-turn token totals, cache metrics and context details are available from the bottom-right context meter. Subagent entries use transparent gradient-avatar rows with name, task, localized status and measured elapsed time; clicking a row opens read-only details, with no panorama entry. Validate model keyboard selection, footer metadata, context details and agent navigation in the isolated composer/transcript fixtures, including narrow layouts.

@@ -7,6 +7,7 @@ import {
   isImageGenerationModel,
   normalizeMode,
   normalizeExecutionProfile,
+  normalizeSubagentLimits,
   type ExecutionProfile,
   trustedExtensionAgentKeyFromProviderId,
   type CommandShellCatalog,
@@ -470,8 +471,17 @@ export function createSessionLaunchRuntime({
         description: skill.description,
       })),
     ];
-    // Team turns use Host-owned experts, never the ordinary Task catalog.
-    // Keep unused definitions, model resolution and credentials out of launch.
+    // Leads and planning researchers keep their Team catalog isolation.
+    // Execution experts use the same scoped subagent catalog as standard agents.
+    const teamContext = executionProfile === "team"
+      ? await runtimeState.host!.call<import("@pi-desktop/shared").TeamRuntimeContextProjection | null>("team.getRuntimeContext", { sessionId })
+      : undefined;
+    if (executionProfile === "team" && !teamContext) {
+      throw Object.assign(new Error("Team runtime context unavailable"), {
+        errorCode: ErrorCodes.TEAM_CONTEXT_UNAVAILABLE,
+      });
+    }
+
     let subagentCatalog: Awaited<ReturnType<typeof loadSubagentDefinitions>> = {
       definitions: [], builtins: [], diagnostics: [],
     };
@@ -479,7 +489,7 @@ export function createSessionLaunchRuntime({
       providers: {}, diagnostics: [],
     };
     const subagentModelKeys: string[] = [];
-    if (executionProfile === "standard") {
+    if (executionProfile === "standard" || (teamContext && !teamContext.isLead && teamContext.workPurpose !== "plan_research")) {
       // Subagents (ADR 0062): definitions are re-read per launch so editing
       // `~/.agents/subagents` or the registry takes effect on the next prompt, and every
       // pinned model is resolved here because credentials and the models.dev catalog
@@ -615,14 +625,6 @@ export function createSessionLaunchRuntime({
     // the session's own provider plus any row a pinned subagent resolved to. The
     // sidecar may then ask main for request auth, but only for a row named here,
     // and the set is rewritten on every launch.
-    const teamContext = executionProfile === "team"
-      ? await runtimeState.host!.call<import("@pi-desktop/shared").TeamRuntimeContextProjection | null>("team.getRuntimeContext", { sessionId })
-      : undefined;
-    if (executionProfile === "team" && !teamContext) {
-      throw Object.assign(new Error("Team runtime context unavailable"), {
-        errorCode: ErrorCodes.TEAM_CONTEXT_UNAVAILABLE,
-      });
-    }
 
     runtimeState.sidecar?.setVendorAuthBindings(
       sessionId,
@@ -637,6 +639,7 @@ export function createSessionLaunchRuntime({
             : [],
         ),
     );
+    const subagentLimits = normalizeSubagentLimits(settings);
     return {
       providerId: provider.id,
       modelId,
@@ -651,6 +654,8 @@ export function createSessionLaunchRuntime({
         ...(overrides.turnId ? { turnId: overrides.turnId } : {}),
         thinkingLevel,
         infiniteProviderRetry: settings.infiniteProviderRetry === true,
+        subagentMaxDepth: subagentLimits.maxDepth,
+        subagentMaxConcurrency: subagentLimits.maxConcurrency,
         commandShell,
         scratchDir: join(dataDir, "scratch", sessionId),
         attachmentsDir: join(dataDir, "attachments"),

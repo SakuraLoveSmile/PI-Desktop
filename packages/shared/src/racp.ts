@@ -692,6 +692,7 @@ export function racpKindForAgentEvent(
       return { kind: options.interrupted ? "turn.interrupted" : "turn.completed", durable: true };
     case "error":
       return { kind: "turn.failed", durable: true };
+    case "context_insights":
     case "usage":
       return { kind: "turn.activity", durable: false };
     case "turn_start":
@@ -732,6 +733,7 @@ export function racpKindForAgentEvent(
 export const LOCAL_AGENT_EVENT_TYPES: readonly AgentEvent["type"][] = [
   "agent_start",
   "agent_end",
+  "context_insights",
   "turn_start",
   "turn_end",
   "usage",

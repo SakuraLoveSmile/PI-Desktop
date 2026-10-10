@@ -686,7 +686,8 @@ export class NativePiSessionService {
       updatedAt: manager.getBranch().at(-1)?.timestamp ?? new Date(snap.mtimeMs).toISOString(),
       messages,
       messageStart: start,
-      ...(aroundIndex >= 0 ? { messageEnd: before, hasMoreAfter: before < all.length } : {}),
+      messageEnd: before,
+      hasMoreAfter: before < all.length,
       hasMoreBefore: start > 0,
     } as SessionDetail;
   }

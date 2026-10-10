@@ -1,4 +1,4 @@
-import { ErrorCodes, type MessageUsage, type UiMessage } from "@pi-desktop/shared";
+import { ErrorCodes, type MessageUsage, type UiMessage, type ContextInsightsRequest, type ContextInsightsEvent } from "@pi-desktop/shared";
 
 import type { HostRpc } from "./host-ports.js";
 
@@ -12,6 +12,7 @@ export type MessageAppend = {
   sessionId: string;
   message?: UiMessage;
   usage?: MessageUsage;
+  contextInsights?: { request?: ContextInsightsRequest; event?: ContextInsightsEvent };
   turnId?: string;
 };
 
@@ -104,9 +105,9 @@ export class TurnPersistence {
       const host = this.deps.getHost();
       if (host && (host.isAvailable?.() ?? true)) {
         try {
-          await host.call(entry.usage ? "session.recordUsage" : "session.appendMessage", {
+          await host.call(entry.contextInsights ? "contextInsights.record" : entry.usage ? "session.recordUsage" : "session.appendMessage", {
             sessionId: entry.sessionId,
-            ...(entry.usage ? { usage: entry.usage } : { message: entry.message }),
+            ...(entry.contextInsights ? entry.contextInsights : entry.usage ? { usage: entry.usage } : { message: entry.message }),
             ...(entry.turnId ? { turnId: entry.turnId } : {}),
           });
           return;

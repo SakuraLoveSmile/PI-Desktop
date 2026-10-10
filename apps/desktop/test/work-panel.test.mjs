@@ -615,11 +615,11 @@ test("work panel empty states match the app's other empty-state proportions", ()
   const body = globalStyles.match(/\.work-tab-empty-body \{[^}]*\}/)?.[0] ?? "";
   assert.match(body, /font-size: var\(--text-md\)/);
   assert.match(body, /max-width: 34ch/);
-  // Launcher rows stay compact and keyboard-visible.
+  // Launcher cards retain keyboard focus and wrap in narrow panels.
   const tool = globalStyles.match(/\.work-panel-launcher-row \{[^}]*\}/)?.[0] ?? "";
-  assert.match(tool, /height: 40px/);
-  assert.match(tool, /border-radius: var\(--radius-sm\)/);
-  assert.doesNotMatch(tool, /border: 1px/);
+  assert.match(tool, /min-height: 56px/);
+  assert.match(tool, /border-radius: var\(--radius-lg\)/);
+  assert.match(tool, /border: 1px solid var\(--ds-border-strong\)/);
   assert.match(globalStyles, /\.work-panel-launcher-row:hover \{\s*background: var\(--ds-bg-hover\);/);
   assert.match(
     globalStyles,

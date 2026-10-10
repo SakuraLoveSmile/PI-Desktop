@@ -1,6 +1,7 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const ptBR = {
+  contextInsights: en.contextInsights,
   app: {
     shellName: "Pi-Desktop-Plus",
     tagline: "Parceiro local de programação com IA",
@@ -889,10 +890,19 @@ export const ptBR = {
       subagents: "Subagentes",
       import: "Importar",
       projects: "Projetos",
+      memory: "Memória",
       sync: "Sincronização",
       remoteHosts: "Hosts remotos",
       info: "Sobre",
       voice: "Voz"
+    },
+    memory: {
+      title: "Memória",
+      description:
+        "Gerencie as memórias salvas e o registro automático por projeto. Projetos do mesmo grupo compartilham memórias; os demais permanecem separados.",
+      projectsTitle: "Memória do projeto",
+      empty: "Ainda não há projetos. Crie ou abra um projeto no Arquivo de projetos primeiro.",
+      loadFailed: "Não foi possível carregar a lista de projetos. Tente novamente.",
     },
     general: "Geral",
     ai: "IA",
@@ -1032,6 +1042,14 @@ export const ptBR = {
     skillBatchFailed: "Falha ao importar {{count}} pastas. Primeiro erro: {{first}}",
     skillsEmpty: "Nenhuma habilidade nesta pasta",
     subagentsEmpty: "Nenhum subagente próprio ainda",
+    subagentRuntimeLimits: "Limites de delegação",
+    subagentRuntimeLimitsDesc: "Agentes individuais e especialistas da equipe podem delegar tarefas independentes dentro destes limites. As alterações valem a partir da próxima execução.",
+    subagentMaxDepth: "Profundidade máxima de recursão",
+    subagentMaxDepthDesc: "O agente principal tem profundidade 0 e seus filhos diretos, 1. Defina 0 para desativar a delegação; valores maiores permitem que os filhos deleguem.",
+    subagentMaxConcurrency: "Máximo de subagentes ativos",
+    subagentMaxConcurrencyDesc: "Limita todos os subagentes ativos na árvore de tarefas de cada agente principal, incluindo os aninhados. Cada especialista tem sua própria árvore.",
+    subagentLimitInvalid: "Insira um número inteiro entre {{min}} e {{max}}.",
+    subagentLimitSaveError: "Não foi possível salvar os limites de delegação.",
     addMcp: "Adicionar",
     newSkill: "Novo",
     editMcp: "Editar",
@@ -1800,6 +1818,13 @@ export const ptBR = {
     memoryEntryContent: "O que este projeto deve lembrar?",
     memoryRemove: "Excluir memória",
     memoryHint: "Usada nas conversas deste projeto. Seja breve e objetivo.",
+    memoryProjectChanged: "Este projeto agora pertence a outro grupo. Feche este diálogo e atualize a lista de projetos antes de editar. Seu rascunho foi preservado.",
+    "memoryConflict": "A memória salva ou o projeto mudou. Seu rascunho foi preservado. Recarregue a memória salva antes de salvar novamente.",
+    "memoryRequestFailed": "Não foi possível carregar ou atualizar a memória do projeto. Seu rascunho foi preservado. Tente novamente ou recarregue a memória salva.",
+    "memoryReload": "Recarregar memória salva",
+    "memoryReloadDiscard": "Recarregar e descartar rascunho",
+    autoMemoryToggle: "Registrar memórias automaticamente",
+    autoMemoryDescription: "Quando ativado, o assistente pode registrar automaticamente preferências duradouras do projeto que você expressa claramente. Desativar interrompe apenas o registro e as atualizações automáticas; as memórias salvas continuam sendo usadas nas conversas do projeto até você editá-las ou excluí-las. O interruptor é aplicado imediatamente; as alterações na memória aguardam Salvar.",
     memorySave: "Salvar memória",
     memorySaving: "Salvando…",
     noSearchResults: "Nenhum projeto corresponde à sua busca",

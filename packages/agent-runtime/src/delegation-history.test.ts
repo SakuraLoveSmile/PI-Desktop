@@ -610,6 +610,33 @@ describe("seedDelegateMessages budget truncation (ADR 0299 §7)", () => {
   });
 });
 
+describe("recursive chains after restart", () => {
+  it("resumes a child's canonical nested Task row under its stable resumed parent owner", () => {
+    const root = taskRow("root-call", "root-run", "Inspect root.");
+    const continuedRoot = taskRow("root-resume-call", "root-run-2", "Continue root.", { resume: "root-run" });
+    const child: UiMessage = {
+      ...taskRow("nested-call", "child-run", "Inspect nested."), id: "nested-call",
+      parentToolCallId: "root-call", agentName: "explorer",
+      toolResult: { details: { delegationId: "child-run", agent: "explorer", ownerId: "root-run", depth: 2, status: "completed" } },
+    };
+    const transcript = [root, child, delegateAssistant("nested-answer", "Child report.", "nested-call"), continuedRoot];
+    const registry = new DelegationChainRegistry();
+    const chains = rebuildChainsFromTranscript(transcript);
+    registry.hydrate(chains);
+    const parent = registry.lookup("root-run-2")!;
+    expect(parent.delegateSessionId).toBe("root-run");
+    const resolved = registry.resolveResume({ resume: "child-run", ownerId: parent.delegateSessionId,
+      agentName: "explorer", runningDelegationIds: new Set() });
+    expect(resolved.ok).toBe(true);
+    if (!resolved.ok) throw new Error("Expected same-owner resume");
+    expect(selectChainRows(transcript, resolved.chain)).toEqual([transcript[2]]);
+    const continuedChild = registry.start({ ownerId: parent.delegateSessionId, delegateSessionId: resolved.chain.delegateSessionId,
+      delegationId: "child-run-2", toolCallId: "child-resume-call", agentName: "explorer", originalTask: "Inspect nested.", objective: "Continue nested.", resumedFrom: resolved.chain });
+    expect(continuedChild).toMatchObject({ ownerId: "root-run", delegateSessionId: "child-run", delegationIds: ["child-run", "child-run-2"] });
+    expect(registry.resumableList({ runningDelegationIds: new Set() }).map(chain => chain.delegateSessionId)).not.toContain("child-run");
+  });
+});
+
 describe("rebuildChainsFromTranscript", () => {
   it("groups resume links into one chain with the latest objective", () => {
     const transcript: UiMessage[] = [

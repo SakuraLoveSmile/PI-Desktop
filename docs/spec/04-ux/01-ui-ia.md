@@ -106,8 +106,11 @@ destination, chat as the home surface, tools and permissions inline.
   work-panel toggle one button group, spaced by that same gap, while the trigger
   keeps a distinct hit target. Clicking `+` creates and activates
   a unique New launcher tab; its body presents the same data-driven Review and
-  plugin-view rows as buttons, so the user chooses a destination in the page
-  instead of opening a dropdown. Selecting a row replaces that launcher tab with
+  plugin-view rows as centered, outlined cards below a decorative compass.
+  The list stays within 380px, with 56px minimum card height, 14px gaps, and
+  wrapping labels; short panels scroll vertically. Available entries and their
+  existing order remain data-driven, without placeholder tools. The user chooses
+  a destination in the page instead of opening a dropdown. Selecting a row replaces that launcher tab with
   the destination or activates an existing singleton. File paths stay distinct
   while plugin views deduplicate by view reference. The viewport-fixed toggle
   and `Cmd/Ctrl + J` both toggle the active session's retained panel context —
@@ -383,7 +386,7 @@ shared capability contract:
 | Command palette | Cmd/Ctrl+K (also Cmd/Ctrl+Shift+P per D014) | builtin + plugin commands |
 | Model menu | Composer-right model × reasoning chip | configured provider/model choices + settings entry (D091) |
 | Profile menu | sidebar footer | Settings / Logs / Theme cycle (D041) |
-| Notification inbox | sidebar footer bell | All/Unread views, task failure rows only (successful completions are hidden, D295), mark-all-read and clear actions (D130/D117) |
+| Notification inbox | sidebar footer bell | All/Unread views over durable completed and failed task rows; bell badge counts all unread rows from the Host-derived store count, matching the Dock/taskbar badge; mark-all-read and clear actions (D130/D117/D295) |
 | Toasts | events (plugin toast, backend restored, copy) | top-center; 4s default, 8s for errors |
 | Project switcher | empty-home underlined project name | sidebar open projects + search + clone git project + open project |
 
@@ -445,11 +448,12 @@ shared capability contract:
 - Completed/failed turn not already visible → host-core appends one durable
   inbox row. A result shown in the visible, focused current chat and every
   `aborted` turn append none. Background sessions and any turn finishing while
-  the window is unfocused still append. The sidebar footer bell lists only
-  `task.failed` rows and its badge counts only unread failures; successful
-  completions stay in the durable record for the sidebar outcome badge and
-  native notification but never appear in the inbox (D295). Selecting a row
-  marks it read and activates its bound project/session.
+  the window is unfocused still append. The sidebar footer bell lists all
+  retained `task.completed` and `task.failed` rows; its badge uses the
+  Host-derived unread count for all durable rows, matching the Dock/taskbar
+  badge. `All` includes read and unread rows, while `Unread` filters by
+  `readAt == null` only. Selecting a row marks it read and activates its bound
+  project/session.
   Electron additionally presents a native task notification only when the
   app window is unfocused, and clicking it focuses the window before activating
   the same session (D117). Interactive ask/permission/plan prompts use their

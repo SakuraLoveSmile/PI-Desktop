@@ -55,21 +55,29 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   8. **Subagents / 子智能体** — Lucide `Bot` (built-in and personal parallel agents)
   9. **Import / 导入** — Lucide `Download` (bring sessions and model configuration in from other tools)
   10. **Projects / 项目** — Lucide `Archive` (durable project index)
-  11. **Cloud sync / 云同步** — Lucide `CloudDownload` (encrypted portable configuration backup and bidirectional sync; developer mode only)
-  12. **Remote Hosts / 远程主机** — Lucide `Globe` (SSH bootstrap and pairing inventory; developer mode only)
-  13. **Info / 信息** — Lucide `Info` (versions, logs, updates, developer)
+  11. **Memory / 记忆** — Lucide `BookOpen` (saved project memory and automatic recording)
+  12. **Cloud sync / 云同步** — Lucide `CloudDownload` (encrypted portable configuration backup and bidirectional sync; developer mode only)
+  13. **Remote Hosts / 远程主机** — Lucide `Globe` (SSH bootstrap and pairing inventory; developer mode only)
+  14. **Info / 信息** — Lucide `Info` (versions, logs, updates, developer)
   Icons are decorative (`aria-hidden` via the SVG default) and stay monochrome
   with the rail label; do not reuse refresh/rotate glyphs here.
 - The directory remains a flat searchable list in the same exact order. For
   scanability, the destinations are shown in four titled visual clusters:
   `Preferences` / `偏好` (General, AI, Shortcuts), `Agent` / `智能体`
   (Instructions, Models, Skills, MCP, Subagents), `Workspace` / `工作区`
-  (Import, Projects), and `System` / `系统` (Cloud sync, Remote Hosts, Info;
+  (Import, Projects, Memory), and `System` / `系统` (Cloud sync, Remote Hosts, Info;
   Cloud sync and Remote Hosts are developer-only). Headings are
   muted, non-interactive labels and use whitespace for separation; no divider
   lines are rendered. These are visual landmarks only, not a second navigation
   level.
   When search filters the directory, empty clusters and their headings disappear.
+- **Memory / 记忆** is a regular Workspace destination available in every build
+  and independent of developer mode. Its page lists Host-provided project groups
+  in a Settings card, using each group as the memory-sharing unit. Each row opens
+  the existing Project memory editor for that group; an empty list links to
+  Project archive, and a failed list read exposes retry. The page does not add a
+  second editor or change storage/API behavior. Project archive keeps its existing
+  Project memory action, and both entry points open the same editor.
 - **Voice** is a regular Preferences destination between AI and Shortcuts,
   present in every build with no Experimental badge and no developer-mode
   requirement. Its rail row, page, search hits, and idle Composer entry are
@@ -970,3 +978,29 @@ the current window width:
 | Card radius | ~14px elevated stroke |
 | Toggle | **32×20** thumb 16, neutral accent on (not green) |
 | Open-target pill | leading VS Code glyph |
+
+## Expert Team and Subagents visual consistency
+
+Expert Team uses the same `AgentCapabilityPage`, `CapabilityPanel`,
+`CapabilityGroupHeader` and `CapabilityRow` as Subagents: compact tiles, muted
+Bot glyphs, shared badges and trailing icon actions. Scope choices retain their
+user/project tab semantics with the shared segmented-control styling. Page and
+built-in explanations are available through shared help controls. Expert role
+forms retain inline editing and field-level inheritance; model/thinking fields,
+form spacing and actions follow the shared Settings primitives and tokens.
+Saving, reset, scope changes, errors and concurrent-update protection are
+unchanged. Subagents retains its existing list and editor sheet.
+
+## Plus project memory recording
+
+Settings > Memory lists project groups and opens the same Project memory editor
+already available from Project archive. The group is the sharing unit: projects
+in a group share its saved notes and automatic-recording preference, while other
+groups stay independent. The editor's shared recording switch follows its
+description, defaults off and persists immediately; note edits continue using
+the existing single Save action. Turning recording off retains saved notes for
+chat context. Existing card layout, add/edit/remove actions and compact/narrow
+scrolling behavior remain. Conflicts retain drafts and offer an explicit reload;
+if the project changes group ownership, editing is disabled until the current
+project identity is refreshed. No separate memory storage, editor, source lists
+or automatic background extraction are introduced.

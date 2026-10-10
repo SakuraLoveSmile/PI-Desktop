@@ -553,14 +553,15 @@ is guidance, not the security boundary.
 one subagent definition. Plan and Goal are read-only contract negotiations, so a
 delegate with `Bash`, `Edit` or `Write` would drive straight through them.
 
-In standard Agent mode, when at least one subagent is enabled, the prompt
-steers the parent to delegate separable, substantial work first: dispatch
-independent assignments with `Task` and converge using `TaskWait`. The parent
-keeps few-tool tasks and work requiring user participation. It must not recurse
-or start delegate debates, and may request at most one optional review. This is
-prompt steering rather than a runtime guarantee. With all subagents disabled,
-the delegation prompt section and `Task*` tools are absent. In Plan and Goal,
-declared `Task*` schemas remain unavailable under the existing execution gate.
+Standard Agent sessions and Agent-mode execution experts actively delegate
+meaningful separable work and converge with TaskWait. Their delegates may
+continue delegating within the configured depth and tree-wide running cap
+(runtime §5f). Every child receives only work tools allowed by its definition,
+parent and Host expert snapshot. Nested permissions cannot elevate the ancestor;
+Host permission and containment checks remain authoritative. Lifecycle tools
+are local, owner-scoped workflow capabilities, not extra work permissions.
+Plan/Goal and Team planning researchers retain their delegation denials.
+No enabled definitions or depth 0 removes Task tools and delegation guidance.
 
 Expert Team uses the separate Team catalog and requires `delegate` with at
 least one expert even for trivial requests; Host rejects every `lead_only`.

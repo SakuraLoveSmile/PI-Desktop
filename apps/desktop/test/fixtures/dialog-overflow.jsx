@@ -31,7 +31,8 @@ window.piDesktop = {
   async invoke(channel, ...args) {
     if (channel === IPC.invoke.extensionsUiRespond) window.dialogFixture.responses.push(args[0]);
     return { ok: true, data: { project: { scope: "project", path, content: "Fixture instructions", exists: true },
-      content: "Fixture instructions", memory: { content: "", entries: [] } } };
+      content: "Fixture instructions", memory: { content: "", entries: [] },
+      editor: { owner: "group:fixture-group", memory: { content: "", entries: [] }, autoRecordEnabled: false } } };
   },
 };
 await i18n.use(initReactI18next).init({ lng: "en", fallbackLng: "en", keySeparator: false,

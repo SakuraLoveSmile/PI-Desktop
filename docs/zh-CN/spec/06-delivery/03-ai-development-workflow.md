@@ -52,7 +52,9 @@
 - 仅请求提交并不授权远程发布。未获远程授权时，停在任务分支提交；不要为了跑 E2E 把任务合进本地 `main`。
 - 打开或更新 PR/MR 之前，获取 `origin/main` 并确认它是请求 head 的祖先（`git merge-base --is-ancestor origin/main HEAD` 或 `pnpm check:pr-base`）。私有分支用 rebase；已共享且不宜改写历史时用非破坏性合并。不得打开或更新落后于 `origin/main` 的 PR。
 - 获准远程交付后，按 `AGENTS.md` 的固定顺序：相对最新 `origin/main` 刷新，在工作树跑 task-candidate E2E，推送请求分支，打开面向 `main` 的 PR/MR，通过远程检查（含 PR-base 门）和审查后合并，再同步本地 `main`。
-- 合入 `main` 后立即删除自己的工作树和已合并分支。
+- 合并后的清理遵循 `AGENTS.md` §5「Verified merge and cleanup」。确认用户已授权的本地或远程合并及必要检查完成后，在同一任务中自动清理本次工作树和已合并分支，不再另问本次资源的清理许可。
+- 删除前将未提交、未跟踪内容及必要的安装包、截图、配置保存到经过校验的可恢复归档。清除 Git 登记和仅含名称标记的空父目录，并移除过期集成分支和普通分支列表中的临时备份分支；备份提交放在 `refs/heads/` 之外的归档引用或备份文件中。
+- 联合检查 `git worktree list`、本地分支及实际目录，单独报告清理结果；受阻时列出准确路径或引用及恢复状态。保留主工作区、活跃或未合并工作、归档及其他任务；批量清理需要明确的用户范围，远程分支删除不包含在该规则中。
 - 若用户要求启动应用，从已集成的 `main` 构建并启动。
 
 ### R5 — 先核实链接的 GitHub issue，再回复并关闭
@@ -343,6 +345,7 @@ git merge --ff-only origin/main
 git worktree remove <worktree-path>
 git branch -d <type>/<short-description>
 git worktree prune
+# Only when the user explicitly authorized remote-branch deletion:
 git push origin --delete <type>/<short-description>
 ```
 
@@ -352,17 +355,7 @@ git push origin --delete <type>/<short-description>
 
 不要为了跑 E2E 或开 PR 把请求分支合进本地 `main`。无远程 PR/MR 的本地交付留在请求分支上，直到用户明确要求集成。
 
-拆卸前工作树必须清洁；提交或丢弃请求自己的
-首先进行剩余的更改。使用 `git branch -d` 而不是 `-D` 因此未合并
-分支拒绝删除。如果 `git worktree remove` 报告工作树为脏
-或锁定，解决该状态而不是强制删除，并且永远不要删除
-另一个请求的工作树。
-
-拆卸前工作树必须清洁；提交或丢弃请求自己的
-首先进行剩余的更改。使用 `git branch -d` 而不是 `-D` 因此未合并
-分支拒绝删除。如果 `git worktree remove` 报告工作树为脏
-或锁定，解决该状态而不是强制删除，并且永远不要删除
-另一个请求的工作树。
+直接删除前工作树必须干净。剩余改动及必要的忽略产物应先保存到经过校验的可恢复归档；清理不授予提交或丢弃这些内容的权限。也可通过托管归档保存内容并移除工作树。使用 `git branch -d`，不用 `-D` 强制删除未合并分支。若工作树为脏或锁定，先解决该状态，不强制删除。其他任务资源须纳入用户明确授权的批量清理范围。核验及报告按 `AGENTS.md` §5 执行。
 
 ---
 

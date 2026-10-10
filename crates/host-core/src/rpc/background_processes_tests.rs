@@ -170,6 +170,68 @@ async fn background_nonzero_timeout_and_bounded_output_spill() {
 }
 #[cfg(not(windows))]
 #[tokio::test]
+async fn background_blocks_project_move_after_turn_ends_until_stopped() {
+    let mut f = Fixture::new("auto");
+    let target = tempfile::tempdir().unwrap();
+    let turn = f
+        .call("session.beginTurn", json!({"sessionId":f.session}))
+        .await
+        .unwrap();
+    let start = f.start("move", "printf started; sleep 30", 60000).await;
+    let id = start["content"]["backgroundProcessId"].as_str().unwrap();
+    f.call(
+        "session.endTurn",
+        json!({"turnId":turn["turnId"],"status":"completed","createNotification":false}),
+    )
+    .await
+    .unwrap();
+    assert!(!sessions::session_has_running_turn(&f.state.lock().await.db, &f.session).unwrap());
+
+    let blocked = f
+        .call(
+            "session.moveProject",
+            json!({"sessionId":f.session,"projectPath":target.path()}),
+        )
+        .await;
+    let before_stop = f
+        .call("session.get", json!({"id":f.session}))
+        .await
+        .unwrap();
+    f.call(
+        "backgroundProcesses.stop",
+        json!({"sessionId":f.session,"id":id}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(f.terminal(id).await["process"]["status"], "stopped");
+    let moved = f
+        .call(
+            "session.moveProject",
+            json!({"sessionId":f.session,"projectPath":target.path()}),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        blocked.unwrap_err().data.unwrap()["errorCode"],
+        "SESSION_HAS_BACKGROUND_PROCESSES"
+    );
+    assert_eq!(
+        before_stop["session"]["projectPath"],
+        crate::db::canonical_project_path(&f._dir.path().to_string_lossy()).unwrap()
+    );
+    assert_eq!(
+        moved["session"]["projectPath"],
+        crate::db::canonical_project_path(&target.path().to_string_lossy()).unwrap()
+    );
+    assert_eq!(
+        f.read(id).await["process"]["cwd"],
+        crate::db::canonical_project_path(&f._dir.path().to_string_lossy()).unwrap()
+    );
+}
+
+#[cfg(not(windows))]
+#[tokio::test]
 async fn background_stop_is_session_scoped_idempotent_and_blocks_deletion() {
     let mut f = Fixture::new("auto");
     let start = f.start("stop", "printf started; sleep 30", 60000).await;
@@ -508,6 +570,18 @@ async fn background_terminal_persistence_failure_retains_output_and_retries_on_r
         blocked.data.unwrap()["errorCode"],
         "BACKGROUND_PROCESS_PERSISTENCE_FAILED"
     );
+    let target = tempfile::tempdir().unwrap();
+    let blocked = f
+        .call(
+            "session.moveProject",
+            json!({"sessionId":f.session,"projectPath":target.path()}),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(
+        blocked.data.unwrap()["errorCode"],
+        "BACKGROUND_PROCESS_PERSISTENCE_FAILED"
+    );
     f.state
         .lock()
         .await
@@ -528,6 +602,17 @@ async fn background_terminal_persistence_failure_retains_output_and_retries_on_r
             "completed"
         );
     }
+    let moved = f
+        .call(
+            "session.moveProject",
+            json!({"sessionId":f.session,"projectPath":target.path()}),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        moved["session"]["projectPath"],
+        crate::db::canonical_project_path(&target.path().to_string_lossy()).unwrap()
+    );
     assert_eq!(
         f.call("session.delete", json!({"id":f.session}))
             .await

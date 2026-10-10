@@ -125,15 +125,15 @@ function fixture(t, { ownOAuth = false, forbidDelegation = false, missingTeam = 
     normalizeThinkingLevel: () => "off",
   });
   const session = { providerId: own.id, modelId: "parent", projectPath: root };
-  const launch = (executionProfile, overrides = {}) => runtime.resolveAgentRuntimeLaunch("session", { ...session, executionProfile }, {}, overrides);
+  const launch = (executionProfile, overrides = {}, settings = {}) => runtime.resolveAgentRuntimeLaunch("session", { ...session, executionProfile }, settings, overrides);
   return { launch, hostCalls, vendorCalls, modelCalls, warnings, authBindings, context, documentPath, brokenPath, own, delegate, vendor };
 }
 
-for (const role of ["lead", "member"]) {
+for (const role of ["lead", "researcher"]) {
   test(`Team ${role} launches without reading ordinary Task configuration or unused models`, async (t) => {
     const f = fixture(t, { ownOAuth: true, forbidDelegation: true });
     f.context.isLead = role === "lead";
-    if (role === "member") f.context.memberName = "Fixture engineer";
+    if (role === "researcher") { f.context.memberName = "Fixture researcher"; f.context.workPurpose = "plan_research"; }
     const params = (await f.launch("team")).sidecarParams;
     assert.equal(params.executionProfile, "team");
     assert.equal(params.teamContext, f.context);
@@ -155,6 +155,19 @@ for (const role of ["lead", "member"]) {
     assert.deepEqual(f.authBindings.at(-1).bindings, [{ providerId: f.own.id }]);
   });
 }
+
+test("Team execution experts load delegation catalog and configured runtime limits", async (t) => {
+  const f = fixture(t);
+  f.context.isLead = false;
+  f.context.memberName = "Fixture engineer";
+  const params = (await f.launch("team", {}, { subagentMaxDepth: 3, subagentMaxConcurrency: 8 })).sidecarParams;
+  assert.equal(params.teamContext, f.context);
+  assert.ok(params.subagents.some(({ name }) => name === "private-reviewer"));
+  assert.ok(f.hostCalls.some(({ method }) => method === "agents.active"));
+  assert.equal(params.subagentMaxDepth, 3);
+  assert.equal(params.subagentMaxConcurrency, 8);
+  assert.ok(params.subagentProviders["fixture/private"]);
+});
 
 test("effective profile override controls launch isolation and keeps own non-OAuth binding", async (t) => {
   const f = fixture(t, { forbidDelegation: true });

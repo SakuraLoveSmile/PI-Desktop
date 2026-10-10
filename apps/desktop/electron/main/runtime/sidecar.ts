@@ -101,6 +101,10 @@ export function createSidecarRuntime({
     // the current turn's state in Agent Host or the renderer. Persistence is a
     // separate call, so dropping it here still archives it as history.
     if (isStaleTerminalEvent(envelope)) return;
+    if (envelope.event.type === "context_insights" && !envelope.event.request && !envelope.event.diagnosticEvent) {
+      sendToRenderer(IPC.event.contextInsightsChanged, { sessionId: envelope.sessionId });
+      return;
+    }
     runtimeState.agentHostBridge?.ingest(envelope);
     sendToRenderer(IPC.event.agentMessage, envelope);
   };
