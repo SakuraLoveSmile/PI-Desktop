@@ -4791,6 +4791,7 @@ async fn handle_request_inner(
                             args: p.args.clone(),
                             options,
                             permit: _tool_permit,
+                            timeout_is_default: p.timeout_ms.is_none(),
                         },
                     )
                     .await

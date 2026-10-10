@@ -1212,3 +1212,11 @@ are observable errors; no partial memory save is published. History search is
 scoped before pagination. Context reads enforce the same current group membership
 and exclude deleted sources. Code index scanning runs outside the async worker
 and binding is rechecked after the blocking operation.
+
+
+后台超时可见性（2026-10-11）：`TOOL_TIMEOUT` 读取的已有 `errorMessage`
+说明实际默认/显式限制及秒数参数。已有持久化工具结果内容记录 `timeoutMs`
+和 `timeoutIsDefault`，不为旧记录补造来源。不新增概要字段、迁移、RPC 或事件
+字段。Sidecar 使用已有可信项目启动绑定，只转发 `{sessionId,id}`，并在 await
+后复核绑定代际和返回进程归属。只开放 `read`，`list` 与 `stop` 仍不可调用。
+团队等待由已有 changed 事件触发读取并返回终态详情；输出/启动事件不结束等待。

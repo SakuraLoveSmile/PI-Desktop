@@ -1847,3 +1847,15 @@ complete canonical history, independently of display windows. The bounded v1
 page and monotonic Task settlement contracts are defined in
 [Complete session activity projection](session-activity-projection.md).
 No protocol-version/schema bump, model call or new plugin capability is added.
+
+
+Background timeout visibility (2026-10-11): the existing `errorMessage` on a
+`TOOL_TIMEOUT` read states the applied default/explicit limit and the seconds
+parameter guidance. The persisted tool-result content records `timeoutMs` and
+`timeoutIsDefault`; older rows are not backfilled with invented provenance.
+No summary field, migration, RPC or event field is added. Sidecar reads use the
+existing opaque project launch binding, forward only `{sessionId,id}`, and
+recheck binding generation plus the returned process owner after the await.
+Only `read` is admitted; sidecar `list` and `stop` remain unavailable.
+Team waits return the scoped terminal detail after an existing changed event;
+output/start events only trigger a read and do not finish the wait.

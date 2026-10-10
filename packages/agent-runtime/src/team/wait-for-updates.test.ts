@@ -18,7 +18,8 @@ function harness(notifications = true) {
   });
   const host: RuntimeHost = {
     async call<T>(method: string, params?: unknown): Promise<T> {
-      expect(params).toMatchObject({ teamSessionId: "team-1", callerSessionId: "member-1" });
+      if (method === "backgroundProcesses.read") expect(params).toEqual({ sessionId: "member-1", id: "job-1" });
+      else expect(params).toMatchObject({ teamSessionId: "team-1", callerSessionId: "member-1" });
       return await rpc(method) as T;
     },
   };
@@ -255,6 +256,98 @@ describe("wait_for_updates", () => {
     await vi.advanceTimersByTimeAsync(1);
     expect((await pending).details).toMatchObject({ updated: true, reason });
     expect(h.rpc).toHaveBeenCalledTimes(4);
+    expect(h.listeners.size).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each(["completed", "timed_out"])("wakes on a scoped background %s and reads the terminal result", async status => {
+    const h = harness();
+    const process = { id: "job-1", sessionId: "member-1", status };
+    const detail = { process, errorCode: status === "timed_out" ? "TOOL_TIMEOUT" : undefined,
+      errorMessage: status === "timed_out" ? "Background Bash timed out after the default 60 seconds." : undefined };
+    h.setReader(async method => method === "backgroundProcesses.read" ? detail
+      : method === "team.getBoard" ? { revision: 7 } : { messages: [] });
+    const pending = h.tool.execute("wait", {});
+    await vi.advanceTimersByTimeAsync(0);
+    h.emit("backgroundProcesses.changed", { sessionId: "other-session", id: "job-1", revision: 1 });
+    h.emit("backgroundProcesses.changed", { sessionId: "member-1", id: "job-1", revision: 2 });
+    await vi.advanceTimersByTimeAsync(100);
+    const outcome = await pending;
+    expect(outcome.details).toEqual({ updated: true, reason: "background_process_completed", backgroundProcess: detail });
+    expect(outcome.terminate).toBeUndefined();
+    expect(h.rpc.mock.calls.filter(([method]) => method === "backgroundProcesses.read")).toHaveLength(1);
+    expect(h.listeners.size).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("retains a terminal invalidation racing a running read and delivers the outcome once", async () => {
+    const h = harness();
+    const first = deferred<unknown>();
+    let reads = 0;
+    const detail = { process: { id: "job-1", sessionId: "member-1", status: "completed" } };
+    h.setReader(async method => method === "backgroundProcesses.read" ? ++reads === 1 ? first.promise : detail
+      : method === "team.getBoard" ? { revision: 7 } : { messages: [] });
+    const pending = h.tool.execute("wait", {});
+    await vi.advanceTimersByTimeAsync(0);
+    h.emit("backgroundProcesses.changed", { sessionId: "member-1", id: "job-1", revision: 1 });
+    await vi.advanceTimersByTimeAsync(100);
+    h.emit("backgroundProcesses.changed", { sessionId: "member-1", id: "job-1", revision: 2 });
+    await vi.advanceTimersByTimeAsync(100);
+    first.resolve({ process: { ...detail.process, status: "running" } });
+    await vi.advanceTimersByTimeAsync(0);
+    expect((await pending).details).toEqual({ updated: true, reason: "background_process_completed", backgroundProcess: detail });
+    expect(reads).toBe(2);
+    const repeated = h.tool.execute("next", { timeoutSeconds: 1 });
+    h.emit("backgroundProcesses.changed", { sessionId: "member-1", id: "job-1", revision: 3 });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect((await repeated).details).toEqual({ updated: false, reason: "timeout" });
+    expect(reads).toBe(2);
+    expect(h.listeners.size).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("ignores live background output and reports a read failure without hiding it as an idle timeout", async () => {
+    const h = harness();
+    let failure = false;
+    h.setReader(async method => {
+      if (method === "backgroundProcesses.read") {
+        if (failure) throw new Error("Background read unavailable");
+        return { process: { id: "job-1", sessionId: "member-1", status: "running" } };
+      }
+      return method === "team.getBoard" ? { revision: 7 } : { messages: [] };
+    });
+    const pending = h.tool.execute("wait", {});
+    await vi.advanceTimersByTimeAsync(0);
+    h.emit("backgroundProcesses.changed", { sessionId: "member-1", id: "job-1", revision: 1 });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(h.listeners.size).toBe(1);
+    failure = true;
+    h.emit("backgroundProcesses.changed", { sessionId: "member-1", id: "job-1", revision: 2 });
+    await vi.advanceTimersByTimeAsync(100);
+    expect((await pending).details).toEqual({ error: "Background read unavailable" });
+    expect(h.listeners.size).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each(["abort", "turn change"])("does not deliver a stale background read after %s and retains the result for the next wait", async ending => {
+    const h = harness();
+    const blocked = deferred<unknown>();
+    let turnId = "turn-1";
+    h.setReader(async method => method === "backgroundProcesses.read" ? blocked.promise
+      : method === "team.getBoard" ? { revision: 7 } : { messages: [] });
+    const tool = createWaitForUpdatesTool({ teamSessionId: "team-1", callerSessionId: "member-1", host: h.host, getTurnId: () => turnId });
+    const controller = new AbortController();
+    const pending = tool.execute("wait", {}, controller.signal);
+    await vi.advanceTimersByTimeAsync(0);
+    h.emit("backgroundProcesses.changed", { sessionId: "member-1", id: "job-1", revision: 1 });
+    await vi.advanceTimersByTimeAsync(100);
+    if (ending === "abort") controller.abort();
+    else turnId = "turn-2";
+    const detail = { process: { id: "job-1", sessionId: "member-1", status: "completed" } };
+    blocked.resolve(detail);
+    await vi.advanceTimersByTimeAsync(0);
+    expect((await pending).details).toEqual(ending === "abort" ? { updated: false, reason: "aborted" } : { error: "Background process wait is no longer active" });
+    expect((await tool.execute("next", {})).details).toEqual({ updated: true, reason: "background_process_completed", backgroundProcess: detail });
     expect(h.listeners.size).toBe(0);
     expect(vi.getTimerCount()).toBe(0);
   });

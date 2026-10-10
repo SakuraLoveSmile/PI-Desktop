@@ -2,6 +2,11 @@
 
 Upstream v0.15.6 → v0.16.1 has been merged.
 
+- Managed background Bash timeout results name the actual default or explicit
+  limit and explain the seconds override for long commands. The default remains
+  60 seconds. Team waits now return an owned background process's terminal
+  result through the existing notification and scoped read path.
+
 - Overview adds actionable attention for approvals, failures, timeouts and
   degraded reports, separates live status from artifacts, and groups Team members
   independently. Loaded-history notices and paging are per group. Repeated file
