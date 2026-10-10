@@ -1,3 +1,4 @@
+import { BackgroundProcessUpdates } from "./team/background-process-updates.js";
 import { backgroundBashDescription, bashTimeoutPayload } from "./background-bash.js";
 import { contextRequestObserver } from "./context-insights.js";
 import { TOOL_ACTIVATION_SECTION, toolDeclarationPolicy, toolActivationSection, restoredToolActivation, syncToolActivation, type ToolDeclarationPolicy } from "./fixed-tool-declarations.js";
@@ -1682,6 +1683,7 @@ export class DesktopAgentRuntime {
   private provider: RuntimeProviderConfig;
   private thinkingLevel: SessionThinkingLevel;
   private host: RuntimeHost;
+  private readonly backgroundProcessUpdates: BackgroundProcessUpdates;
   private onEvent: (envelope: AgentEventEnvelope) => void;
   private onDiagnostic: (diagnostic: AgentRuntimeDiagnostic) => void;
   private streamSink: StreamCoalescer;
@@ -1928,6 +1930,7 @@ export class DesktopAgentRuntime {
     this.thinkingLevel = clampThinkingLevel(opts.provider, opts.thinkingLevel);
     this.infiniteProviderRetry = opts.infiniteProviderRetry === true;
     this.host = opts.host;
+    this.backgroundProcessUpdates = new BackgroundProcessUpdates(this.host, this.sessionId, () => this.disposed || this.runCancelled ? undefined : this.turnEpoch);
     this.onDiagnostic = opts.onDiagnostic ?? (() => undefined);
     this.hostCloseUnsubscribe = this.host.onClose?.(() => {
       this.cleanupActiveToolProgress();
@@ -3351,6 +3354,7 @@ export class DesktopAgentRuntime {
       ) => {
         await this.loadPathInstructions(toolName, params);
         const isBash = toolName === "Bash";
+        const captureBackgroundReceipt = isBash ? this.backgroundProcessUpdates.captureReceipt() : undefined;
         const timeoutMs = isBash ? commandTimeoutMs(params) : undefined;
         let progress = "";
         let progressDirty = false;
@@ -3486,6 +3490,7 @@ export class DesktopAgentRuntime {
                 ? { permissionScope: this.delegatePermissionScopes.get(toolCallId) }
                 : {}),
             });
+          captureBackgroundReceipt?.(result, signal);
         } catch (error) {
           executionFailed = true;
           executionError = error;
@@ -3854,7 +3859,7 @@ export class DesktopAgentRuntime {
           roundId: this.teamContext?.roundId,
           isLead: this.teamContext?.isLead ?? false,
           mode: this.mode,
-          host: this.host,
+          host: this.host, backgroundProcesses: this.backgroundProcessUpdates,
           getTurnId: () => this.turnId, approvedExecution: () => this.autonomousExecution,
           captureInboxYield: () => {
             const turnId = this.turnId;
@@ -9407,6 +9412,7 @@ export class DesktopAgentRuntime {
 
   async dispose(): Promise<void> {
     if (this.disposed) return;
+    this.backgroundProcessUpdates.dispose();
     const runner = this.extensionRunner;
     this.extensionRunner = undefined;
     const closingExtensions = typeof runner?.dispose === "function" ? runner.dispose() : undefined;

@@ -8,6 +8,7 @@ interface WaitForUpdatesOptions {
   teamSessionId: string;
   callerSessionId: string;
   host: RuntimeHost;
+  backgroundProcesses?: BackgroundProcessUpdates;
   getTurnId?: () => string | undefined;
   approvedExecution?: () => boolean;
   /** Capture an ordinary Plan Lead turn and yield only while it still owns the wait. */
@@ -32,7 +33,7 @@ function errorResult(error: unknown): AgentToolResult {
 export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool {
   const { teamSessionId, callerSessionId, host } = opts;
   const consumed = new Set<string>();
-  const background = new BackgroundProcessUpdates(host, callerSessionId);
+  const background = opts.backgroundProcesses ?? new BackgroundProcessUpdates(host, callerSessionId);
   return {
     name: "wait_for_updates",
     label: "Wait for Updates",
@@ -47,6 +48,7 @@ export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool
     }),
     execute: async (toolCallId, params, signal): Promise<AgentToolResult> => {
       const expectedTurnId = opts.getTurnId?.();
+      background.prime();
       const yieldInbox = opts.approvedExecution?.() ? undefined : opts.captureInboxYield?.();
       const readInbox = async () => {
         if (!opts.approvedExecution?.() || !expectedTurnId) return undefined;
@@ -169,6 +171,7 @@ export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool
               return;
             }
             if (settled) return;
+            if (Date.now() >= deadline) { finishDeadline(); return; }
             if (backgroundProcess) { finish(result({ updated: true, reason: "background_process_completed", backgroundProcess })); return; }
             const current = await readState();
             if (settled) return;
