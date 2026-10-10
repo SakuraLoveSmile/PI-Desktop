@@ -2,6 +2,12 @@
 
 Upstream v0.15.6 → v0.16.1 has been merged.
 
+- Expert member errors now reach the Lead through one durable Host-authored
+  notice with a sanitized error code, affected tasks and explicit retry guidance.
+  Existing Team delivery wakes waiting or idle Leads; approved execution must
+  consume failures before completion. User stops and duplicate terminal events
+  do not generate duplicate failure notices.
+
 - Overview adds actionable attention for approvals, failures, timeouts and
   degraded reports, separates live status from artifacts, and groups Team members
   independently. Loaded-history notices and paging are per group. Repeated file
