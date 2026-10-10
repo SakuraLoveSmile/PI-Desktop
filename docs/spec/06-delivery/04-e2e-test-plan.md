@@ -17851,3 +17851,18 @@ keyboard selection, opaque surfaces and narrow footer geometry in the real rende
 RPC tests execute native Git against temporary repositories; renderer interaction
 fixtures mock only the external Host/session API edge and use the real store and
 components. They do not establish SSH server connectivity or a packaged release.
+
+### Team Goal settlement and completion reasons
+
+- `E2E-GOAL-report-waits-for-settled-team`: an approved Team Goal dispatches an
+  expert, attempts a report while that expert runs, and receives the exact
+  member/dispatch/task diagnostic without persisting a draft. After the expert
+  finishes, unconsumed evidence still blocks the report; `wait_for_updates` consumes
+  full results in the original turn and the report then succeeds.
+- `E2E-TEAM-completion-error-keeps-host-reason`: the real Host settlement denial
+  passes through the runtime guard and three reason-specific recovery prompts;
+  the fourth denial produces a terminal error with the identical Host reason.
+
+Automated by `scripts/e2e-goal-report.mjs` (real isolated Host RPC with runtime
+tools/guard) and `scripts/e2e-team-approved-goal.mjs` (isolated Electron and fake
+loopback provider). No live session, profile or real model is accessed.

@@ -172,7 +172,11 @@
       "family": "goals-team",
       "script": "scripts/e2e-goal-report.mjs",
       "tier": "nightly",
-      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked.",
+      "scenarioIds": [
+        "E2E-GOAL-report-waits-for-settled-team",
+        "E2E-TEAM-completion-error-keeps-host-reason"
+      ]
     },
     {
       "id": "goal-team-renderer-ui",

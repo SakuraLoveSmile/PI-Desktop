@@ -1847,3 +1847,14 @@ complete canonical history, independently of display windows. The bounded v1
 page and monotonic Task settlement contracts are defined in
 [Complete session activity projection](session-activity-projection.md).
 No protocol-version/schema bump, model call or new plugin capability is added.
+
+### Settled Team Goal report authorization (2026-10-11)
+
+`team.authorizeLeadTool` applies the existing approved-execution settlement
+predicate to both `TeamFinalAnswer` and `SubmitGoalReport`. The latter is checked
+by the runtime's existing Lead wrapper before the report tool body runs. No RPC
+or payload field is added. A rejection includes all pending dispatch IDs and
+member names, assigned open task IDs, and the count and identities of unconsumed
+current-expert results; the next action remains `wait_for_updates`. Settlement is
+bound to the Host-proven original execution turn, never inferred from a historical
+session approval. Post-execution mail does not extend Goal lifecycle authority.
