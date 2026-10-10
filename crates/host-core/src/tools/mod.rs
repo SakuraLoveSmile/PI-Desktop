@@ -1522,7 +1522,7 @@ fn tool_edit(
         legacy_new,
     ) {
         (Some(tag), Some(ops), _, _) => (tag.to_string(), ops.to_string()),
-        (None, None, Some(old), Some(new)) => {
+        (_, None, Some(old), Some(new)) => {
             let file = hashline::normalize_file(&live);
             let tag = hashline::tag_of_lf_text(&file.text);
             let matches: Vec<_> = file
@@ -1565,7 +1565,10 @@ fn tool_edit(
             ));
         }
         (_, None, _, _) => {
-            return Err(hashline::ToolError::new("INVALID_ARGUMENT", "ops required"));
+            return Err(hashline::ToolError::new(
+                "INVALID_ARGUMENT",
+                "ops required unless old_string and new_string are both supplied; example: PUT 48.=48:\n+replacement\nnew_string is read only when ops is absent",
+            ));
         }
     };
     let display = display_tool_path(root_kind, root, &resolved);
@@ -4775,6 +4778,115 @@ mod tests {
             not_found.error_code.as_deref(),
             Some("EDIT_LEGACY_MATCH_FAILED")
         );
+    }
+
+    #[tokio::test]
+    async fn edit_accepts_tag_with_legacy_arguments() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("legacy.txt");
+        std::fs::write(&target, "before\nunique\nafter\n").unwrap();
+        let result = execute_tool(
+            Some(dir.path()),
+            None,
+            "Edit",
+            &json!({
+                "path": "legacy.txt", "tag": "stale-ignored",
+                "old_string": "unique", "new_string": "replacement"
+            }),
+            5_000,
+        )
+        .await;
+        assert!(result.ok, "{:?}", result.content);
+        assert_eq!(
+            std::fs::read_to_string(&target).unwrap(),
+            "before\nreplacement\nafter\n"
+        );
+        assert_eq!(result.content["tag"].as_str().unwrap().len(), 4);
+        for old in ["missing", "repeated"] {
+            std::fs::write(&target, "repeated\nrepeated\n").unwrap();
+            let result = execute_tool(
+                Some(dir.path()),
+                None,
+                "Edit",
+                &json!({
+                    "path": "legacy.txt", "tag": "stale-ignored",
+                    "old_string": old, "new_string": "replacement"
+                }),
+                5_000,
+            )
+            .await;
+            assert_eq!(
+                result.error_code.as_deref(),
+                Some("EDIT_LEGACY_MATCH_FAILED")
+            );
+            assert_eq!(
+                std::fs::read_to_string(&target).unwrap(),
+                "repeated\nrepeated\n"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn edit_ops_take_precedence_over_legacy_arguments() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("anchored.txt");
+        std::fs::write(&target, "original\n").unwrap();
+        let read = execute_tool(
+            Some(dir.path()),
+            None,
+            "Read",
+            &json!({"path": "anchored.txt"}),
+            5_000,
+        )
+        .await;
+        let result = execute_tool(
+            Some(dir.path()),
+            None,
+            "Edit",
+            &json!({
+                "path": "anchored.txt", "tag": read.content["tag"],
+                "ops": "PUT 1.=1:\n+anchored\n",
+                "old_string": "original", "new_string": "legacy"
+            }),
+            5_000,
+        )
+        .await;
+        assert!(result.ok, "{:?}", result.content);
+        assert_eq!(std::fs::read_to_string(&target).unwrap(), "anchored\n");
+    }
+
+    #[tokio::test]
+    async fn edit_missing_ops_and_body_explain_the_operation_shape() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("shape.txt");
+        std::fs::write(&target, "original\n").unwrap();
+        let read = execute_tool(
+            Some(dir.path()),
+            None,
+            "Read",
+            &json!({"path": "shape.txt"}),
+            5_000,
+        )
+        .await;
+        for (ops, code) in [
+            (None, "INVALID_ARGUMENT"),
+            (Some("PUT 1.=1:"), "EDIT_PARSE_FAILED"),
+        ] {
+            let mut args =
+                json!({"path": "shape.txt", "tag": read.content["tag"], "new_string": "ignored"});
+            if let Some(ops) = ops {
+                args["ops"] = json!(ops);
+            }
+            let result = execute_tool(Some(dir.path()), None, "Edit", &args, 5_000).await;
+            assert_eq!(result.error_code.as_deref(), Some(code));
+            let message = result.content["error"].as_str().unwrap();
+            assert!(message.contains("PUT 48.=48:\n+replacement"), "{message}");
+            assert!(
+                message.contains("new_string is read only when ops is absent"),
+                "{message}"
+            );
+            assert_eq!(std::fs::read_to_string(&target).unwrap(), "original\n");
+        }
     }
 
     #[tokio::test]
