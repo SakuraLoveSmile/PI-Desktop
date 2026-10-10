@@ -440,3 +440,14 @@ delegation data and keep their own model and Host context. Runtime reuse under
 Team ignores unused Task inputs, while standard retains its previous freshness
 checks. This removes configuration-induced Team rebuilding without changing
 the process model, Team consent, member snapshots or active-turn safety.
+
+## Execution expert subagent amendment (2026-10-09)
+
+The blanket Team/standard Task isolation above is superseded for Agent-mode
+execution experts only. Each expert is a root agent and may use ordinary
+subagents recursively within the user's global depth and running-count limits.
+The expert remains responsible for its owned board task and reports to the
+Lead; subagents do not become Team members or bypass staffing approval.
+Descendant work retains the expert's durable session/turn, tool snapshot and
+permission ceiling. Lead and planning-research Task isolation is retained.
+See ADR 0089's bounded recursive delegation amendment for trade-offs.

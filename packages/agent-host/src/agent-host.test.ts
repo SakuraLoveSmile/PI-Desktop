@@ -152,6 +152,26 @@ function build(options: { permissionMode?: SessionSummary["permissionMode"]; que
 }
 
 describe("AgentHost ingest", () => {
+  it("keeps captured provider contexts off the remote event stream", async () => {
+    const { host, received } = build();
+    host.ingest(envelope("s1", "rt_1", { type: "agent_start" }));
+    const before = received.length;
+    host.ingest(envelope("s1", "rt_1", {
+      type: "context_insights",
+      request: {
+        id: "req-1", turnId: "rt_1", step: 1, startedAt: 1, status: "running",
+        providerId: "provider", modelId: "model", mode: "agent", contextWindow: 128000,
+        estimatedTokens: 12, estimateSource: "runtime-usage-anchor", contentTruncated: false,
+        entries: [{ id: "system", category: "system", label: "system", content: "private prompt fixture", estimatedTokens: 12, originalChars: 22, truncated: false }],
+      },
+    }));
+    expect(received).toHaveLength(before);
+    expect(JSON.stringify(await host.snapshot("s1"))).not.toContain("private prompt fixture");
+    expect(host.getTurn("rt_1").status).toBe("running");
+    host.ingest(envelope("s1", "rt_1", { type: "agent_end", messageIds: [] }));
+    expect(host.getTurn("rt_1").status).toBe("completed");
+  });
+
   it("publishes Goal Progress changes on the durable session event stream", () => {
     const { host, received } = build();
     host.publishGoalProgressChanged({ sessionId: "s1", executionId: "execution-1", revision: 2 });

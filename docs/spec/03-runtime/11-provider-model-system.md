@@ -66,8 +66,14 @@ OpenCode Go is exposed as a named `opencode_go` API-style preset. It remains
 inside the `openai_compatible` provider path: the preset fixes the endpoint to
 `https://opencode.ai/zen/go/v1`, uses Bearer API-key authentication, discovers
 models from `/models`, and sends chat turns through pi-ai's OpenAI Chat
-Completions adapter. It does not create a second transport or a closed model
-allowlist. Agent-runtime injects OpenCode routing headers on every LLM
+Completions adapter unless verified per-model metadata selects another wire API.
+OpenCode Zen's `muse-spark-1.3-contributor-free` is Responses-only at
+`https://opencode.ai/zen/v1/responses`: the bundled catalog resolves that exact
+publisher/model to `openai-responses` before runtime construction. Explicit
+model wire metadata still wins, other publishers/models retain their existing
+API, and the model's published limits remain unchanged. This is protocol
+adaptation; credentials, client identity and server eligibility are not changed.
+It does not create a second transport or a closed model allowlist. Agent-runtime injects OpenCode routing headers on every LLM
 request (session turns, subagents, context-compaction summaries, prompt
 enhancement, and plugin one-shots): `x-opencode-session` is the durable
 conversation id (or a per-call UUID when the caller has no session),

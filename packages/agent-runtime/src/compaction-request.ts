@@ -1,3 +1,5 @@
+import { contextRequestObserver } from "./context-insights.js";
+import type { ContextInsightsRequest } from "@pi-desktop/shared";
 /**
  * Outbound headers for the context-compaction summary request.
  *
@@ -108,12 +110,17 @@ export function withCompactionRequestHeaders(
   sessionId: string,
   onUsage?: UsageObserver,
   onRequestShape?: (shape: CompactionRequestShape) => void,
+  diagnostics?: { turnId?: string; mode?: string; agentName?: string; parentToolCallId?: string; onContext: (request: ContextInsightsRequest) => void },
 ): Models {
   const completeSimple: Models["completeSimple"] = async (model, context, options) => {
     const identity = { ...requestUsageIdentity(model, provider.id), costStatus: nativeCostStatus(provider.modelConfig?.nativeCost) };
+    const startedAt = Date.now();
+    const observer = diagnostics ? contextRequestObserver(model, context, { providerId: provider.id,
+      turnId: diagnostics.turnId, agentName: diagnostics.agentName, parentToolCallId: diagnostics.parentToolCallId, step: 0, mode: diagnostics.mode ?? "agent", purpose: "compaction" }, diagnostics.onContext, () => ({ aborted: options?.signal?.aborted })) : undefined;
+    observer?.onRequest(identity);
     const requestOptions = compactionRequestOptions({ provider, sessionId, model, context, options });
     const previousOnPayload = requestOptions.onPayload;
-    if (SUMMARY_CONVERSATION_APIS.has(model.api) || onRequestShape) {
+    if (SUMMARY_CONVERSATION_APIS.has(model.api) || onRequestShape || observer) {
       requestOptions.onPayload = async (payload, requestModel) => {
         const replacement = await previousOnPayload?.(payload, requestModel);
         const base = replacement === undefined ? payload : replacement;
@@ -122,6 +129,7 @@ export function withCompactionRequestHeaders(
           api: requestModel.api,
           sessionId,
         });
+        observer?.onPayload(keyed ?? base);
         // Nothing to change keeps the hook's own return value, so an untouched
         // payload stays the adapter's object instead of a copy of it.
         onRequestShape?.(compactionRequestShape({
@@ -133,8 +141,15 @@ export function withCompactionRequestHeaders(
         return keyed === base ? replacement : keyed;
       };
     }
-    const result = await models.completeSimple(model, context, requestOptions);
-    return onUsage ? accountModelResult(result, identity, onUsage) : result;
+    try {
+      const result = await models.completeSimple(model, context, requestOptions);
+      const accounted = accountModelResult(result, identity, onUsage);
+      observer?.onResult(accounted, identity, Math.max(0, Date.now() - startedAt));
+      return accounted;
+    } catch (error) {
+      observer?.onError(identity, Math.max(0, Date.now() - startedAt));
+      throw error;
+    }
   };
   return new Proxy(models, {
     get: (target, property, receiver) =>

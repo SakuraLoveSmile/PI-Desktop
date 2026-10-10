@@ -46,6 +46,8 @@ import {
 
 /** One chain of `Task` calls that share a delegate session. */
 export type DelegationChain = {
+  /** Stable parent chain identity; absent for the session root. */
+  ownerId?: string;
   /** Stable identity across every `resume`; never appears in a tool or prompt. */
   delegateSessionId: string;
   /** Every `Task` toolCallId on this chain, oldest first. */
@@ -503,6 +505,7 @@ function safeJson(value: unknown): string {
 }
 
 export type RebuiltTaskCall = {
+  ownerId?: string;
   toolCallId: string;
   delegationId: string;
   agentName: string;
@@ -579,6 +582,7 @@ export function rebuildChainsFromTranscript(
       typeof details?.modelId === "string" ? details.modelId : undefined;
     const call: RebuiltTaskCall = {
       toolCallId: row.toolCallId,
+      ...(typeof details?.ownerId === "string" ? { ownerId: details.ownerId } : {}),
       delegationId,
       agentName,
       ...(resume ? { resume } : {}),
@@ -609,7 +613,7 @@ export function rebuildChainsFromTranscript(
       continue;
     }
     const parent = byDelegationId.get(call.resume);
-    if (!parent) {
+    if (!parent || parent.ownerId !== call.ownerId) {
       // A resume whose parent is gone is not a chain; skip it.
       continue;
     }
@@ -638,6 +642,7 @@ export function rebuildChainsFromTranscript(
     const latest = ordered[ordered.length - 1];
     chains.push({
       delegateSessionId: root.delegationId,
+      ...(root.ownerId ? { ownerId: root.ownerId } : {}),
       toolCallIds,
       delegationIds: ordered.map((call) => call.delegationId),
       agentName: root.agentName,

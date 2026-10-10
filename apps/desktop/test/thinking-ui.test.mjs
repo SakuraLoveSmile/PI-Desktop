@@ -131,8 +131,12 @@ test("Composer owns the mode and model controls", () => {
   assert.doesNotMatch(stylesSource, /\.conversation-topbar \.ct-mode/);
   assert.match(composerModelPickerSource, /composer-model-thinking-chip/);
   assert.match(composerModelPickerSource, /composer-model-thinking-menu/);
-  assert.match(composerModelPickerSource, /composer-menu-entry/);
-  assert.match(composerModelPickerSource, /composer-menu-back/);
+  assert.match(composerModelPickerSource, /<ComposerModelList[\s\S]*?selectModel=\{selectModel\}/);
+  assert.match(composerModelPickerSource, /thinkingMenuLevels\.length > 1 \? \(\s*<ThinkingLevelSlider/);
+  assert.match(composerModelPickerSource, /levels=\{thinkingMenuLevels\}[\s\S]*?level=\{thinkingLevel\}[\s\S]*?commit=\{commitThinkingLevel\}/);
+  assert.match(composerModelPickerSource, /className="composer-model-settings"\s*role="menuitem"/);
+  assert.match(composerModelPickerSource, /setOpen\(false\);\s*onOpenModelSettings\(\)/);
+  assert.doesNotMatch(composerModelPickerSource, /composer-menu-entry|composer-menu-back/);
 });
 
 test("conversation topbar keeps the title and actions free of a running indicator", () => {

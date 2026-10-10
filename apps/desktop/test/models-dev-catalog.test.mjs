@@ -6,7 +6,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { createModels, InMemoryModelsStore } from "@earendil-works/pi-ai";
 import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
-import { buildProviderModel } from "../../../packages/agent-runtime/dist/provider-binding.js";
+import { buildProviderModel, createProviderModels } from "../../../packages/agent-runtime/dist/provider-binding.js";
 import {
   apiStyleForAdapter,
   bindingForCustomModelInfo,
@@ -1032,6 +1032,49 @@ test("models.dev parsing keeps the per-model wire API with a responses-only fall
     "https://opencode.ai/zen/go/v1",
   );
   assert.equal(config.api, "openai-responses");
+});
+
+test("OpenCode Zen Muse Spark contributor free uses its published Responses endpoint", async () => {
+  const bundled = JSON.parse(await readFile(new URL("../resources/models.dev/api.json", import.meta.url), "utf8"));
+  const zen = parseModelsDevCatalog(bundled).find((provider) => provider.providerKey === "opencode");
+  const free = zen.models.find((model) => model.modelId === "muse-spark-1.3-contributor-free");
+  assert.ok(free, "the exact endpoint-offered free model exists in the bundled catalog");
+  const config = modelConfigFromModelsDev(free, "https://opencode.ai/zen/v1");
+  const provider = {
+    id: "zen-local-row", name: "OpenCode Zen", vendorKey: "opencode",
+    baseUrl: "https://opencode.ai/zen/v1", apiStyle: "chat_completions", modelId: free.modelId,
+    apiKey: "isolated-fixture-key", authKind: "api_key_and_base_url", modelConfig: config,
+  };
+  const model = buildProviderModel(provider);
+  assert.equal(model.api, "openai-responses");
+  assert.equal(model.baseUrl, "https://opencode.ai/zen/v1");
+  assert.equal(model.id, "muse-spark-1.3-contributor-free");
+  assert.equal(model.contextWindow, free.limit.context);
+  const requests = [];
+  const result = await createProviderModels(provider, model).streamSimple(model, {
+    messages: [{ role: "user", content: "Isolated routing probe", timestamp: 0 }], tools: [],
+  }, { fetch: async (input, init) => {
+    requests.push({ url: input instanceof Request ? input.url : String(input), body: JSON.parse(init.body) });
+    return new Response("isolated gateway failure", { status: 502 });
+  } }).result();
+  assert.equal(result.stopReason, "error");
+  assert.deepEqual(requests.map((request) => request.url), ["https://opencode.ai/zen/v1/responses"]);
+  assert.equal(requests[0].body.model, "muse-spark-1.3-contributor-free");
+});
+
+test("Zen free-model routing preserves other publishers, other models and explicit wire APIs", () => {
+  const id = "muse-spark-1.3-contributor-free";
+  const providers = parseModelsDevCatalog({
+    opencode: { models: { [id]: { id }, normal: { id: "deepseek-v4-flash" } } },
+    llmgateway: { models: { [id]: { id } } },
+    constructor: { models: { [id]: { id } } },
+  });
+  const zen = providers.find((provider) => provider.providerKey === "opencode");
+  const explicit = parseModelsDevCatalog({ opencode: { models: { [id]: { id, api: "openai-completions" } } } })[0].models[0];
+  assert.equal(explicit.modelApi, "openai-completions");
+  assert.equal(zen.models.find((model) => model.modelId === "deepseek-v4-flash").modelApi, undefined);
+  assert.equal(providers.find((provider) => provider.providerKey === "llmgateway").models[0].modelApi, undefined);
+  assert.equal(providers.find((provider) => provider.providerKey === "constructor").models[0].modelApi, undefined);
 });
 
 test("models.dev parsing retains every model in a provider", () => {

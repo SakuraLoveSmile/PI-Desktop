@@ -1,6 +1,7 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const zhTW = {
+  contextInsights: en.contextInsights,
   app: {
     shellName: "Pi-Desktop-Plus",
     tagline: "本地 AI 程式設計助手",
@@ -923,10 +924,19 @@ sklm: {
       subagents: "子智慧體",
       import: "匯入",
       projects: "專案",
+      memory: "記憶",
       sync: "雲端同步",
       remoteHosts: "遠端主機",
       info: "資訊",
       voice: "語音",
+    },
+    memory: {
+      title: "記憶",
+      description:
+        "依專案管理已儲存的記憶與自動記錄。同一專案群組會共用記憶，其他專案互不影響。",
+      projectsTitle: "專案記憶",
+      empty: "目前沒有專案，請先在專案封存中建立或開啟專案。",
+      loadFailed: "無法載入專案清單，請重試。",
     },
     configSync: {
       title: "雲端同步",
@@ -1216,6 +1226,14 @@ sklm: {
     skillBatchFailed: "{{count}} 個資料夾匯入失敗。首個錯誤：{{first}}",
     skillsEmpty: "此目錄中沒有技能",
     subagentsEmpty: "還沒有你自己的子智慧體",
+    subagentRuntimeLimits: "任務委派限制",
+    subagentRuntimeLimitsDesc: "單智慧體和專家團成員都可以在限制內拆分並委派獨立任務。修改從下一次任務執行起生效。",
+    subagentMaxDepth: "最大遞迴深度",
+    subagentMaxDepthDesc: "主智慧體深度為 0，直接子智慧體為 1。設為 0 關閉委派；更大的值允許子智慧體繼續委派。",
+    subagentMaxConcurrency: "活躍子智慧體上限",
+    subagentMaxConcurrencyDesc: "限制每個主智慧體任務樹中所有活躍子智慧體的總數，包括巢狀子智慧體。每位專家擁有獨立的任務樹。",
+    subagentLimitInvalid: "請輸入 {{min}} 到 {{max}} 之間的整數。",
+    subagentLimitSaveError: "無法儲存任務委派限制。",
     addMcp: "新增",
     newSkill: "新建",
     editMcp: "編輯",
@@ -1852,6 +1870,13 @@ sklm: {
     memoryEntryContent: "這個專案應該記住什麼？",
     memoryRemove: "刪除記憶",
     memoryHint: "會用於此專案的聊天。請保持簡潔、客觀。",
+    memoryProjectChanged: "此專案的所屬群組已變更。請關閉對話框並重新整理專案清單後再編輯，本機草稿已保留。",
+    "memoryConflict": "已儲存的記憶或專案已變更。本機草稿已保留，請重新載入已儲存的記憶後再儲存。",
+    "memoryRequestFailed": "無法載入或更新專案記憶。本機草稿已保留，請重試或重新載入已儲存的記憶。",
+    "memoryReload": "重新載入已儲存的記憶",
+    "memoryReloadDiscard": "重新載入並捨棄草稿",
+    autoMemoryToggle: "自動記錄記憶",
+    autoMemoryDescription: "啟用後，助理可自動記錄你明確表達的長期專案偏好。關閉後只停止自動記錄和更新；已儲存的記憶仍會用於專案聊天，直到你自行編輯或刪除。開關立即生效，記憶修改需點擊儲存。",
     memorySave: "保存記憶",
     memorySaving: "保存中…",
     noSearchResults: "沒有匹配的專案",

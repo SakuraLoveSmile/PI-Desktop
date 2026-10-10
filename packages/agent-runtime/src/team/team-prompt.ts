@@ -84,7 +84,7 @@ function teamCollaborationPrompt(options: TeamPromptOptions): string {
       "- Use `send_message` to communicate with teammates.",
       "- Use `wait_for_updates` to pause and await replies or task completion from teammates.",
       "- Use `interrupt_agent` if a teammate turn needs to be cancelled.",
-      "- Subagent `Task*` delegation is disabled in Team mode in favor of durable teammates.",
+      "- Subagent `Task*` delegation is disabled for the Team Lead. Execution experts may delegate meaningful separable work within the configured depth and concurrency limits.",
     ].join("\n");
   }
 

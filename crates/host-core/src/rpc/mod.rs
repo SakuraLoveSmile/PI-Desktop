@@ -5,9 +5,14 @@ mod config_sync_rpc;
 mod git_workspaces_rpc;
 mod goal_rpc;
 mod plan_schedule_rpc;
+mod project_auto_memory;
+mod project_code_search;
+mod project_history;
 mod scheduled_rpc;
 mod scheduled_tools;
 mod session_notes_rpc;
+#[cfg(test)]
+mod subagent_settings_tests;
 #[cfg(test)]
 mod team_expert_config_tests;
 #[cfg(test)]
@@ -956,6 +961,22 @@ fn validate_settings_value(value: &Value) -> Result<(), JsonRpcError> {
     let Some(object) = value.as_object() else {
         return Ok(());
     };
+    for (key, min, max) in [
+        ("subagentMaxDepth", 0, 8),
+        ("subagentMaxConcurrency", 1, 32),
+    ] {
+        if object.get(key).is_some_and(|value| {
+            !value
+                .as_u64()
+                .is_some_and(|number| (min..=max).contains(&number))
+        }) {
+            return Err(rpc_err(
+                1002,
+                format!("{key} must be an integer between {min} and {max}"),
+                "INVALID_PARAMS",
+            ));
+        }
+    }
     if let Some(policy) = object.get("networkPolicy").filter(|v| !v.is_null()) {
         let Some(policy) = policy.as_object() else {
             return Err(rpc_err(
@@ -2002,6 +2023,15 @@ async fn handle_request(
                 .get("entries")
                 .ok_or_else(|| rpc_err(1002, "entries required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
+            if let Some(group) = st
+                .db
+                .list_project_groups()
+                .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?
+                .into_iter()
+                .find(|group| group.id == id)
+            {
+                project_auto_memory::ensure_legacy_write_allowed(&st.db, &group.primary_path)?;
+            }
             let memory = st
                 .db
                 .set_project_group_memory(id, entries)
@@ -2199,8 +2229,23 @@ async fn handle_request(
             st.db
                 .delete_project_memory(&path)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            st.db
+                .delete_path_auto_memory(&path)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "removed": removed, "sessionsRemoved": sessions_removed }))
         }
+        "project.memory.editor.get"
+        | "project.memory.editor.save"
+        | "project.autoMemory.setEnabled"
+        | "project.autoMemory.agentList"
+        | "project.autoMemory.agentUpsert"
+        | "project.autoMemory.agentDelete" => {
+            project_auto_memory::handle(state, method, params).await
+        }
+        "project.history.search" | "project.history.context" => {
+            project_history::handle(state, method, params).await
+        }
+        "project.codeSearch" => project_code_search::handle(state, params).await,
         "project.memory.get" => {
             let path = params
                 .get("path")
@@ -2219,6 +2264,7 @@ async fn handle_request(
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "path required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
+            project_auto_memory::ensure_legacy_write_allowed(&st.db, path)?;
             if let Some(entries) = params.get("entries") {
                 let memory = st
                     .db
@@ -2704,6 +2750,22 @@ async fn handle_request(
                 .filter(|value| !value.is_empty())
                 .ok_or_else(|| rpc_err(1002, "projectPath required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
+            if crate::background_processes::has_pending_finalization(&st, session_id) {
+                return Err(rpc_err(
+                    1008,
+                    "background process result has not been saved; read its details to retry",
+                    "BACKGROUND_PROCESS_PERSISTENCE_FAILED",
+                ));
+            }
+            if crate::background_processes::has_active(&st.db, session_id)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+            {
+                return Err(rpc_err(
+                    1008,
+                    "stop background processes before moving this session",
+                    "SESSION_HAS_BACKGROUND_PROCESSES",
+                ));
+            }
             let session = match sessions::move_session_project(&st.db, session_id, project_path)
                 .map_err(plan_rpc_err)?
             {
@@ -2767,6 +2829,56 @@ async fn handle_request(
             )
             .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "session": session }))
+        }
+        "contextInsights.get" => {
+            let id = params
+                .get("sessionId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_ARGUMENT"))?;
+            let include_content = params
+                .get("includeContent")
+                .and_then(Value::as_bool)
+                .unwrap_or(true);
+            let request_id = params.get("requestId").and_then(Value::as_str);
+            let st = state.lock().await;
+            crate::context_insights::get(&st.db, id, include_content, request_id).map_err(|error| {
+                rpc_err(
+                    1002,
+                    error.to_string(),
+                    if error.to_string().starts_with("NOT_FOUND:") {
+                        "NOT_FOUND"
+                    } else if error.to_string().starts_with("INVALID_ARGUMENT:") {
+                        "INVALID_ARGUMENT"
+                    } else {
+                        "INTERNAL"
+                    },
+                )
+            })
+        }
+        "contextInsights.record" => {
+            let id = params
+                .get("sessionId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_ARGUMENT"))?;
+            let st = state.lock().await;
+            let recorded = crate::context_insights::record(
+                &st.db,
+                id,
+                params.get("request"),
+                params.get("event"),
+            )
+            .map_err(|error| {
+                let message = error.to_string();
+                let code = if message.starts_with("INVALID_ARGUMENT:") {
+                    "INVALID_ARGUMENT"
+                } else if message.starts_with("LIMIT_EXCEEDED:") {
+                    "LIMIT_EXCEEDED"
+                } else {
+                    "INTERNAL"
+                };
+                rpc_err(1002, message, code)
+            })?;
+            Ok(json!({ "recorded": recorded }))
         }
         "todos.get" => {
             let session_id = params

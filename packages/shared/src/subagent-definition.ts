@@ -12,7 +12,7 @@
  * Two defaults matter for safety:
  * - a delegate that does not declare `tools` is read-only, and
  * - a delegate never inherits mutation rights unless it opts in with
- *   `tools: inherit` (nested Task / mode-switch tools stay denied).
+ *   `tools: inherit` (parent Task closures / mode-switch tools stay denied).
  */
 
 import {
@@ -106,6 +106,7 @@ export const SUBAGENT_INHERIT_TOKEN = "inherit";
  * the parent runtime's deferred-tool set and compaction flag, so they stay
  * denied even though the child receives the full catalog without searching.
  */
+// Runtime may append fresh owner-scoped Task tools below the depth ceiling.
 export const SUBAGENT_INHERIT_DENY_TOOLS: readonly string[] = [
   "Task",
   "TaskWait",

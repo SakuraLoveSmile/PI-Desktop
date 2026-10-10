@@ -2407,6 +2407,12 @@ impl OutputNotifier {
     }
 
     fn flush_due(&mut self) {
+        if let Some(output) = &self.background_output {
+            match output.lock() {
+                Ok(mut output) => output.flush_due(),
+                Err(error) => tracing::error!(%error, "background output lock poisoned"),
+            }
+        }
         if self.last_emit.elapsed() < OUTPUT_NOTIFICATION_INTERVAL {
             return;
         }

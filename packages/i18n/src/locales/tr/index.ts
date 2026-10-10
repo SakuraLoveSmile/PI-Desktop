@@ -1,6 +1,7 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const tr = {
+  contextInsights: en.contextInsights,
   app: {
     shellName: "Pi-Desktop-Plus",
     tagline: "Yerel AI kodlama ortağı",
@@ -912,10 +913,19 @@ sklm: {
       subagents: "Alt ajanlar",
       import: "İçe aktar",
       projects: "Projeler",
+      memory: "Bellek",
       sync: "Bulut senkronizasyonu",
       remoteHosts: "Uzak ana bilgisayarlar",
       info: "Bilgi",
       voice: "Ses",
+    },
+    memory: {
+      title: "Bellek",
+      description:
+        "Kaydedilen anıları ve otomatik kaydı projeye göre yönetin. Aynı gruptaki projeler belleği paylaşır; diğer projeler ayrı kalır.",
+      projectsTitle: "Proje belleği",
+      empty: "Henüz proje yok. Önce Proje arşivinden bir proje oluşturun veya açın.",
+      loadFailed: "Proje listesi yüklenemedi. Yeniden deneyin.",
     },
     configSync: {
       title: "Bulut senkronizasyonu",
@@ -1208,6 +1218,14 @@ sklm: {
     skillBatchFailed: "{{count}} klasör içe aktarılamadı. İlk hata: {{first}}",
     skillsEmpty: "Bu klasörde beceri yok",
     subagentsEmpty: "Henüz kendi alt ajanınız yok",
+    subagentRuntimeLimits: "Görev devretme sınırları",
+    subagentRuntimeLimitsDesc: "Tek ajanlar ve ekip uzmanları bu sınırlar içinde bağımsız görevleri devredebilir. Değişiklikler sonraki görev çalıştırmasında geçerli olur.",
+    subagentMaxDepth: "En yüksek özyineleme derinliği",
+    subagentMaxDepthDesc: "Ana ajanın derinliği 0, doğrudan alt ajanlarınki 1’dir. 0 görev devretmeyi kapatır; daha yüksek değerler alt ajanların da görev devretmesini sağlar.",
+    subagentMaxConcurrency: "En fazla etkin alt ajan",
+    subagentMaxConcurrencyDesc: "İç içe alt ajanlar dahil her ana ajanın görev ağacındaki tüm etkin alt ajanları sınırlar. Her ekip uzmanının kendi ağacı vardır.",
+    subagentLimitInvalid: "{{min}} ile {{max}} arasında bir tam sayı girin.",
+    subagentLimitSaveError: "Görev devretme sınırları kaydedilemedi.",
     addMcp: "Ekle",
     newSkill: "Yeni",
     editMcp: "Düzen",
@@ -1850,6 +1868,13 @@ sklm: {
     memoryEntryContent: "Bu proje neyi hatırlamalı?",
     memoryRemove: "Belleği kaldır",
     memoryHint: "Bu projedeki sohbetlerde kullanılır. Kısa ve gerçeğe dayalı tutun.",
+    memoryProjectChanged: "Bu proje artık farklı bir gruba ait. Düzenlemeden önce bu iletişim kutusunu kapatın ve proje listesini yenileyin. Taslağınız korundu.",
+    "memoryConflict": "Kayıtlı bellek veya proje değişti. Taslağınız korundu. Yeniden kaydetmeden önce kayıtlı belleği yükleyin.",
+    "memoryRequestFailed": "Proje belleği yüklenemedi veya güncellenemedi. Taslağınız korundu. Yeniden deneyin veya kayıtlı belleği yükleyin.",
+    "memoryReload": "Kayıtlı belleği yeniden yükle",
+    "memoryReloadDiscard": "Yeniden yükle ve taslağı at",
+    autoMemoryToggle: "Anıları otomatik kaydet",
+    autoMemoryDescription: "Açıldığında asistan, açıkça belirttiğiniz kalıcı proje tercihlerini otomatik olarak kaydedebilir. Kapatmak yalnızca otomatik kaydetmeyi ve güncellemeyi durdurur; kayıtlı anılar siz düzenleyene veya silene kadar proje sohbetlerinde kullanılmaya devam eder. Anahtar hemen uygulanır, değişiklikler Kaydet ile uygulanır.",
     memorySave: "Belleği kaydet",
     memorySaving: "Kaydediliyor…",
     noSearchResults: "Aramanızla eşleşen proje yok",

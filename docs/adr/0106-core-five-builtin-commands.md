@@ -1,6 +1,6 @@
 # ADR 0106: Keep only five core builtin commands
 
-- Status: Accepted
+- Status: Accepted; command-count freeze amended by [Context Insights](context-insights-native-port.md)
 - Date: 2026-08-19
 - Deciders: PI-Desktop core
 - Related: D250, ADR 0024, ADR 0034, `04-ux/04-builtin-commands.md`

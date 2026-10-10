@@ -597,3 +597,14 @@ TEAM_PLANNING_STALE for invalid exact-turn consumption. Trusted Plan execution
 binding returns PLAN_EXECUTION_STALE for invalid execution/session/turn scope
 and PLAN_EXECUTION_CONFLICT for a different immutable binding; identical retries
 remain idempotent. Cancelled roster waits interrupt execution, not complete it.
+
+### Plus session activity
+
+| code | retriable | meaning |
+|---|---|---|
+| `NOTE_CONFLICT` | yes | Quick Note revision changed; preserve draft and reload before saving |
+| `SESSION_NOTES_UNSUPPORTED` | no | Native or remote session does not expose Quick Notes |
+| `BACKGROUND_PROCESS_NOT_FOUND` | no | Managed process does not belong to the requested session |
+| `BACKGROUND_PROCESS_START_FAILED` | yes | Authorized background runner could not start |
+| `BACKGROUND_PROCESS_PERSISTENCE_FAILED` | yes | Managed process state could not be stored; restore storage and retry |
+| `SESSION_HAS_BACKGROUND_PROCESSES` | yes | Stop active managed jobs before deleting or moving their session |

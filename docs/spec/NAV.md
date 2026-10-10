@@ -106,3 +106,5 @@
 
 ## ADR
 - [../adr/README.md](../adr/README.md)
+
+- [Context Insights](03-runtime/context-insights.md) — captured requests, provider payloads, retention and native inspection.

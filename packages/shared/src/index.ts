@@ -48,6 +48,7 @@ export * from "./rpc-limits.js";
 export * from "./ndjson.js";
 export * from "./subagent-definition.js";
 export * from "./subagent-presets.js";
+export * from "./subagent-limits.js";
 export * from "./provider-presets.js";
 export * from "./provider-endpoint.js";
 export * from "./model-catalog.js";
@@ -87,3 +88,5 @@ export type { MarketPluginSummary, MarketPluginDetail } from "./types/marketplac
 export * from "./session-activity.js";
 
 export type { GitWorkspaceRequest, GitWorkspaceMutation, GitWorkspaceSnapshot, GitBranch, GitWorktree } from "./git-workspace.js";
+
+export * from "./context-insights.js";

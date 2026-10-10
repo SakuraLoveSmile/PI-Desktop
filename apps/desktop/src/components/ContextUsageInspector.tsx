@@ -6,6 +6,8 @@ import {
   useRef,
   useState,
 } from "react";
+import { readContextInsightsPreferences } from "../features/context-insights/preferences";
+import { openContextInsightsDialog } from "../features/context-entry/dialog-state";
 import { portalToBody } from "../lib/portal-visibility";
 import { useTranslation } from "react-i18next";
 import {
@@ -14,7 +16,7 @@ import {
   type UiMessage,
 } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
-import { TooltipButton } from "./ui";
+import { Button, TooltipButton } from "./ui";
 import { ContextCompactionAction } from "./ContextCompactionAction";
 import {
   aggregateToolTokenUsage,
@@ -390,6 +392,14 @@ export function ContextUsageInspector({
           </span>
         </div>
       </div>
+      <Button onClick={() => {
+        const store = useAppStore.getState();
+        if (store.activeSessionId) {
+          if (readContextInsightsPreferences().placement === "modal") openContextInsightsDialog(store.activeSessionId);
+          else store.openWorkPanelTabForSession(store.activeSessionId, { id: "context", kind: "context" });
+          closeInspector();
+        }
+      }}>{t("contextInsights.openDashboard")}</Button>
       {compaction ? (
         <div className="context-inspector-compaction">
           <span>
