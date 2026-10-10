@@ -15,6 +15,9 @@ pub mod lifecycle;
 #[cfg(test)]
 mod lifecycle_tests;
 pub mod mailbox;
+pub(crate) mod member_failure;
+#[cfg(test)]
+mod member_failure_tests;
 pub mod model;
 pub mod planning;
 #[cfg(test)]

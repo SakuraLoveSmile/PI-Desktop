@@ -497,3 +497,30 @@ execution; late member-mail continuations do not regain them.
 Trusted roster cancellation/interruption is terminal for approved execution both
 before and during the review wait. Treating it as another consent retry would
 restart cancelled work; no recovery prompt or waiting resource is created.
+
+
+## Amendment: Host-authored member failure mail (2026-10-11)
+
+Member error settlement previously updated phase/tasks but emitted no Lead result:
+Team dispatches deliberately disable ordinary collaboration completion callbacks.
+A dedicated Team helper now inserts an informational `member_failed` JSON body
+into the existing message envelope in the same terminal transaction. This avoids
+turning delivery acknowledgements into results or changing shared callback rules.
+The Host reserves the failure idempotency prefix, sanitizes codes, includes the
+exact failed attempt's task ids, stores source-turn/Host-only proofs and bumps
+revision. Errors alone generate notices; aborts and replays do not.
+
+Existing post-commit `team.messageQueued`, Main Team delivery and Agent Host
+queue persistence wake both waiting and idle Leads. Approved execution consumes
+these authenticated error results in its original turn and cannot complete with
+an unread failure. A read failure never establishes successful participation.
+No schema migration, RPC, new delivery queue or automatic member retry is added.
+The retriable flag is conservative code-derived advice because terminal RPC
+currently carries an error code, not the runtime's full error classification.
+Permission ceilings remain bounded by the starting dispatch/member authority.
+
+
+Host failure delivery also survives post-commit checkpoint I/O errors: the error
+remains observable, while the already durable queued notice emits its existing
+wake event. A terminal replay may re-notify that same pending row; no second
+notice is inserted, and a consumed/running notice is not emitted again.
