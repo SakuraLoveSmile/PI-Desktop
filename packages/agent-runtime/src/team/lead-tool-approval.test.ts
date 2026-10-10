@@ -28,3 +28,15 @@ describe("Team Lead authorization lifecycle", () => {
     expect(execute).not.toHaveBeenCalled();
   });
 });
+
+it("rejects an unsettled Goal report before draft validation or persistence and keeps the Host reason", async () => {
+  const { GoalReportDraftManager } = await import("../goal-report-tool.js");
+  const persist = vi.fn();
+  const manager = new GoalReportDraftManager({ executionId: "execution", sessionId: "lead", onDraftSubmitted: persist });
+  const reason = "TEAM_APPROVAL_REQUIRED: pending dispatches [dispatch-1 running: expert (tasks task-1)]; 1 unconsumed expert results; use wait_for_updates";
+  const host: RuntimeHost = { call: async () => { throw new Error(reason); } };
+  const tool = withTeamLeadApproval(manager.buildTool(), { host, teamSessionId: "lead", callerSessionId: "lead", getTurnId: () => "turn", currentModeDenial: () => undefined });
+  await expect(tool.execute("report", { verdict: "partial", summary: "Waiting on expert evidence" })).rejects.toThrow(reason);
+  expect(persist).not.toHaveBeenCalled();
+  expect(manager.isDraftValid()).toBe(false);
+});

@@ -1212,3 +1212,7 @@ are observable errors; no partial memory save is published. History search is
 scoped before pagination. Context reads enforce the same current group membership
 and exclude deleted sources. Code index scanning runs outside the async worker
 and binding is rechecked after the blocking operation.
+
+### Team Goal 报告结算授权（2026-10-11）
+
+`team.authorizeLeadTool` 将已有获批执行结算谓词应用于 `TeamFinalAnswer` 和 `SubmitGoalReport`。运行时现有 Lead 包装器在报告工具主体之前检查，不新增 RPC 或字段。拒绝列出全部未结束派遣 ID、成员、已分配未完成任务，以及未消费当前专家结果的数量和标识，并要求 `wait_for_updates`。结算只绑定宿主证明的原始执行回合，历史会话批准不能授予新权限；执行结束后的邮件不延长 Goal 生命周期。

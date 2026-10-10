@@ -2,6 +2,12 @@
 
 Upstream v0.15.6 → v0.16.1 has been merged.
 
+- Team Goal reports wait for running/queued experts and unconsumed results before
+  accepting a draft. Settlement denials name the experts, dispatches and open tasks;
+  confirmed teams receive three bounded completion reminders and terminal errors
+  preserve the Host reason instead of incorrectly blaming a missing roster.
+  Trusted roster cancellation also stops execution before review waiting begins.
+
 - Overview adds actionable attention for approvals, failures, timeouts and
   degraded reports, separates live status from artifacts, and groups Team members
   independently. Loaded-history notices and paging are per group. Repeated file
@@ -27,7 +33,7 @@ Upstream v0.15.6 → v0.16.1 has been merged.
   compaction policy are unchanged.
 
 - Expert Team confirmation during the Lead's declaration reply keeps one
-  bounded opportunity to dispatch the approved experts, even if the initial
+  recovery budget of three reminders to dispatch and settle the approved experts, even if the initial
   no-tool answer already needed correction. Actual expert participation is
   still required before a successful final answer.
 

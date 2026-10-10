@@ -1245,3 +1245,11 @@ line numbers and bounded text, and supports explicit status/clear actions. Each
 search reconciles current files and ignore rules, hashes eligible content, then
 verifies candidate contents live. This first version provides a persistent text
 cache, not semantic retrieval or a promised speedup. Grep remains unchanged.
+
+### Goal 报告要求 Team 执行结算
+
+获批 Team Goal 的现有 Lead 工具授权包装器在 `SubmitGoalReport` 校验和草稿持久化之前检查结算。当前排队派遣、运行中专家回合或尚未消费的当前专家结果会拒绝所有 verdict，包括 `partial` 和 `blocked`。先用 `wait_for_updates` 等待并消费，或中断已派遣专家。拒绝保持 `TEAM_APPROVAL_REQUIRED`，列出派遣 ID、专家、其未完成任务 ID 和未消费结果数量；这属于授权拒绝，不是持久化失败。
+
+队友消息由原始获批执行回合消费，其 inbox authority 保持 active。执行结束后的邮件续回合不会取得 Goal token 或报告工具。确认名单后最多三次带宿主原因的完成提示，三个续执行之后下一次拒绝以宿主原文和 `stage: team_completion` 结束。未确认名单仍限一次；普通非 Goal 最终回答语义不变。
+
+可信名单取消／中断即使发生在完成 guard 开始等待之前，也立即中断获批执行；不得消耗恢复次数、重启模型或创建等待监听器／计时器。

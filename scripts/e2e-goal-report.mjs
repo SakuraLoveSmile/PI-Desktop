@@ -23,6 +23,11 @@ import { withScenario } from "./e2e/fixture.mjs";
 import { createSession, beginTurn, endTurn } from "./e2e/session.mjs";
 import { resolvePlan } from "./e2e/plan.mjs";
 
+import { TeamLeadExecutionGuard } from "../packages/agent-runtime/dist/team/lead-execution-guard.js";
+import { GoalReportDraftManager } from "../packages/agent-runtime/dist/goal-report-tool.js";
+import { withTeamLeadApproval } from "../packages/agent-runtime/dist/team/lead-tool-approval.js";
+import { createWaitForUpdatesTool } from "../packages/agent-runtime/dist/team/wait-for-updates.js";
+
 const results = [];
 
 function record(id, ok, detail = "") {
@@ -30,8 +35,11 @@ function record(id, ok, detail = "") {
   console.log(`${ok ? "PASS" : "FAIL"} ${id}${detail ? ` - ${detail}` : ""}`);
 }
 
-async function approvedGoalExecution(ctx, title, shouldClaim = true) {
-  const session = await createSession(ctx.host, ctx.workspace, title, "agent");
+async function approvedGoalExecution(ctx, title, shouldClaim = true, teamProvider) {
+  const session = teamProvider ? (await ctx.host.call("session.create", {
+    title, mode: "agent", executionProfile: "team", projectPath: ctx.workspace,
+    providerId: teamProvider, modelId: "fixture", permissionMode: "auto",
+  })).session : await createSession(ctx.host, ctx.workspace, title, "agent");
   const turnId = await beginTurn(ctx.host, session.id);
   await ctx.host.call("plans.enter", {
     sessionId: session.id,
@@ -61,6 +69,74 @@ async function approvedGoalExecution(ctx, title, shouldClaim = true) {
     execution = claimed.execution;
   }
   return { session, turnId, proposal, execution, executionId };
+}
+
+async function scenarioSettledTeam(binary, tempRoot) {
+  return withScenario("E2E-GOAL-report-waits-for-settled-team", async ctx => {
+    const { host } = ctx;
+    const { provider } = await host.call("providers.create", {
+      name: "Settled Team fixture", vendorKey: "custom", authKind: "none", apiStyle: "chat_completions",
+      baseUrl: "http://127.0.0.1:9/v1", defaultModelId: "fixture", models: [{ id: "fixture", thinkingLevels: ["off"] }],
+    });
+    const { session, turnId, executionId } = await approvedGoalExecution(ctx, "Settled Team Goal", true, provider.id);
+    await host.call("goalReports.bindExecutionTurn", { executionId, turnId });
+    const team = { teamSessionId: session.id, callerSessionId: session.id };
+    const declaration = await host.call("team.declareStrategy", {
+      ...team, leadTurnId: turnId, strategy: "delegate", reason: "Verify settled Goal report boundary",
+      members: [{ name: "report_expert", contextKind: "fresh" }],
+    });
+    const approval = await host.call("team.confirmLaunchReview", {
+      teamSessionId: session.id, reviewId: declaration.review.reviewId, expectedRevision: declaration.review.revision,
+    });
+    const memberId = approval.decision.memberSessionIds[0];
+    const wait = createWaitForUpdatesTool({ ...team, host, getTurnId: () => turnId, approvedExecution: () => true });
+    await wait.execute("confirmation", { timeoutSeconds: 1 });
+    await host.call("team.createTask", { ...team, taskId: "verify-report", subject: "Verify report", ownerMemberName: "report_expert" });
+    const { message } = await host.call("team.sendMessage", { ...team, target: "report_expert", content: "Verify report evidence" });
+    try {
+      await host.call("team.authorizeLeadTool", { ...team, toolName: "SubmitGoalReport" });
+      throw new Error("Queued-only report authorization accepted");
+    } catch (error) {
+      assert(error.errorCode === "TEAM_APPROVAL_REQUIRED" && error.message.includes(message.id) && error.message.includes("report_expert") && error.message.includes("verify-report"), error.message);
+    }
+    const { turnId: memberTurn } = await host.call("session.beginTurn", { sessionId: memberId, sessionMessageId: message.id });
+    const manager = new GoalReportDraftManager({ executionId, sessionId: session.id,
+      onDraftSubmitted: draft => host.call("goalReports.submitDraft", { executionId, draft }),
+    });
+    const reportTool = withTeamLeadApproval(manager.buildTool(), { host, ...team, getTurnId: () => turnId, currentModeDenial: () => undefined });
+    const draft = { verdict: "partial", summary: "Verified expert evidence" };
+    let hostReason;
+    try { await reportTool.execute("early-report", draft); throw new Error("Unsettled report accepted"); }
+    catch (error) {
+      assert(error.errorCode === "TEAM_APPROVAL_REQUIRED", error.message);
+      hostReason = error.message;
+      assert(hostReason.includes("report_expert") && hostReason.includes(message.id) && hostReason.includes("verify-report"), hostReason);
+    }
+    assert(!manager.isDraftValid(), "Rejected report recorded a local draft");
+    const guard = new TeamLeadExecutionGuard();
+    const state = () => ({ turnId, epoch: 1, mode: "agent", inactive: false });
+    let prompt = "approved goal";
+    for (let index = 0; index < 3; index++) {
+      const outcome = await guard.authorizeCompletion(host, team, state, true);
+      assert(outcome.kind === "recover", shortJson(outcome));
+      await guard.recover({ host, team, state, abort: () => { throw new Error("Unexpected recovery abort"); },
+        prepare: () => {}, getPrompt: () => prompt, setPrompt: value => { prompt = value; }, start: () => {},
+        continue: async () => { assert(prompt.includes(hostReason), "Recovery dropped the Host reason"); }, restore: () => {},
+      });
+    }
+    const terminal = await guard.authorizeCompletion(host, team, state, true);
+    assert(terminal.kind === "error" && terminal.error.message === hostReason, shortJson(terminal));
+    record("E2E-TEAM-completion-error-keeps-host-reason", true, "three bounded runtime nudges; terminal reason equals native Host rejection");
+    const result = await host.call("team.sendMessage", { teamSessionId: session.id, callerSessionId: memberId, target: "Lead", content: "Verified full report evidence" });
+    await endTurn(host, memberTurn);
+    await expectRpcError(() => reportTool.execute("unconsumed-report", draft), ["TEAM_APPROVAL_REQUIRED"]);
+    const update = await wait.execute("consume-result", { timeoutSeconds: 1 });
+    assert(JSON.stringify(update).includes(result.message.id), "wait_for_updates did not consume the full result");
+    assert((await host.call("team.getLeadExecutionState", { ...team, expectedTurnId: turnId })).active, "Member wake replaced original execution");
+    const accepted = await reportTool.execute("settled-report", draft);
+    assert(accepted.details.ok && manager.isDraftValid(), shortJson(accepted));
+    assert((await guard.authorizeCompletion(host, team, state, true)).kind === "authorized", "Settled completion denied");
+  }, binary, tempRoot);
 }
 
 async function scenarioStructuredReport(binary, tempRoot) {
@@ -618,6 +694,7 @@ async function main() {
   const binary = resolveHostBinary();
   const tempRoot = await mkdtemp(join(tmpdir(), "pi-desktop-goal-report-e2e-"));
   try {
+    await runScenario("E2E-GOAL-report-waits-for-settled-team", () => scenarioSettledTeam(binary, tempRoot));
     await runScenario("E2E-GOAL-REPORT-001", () => scenarioStructuredReport(binary, tempRoot));
     await runScenario("E2E-GOAL-REPORT-002", () => scenarioFallbackReport(binary, tempRoot));
     await runScenario("E2E-GOAL-REPORT-003", () => scenarioSessionIsolation(binary, tempRoot));

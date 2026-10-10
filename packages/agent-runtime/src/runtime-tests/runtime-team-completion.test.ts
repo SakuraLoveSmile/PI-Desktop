@@ -147,6 +147,21 @@ describe("DesktopAgentRuntime forced Team completion", () => {
     } finally { await runtime.dispose(); }
   });
 
+  it.each(["cancelled", "interrupted"])("interrupts approved %s roster before the completion guard begins waiting", async status => {
+    let change: ((status: string) => void) | undefined;
+    const { runtime, events, requests, changeExecution } = fixture({ initialReview: pendingReview, approvedActive: true,
+      executionState: async query => { if (query === 1) change!(status); } });
+    change = changeExecution;
+    const execution: PlanExecution = { id: "approved-1", proposalId: "proposal-1", sessionId: "session-1", kind: "plan", plan: "# Approved", title: "Approved", question: "Proceed?", artifact: { relativePath: ".pi/plan/approved.md", sha256: "abc", sizeBytes: 10 }, targetPermissionMode: "auto", state: "running" };
+    try {
+      await runtime.executeApprovedPlan(execution, "team-turn");
+      expect(requests).toHaveLength(1);
+      expect(runtime.getStatus().isRunning).toBe(false);
+      expect(events.some(event => event.type === "error" && event.error.code === "TURN_ABORTED")).toBe(true);
+      expect(events.filter(event => event.type === "message_end" && event.message.status === "complete")).toHaveLength(0);
+    } finally { await runtime.dispose(); }
+  });
+
   it.each(["cancelled", "interrupted", "stale"])("interrupts approved pending review when Host reports %s", async status => {
     const { runtime, events, requests, host, changeExecution } = fixture({ initialReview: pendingReview, approvedActive: true });
     const execution: PlanExecution = { id: "approved-1", proposalId: "proposal-1", sessionId: "session-1", kind: "plan", plan: "# Approved", title: "Approved", question: "Proceed?", artifact: { relativePath: ".pi/plan/approved.md", sha256: "abc", sizeBytes: 10 }, targetPermissionMode: "auto", state: "running" };
@@ -244,7 +259,7 @@ describe("DesktopAgentRuntime forced Team completion", () => {
     const { runtime, events, requests } = fixture({ recoverToReview: true, confirmBeforeFinal: true });
     try {
       await runtime.prompt("Use the expert team", "user-1", "team-turn");
-      expect(requests).toHaveLength(4);
+      expect(requests).toHaveLength(6);
       expect(events.some(event => event.type === "error" && event.error.code === "TEAM_APPROVAL_REQUIRED")).toBe(true);
       expect(events.filter(event => event.type === "message_end" && event.message.status === "complete" && event.message.content)).toHaveLength(0);
       expect(events.filter(event => event.type === "agent_end")).toHaveLength(1);
@@ -318,8 +333,9 @@ describe("DesktopAgentRuntime forced Team completion", () => {
     const { runtime, host, events, requests } = fixture({ initialReview: review });
     try {
       await runtime.prompt("Use the expert team", "user-1", "team-turn");
-      expect(requests).toHaveLength(2);
-      expect(host.call.mock.calls.filter(([method, params]) => method === "team.authorizeLeadTool" && params?.toolName === "TeamFinalAnswer")).toHaveLength(2);
+      const attempts = review.status === "confirmed" && review.leadTurnId === "team-turn" ? 4 : 2;
+      expect(requests).toHaveLength(attempts);
+      expect(host.call.mock.calls.filter(([method, params]) => method === "team.authorizeLeadTool" && params?.toolName === "TeamFinalAnswer")).toHaveLength(attempts);
       expect(events.some((event) => event.type === "error" && event.error.code === "TEAM_APPROVAL_REQUIRED")).toBe(true);
     } finally { await runtime.dispose(); }
   });

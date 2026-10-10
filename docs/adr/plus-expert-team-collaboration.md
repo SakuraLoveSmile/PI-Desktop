@@ -477,3 +477,23 @@ research results keep their distinct atomic result/submission completion
 contract and clear any ordinary attempt. The behavior contract and recovery
 cases live in the storage/RPC specs and executable regressions; this decision
 is not evidence that a model satisfied a task's semantic acceptance criteria.
+
+## 2026-10-11 amendment: settled Goal reports and precise completion recovery
+
+The existing runtime Lead-tool authorization boundary now applies the approved
+execution settlement rule to `SubmitGoalReport` as well as `TeamFinalAnswer`.
+Participation alone authorizes substantive work, not report submission. All report
+verdicts wait for dispatched turns and their full results to settle; partial or
+blocked reports require waiting or interruption first. No Team dependency is
+added to Goal persistence and no new RPC or schema is introduced.
+
+Host denials enumerate dispatches, experts, assigned open task IDs and unconsumed
+result counts without copying result bodies. Confirmed-roster completion recovery
+has three bounded nudges with the current Host reason, then a terminal rejection
+retains that reason. The pre-confirmation path and ordinary non-Goal final-answer
+semantics are preserved. Goal tools remain exclusive to the original approved
+execution; late member-mail continuations do not regain them.
+
+Trusted roster cancellation/interruption is terminal for approved execution both
+before and during the review wait. Treating it as another consent retry would
+restart cancelled work; no recovery prompt or waiting resource is created.
