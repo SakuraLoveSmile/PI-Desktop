@@ -9765,3 +9765,10 @@ Overview layout validation also checks long titles, project paths and model name
 320/360/570px in both themes. Metadata retains positive visible width and no
 header/resources/references horizontal overflow is introduced. Selected reference
 options retain pressed states and switching behavior.
+
+### Team Goal 结算与完成原因
+
+- `E2E-GOAL-report-waits-for-settled-team`：获批 Team Goal 派遣专家；专家运行时提交报告被拒绝，诊断精确包含成员、派遣、任务且不持久化草稿；专家结束后的未消费证据继续阻挡，原始回合通过 `wait_for_updates` 消费完整结果后报告成功。
+- `E2E-TEAM-completion-error-keeps-host-reason`：真实宿主拒绝经运行时 guard 和三次具体原因提示，第四次拒绝的终态错误与宿主原因完全相同。
+
+自动执行 `scripts/e2e-goal-report.mjs`（隔离真实 Host RPC 和运行时工具／guard）及 `scripts/e2e-team-approved-goal.mjs`（隔离 Electron、回环假 provider）。不访问真实会话、profile 或模型。

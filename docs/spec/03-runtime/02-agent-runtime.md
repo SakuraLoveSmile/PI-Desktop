@@ -1959,3 +1959,24 @@ line numbers and bounded text, and supports explicit status/clear actions. Each
 search reconciles current files and ignore rules, hashes eligible content, then
 verifies candidate contents live. This first version provides a persistent text
 cache, not semantic retrieval or a promised speedup. Grep remains unchanged.
+
+### Goal reports require settled Team execution
+
+For an approved Team Goal, the existing Lead tool authorization wrapper checks
+`SubmitGoalReport` before validation or draft persistence. Current queued dispatches,
+running expert turns and unconsumed current expert results reject every verdict,
+including `partial` and `blocked`. Wait with `wait_for_updates` or interrupt the
+assigned experts before reporting. The denial retains `TEAM_APPROVAL_REQUIRED`
+and names dispatch IDs, experts, their open task IDs and the unconsumed-result
+count. This is an authorization failure, not a draft-persistence failure.
+
+Member mail is consumed inside the original approved execution turn; its inbox
+authority remains active. A post-execution mailbox continuation does not acquire
+a Goal token or report tool. Confirmed rosters receive up to three reason-specific
+completion nudges; after those three continuations, the next rejection terminates
+with the Host reason and `stage: team_completion`. Unconfirmed-roster recovery
+remains limited to one nudge. Ordinary non-Goal final-answer authority is unchanged.
+
+A trusted cancelled/interrupted roster aborts approved execution even when it
+arrives before the completion guard begins its review wait. It does not spend a
+nudge, restart model work, or install a waiting listener/timer.

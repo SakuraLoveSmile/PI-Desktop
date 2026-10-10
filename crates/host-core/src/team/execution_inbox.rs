@@ -4,7 +4,7 @@
 use super::{TeamLaunchReview, TeamMessage};
 use crate::{db::Database, sessions};
 use anyhow::{anyhow, Result};
-use rusqlite::params;
+use rusqlite::{params, OptionalExtension};
 use serde::Serialize;
 const INBOX_NS: &str = "team-execution-inbox-v1";
 
@@ -132,28 +132,61 @@ pub(super) fn require_settled(
     db: &Database,
     decision: &super::TeamExecutionDecision,
 ) -> Result<()> {
+    let tasks = super::list_team_tasks(db, &decision.team_session_id)?;
+    let describe = |member: &str, session: &str| {
+        let owned = tasks
+            .iter()
+            .filter(|task| {
+                task.owner_session_id.as_deref() == Some(session)
+                    && matches!(task.status.as_str(), "pending" | "in_progress")
+            })
+            .map(|task| task.task_id.as_str())
+            .collect::<Vec<_>>();
+        if owned.is_empty() {
+            member.to_owned()
+        } else {
+            format!("{member} (tasks {})", owned.join(", "))
+        }
+    };
+    let mut pending = Vec::new();
     for dispatch in &decision.message_ids {
-        let pending: bool = db.conn().query_row(
-            "SELECT EXISTS(SELECT 1 FROM session_collaboration_messages m
+        let row: Option<(String, String, String)> = db.conn().query_row(
+            "SELECT COALESCE(member.name,m.target_session_id), m.target_session_id,
+                    CASE WHEN t.status='running' THEN 'running' ELSE 'queued' END
+             FROM session_collaboration_messages m
              LEFT JOIN turns t ON t.id=m.turn_id AND t.session_id=m.target_session_id
+             LEFT JOIN team_members member ON member.team_session_id=?2 AND member.member_session_id=m.target_session_id
              WHERE m.id=?1 AND m.source_session_id=?2 AND m.target_session_id<>?2
-             AND (m.status='queued' OR t.status='running'))",
+             AND (m.status='queued' OR t.status='running')",
             params![dispatch, decision.team_session_id],
-            |r| r.get(0),
-        )?;
-        if pending {
-            return Err(anyhow!("TEAM_APPROVAL_REQUIRED: await assigned experts and consume their full results with wait_for_updates before completing approved execution"));
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        ).optional()?;
+        if let Some((member, session, status)) = row {
+            pending.push(format!(
+                "{dispatch} {status}: {}",
+                describe(&member, &session)
+            ));
         }
     }
+    let mut unconsumed = Vec::new();
     for message in
         super::list_member_messages(db, &decision.team_session_id, &decision.team_session_id)?
     {
         if message.status == "queued" && current_expert_result(db, decision, &message)? {
-            return Err(anyhow!("TEAM_APPROVAL_REQUIRED: consume the current approved experts' full results with wait_for_updates"));
+            unconsumed.push(format!(
+                "{}: {}",
+                message.id,
+                describe(&message.source_member_name, &message.source_session_id)
+            ));
         }
+    }
+    if !pending.is_empty() || !unconsumed.is_empty() {
+        return Err(anyhow!("TEAM_APPROVAL_REQUIRED: pending dispatches [{}]; {} unconsumed expert results [{}]; await assigned experts and consume their full results with wait_for_updates before completing approved execution",
+            pending.join("; "), unconsumed.len(), unconsumed.join("; ")));
     }
     Ok(())
 }
+
 fn current_expert_result(
     db: &Database,
     decision: &super::TeamExecutionDecision,
