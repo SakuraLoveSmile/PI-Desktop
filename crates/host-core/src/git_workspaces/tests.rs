@@ -563,3 +563,20 @@ async fn git_workspaces_git_diagnostics_use_c_locale_without_global_env_change()
     let probe = run(command, COMMAND_TIMEOUT).await.unwrap();
     assert!(String::from_utf8_lossy(&probe.stderr).contains("not a git repository"));
 }
+
+#[tokio::test]
+async fn git_dispatch_head_has_no_stamp_for_nongit_or_unborn_projects() {
+    let dir = tempfile::tempdir().unwrap();
+    assert_eq!(dispatch_head(dir.path()).await.unwrap(), None);
+    run(command(dir.path(), &[], &["init", "-q"]), COMMAND_TIMEOUT)
+        .await
+        .unwrap()
+        .checked()
+        .unwrap();
+    assert_eq!(dispatch_head(dir.path()).await.unwrap(), None);
+    let committed = Fixture::new().await;
+    assert_eq!(
+        dispatch_head(&committed.repo).await.unwrap().unwrap(),
+        committed.git(&["rev-parse", "HEAD"]).await.trim()
+    );
+}

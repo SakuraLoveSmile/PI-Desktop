@@ -704,6 +704,8 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
                 tasks: board.tasks,
                 readiness: board.readiness,
                 scopeOverlaps: board.scopeOverlaps,
+                outOfScopeWriteCount: board.outOfScopeWriteCount ?? 0,
+                outOfScopeWrites: board.outOfScopeWrites ?? [],
               }),
             },
           ],

@@ -67,6 +67,7 @@ export type TeamDeliveryStatus =
   | "failed";
 
 export type TeamMessageRecord = {
+  senderHead?: string;
   id: string;
   teamSessionId: string;
   sourceSessionId: string;
@@ -114,6 +115,9 @@ export type TeamRosterProjection = {
 
 /** Frozen Host DTO for team.getBoard. */
 export type TeamBoardProjection = {
+  /** Advisory successful Write/Edit calls outside the active member task scopes. */
+  outOfScopeWriteCount?: number;
+  outOfScopeWrites?: Array<{ memberSessionId: string; memberName: string; count: number }>;
   teamSessionId: string;
   revision: number;
   tasks: TeamTaskRecord[];

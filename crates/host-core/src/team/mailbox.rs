@@ -68,6 +68,7 @@ fn message_from_row(
         }
     };
     Ok(TeamMessage {
+        sender_head: row.get(12)?,
         id: row.get(0)?,
         team_session_id: team_session_id.to_string(),
         source_session_id: row.get(1)?,
@@ -97,7 +98,8 @@ fn get_message(
                     EXISTS(SELECT 1 FROM session_collaboration_messages receipt
                            WHERE receipt.kind = 'completion'
                              AND receipt.reply_to_message_id = m.id),
-                    EXISTS(SELECT 1 FROM turn_queue q WHERE q.session_message_id = m.id)
+                    EXISTS(SELECT 1 FROM turn_queue q WHERE q.session_message_id = m.id),
+                    (SELECT json_extract(value_json,'$.sha') FROM kv WHERE ns='team-dispatch-head-v1' AND key=m.id)
              FROM session_collaboration_messages m
              WHERE m.id = ?1 AND m.plugin_id = ?2 AND m.kind = ?3",
         )?
@@ -194,7 +196,8 @@ pub fn send_team_message(db: &Database, params: SendMessageParams<'_>) -> Result
                     EXISTS(SELECT 1 FROM session_collaboration_messages receipt
                            WHERE receipt.kind = 'completion'
                              AND receipt.reply_to_message_id = m.id),
-                    EXISTS(SELECT 1 FROM turn_queue q WHERE q.session_message_id = m.id)
+                    EXISTS(SELECT 1 FROM turn_queue q WHERE q.session_message_id = m.id),
+                    (SELECT json_extract(value_json,'$.sha') FROM kv WHERE ns='team-dispatch-head-v1' AND key=m.id)
              FROM session_collaboration_messages m
              WHERE m.plugin_id = ?1 AND m.source_session_id = ?2
                AND m.idempotency_key = ?3 AND m.kind = ?4",
@@ -303,7 +306,8 @@ pub fn list_pending_team_messages(
                 EXISTS(SELECT 1 FROM session_collaboration_messages receipt
                        WHERE receipt.kind = 'completion'
                          AND receipt.reply_to_message_id = m.id),
-                EXISTS(SELECT 1 FROM turn_queue q WHERE q.session_message_id = m.id)
+                EXISTS(SELECT 1 FROM turn_queue q WHERE q.session_message_id = m.id),
+                    (SELECT json_extract(value_json,'$.sha') FROM kv WHERE ns='team-dispatch-head-v1' AND key=m.id)
          FROM session_collaboration_messages m
          LEFT JOIN teams t ON t.team_session_id = ?2
          WHERE m.plugin_id = ?1 AND m.kind = ?3 AND m.status = 'queued'
@@ -332,7 +336,8 @@ pub fn list_member_messages(
                 EXISTS(SELECT 1 FROM session_collaboration_messages receipt
                        WHERE receipt.kind = 'completion'
                          AND receipt.reply_to_message_id = m.id),
-                EXISTS(SELECT 1 FROM turn_queue q WHERE q.session_message_id = m.id)
+                EXISTS(SELECT 1 FROM turn_queue q WHERE q.session_message_id = m.id),
+                    (SELECT json_extract(value_json,'$.sha') FROM kv WHERE ns='team-dispatch-head-v1' AND key=m.id)
          FROM session_collaboration_messages m
          WHERE plugin_id = ?1 AND kind = ?3
            AND (source_session_id = ?2 OR target_session_id = ?2)

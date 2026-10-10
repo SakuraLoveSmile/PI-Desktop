@@ -2452,6 +2452,8 @@ pub fn delete_session(db: &Database, id: &str) -> Result<bool> {
     crate::goal_progress::cleanup_session_conn(&tx, id)?;
     crate::team::task_attempts::cleanup_session(&tx, id)?;
     crate::team::member_failure::cleanup_session(&tx, id)?;
+    crate::team::write_scopes::cleanup_session(&tx, id)?;
+    crate::team::dispatch_head::cleanup_session(&tx, id)?;
     tx.execute(
         "DELETE FROM kv WHERE ns IN ('team-planning-v1','team-member-purpose-v1','team-strategy-scope-v1','team-member-expert-config-v1','context-insights-v1') AND key=?1",
         [id],
@@ -2479,6 +2481,8 @@ pub fn delete_session_with_team_cleanup(db: &Database, id: &str) -> Result<bool>
     crate::goal_progress::cleanup_session_conn(&tx, id)?;
     crate::team::task_attempts::cleanup_session(&tx, id)?;
     crate::team::member_failure::cleanup_session(&tx, id)?;
+    crate::team::write_scopes::cleanup_session(&tx, id)?;
+    crate::team::dispatch_head::cleanup_session(&tx, id)?;
     tx.execute(
         "DELETE FROM kv WHERE ns IN ('team-planning-v1','team-member-purpose-v1','team-strategy-scope-v1','team-member-expert-config-v1','context-insights-v1') AND key=?1",
         [id],

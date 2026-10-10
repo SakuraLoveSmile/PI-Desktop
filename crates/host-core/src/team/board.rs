@@ -543,6 +543,7 @@ pub fn get_team_board_projection(
 
     // Compute write scope overlaps
     let scope_overlaps = compute_scope_overlaps(&tasks);
+    let out_of_scope_writes = super::write_scopes::counts(db, team_session_id)?;
 
     Ok(TeamBoardProjection {
         team_session_id: team_session_id.to_string(),
@@ -550,6 +551,8 @@ pub fn get_team_board_projection(
         tasks,
         readiness,
         scope_overlaps,
+        out_of_scope_write_count: out_of_scope_writes.iter().map(|member| member.count).sum(),
+        out_of_scope_writes,
     })
 }
 

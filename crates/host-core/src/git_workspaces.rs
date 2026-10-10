@@ -382,6 +382,33 @@ pub async fn get(project: &Path, managed_dir: &Path) -> Result<Option<GitWorkspa
     }
 }
 
+/// Read only the commit identity, with the same environment isolation and process
+/// containment as Git workspace operations. Non-Git/unborn workspaces have no stamp.
+pub(crate) async fn dispatch_head(project: &Path) -> Result<Option<String>> {
+    let result = run(
+        command(
+            project,
+            &[],
+            &["rev-parse", "--verify", "--quiet", "HEAD^{commit}"],
+        ),
+        Duration::from_secs(5),
+    )
+    .await?;
+    if !result.status.success() {
+        if result.status.code() == Some(1)
+            || String::from_utf8_lossy(&result.stderr).contains("not a git repository")
+        {
+            return Ok(None);
+        }
+        return Err(internal("Git HEAD snapshot failed"));
+    }
+    let head = result.text()?.trim().to_owned();
+    if !matches!(head.len(), 40 | 64) || !head.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(internal("Git returned an invalid HEAD identity"));
+    }
+    Ok(Some(head))
+}
+
 pub enum Mutation {
     SwitchBranch,
     CreateBranch,

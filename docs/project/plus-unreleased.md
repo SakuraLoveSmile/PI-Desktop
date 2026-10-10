@@ -2,6 +2,11 @@
 
 Upstream v0.15.6 → v0.16.1 has been merged.
 
+- Expert task write scopes now warn after successful out-of-scope Write/Edit,
+  with cumulative per-member counts in team_status. Permissions are unchanged;
+  Bash and scratch writes are not attributed. Team dispatches preserve the
+  sender's send-time Git HEAD in authenticated member input and history.
+
 - Expert member errors now reach the Lead through one durable Host-authored
   notice with a sanitized error code, affected tasks and explicit retry guidance.
   Existing Team delivery wakes waiting or idle Leads; approved execution must
