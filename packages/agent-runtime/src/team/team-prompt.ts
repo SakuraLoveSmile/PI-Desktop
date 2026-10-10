@@ -40,6 +40,7 @@ export interface TeamPromptOptions {
 export function teamSystemPrompt(options: TeamPromptOptions): string {
   return [
     teamCollaborationPrompt(options),
+    ...(options.workPurpose !== "plan_research" ? ["Do not poll with sleep. Use wait_for_updates for teammate replies and task progress. Long sleep and managed background processes hold shell slots until they stop; run long commands in the background and check process status without shell polling."] : []),
     ...(!options.isLead ? [expertInstructionsPrompt(options.expertConfig)] : []),
   ].filter(Boolean).join("\n\n");
 }

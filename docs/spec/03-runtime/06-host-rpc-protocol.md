@@ -42,7 +42,7 @@ The RPC dispatcher caps active requests at 32. `tools.execute` then enters a
 bounded execution budget:
 
 - 16 total tool executions
-- 4 concurrent `Bash` processes globally, 2 per session
+- 4 concurrent `Bash` processes globally, subject to the 4-tool per-session limit
 - 8 read/search tools globally
 - 2 mutating tools globally, 1 per session
 - 4 plugin tools globally
@@ -61,6 +61,22 @@ Dropping a waiting admission future or letting it time out removes its queue
 entry and releases any reservation made before the caller receives its permit. The health counters report only
 fully admitted reservations, including those awaiting delivery to the caller;
 `queued` counts only requests still waiting for capacity.
+
+A rejected `Bash` admission adds `content.capacity` to the existing tool result.
+It contains `host` and requesting `session` counts (`inFlight`, `queued`,
+`shellInFlight`, `shellQueued`) and `holders`, a sorted list of `{ sessionId,
+tool: "Bash", inFlight }`. Counts are captured atomically at rejection, before
+removing the rejected call's queue entry: a timed-out call is included in queued
+counts; a queue-full call was never queued and is excluded. Granted reservations
+count as in-flight, never queued. Diagnostics and admission logs contain only
+session/tool identities and counts, never commands, paths or command output.
+The English error explains that managed background processes and long `sleep`
+hold a shell slot until they stop. Use `wait_for_updates` for Team replies, or
+start long commands in the background and check their process status after
+capacity returns; background execution uses the same limits. Bash descriptions
+and execution Team prompts repeat the no-sleep-polling guidance. Non-shell
+rejections keep their existing message and omit `capacity`; limits, retryability,
+FIFO among eligible requests, approval and cancellation semantics are unchanged.
 
 Electron's `HostProcess` treats an explicit `HOST_OVERLOADED` response as
 retryable backpressure for renderer-facing calls. It waits 50, 100, 200, and

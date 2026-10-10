@@ -4,6 +4,9 @@ use std::time::Duration;
 
 use tokio::sync::Notify;
 
+mod shell_diagnostics;
+use shell_diagnostics::ShellCapacityDiagnostics;
+
 pub const MAX_IN_FLIGHT_TOOLS: usize = 16;
 pub const MAX_IN_FLIGHT_SHELL: usize = 4;
 pub const MAX_IN_FLIGHT_READS: usize = 8;
@@ -40,23 +43,43 @@ impl ToolClass {
 
 #[derive(Debug)]
 pub enum AdmissionError {
-    QueueFull { queue_depth: usize },
-    QueueWaitTimeout,
+    QueueFull {
+        queue_depth: usize,
+        diagnostics: Option<ShellCapacityDiagnostics>,
+    },
+    QueueWaitTimeout {
+        diagnostics: Option<ShellCapacityDiagnostics>,
+    },
 }
 
 impl AdmissionError {
     pub fn code(&self) -> &'static str {
         match self {
-            Self::QueueFull { .. } | Self::QueueWaitTimeout => "HOST_OVERLOADED",
+            Self::QueueFull { .. } | Self::QueueWaitTimeout { .. } => "HOST_OVERLOADED",
         }
     }
 
     pub fn message(&self) -> String {
-        match self {
-            Self::QueueFull { queue_depth } => format!(
+        let reason = match self {
+            Self::QueueFull { queue_depth, .. } => format!(
                 "host tool capacity is exhausted; bounded queue is full ({queue_depth} queued)"
             ),
-            Self::QueueWaitTimeout => "host tool capacity did not become available in time".into(),
+            Self::QueueWaitTimeout { .. } => {
+                "host tool capacity did not become available in time".into()
+            }
+        };
+        format!(
+            "{reason}{}",
+            self.diagnostics()
+                .map_or_else(String::new, ShellCapacityDiagnostics::guidance)
+        )
+    }
+
+    pub fn diagnostics(&self) -> Option<&ShellCapacityDiagnostics> {
+        match self {
+            Self::QueueFull { diagnostics, .. } | Self::QueueWaitTimeout { diagnostics } => {
+                diagnostics.as_ref()
+            }
         }
     }
 }
@@ -95,6 +118,7 @@ struct Request {
 struct SessionUsage {
     active: usize,
     mutations: usize,
+    classes: [usize; 4],
 }
 
 struct WaitingRequest {
@@ -144,6 +168,7 @@ impl BudgetState {
         self.classes[request.class as usize] += 1;
         let usage = self.sessions.entry(request.session_id.clone()).or_default();
         usage.active += 1;
+        usage.classes[request.class as usize] += 1;
         if request.class == ToolClass::Mutation {
             usage.mutations += 1;
         }
@@ -157,6 +182,7 @@ impl BudgetState {
             .get_mut(&request.session_id)
             .expect("admitted tool owns session capacity");
         usage.active -= 1;
+        usage.classes[request.class as usize] -= 1;
         if request.class == ToolClass::Mutation {
             usage.mutations -= 1;
         }
@@ -282,14 +308,17 @@ impl ToolBudget {
             }
             let queue_depth = state.queued + 1;
             if queue_depth > MAX_QUEUED_TOOLS {
-                return Err(AdmissionError::QueueFull { queue_depth });
+                return Err(AdmissionError::QueueFull {
+                    queue_depth,
+                    diagnostics: ShellCapacityDiagnostics::capture(&state, &request),
+                });
             }
             let id = state.next_id;
             state.next_id = state.next_id.wrapping_add(1);
             state.queued += 1;
             state.waiting.push_back(WaitingRequest {
                 id,
-                request,
+                request: request.clone(),
                 ready: ready.clone(),
                 granted: false,
             });
@@ -300,7 +329,9 @@ impl ToolBudget {
         };
         match tokio::time::timeout(wait, ready.notified()).await {
             Ok(()) => Ok(guard.into_permit()),
-            Err(_) => Err(AdmissionError::QueueWaitTimeout),
+            Err(_) => Err(AdmissionError::QueueWaitTimeout {
+                diagnostics: ShellCapacityDiagnostics::capture(&self.lock(), &request),
+            }),
         }
     }
 

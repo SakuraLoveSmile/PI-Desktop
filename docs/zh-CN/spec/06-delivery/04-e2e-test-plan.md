@@ -267,6 +267,20 @@ task-candidate E2E 从请求工作树运行，但使用主工作区已经准备�
 - **里程碑**：M5
 - **状态**：已记录；自动化待定
 
+#### E2E-RUNTIME-shell-capacity-diagnostics：Shell 准入说明额度饱和
+
+- **前置条件**：隔离 Host/profile 和本地 shell 夹具，不调用 provider。
+- **步骤**：占满四个 shell 槽并排队十二个调用。独立 Read/Write 成功后，
+  让另一 Bash 调用触发真实 30 秒准入超时；释放夹具门并排空已接受任务。
+- **预期**：被拒绝命令不会启动。`HOST_OVERLOADED` 保持可重试属性，
+  `content.capacity` 在拒绝时显示 host 运行 4/排队 13、请求会话运行 0/排队 1，
+  并列出四个安全的 Bash 占用会话。文案包含 `wait_for_updates`、长 `sleep`
+  以及后台仍占同一额度。不含命令或路径。超时排队项被清除，既有 FIFO/取消
+  测试通过，最终全部计数归零。
+- **自动化**：`node scripts/e2e-tool-admission.mjs`；运行时 Bash 结果透传与
+  Team 提示词使用假 host 测试。
+- **关联规格**：`03-runtime/06-host-rpc-protocol.md`、`03-runtime/08-error-codes.md`
+
 ### 启动和健康检查
 
 #### E2E-001：应用程序启动并显示主窗口

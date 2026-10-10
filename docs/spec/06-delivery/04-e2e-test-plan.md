@@ -777,6 +777,22 @@ identify the platform validation still needed.
   session, global, mutation, queue bounds, fairness, cancellation, and timeout
   are unit-covered by `tool_budget/tests.rs`; restart coverage remains pending.
 
+#### E2E-RUNTIME-shell-capacity-diagnostics: Shell admission explains saturation
+
+- **Preconditions**: Isolated Host/profile and local shell fixtures; no provider.
+- **Steps**: Hold four shell slots and queue twelve calls. Run independent Read
+  and Write successfully, then let another Bash call hit the real 30-second
+  admission deadline. Release the fixture gate and drain all accepted work.
+- **Expected**: Rejected Bash never starts. `HOST_OVERLOADED` retains retryable
+  semantics; `content.capacity` shows host 4 in-flight/13 queued and requesting
+  session 0 in-flight/1 queued at rejection, with four safe Bash session holders.
+  Text names `wait_for_updates`, long `sleep`, and background retention of the
+  same capacity. No command/path appears. Rejected admission is removed from the
+  queue, existing FIFO/cancellation coverage stays green, and all counters drain.
+- **Automation**: `node scripts/e2e-tool-admission.mjs`; runtime Bash-result
+  passthrough and Team prompt guidance use fixture-host tests.
+- **Specs linked**: `03-runtime/06-host-rpc-protocol.md`, `03-runtime/08-error-codes.md`
+
 ### Release & Packaging
 
 #### E2E-192: Linux release publishes a system-Electron ASAR asset
