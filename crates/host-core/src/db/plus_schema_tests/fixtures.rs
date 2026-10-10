@@ -118,9 +118,13 @@ fn drop_columns(conn: &Connection, columns: &[(&str, &str)]) {
 }
 
 fn strip_all_plus_structures(conn: &Connection) {
+    conn.execute_batch("DROP TRIGGER IF EXISTS background_processes_block_session_delete;")
+        .unwrap();
     drop_tables(
         conn,
         &[
+            "background_processes",
+            "session_quick_notes",
             "team_tasks",
             "team_members",
             "teams",

@@ -1,28 +1,28 @@
-import { useState } from "react";
-import type { TFunction } from "i18next";
 import {
-  keybindingDisplayParts,
   type ComposerCommand,
   type ExecutionProfile,
+  keybindingDisplayParts,
   type Mode,
   type PermissionMode,
-  type ShortcutPlatform,
   type SessionThinkingLevel,
+  type ShortcutPlatform,
 } from "@pi-desktop/shared";
-import type { AppState } from "../../../stores/app-store";
-import { TooltipButton } from "../../../components/ui";
+import type { TFunction } from "i18next";
+import { useState } from "react";
 import {
   IconArrowUp,
   IconSparkles,
   IconStop,
   IconUndo2,
 } from "../../../components/icons";
+import { TooltipButton } from "../../../components/ui";
+import { type AppState, useAppStore } from "../../../stores/app-store";
 import { LiveVoiceControls } from "../../voice/live/LiveVoiceControls";
-import { ComposerPlusMenu } from "./ComposerPlusMenu";
-import { ComposerModelPicker } from "./ComposerModelPicker";
-import { ComposerExecutionProfilePicker } from "./ComposerExecutionProfilePicker";
 import { ComposerContractPicker } from "./ComposerContractPicker";
 import { ComposerControlSlots } from "./ComposerControlSlots";
+import { ComposerExecutionProfilePicker } from "./ComposerExecutionProfilePicker";
+import { ComposerModelPicker } from "./ComposerModelPicker";
+import { ComposerPlusMenu } from "./ComposerPlusMenu";
 import type { useComposerModelMenu } from "./hooks/useComposerModelMenu";
 
 type ModelMenuController = ReturnType<typeof useComposerModelMenu>;
@@ -104,6 +104,7 @@ export function ComposerToolbar({
   workSessionId,
   workSessionLabel,
 }: ComposerToolbarProps) {
+  const setSettingsTab = useAppStore((state) => state.setSettingsTab);
   const [plusOpen, setPlusOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const platform = (window.piDesktop?.platform ?? "darwin") as ShortcutPlatform;
@@ -204,6 +205,7 @@ export function ComposerToolbar({
         <ComposerModelPicker
           t={t}
           controller={modelMenu}
+          onOpenModelSettings={() => setSettingsTab("agent")}
           modelLabel={modelLabel}
           thinkingLabel={thinkingLabel}
           thinkingLevel={thinkingLevel}

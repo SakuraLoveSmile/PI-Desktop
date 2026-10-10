@@ -741,3 +741,12 @@ export function buildToolPresentation(
   if (Object.keys(remaining).length === 0) return blocks;
   return [...blocks, ...recordBlocks(remaining, "input")];
 }
+
+/** A successful launch receipt is distinct from the command's eventual exit. */
+export function isBackgroundProcessStart(message: ToolPresentationMessage): boolean {
+  if (message.toolName !== "Bash" || message.toolStatus !== "success") return false;
+  const payload = toolResultPayload(message);
+  return Boolean(payload && typeof payload === "object" && !Array.isArray(payload) &&
+    typeof (payload as Record<string, unknown>).backgroundProcessId === "string" &&
+    (payload as Record<string, unknown>).backgroundProcessId);
+}

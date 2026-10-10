@@ -5,6 +5,8 @@ type StoreState = {
   providers: ProviderPublic[];
   providerModels: Record<string, ModelInfo[]>;
   settings: undefined;
+  settingsTab: string | undefined;
+  setSettingsTab: (tab: string) => void;
   loadProviderModels: (providerId: string) => Promise<void>;
   showToast: (message: string) => void;
 };
@@ -14,6 +16,8 @@ let state: StoreState = {
   providers: [],
   providerModels: {},
   settings: undefined,
+  settingsTab: undefined,
+  setSettingsTab: (settingsTab) => useAppStore.setState({ settingsTab }),
   loadProviderModels: async () => {},
   showToast: () => {},
 };

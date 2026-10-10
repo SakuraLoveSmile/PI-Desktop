@@ -210,7 +210,6 @@ globalThis.providerOrderProbe = async (restart = false) => {
     await i18n.changeLanguage("zh-CN");
     await until(() => !!row("B").getAttribute("aria-label")?.includes("拖动"), "card reorder instruction must follow the interface language");
     flushSync(() => host.querySelector<HTMLButtonElement>(".composer-model-thinking-chip")!.click());
-    flushSync(() => document.querySelector<HTMLButtonElement>(".composer-menu-entry")!.click());
     await until(() => document.querySelectorAll(".composer-model-group").length === 3, "model menu groups missing");
     const groups = Array.from(document.querySelectorAll(".composer-model-group"), (group) => group.getAttribute("aria-label"));
     assert(groups.join(",") === "B,C,A", `composer model menu did not follow provider order: ${groups}`);

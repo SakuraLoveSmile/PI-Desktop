@@ -6,6 +6,19 @@ import { isDelegationActivityItem, subagentOutcome, type SubagentOutcome } from 
 import { messageContentFacts } from "./transcript-summary";
 
 const toolFacts = new WeakMap<UiMessage, { action: ReturnType<typeof getToolAction>; issue: boolean }>();
+const activityLabels: Record<ReturnType<typeof getToolAction>, string> = {
+  read: "chat.activityReads",
+  list: "chat.activityReads",
+  write: "chat.activityEdits",
+  edit: "chat.activityEdits",
+  run: "chat.activityCommands",
+  search: "chat.activitySearches",
+  fetch: "chat.activityTools",
+  fork: "chat.activityTools",
+  delegate: "chat.activityTools",
+  todo: "chat.activityTools",
+  use: "chat.activityTools",
+};
 const outcomes = new WeakMap<UiMessage, {
   fallback?: SubagentOutcome;
   byStatuses: WeakMap<ReadonlyMap<string, SubagentOutcome>, SubagentOutcome>;
@@ -25,17 +38,20 @@ function cachedOutcome(message: UiMessage, statuses?: ReadonlyMap<string, Subage
   return outcome;
 }
 
-/** Same labels/counts as activitySummary, with payload work keyed by message. */
+/** Preserve legacy totals and add ordered category counts; cache payload facts by message. */
 export function cachedActivitySummary(items: readonly AssistantActivityItem[], statuses?: ReadonlyMap<string, SubagentOutcome>) {
   let tools = 0;
   let thinking = 0;
   let issues = 0;
   let allRun = true;
   let allSearch = true;
+  const categories = new Map<string, number>();
   for (const item of items) {
     if (item.kind === "thinking") { thinking += 1; continue; }
     tools += 1;
     if (item.kind === "hostedSearch") {
+      const label = activityLabels.search;
+      categories.set(label, (categories.get(label) ?? 0) + 1);
       allRun = false;
       if (item.round.status === "failed") issues += 1;
       continue;
@@ -45,6 +61,8 @@ export function cachedActivitySummary(items: readonly AssistantActivityItem[], s
       facts = { action: getToolAction(item.message.toolName), issue: activityItemHasIssue(item) };
       toolFacts.set(item.message, facts);
     }
+    const label = activityLabels[facts.action];
+    categories.set(label, (categories.get(label) ?? 0) + 1);
     allRun &&= facts.action === "run";
     allSearch &&= facts.action === "search";
     if (isDelegationActivityItem(item)) {
@@ -55,6 +73,7 @@ export function cachedActivitySummary(items: readonly AssistantActivityItem[], s
   return {
     label: tools === 0 ? "chat.activityThinking" : allRun ? "chat.activityCommands" : allSearch ? "chat.activitySearches" : "chat.activityTools",
     count: tools || thinking, tools, thinking, issues,
+    segments: Array.from(categories, ([label, count]) => ({ label, count })),
   };
 }
 

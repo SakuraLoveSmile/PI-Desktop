@@ -57,7 +57,9 @@ import { useComposerSubmit } from "../features/chat/composer/hooks/useComposerSu
 import { ComposerImageAttachments } from "../features/chat/composer/ComposerImageAttachments";
 import { ComposerInput } from "../features/chat/composer/ComposerInput";
 import { useComposerModelMenu } from "../features/chat/composer/hooks/useComposerModelMenu";
+import { ComposerWorkspaceContext } from "../features/chat/composer/ComposerWorkspaceContext";
 import { ComposerUsageFooter } from "../features/chat/composer/ComposerUsageFooter";
+import { ContextUsagePlaceholder } from "../features/chat/composer/ContextUsagePlaceholder";
 import { useVoiceInput } from "../features/voice/useVoiceInput";
 import { ComposerToolbar } from "../features/chat/composer/ComposerToolbar";
 import { ComposerStatus } from "../features/chat/composer/ComposerStatus";
@@ -710,9 +712,10 @@ export function Composer({
           />
         </div>
         <div className="composer-bottom-footer">
+          <ComposerWorkspaceContext />
           {composerContextUsage ? (
             <ComposerUsageFooter {...composerContextUsage} />
-          ) : null}
+          ) : <ContextUsagePlaceholder />}
         </div>
       </div>
     </div>

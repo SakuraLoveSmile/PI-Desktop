@@ -1,0 +1,68 @@
+.session-skill-suggestions { margin-bottom: 20px; min-width: 0; }
+.session-skill-suggestions[hidden] { display: none; }
+.session-skill-suggestions-heading { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.session-skill-suggestions-menu { flex: 0 0 auto; margin-left: auto; }
+.session-skill-suggestions-count.btn {
+  min-height: 24px; max-width: 150px; overflow: hidden; text-overflow: ellipsis;
+  padding: 3px 8px; border: 0; border-radius: var(--radius-xs);
+  background: var(--ds-bg-tertiary); color: var(--ds-text-secondary); font-size: var(--text-xs);
+}
+.session-skill-suggestions-count.btn:hover { background: var(--ds-bg-hover); color: var(--ds-text-primary); }
+.session-skill-suggestions-toggle.btn {
+  min-width: 0; min-height: 28px; padding: 0; gap: 6px; border: 0; border-radius: 0;
+  background: transparent; color: var(--ds-text-muted); font-size: var(--text-md);
+}
+.session-skill-suggestions-toggle.btn:hover,
+.session-skill-suggestions-toggle.btn:focus-visible { background: transparent; color: var(--ds-text-primary); }
+.session-skill-suggestions-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+.session-skill-suggestions-toggle span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.session-skill-suggestions-body { margin-top: 8px; }
+.session-skill-references { margin: 0; padding: 0; list-style: none; }
+.session-skill-reference,
+.session-skill-reference.btn {
+  display: flex; align-items: center; width: 100%; min-width: 0; min-height: 40px;
+  padding: 4px 0; gap: 10px; text-align: left; color: var(--ds-text-secondary);
+  border: 0; border-radius: var(--radius-xs); background: transparent;
+}
+.session-skill-reference.btn:hover { background: var(--ds-bg-hover); color: var(--ds-text-primary); }
+.session-skill-reference-icon {
+  display: flex; align-items: center; justify-content: center; flex: 0 0 30px;
+  width: 30px; height: 30px; border-radius: var(--radius-2xs); background: var(--ds-bg-tertiary);
+  color: var(--ds-text-muted);
+}
+.session-skill-reference-name { flex: 1; text-align: left; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-md); }
+.session-skill-suggestions-popover {
+  position: fixed; z-index: 60; visibility: hidden;
+  width: min(380px, calc(100vw - 16px)); max-height: calc(100vh - 16px);
+  overflow: auto; overscroll-behavior: contain; padding: 12px;
+  border: 1px solid var(--ds-border-subtle); border-radius: var(--radius-sm);
+  background: var(--ds-bg-elevated-opaque); box-shadow: var(--ds-shadow-dialog);
+}
+.session-skill-suggestions-popover.is-open { visibility: visible; }
+.session-skill-suggestions-popover-title { margin: 0 0 12px; font-size: var(--text-md); font-weight: var(--font-weight-semibold); }
+.session-skill-suggestions-list { margin: 0; padding: 0; list-style: none; }
+.session-skill-suggestion { min-width: 0; padding: 12px 10px; border-radius: var(--radius-xs); }
+.session-skill-suggestion:hover,
+.session-skill-suggestion:focus-within { background: var(--ds-bg-hover); }
+.session-skill-suggestion-heading { display: flex; align-items: center; gap: 8px; min-width: 0; margin-bottom: 6px; }
+.session-skill-suggestion-name {
+  min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--ds-text-primary); font-weight: var(--font-weight-medium); font-size: var(--text-md);
+}
+.session-skill-suggestion-actions { display: flex; flex: 0 0 auto; gap: 6px; opacity: 0; }
+.session-skill-suggestion:hover .session-skill-suggestion-actions,
+.session-skill-suggestion:focus-within .session-skill-suggestion-actions { opacity: 1; }
+.session-skill-suggestion-actions .btn {
+  min-height: 24px; padding: 2px 0; border: 0; border-radius: 0; background: transparent;
+  color: var(--ds-text-secondary); font-size: var(--text-sm);
+}
+.session-skill-suggestion-actions .btn:hover { background: transparent; color: var(--ds-text-primary); }
+.session-skill-suggestion-description {
+  color: var(--ds-text-muted); font-size: var(--text-md); line-height: var(--leading-body);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.session-skill-suggestions-generate.btn { margin-top: 10px; }
+@media (hover: none) {
+  .session-skill-suggestion-actions { opacity: 1; }
+}

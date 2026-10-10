@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
-import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, readFile, rm, writeFile , readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,6 +15,7 @@ const require = createRequire(
 );
 const { build } = require("esbuild");
 const { electronBinary } = resolveElectronBinary(root);
+const preview = process.env.PI_COMPOSER_PREVIEW === "1";
 const temp = await mkdtemp(join(tmpdir(), "pi-transcript-render-"));
 try {
   await build({
@@ -26,7 +27,7 @@ try {
     jsx: "automatic",
     define: { "process.env.NODE_ENV": '"production"', "import.meta.env.DEV": "false" },
     // Styles are outside the render-count contract; component and hook code is real.
-    loader: { ".css": "empty", ".svg": "dataurl" },
+    loader: { ".css": "empty", ".svg": "dataurl", ".png": "dataurl", ".gif": "dataurl" },
     alias: {
       "@pi-desktop/i18n": join(root, "packages/i18n/src/index.ts"),
       // The fixture lives outside the desktop package; use its React instance.
@@ -82,6 +83,13 @@ try {
   const css = [...appHtml.matchAll(/href="([^" ]+\.css)"/g)].map(
     (match) => match[1],
   );
+  // Lazy route CSS is not linked by index.html; load the actual activity chunk.
+  for (const asset of await readdir(join(renderer, "assets"))) {
+    if (!asset.endsWith(".css")) continue;
+    const body = await readFile(join(renderer, "assets", asset), "utf8");
+    const path = `./assets/${asset}`;
+    if ((body.includes(".session-activity-rail{") || body.includes(".session-quick-notes{") || body.includes(".subagent-detail-header{") || body.includes(".session-skill-suggestions{")) && !css.includes(path)) css.push(path);
+  }
   assert(
     css.length,
     "Build the app with pnpm build:js before running this check",
@@ -131,7 +139,7 @@ try {
   );
   await writeFile(
     join(temp, "index.html"),
-    `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:"><title>Transcript render regression</title>${css
+    `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:"><title>${preview ? "PI-Desktop · Design preview (sample data)" : "Transcript render regression"}</title>${css
       .map((path) => `<link rel="stylesheet" href="${path}">`)
       .join("")}<script src="renderer.js"></script>`,
   );
@@ -141,18 +149,58 @@ try {
 const { app, BrowserWindow } = require("electron");
 const path = require("node:path");
 app.setPath("userData", path.join(__dirname, "profile"));
+app.on("window-all-closed", () => app.quit());
 app.whenReady().then(async () => {
-  const window = new BrowserWindow({ show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } });
+  const window = new BrowserWindow({ width: 1200, height: 850, title: "PI-Desktop · Isolated design preview", show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } });
   window.webContents.on("console-message", (event) => console.error(event.message));
   try {
     await window.loadFile(path.join(__dirname, "index.html"));
     await window.webContents.executeJavaScript("window.addEventListener('error', event => console.error(event.error?.stack ?? event.message)); window.addEventListener('unhandledrejection', event => console.error(event.reason?.stack ?? String(event.reason)));");
     const result = await window.webContents.executeJavaScript("(async () => { const render = await globalThis.transcriptRenderProbe(); const slot = await globalThis.transcriptRuntimeSlotProbe(); const smoothText = await globalThis.smoothTextThrottleProbe(); const longHistory = await globalThis.transcriptLongHistoryProbe(); return { ...render, runtimeSlot: slot, smoothText, longHistory, ok: render.ok && slot.ok && smoothText.ok && longHistory.ok }; })()");
     const contextOverflowRecovery = await require(${JSON.stringify(join(root, "scripts/e2e/context-overflow-recovery.cjs"))})(window);
+    result.activityRail = await window.webContents.executeJavaScript("globalThis.sessionActivityRailProbe()");
+    result.ok = result.ok && result.activityRail.ok;
+    const readability = await window.webContents.executeJavaScript("globalThis.transcriptReadabilityProbe()");
+    result.readability = readability;
+    result.ok = result.ok && readability.ok;
+    if (process.env.PI_TRANSCRIPT_SCREENSHOT) {
+      await require("node:fs/promises").writeFile(process.env.PI_TRANSCRIPT_SCREENSHOT, (await window.webContents.capturePage()).toPNG());
+    }
+    await window.webContents.executeJavaScript("globalThis.cleanupReadabilityProbe()");
+    result.activityIntegration = await window.webContents.executeJavaScript("globalThis.sessionActivityIntegrationProbe()");
+    result.ok = result.ok && result.activityIntegration.ok;
+    if (process.env.PI_SESSION_ACTIVITY_SCREENSHOT) {
+      await require("node:fs/promises").writeFile(process.env.PI_SESSION_ACTIVITY_SCREENSHOT, (await window.webContents.capturePage()).toPNG());
+    }
+    if (process.env.PI_COMPOSER_SCREENSHOT_DIR) {
+      const fs = require("node:fs/promises");
+      await fs.mkdir(process.env.PI_COMPOSER_SCREENSHOT_DIR, { recursive: true });
+      for (const scene of ["default", "profile", "models", "subagent", "narrow", "context", "outputs", "skills-list", "skills", "project-menu", "location-menu", "branch-menu", "worktree-create"]) {
+        await window.webContents.executeJavaScript("globalThis.composerDesignScene(" + JSON.stringify(scene) + ")");
+        if (scene === "skills") {
+          const point = await window.webContents.executeJavaScript("(() => { const rect = document.querySelector('.session-pane[data-visible=true] .session-skill-suggestions-toggle').getBoundingClientRect(); return { x: Math.round(rect.x + rect.width / 2), y: Math.round(rect.y + rect.height / 2) }; })()");
+          window.webContents.sendInputEvent({ type: "mouseMove", ...point });
+          const flatHeading = await window.webContents.executeJavaScript("new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => { const style = getComputedStyle(document.querySelector('.session-pane[data-visible=true] .session-skill-suggestions-toggle')); resolve(style.backgroundColor === 'rgba(0, 0, 0, 0)' && style.borderRadius === '0px'); })))");
+          if (!flatHeading) throw new Error("Suggestion header retains a capsule on hover");
+        }
+        await fs.writeFile(path.join(process.env.PI_COMPOSER_SCREENSHOT_DIR, "composer-" + scene + ".png"), (await window.webContents.capturePage()).toPNG());
+      }
+      await window.webContents.executeJavaScript("globalThis.composerDesignScene('default')");
+    }
+    if (process.env.PI_COMPOSER_PREVIEW !== "1") {
+      await window.webContents.executeJavaScript("globalThis.cleanupSessionActivityIntegrationProbe()");
+    }
     result.contextOverflowRecovery = contextOverflowRecovery;
     result.ok = result.ok && contextOverflowRecovery.ok;
     console.log("TRANSCRIPT_RENDER_PROBE " + JSON.stringify(result));
-    app.quit();
+    if (process.env.PI_COMPOSER_PREVIEW === "1") {
+      await window.webContents.executeJavaScript("globalThis.enableResponsiveComposerPreview()");
+      window.show();
+      window.focus();
+      console.log("COMPOSER_PREVIEW_READY " + JSON.stringify({ profile: app.getPath("userData"), syntheticData: true, connectedHost: false }));
+    } else {
+      app.quit();
+    }
   } catch (error) {
     console.error("TRANSCRIPT_RENDER_PROBE " + JSON.stringify({ ok: false, error: error?.stack ?? String(error) }));
     app.exit(1);
@@ -170,8 +218,9 @@ app.whenReady().then(async () => {
   for (const stream of [child.stdout, child.stderr])
     stream.on("data", (data) => {
       output += data;
+      if (preview) process.stdout.write(data);
     });
-  const timeout = setTimeout(() => child.kill("SIGKILL"), 45_000);
+  const timeout = preview ? undefined : setTimeout(() => child.kill("SIGKILL"), 45_000);
   let code;
   try {
     code = await new Promise((resolve, reject) => {
@@ -179,7 +228,7 @@ app.whenReady().then(async () => {
       child.once("close", resolve);
     });
   } finally {
-    clearTimeout(timeout);
+    if (timeout) clearTimeout(timeout);
   }
   const line = output
     .split(/\r?\n/)

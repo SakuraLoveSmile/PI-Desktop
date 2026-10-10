@@ -678,3 +678,16 @@ Naming:
 before the trusted desktop executes the request. Plan/Goal remain denied even
 under Auto. See [image generation](21-image-generation.md) for cancellation,
 limits and result semantics.
+
+## Managed background Bash
+
+`Bash` optionally accepts `run_in_background: boolean` (default false). Pi's
+normal tool-argument conversion is retained, while direct Host RPC requires the
+boolean type. The call uses the same permissions, mode/Team policy, persisted
+workspace, pinned native shell and admission budget as foreground Bash. Accepted
+background launch returns a backgroundProcessId and starting/current lifecycle
+status, without fabricating exitCode zero. The command's outcome belongs to the
+session activity registry, not this launch receipt. The renderer can read/stop
+only the explicitly named local session resource. Background tasks retain the
+same default and maximum command timeout, do not bypass approvals, and cannot
+turn arbitrary `command &` invocations into managed processes.

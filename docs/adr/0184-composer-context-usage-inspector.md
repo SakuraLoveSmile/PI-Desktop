@@ -6,6 +6,18 @@
 - Amends: D103, D184, D244, ADR 0047, ADR 0103
 - Related: D347, D355, E2E-060d, US-UI-61
 
+## Footer presentation amendment (2026-10-10)
+
+The approved Composer design now exposes this same accounting snapshot as a
+horizontal progress track and percentage at the right of the input footer.
+An unavailable snapshot is a disabled unknown track, never a fabricated value.
+The used/remaining preference, provider/tool totals and native ring consumers
+retain their previous meaning. The footer popup adds a used-occupancy track and
+a guarded action into the existing manual compaction workflow. It has no
+System/Skill percentage data and does not infer those categories. See Component
+Spec §11 and E2E-060d / E2E-250 for the current presentation; the original
+placement decision below records the historical toolbar version.
+
 ## Context
 
 The compact context inspector (ADR 0047, ADR 0103) hung under the newest

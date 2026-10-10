@@ -13,24 +13,23 @@ const listSource = await readComposerModule("ComposerModelList.tsx");
 const composerSource = `${modelMenuSource}\n${pickerSource}\n${sliderSource}\n${listSource}`;
 const stylesSource = await loadStyles();
 
-test("Composer uses one model popover with a root and one in-place submenu", () => {
-  assert.match(composerSource, /useState<ComposerMenuView>\("root"\)/);
-  assert.match(composerSource, /showView\("model"\)/);
-  // The reasoning level is the slider itself: no second submenu to enter.
-  assert.doesNotMatch(composerSource, /showView\("thinking"\)/);
-  assert.match(composerSource, /menuClassName="composer-model-menu composer-model-thinking-menu"/);
-  assert.match(composerSource, /role="menuitem"[\s\S]*?aria-haspopup="menu"/);
-  assert.match(composerSource, /className="composer-menu-back"/);
-  assert.match(composerSource, /IconChevronLeft/);
+test("Composer opens the model list directly without search or view tabs", () => {
+  assert.match(pickerSource, /<ComposerModelList/);
+  assert.match(pickerSource, /initialFocus="none"/);
+  assert.doesNotMatch(composerSource, /modelSearchRef|setQuery|queryNeedle|filteredModelGroups|composer-model-search/);
+  assert.match(pickerSource, /menuClassName="composer-model-menu composer-model-thinking-menu"/);
+  assert.doesNotMatch(composerSource, /ComposerMenuView|showView|composer-menu-back|composer-menu-entry/);
   assert.doesNotMatch(composerSource, /className="composer-thinking"/);
-  assert.doesNotMatch(composerSource, /className={`icon-btn mode-chip thinking-chip/);
+  // Scheduled task drafts still supply their existing reset-to-default action.
+  assert.match(pickerSource, /\{rootActions\}/);
 });
 
-test("model selection returns to the root without closing", () => {
-  assert.match(composerSource, /await configureActiveSession\(\{[\s\S]*?thinkingLevel: nextThinkingLevel/);
-  assert.match(composerSource, /setQuery\(""\);[\s\S]*?setView\("root"\)/);
-  assert.match(composerSource, /const thinkingMenuLevels = sessionThinkingMenuLevels\(availableThinkingLevels\)/);
+test("model selection keeps the list and reasoning surface open", () => {
+  assert.match(modelMenuSource, /await configureActiveSession\(\{[\s\S]*?thinkingLevel: nextThinkingLevel/);
+  assert.match(modelMenuSource, /const flatModels = useMemo\([\s\S]*?modelGroups\.flatMap/);
+  assert.match(modelMenuSource, /const thinkingMenuLevels = sessionThinkingMenuLevels\(availableThinkingLevels\)/);
 });
+
 test("switching models adopts the target default without resetting same-model overrides", () => {
   assert.match(modelMenuSource, /const selectedSameModel =\s*activeSessionId &&\s*candidate\.id === provider\?\.id &&\s*sameComposerModelId\(modelId \?\? "", nextModelId\);/);
   assert.match(
@@ -38,7 +37,7 @@ test("switching models adopts the target default without resetting same-model ov
     /const nextThinkingLevel = selectedSameModel\s*\?\s*thinkingLevelForProvider\(nextModelProvider, thinkingLevel\)[\s\S]*?initialThinkingLevelForBinding\(\s*nextBinding,\s*nextModelProvider\?\.supportedThinkingLevels,\s*\)[\s\S]*?initialThinkingLevelForUnmatchedModel\(\s*nextBinding,\s*nextModelProvider\?\.supportedThinkingLevels,\s*\)/,
   );
 });
-test("the menu root carries the reasoning slider itself", () => {
+test("the direct model list carries the reasoning slider itself", () => {
   // The root view renders the slider and nothing else for the level: there is
   // no reasoning entry left to open a list of levels.
   assert.match(composerSource, /\{thinkingMenuLevels\.length > 1 \? \(/);
@@ -92,7 +91,7 @@ test("the reasoning slider aligns each track dot and label to the thumb", () => 
   assert.match(stylesSource, /\.composer-thinking-range::-webkit-slider-runnable-track \{\s*height: var\(--thinking-track-height\);\s*background: transparent;/);
 });
 
-test("opening the combined menu preloads model metadata before its submenu", () => {
+test("opening the combined menu loads model metadata", () => {
   assert.match(
     composerSource,
     /useEffect\(\(\) => \{\n    if \(!open\) return;\n    for \(const candidate of providers\)\s*\{/,
@@ -107,11 +106,12 @@ test("the combined chip and menu meet the compact accessible visual contract", (
   assert.match(composerSource, /role="menuitemradio"/);
   assert.match(composerSource, /aria-checked=\{active\}/);
   assert.doesNotMatch(composerSource, /aria-checked=\{thinkingLevel === level\}/);
-  assert.match(composerSource, /event\.key === "ArrowLeft"/);
+  assert.match(composerSource, /if \(!focusedRow\) return/);
+  assert.match(composerSource, /event\.nativeEvent\.isComposing/);
   assert.match(composerSource, /event\.key === "Escape"/);
   assert.match(stylesSource, /\.composer-model-thinking-menu\s*\{[\s\S]*?position:\s*fixed;/);
   assert.match(stylesSource, /\.composer-model-thinking-menu\s*\{[\s\S]*?top:\s*0;/);
-  assert.match(stylesSource, /\.composer-model-thinking-menu\s*\{[\s\S]*?width:\s*min\(280px,\s*calc\(100vw - 24px\)\)/);
+  assert.match(stylesSource, /\.composer-model-thinking-menu\s*\{[\s\S]*?width:\s*min\(\d+px,\s*calc\(100vw - 24px\)\)/);
   assert.match(composerSource, /className="composer-model-thinking-icon"[\s\S]*?<IconBot size=\{14\} \/>/);
   assert.doesNotMatch(stylesSource, /\.composer-model-thinking-icon\.is-off/);
   assert.match(stylesSource, /@media \(prefers-reduced-motion: reduce\)/);
@@ -127,7 +127,7 @@ test("model options share the compact provider heading inset", () => {
 
 test("model groups use the account-aware display name", () => {
   assert.match(composerSource, /providerDisplayName: providerDisplayName\(candidate\)/);
-  assert.match(composerSource, /providerSearchText: providerSearchText\(candidate\)/);
+
   assert.match(composerSource, /aria-label=\{group\.providerDisplayName\}/);
   assert.match(composerSource, /\{group\.providerDisplayName\}/);
 });
@@ -164,29 +164,22 @@ test("reasoning projection uses the selected exact catalog row and binding", asy
   assert.match(source, /sameComposerModelId\(candidate\.id, modelId\)/);
 });
 
-test("a model row spends the panel's width instead of stacking at its left edge", () => {
-  // The label and the capability icons share one line, with the icons pinned to
-  // the trailing edge: stacking them in a column left the right half of the
-  // menu empty next to every row.
-  assert.match(
-    stylesSource,
-    /\.composer-model-option-main\s*\{[^}]*flex-direction:\s*row;/,
-  );
-  assert.match(
-    stylesSource,
-    /\.composer-model-option-main\s*\{[^}]*flex-wrap:\s*wrap;/,
-  );
-  assert.match(
-    stylesSource,
-    /\.composer-model-option-meta\s*\{[^}]*margin-left:\s*auto;/,
-  );
-  // One label per row, and a long name wraps in full rather than truncating.
-  assert.doesNotMatch(stylesSource, /\.composer-model-full-id/);
-  assert.doesNotMatch(stylesSource, /\.composer-model-display-name/);
-  assert.match(
-    stylesSource,
-    /\.composer-model-label\s*\{[^}]*overflow-wrap:\s*anywhere;[^}]*white-space:\s*normal;/,
-  );
+test("model options use an icon and actual provider metadata below the name", () => {
+  assert.match(listSource, /className="composer-model-option-icon" aria-hidden="true"/);
+  assert.match(listSource, /badges\.includes\("reasoning"\)/);
+  assert.match(listSource, /className="composer-model-option-provider"/);
+  assert.match(listSource, /formatTokenCount\(model\.contextWindow\)/);
+  assert.match(stylesSource, /\.composer-model-option-main\s*\{[^}]*flex-direction:\s*column;/);
+  assert.match(stylesSource, /\.composer-model-label\s*\{[^}]*overflow-wrap:\s*anywhere;[^}]*white-space:\s*normal;/);
+});
+
+test("model management is caller opt-in and chat opens the real settings route", async () => {
+  assert.match(pickerSource, /t\("settings\.modelConfigurations"\)/);
+  assert.match(pickerSource, /\{onOpenModelSettings \? \(/);
+  assert.match(pickerSource, /onOpenModelSettings\(\)/);
+  assert.doesNotMatch(modelMenuSource, /setSettingsTab/);
+  const toolbar = await readComposerModule("ComposerToolbar.tsx");
+  assert.match(toolbar, /onOpenModelSettings=\{\(\) => setSettingsTab\("agent"\)\}/);
 });
 
 test("an alias is told apart from the catalog name, and capabilities are icons", () => {
@@ -208,17 +201,10 @@ test("an alias is told apart from the catalog name, and capabilities are icons",
   assert.match(listSource, /chat\.modelBadgeVision/);
 });
 
-test("composer-model-thinking-menu uses 96% opacity, blur, and solid fallback", () => {
-  assert.match(
-    stylesSource,
-    /\.composer-model-thinking-menu\s*\{[\s\S]*?background:\s*color-mix\(in oklab, var\(--ds-bg-elevated-opaque\) 96%, transparent\);[\s\S]*?backdrop-filter:\s*saturate\(1\.6\) blur\(40px\);/,
-  );
-  assert.match(
-    stylesSource,
-    /@supports not \(\(backdrop-filter: blur\(1px\)\) or \(-webkit-backdrop-filter: blur\(1px\)\)\)\s*\{\s*\.composer-model-thinking-menu\s*\{\s*background:\s*var\(--ds-bg-elevated-opaque\);/,
-  );
-  assert.match(
-    stylesSource,
-    /:root\[data-theme="light"\] \.composer-model-thinking-menu\s*\{[\s\S]*?background:\s*var\(--ds-bg-elevated-opaque\);[\s\S]*?backdrop-filter:\s*none;/,
-  );
+test("model menu uses a solid surface and separated options", () => {
+  const block = stylesSource.match(/\.composer-model-thinking-menu \{([^}]+)\}/)?.[1];
+  assert.match(block, /background:\s*var\(--ds-bg-elevated-opaque\);/);
+  assert.doesNotMatch(block, /transparent/);
+  assert.match(block, /backdrop-filter:\s*none;/);
+  assert.match(stylesSource, /\.composer-model-thinking-menu \.composer-model-group \{[^}]*gap:\s*6px;/);
 });

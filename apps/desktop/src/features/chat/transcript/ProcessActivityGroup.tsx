@@ -10,24 +10,26 @@ import { DisclosureScope, type useAutomaticDisclosure } from "./disclosure";
 export function ProcessActivityGroup({
   items,
   active,
+  compact,
   activeStatusLabel,
   disclosure,
   children,
 }: {
   items: readonly AssistantActivityItem[];
   active: boolean;
+  compact: boolean;
   activeStatusLabel?: string;
   disclosure: ReturnType<typeof useAutomaticDisclosure>;
   children: ReactNode;
 }) {
   const { t } = useTranslation();
   const detailsId = useId();
-  const grouped = items.length > 1;
-  const open = !grouped || disclosure.open;
   const summary = useMemo(() => cachedActivitySummary(items), [items]);
+  const grouped = items.length > 1 || (compact && summary.tools > 0);
+  const open = !grouped || disclosure.open;
   if (items.length === 0) return null;
   return (
-    <div className={`process-activity-group${grouped ? " grouped" : " singleton"}${open ? " open" : ""}`}>
+    <div className={`process-activity-group${grouped ? " grouped" : " singleton"}${open ? " open" : ""}${compact ? " compact" : ""}`}>
       {grouped ? (
         <button
           type="button"
@@ -39,7 +41,9 @@ export function ProcessActivityGroup({
         >
           <span className="tool-activity-icon" aria-hidden><IconSparkles size={14} /></span>
           <span className={`tool-activity-label${active ? " running" : ""}`}>
-            {t(summary.label, { count: summary.count })}
+            {compact && summary.segments.length > 0
+              ? summary.segments.map((segment) => t(segment.label, { count: segment.count })).join(" · ")
+              : t(summary.label, { count: summary.count })}
           </span>
           {summary.thinking > 0 && summary.tools > 0 ? (
             <span className="tool-activity-count">{t("chat.activityIncludesThinking")}</span>

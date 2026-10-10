@@ -189,7 +189,7 @@ export function MessageMeta({
   );
 }
 
-export function AssistantErrorMessage({ message }: { message: UiMessage }) {
+export function AssistantErrorMessage({ message, readOnly = false }: { message: UiMessage; readOnly?: boolean }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(true);
   const detailsToggleRef = useRef<HTMLButtonElement | null>(null);
@@ -202,7 +202,7 @@ export function AssistantErrorMessage({ message }: { message: UiMessage }) {
     (state) => state.dismissAssistantErrorMessage,
   );
   const error = message.error;
-  if (!error || dismissed) return null;
+  if (!error || (!readOnly && dismissed)) return null;
   const networkDetails = error.details;
   const certificateFailure =
     error.code === "NETWORK_ERROR" &&
@@ -261,7 +261,7 @@ export function AssistantErrorMessage({ message }: { message: UiMessage }) {
             <IconChevronRight size={12} aria-hidden />
             {open ? t("chat.hideErrorDetails") : t("chat.showErrorDetails")}
           </button>
-          <button
+          {!readOnly && <button
             type="button"
             className="copy-btn primary"
             onClick={() =>
@@ -271,8 +271,8 @@ export function AssistantErrorMessage({ message }: { message: UiMessage }) {
             }
           >
             {t("errors.action.continue")}
-          </button>
-          {configurationError ? (
+          </button>}
+          {configurationError && !readOnly ? (
             <button
               type="button"
               className="copy-btn"
@@ -284,7 +284,7 @@ export function AssistantErrorMessage({ message }: { message: UiMessage }) {
               {t("errors.action.openSettings")}
             </button>
           ) : null}
-          <button
+          {!readOnly && <button
             type="button"
             className="message-error-dismiss"
             aria-label={t("chat.dismissError")}
@@ -292,7 +292,7 @@ export function AssistantErrorMessage({ message }: { message: UiMessage }) {
             onClick={() => dismissAssistantErrorMessage(message.id)}
           >
             <IconX size={14} aria-hidden />
-          </button>
+          </button>}
         </div>
       </div>
       <div

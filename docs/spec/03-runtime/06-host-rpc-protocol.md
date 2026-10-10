@@ -184,7 +184,7 @@ checkpoint architecture remains host-owned.
 The shared host-core storage chain is v19. Plus-only structures, including
 approved execution provider/model bindings, durable revision intent fields, and
 the `plan_execution_schedules` table, are versioned by the separate Plus track
-recorded in `plus_schema_meta` (current v4; see the data-storage spec, section
+recorded in `plus_schema_meta` (current v5; see the data-storage spec, section
 7.1), so a Plus persistence increment does not move `user_version`. Protocol v11
 remains the wire version; persistence increments on either track do not add a
 JSON-RPC version field.
@@ -1717,3 +1717,56 @@ is rejected; unchanged legacy roundtrips remain readable. Ordinary renderer
 settings writes omit expertTeam unless submitted by this dedicated CAS editor.
 Main applies the complete committed Host settings to network/menu/developer
 side effects, so a partial request cannot reset unrelated runtime policy.
+
+## Session activity RPCs
+
+Local Desktop resources add `sessionNotes.get({sessionId})` and
+`sessionNotes.set({sessionId,content,expectedRevision})`, returning `{note}`.
+An existing session without a note reads exact empty content/revision zero;
+nonexistent sessions are NOT_FOUND and conflicting writes are NOTE_CONFLICT.
+
+`backgroundProcesses.list({sessionId})` returns `{processes}`: all active jobs
+plus latest 100 terminal records. `read({sessionId,id})` returns `{process,
+stdout,stderr,stdoutTruncated,stderrTruncated}` and optional execution errorCode,
+errorMessage and persistenceError. `stop({sessionId,id})` returns `{process}` and
+is idempotent for settled jobs. Cross-session IDs cannot read or stop another
+owner. `backgroundProcesses.changed({sessionId,id,revision})` invalidates visible
+reads; no command output is broadcast with the event. Explicit stopping remains
+effective if its state write fails, while the storage error is reported.
+
+Background start is the existing authorized `tools.execute` Bash path with
+`args.run_in_background: true`; the immediate result is a launch receipt, not
+an exit status. Permit/cancellation ownership transfers to the Host job until
+its runner tree exits. The ordinary command timeout still applies. EOF/shutdown
+joins jobs; startup recovers unfinished rows as interrupted without replay.
+
+### Local Git workspace RPC (Plus)
+
+`workspace.git.get` takes `{projectPath, sessionId?}` and returns `{git}` where
+`git` is null for a non-Git directory. `workspace.git.switchBranch`,
+`workspace.git.createBranch`, and `workspace.git.createWorktree` additionally
+require `{branch, expectedHead, expectedBranch}`; both expected fields are
+explicitly nullable. They return `{git}`; createWorktree also returns `{worktree}`.
+The shared `GitWorkspaceSnapshot` defines checkout roots, primary path, HEAD,
+branch, dirt, local branches with occupied paths and the Git worktree registry.
+
+Host validates the requested path against the owning local session or active
+workspace; imported sessions and remote origins are refused. Mutation ownership
+also excludes team members. Branch operations reject active turns, Bash tools,
+and managed background processes in the checkout or a descendant directory.
+Host serializes admission with its state lock. Expected branch and HEAD must
+still match when executing; no reset, force checkout or automatic stash occurs.
+Worktree targets are allocated by Host under its data directory, never supplied
+by the renderer. Git's registry remains the durable source of checkout identity;
+no session-mode or database schema field is added. Failures keep existing user
+changes and successfully created worktrees recoverable.
+
+Read-only metadata copies validated ownership under the state lock, then releases
+it before invoking Git. Mutation lock admission is bounded; Git has per-command
+and operation deadlines, bounded output, and owned child cleanup. Effective Git
+root must contain the canonical project path; an unrelated `core.worktree`
+redirection is refused. Repositories that require executable file filters (such
+as LFS conversion) are rejected for checkout mutations rather than silently
+producing repository-format files. Metadata remains readable without executing
+hooks or filters. A globally installed but unused filter does not block an
+ordinary repository.

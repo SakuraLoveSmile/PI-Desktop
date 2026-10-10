@@ -760,8 +760,7 @@
 /*
  * A delegation renders as a conversation: the tab reuses the main transcript's
  * message-list classes for its rows, so the only tab-specific layout is the
- * column (scroll area above a read-only composer) and the composer itself.
- * The scroll area owns the only scrollbar; the composer never scrolls.
+ * column. The display-only scroll area owns the only scrollbar.
  */
 .subagent-transcript-tab {
   display: flex;
@@ -803,24 +802,10 @@
 }
 
 .subagent-transcript-jump {
-  bottom: calc(var(--st-composer-dock-height, 68px) + 8px);
+  bottom: 16px;
   z-index: 6;
 }
 
-.subagent-transcript-composer {
-  flex: none;
-  border-top: 1px solid var(--ds-border-subtle);
-  padding: 10px 14px;
-}
-
-.subagent-transcript-composer textarea {
-  font-size: var(--text-base);
-  line-height: var(--leading-chat);
-  display: block;
-  width: 100%;
-  min-height: calc(var(--leading-chat) * 2em);
-  resize: none;
-}
 /* Shared per-tool empty state used by Files and plugin fallback surfaces. */
 .work-tab-empty {
   display: flex;
