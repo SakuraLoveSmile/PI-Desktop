@@ -14,7 +14,9 @@ use crate::sessions;
 
 pub(super) fn team_rpc_err(e: anyhow::Error) -> JsonRpcError {
     let msg = e.to_string();
-    let code_str = if msg.contains("TEAM_PLANNING_NOT_READY") {
+    let code_str = if msg.contains("TEAM_TURN_INVALID") {
+        "TEAM_TURN_INVALID"
+    } else if msg.contains("TEAM_PLANNING_NOT_READY") {
         "TEAM_PLANNING_NOT_READY"
     } else if msg.contains("TEAM_PLANNING_STALE") {
         "TEAM_PLANNING_STALE"
@@ -423,6 +425,21 @@ pub(super) async fn handle(
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "callerSessionId required", "INVALID_PARAMS"))?;
             authorize_lead_mutation(&st.db, team_id, caller_id)?;
+            if let Some(expected_turn) = params.get("expectedCallerTurnId") {
+                let expected_turn = expected_turn.as_str().ok_or_else(|| {
+                    rpc_err(
+                        1002,
+                        "expectedCallerTurnId must be a string",
+                        "INVALID_PARAMS",
+                    )
+                })?;
+                crate::team::task_attempts::validate_caller_turn(
+                    st.db.conn(),
+                    caller_id,
+                    expected_turn,
+                )
+                .map_err(team_rpc_err)?;
+            }
             let task_id = params
                 .get("taskId")
                 .and_then(|v| v.as_str())

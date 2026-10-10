@@ -42,6 +42,11 @@ impl Database {
         for (team_session_id, _) in &running_members {
             running_team_sessions.insert(team_session_id.clone());
         }
+        let interrupted_turns = {
+            let mut stmt = tx.prepare_cached("SELECT id FROM turns WHERE status='running'")?;
+            let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+            rows.collect::<rusqlite::Result<Vec<_>>>()?
+        };
         tx.execute(
             "UPDATE turns
          SET status = 'aborted', error_code = COALESCE(error_code, 'TURN_ABORTED'),
@@ -49,6 +54,9 @@ impl Database {
          WHERE status = 'running'",
             params![now],
         )?;
+        for turn in interrupted_turns {
+            crate::team::task_attempts::settle_turn(&tx, &turn, "aborted")?;
+        }
         for (_, member_session_id) in running_members {
             tx.execute(
                 "UPDATE team_members SET phase='idle', error=NULL, updated_at=?2

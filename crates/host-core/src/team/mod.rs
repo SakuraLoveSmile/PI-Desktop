@@ -31,6 +31,9 @@ pub mod roster;
 #[cfg(test)]
 mod roster_tests;
 #[cfg(test)]
+mod task_attempt_tests;
+pub(crate) mod task_attempts;
+#[cfg(test)]
 mod test_support;
 #[cfg(test)]
 mod tests;

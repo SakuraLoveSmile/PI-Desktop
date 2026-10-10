@@ -2449,6 +2449,7 @@ pub fn delete_session(db: &Database, id: &str) -> Result<bool> {
     }
     let tx = db.conn().unchecked_transaction()?;
     crate::goal_progress::cleanup_session_conn(&tx, id)?;
+    crate::team::task_attempts::cleanup_session(&tx, id)?;
     tx.execute(
         "DELETE FROM kv WHERE ns IN ('team-planning-v1','team-member-purpose-v1','team-strategy-scope-v1','team-member-expert-config-v1') AND key=?1",
         [id],
@@ -2474,6 +2475,7 @@ pub fn delete_session_with_team_cleanup(db: &Database, id: &str) -> Result<bool>
     let tx = db.conn().unchecked_transaction()?;
     crate::team::lifecycle::cleanup_team_on_lead_delete_conn(&tx, id)?;
     crate::goal_progress::cleanup_session_conn(&tx, id)?;
+    crate::team::task_attempts::cleanup_session(&tx, id)?;
     tx.execute(
         "DELETE FROM kv WHERE ns IN ('team-planning-v1','team-member-purpose-v1','team-strategy-scope-v1','team-member-expert-config-v1') AND key=?1",
         [id],
@@ -4355,6 +4357,7 @@ pub fn end_turn_settling(
             turn_id,
         ])?;
     if n > 0 {
+        crate::team::task_attempts::settle_turn(&tx, turn_id, status)?;
         let phase = match status {
             "completed" => "completed",
             "error" => "failed",
