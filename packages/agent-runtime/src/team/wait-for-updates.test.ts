@@ -132,6 +132,31 @@ describe("wait_for_updates", () => {
     },
   );
 
+  it("wakes on a Host failure notice and returns its complete structured body once", async () => {
+    const h = harness();
+    let failed = false;
+    const content = JSON.stringify({ kind: "member_failed", memberName: "expert", errorCode: "MUTATION_RETRY_BUDGET_EXHAUSTED",
+      retriable: false, taskIds: ["rewrite"], suggestedAction: "Inspect the failed attempt before retrying" });
+    const messages = [{ id: "host-failure", content }];
+    h.setReader(async method => method === "team.readExecutionInbox" ? { turnId: "approved-turn", messages: failed ? messages : [] }
+      : method === "team.getBoard" ? { revision: failed ? 8 : 7 } : { messages: [] });
+    const tool = createWaitForUpdatesTool({ teamSessionId: "team-1", callerSessionId: "member-1", host: h.host,
+      approvedExecution: () => true, getTurnId: () => "approved-turn" });
+    const waiting = tool.execute("failure-wait", { timeoutSeconds: 60 });
+    await vi.advanceTimersByTimeAsync(0);
+    failed = true;
+    h.emit("team.messageQueued", { teamSessionId: "team-1", messageId: "host-failure" });
+    await vi.advanceTimersByTimeAsync(100);
+    const outcome = await waiting;
+    expect(outcome.details).toEqual({ updated: true, reason: "execution_inbox", messages });
+    expect(outcome.content[0]).toEqual({ type: "text", text: JSON.stringify(outcome.details) });
+    const repeated = tool.execute("failure-recheck", { timeoutSeconds: 1 });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect((await repeated).details).toEqual({ updated: false, reason: "timeout" });
+    expect(vi.getTimerCount()).toBe(0);
+    expect(h.listeners.size).toBe(0);
+  });
+
   it("keeps approved execution mail in the same turn without yielding or replaying consumed results", async () => {
     const h = harness();
     const messages = [{ id: "execution-mail", content: "Full approved expert report" }];
