@@ -3294,13 +3294,13 @@ export class DesktopAgentRuntime {
         tag: Type.Optional(
           Type.String({
             description:
-              "4 uppercase hex from the latest Read, Grep, Write, or Edit for this path. Required unless legacy old_string/new_string is used.",
+              "4 uppercase hex from the latest Read, Grep, Write, or Edit for this path. Required when ops is supplied; ignored when ops is absent and legacy old_string/new_string is used.",
           }),
         ),
         ops: Type.Optional(
           Type.String({
             description:
-              "One or more operation headers with + body rows, newline separated. A PUT with body rows must end its header with `:` (for example, `PUT 48.=48:`); `PUT 48.=48` followed by + rows is invalid. A colonless PUT is only for a register paste such as `PUT <1 @name`. Required unless legacy old_string/new_string is used.",
+              "One or more operation headers with + body rows, newline separated. A PUT with body rows must end its header with `:` (for example, `PUT 48.=48:`); `PUT 48.=48` followed by + rows is invalid. A colonless PUT is only for a register paste such as `PUT <1 @name`. When supplied, ops takes precedence over old_string/new_string. Omit ops for legacy replacement.",
           }),
         ),
         old_string: Type.Optional(
@@ -3312,7 +3312,7 @@ export class DesktopAgentRuntime {
         new_string: Type.Optional(
           Type.String({
             description:
-              "Legacy text replacement: new text to replace old_string with.",
+              "Legacy text replacement: new text to replace old_string with; read only when ops is absent.",
           }),
         ),
       },

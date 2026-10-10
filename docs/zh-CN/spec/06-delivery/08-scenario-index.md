@@ -10,6 +10,7 @@ IDs come from executable result/test calls and annotated dynamic suites. 文档�
 
 | Suite | Family | Tier | Executable | Boundary / excluded coverage |
 | --- | --- | --- | --- | --- |
+| edit-legacy | runtime-provider | nightly | [scripts/e2e-edit-legacy.mjs](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-edit-legacy.mjs)  | Isolated temporary Host/workspace and real tools RPC; no provider, Desktop instance or user profile.  |
 | agent-live | runtime-provider | manual | [scripts/e2e-agent-live.mjs](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-agent-live.mjs)  | Requires an explicitly chosen real provider, key and paid-model authorization.  |
 | asktool-card | composer | nightly | [scripts/e2e-asktool-card.mjs](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-asktool-card.mjs)  | Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked.  |
 | capability-move | extensions | nightly | [scripts/e2e-capability-move.mjs](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-capability-move.mjs)  | Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked.  |
@@ -214,6 +215,7 @@ IDs come from executable result/test calls and annotated dynamic suites. 文档�
 | E2E-PROJECT-delete-removes-project-and-owned-sessions-unknown-path | [scripts/e2e-smoke.mjs:639](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-smoke.mjs#L639) |
 | E2E-PROJECT-SKILL-CREATE | [scripts/e2e-skill-market.mjs:274](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-skill-market.mjs#L274) |
 | E2E-PROJECT-SKILL-NO-OVERWRITE | [scripts/e2e-skill-market.mjs:281](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-skill-market.mjs#L281) |
+| E2E-RUNTIME-edit-accepts-tag-with-legacy-arguments | [scripts/e2e-edit-legacy.mjs:15](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-edit-legacy.mjs#L15) |
 | E2E-runtime-module | [scripts/e2e-smoke.mjs:831](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-smoke.mjs#L831) |
 | E2E-SESSION-activity-aggregate | [scripts/e2e-suite-catalog.json (session-activity-aggregate)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
 | E2E-SESSION-activity-full-history-ui | [scripts/e2e-suite-catalog.json (session-activity-history)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
