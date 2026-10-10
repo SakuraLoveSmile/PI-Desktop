@@ -1,4 +1,5 @@
-import { memo, useMemo, useState } from "react";
+import { overviewWorkPanelTab } from "../lib/work-panel-tabs";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   messageHasTranscriptContent,
@@ -8,7 +9,7 @@ import { Composer } from "./Composer";
 import { HomeMascotLogo } from "./HomeMascotLogo";
 import { HomeProjectSwitcher } from "./HomeProjectSwitcher";
 import { IconX } from "./icons";
-import { TooltipButton } from "./ui";
+import { Button, TooltipButton } from "./ui";
 import { OnboardingChecklist } from "./OnboardingChecklist";
 import { SessionPane } from "./SessionPane";
 import { ConversationWidthHandles } from "./ConversationWidthHandles";
@@ -50,6 +51,20 @@ export const ChatSurface = memo(function ChatSurface({
   visible?: boolean;
 }) {
   const { t } = useTranslation();
+  const surfaceRef = useRef<HTMLDivElement>(null);
+  const [surfaceWidth, setSurfaceWidth] = useState(0);
+  const openWorkPanelTabForSession = useAppStore((state) => state.openWorkPanelTabForSession);
+  const workPanelOpen = useAppStore((state) => state.workPanelOpen);
+  useEffect(() => {
+    const surface = surfaceRef.current;
+    if (!surface) return;
+    const sync = () => setSurfaceWidth(surface.clientWidth);
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(surface);
+    return () => observer.disconnect();
+  }, []);
+  const activityVisible = visible && !workPanelOpen && surfaceWidth >= 820;
   const activeSessionId = useAppStore((state) => state.activeSessionId);
   const selectingSessionId = useAppStore((state) => state.selectingSessionId);
   const retainedSessionIds = useAppStore((state) => state.retainedSessionIds);
@@ -149,6 +164,8 @@ export const ChatSurface = memo(function ChatSurface({
   return (
     <div
       className={`chat-surface route-surface${sessionSwitching ? " session-switching" : ""}`}
+      ref={surfaceRef}
+      data-activity-visible={activityVisible && !showEmptyState ? "true" : "false"}
       aria-busy={sessionSwitching}
     >
       {sessionSwitching ? (
@@ -156,7 +173,14 @@ export const ChatSurface = memo(function ChatSurface({
           <span />
         </div>
       ) : null}
+      <div className="chat-session-main">
       <ConversationWidthHandles />
+      {!showEmptyState && !activityVisible && !workPanelOpen && visibleSessionId ? (
+        <Button variant="ghost" size="sm" className="session-activity-access" disabled={sessionSwitching}
+          onClick={() => openWorkPanelTabForSession(visibleSessionId, overviewWorkPanelTab("activity"))}>
+          {t("panel.activity.title")}
+        </Button>
+      ) : null}
       {showEmptyState ? (
         <div
           className="home-main-content"
@@ -204,6 +228,7 @@ export const ChatSurface = memo(function ChatSurface({
                 key={id}
                 sessionId={id}
                 visible={visible && id === visibleSessionId}
+                activityVisible={activityVisible}
               />
             ))}
           </div>
@@ -211,6 +236,7 @@ export const ChatSurface = memo(function ChatSurface({
         </>
       )}
 
+      </div>
       {noticeError ? (
         <div className="chat-error-layer">
           <div className="chat-error-notice">

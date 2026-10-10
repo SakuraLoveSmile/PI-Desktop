@@ -2425,22 +2425,21 @@ identify the platform validation still needed.
 
 - **Preconditions**: Chat route active; provider configured with two reasoning
   models whose binding defaults differ.
-- **Steps**: 1) Click the Composer-right model × reasoning chip. 2) Confirm the
-  menu opens upward from the bottom composer. 3) Enter Model, select a different
-  provider/model, and return to the root. 4) Confirm its default thinking level,
-  choose another supported level, then reselect the same model. 5) Open Settings
-  from the command palette or application menu.
+- **Steps**: 1) Click the Composer-left model × reasoning chip. 2) Confirm the
+  menu opens upward directly to the searchable model list, with no Default/Custom
+  tabs. 3) Select a different provider/model. 4) Confirm its default thinking
+  level, choose another supported level, then reselect the same model. 5) Use
+  Model configurations in the popup to open the existing Settings model page.
 - **Expected**: The trigger uses a Bot icon while retaining the current model
-  and reasoning labels. The root shows only Model and Reasoning level entries.
-  The Model submenu lists enabled runnable providers and only the model bindings
-  saved for each provider, with each model row visibly indented beneath its provider
-  heading. Cached or freshly discovered models may supply display names and
+  and reasoning labels. The popup shows the model list immediately. Each row has
+  a neutral icon, one display name and actual provider, context and capability
+  metadata. It lists enabled runnable providers and only their saved bindings. Cached or freshly discovered models may supply display names and
   metadata for those bindings, but unconfigured discovery results are absent;
-  configured IDs remain available when discovery is unavailable. The root slider
+  configured IDs remain available when discovery is unavailable. The slider
   lists the selected model's supported levels. Selecting a different model
   updates the active session to that binding's default thinking level; selecting
-  the already-active model preserves a manually selected level. Settings opens
-  from the command palette/menu. The Composer model trigger ellipsizes long IDs.
+  the already-active model preserves a manually selected level. Model
+  configurations closes the popup and opens the existing model Settings page. The Composer model trigger ellipsizes long IDs.
   Each option shows one display name only, and hovering a long option exposes its
   complete display name in the tooltip without changing the menu layout or adding
   a visible model ID.
@@ -2472,7 +2471,11 @@ identify the platform validation still needed.
   slot remains reachable. Both mode menus are visible and pointer-accessible,
   and each selection updates its trigger. The execution-profile labels
   `智能体` and `专家团` remain fully visible at desktop and narrow composer widths.
-  Home and thread-docked composers match.
+  Home and thread-docked composers match, with four-line empty input, a neutral
+  outline and unseparated toolbar. Profile menu options have at least 6px vertical
+  separation; switching profiles preserves model, reasoning and permission.
+  The task-progress card and activity rail both open the existing read-only
+  subagent transcript tab, while the composer stays in the reading region.
 - **Specs linked**: `04-ux/08-component-spec.md` (§11)
 - **Acceptance**: C (send/UI), Quality
 - **Milestone**: M2
@@ -4792,7 +4795,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   binding still contains the legacy 128k generic seed.
 - **Steps**: 1) Open the session. 2) Confirm the completed turn shows a model
   badge and no context inspector under the answer. 3) Hover the composer
-  toolbar inspector trigger, confirm the panel stays closed, then click it.
+  footer meter trigger, confirm the panel stays closed, then click it.
   4) Inspect the remaining-token-plus-percentage heading, used/window counts,
   unboxed turn/speed values, one inline provider-usage summary, and one
   aggregate tool-usage summary, with no doubled heading rule and no inner
@@ -4804,20 +4807,24 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   context inspector, and confirm the summary stays inside the conversation pane:
   fully visible, clear of the panel column, and narrowed rather than clipped on
   a narrow pane. 8) Click Retry on that turn while idle. 9) Confirm a session
-  without usage still offers Retry on completed turns and omits the composer
-  inspector.
+  without usage still offers Retry on completed turns and shows the disabled
+  unknown meter. 10) In an idle editable Desktop session, activate Compact
+  context and confirm the existing workflow starts once. Repeat while running,
+  awaiting approval, or viewing a read-only session; the action is disabled.
+  Switch sessions with the popup open and confirm it closes.
 - **Expected**: Model badge appears under completed assistant answers when a
   model id exists. The compact Context inspector appears in the composer
-  right toolbar, left of the model picker, once any usage exists, and always
-  mirrors the newest usage-bearing assistant turn. The trigger shows the ring
-  plus remaining-capacity percentage (no Context label) and low-space
+  footer at its right edge, and always mirrors the newest usage-bearing
+  assistant turn. The trigger shows a horizontal progress bar plus the
+  configured used/remaining percentage (no Context label) and low-space
   warning/error states; click or keyboard activation toggles the same compact
   summary while pointer hover alone never opens or closes it. An open panel
   survives the pointer leaving it and closes on a second trigger activation,
   an outside click, or Escape, which returns focus to the trigger. Provider
   values remain exact, tool values remain visibly approximate through the `~`
-  aggregate total, and no per-tool list, source badge, progress bar, or
-  explanatory estimate paragraph is rendered. Occupancy, turn total, and
+  aggregate total. An additional used-occupancy bar and Compact context action
+  appear in the footer popup; no invented System/Skill shares or per-tool source
+  list is rendered. Missing usage remains `—`, rather than a made-up percentage. Occupancy, turn total, and
   provider cache/input/output/reasoning/hit-rate are the last usage-bearing
   assistant message, not the summed tool-loop, so cache read stays on the
   same scale as the context window. The cache hit rate is omitted
@@ -9523,6 +9530,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 | Acceptance | Scenarios |
 |---|---|
 | C / E / Security / Quality — Bounded recursive standard/expert delegation and persisted settings | E2E-SUBAGENT-bounded-recursive-execution |
+| C / E / Quality / Security — Session activity, persistent notes and managed process lifecycle | E2E-CHAT-session-activity |
 | E / Quality — Standard Agent delegate-first prompt and Task report convergence | E2E-DELEGATION-standard-delegates-to-subagents |
 | C / E / Quality — Mandatory Team delegation, expert-start gate and catalog isolation | E2E-TEAM-lead-delegates-to-experts, E2E-TEAM-forced-delegation |
 | C / Quality / Security — Automatic read-only Team planning | E2E-TEAM-approved-plan-research-and-execution, E2E-TEAM-automatic-plan-research |
@@ -14855,19 +14863,19 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Preconditions**: An Agent session has completed at least one turn that
   reported token usage. Settings → AI → Defaults is reachable.
 - **Steps**:
-  1. Confirm the composer toolbar context ring shows remaining capacity
-     (ring nearly full, percentage ≈ remaining %, tooltip and aria-label
+  1. Confirm the composer footer context track shows remaining capacity
+     (track nearly full, percentage ≈ remaining %, tooltip and aria-label
      use remaining vocabulary).
   2. Open Settings → AI → Defaults and switch the Context usage display
      segmented control from Remaining to Used.
-  3. Return to the chat and inspect the context ring: the ring arc now
+  3. Return to the chat and inspect the context meter: the track now
      fills by `usedRatio` (nearly empty at low occupancy), the percentage
      shows ≈ used %, the popover heading shows used tokens + percentage,
      and the tooltip/aria-label use used-capacity vocabulary.
-  4. Confirm warning/critical ring colors still follow remaining capacity:
-     at remaining > 25 % the ring stays neutral even when used % is high.
+  4. Confirm warning/critical track colors still follow remaining capacity:
+     at remaining > 25 % the track stays neutral even when used % is high.
   5. Switch back to Remaining and confirm the original display returns.
-- **Expected**: The display mode flips the ring arc, percentage, token
+- **Expected**: The display mode flips the track fill, percentage, token
   count, heading, tooltip, and aria-label consistently. Color thresholds
   remain based on remaining capacity in both modes. The default for a
   fresh profile is Remaining.
@@ -16077,7 +16085,10 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   toggles, parent close/reopen, a singleton segment, literal-final-item leaf
   selection, failure/denial/recovery, retained-pane remounts and a legacy search
   reveal. Repeat in Compact with permission/question/plan/goal cards, a stopped
-  partial answer, an assistant error and delegated child work.
+  partial answer, an assistant error and delegated child work. Check Compact
+  singleton and mixed-category summaries, their expansion, search reveal and
+  failure/denial badges. Check built typography and horizontal containment in
+  dark/light themes at 450px and 960px preferred reading bands.
 - **Expected:** Detailed uses one whole-process disclosure and leaves the final
   answer, assistant errors, stopped trailing text and pending actions outside it.
   Detailed starts active processes open; untouched processes collapse at
@@ -16099,6 +16110,10 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Validation scope for the 2026-09-20 change:** Nested disclosure and activity
   group presentation only; precise item-level transcript search targeting is out
   of scope and keeps the existing message-level search behavior.
+- **Readability:** Compact tools, including singleton calls, start behind a
+  category-count summary; progress and answer remain visible. Failures and
+  denials retain an issue count while folded. Prose uses a larger type scale
+  than summaries; narrow bands wrap the summary without horizontal overflow.
 - **Automation:** `pnpm test:e2e:transcript` covers default and active-to-completed
   process disclosure behavior; `pnpm test:e2e:transcript-disclosure` verifies
   manual-open retention and viewport anchoring; `apps/desktop/test/turn-process.test.mjs`
@@ -17823,3 +17838,56 @@ OpenCode Go's previous Muse routes, other publishers, ordinary completions
 models and explicit per-model API overrides unchanged. Existing provider
 API-style Electron checks remain applicable. This isolated validation does not
 prove account/region eligibility or call a real model.
+### E2E-CHAT-session-activity
+
+- **Preconditions:** Built request candidate, isolated local Desktop sessions A/B,
+  temporary database/project, synthetic provider/IPC fixtures, production Host
+  runner, a wide chat surface and a narrow surface/work-panel layout.
+- **Steps:** Use Settings to select Compact and confirm the conversation has no
+  duplicate switch. Review plan/agent/source records and expand activity groups.
+  Confirm Quick Notes is absent in the wide rail and narrow work panel, with
+  no note reads/writes. Confirm flat suggestion headers/counts. Start an approved background
+  Bash job, inspect live streams, stop it and attempt a foreign-session stop.
+  Exercise nonzero/timeout/start failure, capped output, storage-write refusal,
+  an old active job with 100 newer terminal jobs, and deletion prechecks. Test
+  Host EOF, graceful app dispose and forced loss with owned child/grandchild
+  markers, then restart. Keep a detail panel open during Host recovery. Open
+  the activity work-panel fallback at a narrow chat width.
+- **Expected:** Original display preference/default and chronological reading
+  remain intact. The rail does not overlap chat/composer and yields to the work
+  panel. Hidden panes do not read another owner; async navigation/read/stop never
+  overrides a new session/request. Retained legacy notes stay stored without UI
+  reads/writes and never enter transcripts or forks. Every active process stays manageable; explicit stop reaches the runner
+  despite storage refusal, permit release follows actual tree exit, and storage
+  failure retains observable terminal output pending repair. Startup marks
+  unfinished jobs interrupted without re-execution or stale-PID control.
+- **Specs:** 04-ux/08-component-spec §13.3-13.4, 04-ux/06-settings-ia,
+  03-runtime/03-tools-and-permissions, 03-runtime/04-data-storage §7.1,
+  03-runtime/06-host-rpc-protocol; ADR session-activity-rail-and-managed-background-processes.
+- **Acceptance:** C / E / Quality / Security.
+- **Milestone:** M6+.
+- **Automation:** `test:e2e:transcript` (real React/Chromium shell and interaction
+  fixtures), `test:e2e:session-activity` (real isolated production Host), focused
+  note/process/permission/migration and Runtime contract tests.
+- **Status:** Local candidate verification; Windows process-tree acceptance
+  remains separate. No user profile or real model provider is a test fixture.
+
+### Composer metadata and compact agent rows
+
+The composer footer shows the current session's project, local/remote host, and known local Git branch. Unavailable project/branch metadata is omitted; remote sessions never borrow a local branch. Model menus list all models without a search field. Generation speed, full-turn token totals, cache metrics and context details are available from the bottom-right context meter. Subagent entries use transparent gradient-avatar rows with name, task, localized status and measured elapsed time; clicking a row opens read-only details, with no panorama entry. Validate model keyboard selection, footer metadata, context details and agent navigation in the isolated composer/transcript fixtures, including narrow layouts.
+
+### Recorded outputs, delegate details and project Skill suggestions
+
+Output rows display file basenames with a file-type icon plate and a full-path tooltip. They retain existing file navigation, omit status badges and use the current neutral theme. Delegate details show the recorded agent identity/state, bounded expandable task prompts, and collapsed contiguous thinking/tool groups with real counts. Follow-up turns, Markdown, search and scroll remain available; delegate errors/reviews have no Continue, dismiss or rollback mutation controls.
+
+Self-evolution suggestions are generated only through an explicit action in an idle, local, writable project conversation. The normal session send workflow requests evidence-based reusable lessons as a bounded `skill-suggestions` JSON fence. Only settled top-level assistant responses are accepted; malformed, oversized, nested and untrusted-role blocks do not become suggestions. Suggestions remain transcript-backed across reloads. Each draft opens the existing Skill editor for review before using `skills.create` at the captured owning project path; it is disabled by default, may be enabled by the reviewer, and never overwrites an existing skill. No project, partial loaded history, running/queued execution, approvals, imported/remote/read-only conversations and Team members disable generation/creation. Session/project changes close the editor and prevent stale saves. Generation uses the configured model when the user explicitly requests it; no background generation occurs.
+
+Acceptance covers file names/navigation, delegate prompt/group disclosure and absence of mutation actions, generation through the real send workflow, review edits, duplicate-save locking, failed-save draft preservation, late generation/save during session switches, parser validation and isolated Host project-Skill creation/list/read/no-overwrite. The reference pinned card is a progress-summary example; it does not imply automatic memory generation. Quick Notes is not exposed in the current UI; previously stored data is retained.
+
+### Skills and MCP sidebar with suggestion dialog
+
+The sidebar uses a flat Skills & MCP heading and a title-only icon list of recorded Skill/MCP references plus pending suggestions. References are removed from the separate Sources list; web sources remain there. Same-kind/name references are deduplicated, and a pending same-name Skill uses one row. The pending count is a compact rectangular action opening an opaque, viewport-bounded anchored dialog headed Self-evolution suggestions. Rows show a name and a two-line description; hover, keyboard focus and touch reveal Create/Ignore actions. Create opens the existing project Skill review editor before saving. Ignore hides only that recorded suggestion in the sidebar/count/dialog.
+
+Ignore preferences are renderer-owned UI preferences under an independent version-1 key, identified by owning session, source message, name and content fingerprint. They survive remount/reload, do not alter task messages or Skill files, and keep only the latest 200 identities. A regenerated source or revised content is independent. Invalid/unavailable storage is visible and failed writes do not remove a row. Escape/outside pointer closes the dialog; Escape returns focus to its count; changing sessions closes it without opening another owner's editor.
+
+Validate count-to-dialog, keyboard/hover actions, project review/save, Ignore/count/list updates, remount persistence, session/content isolation, recorded references and viewport bounds. Preview examples are synthetic.

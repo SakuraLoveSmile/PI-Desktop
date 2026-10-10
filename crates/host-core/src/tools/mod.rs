@@ -761,6 +761,8 @@ pub struct BashExecutionOptions {
     pub timeout_ms: Option<u64>,
     pub cancellation: Option<watch::Receiver<bool>>,
     pub output_tx: Option<mpsc::UnboundedSender<String>>,
+    pub background_output:
+        Option<std::sync::Arc<std::sync::Mutex<crate::background_processes::BackgroundOutput>>>,
 }
 
 impl BashExecutionOptions {
@@ -772,6 +774,7 @@ impl BashExecutionOptions {
             timeout_ms,
             cancellation: None,
             output_tx: None,
+            background_output: None,
         }
     }
 }
@@ -2293,6 +2296,8 @@ impl CapturedOutput {
 #[derive(Debug)]
 struct OutputNotifier {
     tx: Option<mpsc::UnboundedSender<String>>,
+    background_output:
+        Option<std::sync::Arc<std::sync::Mutex<crate::background_processes::BackgroundOutput>>>,
     session_id: String,
     tool_call_id: String,
     command_shell_id: String,
@@ -2308,6 +2313,7 @@ impl OutputNotifier {
     fn new(options: &BashExecutionOptions) -> Self {
         Self {
             tx: options.output_tx.clone(),
+            background_output: options.background_output.clone(),
             session_id: options.session_id.clone(),
             tool_call_id: options.tool_call_id.clone(),
             command_shell_id: options.command_shell_id.clone(),
@@ -2323,6 +2329,12 @@ impl OutputNotifier {
     fn push(&mut self, stream: OutputStream, chunk: String) {
         if chunk.is_empty() {
             return;
+        }
+        if let Some(output) = &self.background_output {
+            match output.lock() {
+                Ok(mut output) => output.push(matches!(stream, OutputStream::Stderr), &chunk),
+                Err(error) => tracing::error!(%error, "background output lock poisoned"),
+            }
         }
         if self.tx.is_none() || self.sent >= MAX_OUTPUT_NOTIFICATIONS {
             self.note_dropped(&chunk);
@@ -2699,6 +2711,11 @@ async fn tool_bash(
         scratch_dir: scratch.map(Path::to_path_buf),
         env_path: shell::user_login_path().map(str::to_string),
     };
+    // A managed background job may be stopped while waiting to begin. Never
+    // spawn an already-cancelled call solely to kill it afterwards.
+    if options.cancellation.as_ref().is_some_and(|rx| *rx.borrow()) {
+        return Err(("TOOL_ABORTED".into(), "bash aborted".into()));
+    }
     let SpawnedToolRunner {
         pid,
         mut ownership,
@@ -3004,7 +3021,7 @@ pub fn builtin_tool_defs() -> Value {
             "risk": "high",
             "parameters": {
                 "type": "object",
-                "properties": { "command": { "type": "string" } },
+                "properties": { "command": { "type": "string" }, "run_in_background": { "type": "boolean", "default": false, "description": "Start a Host-managed background process after normal approval; return its ID immediately. It keeps the same timeout and tool capacity until it stops." } },
                 "required": ["command"]
             }
         }
@@ -4495,6 +4512,7 @@ mod tests {
                 timeout_ms: Some(15_000),
                 cancellation: None,
                 output_tx: None,
+                background_output: None,
             }),
         )
         .await;
@@ -4564,6 +4582,7 @@ mod tests {
             timeout_ms: None,
             cancellation: None,
             output_tx: Some(tx),
+            background_output: None,
         };
         let mut notifier = OutputNotifier::new(&options);
         for _ in 0..(MAX_OUTPUT_NOTIFICATIONS + 100) {
@@ -4589,6 +4608,7 @@ mod tests {
             timeout_ms: Some(5_000),
             cancellation: None,
             output_tx: None,
+            background_output: None,
         };
 
         let output = execute_tool_with_options(

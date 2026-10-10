@@ -96,6 +96,17 @@ execution, or copy payloads. Process headers use recorded timing, direct
 tool/search counts, running state, and issue counts; they do not double-count
 delegated child work or treat a failed child as a failed assistant turn.
 
+## Compact readability amendment (2026-10-09)
+
+Compact ordinary tool segments, including singleton calls, use a folded category
+summary instead of showing each item header by default. Read/list, edit/write,
+command, search and other-call counts retain first-seen category order; counts
+represent calls, not unique paths. Original tool disclosures stay independent
+inside the summary, and visible issue counts retain failed/denied evidence.
+Detailed singleton behavior and chronological progress remain unchanged. Larger
+Compact prose and quieter wrapping summaries preserve the existing theme and
+user-resizable reading band.
+
 ## Consequences
 
 - Detailed exposes one whole-process disclosure; Compact keeps chronological

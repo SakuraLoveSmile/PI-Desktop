@@ -12,18 +12,13 @@ import {
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   composerModelBinding,
-  composerModelMatchesQuery,
   composerModelsForProvider,
   sameComposerModelId,
 } from "../../../../lib/composer-models";
-import {
-  providerDisplayName,
-  providerSearchText,
-} from "../../../../lib/provider-display";
+import { providerDisplayName } from "../../../../lib/provider-display";
 import { providerThinkingLevels } from "../../../../lib/session-thinking";
 import { useAppStore } from "../../../../stores/app-store";
 import {
-  type ComposerMenuView,
   sessionThinkingMenuLevels,
   thinkingLevelForProvider,
   thinkingProviderForModel,
@@ -64,12 +59,9 @@ export function useComposerModelMenu({
   const loadProviderModels = useAppStore((s) => s.loadProviderModels);
   const showToast = useAppStore((s) => s.showToast);
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState<ComposerMenuView>("root");
-  const [query, setQuery] = useState("");
   const [modelHighlight, setModelHighlight] = useState(-1);
-  const rootMenuRef = useRef<HTMLDivElement>(null);
-  const modelSearchRef = useRef<HTMLInputElement>(null);
   const modelListRef = useRef<HTMLDivElement>(null);
+  const modelMenuFocusedRef = useRef(false);
   const thinkingConfigRef = useRef({
     mode,
     providerId: provider?.id,
@@ -133,39 +125,18 @@ export function useComposerModelMenu({
           return {
             provider: candidate,
             providerDisplayName: providerDisplayName(candidate),
-            providerSearchText: providerSearchText(candidate),
             models,
           };
         })
         .filter((group) => group.models.length > 0),
     [providers, providerModels, imageGenerationCandidates],
   );
-  const queryNeedle = query.trim().toLowerCase();
-  const filteredModelGroups = useMemo(
-    () =>
-      queryNeedle
-        ? modelGroups
-            .map((group) => ({
-              ...group,
-              models: group.models.filter((model) =>
-                composerModelMatchesQuery(
-                  model,
-                  group.providerSearchText,
-                  queryNeedle,
-                  composerModelBinding(group.provider, model.modelId)?.alias,
-                ),
-              ),
-            }))
-            .filter((group) => group.models.length > 0)
-        : modelGroups,
-    [modelGroups, queryNeedle],
-  );
   const flatModels = useMemo(
     () =>
-      filteredModelGroups.flatMap((group) =>
+      modelGroups.flatMap((group) =>
         group.models.map((model) => ({ provider: group.provider, model })),
       ),
-    [filteredModelGroups],
+    [modelGroups],
   );
   const flatModelsKey = useMemo(
     () => flatModels.map((entry) => `${entry.provider.id}:${entry.model.modelId}`).join("|"),
@@ -182,9 +153,9 @@ export function useComposerModelMenu({
   );
 
   useEffect(() => {
-    if (!open || view !== "model") return;
-    setModelHighlight(queryNeedle ? (flatModels.length ? 0 : -1) : activeFlatIndex);
-  }, [activeFlatIndex, flatModels.length, flatModelsKey, open, queryNeedle, view]);
+    if (!open) return;
+    setModelHighlight(activeFlatIndex);
+  }, [activeFlatIndex, flatModels.length, flatModelsKey, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -197,8 +168,6 @@ export function useComposerModelMenu({
 
   useEffect(() => {
     if (open) return;
-    setView("root");
-    setQuery("");
     setModelHighlight(-1);
   }, [open]);
   useEffect(() => {
@@ -212,30 +181,35 @@ export function useComposerModelMenu({
   }, [controlsBlocked]);
 
   useEffect(() => {
-    if (!open) return;
-    requestAnimationFrame(() => {
-      if (view === "root") rootMenuRef.current?.querySelector<HTMLButtonElement>(".composer-menu-entry")?.focus();
-      if (view === "model") modelSearchRef.current?.focus();
-      if (view === "model" && modelHighlight >= 0) {
-        modelListRef.current
-          ?.querySelector(`[data-model-index="${modelHighlight}"]`)
-          ?.scrollIntoView({ block: "nearest" });
-      }
-    });
-  }, [open, view]);
-
-  useEffect(() => {
-    if (!open || view !== "model" || modelHighlight < 0) return;
+    if (!open || modelHighlight < 0) return;
     modelListRef.current
       ?.querySelector(`[data-model-index="${modelHighlight}"]`)
       ?.scrollIntoView({ block: "nearest" });
-  }, [modelHighlight, open, view]);
+  }, [modelHighlight, open]);
 
-  const showView = (nextView: ComposerMenuView) => {
-    setView(nextView);
-    setModelHighlight(-1);
-    if (nextView !== "model") setQuery("");
-  };
+  useEffect(() => {
+    if (!open) {
+      modelMenuFocusedRef.current = false;
+      return;
+    }
+    if (!flatModels.length || modelMenuFocusedRef.current) return;
+    let frame = 0;
+    const focusInitialModel = () => {
+      const list = modelListRef.current;
+      const menu = list?.closest<HTMLElement>(".composer-model-thinking-menu");
+      if (!menu?.isConnected) return;
+      if (!menu.classList.contains("is-open")) {
+        frame = requestAnimationFrame(focusInitialModel);
+        return;
+      }
+      const current = list?.querySelector<HTMLButtonElement>('[aria-checked="true"]');
+      const target = current ?? list?.querySelector<HTMLButtonElement>(".composer-model-option");
+      target?.focus();
+      modelMenuFocusedRef.current = true;
+    };
+    frame = requestAnimationFrame(focusInitialModel);
+    return () => cancelAnimationFrame(frame);
+  }, [open, flatModels.length]);
 
   const selectModel = async (candidate: ProviderPublic, nextModelId: string) => {
     thinkingQueueRef.current?.invalidate();
@@ -281,9 +255,6 @@ export function useComposerModelMenu({
         modelId: nextModelId,
         thinkingLevel: nextThinkingLevel,
       });
-      setQuery("");
-      setView("root");
-      setModelHighlight(-1);
     } catch (error) {
       showToast(error instanceof Error ? error.message : String(error), {
         variant: "error",
@@ -304,52 +275,51 @@ export function useComposerModelMenu({
   };
 
   const onMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
+    if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) {
+      if (event.key === "Enter") event.preventDefault();
+      return;
+    }
     if (event.key === "Escape") {
       event.preventDefault();
       setOpen(false);
       return;
     }
-    if (event.key === "ArrowLeft" && view !== "root") {
-      event.preventDefault();
-      showView("root");
-      return;
-    }
-    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") {
-      if (event.key === "Enter" && view === "model" && event.target instanceof HTMLInputElement) {
-        const entry = flatModels[modelHighlight];
-        if (entry) {
-          event.preventDefault();
-          void selectModel(entry.provider, entry.model.modelId);
-        }
+    const focusedRow = event.target instanceof HTMLElement
+      ? event.target.closest<HTMLButtonElement>(".composer-model-option")
+      : null;
+    if (!focusedRow) return;
+    if (event.key === "Enter") {
+      const entry = flatModels[Number(focusedRow.dataset.modelIndex)];
+      if (entry) {
+        event.preventDefault();
+        void selectModel(entry.provider, entry.model.modelId);
       }
       return;
     }
-    if (view === "root") return;
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
     event.preventDefault();
     if (!flatModels.length) return;
     const delta = event.key === "ArrowDown" ? 1 : -1;
-    setModelHighlight((current) => {
-      const base = current < 0 ? (delta > 0 ? -1 : flatModels.length) : current;
-      return (base + delta + flatModels.length) % flatModels.length;
-    });
+    const current = Number(focusedRow.dataset.modelIndex);
+    const base = current < 0 ? (delta > 0 ? -1 : flatModels.length) : current;
+    const next = (base + delta + flatModels.length) % flatModels.length;
+    setModelHighlight(next);
+    if (focusedRow) {
+      modelListRef.current
+        ?.querySelector<HTMLButtonElement>(`[data-model-index="${next}"]`)
+        ?.focus();
+    }
   };
 
   return {
     open,
     setOpen,
-    view,
-    query,
-    setQuery,
     modelHighlight,
     setModelHighlight,
-    rootMenuRef,
-    modelSearchRef,
     modelListRef,
-    modelGroups: filteredModelGroups,
+    modelGroups,
     flatModels,
     thinkingMenuLevels,
-    showView,
     selectModel,
     commitThinkingLevel,
     onMenuKeyDown,

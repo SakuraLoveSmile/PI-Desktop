@@ -1,6 +1,6 @@
 import type {
-  ModelInfo,
   Mode,
+  ModelInfo,
   PermissionMode,
   ProviderPublic,
   SessionThinkingLevel,
@@ -66,8 +66,6 @@ export type ComposerFileReference = {
   token?: string;
   plugin?: ComposerPluginPart;
 };
-
-export type ComposerMenuView = "root" | "model";
 
 export type PromptEnhancementError = {
   message: string;

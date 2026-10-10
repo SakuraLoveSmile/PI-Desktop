@@ -1,20 +1,13 @@
+import { ActivityOverviewTab } from "../../features/chat/activity/ActivityOverviewTab";
+import { activityPlans, activitySubagents } from "../../features/chat/activity/session-activity-model";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { PlanProposal } from "@pi-desktop/shared";
 import { useAppStore } from "../../stores/app-store";
 import { IconChevronDown, IconBot, IconFileText, IconInfo, IconWorkflow } from "../icons";
 import { AgentPanorama, type PanoramaNode, type PanoramaNodeStatus } from "./AgentPanorama";
-import { fileWorkPanelTab, teamWorkPanelTab } from "../../lib/work-panel-tabs";
+import { fileWorkPanelTab, teamWorkPanelTab, overviewWorkPanelTab } from "../../lib/work-panel-tabs";
 import { resolvePlanArtifactPath } from "../../lib/plan-artifact";
-import { isDelegationStartTool } from "../../lib/tool-display";
-import { delegationIdForMessage } from "../../lib/subagent-panel";
-import {
-  collectDelegationStatuses,
-  subagentOutcome,
-  type SubagentOutcome,
-} from "../../lib/subagent-topology";
-import { delegateAgentName } from "../../features/chat/transcript/model";
-import { delegateTaskDescription } from "../../lib/subagent-transcript";
 import { useTeamSnapshot } from "../../hooks/useTeamSnapshot";
 import { usePendingTeamExecutionReview } from "../../hooks/useTeamExecutionReview";
 import { useOverviewMetadata } from "../../hooks/useOverviewMetadata";
@@ -46,6 +39,12 @@ function proposalStatus(proposal: PlanProposal): string {
 
 
 export function OverviewTab() {
+  const sessionId = useAppStore((state) => state.activeSessionId);
+  const activity = useAppStore((state) => state.workPanelTabs.find((tab) => tab.id === state.activeWorkPanelTabId)?.resource === "activity");
+  return activity && sessionId ? <ActivityOverviewTab key={sessionId} sessionId={sessionId} /> : <OverviewContent />;
+}
+
+function OverviewContent() {
   const { t } = useTranslation();
   const activeSessionId = useAppStore((state) => state.activeSessionId);
   const pendingTeamReview = usePendingTeamExecutionReview(activeSessionId);
@@ -76,17 +75,8 @@ export function OverviewTab() {
   const session = sessions.find((candidate) => candidate.id === activeSessionId);
   const proposals = useMemo(() => {
     if (!activeSessionId) return [];
-    const candidates = [
-      pendingPlans[activeSessionId],
-      planCheckpoints[activeSessionId],
-      ...(planHistory[activeSessionId] ?? []),
-    ];
-    const seen = new Set<string>();
-    return candidates.filter((proposal): proposal is PlanProposal => {
-      if (!proposal || seen.has(proposal.id)) return false;
-      seen.add(proposal.id);
-      return true;
-    });
+    return activityPlans(activeSessionId, pendingPlans[activeSessionId],
+      planCheckpoints[activeSessionId], planHistory[activeSessionId]);
   }, [activeSessionId, pendingPlans, planCheckpoints, planHistory]);
 
   const artifactItems = useMemo<OverviewItem[]>(() => {
@@ -142,41 +132,9 @@ export function OverviewTab() {
     }
   };
 
-  const subagents = useMemo(() => {
-    if (!messages || messages.length === 0) return [];
-    const seen = new Set<string>();
-    const list: {
-      delegationId: string;
-      agentName: string;
-      task: string;
-      status: SubagentOutcome;
-    }[] = [];
-
-    const statuses = collectDelegationStatuses(
-      messages
-        .filter((m) => m.role === "tool")
-        .map((m) => ({ kind: "tool" as const, message: m })),
-      { turnLive: running },
-    );
-
-    for (const m of messages) {
-      if (m.role === "tool" && isDelegationStartTool(m.toolName)) {
-        const delegationId = delegationIdForMessage(m);
-        if (seen.has(delegationId)) continue;
-        seen.add(delegationId);
-        const agent = delegateAgentName(m);
-        const task = delegateTaskDescription(m);
-        const status = subagentOutcome(m, statuses);
-        list.push({
-          delegationId,
-          agentName: agent || t("chat.subagentUnnamed"),
-          task,
-          status,
-        });
-      }
-    }
-    return list;
-  }, [messages, running, t]);
+  const subagents = useMemo(() => activitySubagents(messages, running)
+    .map((item) => ({ ...item, agentName: item.agentName || t("chat.subagentUnnamed") })),
+  [messages, running, t]);
 
   if (viewMode === "panorama" && session && !isTeam) {
     const rootNode: PanoramaNode = {
@@ -282,6 +240,9 @@ export function OverviewTab() {
       </header>
 
       <div className="work-panel-overview-scroll">
+        <Button variant="ghost" size="sm" onClick={() => openWorkPanelTabForSession(session.id, overviewWorkPanelTab("activity"))}>
+          {t("panel.activity.title")}
+        </Button>
         <SessionTodoChecklist key={session.id} sessionId={session.id} />
         {isTeam && teamSessionId && (
           <section className="work-panel-overview-section work-panel-overview-team-progress" data-testid="overview-team-progress">

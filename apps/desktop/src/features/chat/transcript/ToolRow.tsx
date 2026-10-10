@@ -30,6 +30,7 @@ import {
   buildToolPresentation,
   hasToolDetails,
   runOutcome,
+  isBackgroundProcessStart,
   toolResultChips,
   toolResultPayload,
 } from "../../../lib/tool-presentation";
@@ -192,6 +193,7 @@ function HostToolRow({
   // exit code the shell reported outranks a tool call that came back fine
   // (D227). Property reads only, so a streaming row can afford it every tick.
   const run = action === "run" ? runOutcome(message) : null;
+  const backgroundStart = isBackgroundProcessStart(message);
   const failed = status === "error" || run === "failed";
   // Detailed mode opens the last tool of the last activity group. Compact keeps
   // payloads collapsed so a live burst only updates the header. Failure and
@@ -212,7 +214,7 @@ function HostToolRow({
     onUserInteraction?.();
     collapseDisclosure();
   }, [collapseDisclosure, onUserInteraction]);
-  const actionLabel = t(
+  const actionLabel = backgroundStart ? t("chat.toolBackgroundStarted") : t(
     (compact ? getCompactTeamToolLabelKey(message.toolName) : undefined) ??
       (status === "running" ? TOOL_RUNNING_KEYS[action] : TOOL_ACTION_KEYS[action]),
   );
@@ -287,7 +289,7 @@ function HostToolRow({
     variant === "topology" &&
     outcome === "running" &&
     delegationIsCreating(message);
-  const runLabel =
+  const runLabel = backgroundStart ? "" :
     run === "running"
       ? t("chat.running")
       : run === "failed"

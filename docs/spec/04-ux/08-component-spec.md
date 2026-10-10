@@ -859,8 +859,16 @@ group/item; errors, denied actions and pending decisions remain reachable.
 
 Within the process, an ordinary activity group represents one contiguous
 tool/search/thinking segment between progress paragraphs. It renders a group header
-only when the current mode has two or more visible items. A singleton uses its item
-disclosure directly, compact-hidden thinking never creates an empty wrapper, and
+in Detailed only when it has two or more visible items. Compact also gives a
+single tool a collapsed group header, summarizing reads (including listings),
+edits (including writes), commands, searches and other tool calls in first-seen
+category order. Counts describe calls, not distinct files. Hosted search rounds
+count as searches. Expanding a summary reveals the original item disclosures,
+with payloads still independently folded. Compact prose uses the 16px scaled
+type token, 1.6 line height and 12px inter-part spacing; summary text uses the
+13px scaled token and wraps inside narrow bands. Existing band-width controls
+remain authoritative. A Detailed singleton uses its item disclosure directly,
+compact-hidden thinking never creates an empty wrapper, and
 the existing Task topology remains the container for delegated work.
 
 Detailed opens whole-process disclosures while a turn is active. When a turn
@@ -1886,20 +1894,23 @@ Single message render — either user (plaintext) or assistant (markdown streami
   contentful fragment so existing durable transcript semantics remain intact
   (D157).
 - Assistant meta: optional model badge under the answer. The compact
-  Codex-style context inspector lives in the composer right toolbar,
-  immediately left of the model × reasoning chip, and always mirrors the
+  context inspector lives at the right edge of the footer below the input,
+  and always mirrors the
   newest assistant turn that reported usage (D347). Occupancy, remaining
   capacity, used/window counts, turn total, and provider
   input/output/cache/reasoning/hit-rate are that turn's newest usage-bearing
   assistant message (the last model request), using
   `input + output + reasoning + cacheRead + cacheWrite` (D355). They are not
-  the sum of every model call in the visual tool-loop. It is hidden until that
-  usage exists. The trigger keeps a small capacity ring beside the
-  percentage and omits the redundant `Context` label; the leading figure
-  (ring arc, percentage, token label, popover heading, tooltip, and
+  the sum of every model call in the visual tool-loop. Before usage exists,
+  the footer shows a disabled neutral track and `—`, with a localized unavailable
+  accessible name; it never fabricates 0% or 100%. The trigger shows a small
+  horizontal progress track beside the percentage, omitting the redundant
+  `Context` label; the leading figure (track fill, percentage, token label,
+  popover heading, tooltip, and
   `aria-label`) follows `settings.contextUsageDisplay` — `"remaining"`
-  (default) or `"used"` — so the ring fills by `remainingRatio` or
-  `usedRatio` accordingly. Low capacity changes the semantic color based
+  (default) or `"used"` — so the footer track fills by `remainingRatio` or
+  `usedRatio` accordingly. Other consumers of the existing ring variant retain
+  their previous rendering. Low capacity changes the semantic color based
   on remaining capacity (remaining ≤ 25 % warning, ≤ 10 % critical)
   regardless of display mode, without making color the only signal.
   Clicking the trigger (or activating it from the keyboard) toggles a
@@ -1916,6 +1927,15 @@ Single message render — either user (plaintext) or assistant (markdown streami
   spacing; the popover keeps its floating-layer edge and draws no inner
   section rules (D297). Generation speed is a completed-turn value in tokens
   per second and is not updated while a response is streaming. The
+  footer popover also shows a used-capacity progress bar and Compact context
+  action. It does not invent System prompt or Skill percentages: the accounting
+  contract only supplies actual provider and aggregate tool statistics. Compact
+  context delegates to the existing store workflow and is enabled only for the
+  same idle editable Desktop session that opened the panel, with collected usage
+  and no pending permission, question or plan approval. Native, remote, read-only
+  and Team-member sessions cannot use it. The click synchronously rechecks all
+  gates, closes the panel after starting, and a session switch dismisses stale
+  footer details. The
   context-window total uses the same effective model window as the agent
   sidecar: a published models.dev `limit.context` replaces a legacy 128k
   generic binding seed, while a non-default per-model Advanced value remains
@@ -2482,10 +2502,9 @@ as a conversation:
   compares them by row identity and length rather than by object identity —
   otherwise a streaming delegate would freeze at its first row.
 - Every `Task` call in an activity group becomes one full-width delegation card
-  rather than a compact tool row, a lone delegation included (D265). Its header
-  presents aggregate state, the number of subagents, the settled/total count and
-  elapsed time; it keeps the standard disclosure caret. The aggregate state is
-  count-aware, so a single delegation is not announced in the plural.
+  rather than a compact tool row, a lone delegation included (D265). The
+  default presentation uses transparent avatar rows showing name, task, state
+  and measured elapsed time. Clicking a row opens its read-only details; no panorama entry is shown.
 - **The card contains only those `Task` calls** (D319). Consecutive `Task`
   starts stay in one topology group so a fan-out still reads as one card.
   Parent thinking, workspace tools (`Read`/`Grep`/`Bash`/…), and lifecycle rows
@@ -2499,10 +2518,9 @@ as a conversation:
   compares them by row identity and length rather than by object identity —
   otherwise a streaming delegate would freeze at its first row.
 - Every `Task` call in an activity group becomes one full-width delegation card
-  rather than a compact tool row, a lone delegation included (D265). Its header
-  presents aggregate state, the number of subagents, the settled/total count and
-  elapsed time; it keeps the standard disclosure caret. The aggregate state is
-  count-aware, so a single delegation is not announced in the plural.
+  rather than a compact tool row, a lone delegation included (D265). The
+  default presentation uses transparent avatar rows showing name, task, state
+  and measured elapsed time. Clicking a row opens its read-only details; no panorama entry is shown.
 - **The card contains only those `Task` calls** (D319). Consecutive `Task`
   starts stay in one topology group so a fan-out still reads as one card.
   Parent thinking, workspace tools (`Read`/`Grep`/`Bash`/…), and lifecycle rows
@@ -3125,25 +3143,27 @@ reasoning-level control.
 
 ```text
 +----------------------------------------------------------+
-| [Agent/Plan/Goal] [permission mode]     | [ring %] [model · reasoning ▾] |
-| queued messages (optional; one row per item) | [⏹ Stop / → Send] (one submit slot) |
-| textarea (auto-growing, 1 line → max 7)                         |
-| placeholder: welcome → command/file hint → keyboard hint        |
-| (advances only on page/session changes; native value stays accessible) |
+| queued prompts, attachments and approval controls (when present) |
+| input (four empty lines, grows through seven visible lines)       |
+| placeholder: welcome → command/file hint → keyboard hint          |
+| [+] [Agent/Expert Team ▾] [model · reasoning ▾] [Plan/Goal]         |
+|                                  [plugin] [enhance] [Live] [↑/⏹] |
+| context usage footer (when available)                            |
 +----------------------------------------------------------+
 ```
 
 ### 11.3 Layout
 
-- Height: compact one-line shell by default; textarea auto-grows through seven
-  visible lines, then the textarea scrolls internally
+- Height: four input lines before draft growth, through seven visible lines,
+  then the editor scrolls internally
 - Workspace context: no project, Local, or branch rail is rendered or
   reserved above the shell in either home or thread-docked mode (D095)
 - Background: one solid semantic composer surface; no internal gradient,
   background image, or decorative wash
-- Elevation: 20px radius with the restrained soft shadow alone; the hairline
-  stroke was removed in D297;
-  the docked transcript fade is outside the composer shell
+- Elevation: `radius-lg` (16px), a restrained soft shadow and a neutral 1px
+  `--ds-border-subtle` outline in both themes. This approved Composer treatment
+  supersedes D297's stroke-free shell for this surface only; the docked
+  transcript fade stays outside the shell
 - The solid/near-opaque surface uses no `backdrop-filter`; focus-within adds a
   1px lift and token shadow without forcing transcript repaint through a blur
   layer.
@@ -3151,11 +3171,11 @@ reasoning-level control.
 - Padding: px-4 py-3 inner textarea
 - Font: text-sm for Agent, Plan, and Goal; mode changes semantics and tool
   controls, not the typography
-- The Agent/Plan/Goal mode chip reserves one fixed 88px width, sized from the
-  longest built-in label in English and zh-CN ("Agent" / "智能体"). Its label
-  stays single-line and ellipsizes if a future locale exceeds that budget, so
-  switching modes never reflows the adjacent Composer controls. Cycling the
-  chip cross-fades the icon and label in place. While the live turn is
+- Plan/Goal uses the existing compact contract indicator; the Agent operating
+  mode omits that extra indicator. The execution-profile chip carries the
+  Agent/Expert Team choice separately. Its labels remain single-line and
+  ellipsize within their established responsive budgets. Cycling the profile
+  cross-fades its icon and label in place. While the live turn is
   `planning`, the chip pulses on its icon (purple) instead of leaving a
   second status row parked above the composer; a staged mode choice still
   updates the chip immediately and does not start that pulse until the
@@ -3163,18 +3183,16 @@ reasoning-level control.
 - The adjacent execution-profile chip compactly fits its localized Agent and
   Expert Team labels (up to 130px, or 104px below a 480px composer) to
   maintain a dense toolbar with 4-8px internal gaps.
-- The permission chip remains visible in Agent, Plan, and Goal for a stable
-  toolbar rhythm. Agent and Plan expose the effective selectable permission;
-  Goal displays the localized Auto label as a disabled, non-opening chip while
-  the approval card remains the separate place for choosing execution policy.
-  The permission menu stays 120px wide; its Chinese Composer short label for
-  Accept edits is `允许编辑` / `允許編輯` so the option remains single-line
-  beside its selection indicator.
-- The right toolbar owns the remaining-capacity context inspector (when the
-  newest assistant turn has usage) immediately left of one combined model ×
-  reasoning-level chip, then the standalone prompt-enhancement action and the
-  single Stop/Send submit slot (D347). The inspector trigger shows the ring
-  and percentage only. The chip shows Bot, the current model name, and the
+- Permission and operating-mode controls retain their existing Add-menu and
+  approval-card entry points. Repositioning the toolbar does not change
+  permission defaults, mode gates or the separate execution-policy approval.
+- The left toolbar owns Add, execution profile and the combined model ×
+  reasoning-level chip, with 8px between controls. Plan/Goal remains a compact
+  indicator when active. The right toolbar retains plugin controls, prompt
+  enhancement, Live voice and the single Stop/Send slot. Send uses an upward
+  arrow in a neutral 32px rounded-square button; a running empty draft retains
+  Stop. Context usage stays in the existing footer. The chip shows Bot, the
+  current model name, and the
   current canonical reasoning level value separated by `·`; `off` omits the
   level text. The canonical value is rendered as-is (`low`, `high`, `xhigh`,
   or `max`) and is not localized. The
@@ -3193,17 +3211,29 @@ reasoning-level control.
   loading state becomes icon-only, preserving the action hit targets without
   clipping or overlapping toolbar content. Home and thread-docked composers
   use the same responsive rules.
-- The combined chip opens one anchored menu above itself. The menu starts with
-  only Model and Reasoning level entries, each showing its current value and a
-  chevron. Selecting an entry replaces the menu contents in place with a back
-  row and its submenu; selecting a model or level returns to the two-entry root
-  without closing the popover. The menu is `min(300px, 100vw - 24px)`, uses the
-  large radius/dialog shadow tokens, and enters with a short upward fade.
-- The Model submenu establishes a clear provider → model hierarchy: sticky
-  provider headings use the stronger `--text-md` section treatment, while
-  indented model options use normal-weight `--text-sm` text. In zh-CN, provider
-  headings remove uppercase transformation and wide tracking so localized labels
-  remain readable.
+- The combined chip opens the complete model list directly above itself, without search,
+  provider-labelled rows, the current model's reasoning slider and a Model
+  configurations action. There is no Default/Custom tab or intermediate root
+  menu. Each row uses a 32px neutral icon, one model name, and a second line
+  of actual provider, context-window and capability metadata. No synthetic
+  preset routing, pricing or unsupported capabilities are inferred. The popup
+  is `min(348px, 100vw - 24px)` and uses existing anchored-menu focus, Escape,
+  viewport-clamping and keyboard selection behavior. Model configurations
+  opens the existing Settings model page in the chat Composer; it creates no
+  second preference store or model configuration path. The shared picker makes
+  this navigation caller opt-in, so the scheduled-task editor retains its
+  unsaved draft and does not expose a cross-page management action.
+- Compact delegation activity renders the existing `SubagentTopology` task
+  card directly at the first delegation's position. Ordinary tools before and
+  after the card retain chronological order and collapsed category summaries.
+  Clicking a task or the activity-rail agent opens `SubagentTranscriptTab`:
+  task, thinking, tools and replies reuse the existing read-only rendering.
+  The card's panorama entry remains available. Detailed mode is unchanged.
+- Execution-profile options have a 6px vertical gap. Agent and Expert Team
+  still change only the existing `standard`/`team` profile, retaining their
+  descriptions, Team parallel-call notice and switching gates. The menu does
+  not offer a synthetic agent or team roster. Ordinary delegate definitions
+  remain managed in the existing subagent settings page.
 - Width: Home and thread-docked composers share one `24px` horizontal gutter
   and a `768px` maximum content envelope. The left-edge conversation minimap
   is absolutely positioned outside that envelope, so its appearance or
@@ -3219,8 +3249,8 @@ reasoning-level control.
   of remaining visible beneath the floating shell or through its rounded outer
   corners, and the conversation pane's own surface stays visible behind the
   dock (issue #728, D624).
-- Empty draft height: `.composer-input` uses `min-height: 3lh`, so an idle
-  composer shows three lines of input before it grows with the draft.
+- Empty draft height: `.composer-input` uses `min-height: 4lh`, with 16px
+  input inset and an unseparated bottom toolbar, in both Composer variants.
 - Scroll stability: The thread scrollport reserves one stable trailing gutter,
   so the transcript does not shift when overflow appears while the minimap
   does not create a matching blank strip on the left.
@@ -3440,19 +3470,18 @@ transcript and Overview history.
   bindings. Cached or freshly discovered rows may enrich those configured
   models, but unconfigured discovery results never appear in the conversation
   list; configured IDs remain visible when discovery is unavailable.
-- Opening the combined menu starts model hydration before the Model submenu is
-  entered. The first visible rows use cached metadata or configured bindings;
+- Opening the combined menu starts model hydration and shows the list directly.
+  The first visible rows use cached metadata or configured bindings;
   live discovery updates them in the background without replacing a configured
   alias with the wire ID or a second visible name.
 - The combined model × reasoning menu opens at `bottom: calc(100% + 8px)` with
   `role="menu"`. In dark mode, `.composer-model-thinking-menu` uses an anti-bleed
-  surface with 96% opacity (`color-mix(in oklab, var(--ds-bg-elevated-opaque) 96%, transparent)`)
-  and `backdrop-filter: blur(40px)`, falling back to solid `--ds-bg-elevated-opaque`
-  where `backdrop-filter` is unsupported; light mode maintains a solid background so
-  underlying transcript text is completely obscured while menu text and slider labels
-  remain sharp and legible. Its root has exactly two `role="menuitem"` entries and, when
-  the menu lists more than one level, a drag slider with one labeled stop per
-  level directly beneath the Reasoning level entry (D458). The slider shows a
+  solid `--ds-bg-elevated-opaque` surface in both themes, so underlying draft
+  and transcript text are completely obscured. Model rows have at least 6px
+  spacing; menu text and slider labels
+  remain sharp and legible. The list uses `menuitemradio` rows and, when
+  the selected model supports more than one level, a drag slider with one labeled
+  stop per level immediately below the model list (D458). The slider shows a
   rail with one track dot per stop and a label under each stop; every label
   stays visible and ellipsizes inside its column. The dots row and the labels
   row are full-width n-column grids and the range input overlays the rail at
@@ -3477,20 +3506,18 @@ transcript and Overview history.
   level, and stale completions cannot overwrite a newer choice. Reopening
   starts directly at the current level. Reduced motion disables travel.
   This replaces the earlier timer-driven settle pulse.
-  The Model submenu has a search input and sticky provider headings, while
-  the Reasoning level submenu starts with `Current model <model> supports
-  these reasoning levels` and lists `omit` then the selected model binding's
-  enabled levels as the classic radio rows. `omit` persists as the session
-  thinking level and sends no provider thinking override (ADR 0295).
+  Search and provider-labelled rows remain in the same popup as the reasoning
+  slider. `omit` remains a supported session thinking level and sends no
+  provider thinking override (ADR 0295).
   Model-row reasoning badges use published reasoning metadata; vision badges
   use the effective image-input capability for the row's provider binding
   (`supportsImages` when explicitly set, published image input otherwise).
   Rows use `role="menuitemradio"`, `aria-checked`, active-row styling, and a
   trailing check. Selecting a concrete model, or a level from the radio list,
-  persists the complete session config, clears model filtering, and returns
-  to the root without dismissing the menu; slider and tick commits persist
-  the last pending level while the menu stays where it is. Closing and
-  reopening always starts at the root.
+  persists the complete session config and clears model filtering; the direct
+  list remains available for reasoning adjustment. Slider and tick commits
+  persist the last pending level without closing the popup. Closing and
+  reopening always shows the list with the current selection.
 - The model/reasoning trigger shrinks within its toolbar slot. Switching
   reasoning labels, including `off`, must not move the menu horizontally when
   the toolbar bounds are unchanged. Long model names truncate within the
@@ -4776,12 +4803,48 @@ resolution keeps the interactive card and draft.
 
 ### 13.3 Transcript display mode
 
-The transcript toolbar exposes the persisted `thinkingDisplayMode` setting as
-Detailed/Compact. Compact places the answer first and collapses completed
-thinking/process/tool rows to expandable summaries. Errors, approvals, AskTool
-summaries, Plan/Goal cards, search targets, copy, and expansion to full detail
-remain available. The control changes presentation only and retains detailed as
-the compatibility default when the setting is absent.
+Settings / General / Defaults exposes the persisted `thinkingDisplayMode`
+as Detailed/Compact. There is no conversation toolbar mirror. Compact preserves
+chronological progress and uses folded category summaries, including singleton
+tools; Detailed retains its whole-process disclosure. Both keep errors,
+approvals, AskTool summaries, Plan/Goal cards, search, copy and full detail
+available. Missing preferences retain Detailed.
+
+### 13.4 Session activity rail
+
+The accepted right rail groups Plan, Subagents, Background processes, Outputs,
+Sources without a framed card. Group headers are muted and
+independently expandable; agents show a stable round avatar and an accessible
+status glyph, command rows show a small terminal tile, and long labels have a
+full tooltip. Outputs/Sources start folded, other activity groups start open,
+and the suggestion list opens explicitly. Group choices belong to the retained pane.
+
+The rail reserves 264px when the actual chat surface is at least 820px wide and
+the work panel is closed. It never overlays the transcript or composer. Narrow
+surfaces expose an activity entry in the existing work panel; normal Overview
+also links to it. There is no extra width reservation when that panel is open.
+The titlebar reading inset remains after the display switch is removed.
+
+Plans and recorded delegations use the same projection as Overview; successful
+Write/Edit records and attachments form Outputs, and recorded skills/MCP and
+captured HTTP(S) links form Sources. Missing loaded history is marked as a
+range limitation, not proof that a session has no work. Navigation captures the
+owning session. Team data loading/errors remain observable.
+
+Background rows come from the Host registry, not historical Bash success or
+shell `&`. Clicking opens command, working directory, bounded stdout/stderr,
+status, errors and stop/refresh actions. Stop is available only for actual active
+jobs. Host restart/focus refreshes open details and cannot let an old stop
+response overwrite interrupted state. Starting a job is an approved Bash call
+with `run_in_background: true`; there is no bypassing manual launch path.
+
+Quick Notes is not exposed in the activity rail or narrow work-panel fallback.
+Its editor and renderer draft lifecycle have been removed; retained Host data
+and storage contracts preserve previously saved notes without loading or saving
+them from the current interface. Self-evolution headers use the same flat text
+and disclosure arrow as the other groups, including hover/focus. The suggestion count is a compact rectangular action
+opening an anchored suggestion dialog.
+See [the session activity ADR](../../adr/session-activity-rail-and-managed-background-processes.md).
 
 ### Mandatory Expert Team behavior
 
@@ -4859,3 +4922,23 @@ Pixel portraits, state footers, dotted background and zoom/fit/reset controls
 follow the supplied visual reference. Ordinary subagent panorama retains its
 existing layout. Live state, stale/error feedback, navigation and per-scope
 viewport restoration remain intact.
+
+### Composer metadata and compact agent rows
+
+The composer footer shows the current session's project, local/remote host, and known local Git branch. Unavailable project/branch metadata is omitted; remote sessions never borrow a local branch. Model menus list all models without a search field. Generation speed, full-turn token totals, cache metrics and context details are available from the bottom-right context meter. Subagent entries use transparent gradient-avatar rows with name, task, localized status and measured elapsed time; clicking a row opens read-only details, with no panorama entry. Validate model keyboard selection, footer metadata, context details and agent navigation in the isolated composer/transcript fixtures, including narrow layouts.
+
+### Recorded outputs, delegate details and project Skill suggestions
+
+Output rows display file basenames with a file-type icon plate and a full-path tooltip. They retain existing file navigation, omit status badges and use the current neutral theme. Delegate details show the recorded agent identity/state, bounded expandable task prompts, and collapsed contiguous thinking/tool groups with real counts. Follow-up turns, Markdown, search and scroll remain available; delegate errors/reviews have no Continue, dismiss or rollback mutation controls.
+
+Self-evolution suggestions are generated only through an explicit action in an idle, local, writable project conversation. The normal session send workflow requests evidence-based reusable lessons as a bounded `skill-suggestions` JSON fence. Only settled top-level assistant responses are accepted; malformed, oversized, nested and untrusted-role blocks do not become suggestions. Suggestions remain transcript-backed across reloads. Each draft opens the existing Skill editor for review before using `skills.create` at the captured owning project path; it is disabled by default, may be enabled by the reviewer, and never overwrites an existing skill. No project, partial loaded history, running/queued execution, approvals, imported/remote/read-only conversations and Team members disable generation/creation. Session/project changes close the editor and prevent stale saves. Generation uses the configured model when the user explicitly requests it; no background generation occurs.
+
+Acceptance covers file names/navigation, delegate prompt/group disclosure and absence of mutation actions, generation through the real send workflow, review edits, duplicate-save locking, failed-save draft preservation, late generation/save during session switches, parser validation and isolated Host project-Skill creation/list/read/no-overwrite. The reference pinned card is a progress-summary example; it does not imply automatic memory generation. Quick Notes is not exposed in the current UI; previously stored data is retained.
+
+### Skills and MCP sidebar with suggestion dialog
+
+The sidebar uses a flat Skills & MCP heading and a title-only icon list of recorded Skill/MCP references plus pending suggestions. References are removed from the separate Sources list; web sources remain there. Same-kind/name references are deduplicated, and a pending same-name Skill uses one row. The pending count is a compact rectangular action opening an opaque, viewport-bounded anchored dialog headed Self-evolution suggestions. Rows show a name and a two-line description; hover, keyboard focus and touch reveal Create/Ignore actions. Create opens the existing project Skill review editor before saving. Ignore hides only that recorded suggestion in the sidebar/count/dialog.
+
+Ignore preferences are renderer-owned UI preferences under an independent version-1 key, identified by owning session, source message, name and content fingerprint. They survive remount/reload, do not alter task messages or Skill files, and keep only the latest 200 identities. A regenerated source or revised content is independent. Invalid/unavailable storage is visible and failed writes do not remove a row. Escape/outside pointer closes the dialog; Escape returns focus to its count; changing sessions closes it without opening another owner's editor.
+
+Validate count-to-dialog, keyboard/hover actions, project review/save, Ignore/count/list updates, remount persistence, session/content isolation, recorded references and viewport bounds. Preview examples are synthetic.
