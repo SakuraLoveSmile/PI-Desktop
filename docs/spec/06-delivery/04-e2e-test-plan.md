@@ -17845,6 +17845,24 @@ prove account/region eligibility or call a real model.
   runner, a wide chat surface and a narrow surface/work-panel layout.
 - **Steps:** Use Settings to select Compact and confirm the conversation has no
   duplicate switch. Review plan/agent/source records and expand activity groups.
+  Confirm live-status/artifact sections, separate Team members and role labels,
+  state glyphs in Overview while transcript avatars remain. Click attention for a
+  failed agent beyond the five-row preview and for the seventh terminal timeout
+  behind two collapsed process groups; verify expansion, focus and later manual
+  collapse. Test pending-approval attention without resolving it. Inspect recorded
+  source-domain reference counts, merged output counts/timestamps and known Host
+  diff metrics; unknown/legacy snippets must omit totals. Open, locate and copy an
+  output; use per-group Load earlier through the actual bounded history service
+  and return to latest. Inspect recommendation rationale, inline Ignore and its
+  remount persistence, plus five-row Show all/Show less for references.
+  Verify two-line agent identity/task/timing and unprefixed status badges. Check
+  readable script titles and full-command tooltips, per-group counts/status,
+  and timeout warning distinct from failure. Collapse a group, switch sessions
+  and return; retain its choice, then introduce a new failure and verify expansion.
+  Expand Ended N and Clear; only terminal view records disappear, with no stop
+  request or log deletion. Open a Goal artifact and its report separately; verify
+  the same Host count in Overview and the capsule, session/execution ownership,
+  fallback visibility after capsule completion, and unavailable/missing states.
   Confirm Quick Notes is absent in the wide rail and narrow work panel, with
   no note reads/writes. Confirm flat suggestion headers/counts. Start an approved background
   Bash job, inspect live streams, stop it and attempt a foreign-session stop.
@@ -17870,7 +17888,9 @@ prove account/region eligibility or call a real model.
 - **Acceptance:** C / E / Quality / Security.
 - **Milestone:** M6+.
 - **Automation:** `test:e2e:transcript` (real React/Chromium shell and interaction
-  fixtures), `test:e2e:session-activity` (real isolated production Host), focused
+  fixtures), `node scripts/e2e-goal-team-renderer-ui.mjs` (shared Goal reader,
+  report/artifact navigation and native layout), `test:e2e:session-activity`
+  (real isolated production Host), focused
   note/process/permission/migration and Runtime contract tests.
 - **Status:** Local candidate verification; Windows process-tree acceptance
   remains separate. No user profile or real model provider is a test fixture.

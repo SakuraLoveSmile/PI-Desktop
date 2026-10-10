@@ -18,7 +18,7 @@ function deferred<T>() {
 /** Real rail and details; only the IPC host boundary is replaced. No real process starts. */
 export async function sessionActivityRailProbe() {
   const i18n = createInstance();
-  await i18n.init({ lng: "en", resources: { en: { translation: en } } });
+  await i18n.init({ lng: "en", interpolation: { escapeValue: false }, resources: { en: { translation: en } } });
   const host = document.createElement("div");
   host.style.cssText = "position:fixed;top:40px;right:40px;width:248px;max-height:90vh;overflow:auto;background:var(--color-bg-primary);z-index:1000;";
   document.body.append(host);
@@ -43,6 +43,10 @@ export async function sessionActivityRailProbe() {
   const click = (element: Element | null) => { if (!(element instanceof HTMLElement)) throw new Error("Missing fixture control"); flushSync(() => element.click()); };
   // A frame flushes React's async result paint; it does not gate on a guessed duration.
   const paint = async () => { await Promise.resolve(); await new Promise<void>((resolve) => requestAnimationFrame(() => resolve())); };
+  const until = async (predicate: () => boolean, label: string) => {
+    const deadline = performance.now() + 5000;
+    while (!predicate()) { if (performance.now() > deadline) throw new Error(label); await paint(); }
+  };
   const process: BackgroundProcessSummary = { id: "p1", sessionId: "s1", toolCallId: "call", command: "node scripts/long-background-command.js --flag=value", cwd: "/isolated/project", status: "starting", startedAt: "2026-10-09T00:00:00Z" };
   const detail = (record = process): BackgroundProcessDetail => ({ process: record, stdout: "bounded stdout", stderr: "bounded stderr", stdoutTruncated: true, stderrTruncated: false });
   const renderDetails = (sessionId: string, id: string, visible = true) => flushSync(() => root.render(
@@ -52,7 +56,7 @@ export async function sessionActivityRailProbe() {
     const opened: string[] = [];
     const railProps: SessionActivityRailProps = {
       sessionId: "s1", visible: true, plans: [{ id: "plan", label: "Repair plan", onOpen: () => opened.push("plan") }],
-      agents: [{ id: "agent", label: "architect", detail: "Review state ownership", status: "running", statusLabel: "Running", onOpen: () => opened.push("agent") }],
+      agents: [{ id: "agent", label: "architect", detail: "Review state ownership", status: "running", statusLabel: "Running", timing: { startedAt: Date.now() - 20_000 }, onOpen: () => opened.push("agent") }],
       outputs: [{ id: "output", label: "result.ts", onOpen: () => opened.push("output") }],
       sources: [{ id: "source", label: "Readonly evidence" }], processes: [process, { ...process, id: "other", sessionId: "s2" }],
       processesLoading: false, onRefreshProcesses: () => opened.push("refresh"), onOpenProcess: (id) => opened.push(id),
@@ -62,6 +66,10 @@ export async function sessionActivityRailProbe() {
     const groups = [...host.querySelectorAll<HTMLButtonElement>(".session-activity-disclosure")];
     check(groups.map((item) => item.getAttribute("aria-expanded")).join() === "true,true,true,false,false", "plan, agents, processes open; outputs and sources folded");
     check(host.querySelectorAll("[data-process-id]").length === 1, "rail shows only the explicit session's processes");
+    check(Boolean(host.querySelector(".subagent-activity-overview-main")) && Boolean(host.querySelector(".subagent-activity-overview-detail")), "Overview separates agent identity/status from task/timing");
+    check(host.querySelector(".subagent-activity-status")?.textContent?.trim() === "Running", "Overview status has no repeated Agent prefix");
+    check(host.querySelector('[data-process-id="p1"] .session-activity-command')?.textContent === "long-background-command.js", "Process uses a readable script title");
+    check(host.querySelector('[data-activity-group="agents"] .session-activity-group-count')?.textContent === "1", "Group displays its count");
     check(host.querySelector('[data-process-id="p1"]')?.textContent?.includes(i18n.t("panel.activity.status.starting")), "accepted process starts truthfully without completed label");
     for (const theme of ["dark", "light"]) {
       document.documentElement.setAttribute("data-theme", theme);
@@ -76,12 +84,89 @@ export async function sessionActivityRailProbe() {
     check(host.querySelector(".session-activity-readonly")?.tagName === "SPAN", "readonly source is not a fake navigation action");
     check(!host.querySelector(".session-quick-notes"), "quick notes are absent from activity groups");
     renderRail({ ...railProps, supported: false });
-    check(!host.querySelector('[data-process-id]') && !host.querySelector(".session-activity-action"), "unsupported host exposes no process controls");
+    check(!host.querySelector('[data-process-id]') && !host.querySelector('[data-activity-group="processes"] .session-activity-action'), "unsupported host exposes no process controls");
     renderRail({ ...railProps, sessionId: "s2", plans: [], agents: [], outputs: [], sources: [], processes: [], processesError: "List unavailable" });
     check(host.querySelectorAll('.session-activity-disclosure[aria-expanded="false"]').length === 2, "new session restores disclosure defaults");
     check(host.textContent?.includes("List unavailable") && Boolean(host.querySelector('[role="alert"]')), "list error is observable");
     click(host.querySelector('[role="alert"] button')); check(opened.at(-1) === "refresh", "list error has explicit retry");
 
+
+    renderRail();
+    const outputsDisclosure = host.querySelector('[data-activity-group="outputs"] .session-activity-disclosure');
+    check(outputsDisclosure?.getAttribute("aria-expanded") === "true", "Returning to a session retains disclosure preference");
+    click(host.querySelector('[data-activity-group="agents"] .session-activity-disclosure'));
+    renderRail({ ...railProps, agents: [...railProps.agents, { id: "new-failure", label: "checker", status: "failed", statusLabel: "Failed" }] });
+    check(host.querySelector('[data-activity-group="agents"] .session-activity-disclosure')?.getAttribute("aria-expanded") === "true", "New failure expands a manually collapsed group");
+    const completed = { ...process, id: "ended", status: "completed" as const };
+    renderRail({ ...railProps, processes: [process, completed] });
+    check(host.querySelector('[data-activity-group="ended-processes"] .session-activity-disclosure')?.getAttribute("aria-expanded") === "false", "Ended processes initially collapse");
+    click(host.querySelector('[data-activity-group="ended-processes"] .session-activity-disclosure'));
+    check(Boolean(host.querySelector('[data-process-id="ended"]')), "Ended group exposes its records");
+    click(host.querySelector('.session-activity-clear-ended'));
+    check(!host.querySelector('[data-process-id="ended"]') && Boolean(host.querySelector('[data-process-id="p1"]')), "Clear hides only ended processes");
+    check(stops.length === 0, "Clearing ended records does not stop a process");
+    renderRail({ ...railProps, processes: [process, { ...process, id: "timeout", status: "timed_out" }] });
+    check(host.querySelector('[data-process-id="timeout"] .session-activity-status')?.getAttribute("data-tone") === "warning", "Tool timeout uses a distinct warning tone");
+    const remainingProps: SessionActivityRailProps = {
+      ...railProps, sessionId: "remaining-a", rangeLimited: true, hasMoreBefore: true,
+      onLoadEarlier: () => opened.push("load-earlier"), onReturnToLatest: () => opened.push("return-latest"),
+      agents: Array.from({ length: 7 }, (_, index) => ({ id: `expert-${index}`, label: `Expert ${index}`, detail: "A long task summary which should remain bounded at narrow widths",
+        status: index === 6 ? "failed" : "completed", statusLabel: index === 6 ? "Failed" : "Completed", onOpen: () => opened.push(`expert-${index}`) })),
+      teamMembers: [{ id: "member", label: "Team member", roleLabel: "Reviewer", status: "running", statusLabel: "Running" }],
+      outputs: [{ id: "merged-output", label: "src/result.ts", path: "src/result.ts", groupLabel: "src", changeCount: 2, addedLines: 3, removedLines: 1,
+        lastChangedAt: "2026-10-10T01:00:00Z", onOpen: () => opened.push("open-output"), onLocate: () => opened.push("locate-output"), onCopyPath: () => opened.push("copy-output") }],
+      sources: [{ id: "domain", label: "docs.example.org", sourceCount: 3, onOpen: () => opened.push("open-source") }],
+      processes: [ { ...process, id: "remaining-live", sessionId: "remaining-a", status: "running" },
+        ...Array.from({ length: 6 }, (_, index) => ({ ...process, id: `remaining-ended-${index}`, sessionId: "remaining-a", status: "completed" as const })),
+        { ...process, id: "remaining-timeout", sessionId: "remaining-a", status: "timed_out" } ],
+      attentionItems: [{ id: "approval", label: "2 approvals pending", group: "approvals", onOpen: () => opened.push("approval") },
+        { id: "degraded", label: "Goal · Fallback report", group: "plans", itemId: "plan", onOpen: () => opened.push("report") }],
+    };
+    renderRail(remainingProps); await paint();
+    check(host.querySelectorAll('[data-activity-group="agents"] [data-activity-item-id]').length === 5, "long agent list starts with five rows");
+    check(Boolean(host.querySelector('[data-activity-group="team-members"]')) && !host.querySelector('[data-activity-group="agents"]')?.textContent?.includes("Team member"), "Team members have a separate role group");
+    check(!host.querySelector('.subagent-activity-avatar') && Boolean(host.querySelector('.session-activity-agent-glyph')), "Overview uses a status glyph without decorative avatars");
+    const groupHeading = (group: string) => host.querySelector(`[data-activity-group="${group}"] .session-activity-disclosure`);
+    click(groupHeading("agents"));
+    const failureLink = [...host.querySelectorAll('.session-activity-attention-link')].find((element) => element.textContent?.includes("Expert 6"));
+    click(failureLink); await paint(); await paint();
+    const revealedExpert = host.querySelector('[data-activity-item-id="expert-6"]');
+    check(groupHeading("agents")?.getAttribute('aria-expanded') === 'true' && Boolean(revealedExpert), "attention opens collapsed group and reveals a failure beyond the first five");
+    await until(() => Boolean(host.querySelector('[data-activity-item-id="expert-6"]')?.contains(document.activeElement)), "attention transfers keyboard focus to the target row");
+    click(groupHeading("agents")); await paint();
+    check(groupHeading("agents")?.getAttribute('aria-expanded') === 'false', "manual collapse works after attention reveal");
+    renderRail({ ...remainingProps, sessionId: "remaining-b", agents: [], teamMembers: [], processes: [], attentionItems: [] });
+    renderRail(remainingProps); await paint();
+    check(groupHeading("agents")?.getAttribute('aria-expanded') === 'false', "attention reveal does not reopen on returning to unchanged session");
+    click(groupHeading("agents"));
+    check(host.querySelectorAll('[data-activity-group="agents"] [data-activity-item-id]').length === 7, "show-all choice survives a session switch");
+    click(groupHeading("outputs")); click(groupHeading("sources"));
+    check(host.querySelectorAll('.session-activity-range-notice').length === 3, "each transcript-derived group states its loaded range");
+    click(host.querySelector('.session-activity-range-notice button')); check(opened.at(-1) === "load-earlier", "loaded-range action reaches the supplied history loader");
+    click([...host.querySelectorAll('.session-activity-range-notice button')].find((element) => element.textContent === i18n.t("panel.activity.returnToLatest")));
+    check(opened.at(-1) === "return-latest", "historical range retains return-to-latest action");
+    check(host.querySelector('.session-activity-directory')?.textContent === "src" && host.querySelector('.session-activity-row-metadata')?.textContent?.includes("2 writes"), "outputs show directory and merged write evidence");
+    check(host.querySelector('.session-activity-line-changes')?.textContent === "+3−1", "known output line changes remain distinct");
+    check(host.querySelector('[data-activity-group="sources"]')?.textContent?.includes("3 references"), "domain source displays citation occurrences");
+    const outputActions = [...host.querySelectorAll('[data-activity-item-id="merged-output"] .session-activity-tail-actions button')];
+    for (const action of outputActions) click(action);
+    check(opened.slice(-3).join() === "open-output,locate-output,copy-output", "output tail actions reach open, locate and copy without nesting");
+    check(!host.querySelector('button button'), "row actions never nest interactive buttons");
+    click([...host.querySelectorAll('.session-activity-attention-link')].find((element) => element.textContent === "2 approvals pending"));
+    check(opened.at(-1) === "approval", "approval attention has an explicit navigation action");
+    if (groupHeading("ended-processes")?.getAttribute("aria-expanded") === "true") click(groupHeading("ended-processes"));
+    if (groupHeading("processes")?.getAttribute("aria-expanded") === "true") click(groupHeading("processes"));
+    click([...host.querySelectorAll('.session-activity-attention-link')].find((element) => element.textContent?.includes("Timed out"))); await paint(); await paint();
+    await until(() => Boolean(host.querySelector('[data-activity-item-id="remaining-timeout"]')?.contains(document.activeElement)), "timeout attention reveals and focuses ended process records");
+    for (const theme of ["dark", "light"]) {
+      document.documentElement.setAttribute("data-theme", theme);
+      document.documentElement.style.setProperty("--font-scale", "1.4"); await paint();
+      check(host.scrollWidth <= host.clientWidth, `${theme}: attention, metadata and tail actions fit 248px at enlarged font scale`);
+      const copyAction = host.querySelector<HTMLElement>('[data-activity-item-id="merged-output"] .session-activity-tail-actions button:last-child');
+      copyAction?.focus(); await paint();
+      check(copyAction && getComputedStyle(copyAction.parentElement!).opacity === "1", `${theme}: tail actions are visible for keyboard focus`);
+    }
+    document.documentElement.style.setProperty("--font-scale", "1");
     renderDetails("s1", "p1"); await paint();
     check(reads.length === 1 && listeners.size === 1, "opening detail reads the owning session and subscribes");
     reads[0].task.resolve(detail()); await paint();

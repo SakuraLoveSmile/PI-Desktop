@@ -6,6 +6,7 @@ import { delegationIdForMessage } from "../../../lib/subagent-panel";
 import { delegateTaskDescription } from "../../../lib/subagent-transcript";
 import { collectDelegationStatuses, collectDelegationTimings, subagentOutcome, type SubagentOutcome, type SubagentTiming } from "../../../lib/subagent-topology";
 import { subagentItemTiming } from "./subagent-row-presentation";
+import { activityChangedFiles, activityWebsites } from "./session-activity-resources";
 
 /** Shared with Overview: only actual installed/pending session proposals. */
 export function activityPlans(sessionId: string | undefined, pending?: PlanProposal, checkpoint?: PlanProposal, history: readonly PlanProposal[] = []): PlanProposal[] {
@@ -40,15 +41,5 @@ export function activitySubagents(messages: readonly UiMessage[], running: boole
 
 export function activityResources(messages: UiMessage[]) {
   const recorded = recordedOverviewResources(messages);
-  const websites = new Map<string, { id: string; label: string; url: string }>();
-  for (const message of messages) for (const round of message.hostedSearch?.rounds ?? []) {
-    for (const source of round.sources ?? []) {
-      try {
-        const url = new URL(source.url);
-        if ((url.protocol !== "https:" && url.protocol !== "http:") || url.username || url.password) continue;
-        websites.set(url.href, { id: url.href, label: source.title || url.hostname, url: url.href });
-      } catch { /* A malformed captured URL is not an actionable source. */ }
-    }
-  }
-  return { ...recorded, websites: [...websites.values()] };
+  return { ...recorded, changedFiles: activityChangedFiles(messages), websites: activityWebsites(messages) };
 }
