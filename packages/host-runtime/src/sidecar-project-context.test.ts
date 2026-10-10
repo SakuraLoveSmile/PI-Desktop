@@ -99,6 +99,40 @@ describe("project context reverse RPC binding", () => {
     await expect(probe("project.autoMemory.agentList", { sessionId: "bound" })).rejects.toThrow("bound project session");
   });
 
+  it("reads only a launch-bound owned background process and strips unrelated arguments", async () => {
+    const detail = { process: { id: "job", sessionId: "bound", status: "timed_out" }, errorMessage: "explicit 1 second limit" };
+    const { launch, probe, calls, sidecar } = fixture(async () => detail);
+    await launch("bound", "/trusted/root");
+    await launch("other", "/other/root");
+    expect(await probe("backgroundProcesses.read", { sessionId: "bound", id: "job", command: "spoof", boundPath: "/spoof" })).toEqual(detail);
+    expect(calls).toEqual([{ method: "backgroundProcesses.read", params: { sessionId: "bound", id: "job" } }]);
+    await expect(probe("backgroundProcesses.read", { sessionId: "other", id: "job" })).rejects.toThrow("bound project session");
+    await expect(probe("backgroundProcesses.read", { sessionId: "bound", id: "foreign" })).rejects.toThrow("ownership mismatch");
+    await expect(probe("backgroundProcesses.read", { sessionId: "bound", id: "" })).rejects.toThrow("id required");
+    await expect(probe("backgroundProcesses.stop", { sessionId: "bound", id: "job" })).rejects.toThrow("not allowed");
+    await expect(probe("backgroundProcesses.list", { sessionId: "bound" })).rejects.toThrow("not allowed");
+    sidecar.clearProjectInstructionRoot("bound");
+    await expect(probe("backgroundProcesses.read", { sessionId: "bound", id: "job" })).rejects.toThrow("bound project session");
+    expect(calls).toHaveLength(2);
+  });
+
+  it("rejects a background read completing after its launch binding changes", async () => {
+    let resolveRead!: (value: unknown) => void;
+    let notifyRead!: () => void;
+    const started = new Promise<void>(resolve => { notifyRead = resolve; });
+    const { launch, probe, sidecar } = fixture(async () => {
+      notifyRead();
+      return new Promise(resolve => { resolveRead = resolve; });
+    });
+    await launch("bound", "/trusted/root");
+    const reading = probe("backgroundProcesses.read", { sessionId: "bound", id: "job" });
+    const rejected = expect(reading).rejects.toThrow("binding changed");
+    await started;
+    sidecar.setProjectInstructionRoot("bound", "/new/root");
+    resolveRead({ process: { id: "job", sessionId: "bound", status: "completed" } });
+    await rejected;
+  });
+
   it("fails closed without a host", async () => {
     const sidecar = new AgentSidecar({ launch: { command: process.execPath, args: ["-e", child] }, onStderr: () => {} });
     sidecars.push(sidecar);

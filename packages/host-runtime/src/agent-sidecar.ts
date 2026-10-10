@@ -52,6 +52,7 @@ const HOST_PROXY_ALLOWED = new Set([
   "tools.execute",
   "tools.abort",
   "tools.list",
+  "backgroundProcesses.read",
   "session.get",
   "session.appendMessage",
   "session.appendCompaction",
@@ -548,7 +549,7 @@ export class AgentSidecar {
           return;
         }
         if (method.startsWith("project.autoMemory.agent") || method === "project.history.search" ||
-          method === "project.history.context" || method === "project.codeSearch") {
+          method === "project.history.context" || method === "project.codeSearch" || method === "backgroundProcesses.read") {
           if (!this.host) throw new Error("host unavailable");
           const sessionId = typeof params.sessionId === "string" ? params.sessionId : "";
           const binding = this.projectContextBindings.get(sessionId);
@@ -562,6 +563,18 @@ export class AgentSidecar {
             : method === "project.history.search" ? ["query", "limit"]
             : method === "project.history.context" ? ["targetSessionId", "messageId", "query"]
             : method === "project.codeSearch" ? ["action", "query", "limit"] : [];
+          if (method === "backgroundProcesses.read") {
+            if (typeof params.id !== "string" || !params.id.trim()) throw new Error("Background process id required");
+            const result = await host.call<{ process: { id: string; sessionId: string } }>(method, { sessionId, id: params.id });
+            if (this.disposed || this.host !== host || this.projectContextBindings.get(sessionId) !== binding) {
+              throw new Error("project context binding changed during request");
+            }
+            if (result.process?.id !== params.id || result.process?.sessionId !== sessionId) {
+              throw new Error("Background process ownership mismatch");
+            }
+            this.writeToChild(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result }) + "\n");
+            return;
+          }
           const result = await host.call(method, {
             sessionId, boundPath: binding.path,
             ...Object.fromEntries(fields.filter(field => params[field] !== undefined).map(field => [field, params[field]])),

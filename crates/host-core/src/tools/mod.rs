@@ -3027,7 +3027,7 @@ pub fn builtin_tool_defs() -> Value {
             "risk": "high",
             "parameters": {
                 "type": "object",
-                "properties": { "command": { "type": "string" }, "run_in_background": { "type": "boolean", "default": false, "description": "Start a Host-managed background process after normal approval; return its ID immediately. It keeps the same timeout and tool capacity until it stops." } },
+                "properties": { "command": { "type": "string" }, "run_in_background": { "type": "boolean", "default": false, "description": "Start a Host-managed background process after normal approval; return its ID immediately. It keeps the same timeout and tool capacity until it stops: default 60 seconds; pass timeout in seconds (1-21600) for long runs." } },
                 "required": ["command"]
             }
         }

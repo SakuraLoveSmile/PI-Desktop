@@ -9765,3 +9765,17 @@ Overview layout validation also checks long titles, project paths and model name
 320/360/570px in both themes. Metadata retains positive visible width and no
 header/resources/references horizontal overflow is introduced. Selected reference
 options retain pressed states and switching behavior.
+
+
+### E2E-RUNTIME-background-bash-timeout-is-visible
+
+- **前置条件：** 记录候选版本构建的 Host/runtime/sidecar，隔离临时数据与工作区，
+  不调用模型的本地 provider 夹具。
+- **步骤：** 建立已批准团队与成功的专家参与；等待期间运行显式 1 秒的后台命令，
+  再验证正常退出和缺省 60 秒超时。检查等待结果与持久化详情。
+- **预期：** 超时准确说明默认/显式限制并提示 `timeout` 秒数（1–21,600）。
+  退出和超时经真实 HostProcess/AgentSidecar 唤醒已有等待，运行中输出不结束等待。
+  不插入邮箱、不调用真实模型、不授予进程修改或跨会话读取。旧消息不补造默认来源。
+- **覆盖：** `scripts/e2e-background-bash-limit.mjs`，Rust 后台 RPC、运行时
+  schema/载荷、团队等待生命周期与启动绑定代理回归。
+- **状态：** 记录候选执行结果；Windows 仍需平台验收。

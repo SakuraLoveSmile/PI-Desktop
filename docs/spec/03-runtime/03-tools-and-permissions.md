@@ -337,7 +337,7 @@ Host execution baseline:
 - A project-bound session workspace is required
 - Default cwd = the originating session's `workspaceRoot`
 - Confirmation required by default
-- Set a mandatory 60s timeout; accept a 1s–21,600s override (D329)
+- Set a mandatory 60s timeout, including managed background Bash; accept a 1s–21,600s override (D329). For long commands, pass `timeout` in seconds.
 - Stream stdout and stderr separately, then return bounded final output
 - Truncate large output without mixing the two streams
 - No interactive TTY (MVP)
@@ -692,3 +692,29 @@ session activity registry, not this launch receipt. The renderer can read/stop
 only the explicitly named local session resource. Background tasks retain the
 same default and maximum command timeout, do not bypass approvals, and cannot
 turn arbitrary `command &` invocations into managed processes.
+
+
+### Background timeout visibility and waiting (2026-10-11)
+
+Both `run_in_background` and `timeout` descriptions state the default 60-second
+limit and the 1–21,600-second override. The default stays unchanged. Background
+launches without a model `timeout` omit transport `timeoutMs`, letting the Host
+apply the same default and retain its provenance; explicit overrides, including
+60 seconds, remain explicit. Foreground transport behavior is unchanged.
+
+On `TOOL_TIMEOUT`, the existing persisted result content includes `timeoutMs`
+and `timeoutIsDefault`. Its existing `errorMessage` identifies the applied
+limit as default or explicit and tells the model to pass `timeout` in seconds
+for long runs. Historical records keep their original message; missing
+provenance is not inferred as a default.
+
+The existing `backgroundProcesses.changed` event remains an identity-only
+invalidation. Team `wait_for_updates` observes events for its owning session,
+reads the process through `backgroundProcesses.read`, and returns a terminal
+outcome as `reason: background_process_completed` with `backgroundProcess`
+detail, including timeout guidance. Running/output changes do not finish the
+wait. This does not enqueue mailbox messages or start an idle Lead turn.
+The read is protected by the trusted launch binding and process/session owner
+checks. Errors remain visible; cancellation, deadline or a replaced turn never
+consumes a late outcome, so a later wait can receive it. Team inbox delivery,
+permission/admission limits and process cancellation rules are unchanged.
