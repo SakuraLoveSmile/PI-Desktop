@@ -61,6 +61,10 @@ impl AdmissionError {
 
     pub fn message(&self) -> String {
         let reason = match self {
+            Self::QueueFull {
+                diagnostics: Some(_),
+                ..
+            } => "host tool capacity is exhausted; bounded queue is full".into(),
             Self::QueueFull { queue_depth, .. } => format!(
                 "host tool capacity is exhausted; bounded queue is full ({queue_depth} queued)"
             ),
