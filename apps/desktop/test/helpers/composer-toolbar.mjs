@@ -76,5 +76,5 @@ export async function composerToolbar(t, ssr) {
     else delete globalThis.window;
   });
   const { ComposerToolbar } = await ssr.load("/src/features/chat/composer/ComposerToolbar.tsx");
-  return () => ssr.render(createElement(ComposerToolbar, TOOLBAR_PROPS), { sessionId: null });
+  return (props = {}) => ssr.render(createElement(ComposerToolbar, { ...TOOLBAR_PROPS, ...props }), { sessionId: null });
 }

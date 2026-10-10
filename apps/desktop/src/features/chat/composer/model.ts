@@ -77,6 +77,13 @@ export function nextMode(mode: Mode): Mode {
   return MODE_CYCLE[(index + 1) % MODE_CYCLE.length] ?? "agent";
 }
 
+export function isComposerContractVisible(
+  mode: Mode,
+  goalExecutionActive: boolean,
+): boolean {
+  return mode !== "agent" && !(mode === "goal" && goalExecutionActive);
+}
+
 export function isThinkingLevel(value: unknown): value is SessionThinkingLevel {
   return isSessionThinkingLevel(value);
 }

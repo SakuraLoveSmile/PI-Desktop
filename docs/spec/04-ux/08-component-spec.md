@@ -3155,9 +3155,8 @@ reasoning-level control.
 | queued prompts, attachments and approval controls (when present) |
 | input (four empty lines, grows through seven visible lines)       |
 | placeholder: welcome → command/file hint → keyboard hint          |
-| [+] [Agent/Expert Team ▾] [model · reasoning ▾] [Plan/Goal]         |
-|                                  [plugin] [enhance] [Live] [↑/⏹] |
-| context usage footer (when available)                            |
+| [+] [Agent/Expert Team ▾] [Plan/Goal] [plugin] [model · reasoning ▾] [enhance] [Live] [↑/⏹] |
+| context usage footer (Context label and meter, when available)                                  |
 +----------------------------------------------------------+
 ```
 
@@ -3180,8 +3179,9 @@ reasoning-level control.
 - Padding: px-4 py-3 inner textarea
 - Font: text-sm for Agent, Plan, and Goal; mode changes semantics and tool
   controls, not the typography
-- Plan/Goal uses the existing compact contract indicator; the Agent operating
-  mode omits that extra indicator. The execution-profile chip carries the
+- Plan/Goal uses the existing compact contract indicator; hide the Goal contract
+  picker while Goal execution is active and keep it available during Goal
+  planning. The Agent operating mode omits that extra indicator. The execution-profile chip carries the
   Agent/Expert Team choice separately. Its labels remain single-line and
   ellipsize within their established responsive budgets. Cycling the profile
   cross-fades its icon and label in place. While the live turn is
@@ -3195,12 +3195,14 @@ reasoning-level control.
 - Permission and operating-mode controls retain their existing Add-menu and
   approval-card entry points. Repositioning the toolbar does not change
   permission defaults, mode gates or the separate execution-policy approval.
-- The left toolbar owns Add, execution profile and the combined model ×
-  reasoning-level chip, with 8px between controls. Plan/Goal remains a compact
-  indicator when active. The right toolbar retains plugin controls, prompt
-  enhancement, Live voice and the single Stop/Send slot. Send uses an upward
-  arrow in a neutral 32px rounded-square button; a running empty draft retains
-  Stop. Context usage stays in the existing footer. The chip shows Bot, the
+- The left toolbar owns Add, execution profile and Plan/Goal controls; left-side
+  plugin slots remain there in their existing order. Right-side plugin slots
+  retain their side and order, followed by the combined model × reasoning-level
+  chip, prompt enhancement, Live voice and the single Stop/Send slot. The model
+  chip remains one button and its anchored menu remains tied to that button.
+  Send and Stop use the same neutral 32px rounded-square footprint. Context
+  usage stays in the existing footer with the visible `chat.usageContextLabel`
+  beside its meter. The chip shows Bot, the
   current model name, and the
   current canonical reasoning level value separated by `·`; `off` omits the
   level text. The canonical value is rendered as-is (`low`, `high`, `xhigh`,
@@ -3231,7 +3233,8 @@ reasoning-level control.
   opens the existing Settings model page in the chat Composer; it creates no
   second preference store or model configuration path. The shared picker makes
   this navigation caller opt-in, so the scheduled-task editor retains its
-  unsaved draft and does not expose a cross-page management action.
+  unsaved draft and does not expose a cross-page management action. Its picker
+  placement and behavior remain unchanged.
 - Compact delegation activity renders the existing `SubagentTopology` task
   card directly at the first delegation's position. Ordinary tools before and
   after the card retain chronological order and collapsed category summaries.

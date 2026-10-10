@@ -1355,10 +1355,9 @@
       ]
     },
     "apps/desktop/test/composer-pickers.test.mjs": {
-      "assertions": 35,
+      "assertions": 34,
       "cases": 5,
       "signatures": [
-        "0bb70b4dee54463eb87a",
         "0e32fc23745f6b358c99",
         "1124eebe03f4598e0a8d",
         "13968e3e998be3cff5d9",
@@ -1450,7 +1449,7 @@
       ]
     },
     "apps/desktop/test/composer-send-state.test.mjs": {
-      "assertions": 102,
+      "assertions": 101,
       "cases": 11,
       "signatures": [
         "01269e23a99528941642",
@@ -1535,7 +1534,6 @@
         "d707520a66fdca604d3e",
         "d754709d69184e4645fe",
         "d98d0404b6e6887da232",
-        "d99b2a9a508369c8756d",
         "db852e948568e827ca6a",
         "dc7d3b743025f3f522c8",
         "e1fcb741d990882e31f4",

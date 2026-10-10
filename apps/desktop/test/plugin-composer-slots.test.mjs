@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createElement } from "react";
 import { composerToolbar } from "./helpers/composer-toolbar.mjs";
 import { parseProbe, probed, propsProbe, slotMounts, slotSsr } from "./helpers/slot-ssr.mjs";
 
@@ -16,10 +17,10 @@ import { parseProbe, probed, propsProbe, slotMounts, slotSsr } from "./helpers/s
 /** The toolbar's own controls below, by label. */
 // Live Voice's idle entry is conditional on the feature setting and therefore
 // is not a permanent host slot in this disabled-by-default fixture. Plus
-// keeps the execution profile and the model pickers on the left row and the
-// context meter in the usage footer, so only the prompt actions sit right.
-const HOST_LEFT = ["chat.addFiles", "chat.profileAgent · chat.profileAgentDesc", "chat.model: Model. chat.reasoningLevel: Off"];
-const HOST_RIGHT = ["chat.enhancePrompt", "chat.send"];
+// keeps the execution profile on the left row and the model picker before
+// the prompt actions on the right. Context remains in the usage footer.
+const HOST_LEFT = ["chat.addFiles", "chat.profileAgent · chat.profileAgentDesc"];
+const HOST_RIGHT = ["chat.model: Model. chat.reasoningLevel: Off", "chat.enhancePrompt", "chat.send"];
 
 async function composer(t) {
   const ssr = await slotSsr(t);
@@ -92,4 +93,29 @@ test("a control leaves its side as soon as it is disposed", async (t) => {
   assert.deepEqual(sidesOf(ssr.toolbar()), { left: HOST_LEFT, right: ["b:right", ...HOST_RIGHT] });
   ssr.clear();
   assert.equal(ssr.toolbar(), plain);
+});
+
+test("Goal planning retains its mode entry and execution removes only that indicator", async (t) => {
+  const ssr = await composer(t);
+  const planning = sidesOf(ssr.toolbar({ mode: "goal", planningLive: true, runActive: true }));
+  assert.deepEqual(planning, { left: [...HOST_LEFT, "goal.planning"], right: [...HOST_RIGHT.slice(0, -1), "chat.stopGenerating"] });
+  const execution = sidesOf(ssr.toolbar({ mode: "agent", displayMode: "goal", goalExecutionActive: true, runActive: true }));
+  assert.deepEqual(execution, { left: HOST_LEFT, right: planning.right });
+  const ended = sidesOf(ssr.toolbar({ mode: "goal", goalExecutionActive: false }));
+  assert.deepEqual(ended, { left: [...HOST_LEFT, "chat.contractMode: settings.modeGoal"], right: HOST_RIGHT });
+});
+
+test("context footer identifies both known and unavailable usage with a visible label", async (t) => {
+  const ssr = await composer(t);
+  const { ContextUsageInspector } = await ssr.load("/src/components/ContextUsageInspector.tsx");
+  const { ContextUsagePlaceholder } = await ssr.load("/src/features/chat/composer/ContextUsagePlaceholder.tsx");
+  const usage = { inputTokens: 1_000, outputTokens: 200, totalTokens: 1_200 };
+  const known = ssr.render(createElement(ContextUsageInspector, { usage, turnUsage: usage, contextWindow: 200_000, tools: [], variant: "footer" }));
+  const unknown = ssr.render(createElement(ContextUsagePlaceholder));
+  for (const html of [known, unknown]) {
+    assert.match(html, /<span class="composer-usage-label">Context<\/span>/);
+    assert.match(html, /composer-usage-context-track/);
+  }
+  assert.match(known, /aria-haspopup="dialog"/);
+  assert.match(unknown, /disabled=""/);
 });

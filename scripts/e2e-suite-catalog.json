@@ -711,6 +711,9 @@
       "family": "transcript",
       "script": "scripts/e2e-transcript-render.mjs",
       "tier": "nightly",
+      "scenarioIds": [
+        "E2E-COMPOSER-toolbar-footer"
+      ],
       "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
     },
     {

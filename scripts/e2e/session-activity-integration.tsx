@@ -11,6 +11,7 @@ import { OverviewTab } from "../../apps/desktop/src/components/workpanel/Overvie
 import { useAppStore } from "../../apps/desktop/src/stores/app-store";
 import { createTranscriptReadingRuntime } from "../../apps/desktop/src/stores/runtime/transcript-reading-runtime";
 import { api } from "../../apps/desktop/src/lib/api";
+import { slotRegistry } from "../../apps/desktop/src/plugins/renderer-slots/registry";
 import { installFooterMenuFixture, type FooterScene } from "./session-activity/footer-menus";
 
 declare global {
@@ -116,11 +117,56 @@ export async function sessionActivityIntegrationProbe() {
     const editor=()=>host.querySelector<HTMLElement>('.composer-input');
     const input=(content:string)=>{const field=editor();if(!field)throw new Error('Missing composer editor');flushSync(()=>{field.textContent=content;field.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:content}));});};
     check(Boolean(host.querySelector('.stop-btn')),'running empty draft retains stop');
+    const stop = host.querySelector<HTMLElement>('.stop-btn')!;
+    const stopBounds = stop.getBoundingClientRect();
+    const stopRadius = getComputedStyle(stop).borderRadius;
+    check(Math.abs(stopBounds.width - 32) < .5 && Math.abs(stopBounds.height - 32) < .5, 'stop is a 32 pixel rounded toolbar control');
+    // Goal planning is running too: hide the redundant contract only after the
+    // authoritative checkpoint enters execution, never from isRunning alone.
+    const toolbarSessions = useAppStore.getState().sessions;
+    api.getGoalProgress = async () => ({ progress: null });
+    api.getGoalReport = async () => ({ state: 'pending', report: null });
+    api.onGoalProgressChanged = () => () => {};
+    api.onGoalReportChanged = () => () => {};
+    set({ sessions: toolbarSessions.map(item => item.id === 'activity-a' ? { ...item, mode: 'goal' } : item), planningStates: { 'activity-a': 'planning' } });
+    check(host.querySelector('.composer-contract-chip[data-mode="goal"]')?.getAttribute('data-planning') === 'true', 'Goal planning keeps its contract indicator');
+    const executingGoal: PlanProposal = { ...plan, kind: 'goal', executionKind: 'goal', executionId: 'toolbar-goal', executionState: 'running' };
+    set({ planCheckpoints: { 'activity-a': executingGoal }, planningStates: {} });
+    check(!host.querySelector('.composer-contract-chip') && Boolean(host.querySelector('.goal-progress-capsule')), 'Goal execution uses its progress bar without a second contract status');
+    set({ planCheckpoints: { 'activity-a': { ...executingGoal, executionState: 'completed' } } });
+    check(Boolean(host.querySelector('.composer-contract-chip[data-mode="goal"]')), 'Goal contract returns when execution is completed');
+    set({ sessions: toolbarSessions.map(item => item.id === 'activity-a' ? { ...item, mode: 'plan' } : item), planCheckpoints: { 'activity-a': { ...plan, executionState: 'running' } } });
+    check(Boolean(host.querySelector('.composer-contract-chip[data-mode="plan"]')), 'Plan execution keeps the Plan contract indicator');
+    set({ sessions: toolbarSessions, planCheckpoints: {}, planningStates: {} });
     input('请按这个方案继续修改，并保留现有缓存。');
     await until(()=>Boolean(host.querySelector<HTMLButtonElement>('.send-btn:not(:disabled)')),'Running draft did not expose send');
     check(!host.querySelector('.stop-btn'),'running draft retains steering send slot');
     const left=host.querySelector('.composer-left')!;const right=host.querySelector('.composer-right')!;
-    check(Boolean(left.querySelector('.composer-plus')&&left.querySelector('.composer-profile-chip')&&left.querySelector('.composer-model-thinking-chip')),'plus profile and model use left toolbar');
+    check(Boolean(left.querySelector('.composer-plus') && left.querySelector('.composer-profile-chip')) && !left.querySelector('.composer-model-thinking-chip'), 'plus and profile retain the left toolbar');
+    check(Boolean(right.querySelector('.composer-model-thinking-chip')), 'model and reasoning share one right toolbar control');
+    const sendBounds = right.querySelector('.send-btn')!.getBoundingClientRect();
+    check(Math.abs(sendBounds.width - 32) < .5 && Math.abs(sendBounds.height - 32) < .5 && getComputedStyle(right.querySelector('.send-btn')!).borderRadius === stopRadius, 'send and stop share 32 pixel size and corner radius');
+    // Use the production registry/outlets. Plugin registration side and order
+    // remain stable as the built-in model picker moves between groups.
+    const disposers: (() => void)[] = [];
+    try {
+      flushSync(() => {
+        for (const side of ['left', 'right'] as const) {
+          for (const name of ['first', 'second']) {
+            disposers.push(slotRegistry.register(`toolbar-${side}-${name}`, {
+              slot: 'composerControl', positions: [side],
+              component: ({ position }: { position: 'left' | 'right' }) => <Button variant="ghost" data-toolbar-plugin={`${position}-${name}`}>{name === 'first' ? 'A' : 'B'}</Button>,
+            }, []));
+          }
+        }
+      });
+      for (const side of ['left', 'right'] as const) {
+        const group = host.querySelector(`.composer-${side}`)!;
+        check([...group.querySelectorAll('[data-toolbar-plugin]')].map(item => item.getAttribute('data-toolbar-plugin')).join(',') === `${side}-first,${side}-second`, `${side} plugin controls preserve side and registration order`);
+      }
+    } finally {
+      flushSync(() => disposers.forEach(dispose => dispose()));
+    }
     check(Boolean(right.querySelector('.composer-enhance-btn')&&right.querySelector('.send-btn')),'enhancement and send use right toolbar');
     set({runningSessions:{},isRunning:false});
     const profile=()=>host.querySelector('.composer-profile-chip');
@@ -140,7 +186,23 @@ export async function sessionActivityIntegrationProbe() {
     const modelSurface=getComputedStyle(document.querySelector('.composer-model-thinking-menu')!);
     check(!modelSurface.backgroundColor.startsWith('rgba(')&&!modelSurface.backgroundColor.includes('/'),'model popup surface is opaque and hides the draft');
 
-    click([...document.querySelectorAll('.composer-model-option')].find(option=>option.textContent?.includes('GPT-6.1 Sol')));await until(()=>selected().modelId==='gpt-6.1-sol','Real session model selection did not persist');
+    await until(() => Boolean(document.querySelector('.composer-model-menu.is-open')), 'model popup layout did not settle');
+    await Promise.all(document.querySelector('.composer-model-menu')!.getAnimations().map(animation => animation.finished));
+    const modelPopupBounds = document.querySelector('.composer-model-menu')!.getBoundingClientRect();
+    const modelAnchorBounds = right.querySelector('.composer-model-thinking-chip')!.getBoundingClientRect();
+    check(modelPopupBounds.left >= 0 && modelPopupBounds.right <= window.innerWidth && modelPopupBounds.top >= 0 && modelPopupBounds.bottom <= modelAnchorBounds.top + 1, 'right model menu opens above its anchor inside the viewport');
+    check(Math.abs(modelPopupBounds.right - modelAnchorBounds.right) <= 1, `model menu keeps end alignment after moving right; menu=${modelPopupBounds.left},${modelPopupBounds.right}; anchor=${modelAnchorBounds.left},${modelAnchorBounds.right}`);
+    const firstModel = modelOptions[0] as HTMLButtonElement;
+    firstModel.focus();
+    flushSync(() => firstModel.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })));
+    check(document.activeElement === modelOptions[1], 'model menu ArrowDown reaches the next model');
+    flushSync(() => modelOptions[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    await until(()=>selected().modelId==='gpt-6.1-sol','Keyboard session model selection did not persist');
+    flushSync(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    await until(() => !document.querySelector('.composer-model-menu'), 'Escape did not close the relocated model menu');
+    check(document.activeElement === right.querySelector('.composer-model-thinking-chip'), 'relocated model menu restores focus to its trigger');
+    click(right.querySelector('.composer-model-thinking-chip'));
+    await until(() => Boolean(document.querySelector('.composer-model-settings')), 'model menu did not reopen after keyboard selection');
     check(selected().permissionMode==='auto'&&selected().executionProfile==='standard','model selection preserves permission and profile');
     await until(()=>Boolean(document.querySelector('.composer-model-settings')),'Model management entry missing');click(document.querySelector('.composer-model-settings'));
     check(useAppStore.getState().page==='settings'&&useAppStore.getState().settingsTab==='agent','model management navigates existing settings route');set({page:'chat'});
@@ -150,11 +212,13 @@ export async function sessionActivityIntegrationProbe() {
     set({messages:previewMessages,retainedTranscripts:{'activity-a':previewMessages,'activity-b':second},runningSessions:{'activity-a':true},isRunning:true});
     const meter=()=>host.querySelector<HTMLButtonElement>('.composer-usage-context-btn');
     check(Boolean(host.querySelector('.composer-usage-context[data-unavailable="true"]')&&meter()?.disabled&&meter()?.textContent?.includes('—')),'missing usage displays unknown rather than a fabricated percentage');
+    check(meter()?.querySelector('.composer-usage-label')?.textContent === i18n.t('chat.usageContextLabel'), 'unknown context footer includes its visible label');
     const outputMessages=['0001-deadline-based-timer.md','0002-clock-choice-and-sleep.md','flutter-doctor.txt','0005-tray-manager-pin.md'].map((name,index)=>msg(`output-${index}`,'tool','Written',{toolName:'Write',toolStatus:'success',toolArgs:{path:`/isolated/music/docs/${name}`}}));
     const usageMessages=previewMessages.map(message=>message.id==='activity-text'?{...message,providerId:provider.id,modelId:'qwen3.8-max',usage:{inputTokens:27520,outputTokens:1024,totalTokens:28544},responseDurationMs:32000}:message.id==='activity-child-answer'?{...message,usage:{inputTokens:900000,outputTokens:1000}}:message);
     set({messages:usageMessages,retainedTranscripts:{'activity-a':usageMessages,'activity-b':second},settings:{...useAppStore.getState().settings!,contextUsageDisplay:'used'}});
     await until(()=>meter()?.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')==='11','context progress did not use real parent-message usage');
     check(Boolean(meter()?.textContent?.includes('11%')),'context percentage and progress bar agree');
+    check(meter()?.querySelector('.composer-usage-label')?.textContent === i18n.t('chat.usageContextLabel'), 'known context footer includes its visible label');
     const track=meter()!.querySelector('.composer-usage-context-track')!.getBoundingClientRect();const fill=meter()!.querySelector('.composer-usage-context-fill')!.getBoundingClientRect();
     check(Math.abs(fill.width/track.width-28544/262144)<.01,'bar width uses reported tokens over configured context window');
     check(meter()!.getBoundingClientRect().right>=host.querySelector('.composer-shell')!.getBoundingClientRect().right-10,'context meter is right aligned below the input');
@@ -288,7 +352,51 @@ export async function sessionActivityIntegrationProbe() {
       if(scene==='profile'||scene==='models'){await until(()=>Boolean(document.querySelector(scene==='profile'?'.composer-profile-menu.is-open':'.composer-model-menu.is-open')),'Preview portal did not settle');const menu=document.querySelector<HTMLElement>(scene==='profile'?'.composer-profile-menu':'.composer-model-menu')!;const bounds=menu.getBoundingClientRect();check(getComputedStyle(menu).opacity==='1'&&getComputedStyle(menu).visibility==='visible',`${scene} preview menu is visibly open`);check(menu.contains(document.elementFromPoint(bounds.left+bounds.width/2,bounds.top+bounds.height/2)),`${scene} preview menu is visually above chat`);}
       if(scene==='narrow'){check(meter()!.getBoundingClientRect().right<=host.querySelector('.composer-shell')!.getBoundingClientRect().right+2,'narrow context meter remains reachable');check(host.scrollWidth<=host.clientWidth,'498 pixel composer has no horizontal overflow');const narrowCard=host.querySelector('.session-pane[data-visible="true"] .subagent-tasks-card')!;check(Math.abs(narrowCard.getBoundingClientRect().width-narrowCard.closest('.message-col')!.getBoundingClientRect().width)<=2,'narrow task card fills reading column');const box=host.querySelector('.composer-shell')!.getBoundingClientRect();check(host.querySelector('.send-btn')!.getBoundingClientRect().right<=box.right,'narrow send stays in shell');}
     };
-    await globalThis.composerDesignScene('narrow');await globalThis.composerDesignScene('default');
+    // Real dock geometry: both themes and enlarged type retain the relocated
+    // picker, action button and labeled usage footer inside the reading region.
+    const originalScale = host.style.getPropertyValue('--font-scale');
+    const narrowPluginDisposers: (() => void)[] = [];
+    flushSync(() => {
+      for (const side of ['left', 'right'] as const) {
+        narrowPluginDisposers.push(slotRegistry.register(`toolbar-narrow-${side}`, {
+          slot: 'composerControl', positions: [side],
+          component: ({ position }: { position: 'left' | 'right' }) => <Button variant="ghost" data-toolbar-plugin={position}>P</Button>,
+        }, []));
+      }
+    });
+    try {
+      for (const appearance of ['dark', 'light']) {
+        document.documentElement.setAttribute('data-theme', appearance);
+        host.style.setProperty('--font-scale', '1.4');
+        await globalThis.composerDesignScene('narrow');
+        await globalThis.composerDesignScene('models');
+        // Resize with the real menu open: its viewport hook must re-position it.
+        host.style.width = '498px';
+        window.dispatchEvent(new Event('resize'));
+        await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+        const menu = document.querySelector<HTMLElement>('.composer-model-menu')!;
+        await Promise.all(menu.getAnimations().map(animation => animation.finished));
+        const bounds = menu.getBoundingClientRect();
+        check(bounds.left >= 0 && bounds.right <= window.innerWidth && bounds.top >= 0 && bounds.bottom <= window.innerHeight, `${appearance} enlarged narrow model menu stays in viewport`);
+        escape();
+        const shellBounds = host.querySelector('.composer-shell')!.getBoundingClientRect();
+        for (const selector of ['.composer-model-thinking-chip', '.send-btn', '.composer-usage-context-btn', '[data-toolbar-plugin="left"]', '[data-toolbar-plugin="right"]']) {
+          const control = host.querySelector<HTMLElement>(selector)!;
+          const box = control.getBoundingClientRect();
+          check(box.left >= shellBounds.left - 1 && box.right <= shellBounds.right + 1 && box.width > 0 && box.height > 0, `${appearance} enlarged narrow ${selector} remains reachable inside composer`);
+        }
+        const toolbarBoxes = [...host.querySelectorAll<HTMLElement>('.composer-toolbar button:not([disabled])')].map(control => control.getBoundingClientRect());
+        check(toolbarBoxes.every((first, index) => toolbarBoxes.slice(index + 1).every(second => first.right <= second.left + 1 || second.right <= first.left + 1 || first.bottom <= second.top + 1 || second.bottom <= first.top + 1)), `${appearance} enlarged narrow toolbar controls never overlap with plugins`);
+        check(host.scrollWidth <= host.clientWidth, `${appearance} enlarged narrow composer has no horizontal overflow`);
+        check(meter()?.querySelector('.composer-usage-label')?.textContent === i18n.t('chat.usageContextLabel'), `${appearance} enlarged context label remains visible`);
+      }
+    } finally {
+      flushSync(() => narrowPluginDisposers.forEach(dispose => dispose()));
+      if (originalScale) host.style.setProperty('--font-scale', originalScale);
+      else host.style.removeProperty('--font-scale');
+    }
+    document.documentElement.setAttribute('data-theme', 'dark');
+    await globalThis.composerDesignScene('default');
     // Exercise the public history/navigation service with only its Host read edge replaced.
     const historicalWrite = msg("earlier-write", "tool", "Written", { toolName: "Write", toolStatus: "success", toolArgs: { path: "history/earlier.txt" } });
     const historyMessages = [historicalWrite, ...previewSkillMessages];
@@ -407,6 +515,7 @@ export async function sessionActivityIntegrationProbe() {
     const changedRow = rail()?.querySelector('[data-activity-item-id="change:/isolated/music/docs/0001-deadline-based-timer.md"]');
     check(changedRow?.textContent?.includes(i18n.t("panel.activity.writeCount", { count: 2 })) && changedRow?.querySelector('.session-activity-line-changes')?.textContent === "+3−1", 'merged output displays complete Host review evidence');
     await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    checks.push('E2E-COMPOSER-toolbar-footer');
     globalThis.cleanupSessionActivityIntegrationProbe=cleanup;return {ok:true,checks};
   }catch(error){cleanup();throw error;}
 }
