@@ -1584,6 +1584,20 @@ also require every approved research member's active turn to end. The Lead's
 own active synthesis turn is permitted; existing Team activity revisions wake
 wait_for_updates after research settlement.
 
+### Expert Team launch route validation
+
+Launch review edits validate enabled providers and configured or cached model
+identities without making provider calls. The configured model binding owns
+non-empty `thinkingLevels`; deprecated provider compatibility reasoning/level
+fields do not override it. `off` and `omit` remain valid (`omit` sends no
+provider parameter). An empty configured binding permits canonical manual
+thinking requests, with the selected native model's final normalization still
+owned by runtime. Catalog-only capability labels do not imply an effort ladder:
+without a binding, only `off`/`omit` are accepted. Missing/disabled routes and
+unsupported explicit binding levels retain `TEAM_MODEL_SELECTION_INVALID`.
+Trusted review edits may update a single member; confirmation always revalidates
+the entire review before creating or updating any expert session.
+
 ### Mandatory Expert Team delegation
 
 Expert Team requires `delegate` with at least one named expert. `lead_only` is
