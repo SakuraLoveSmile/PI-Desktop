@@ -687,6 +687,7 @@
     },
     {
       "id": "tool-admission",
+      "scenarioIds": ["E2E-RUNTIME-shell-capacity-diagnostics"],
       "family": "runtime-provider",
       "script": "scripts/e2e-tool-admission.mjs",
       "tier": "nightly",

@@ -312,9 +312,14 @@ async fn bounded_queue_rejects_overflow_and_recovers_after_cancellation() {
     assert_eq!(budget.snapshot().queued, MAX_QUEUED_TOOLS);
     let mut overflow = Box::pin(budget.acquire("overflow", "Bash"));
     match poll_once(overflow.as_mut()) {
-        Poll::Ready(Err(error @ AdmissionError::QueueFull { queue_depth })) => {
+        Poll::Ready(Err(error @ AdmissionError::QueueFull { queue_depth, .. })) => {
             assert_eq!(queue_depth, MAX_QUEUED_TOOLS + 1);
             assert_eq!(error.code(), "HOST_OVERLOADED");
+            let capacity = serde_json::to_value(error.diagnostics().unwrap()).unwrap();
+            assert_eq!(capacity["host"]["queued"], 64);
+            assert_eq!(capacity["host"]["shellQueued"], 64);
+            assert_eq!(capacity["session"]["queued"], 0);
+            assert_eq!(capacity["holders"].as_array().unwrap().len(), 4);
         }
         _ => panic!("queue overflow must reject admission immediately"),
     }
@@ -372,8 +377,16 @@ async fn timeout_removes_only_its_queue_entry_and_preserves_running_capacity() {
         .acquire_with_timeout("timed-out", "Bash", Duration::ZERO)
         .await;
     match result {
-        Err(error @ AdmissionError::QueueWaitTimeout) => {
+        Err(error @ AdmissionError::QueueWaitTimeout { .. }) => {
             assert_eq!(error.code(), "HOST_OVERLOADED");
+            let message = error.message();
+            assert!(message.contains("host: 4 in-flight, 2 queued"), "{message}");
+            assert!(
+                message.contains("session: 0 in-flight, 1 queued"),
+                "{message}"
+            );
+            assert!(message.contains("wait_for_updates"), "{message}");
+            assert!(message.contains("sleep"), "{message}");
         }
         _ => panic!("exhausted capacity must time out without admission"),
     }
@@ -417,5 +430,68 @@ async fn dispatch_skips_a_blocked_class_for_the_oldest_runnable_request() {
     assert_eq!(budget.snapshot().active, 16);
     assert_eq!(budget.snapshot().queued, 0);
     drop((write_permit, shell_permit, running));
+    assert_eq!(budget.snapshot().active, 0);
+}
+
+#[tokio::test]
+async fn shell_rejection_counts_own_session_and_other_classes_without_exposing_commands() {
+    let budget = ToolBudget::new();
+    let mut running = Vec::new();
+    for _ in 0..3 {
+        running.push(budget.acquire("own-session", "Bash").await.unwrap());
+    }
+    running.push(budget.acquire("other-session", "Bash").await.unwrap());
+    running.push(budget.acquire("own-session", "Read").await.unwrap());
+    let mut own_waiter = Box::pin(budget.acquire("own-session", "Bash"));
+    let mut other_waiter = Box::pin(budget.acquire("other-session", "Bash"));
+    assert!(poll_once(own_waiter.as_mut()).is_pending());
+    assert!(poll_once(other_waiter.as_mut()).is_pending());
+    let error = match budget
+        .acquire_with_timeout("own-session", "Bash", Duration::ZERO)
+        .await
+    {
+        Err(error) => error,
+        Ok(_) => panic!("saturated shell admission must fail"),
+    };
+    let capacity = serde_json::to_value(error.diagnostics().unwrap()).unwrap();
+    assert_eq!(
+        capacity,
+        serde_json::json!({
+            "host": {"inFlight": 5, "queued": 3, "shellInFlight": 4, "shellQueued": 3},
+            "session": {"inFlight": 4, "queued": 2, "shellInFlight": 3, "shellQueued": 2},
+            "holders": [
+                {"sessionId": "other-session", "tool": "Bash", "inFlight": 1},
+                {"sessionId": "own-session", "tool": "Bash", "inFlight": 3}
+            ]
+        })
+    );
+    assert!(error.message().contains("own-session:Bash x3"));
+    assert!(error
+        .message()
+        .contains("background execution uses the same capacity"));
+    assert_eq!(budget.snapshot().queued, 2);
+    drop((own_waiter, other_waiter, running));
+    assert_eq!(budget.snapshot().active, 0);
+    assert_eq!(budget.snapshot().queued, 0);
+}
+
+#[tokio::test]
+async fn non_shell_admission_errors_keep_their_existing_message() {
+    let budget = ToolBudget::new();
+    let first = budget.acquire("own-session", "Edit").await.unwrap();
+    let error = match budget
+        .acquire_with_timeout("own-session", "Write", Duration::ZERO)
+        .await
+    {
+        Err(error) => error,
+        Ok(_) => panic!("same-session mutation must wait"),
+    };
+    assert!(error.diagnostics().is_none());
+    assert_eq!(
+        error.message(),
+        "host tool capacity did not become available in time"
+    );
+    drop(first);
+    assert_eq!(budget.snapshot().queued, 0);
     assert_eq!(budget.snapshot().active, 0);
 }

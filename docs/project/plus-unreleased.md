@@ -2,6 +2,11 @@
 
 Upstream v0.15.6 → v0.16.1 has been merged.
 
+- Saturated Bash admission reports host/session in-flight and queued counts,
+  safe holder session identities, and actionable guidance. Team prompts and Bash
+  descriptions discourage sleep polling; background commands retain the same
+  capacity until exit. Existing limits and the 30-second wait are unchanged.
+
 - Overview adds actionable attention for approvals, failures, timeouts and
   degraded reports, separates live status from artifacts, and groups Team members
   independently. Loaded-history notices and paging are per group. Repeated file
