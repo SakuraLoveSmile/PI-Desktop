@@ -80,6 +80,7 @@ pub(super) fn callback(db: &Database, message: &Message) -> Result<Option<Messag
         "turnId":message.turn_id,"status":message.status,"result":message.result,"error":message.error}).to_string();
     let at = ms_to_ts(now_ms());
     let receipt = Message {
+        sender_head: None,
         id: Uuid::new_v4().to_string(),
         plugin_id: message.plugin_id.clone(),
         source_session_id: message.target_session_id.clone(),

@@ -643,16 +643,30 @@ describe("planning research boundary", () => {
 });
 
 describe("approved Lead execution inbox", () => {
+  it("includes advisory write counts in the visible team status", async () => {
+    const counts = [{ memberSessionId: "member", memberName: "Builder", count: 2 }];
+    const call = vi.fn(async (method: string) => {
+      if (method === "team.getRoster") return { teamSessionId: "lead", paused: false, members: [] };
+      if (method === "team.getBoard") return { teamSessionId: "lead", revision: 3, tasks: [], readiness: [], scopeOverlaps: [], outOfScopeWriteCount: 2, outOfScopeWrites: counts };
+      if (method === "team.getPlanning") return null;
+      throw new Error(`Unexpected ${method}`);
+    });
+    const tools = createTeamTools({ teamSessionId: "lead", callerSessionId: "lead", isLead: true, host: { call } as unknown as RuntimeHost });
+    const status = await tools.find(tool => tool.name === "team_status")!.execute("status", {});
+    if (status.content[0].type !== "text") throw new Error("Missing Team status text");
+    expect(JSON.parse(status.content[0].text)).toMatchObject({ outOfScopeWriteCount: 2, outOfScopeWrites: counts });
+  });
   it("returns full authenticated messages as Team tool results and suppresses reread duplicates", async () => {
     const calls: unknown[] = [];
     const host: RuntimeHost = { call: async <T>(method: string, params?: unknown): Promise<T> => {
       calls.push([method, params]);
-      return { turnId: "approved-turn", messages: [{ id: "result", content: "Complete expert source findings", sourceSessionId: "expert", sourceMemberName: "Researcher" }] } as T;
+      return { turnId: "approved-turn", messages: [{ id: "result", content: "Complete expert source findings", senderHead: "a".repeat(40), sourceSessionId: "expert", sourceMemberName: "Researcher" }] } as T;
     } };
     const wait = createTeamTools({ teamSessionId: "lead", callerSessionId: "lead", isLead: true, host,
       getTurnId: () => "approved-turn", approvedExecution: () => true }).find(tool => tool.name === "wait_for_updates")!;
     const first = await wait.execute("read-first", {});
     expect(first.content).toEqual([{ type: "text", text: expect.stringContaining("Complete expert source findings") }]);
+    expect(first.details).toMatchObject({ messages: [expect.objectContaining({ senderHead: "a".repeat(40) })] });
     expect(calls).toEqual([["team.readExecutionInbox", { teamSessionId: "lead", callerSessionId: "lead", expectedTurnId: "approved-turn" }]]);
     const controller = new AbortController(); controller.abort();
     const duplicate = await wait.execute("read-again", {}, controller.signal);

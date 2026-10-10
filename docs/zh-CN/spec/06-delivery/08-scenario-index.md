@@ -119,6 +119,7 @@ IDs come from executable result/test calls and annotated dynamic suites. 文档�
 | restart | sessions | smoke | [scripts/e2e-suite-core.mjs](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-core.mjs) restart | Public Host RPC against fresh temporary workspace/data; no model or external service.  |
 | session-activity-aggregate | sessions | nightly | [scripts/e2e-session-activity-aggregate.mjs](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-session-activity-aggregate.mjs)  | Real Host RPC, production IPC adapter and renderer reader against fresh temporary data; synthetic persisted messages, no provider or user profile.  |
 | session-activity-history | sessions | nightly | [scripts/e2e-session-activity-history.mjs](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-session-activity-history.mjs)  | Real isolated Rust Host and Electron renderer through the production IPC/reader/Overview; tail-only transcript and synthetic persisted evidence, no user profile or provider.  |
+| team-write-scope | goals-team | nightly | [scripts/e2e-team-write-scope.mjs](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-team-write-scope.mjs)  | Isolated real Host, runtime tool/message boundaries and temporary Git; no model calls or user profile.  |
 
 ## Executable IDs
 
@@ -236,6 +237,7 @@ IDs come from executable result/test calls and annotated dynamic suites. 文档�
 | E2E-TEAM-member-failure-wakes-lead | [scripts/e2e-team-member-failure.mjs:18](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-team-member-failure.mjs#L18); [scripts/e2e-suite-catalog.json (team-member-failure)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
 | E2E-TEAM-task-completion | [scripts/e2e-team-task-completion.mjs:14](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-team-task-completion.mjs#L14) |
 | E2E-TEAM-turn-renders-chronological-timeline | [scripts/e2e-team-planning.mjs:480](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-team-planning.mjs#L480) |
+| E2E-TEAM-write-scope-warning | [scripts/e2e-team-write-scope.mjs:17](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-team-write-scope.mjs#L17); [scripts/e2e-suite-catalog.json (team-write-scope)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
 | E2E-TURN-GET | [scripts/e2e-turn-get.mjs:90](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-turn-get.mjs#L90) |
 | E2E-TURN-GET-001 | [scripts/e2e-turn-get.mjs:209](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-turn-get.mjs#L209) |
 | E2E-TURN-GET-002 | [scripts/e2e-turn-get.mjs:239](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-turn-get.mjs#L239) |

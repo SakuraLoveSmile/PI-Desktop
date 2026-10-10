@@ -524,3 +524,31 @@ Host failure delivery also survives post-commit checkpoint I/O errors: the error
 remains observable, while the already durable queued notice emits its existing
 wake event. A terminal replay may re-notify that same pending row; no second
 notice is inserted, and a consumed/running notice is not emitted again.
+
+
+## Amendment: Advisory write scopes and dispatch HEAD (2026-10-11)
+
+The shared tree remains a coordination surface, not a per-member worktree or a
+new permission boundary. The Host attributes successful Write/Edit calls only
+to non-deleted, owned tasks explicitly started in the member's current turn at
+their current revision. Non-empty task scopes are combined for that turn;
+unstarted/historical owned tasks grant no scope. Canonical paths and directory
+component boundaries follow the existing filesystem resolver. Empty scopes,
+session scratch files, failed mutations and Bash writes are excluded.
+
+An out-of-scope mutation succeeds and carries an informational `scopeWarning`.
+The existing KV track keeps one count per member/turn/tool-call identity; the
+existing board RPC exposes total and per-member counts. Tracking failures stay
+observable without falsifying a committed write as a failed mutation. The Lead
+prompt asks file-editing tasks to declare scopes before parallel dispatch.
+
+Team sends also capture the sender project's Git commit identity outside the
+state lock with bounded, hardened metadata execution. After the await, Host
+rechecks project ownership and ordinary Team authorization. The immutable body,
+permission ceiling and idempotency semantics are preserved. A Host-only KV
+stamp is carried by optional `senderHead` collaboration/origin metadata into
+live member input and restored history; replay retains the original stamp.
+Non-Git/unborn senders omit it; unexpected probe failures log a bounded diagnostic
+and do not block dispatch. Only the commit SHA is exposed, never paths, Git
+configuration or stderr. Deletion cleans owned counts/stamps. No new RPC,
+SQLite migration, automatic abort or stronger write restriction is introduced.

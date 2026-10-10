@@ -14,11 +14,15 @@ mod session_activity_rpc;
 mod session_notes_rpc;
 #[cfg(test)]
 mod subagent_settings_tests;
+mod team_dispatch_head;
 #[cfg(test)]
 mod team_expert_config_tests;
+mod team_mailbox;
 #[cfg(test)]
 mod team_planning_tests;
 mod team_rpc;
+#[cfg(test)]
+mod team_write_scope_tests;
 mod todos;
 
 #[cfg(test)]
@@ -4283,6 +4287,16 @@ async fn handle_request_inner(
                 false
             };
             let mut background_owned = false;
+            let scope_context = {
+                let st = state.lock().await;
+                crate::team::write_scopes::capture(
+                    &st.db,
+                    &p.session_id,
+                    p.turn_id.as_deref(),
+                    &p.tool_name,
+                )
+                .map_err(team_rpc_err)?
+            };
             {
                 let st = state.lock().await;
                 crate::team::planning::validate_tool(&st.db, &p.session_id, &p.tool_name)
@@ -4892,6 +4906,7 @@ async fn handle_request_inner(
                 // Scratch files are temp by definition: keep them out of the
                 // artifacts table so the work panel file list only shows
                 // workspace deliverables (D114).
+                crate::team::write_scopes::annotate_observable(&st.db, scope_context.as_ref(), ws_path.as_deref(), &p.tool_call_id, &mut result);
                 let result_root = result.content.get("root").and_then(|v| v.as_str());
                 if result.ok
                     && result_root == Some("workspace")
