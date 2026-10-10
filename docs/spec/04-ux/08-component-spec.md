@@ -4976,6 +4976,19 @@ Overview section explicitly says Session checklist and keeps its independent
 inline ordered list. Both lists retain live updates and existing recovery/lifecycle
 semantics; this presentation supersedes the earlier centered-capsule geometry.
 
+The Goal disclosure is the first normal-flow child of the chat input card,
+above the editor and toolbar. It has no separate card border, corner radius,
+background or external gap; one bottom divider separates it from the editor.
+The header exposes one visible, live status: loading progress during its first
+read, the execution phase with an indeterminate indicator after a successful
+read without a snapshot, or the recorded count and execution phase once items
+exist. Missing progress never fabricates 0/0 or a percentage. Pending expert
+review overrides ordinary progress presentation; read failures stay visible.
+True counts remain announced without duplicating the visible state label.
+Disclosure, terminal report removal and session isolation retain their current
+behavior. Scheduled instruction cards do not mount this Goal disclosure and
+keep their existing shell appearance.
+
 ### Expert Team settings and reference-aligned Overview (2026-10-08)
 
 Settings exposes an Expert Team destination under Agent configuration. The page

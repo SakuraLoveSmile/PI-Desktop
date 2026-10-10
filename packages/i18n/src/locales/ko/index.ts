@@ -693,7 +693,7 @@ export const ko = {
   goal: {
     progressLabel: "목표 진행 상황",
     progressListLabel: "목표 작업 목록",
-    progressInitializing: "준비 중…",
+    progressInitializing: "진행 상황 불러오는 중…",
     progressFailed: "진행 상황을 사용할 수 없음",
     planning: "목표 정의 중",
     approvalRegion: "목표 승인",

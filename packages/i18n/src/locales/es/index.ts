@@ -684,7 +684,7 @@ export const es = {
   "goal": {
     "progressLabel": "Progreso del objetivo",
     "progressListLabel": "Lista de tareas del objetivo",
-    "progressInitializing": "Preparando…",
+    "progressInitializing": "Cargando progreso…",
     "progressFailed": "Progreso no disponible",
     "planning": "Definición de meta",
     "approvalRegion": "Aprobación de meta",

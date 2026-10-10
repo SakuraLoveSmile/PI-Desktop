@@ -17610,6 +17610,17 @@ isolated renderer fixture also checks narrow layout, existing out-of-order
 Goal updates, session switching, report completion, and interrupted execution.
 No live model or user profile is used.
 
+#### E2E-GOAL-inline-input-status
+
+Start an approved Goal in the chat Composer. Its title disclosure is inside the
+same input card, above the editor, with only a divider. While the first progress
+read is pending show one loading status; resolve it without a snapshot and show
+one Running status with an indeterminate indicator, never Preparing or 0/0.
+Publish real items and check count updates, expand/collapse the labeled list,
+pending expert review, visible read errors, session switching and ready-report
+removal. At narrow widths and enlarged text the title/status remain reachable.
+The scheduled instruction editor keeps its original card and minimum height.
+
 ### Session checklist relocation to Overview
 
 `node scripts/e2e-todo-checklist.mjs` mounts the actual OverviewTab with real

@@ -684,7 +684,7 @@ export const fr = {
   "goal": {
     "progressLabel": "Progression de l’objectif",
     "progressListLabel": "Liste des tâches de l’objectif",
-    "progressInitializing": "Préparation…",
+    "progressInitializing": "Chargement de la progression…",
     "progressFailed": "Progression indisponible",
     "planning": "Définition de l'objectif",
     "approvalRegion": "Approbation de l'objectif",

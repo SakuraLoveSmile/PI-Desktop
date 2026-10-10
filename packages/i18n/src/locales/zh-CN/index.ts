@@ -848,7 +848,7 @@ export const zhCN = {
   goal: {
     progressLabel: "目标进度",
     progressListLabel: "目标任务清单",
-    progressInitializing: "准备中…",
+    progressInitializing: "加载进度…",
     progressFailed: "进度读取失败",
     planning: "正在明确目标",
     approvalRegion: "目标审批",

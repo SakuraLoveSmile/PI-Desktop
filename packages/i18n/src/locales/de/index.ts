@@ -684,7 +684,7 @@ export const de = {
   "goal": {
     "progressLabel": "Zielfortschritt",
     "progressListLabel": "Aufgabenliste des Ziels",
-    "progressInitializing": "Vorbereitung läuft…",
+    "progressInitializing": "Fortschritt wird geladen…",
     "progressFailed": "Fortschritt nicht verfügbar",
     "planning": "Ziel definieren",
     "approvalRegion": "Zielgenehmigung",

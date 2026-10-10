@@ -711,7 +711,10 @@
       "family": "transcript",
       "script": "scripts/e2e-transcript-render.mjs",
       "tier": "nightly",
-      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked.",
+      "scenarioIds": [
+        "E2E-GOAL-inline-input-status"
+      ]
     },
     {
       "id": "trusted-extensions",

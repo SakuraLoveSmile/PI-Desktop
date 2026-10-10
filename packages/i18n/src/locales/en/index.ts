@@ -856,7 +856,7 @@ export const en = {
   goal: {
     progressLabel: "Goal progress",
     progressListLabel: "Goal task list",
-    progressInitializing: "Preparing…",
+    progressInitializing: "Loading progress…",
     progressFailed: "Progress unavailable",
     planning: "Defining goal",
     approvalRegion: "Goal approval",

@@ -173,6 +173,7 @@ IDs come from executable result/test calls and annotated dynamic suites. 文档�
 | E2E-DELEGATION-standard-delegates-to-subagents | [scripts/e2e-subagent-models.mjs:352](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-subagent-models.mjs#L352) |
 | E2E-fatal | [scripts/e2e-smoke.mjs:836](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-smoke.mjs#L836) |
 | E2E-fixed-tool-declarations | [scripts/e2e-fixed-tool-declarations.mjs:50](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-fixed-tool-declarations.mjs#L50) |
+| E2E-GOAL-inline-input-status | [scripts/e2e-suite-catalog.json (transcript-render)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
 | E2E-GOAL-REPORT-001 | [scripts/e2e-goal-report.mjs:67](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-goal-report.mjs#L67) |
 | E2E-GOAL-REPORT-002 | [scripts/e2e-goal-report.mjs:250](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-goal-report.mjs#L250) |
 | E2E-GOAL-REPORT-003 | [scripts/e2e-goal-report.mjs:381](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-goal-report.mjs#L381) |

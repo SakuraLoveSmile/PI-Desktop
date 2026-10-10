@@ -120,7 +120,7 @@ test("capsule state does not show fake 0/0 or 0% when uninitialized or failed", 
     progress: null,
   });
   assert.equal(loadState.kind, "initializing");
-  assert.equal(loadState.message, "准备中...");
+  assert.equal(loadState.message, "加载进度...");
 
   // Progress with empty items
   const emptyState = resolveGoalCapsuleState({
@@ -128,8 +128,15 @@ test("capsule state does not show fake 0/0 or 0% when uninitialized or failed", 
     error: null,
     progress: { items: [] },
   });
-  assert.equal(emptyState.kind, "initializing");
-  assert.equal(emptyState.message, "准备中...");
+  assert.deepEqual(emptyState, { kind: "indeterminate", message: "执行中" });
+
+  const localizedLoading = resolveGoalCapsuleState({
+    loading: true,
+    error: null,
+    progress: { items: [] },
+    labels: { running: "Running", initializing: "Loading progress" },
+  });
+  assert.deepEqual(localizedLoading, { kind: "initializing", message: "Loading progress" });
 
   // Real progress with 3 of 5 completed
   const progressState = resolveGoalCapsuleState({
@@ -149,4 +156,15 @@ test("capsule state does not show fake 0/0 or 0% when uninitialized or failed", 
   assert.equal(progressState.completedCount, 3);
   assert.equal(progressState.totalCount, 5);
   assert.equal(progressState.ratio, 0.6);
+});
+
+test("a completed read without progress is indeterminate execution rather than loading", () => {
+  for (const progress of [null, { items: [] }]) {
+    assert.deepEqual(resolveGoalCapsuleState({
+      loading: false,
+      error: null,
+      progress,
+      labels: { running: "Running", initializing: "Loading progress" },
+    }), { kind: "indeterminate", message: "Running" });
+  }
 });
