@@ -803,6 +803,34 @@ token (`writeToken`) from the Host and exposes the `UpdateGoalProgress` tool to 
 - **Lifecycle Cleanup:** When the goal execution completes, aborts, errors, or the runtime is disposed,
   the tool is removed and the write token is invalidated on the Host.
 
+### Goal completion report consistency
+
+Approved Goal execution instructions require `UpdateGoalProgress` for the Goal
+checklist when that tool is available. `TodoWrite` manages the separate session
+checklist and does not replace Goal progress updates. Before claiming `met`,
+the Agent must reconcile every Goal item to `completed`; runtime and Host reject
+`met` drafts with pending, in-progress, or failed items. An absent snapshot stays
+compatible with existing callers. Honest `partial`, `blocked`, and `unknown`
+reports may retain unfinished items; no report silently marks them completed.
+The Host also checks the latest progress at finalization.
+
+`SubmitGoalReport` records a draft, not a finalized result. Known read-only tools
+and bookkeeping (`TodoWrite`, `UpdateGoalProgress`, `ToolSearch`) preserve the
+draft. Evidence-changing tools, unknown extension tools, and user steering
+invalidate it; the tool result warns the Agent to resubmit after such work.
+If successful Goal execution ends without a valid draft, the runtime requests
+one report-only continuation at most, preserving the same execution and single
+terminal lifecycle. Errors, cancellation, and interruption do not trigger it.
+If this continuation still leaves no valid report, normal Host fallback applies.
+
+A fallback retains bounded steps from the same execution's last Goal progress
+snapshot. Completed and failed items keep those statuses; pending/in-progress
+items are shown as skipped with their exact snapshot status in the detail,
+without claiming they were completed. At least one completed item yields
+`partial`, failed-only work yields `blocked`, and no demonstrated completion or
+failure remains `unknown`. Fallback integrity stays visible and never implies
+that the Goal contract was met. No existing stored reports are rewritten.
+
 ## 5c. Thinking capability and stream contract
 
 - Canonical levels are `off`, `minimal`, `low`, `medium`, `high`, `xhigh`,

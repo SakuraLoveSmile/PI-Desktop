@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { GoalProgressSnapshot } from "@pi-desktop/shared";
 import {
   GoalReportDraftManager,
   persistGoalReportFailure,
@@ -6,6 +7,112 @@ import {
 } from "./goal-report-tool.js";
 
 describe("GoalReportDraftManager", () => {
+  it("does not accept a first submission invalidated by steering while Host persistence is pending", async () => {
+    let finishSubmission!: () => void;
+    const gate = new Promise<void>((resolve) => { finishSubmission = resolve; });
+    let hostDraft: string | null = null;
+    const manager = new GoalReportDraftManager({
+      sessionId: "sess-1", executionId: "exec-1",
+      onDraftSubmitted: async (draft) => { await gate; hostDraft = draft.summary; },
+      onDraftInvalidated: () => { hostDraft = null; },
+    });
+    const submission = manager.buildTool().execute("report", { summary: "Before steering", verdict: "met" });
+    await Promise.resolve();
+    await manager.invalidate();
+    finishSubmission();
+    const result = await submission;
+    expect(result.details).toMatchObject({ ok: false });
+    expect(manager.isDraftValid()).toBe(false);
+    expect(hostDraft).toBeNull();
+  });
+
+  it("drops an earlier local draft when Host rejects a replacement against newer progress", async () => {
+    const onDraftSubmitted = vi.fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(Object.assign(new Error("UpdateGoalProgress before claiming met"), { errorCode: "INVALID_ARGUMENT" }));
+    const onDraftPersistenceFailure = vi.fn();
+    const manager = new GoalReportDraftManager({ sessionId: "sess-1", executionId: "exec-1", onDraftSubmitted, onDraftPersistenceFailure });
+    await manager.buildTool().execute("before", { summary: "Previously met", verdict: "met" });
+    expect(manager.isDraftValid()).toBe(true);
+    const rejected = await manager.buildTool().execute("after", { summary: "Still met", verdict: "met" });
+    expect(rejected.details).toMatchObject({ ok: false });
+    expect(manager.isDraftValid()).toBe(false);
+    expect(onDraftPersistenceFailure).not.toHaveBeenCalled();
+  });
+  it("waits for Host invalidation before persisting a replacement draft", async () => {
+    let finishInvalidation!: () => void;
+    const gate = new Promise<void>((resolve) => { finishInvalidation = resolve; });
+    let hostDraft: string | null = null;
+    const manager = new GoalReportDraftManager({
+      sessionId: "sess-1", executionId: "exec-1",
+      onDraftSubmitted: (draft) => { hostDraft = draft.summary; },
+      onDraftInvalidated: async () => { await gate; hostDraft = null; },
+    });
+    const tool = manager.buildTool();
+    await tool.execute("first", { summary: "Before change", verdict: "met" });
+    const invalidating = manager.invalidate();
+    let replacementSettled = false;
+    const replacing = tool.execute("replacement", { summary: "After change", verdict: "met" })
+      .then(() => { replacementSettled = true; });
+    await Promise.resolve();
+    expect(replacementSettled).toBe(false);
+    finishInvalidation();
+    await Promise.all([invalidating, replacing]);
+    expect(hostDraft).toBe("After change");
+    expect(manager.isDraftValid()).toBe(true);
+  });
+
+  it("returns Host progress validation as a correctable rejection without marking persistence failed", async () => {
+    const onDraftPersistenceFailure = vi.fn();
+    const manager = new GoalReportDraftManager({
+      sessionId: "sess-1", executionId: "exec-1", onDraftPersistenceFailure,
+      onDraftSubmitted: () => { throw Object.assign(new Error("UpdateGoalProgress before claiming met"), { errorCode: "INVALID_ARGUMENT" }); },
+    });
+    const result = await manager.buildTool().execute("report", { summary: "Done", verdict: "met" });
+    expect(result.details).toMatchObject({ ok: false, error: expect.stringContaining("UpdateGoalProgress") });
+    expect(onDraftPersistenceFailure).not.toHaveBeenCalled();
+    expect(manager.isDraftValid()).toBe(false);
+  });
+  it.each(["pending", "in_progress", "failed"] as const)(
+    "requires progress reconciliation for a met report with %s work", async (status) => {
+      let snapshot: GoalProgressSnapshot = {
+        schemaVersion: 1, sessionId: "sess-1", executionId: "exec-1",
+        proposalId: "proposal-1", revision: 1, updatedAt: 1,
+        items: [{ id: "check", label: "Run checks", status }],
+      };
+      const onDraftSubmitted = vi.fn();
+      const manager = new GoalReportDraftManager({
+        sessionId: "sess-1", executionId: "exec-1", onDraftSubmitted,
+        getProgressSnapshot: () => snapshot,
+      });
+      const tool = manager.buildTool();
+      const result = await tool.execute("report", { summary: "Done", verdict: "met" });
+      expect(result.details).toMatchObject({ ok: false });
+      expect(result.content).toEqual(expect.arrayContaining([
+        expect.objectContaining({ text: expect.stringContaining("UpdateGoalProgress") }),
+      ]));
+      expect(onDraftSubmitted).not.toHaveBeenCalled();
+      expect(manager.isDraftValid()).toBe(false);
+      await tool.execute("partial", { summary: "Some work remains", verdict: "partial" });
+      expect(manager.isDraftValid()).toBe(true);
+      await tool.execute("blocked", { summary: "Cannot run checks", verdict: "blocked" });
+      expect(manager.isDraftValid()).toBe(true);
+      snapshot = { ...snapshot, revision: 2, items: [{ ...snapshot.items[0]!, status: "completed" }] };
+      const accepted = await tool.execute("reconciled", { summary: "Verified", verdict: "met" });
+      expect(accepted.details).toMatchObject({ ok: true });
+      expect(manager.isDraftValid()).toBe(true);
+      snapshot = { ...snapshot, revision: 3, items: [{ ...snapshot.items[0]!, status }] };
+      expect(manager.isDraftValid()).toBe(false);
+    },
+  );
+
+  it("warns that further evidence-changing tools require report resubmission", async () => {
+    const manager = new GoalReportDraftManager({ sessionId: "sess-1", executionId: "exec-1" });
+    const result = await manager.buildTool().execute("report", { summary: "Done", verdict: "met" });
+    expect(result.content).toEqual(expect.arrayContaining([
+      expect.objectContaining({ text: expect.stringMatching(/invalidate.*SubmitGoalReport/) }),
+    ]));
+  });
   it("marks draft persistence failures against their owning session", async () => {
     const host = { call: vi.fn().mockResolvedValue(undefined) };
     const execution = { sessionId: "sess-1", executionId: "exec-1" };

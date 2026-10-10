@@ -13,6 +13,9 @@ use super::{emit_notification, rpc_err, AppState, JsonRpcError};
 
 fn goal_report_rpc_err(error: impl ToString) -> JsonRpcError {
     let message = error.to_string();
+    if message.starts_with("INVALID_ARGUMENT:") {
+        return rpc_err(1002, message, "INVALID_ARGUMENT");
+    }
     if message.starts_with("PERMISSION_DENIED:") {
         return rpc_err(
             1007,
@@ -129,7 +132,7 @@ pub(super) async fn handle(
                 .ok_or_else(|| rpc_err(1002, "draft required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
             crate::goal_reports::submit_draft(&st.db, execution_id, draft)
-                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+                .map_err(goal_report_rpc_err)?;
             Ok(json!({ "ok": true }))
         }
         "goalReports.finalizeReport" => {
@@ -393,5 +396,90 @@ pub(super) async fn handle(
             format!("method not found: {method}"),
             "NOT_FOUND",
         )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::params;
+
+    #[tokio::test]
+    async fn submit_draft_progress_mismatch_returns_actionable_validation_error() {
+        let data = tempfile::tempdir().unwrap();
+        let app = AppState::open(data.path()).unwrap();
+        app.db
+            .conn()
+            .execute(
+                "INSERT INTO sessions (id, title, mode, permission_mode, created_at, updated_at)
+             VALUES ('session-progress-rpc', 'Goal', 'agent', 'auto', 1, 1)",
+                [],
+            )
+            .unwrap();
+        app.db
+            .conn()
+            .execute(
+                "INSERT INTO plan_approvals (
+                request_id, session_id, turn_id, tool_call_id, kind, plan_json,
+                title, question, status, action, target_permission_mode,
+                created_at, updated_at, execution_id, execution_state
+             ) VALUES ('proposal-progress-rpc', 'session-progress-rpc', 'turn-rpc',
+                'tool-rpc', 'goal', '# Goal', 'Goal', 'Approve?', 'approved', 'approve',
+                'auto', 1, 1, 'execution-progress-rpc', 'running')",
+                [],
+            )
+            .unwrap();
+        app.db
+            .conn()
+            .execute(
+                "INSERT INTO kv (ns, key, value_json, updated_at) VALUES (?1, ?2, ?3, 1)",
+                params![
+                    crate::goal_progress::GOAL_PROGRESS_KV_NAMESPACE,
+                    "execution-progress-rpc",
+                    json!({
+                        "schemaVersion": 1,
+                        "sessionId": "session-progress-rpc",
+                        "proposalId": "proposal-progress-rpc",
+                        "executionId": "execution-progress-rpc",
+                        "revision": 1,
+                        "updatedAt": 1,
+                        "items": [{"id": "verify", "label": "Verify", "status": "pending"}],
+                    })
+                    .to_string(),
+                ],
+            )
+            .unwrap();
+        let state = Arc::new(Mutex::new(app));
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let error = handle(
+            state.clone(),
+            "goalReports.submitDraft",
+            json!({
+                "executionId": "execution-progress-rpc",
+                "draft": {"summary": "All complete", "verdict": "met"},
+            }),
+            tx,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(error.code, 1002);
+        assert_eq!(error.data.unwrap()["errorCode"], "INVALID_ARGUMENT");
+        assert!(error.message.contains("UpdateGoalProgress"));
+        let app = state.lock().await;
+        let count: i64 = app
+            .db
+            .conn()
+            .query_row(
+                "SELECT COUNT(*) FROM goal_reports WHERE execution_id = 'execution-progress-rpc'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 0);
+        assert!(!app
+            .db
+            .data_dir()
+            .join("goal_reports/session-progress-rpc/execution-progress-rpc.draft.json")
+            .exists());
     }
 }
