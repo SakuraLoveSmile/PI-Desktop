@@ -942,6 +942,26 @@ Expert Team state is stored in three Host-owned tables (ADR plus-expert-team-col
 - `team_tasks` stores the revisioned shared task board, owner, dependencies,
   advisory write scopes, status, and soft-delete marker.
 
+Host-managed execution claims for ordinary Agent Team tasks use the additive
+`team-task-attempt-v1` KV namespace. Keys encode `[teamSessionId, taskId]` as a
+JSON tuple; version-1 values store `schemaVersion`, Team/task identity, owner,
+associated turn/session, task revision, completion claim and settled status.
+Only explicit task status updates establish an association; opening a new turn
+never binds all owned tasks. There is no backfill for historical tasks.
+
+An active completion claim is persisted as `in_progress`, not `completed`.
+The matching turn's terminal CAS atomically settles the exact current attempt:
+completed with a claim → completed; error → failed; aborted → cancelled.
+Success without a completion claim leaves the task unfinished. Task/team
+revisions advance with changes, preserving stale-request protection. Metadata
+edits preserve a valid claim; explicit resets, reassignment, deletion and
+accepted structured Plan research results clear it. Failed/cancelled attempt
+markers prevent late completion claims until explicit retry or a new active
+verification turn. Startup recovery cancels matching interrupted attempts in
+its existing abort transaction. Team/session cleanup removes these records.
+Existing tasks without an attempt retain legacy semantics; no SQL schema or
+Plus track version changes are required for this versioned KV addition.
+
 Optional role/display-name presentation is stored in the existing Host KV
 store under namespace `team-member-presentation-v1`, keyed by durable member
 Session ID. It is copied from a `TeamLaunchReviewMember` only in the confirmed

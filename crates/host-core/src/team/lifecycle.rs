@@ -144,6 +144,7 @@ pub(crate) fn cleanup_team_on_lead_delete_conn(
     if !has_team {
         return Ok(());
     }
+    super::task_attempts::cleanup_session(conn, lead_session_id)?;
 
     let now = now_ms();
     conn.execute(

@@ -401,6 +401,28 @@ describe("Expert Team tools and prompt (ADR 0304)", () => {
     });
   });
 
+  it("explains deferred completion without asking the agent to resubmit it", async () => {
+    const host = createMockHost({ "team.updateTask": async () => ({ task: {
+      taskId: "task-pending-completion", revision: 2, status: "in_progress",
+    } }) });
+    const tool = createTeamTools({ teamSessionId: "team-1", callerSessionId: "member-1",
+      isLead: false, host, getTurnId: () => "turn-owned",
+    }).find((item) => item.name === "task_update");
+    expect(tool).toBeDefined();
+    const result = await tool!.execute("claim-complete", {
+      taskId: "task-pending-completion", expectedRevision: 1, status: "completed",
+    });
+    expect(host.call).toHaveBeenCalledWith("team.updateTask", expect.objectContaining({
+      expectedCallerTurnId: "turn-owned", status: "completed",
+    }));
+    expect(result.content[0].type).toBe("text");
+    if (result.content[0].type !== "text") throw new Error("Expected task feedback");
+    const feedback = JSON.parse(result.content[0].text);
+    expect(feedback.task.status).toBe("in_progress");
+    expect(feedback.nextStep).toContain("successful");
+    expect(feedback.nextStep).toContain("Do not repeat");
+  });
+
   it("task_create and task_update interact with host task board", async () => {
     const host = createMockHost({
       "team.createTask": async (params) => ({

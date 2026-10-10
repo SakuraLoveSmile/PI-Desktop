@@ -433,7 +433,7 @@ pub fn update_team_task(db: &Database, params: UpdateTaskParams<'_>) -> Result<T
     let blocked_by_json = serde_json::to_string(&final_blocked_by)?;
     let write_scopes_json = serde_json::to_string(&final_write_scopes)?;
 
-    crate::sessions::with_savepoint(db.conn(), "team_update_task", |_| {
+    let final_status = crate::sessions::with_savepoint(db.conn(), "team_update_task", |conn| {
         super::planning::enrol(
             db,
             team_session_id,
@@ -442,7 +442,16 @@ pub fn update_team_task(db: &Database, params: UpdateTaskParams<'_>) -> Result<T
             final_deleted,
             final_status,
         )?;
-        db.conn().execute(
+        let final_status = super::task_attempts::update(
+            conn,
+            &current,
+            caller_session_id,
+            final_owner_session_id.as_deref(),
+            final_deleted,
+            status,
+            next_revision,
+        )?;
+        let changed = db.conn().execute(
             "UPDATE team_tasks
          SET revision = ?1, subject = ?2, description = ?3, status = ?4,
              owner_session_id = ?5, owner_member_name = ?6, blocked_by_json = ?7,
@@ -464,13 +473,16 @@ pub fn update_team_task(db: &Database, params: UpdateTaskParams<'_>) -> Result<T
                 expected_revision
             ],
         )?;
+        if changed != 1 {
+            return Err(anyhow!("TEAM_TASK_REVISION_CONFLICT: task changed"));
+        }
 
         db.conn().execute(
             "UPDATE teams SET revision = revision + 1, updated_at = ?2 WHERE team_session_id = ?1",
             params![team_session_id, now],
         )?;
 
-        Ok(())
+        Ok(final_status)
     })?;
 
     Ok(TeamTask {
