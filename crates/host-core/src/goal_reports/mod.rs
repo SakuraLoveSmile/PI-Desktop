@@ -20,6 +20,7 @@ use crate::db::{now_ms, Database};
 
 pub mod assets;
 pub mod evidence;
+mod progress;
 mod read;
 
 #[allow(unused_imports)]
@@ -421,6 +422,9 @@ pub fn submit_draft(db: &Database, execution_id: &str, draft: &Value) -> Result<
         return Err(anyhow!("INVALID_ARGUMENT: execution is not a goal"));
     }
 
+    let progress = progress::load_matching_progress(db, execution_id, &facts)?;
+    progress::validate_met_progress(draft, progress.as_ref())?;
+
     let status: Option<String> = db
         .conn()
         .prepare_cached("SELECT status FROM goal_reports WHERE execution_id = ?1")?
@@ -662,11 +666,13 @@ pub fn finalize_report(
         (facts.created_at, now, "unavailable")
     };
     let draft_path = draft_file_path(db.data_dir(), &facts.session_id, execution_id);
+    let progress = progress::load_matching_progress(db, execution_id, &facts)?;
     let maybe_draft = if draft_path.exists() {
         fs::read_to_string(&draft_path)
             .ok()
             .and_then(|s| serde_json::from_str::<Value>(&s).ok())
             .filter(|draft| validate_structured_draft(draft).is_ok())
+            .filter(|draft| progress::validate_met_progress(draft, progress.as_ref()).is_ok())
     } else {
         None
     };
@@ -759,8 +765,8 @@ pub fn finalize_report(
         }
         _ => {
             // Fallback report
-            let verdict = "unknown".to_string();
-            let fallback_summary = "Execution finished without a submitted structured report; basic execution facts retained.".to_string();
+            let (verdict, steps, limitations) = progress::fallback_progress(progress.as_ref())?;
+            let fallback_summary = "Execution finished without a valid structured report; host execution facts and available agent-reported progress retained. Goal acceptance remains unverified.".to_string();
 
             let report_obj = json!({
                 "schemaVersion": GOAL_REPORT_SCHEMA_VERSION,
@@ -786,16 +792,16 @@ pub fn finalize_report(
                 "integrity": {
                     "kind": "fallback",
                     "missingFields": ["structured_draft"],
-                    "truncationNotice": "Generated from host execution facts without agent structured draft",
+                    "truncationNotice": "Generated from host execution facts and available agent-reported progress without a valid structured draft",
                 },
                 "verdict": verdict,
                 "summary": fallback_summary,
                 "metrics": [],
                 "criteria": [],
-                "steps": [],
+                "steps": steps,
                 "files": [],
                 "checks": [],
-                "limitations": [],
+                "limitations": limitations,
                 "nextSteps": [],
                 "evidences": [],
                 "assets": [],

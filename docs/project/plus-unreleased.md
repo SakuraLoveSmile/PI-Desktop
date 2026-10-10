@@ -63,6 +63,10 @@ Upstream v0.15.6 → v0.16.1 has been merged.
   prose and clearer spacing. Tool segments, including single calls, collapse
   into localized read/edit/command/search counts with visible issue counts;
   original details, search reveal and Detailed mode remain available.
+- Goal reports survive bookkeeping and known read-only tools after submission.
+  Successful executions missing a valid draft request one bounded report-only
+  continuation. Completion claims must agree with Goal progress; fallback
+  reports retain the last checklist without inventing completed work.
 
 - AskTool questions keep paragraphs and wide tables readable instead of
   squeezing them into vertical strips. Tables scroll inside the card and long

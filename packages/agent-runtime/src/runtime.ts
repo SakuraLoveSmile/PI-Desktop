@@ -18,6 +18,7 @@ import { scheduledToolParameters, scheduledToolDescriptions } from "./scheduled-
 import { withPiFileOpToolNames } from "./pi-file-ops.js";
 import {
   GoalReportDraftManager,
+  invalidatesGoalReportDraft,
   persistGoalReportFailure,
   SUBMIT_GOAL_REPORT_TOOL_NAME,
 } from "./goal-report-tool.js";
@@ -25,6 +26,7 @@ import {
   GoalProgressManager,
   UPDATE_GOAL_PROGRESS_TOOL_NAME,
 } from "./goal-progress-tool.js";
+import { GoalReportRecovery } from "./goal-report-recovery.js";
 import { randomUUID } from "node:crypto";
 import {
   settledDelegationMessage,
@@ -1834,6 +1836,7 @@ export class DesktopAgentRuntime {
   private progressTurnRerunInProgress = false;
   private suppressProgressTurnRunEnd = false;
   private readonly teamLeadExecution = new TeamLeadExecutionGuard();
+  private readonly goalReportRecovery = new GoalReportRecovery();
   private activeToolCalls = new Map<
     string,
     { toolName: string; args: unknown; startedAt: number }
@@ -6389,6 +6392,7 @@ export class DesktopAgentRuntime {
     this.silentTurnRerunInProgress = false;
     this.suppressSilentTurnRunEnd = false;
     this.teamLeadExecution.reset();
+    this.goalReportRecovery.reset();
     this.pendingProgressTurnRerun = false;
     this.progressTurnRerunAttempted = false;
     this.progressTurnRerunInProgress = false;
@@ -6513,6 +6517,7 @@ export class DesktopAgentRuntime {
       this.pendingOverflow ||
       this.pendingSilentTurnRerun ||
       this.pendingProgressTurnRerun ||
+      this.goalReportRecovery.pending ||
       this.teamLeadExecution.pending
     ) {
       if (this.pendingProviderRetry) {
@@ -6569,9 +6574,68 @@ export class DesktopAgentRuntime {
         await this.rerunTeamCompletionTurn();
         continue;
       }
-      await this.rerunProgressOnlyTurn();
+      if (this.pendingProgressTurnRerun) {
+        await this.rerunProgressOnlyTurn();
+        continue;
+      }
+      await this.rerunGoalReportTurn();
     }
     return true;
+  }
+
+  private prepareGoalReportRecovery(): boolean {
+    if (
+      !this.autonomousExecution || !this.goalReportDraftManager ||
+      this.goalReportDraftManager.isDraftValid() || this.disposed ||
+      this.runCancelled || this.gracefulStopRequested || this.turnHadError ||
+      this.pendingSubmissionOutcome || this.pendingMutationTermination ||
+      this.suppressOverflowRunEnd || this.suppressProviderRetryRunEnd ||
+      this.suppressSilentTurnRunEnd || this.suppressProgressTurnRunEnd ||
+      this.goalReportRecovery.suppressRunEnd ||
+      this.teamLeadExecution.suppressRunEnd || this.keepTurnOpenForDelegates()
+    ) return false;
+    return this.goalReportRecovery.arm();
+  }
+
+  private async rerunGoalReportTurn(): Promise<void> {
+    const epoch = this.turnEpoch;
+    const closeStoppedRecovery = () => {
+      this.goalReportRecovery.reset();
+      this.autonomousExecution = false;
+      this.goalReportDraftManager = undefined;
+      this.goalProgressManager = undefined;
+      this.rebuildToolCatalog();
+      this.setAgentTools(this.activeTools());
+      this.clearAgentActivity();
+      this.finalizeCurrentAssistant("aborted");
+      this.emit({ type: "turn_end" });
+      this.emit({ type: "agent_end", messageIds: [] });
+    };
+    // The preceding loop's terminal events were held. A stop between that
+    // loop and its recovery still needs to close the original execution.
+    if (this.runCancelled || this.disposed) {
+      closeStoppedRecovery();
+      return;
+    }
+    await this.goalReportRecovery.recover({
+      prepare: () => this.setAgentMessages(removeTrailingAssistantMessages(this.agent.state.messages)),
+      getPrompt: () => this.agentSystemPromptContent(),
+      setPrompt: prompt => this.setAgentSystemPrompt(prompt),
+      start: () => {
+        this.requestStartedAt = Date.now();
+        this.setAgentActivity({ phase: "recovering", since: Date.now() });
+      },
+      continue: async () => {
+        if (this.turnEpoch !== epoch) return;
+        if (this.disposed || this.runCancelled) {
+          closeStoppedRecovery();
+          return;
+        }
+        await this.agent.continue();
+        await this.waitForIdleAndSteering();
+      },
+      restore: () => this.applyPendingResumablePrompt(),
+    });
   }
 
   private async rerunProgressOnlyTurn(): Promise<void> {
@@ -7966,6 +8030,7 @@ export class DesktopAgentRuntime {
           this.overflowRecoveryInProgress ||
           this.silentTurnRerunInProgress ||
           this.progressTurnRerunInProgress ||
+          this.goalReportRecovery.inProgress ||
           this.teamLeadExecution.inProgress
         ) {
           break;
@@ -7978,6 +8043,7 @@ export class DesktopAgentRuntime {
           this.overflowRecoveryInProgress ||
           this.silentTurnRerunInProgress ||
           this.progressTurnRerunInProgress ||
+          this.goalReportRecovery.inProgress ||
           this.teamLeadExecution.inProgress
         ) {
           break;
@@ -7994,6 +8060,7 @@ export class DesktopAgentRuntime {
             this.overflowRecoveryInProgress ||
             this.silentTurnRerunInProgress ||
             this.progressTurnRerunInProgress ||
+            this.goalReportRecovery.inProgress ||
             this.teamLeadExecution.inProgress
               ? this.currentAssistant
               : undefined;
@@ -8024,6 +8091,7 @@ export class DesktopAgentRuntime {
             this.overflowRecoveryInProgress = false;
             this.silentTurnRerunInProgress = false;
             this.progressTurnRerunInProgress = false;
+            this.goalReportRecovery.inProgress = false;
             this.teamLeadExecution.inProgress = false;
             this.emit({ type: "message_update", message: this.currentAssistant });
           } else {
@@ -8365,6 +8433,21 @@ export class DesktopAgentRuntime {
             this.streamStartedAt = undefined;
             break;
           }
+          if (!failed && !aborted && !emptyResponse && !diagnosticError &&
+              !messageRequestsTools(event.message) && this.prepareGoalReportRecovery()) {
+            // Keep the visible response open until the bounded report recovery
+            // settles, so Host finalization observes only one execution end.
+            this.currentAssistant = {
+              ...this.currentAssistant,
+              content: nextText,
+              ...(nextThinking ? { thinking: nextThinking } : {}),
+              status: "streaming",
+              ...(usage ? { usage } : {}),
+            };
+            this.emit({ type: "message_update", message: this.currentAssistant });
+            this.streamStartedAt = undefined;
+            break;
+          }
           const responseDurationMs =
             this.streamStartedAt !== undefined
               ? Math.max(0, endedAt - this.streamStartedAt)
@@ -8429,7 +8512,7 @@ export class DesktopAgentRuntime {
         break;
       }
       case "tool_execution_start": {
-        if (event.toolName !== SUBMIT_GOAL_REPORT_TOOL_NAME) {
+        if (invalidatesGoalReportDraft(event.toolName)) {
           const reportDraft = this.goalReportDraftManager;
           if (reportDraft) {
             void reportDraft.invalidate().catch(() => {
@@ -8521,11 +8604,13 @@ export class DesktopAgentRuntime {
         }
         break;
       case "turn_end":
+        if (!messageRequestsTools(event.message) && this.prepareGoalReportRecovery()) break;
         if (
           this.suppressOverflowRunEnd ||
           this.suppressProviderRetryRunEnd ||
           this.suppressSilentTurnRunEnd ||
           this.suppressProgressTurnRunEnd ||
+          this.goalReportRecovery.suppressRunEnd ||
           this.teamLeadExecution.suppressRunEnd ||
           this.keepTurnOpenForDelegates()
         )
@@ -8574,10 +8659,12 @@ export class DesktopAgentRuntime {
           this.suppressProviderRetryRunEnd ||
           this.suppressSilentTurnRunEnd ||
           this.suppressProgressTurnRunEnd ||
+          this.goalReportRecovery.suppressRunEnd ||
           this.teamLeadExecution.suppressRunEnd ||
           this.keepTurnOpenForDelegates()
         )
           break;
+        if (this.prepareGoalReportRecovery()) break;
         this.acceptingSteering = false;
         this.retainPendingSteering();
         this.autonomousExecution = false;
@@ -8807,6 +8894,7 @@ export class DesktopAgentRuntime {
       this.goalReportDraftManager = new GoalReportDraftManager({
         executionId: execution.id,
         sessionId: execution.sessionId,
+        getProgressSnapshot: () => this.goalProgressManager?.snapshot,
         onDraftSubmitted: async (draft) => {
           // No catch here: a swallowed failure would make the tool report
           // success while the Host publishes a fallback report instead. The
@@ -8913,6 +9001,7 @@ export class DesktopAgentRuntime {
             "</approved-goal-markdown>",
             "Choose your own approach with the normal Agent tools. Then verify every acceptance criterion yourself, running the checks the contract names rather than assuming they pass.",
             "Keep working while a criterion is still unmet and you have an untried approach. Stop early only if a boundary in the contract blocks you or a criterion cannot be verified; say which one and why.",
+            "Use UpdateGoalProgress to maintain the approved Goal checklist from the start and whenever a milestone starts, completes, or fails. TodoWrite is a separate working checklist and does not update Goal progress. Before SubmitGoalReport, reconcile every existing progress item with the observed outcome; use partial or blocked when work remains incomplete.",
             "Finish with a report that walks the acceptance criteria one by one, each marked met or unmet with the evidence you observed.",
             "Call SubmitGoalReport with your final structured report (summary, verdict, metrics, criteria checklist, steps, and verification evidence) once your verification is complete.",
           ].join("\n")
@@ -9244,6 +9333,7 @@ export class DesktopAgentRuntime {
     // continuation will consume steering after repairing the context/backoff.
     if (this.suppressOverflowRunEnd || this.suppressProviderRetryRunEnd ||
         this.suppressSilentTurnRunEnd || this.suppressProgressTurnRunEnd ||
+        this.goalReportRecovery.suppressRunEnd ||
         this.teamLeadExecution.suppressRunEnd) return;
     while (this.pendingSteering.size && this.acceptingSteering && !this.runCancelled && !this.turnHadError) {
       this.steeringContinuation = true;
@@ -9258,6 +9348,7 @@ export class DesktopAgentRuntime {
           this.suppressProviderRetryRunEnd ||
           this.suppressSilentTurnRunEnd ||
           this.suppressProgressTurnRunEnd ||
+          this.goalReportRecovery.suppressRunEnd ||
           this.teamLeadExecution.suppressRunEnd
         ) return;
       } finally {
@@ -9286,7 +9377,7 @@ export class DesktopAgentRuntime {
 
   /** Ask pi-agent-core to stop after the current assistant/tool turn. */
   requestGracefulStop(): { requested: boolean } {
-    if (this.teamLeadExecution.suppressRunEnd) { void this.abort(); return { requested: true }; }
+    if (this.teamLeadExecution.suppressRunEnd || this.goalReportRecovery.suppressRunEnd) { void this.abort(); return { requested: true }; }
     if (this.disposed || !this.agent.state.isStreaming) {
       return { requested: false };
     }

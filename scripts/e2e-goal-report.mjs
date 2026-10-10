@@ -125,6 +125,16 @@ async function scenarioStructuredReport(binary, tempRoot) {
       ],
     };
 
+    // A completion claim must not contradict the persisted Goal checklist.
+    await expectRpcError(() => ctx.host.call("goalReports.submitDraft", {
+      executionId, draft,
+    }), ["INVALID_ARGUMENT"]);
+    const reconciled = await ctx.host.call("goalProgress.update", {
+      sessionId: session.id, executionId, writeToken, expectedRevision: 1,
+      items: items.map(item => ({ ...item, status: "completed" })),
+    });
+    assert(reconciled.progress?.revision === 2, shortJson(reconciled));
+
     ctx.host.clearNotifications();
     const submitDraftRes = await ctx.host.call("goalReports.submitDraft", {
       executionId,
@@ -147,7 +157,7 @@ async function scenarioStructuredReport(binary, tempRoot) {
     const settledProgress = await ctx.host.call("goalProgress.get", {
       sessionId: session.id, executionId,
     });
-    assert(settledProgress.progress?.revision === 1, "settlement must retain readable progress");
+    assert(settledProgress.progress?.revision === 2, "settlement must retain readable progress");
 
     // Finalize report
     const finalizeRes = await ctx.host.call("goalReports.finalizeReport", {
@@ -217,7 +227,7 @@ async function scenarioStructuredReport(binary, tempRoot) {
         executionId,
         draft: { ...draft, summary: "Late replacement" },
       }),
-      ["INTERNAL"],
+      ["INVALID_ARGUMENT"],
     );
     const afterLateDraft = await ctx.host.call("goalReports.get", {
       sessionId: session.id,
@@ -265,6 +275,20 @@ async function scenarioFallbackReport(binary, tempRoot) {
     });
     assert(invalidateRes.ok === true, shortJson(invalidateRes));
 
+    const { writeToken } = await ctx.host.call("goalProgress.issueToken", {
+      sessionId: session.id, executionId, turnId,
+    });
+    const progress = await ctx.host.call("goalProgress.update", {
+      sessionId: session.id, executionId, writeToken,
+      items: [
+        { id: "implemented", label: "Implemented", status: "completed" },
+        { id: "verification", label: "Verification", status: "in_progress" },
+        { id: "remaining", label: "Remaining", status: "pending" },
+        { id: "blocked", label: "Blocked", status: "failed" },
+      ],
+    });
+    assert(progress.progress?.revision === 1, shortJson(progress));
+
     // A completed execution without a valid draft still produces Host fallback facts.
     await ctx.host.call("plans.finishExecution", { executionId, status: "completed" });
     const finalizeRes = await ctx.host.call("goalReports.finalizeReport", {
@@ -281,7 +305,13 @@ async function scenarioFallbackReport(binary, tempRoot) {
     const report = getRes.report;
     assert(report?.execution?.status === "completed", shortJson(report));
     assert(report?.integrity?.kind === "fallback", shortJson(report));
-    assert(report?.verdict === "unknown", shortJson(report));
+    assert(report?.verdict === "partial", shortJson(report));
+    assert(report.steps?.length === 4, shortJson(report));
+    assert(report.steps.map(step => step.status).join(",") === "completed,skipped,skipped,failed", shortJson(report));
+    assert(report.steps[1].detail.includes("in_progress"), shortJson(report));
+    assert(report.steps[2].detail.includes("pending"), shortJson(report));
+    const snapshot = await ctx.host.call("goalProgress.get", { sessionId: session.id, executionId });
+    assert(snapshot.progress?.items[1]?.status === "in_progress", "fallback must not fabricate completed progress");
 
     await endTurn(ctx.host, turnId);
     return `reportId=${report.reportId} integrity=fallback verdict=${report.verdict}`;
