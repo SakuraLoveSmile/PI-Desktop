@@ -139,3 +139,4 @@ Upstream v0.15.6 → v0.16.1 has been merged.
   logical project. CodeSearch provides local literal code search and a disposable
   persistent text cache, with live file reconciliation and explicit partial coverage.
   Neither feature adds background model or embedding calls.
+- OpenCode Zen Muse Spark 1.3 Contributor Free now uses its Responses API instead of falling back to Chat Completions. Other publishers, explicit API metadata and client identity are preserved.

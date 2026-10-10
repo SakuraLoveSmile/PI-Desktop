@@ -17814,3 +17814,12 @@ separately and never presented as full layout acceptance.
 | Plus scenario | User path | Automated entry |
 | --- | --- | --- |
 | E2E-PLUS-project-context | Remember → later turn/restart recall → source lookup → current code search | project-context, code-index, project-auto-memory scripts |
+### OpenCode Zen Muse Spark contributor free routing
+
+Load the bundled OpenCode catalog, select `muse-spark-1.3-contributor-free`
+through the normal provider model binding and verify runtime uses the
+`openai-responses` adapter with the Zen base URL and exact model ID. Keep
+OpenCode Go's previous Muse routes, other publishers, ordinary completions
+models and explicit per-model API overrides unchanged. Existing provider
+API-style Electron checks remain applicable. This isolated validation does not
+prove account/region eligibility or call a real model.
