@@ -18133,7 +18133,12 @@ It uses no provider service, test-only production backdoor, or system-clock edit
 - **Milestone:** Maintenance.
 - **Status:** Scripted baseline replay reproduces four confirmation wakeups,
   TEAM_APPROVAL_REQUIRED and zero dispatch on `26db50438`. Record candidate test
-  results separately. Real model: **NOT RUN**.
+  results separately. Real model: attempted on candidate `3968c4160882` with
+  MINIKV-GOAL-TEST-2, but **confirmation recovery NOT EXERCISED**: Goal UI
+  approval succeeded, then the harness's 240-second pre-roster wait expired
+  without a declaration, task or expert. No provider or TEAM error was recorded;
+  the wait's cause remains unknown. This does not establish a recovery failure
+  or real-model acceptance. See docs/project/team-roster-resume-validation.md.
 - **Real-model follow-up:** On the candidate, reopen the original minikv prompt
   in a new directory with marker MINIKV-GOAL-TEST-2, using
   gemini-3.8-flash-high as Lead. Confirm through the trusted roster UI. Acceptance
