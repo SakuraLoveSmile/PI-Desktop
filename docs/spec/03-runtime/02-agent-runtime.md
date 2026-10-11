@@ -1980,3 +1980,28 @@ remains limited to one nudge. Ordinary non-Goal final-answer authority is unchan
 A trusted cancelled/interrupted roster aborts approved execution even when it
 arrives before the completion guard begins its review wait. It does not spend a
 nudge, restart model work, or install a waiting listener/timer.
+
+
+### Expert Team execution reliability guidance (2026-10-11)
+
+Generated Team prompts use available Host-backed member phase and turn/process
+evidence for liveness, never Git activity. They require consuming authenticated
+reports before replacement or redispatch; a pending-mail summary is not its body.
+Ordinary unapproved Agent turns receive queued bodies only after their current
+turn ends; approved Plan/Goal executions instead keep their original turn open
+and consume the execution inbox. Ordinary Plan aggregation retains its yield.
+
+Execution participants run only diff-related revalidation, assign a full suite
+to one participant, avoid foreground sleep polling and declare explicit limits
+for long-lived background commands. `timed_out` is a timeout, not proof of a
+crash; `nohup` is not a managed-lifetime workaround. Shared-tree `git add -A` and
+`git stash` are forbidden by guidance, without changing tool authorization.
+After two attempts based on different evidence still fail the same acceptance
+check, report the blocker rather than blindly start another repair/retest cycle.
+Independent authorized work can continue.
+
+A Lead does not redo completed delegated work without first explaining a concrete
+independent-review reason. Final reporting distinguishes commands the Lead
+actually launched from commands experts launched, and relies on tool/Host
+records. Guidance does not mechanically enforce model obedience, add a watchdog,
+change quotas, or authorize unread report content or user consent.
