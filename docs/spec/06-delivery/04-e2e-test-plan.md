@@ -17973,3 +17973,12 @@ loopback provider). No live session, profile or real model is accessed.
 - **Specs:** [Team collaboration decision](../../adr/plus-expert-team-collaboration.md), advisory amendment dated 2026-10-11; 03-runtime/06-host-rpc-protocol.
 - **Acceptance:** P1 shared-tree coordination; no write denial/new RPC/migration.
 - **Status:** Automated isolated Host and runtime-contract fixture.
+
+#### E2E-TEAM-member-activity-interrupt-guard
+
+- **Scope:** Lead Team tools → Host activity projection → exact-turn interruption.
+- **Fixture:** Isolated Host data/workspace and deterministic fake provider; no paid model or user profile.
+- **Steps:** Approve a tester, dispatch work, start a quiet managed background test without Git activity. Lead reads `team_status`, tries unforced `interrupt_agent`, tries force without reason, then supplies a justified reason.
+- **Expected:** Status shows the real running process and turn. The first two stops return `TEAM_MEMBER_ACTIVE` and `TEAM_INTERRUPT_REASON_REQUIRED` with no interruption notification. Only the reasoned force emits one exact-member/turn stop and an audit record. Role/approval boundaries stay unchanged.
+- **Automation:** `scripts/e2e-team-member-activity.mjs` runs real Host + runtime tools through the fake provider. `rpc::team_member_activity_tests` additionally controls Host timestamps to replay a twenty-minute job and eligible inactive turn, verifies active foreground Bash protection, unauthorized force refusal and audit contents. `team::member_activity_tests` covers five-hour queue ages after ACK and usage replay/restart; runtime tool tests preserve projection and optional force/reason forwarding.
+- **Evidence limit:** Twenty minutes and five hours are deterministic timestamp fixtures, not wall-clock soak runs; no Windows or real-provider test is claimed.

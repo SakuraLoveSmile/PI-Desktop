@@ -396,6 +396,8 @@ with teammates, shared task boards, and peer mailboxes.
 | `TEAM_MODEL_SELECTION_INVALID` | no | a proposed provider/model/thinking route cannot be launched |
 | `TEAM_MEMBER_MODEL_CHANGE_BLOCKED` | no | the member holds an active turn or queued work on its route |
 | `TEAM_LEAD_CONFIGURATION_BLOCKED` | no | a Lead with durable Team data cannot change to the standard profile |
+| `TEAM_MEMBER_ACTIVE` | no | current Host activity within ten minutes or active Bash ownership protects the member; inspect team_status before an explicit force with reason |
+| `TEAM_INTERRUPT_REASON_REQUIRED` | no | force:true requires a trimmed nonempty interruption reason |
 
 ## 4. Mapping rules
 

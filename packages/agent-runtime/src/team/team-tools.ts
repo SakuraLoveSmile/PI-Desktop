@@ -358,11 +358,13 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
     name: "interrupt_agent",
     label: "Interrupt Agent",
     description:
-      "Interrupt the current running turn of a named teammate. Only available to the Team Lead.",
+      "Interrupt a teammate turn. Host activity within 10 minutes or an active Bash process requires force:true and a nonempty reason. Only the Team Lead may interrupt.",
     parameters: Type.Object({
       memberName: Type.String({
         description: "Name of the teammate to interrupt.",
       }),
+      force: Type.Optional(Type.Boolean({ description: "Override the Host activity safeguard, without changing authority or permissions." })),
+      reason: Type.Optional(Type.String({ minLength: 1, maxLength: 1000, description: "Required with force:true; explain why stopping this active work is necessary." })),
     }),
     execute: async (_toolCallId, params): Promise<AgentToolResult> => {
       if (!isLead) {
@@ -377,7 +379,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
         };
       }
       try {
-        const p = params as { memberName: string };
+        const p = params as { memberName: string; force?: boolean; reason?: string };
         const roster = await host.call<{ members: TeamMemberRecord[] }>(
           "team.getRoster",
           { teamSessionId, callerSessionId },
@@ -397,7 +399,10 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
 
         const interrupt = await host.call<{ interrupted?: boolean }>(
           "team.interruptMember",
-          { teamSessionId, callerSessionId, memberName: p.memberName },
+          { teamSessionId, callerSessionId, memberName: p.memberName,
+            ...(p.force !== undefined ? { force: p.force } : {}),
+            ...(p.reason !== undefined ? { reason: p.reason } : {}),
+          },
         );
         const interrupted = interrupt.interrupted === true;
 
@@ -413,7 +418,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
             },
           ],
           details: {
-            interrupted: true,
+            interrupted,
             memberName: p.memberName,
             turnInterrupted: interrupted,
           },
@@ -674,7 +679,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
     name: "team_status",
     label: "Team Status",
     description:
-      "Get full Expert Team status, including roster of members, task board, and current paused state.",
+      "Get full Expert Team status, including roster, task board, paused state, and Host-owned member activity evidence; queued mail is not proof of execution.",
     parameters: Type.Object({}),
     execute: async (): Promise<AgentToolResult> => {
       try {
@@ -703,6 +708,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
                 paused: roster.paused,
                 revision: board.revision,
                 members: roster.members,
+                ...(roster.memberActivity ? { memberActivity: roster.memberActivity } : {}),
                 tasks: board.tasks,
                 readiness: board.readiness,
                 scopeOverlaps: board.scopeOverlaps,
