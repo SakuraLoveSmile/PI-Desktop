@@ -17973,3 +17973,10 @@ loopback provider). No live session, profile or real model is accessed.
 - **Specs:** [Team collaboration decision](../../adr/plus-expert-team-collaboration.md), advisory amendment dated 2026-10-11; 03-runtime/06-host-rpc-protocol.
 - **Acceptance:** P1 shared-tree coordination; no write denial/new RPC/migration.
 - **Status:** Automated isolated Host and runtime-contract fixture.
+
+
+## Team task dispatch reliability (WP10)
+
+See [Team task dispatch scenarios](team-task-dispatch-scenarios.md) for busy-member
+conflicting dispatch, successful task completion cleanup, authenticated age framing
+and replay/validation acceptance IDs.

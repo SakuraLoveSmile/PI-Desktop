@@ -1292,3 +1292,9 @@ SessionMessageOrigin 传入真实及恢复成员模型输入，二者看到同�
 正文、来源校验和权限上限不变。非 Git、无提交和旧消息省略；意外探测错误记录有界
 Host 诊断但不阻止发送。只暴露 SHA，不暴露路径、Git stderr 或秘密；不增加 RPC、
 协议版本或数据库迁移。
+
+
+## WP10 团队派发时效
+
+可选 taskDispatch、队列位置及仅取消未开始派发的约定见
+[团队任务派发](team-task-dispatch.md)。

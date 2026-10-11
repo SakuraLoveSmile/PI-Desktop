@@ -7,11 +7,14 @@ describe("Host-owned Team dispatch HEAD", () => {
     const senderHead = "a".repeat(40);
     const content = "Inspect assigned source";
     const host = { async call<T>() {
-      return { message: { id: "dispatch", sourceSessionId: "lead", sourceTitle: "Lead", targetSessionId: "member", kind: "message", content, status: "queued", senderHead } } as T;
+      return { message: { id: "dispatch", sourceSessionId: "lead", sourceTitle: "Lead", targetSessionId: "member", kind: "message", content, status: "queued", senderHead,
+        sentAt: "2026-10-11T01:00:00.000Z", targetBusyAtSend: true,
+        taskDispatch: { taskId: "task-1", expectedRevision: 2 } } } as T;
     } };
     const input = await resolveSessionMessageInput(host, { sessionId: "member", sessionMessageId: "dispatch" });
     expect(input?.content).toBe(content);
-    expect(input?.origin).toMatchObject({ senderHead });
+    expect(input?.origin).toMatchObject({ senderHead, sentAt: "2026-10-11T01:00:00.000Z", targetBusyAtSend: true, taskDispatch: { taskId: "task-1", expectedRevision: 2 } });
+    expect(formatSessionMessage(input!.content, input!.origin)).toContain("may be stale");
     expect(formatSessionMessage(input!.content, input!.origin)).toContain(`"senderHead":"${senderHead}"`);
   });
   it("leaves old messages and non-Git senders compatible", async () => {

@@ -1958,3 +1958,9 @@ validation and permission ceilings remain unchanged. Non-Git/unborn/legacy
 messages omit it; unexpected probe errors log a bounded Host diagnostic without
 blocking dispatch. Only SHA is exposed, not paths, Git stderr or secrets.
 No new RPC, protocol version or schema migration is introduced.
+
+
+## Explicit task dispatch and mailbox age (WP10)
+
+The additive `taskDispatch` send contract, Host-owned age/provenance fields and
+queued-only cancellation semantics are defined in [Team task dispatch](team-task-dispatch.md).
