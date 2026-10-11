@@ -9853,3 +9853,17 @@ options retain pressed states and switching behavior.
 - **规格：** 团队协作决策 docs/adr/plus-expert-team-collaboration.md 的建议性范围修订（2026-10-11）及 03-runtime/06-host-rpc-protocol。
 - **验收：** P1 共享树协作；不拒绝写入，不增加 RPC 或迁移。
 - **状态：** 隔离 Host 和 runtime 契约夹具自动化。
+
+
+### E2E-TEAM-shared-git-warning
+
+- **前提：** 候选 Host/runtime、一次性 Git 仓库、隔离数据/配置和已确认团队；不调用模型。
+- **步骤：** 委派写任务并置为 in_progress；Lead 对双方文件执行
+  git add -A && git commit、git stash、无效 git reset --hard；读取真实 team_status。
+  再由唯一写入者暂存，并在任务完成后重试 Git 命令。
+- **预期：** 混合提交和 stash 实际成功并告警；无效 reset 保留失败与真实退出码。
+  状态累计三个归属调用者的 Git 警告，与 Write/Edit 计数分离；唯一写入者及已完成任务不误报。
+- **覆盖：** node scripts/e2e-team-shared-git-warning.mjs；Host RPC 覆盖六种操作、
+  后台准入、跨团队/空范围排除、幂等、重启持久化和删除竞态；runtime 验证可见投影与旧字段缺省。
+- **规格：** 03-runtime/06-host-rpc-protocol 的共享 Git 建议性警告。
+- **状态：** 记录实际候选结果；不代表真实模型或 Windows 验收，动态 shell 形式不保证覆盖。

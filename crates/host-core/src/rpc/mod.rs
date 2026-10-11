@@ -17,6 +17,8 @@ mod subagent_settings_tests;
 mod team_dispatch_head;
 #[cfg(test)]
 mod team_expert_config_tests;
+#[cfg(test)]
+mod team_git_warning_tests;
 mod team_mailbox;
 #[cfg(test)]
 mod team_planning_tests;
@@ -4714,6 +4716,10 @@ async fn handle_request_inner(
                 };
 
                 let ws_path = workspace_path.map(PathBuf::from);
+                let git_warning_context = {
+                    let st = state.lock().await;
+                    crate::team::git_warnings::capture(&st.db, &p.session_id, p.turn_id.as_deref(), &p.tool_name, &p.args)
+                };
                 let (data_dir, hashline_store) = {
                     let st = state.lock().await;
                     (st.data_dir.clone(), st.hashline.clone())
@@ -4827,12 +4833,11 @@ async fn handle_request_inner(
                             "prompted": prompted, "permissionWaitMs": permission_wait_ms,
                         }),
                     );
+                    let mut content = json!({"backgroundProcessId": process.id, "status":"starting", "message":"Background process accepted. Read its output and terminal status through the background process manager."});
+                    crate::team::git_warnings::annotate_observable(&st.db, &git_warning_context, &p.tool_call_id, &mut content);
                     return Ok(json!({
                         "toolCallId": p.tool_call_id, "ok": true, "isError": false,
-                        "content": {
-                            "backgroundProcessId": process.id, "status": "starting",
-                            "message": "Background process accepted. Read its output and terminal status through the background process manager.",
-                        },
+                        "content": content,
                         "durationMs": call_started.elapsed().as_millis() as u64,
                         "denied": false, "commandShellId": command_shell_id,
                     }));
@@ -4907,6 +4912,7 @@ async fn handle_request_inner(
                 // artifacts table so the work panel file list only shows
                 // workspace deliverables (D114).
                 crate::team::write_scopes::annotate_observable(&st.db, scope_context.as_ref(), ws_path.as_deref(), &p.tool_call_id, &mut result);
+                crate::team::git_warnings::annotate_observable(&st.db, &git_warning_context, &p.tool_call_id, &mut result.content);
                 let result_root = result.content.get("root").and_then(|v| v.as_str());
                 if result.ok
                     && result_root == Some("workspace")

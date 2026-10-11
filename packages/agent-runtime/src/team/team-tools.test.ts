@@ -645,16 +645,25 @@ describe("planning research boundary", () => {
 describe("approved Lead execution inbox", () => {
   it("includes advisory write counts in the visible team status", async () => {
     const counts = [{ memberSessionId: "member", memberName: "Builder", count: 2 }];
-    const call = vi.fn(async (method: string) => {
+    const call = vi.fn(async (method: string): Promise<unknown> => {
       if (method === "team.getRoster") return { teamSessionId: "lead", paused: false, members: [] };
-      if (method === "team.getBoard") return { teamSessionId: "lead", revision: 3, tasks: [], readiness: [], scopeOverlaps: [], outOfScopeWriteCount: 2, outOfScopeWrites: counts };
+      if (method === "team.getBoard") return { teamSessionId: "lead", revision: 3, tasks: [], readiness: [], scopeOverlaps: [], outOfScopeWriteCount: 2, outOfScopeWrites: counts, sharedGitWarningCount: 3, sharedGitWarnings: [{ memberSessionId: "lead", memberName: "Lead", count: 3 }] };
       if (method === "team.getPlanning") return null;
       throw new Error(`Unexpected ${method}`);
     });
     const tools = createTeamTools({ teamSessionId: "lead", callerSessionId: "lead", isLead: true, host: { call } as unknown as RuntimeHost });
     const status = await tools.find(tool => tool.name === "team_status")!.execute("status", {});
     if (status.content[0].type !== "text") throw new Error("Missing Team status text");
-    expect(JSON.parse(status.content[0].text)).toMatchObject({ outOfScopeWriteCount: 2, outOfScopeWrites: counts });
+    expect(JSON.parse(status.content[0].text)).toMatchObject({ outOfScopeWriteCount: 2, outOfScopeWrites: counts, sharedGitWarningCount: 3, sharedGitWarnings: [{ memberSessionId: "lead", memberName: "Lead", count: 3 }] });
+    call.mockImplementation(async (method: string) => {
+      if (method === "team.getRoster") return { teamSessionId: "lead", paused: false, members: [] };
+      if (method === "team.getBoard") return { teamSessionId: "lead", revision: 1, tasks: [], readiness: [], scopeOverlaps: [] };
+      if (method === "team.getPlanning") return null;
+      throw new Error(`Unexpected ${method}`);
+    });
+    const legacy = await tools.find(tool => tool.name === "team_status")!.execute("legacy-status", {});
+    if (legacy.content[0].type !== "text") throw new Error("Missing legacy Team status text");
+    expect(JSON.parse(legacy.content[0].text)).toMatchObject({ sharedGitWarningCount: 0, sharedGitWarnings: [] });
   });
   it("returns full authenticated messages as Team tool results and suppresses reread duplicates", async () => {
     const calls: unknown[] = [];
