@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { createTeamTools } from "./team-tools.js";
-import type { RuntimeHost } from "../types.js";
+import type { RuntimeHost } from "../host-client.js";
 
 it("shows the Host run budget together with ordinary Lead mailbox metadata", async () => {
   const runLimits = { enabled: true, softMs: 21600000, hardMs: 36000000,
