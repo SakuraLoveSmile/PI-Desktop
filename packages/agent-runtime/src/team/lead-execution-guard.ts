@@ -142,6 +142,7 @@ export class TeamLeadExecutionGuard {
     abort: (error?: ReturnType<typeof classifyAgentError>) => void;
     host: RuntimeHost;
     team: { teamSessionId: string; callerSessionId: string };
+    refreshDeclaration?: (review: TeamLaunchReview) => void;
   }): Promise<void> {
     const pending = this.pending;
     if (!pending) return;
@@ -169,7 +170,6 @@ export class TeamLeadExecutionGuard {
           if (update.details && typeof update.details === "object" && "error" in update.details) throw new Error(String(update.details.error));
         }
       }
-      this.suppressRunEnd = false;
       const current = runtime.state();
       if (pending.epoch !== current.epoch || pending.turnId !== current.turnId) return;
       if (current.inactive || pending.mode !== current.mode) { runtime.abort(); return; }
@@ -180,6 +180,20 @@ export class TeamLeadExecutionGuard {
         if (state.inactive || state.mode !== pending.mode) { runtime.abort(); return; }
         if (!execution.active || execution.reviewStatus !== "confirmed") { runtime.abort(); return; }
       }
+      if (runtime.refreshDeclaration) {
+        const { review } = await abortableHostCall<{ review: TeamLaunchReview | null }>(runtime.host,
+          "team.getLaunchReview", { teamSessionId: runtime.team.teamSessionId }, controller.signal);
+        const state = runtime.state();
+        if (!ownsTurn()) return;
+        if (controller.signal.aborted || state.inactive || state.mode !== pending.mode) { runtime.abort(); return; }
+        if (review && (review.launchPolicy ?? "user_confirmed") === "user_confirmed" &&
+            review.teamSessionId === runtime.team.teamSessionId && review.leadTurnId === pending.turnId) {
+          if (review.status === "cancelled" || review.status === "interrupted") { runtime.abort(); return; }
+          if (review.status === "confirmed" && (review.strategy ?? "delegate") === "delegate" &&
+              Array.isArray(review.members) && review.members.length > 0) runtime.refreshDeclaration(review);
+        }
+      }
+      this.suppressRunEnd = false;
       await recoverFinalAnswer(awaitingReview
         ? "The Host confirmed the expert roster for this SAME approved execution. Continue the exact approved contract without renegotiation. Call wait_for_updates to read authenticated confirmation mail, create owned tasks, dispatch approved experts, then call wait_for_updates to consume their full results within this turn. Keep GoalProgress and SubmitGoalReport bound to this execution."
         : pending.mode === "plan" ? TEAM_PLAN_COMPLETION_NUDGE

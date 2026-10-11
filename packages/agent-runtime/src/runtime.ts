@@ -157,6 +157,7 @@ import {
 } from "./agent-messages.js";
 import { withExplicitRequired } from "./tool-schema.js";
 import { createTeamTools, teamSystemPrompt } from "./team/index.js";
+import { refreshDeclareStrategyResult } from "./team/declare-strategy-result.js";
 import { createTeamMailboxGuards } from "./team/mailbox-context-guards.js";
 import { nestedDelegationPermission, type DelegationOwnerContext } from "./delegation-owner.js";
 import { expertToolDenial } from "./team/expert-policy.js";
@@ -6660,6 +6661,9 @@ export class DesktopAgentRuntime {
     if (this.teamBudgetStop.requested || this.runCancelled) return;
     await this.teamLeadExecution.recover({
       host: this.host, team: this.teamContext!,
+      refreshDeclaration: this.autonomousExecution
+        ? review => this.setAgentMessages(refreshDeclareStrategyResult(this.agent.state.messages, review))
+        : undefined,
       state: () => ({ turnId: this.turnId, epoch: this.turnEpoch, mode: this.mode,
         inactive: this.disposed || this.runCancelled }),
       abort: error => { this.terminateParentTurn(); this.runCancelled = true; this.autonomousExecution = false; this.goalReportDraftManager = undefined; this.clearGoalProgressTool(); this.finalizeCurrentAssistant("aborted"); this.emit({ type: "error", error: error ?? { code: "TURN_ABORTED", message: "Approved Team execution interrupted.", retriable: false } }); this.emit({ type: "turn_end" }); this.emit({ type: "agent_end", messageIds: [] }); },

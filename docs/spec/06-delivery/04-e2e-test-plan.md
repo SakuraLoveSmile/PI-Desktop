@@ -18105,3 +18105,38 @@ require Node/JS dependencies. The fixture exercises approved Goal dispatch,
 30-minute controlled wait, actual Main finalization/outbox, Rust interrupted
 execution, no successful report, and rejection of a genuine old progress token.
 It uses no provider service, test-only production backdoor, or system-clock edit.
+
+
+### E2E-TEAM-approved-goal-roster-resume-weak-lead-dispatches
+
+- **Preconditions:** Request candidate based on `26db50438`; isolated approved
+  Team Goal, Host and provider boundary fixtures. The scripted weak Lead ignores
+  system nudges and follows only the last conversational tool result.
+- **Steps:** Declare a delegate roster, explain it without tool calls, and park
+  the original approved execution. Confirm the roster later through trusted Host
+  state. Inspect the first resumed provider request, dispatch an owned task with
+  task_create/send_message, consume full expert results and submit the Goal
+  report. Repeat cancellation, interruption, Stop, confirmation between Host
+  reads and missing declaration-result cases.
+- **Expected:** The first resumed request contains the matched confirmed roster
+  and awaitingUserApproval=false, with no stale memberSessionIds. One roster
+  resume starts owned dispatch in the same turn/execution without
+  TEAM_APPROVAL_REQUIRED or Goal interruption. Original UI/persisted declaration
+  evidence stays pending. Cancellation/Stop cannot refresh or dispatch; missing
+  matches retain all three completion retries and observable terminal denial.
+- **Specs:** 03-runtime/02-agent-runtime and 03-tools-and-permissions, approved
+  Team same-turn recovery.
+- **Acceptance:** Runtime regression and copy-on-write/helper coverage establish
+  the changed provider context and scripted dispatch, not real-model compliance.
+- **Automation:** packages/agent-runtime/src/runtime-tests/runtime-team-roster-resume.test.ts
+  and src/team/declare-strategy-result.test.ts.
+- **Milestone:** Maintenance.
+- **Status:** Scripted baseline replay reproduces four confirmation wakeups,
+  TEAM_APPROVAL_REQUIRED and zero dispatch on `26db50438`. Record candidate test
+  results separately. Real model: **NOT RUN**.
+- **Real-model follow-up:** On the candidate, reopen the original minikv prompt
+  in a new directory with marker MINIKV-GOAL-TEST-2, using
+  gemini-3.8-flash-high as Lead. Confirm through the trusted roster UI. Acceptance
+  requires task_create/send_message and three experts starting their turns within
+  the same approved execution. If it fails, stop and report; do not add another
+  nudge or enable package C without a new user decision.

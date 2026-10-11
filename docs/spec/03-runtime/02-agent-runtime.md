@@ -712,13 +712,13 @@ nonempty final replies require a current approved expert dispatch whose turn
 has actually started. Idle members or queued messages are insufficient. This
 participation gate does not prove task ownership or completed expert work.
 
-A Lead has one bounded no-participation recovery before approval and one
-independent recovery after a trusted, nonempty delegate roster is confirmed for
+A Lead has one bounded no-participation recovery before approval and three
+bounded independent recoveries after a trusted, nonempty delegate roster is confirmed for
 that same original Agent turn. Fast confirmation during the declaration reply
 must not exhaust the dispatch recovery just because the preapproval correction
 was already used. Confirmation does not authorize completion: Host still checks
 actual expert participation, and continued no-dispatch replies fail after the
-single postconfirmation correction. Stale reviews, other teams and automatic
+three postconfirmation corrections. Stale reviews, other teams and automatic
 Plan rosters cannot acquire this execution-phase recovery.
 
 Team Plan research automatically launches read-only experts using Host-selected
@@ -746,6 +746,15 @@ An approved Team Plan/Goal execution waits for execution-roster confirmation
 and expert settlement inside its original running Host turn. It must not emit
 final agent_end, end the Goal execution token or complete the approval while
 waiting. Confirmation resumes the same approved contract.
+Before the first recovery request, Host confirmation refreshes only the
+model-facing latest successful declare_team_strategy result for that review,
+using the confirmed roster, awaitingUserApproval=false and the shared tool
+payload builder. This is copy-on-write; the original pending tool event and
+persisted/UI timeline remain intact, and later tool-loop context rebuilding
+still reads that original history. Stale memberSessionIds are omitted. A missing
+match retains the existing nudge/three-attempt completion guard. A fresh review
+read rechecks turn/epoch, mode and cancellation before applying the projection.
+No Host dispatch, public contract or restart recovery is added.
 An earlier pending review snapshot cannot authorize completion if confirmation
 commits before the execution-state read: Host final authorization still runs,
 and the bound confirmed execution receives its dispatch recovery when needed.
