@@ -12,7 +12,11 @@ function withQueue(queues: AskQueues, sessionId: string, queue: PendingAsk[]): A
 
 export function enqueueAsk(queues: AskQueues, request: PendingAsk): AskQueues {
   const queue = queues[request.sessionId] ?? [];
-  if (queue.some((entry) => entry.requestId === request.requestId)) return queues;
+  const existing = queue.findIndex(entry => entry.requestId === request.requestId);
+  if (existing >= 0) {
+    if (!request.teamPending || queue[existing].teamPending) return queues;
+    return withQueue(queues, request.sessionId, queue.map((entry, index) => index === existing ? request : entry));
+  }
   return withQueue(queues, request.sessionId, [...queue, request]);
 }
 
@@ -44,13 +48,14 @@ export function removeAskForToolCall(
 ): AskQueues {
   const queue = queues[sessionId];
   if (!queue) return queues;
-  const remaining = queue.filter((entry) => entry.toolCallId !== toolCallId);
+  const remaining = queue.filter((entry) => entry.toolCallId !== toolCallId || entry.teamPending);
   return remaining.length === queue.length
     ? queues
     : withQueue(queues, sessionId, remaining);
 }
 
-export function clearSessionAsks(queues: AskQueues, sessionId: string): AskQueues {
+export function clearSessionAsks(queues: AskQueues, sessionId: string, keepDeferred = false): AskQueues {
+  if (keepDeferred) return withQueue(queues, sessionId, (queues[sessionId] ?? []).filter(entry => entry.teamPending));
   if (!queues[sessionId]) return queues;
   const next = { ...queues };
   delete next[sessionId];

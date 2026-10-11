@@ -160,6 +160,16 @@ export class TurnQueue {
     return queue.length;
   }
 
+  /** Mirror a record already committed by the Host with its original identity. */
+  adoptPersisted(record: QueuedTurnRecord): number {
+    const existing = this.position(record.sessionId, record.id);
+    if (existing !== undefined) return existing;
+    const queue = this.bySession.get(record.sessionId) ?? [];
+    queue.push(record);
+    this.bySession.set(record.sessionId, orderQueue(queue));
+    return this.position(record.sessionId, record.id)!;
+  }
+
   async remove(sessionId: string, id: string): Promise<QueuedTurnRecord | undefined> {
     const queue = this.bySession.get(sessionId);
     if (!queue) return undefined;

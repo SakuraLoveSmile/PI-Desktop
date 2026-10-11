@@ -1955,6 +1955,8 @@ export const ptBR = {
     queued_other: "Mais {{count}} solicitações aguardando",
   },
   askTool: {
+    pending: "Resposta pendente",
+    pendingHelp: "O coordenador parou de esperar após 30 minutos. A resposta inicia um novo turno; retome ou aprove a execução explicitamente.",
     completedTitle: "Perguntas esclarecidas",
     completedSkipped: "Ignorada",
     title: "Algumas perguntas",

@@ -2007,6 +2007,8 @@ sklm: {
     queued_other: "還有 {{count}} 個請求在排隊",
   },
   askTool: {
+    pending: "待回答",
+    pendingHelp: "Lead 已在 30 分鐘後停止等待。回答將開啟新回合；請明確恢復或重新核准執行。",
     completedTitle: "問題釐清",
     completedSkipped: "已略過",
     title: "需要回答幾個問題",

@@ -2171,6 +2171,8 @@ sklm: {
     queued_other: "还有 {{count}} 个请求在排队",
   },
   askTool: {
+    pending: "待回答",
+    pendingHelp: "Lead 已在 30 分钟后停止等待。回答将开启新回合；请明确恢复或重新批准执行。",
     completedTitle: "问题澄清",
     completedSkipped: "已跳过",
     title: "需要回答几个问题",

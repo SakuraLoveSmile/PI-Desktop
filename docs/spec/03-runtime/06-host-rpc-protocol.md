@@ -2052,3 +2052,22 @@ Host-only `team.runLimitPauseRequested({teamSessionId})` asks Main to hold queue
 and request safe runtime boundaries; it is not a renderer/model command or an
 execution permission. See [Team run limits](team-run-limits.md) for run identity,
 clock, notices, Goal interruption and compatible internal stop behavior.
+### Team Lead unanswered questions and failed-slot successors (WP11)
+
+`team.registerLeadAsk`, `team.deferLeadAsk`, and `team.ackLeadAsk` require the
+actual Lead session and its running turn. Host fixes a 30-minute question wait.
+Trusted Main alone reads/resolves/cancels durable asks; resolve atomically
+persists a late response and an existing turn_queue user record. New replies
+start a new user scope and never bind the former Plan/Goal execution token.
+Optional Team pending metadata on AskToolRequest/RACP input requests is display
+data, not approval. No ordinary permission or asktool deadline is introduced.
+
+`team.createMember` accepts optional `replaces` for one approved failed slot.
+It requires a new unique name and inherits the original confirmed route, role,
+configuration and permission mode; route/role/fork overrides fail closed.
+Host-only replacement links extend the same decision without changing its
+approved review. Replaying the same replacement is idempotent; replacement
+chains, another successor, active/queued sources and out-of-scope slots are
+rejected with a legal nextStep. The original handle no longer accepts dispatch,
+and its sessions/tasks/history remain. The eight-member limit still counts
+failed members; full rosters need a new trusted review.

@@ -2024,3 +2024,14 @@ creates a fresh record. Team deletion removes its KV record. Mailbox notices use
 `team-run-limit-soft:<runId>` and the exact stored message id is Host proof, not
 model text. No storage schema bump is required; old policy omissions use defaults.
 See [Team run limits](team-run-limits.md).
+### WP11 Team question and replacement KV ownership
+
+Rust owns `team-lead-ask-v1` durable question requests, original turn, Host time,
+waiting/pending/answered_live/answered/cancelled lifecycle, normalized answers
+and stable queued-answer ID. `team-lead-ask-cancel-v1` fences late registration
+for a stopped running turn. Late replies atomically enter the existing
+turn_queue under the same savepoint; deletion removes owned question records.
+`team-member-replacement-v1` records an immutable original/successor slot link,
+approved scope/review and exact selection/permission ceiling. Reviews and old
+member/task identities remain unchanged; Team dissolution deletes owned links.
+These versioned namespaces use existing KV storage and require no schema bump.

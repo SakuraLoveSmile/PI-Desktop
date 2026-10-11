@@ -25,6 +25,8 @@ mod team_mailbox;
 #[cfg(test)]
 mod team_member_activity_tests;
 #[cfg(test)]
+mod team_pending_tests;
+#[cfg(test)]
 mod team_planning_tests;
 mod team_rpc;
 mod team_run_limits;
