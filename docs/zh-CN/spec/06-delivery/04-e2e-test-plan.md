@@ -9853,3 +9853,8 @@ options retain pressed states and switching behavior.
 - **规格：** 团队协作决策 docs/adr/plus-expert-team-collaboration.md 的建议性范围修订（2026-10-11）及 03-runtime/06-host-rpc-protocol。
 - **验收：** P1 共享树协作；不拒绝写入，不增加 RPC 或迁移。
 - **状态：** 隔离 Host 和 runtime 契约夹具自动化。
+
+
+### 专家团协作可靠性指导
+
+生成后提示词回归覆盖 lead/成员、普通 Agent 排队正文、普通 Plan 让出与批准执行 inbox 指导。runtime 的模型边界夹具经 executeApprovedPlan 跑批准 Plan/Goal 两条路径，验证同回合认证 inbox 和模型实际系统提示；不能代替真实模型遵循证明。入口 packages/agent-runtime/src/team/team-prompt.test.ts，新指导不使用源码文本断言。排队报告用户路径另按 Host 进程记录核对专家/lead 数量。
