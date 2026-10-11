@@ -2011,3 +2011,33 @@ the existing approved execution inbox as appropriate. Metadata reads validate
 current turn/epoch/Team/mode after awaits. An ACKed queued/unbound row is pending;
 createdAt is milliseconds encoded as a string, not ISO. Unknown oldest age is
 null, including mixed known/unknown pending timestamps.
+### Team member activity and interruption (WP9)
+
+`team.getRoster` returns additive `memberActivity` for the Lead and every member;
+`team_status` preserves it verbatim. Each item contains session/name, Host
+observation time, ten-minute window, latest turn status/duration, last tool
+name/time, active Bash ids and managed background process ids/status/start time,
+recent completed usage call/token counts, and incoming/outgoing queued Team mail
+counts/oldest age. Counts cover first Host-observed usage only; legacy untimed
+usage and requests in flight are unknown. There are no report bodies, commands,
+paths, Git-derived signals or credentials in this projection.
+
+Queue age uses durable millisecond creation times. A durable queue ACK is
+admission, not consumption: queued messages remain counted once until consumed.
+Incoming queues never prove recipient execution activity. A member's actual
+outbound response does, excluding Host-authored approval/failure notices.
+
+`team.interruptMember({ teamSessionId, callerSessionId, memberName, force?, reason? })`
+retains existing Lead-only and stop-only authority. Omitted force is false. Host
+turn start, tool, completed reported usage, actual outbound response or background
+start/completion within ten minutes requires force. Running managed background
+processes and owned foreground Bash protect members regardless of duration.
+Default refusal is `TEAM_MEMBER_ACTIVE`. `force:true` requires a trimmed nonempty
+reason (maximum 1000 characters) or returns `TEAM_INTERRUPT_REASON_REQUIRED`.
+The override bypasses only activity protection, not authority or approval.
+The accepted exact-turn stop request is audited as `team_member_interrupt` before
+notification; persistence failure emits no interruption. No active turn returns
+`{ interrupted: false }`. No inactivity watchdog, shell budget, queue scheduling,
+mailbox delivery or execution-token behavior changes. Additive local RPC; no
+protocol bump or database migration. See ADR
+[team-member-activity-and-interruption-guard](../../adr/team-member-activity-and-interruption-guard.md).
