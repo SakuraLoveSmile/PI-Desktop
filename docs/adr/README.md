@@ -20,6 +20,7 @@ Each ADR includes:
 
 | ID | Title | Status |
 |---|---|---|
+| team-agent-mailbox-delivery | [Ordinary Agent Lead mailbox delivery within a running turn](team-agent-mailbox-delivery.md) | Proposed; delivery alternatives not implemented |
 | composer-native-git-workspaces | [Composer native Git workspace navigation](composer-native-git-workspaces.md) | Accepted (local implementation) |
 | context-insights-native-port | [Native Context Insights](context-insights-native-port.md) | Accepted for implementation under the requested plugin-first port |
 | session-activity-rail-and-managed-background-processes | [Session activity rail, managed background processes and Quick Notes](session-activity-rail-and-managed-background-processes.md) | Accepted |
