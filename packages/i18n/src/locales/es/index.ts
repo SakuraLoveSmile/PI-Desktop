@@ -760,6 +760,7 @@ export const es = {
       operationError: "No se pudo iniciar la operación de almacenamiento. {{error}}",
     },
     expertTeam: {
+      runLimits: en.settings.expertTeam.runLimits,
       title: "Equipo de expertos",
       description: "Configura el modelo, el nivel de razonamiento, el subconjunto de herramientas y las instrucciones adicionales de los seis expertos integrados. Los cambios solo afectan a los expertos que se inicien después. El modelo de Composer también se aplica al líder y a los expertos sin modelo fijado. Las restricciones opcionales de herramientas solo reducen la disponibilidad; nunca conceden permisos.",
       loadFailed: "No se pudo cargar la configuración de expertos", currentProject: "Proyecto actual",
@@ -2028,6 +2029,14 @@ sklm: {
     "close": "Cerrar el widget"
   },
   "team": {
+    runLimitTitle: en.team.runLimitTitle,
+    runLimitSoft: en.team.runLimitSoft,
+    runLimitStopping: en.team.runLimitStopping,
+    runLimitPaused: en.team.runLimitPaused,
+    runLimitHours: en.team.runLimitHours,
+    runLimitReadyToResume: en.team.runLimitReadyToResume,
+    runLimitDisabled: en.team.runLimitDisabled,
+
     "title": "Equipo de expertos",
     "roster": "Lista del equipo",
     "board": "Tablero de tareas",

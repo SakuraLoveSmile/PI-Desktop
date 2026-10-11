@@ -628,3 +628,11 @@ include that reason; the following rejection retains the Host message verbatim
 (after normal transport classification/redaction), with `stage: team_completion`.
 The runtime must not replace it with a missing-roster explanation or classify
 the pre-tool authorization denial as draft-persistence failure.
+
+### Team wall-clock pause (WP8)
+
+`TEAM_RUN_LIMIT_REACHED` means the current Team run is hard-paused, or Resume
+was requested while its persisted elapsed time still exceeds the enabled live
+hard limit. Extend/disable the policy in Settings → Expert team, then explicitly
+resume; a queued new message cannot reset/unpause the old run. A new session is an
+independent task. No permission or shell-capacity meaning is attached to this code.

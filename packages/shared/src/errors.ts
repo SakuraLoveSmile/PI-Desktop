@@ -334,6 +334,7 @@ export const ErrorCodes = {
   /** The review revision changed after the caller read it. */
   TEAM_REVIEW_REVISION_CONFLICT: "TEAM_REVIEW_REVISION_CONFLICT",
   /** Expert preset settings changed since the caller read them. */
+  TEAM_RUN_LIMIT_REACHED: "TEAM_RUN_LIMIT_REACHED",
   TEAM_CONFIG_CONFLICT: "TEAM_CONFIG_CONFLICT",
   /** A proposed provider/model/thinking route cannot be launched. */
   TEAM_MODEL_SELECTION_INVALID: "TEAM_MODEL_SELECTION_INVALID",

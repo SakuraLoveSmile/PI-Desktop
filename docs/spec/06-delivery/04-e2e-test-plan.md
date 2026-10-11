@@ -18041,3 +18041,38 @@ and replay/validation acceptance IDs.
 - **Expected:** Status shows the real running process and turn. The first two stops return `TEAM_MEMBER_ACTIVE` and `TEAM_INTERRUPT_REASON_REQUIRED` with no interruption notification. Only the reasoned force emits one exact-member/turn stop and an audit record. Role/approval boundaries stay unchanged.
 - **Automation:** `scripts/e2e-team-member-activity.mjs` runs real Host + runtime tools through the fake provider. `rpc::team_member_activity_tests` additionally controls Host timestamps to replay a twenty-minute job and eligible inactive turn, verifies active foreground Bash protection, unauthorized force refusal and audit contents. `team::member_activity_tests` covers five-hour queue ages after ACK and usage replay/restart; runtime tool tests preserve projection and optional force/reason forwarding.
 - **Evidence limit:** Twenty minutes and five hours are deterministic timestamp fixtures, not wall-clock soak runs; no Windows or real-provider test is claimed.
+### E2E-TEAM-bounded-run-limit
+
+- **Title:** Bound repeated expert validation/fix loops without killing tools.
+- **Preconditions:** Dedicated request candidate containing WP1–WP6; isolated
+  Host data/workspace and fake provider; controlled Host clock; no real profile/API.
+- **Steps:** Start an ordinary Team run and an approved Goal run. Replay repeated
+  validate → discover defect → fix → validate loops. Advance past soft, repeat
+  the sweep, then advance past hard while a foreground tool/recovery is pending.
+  Queue expert mail, restart Host/runtime, attempt Resume, extend/disable policy,
+  explicitly resume, and finally admit a fresh non-mail user scope. Repeat with
+  a completed idle Team, a disabled policy, and a manual queue pause while a
+  turn is still running. Save settings while another role
+  is edited in a different window.
+- **Expected:** One soft notice and notification per run; hard persisted pause,
+  safe current-batch finish, no background process stop and no next-loop request.
+  Running Goal becomes interrupted and its token is invalid. Queued mail cannot
+  wake a paused run; restart retains run id/time/pause. Resume never refunds time
+  and rejects an exceeded live limit. Policy changes alone do not unpause. A new
+  admitted user scope gets a new budget. Completed idle Teams get no alert/wake-up.
+  Settings preserve unrelated role edits and reject same-policy conflicts.
+- **Specs:** [Team run limits](../03-runtime/team-run-limits.md).
+- **Coverage:** Host `run_limits_tests`, RPC `team_run_limits_tests`, execution
+  inbox tests, runtime `runtime-team-run-limit-stop.test.ts`, Desktop Team delivery
+  and expert settings persistence tests. Native settings/status UI must be checked
+  on the final integration candidate; deterministic coverage is not a live 10-hour
+  provider run.
+- **Acceptance:** Record candidate/base revisions, fixture results and native UI
+  evidence separately. No provider cost or publication is implied.
+- **Milestone:** WP8.
+- **Status:** Implementation/verification in request worktree; user acceptance pending.
+
+
+### E2E-TEAM-run-limits-ui
+
+Run `node scripts/e2e-team-run-limits-ui.mjs` with the candidate sources and isolated Electron profile. Real clicks and text input cover enabled 6/10-hour defaults, invalid input, disabled persistence, role-preserving CAS rebasing and policy-conflict refusal. Render the production notice for soft, safe finishing, paused and disabled states. The settings backend is a fixture; Host durable clock, restart and pause/resume authority remain separate domain/RPC acceptance. No live provider, OS-notification presentation or ten-hour soak result is implied.

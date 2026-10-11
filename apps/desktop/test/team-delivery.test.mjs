@@ -4,7 +4,7 @@ import { AgentHost } from "@pi-desktop/agent-host";
 import { createTeamDeliveryService } from "../electron/main/services/team-delivery.ts";
 import { restoreAgentHostThenDrain } from "../electron/main/runtime/team-startup.ts";
 
-function fixture({ paused = false, queueReceipt = false, failFirstAck = false, deferFirstRoster = false, noPendingMessages = false, agentHost: providedAgentHost } = {}) {
+function fixture({ paused = false, queueReceipt = false, failFirstAck = false, deferFirstRoster = false, noPendingMessages = false, agentHost: providedAgentHost, stopAtBoundary } = {}) {
   const order = [];
   const queueEntries = queueReceipt
     ? [{ sessionId: "member-1", sessionMessageId: "message-1" }]
@@ -125,6 +125,7 @@ function fixture({ paused = false, queueReceipt = false, failFirstAck = false, d
     getHost: () => currentHost,
     getBridge: () => bridge,
     activeTurns,
+    stopAtBoundary: stopAtBoundary ?? (async () => {}),
     log: (...args) => order.push(args),
   });
   return {
@@ -396,4 +397,25 @@ test("Host inbox-consumed event removes only verified Team queue entries and tol
   assert.deepEqual(removed, ["team-entry"]);
   assert.deepEqual(f.queueEntries.map(entry => entry.id), ["ordinary-entry"]);
   assert.equal(f.order.some(entry => typeof entry === "string" && entry.startsWith("kick:")), false);
+});
+
+// Host budget pauses do not invoke the ordinary user-stop peer-abort path.
+test("hard run limit holds Lead and experts, requests safe boundaries, and leaves mail queued", async () => {
+  const stopped = [];
+  const f = fixture({ paused: true, stopAtBoundary: async (session, turn) => { stopped.push([session, turn]); } });
+  f.activeTurns.set("lead", "lead-turn"); f.activeTurns.set("member-1", "expert-turn");
+  await f.service.onNotification("team.runLimitPauseRequested", { teamSessionId: "lead" });
+  await f.service.onNotification("team.messageQueued", { teamSessionId: "lead" });
+  assert.deepEqual(stopped, [["lead", "lead-turn"], ["member-1", "expert-turn"]]);
+  assert.ok(f.order.includes("hold:lead:team:lead")); assert.ok(f.order.includes("hold:member-1:team:lead"));
+  assert.equal(f.order.some((item) => typeof item === "string" && item.startsWith("interrupt:")), false);
+  assert.equal(f.hostCalls.some(([method]) => method === "team.ackMessage"), false);
+  assert.equal(f.message.status, "queued");
+});
+test("a stale budget event after explicit resume cannot stop a newer run", async () => {
+  let stopped = 0;
+  const f = fixture({ stopAtBoundary: async () => { stopped++; } });
+  f.activeTurns.set("lead", "new-turn");
+  await f.service.onNotification("team.runLimitPauseRequested", { teamSessionId: "lead" });
+  assert.equal(stopped, 0);
 });

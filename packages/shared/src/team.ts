@@ -135,6 +135,7 @@ export type TeamMemberActivity = {
 };
 
 export type TeamRosterProjection = {
+  runLimits?: TeamRunLimitState & import("./expert-team-settings.js").TeamRunLimitSettings | null;
   teamSessionId: string;
   revision: number;
   paused: boolean;
@@ -165,8 +166,13 @@ export type TeamBoardProjection = {
   }>;
 };
 
+export type TeamRunLimitState = {
+  runId: string; startedAt: number; elapsedMs: number; softMessageId: string | null; hardReachedAt: number | null;
+};
+
 /** Atomic Host-owned view used by Team overview, board, and panorama. */
 export type TeamSnapshot = {
+  runLimits?: TeamRunLimitState & import("./expert-team-settings.js").TeamRunLimitSettings;
   teamSessionId: string;
   revision: number;
   paused: boolean;
@@ -188,7 +194,9 @@ export type TeamChangedReason =
   | "mailbox"
   | "pause"
   | "resume"
-  | "dissolved";
+  | "dissolved"
+  | "run-limit-soft"
+  | "run-limit-hard";
 
 export type TeamChangedEvent = {
   teamSessionId: string;

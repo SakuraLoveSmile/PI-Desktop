@@ -13,6 +13,7 @@ pub(crate) fn record_user_turn(db: &Database, session: &str, turn: &str) -> Resu
         && super::get_team_member_by_session_id(db, session)?.is_none()
     {
         db.kv_set(SCOPE_NS, session, &serde_json::json!(turn))?;
+        super::run_limits::start_user_run(db, session, turn, crate::db::now_ms())?;
     }
     Ok(())
 }
@@ -176,7 +177,10 @@ fn current_confirmed_decision(db: &Database, team: &str) -> Result<super::TeamEx
     };
     let confirmation = decision.message_ids.contains(&message_id)
         && key == format!("team-review:{review_id}:confirmed");
-    if confirmation || decision.member_session_ids.contains(&source) {
+    if confirmation
+        || decision.member_session_ids.contains(&source)
+        || super::run_limits::is_soft_notice(db, team, &message_id)?
+    {
         return Ok(decision);
     }
     Err(deny())

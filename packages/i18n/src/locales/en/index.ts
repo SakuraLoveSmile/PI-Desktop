@@ -932,6 +932,11 @@ export const en = {
       operationError: "Could not start the storage operation. {{error}}",
     },
     expertTeam: {
+      runLimits: {
+        title: "Team run limits", enabled: "Enable wall-clock limits", soft: "Wrap-up after (hours)", hard: "Pause after (hours)",
+        description: "Defaults: wrap up after 6 hours, pause after 10 hours. Pauses and restarts keep the current run clock. A new admitted user task starts a new run. At the hard limit, the current tool batch finishes safely; background processes are left running. Extend or disable the limit, then resume the paused run.",
+        invalid: "Enter positive hours with the pause limit greater than the wrap-up limit.",
+      },
       title: "Expert team",
       loadFailed: "Could not load expert settings",
       currentProject: "Current project",
@@ -2234,6 +2239,14 @@ sklm: {
     close: "Close widget",
   },
   team: {
+    runLimitReadyToResume: "The Team remains paused, but the current policy permits Resume. Resume explicitly to continue; the run clock is retained.",
+    runLimitDisabled: "Wall-clock limits are disabled. The run clock is retained.",
+    runLimitTitle: "Team run limit",
+    runLimitSoft: "The wrap-up limit was reached. Collect expert results and conclude the current task.",
+    runLimitStopping: "Hard run limit reached: safely finishing the current tool batch. Background processes remain running.",
+    runLimitPaused: "Paused at the hard run limit. Extend or disable Team run limits in Settings, then resume. A new session starts an independent run.",
+    runLimitHours: "Current run: {{elapsed}} h · wrap-up {{soft}} h · pause {{hard}} h",
+
     viewMemberDetail: "View {{name}} details",
     memberDetailUnavailable: "Member details unavailable",
     dispatchCardsLabel: "Expert task dispatches",

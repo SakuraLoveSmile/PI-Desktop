@@ -26,6 +26,7 @@ import {
   persistExpertTeamProjectRemoval,
 } from "./expert-team-settings";
 import "../../styles/settings-expert-team.css";
+import { TeamRunLimitsSettings } from "./TeamRunLimitsSettings";
 
 export function ExpertTeamSettingsPage() {
   const { t } = useTranslation();
@@ -117,6 +118,7 @@ export function ExpertTeamSettingsPage() {
           <Button size="sm" variant="secondary" disabled={saving} onClick={() => void removeUnavailableScope()}>{t("settings.expertTeam.removeProjectOverrides")}</Button>
         </div> : null}
         {scopeError ? <p className="expert-team-error" role="alert">{scopeError}</p> : null}
+        {!scope && <TeamRunLimitsSettings />}
         <div id="expert-team-roles" role="tabpanel" aria-label={t("settings.expertTeam.builtinTitle")}>
           <CapabilityPanel loading={false} loadingLabel={t("common.loading")}>
             <CapabilityGroupHeader

@@ -1,3 +1,4 @@
+import { TeamRunLimitStop } from "./team/run-limit-stop.js";
 import { BackgroundProcessUpdates } from "./team/background-process-updates.js";
 import { backgroundBashDescription, bashTimeoutPayload } from "./background-bash.js";
 import { contextRequestObserver } from "./context-insights.js";
@@ -1904,6 +1905,7 @@ export class DesktopAgentRuntime {
   private pendingModelCompaction = false;
   /** One-shot request to finish the current turn at the next boundary. */
   private gracefulStopRequested = false;
+  private readonly teamBudgetStop = new TeamRunLimitStop();
   /** Codex's `claim_*` flags: one of each reminder per context window. */
   private contextReminderClaimed = false;
   private contextFallbackReminderClaimed = false;
@@ -2020,6 +2022,7 @@ export class DesktopAgentRuntime {
     const tools = this.declaredTools();
     this.agent = new Agent({
       streamFn: (m, context, options) => {
+        this.teamBudgetStop.assertModelAdmission();
         this.setAgentActivity({ phase: "waiting-model", since: Date.now() });
         this.providerResponseStatus = undefined;
         this.providerRetryHeaders = undefined;
@@ -2103,6 +2106,7 @@ export class DesktopAgentRuntime {
           signal: AbortSignal.any([
             ...(hookedOptions.signal ? [hookedOptions.signal] : []),
             stallAbort.signal,
+            this.teamBudgetStop.providerSignal,
           ]),
         };
         const usageTurnId = this.turnId;
@@ -2112,6 +2116,7 @@ export class DesktopAgentRuntime {
           context,
           attemptOptions,
           (retryOptions) => {
+            this.teamBudgetStop.assertModelAdmission();
             const observer = contextRequestObserver(m, context, { providerId: this.provider.id,
               turnId: usageTurnId, step: contextInsightsStep, mode: this.mode },
               request => this.emit({ type: "context_insights", request }, usageTurnId),
@@ -2185,7 +2190,13 @@ export class DesktopAgentRuntime {
       // Plan transitions must be the only tool call in an assistant batch.
       // Sequential execution also makes the host-confirmed mode change visible
       // before the next model request in the same run.
-      beforeToolCall: (context) => this.beforeToolCall(context),
+      beforeToolCall: async (context) => {
+        const blocked = this.teamBudgetStop.denial(context);
+        if (blocked) return blocked;
+        const result = await this.beforeToolCall(context);
+        if (result?.block) return result;
+        return this.teamBudgetStop.beforeToolCall(context) ?? result;
+      },
       // Every tool except `Task` carries `executionMode: "sequential"`, and pi
       // runs a batch sequentially as soon as it contains one such tool. So the
       // only batch that actually runs concurrently is a batch of nothing but
@@ -2197,6 +2208,12 @@ export class DesktopAgentRuntime {
       // queued renderer prompt ends a completed turn at the next boundary,
       // without treating an error or abort as a graceful stop.
       finishTurn: async ({ message }) => {
+        if (this.teamBudgetStop.requested) {
+          this.gracefulStopRequested = false;
+          this.runCancelled = true;
+          this.resetRunRecoveryState();
+          return { action: "end" };
+        }
         if (this.pendingTeamInboxYield?.()) {
           return { action: "end" };
         }
@@ -6253,7 +6270,7 @@ export class DesktopAgentRuntime {
     error: ReturnType<typeof classifyAgentError>,
     phase: "request" | "stream",
   ): number | undefined {
-    if (!error.retriable || error.details?.origin === "local") return undefined;
+    if (this.teamBudgetStop.requested || this.runCancelled || !error.retriable || error.details?.origin === "local") return undefined;
     const infinite = this.infiniteProviderRetry;
     if (error.code === "PROVIDER_RATE_LIMITED") {
       if (
@@ -6410,6 +6427,7 @@ export class DesktopAgentRuntime {
   }
 
   private async retryPendingProviderFailure(): Promise<void> {
+    if (this.teamBudgetStop.requested || this.runCancelled) return;
     if (!this.pendingProviderRetry) return;
     const retryError = this.pendingProviderRetry;
     // Fall back to the budget the error actually draws from. Hardcoding 1 here
@@ -6461,11 +6479,14 @@ export class DesktopAgentRuntime {
       });
       await delayWithAbort(delayMs, this.providerRetryAbort.signal);
       if (this.disposed) throw new Error("runtime disposed");
+      if (this.teamBudgetStop.requested || this.runCancelled) return;
       // The failed attempt has already finished. Only its lifecycle events
       // are suppressed; the retry must close the visible run normally.
       this.suppressProviderRetryRunEnd = false;
       await this.agent.continue();
       await this.waitForIdleAndSteering();
+    } catch (error) {
+      if (!(this.teamBudgetStop.requested && error instanceof Error && error.name === "AbortError")) throw error;
     } finally {
       this.providerRetryAbort = undefined;
       this.activeProviderRetryAttempt = 0;
@@ -6475,6 +6496,7 @@ export class DesktopAgentRuntime {
   }
 
   private async rerunSilentTurn(): Promise<void> {
+    if (this.teamBudgetStop.requested || this.runCancelled) return;
     if (!this.pendingSilentTurnRerun) return;
     this.pendingSilentTurnRerun = false;
     this.suppressSilentTurnRunEnd = false;
@@ -6489,6 +6511,7 @@ export class DesktopAgentRuntime {
       },
       continue: async () => {
         if (this.disposed) throw new Error("runtime disposed");
+        if (this.teamBudgetStop.requested || this.runCancelled) return;
         await this.agent.continue();
         await this.waitForIdleAndSteering();
       },
@@ -6512,7 +6535,22 @@ export class DesktopAgentRuntime {
    * Returns false when overflow recovery could not create a checkpoint and the
    * caller must stop; the error event is already emitted.
    */
+  private settleStoppedTeamBudget(): void {
+    if (!this.teamBudgetStop.requested || !this.teamBudgetStop.claimSettlement()) return;
+    this.acceptingSteering = false;
+    this.gracefulStopRequested = false;
+    this.runCancelled = true;
+    this.resetRunRecoveryState();
+    this.clearAgentActivity();
+    this.finalizeCurrentAssistant("aborted");
+    this.emit({ type: "error", error: { code: "TURN_ABORTED", message: "Team paused at its hard run limit.", retriable: false } });
+    this.emit({ type: "turn_end" });
+    this.emit({ type: "agent_end", messageIds: [] });
+  }
+
   private async runPendingRecoveries(): Promise<boolean> {
+    if (this.teamBudgetStop.requested) { this.settleStoppedTeamBudget(); return false; }
+    if (this.runCancelled) return false;
     while (
       this.pendingProviderRetry ||
       this.pendingOverflow ||
@@ -6521,6 +6559,8 @@ export class DesktopAgentRuntime {
       this.goalReportRecovery.pending ||
       this.teamLeadExecution.pending
     ) {
+      if (this.teamBudgetStop.requested) { this.settleStoppedTeamBudget(); return false; }
+      if (this.runCancelled) return false;
       if (this.pendingProviderRetry) {
         await this.retryPendingProviderFailure();
         continue;
@@ -6558,6 +6598,7 @@ export class DesktopAgentRuntime {
             this.emit({ type: "error", error });
             return false;
           }
+          if (this.teamBudgetStop.requested || this.runCancelled) return false;
           this.turnHadError = false;
           this.requestStartedAt = Date.now();
           await this.agent.continue();
@@ -6581,7 +6622,8 @@ export class DesktopAgentRuntime {
       }
       await this.rerunGoalReportTurn();
     }
-    return true;
+    if (this.teamBudgetStop.requested) { this.settleStoppedTeamBudget(); return false; }
+    return !this.runCancelled;
   }
 
   private prepareGoalReportRecovery(): boolean {
@@ -6599,6 +6641,7 @@ export class DesktopAgentRuntime {
   }
 
   private async rerunGoalReportTurn(): Promise<void> {
+    if (this.teamBudgetStop.requested || this.runCancelled) return;
     const epoch = this.turnEpoch;
     const closeStoppedRecovery = () => {
       this.goalReportRecovery.reset();
@@ -6632,6 +6675,7 @@ export class DesktopAgentRuntime {
           closeStoppedRecovery();
           return;
         }
+        if (this.teamBudgetStop.requested || this.runCancelled) return;
         await this.agent.continue();
         await this.waitForIdleAndSteering();
       },
@@ -6640,6 +6684,7 @@ export class DesktopAgentRuntime {
   }
 
   private async rerunProgressOnlyTurn(): Promise<void> {
+    if (this.teamBudgetStop.requested || this.runCancelled) return;
     if (!this.pendingProgressTurnRerun) return;
     this.pendingProgressTurnRerun = false;
     this.suppressProgressTurnRunEnd = false;
@@ -6655,6 +6700,7 @@ export class DesktopAgentRuntime {
       continue: async () => {
         if (this.disposed) throw new Error("runtime disposed");
         this.suppressProgressTurnRunEnd = false;
+        if (this.teamBudgetStop.requested || this.runCancelled) return;
         await this.agent.continue();
         await this.waitForIdleAndSteering();
       },
@@ -6667,6 +6713,7 @@ export class DesktopAgentRuntime {
   }
 
   private async rerunTeamCompletionTurn(): Promise<void> {
+    if (this.teamBudgetStop.requested || this.runCancelled) return;
     await this.teamLeadExecution.recover({
       host: this.host, team: this.teamContext!,
       state: () => ({ turnId: this.turnId, epoch: this.turnEpoch, mode: this.mode,
@@ -6676,7 +6723,7 @@ export class DesktopAgentRuntime {
       getPrompt: () => this.agentSystemPromptContent(),
       setPrompt: prompt => this.setAgentSystemPrompt(prompt),
       start: () => { this.requestStartedAt = Date.now(); this.setAgentActivity({ phase: "recovering", since: Date.now() }); },
-      continue: async () => { await this.agent.continue(); await this.waitForIdleAndSteering(); },
+      continue: async () => { if (this.teamBudgetStop.requested || this.runCancelled) return; await this.agent.continue(); await this.waitForIdleAndSteering(); },
       restore: () => this.applyPendingResumablePrompt(),
     });
   }
@@ -7036,6 +7083,7 @@ export class DesktopAgentRuntime {
     willRetry: boolean,
     retentionMode: CompactionRetentionMode = "completed_turn",
   ): Promise<boolean> {
+    if (this.teamBudgetStop.requested) { this.compactionAborted = true; return false; }
     if (this.compactionInProgress) return false;
     this.compactionInProgress = true;
     this.compactionAborted = false;
@@ -7055,6 +7103,7 @@ export class DesktopAgentRuntime {
         );
         if (decision?.cancel) return false;
       }
+      if (this.teamBudgetStop.requested) { this.compactionAborted = true; return false; }
       const compacted = await this.performCompaction(reason, willRetry, retentionMode);
       if (runner) {
         void runner.emit(compacted ? "session_compact" : "session_compact_failed", {
@@ -7956,7 +8005,7 @@ export class DesktopAgentRuntime {
     this.compactionAbort = new AbortController();
     let build: CheckpointBuild;
     try {
-      build = await this.buildCheckpoint(this.compactionAbort.signal, retentionMode);
+      build = await this.buildCheckpoint(AbortSignal.any([this.compactionAbort.signal, this.teamBudgetStop.providerSignal]), retentionMode);
     } finally {
       this.compactionAbort = undefined;
     }
@@ -8624,6 +8673,10 @@ export class DesktopAgentRuntime {
         });
         break;
       case "agent_end": {
+        if (this.teamBudgetStop.requested) {
+          this.settleStoppedTeamBudget();
+          break;
+        }
         if (this.pendingTeamInboxYield?.()) {
           this.pendingTeamInboxYield = undefined;
           this.acceptingSteering = false;
@@ -8861,6 +8914,7 @@ export class DesktopAgentRuntime {
     this.acceptingSteering = true;
     this.pendingUserMessageId = undefined;
     this.gracefulStopRequested = false;
+    this.teamBudgetStop.reset();
     this.runCancelled = false;
     this.resetRunRecoveryState();
     this.turnEpoch += 1;
@@ -9088,6 +9142,7 @@ export class DesktopAgentRuntime {
     this.turnId = nextTurnId;
     this.acceptingSteering = true;
     this.gracefulStopRequested = false;
+    this.teamBudgetStop.reset();
     this.runCancelled = false;
     this.turnSubagentUsage = undefined;
     // Capabilities and path-scoped instruction claims belong to one prompt.
@@ -9336,7 +9391,7 @@ export class DesktopAgentRuntime {
         this.suppressSilentTurnRunEnd || this.suppressProgressTurnRunEnd ||
         this.goalReportRecovery.suppressRunEnd ||
         this.teamLeadExecution.suppressRunEnd) return;
-    while (this.pendingSteering.size && this.acceptingSteering && !this.runCancelled && !this.turnHadError) {
+    while (this.pendingSteering.size && this.acceptingSteering && !this.runCancelled && !this.teamBudgetStop.requested && !this.turnHadError) {
       this.steeringContinuation = true;
       try {
         await this.agent.continue();
@@ -9361,6 +9416,7 @@ export class DesktopAgentRuntime {
   async abort(): Promise<void> {
     this.acceptingSteering = false;
     this.gracefulStopRequested = false;
+    this.teamBudgetStop.reset();
     this.runCancelled = true;
     this.projectMemoryRefreshAbort?.abort();
     this.teamLeadExecution.cancel();
@@ -9377,7 +9433,16 @@ export class DesktopAgentRuntime {
   }
 
   /** Ask pi-agent-core to stop after the current assistant/tool turn. */
-  requestGracefulStop(): { requested: boolean } {
+  requestGracefulStop(preserveRunningTools = false): { requested: boolean } {
+    if (preserveRunningTools) {
+      if (this.disposed || !this.getStatus().isRunning) return { requested: false };
+      this.acceptingSteering = false;
+      this.gracefulStopRequested = true;
+      this.teamBudgetStop.request();
+      if (this.compactionInProgress) this.compactionAborted = true;
+      if (!this.agent.state.isStreaming) this.settleStoppedTeamBudget();
+      return { requested: true };
+    }
     if (this.teamLeadExecution.suppressRunEnd || this.goalReportRecovery.suppressRunEnd) { void this.abort(); return { requested: true }; }
     if (this.disposed || !this.agent.state.isStreaming) {
       return { requested: false };
@@ -9436,6 +9501,7 @@ export class DesktopAgentRuntime {
     this.delegateToolCalls.clear();
     this.appendedDelegationRowIds.clear();
     this.gracefulStopRequested = false;
+    this.teamBudgetStop.reset();
     this.hostCloseUnsubscribe?.();
     this.hostCloseUnsubscribe = undefined;
     this.agent.abort();

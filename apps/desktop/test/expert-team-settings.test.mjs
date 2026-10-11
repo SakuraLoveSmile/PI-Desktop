@@ -3,7 +3,7 @@ import { register } from "node:module";
 import test from "node:test";
 register(new URL("./helpers/ts-import-hooks.mjs", import.meta.url));
 const { expertTeamScopeRole, expertTeamModelOptions, expertTeamThinkingLevels,
-  persistExpertTeamRole, persistExpertTeamProjectRemoval, ExpertTeamSettingsConflict } = await import("../src/features/settings/expert-team-settings.ts");
+  persistExpertTeamRole, persistExpertTeamProjectRemoval, persistTeamRunLimits, ExpertTeamSettingsConflict } = await import("../src/features/settings/expert-team-settings.ts");
 const { resolveExpertTeamRoleConfig } = await import("@pi-desktop/shared");
 
 const settings = () => ({ theme: "dark", defaultMode: "agent", enterToSend: true,
@@ -111,4 +111,19 @@ test("a removed project config can be explicitly cleared without touching other 
   assert.equal(result.expertTeam.projectOverrides["/project-a"], undefined);
   assert.deepEqual(result.expertTeam.projectOverrides["/project-b"], { qa: { tools: [] } });
   assert.deepEqual(result.expertTeam.userDefaults, settings().expertTeam.userDefaults);
+});
+
+test("editing live run limits preserves concurrent role changes and Host CAS rejects same-policy conflicts", async () => {
+  let stored = settings();
+  const config = { enabled: true, softMs: 21600000, hardMs: 36000000 };
+  stored.expertTeam.userDefaults.qa = { instructions: "Concurrent QA edit" };
+  const result = await persistTeamRunLimits({ config, expected: undefined, isCurrent: () => true,
+    getSettings: async () => structuredClone(stored), setSettings: async (patch) => {
+      assert.deepEqual(patch.expertTeamExpected, stored.expertTeam);
+      stored = { ...stored, expertTeam: structuredClone(patch.expertTeam) };
+    } });
+  assert.deepEqual(result.expertTeam.runLimits, config);
+  assert.equal(result.expertTeam.userDefaults.qa.instructions, "Concurrent QA edit");
+  await assert.rejects(persistTeamRunLimits({ config: { ...config, enabled: false }, expected: undefined,
+    isCurrent: () => true, getSettings: async () => stored, setSettings: async () => assert.fail("must not overwrite") }), ExpertTeamSettingsConflict);
 });

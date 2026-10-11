@@ -28,6 +28,7 @@ import {
   IconWorkflow,
 } from "../icons";
 import { Button, TooltipButton } from "../ui";
+import { TeamRunLimitNotice } from "./team/TeamRunLimitNotice";
 import { TeamMemberTranscript } from "./team/TeamMemberTranscript";
 import { TeamTaskBrief } from "./team/TeamTaskBrief";
 import { CompactTeamBoard } from "./team/CompactTeamBoard";
@@ -112,7 +113,9 @@ export function TeamPanel({
       setActionError(null);
       await loadData();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : String(err));
+      const code = typeof err === "object" && err !== null && "code" in err ? err.code : undefined;
+      setActionError(code === "TEAM_RUN_LIMIT_REACHED" || (err instanceof Error && err.message.includes("TEAM_RUN_LIMIT_REACHED"))
+        ? t("team.runLimitPaused") : err instanceof Error ? err.message : String(err));
     } finally {
       setResuming(false);
     }
@@ -305,6 +308,8 @@ export function TeamPanel({
         </div>
       </header>
 
+      {snapshot?.runLimits && <TeamRunLimitNotice limits={snapshot.runLimits}
+        safelyFinishing={snapshot.leadPhase === "running" || roster.some((member) => member.phase === "running")} />}
       {overlaps.length > 0 && (
         <aside className="team-warning-box" aria-label={t("team.warnings")}>
           <div className="team-warning-title">
