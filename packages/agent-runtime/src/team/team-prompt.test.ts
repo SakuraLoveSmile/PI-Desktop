@@ -117,12 +117,21 @@ describe("Expert Team reliability guidance", () => {
       expect(requests).toHaveLength(kind === "goal" ? 3 : 2);
       const prompt = getCurrentSystemPrompt(requests[0].messages);
       expect(prompt).toContain("During approved Plan/Goal execution");
+      expect(prompt).toContain("either call wait_for_updates");
+      expect(prompt).toContain("or end your message");
+      expect(prompt).not.toContain("Explain the proposed experts and stop for trusted user roster confirmation");
       expect(prompt).toContain("do not end that execution turn merely to receive reports");
       expect(prompt).not.toContain("wait_for_updates normally ends this aggregation turn");
       expect(inboxReads).toEqual([{ teamSessionId: "lead", callerSessionId: "lead", expectedTurnId: "approved-turn" }]);
       expect(JSON.stringify(requests[1].messages)).toContain("Expert finished the assigned verification.");
       expect(events.filter(event => event.type === "error")).toEqual([]);
       expect(events.filter(event => event.type === "agent_end")).toHaveLength(1);
+      // Reuse the no-project/no-extension/no-subagent runtime: no incidental
+      // prompt rebuild may mask a stale approved-execution prompt.
+      await runtime.prompt("Explain an ordinary Team request", "ordinary-user", "ordinary-turn");
+      const ordinaryPrompt = getCurrentSystemPrompt(requests.at(-1)!.messages);
+      expect(ordinaryPrompt).toContain("Explain the proposed experts and stop for trusted user roster confirmation");
+      expect(ordinaryPrompt).not.toContain("or end your message");
     } finally { await runtime.dispose(); }
   });
 });

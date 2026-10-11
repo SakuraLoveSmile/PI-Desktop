@@ -44,6 +44,32 @@ Candidate A checks:
   whitespace checks passed. Independent review identified the fresh-read
   cancellation window; the corrected increment was independently re-reviewed.
 
+## Package B: waiting and role guidance
+
+The pending result and approved Lead system prompt share the two supported
+waiting choices: wait_for_updates or end the assistant message while Host keeps
+execution open. A runtime-owned approvedExecution flag selects only that prompt
+variant, including the first approved Plan request after mode switching.
+Ordinary Team confirmation and automatic Plan research guidance remain intact.
+Presentation role schema describes all five existing enum values and maps
+builders to executor without adding a value or permission.
+
+R8 initially failed on the absent role description and old waiting text, then
+passed. Actual provider-schema validation accepts all five values (including
+builder routing name with executor presentation) and rejects the builder role.
+R9 existing Team strategy/tools/prompt/completion cases were run.
+
+Final combined run: 113 tests passed in seven suites (roster replay, declaration
+helper, roster guidance, existing team-tools, team-prompt, runtime-team-strategy
+and runtime-team-completion). Actual approved Plan/Goal provider requests carry
+approved waiting guidance; ordinary Team and Plan research retain their paths.
+Runtime project build passed. Independent B review found stale approved guidance
+after reusing the runtime for ordinary Team requests; both approved Plan/Goal
+reuse regressions first failed, then passed after ordinary Team Lead startup
+explicitly recomposed the prompt. The increment was independently re-reviewed.
+Final combined validation ran at 21:47 local time. Test quality, configured lint,
+diff checks and request-head ancestry passed on the final local candidate.
+
 ## Environment and acceptance limits
 
 Dependencies are referenced from the primary host environment; no separate

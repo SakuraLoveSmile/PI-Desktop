@@ -1,6 +1,7 @@
 import type { AgentMessage, AgentToolResult } from "@earendil-works/pi-agent-core";
 import { DECLARE_TEAM_STRATEGY_TOOL_NAME, type TeamExecutionDecision, type TeamLaunchReview } from "@pi-desktop/shared";
 import { isRecord } from "../agent-messages.js";
+import { TEAM_APPROVED_ROSTER_WAIT_GUIDANCE } from "./team-prompt.js";
 
 type DeclareStrategyResult = {
   decision: Pick<TeamExecutionDecision, "strategy" | "reason"> & Partial<TeamExecutionDecision>;
@@ -19,7 +20,7 @@ export function buildDeclareStrategyResult(result: DeclareStrategyResult, approv
       awaitingUserApproval: result.review?.status === "pending",
       ...(result.review?.status === "pending" ? {
         nextStep: approvedExecution
-          ? "Explain the proposal and keep this approved execution open while waiting for trusted roster confirmation. After confirmation use wait_for_updates to consume authenticated Team messages in this same execution; dispatch owned expert tasks and await their full results before completion."
+          ? TEAM_APPROVED_ROSTER_WAIT_GUIDANCE
           : "Explain the proposal and stop this turn. Wait for trusted user review confirmation before executing work or submitting a plan.",
       } : result.review?.status === "confirmed" ? {
         nextStep: result.review.launchPolicy === "automatic_plan"

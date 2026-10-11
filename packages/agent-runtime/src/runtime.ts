@@ -2377,6 +2377,7 @@ export class DesktopAgentRuntime {
           ? [
               teamSystemPrompt({
                 mode: this.mode,
+                approvedExecution: this.autonomousExecution,
                 workPurpose: this.teamContext?.workPurpose,
                 expertConfig: this.teamContext?.expertConfig,
                 isLead: this.teamContext?.isLead ?? false,
@@ -8901,6 +8902,7 @@ export class DesktopAgentRuntime {
     this.requestStartedAt = Date.now();
     this.setMode("agent");
     this.autonomousExecution = true;
+    this.setAgentSystemPrompt(this.composeSystemPrompt());
     if (this.projectPath) await this.refreshAutoMemoryForTurn();
     try { ensureExecutionIsCurrent(); } catch (error) {
       this.terminateParentTurn();
@@ -9121,6 +9123,9 @@ export class DesktopAgentRuntime {
     this.pendingUserMessageId = userMessageId;
     this.resetRunRecoveryState();
     this.autonomousExecution = false;
+    if (this.executionProfile === "team" && this.teamContext?.isLead) {
+      this.setAgentSystemPrompt(this.composeSystemPrompt());
+    }
     if (this.goalReportDraftManager || this.goalProgressManager) {
       this.goalReportDraftManager = undefined;
       this.goalProgressManager = undefined;
