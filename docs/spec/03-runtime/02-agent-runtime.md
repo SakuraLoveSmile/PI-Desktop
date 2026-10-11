@@ -1980,3 +1980,36 @@ remains limited to one nudge. Ordinary non-Goal final-answer authority is unchan
 A trusted cancelled/interrupted roster aborts approved execution even when it
 arrives before the completion guard begins its review wait. It does not spend a
 nudge, restart model work, or install a waiting listener/timer.
+
+
+### Ordinary Agent Lead pending-mail visibility (2026-10-11)
+
+A Lead's team_status exposes pendingMessagesCount, pendingMessageSenders and
+oldestPendingMessageAgeSeconds from the existing authenticated mailbox read.
+Pending means inbound, non-self, queued and not yet bound to a recipient turn.
+An acknowledged queue receipt does not establish body consumption. Outbound,
+other-recipient, running, completed and cancelled rows are excluded.
+
+An ordinary unapproved Agent Lead's wait_for_updates returns
+reason: pending_mailbox_messages immediately when its initial read already has
+pending mail, or on a later recheck when mail arrives. It includes count, sender
+names, age and the current-turn delivery guidance; it does not terminate the
+turn, include bodies, acknowledge messages or modify queue state. The Lead must
+finish its ordinary turn before the existing authenticated role=user mailbox
+continuation can deliver full content. Counts and prompts are not consumption.
+
+Ordinary Plan Lead yield retains priority and terminate:true. Approved Plan/Goal
+execution reads its authenticated execution inbox first and never receives an
+instruction to end that execution to fetch mail. Owned background terminal
+results retain their existing priority and once-only delivery; pending mail
+remains visible on the next status/wait call.
+
+Initial subscription precedes baseline reads. The total deadline, single-flight
+rechecks, abort and cleanup remain bounded. Reads pin turn, epoch, Team identity
+and mode; replacement or disposal invalidates late metadata. A read failure is
+observable, not a zero-mail success. Sender names are stable-deduplicated in
+mailbox order; createdAt is a Unix-millisecond numeric string. Ages are nonnegative
+whole seconds; empty queues or any unparseable pending timestamp return null
+for the unknown oldest age. No new Host RPC, schema, quota, automatic Agent
+yield or in-turn body capability is added. See the proposed
+[delivery alternatives](../../adr/team-agent-mailbox-delivery.md), not implemented.

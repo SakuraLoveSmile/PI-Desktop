@@ -154,6 +154,7 @@ import {
 } from "./agent-messages.js";
 import { withExplicitRequired } from "./tool-schema.js";
 import { createTeamTools, teamSystemPrompt } from "./team/index.js";
+import { createTeamMailboxGuards } from "./team/mailbox-context-guards.js";
 import { nestedDelegationPermission, type DelegationOwnerContext } from "./delegation-owner.js";
 import { expertToolDenial } from "./team/expert-policy.js";
 import { buildSessionContext } from "./session-context.js";
@@ -3861,21 +3862,15 @@ export class DesktopAgentRuntime {
           mode: this.mode,
           host: this.host, backgroundProcesses: this.backgroundProcessUpdates,
           getTurnId: () => this.turnId, approvedExecution: () => this.autonomousExecution,
-          captureInboxYield: () => {
-            const turnId = this.turnId;
-            const epoch = this.turnEpoch;
-            const team = this.teamContext;
-            const current = () => Boolean(turnId) && this.turnId === turnId && this.turnEpoch === epoch &&
-              this.teamContext === team && team?.isLead === true && this.executionProfile === "team" &&
-              this.mode === "plan" && !this.autonomousExecution && !this.disposed && !this.runCancelled;
-            if (!current()) return undefined;
-            return toolCallId => {
-              if (!current()) return false;
-              this.terminatingToolCalls.add(toolCallId);
-              this.pendingTeamInboxYield = current;
-              return true;
-            };
-          },
+          ...createTeamMailboxGuards(() => ({
+            turnId: this.turnId, epoch: this.turnEpoch, team: this.teamContext,
+            isLead: this.teamContext?.isLead ?? false, profile: this.executionProfile,
+            mode: this.mode, approvedExecution: this.autonomousExecution,
+            inactive: this.disposed || this.runCancelled,
+          }), (toolCallId, current) => {
+            this.terminatingToolCalls.add(toolCallId);
+            this.pendingTeamInboxYield = current;
+          }),
           abortActiveTurn: this.teamContext?.abortActiveTurn,
         })
       : [];

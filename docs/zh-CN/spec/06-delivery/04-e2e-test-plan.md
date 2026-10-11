@@ -9853,3 +9853,13 @@ options retain pressed states and switching behavior.
 - **规格：** 团队协作决策 docs/adr/plus-expert-team-collaboration.md 的建议性范围修订（2026-10-11）及 03-runtime/06-host-rpc-protocol。
 - **验收：** P1 共享树协作；不拒绝写入，不增加 RPC 或迁移。
 - **状态：** 隔离 Host 和 runtime 契约夹具自动化。
+
+
+### E2E-TEAM-agent-lead-sees-queued-expert-report
+
+- **前提：** 候选 Host/runtime、隔离目录/数据、普通 Agent team lead，无批准执行，确定性 fake provider。
+- **步骤：** 委派专家两条后台命令，lead 长回合等待时专家发完整报告；分别记录入库、通知、ACK、kick、回合结束、出队与正文入模，重放同一投递。结束 lead 前查询 status/wait。
+- **预期：** 基线在准入和 kick 及时完成时仍积压三分多钟、lead 重跑命令；候选下一次 status/wait 立即给摘要，不泄正文、不 ACK、不自动结束，lead 主动结束普通回合后认证全文恰好一次。宿主进程数专家 2、lead 0。
+- **验收：** --timeout-acceptance 运行 sleep 5/timeout2 和 sleep75/缺省timeout，读取约 2/60 秒 timed_out/TOOL_TIMEOUT 并核对会话计数。既有回归保留 Plan yield、批准 inbox、取消/上下文变化和 WP5 间隙补收；不当作取消验收。
+- **自动化：** scripts/e2e-team-agent-queued-report.mjs 与 pending/wait/status/runtime/Main/AgentHost 行为回归。
+- **规格：** 03-runtime/02-agent-runtime、06-host-rpc-protocol；WP16 S3 仍为 proposed ADR，未实现回合内正文能力。

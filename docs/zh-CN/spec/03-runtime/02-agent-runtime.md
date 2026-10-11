@@ -1253,3 +1253,12 @@ cache, not semantic retrieval or a promised speedup. Grep remains unchanged.
 队友消息由原始获批执行回合消费，其 inbox authority 保持 active。执行结束后的邮件续回合不会取得 Goal token 或报告工具。确认名单后最多三次带宿主原因的完成提示，三个续执行之后下一次拒绝以宿主原文和 `stage: team_completion` 结束。未确认名单仍限一次；普通非 Goal 最终回答语义不变。
 
 可信名单取消／中断即使发生在完成 guard 开始等待之前，也立即中断获批执行；不得消耗恢复次数、重启模型或创建等待监听器／计时器。
+
+
+### 普通 Agent lead 待处理邮件可见性（2026-10-11）
+
+lead 的 team_status 从既有认证邮箱读取派生 pendingMessagesCount、pendingMessageSenders、oldestPendingMessageAgeSeconds。待处理指向本 lead 的入站非自身邮件，status=queued 且未绑定收件回合；队列 ACK 不代表正文已消费。外发、其他目标、running/completed/cancelled 邮件不计入。
+
+普通未批准 Agent lead 的 wait_for_updates 在初读已有邮件或后续 recheck 收到邮件时，立即返回 reason:pending_mailbox_messages，携带数量、发件人、年龄及当前回合投递指导。不结束回合、不带正文、不 ACK、不改队列；普通 lead 需结束回合，现有认证 role=user 续接才投递全文。摘要和提示不构成消费证明。
+
+普通 Plan lead 保留原让出优先和 terminate:true；获批 Plan/Goal 先消费执行 inbox，不能为读邮件结束批准执行。已有后台终态结果优先且仅交付一次，邮件在下一次 status/wait 仍可见。订阅先于 baseline、总 deadline、single-flight、取消与清理保持；回合/epoch/团队/模式变化使晚到摘要失效，读取错误不能伪装成零封。createdAt 为 Unix 毫秒数字字符串；发件人按邮箱顺序稳定去重，年龄为非负整数秒。空队列或任意 pending 时间无法解析时最老年龄为 null。不新增 Host RPC、持久化格式、额度、Agent 自动让出或回合内正文权限。回合内投递只见 proposed ADR /adr/team-agent-mailbox-delivery，尚未实现。
