@@ -1,4 +1,4 @@
-# Explicit Team task dispatch and queued-message age
+# ADR: Explicit Team task dispatch and queued-message age
 
 - Date: 2026-10-11
 - Status: Accepted for WP10

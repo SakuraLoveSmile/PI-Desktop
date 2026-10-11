@@ -32,6 +32,7 @@
 - [04-data-storage.md](/zh-CN/spec/03-runtime/04-data-storage)
 - [05-host-core-rust.md](/zh-CN/spec/03-runtime/05-host-core-rust)
 - [06-host-rpc-protocol.md](/zh-CN/spec/03-runtime/06-host-rpc-protocol)
+- [team-task-dispatch.md](/zh-CN/spec/03-runtime/team-task-dispatch)
 - [07-process-model.md](/zh-CN/spec/03-runtime/07-process-model)
 - [08-error-codes.md](/zh-CN/spec/03-runtime/08-error-codes)
 - [09-logging-and-observability.md](/zh-CN/spec/03-runtime/09-logging-and-observability)

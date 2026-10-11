@@ -20,6 +20,8 @@ Each ADR includes:
 
 | ID | Title | Status |
 |---|---|---|
+| team-task-dispatch-age | [Explicit task dispatch and queue age](team-task-dispatch-age.md) | Accepted for implementation |
+| team-member-activity-and-interruption-guard | [Host activity and explicit interruption](team-member-activity-and-interruption-guard.md) | Accepted for implementation |
 | team-managed-service-processes | [Explicit Host-managed Team service processes](team-managed-service-processes.md) | Proposed; not implemented |
 | team-agent-mailbox-delivery | [Ordinary Agent Lead mailbox delivery within a running turn](team-agent-mailbox-delivery.md) | Proposed; delivery alternatives not implemented |
 | composer-native-git-workspaces | [Composer native Git workspace navigation](composer-native-git-workspaces.md) | Accepted (local implementation) |
