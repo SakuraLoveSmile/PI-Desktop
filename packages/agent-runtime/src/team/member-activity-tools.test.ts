@@ -32,6 +32,7 @@ describe("Host-owned Team member activity", () => {
       if (method === "team.getRoster") return { teamSessionId: "lead", paused: false, members: [{ name: "tester", memberSessionId: "expert" }], memberActivity: evidence };
       if (method === "team.getBoard") return { revision: 1, tasks: [], readiness: [], scopeOverlaps: [] };
       if (method === "team.getPlanning") return null;
+      if (method === "team.listMessages") return { messages: [] };
       if (method === "team.interruptMember") return { interrupted: false };
       throw new Error(`Unexpected RPC: ${method}`);
     }) } as unknown as RuntimeHost;

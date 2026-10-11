@@ -8598,6 +8598,10 @@ export class DesktopAgentRuntime {
         }
         break;
       case "turn_end":
+        if (this.teamBudgetStop.requested) {
+          this.settleStoppedTeamBudget();
+          break;
+        }
         if (this.teamAskDeferred) {
           this.runCancelled = true;
           this.emit({ type: "error", error: { code: "TURN_ABORTED", message: "Team question remains pending after 30 minutes. Answer the question, then explicitly resume or obtain new approval.", retriable: false } });
