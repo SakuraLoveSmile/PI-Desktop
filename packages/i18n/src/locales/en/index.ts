@@ -2205,6 +2205,8 @@ sklm: {
     queued_other: "{{count}} more requests are waiting",
   },
   askTool: {
+    pending: "Pending answer",
+    pendingHelp: "The Lead stopped waiting after 30 minutes. Your answer starts a new turn; explicitly resume or approve execution again.",
     completedTitle: "Question clarification",
     completedSkipped: "Skipped",
     title: "A few questions",

@@ -198,6 +198,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
         minLength: 1,
         maxLength: 64,
       }),
+      replaces: Type.Optional(Type.String({ description: "Immutable name of an approved failed expert to replace once. Use a new unique name; omit route, context and role overrides. The Host inherits the frozen approved configuration." })),
       description: Type.Optional(
         Type.String({ description: "Role or specialty description." }),
       ),
@@ -235,6 +236,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
       try {
         const p = params as {
           name: string;
+          replaces?: string;
           description?: string;
           contextKind?: TeamContextKind;
           modelId?: string;
@@ -248,7 +250,8 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
             callerSessionId,
             name: p.name,
             description: p.description,
-            contextKind: p.contextKind ?? "fresh",
+            replaces: p.replaces,
+            contextKind: p.replaces ? p.contextKind : p.contextKind ?? "fresh",
             modelId: p.modelId,
             providerId: p.providerId,
           },
@@ -260,6 +263,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
             callerSessionId,
             target: result.member.name,
             content: p.prompt,
+            ...(p.replaces ? { idempotencyKey: `team-replacement:${result.member.memberSessionId}:initial` } : {}),
           });
         }
 

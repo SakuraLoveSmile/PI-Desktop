@@ -1234,6 +1234,22 @@
             "expiresAt": {
               "type": "string"
             },
+            "teamPending": {
+              "type": "object",
+              "required": [
+                "deferredAt",
+                "requiresNewApproval"
+              ],
+              "properties": {
+                "deferredAt": {
+                  "type": "string"
+                },
+                "requiresNewApproval": {
+                  "type": "boolean",
+                  "const": true
+                }
+              }
+            },
             "agentName": {
               "type": "string"
             },
@@ -1639,6 +1655,22 @@
       },
       "expiresAt": {
         "type": "string"
+      },
+      "teamPending": {
+        "type": "object",
+        "required": [
+          "deferredAt",
+          "requiresNewApproval"
+        ],
+        "properties": {
+          "deferredAt": {
+            "type": "string"
+          },
+          "requiresNewApproval": {
+            "type": "boolean",
+            "const": true
+          }
+        }
       },
       "agentName": {
         "type": "string"

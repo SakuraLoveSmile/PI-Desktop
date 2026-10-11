@@ -9853,3 +9853,21 @@ options retain pressed states and switching behavior.
 - **规格：** 团队协作决策 docs/adr/plus-expert-team-collaboration.md 的建议性范围修订（2026-10-11）及 03-runtime/06-host-rpc-protocol。
 - **验收：** P1 共享树协作；不拒绝写入，不增加 RPC 或迁移。
 - **状态：** 隔离 Host 和 runtime 契约夹具自动化。
+
+### WP11 无人值守提问与失败 slot 替换
+
+`E2E-TEAM-lead-pending-ask-late-answer` 回放 Lead 05:05 提问、05:35 中断并
+保留待回答卡、迟到回答开启一个认证新用户回合。不得恢复旧执行令牌或
+自动批准。原生隔离 Ask 卡验证徽标、提示和可回答控件。宿主 RPC 完整路径
+验证已批准成员 failed 后一次替换、幂等重试、继承权限与模型、新成员派发
+和回合接纳；旧成员和第二次替换拒绝。补充超时/回答竞态、ACK、重启恢复、
+队列满回滚和取消围栏检查。真实供应商通宵验收与受控回放分开报告。
+
+The explicit nightly lane `node scripts/e2e-team-lead-pending.mjs` requires the
+existing environment's `pnpm build:js` output. It runs the opt-in Rust
+cross-language fixture with `--ignored`, then records
+`E2E-TEAM-approved-lead-ask-interrupted`. The default pure Rust CI does not
+require Node/JS dependencies. The fixture exercises approved Goal dispatch,
+30-minute controlled wait, actual Main finalization/outbox, Rust interrupted
+execution, no successful report, and rejection of a genuine old progress token.
+It uses no provider service, test-only production backdoor, or system-clock edit.

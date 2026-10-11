@@ -173,6 +173,8 @@ pub(crate) fn cleanup_team_on_lead_delete_conn(
         )?;
     }
 
+    super::lead_asks::cleanup(conn, lead_session_id)?;
+    conn.execute("DELETE FROM kv WHERE ns='team-member-replacement-v1' AND json_extract(value_json,'$.teamSessionId')=?1",[lead_session_id])?;
     conn.execute(
         "DELETE FROM kv WHERE ns IN ('team-planning-v1','team-strategy-scope-v1') AND key=?1",
         [lead_session_id],

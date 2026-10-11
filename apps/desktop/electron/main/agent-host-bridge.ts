@@ -13,12 +13,15 @@ import {
   createHostQueueStore,
   createHostSessionPort,
   listPendingToolRequests,
+  fromHostQueueEntry,
+  type HostQueueEntry,
 } from "@pi-desktop/host-runtime";
 import type {
   AgentEventEnvelope,
   AgentQueueChangedEvent,
   AgentQueuePushRequest,
   AskToolResolution,
+  AskToolRequest,
   PendingInteractiveRequests,
   QueuedTurnSummary,
   RacpApprovalResult,
@@ -268,6 +271,12 @@ export function createAgentHostBridge(options: AgentHostBridgeOptions) {
     sessions,
     approvals,
     queueStore,
+    readDurableInputs: async sessionId => {
+      if (!options.getHost()) return undefined;
+      const result = await requireHost().call<{ asks: Array<{ request: AskToolRequest; turnId: string }>; entries?: HostQueueEntry[] }>("team.listLeadAsks", { sessionId });
+      for (const entry of result.entries ?? []) await agentHost.admitPersistedAnswer(DESKTOP_PRINCIPAL, fromHostQueueEntry(entry), true);
+      return result.asks;
+    },
     onQueueChange: (sessionId, entries) => {
       options.onQueueChange?.({ sessionId, entries: entries.map(toQueueSummary) });
     },
@@ -346,9 +355,8 @@ export function createAgentHostBridge(options: AgentHostBridgeOptions) {
      * longer exists; both lists are bounded.
      */
     async pendingInteractiveRequests(sessionId: string): Promise<PendingInteractiveRequests> {
-      const asks = agentHost.pendingInputRequests(sessionId)
-        .slice(0, MAX_PENDING_INTERACTIVE)
-        .map((entry) => entry.original);
+      await agentHost.refreshPendingInputs(sessionId);
+      const asks = agentHost.pendingInputRequests(sessionId).slice(0,MAX_PENDING_INTERACTIVE).map(entry => entry.original);
       const pending = await listPendingToolRequests(options.getHost, sessionId);
       return {
         asks,
@@ -400,9 +408,23 @@ export function createAgentHostBridge(options: AgentHostBridgeOptions) {
       if (resolvingInputs.has(key)) return null;
       const entry = agentHost.pendingInputRequests(sessionId)
         .find((candidate) => candidate.original.requestId === requestId);
-      if (!entry) return null;
       resolvingInputs.add(key);
       try {
+        if (options.getHost()) {
+          try {
+            const result = await requireHost().call<{ ask: { status: string; answers?: Array<string[] | null> }; entry?: HostQueueEntry | null }>("team.resolveLeadAsk", { ...resolution, sessionId, requestId });
+            if (result.entry) {
+              await agentHost.admitPersistedAnswer(DESKTOP_PRINCIPAL, fromHostQueueEntry(result.entry));
+              agentHost.closePendingInput(sessionId, requestId);
+              return { ok: true };
+            }
+            if (result.ask.status === "answered") return { ok: true };
+          } catch (error) {
+            const failure = error as { errorCode?: string; data?: { errorCode?: string } };
+            if (failure?.errorCode !== "ASKTOOL_NOT_FOUND" && failure?.data?.errorCode !== "ASKTOOL_NOT_FOUND") throw error;
+          }
+        }
+        if (!entry) return null;
         await forIpc(() => agentHost.respondInput(DESKTOP_PRINCIPAL, {
           inputId: entry.input.id,
           answers: resolution.answers,

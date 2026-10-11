@@ -271,6 +271,18 @@ describe("Expert Team tools and prompt (ADR 0304)", () => {
     }));
   });
 
+  it("replacement spawn inherits Host authority and gives the initial message a stable identity", async () => {
+    const host = createMockHost({
+      "team.createMember": async () => ({ member: { memberSessionId: "successor-id", name: "successor", phase: "idle" } }),
+      "team.sendMessage": async () => ({ message: { id: "initial-message" } }),
+    });
+    const tools = createTeamTools({ host, teamSessionId: "lead", callerSessionId: "lead", isLead: true });
+    const tool = tools.find(candidate => candidate.name === "spawn_teammate")!;
+    for (const id of ["attempt-1", "retry"]) await tool.execute(id, { name: "successor", replaces: "failed", prompt: "Complete the approved task" });
+    expect(host.call).toHaveBeenCalledWith("team.createMember", expect.objectContaining({ name: "successor", replaces: "failed", contextKind: undefined, providerId: undefined, modelId: undefined }));
+    expect(host.call).toHaveBeenCalledWith("team.sendMessage", expect.objectContaining({ target: "successor", idempotencyKey: "team-replacement:successor-id:initial", content: "Complete the approved task" }));
+  });
+
   it("spawn_teammate rejects non-lead and succeeds for lead", async () => {
     const host = createMockHost({
       "team.createMember": async (params) => ({
