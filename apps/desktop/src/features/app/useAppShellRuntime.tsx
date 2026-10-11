@@ -660,6 +660,14 @@ export function useAppShellRuntime() {
         useAppStore.setState({ isRunning: false });
       }
     });
+    const offTeamLimit = api.onTeamChanged((event) => {
+      if (event.reason !== "run-limit-soft" && event.reason !== "run-limit-hard") return;
+      const body = t(event.reason === "run-limit-soft" ? "team.runLimitSoft" : "team.runLimitStopping");
+      showToast(body, { variant: "info", duration: 8_000 });
+      void api.showNativeNotification({ id: `team-limit:${event.teamSessionId}:${event.revision}`,
+        sessionId: event.teamSessionId, kind: "interactive", title: t("team.runLimitTitle"), body,
+      }).catch((error: unknown) => console.warn("Team run-limit notification failed", error));
+    });
     const offNotificationChanged = api.onNotificationChanged((notification) => {
       const accepted = useAppStore.getState().receiveNotification(notification);
       // A host replay, renderer reload, or post-clear delayed event may refer
@@ -849,6 +857,7 @@ export function useAppShellRuntime() {
       offGoalReportChanged();
       offBrowserState();
       offHostStatus();
+      offTeamLimit();
       offNotificationChanged();
       offSessionsChanged();
       offNotificationActivated();

@@ -32,7 +32,9 @@ pub(super) fn send_pending_member_failure(
 
 pub(super) fn team_rpc_err(e: anyhow::Error) -> JsonRpcError {
     let msg = e.to_string();
-    let code_str = if msg.contains("TEAM_TURN_INVALID") {
+    let code_str = if msg.contains("TEAM_RUN_LIMIT_REACHED") {
+        "TEAM_RUN_LIMIT_REACHED"
+    } else if msg.contains("TEAM_TURN_INVALID") {
         "TEAM_TURN_INVALID"
     } else if msg.contains("TEAM_PLANNING_NOT_READY") {
         "TEAM_PLANNING_NOT_READY"
@@ -311,6 +313,7 @@ pub(super) async fn handle(
                 "revision": team.as_ref().map(|t| t.revision).unwrap_or(1),
                 "paused": team.as_ref().map(|t| t.paused).unwrap_or(false),
                 "members": members,
+                "runLimits": crate::team::run_limits::projection(&st.db, team_id, crate::db::now_ms()).map_err(team_rpc_err)?,
             }))
         }
         "team.getSnapshot" => {

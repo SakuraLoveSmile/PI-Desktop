@@ -9853,3 +9853,8 @@ options retain pressed states and switching behavior.
 - **规格：** 团队协作决策 docs/adr/plus-expert-team-collaboration.md 的建议性范围修订（2026-10-11）及 03-runtime/06-host-rpc-protocol。
 - **验收：** P1 共享树协作；不拒绝写入，不增加 RPC 或迁移。
 - **状态：** 隔离 Host 和 runtime 契约夹具自动化。
+
+
+### E2E-TEAM-run-limits-ui
+
+候选源码在隔离 Electron profile 执行 `node scripts/e2e-team-run-limits-ui.mjs`，以真实点击/输入覆盖默认启用 6/10 小时、非法输入、关闭后保存、保留并发角色设置及策略冲突拒绝。生产状态组件覆盖收尾、安全结束、暂停及关闭限额。设置后端是夹具；Host 时钟持久化、重启和暂停/恢复权限由独立领域/RPC 验证，不代表真实 provider、系统通知或十小时长跑。

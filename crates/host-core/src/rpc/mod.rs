@@ -21,6 +21,9 @@ mod team_mailbox;
 #[cfg(test)]
 mod team_planning_tests;
 mod team_rpc;
+mod team_run_limits;
+#[cfg(test)]
+mod team_run_limits_tests;
 #[cfg(test)]
 mod team_write_scope_tests;
 mod todos;
@@ -344,6 +347,7 @@ pub async fn serve(state: Arc<Mutex<AppState>>) -> Result<()> {
             return Err(anyhow!("host stdin reader unavailable: {error}"));
         }
     };
+    let team_limit_scheduler = team_run_limits::start(state.clone(), tx.clone());
     let config_sync_scheduler = tokio::spawn({
         let state = state.clone();
         let tx = tx.clone();
@@ -490,6 +494,8 @@ pub async fn serve(state: Arc<Mutex<AppState>>) -> Result<()> {
         }
     }
 
+    team_limit_scheduler.abort();
+    let _ = team_limit_scheduler.await;
     config_sync_scheduler.abort();
     let _ = config_sync_scheduler.await;
     {
