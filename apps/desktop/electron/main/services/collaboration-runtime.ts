@@ -44,6 +44,13 @@ export function createCollaborationRuntime(deps: CollaborationRuntimeDependencie
     getHost: deps.getHost,
     getBridge: deps.getBridge,
     activeTurns: deps.activeTurns,
+    stopAtBoundary: async (sessionId, turnId) => {
+      const sidecar = deps.getSidecar();
+      if (!sidecar || deps.activeTurns.get(sessionId) !== turnId) return;
+      // Host-only path: the ordinary user stop hook aborts peers and must not
+      // run for a wall-clock pause. Preserve the current foreground tool batch.
+      await sidecar.call("agent.stop", { sessionId, turnId, preserveRunningTools: true });
+    },
     log: (message, data) => deps.logger.app("runtime", "warn", message, { data }),
   });
   const drainTeamMail = () => teamDelivery.drainPending();

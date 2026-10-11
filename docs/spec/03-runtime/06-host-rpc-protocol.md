@@ -2041,3 +2041,14 @@ notification; persistence failure emits no interruption. No active turn returns
 mailbox delivery or execution-token behavior changes. Additive local RPC; no
 protocol bump or database migration. See ADR
 [team-member-activity-and-interruption-guard](../../adr/team-member-activity-and-interruption-guard.md).
+### Expert Team run limits (WP8)
+
+`team.getSnapshot` and `team.getRoster` expose compatible optional `runLimits`
+containing the live policy and durable run state. A roster with no started run may
+return `runLimits: null`; a snapshot omits it. `team.resume` rejects a still-exceeded
+live hard limit with `TEAM_RUN_LIMIT_REACHED`; policy adjustment never unpauses
+by itself. Host `team.changed` adds reasons `run-limit-soft` / `run-limit-hard`.
+Host-only `team.runLimitPauseRequested({teamSessionId})` asks Main to hold queues
+and request safe runtime boundaries; it is not a renderer/model command or an
+execution permission. See [Team run limits](team-run-limits.md) for run identity,
+clock, notices, Goal interruption and compatible internal stop behavior.

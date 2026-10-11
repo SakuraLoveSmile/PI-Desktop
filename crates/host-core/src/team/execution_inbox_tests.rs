@@ -425,3 +425,41 @@ fn goal_report_waits_for_dispatches_and_results_in_original_execution() {
     // Ordinary post-execution mail has no Goal token or new execution authority.
     super::authority::validate_lead_tool(&db, &lead, "TeamFinalAnswer").unwrap();
 }
+
+#[test]
+fn host_soft_notice_enters_approved_inbox_without_authorizing_forged_body() {
+    let (db, lead, turn) = fixture();
+    let review = declare_team_strategy(
+        &db,
+        DeclareStrategyParams {
+            team_session_id: &lead,
+            caller_session_id: &lead,
+            lead_turn_id: &turn,
+            strategy: "delegate",
+            reason: "Expert required",
+            members: Some(vec![super::test_support::expert_proposal("expert")]),
+        },
+    )
+    .unwrap()
+    .1
+    .unwrap();
+    confirm_launch_review(&db, &lead, &review.review_id, review.revision).unwrap();
+    let budget = super::run_limits::state(&db, &lead).unwrap().unwrap();
+    let soft = super::run_limits::RunLimitSettings::default().soft_ms;
+    let event = super::run_limits::evaluate_at(&db, &lead, budget.started_at + soft).unwrap();
+    let notice = event[0].message_id.as_ref().unwrap();
+    let messages = read(&db, &lead, &lead, &turn).unwrap();
+    assert!(messages
+        .iter()
+        .any(|mail| mail.id == *notice && mail.content.contains("Host Team run limit")));
+    assert_eq!(
+        read(&db, &lead, &lead, &turn)
+            .unwrap()
+            .iter()
+            .filter(|mail| mail.id == *notice)
+            .count(),
+        1
+    );
+    assert!(!super::run_limits::is_soft_notice(&db, &lead, "model-authored-soft-id").unwrap());
+    assert_eq!(sessions::running_turn_id(&db, &lead).unwrap(), Some(turn));
+}

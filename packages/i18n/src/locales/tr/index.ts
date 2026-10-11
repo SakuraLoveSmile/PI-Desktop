@@ -769,6 +769,7 @@ export const tr = {
       operationError: "Depolama işlemi başlatılamadı. {{error}}",
     },
     expertTeam: {
+      runLimits: en.settings.expertTeam.runLimits,
       title: "Uzman ekibi",
       description: "Yerleşik altı uzman için model, akıl yürütme düzeyi, araç alt kümesi ve ek talimatları yapılandırın. Değişiklikler yalnızca bundan sonra başlatılan uzmanları etkiler. Composer modeli Lead ve modeli sabitlenmemiş uzmanlar için de geçerlidir. İsteğe bağlı araç kısıtlamaları yalnızca kullanılabilirliği daraltır; izin vermez.",
       loadFailed: "Uzman ayarları yüklenemedi", currentProject: "Geçerli proje",
@@ -2033,6 +2034,14 @@ sklm: {
     close: "Widget'ı kapat",
   },
   team: {
+    runLimitTitle: en.team.runLimitTitle,
+    runLimitSoft: en.team.runLimitSoft,
+    runLimitStopping: en.team.runLimitStopping,
+    runLimitPaused: en.team.runLimitPaused,
+    runLimitHours: en.team.runLimitHours,
+    runLimitReadyToResume: en.team.runLimitReadyToResume,
+    runLimitDisabled: en.team.runLimitDisabled,
+
     title: "Uzman Ekip",
     roster: "Ekip Listesi",
     board: "Görev Panosu",

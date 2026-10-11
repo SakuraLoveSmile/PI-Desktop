@@ -18,6 +18,7 @@ export type TeamDeliveryDependencies = {
   getHost: () => HostProcess | null;
   getBridge: () => AgentHostBridge | null;
   activeTurns: Map<string, string>;
+  stopAtBoundary: (sessionId: string, turnId: string) => Promise<void>;
   log: (message: string, data: Record<string, unknown>) => void;
 };
 
@@ -380,6 +381,22 @@ export function createTeamDeliveryService(deps: TeamDeliveryDependencies) {
     const input = params && typeof params === "object" && !Array.isArray(params)
       ? params as Record<string, unknown>
       : {};
+    if (method === "team.runLimitPauseRequested") {
+      const team = typeof input.teamSessionId === "string" ? input.teamSessionId : undefined;
+      if (!team) return;
+      await withTeamLock(team, async () => {
+        const host = requireHost();
+        const roster = await rosterFor(host, team);
+        if (requireHost() !== host || !roster.paused) return;
+        setTeamHold(deps.getBridge(), roster, true);
+        for (const sessionId of [team, ...roster.members.map((member) => member.memberSessionId)]) {
+          const turn = deps.activeTurns.get(sessionId);
+          if (!turn) continue;
+          await deps.stopAtBoundary(sessionId, turn);
+        }
+      });
+      return;
+    }
     if (method === "team.changed") {
       const team = typeof input.teamSessionId === "string" ? input.teamSessionId : undefined;
       if (!team) return;

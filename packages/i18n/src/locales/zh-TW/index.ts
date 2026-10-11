@@ -764,6 +764,7 @@ export const zhTW = {
       operationError: "無法啟動儲存操作。{{error}}",
     },
     expertTeam: {
+      runLimits: en.settings.expertTeam.runLimits,
       title: "專家團",
       loadFailed: "無法載入專家設定",
       currentProject: "目前專案",
@@ -2035,6 +2036,14 @@ sklm: {
     close: "關閉小工具",
   },
   team: {
+    runLimitTitle: en.team.runLimitTitle,
+    runLimitSoft: en.team.runLimitSoft,
+    runLimitStopping: en.team.runLimitStopping,
+    runLimitPaused: en.team.runLimitPaused,
+    runLimitHours: en.team.runLimitHours,
+    runLimitReadyToResume: en.team.runLimitReadyToResume,
+    runLimitDisabled: en.team.runLimitDisabled,
+
     viewMemberDetail: "查看成員 {{name}}",
     memberDetailUnavailable: "成員詳情無法使用",
     dispatchCardsLabel: "專家任務分派",
