@@ -18076,3 +18076,8 @@ and replay/validation acceptance IDs.
 ### E2E-TEAM-run-limits-ui
 
 Run `node scripts/e2e-team-run-limits-ui.mjs` with the candidate sources and isolated Electron profile. Real clicks and text input cover enabled 6/10-hour defaults, invalid input, disabled persistence, role-preserving CAS rebasing and policy-conflict refusal. Render the production notice for soft, safe finishing, paused and disabled states. The settings backend is a fixture; Host durable clock, restart and pause/resume authority remain separate domain/RPC acceptance. No live provider, OS-notification presentation or ten-hour soak result is implied.
+
+
+### E2E-TEAM-member-interrupt-production-chain
+
+`node --experimental-strip-types scripts/e2e-team-member-interrupt.mjs` replays real Host interruption through Main delivery, bridge, IPC, sidecar and runtime using a loopback provider. Assert unforced refusal, foreground process termination and interrupted turn state. Block the real session gate, replace the old turn, then release and replay its notification: the replacement remains active. Accepted background work survives abort/dispose and is explicitly stopped in cleanup; background zero is not the turn-cancellation contract.

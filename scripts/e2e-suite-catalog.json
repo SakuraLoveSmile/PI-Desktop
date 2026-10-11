@@ -874,6 +874,16 @@
         "E2E-TEAM-run-limits-ui"
       ],
       "safety": "Fresh sandboxed Electron profile and production React/settings store with fixture settings backend; no live provider or user settings."
+    },
+    {
+      "id": "team-member-interrupt",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-member-interrupt.mjs",
+      "tier": "nightly",
+      "scenarioIds": [
+        "E2E-TEAM-member-interrupt-production-chain"
+      ],
+      "safety": "Real isolated Host/Main/IPC/sidecar/runtime with loopback SSE provider and disposable shell processes. No live provider or user profile; accepted background tasks are explicitly stopped only during fixture cleanup."
     }
   ]
 }

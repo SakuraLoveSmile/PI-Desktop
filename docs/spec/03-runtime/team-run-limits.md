@@ -88,3 +88,5 @@ no ordinary cancel, and no mailbox wake-up; settings tests assert CAS preservati
 These deterministic tests prove mechanics, not real-provider compliance or a
 10-hour real-device run. Real native UI verification belongs to the integration
 candidate's final acceptance.
+
+The Lead-visible `team_status` also projects the optional Host `runLimits` object alongside activity, mailbox metadata and independent advisory counts. It does not reset or change the budget.

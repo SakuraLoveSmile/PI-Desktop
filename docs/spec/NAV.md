@@ -30,6 +30,7 @@
 - [05-host-core-rust.md](03-runtime/05-host-core-rust.md)
 - [06-host-rpc-protocol.md](03-runtime/06-host-rpc-protocol.md)
 - [team-task-dispatch.md](03-runtime/team-task-dispatch.md)
+- [team-run-limits.md](03-runtime/team-run-limits.md)
 - [07-process-model.md](03-runtime/07-process-model.md)
 - [08-error-codes.md](03-runtime/08-error-codes.md)
 - [09-logging-and-observability.md](03-runtime/09-logging-and-observability.md)
