@@ -20,6 +20,7 @@ Each ADR includes:
 
 | ID | Title | Status |
 |---|---|---|
+| team-lead-pending-questions-and-replacements | [Durable Lead questions and bounded replacement](team-lead-pending-questions-and-replacements.md) | Accepted for implementation |
 | team-run-limits | [Host-owned Team wall-clock limits](team-run-limits.md) | Accepted for implementation |
 | team-task-dispatch-age | [Explicit task dispatch and queue age](team-task-dispatch-age.md) | Accepted for implementation |
 | team-member-activity-and-interruption-guard | [Host activity and explicit interruption](team-member-activity-and-interruption-guard.md) | Accepted for implementation |
