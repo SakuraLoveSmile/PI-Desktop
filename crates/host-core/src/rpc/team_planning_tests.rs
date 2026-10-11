@@ -546,12 +546,17 @@ async fn direct_team_mutation_rpc_cannot_reuse_an_old_approval_for_a_new_pending
         let denied = call(method, args).await.unwrap_err();
         assert_eq!(denied.data.unwrap()["errorCode"], "TEAM_APPROVAL_REQUIRED");
     }
-    let after = call(
+    let mut after = call(
         "team.getSnapshot",
         json!({"teamSessionId":lead,"callerSessionId":lead}),
     )
     .await
     .unwrap();
+    assert!(
+        after["runLimits"]["elapsedMs"].as_i64().unwrap()
+            >= before["runLimits"]["elapsedMs"].as_i64().unwrap()
+    );
+    after["runLimits"]["elapsedMs"] = before["runLimits"]["elapsedMs"].clone();
     assert_eq!(after, before);
     let review = call("team.getLaunchReview", json!({"teamSessionId":lead}))
         .await
@@ -590,12 +595,19 @@ async fn direct_team_mutation_rpc_cannot_reuse_an_old_approval_for_a_new_pending
         let denied = call(method, args).await.unwrap_err();
         assert_eq!(denied.data.unwrap()["errorCode"], "TEAM_APPROVAL_REQUIRED");
     }
-    let after_subset = call(
+    let mut after_subset = call(
         "team.getSnapshot",
         json!({"teamSessionId":lead,"callerSessionId":lead}),
     )
     .await
     .unwrap();
+    // Read-only elapsed projection advances with wall clock, while every
+    // authority, budget identity and mutable Team field must stay unchanged.
+    assert!(
+        after_subset["runLimits"]["elapsedMs"].as_i64().unwrap()
+            >= before_subset["runLimits"]["elapsedMs"].as_i64().unwrap()
+    );
+    after_subset["runLimits"]["elapsedMs"] = before_subset["runLimits"]["elapsedMs"].clone();
     assert_eq!(after_subset, before_subset);
     {
         let st = state.lock().await;
@@ -652,12 +664,17 @@ async fn direct_team_mutation_rpc_cannot_reuse_an_old_approval_for_a_new_pending
     .unwrap();
     let replay=call("team.sendMessage",json!({"teamSessionId":lead,"callerSessionId":lead,"target":"worker","content":"Original dispatch","idempotencyKey":"old-dispatch"})).await.unwrap_err();
     assert_eq!(replay.data.unwrap()["errorCode"], "TEAM_APPROVAL_REQUIRED");
-    let after_replay = call(
+    let mut after_replay = call(
         "team.getSnapshot",
         json!({"teamSessionId":lead,"callerSessionId":lead}),
     )
     .await
     .unwrap();
+    assert!(
+        after_replay["runLimits"]["elapsedMs"].as_i64().unwrap()
+            >= before_replay["runLimits"]["elapsedMs"].as_i64().unwrap()
+    );
+    after_replay["runLimits"]["elapsedMs"] = before_replay["runLimits"]["elapsedMs"].clone();
     assert_eq!(
         after_replay, before_replay,
         "old expert execution cannot be adopted into a fresh approval"

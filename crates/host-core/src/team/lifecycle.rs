@@ -91,20 +91,23 @@ pub fn pause_team(db: &Database, team_session_id: &str) -> Result<Team> {
 }
 
 pub fn resume_team(db: &Database, team_session_id: &str) -> Result<Team> {
-    let now = now_ms();
-    let rows = db.conn().execute(
-        "UPDATE teams
+    crate::sessions::with_savepoint(db.conn(), "team_activity", |_| {
+        super::run_limits::authorize_resume(db, team_session_id, now_ms())?;
+        let now = now_ms();
+        let rows = db.conn().execute(
+            "UPDATE teams
          SET paused = 0, revision = revision + 1, updated_at = ?2
          WHERE team_session_id = ?1",
-        params![team_session_id, now],
-    )?;
-    if rows == 0 {
-        return Err(anyhow!(
-            "TEAM_NOT_FOUND: team '{team_session_id}' not found"
-        ));
-    }
-    get_team(db, team_session_id)?
-        .ok_or_else(|| anyhow!("TEAM_NOT_FOUND: team '{team_session_id}' not found"))
+            params![team_session_id, now],
+        )?;
+        if rows == 0 {
+            return Err(anyhow!(
+                "TEAM_NOT_FOUND: team '{team_session_id}' not found"
+            ));
+        }
+        get_team(db, team_session_id)?
+            .ok_or_else(|| anyhow!("TEAM_NOT_FOUND: team '{team_session_id}' not found"))
+    })
 }
 
 /// Enforce deletion rules: a member session cannot be deleted while attached to a team.
@@ -147,6 +150,10 @@ pub(crate) fn cleanup_team_on_lead_delete_conn(
     super::task_attempts::cleanup_session(conn, lead_session_id)?;
     super::write_scopes::cleanup_session(conn, lead_session_id)?;
 
+    conn.execute(
+        "DELETE FROM kv WHERE ns='team-run-limits-v1' AND key=?1",
+        [lead_session_id],
+    )?;
     let now = now_ms();
     conn.execute(
         "UPDATE teams SET paused = 1, updated_at = ?2 WHERE team_session_id = ?1",
@@ -278,5 +285,6 @@ pub fn get_team_snapshot(
         queued_message_count,
         review,
         decision: super::review::get_latest_execution_decision(db, team_session_id)?,
+        run_limits: super::run_limits::projection(db, team_session_id, crate::db::now_ms())?,
     })
 }

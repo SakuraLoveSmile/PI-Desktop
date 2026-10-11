@@ -332,6 +332,7 @@ export function createHostRuntime({
       // request's own answer is still the outcome.
       sendToRenderer(IPC.event.configSyncProgress, params);
     } else if (
+      method === "team.runLimitPauseRequested" ||
       method === "team.messageQueued" ||
       method === "team.queueChanged" ||
       method === "team.interruptRequested" ||

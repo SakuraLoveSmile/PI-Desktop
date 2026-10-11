@@ -13,7 +13,10 @@ pub struct QueuedMemberFailure {
 }
 
 pub(super) fn validate_message_key(key: Option<&str>) -> Result<()> {
-    if key.is_some_and(|key| key.trim().starts_with("member-turn-failed:")) {
+    if key.is_some_and(|key| {
+        key.trim().starts_with("member-turn-failed:")
+            || key.trim().starts_with("team-run-limit-soft:")
+    }) {
         return Err(anyhow!(
             "TEAM_UNAUTHORIZED: member-turn-failed message keys are Host-owned"
         ));

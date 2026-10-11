@@ -185,6 +185,8 @@ pub struct TeamLaunchReviewMember {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TeamSnapshot {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub run_limits: Option<super::run_limits::RunLimitProjection>,
     pub team_session_id: String,
     pub revision: i64,
     pub paused: bool,

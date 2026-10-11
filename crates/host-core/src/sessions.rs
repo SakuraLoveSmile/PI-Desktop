@@ -4281,6 +4281,7 @@ fn begin_turn_inner(
             }
             return Err(anyhow!("AGENT_BUSY"));
         }
+        crate::team::run_limits::start_conn(conn, session_id, now_ms())?;
         crate::team::roster::update_member_turn_phase_conn(conn, session_id, "running", None)?;
         Ok(())
     })?;

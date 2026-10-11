@@ -48,6 +48,8 @@ pub struct ExpertTeamRoleConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ExpertTeamSettings {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run_limits: Option<super::run_limits::RunLimitSettings>,
     pub schema_version: u32,
     pub user_defaults: BTreeMap<ExpertTeamPresetId, ExpertTeamRoleConfig>,
     pub project_overrides: BTreeMap<String, BTreeMap<ExpertTeamPresetId, ExpertTeamRoleConfig>>,
@@ -109,6 +111,11 @@ fn validate_role(config: &ExpertTeamRoleConfig) -> Result<()> {
 }
 
 pub fn parse(value: &Value) -> Result<ExpertTeamSettings> {
+    if value.get("runLimits").is_some_and(Value::is_null) {
+        return Err(anyhow!(
+            "INVALID_PARAMS: runLimits must be omitted or a complete policy"
+        ));
+    }
     // Optional means absent, not null; this matches the renderer contract and
     // avoids silently interpreting malformed explicit values as inheritance.
     let user_roles = value.get("userDefaults").and_then(Value::as_object);
@@ -139,6 +146,9 @@ pub fn parse(value: &Value) -> Result<ExpertTeamSettings> {
         return Err(anyhow!(
             "INVALID_PARAMS: invalid expertTeam schema version or scopes"
         ));
+    }
+    if let Some(limits) = &settings.run_limits {
+        limits.validate()?;
     }
     for (path, roles) in &settings.project_overrides {
         if !valid_id(path, 4096) {

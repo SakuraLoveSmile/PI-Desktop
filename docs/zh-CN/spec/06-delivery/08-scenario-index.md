@@ -120,6 +120,7 @@ IDs come from executable result/test calls and annotated dynamic suites. 文档�
 | session-activity-aggregate | sessions | nightly | [scripts/e2e-session-activity-aggregate.mjs](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-session-activity-aggregate.mjs)  | Real Host RPC, production IPC adapter and renderer reader against fresh temporary data; synthetic persisted messages, no provider or user profile.  |
 | session-activity-history | sessions | nightly | [scripts/e2e-session-activity-history.mjs](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-session-activity-history.mjs)  | Real isolated Rust Host and Electron renderer through the production IPC/reader/Overview; tail-only transcript and synthetic persisted evidence, no user profile or provider.  |
 | team-write-scope | goals-team | nightly | [scripts/e2e-team-write-scope.mjs](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-team-write-scope.mjs)  | Isolated real Host, runtime tool/message boundaries and temporary Git; no model calls or user profile.  |
+| team-run-limits-ui | goals-team | nightly | [scripts/e2e-team-run-limits-ui.mjs](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-team-run-limits-ui.mjs)  | Fresh sandboxed Electron profile and production React/settings store with fixture settings backend; no live provider or user settings.  |
 
 ## Executable IDs
 
@@ -235,6 +236,7 @@ IDs come from executable result/test calls and annotated dynamic suites. 文档�
 | E2E-system-transcript | [scripts/e2e-system-transcript.mjs:44](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-system-transcript.mjs#L44) |
 | E2E-TEAM-completion-error-keeps-host-reason | [scripts/e2e-goal-report.mjs:129](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-goal-report.mjs#L129); [scripts/e2e-suite-catalog.json (goal-report)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
 | E2E-TEAM-member-failure-wakes-lead | [scripts/e2e-team-member-failure.mjs:18](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-team-member-failure.mjs#L18); [scripts/e2e-suite-catalog.json (team-member-failure)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
+| E2E-TEAM-run-limits-ui | [scripts/e2e-suite-catalog.json (team-run-limits-ui)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
 | E2E-TEAM-task-completion | [scripts/e2e-team-task-completion.mjs:14](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-team-task-completion.mjs#L14) |
 | E2E-TEAM-turn-renders-chronological-timeline | [scripts/e2e-team-planning.mjs:480](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-team-planning.mjs#L480) |
 | E2E-TEAM-write-scope-warning | [scripts/e2e-team-write-scope.mjs:17](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-team-write-scope.mjs#L17); [scripts/e2e-suite-catalog.json (team-write-scope)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |

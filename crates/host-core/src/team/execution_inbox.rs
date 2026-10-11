@@ -100,6 +100,7 @@ pub fn read(db: &Database, team: &str, caller: &str, expected: &str) -> Result<V
             params![message.id, format!("team-review:{}:confirmed", review.review_id)], |r| r.get(0))?;
         if !(confirmation && decision.message_ids.contains(&message.id))
             && !current_expert_result(db, &decision, message)?
+            && !super::run_limits::is_soft_notice(db, team, &message.id)?
         {
             continue;
         }
