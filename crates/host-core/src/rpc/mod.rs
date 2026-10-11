@@ -8,6 +8,9 @@ mod plan_schedule_rpc;
 mod project_auto_memory;
 mod project_code_search;
 mod project_history;
+#[cfg(test)]
+#[path = "../team/run_limits_pending_tests.rs"]
+mod run_limits_pending_tests;
 mod scheduled_rpc;
 mod scheduled_tools;
 mod session_activity_rpc;
@@ -21,6 +24,7 @@ mod team_dispatch_head;
 mod team_expert_config_tests;
 #[cfg(test)]
 mod team_git_warning_tests;
+mod team_lead_asks;
 mod team_mailbox;
 #[cfg(test)]
 mod team_member_activity_tests;
