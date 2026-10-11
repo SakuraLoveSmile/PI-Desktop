@@ -64,9 +64,20 @@ export type TeamDeliveryStatus =
   | "accepted"
   | "acknowledged"
   | "completed"
-  | "failed";
+  | "failed"
+  | "cancelled";
+
+/** Explicit Lead dispatch; message text never supplies task identity. */
+export type TeamTaskDispatch = { taskId: string; expectedRevision: number };
 
 export type TeamMessageRecord = {
+  sentAt?: string;
+  targetBusyAtSend?: boolean;
+  targetState?: "running" | "paused" | "idle";
+  /** One-based queued Team mailbox position, not the user turn queue position. */
+  queuePosition?: number;
+  taskDispatch?: TeamTaskDispatch;
+  dispatchCancellation?: "superseded" | "task_completed";
   senderHead?: string;
   id: string;
   teamSessionId: string;
@@ -210,13 +221,17 @@ export type SpawnTeammateResult = {
 };
 
 export type SendMessageArgs = {
+  taskDispatch?: TeamTaskDispatch;
   targetMemberName: string;
   content: string;
 };
 
-export type SendMessageResult = {
+export type SendMessageResult = Pick<TeamMessageRecord,
+  "sentAt" | "targetBusyAtSend" | "targetState" | "queuePosition" | "taskDispatch" | "dispatchCancellation"
+> & {
   messageId: string;
   delivered: boolean;
+  queuePositionScope?: "team_mailbox";
 };
 
 export type WaitForUpdatesArgs = {

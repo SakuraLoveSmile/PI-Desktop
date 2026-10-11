@@ -482,6 +482,9 @@ pub fn update_team_task(db: &Database, params: UpdateTaskParams<'_>) -> Result<T
             params![team_session_id, now],
         )?;
 
+        if final_status == "completed" {
+            super::dispatch_metadata::task_completed(conn, team_session_id, task_id)?;
+        }
         Ok(final_status)
     })?;
 

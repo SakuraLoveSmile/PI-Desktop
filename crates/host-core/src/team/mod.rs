@@ -6,6 +6,7 @@ pub(crate) mod authority;
 mod authority_tests;
 pub mod board;
 pub(crate) mod dispatch_head;
+pub(crate) mod dispatch_metadata;
 pub mod execution_inbox;
 #[cfg(test)]
 mod execution_inbox_tests;
