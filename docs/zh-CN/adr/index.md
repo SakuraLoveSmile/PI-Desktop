@@ -11,6 +11,7 @@ ADR 记录那些不应被静默改变的架构选择。中文入口与英文索�
 
 | 决策 | 说明 |
 |---|---|
+| [待处理 Lead 问题与一次替换](/adr/team-lead-pending-questions-and-replacements) | WP11 认证迟答、旧执行令牌失效和失败成员原权限继承 |
 | [团队运行上限](/adr/team-run-limits) | WP8 持久预算与安全暂停；保留运行中的工具与后台任务 |
 | [派发时效与队列年龄](/adr/team-task-dispatch-age) | WP10 显式关联派发、未开始取消和认证时间元数据 |
 | [成员活动与中断保护](/adr/team-member-activity-and-interruption-guard) | WP9 Host 存活证据、force 与理由审计 |
