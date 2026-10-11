@@ -56,7 +56,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
     name: DECLARE_TEAM_STRATEGY_TOOL_NAME,
     label: "Declare Team Strategy",
     description:
-      "Expert Team mode requires expert delegation. Declare at least one named expert with a role and context. In Plan mode, the Host automatically starts a read-only research roster without user confirmation; immediately assign owned tasks and dispatch researchers. In Agent execution mode, stop for trusted user launch review before dispatch. Solo execution and lead_only are unavailable. " + TEAM_EXPERT_PRESET_GUIDANCE,
+      "Expert Team mode requires expert delegation. Declare at least one named expert with a role and context. In Plan mode, the Host automatically starts a read-only research roster without user confirmation; immediately assign owned tasks and dispatch researchers. In Agent execution mode, trusted user launch review is required before dispatch. Solo execution and lead_only are unavailable. " + TEAM_EXPERT_PRESET_GUIDANCE,
     parameters: Type.Object({
       strategy: Type.Literal("delegate", {
         description: "Required delegation strategy. Expert Team mode does not permit lead_only.",
@@ -92,7 +92,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
                   Type.Literal("reviewer"),
                   Type.Literal("planner"),
                   Type.Literal("collaborator"),
-                ]),
+                ], { description: "Presentation role: researcher, executor, reviewer, planner, or collaborator. Use executor for a builder or implementation expert; builder is not an allowed role." }),
                 displayName: Type.String({ description: TEAM_MEMBER_DISPLAY_NAME_GUIDANCE, minLength: 1, maxLength: 64 }),
               }),
             ),

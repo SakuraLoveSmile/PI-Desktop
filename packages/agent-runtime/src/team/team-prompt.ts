@@ -20,6 +20,9 @@ export const TEAM_MEMBER_DESCRIPTION_GUIDANCE =
 export const TEAM_MEMBER_DISPLAY_NAME_GUIDANCE =
   "Use a short, user-readable name in the primary language of the user's request; personal names such as Alex or Sam are allowed. Keep technical scope and routing handles out of the display name.";
 
+export const TEAM_APPROVED_ROSTER_WAIT_GUIDANCE =
+  "Explain the proposal. Then either call wait_for_updates to keep waiting, or end your message: the Host keeps this approved execution open and resumes you with the confirmed roster. Do not redeclare.";
+
 const TEAM_LAUNCH_REVIEW_GUIDANCE = [
   TEAM_EXPERT_PRESET_GUIDANCE,
   `For declare_team_strategy reason: ${TEAM_STRATEGY_REASON_GUIDANCE}`,
@@ -43,6 +46,7 @@ const TEAM_EXECUTION_RELIABILITY_GUIDANCE = [
 
 export interface TeamPromptOptions {
   mode?: string;
+  approvedExecution?: boolean;
   workPurpose?: TeamWorkPurpose;
   isLead: boolean;
   memberName?: string;
@@ -89,7 +93,9 @@ function teamCollaborationPrompt(options: TeamPromptOptions): string {
       "- Expert Team mode always delegates, even for small tasks. Never choose lead_only or offer solo approval.",
       "- Declare `declare_team_strategy` with strategy delegate, at least one expert, and clear roles, tasks and context kinds.",
       TEAM_LAUNCH_REVIEW_GUIDANCE,
-      "- Explain the proposed experts and stop for trusted user roster confirmation. Confirmation does not itself execute the experts.",
+      options.approvedExecution
+        ? `- ${TEAM_APPROVED_ROSTER_WAIT_GUIDANCE} Confirmation does not itself execute the experts.`
+        : "- Explain the proposed experts and stop for trusted user roster confirmation. Confirmation does not itself execute the experts.",
       "- After confirmation, create owned work with task_create, dispatch instructions through send_message and use wait_for_updates to await actual expert progress.",
       "- A queued message or an idle created member is not expert participation. Do not perform substantive work before an approved expert has actually started its assigned turn.",
       "- Coordinate, inspect, review and integrate expert results, then deliver the synthesized answer. Delegate the implementation/research work instead of doing the whole task alone.",

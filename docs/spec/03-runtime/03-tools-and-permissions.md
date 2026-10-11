@@ -591,6 +591,13 @@ UI transcript and persisted history remain unchanged. Later normal context
 rebuilding uses that original history. Missing/compacted/mismatched/error results
 retain the existing recovery nudge and three confirmed-roster completion retries.
 Ordinary Team turns and automatic Plan research do not acquire this projection.
+Pending approved-execution guidance permits either wait_for_updates or ending
+only the assistant message: the Host keeps the execution open and resumes it
+with the confirmed roster. Ordinary unapproved Team turns still stop for trusted
+user confirmation, and Plan research still launches automatically. Presentation
+role descriptions enumerate researcher/executor/reviewer/planner/collaborator;
+implementation builders use executor. The allowed values and permission
+contracts are unchanged.
 The internal inbox reads are narrow, Host-authorized model-proxy operations;
 trusted plans.bindExecutionTurn is never exposed to the model reverse proxy.
 
