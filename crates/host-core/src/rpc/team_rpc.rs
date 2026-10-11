@@ -46,6 +46,10 @@ pub(super) fn team_rpc_err(e: anyhow::Error) -> JsonRpcError {
         "TEAM_RESEARCH_READ_ONLY"
     } else if msg.contains("TEAM_DELIVERY_PENDING") {
         "TEAM_DELIVERY_PENDING"
+    } else if msg.contains("TEAM_MEMBER_ACTIVE") {
+        "TEAM_MEMBER_ACTIVE"
+    } else if msg.contains("TEAM_INTERRUPT_REASON_REQUIRED") {
+        "TEAM_INTERRUPT_REASON_REQUIRED"
     } else if msg.contains("TEAM_UNAUTHORIZED") {
         "TEAM_UNAUTHORIZED"
     } else if msg.contains("TEAM_NOT_FOUND") {
@@ -311,6 +315,7 @@ pub(super) async fn handle(
                 "revision": team.as_ref().map(|t| t.revision).unwrap_or(1),
                 "paused": team.as_ref().map(|t| t.paused).unwrap_or(false),
                 "members": members,
+                "memberActivity": crate::team::member_activity::roster(&st, team_id).map_err(team_rpc_err)?,
             }))
         }
         "team.getSnapshot" => {
@@ -648,28 +653,34 @@ pub(super) async fn handle(
                 .get("callerSessionId")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "callerSessionId required", "INVALID_PARAMS"))?;
-            if caller_id != team_id {
-                return Err(rpc_err(
-                    1001,
-                    "only the team lead can interrupt a member",
-                    "TEAM_UNAUTHORIZED",
-                ));
-            }
-            crate::team::validate_team_lead(&st.db, team_id).map_err(team_rpc_err)?;
             let member_name = params
                 .get("memberName")
-                .and_then(|v| v.as_str())
+                .and_then(Value::as_str)
                 .ok_or_else(|| rpc_err(1002, "memberName required", "INVALID_PARAMS"))?;
-            let member = crate::team::get_team_member_by_name(&st.db, team_id, member_name)
-                .map_err(team_rpc_err)?
-                .ok_or_else(|| rpc_err(1002, "Team member not found", "TEAM_TARGET_NOT_FOUND"))?;
-            let turn_id = sessions::running_turn_id(&st.db, &member.member_session_id)
-                .map_err(|error| rpc_err(1000, error.to_string(), "INTERNAL"))?;
-            if let Some(turn_id) = turn_id {
+            let force = match params.get("force") {
+                None => false,
+                Some(Value::Bool(value)) => *value,
+                Some(_) => return Err(rpc_err(1002, "force must be boolean", "INVALID_PARAMS")),
+            };
+            let reason = match params.get("reason") {
+                None => None,
+                Some(Value::String(value)) => Some(value.as_str()),
+                Some(_) => return Err(rpc_err(1002, "reason must be string", "INVALID_PARAMS")),
+            };
+            let interruption = crate::team::interruption::request(
+                &st,
+                team_id,
+                caller_id,
+                member_name,
+                force,
+                reason,
+            )
+            .map_err(team_rpc_err)?;
+            if let Some(interruption) = interruption {
                 send_notification(
                     &tx,
                     "team.interruptRequested",
-                    json!({ "teamSessionId": team_id, "sessionId": member.member_session_id, "turnId": turn_id }),
+                    json!({ "teamSessionId": team_id, "sessionId": interruption.session_id, "turnId": interruption.turn_id }),
                 );
                 Ok(json!({ "interrupted": true }))
             } else {

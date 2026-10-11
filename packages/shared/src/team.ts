@@ -117,11 +117,30 @@ export type TeamTaskWriteScopeOverlapWarning = {
 };
 
 /** Frozen Host DTO for team.getRoster. */
+export type TeamMemberActivity = {
+  memberSessionId: string;
+  memberName: string;
+  observedAtMs: number;
+  activityWindowMs: number;
+  requiresForce: boolean;
+  lastActivityAtMs: number | null;
+  turn: { id: string; status: string; startedAtMs: number; durationMs: number } | null;
+  lastTool: { name: string; observedAtMs: number } | null;
+  runningBackgroundProcesses: Array<{ id: string; toolCallId: string; status: string; startedAt: string }>;
+  activeBashToolCallIds: string[];
+  /** Counts only usage first observed by this Host within the window, not requests in flight. */
+  recentUsage: { completedCallCount: number; totalTokens: number; windowMs: number; coverage: "host_observed_usage" };
+  incomingQueue: { count: number; oldestAgeMs: number | null };
+  outgoingQueue: { count: number; oldestAgeMs: number | null };
+};
+
 export type TeamRosterProjection = {
   teamSessionId: string;
   revision: number;
   paused: boolean;
   members: TeamMemberRecord[];
+  /** Additive Host evidence; includes Lead as well as the named members. */
+  memberActivity?: TeamMemberActivity[];
 };
 
 /** Frozen Host DTO for team.getBoard. */

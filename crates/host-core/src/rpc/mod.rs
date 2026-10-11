@@ -23,6 +23,8 @@ mod team_expert_config_tests;
 mod team_git_warning_tests;
 mod team_mailbox;
 #[cfg(test)]
+mod team_member_activity_tests;
+#[cfg(test)]
 mod team_planning_tests;
 mod team_rpc;
 #[cfg(test)]
