@@ -9890,3 +9890,8 @@ options retain pressed states and switching behavior.
 ### E2E-TEAM-run-limits-ui
 
 候选源码在隔离 Electron profile 执行 `node scripts/e2e-team-run-limits-ui.mjs`，以真实点击/输入覆盖默认启用 6/10 小时、非法输入、关闭后保存、保留并发角色设置及策略冲突拒绝。生产状态组件覆盖收尾、安全结束、暂停及关闭限额。设置后端是夹具；Host 时钟持久化、重启和暂停/恢复权限由独立领域/RPC 验证，不代表真实 provider、系统通知或十小时长跑。
+
+
+### E2E-TEAM-member-interrupt-production-chain
+
+隔离 Host 和 loopback provider 经真实 Main、bridge、IPC、sidecar/runtime 重放成员中断；验证普通请求拒绝、前台进程终止和 interrupted 状态。阻塞真实 session gate 后替换回合，再释放并重放旧通知，新回合不受影响。已接受后台任务在 abort/dispose 后保留，清理阶段显式停止；不以后台归零作为回合取消契约。入口 `node --experimental-strip-types scripts/e2e-team-member-interrupt.mjs`。

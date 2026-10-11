@@ -736,6 +736,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
                 ...summary,
                 teamSessionId: roster.teamSessionId,
                 paused: roster.paused,
+                ...(roster.runLimits ? { runLimits: roster.runLimits } : {}),
                 revision: board.revision,
                 members: roster.members,
                 ...(roster.memberActivity ? { memberActivity: roster.memberActivity } : {}),

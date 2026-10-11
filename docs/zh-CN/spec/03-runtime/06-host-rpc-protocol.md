@@ -1347,3 +1347,8 @@ turn、force、reason 与证据）；审计失败则不发通知。无运行回�
 `{ interrupted: false }`。不新增空转自动 kill，不改 shell 配额、FIFO、邮箱正文投递或执行令牌。
 这是增量本地 RPC，无协议升版或数据库迁移。决策见
 [ADR](../../../adr/team-member-activity-and-interruption-guard.md)。
+
+
+### 团队运行上限（WP8）
+
+默认启用 soft 6 小时、hard 10 小时，设置支持 CAS 调整。可信准入新用户 scope 启动 Host 持久时钟；邮件、暂停、重试及重启不重置。soft 一次收尾通知，hard 保持队列暂停、批准 Goal 中断并停止新模型请求/重试及未开始工具批次，已开始工具自然结束、后台任务不强杀。关闭或延长后仍需显式恢复。team.getRoster、team.getSnapshot 及 team_status 提供 runLimits；详情见英文 /spec/03-runtime/team-run-limits 与 ADR /adr/team-run-limits。
