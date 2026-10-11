@@ -552,3 +552,23 @@ Non-Git/unborn senders omit it; unexpected probe failures log a bounded diagnost
 and do not block dispatch. Only the commit SHA is exposed, never paths, Git
 configuration or stderr. Deletion cleans owned counts/stamps. No new RPC,
 SQLite migration, automatic abort or stronger write restriction is introduced.
+
+
+## Amendment: Shared-tree Git warnings (2026-10-11)
+
+The shared Git index and working tree can mix or remove another expert's changes
+without crossing a filesystem permission boundary. A permission denial or a new
+per-member worktree model would change execution semantics, so this increment
+adds only Host-owned diagnostics after existing Bash authorization/admission.
+Literal risky Git command forms are compared with other Team participants'
+in-progress non-empty task scopes. Tool results and the existing board/status
+projection carry a warning and caller-attributed count; a command's real failure
+or background acceptance remains intact. Counts use the existing KV lifecycle
+and separate identities from successful Write/Edit scope warnings.
+
+The bounded lexical detector is not a shell parser or sandbox: dynamic commands,
+aliases and target-repository inference are not guaranteed. Warning presence does
+not prove a mutation occurred, and absence does not establish safety. This avoids
+inventing a shell execution path, changing permissions, or blocking legitimate
+single-writer Git use. Per-member worktrees and a scoped team_commit tool remain
+outside this increment.

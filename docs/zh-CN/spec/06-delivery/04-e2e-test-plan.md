@@ -9858,3 +9858,16 @@ options retain pressed states and switching behavior.
 ### 专家团协作可靠性指导
 
 生成后提示词回归覆盖 lead/成员、普通 Agent 排队正文、普通 Plan 让出与批准执行 inbox 指导。runtime 的模型边界夹具经 executeApprovedPlan 跑批准 Plan/Goal 两条路径，验证同回合认证 inbox 和模型实际系统提示；不能代替真实模型遵循证明。入口 packages/agent-runtime/src/team/team-prompt.test.ts，新指导不使用源码文本断言。排队报告用户路径另按 Host 进程记录核对专家/lead 数量。
+
+### E2E-TEAM-shared-git-warning
+
+- **前提：** 候选 Host/runtime、一次性 Git 仓库、隔离数据/配置和已确认团队；不调用模型。
+- **步骤：** 委派写任务并置为 in_progress；Lead 对双方文件执行
+  git add -A && git commit、git stash、无效 git reset --hard；读取真实 team_status。
+  再由唯一写入者暂存，并在任务完成后重试 Git 命令。
+- **预期：** 混合提交和 stash 实际成功并告警；无效 reset 保留失败与真实退出码。
+  状态累计三个归属调用者的 Git 警告，与 Write/Edit 计数分离；唯一写入者及已完成任务不误报。
+- **覆盖：** node scripts/e2e-team-shared-git-warning.mjs；Host RPC 覆盖六种操作、
+  后台准入、跨团队/空范围排除、幂等、重启持久化和删除竞态；runtime 验证可见投影与旧字段缺省。
+- **规格：** 03-runtime/06-host-rpc-protocol 的共享 Git 建议性警告。
+- **状态：** 记录实际候选结果；不代表真实模型或 Windows 验收，动态 shell 形式不保证覆盖。
