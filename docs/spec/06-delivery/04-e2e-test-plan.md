@@ -17973,3 +17973,15 @@ loopback provider). No live session, profile or real model is accessed.
 - **Specs:** [Team collaboration decision](../../adr/plus-expert-team-collaboration.md), advisory amendment dated 2026-10-11; 03-runtime/06-host-rpc-protocol.
 - **Acceptance:** P1 shared-tree coordination; no write denial/new RPC/migration.
 - **Status:** Automated isolated Host and runtime-contract fixture.
+
+
+### Expert Team coordination reliability guidance
+
+Generated-prompt regressions cover Lead/member guidance, ordinary Agent queued
+mail, ordinary Plan yield and approved execution inbox instructions. The runtime
+provider-boundary fixture executes both approved Plan and Goal paths through
+`executeApprovedPlan`, consumes authenticated inbox content in the same turn and
+asserts the generated model prompt. It does not establish real-model obedience.
+See `packages/agent-runtime/src/team/team-prompt.test.ts`; no source-text assertion
+is used for the new guidance. The queued-report user-path scenario separately
+checks actual expert/Lead Host process counts.
