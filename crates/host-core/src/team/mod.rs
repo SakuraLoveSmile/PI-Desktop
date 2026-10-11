@@ -15,6 +15,9 @@ pub mod expert_config;
 mod expert_config_tests;
 pub(crate) mod git_warnings;
 pub(crate) mod interruption;
+pub(crate) mod lead_asks;
+#[cfg(test)]
+mod lead_asks_tests;
 pub mod lifecycle;
 #[cfg(test)]
 mod lifecycle_tests;
@@ -33,6 +36,9 @@ mod planning_assignment_tests;
 mod planning_mail_tests;
 #[cfg(test)]
 mod planning_tests;
+#[cfg(test)]
+mod replacement_tests;
+pub(crate) mod replacements;
 pub mod review;
 pub(super) mod review_selection;
 #[cfg(test)]

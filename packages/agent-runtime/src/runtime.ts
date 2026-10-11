@@ -1,4 +1,6 @@
 import { TeamRunLimitStop } from "./team/run-limit-stop.js";
+import { AskToolInputs } from "./ask-tool-inputs.js";
+import { waitForLeadAsk } from "./team/lead-ask-wait.js";
 import { BackgroundProcessUpdates } from "./team/background-process-updates.js";
 import { backgroundBashDescription, bashTimeoutPayload } from "./background-bash.js";
 import { contextRequestObserver } from "./context-insights.js";
@@ -1846,13 +1848,8 @@ export class DesktopAgentRuntime {
     string,
     { toolName: string; args: unknown; startedAt: number }
   >();
-  private pendingAskTools = new Map<
-    string,
-    {
-      request: AskToolRequest;
-      resolve: (answers: Array<string[] | null>) => void;
-    }
-  >();
+  private teamAskDeferred = false;
+  private readonly askTools = new AskToolInputs(request => this.emit({ type: "asktool_request", request }));
   /** Host failures need to reach pi-agent-core's tool error channel without
    * discarding the structured diagnostics returned in `details`. */
   private failedHostToolCalls = new Set<string>();
@@ -3766,7 +3763,17 @@ export class DesktopAgentRuntime {
           if (questionContext) {
             for (let index=0;index<questions.length;index++) await this.host.call("team.openPlanningQuestion", {...questionContext, questionId: `${request.requestId}:${index}`});
           }
-          const answers = await this.waitForAskTool(request, signal);
+          const answers = this.executionProfile === "team" && this.teamContext?.isLead && this.turnId
+            ? await waitForLeadAsk({ host: this.host, request, turnId: this.turnId, signal,
+                wait: (ask, waitSignal) => this.askTools.wait(ask, waitSignal),
+                pending: ask => { this.teamAskDeferred = true; if (ask) this.emit({ type: "asktool_request", request: ask }); },
+              })
+            : await this.askTools.wait(request, signal);
+          if (answers === undefined) {
+            this.terminatingToolCalls.add(toolCallId);
+            return { content: [{ type: "text", text: "The question remains pending after 30 minutes. This turn is interrupted, not completed. Wait for the user's authenticated answer; resume or obtain new execution approval explicitly." }],
+              details: { questions, requestId: request.requestId, pending: true }, terminate: true };
+          }
           return {content: [{type: "text", text: formatAskToolOutput(questions, answers)}], details: {questions, answers, resolvedAt: new Date().toISOString()}};
         } finally {
           if (questionContext) {
@@ -6059,72 +6066,8 @@ export class DesktopAgentRuntime {
     return questions.length > 0 && questions.length <= 20 ? questions : undefined;
   }
 
-  private waitForAskTool(
-    request: AskToolRequest,
-    signal?: AbortSignal,
-  ): Promise<Array<string[] | null>> {
-    return new Promise((resolve) => {
-      let settled = false;
-      const finish = (answers: Array<string[] | null>) => {
-        if (settled) return;
-        settled = true;
-        signal?.removeEventListener("abort", abort);
-        this.pendingAskTools.delete(request.requestId);
-        resolve(answers);
-      };
-      const abort = () => finish(request.questions.map(() => null));
-      this.pendingAskTools.set(request.requestId, { request, resolve: finish });
-      this.emit({ type: "asktool_request", request });
-      if (signal?.aborted) abort();
-      else signal?.addEventListener("abort", abort, { once: true });
-    });
-  }
-
   resolveAskTool(resolution: AskToolResolution): { ok: boolean } {
-    if (resolution.sessionId !== this.sessionId) {
-      throw Object.assign(new Error("asktool session mismatch"), {
-        errorCode: "ASKTOOL_NOT_FOUND",
-      });
-    }
-    const pending = this.pendingAskTools.get(resolution.requestId);
-    if (!pending) {
-      throw Object.assign(new Error("asktool request is no longer pending"), {
-        errorCode: "ASKTOOL_NOT_FOUND",
-      });
-    }
-    if (!Array.isArray(resolution.answers) || resolution.answers.length !== pending.request.questions.length) {
-      throw Object.assign(new Error("asktool answer count does not match questions"), {
-        errorCode: "ASKTOOL_INVALID_ARGUMENT",
-      });
-    }
-    const answers = resolution.answers.map((answer, index) => {
-      if (answer === null) return null;
-      if (!Array.isArray(answer)) {
-        throw Object.assign(new Error(`asktool answer ${index + 1} must be an array or null`), {
-          errorCode: "ASKTOOL_INVALID_ARGUMENT",
-        });
-      }
-      const values = answer
-        .filter((value): value is string => typeof value === "string")
-        .map((value) => value.trim())
-        .filter(Boolean);
-      if (!pending.request.questions[index].multiSelect && values.length > 1) {
-        throw Object.assign(new Error(`asktool question ${index + 1} accepts one answer`), {
-          errorCode: "ASKTOOL_INVALID_ARGUMENT",
-        });
-      }
-      return [...new Set(values)];
-    });
-    pending.resolve(answers);
-    return { ok: true };
-  }
-
-  private resolvePendingAskTools(): void {
-    const pending = [...this.pendingAskTools.values()];
-    this.pendingAskTools.clear();
-    for (const entry of pending) {
-      entry.resolve(entry.request.questions.map(() => null));
-    }
+    return this.askTools.resolve(resolution, this.sessionId);
   }
 
   private async loadPathInstructions(
@@ -6422,6 +6365,7 @@ export class DesktopAgentRuntime {
     this.pendingMutationTermination = undefined;
     this.pendingSubmissionOutcome = undefined;
     this.pendingTeamInboxYield = undefined;
+    this.teamAskDeferred = false;
     this.terminatingToolCalls.clear();
     this.turnHadError = false;
   }
@@ -8654,6 +8598,12 @@ export class DesktopAgentRuntime {
         }
         break;
       case "turn_end":
+        if (this.teamAskDeferred) {
+          this.runCancelled = true;
+          this.emit({ type: "error", error: { code: "TURN_ABORTED", message: "Team question remains pending after 30 minutes. Answer the question, then explicitly resume or obtain new approval.", retriable: false } });
+          this.emit({ type: "turn_end" });
+          break;
+        }
         if (!messageRequestsTools(event.message) && this.prepareGoalReportRecovery()) break;
         if (
           this.suppressOverflowRunEnd ||
@@ -8675,6 +8625,16 @@ export class DesktopAgentRuntime {
       case "agent_end": {
         if (this.teamBudgetStop.requested) {
           this.settleStoppedTeamBudget();
+          break;
+        }
+        if (this.teamAskDeferred) {
+          this.acceptingSteering = false;
+          this.autonomousExecution = false;
+          this.goalReportDraftManager = undefined;
+          this.goalProgressManager = undefined;
+          this.retainPendingSteering();
+          this.clearAgentActivity();
+          this.emit({ type: "agent_end", messageIds: [] });
           break;
         }
         if (this.pendingTeamInboxYield?.()) {
@@ -9423,7 +9383,7 @@ export class DesktopAgentRuntime {
     this.clearGoalProgressTool();
     this.steeringWaitAbort?.abort();
     this.extensionRunner?.cancelPending();
-    this.resolvePendingAskTools();
+    this.askTools.cancelAll();
     this.abortRunningDelegations();
     this.turnSubagentUsage = undefined;
     this.agent.abort();
@@ -9487,7 +9447,7 @@ export class DesktopAgentRuntime {
     this.projectMemoryRefreshAbort?.abort();
     this.teamLeadExecution.cancel();
     this.steeringWaitAbort?.abort();
-    this.resolvePendingAskTools();
+    this.askTools.cancelAll();
     this.abortRunningDelegations();
     this.delegationWaitTargets = undefined;
     this.pathInstructionClaims.clear();

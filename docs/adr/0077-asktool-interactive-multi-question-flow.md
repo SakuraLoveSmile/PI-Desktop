@@ -47,3 +47,12 @@ CommonMark/GFM. The renderer uses a safe phrasing-content projection: raw HTML
 is ignored, links are non-interactive, and images do not load. Selection and
 tool output preserve the normalized source strings; Markdown affects display
 only. The request schema and protocol version are unchanged.
+
+## Amendment — 2026-10-11: Team Lead unanswered questions
+
+[Team Lead pending questions](team-lead-pending-questions-and-replacements.md)
+introduces a Team-only 30-minute wait budget and durable late-answer lifecycle.
+It supersedes the unlimited runtime wait only for a Host-bound Team Lead turn.
+Ordinary questions and permission approvals retain the original unlimited
+contract. The wait ends without expiring or answering the question and never
+approves work or restores an execution token.

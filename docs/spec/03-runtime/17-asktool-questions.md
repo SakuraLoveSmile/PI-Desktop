@@ -4,8 +4,8 @@
 
 `asktool` lets the model pause a turn and ask the user one or more bounded
 questions. It is available in Agent, Plan, and Goal mode and is separate from
-permission approval: it does not authorize an operation and has no validity
-deadline.
+permission approval: it does not authorize an operation. Ordinary questions have
+no validity deadline; the Team Lead wait exception below preserves the unanswered question.
 
 ## 2. Request shape
 
@@ -34,7 +34,7 @@ indicator revisits that question. `Next` records an answer when one exists;
 otherwise it records a skip. `Skip` explicitly records a skip and advances.
 `Decline all` resolves every question as skipped.
 
-There is no timer, countdown, or automatic expiration. The card remains pending
+For ordinary questions there is no timer, countdown, or automatic expiration. The card remains pending
 until the user submits or the turn is stopped. If the turn is stopped while a
 card is open, the runtime resolves every remaining question as skipped.
 
@@ -65,3 +65,18 @@ question text：
 This format is deterministic, preserves question order, and makes multi-select
 answers distinguishable without exposing a renderer-only state object to the
 model.
+
+## Team Lead pending questions (WP11)
+
+Only a Team Lead's Host-bound running turn has a 30-minute wait budget. Rust
+registers the question durably. Timeout changes it to pending and interrupts
+the turn without answering, approving work, or completing a Goal. The same Ask
+card remains answerable. A timely answer goes to the current tool and is
+acknowledged; a late or orphan-recovered answer is atomically queued as a new
+authenticated user turn with identity `asktool-answer:<requestId>`. It carries
+no old execution token and requires explicit resume/new approval. Queue-full
+failure preserves the pending question. Identical replies are idempotent;
+changed replies fail. Stop/Abort cancels questions and fences late registration.
+Reload restores pending cards; restart preserves questions and the existing
+controller-held queue behavior. Ordinary asks and permission approvals have no
+new timeout. See [the decision](../../adr/team-lead-pending-questions-and-replacements.md).

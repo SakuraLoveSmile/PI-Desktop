@@ -2005,6 +2005,8 @@ sklm: {
     queued_other: "{{count}} istek daha bekliyor",
   },
   askTool: {
+    pending: "Yanıt bekleniyor",
+    pendingHelp: "Lider 30 dakika sonra beklemeyi bıraktı. Yanıtınız yeni bir tur başlatır; yürütmeyi açıkça sürdürün veya yeniden onaylayın.",
     completedTitle: "Sorular netlestirildi",
     completedSkipped: "Atlandi",
     title: "Birkaç soru",

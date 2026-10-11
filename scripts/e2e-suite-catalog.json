@@ -884,6 +884,13 @@
         "E2E-TEAM-member-interrupt-production-chain"
       ],
       "safety": "Real isolated Host/Main/IPC/sidecar/runtime with loopback SSE provider and disposable shell processes. No live provider or user profile; accepted background tasks are explicitly stopped only during fixture cleanup."
+    },
+    {
+      "id": "team-lead-pending",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-lead-pending.mjs",
+      "tier": "nightly",
+      "safety": "Requires prebuilt JS packages and the existing Rust toolchain. Isolated Rust AppState RPC, production Node runtime/Main finalization and controlled fake provider/clock; no Desktop, user profile or real provider. Local runs reuse cached dependencies; clean CI resolves only locked Cargo dependencies."
     }
   ]
 }

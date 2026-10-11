@@ -103,10 +103,13 @@ pub(crate) fn require_confirmed_strategy(db: &Database, team: &str) -> Result<()
     current_confirmed_decision(db, team).map(|_| ())
 }
 
-fn current_confirmed_decision(db: &Database, team: &str) -> Result<super::TeamExecutionDecision> {
+pub(super) fn current_confirmed_decision(
+    db: &Database,
+    team: &str,
+) -> Result<super::TeamExecutionDecision> {
     let deny = || {
         anyhow!(
-            "TEAM_APPROVAL_REQUIRED: user confirmation of this turn's Team strategy is required"
+            "TEAM_APPROVAL_REQUIRED: user confirmation of this turn's Team strategy is required; nextStep: declare_team_strategy and wait for trusted roster review"
         )
     };
     let Some(scope) = db
@@ -217,6 +220,11 @@ pub(crate) fn validate_current_expert(db: &Database, team: &str, target: &str) -
         Some(member) => Some(member),
         None => super::get_team_member_by_session_id(db, target)?,
     };
+    if let Some(ref member) = member {
+        if super::replacements::replaced(db, team, &member.member_session_id)? {
+            return Err(anyhow!("TEAM_REPLACED_MEMBER: source slot already has a successor; nextStep: dispatch to the replacement or request trusted review"));
+        }
+    }
     if decision.strategy.as_deref() == Some("delegate")
         && member.is_some_and(|member| {
             member.team_session_id == team

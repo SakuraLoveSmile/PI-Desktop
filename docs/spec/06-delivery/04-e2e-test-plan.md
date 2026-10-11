@@ -18081,3 +18081,27 @@ Run `node scripts/e2e-team-run-limits-ui.mjs` with the candidate sources and iso
 ### E2E-TEAM-member-interrupt-production-chain
 
 `node --experimental-strip-types scripts/e2e-team-member-interrupt.mjs` replays real Host interruption through Main delivery, bridge, IPC, sidecar and runtime using a loopback provider. Assert unforced refusal, foreground process termination and interrupted turn state. Block the real session gate, replace the old turn, then release and replay its notification: the replacement remains active. Accepted background work survives abort/dispose and is explicitly stopped in cleanup; background zero is not the turn-cancellation contract.
+### WP11 Team unattended questions and failed-slot replacement
+
+- `E2E-TEAM-lead-pending-ask-late-answer`: fake-provider Lead asks at 05:05; at
+  05:35 the original turn is interrupted and the question remains pending. UI
+  restore retains the card; a late trusted reply queues exactly one new user
+  turn with stable identity, no Team origin or old execution token.
+- Native Ask-card interaction mounts the pending badge, new-approval guidance
+  and enabled answer controls using the existing isolated Electron harness.
+- Host RPC replacement path confirms a roster, fails a member, replaces it once,
+  dispatches the successor and admits its turn without a second review. Replay
+  reuses its identity; a second successor or old-handle dispatch is rejected.
+- Host regressions cover deadline/answer races, ACK/orphan recovery, queue-full
+  rollback, cancellation fences, stale owner/turn, route/config/permission
+  inheritance and the frozen roster limit. Real-provider overnight acceptance
+  is separate from these controlled replay checks.
+
+The explicit nightly lane `node scripts/e2e-team-lead-pending.mjs` requires the
+existing environment's `pnpm build:js` output. It runs the opt-in Rust
+cross-language fixture with `--ignored`, then records
+`E2E-TEAM-approved-lead-ask-interrupted`. The default pure Rust CI does not
+require Node/JS dependencies. The fixture exercises approved Goal dispatch,
+30-minute controlled wait, actual Main finalization/outbox, Rust interrupted
+execution, no successful report, and rejection of a genuine old progress token.
+It uses no provider service, test-only production backdoor, or system-clock edit.

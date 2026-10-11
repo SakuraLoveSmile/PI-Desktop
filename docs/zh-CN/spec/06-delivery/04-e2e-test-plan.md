@@ -9895,3 +9895,20 @@ options retain pressed states and switching behavior.
 ### E2E-TEAM-member-interrupt-production-chain
 
 隔离 Host 和 loopback provider 经真实 Main、bridge、IPC、sidecar/runtime 重放成员中断；验证普通请求拒绝、前台进程终止和 interrupted 状态。阻塞真实 session gate 后替换回合，再释放并重放旧通知，新回合不受影响。已接受后台任务在 abort/dispose 后保留，清理阶段显式停止；不以后台归零作为回合取消契约。入口 `node --experimental-strip-types scripts/e2e-team-member-interrupt.mjs`。
+### WP11 无人值守提问与失败 slot 替换
+
+`E2E-TEAM-lead-pending-ask-late-answer` 回放 Lead 05:05 提问、05:35 中断并
+保留待回答卡、迟到回答开启一个认证新用户回合。不得恢复旧执行令牌或
+自动批准。原生隔离 Ask 卡验证徽标、提示和可回答控件。宿主 RPC 完整路径
+验证已批准成员 failed 后一次替换、幂等重试、继承权限与模型、新成员派发
+和回合接纳；旧成员和第二次替换拒绝。补充超时/回答竞态、ACK、重启恢复、
+队列满回滚和取消围栏检查。真实供应商通宵验收与受控回放分开报告。
+
+The explicit nightly lane `node scripts/e2e-team-lead-pending.mjs` requires the
+existing environment's `pnpm build:js` output. It runs the opt-in Rust
+cross-language fixture with `--ignored`, then records
+`E2E-TEAM-approved-lead-ask-interrupted`. The default pure Rust CI does not
+require Node/JS dependencies. The fixture exercises approved Goal dispatch,
+30-minute controlled wait, actual Main finalization/outbox, Rust interrupted
+execution, no successful report, and rejection of a genuine old progress token.
+It uses no provider service, test-only production backdoor, or system-clock edit.

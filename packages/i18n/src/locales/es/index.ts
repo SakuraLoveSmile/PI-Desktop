@@ -2000,6 +2000,8 @@ sklm: {
     "queued_other": "{{count}} más solicitudes están esperando"
   },
   "askTool": {
+    "pending": "Respuesta pendiente",
+    "pendingHelp": "El coordinador dejó de esperar después de 30 minutos. La respuesta inicia un nuevo turno; reanuda o aprueba la ejecución explícitamente.",
     "completedTitle": "Preguntas aclaradas",
     "completedSkipped": "Omitida",
     "title": "Algunas preguntas",

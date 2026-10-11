@@ -244,6 +244,9 @@ export type AskToolRequest = {
   sessionId: string;
   toolCallId: string;
   questions: AskToolQuestion[];
+  /** Host-owned Team-only deferred question; grants no execution authority. */
+  teamManaged?: true;
+  teamPending?: { deferredAt: string; requiresNewApproval: true };
 };
 
 /**

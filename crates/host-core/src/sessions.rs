@@ -36,6 +36,10 @@ pub(crate) fn with_savepoint<T>(
             | "team_create_task"
             | "team_update_task"
             | "team_research_result"
+            | "team_replacement"
+            | "team_ask_answer"
+            | "team_ask_cancel"
+            | "turn_queue_push"
     ) {
         return Err(anyhow!("invalid internal savepoint name"));
     }
@@ -2453,6 +2457,7 @@ pub fn delete_session(db: &Database, id: &str) -> Result<bool> {
     crate::goal_progress::cleanup_session_conn(&tx, id)?;
     crate::team::task_attempts::cleanup_session(&tx, id)?;
     crate::team::member_failure::cleanup_session(&tx, id)?;
+    crate::team::lead_asks::cleanup(&tx, id)?;
     crate::team::write_scopes::cleanup_session(&tx, id)?;
     crate::team::dispatch_head::cleanup_session(&tx, id)?;
     crate::team::dispatch_metadata::cleanup_session(&tx, id)?;
@@ -2484,6 +2489,7 @@ pub fn delete_session_with_team_cleanup(db: &Database, id: &str) -> Result<bool>
     crate::goal_progress::cleanup_session_conn(&tx, id)?;
     crate::team::task_attempts::cleanup_session(&tx, id)?;
     crate::team::member_failure::cleanup_session(&tx, id)?;
+    crate::team::lead_asks::cleanup(&tx, id)?;
     crate::team::write_scopes::cleanup_session(&tx, id)?;
     crate::team::dispatch_head::cleanup_session(&tx, id)?;
     crate::team::dispatch_metadata::cleanup_session(&tx, id)?;
