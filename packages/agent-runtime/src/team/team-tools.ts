@@ -7,6 +7,7 @@ import { Type } from "@earendil-works/pi-ai";
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { RuntimeHost } from "../host-client.js";
 import { createWaitForUpdatesTool } from "./wait-for-updates.js";
+import { pendingMailboxNextStep, readPendingMailbox } from "./pending-mailbox.js";
 import {
   TEAM_TASK_SUBJECT_GUIDANCE,
   TEAM_STRATEGY_REASON_GUIDANCE,
@@ -43,6 +44,7 @@ export interface TeamToolsOptions {
   backgroundProcesses?: BackgroundProcessUpdates;
   getTurnId?: () => string | undefined;
   approvedExecution?: () => boolean;
+  captureMailboxGuard?: () => (() => boolean);
   captureInboxYield?: () => ((toolCallId: string) => boolean) | undefined;
   abortActiveTurn?: (memberSessionId: string) => Promise<boolean>;
 }
@@ -694,9 +696,12 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
     description:
       "Get full Expert Team status, including roster of members, task board, and current paused state.",
     parameters: Type.Object({}),
-    execute: async (): Promise<AgentToolResult> => {
+    execute: async (_id, _params, signal): Promise<AgentToolResult> => {
       try {
-        const [roster, board, planning] = await Promise.all([
+        signal?.throwIfAborted();
+        const expectedTurnId = opts.getTurnId?.();
+        const ownsMailbox = opts.captureMailboxGuard?.();
+        const [roster, board, planning, mailbox] = await Promise.all([
           host.call<TeamRosterProjection>("team.getRoster", {
             teamSessionId,
             callerSessionId,
@@ -706,7 +711,16 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
             callerSessionId,
           }),
           host.call<TeamPlanningProjection | null>("team.getPlanning", {teamSessionId, callerSessionId}),
+          isLead ? readPendingMailbox(host, teamSessionId, callerSessionId) : undefined,
         ]);
+        signal?.throwIfAborted();
+        if ((opts.getTurnId && opts.getTurnId() !== expectedTurnId) || ownsMailbox?.() === false) {
+          throw new Error("TEAM_PLANNING_STALE: team mailbox context changed");
+        }
+        const pending = mailbox?.summary;
+        const summary = pending ? { ...pending, ...(pending.pendingMessagesCount > 0 ? {
+          nextStep: pendingMailboxNextStep(opts.mode, opts.approvedExecution?.() === true),
+        } : {}) } : {};
 
         return {
           content: [
@@ -714,9 +728,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
               type: "text",
               text: JSON.stringify({
                 planning,
-                ...(isLead && planning && (planning.pendingMessagesCount ?? 0) > 0 ? {
-                  nextStep: "Expert messages are pending. Finish the current aggregation turn to let the mailbox consume their full contents; do not keep waiting while holding the Lead turn. Resume synthesis after those messages are consumed, then call SubmitPlan.",
-                } : {}),
+                ...summary,
                 teamSessionId: roster.teamSessionId,
                 paused: roster.paused,
                 revision: board.revision,
@@ -731,7 +743,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
               }),
             },
           ],
-          details: { roster, board, planning },
+          details: { roster, board, planning, ...summary },
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

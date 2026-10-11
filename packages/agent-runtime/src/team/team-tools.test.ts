@@ -632,9 +632,10 @@ describe("planning research boundary", () => {
       if (method === "team.getRoster") return { teamSessionId: "lead", paused: false, members: [] };
       if (method === "team.getBoard") return { teamSessionId: "lead", revision: 1, tasks: [] };
       if (method === "team.getPlanning") return planning;
+      if (method === "team.listMessages") return { messages: [1, 2].map(id => ({ id: String(id), sourceSessionId: "expert", sourceMemberName: "expert", targetSessionId: "lead", status: "queued", turnId: null })) };
       throw new Error(`Unexpected ${method}`);
     });
-    const tools = createTeamTools({ teamSessionId: "lead", callerSessionId: "lead", isLead: true, host: { call } as unknown as RuntimeHost });
+    const tools = createTeamTools({ teamSessionId: "lead", callerSessionId: "lead", isLead: true, mode: "plan", host: { call } as unknown as RuntimeHost });
     const status = await tools.find(tool => tool.name === "team_status")!.execute("status", {});
     expect(status.content[0]).toEqual({ type: "text", text: expect.stringContaining("Finish the current aggregation turn") });
     expect(status.details).toMatchObject({ planning });
@@ -649,6 +650,7 @@ describe("approved Lead execution inbox", () => {
       if (method === "team.getRoster") return { teamSessionId: "lead", paused: false, members: [] };
       if (method === "team.getBoard") return { teamSessionId: "lead", revision: 3, tasks: [], readiness: [], scopeOverlaps: [], outOfScopeWriteCount: 2, outOfScopeWrites: counts, sharedGitWarningCount: 3, sharedGitWarnings: [{ memberSessionId: "lead", memberName: "Lead", count: 3 }] };
       if (method === "team.getPlanning") return null;
+      if (method === "team.listMessages") return { messages: [] };
       throw new Error(`Unexpected ${method}`);
     });
     const tools = createTeamTools({ teamSessionId: "lead", callerSessionId: "lead", isLead: true, host: { call } as unknown as RuntimeHost });
@@ -659,11 +661,13 @@ describe("approved Lead execution inbox", () => {
       if (method === "team.getRoster") return { teamSessionId: "lead", paused: false, members: [] };
       if (method === "team.getBoard") return { teamSessionId: "lead", revision: 1, tasks: [], readiness: [], scopeOverlaps: [] };
       if (method === "team.getPlanning") return null;
+      if (method === "team.listMessages") return { messages: [] };
       throw new Error(`Unexpected ${method}`);
     });
     const legacy = await tools.find(tool => tool.name === "team_status")!.execute("legacy-status", {});
     if (legacy.content[0].type !== "text") throw new Error("Missing legacy Team status text");
     expect(JSON.parse(legacy.content[0].text)).toMatchObject({ sharedGitWarningCount: 0, sharedGitWarnings: [] });
+    expect(status.details).toMatchObject({ pendingMessagesCount: 0, pendingMessageSenders: [], oldestPendingMessageAgeSeconds: null });
   });
   it("returns full authenticated messages as Team tool results and suppresses reread duplicates", async () => {
     const calls: unknown[] = [];
@@ -693,5 +697,70 @@ describe("approved Lead execution inbox", () => {
     const result = await wait.execute("late-read", {});
     expect(JSON.stringify(result)).toContain("TEAM_PLANNING_STALE");
     expect(JSON.stringify(result)).not.toContain("Stale findings");
+  });
+});
+
+describe("Lead pending mailbox status", () => {
+  it.each(["cancel", "turn", "context"])("does not publish metadata from a stale status read after %s", async change => {
+    const controller = new AbortController();
+    let turnId = "turn", current = true;
+    const call = async <T>(method: string): Promise<T> => {
+      if (method === "team.getPlanning") return null as T;
+      if (method === "team.listMessages") {
+        if (change === "cancel") controller.abort();
+        if (change === "turn") turnId = "replacement";
+        if (change === "context") current = false;
+        return { messages: [{ id: "report", sourceSessionId: "expert", sourceMemberName: "expert", targetSessionId: "lead", status: "queued", turnId: null }] } as T;
+      }
+      return { members: [], tasks: [] } as T;
+    };
+    const tools = createTeamTools({ teamSessionId: "lead", callerSessionId: "lead", isLead: true, mode: "agent", host: { call },
+      getTurnId: () => turnId, captureMailboxGuard: () => () => current });
+    const outcome = await tools.find(tool => tool.name === "team_status")!.execute("status", {}, controller.signal);
+    expect(outcome.details).toHaveProperty("error");
+    expect(outcome.details).not.toHaveProperty("pendingMessagesCount");
+    expect(outcome.terminate).toBeUndefined();
+  });
+
+  it.each(["agent", "plan", "approved"])("projects authorized summaries with %s guidance and no body consumption", async mode => {
+    const now = vi.spyOn(Date, "now").mockReturnValue(1_800_000_000_000);
+    const mail = { id: "report", sourceSessionId: "expert-session", sourceMemberName: "expert", targetSessionId: "lead",
+      status: "queued", deliveryStatus: "acknowledged", turnId: null, createdAt: "1799999770100", content: "PRIVATE_BODY_AND_PATH" };
+    const call = vi.fn(async (method: string, params?: unknown) => {
+      if (method === "team.getRoster") return { teamSessionId: "lead", members: [], paused: false };
+      if (method === "team.getBoard") return { revision: 1, tasks: [] };
+      if (method === "team.getPlanning") return null;
+      if (method === "team.listMessages") {
+        expect(params).toEqual({ teamSessionId: "lead", callerSessionId: "lead", sessionId: "lead" });
+        return { messages: [mail, { ...mail, id: "outgoing", sourceSessionId: "lead", targetSessionId: "expert-session" },
+          { ...mail, id: "bound", turnId: "consumed-turn" }, { ...mail, id: "finished", status: "completed" }] };
+      }
+      throw new Error(`Unexpected ${method}`);
+    });
+    try {
+      const tools = createTeamTools({ teamSessionId: "lead", callerSessionId: "lead", isLead: true, mode: mode === "plan" ? "plan" : "agent",
+        approvedExecution: () => mode === "approved", host: { call } as RuntimeHost });
+      const outcome = await tools.find(tool => tool.name === "team_status")!.execute("status", {});
+      const expected = { pendingMessagesCount: 1, pendingMessageSenders: ["expert"], oldestPendingMessageAgeSeconds: 229 };
+      expect(outcome.details).toMatchObject(expected);
+      if (outcome.content[0].type !== "text") throw new Error("Missing status text");
+      const visible: { nextStep: string } = JSON.parse(outcome.content[0].text);
+      expect(visible).toMatchObject(expected);
+      expect(visible.nextStep).toContain(mode === "approved" ? "wait_for_updates" : mode === "plan" ? "Finish the current aggregation turn" : "after you end the current turn");
+      if (mode === "approved") expect(visible.nextStep).not.toContain("end the current turn");
+      expect(JSON.stringify(outcome)).not.toContain(mail.content);
+      expect(call.mock.calls.map(([method]) => method)).not.toContain("team.ackMessage");
+      expect(outcome.terminate).toBeUndefined();
+    } finally { now.mockRestore(); }
+  });
+
+  it("keeps failed mailbox reads observable instead of reporting zero pending messages", async () => {
+    const call = async <T>(method: string): Promise<T> => {
+      if (method === "team.getPlanning") return null as T;
+      if (method === "team.listMessages") throw new Error("Mailbox unavailable");
+      return { members: [], tasks: [] } as T;
+    };
+    const tools = createTeamTools({ teamSessionId: "lead", callerSessionId: "lead", isLead: true, mode: "agent", host: { call } });
+    expect((await tools.find(tool => tool.name === "team_status")!.execute("status", {})).details).toEqual({ error: "Mailbox unavailable" });
   });
 });
