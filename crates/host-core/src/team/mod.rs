@@ -12,10 +12,14 @@ mod execution_inbox_tests;
 pub mod expert_config;
 #[cfg(test)]
 mod expert_config_tests;
+pub(crate) mod interruption;
 pub mod lifecycle;
 #[cfg(test)]
 mod lifecycle_tests;
 pub mod mailbox;
+pub(crate) mod member_activity;
+#[cfg(test)]
+mod member_activity_tests;
 pub(crate) mod member_failure;
 #[cfg(test)]
 mod member_failure_tests;

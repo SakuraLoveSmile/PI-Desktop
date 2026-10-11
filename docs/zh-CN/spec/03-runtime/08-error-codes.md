@@ -387,6 +387,8 @@ ADR 0285）。渲染进程除了一个标识徽章外看不到本地/远程之�
 | `TEAM_MODEL_SELECTION_INVALID` | 否 | 提议的模型/提供商/思考路线无法启动 |
 | `TEAM_MEMBER_MODEL_CHANGE_BLOCKED` | 否 | 该成员在其路线上持有活跃 turn 或排队任务 |
 | `TEAM_LEAD_CONFIGURATION_BLOCKED` | 否 | Lead 仍有团队数据时不能切换为普通执行模式 |
+| `TEAM_MEMBER_ACTIVE` | 否 | 十分钟内有 Host 活动或仍有活动 Bash；先查看 team_status，确需中断时显式 force 并说明理由 |
+| `TEAM_INTERRUPT_REASON_REQUIRED` | 否 | force:true 必须提供裁剪后非空的中断理由 |
 
 ## 4. 映射规则
 

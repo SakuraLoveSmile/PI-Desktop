@@ -17,7 +17,7 @@ const TOKENS: [&str; 6] = [
 ];
 const COSTS: [&str; 5] = ["input", "output", "cacheRead", "cacheWrite", "total"];
 
-fn operations(usage: &Value) -> Vec<Value> {
+pub(crate) fn operations(usage: &Value) -> Vec<Value> {
     if let Some(records) = usage
         .get("operations")
         .and_then(Value::as_array)
@@ -197,10 +197,20 @@ pub fn record_usage(db: &Database, session_id: &str, turn_id: &str, usage: &Valu
         .map(serde_json::from_str::<Value>)
         .transpose()?;
     let merged = merge_usage(parsed.as_ref(), usage);
-    db.conn().execute(
-        "UPDATE turns SET usage_json = ?1, input_tokens = ?2, output_tokens = ?3 WHERE id = ?4 AND session_id = ?5",
-        params![merged.to_string(), count(&merged, "inputTokens"), count(&merged, "outputTokens"), turn_id, session_id],
-    )?;
+    super::with_savepoint(db.conn(), "team_activity", |conn| {
+        conn.execute(
+            "UPDATE turns SET usage_json = ?1, input_tokens = ?2, output_tokens = ?3 WHERE id = ?4 AND session_id = ?5",
+            params![merged.to_string(), count(&merged, "inputTokens"), count(&merged, "outputTokens"), turn_id, session_id],
+        )?;
+        crate::team::member_activity::observe_usage(
+            db,
+            session_id,
+            parsed.as_ref(),
+            usage,
+            crate::db::now_ms(),
+        )?;
+        Ok(())
+    })?;
     Ok(true)
 }
 

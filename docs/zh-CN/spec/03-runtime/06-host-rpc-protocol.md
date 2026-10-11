@@ -1292,3 +1292,27 @@ SessionMessageOrigin 传入真实及恢复成员模型输入，二者看到同�
 正文、来源校验和权限上限不变。非 Git、无提交和旧消息省略；意外探测错误记录有界
 Host 诊断但不阻止发送。只暴露 SHA，不暴露路径、Git stderr 或秘密；不增加 RPC、
 协议版本或数据库迁移。
+
+### 专家成员活动与中断保护（WP9）
+
+`team.getRoster` 增量返回 Lead 和每位成员的 `memberActivity`，`team_status` 原样展示。
+包含 Host 观测时间、十分钟窗口、最近回合状态与持续时长、最近工具名称与时间、活动 Bash
+调用 ID、运行后台进程 ID/状态/启动时间、近期已完成物理调用与 token 数、收发 Team 队列
+数量及最老等待时长。不包含报告正文、命令、路径、凭据，也不依赖 Git 活动。
+近期调用只统计 Host 首次观测到的已报告 usage；旧记录无时间戳和仍在请求中的调用均未知。
+重放 usage 不刷新活动时间，观测与 usage 在同一 savepoint 持久化，重启不改变原时间。
+
+队列年龄使用持久化毫秒创建时间。ACK 表示已入队，不表示已消费；未消费消息只计一次。
+入站排队不能证明成员仍在执行；本人真实出站回复可作为活动，Host 代发的审批和失败通知除外。
+
+`team.interruptMember({ teamSessionId, callerSessionId, memberName, force?, reason? })`
+保留原有 Lead 与停止权限。默认 `force=false`；十分钟内有实际回合开始、工具、usage、
+本人回复或后台开始/结束记录，返回 `TEAM_MEMBER_ACTIVE`。活动后台进程与 Host 持有的
+前台 Bash 调用不受启动时长限制，二十分钟测试仍被保护。
+`force:true` 必须带裁剪后非空、最多 1000 字符的 reason，否则返回
+`TEAM_INTERRUPT_REASON_REQUIRED`；只豁免活动防护，不豁免权限或审批。
+发出绑定精确 turn 的中断通知前先写 `team_member_interrupt` 审计（包含操作者、对象、
+turn、force、reason 与证据）；审计失败则不发通知。无运行回合仍返回
+`{ interrupted: false }`。不新增空转自动 kill，不改 shell 配额、FIFO、邮箱正文投递或执行令牌。
+这是增量本地 RPC，无协议升版或数据库迁移。决策见
+[ADR](../../../adr/team-member-activity-and-interruption-guard.md)。

@@ -9853,3 +9853,12 @@ options retain pressed states and switching behavior.
 - **规格：** 团队协作决策 docs/adr/plus-expert-team-collaboration.md 的建议性范围修订（2026-10-11）及 03-runtime/06-host-rpc-protocol。
 - **验收：** P1 共享树协作；不拒绝写入，不增加 RPC 或迁移。
 - **状态：** 隔离 Host 和 runtime 契约夹具自动化。
+
+#### E2E-TEAM-member-activity-interrupt-guard
+
+- **范围：** Lead 团队工具 → Host 活动投影 → 精确回合中断。
+- **夹具：** 隔离 Host 数据与目录、确定性假 provider，不使用用户实例或付费模型。
+- **步骤：** 批准 tester、派发任务、启动不产生 Git 活动的后台测试；Lead 查看 team_status，依次请求普通中断、无理由 force、有理由 force。
+- **预期：** 状态展示真实后台进程和回合；前两次分别返回 TEAM_MEMBER_ACTIVE、TEAM_INTERRUPT_REASON_REQUIRED 且不发送中断通知；只有有理由 force 产生一次绑定成员和 turn 的通知并写审计，权限和审批不变。
+- **自动化：** `scripts/e2e-team-member-activity.mjs` 使用真实 Host/运行时工具与假 provider；Host RPC 测试控制时间回放二十分钟测试、空转、前台 Bash、权限与审计；领域测试覆盖 ACK 后五小时队列和 usage 重启/重放；工具测试验证证据与 force/reason 透传。
+- **证据限制：** 二十分钟和五小时是确定性时间夹具，不代表真实长跑、Windows 或真实模型验收。
