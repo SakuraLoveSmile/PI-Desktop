@@ -854,6 +854,16 @@
         "E2E-TEAM-shared-git-warning"
       ],
       "safety": "Disposable Git repository and isolated Host/runtime data; no live model or user profile. Git operations affect fixture files only."
+    },
+    {
+      "id": "team-member-activity",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-member-activity.mjs",
+      "tier": "nightly",
+      "scenarioIds": [
+        "E2E-TEAM-member-activity-interrupt-guard"
+      ],
+      "safety": "Fresh temporary Host/workspace and fake model boundary; fixture background command only, no live provider or user profile."
     }
   ]
 }

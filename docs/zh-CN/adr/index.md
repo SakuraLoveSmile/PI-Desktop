@@ -11,6 +11,8 @@ ADR 记录那些不应被静默改变的架构选择。中文入口与英文索�
 
 | 决策 | 说明 |
 |---|---|
+| [派发时效与队列年龄](/adr/team-task-dispatch-age) | WP10 显式关联派发、未开始取消和认证时间元数据 |
+| [成员活动与中断保护](/adr/team-member-activity-and-interruption-guard) | WP9 Host 存活证据、force 与理由审计 |
 | [显式 Host 管理的团队常驻服务](/adr/team-managed-service-processes) | WP14 提案；尚未实现，不改变默认 60 秒、许可或进程生命周期 |
 | [普通 Agent lead 回合内邮件投递](/adr/team-agent-mailbox-delivery) | WP16 S3 提案；先验证待处理摘要，不实施 steer 或扩展批准执行 inbox |
 | [ADR 0001：Electron 桌面壳](/adr/0001-use-electron) | 桌面窗口与平台能力的承载层 |
