@@ -17985,3 +17985,24 @@ asserts the generated model prompt. It does not establish real-model obedience.
 See `packages/agent-runtime/src/team/team-prompt.test.ts`; no source-text assertion
 is used for the new guidance. The queued-report user-path scenario separately
 checks actual expert/Lead Host process counts.
+
+### E2E-TEAM-shared-git-warning
+
+- **Preconditions:** Candidate Host/runtime; disposable native Git repository,
+  temporary data/profile and confirmed Team roster. No provider calls.
+- **Steps:** Dispatch an owned writer task and mark it in progress. The Lead
+  runs `git add -A && git commit` across both authors' fixture files, then
+  `git stash`, and an invalid `git reset --hard`. Read production team_status.
+  Repeat Git staging as the sole writer and after the task has completed.
+- **Expected:** Actual mixed commit and stash succeed with advisory warnings;
+  the invalid reset retains its failure/exit code. Status shows three separate
+  caller-attributed Git warnings and zero Write/Edit scope warnings. Sole writer
+  and completed tasks do not warn. Permissions and shell admission are unchanged.
+- **Coverage:** `node scripts/e2e-team-shared-git-warning.mjs`; Host RPC covers
+  all six operations, background acceptance, cross-team/empty-scope exclusion,
+  idempotent counts, restart persistence and deletion races. Runtime contract
+  tests verify status projection and legacy defaults. Literal detection tests
+  cover quotes, options, command combinations and output-text false positives.
+- **Spec:** 03-runtime/06-host-rpc-protocol, Team shared-tree Git advisory.
+- **Status:** Record the candidate result; no real-model or Windows acceptance
+  is implied. Dynamic shell forms are outside the bounded advisory coverage.

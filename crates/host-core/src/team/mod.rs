@@ -12,6 +12,7 @@ mod execution_inbox_tests;
 pub mod expert_config;
 #[cfg(test)]
 mod expert_config_tests;
+pub(crate) mod git_warnings;
 pub mod lifecycle;
 #[cfg(test)]
 mod lifecycle_tests;

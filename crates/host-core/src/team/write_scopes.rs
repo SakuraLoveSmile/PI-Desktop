@@ -146,7 +146,7 @@ pub fn counts(db: &Database, team: &str) -> Result<Vec<MemberWriteCount>> {
 }
 
 pub(crate) fn cleanup_session(conn: &rusqlite::Connection, session: &str) -> Result<()> {
-    conn.execute("DELETE FROM kv WHERE ns=?1 AND (json_extract(value_json,'$.teamSessionId')=?2 OR json_extract(value_json,'$.memberSessionId')=?2)",params![NS,session])?;
+    conn.execute("DELETE FROM kv WHERE ns IN (?1,?3) AND (json_extract(value_json,'$.teamSessionId')=?2 OR json_extract(value_json,'$.memberSessionId')=?2)",params![NS,session,super::git_warnings::NS])?;
     Ok(())
 }
 

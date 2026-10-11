@@ -1958,3 +1958,38 @@ validation and permission ceilings remain unchanged. Non-Git/unborn/legacy
 messages omit it; unexpected probe errors log a bounded Host diagnostic without
 blocking dispatch. Only SHA is exposed, not paths, Git stderr or secrets.
 No new RPC, protocol version or schema migration is introduced.
+
+
+### Team shared-tree Git advisory
+
+After ordinary authorization and tool admission, Host recognizes common literal
+Bash Git command forms: `add -A`/`--all`, `stash` (except `list`/`show`),
+`reset --hard`, `checkout .`, `clean`, and `commit -a`/`--all`. When a different
+current Team participant owns a non-deleted `in_progress` task with non-empty
+`writeScopes`, the result includes `content.gitWarning`:
+`{code:"TEAM_SHARED_GIT_WARNING",operations,conflictingTasks,message}`.
+Each conflicting task identifies `taskId`, `memberSessionId`, and `memberName`;
+no scope paths or command text are copied into diagnostic persistence.
+
+This is a coordination warning, not a permission boundary or a shell sandbox.
+It does not change permission prompts, tool admission, FIFO, shell limits,
+`ok`, `isError`, `exitCode`, cancellation or timeout behavior. Failed commands
+retain their real failure and warning. Background acceptance carries the same
+warning without pretending the command has already succeeded. Common quoted
+arguments, escaped words, `&&`/`;`/pipeline/newline combinations and Git global
+options are recognized lexically. Aliases, variables, interpreter scripts and
+other computed command forms are not guaranteed; target-repository inference
+is not performed. Use explicit scoped staging and coordinate with other writers.
+Read-only status/diff, stash list/show, the caller's own sole writer task,
+empty scopes and completed/deleted/other-team tasks do not trigger this warning.
+
+`team.getBoard` and `team_status` add optional `sharedGitWarningCount` and
+`sharedGitWarnings` (`{memberSessionId,memberName,count}[]`), with zero/empty
+legacy defaults. Counts record advisory-bearing executed/admitted Bash calls,
+including failures, at most once per caller/session turn/tool-call identity;
+they are separate from successful out-of-scope Write/Edit counts. Existing KV
+preserves counts across restart; session/team deletion cleans them. Capture or
+storage errors are visible as `content.gitTrackingError` and never change the
+Bash result. A detached owner receives `content.gitTrackingSkipped` with no
+orphan count. No RPC, protocol version, schema migration, member worktree or
+`team_commit` tool is introduced.

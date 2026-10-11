@@ -1292,3 +1292,28 @@ SessionMessageOrigin 传入真实及恢复成员模型输入，二者看到同�
 正文、来源校验和权限上限不变。非 Git、无提交和旧消息省略；意外探测错误记录有界
 Host 诊断但不阻止发送。只暴露 SHA，不暴露路径、Git stderr 或秘密；不增加 RPC、
 协议版本或数据库迁移。
+
+
+### 团队共享树 Git 建议性警告
+
+通常权限和工具准入通过后，Host 识别 Bash 常见字面 Git 命令：
+`add -A`/`--all`、`stash`（排除 `list`/`show`）、`reset --hard`、
+`checkout .`、`clean`、`commit -a`/`--all`。同一团队另一当前成员拥有
+未删除、`in_progress` 且非空 `writeScopes` 的任务时，结果加入
+`content.gitWarning`：`{code:"TEAM_SHARED_GIT_WARNING",operations,conflictingTasks,message}`。
+冲突任务标识 taskId/memberSessionId/memberName；不把范围路径或命令文本复制到持久化诊断。
+
+这仅是协作警告，不是权限边界或 shell 沙箱；命令仍执行，不改变权限提示、
+准入、FIFO、额度、ok/isError/exitCode、取消或超时。失败保留真实失败和警告；
+后台准入带警告但不声称已执行成功。字面引号、转义、组合命令和 Git 全局选项
+通过词法识别；别名、变量、解释器脚本等动态形式不保证覆盖，也不推断目标仓库。
+应显式暂存自有范围并与其他写入者协调。只读 status/diff、stash list/show、
+调用者自己是唯一写入者、空范围、已完成/删除/其他团队任务不告警。
+
+team.getBoard/team_status 新增可选 sharedGitWarningCount 和 sharedGitWarnings
+（`{memberSessionId,memberName,count}[]`），旧 Host 缺省为零/空数组。
+计数记录带警告的已执行或已准入 Bash 调用，包括失败；调用者会话/turn/toolCallId
+最多一次，与 Write/Edit 越界成功计数分离。既有 KV 跨重启保存，session/team 删除清理。
+捕获/存储失败通过 content.gitTrackingError 可见且不改变 Bash 结果；所有者已移除时
+返回 content.gitTrackingSkipped，不留孤立计数。不增加 RPC、协议版本、迁移、成员
+worktree 或 team_commit 工具。
