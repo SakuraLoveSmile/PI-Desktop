@@ -571,8 +571,9 @@ recheck current Host authority: an approved dispatched expert turn must have
 actually started. Idle members and queued messages cannot grant authority.
 The gate does not itself require task ownership or a completed contribution.
 Tool permissions, cancellation and mode checks continue to apply after authority.
-A nonempty final reply uses the same gate; one recovery is allowed in the same
-durable turn, then repeated refusal ends with an observable approval error.
+A nonempty final reply uses the same gate; one preconfirmation recovery and
+three confirmed-roster completion retries are allowed in the same durable turn,
+then repeated refusal ends with an observable approval error.
 An ordinary unapproved Agent turn with a valid pending roster may explain that
 user confirmation is needed. An already-approved Team Plan/Goal execution
 instead suspends inside the same Host turn until trusted roster confirmation,
@@ -580,6 +581,16 @@ then consumes full authenticated results with wait_for_updates. Expert-start
 authority only unlocks substantive tools; completion additionally requires
 recorded expert dispatches/turns settled and their current results consumed.
 No final agent_end or Goal execution-token release is permitted while waiting.
+On same-turn approved execution recovery, a fresh Host-confirmed, user-confirmed
+nonempty delegate review bound to the same team/turn refreshes the latest matching
+non-error declare_team_strategy result in the model-only context before the first
+recovery request. Its payload and details use the confirmed roster and
+awaitingUserApproval=false; declaration-time memberSessionIds are omitted because
+the review read cannot refresh them. The original pending tool event, visible
+UI transcript and persisted history remain unchanged. Later normal context
+rebuilding uses that original history. Missing/compacted/mismatched/error results
+retain the existing recovery nudge and three confirmed-roster completion retries.
+Ordinary Team turns and automatic Plan research do not acquire this projection.
 The internal inbox reads are narrow, Host-authorized model-proxy operations;
 trusted plans.bindExecutionTurn is never exposed to the model reverse proxy.
 

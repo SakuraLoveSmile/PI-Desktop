@@ -7,6 +7,7 @@ import { Type } from "@earendil-works/pi-ai";
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { RuntimeHost } from "../host-client.js";
 import { createWaitForUpdatesTool } from "./wait-for-updates.js";
+import { buildDeclareStrategyResult } from "./declare-strategy-result.js";
 import { pendingMailboxNextStep, readPendingMailbox } from "./pending-mailbox.js";
 import {
   TEAM_TASK_SUBJECT_GUIDANCE,
@@ -139,39 +140,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
           ...(p.strategy === "delegate" ? { members: p.members } : {}),
         });
 
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({
-                strategy: result.decision.strategy,
-                reason: result.decision.reason,
-                reviewId: result.review?.reviewId,
-                status: result.review?.status ?? "none",
-                launchPolicy: result.review?.launchPolicy ?? "user_confirmed",
-                awaitingUserApproval: result.review?.status === "pending",
-                ...(result.review?.status === "pending" ? {
-                  nextStep: opts.approvedExecution?.()
-                    ? "Explain the proposal and keep this approved execution open while waiting for trusted roster confirmation. After confirmation use wait_for_updates to consume authenticated Team messages in this same execution; dispatch owned expert tasks and await their full results before completion."
-                    : "Explain the proposal and stop this turn. Wait for trusted user review confirmation before executing work or submitting a plan.",
-                } : result.review?.status === "confirmed" ? {
-                  nextStep: result.review.launchPolicy === "automatic_plan"
-                    ? "The read-only researchers are ready automatically. Do not ask for roster confirmation or stop to explain dispatch: create owned research tasks, send_message each taskId to its researcher, and await full structured research results. Synthesize settled findings and questions, then call SubmitPlan for user approval of the implementation plan."
-                    : "The user confirmed the execution roster. Create owned tasks and dispatch the approved experts; await actual expert participation before substantive execution or completion.",
-                } : {}),
-                memberSessionIds: result.decision.memberSessionIds,
-                members: result.review?.members?.map(
-                  (m: { name: string; selection: { modelId: string; providerId: string } }) => ({
-                    name: m.name,
-                    modelId: m.selection.modelId,
-                    providerId: m.selection.providerId,
-                  }),
-                ),
-              }),
-            },
-          ],
-          details: result,
-        };
+        return buildDeclareStrategyResult(result, opts.approvedExecution?.() ?? false);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
