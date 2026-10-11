@@ -98,6 +98,8 @@ pub struct TeamBoardProjection {
     pub tasks: Vec<TeamTask>,
     pub readiness: Vec<TeamTaskReadiness>,
     pub scope_overlaps: Vec<WriteScopeOverlap>,
+    pub shared_git_warning_count: u64,
+    pub shared_git_warnings: Vec<super::write_scopes::MemberWriteCount>,
     pub out_of_scope_write_count: u64,
     pub out_of_scope_writes: Vec<super::write_scopes::MemberWriteCount>,
 }

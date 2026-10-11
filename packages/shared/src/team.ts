@@ -117,6 +117,9 @@ export type TeamRosterProjection = {
 export type TeamBoardProjection = {
   /** Advisory successful Write/Edit calls outside the active member task scopes. */
   outOfScopeWriteCount?: number;
+  /** Advisory Bash calls containing shared-tree Git operations during another writer task. */
+  sharedGitWarningCount?: number;
+  sharedGitWarnings?: Array<{ memberSessionId: string; memberName: string; count: number }>;
   outOfScopeWrites?: Array<{ memberSessionId: string; memberName: string; count: number }>;
   teamSessionId: string;
   revision: number;
