@@ -844,6 +844,16 @@
         "E2E-TEAM-agent-lead-sees-queued-expert-report"
       ],
       "safety": "Isolated real Host, Main delivery, AgentHost and runtime with a fake external provider and disposable shell processes; no live provider or user profile."
+    },
+    {
+      "id": "team-shared-git-warning",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-shared-git-warning.mjs",
+      "tier": "nightly",
+      "scenarioIds": [
+        "E2E-TEAM-shared-git-warning"
+      ],
+      "safety": "Disposable Git repository and isolated Host/runtime data; no live model or user profile. Git operations affect fixture files only."
     }
   ]
 }
