@@ -74,7 +74,7 @@ describe("wait_for_updates", () => {
     const controller = new AbortController();
     const removeListener = vi.spyOn(controller.signal, "removeEventListener");
     const outcome = await tool.execute("wait-mail", {}, controller.signal);
-    expect(outcome.details).toEqual({ updated: true, reason: "pending_mailbox_messages", count: 4 });
+    expect(outcome.details).toEqual({ updated: true, reason: "pending_mailbox_messages", count: 4, pendingMessagesCount: 4, pendingMessageSenders: [], oldestPendingMessageAgeSeconds: null });
     expect(outcome.terminate).toBe(true);
     expect(yieldInbox).toHaveBeenCalledExactlyOnceWith("wait-mail");
     expect(h.rpc.mock.calls.map(([method]) => method)).toEqual(["team.getBoard", "team.listMessages"]);
@@ -97,7 +97,7 @@ describe("wait_for_updates", () => {
     queued = true;
     h.emit("team.messageQueued");
     await vi.advanceTimersByTimeAsync(100);
-    expect((await pending).details).toEqual({ updated: true, reason: "pending_mailbox_messages", count: 1 });
+    expect((await pending).details).toEqual({ updated: true, reason: "pending_mailbox_messages", count: 1, pendingMessagesCount: 1, pendingMessageSenders: [], oldestPendingMessageAgeSeconds: null });
     expect(yieldInbox).toHaveBeenCalledExactlyOnceWith("wait-recheck");
     expect(vi.getTimerCount()).toBe(0);
     expect(h.listeners.size).toBe(0);
@@ -121,7 +121,7 @@ describe("wait_for_updates", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it.each([{ isLead: false, mode: "plan" }, { isLead: true, mode: "agent" }])(
+  it.each([{ isLead: false, mode: "plan" }, { isLead: false, mode: "agent" }])(
     "preserves ordinary wait behavior for %j", async options => {
       const h = harness();
       h.setReader(async method => method === "team.getBoard" ? { revision: 7 } : { messages: [queuedMessage("a")] });
@@ -135,6 +135,69 @@ describe("wait_for_updates", () => {
       expect(captureInboxYield).not.toHaveBeenCalled();
     },
   );
+
+  it("shows existing ACKed reports to an ordinary Agent lead without ending or consuming the turn", async () => {
+    const h = harness();
+    vi.setSystemTime(1_800_000_000_000);
+    h.setReader(async method => method === "team.getBoard" ? { revision: 7 } : { messages: [
+      { ...queuedMessage("a"), sourceMemberName: "expert", createdAt: String(Date.now() - 229_900), content: "PRIVATE_REPORT_BODY" },
+    ] });
+    const captureInboxYield = vi.fn(() => vi.fn(() => true));
+    const tool = createTeamTools({ teamSessionId: "team-1", callerSessionId: "member-1", host: h.host,
+      isLead: true, mode: "agent", captureInboxYield }).find(tool => tool.name === "wait_for_updates")!;
+    const pending = tool.execute("agent-wait", { timeoutSeconds: 1 });
+    await vi.advanceTimersByTimeAsync(1000);
+    const outcome = await pending;
+    expect(outcome.details).toMatchObject({ updated: true, reason: "pending_mailbox_messages", count: 1,
+      pendingMessagesCount: 1, pendingMessageSenders: ["expert"], oldestPendingMessageAgeSeconds: 229 });
+    expect(outcome.terminate).toBeUndefined();
+    expect(JSON.stringify(outcome)).not.toContain("PRIVATE_REPORT_BODY");
+    expect(captureInboxYield).not.toHaveBeenCalled();
+    expect(h.rpc.mock.calls.map(([method]) => method)).toEqual(["team.getBoard", "team.listMessages"]);
+    expect(h.listeners.size).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("shows a newly pending report even if total count is unchanged, including a notification during baseline", async () => {
+    const h = harness();
+    vi.setSystemTime(1_800_000_000_000);
+    const initial = deferred<unknown>();
+    let pending = false;
+    h.setReader(async method => method === "team.getBoard" ? { revision: 7 } : initial.promise);
+    const tool = createTeamTools({ teamSessionId: "team-1", callerSessionId: "member-1", host: h.host,
+      isLead: true, mode: "agent" }).find(tool => tool.name === "wait_for_updates")!;
+    const waiting = tool.execute("agent-race", { timeoutSeconds: 1 });
+    h.emit("team.messageQueued");
+    await vi.advanceTimersByTimeAsync(100);
+    pending = true;
+    h.setReader(async method => method === "team.getBoard" ? { revision: 7 } : { messages: [
+      { ...queuedMessage("a"), status: pending ? "queued" : "completed", sourceMemberName: "expert", createdAt: String(Date.now() - 5100) },
+      { ...queuedMessage("outbound"), sourceSessionId: "member-1", targetSessionId: "researcher" },
+    ] });
+    initial.resolve({ messages: [{ ...queuedMessage("a"), status: "completed" }, { ...queuedMessage("bound"), turnId: "previous" }] });
+    await vi.advanceTimersByTimeAsync(900);
+    expect((await waiting).details).toMatchObject({ reason: "pending_mailbox_messages", count: 1,
+      pendingMessageSenders: ["expert"], oldestPendingMessageAgeSeconds: 5 });
+    expect(h.listeners.size).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("keeps a background terminal outcome ahead of an Agent report and returns the report on the next wait", async () => {
+    const h = harness();
+    const terminal = { process: { id: "job-1", sessionId: "member-1", status: "timed_out" }, errorCode: "TOOL_TIMEOUT" };
+    h.setReader(async method => method === "team.getBoard" ? { revision: 7 }
+      : method === "backgroundProcesses.read" ? terminal : { messages: [queuedMessage("report")] });
+    h.registerProcess();
+    const tool = createTeamTools({ teamSessionId: "team-1", callerSessionId: "member-1", host: h.host, isLead: true,
+      mode: "agent", backgroundProcesses: h.background }).find(tool => tool.name === "wait_for_updates")!;
+    expect((await tool.execute("process-first", {})).details).toEqual({ updated: true, reason: "background_process_completed", backgroundProcess: terminal });
+    const next = await tool.execute("mail-next", {});
+    expect(next.details).toMatchObject({ reason: "pending_mailbox_messages", count: 1 });
+    expect(next.terminate).toBeUndefined();
+    expect(h.rpc.mock.calls.filter(([method]) => method === "backgroundProcesses.read")).toHaveLength(1);
+    expect(h.listeners.size).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
 
   it("wakes on a Host failure notice and returns its complete structured body once", async () => {
     const h = harness();

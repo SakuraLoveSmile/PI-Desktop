@@ -1262,3 +1262,10 @@ cache, not semantic retrieval or a promised speedup. Grep remains unchanged.
 执行成员只重验 diff 相关测试，全量只交一个参与者运行；不以前台 sleep 轮询，常驻后台命令显式设置 timeout。timed_out 表示超时，不能据此推断崩溃，也不用 nohup 脱离管理。共享树禁止 git add -A/git stash，但不改变工具权限。针对同一验收项经过两次有不同依据的尝试仍失败，就报告阻塞，不盲目再开修复/重测循环；其他独立且已授权工作继续。
 
 已完成委派工作不重做，确需独立复核先说明具体理由。最终汇报分别列出 lead 与专家实际启动的命令，并以工具/Host 记录为准。提示词不构成模型遵循保证，不新增看门狗、额度、未读正文授权或自动批准。
+### 普通 Agent lead 待处理邮件可见性（2026-10-11）
+
+lead 的 team_status 从既有认证邮箱读取派生 pendingMessagesCount、pendingMessageSenders、oldestPendingMessageAgeSeconds。待处理指向本 lead 的入站非自身邮件，status=queued 且未绑定收件回合；队列 ACK 不代表正文已消费。外发、其他目标、running/completed/cancelled 邮件不计入。
+
+普通未批准 Agent lead 的 wait_for_updates 在初读已有邮件或后续 recheck 收到邮件时，立即返回 reason:pending_mailbox_messages，携带数量、发件人、年龄及当前回合投递指导。不结束回合、不带正文、不 ACK、不改队列；普通 lead 需结束回合，现有认证 role=user 续接才投递全文。摘要和提示不构成消费证明。
+
+普通 Plan lead 保留原让出优先和 terminate:true；获批 Plan/Goal 先消费执行 inbox，不能为读邮件结束批准执行。已有后台终态结果优先且仅交付一次，邮件在下一次 status/wait 仍可见。订阅先于 baseline、总 deadline、single-flight、取消与清理保持；回合/epoch/团队/模式变化使晚到摘要失效，读取错误不能伪装成零封。createdAt 为 Unix 毫秒数字字符串；发件人按邮箱顺序稳定去重，年龄为非负整数秒。空队列或任意 pending 时间无法解析时最老年龄为 null。不新增 Host RPC、持久化格式、额度、Agent 自动让出或回合内正文权限。回合内投递只见 proposed ADR /adr/team-agent-mailbox-delivery，尚未实现。

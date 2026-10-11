@@ -18011,3 +18011,25 @@ checks actual expert/Lead Host process counts.
 See [Team task dispatch scenarios](team-task-dispatch-scenarios.md) for busy-member
 conflicting dispatch, successful task completion cleanup, authenticated age framing
 and replay/validation acceptance IDs.
+### E2E-TEAM-agent-lead-sees-queued-expert-report
+
+- **Preconditions:** Candidate Host/runtime, isolated workspace/data, ordinary
+  Team Agent Lead without an approved execution; deterministic fake provider.
+- **Steps:** Delegate two background commands to an expert. Send its complete
+  report while the Lead waits in a long running turn. Record storage, notification,
+  ACK, kick, turn settlement, dequeue and body admission separately. Replay an
+  identical delivery. Query pending status/wait before ending the Lead turn.
+- **Expected:** Baseline report waits over three minutes despite timely admission
+  and kick; the baseline Lead duplicates the commands. The candidate's next
+  status/wait reveals metadata without bodies, ACK or auto-termination; the Lead
+  ends its ordinary turn and receives the authenticated full report exactly once.
+  Host process counts are expert 2 and Lead 0, not a model claim.
+- **Acceptance:** The --timeout-acceptance variant runs sleep 5 with timeout 2 and
+  sleep 75 with no timeout, consumes timed_out/TOOL_TIMEOUT at approximately 2
+  and 60 seconds and checks the same per-session counts. Plan yield, approved
+  inbox, cancellation/context changes and WP5 gap recovery remain covered by
+  their existing runtime/Host regressions. This is not cancellation acceptance.
+- **Automation:** scripts/e2e-team-agent-queued-report.mjs; runtime Team mailbox,
+  pending metadata, wait/status, Main delivery and AgentHost queue regressions.
+- **Specs:** 03-runtime/02-agent-runtime and 06-host-rpc-protocol; WP16 S3 is a
+  separate proposed delivery ADR and has no adopted in-turn capability.

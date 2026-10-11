@@ -1997,3 +1997,17 @@ orphan count. No RPC, protocol version, schema migration, member worktree or
 
 The additive `taskDispatch` send contract, Host-owned age/provenance fields and
 queued-only cancellation semantics are defined in [Team task dispatch](team-task-dispatch.md).
+### Runtime-only pending Team mailbox metadata
+
+team_status and ordinary Agent Lead wait_for_updates project metadata from
+team.listMessages with the caller's own recipient session. The existing Host
+authority and response are unchanged. Runtime exposes pendingMessagesCount,
+pendingMessageSenders and oldestPendingMessageAgeSeconds; pending wait also
+retains count and reason: pending_mailbox_messages. Both tool text and details
+exclude the fetched message bodies and raw mailbox rows. Summary reads are
+non-consuming: no ACK, receipt removal, provenance change, execution proof or
+new RPC/event. Full bodies continue through authenticated role=user delivery or
+the existing approved execution inbox as appropriate. Metadata reads validate
+current turn/epoch/Team/mode after awaits. An ACKed queued/unbound row is pending;
+createdAt is milliseconds encoded as a string, not ISO. Unknown oldest age is
+null, including mixed known/unknown pending timestamps.

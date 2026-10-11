@@ -1321,3 +1321,6 @@ worktree 或 team_commit 工具。
 
 可选 taskDispatch、队列位置及仅取消未开始派发的约定见
 [团队任务派发](team-task-dispatch.md)。
+### 仅运行时工具的团队待处理元数据
+
+team_status 与普通 Agent lead wait_for_updates 使用现有 team.listMessages，只读 caller 自己的收件会话；Host 权限和响应不变。工具返回 pendingMessagesCount、pendingMessageSenders、oldestPendingMessageAgeSeconds；pending wait 还保留 count 和 reason:pending_mailbox_messages。工具文本与 details 不包含抓取的正文或原始邮箱行。查询不 ACK、不移除收据、不改变来源或执行证明，不新增 RPC/event；正文仍按场景经认证 role=user 或既有批准执行 inbox 投递。await 后检查当前 turn/epoch/团队/模式；ACKed 的 queued/未绑定邮件仍算待处理。createdAt 是毫秒数字字符串，未知最老年龄为 null，包括混合已知/未知时间戳。
