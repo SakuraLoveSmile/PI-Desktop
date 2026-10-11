@@ -8,6 +8,8 @@ use crate::db::{ms_to_ts, now_ms, Database};
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Message {
+    #[serde(flatten)]
+    pub team_metadata: Option<crate::team::dispatch_metadata::Metadata>,
     pub id: String,
     pub plugin_id: String,
     pub source_session_id: String,
@@ -39,10 +41,23 @@ pub(super) const SELECT: &str = "SELECT id,plugin_id,source_session_id,source_ti
  target_session_id,target_title,kind,content,status,notify_on_completion,turn_id,
  reply_to_message_id,result,error,created_at,updated_at,remaining_hops,permission_ceiling,
  (SELECT json_extract(value_json,'$.sha') FROM kv WHERE ns='team-dispatch-head-v1' AND key=session_collaboration_messages.id)
+ ,(SELECT value_json FROM kv WHERE ns='team-dispatch-metadata-v1' AND key=session_collaboration_messages.id)
  FROM session_collaboration_messages";
 
 pub(super) fn row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Message> {
     Ok(Message {
+        team_metadata: row
+            .get::<_, Option<String>>(19)?
+            .map(|raw| {
+                serde_json::from_str(&raw).map_err(|error| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        19,
+                        rusqlite::types::Type::Text,
+                        Box::new(error),
+                    )
+                })
+            })
+            .transpose()?,
         id: row.get(0)?,
         plugin_id: row.get(1)?,
         source_session_id: row.get(2)?,
@@ -185,6 +200,13 @@ pub fn origin(message: &Message) -> Value {
         "sourceTitle":message.source_title,"targetSessionId":message.target_session_id,"kind":message.kind});
     if let Some(reply) = &message.reply_to_message_id {
         value["replyToMessageId"] = json!(reply);
+    }
+    if let Some(metadata) = &message.team_metadata {
+        value["sentAt"] = json!(metadata.sent_at);
+        value["targetBusyAtSend"] = json!(metadata.target_busy_at_send);
+        if let Some(dispatch) = &metadata.task_dispatch {
+            value["taskDispatch"] = json!(dispatch);
+        }
     }
     if let Some(head) = &message.sender_head {
         value["senderHead"] = json!(head);

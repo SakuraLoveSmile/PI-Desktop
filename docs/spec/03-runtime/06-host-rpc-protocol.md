@@ -1993,3 +1993,7 @@ storage errors are visible as `content.gitTrackingError` and never change the
 Bash result. A detached owner receives `content.gitTrackingSkipped` with no
 orphan count. No RPC, protocol version, schema migration, member worktree or
 `team_commit` tool is introduced.
+## Explicit task dispatch and mailbox age (WP10)
+
+The additive `taskDispatch` send contract, Host-owned age/provenance fields and
+queued-only cancellation semantics are defined in [Team task dispatch](team-task-dispatch.md).

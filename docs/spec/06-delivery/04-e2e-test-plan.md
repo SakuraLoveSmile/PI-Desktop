@@ -18006,3 +18006,8 @@ checks actual expert/Lead Host process counts.
 - **Spec:** 03-runtime/06-host-rpc-protocol, Team shared-tree Git advisory.
 - **Status:** Record the candidate result; no real-model or Windows acceptance
   is implied. Dynamic shell forms are outside the bounded advisory coverage.
+## Team task dispatch reliability (WP10)
+
+See [Team task dispatch scenarios](team-task-dispatch-scenarios.md) for busy-member
+conflicting dispatch, successful task completion cleanup, authenticated age framing
+and replay/validation acceptance IDs.

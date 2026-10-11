@@ -216,6 +216,11 @@ pub(crate) fn settle_turn(conn: &Connection, turn: &str, status: &str) -> Result
             return Err(anyhow!("TEAM_TASK_REVISION_CONFLICT: team changed during task settlement"));
         }
         if status == "completed" {
+            super::dispatch_metadata::task_completed(
+                conn,
+                &attempt.team_session_id,
+                &attempt.task_id,
+            )?;
             clear_task(conn, &attempt.team_session_id, &attempt.task_id)?;
         } else {
             attempt.task_revision += 1;

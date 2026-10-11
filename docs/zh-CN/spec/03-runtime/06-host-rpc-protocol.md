@@ -1317,3 +1317,7 @@ team.getBoard/team_status 新增可选 sharedGitWarningCount 和 sharedGitWarnin
 捕获/存储失败通过 content.gitTrackingError 可见且不改变 Bash 结果；所有者已移除时
 返回 content.gitTrackingSkipped，不留孤立计数。不增加 RPC、协议版本、迁移、成员
 worktree 或 team_commit 工具。
+## WP10 团队派发时效
+
+可选 taskDispatch、队列位置及仅取消未开始派发的约定见
+[团队任务派发](team-task-dispatch.md)。

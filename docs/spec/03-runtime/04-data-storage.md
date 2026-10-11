@@ -2005,3 +2005,12 @@ visible diagnostics and one repair attempt per scoped resource request. Hard
 Host loss cannot preserve this unwritten snapshot. P5 does not advance the
 shared PRAGMA user_version. Current executable shared migration ownership is
 `crates/host-core/src/db.rs`; older shared-v19 examples above are historical.
+
+## Team dispatch metadata (WP10)
+
+The optional Host-owned `team-dispatch-metadata-v1` KV record is keyed by mailbox
+message ID and preserves immutable send-time facts and explicit board task
+association. Queued-only cancellation and completion transaction semantics are
+specified in [Team task dispatch](team-task-dispatch.md). Existing ledger rows,
+source proofs, permission ceilings and delivery keys remain intact; no schema
+migration or protocol version bump is introduced.
