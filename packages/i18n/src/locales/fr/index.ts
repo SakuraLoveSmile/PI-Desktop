@@ -1998,6 +1998,8 @@ sklm: {
     "queued_other": "{{count}} demande supplémentaire en attente"
   },
   "askTool": {
+    "pending": "Réponse en attente",
+    "pendingHelp": "Le coordinateur a cessé d’attendre après 30 minutes. Votre réponse ouvre un nouveau tour ; reprenez ou approuvez explicitement l’exécution.",
     "completedTitle": "Questions clarifiées",
     "completedSkipped": "Ignorée",
     "title": "Quelques questions",

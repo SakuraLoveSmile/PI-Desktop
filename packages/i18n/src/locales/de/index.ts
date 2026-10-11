@@ -2001,6 +2001,8 @@ sklm: {
     "queued_other": "{{count}} weitere Anfragen warten"
   },
   "askTool": {
+    "pending": "Antwort ausstehend",
+    "pendingHelp": "Der Lead wartet nach 30 Minuten nicht weiter. Ihre Antwort startet einen neuen Durchlauf. Setzen Sie die Ausführung ausdrücklich fort oder genehmigen Sie sie erneut.",
     "completedTitle": "Fragen geklärt",
     "completedSkipped": "Übersprungen",
     "title": "Ein paar Fragen",

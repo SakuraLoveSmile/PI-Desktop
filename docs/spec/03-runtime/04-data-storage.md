@@ -2005,3 +2005,15 @@ visible diagnostics and one repair attempt per scoped resource request. Hard
 Host loss cannot preserve this unwritten snapshot. P5 does not advance the
 shared PRAGMA user_version. Current executable shared migration ownership is
 `crates/host-core/src/db.rs`; older shared-v19 examples above are historical.
+
+### WP11 Team question and replacement KV ownership
+
+Rust owns `team-lead-ask-v1` durable question requests, original turn, Host time,
+waiting/pending/answered_live/answered/cancelled lifecycle, normalized answers
+and stable queued-answer ID. `team-lead-ask-cancel-v1` fences late registration
+for a stopped running turn. Late replies atomically enter the existing
+turn_queue under the same savepoint; deletion removes owned question records.
+`team-member-replacement-v1` records an immutable original/successor slot link,
+approved scope/review and exact selection/permission ceiling. Reviews and old
+member/task identities remain unchanged; Team dissolution deletes owned links.
+These versioned namespaces use existing KV storage and require no schema bump.

@@ -93,6 +93,9 @@ const HOST_PROXY_ALLOWED = new Set([
   "session.queuePush",
   "session.queuePrioritize",
   // Team data is Host-authorized by the session context carried on each call.
+  "team.registerLeadAsk",
+  "team.deferLeadAsk",
+  "team.ackLeadAsk",
   "team.createMember",
   "team.createTask",
   "team.declareStrategy",

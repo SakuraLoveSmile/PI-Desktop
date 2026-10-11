@@ -775,6 +775,7 @@ export function registerAgentIpc({
     const executionId = lockExecutionInterruption(req.sessionId, abortedTurnId);
     let result: unknown;
     try {
+      await host?.call("team.cancelLeadAsks", { sessionId: req.sessionId, expectedTurnId: abortedTurnId ?? null });
       if (!req.turnId) await beforeUserAbort?.(req.sessionId);
       // Delivery cleanup can await while the session advances. The captured
       // old execution still settles below, but this request must never cancel
@@ -814,10 +815,15 @@ export function registerAgentIpc({
     if (req.turnId && activeTurnId !== req.turnId) {
       return { requested: false };
     }
+    if (activeTurnId && agentHostBridge?.agentHost.pendingInputRequests(req.sessionId).some(entry => entry.original.teamManaged && !entry.original.teamPending)) {
+      const stopped = await agentHostBridge.stopWorkSession({ sessionId: req.sessionId, expectedTurnId: activeTurnId, urgency: "immediate" });
+      return { requested: stopped.status === "requested" };
+    }
     // Graceful stop still completes the current ordinary turn; it does not
     // mean the approved Goal itself was achieved. Record only that Goal's
     // interrupted execution before delivery cleanup or the stop RPC awaits.
     lockExecutionInterruption(req.sessionId, activeTurnId, { goalOnly: true });
+    await host?.call("team.cancelLeadAsks", { sessionId: req.sessionId, expectedTurnId: activeTurnId ?? null });
     await beforeUserStop?.(req.sessionId);
     if (activeTurns.get(req.sessionId) !== activeTurnId) return { requested: false };
     logger.app("session", "info", "prompt graceful stop requested", {

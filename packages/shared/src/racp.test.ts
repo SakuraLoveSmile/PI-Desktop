@@ -16,6 +16,7 @@ import {
   RacpEventEnvelopeSchema,
   RacpInitializeResultSchema,
   RacpSessionSnapshotSchema,
+  RacpInputRequestSchema,
   allowedDecisionsAreCoherent,
   effectiveRemotePermissionMode,
   eventEnvelopeSequencingIsValid,
@@ -139,6 +140,13 @@ describe("RACP schemas", () => {
       generatedAt: "2026-09-10T00:00:02.000Z",
     };
     expect(Value.Check(RacpSessionSnapshotSchema, snapshot)).toBe(true);
+  });
+
+  it("accepts optional Team pending metadata without granting approval or changing legacy input shape", () => {
+    const input = { id: "ask", sessionId: session.id, turnId: "turn", expiresAt: "", questions: [{ id: "q", question: "Next?", options: ["Review"], multiSelect: false }] };
+    expect(Value.Check(RacpInputRequestSchema, input)).toBe(true);
+    expect(Value.Check(RacpInputRequestSchema, { ...input, teamPending: { deferredAt: "2026-10-11T05:35:00Z", requiresNewApproval: true } })).toBe(true);
+    expect(Value.Check(RacpInputRequestSchema, { ...input, teamPending: { deferredAt: "2026-10-11T05:35:00Z", requiresNewApproval: false } })).toBe(false);
   });
 
   it("keeps every named schema in the generated fixture bundle", async () => {

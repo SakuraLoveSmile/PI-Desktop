@@ -32,7 +32,21 @@ pub(super) fn send_pending_member_failure(
 
 pub(super) fn team_rpc_err(e: anyhow::Error) -> JsonRpcError {
     let msg = e.to_string();
-    let code_str = if msg.contains("TEAM_TURN_INVALID") {
+    let ask_code = [
+        "ASKTOOL_NOT_FOUND",
+        "ASKTOOL_INVALID_ARGUMENT",
+        "ASKTOOL_NOT_DUE",
+        "ASKTOOL_QUEUE_FULL",
+        "TEAM_REPLACEMENT_ALREADY_USED",
+        "TEAM_REPLACEMENT_NOT_FAILED",
+        "TEAM_REPLACED_MEMBER",
+        "QUEUE_FULL",
+    ]
+    .into_iter()
+    .find(|code| msg.starts_with(code));
+    let code_str = if let Some(code) = ask_code {
+        code
+    } else if msg.contains("TEAM_TURN_INVALID") {
         "TEAM_TURN_INVALID"
     } else if msg.contains("TEAM_PLANNING_NOT_READY") {
         "TEAM_PLANNING_NOT_READY"
@@ -187,6 +201,108 @@ pub(super) async fn handle(
     let st = state.lock().await;
     super::team_dispatch_head::validate(&st.db, dispatch_head.as_ref())?;
     match method {
+        "team.registerLeadAsk" | "team.deferLeadAsk" | "team.ackLeadAsk" => {
+            let session = params
+                .get("sessionId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let caller = params
+                .get("callerSessionId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "callerSessionId required", "INVALID_PARAMS"))?;
+            if caller != session {
+                return Err(rpc_err(
+                    1002,
+                    "Only the Lead owns questions",
+                    "TEAM_UNAUTHORIZED",
+                ));
+            }
+            let turn = params
+                .get("turnId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "turnId required", "INVALID_PARAMS"))?;
+            let ask = if method == "team.registerLeadAsk" {
+                let request =
+                    serde_json::from_value(params.get("request").cloned().unwrap_or(Value::Null))
+                        .map_err(|_| {
+                        rpc_err(1002, "invalid ask request", "ASKTOOL_INVALID_ARGUMENT")
+                    })?;
+                let request: crate::team::lead_asks::AskRequest = request;
+                if request.session_id != session {
+                    return Err(rpc_err(
+                        1002,
+                        "question session mismatch",
+                        "TEAM_UNAUTHORIZED",
+                    ));
+                }
+                crate::team::lead_asks::register(&st.db, request, turn).map_err(team_rpc_err)?
+            } else {
+                let id = params
+                    .get("requestId")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| rpc_err(1002, "requestId required", "INVALID_PARAMS"))?;
+                if method == "team.ackLeadAsk" {
+                    crate::team::lead_asks::acknowledge(&st.db, session, id, turn)
+                        .map_err(team_rpc_err)?;
+                    return Ok(json!({"ok":true}));
+                }
+                crate::team::lead_asks::defer(&st.db, session, id, turn).map_err(team_rpc_err)?
+            };
+            Ok(json!({"ask":ask,"deadlineMs":ask.created_at+crate::team::lead_asks::WAIT_MS}))
+        }
+        "team.listLeadAsks" => {
+            let session = params
+                .get("sessionId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let asks = crate::team::lead_asks::list(&st.db, session).map_err(team_rpc_err)?;
+            let entries = crate::turn_queue::list(&st.db, Some(session))
+                .map_err(team_rpc_err)?
+                .into_iter()
+                .filter(|entry| entry.id.starts_with("asktool-answer:"))
+                .collect::<Vec<_>>();
+            Ok(json!({"asks":asks,"entries":entries}))
+        }
+        "team.resolveLeadAsk" => {
+            let session = params
+                .get("sessionId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let id = params
+                .get("requestId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "requestId required", "INVALID_PARAMS"))?;
+            let ask = crate::team::lead_asks::resolve(
+                &st.db,
+                session,
+                id,
+                params.get("answers").unwrap_or(&Value::Null),
+            )
+            .map_err(team_rpc_err)?;
+            let entry = crate::team::lead_asks::queue_entry(&st.db, &ask).map_err(team_rpc_err)?;
+            Ok(json!({"ask":ask,"entry":entry}))
+        }
+        "team.cancelLeadAsks" => {
+            let session = params
+                .get("sessionId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            if let Some(expected) = params.get("expectedTurnId") {
+                if !expected.is_null() && !expected.is_string() {
+                    return Err(rpc_err(
+                        1002,
+                        "expectedTurnId must be a string or null",
+                        "INVALID_PARAMS",
+                    ));
+                }
+                let running = sessions::running_turn_id(&st.db, session).map_err(team_rpc_err)?;
+                if running.as_deref() != expected.as_str() {
+                    return Ok(json!({"ok":false}));
+                }
+            }
+            crate::team::lead_asks::cancel(&st.db, session).map_err(team_rpc_err)?;
+            Ok(json!({"ok":true}))
+        }
         "team.getRuntimeContext" => {
             let session_id = params
                 .get("sessionId")
@@ -356,23 +472,28 @@ pub(super) async fn handle(
                 .get("name")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "name required", "INVALID_PARAMS"))?;
-            authorize_lead_expert(&st.db, team_id, caller_id, name)?;
+            let replaces = params.get("replaces").and_then(Value::as_str);
+            if replaces.is_none() {
+                authorize_lead_expert(&st.db, team_id, caller_id, name)?;
+            }
             let description = params.get("description").and_then(|v| v.as_str());
             let context_kind = params.get("contextKind").and_then(|v| v.as_str());
             let model_id = params.get("modelId").and_then(|v| v.as_str());
             let provider_id = params.get("providerId").and_then(|v| v.as_str());
-            let member = crate::team::create_team_member(
-                &st.db,
-                crate::team::CreateMemberParams {
-                    team_session_id: team_id,
-                    caller_session_id: caller_id,
-                    name,
-                    description,
-                    context_kind,
-                    model_id,
-                    provider_id,
-                },
-            )
+            let member_params = crate::team::CreateMemberParams {
+                team_session_id: team_id,
+                caller_session_id: caller_id,
+                name,
+                description,
+                context_kind,
+                model_id,
+                provider_id,
+            };
+            let member = if let Some(replaces) = replaces {
+                crate::team::replacements::create(&st.db, member_params, replaces)
+            } else {
+                crate::team::create_team_member(&st.db, member_params)
+            }
             .map_err(team_rpc_err)?;
             Ok(json!({ "member": member }))
         }

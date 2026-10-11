@@ -2014,6 +2014,8 @@ sklm: {
     queued_other: "요청 {{count}}개가 더 대기 중",
   },
   askTool: {
+    pending: "답변 대기 중",
+    pendingHelp: "리드는 30분 후 대기를 중단했습니다. 답변은 새 턴을 시작합니다. 실행을 명시적으로 재개하거나 다시 승인하세요.",
     completedTitle: "질문 확인",
     completedSkipped: "건너뜀",
     title: "몇 가지 질문",

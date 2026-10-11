@@ -715,7 +715,9 @@
     },
     {
       "id": "tool-admission",
-      "scenarioIds": ["E2E-RUNTIME-shell-capacity-diagnostics"],
+      "scenarioIds": [
+        "E2E-RUNTIME-shell-capacity-diagnostics"
+      ],
       "family": "runtime-provider",
       "script": "scripts/e2e-tool-admission.mjs",
       "tier": "nightly",
@@ -832,6 +834,13 @@
       "scenarioIds": [
         "E2E-TEAM-write-scope-warning"
       ]
+    },
+    {
+      "id": "team-lead-pending",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-lead-pending.mjs",
+      "tier": "nightly",
+      "safety": "Requires prebuilt JS packages and the existing Rust toolchain. Isolated Rust AppState RPC, production Node runtime/Main finalization and controlled fake provider/clock; no Desktop, user profile or real provider. Local runs reuse cached dependencies; clean CI resolves only locked Cargo dependencies."
     }
   ]
 }

@@ -91,3 +91,13 @@ request. Switching chats or advancing the pending queue mounts a fresh card at
 question one with empty answers and enabled actions. State from the previous
 request must not leak into the destination request. Unsubmitted card drafts are
 local to the mounted card and are reset when it is replaced.
+
+## Team Lead pending badge
+
+A Team Lead ask that reaches its 30-minute Host wait budget remains in this same
+composer card with the shared Badge primitive and localized pending-answer copy.
+The help states that the Lead stopped waiting, the answer opens a new turn, and
+execution needs explicit resume or approval. Existing options, question drafts,
+Skip/Decline/Submit controls and layout tokens remain. Tool/turn end retains
+only Host-deferred cards; authoritative Host reads reconcile answers and
+cancellations after reload. Ordinary question cards remain unlimited.

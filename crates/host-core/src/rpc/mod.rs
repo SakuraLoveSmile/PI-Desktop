@@ -19,6 +19,8 @@ mod team_dispatch_head;
 mod team_expert_config_tests;
 mod team_mailbox;
 #[cfg(test)]
+mod team_pending_tests;
+#[cfg(test)]
 mod team_planning_tests;
 mod team_rpc;
 #[cfg(test)]
