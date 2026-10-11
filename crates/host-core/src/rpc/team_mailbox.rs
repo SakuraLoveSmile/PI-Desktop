@@ -33,6 +33,19 @@ pub(super) fn send(
         .and_then(|v| v.as_str())
         .ok_or_else(|| rpc_err(1002, "content required", "INVALID_PARAMS"))?;
     let idempotency_key = params.get("idempotencyKey").and_then(|v| v.as_str());
+    let dispatch = params
+        .get("taskDispatch")
+        .map(|value| {
+            serde_json::from_value::<crate::team::dispatch_metadata::TaskDispatch>(value.clone())
+                .map_err(|_| {
+                    rpc_err(
+                        1002,
+                        "taskDispatch requires taskId and expectedRevision",
+                        "INVALID_PARAMS",
+                    )
+                })
+        })
+        .transpose()?;
     let previous_revision = team_revision(&st.db, team_id)?;
     let delivery_tx = st
         .db
@@ -48,7 +61,7 @@ pub(super) fn send(
     } else {
         false
     };
-    let msg = crate::team::send_team_message(
+    let msg = crate::team::mailbox::send_team_message_with_dispatch(
         &st.db,
         crate::team::SendMessageParams {
             team_session_id: team_id,
@@ -57,8 +70,15 @@ pub(super) fn send(
             content,
             idempotency_key,
         },
+        dispatch.as_ref(),
     )
-    .map_err(team_rpc_err)?;
+    .map_err(|error| {
+        if error.to_string().starts_with("IDEMPOTENCY_CONFLICT") {
+            super::session_collaboration_rpc_err(error)
+        } else {
+            team_rpc_err(error)
+        }
+    })?;
     if caller_id == team_id {
         crate::team::authority::record_dispatch(&st.db, team_id, &msg, existed)
             .map_err(team_rpc_err)?;
@@ -75,11 +95,13 @@ pub(super) fn send(
         .map_err(team_rpc_err)?
         .ok_or_else(|| rpc_err(1000, "dispatch receipt missing", "INTERNAL"))?;
     delivery_tx.commit().map_err(|e| team_rpc_err(e.into()))?;
-    send_notification(
-        tx,
-        "team.messageQueued",
-        json!({ "teamSessionId": team_id, "messageId": msg.id }),
-    );
+    if msg.status == "queued" {
+        send_notification(
+            tx,
+            "team.messageQueued",
+            json!({ "teamSessionId": team_id, "messageId": msg.id }),
+        );
+    }
     send_team_changed_if_revision_changed(&st.db, tx, team_id, previous_revision, "mailbox")?;
     Ok(json!({ "message": msg }))
 }

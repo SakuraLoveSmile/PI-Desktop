@@ -14,6 +14,8 @@ mod session_activity_rpc;
 mod session_notes_rpc;
 #[cfg(test)]
 mod subagent_settings_tests;
+#[cfg(test)]
+mod team_dispatch_age_tests;
 mod team_dispatch_head;
 #[cfg(test)]
 mod team_expert_config_tests;

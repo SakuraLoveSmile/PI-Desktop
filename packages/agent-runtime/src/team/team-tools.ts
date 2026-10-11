@@ -301,10 +301,14 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
         description: "Name of the recipient teammate, or 'Lead'.",
       }),
       content: Type.String({ description: "Message body (up to 64 KiB)." }),
+      taskDispatch: Type.Optional(Type.Object({
+        taskId: Type.String({ description: "Explicit task dispatch by Lead to its current owner. Supersedes only unstarted queued dispatches for this same task and recipient. Omit for reports, questions and ordinary mail." }),
+        expectedRevision: Type.Integer({ minimum: 1, description: "Current task revision from task_create, task_get or task_update." }),
+      })),
     }),
     execute: async (_toolCallId, params): Promise<AgentToolResult> => {
       try {
-        const p = params as { targetMemberName: string; content: string };
+        const p = params as { targetMemberName: string; content: string; taskDispatch?: { taskId: string; expectedRevision: number } };
         const result = await host.call<{
           message: {
             id: string;
@@ -312,12 +316,19 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
             target_member_name?: string;
             status: string;
             deliveryStatus?: string;
+            sentAt?: string;
+            targetBusyAtSend?: boolean;
+            targetState?: string;
+            queuePosition?: number;
+            taskDispatch?: { taskId: string; expectedRevision: number };
+            dispatchCancellation?: string;
           };
         }>("team.sendMessage", {
           teamSessionId,
           callerSessionId,
           target: p.targetMemberName,
           content: p.content,
+          ...(p.taskDispatch ? { taskDispatch: p.taskDispatch } : {}),
         });
 
         return {
@@ -330,6 +341,13 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
                 status: result.message.status,
                 deliveryStatus: result.message.deliveryStatus ?? "queued",
                 delivered: false,
+                sentAt: result.message.sentAt,
+                targetBusyAtSend: result.message.targetBusyAtSend,
+                targetState: result.message.targetState,
+                queuePosition: result.message.queuePosition,
+                queuePositionScope: "team_mailbox",
+                taskDispatch: result.message.taskDispatch,
+                dispatchCancellation: result.message.dispatchCancellation,
               }),
             },
           ],
