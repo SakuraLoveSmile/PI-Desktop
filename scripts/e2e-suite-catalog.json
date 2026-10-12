@@ -973,6 +973,16 @@
       "scenarioIds": [
         "E2E-TEAM-open-tasks-block-final-answer"
       ]
+    },
+    {
+      "id": "team-member-silence",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-member-silence.mjs",
+      "tier": "nightly",
+      "safety": "Temporary real Host and runtime inbox wait; no model calls, user profile or running Desktop instance.",
+      "scenarioIds": [
+        "E2E-TEAM-member-silent-completion-wakes-lead"
+      ]
     }
   ]
 }

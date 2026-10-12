@@ -14,6 +14,9 @@ pub mod expert_config;
 #[cfg(test)]
 mod expert_config_tests;
 pub(crate) mod git_warnings;
+pub(crate) mod host_notices;
+#[cfg(test)]
+mod host_notices_tests;
 pub(crate) mod interruption;
 pub(crate) mod lead_asks;
 #[cfg(test)]
@@ -28,6 +31,9 @@ mod member_activity_tests;
 pub(crate) mod member_failure;
 #[cfg(test)]
 mod member_failure_tests;
+pub(crate) mod member_silence;
+#[cfg(test)]
+pub(crate) mod member_silence_tests;
 pub mod model;
 pub(crate) mod ordinary_inbox;
 pub mod planning;

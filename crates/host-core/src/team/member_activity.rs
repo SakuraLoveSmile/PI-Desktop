@@ -143,8 +143,12 @@ pub(crate) fn member(
         "SELECT MAX(created_at) FROM session_collaboration_messages WHERE plugin_id=?1
          AND source_session_id=?2 AND kind='message'
          AND idempotency_key NOT LIKE 'team-review:%'
-         AND idempotency_key NOT LIKE 'member-turn-failed:%'",
-        params![super::team_plugin_origin(team), session],
+         AND NOT EXISTS(SELECT 1 FROM json_each(?3) p WHERE idempotency_key LIKE p.value||'%')",
+        params![
+            super::team_plugin_origin(team),
+            session,
+            super::host_notices::prefixes_json()
+        ],
         |r| r.get(0),
     )?;
     let usage: Vec<_> = observations(db, session)?
