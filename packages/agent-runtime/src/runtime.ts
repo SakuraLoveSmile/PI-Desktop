@@ -157,7 +157,7 @@ import {
 } from "./agent-messages.js";
 import { withExplicitRequired } from "./tool-schema.js";
 import { createTeamTools, teamSystemPrompt } from "./team/index.js";
-import { refreshDeclareStrategyResult } from "./team/declare-strategy-result.js";
+import { ConfirmedDeclarationModelView } from "./team/confirmed-declaration-model-view.js";
 import { createTeamMailboxGuards } from "./team/mailbox-context-guards.js";
 import { nestedDelegationPermission, type DelegationOwnerContext } from "./delegation-owner.js";
 import { expertToolDenial } from "./team/expert-policy.js";
@@ -1844,6 +1844,7 @@ export class DesktopAgentRuntime {
   private progressTurnRerunInProgress = false;
   private suppressProgressTurnRunEnd = false;
   private readonly teamLeadExecution = new TeamLeadExecutionGuard();
+  private readonly confirmedDeclarationView = new ConfirmedDeclarationModelView();
   private readonly goalReportRecovery = new GoalReportRecovery();
   private activeToolCalls = new Map<
     string,
@@ -2172,8 +2173,13 @@ export class DesktopAgentRuntime {
             sessionId: this.sessionId, turnId: this.turnId, message,
           });
         });
+        const modelView = this.confirmedDeclarationView.project(messages, {
+          teamSessionId: this.sessionId, turnId: this.turnId, epoch: this.turnEpoch,
+          active: this.autonomousExecution && this.mode === "agent" && !this.disposed &&
+            !this.runCancelled && !this.gracefulStopRequested && !this.teamBudgetStop.requested,
+        });
         return alignRetainedReasoningIdentity(
-          convertToLlm(this.dropDuplicateToolCalls(messages)), this.reasoningReplayIdentity(),
+          convertToLlm(this.dropDuplicateToolCalls(modelView)), this.reasoningReplayIdentity(),
         );
       },
       prepareNextTurnWithContext: (context, signal) =>
@@ -6355,6 +6361,7 @@ export class DesktopAgentRuntime {
     this.silentTurnRerunInProgress = false;
     this.suppressSilentTurnRunEnd = false;
     this.teamLeadExecution.reset();
+    this.confirmedDeclarationView.clear();
     this.goalReportRecovery.reset();
     this.pendingProgressTurnRerun = false;
     this.progressTurnRerunAttempted = false;
@@ -6660,10 +6667,12 @@ export class DesktopAgentRuntime {
 
   private async rerunTeamCompletionTurn(): Promise<void> {
     if (this.teamBudgetStop.requested || this.runCancelled) return;
+    const executionStart = this.autonomousExecution ? this.executionContextStartIndex : null;
     await this.teamLeadExecution.recover({
       host: this.host, team: this.teamContext!,
-      refreshDeclaration: this.autonomousExecution
-        ? review => this.setAgentMessages(refreshDeclareStrategyResult(this.agent.state.messages, review))
+      refreshDeclaration: executionStart !== null
+        ? review => this.confirmedDeclarationView.register(review, this.turnEpoch,
+          entriesFromExecutionStart(this.fullEntries, executionStart).map(entry => entry.message))
         : undefined,
       state: () => ({ turnId: this.turnId, epoch: this.turnEpoch, mode: this.mode,
         inactive: this.disposed || this.runCancelled }),

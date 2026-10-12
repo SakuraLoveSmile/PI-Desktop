@@ -17572,6 +17572,30 @@ a fresh expert roster review and integrate a real approved expert contribution.
   expert result is consumed before the original Host turn completes.
   Confirmation/expert mail never becomes a detached user turn or duplicate
   mailbox kickoff and never changes the executionId or ends its token early.
+- **Execution-wide roster visibility:** After guarded roster recovery, inspect
+  every provider request through execution completion, including at least three
+  consecutive tool-loop requests and retry/rebuild/compaction boundaries.
+  Every successful `declare_team_strategy` result matching the same
+  team/turn/review stays `status=confirmed`,
+  `awaitingUserApproval=false`, with confirmed `nextStep` and no stale
+  `memberSessionIds`; provider telemetry matches the transmitted model view.
+  Registration reads only original entries since the current approved
+  execution's start, so preconfirmation compaction cannot hide its declaration
+  and cannot import a previous execution's declaration. After compaction
+  archives the complete assistant tool batch, that registered
+  batch and all original paired results are present in the final model view
+  only. Signed thinking/text/tool signatures and sibling calls/results remain
+  intact; no orphan call/result or persisted summary/checkpoint rewrite occurs.
+  Repeated recovery retains same-owner/review/epoch registration after archival;
+  wire-call ID collisions cannot replace newer work. If no matching declaration
+  in a fully paired valid batch exists at initial registration, no call is
+  invented and fallback remains unchanged.
+  Original pending entries/journal/UI and unrelated tool results remain intact.
+  Pending/cancelled/replaced reviews, Stop, execution completion followed by an
+  ordinary turn, and a second execution cannot reuse the earlier projection.
+  Runtime replay/helper tests cover these boundaries; the existing Electron
+  suite alone does not establish all-request or real-model coverage. Direct
+  `wait_for_updates` confirmation consumption remains unchanged.
 - **Cancellation path:** Negotiate and approve a second Team Goal through the
   Composer, then cancel its pending roster through trusted Main. The original
   turn becomes aborted and executionStatus interrupted; no expert starts,
@@ -18114,15 +18138,30 @@ It uses no provider service, test-only production backdoor, or system-clock edit
   system nudges and follows only the last conversational tool result.
 - **Steps:** Declare a delegate roster, explain it without tool calls, and park
   the original approved execution. Confirm the roster later through trusted Host
-  state. Inspect the first resumed provider request, dispatch an owned task with
-  task_create/send_message, consume full expert results and submit the Goal
+  state. Inspect every resumed provider request through execution completion,
+  including at least three consecutive requests around wait_for_updates,
+  task_create/send_message and a further wait. Dispatch an owned task,
+  consume full expert results and submit the Goal
   report. Repeat cancellation, interruption, Stop, confirmation between Host
   reads and missing declaration-result cases.
-- **Expected:** The first resumed request contains the matched confirmed roster
-  and awaitingUserApproval=false, with no stale memberSessionIds. One roster
+- **Expected:** Every resumed request contains confirmed content for every
+  successful declaration matching the same team/turn/review, with
+  awaitingUserApproval=false, confirmed nextStep and no stale memberSessionIds,
+  throughout the same approved execution. After compaction archives the original
+  complete assistant tool batch, the registered batch and all paired results
+  remain in the final model view only, with signed thinking/text/tool signatures
+  and sibling calls/results intact. Repeated recovery retains registration after
+  archival, and wire-call ID collisions cannot replace newer work. No fully
+  paired valid batch at initial registration means unchanged fallback, not an
+  invented tool invocation.
+  Tool-loop context rebuilds, retries and compaction cannot restore a stale
+  matching result. One roster
   resume starts owned dispatch in the same turn/execution without
   TEAM_APPROVAL_REQUIRED or Goal interruption. Original UI/persisted declaration
-  evidence stays pending. Cancellation/Stop cannot refresh or dispatch; missing
+  evidence stays pending; projection is copy-on-write and model-only. Pending,
+  cancelled or replaced reviews cannot project; completion/Stop and later
+  ordinary turns or executions cannot reuse an old projection.
+  Cancellation/Stop cannot refresh or dispatch; missing
   matches retain all three completion retries and observable terminal denial.
 - **Specs:** 03-runtime/02-agent-runtime and 03-tools-and-permissions, approved
   Team same-turn recovery.
@@ -18139,9 +18178,19 @@ It uses no provider service, test-only production backdoor, or system-clock edit
   without a declaration, task or expert. No provider or TEAM error was recorded;
   the wait's cause remains unknown. This does not establish a recovery failure
   or real-model acceptance. See docs/project/team-roster-resume-validation.md.
-- **Real-model follow-up:** On the candidate, reopen the original minikv prompt
-  in a new directory with marker MINIKV-GOAL-TEST-2, using
-  gemini-3.8-flash-high as Lead. Confirm through the trusted roster UI. Acceptance
-  requires task_create/send_message and three experts starting their turns within
-  the same approved execution. If it fails, stop and report; do not add another
-  nudge or enable package C without a new user decision.
+- **Execution-wide baseline:** Read-only TEST-4 evidence on `961a4e480`
+  confirms the declaration at step 8 but retains stale content at steps 9–41;
+  the task still completed. This is a robustness gap in later model views, not
+  an observed task failure or evidence for this fix.
+- **Real-model follow-up: NOT RUN.** Only after separate user consent, rerun the
+  park-aware TEST-4 flow on this fix branch with a new marker and independent
+  HOME/profile/data/scratch project. Keep CPA first-token precheck (10 seconds,
+  total 30 seconds), the same provider and gemini-3.7-flash-high Lead. Confirm
+  through the real trusted roster UI after observed parking. Audit every
+  postconfirmation lead providerPayload through execution end for the same
+  review's confirmed result and preserved original history; do not limit the
+  check to the first request. Record missing/truncated coverage and provider
+  silence separately, retain all evidence after teardown, and independently
+  rerun C1–C5 on a project copy, auditing C6–C8 against real Host/tool records.
+  See the validation record for the exact method.
+  No new live-model result or prompt-cache behavior is claimed.

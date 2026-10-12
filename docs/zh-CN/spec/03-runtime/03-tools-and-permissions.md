@@ -514,7 +514,11 @@ MVP 可以通过写入 SQLite 或日志文件来启动。
 
 标准 Agent 启用至少一个 subagent 时，提示词优先引导可分离的重要工作通过 Task 并行派发、TaskWait 汇总。几次工具调用的小任务和需要用户参与的步骤仍自行处理，保留不递归、不辩论、最多一次可选评审。全部停用时无委派提示或 Task*；Plan/Goal 保留已有声明，但模式执行门禁仍拒绝运行。标准模式没有委派硬保证。
 
-专家团独立工具目录要求所有工作均 delegate 至少一位专家，Host 拒绝全部 lead_only。Agent 执行仍需可信用户名单确认。Lead 的 Write/Edit/Bash 等实质操作由运行时及 Host 核验当前 authority：获批派遣的专家回合必须已实际启动，空闲成员和仅排队消息不够。此门禁不证明任务归属或完成贡献；普通权限、取消和模式检查仍适用。非空最终回复使用同一门禁，同一持久回合可恢复一次，重复拒绝以可见审批错误结束；普通未批准 Agent 回合可说明有效名单需要用户批准启动。已批准的 Team Plan/Goal 执行则在同一 Host 回合挂起等待名单确认，之后用 wait_for_updates 获取完整可信结果。专家启动仅授权实质工具；完成另要求当前记录派遣／专家回合结束、当前结果已消费。等待期间不得发出最终 agent_end 或释放 Goal 执行 token。内部 inbox 读取是 Host 授权的窄模型代理操作；可信 plans.bindExecutionTurn 不暴露给模型反向代理。
+专家团独立工具目录要求所有工作均 delegate 至少一位专家，Host 拒绝全部 lead_only。Agent 执行仍需可信用户名单确认。Lead 的 Write/Edit/Bash 等实质操作由运行时及 Host 核验当前 authority：获批派遣的专家回合必须已实际启动，空闲成员和仅排队消息不够。此门禁不证明任务归属或完成贡献；普通权限、取消和模式检查仍适用。非空最终回复使用同一门禁，同一持久回合可恢复一次，重复拒绝以可见审批错误结束；普通未批准 Agent 回合可说明有效名单需要用户批准启动。已批准的 Team Plan/Goal 执行则在同一 Host 回合挂起等待名单确认，之后用 wait_for_updates 获取完整可信结果。专家启动仅授权实质工具；完成另要求当前记录派遣／专家回合结束、当前结果已消费。等待期间不得发出最终 agent_end 或释放 Goal 执行 token。
+
+同回合获批执行的 guard 恢复登记绑定当前团队／回合的新鲜 Host／用户确认非空 delegate review，并捕获包含最新匹配成功声明的完整合法 assistant 工具 batch 与全部原始配对 tool results 快照；登记只读当前已批准 execution 开始边界之后的原始 entries，因此确认前压缩已归档的声明仍可登记，不读取前一次执行声明，也不修改 entries。最终模型转换在整个同一获批执行的每次请求中投影同 team／turn／review 的所有成功 `declare_team_strategy` 结果。包括工具轮次、重试及重建上下文；压缩归档原完整 batch 后，在最终模型视图重新包含完整 batch 和全部原始配对结果，不得有孤立 call／result；signed thinking／text／tool signatures 和兄弟调用／结果不裁剪，仅改变匹配 review 的声明结果。重复恢复保留同 owner／review／epoch 登记，wireCallId 碰撞不覆盖新工作。载荷和 details 均为已确认名单、`awaitingUserApproval=false`、以 `The user confirmed the execution roster` 开头的 `nextStep`，去掉不能由 review 刷新的旧 `memberSessionIds`，遥测记录相同投影载荷。投影幂等、copy-on-write，Agent 消息状态、原 pending 工具事件、entries、journal、压缩输入／summary／checkpoint、UI 历史和无关结果不变。pending、cancelled、被替换 review、结束／中断执行、Stop、普通回合及后一次执行不得复用旧投影；不同 reviewId、撤销或更高 revision 的较新可观察声明清登记，当前 mode／execution／turn／epoch 及取消／销毁／gracefulStop／Team budget fence 仍适用。首次登记时没有完整合法、全部配对的 assistant batch 内匹配成功声明就不造调用，保留既有 nudge 与三次完成恢复。不增加 Host 通知、review 读取或 RPC。普通 Team 与自动 Plan 研究不获得投影，`wait_for_updates` 直接消费确认的路径不变；不改变 Host 参与／结算门禁或工具权限。
+
+内部 inbox 读取是 Host 授权的窄模型代理操作；可信 plans.bindExecutionTurn 不暴露给模型反向代理。
 
 Team Plan 使用 Host 派生的 automatic_plan 策略和有效获批模型绑定自动启动只读专家，不能用等待研究名单批准的回复结束。SubmitPlan 另需完整结构化研究、专家回合及问题全部结束、未消费 Team 收件箱为空。方案产物和后续 Agent 名单仍需用户批准，automatic_plan 不授权 Agent 工作。Goal 协商权限不变。Team 不暴露 Task* 或插件 SessionTask。
 

@@ -746,15 +746,42 @@ An approved Team Plan/Goal execution waits for execution-roster confirmation
 and expert settlement inside its original running Host turn. It must not emit
 final agent_end, end the Goal execution token or complete the approval while
 waiting. Confirmation resumes the same approved contract.
-Before the first recovery request, Host confirmation refreshes only the
-model-facing latest successful declare_team_strategy result for that review,
-using the confirmed roster, awaitingUserApproval=false and the shared tool
-payload builder. This is copy-on-write; the original pending tool event and
-persisted/UI timeline remain intact, and later tool-loop context rebuilding
-still reads that original history. Stale memberSessionIds are omitted. A missing
-match retains the existing nudge/three-attempt completion guard. A fresh review
-read rechecks turn/epoch, mode and cancellation before applying the projection.
-No Host dispatch, public contract or restart recovery is added.
+Same-turn guard recovery registers a fresh Host-confirmed, user-confirmed,
+nonempty delegate review bound to the same team and approved execution turn.
+Registration reads only the original entries from the current approved
+execution boundary, capturing the complete valid assistant tool batch containing
+the latest successful matching declaration with every original paired result.
+A declaration archived by compaction before confirmation remains eligible;
+entries from an earlier execution are never used.
+It preserves signed thinking, text, tool signatures and sibling calls/results;
+only matching declaration results change. From the first resumed request
+through execution end, final model conversion projects all successful results
+matching that team/turn/review using the confirmed roster,
+`awaitingUserApproval=false` and the shared tool payload builder. Its `nextStep`
+begins with `The user confirmed the execution roster`; stale `memberSessionIds`
+are omitted. Every subsequent tool-loop request, retry and context rebuild
+applies the same idempotent, copy-on-write projection. If compaction archives
+that batch, final conversion includes the complete registered batch and all its
+paired results in the model view only. It never invents an orphan call/result
+or trims signed content. Repeated guard recovery retains a registration with
+the same owner/review/epoch when rebuilt messages no longer contain the batch.
+Wire-call ID collisions with newer work never replace that newer work. Provider
+telemetry captures that projected model payload.
+The projection runs after system-journal persistence; original entries, journal,
+compaction input and persisted/UI timeline remain unchanged. Pending, cancelled
+or replaced reviews cannot register or reuse it; a newer observable declaration
+with a different reviewId, cancellation or higher revision clears registration.
+Execution completion, Stop, cancellation/disposal/graceful stop, Team budget
+stop, turn/epoch or mode changes and a subsequent execution invalidate its scope;
+ordinary turns cannot refresh an earlier execution's declaration. A fresh review
+read rechecks turn/epoch, mode and cancellation before registration. With no
+matching successful declaration in a fully paired valid assistant batch at
+initial registration, no batch is invented and the existing nudge and three-attempt completion guard
+remain. Reinserted model batches are never written to Agent state, entries,
+compaction summary/checkpoint or journal. No additional Host notification,
+review read or RPC is introduced. This projection only extends guard recovery; `wait_for_updates` consuming confirmation directly
+keeps its existing path. No Host dispatch, public contract or restart recovery
+is added.
 An earlier pending review snapshot cannot authorize completion if confirmation
 commits before the execution-state read: Host final authorization still runs,
 and the bound confirmed execution receives its dispatch recovery when needed.
