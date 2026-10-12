@@ -17,6 +17,9 @@ on:
       - 'CLAUDE.md'
       - 'packages/shared/src/changelog*.ts'
       - 'scripts/check-*.mjs'
+      - 'scripts/*scenario*.mjs'
+      - 'scripts/e2e-suite*.mjs'
+      - 'scripts/e2e-suite-catalog.json'
       - 'docs/scripts/**'
       - '.github/workflows/docs-check.yml'
   pull_request:
@@ -27,6 +30,9 @@ on:
       - 'CLAUDE.md'
       - 'packages/shared/src/changelog*.ts'
       - 'scripts/check-*.mjs'
+      - 'scripts/*scenario*.mjs'
+      - 'scripts/e2e-suite*.mjs'
+      - 'scripts/e2e-suite-catalog.json'
       - 'docs/scripts/**'
       - '.github/workflows/docs-check.yml'
   workflow_dispatch:
@@ -62,6 +68,9 @@ jobs:
 
       - name: Check locale pairs and every documentation page
         run: pnpm docs:check
+
+      - name: Check generated executable scenario indexes
+        run: node scripts/generate-scenario-index.mjs --check
 
       - name: Build the documentation site (dead links and routes)
         run: pnpm docs:build

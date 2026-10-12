@@ -42,7 +42,7 @@ RPC 调度程序将活动请求上限限制为 32。然后，`tools.execute` 输
 有界执行预算：
 
 - 总共 16 次工具执行
-- 全局 4 个并发 `Bash` 进程，每个会话 2 个
+- 全局 4 个并发 `Bash` 进程，并受每会话 4 个工具的总额度约束
 - 全球 8 个 read/search 工具
 - 2 个全局变异工具，每个会话 1 个
 - 全球4个插件工具
@@ -56,6 +56,19 @@ Electron 和 sidecar 不能独立过度接纳相同的资源。
 每会话突变许可是在全局突变槽之前获取的；
 因此，排队的 `Bash`/read/search 调用在等待时不会保留全局容量
 对于同一会话中的较早突变。
+
+被拒绝的 `Bash` 准入在既有工具结果中增加 `content.capacity`。
+它包括 `host` 和请求 `session` 的数量（`inFlight`、`queued`、
+`shellInFlight`、`shellQueued`），以及按会话标识排序的 `holders`：
+`{ sessionId, tool: "Bash", inFlight }`。数量在拒绝时原子捕获，早于移除
+被拒绝的排队项：超时调用计入排队数量，队列已满而从未入队的调用不计入。
+已获准但尚未交付的许可计入运行数量，不计入排队数量。诊断和准入日志
+只包含会话/工具标识和数量，不包含命令、路径或输出。
+错误说明后台进程和长 `sleep` 会持续占用 shell 槽，直到进程结束。
+等待团队回复应使用 `wait_for_updates`；长命令可在后台运行，并在额度
+恢复后查看进程状态。后台执行使用同一额度。Bash 描述和执行团队提示词
+也明确禁止 sleep 轮询。非 shell 拒绝保留原有文案，不带 `capacity`；
+额度、可重试属性、可准入请求的 FIFO、审批与取消语义均不改变。
 
 ### 请求
 
@@ -1188,3 +1201,178 @@ is rejected; unchanged legacy roundtrips remain readable. Ordinary renderer
 settings writes omit expertTeam unless submitted by this dedicated CAS editor.
 Main applies the complete committed Host settings to network/menu/developer
 side effects, so a partial request cannot reset unrelated runtime policy.
+
+## Plus project context RPCs
+
+| Method | Parameters | Result |
+| --- | --- | --- |
+| `project.memory.editor.get` | `path` | `{editor: {owner, memory, autoRecordEnabled}}` |
+| `project.memory.editor.save` | `path, expectedOwner, expectedMemory, entries` | `{editor}` after owner/snapshot CAS |
+| `project.autoMemory.setEnabled` | `path, expectedOwner, enabled` | `{autoRecordEnabled}` |
+| `project.autoMemory.agentList` | trusted `sessionId, boundPath` | `{memory, autoRecordEnabled}` |
+| `project.autoMemory.agentUpsert` | binding plus optional `id`, `title`, `content`, update's `expectedTitle, expectedContent` | current runtime memory state |
+| `project.autoMemory.agentDelete` | binding plus `id, expectedTitle, expectedContent` | current runtime memory state |
+| `project.history.search` | binding plus literal `query` (1–500 characters), optional `limit` (1–20, default 10) | `{hits, hasMore}` |
+| `project.history.context` | binding plus `targetSessionId, messageId`, optional `query` | `{sessionId, title, messages, truncated}` |
+| `project.codeSearch` | binding plus optional `action` (`search` default, `status`, `clear`), search `query` (1–500 characters), optional `limit` (1–50, default 20) | `{hits, truncated, index}` |
+
+Agent RPCs resolve the stored session project and reject a stale/mismatched
+`boundPath`. The parent proxy additionally requires its opaque launch binding,
+rewrites the path from trusted session launch state and forwards only approved
+fields. Agent memory writes require opt-in and Agent execution mode; Plan/Goal
+are read-only, including code-cache clear. Invalid input and CAS/owner conflicts
+are observable errors; no partial memory save is published. History search is
+scoped before pagination. Context reads enforce the same current group membership
+and exclude deleted sources. Code index scanning runs outside the async worker
+and binding is rechecked after the blocking operation.
+
+### Team Goal 报告结算授权（2026-10-11）
+
+`team.authorizeLeadTool` 将已有获批执行结算谓词应用于 `TeamFinalAnswer` 和 `SubmitGoalReport`。运行时现有 Lead 包装器在报告工具主体之前检查，不新增 RPC 或字段。拒绝列出全部未结束派遣 ID、成员、已分配未完成任务，以及未消费当前专家结果的数量和标识，并要求 `wait_for_updates`。结算只绑定宿主证明的原始执行回合，历史会话批准不能授予新权限；执行结束后的邮件不延长 Goal 生命周期。
+
+
+### 成员失败通知（2026-10-11）
+
+成员 turn 以 `error` 赢得终结 CAS 时，Host 在同一事务写入一条 lead 邮件，
+沿用 ledger 的 `kind: "message"` 和字符串 `content`；内容为 JSON：
+`{kind:"member_failed",memberName,errorCode,retriable,taskIds,suggestedAction}`。
+只携带净化的错误码，不携带原始错误、路径或凭据。任务 ID 包括成员尚未结束的
+任务，以及此次精确 attempt 刚转为 failed 的任务。
+`retriable` 仅是保守建议：`HOST_OVERLOADED`、`HOST_UNAVAILABLE`、`PROVIDER_RATE_LIMITED`、
+`TIMEOUT` 为 true，其余/未知错误先检查，再明确重新派发，不授权自动重试。
+
+`member-turn-failed:<turnId>` 为 Host 保留的幂等键；模型通过 `team.sendMessage`
+使用此前缀会返回 `TEAM_UNAUTHORIZED`。终结 CAS、邮件、可信来源证明和 Team revision
+同时提交；重复终结不重复通知，成功、用户 abort/cancel 不生成通知。
+提交后沿用 `team.messageQueued` 唤醒等待中的 lead；空闲 lead 由 Main 现有持久化队列
+投递路径唤醒，不改变 Agent Host 队列语义。重启沿用 pending-mail drain 恢复未投递邮件。
+
+批准执行中的通知同时带 `team-message-source-turn-v1` 和 Host 专属
+`team-member-failure-v1` 证明；仅此证明允许当前 dispatch 的 error turn 结果进入
+execution inbox。成员伪造 `member_failed` 文本不构成证明，aborted 来源仍被排除。
+未读失败通知阻止完成，直到 `wait_for_updates` 消费完整内容；消费失败不算成功专家参与。
+
+
+提交后检查点 I/O 失败仍保留原错误，并对已落盘且尚在 queued 状态的失败邮件发出既有
+唤醒事件。终结重放可以再次唤醒同一 pending 邮件，但不新建第二条；已消费或 running
+的邮件不再发出事件。
+
+
+后台超时可见性（2026-10-11）：`TOOL_TIMEOUT` 读取的已有 `errorMessage`
+说明实际默认/显式限制及秒数参数。已有持久化工具结果内容记录 `timeoutMs`
+和 `timeoutIsDefault`，不为旧记录补造来源。不新增概要字段、迁移、RPC 或事件
+字段。Sidecar 使用已有可信项目启动绑定，只转发 `{sessionId,id}`，并在 await
+后复核绑定代际和返回进程归属。只开放 `read`，`list` 与 `stop` 仍不可调用。
+团队等待由已有 changed 事件触发读取并返回终态详情；输出/启动事件不结束等待。
+
+运行时仅跨工具刷新保留成功的自身启动回执，每次等待核对未消费 ID，以免漏掉
+等待间隙的终态。销毁撤销内存跟踪；该只读能力不授予历史列表或重启回放。
+
+### 团队建议性写范围和发送时 HEAD
+
+原权限检查通过且成员 Write/Edit 成功后，若规范路径在当前成员 turn 明确绑定、
+版本匹配的任务非空 writeScopes 合集外，tools.execute 可追加 content.scopeWarning：
+`{code:"TEAM_WRITE_SCOPE_WARNING",taskIds,message}`。不加入原始路径，也不改变
+ok/isError、权限、重试预算或任务状态。空 scopes、scratch、Bash、失败写入和
+未开始/历史任务排除；解析或统计异常通过 content.scopeTrackingError 保持可见，
+不把已成功写入伪装成失败。执行中团队所有者被移除时，返回可见
+content.scopeTrackingSkipped，不留下孤立计数。
+
+team.getBoard 新增可选 outOfScopeWriteCount 和 outOfScopeWrites
+（`{memberSessionId,memberName,count}[]`），新 Host 无告警时返回零和空数组，
+team_status 对旧 Host 缺省字段默认零。计数在成员团队内累计，按成功 turn/工具调用
+身份最多一次；既有 KV 跨重启保留，session/team 删除清理；不是权限或语义完成判断。
+
+team.sendMessage 在发送准入时由 Host 解析发送方项目，通过锁外有界、安全隔离的
+只读 Git 探测记录 HEAD；await 后重新检查项目归属、运行 turn、Lead 用户范围和通常 Team 权限；
+变更 turn/范围会在写入邮件或快照之前返回 TEAM_TURN_INVALID。Host 专用 KV
+快照在幂等重放时不变。可选 senderHead 经团队 mailbox（包括 readExecutionInbox/wait_for_updates）、
+session.collaboration.message 和认证的
+SessionMessageOrigin 传入真实及恢复成员模型输入，二者看到同一个 SHA。
+正文、来源校验和权限上限不变。非 Git、无提交和旧消息省略；意外探测错误记录有界
+Host 诊断但不阻止发送。只暴露 SHA，不暴露路径、Git stderr 或秘密；不增加 RPC、
+协议版本或数据库迁移。
+
+
+### 团队共享树 Git 建议性警告
+
+通常权限和工具准入通过后，Host 识别 Bash 常见字面 Git 命令：
+`add -A`/`--all`、`stash`（排除 `list`/`show`）、`reset --hard`、
+`checkout .`、`clean`、`commit -a`/`--all`。同一团队另一当前成员拥有
+未删除、`in_progress` 且非空 `writeScopes` 的任务时，结果加入
+`content.gitWarning`：`{code:"TEAM_SHARED_GIT_WARNING",operations,conflictingTasks,message}`。
+冲突任务标识 taskId/memberSessionId/memberName；不把范围路径或命令文本复制到持久化诊断。
+
+这仅是协作警告，不是权限边界或 shell 沙箱；命令仍执行，不改变权限提示、
+准入、FIFO、额度、ok/isError/exitCode、取消或超时。失败保留真实失败和警告；
+后台准入带警告但不声称已执行成功。字面引号、转义、组合命令和 Git 全局选项
+通过词法识别；别名、变量、解释器脚本等动态形式不保证覆盖，也不推断目标仓库。
+应显式暂存自有范围并与其他写入者协调。只读 status/diff、stash list/show、
+调用者自己是唯一写入者、空范围、已完成/删除/其他团队任务不告警。
+
+team.getBoard/team_status 新增可选 sharedGitWarningCount 和 sharedGitWarnings
+（`{memberSessionId,memberName,count}[]`），旧 Host 缺省为零/空数组。
+计数记录带警告的已执行或已准入 Bash 调用，包括失败；调用者会话/turn/toolCallId
+最多一次，与 Write/Edit 越界成功计数分离。既有 KV 跨重启保存，session/team 删除清理。
+捕获/存储失败通过 content.gitTrackingError 可见且不改变 Bash 结果；所有者已移除时
+返回 content.gitTrackingSkipped，不留孤立计数。不增加 RPC、协议版本、迁移、成员
+worktree 或 team_commit 工具。
+## WP10 团队派发时效
+
+可选 taskDispatch、队列位置及仅取消未开始派发的约定见
+[团队任务派发](team-task-dispatch.md)。
+### 仅运行时工具的团队待处理元数据
+
+team_status 与普通 Agent lead wait_for_updates 使用现有 team.listMessages，只读 caller 自己的收件会话；Host 权限和响应不变。工具返回 pendingMessagesCount、pendingMessageSenders、oldestPendingMessageAgeSeconds；pending wait 还保留 count 和 reason:pending_mailbox_messages。工具文本与 details 不包含抓取的正文或原始邮箱行。查询不 ACK、不移除收据、不改变来源或执行证明，不新增 RPC/event；正文仍按场景经认证 role=user 或既有批准执行 inbox 投递。await 后检查当前 turn/epoch/团队/模式；ACKed 的 queued/未绑定邮件仍算待处理。createdAt 是毫秒数字字符串，未知最老年龄为 null，包括混合已知/未知时间戳。
+### 专家成员活动与中断保护（WP9）
+
+`team.getRoster` 增量返回 Lead 和每位成员的 `memberActivity`，`team_status` 原样展示。
+包含 Host 观测时间、十分钟窗口、最近回合状态与持续时长、最近工具名称与时间、活动 Bash
+调用 ID、运行后台进程 ID/状态/启动时间、近期已完成物理调用与 token 数、收发 Team 队列
+数量及最老等待时长。不包含报告正文、命令、路径、凭据，也不依赖 Git 活动。
+近期调用只统计 Host 首次观测到的已报告 usage；旧记录无时间戳和仍在请求中的调用均未知。
+重放 usage 不刷新活动时间，观测与 usage 在同一 savepoint 持久化，重启不改变原时间。
+
+队列年龄使用持久化毫秒创建时间。ACK 表示已入队，不表示已消费；未消费消息只计一次。
+入站排队不能证明成员仍在执行；本人真实出站回复可作为活动，Host 代发的审批和失败通知除外。
+
+`team.interruptMember({ teamSessionId, callerSessionId, memberName, force?, reason? })`
+保留原有 Lead 与停止权限。默认 `force=false`；十分钟内有实际回合开始、工具、usage、
+本人回复或后台开始/结束记录，返回 `TEAM_MEMBER_ACTIVE`。活动后台进程与 Host 持有的
+前台 Bash 调用不受启动时长限制，二十分钟测试仍被保护。
+`force:true` 必须带裁剪后非空、最多 1000 字符的 reason，否则返回
+`TEAM_INTERRUPT_REASON_REQUIRED`；只豁免活动防护，不豁免权限或审批。
+发出绑定精确 turn 的中断通知前先写 `team_member_interrupt` 审计（包含操作者、对象、
+turn、force、reason 与证据）；审计失败则不发通知。无运行回合仍返回
+`{ interrupted: false }`。不新增空转自动 kill，不改 shell 配额、FIFO、邮箱正文投递或执行令牌。
+这是增量本地 RPC，无协议升版或数据库迁移。决策见
+[ADR](../../../adr/team-member-activity-and-interruption-guard.md)。
+
+
+### 团队运行上限（WP8）
+
+默认启用 soft 6 小时、hard 10 小时，设置支持 CAS 调整。可信准入新用户 scope 启动 Host 持久时钟；邮件、暂停、重试及重启不重置。soft 一次收尾通知，hard 保持队列暂停、批准 Goal 中断并停止新模型请求/重试及未开始工具批次，已开始工具自然结束、后台任务不强杀。关闭或延长后仍需显式恢复。team.getRoster、team.getSnapshot 及 team_status 提供 runLimits；详情见英文 /spec/03-runtime/team-run-limits 与 ADR /adr/team-run-limits。
+### WP11 Lead 待回答与失败专家替换
+
+Team Lead 问题由宿主 KV 持久化。注册、转待回答、及时回答确认绑定真实
+Lead/运行回合；回答、取消和恢复读取仅通过可信 Main，不暴露给模型代理。
+30 分钟后中断回合并保留卡片；迟到回答原子入普通用户队列，不自动批准
+阵容、不复活 Plan/Goal 执行令牌。普通权限与普通问题不增加期限。
+
+`spawn_teammate` 的可选 `replaces` 指明同一当前已批准阵容的 failed 成员。
+新成员必须使用唯一新 handle，继承冻结角色、配置、模型与权限，每原批准
+slot 只允许一次替换；原审查、会话、任务和日志保留，任务需明确重新分配。
+旧成员不能再收到派发；旧成员仍计入 8 人上限。二次失败、阵容满或修改
+权限/模型需要新的可信审查，拒绝信息给出合法下一步。
+
+### 普通 Agent Lead 边界 inbox（WP16 S3）
+
+内部 team.getOrdinaryInboxCapability、team.readOrdinaryInbox、team.ackOrdinaryInbox、team.getOrdinaryInboxProof 与仅身份提示 team.ordinaryInboxPersisted，遵循[普通 inbox](/zh-CN/spec/03-runtime/team-ordinary-inbox)的精确绑定/证明。正文读取只在可信 launch plumbing 内部，不暴露为模型可选代理或工具输出。Host 核验当前普通回合 authority；Main/AgentHost/Runtime 独立校验 epoch。Plus P6 保存 prepared → persisted → ACKed 证明及 JSONL-first 恢复；队列准入不等于 runtime/模型消费。协议 11 不变。
+
+### 显式团队服务投影（WP14）
+
+Bash backgroundKind、owner/caps/TTL 及原 backgroundProcesses list/read/launch 的可选字段遵循[显式服务](/zh-CN/spec/03-runtime/team-managed-services)。changed 仍仅身份失效提示；读取/停止仍限 session。Plus P7 保存显式 ownership，旧进程不推断为服务。不扩大 shell budget/FIFO、批准执行权限或协议版本。
+
+### 团队诊断与进度提示（WP7）
+
+strategy、presentation.role、displayName 参数错误说明合法值/范围；路由/过期范围/未批准派遣拒绝保持原 code 和条件，增加可操作 nextStep。runtime 的 completedMembersWithOpenTasks 和 completedMemberOpenTaskNextStep 仅由既有名单/任务投影派生，不授权限或结算任务。

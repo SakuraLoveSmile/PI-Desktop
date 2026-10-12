@@ -131,7 +131,10 @@ phases, task states and queued Team mail, never the pause flag alone.
    transaction, unseen `completed` inserts `task.completed`, unseen `error`
    inserts `task.failed`, and a result already visible in the focused current
    chat or any `aborted` turn inserts no notification (D117). Repeated terminal
-   calls are no-ops. Renderer terminal lifecycle events update the transcript
+   calls are no-ops. WP7 additionally suppresses independent success notices
+   for Host-confirmed Team members; their turn/transcript/report remains durable.
+   Member failure, Lead/Goal and non-Team outcomes retain the original rules.
+   Renderer terminal lifecycle events update the transcript
    and turn result card; the sidebar terminal mark is derived only from the
    corresponding unread notification, never from `agent_end` alone.
 10. Whole-session fork is idle-only. A Desktop message-scoped fork may copy
@@ -181,7 +184,7 @@ transcript-file line first, index transaction second.
   persistence field
 - turn run row: on start + terminal `session.endTurn` update
 - notification row: same transaction as an unseen completed/error terminal
-  update; never for a visible-current result or abort
+  update; never for a visible-current result, abort or Team member success
 - assistant/tool messages: on message_end/tool_end. Electron retains each
   in-flight tool's metadata with its owning turn until the terminal event is
   persisted; delayed cleanup is scoped to that turn so a later turn's long
@@ -229,8 +232,9 @@ transcript-file line first, index transaction second.
 3. waiting_permission is visible in UI status
 4. sessions in two retained project tabs may run independently without
    transcript-event or workspace-root crossover
-5. each unseen completed/failed turn produces exactly one notification record
-   while a visible-current result or aborted turn produces none
+5. each eligible unseen completed/failed turn produces exactly one notification
+   record; visible-current, aborted and Team member successful turns produce none,
+   while successful experts retain durable turn/transcript/report facts
 6. a fork starts as an independent idle session; a busy Desktop source can
    fork only a completed assistant prefix outside its running turn
 7. a message-scoped fork excludes later rows and begins with no source runtime

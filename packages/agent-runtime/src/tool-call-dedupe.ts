@@ -25,7 +25,7 @@ function isRecord(value: unknown): value is RecordLike {
  * differ in the item half therefore still collide on the wire, so every
  * comparison below uses this wire-visible id (D620).
  */
-function wireCallId(id: string): string {
+export function wireCallId(id: string): string {
   const separator = id.indexOf("|");
   return separator < 0 ? id : id.slice(0, separator);
 }

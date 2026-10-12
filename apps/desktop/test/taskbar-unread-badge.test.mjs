@@ -2,10 +2,6 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import ts from "typescript";
-import {
-  inboxNotifications,
-  inboxUnreadCount,
-} from "../src/lib/notification-inbox.ts";
 
 const IPC = {
   invoke: {
@@ -395,43 +391,4 @@ test("badge source has no image.resize and imports the Canvas renderer", () => {
   assert.match(source, /renderTaskbarUnreadOverlayPng/);
   assert.match(source, /scaleFactor:\s*TASKBAR_UNREAD_OVERLAY_SCALE_FACTOR/);
   assert.match(source, /buildTaskbarUnreadOverlayPng/);
-});
-
-test("D295 inbox still counts failures only while shell uses full unreadCount", () => {
-  const rows = [
-    {
-      id: "c1",
-      kind: "task.completed",
-      sessionId: "s",
-      sessionTitle: "S",
-      turnId: "t1",
-      createdAt: "2026-09-24T00:00:00.000Z",
-      readAt: null,
-    },
-    {
-      id: "f1",
-      kind: "task.failed",
-      sessionId: "s",
-      sessionTitle: "S",
-      turnId: "t2",
-      createdAt: "2026-09-24T00:00:01.000Z",
-      readAt: null,
-    },
-    {
-      id: "c2",
-      kind: "task.completed",
-      sessionId: "s",
-      sessionTitle: "S",
-      turnId: "t3",
-      createdAt: "2026-09-24T00:00:02.000Z",
-      readAt: null,
-    },
-  ];
-  assert.deepEqual(
-    inboxNotifications(rows).map((row) => row.id),
-    ["f1"],
-  );
-  assert.equal(inboxUnreadCount(rows), 1);
-  // Shell badge path reads host unreadCount (completed + failed) — 3 here.
-  assert.equal(rows.filter((row) => row.readAt == null).length, 3);
 });

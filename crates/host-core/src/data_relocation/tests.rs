@@ -52,6 +52,20 @@ fn relocates_a_real_copied_profile_without_recovery_or_changing_user_content() {
         .unwrap();
     database.conn().execute("INSERT INTO turn_queue(id,session_id,principal,input_hash,content,attachments_json,permission_mode,position,created_at) VALUES ('queued',?1,'user','hash',?2,?3,'ask',0,0)", params![session.id, attachment.to_string_lossy(), json!([{"ref":attachment}]).to_string()]).unwrap();
     database.conn().execute("INSERT INTO kv(ns,key,value_json,updated_at) VALUES ('projectMemory',?1,?2,0),('projectGroups','group',?3,0)", params![project.to_string_lossy(), json!({"content":attachment.to_string_lossy()}).to_string(), json!({"primaryPath":project,"roots":[{"path":project}],"detachedPaths":[source.join("removed")]}).to_string()]).unwrap();
+    database
+        .kv_set(
+            "projectAutoMemory",
+            &format!("path:{}", project.to_string_lossy()),
+            &json!({"enabled": true}),
+        )
+        .unwrap();
+    database
+        .kv_set(
+            "projectAutoMemory",
+            "group:group",
+            &json!({"enabled": true}),
+        )
+        .unwrap();
     drop(database);
     let secrets = SecretStore::open(&source).unwrap();
     secrets.set("secret:test", "fixture-credential").unwrap();
@@ -191,6 +205,31 @@ fn relocates_a_real_copied_profile_without_recovery_or_changing_user_content() {
         })
         .unwrap();
     assert_eq!(memory_key, destination.join("project").to_string_lossy());
+    let automatic_memory: String = connection
+        .query_row(
+            "SELECT value_json FROM kv WHERE ns='projectAutoMemory' AND key=?1",
+            [format!(
+                "path:{}",
+                destination.join("project").to_string_lossy()
+            )],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(
+        serde_json::from_str::<Value>(&automatic_memory).unwrap()["enabled"],
+        true
+    );
+    let automatic_group: String = connection
+        .query_row(
+            "SELECT value_json FROM kv WHERE ns='projectAutoMemory' AND key='group:group'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(
+        serde_json::from_str::<Value>(&automatic_group).unwrap()["enabled"],
+        true
+    );
     let group: String = connection
         .query_row(
             "SELECT value_json FROM kv WHERE ns='projectGroups'",

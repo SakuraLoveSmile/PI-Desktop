@@ -85,7 +85,7 @@ test("dismissing an assistant error hides its card without changing transcript d
   );
 
   assert.match(component, /dismissedAssistantErrorMessages\[message\.id\]/);
-  assert.match(component, /if \(!error \|\| dismissed\) return null/);
+  assert.match(component, /if \(!error \|\| \(!readOnly && dismissed\)\) return null/);
   assert.match(component, /aria-label=\{t\("chat\.dismissError"\)\}/);
   assert.match(component, /title=\{t\("chat\.dismissError"\)\}/);
   assert.match(component, /onClick=\{\(\) => dismissAssistantErrorMessage\(message\.id\)\}/);

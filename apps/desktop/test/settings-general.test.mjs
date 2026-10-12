@@ -7,6 +7,7 @@ import {
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { formatMoment, formatRelativeMoment } from "../src/features/scheduled/scheduled-format.ts";
 import { loadStyles } from "./helpers/styles.mjs";
 
 const settingsPageSource = await readSettingsSource();
@@ -24,10 +25,6 @@ const defaultModelSource = await readFile(
 );
 const scheduledSource = await readFile(
   new URL("../src/pages/ScheduledPage.tsx", import.meta.url),
-  "utf8",
-);
-const scheduledFormatSource = await readFile(
-  new URL("../src/features/scheduled/scheduled-format.ts", import.meta.url),
   "utf8",
 );
 const pluginsPageSource = await readPluginsSource();
@@ -257,20 +254,23 @@ test("stored language drives i18n and native labels at startup and on settings c
 });
 
 test("date copy follows the active application locale", () => {
-  // The page resolves one locale and hands it to every moment it renders; the
-  // formatter is what actually builds the string.
   assert.match(scheduledSource, /const locale = i18n\.resolvedLanguage \?\? i18n\.language;/);
   assert.match(scheduledSource, /locale=\{locale\}/);
-  assert.match(
-    scheduledFormatSource,
-    /new Intl\.DateTimeFormat\(locale \|\| undefined/,
-  );
   assert.match(
     providersSource,
     /toLocaleString\(\s*i18n\.resolvedLanguage \?\? i18n\.language/s,
   );
 });
 
+test("date copy follows the requested application locale", () => {
+  const value = "2026-01-02T12:00:00Z";
+  assert.match(formatMoment(value, "en"), /Jan/);
+  assert.match(formatMoment(value, "fr"), /janv/);
+  assert.notEqual(formatMoment(value, "en"), formatMoment(value, "fr"));
+  assert.equal(formatRelativeMoment(value, Date.parse(value) + 3_600_000, "en"), "1 hour ago");
+  assert.equal(formatRelativeMoment(value, Date.parse(value) + 3_600_000, "fr"), "il y a 1 heure");
+  assert.equal(formatMoment("invalid", "en"), "");
+});
 test("sandboxed preload receives the OS locale without importing main-only APIs", () => {
   assert.match(electronMainSource, /additionalArguments:\s*\[`--pi-desktop-locale=\$\{app\.getLocale\(\)\}`\]/);
   assert.match(preloadSource, /const LOCALE_ARGUMENT_PREFIX = "--pi-desktop-locale="/);

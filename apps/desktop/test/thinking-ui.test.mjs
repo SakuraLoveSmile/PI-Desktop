@@ -10,6 +10,9 @@ import {
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { register } from "node:module";
+register(new URL("./helpers/ts-import-hooks.mjs", import.meta.url));
+const { messageHasTranscriptContent } = await import("../src/lib/chat-launch-error.ts");
 import { loadStyles } from "./helpers/styles.mjs";
 
 const composerSource = await readComposerSource();
@@ -104,7 +107,6 @@ test("Composer owns the mode and model controls", () => {
   );
   const plusControl = leftToolbar.indexOf("<ComposerPlusMenu");
   const profileControl = leftToolbar.indexOf("<ComposerExecutionProfilePicker");
-  const modelControl = leftToolbar.indexOf("<ComposerModelPicker");
   const modeControl = leftToolbar.indexOf("<ComposerContractPicker");
   const rightToolbar = composerToolbarSource.slice(
     composerToolbarSource.indexOf('<div className="composer-right">'),
@@ -112,8 +114,8 @@ test("Composer owns the mode and model controls", () => {
 
   assert.ok(plusControl >= 0);
   assert.ok(profileControl > plusControl);
-  assert.ok(modelControl > profileControl);
-  assert.ok(modeControl > modelControl);
+  assert.ok(modeControl > profileControl);
+  assert.ok(rightToolbar.indexOf("<ComposerModelPicker") >= 0);
   assert.doesNotMatch(leftToolbar, /<ComposerPermissionPicker/);
   // The task draft has no session, so its picker must not claim one: with
   // `activeSessionId` unset the menu resolves the selected model's binding
@@ -131,8 +133,12 @@ test("Composer owns the mode and model controls", () => {
   assert.doesNotMatch(stylesSource, /\.conversation-topbar \.ct-mode/);
   assert.match(composerModelPickerSource, /composer-model-thinking-chip/);
   assert.match(composerModelPickerSource, /composer-model-thinking-menu/);
-  assert.match(composerModelPickerSource, /composer-menu-entry/);
-  assert.match(composerModelPickerSource, /composer-menu-back/);
+  assert.match(composerModelPickerSource, /<ComposerModelList[\s\S]*?selectModel=\{selectModel\}/);
+  assert.match(composerModelPickerSource, /thinkingMenuLevels\.length > 1 \? \(\s*<ThinkingLevelSlider/);
+  assert.match(composerModelPickerSource, /levels=\{thinkingMenuLevels\}[\s\S]*?level=\{thinkingLevel\}[\s\S]*?commit=\{commitThinkingLevel\}/);
+  assert.match(composerModelPickerSource, /className="composer-model-settings"\s*role="menuitem"/);
+  assert.match(composerModelPickerSource, /setOpen\(false\);\s*onOpenModelSettings\(\)/);
+  assert.doesNotMatch(composerModelPickerSource, /composer-menu-entry|composer-menu-back/);
 });
 
 test("conversation topbar keeps the title and actions free of a running indicator", () => {
@@ -323,12 +329,11 @@ test("activity headers omit the redundant status capsule", () => {
   assert.match(stylesSource, /\.run-activity-indicator\[data-phase="waiting-subagents"\]/);
 });
 
-test("thinking-only assistant streams open the transcript surface", () => {
-  assert.match(launchErrorSource, /typeof message\.thinking === "string"/);
-  assert.match(launchErrorSource, /hasContent \|\| hasThinking/);
-  assert.match(appSource, /messageHasTranscriptContent\(message\)/);
+test("thinking-only assistant streams contain visible transcript content", () => {
+  assert.equal(messageHasTranscriptContent({ role: "assistant", content: "", thinking: "Checking the result" }), true);
+  assert.equal(messageHasTranscriptContent({ role: "assistant", content: "", thinking: "  " }), false);
+  assert.equal(messageHasTranscriptContent({ role: "assistant", content: "", thinking: "", error: { code: "MODEL_NOT_CONFIGURED" } }), true);
 });
-
 test("provider settings persist model-local limits and thinking configuration", () => {
   assert.match(settingsSource, /useProviderModels/);
   assert.match(settingsSource, /bindingFromModelInfo/);

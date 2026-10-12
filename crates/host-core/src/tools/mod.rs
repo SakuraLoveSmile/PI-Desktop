@@ -21,6 +21,7 @@ use crate::workspace::{resolve_tool_path_with_external, simple_canonicalize, Too
 mod grep_rg;
 pub mod hashline;
 pub mod ignore_rules;
+mod service_control;
 pub mod shell;
 
 pub use hashline::{HashlineContext, HashlineStore};
@@ -214,6 +215,8 @@ struct ToolRunnerStartConfig {
     scratch_dir: Option<PathBuf>,
     #[serde(default)]
     env_path: Option<String>,
+    #[serde(default)]
+    service: bool,
 }
 
 fn path_has_nul(path: &Path) -> bool {
@@ -382,6 +385,16 @@ pub async fn run_internal_tool_runner() -> Result<i32> {
     let config = read_runner_config(&mut control)
         .await
         .map_err(|error| anyhow!(error))?;
+    // Keep the runner alive while its shell handles group TERM. A caught signal
+    // is reset on exec, so the shell and descendants retain normal TERM behavior.
+    #[cfg(unix)]
+    let _service_term = if config.service {
+        Some(tokio::signal::unix::signal(
+            tokio::signal::unix::SignalKind::terminate(),
+        )?)
+    } else {
+        None
+    };
 
     let mut command = Command::new(&config.program);
     command
@@ -755,23 +768,28 @@ fn spill_output(scratch: Option<&Path>, label: &str, text: &str) -> Option<PathB
 
 #[derive(Debug)]
 pub struct BashExecutionOptions {
+    pub(crate) service: bool,
     pub session_id: String,
     pub tool_call_id: String,
     pub command_shell_id: String,
     pub timeout_ms: Option<u64>,
     pub cancellation: Option<watch::Receiver<bool>>,
     pub output_tx: Option<mpsc::UnboundedSender<String>>,
+    pub background_output:
+        Option<std::sync::Arc<std::sync::Mutex<crate::background_processes::BackgroundOutput>>>,
 }
 
 impl BashExecutionOptions {
     fn local(command_shell_id: String, timeout_ms: Option<u64>) -> Self {
         Self {
+            service: false,
             session_id: "local".into(),
             tool_call_id: "local".into(),
             command_shell_id,
             timeout_ms,
             cancellation: None,
             output_tx: None,
+            background_output: None,
         }
     }
 }
@@ -1519,7 +1537,7 @@ fn tool_edit(
         legacy_new,
     ) {
         (Some(tag), Some(ops), _, _) => (tag.to_string(), ops.to_string()),
-        (None, None, Some(old), Some(new)) => {
+        (_, None, Some(old), Some(new)) => {
             let file = hashline::normalize_file(&live);
             let tag = hashline::tag_of_lf_text(&file.text);
             let matches: Vec<_> = file
@@ -1562,7 +1580,10 @@ fn tool_edit(
             ));
         }
         (_, None, _, _) => {
-            return Err(hashline::ToolError::new("INVALID_ARGUMENT", "ops required"));
+            return Err(hashline::ToolError::new(
+                "INVALID_ARGUMENT",
+                "ops required unless old_string and new_string are both supplied; example: PUT 48.=48:\n+replacement\nnew_string is read only when ops is absent",
+            ));
         }
     };
     let display = display_tool_path(root_kind, root, &resolved);
@@ -2293,6 +2314,8 @@ impl CapturedOutput {
 #[derive(Debug)]
 struct OutputNotifier {
     tx: Option<mpsc::UnboundedSender<String>>,
+    background_output:
+        Option<std::sync::Arc<std::sync::Mutex<crate::background_processes::BackgroundOutput>>>,
     session_id: String,
     tool_call_id: String,
     command_shell_id: String,
@@ -2308,6 +2331,7 @@ impl OutputNotifier {
     fn new(options: &BashExecutionOptions) -> Self {
         Self {
             tx: options.output_tx.clone(),
+            background_output: options.background_output.clone(),
             session_id: options.session_id.clone(),
             tool_call_id: options.tool_call_id.clone(),
             command_shell_id: options.command_shell_id.clone(),
@@ -2323,6 +2347,12 @@ impl OutputNotifier {
     fn push(&mut self, stream: OutputStream, chunk: String) {
         if chunk.is_empty() {
             return;
+        }
+        if let Some(output) = &self.background_output {
+            match output.lock() {
+                Ok(mut output) => output.push(matches!(stream, OutputStream::Stderr), &chunk),
+                Err(error) => tracing::error!(%error, "background output lock poisoned"),
+            }
         }
         if self.tx.is_none() || self.sent >= MAX_OUTPUT_NOTIFICATIONS {
             self.note_dropped(&chunk);
@@ -2395,6 +2425,12 @@ impl OutputNotifier {
     }
 
     fn flush_due(&mut self) {
+        if let Some(output) = &self.background_output {
+            match output.lock() {
+                Ok(mut output) => output.flush_due(),
+                Err(error) => tracing::error!(%error, "background output lock poisoned"),
+            }
+        }
         if self.last_emit.elapsed() < OUTPUT_NOTIFICATION_INTERVAL {
             return;
         }
@@ -2698,7 +2734,13 @@ async fn tool_bash(
         workspace: root.to_path_buf(),
         scratch_dir: scratch.map(Path::to_path_buf),
         env_path: shell::user_login_path().map(str::to_string),
+        service: options.service,
     };
+    // A managed background job may be stopped while waiting to begin. Never
+    // spawn an already-cancelled call solely to kill it afterwards.
+    if options.cancellation.as_ref().is_some_and(|rx| *rx.borrow()) {
+        return Err(("TOOL_ABORTED".into(), "bash aborted".into()));
+    }
     let SpawnedToolRunner {
         pid,
         mut ownership,
@@ -2739,14 +2781,14 @@ async fn tool_bash(
                 notifier.flush_due();
             }
             _ = &mut timeout_future => {
-                match kill_and_reap(pid, &mut ownership, &mut control, &mut wait_task).await {
+                match service_control::stop_or_kill(&options, service_control::Runner { pid, ownership: &mut ownership, control: &mut control, wait_task: &mut wait_task }, service_control::Output { rx: &mut output_rx, closed: &mut output_closed, stdout: &mut stdout, stderr: &mut stderr, notifier: &mut notifier }).await {
                     Ok(()) => break BashStop::TimedOut,
                     Err(error) => break BashStop::LifecycleFailed(error),
                 }
             }
             cancelled = wait_for_cancellation(&mut cancellation) => {
                 if cancelled {
-                    match kill_and_reap(pid, &mut ownership, &mut control, &mut wait_task).await {
+                    match service_control::stop_or_kill(&options, service_control::Runner { pid, ownership: &mut ownership, control: &mut control, wait_task: &mut wait_task }, service_control::Output { rx: &mut output_rx, closed: &mut output_closed, stdout: &mut stdout, stderr: &mut stderr, notifier: &mut notifier }).await {
                         Ok(()) => break BashStop::Aborted,
                         Err(error) => break BashStop::LifecycleFailed(error),
                     }
@@ -2997,14 +3039,14 @@ pub fn builtin_tool_defs() -> Value {
                 "Run a non-interactive shell command in the workspace. stdout keeps its first {}KB, stderr its \
                  last {}KB, and anything over budget is spilled to a file named in the truncation marker. \
                  Use Read/Glob/Grep for reading and searching instead of shell equivalents; when a shell search \
-                 is genuinely needed prefer `rg` and exclude build output.",
+                 is genuinely needed prefer `rg` and exclude build output. Do not poll with sleep; in an Expert Team use wait_for_updates for teammate replies. Background processes and long sleep hold shell slots until they stop; for long commands use run_in_background and check process status without shell polling.",
                 BUDGET_SHELL.max_bytes / 1024,
                 BUDGET_SHELL_ERR.max_bytes / 1024
             ),
             "risk": "high",
             "parameters": {
                 "type": "object",
-                "properties": { "command": { "type": "string" } },
+                "properties": { "command": { "type": "string" }, "backgroundKind": { "type":"string", "enum":["command","service"], "default":"command", "description":"command preserves the existing timeout. Explicit service requires an approved current Agent Team/run and run_in_background=true; do not pass timeout. Host-owned TTL is 6 hours; Team pause/end and owner cancellation stop it. Services hold the existing tool/shell permit, with an additional Host limit of 2 and Team/session limit of 1." }, "run_in_background": { "type": "boolean", "default": false, "description": "Start a Host-managed background process after normal approval; return its ID immediately. Ordinary commands keep the same timeout and tool capacity until they stop: default 60 seconds; pass timeout in seconds (1-21600) for finite long runs." } },
                 "required": ["command"]
             }
         }
@@ -3110,6 +3152,7 @@ mod tests {
     #[test]
     fn runner_config_frame_validation_rejects_malformed_payloads() {
         let config = ToolRunnerStartConfig {
+            service: false,
             program: PathBuf::from("resolved-shell"),
             args: vec!["-c".into(), "printf test".into()],
             workspace: PathBuf::from("workspace"),
@@ -3128,6 +3171,7 @@ mod tests {
         assert!(decode_runner_config(&invalid_json).is_err());
 
         let nul_config = ToolRunnerStartConfig {
+            service: false,
             program: PathBuf::from("resolved-shell"),
             args: vec!["bad\0arg".into()],
             workspace: PathBuf::from("workspace"),
@@ -4489,12 +4533,14 @@ mod tests {
             &serde_json::json!({ "command": command }),
             Some(15_000),
             Some(BashExecutionOptions {
+                service: false,
                 session_id: "bounded-session".into(),
                 tool_call_id: "bounded-call".into(),
                 command_shell_id: shell_id,
                 timeout_ms: Some(15_000),
                 cancellation: None,
                 output_tx: None,
+                background_output: None,
             }),
         )
         .await;
@@ -4558,12 +4604,14 @@ mod tests {
     fn output_notifications_have_a_per_call_cap() {
         let (tx, rx) = mpsc::unbounded_channel();
         let options = BashExecutionOptions {
+            service: false,
             session_id: "notification-session".into(),
             tool_call_id: "notification-call".into(),
             command_shell_id: shell::default_shell_id().into(),
             timeout_ms: None,
             cancellation: None,
             output_tx: Some(tx),
+            background_output: None,
         };
         let mut notifier = OutputNotifier::new(&options);
         for _ in 0..(MAX_OUTPUT_NOTIFICATIONS + 100) {
@@ -4583,12 +4631,14 @@ mod tests {
         let workspace = root.path().join("cwd with spaces");
         std::fs::create_dir_all(&workspace).unwrap();
         let options = || BashExecutionOptions {
+            service: false,
             session_id: "powershell-session".into(),
             tool_call_id: "powershell-call".into(),
             command_shell_id: shell::WINDOWS_POWERSHELL_ID.into(),
             timeout_ms: Some(5_000),
             cancellation: None,
             output_tx: None,
+            background_output: None,
         };
 
         let output = execute_tool_with_options(
@@ -4749,6 +4799,115 @@ mod tests {
             not_found.error_code.as_deref(),
             Some("EDIT_LEGACY_MATCH_FAILED")
         );
+    }
+
+    #[tokio::test]
+    async fn edit_accepts_tag_with_legacy_arguments() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("legacy.txt");
+        std::fs::write(&target, "before\nunique\nafter\n").unwrap();
+        let result = execute_tool(
+            Some(dir.path()),
+            None,
+            "Edit",
+            &json!({
+                "path": "legacy.txt", "tag": "stale-ignored",
+                "old_string": "unique", "new_string": "replacement"
+            }),
+            5_000,
+        )
+        .await;
+        assert!(result.ok, "{:?}", result.content);
+        assert_eq!(
+            std::fs::read_to_string(&target).unwrap(),
+            "before\nreplacement\nafter\n"
+        );
+        assert_eq!(result.content["tag"].as_str().unwrap().len(), 4);
+        for old in ["missing", "repeated"] {
+            std::fs::write(&target, "repeated\nrepeated\n").unwrap();
+            let result = execute_tool(
+                Some(dir.path()),
+                None,
+                "Edit",
+                &json!({
+                    "path": "legacy.txt", "tag": "stale-ignored",
+                    "old_string": old, "new_string": "replacement"
+                }),
+                5_000,
+            )
+            .await;
+            assert_eq!(
+                result.error_code.as_deref(),
+                Some("EDIT_LEGACY_MATCH_FAILED")
+            );
+            assert_eq!(
+                std::fs::read_to_string(&target).unwrap(),
+                "repeated\nrepeated\n"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn edit_ops_take_precedence_over_legacy_arguments() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("anchored.txt");
+        std::fs::write(&target, "original\n").unwrap();
+        let read = execute_tool(
+            Some(dir.path()),
+            None,
+            "Read",
+            &json!({"path": "anchored.txt"}),
+            5_000,
+        )
+        .await;
+        let result = execute_tool(
+            Some(dir.path()),
+            None,
+            "Edit",
+            &json!({
+                "path": "anchored.txt", "tag": read.content["tag"],
+                "ops": "PUT 1.=1:\n+anchored\n",
+                "old_string": "original", "new_string": "legacy"
+            }),
+            5_000,
+        )
+        .await;
+        assert!(result.ok, "{:?}", result.content);
+        assert_eq!(std::fs::read_to_string(&target).unwrap(), "anchored\n");
+    }
+
+    #[tokio::test]
+    async fn edit_missing_ops_and_body_explain_the_operation_shape() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("shape.txt");
+        std::fs::write(&target, "original\n").unwrap();
+        let read = execute_tool(
+            Some(dir.path()),
+            None,
+            "Read",
+            &json!({"path": "shape.txt"}),
+            5_000,
+        )
+        .await;
+        for (ops, code) in [
+            (None, "INVALID_ARGUMENT"),
+            (Some("PUT 1.=1:"), "EDIT_PARSE_FAILED"),
+        ] {
+            let mut args =
+                json!({"path": "shape.txt", "tag": read.content["tag"], "new_string": "ignored"});
+            if let Some(ops) = ops {
+                args["ops"] = json!(ops);
+            }
+            let result = execute_tool(Some(dir.path()), None, "Edit", &args, 5_000).await;
+            assert_eq!(result.error_code.as_deref(), Some(code));
+            let message = result.content["error"].as_str().unwrap();
+            assert!(message.contains("PUT 48.=48:\n+replacement"), "{message}");
+            assert!(
+                message.contains("new_string is read only when ops is absent"),
+                "{message}"
+            );
+            assert_eq!(std::fs::read_to_string(&target).unwrap(), "original\n");
+        }
     }
 
     #[tokio::test]

@@ -114,7 +114,7 @@ runs 10 delegates, telling the model to wait or stop first.
 - A delegate that outlives its turn is stopped, not left running; the prompt
   rule plus the turn-end abort make that the exception rather than the policy.
 
-## Delegation policy amendment (2026-10-07)
+## Historical delegation policy amendment (2026-10-07)
 
 For a standard Agent session with at least one enabled subagent, the orchestrator
 uses a delegate-first policy for separable, substantial work: split independent
@@ -150,3 +150,24 @@ ADR; Team turns continue to omit `Task*` and plugin `SessionTask`.
   must remember to set is a flag it forgets; a lifecycle with distinct tools
   makes "start, work, converge" a sequence the model can follow and the prompt
   can teach.
+
+## Bounded recursive delegation amendment (2026-10-09)
+
+The previous no-recursion rule and blanket Team Task isolation prevented
+execution experts from decomposing their own work, even when users intended
+bounded delegation. Replace those rules with the shared runtime policy in
+runtime §5f: configurable depth and tree-wide running-count limits, scoped
+lifecycle/history, descendant permission/tool ceilings and subtree cleanup.
+Default depth 1 preserves existing standard one-level fan-out; default running
+cap remains 10. Agent execution experts now use the standard catalog, while
+Team Leads and Plan research retain their separate orchestration boundaries.
+
+Reusing root Task closures was rejected because child lifecycle calls could
+control sibling branches and inherit broader permissions. Creating durable
+child sessions was rejected because it would lose expert identity and change
+persistence ownership. Child loops remain SubagentRun instances under the
+existing durable session/turn, with actual Task-parent attribution.
+
+This enables delegation rather than guaranteeing that every model request
+will use it. It adds no paid request beyond tasks the selected model dispatches
+and makes no changes to Plan approval or Host authorization boundaries.

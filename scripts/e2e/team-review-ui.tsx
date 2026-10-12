@@ -69,8 +69,11 @@ globalThis.teamReviewUiProbe = async () => {
   });
   globalThis.__teamReviewStore = {
     providers: [
-      { id: "provider-1", name: "Provider One", models: [{ id: "model-1" }, { id: "model-2", alias: "Model Two" }] },
-      { id: "provider-2", name: "Provider Two", models: [{ id: "model-3" }] },
+      { id: "provider-1", name: "Provider One", enabled: true, hasSecret: true, models: [{ id: "model-1", thinkingLevels: ["high"] }, { id: "model-2", alias: "Model Two", thinkingLevels: ["low"] }] },
+      { id: "provider-2", name: "Provider Two", enabled: true, hasSecret: true, models: [{ id: "model-3", thinkingLevels: ["off"] }] },
+      { id: "provider-disabled", name: "Disabled", enabled: false, hasSecret: true, models: [{ id: "disabled-model", thinkingLevels: ["high"] }] },
+      { id: "provider-empty", name: "Empty", enabled: true, hasSecret: true, models: [] },
+      { id: "provider-generic", name: "Generic", enabled: true, hasSecret: true, models: [{ id: "generic-model", thinkingLevels: [] }] },
     ],
   };
 
@@ -163,12 +166,14 @@ globalThis.teamReviewUiProbe = async () => {
   assert(select("review-provider-researcher").value === "provider-removed", "missing provider ID was replaced");
   assert(select("review-model-researcher").value === "model-removed", "missing model ID was replaced");
   assert(host.textContent?.includes(i18n.t("team.review.missingProvider", { id: "provider-removed" })), "missing route ID is not visible");
+  assert(!Array.from(select("review-provider-researcher").options).some((option) => ["provider-disabled", "provider-empty"].includes(option.value)), "review offers an unrunnable provider");
 
   shouldRejectInvalid = true;
   choose(select("review-provider-researcher"), "provider-1");
   await waitFor(() => calls.some((call) => call.method === "update"), "provider edit reached API");
   await waitFor(() => select("review-model-researcher").value === "model-1", "provider edit model selection");
   await waitFor(() => !select("review-model-researcher").disabled, "provider edit finished saving");
+  assert(Array.from(select("review-thinking-researcher").options).map((option) => option.value).join(",") === "omit,high", "thinking menu is not bound to the selected model");
   choose(select("review-model-researcher"), "model-2");
   await waitFor(() => Boolean(host.querySelector('[role="alert"]')), "invalid route error rendered");
   assert(select("review-provider-researcher").value === "provider-1", "rejected update changed provider binding");
@@ -202,6 +207,8 @@ globalThis.teamReviewUiProbe = async () => {
   await frame();
   assert(select("review-provider-researcher").value === "provider-2", "stale response replaced new team provider");
   assert(select("review-model-researcher").value === "model-3", "stale response replaced new team model");
+  const routeChange = calls.filter((call) => call.method === "update").at(-1);
+  assert((routeChange?.args[3] as Array<{thinkingLevel: string}>)[0].thinkingLevel === "off", "provider change retained unsupported high thinking");
   assert(refreshes === 2, "stale response triggered a refresh for the new team");
 
   pendingUpdate = null;
@@ -215,6 +222,28 @@ globalThis.teamReviewUiProbe = async () => {
   const cancelCall = calls.find((call) => call.method === "cancel");
   assert(cancelCall?.args[0] === "team-new" && cancelCall.args[2] === 11, "cancel used stale team or revision");
   assert(cancelRevision === 11, "cancel did not carry current CAS revision");
+  // Repair one member without resubmitting another member's stale route.
+  const repair = review("team-repair", "review-repair", 1, "provider-1", "model-1");
+  repair.members.push({ name: "other", contextKind: "fresh", selection: {
+    providerId: "provider-removed", modelId: "model-removed", thinkingLevel: "high",
+  } });
+  shouldRejectInvalid = false;
+  render("team-repair", repair);
+  await waitFor(() => !select("review-model-researcher").disabled, "repair review became editable");
+  const updatesBeforeRepair = calls.filter((call) => call.method === "update").length;
+  choose(select("review-model-researcher"), "model-2");
+  await waitFor(() => calls.filter((call) => call.method === "update").length > updatesBeforeRepair && !select("review-model-researcher").disabled, "model repair saved");
+  const repairCall = calls.filter((call) => call.method === "update").at(-1);
+  const repairSelections = repairCall?.args[3] as Array<{ name: string; thinkingLevel: string }>;
+  assert(repairSelections.length === 1 && repairSelections[0].name === "researcher", "member repair resubmitted another invalid route");
+  assert(repairSelections[0].thinkingLevel === "low", "model change retained unsupported thinking");
+  assert(select("review-thinking-researcher").value === "low", "adjusted effort was not displayed");
+  choose(select("review-thinking-researcher"), "omit");
+  await waitFor(() => select("review-thinking-researcher").value === "omit" && !select("review-thinking-researcher").disabled, "omit effort saved");
+  assert(select("review-thinking-researcher").selectedOptions[0].textContent === i18n.t("extensions.subagents.thinkingOmit"), "omit label is not localized");
+  render("team-generic", review("team-generic", "review-generic", 1, "provider-generic", "generic-model"));
+  await waitFor(() => select("review-provider-researcher").value === "provider-generic", "generic route rendered");
+  assert(Array.from(select("review-thinking-researcher").options).some((option) => option.value === "high" && !option.disabled), "generic empty binding lost manual thinking levels");
   root.unmount();
   host.remove();
   return { ok: true, calls: calls.map(({ method, args }) => ({ method, revision: args[2] })), refreshes };

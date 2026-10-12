@@ -1,28 +1,28 @@
-import { useState } from "react";
-import type { TFunction } from "i18next";
 import {
-  keybindingDisplayParts,
   type ComposerCommand,
   type ExecutionProfile,
+  keybindingDisplayParts,
   type Mode,
   type PermissionMode,
-  type ShortcutPlatform,
   type SessionThinkingLevel,
+  type ShortcutPlatform,
 } from "@pi-desktop/shared";
-import type { AppState } from "../../../stores/app-store";
-import { TooltipButton } from "../../../components/ui";
+import type { TFunction } from "i18next";
+import { useState } from "react";
 import {
   IconArrowUp,
   IconSparkles,
   IconStop,
   IconUndo2,
 } from "../../../components/icons";
+import { TooltipButton } from "../../../components/ui";
+import { type AppState, useAppStore } from "../../../stores/app-store";
 import { LiveVoiceControls } from "../../voice/live/LiveVoiceControls";
-import { ComposerPlusMenu } from "./ComposerPlusMenu";
-import { ComposerModelPicker } from "./ComposerModelPicker";
-import { ComposerExecutionProfilePicker } from "./ComposerExecutionProfilePicker";
 import { ComposerContractPicker } from "./ComposerContractPicker";
 import { ComposerControlSlots } from "./ComposerControlSlots";
+import { ComposerExecutionProfilePicker } from "./ComposerExecutionProfilePicker";
+import { ComposerModelPicker } from "./ComposerModelPicker";
+import { ComposerPlusMenu } from "./ComposerPlusMenu";
 import type { useComposerModelMenu } from "./hooks/useComposerModelMenu";
 
 type ModelMenuController = ReturnType<typeof useComposerModelMenu>;
@@ -33,6 +33,7 @@ export type ComposerToolbarProps = {
   displayMode?: Mode;
   executionProfile?: ExecutionProfile;
   planningLive: boolean;
+  goalExecutionActive?: boolean;
   providerId?: string;
   modelId?: string;
   thinkingLevel: SessionThinkingLevel;
@@ -65,9 +66,8 @@ export type ComposerToolbarProps = {
 
 /**
  * Composer toolbar:
- * Left to right: fixed `+` menu trigger, profile picker, model/reasoning picker,
- * compact mode indicator (when Plan or Goal is active).
- * Right: plugin controls, prompt enhancement, live voice, send/stop.
+ * Left: fixed `+` menu trigger, profile picker, compact mode indicator, plugins.
+ * Right: plugins, model/reasoning picker, prompt enhancement, live voice, send/stop.
  */
 export function ComposerToolbar({
   t,
@@ -75,6 +75,7 @@ export function ComposerToolbar({
   displayMode,
   executionProfile = "standard",
   planningLive,
+  goalExecutionActive = false,
   providerId,
   modelId,
   thinkingLevel,
@@ -104,6 +105,7 @@ export function ComposerToolbar({
   workSessionId,
   workSessionLabel,
 }: ComposerToolbarProps) {
+  const setSettingsTab = useAppStore((state) => state.setSettingsTab);
   const [plusOpen, setPlusOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const platform = (window.piDesktop?.platform ?? "darwin") as ShortcutPlatform;
@@ -117,7 +119,7 @@ export function ComposerToolbar({
 
   return (
     <div className="composer-toolbar">
-      {/* Slot 1 (+), Slot 2 (Profile), Slot 3 (Model), Slot 4 (Mode Indicator) */}
+      {/* Left controls retain their plugin slot and mode-entry wiring. */}
       <div className="composer-left">
         {/* Slot 1: Anchored Plus Menu */}
         <ComposerPlusMenu
@@ -200,10 +202,30 @@ export function ComposerToolbar({
           }}
         />
 
-        {/* Slot 3: Model and Reasoning Picker */}
+        {/* Goal execution status is already presented by the progress bar. */}
+        <ComposerContractPicker
+          t={t}
+          mode={mode}
+          displayMode={displayMode}
+          planningLive={planningLive}
+          goalExecutionActive={goalExecutionActive}
+          disabled={controlsBlocked}
+          controlsBlocked={controlsBlocked}
+          onClick={() => {
+            closeAllMenus();
+            setPlusOpen(true);
+          }}
+        />
+        <ComposerControlSlots side="left" />
+      </div>
+
+      {/* Right side: Plugin controls, Model, Enhancement, Live voice, Send/Stop */}
+      <div className="composer-right">
+        <ComposerControlSlots side="right" />
         <ComposerModelPicker
           t={t}
           controller={modelMenu}
+          onOpenModelSettings={() => setSettingsTab("agent")}
           modelLabel={modelLabel}
           thinkingLabel={thinkingLabel}
           thinkingLevel={thinkingLevel}
@@ -215,26 +237,6 @@ export function ComposerToolbar({
             setProfileOpen(false);
           }}
         />
-
-        {/* Slot 4: Compact Indicator only when Plan or Goal is active */}
-        <ComposerContractPicker
-          t={t}
-          mode={mode}
-          displayMode={displayMode}
-          planningLive={planningLive}
-          disabled={controlsBlocked}
-          controlsBlocked={controlsBlocked}
-          onClick={() => {
-            closeAllMenus();
-            setPlusOpen(true);
-          }}
-        />
-        <ComposerControlSlots side="left" />
-      </div>
-
-      {/* Right side: Plugin controls, Enhancement, Live voice, Send/Stop */}
-      <div className="composer-right">
-        <ComposerControlSlots side="right" />
         <TooltipButton
           type="button"
           className={`icon-btn icon-btn-square composer-enhance-btn${enhancingPrompt ? " is-loading" : ""}`}

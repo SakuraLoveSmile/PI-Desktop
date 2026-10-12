@@ -220,3 +220,12 @@ many requests wait behind it.
   to any user of parallel delegates.
 - Delegate rows make transcripts longer on disk; they stay collapsed and out of
   model context, but review and rollback still see them.
+
+## Recursive execution amendment (2026-10-09)
+
+The earlier no-nested-Task decision is superseded by ADR 0089's bounded
+recursive delegation amendment. SubagentRun still owns child context/report
+execution, while owner-scoped runtime Task closures manage descendants under
+user-configured limits. Work-tool inheritance never copies a parent's Task
+closures or Team coordination identity; fresh scoped lifecycle tools are added
+only below the depth ceiling. Ordinary Host permissions remain authoritative.

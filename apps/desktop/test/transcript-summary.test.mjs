@@ -109,7 +109,9 @@ test("activity summary and compact visibility preserve error, search and thinkin
     { kind: "hostedSearch", message: message("search", ""), round: { id: "r", status: "failed" } },
   ];
   for (const subset of [[], items, items.slice(0, 1), items.slice(2, 4), items.slice(4)]) {
-    assert.deepEqual(cachedActivitySummary(subset), activitySummary(subset));
+    const { segments, ...summary } = cachedActivitySummary(subset);
+    assert.deepEqual(summary, activitySummary(subset));
+    assert.equal(segments.reduce((count, segment) => count + segment.count, 0), summary.tools);
     for (const compact of [false, true]) for (const active of [false, true]) {
       assert.deepEqual(cachedVisibleActivityItems(subset, compact, active), visibleActivityItems(subset, compact, active));
       const parts = [{ kind: "activity", items: subset }, { kind: "message", message: message("progress", "progress") }];
@@ -138,7 +140,9 @@ test("text and delegate-child changes keep tool inputs stable; cross-part TaskWa
   const timings = collectDelegationTimings(inputs);
   assert.equal(statuses.get("d"), "failed");
   assert.deepEqual(delegationTimingBounds([task], timings), { startedAt: 1000, completedAt: 6000 });
-  assert.deepEqual(cachedActivitySummary([task], statuses), activitySummary([task], statuses));
+  const { segments, ...summary } = cachedActivitySummary([task], statuses);
+  assert.deepEqual(summary, activitySummary([task], statuses));
+  assert.deepEqual(segments, [{ label: "chat.activityTools", count: 1 }]);
   assert.equal(cachedActivitySummary([task], statuses).issues, 1);
   assert.equal(collectDelegationStatuses(getAssistantTurnSummary(first).toolItems, { turnLive: false }).get("d"), "aborted");
 });

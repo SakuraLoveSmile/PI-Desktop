@@ -52,6 +52,7 @@ const HOST_PROXY_ALLOWED = new Set([
   "tools.execute",
   "tools.abort",
   "tools.list",
+  "backgroundProcesses.read",
   "session.get",
   "session.appendMessage",
   "session.appendCompaction",
@@ -61,6 +62,12 @@ const HOST_PROXY_ALLOWED = new Set([
   "plans.submit",
   "plans.pending",
   "plans.abort",
+  "project.autoMemory.agentList",
+  "project.autoMemory.agentUpsert",
+  "project.autoMemory.agentDelete",
+  "project.history.search",
+  "project.history.context",
+  "project.codeSearch",
   // Goal report draft writes are scoped by the Host-approved execution id
   // captured in the runtime context; report reads/retry remain Main-only.
   "goalReports.submitDraft",
@@ -86,6 +93,9 @@ const HOST_PROXY_ALLOWED = new Set([
   "session.queuePush",
   "session.queuePrioritize",
   // Team data is Host-authorized by the session context carried on each call.
+  "team.registerLeadAsk",
+  "team.deferLeadAsk",
+  "team.ackLeadAsk",
   "team.createMember",
   "team.createTask",
   "team.declareStrategy",
@@ -102,6 +112,9 @@ const HOST_PROXY_ALLOWED = new Set([
   "team.listMessages",
   "team.getLeadExecutionState",
   "team.readExecutionInbox",
+  "team.getOrdinaryInboxCapability",
+  "team.readOrdinaryInbox",
+  "team.ackOrdinaryInbox",
   "team.sendMessage",
   "team.updateTask",
 ]);
@@ -170,6 +183,7 @@ export class AgentSidecar {
   private exitNotified = false;
   private stderrTail: string[] = [];
   private host: SidecarHostLink | null = null;
+  private ordinaryTeamInboxHandler?: (method: string, params: Record<string, unknown>) => Promise<unknown>;
   private unsubscribeHost: (() => void) | null = null;
   private unsubscribeHostExit: (() => void) | null = null;
   private stdoutReader?: ReturnType<typeof readNdjsonLines>;
@@ -183,6 +197,7 @@ export class AgentSidecar {
   // The embedding host registers this binding from the host-owned session
   // record immediately before starting a runtime turn.
   private projectInstructionRoots = new Map<string, string>();
+  private projectContextBindings = new Map<string, { id: string; path: string }>();
   private vendorAuthResolver: VendorAuthResolver | null = null;
   private trustedExtensionBridge: TrustedExtensionSidecarBridge | null = null;
   // Vendor-account rows this session was launched with. The sidecar can only
@@ -237,6 +252,7 @@ export class AgentSidecar {
     this.unsubscribeHostExit?.();
     this.unsubscribeHostExit = null;
     this.host = null;
+    this.ordinaryTeamInboxHandler = undefined;
     for (const [, p] of this.pending) {
       if (p.timer) clearTimeout(p.timer);
       p.reject(error);
@@ -351,10 +367,15 @@ export class AgentSidecar {
     const root = projectPath?.trim();
     if (root) this.projectInstructionRoots.set(id, root);
     else this.projectInstructionRoots.delete(id);
+    if (!root) this.projectContextBindings.delete(id);
+    else if (this.projectContextBindings.get(id)?.path !== root) {
+      this.projectContextBindings.set(id, { id: randomUUID(), path: root });
+    }
   }
 
   clearProjectInstructionRoot(sessionId: string): void {
     this.projectInstructionRoots.delete(sessionId.trim());
+    this.projectContextBindings.delete(sessionId.trim());
   }
 
   setVendorAuthResolver(resolver: VendorAuthResolver): void {
@@ -418,6 +439,11 @@ export class AgentSidecar {
       this.unsubscribeHostExit = null;
       this.host = null;
     });
+  }
+
+  /** Internal Main admission path; mailbox bodies must never bypass its gate. */
+  setOrdinaryTeamInboxHandler(handler: (method: string, params: Record<string, unknown>) => Promise<unknown>): void {
+    this.ordinaryTeamInboxHandler = handler;
   }
 
   /**
@@ -499,6 +525,19 @@ export class AgentSidecar {
           );
         }
         const params = (msg.params?.params ?? {}) as Record<string, unknown>;
+        if (method === "team.getOrdinaryInboxCapability" || method === "team.readOrdinaryInbox" || method === "team.ackOrdinaryInbox") {
+          const handler = this.ordinaryTeamInboxHandler;
+          const host = this.host;
+          if (!handler) throw Object.assign(new Error("ordinary Team inbox capability unavailable"), { code: -32601 });
+          if (!host || this.disposed || this.closed) throw Object.assign(new Error("ordinary Team inbox admission unavailable"), { errorCode: "TEAM_TURN_INVALID" });
+          const result = method === "team.getOrdinaryInboxCapability"
+            ? await host.call(method, {}) : await handler(method, params);
+          if (this.disposed || this.closed || this.host !== host || this.ordinaryTeamInboxHandler !== handler) {
+            throw Object.assign(new Error("ordinary Team inbox transport changed during admission"), { errorCode: "TEAM_TURN_INVALID" });
+          }
+          this.writeToChild(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result }) + "\n");
+          return;
+        }
         const requestedToolName = String(params.toolName ?? "");
         const planLocalTool =
           requestedToolName === "Skill" ||
@@ -533,6 +572,43 @@ export class AgentSidecar {
           this.writeToChild(
             JSON.stringify({ jsonrpc: "2.0", id: msg.id, result }) + "\n",
           );
+          return;
+        }
+        if (method.startsWith("project.autoMemory.agent") || method === "project.history.search" ||
+          method === "project.history.context" || method === "project.codeSearch" || method === "backgroundProcesses.read") {
+          if (!this.host) throw new Error("host unavailable");
+          const sessionId = typeof params.sessionId === "string" ? params.sessionId : "";
+          const binding = this.projectContextBindings.get(sessionId);
+          if (!binding || params.projectContextBindingId !== binding.id) {
+            throw new Error("project context requires a bound project session");
+          }
+          const host = this.host;
+          const fields = method === "project.autoMemory.agentUpsert"
+            ? ["id", "title", "content", "expectedTitle", "expectedContent"]
+            : method === "project.autoMemory.agentDelete" ? ["id", "expectedTitle", "expectedContent"]
+            : method === "project.history.search" ? ["query", "limit"]
+            : method === "project.history.context" ? ["targetSessionId", "messageId", "query"]
+            : method === "project.codeSearch" ? ["action", "query", "limit"] : [];
+          if (method === "backgroundProcesses.read") {
+            if (typeof params.id !== "string" || !params.id.trim()) throw new Error("Background process id required");
+            const result = await host.call<{ process: { id: string; sessionId: string } }>(method, { sessionId, id: params.id });
+            if (this.disposed || this.host !== host || this.projectContextBindings.get(sessionId) !== binding) {
+              throw new Error("project context binding changed during request");
+            }
+            if (result.process?.id !== params.id || result.process?.sessionId !== sessionId) {
+              throw new Error("Background process ownership mismatch");
+            }
+            this.writeToChild(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result }) + "\n");
+            return;
+          }
+          const result = await host.call(method, {
+            sessionId, boundPath: binding.path,
+            ...Object.fromEntries(fields.filter(field => params[field] !== undefined).map(field => [field, params[field]])),
+          });
+          if (this.disposed || this.host !== host || this.projectContextBindings.get(sessionId) !== binding) {
+            throw new Error("project context binding changed during request");
+          }
+          this.writeToChild(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result }) + "\n");
           return;
         }
         if (method === "provider.resolveAuth") {
@@ -640,6 +716,15 @@ export class AgentSidecar {
 
   async call<T = unknown>(method: string, params: unknown = {}): Promise<T> {
     if (this.closed) throw new Error("agent sidecar is unavailable");
+    if ((method === "agent.prompt" || method === "agent.executeApprovedPlan" || method === "agent.compact") &&
+      params && typeof params === "object" && !Array.isArray(params)) {
+      const values = params as Record<string, unknown>;
+      const binding = this.projectContextBindings.get(String(values.sessionId ?? ""));
+      params = { ...values, projectContextBindingId: binding?.id };
+    }
+    if (method === "agent.disposeSession" && params && typeof params === "object" && !Array.isArray(params)) {
+      this.clearProjectInstructionRoot(String((params as Record<string, unknown>).sessionId ?? ""));
+    }
     const id = randomUUID();
     const timeoutMs = rpcTimeoutMs(method, params);
     const payload = JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n";
@@ -674,6 +759,7 @@ export class AgentSidecar {
 
   async dispose(): Promise<void> {
     this.disposed = true;
+    this.projectContextBindings.clear();
     this.projectInstructionRoots.clear();
     this.vendorAuthBindings.clear();
     this.closeTransport(new Error("agent sidecar disposed"));

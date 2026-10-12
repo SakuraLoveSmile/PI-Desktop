@@ -2,6 +2,76 @@ import { readComposerSource } from "./helpers/source-contracts.mjs";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { register } from "node:module";
+
+register(new URL("./helpers/ts-import-hooks.mjs", import.meta.url));
+const { resolveComposerPlaceholder } = await import("../src/features/chat/composer/model.ts");
+
+const placeholderInput = {
+  variant: "docked",
+  index: 0,
+  runActive: false,
+  hasDraft: false,
+  enterToSend: true,
+  platform: "darwin",
+};
+
+test("idle placeholders keep each context's stable index and fallback", () => {
+  for (const [variant, keys] of [
+    ["home", ["chat.placeholderHome", "chat.placeholderHomeHint", "chat.placeholderShortcut"]],
+    ["docked", ["chat.placeholder", "chat.placeholderHint", "chat.placeholderShortcut"]],
+  ]) {
+    for (const index of [0, 1, 2, 3, 7, -1]) {
+      const input = { ...placeholderInput, variant, index };
+      const expected = keys[index % keys.length] ?? keys[0];
+      assert.equal(resolveComposerPlaceholder(input).key, expected);
+      assert.deepEqual(resolveComposerPlaceholder(input), resolveComposerPlaceholder(input));
+    }
+  }
+});
+
+test("an active run with an empty draft teaches follow-up and immediate steering in both contexts", () => {
+  for (const variant of ["home", "docked"]) {
+    assert.deepEqual(resolveComposerPlaceholder({ ...placeholderInput, variant, index: 2, runActive: true }), {
+      key: "chat.placeholderRunning",
+      sendShortcut: "Enter",
+      steerShortcut: "⌥Enter",
+    });
+  }
+});
+
+test("a running text or file-reference draft retains the selected idle guidance", () => {
+  const reference = { id: "file-1", sessionId: "session-1", path: "/tmp/report.md", name: "report.md", kind: "file" };
+  for (const draft of [
+    { value: "continue", references: [] },
+    { value: "", references: [reference] },
+  ]) {
+    const hasDraft = Boolean(draft.value.trim() || draft.references.length);
+    assert.equal(resolveComposerPlaceholder({ ...placeholderInput, index: 1, runActive: true, hasDraft }).key, "chat.placeholderHint");
+  }
+});
+
+test("running guidance follows the platform and Enter-to-send preference", () => {
+  for (const [platform, sendShortcut, steerShortcut] of [
+    ["darwin", "⌘Enter", "⌥Enter"],
+    ["win32", "Ctrl+Enter", "Alt+Enter"],
+    ["linux", "Ctrl+Enter", "Alt+Enter"],
+  ]) {
+    assert.deepEqual(resolveComposerPlaceholder({ ...placeholderInput, runActive: true, platform, enterToSend: false }), {
+      key: "chat.placeholderRunning", sendShortcut, steerShortcut,
+    });
+    assert.deepEqual(resolveComposerPlaceholder({ ...placeholderInput, runActive: true, platform, enterToSend: true }), {
+      key: "chat.placeholderRunning", sendShortcut: "Enter", steerShortcut,
+    });
+  }
+});
+
+test("clearing a running draft restores guidance without changing its idle index", () => {
+  const input = { ...placeholderInput, variant: "home", index: 1, runActive: true };
+  assert.equal(resolveComposerPlaceholder({ ...input, hasDraft: true }).key, "chat.placeholderHomeHint");
+  assert.equal(resolveComposerPlaceholder(input).key, "chat.placeholderRunning");
+  assert.equal(resolveComposerPlaceholder({ ...input, runActive: false }).key, "chat.placeholderHomeHint");
+});
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 

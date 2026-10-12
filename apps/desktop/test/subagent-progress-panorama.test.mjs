@@ -4,6 +4,7 @@ import test from "node:test";
 
 const [
   subagentDetailSource,
+  subagentRowSource,
   agentPanoramaSource,
   viewportSource,
   overviewTabSource,
@@ -16,6 +17,7 @@ const [
   zhLocaleSource,
 ] = await Promise.all([
   readFile(new URL("../src/features/chat/transcript/SubagentDetail.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../src/features/chat/activity/SubagentActivityRow.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/components/workpanel/AgentPanorama.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/components/workpanel/agent-panorama-viewport.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/components/workpanel/OverviewTab.tsx", import.meta.url), "utf8"),
@@ -28,12 +30,12 @@ const [
   readFile(new URL("../../../packages/i18n/src/locales/zh-CN/index.ts", import.meta.url), "utf8"),
 ]);
 
-test("SubagentDetail renders compact Task progress card with panorama button and task rows", () => {
-  // Card header and title
+test("SubagentDetail renders compact task rows that open the owning session's delegation", () => {
+  // The inline list has an accessible title; panorama remains in Overview.
   assert.match(subagentDetailSource, /subagent-tasks-card/);
   assert.match(subagentDetailSource, /chat\.taskProgress/);
-  assert.match(subagentDetailSource, /chat\.viewPanorama/);
-  assert.match(subagentDetailSource, /overviewWorkPanelTab\("panorama"\)/);
+  assert.match(subagentDetailSource, /className="subagent-tasks-list" role="list"/);
+  assert.doesNotMatch(subagentDetailSource, /viewPanorama|overviewWorkPanelTab|subagent-tasks-header/);
 
   // Filters actual delegations
   assert.match(subagentDetailSource, /isDelegationActivityItem/);
@@ -43,7 +45,14 @@ test("SubagentDetail renders compact Task progress card with panorama button and
   assert.match(subagentDetailSource, /subagent-tasks-row/);
   assert.match(subagentDetailSource, /delegateAgentName/);
   assert.match(subagentDetailSource, /delegateTaskDescription/);
-  assert.match(subagentDetailSource, /openSubagentTab/);
+  assert.match(subagentDetailSource, /openWorkPanelTabForSession\(ownerSessionId, subagentWorkPanelTab\(row\.delegationId, row\.agentName\)\)/);
+  assert.match(subagentDetailSource, /openSubagentTab\(row\.delegationId, row\.agentName\)/);
+  assert.match(subagentDetailSource, /statusLabel=\{t\(`panel\.activity\.status\.\$\{row\.status\}`\)\} timing=\{row\.timing\} now=\{now\}/);
+  assert.match(subagentRowSource, /subagent-activity-name/);
+  assert.match(subagentRowSource, /subagent-activity-task/);
+  assert.match(subagentRowSource, /subagent-activity-status/);
+  assert.match(subagentRowSource, /subagent-activity-elapsed/);
+  assert.match(subagentRowSource, /<TooltipButton[\s\S]*?tooltip=\{title\} onClick=\{onOpen\}/);
 });
 
 test("AgentPanorama implements zoom, fit, reset, pan, and coordinate geometry", () => {
@@ -95,8 +104,10 @@ test("Team panorama owns the canvas separately from the aggregate panel", () => 
 test("CSS rules include agent-panorama import and compact task progress styles", () => {
   assert.match(globalsCssSource, /@import "\.\/agent-panorama\.css";/);
   assert.match(messagesCssSource, /\.subagent-tasks-card/);
-  assert.match(messagesCssSource, /\.subagent-tasks-header/);
-  assert.match(messagesCssSource, /\.subagent-tasks-row/);
+  assert.match(messagesCssSource, /\.subagent-tasks-list/);
+  assert.match(messagesCssSource, /\.subagent-activity-row/);
+  assert.match(messagesCssSource, /\.subagent-activity-row:focus-visible/);
+  assert.match(messagesCssSource, /\.subagent-activity-text\s*\{[^}]*text-overflow:\s*ellipsis/);
   assert.match(agentPanoramaCssSource, /\.agent-panorama/);
   assert.match(agentPanoramaCssSource, /width:\s*276px;/);
   assert.match(agentPanoramaCssSource, /\.agent-panorama-edge/);

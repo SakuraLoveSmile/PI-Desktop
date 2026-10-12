@@ -158,6 +158,10 @@ export type SubagentRunOptions = {
   /** Host-backed tools, built by the session runtime so a delegate's calls
    * take the exact same path as the parent's. */
   tools: AgentTool[];
+  /** At idle, converge on owned children and integrate their reports. */
+  collectDelegationReports?: () => Promise<string | undefined>;
+  /** Cancel this run's descendants on every terminal exit. */
+  abortDelegations?: () => void;
   onEvent: (envelope: AgentEventEnvelope) => void;
   /**
    * Result of the parent's own `afterToolCall` bookkeeping for one call, so a
@@ -200,7 +204,10 @@ export function composeSubagentSystemPrompt(options: {
       : subagentToolsLabel(definition);
   const framing = [
     `You are the \"${definition.name}\" subagent inside Pi-Desktop-Plus, working on one task delegated by the main agent.`,
-    `You cannot see the user, ask questions, or delegate further. Finish the task with the tools you have: ${toolList}.`,
+    `You cannot see the user or ask questions. Finish the task with the tools you have: ${toolList}.`,
+    resolved?.includes(SUBAGENT_TOOL_NAME)
+      ? "Before nontrivial work, identify useful independent investigation, implementation, or validation assignments. Delegate those parts early with Task even when each assignment is small, using bounded briefs, exclusive file ownership and clear reports. Continue independent parts of your own assignment and converge with TaskWait before integrating the findings. Your children share the configured depth and concurrency limits. Do not invent trivial assignments or repeat delegated work."
+      : "The configured delegation depth has been reached or delegation is unavailable. Complete this bounded task with your own tools.",
     subagentCanMutate(definition, resolved)
       ? "You may change files, but only the ones the task is about; leave everything else untouched. If the final report would exceed ~8,000 characters, write the full report to a file yourself and make the final message a compact summary plus the file path."
       : "You have no tools that change files or run commands, so never report an edit you could not have made.",
@@ -293,7 +300,7 @@ export class SubagentRun {
         thinkingLevel: binding.agentThinkingLevel,
         messages: opts.initialMessages ? [...opts.initialMessages] : [],
       },
-      toolExecution: "sequential",
+      toolExecution: "parallel",
     });
     this.agent.subscribe((event) => this.handleEvent(event));
   }
@@ -335,6 +342,8 @@ export class SubagentRun {
             preflightModel,
             this.opts.sessionId,
             usage => this.recordUsage(usage),
+            { turnId: this.opts.turnId, agentName: this.opts.definition.name, parentToolCallId: this.opts.parentToolCallId,
+              onContext: request => this.emit({ type: "context_insights", request }) },
           ),
         systemPrompt: preflightSystemPrompt,
         tools: preflightTools,
@@ -364,12 +373,17 @@ export class SubagentRun {
           await this.agent.continue();
           await this.agent.waitForIdle();
         } else {
-          break;
+          if (this.turnAborted || this.streamError) break;
+          const reports = await this.opts.collectDelegationReports?.();
+          if (!reports || signal?.aborted) break;
+          await this.agent.prompt(reports);
+          await this.agent.waitForIdle();
         }
       }
     } catch (error) {
       caughtError = classifyAgentError(error);
     } finally {
+      this.opts.abortDelegations?.();
       signal?.removeEventListener("abort", onAbort);
       this.finalizeCurrentAssistant();
     }
@@ -441,6 +455,9 @@ export class SubagentRun {
       sessionId: this.opts.sessionId,
       maxTokens: this.opts.definition.maxTokens,
       onUsage: usage => this.recordUsage(usage),
+      turnId: this.opts.turnId, agentName: this.opts.definition.name,
+      parentToolCallId: this.opts.parentToolCallId,
+      onContext: request => this.emit({ type: "context_insights", request }),
     }, this.retryState);
   }
 
@@ -454,6 +471,12 @@ export class SubagentRun {
       ...(systemMessage ? [systemMessage] : []),
       ...outcome.messages.filter((message) => message.role !== "system"),
     ];
+    this.emit({ type: "context_insights", diagnosticEvent: {
+      id: randomUUID(), at: Date.now(), turnId: this.opts.turnId,
+      type: outcome.kind === "compacted" ? "compaction" : "prune",
+      label: `${this.opts.definition.name}: ${outcome.kind === "compacted" ? "checkpoint" : "retained-tail degradation"}`,
+      tokensBefore: outcome.tokensBefore, tokensAfter: contextBudgetFor(this.agent.state.model, outcome.messages).tokens,
+    } });
     if (outcome.kind === "compacted") {
       this.contextCompactions += 1;
     } else {
@@ -483,6 +506,8 @@ export class SubagentRun {
           this.agent.state.model,
           this.opts.sessionId,
           usage => this.recordUsage(usage),
+          { turnId: this.opts.turnId, agentName: this.opts.definition.name, parentToolCallId: this.opts.parentToolCallId,
+            onContext: request => this.emit({ type: "context_insights", request }) },
         ),
       thinkingLevel: this.agent.state.thinkingLevel,
       signal: signal ?? this.runSignal(),

@@ -1,13 +1,48 @@
+mod background_processes_rpc;
+#[cfg(test)]
+mod background_processes_tests;
+#[cfg(test)]
+mod background_services_tests;
 mod config_sync_rpc;
+mod git_workspaces_rpc;
 mod goal_rpc;
 mod plan_schedule_rpc;
+mod project_auto_memory;
+mod project_code_search;
+mod project_history;
+#[cfg(test)]
+#[path = "../team/run_limits_pending_tests.rs"]
+mod run_limits_pending_tests;
 mod scheduled_rpc;
 mod scheduled_tools;
+mod session_activity_rpc;
+mod session_notes_rpc;
+#[cfg(test)]
+mod storage_compatibility_tests;
+#[cfg(test)]
+mod subagent_settings_tests;
+#[cfg(test)]
+mod team_dispatch_age_tests;
+mod team_dispatch_head;
 #[cfg(test)]
 mod team_expert_config_tests;
 #[cfg(test)]
+mod team_git_warning_tests;
+mod team_lead_asks;
+mod team_mailbox;
+#[cfg(test)]
+mod team_member_activity_tests;
+mod team_ordinary_inbox;
+#[cfg(test)]
+mod team_pending_tests;
+#[cfg(test)]
 mod team_planning_tests;
 mod team_rpc;
+mod team_run_limits;
+#[cfg(test)]
+mod team_run_limits_tests;
+#[cfg(test)]
+mod team_write_scope_tests;
 mod todos;
 
 #[cfg(test)]
@@ -329,6 +364,7 @@ pub async fn serve(state: Arc<Mutex<AppState>>) -> Result<()> {
             return Err(anyhow!("host stdin reader unavailable: {error}"));
         }
     };
+    let team_limit_scheduler = team_run_limits::start(state.clone(), tx.clone());
     let config_sync_scheduler = tokio::spawn({
         let state = state.clone();
         let tx = tx.clone();
@@ -475,6 +511,8 @@ pub async fn serve(state: Arc<Mutex<AppState>>) -> Result<()> {
         }
     }
 
+    team_limit_scheduler.abort();
+    let _ = team_limit_scheduler.await;
     config_sync_scheduler.abort();
     let _ = config_sync_scheduler.await;
     {
@@ -486,6 +524,16 @@ pub async fn serve(state: Arc<Mutex<AppState>>) -> Result<()> {
             tracing::warn!(error = %error, "RPC request task failed during shutdown");
         }
     }
+    let background_jobs = {
+        let mut st = state.lock().await;
+        std::mem::take(&mut st.background_jobs)
+    };
+    for (_, task) in background_jobs {
+        if let Err(error) = task.await {
+            tracing::error!(%error,"background process task failed during shutdown");
+        }
+    }
+
     drop(tx);
     if !writer_done {
         input_error = match tokio::time::timeout(STDOUT_WRITER_SHUTDOWN, writer_done_rx).await {
@@ -941,6 +989,22 @@ fn validate_settings_value(value: &Value) -> Result<(), JsonRpcError> {
     let Some(object) = value.as_object() else {
         return Ok(());
     };
+    for (key, min, max) in [
+        ("subagentMaxDepth", 0, 8),
+        ("subagentMaxConcurrency", 1, 32),
+    ] {
+        if object.get(key).is_some_and(|value| {
+            !value
+                .as_u64()
+                .is_some_and(|number| (min..=max).contains(&number))
+        }) {
+            return Err(rpc_err(
+                1002,
+                format!("{key} must be an integer between {min} and {max}"),
+                "INVALID_PARAMS",
+            ));
+        }
+    }
     if let Some(policy) = object.get("networkPolicy").filter(|v| !v.is_null()) {
         let Some(policy) = policy.as_object() else {
             return Err(rpc_err(
@@ -1762,7 +1826,67 @@ fn parse_capability_target(
         .map_err(|error| capability_err(error.to_string()))
 }
 
+// Notify only after canonical persistence/turn state succeeds, never on the earlier
+// agent stream event. Readers can therefore refresh without racing a queued write.
 async fn handle_request(
+    state: Arc<Mutex<AppState>>,
+    method: &str,
+    params: Value,
+    tx: mpsc::UnboundedSender<String>,
+) -> Result<Value, JsonRpcError> {
+    let changes_activity = matches!(
+        method,
+        "session.appendMessage"
+            | "session.replaceMessages"
+            | "session.truncateFrom"
+            | "session.saveRevision"
+            | "session.activateRevision"
+            | "session.beginTurn"
+            | "session.endTurn"
+    );
+    let mut owner = changes_activity
+        .then(|| {
+            params
+                .get("sessionId")
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+        })
+        .flatten();
+    let turn_id = if changes_activity && owner.is_none() {
+        params
+            .get("turnId")
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+    } else {
+        None
+    };
+    let result = handle_request_inner(state.clone(), method, params, tx.clone()).await;
+    if result.is_ok() && changes_activity {
+        if owner.is_none() {
+            if let Some(turn_id) = turn_id {
+                let st = state.lock().await;
+                owner = st
+                    .db
+                    .conn()
+                    .query_row("SELECT session_id FROM turns WHERE id=?1", [turn_id], |r| {
+                        r.get(0)
+                    })
+                    .optional()
+                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            }
+        }
+        if let Some(session_id) = owner {
+            send_notification(
+                &tx,
+                "sessionActivity.changed",
+                json!({"sessionId": session_id}),
+            );
+        }
+    }
+    result
+}
+
+async fn handle_request_inner(
     state: Arc<Mutex<AppState>>,
     method: &str,
     params: Value,
@@ -1785,6 +1909,7 @@ async fn handle_request(
     }
 
     match method {
+        "sessionActivity.get" => session_activity_rpc::handle(state, &params).await,
         method if method.starts_with("team.") => team_rpc::handle(state, method, params, tx).await,
         method if method.starts_with("goalReports.") || method.starts_with("goalProgress.") => {
             goal_rpc::handle(state, method, params, tx).await
@@ -1871,6 +1996,9 @@ async fn handle_request(
             "version": HOST_VERSION,
             "protocolVersion": PROTOCOL_VERSION
         })),
+        method if method.starts_with("workspace.git.") => {
+            git_workspaces_rpc::handle(state.clone(), method, &params).await
+        }
         "workspace.get" => {
             let st = state.lock().await;
             let mut workspace = json!(st.workspace.get());
@@ -1984,6 +2112,15 @@ async fn handle_request(
                 .get("entries")
                 .ok_or_else(|| rpc_err(1002, "entries required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
+            if let Some(group) = st
+                .db
+                .list_project_groups()
+                .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?
+                .into_iter()
+                .find(|group| group.id == id)
+            {
+                project_auto_memory::ensure_legacy_write_allowed(&st.db, &group.primary_path)?;
+            }
             let memory = st
                 .db
                 .set_project_group_memory(id, entries)
@@ -2073,6 +2210,22 @@ async fn handle_request(
             // directory and is still writing to that session's transcript, so
             // the bulk delete waits until every attached session is idle.
             for id in &session_ids {
+                if crate::background_processes::has_pending_finalization(&st, id) {
+                    return Err(rpc_err(
+                        1008,
+                        "background process result has not been saved; read its details to retry",
+                        "BACKGROUND_PROCESS_PERSISTENCE_FAILED",
+                    ));
+                }
+                if crate::background_processes::has_active(&st.db, id)
+                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                {
+                    return Err(rpc_err(
+                        1008,
+                        "stop background processes before removing this project",
+                        "SESSION_HAS_BACKGROUND_PROCESSES",
+                    ));
+                }
                 if sessions::session_has_running_turn(&st.db, id)
                     .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
                 {
@@ -2165,8 +2318,23 @@ async fn handle_request(
             st.db
                 .delete_project_memory(&path)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            st.db
+                .delete_path_auto_memory(&path)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "removed": removed, "sessionsRemoved": sessions_removed }))
         }
+        "project.memory.editor.get"
+        | "project.memory.editor.save"
+        | "project.autoMemory.setEnabled"
+        | "project.autoMemory.agentList"
+        | "project.autoMemory.agentUpsert"
+        | "project.autoMemory.agentDelete" => {
+            project_auto_memory::handle(state, method, params).await
+        }
+        "project.history.search" | "project.history.context" => {
+            project_history::handle(state, method, params).await
+        }
+        "project.codeSearch" => project_code_search::handle(state, params).await,
         "project.memory.get" => {
             let path = params
                 .get("path")
@@ -2185,6 +2353,7 @@ async fn handle_request(
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "path required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
+            project_auto_memory::ensure_legacy_write_allowed(&st.db, path)?;
             if let Some(entries) = params.get("entries") {
                 let memory = st
                     .db
@@ -2670,6 +2839,49 @@ async fn handle_request(
                 .filter(|value| !value.is_empty())
                 .ok_or_else(|| rpc_err(1002, "projectPath required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
+            if background_processes_rpc::has_services(&st, session_id, false)? {
+                if sessions::session_has_running_turn(&st.db, session_id).map_err(plan_rpc_err)? {
+                    return Err(rpc_err(1008, "session is running", "CONFLICT"));
+                }
+                if plans::has_live_scratch_goal(&st.db, session_id).map_err(plan_rpc_err)? {
+                    return Err(plan_rpc_err("PLAN_CONFIGURATION_BLOCKED"));
+                }
+                let current_project: Option<String> = st.db.conn().query_row(
+                    "SELECT p.path FROM sessions s LEFT JOIN projects p ON p.id=s.project_id WHERE s.id=?1",
+                    [session_id], |row| row.get(0),
+                ).optional().map_err(|error| rpc_err(1000, error.to_string(), "INTERNAL"))?.flatten();
+                let project_changed =
+                    current_project != crate::db::canonical_project_path(project_path);
+                drop(st);
+                if project_changed {
+                    background_processes_rpc::cleanup_services(
+                        &state,
+                        session_id,
+                        false,
+                        "owner_workspace_changed",
+                    )
+                    .await?;
+                }
+            } else {
+                drop(st);
+            }
+            let st = state.lock().await;
+            if crate::background_processes::has_pending_finalization(&st, session_id) {
+                return Err(rpc_err(
+                    1008,
+                    "background process result has not been saved; read its details to retry",
+                    "BACKGROUND_PROCESS_PERSISTENCE_FAILED",
+                ));
+            }
+            if crate::background_processes::has_active(&st.db, session_id)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+            {
+                return Err(rpc_err(
+                    1008,
+                    "stop background processes before moving this session",
+                    "SESSION_HAS_BACKGROUND_PROCESSES",
+                ));
+            }
             let session = match sessions::move_session_project(&st.db, session_id, project_path)
                 .map_err(plan_rpc_err)?
             {
@@ -2734,6 +2946,56 @@ async fn handle_request(
             .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "session": session }))
         }
+        "contextInsights.get" => {
+            let id = params
+                .get("sessionId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_ARGUMENT"))?;
+            let include_content = params
+                .get("includeContent")
+                .and_then(Value::as_bool)
+                .unwrap_or(true);
+            let request_id = params.get("requestId").and_then(Value::as_str);
+            let st = state.lock().await;
+            crate::context_insights::get(&st.db, id, include_content, request_id).map_err(|error| {
+                rpc_err(
+                    1002,
+                    error.to_string(),
+                    if error.to_string().starts_with("NOT_FOUND:") {
+                        "NOT_FOUND"
+                    } else if error.to_string().starts_with("INVALID_ARGUMENT:") {
+                        "INVALID_ARGUMENT"
+                    } else {
+                        "INTERNAL"
+                    },
+                )
+            })
+        }
+        "contextInsights.record" => {
+            let id = params
+                .get("sessionId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_ARGUMENT"))?;
+            let st = state.lock().await;
+            let recorded = crate::context_insights::record(
+                &st.db,
+                id,
+                params.get("request"),
+                params.get("event"),
+            )
+            .map_err(|error| {
+                let message = error.to_string();
+                let code = if message.starts_with("INVALID_ARGUMENT:") {
+                    "INVALID_ARGUMENT"
+                } else if message.starts_with("LIMIT_EXCEEDED:") {
+                    "LIMIT_EXCEEDED"
+                } else {
+                    "INTERNAL"
+                };
+                rpc_err(1002, message, code)
+            })?;
+            Ok(json!({ "recorded": recorded }))
+        }
         "todos.get" => {
             let session_id = params
                 .get("sessionId")
@@ -2794,6 +3056,41 @@ async fn handle_request(
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
+            if background_processes_rpc::has_services(&st, id, true)? {
+                crate::team::can_delete_session(&st.db, id).map_err(|error| {
+                    let message = error.to_string();
+                    if message.starts_with("TEAM_MEMBER_DELETION_BLOCKED:") {
+                        rpc_err(1002, message, "TEAM_MEMBER_DELETION_BLOCKED")
+                    } else {
+                        rpc_err(1000, message, "INTERNAL")
+                    }
+                })?;
+                if plans::has_live_scratch_goal(&st.db, id).map_err(plan_rpc_err)? {
+                    return Err(plan_rpc_err("PLAN_CONFIGURATION_BLOCKED"));
+                }
+                drop(st);
+                background_processes_rpc::cleanup_services(&state, id, true, "session_deleted")
+                    .await?;
+            } else {
+                drop(st);
+            }
+            let st = state.lock().await;
+            if crate::background_processes::has_pending_finalization(&st, id) {
+                return Err(rpc_err(
+                    1008,
+                    "background process result has not been saved; read its details to retry",
+                    "BACKGROUND_PROCESS_PERSISTENCE_FAILED",
+                ));
+            }
+            if crate::background_processes::has_active(&st.db, id)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+            {
+                return Err(rpc_err(
+                    1008,
+                    "stop background processes before deleting this session",
+                    "SESSION_HAS_BACKGROUND_PROCESSES",
+                ));
+            }
             let team_before_delete = crate::team::get_team(&st.db, id).map_err(team_rpc_err)?;
             crate::team::can_delete_session(&st.db, id).map_err(|error| {
                 let message = error.to_string();
@@ -3193,6 +3490,56 @@ async fn handle_request(
             if !st.allow_plugin_delete(plugin_id) {
                 return Err(rpc_err(1006, "plugin delete rate exceeded", "RATE_LIMITED"));
             }
+            if let Some(session_id) = params.get("sessionId").and_then(Value::as_str) {
+                if background_processes_rpc::has_services(&st, session_id, true)? {
+                    plugin_sessions::get(&st.db, plugin_id, &params)
+                        .map_err(plugin_session_rpc_err)?;
+                    if !matches!(
+                        params
+                            .get("mode")
+                            .and_then(Value::as_str)
+                            .unwrap_or("trash"),
+                        "trash" | "purge"
+                    ) {
+                        return Err(rpc_err(
+                            1002,
+                            "mode must be trash or purge",
+                            "INVALID_ARGUMENT",
+                        ));
+                    }
+                    drop(st);
+                    background_processes_rpc::cleanup_services(
+                        &state,
+                        session_id,
+                        true,
+                        "session_deleted",
+                    )
+                    .await?;
+                } else {
+                    drop(st);
+                }
+            } else {
+                drop(st);
+            }
+            let st = state.lock().await;
+            if let Some(session_id) = params.get("sessionId").and_then(Value::as_str) {
+                if crate::background_processes::has_active(&st.db, session_id)
+                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                {
+                    // Preserve plugin ownership validation before reporting a lifecycle conflict.
+                    plugin_sessions::get(&st.db, plugin_id, &params)
+                        .map_err(plugin_session_rpc_err)?;
+                    if crate::background_processes::has_pending_finalization(&st, session_id) {
+                        return Err(rpc_err(1008,"background process result has not been saved; read its details to retry","BACKGROUND_PROCESS_PERSISTENCE_FAILED"));
+                    }
+
+                    return Err(rpc_err(
+                        1008,
+                        "stop background processes before deleting this session",
+                        "SESSION_HAS_BACKGROUND_PROCESSES",
+                    ));
+                }
+            }
             plugin_sessions::delete(&st.db, plugin_id, &params).map_err(plugin_session_rpc_err)
         }
 
@@ -3320,8 +3667,9 @@ async fn handle_request(
                         .get("recoverInflight")
                         .and_then(|v| v.as_bool())
                         .unwrap_or(false),
-                )
-                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+                );
+                team_rpc::send_pending_member_failure(&st.db, &tx, turn_id)?;
+                let result = result.map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
                 if result.updated {
                     let turn_session_id: Option<String> = st
                         .db
@@ -3981,6 +4329,12 @@ async fn handle_request(
             scheduled_rpc::handle(&st, method, params)
         }
 
+        method if method.starts_with("backgroundProcesses.") => {
+            background_processes_rpc::handle(state.clone(), method, &params).await
+        }
+        method if method.starts_with("sessionNotes.") => {
+            session_notes_rpc::handle(state.clone(), method, &params).await
+        }
         "tools.list" => {
             let mut definitions = tools::builtin_tool_defs();
             if let Some(items) = definitions.as_array_mut() {
@@ -4018,6 +4372,46 @@ async fn handle_request(
             let p: ToolsExecuteParams = serde_json::from_value(params.clone())
                 .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
             let execution_timeout_ms = tools::effective_timeout_ms(&p.tool_name, p.timeout_ms);
+            let service_scope = if p.tool_name == "Bash" {
+                let st = state.lock().await;
+                crate::background_services::capture(
+                    &st.db,
+                    &p.session_id,
+                    p.turn_id.as_deref(),
+                    &p.args,
+                    p.timeout_ms,
+                    p.permission_scope.as_deref(),
+                )
+                .map_err(background_processes_rpc::service_err)?
+            } else {
+                None
+            };
+            let background = if p.tool_name == "Bash" {
+                match p.args.get("run_in_background") {
+                    None => false,
+                    Some(Value::Bool(value)) => *value,
+                    Some(_) => {
+                        return Err(rpc_err(
+                            1002,
+                            "run_in_background must be a boolean",
+                            "INVALID_PARAMS",
+                        ))
+                    }
+                }
+            } else {
+                false
+            };
+            let mut background_owned = false;
+            let scope_context = {
+                let st = state.lock().await;
+                crate::team::write_scopes::capture(
+                    &st.db,
+                    &p.session_id,
+                    p.turn_id.as_deref(),
+                    &p.tool_name,
+                )
+                .map_err(team_rpc_err)?
+            };
             {
                 let st = state.lock().await;
                 crate::team::planning::validate_tool(&st.db, &p.session_id, &p.tool_name)
@@ -4085,6 +4479,18 @@ async fn handle_request(
                     .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
                     .ok_or_else(|| rpc_err(1007, "session not found", "SESSION_NOT_FOUND"))?
             };
+
+            if p.tool_name == "Bash" {
+                let st = state.lock().await;
+                if let Some(process) =
+                    crate::background_processes::duplicate_view(&st, &p.session_id, &p.tool_call_id)
+                        .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                {
+                    return Ok(
+                        json!({"toolCallId":p.tool_call_id,"ok":true,"isError":false,"content":{"backgroundProcessId":process.id,"status":process.status,"message":"Background process already accepted; no duplicate command was started."},"durationMs":0,"denied":false}),
+                    );
+                }
+            }
 
             // Register before permission evaluation so tools.abort can cancel
             // an approval wait as well as an already-spawned process.
@@ -4155,6 +4561,7 @@ async fn handle_request(
                         }
                         _ => effective_pm,
                     };
+                    let effective_pm = service_scope.as_ref().map(|scope| scope.permission_ceiling.clone()).unwrap_or(effective_pm);
                     // Resolve the tool root from the persisted session instead of
                     // the mutable global workspace. This keeps background turns
                     // isolated when the renderer switches between project tabs.
@@ -4397,6 +4804,7 @@ async fn handle_request(
                             tool = %p.tool_name,
                             session_id = %p.session_id,
                             error_code = error.code(),
+                            capacity = ?error.diagnostics(),
                             "tool admission rejected"
                         );
                         let mut result = json!({
@@ -4411,6 +4819,9 @@ async fn handle_request(
                             "denied": false,
                             "errorCode": error.code()
                         });
+                        if let Some(capacity) = error.diagnostics() {
+                            result["content"]["capacity"] = json!(capacity);
+                        }
                         if let Some(shell_id) = permission_shell_id.as_deref() {
                             result["commandShellId"] = json!(shell_id);
                         }
@@ -4419,6 +4830,10 @@ async fn handle_request(
                 };
 
                 let ws_path = workspace_path.map(PathBuf::from);
+                let git_warning_context = {
+                    let st = state.lock().await;
+                    crate::team::git_warnings::capture(&st.db, &p.session_id, p.turn_id.as_deref(), &p.tool_name, &p.args)
+                };
                 let (data_dir, hashline_store) = {
                     let st = state.lock().await;
                     (st.data_dir.clone(), st.hashline.clone())
@@ -4490,13 +4905,67 @@ async fn handle_request(
                         (effective.id.clone(), cancellation_receiver.clone())
                     };
                     bash_options = Some(tools::BashExecutionOptions {
+                        service: false,
                         session_id: p.session_id.clone(),
                         tool_call_id: p.tool_call_id.clone(),
                         command_shell_id: shell_id,
                         timeout_ms: execution_timeout_ms,
                         cancellation,
                         output_tx: Some(tx.clone()),
+                        background_output: None,
                     });
+                }
+
+                if background {
+                    let workspace = ws_path.clone().ok_or_else(|| {
+                        rpc_err(1002, "workspace required", "WORKSPACE_REQUIRED")
+                    })?;
+                    let options = bash_options
+                        .ok_or_else(|| rpc_err(1000, "Bash options missing", "INTERNAL"))?;
+                    let process = crate::background_processes::start(
+                        state.clone(),
+                        tx.clone(),
+                        crate::background_processes::ApprovedJob {
+                            service_scope: service_scope.clone(),
+                            workspace,
+                            scratch: scratch_path.clone(),
+                            args: p.args.clone(),
+                            options,
+                            permit: _tool_permit,
+                            timeout_is_default: p.timeout_ms.is_none(),
+                        },
+                    )
+                    .await
+                    .map_err(|error| {
+                        let message = error.to_string();
+                        let code = if message.starts_with("TEAM_SERVICE_") || message.starts_with("TEAM_APPROVAL_REQUIRED") { message.split(':').next().unwrap_or("BACKGROUND_PROCESS_START_FAILED") } else { "BACKGROUND_PROCESS_START_FAILED" };
+                        rpc_err(1008,message.clone(),code)
+                    })?;
+                    // The detached execution now owns cancellation and admission.
+                    background_owned = true;
+                    let st = state.lock().await;
+                    let _ = audit::append(
+                        &st.db,
+                        "background_process_start",
+                        Some(&p.session_id),
+                        json!({
+                            "id": process.id, "toolCallId": p.tool_call_id,
+                            "prompted": prompted, "permissionWaitMs": permission_wait_ms,
+                        }),
+                    );
+                    let mut content = json!({"backgroundProcessId": process.id, "status":"starting", "message":"Background process accepted. Read its output and terminal status through the background process manager."});
+                    if let Some(service) = process.service {
+                        if let Some(metadata) = serde_json::to_value(service).map_err(|error|rpc_err(1000,error.to_string(),"INTERNAL"))?.as_object() {
+                            for (key,value) in metadata { content[key] = value.clone(); }
+                        }
+                    }
+                    crate::team::git_warnings::annotate_observable(&st.db, &git_warning_context, &p.tool_call_id, &mut content);
+                    return Ok(json!({
+                        "toolCallId": p.tool_call_id, "ok": true, "isError": false,
+                        "content": content,
+                        "durationMs": call_started.elapsed().as_millis() as u64,
+                        "denied": false, "commandShellId": command_shell_id,
+                    }));
                 }
 
                 let mut result = if p.tool_name == "TodoWrite" {
@@ -4567,6 +5036,8 @@ async fn handle_request(
                 // Scratch files are temp by definition: keep them out of the
                 // artifacts table so the work panel file list only shows
                 // workspace deliverables (D114).
+                crate::team::write_scopes::annotate_observable(&st.db, scope_context.as_ref(), ws_path.as_deref(), &p.tool_call_id, &mut result);
+                crate::team::git_warnings::annotate_observable(&st.db, &git_warning_context, &p.tool_call_id, &mut result.content);
                 let result_root = result.content.get("root").and_then(|v| v.as_str());
                 if result.ok
                     && result_root == Some("workspace")
@@ -4618,7 +5089,9 @@ async fn handle_request(
                 serde_json::to_value(result).map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))
             }
             .await;
-            clear_bash_cancellation(&state, &p).await;
+            if !background_owned {
+                clear_bash_cancellation(&state, &p).await;
+            }
             outcome
         }
 
@@ -11109,6 +11582,23 @@ mod image_generation_settings_tests {
         .await
         .unwrap();
         assert_eq!(task_res["task"]["subject"], "Inspect repository structure");
+
+        let stale_update = handle_request(
+            state.clone(),
+            "team.updateTask",
+            json!({
+                "teamSessionId": team_id,
+                "callerSessionId": team_id,
+                "expectedCallerTurnId": turn_id,
+                "taskId": "task-1",
+                "expectedRevision": 1,
+                "status": "completed"
+            }),
+            tx.clone(),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(stale_update.data.unwrap()["errorCode"], "TEAM_TURN_INVALID");
 
         let update_res = handle_request(
             state.clone(),

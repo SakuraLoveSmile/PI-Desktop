@@ -24,7 +24,7 @@ Three properties are enforced, in this order, before any byte is written:
 | Topic | Decision |
 |---|---|
 | `Edit` parameters | `path`, `tag`, `ops` |
-| Removed | `old_string`, `new_string`, and any mode switch between contracts |
+| Tolerated aliases | `old_string`, `new_string`, applied when `ops` is absent (D273); no mode switch |
 | Tag | 4 uppercase hex, derived from the whole normalized file |
 | Tag minted by | `Read`, `Grep`, `Write`, and every successful `Edit` |
 | Anchor unit | 1-indexed original line numbers of the tagged snapshot |
@@ -36,6 +36,25 @@ Three properties are enforced, in this order, before any byte is written:
 | Stale tag | recover only when provably unique and safe; otherwise reject |
 | No-op apply | error |
 | Snapshot store | in-memory, per session, bounded, dropped with the session |
+
+### 2.1 Legacy argument tolerance (D273)
+
+When `ops` is absent and both `old_string` and `new_string` are supplied, the Host
+uses the existing unique-match legacy replacement even if `tag` is supplied.
+This shape ignores the supplied `tag` and uses the existing legacy conversion;
+zero or multiple matches still return `EDIT_LEGACY_MATCH_FAILED`. When `ops` is
+present, anchored operations win and legacy fields are ignored; tag, provenance
+and drift checks are unchanged. The mutation retry budget remains three.
+
+Missing `ops` and a colon PUT without body rows include an executable example:
+
+```text
+PUT 48.=48:
++replacement
+```
+
+Both errors explain that `new_string` is read only when `ops` is absent; use
+`CUT` to delete content.
 
 ## 3. Snapshot tags
 
@@ -522,7 +541,7 @@ Recovery warnings distinguish cause, because the corrective action differs:
 | `EDIT_TAG_MISMATCH` | yes after a `Read` | tag does not hash the live file and recovery declined; carries the live tag and current content at the anchors |
 | `EDIT_TAG_UNKNOWN` | yes after a `Read` | tag is well-formed but this session recorded no such content for the path |
 | `EDIT_LINES_UNSEEN` | yes | anchors reference lines never displayed; carries the revealed content |
-| `EDIT_PARSE_FAILED` | no | malformed header, body row under a colonless header, missing body, `-`/context row |
+| `EDIT_PARSE_FAILED` | no | malformed header, body row under a colonless header, missing body, `-`/context row; missing-body errors include a PUT/+ example and legacy-field precedence |
 | `EDIT_RANGE_INVALID` | no | reversed range, out-of-bounds line, overlapping ops, duplicate anchor |
 | `EDIT_BLOCK_UNRESOLVED` | no | `N*` could not resolve; names the plain-range alternative |
 | `EDIT_REGISTER_EMPTY` | no | paste from an unset register |

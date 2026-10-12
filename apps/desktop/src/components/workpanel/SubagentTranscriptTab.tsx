@@ -1,13 +1,20 @@
-import { Fragment, useLayoutEffect, useMemo } from "react";
+import { Fragment, useId, useLayoutEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../../stores/app-store";
 import { useFollowScroll } from "../../hooks/use-follow-scroll";
 import { useTranscriptView } from "../../hooks/use-transcript-view";
 import { useTranscriptSearchFocus } from "../../hooks/use-transcript-search-focus";
-import { IconArrowDown } from "../icons";
-import { Textarea, TooltipButton } from "../ui";
+import { IconArrowDown, IconChevronRight, IconCircleAlert } from "../icons";
+import { Button, TooltipButton } from "../ui";
 import { DisclosureAnchorContext } from "../../lib/disclosure-anchor-context";
-import { TranscriptDisclosureProvider } from "../../features/chat/transcript/disclosure";
+import { DisclosureScope, disclosureKey, TranscriptDisclosureProvider, useAutomaticDisclosure } from "../../features/chat/transcript/disclosure";
+import { TranscriptSearchContext } from "../../lib/transcript-search-context";
+import type { TranscriptSearchTarget } from "../../lib/transcript-reading";
+import type { SubagentRunItem } from "../../lib/assistant-turns";
+import { cachedActivitySummary } from "../../lib/transcript-activity-summary";
+import { activitySubagents } from "../../features/chat/activity/session-activity-model";
+import { subagentAvatarVariant } from "../../features/chat/activity/subagent-row-presentation";
+import "./subagent-transcript-detail.css";
 import { buildSubagentTranscript } from "../../lib/subagent-transcript";
 import {
   AssistantErrorMessage,
@@ -23,8 +30,9 @@ import { Markdown } from "../Markdown";
  * The work-panel tab showing one delegation as a conversation (issue #917).
  *
  * Every `Task` call of the delegation chain opens a turn: the prompt the
- * parent sent renders as a user row, and the rows the delegate produced under
- * that call render with the main transcript's own message-list language —
+ * parent sent renders as a bounded, expandable prompt, and the delegate's
+ * process rows form consecutive disclosures between its progress paragraphs.
+ * Output keeps the main transcript's own message-list language —
  * tool rows, thinking rows, and answer bubbles alike. Follow-up `Task` calls
  * on the same delegation append further turns, so a resumed delegate reads as
  * one continuing user/assistant exchange.
@@ -54,6 +62,10 @@ function SubagentTranscriptSurface({ delegationId }: { delegationId: string }) {
   const transcriptResult = useMemo(
     () => buildSubagentTranscript(messages, delegationId),
     [messages, delegationId],
+  );
+  const agent = useMemo(
+    () => activitySubagents(messages, isRunning).find((item) => item.delegationId === delegationId),
+    [messages, isRunning, delegationId],
   );
   const {
     scrollRef,
@@ -111,52 +123,24 @@ function SubagentTranscriptSurface({ delegationId }: { delegationId: string }) {
         >
           <div ref={contentRef} className="subagent-transcript-list">
             {transcriptResult ? (
-              transcriptResult.turns.map((turn, turnIndex) => (
-                <Fragment key={`turn-${turnIndex}`}>
-                  <div className="message-row user">
-                    <div className="message-col">
-                      <div className="message-bubble">
-                        <div className="message-user-text selectable">
-                          {turn.task || t("panel.subagentTaskEmpty")}
-                        </div>
-                      </div>
-                    </div>
+              <>
+                <header className="subagent-detail-header">
+                  <span className="subagent-activity-avatar" data-variant={subagentAvatarVariant(delegationId)} aria-hidden />
+                  <div className="subagent-detail-heading">
+                    <h2>{transcriptResult.agentName || agent?.agentName || t("panel.subagent")}</h2>
+                    {transcriptResult.turns[0]?.task ? <p>{transcriptResult.turns[0].task.split("\n")[0]}</p> : null}
                   </div>
-                  {turn.rows.map((row) =>
-                    row.kind === "tool" ? (
-                      <Fragment key={row.message.id}>
-                        <ToolRow message={row.message} />
-                        <ReviewChangeCard message={row.message} />
-                      </Fragment>
-                    ) : row.kind === "thinking" ? (
-                      <ThinkingRow
-                        key={`thinking-${row.message.id}`}
-                        message={row.message}
-                        streaming={isRunning && row.message.status === "streaming"}
-                      />
-                    ) : (
-                      <div
-                        className="message-row assistant"
-                        data-message-id={row.message.id}
-                        key={`answer-${row.message.id}`}
-                      >
-                        <div className="message-col">
-                          <div className="message-bubble">
-                            {row.message.content ? (
-                              <div className="prose-chat selectable">
-                                <Markdown source={row.message.content} />
-                              </div>
-                            ) : null}
-                            {row.message.error ? (
-                              <AssistantErrorMessage message={row.message} />
-                            ) : null}
-                          </div>
-                        </div>
-                      </div>
-                    ),
-                  )}
-                </Fragment>
-              ))
+                  {agent ? <span className="subagent-detail-status" data-status={agent.status}>{t(`panel.activity.status.${agent.status}`)}</span> : null}
+                </header>
+                <TranscriptSearchContext.Provider value={searchTarget}>
+                  {transcriptResult.turns.map((turn, turnIndex) => (
+                    <section className="subagent-detail-turn" key={`turn-${turnIndex}`}>
+                      <SubagentTaskPrompt task={turn.task} identity={`${delegationId}-${turnIndex}`} />
+                      <SubagentTurnRows rows={turn.rows} isRunning={isRunning} searchTarget={searchTarget} />
+                    </section>
+                  ))}
+                </TranscriptSearchContext.Provider>
+              </>
             ) : (
               <div className="subagent-transcript-empty" role="status">
                 {t("panel.subagentEmpty")}
@@ -175,15 +159,86 @@ function SubagentTranscriptSurface({ delegationId }: { delegationId: string }) {
             <IconArrowDown size={14} />
           </TooltipButton>
         ) : null}
-        <footer className="subagent-transcript-composer">
-          <Textarea
-            disabled
-            rows={2}
-            aria-label={t("panel.subagentReadOnly")}
-            placeholder={t("panel.subagentReadOnly")}
-          />
-        </footer>
       </div>
     </DisclosureAnchorContext.Provider>
+  );
+}
+
+
+function SubagentTaskPrompt({ task, identity }: { task: string; identity: string }) {
+  const { t } = useTranslation();
+  const detailsId = useId();
+  const disclosure = useAutomaticDisclosure(false, undefined, disclosureKey("subagent-task", identity));
+  return (
+    <div className={`subagent-task-disclosure${disclosure.open ? " open" : ""}`}>
+      <div ref={disclosure.bodyRef} id={detailsId} className="subagent-task-preview selectable" {...disclosure.bodyEvents}>
+        {task || t("panel.subagentTaskEmpty")}
+      </div>
+      <Button variant="ghost" type="button" className="subagent-task-toggle" ref={disclosure.titleRef} aria-expanded={disclosure.open} aria-controls={detailsId} onClick={disclosure.toggle}>
+        {t("panel.subagentTask")}
+        <span>{t(disclosure.open ? "chat.subagentTaskCollapse" : "chat.subagentTaskExpand")}</span>
+        <IconChevronRight size={12} aria-hidden />
+      </Button>
+    </div>
+  );
+}
+
+/** Group only consecutive process rows; progress prose retains its chronology. */
+function SubagentTurnRows({ rows, isRunning, searchTarget }: { rows: SubagentRunItem[]; isRunning: boolean; searchTarget: TranscriptSearchTarget | null }) {
+  const segments = useMemo(() => {
+    const result: { rows: SubagentRunItem[]; activity: boolean }[] = [];
+    for (const row of rows) {
+      const activity = row.kind !== "answer";
+      const previous = result[result.length - 1];
+      if (activity && previous?.activity) previous.rows.push(row);
+      else result.push({ rows: [row], activity });
+    }
+    return result;
+  }, [rows]);
+  return segments.map((segment) => segment.activity ? (
+    <SubagentProcessGroup key={segment.rows[0].message.id} rows={segment.rows.filter((row) => row.kind !== "answer")} isRunning={isRunning} searchTarget={searchTarget} />
+  ) : <SubagentAnswer key={segment.rows[0].message.id} row={segment.rows[0]} />);
+}
+
+function SubagentProcessGroup({ rows, isRunning, searchTarget }: { rows: Exclude<SubagentRunItem, { kind: "answer" }>[]; isRunning: boolean; searchTarget: TranscriptSearchTarget | null }) {
+  const { t } = useTranslation();
+  const detailsId = useId();
+  const revealRequest = rows.some((row) => row.message.id === searchTarget?.messageId) ? searchTarget?.requestId : undefined;
+  const disclosure = useAutomaticDisclosure(false, revealRequest, disclosureKey("subagent-process", rows[0].message.id));
+  const summary = useMemo(() => cachedActivitySummary(rows), [rows]);
+  const active = isRunning && rows.some((row) => row.message.status === "streaming");
+  return (
+    <div className={`subagent-process-group${disclosure.open ? " open" : ""}`}>
+      <Button variant="ghost" type="button" className="subagent-process-summary" ref={disclosure.titleRef} aria-expanded={disclosure.open} aria-controls={detailsId} onClick={disclosure.toggle}>
+        <span className="subagent-process-count" aria-hidden>{summary.tools + summary.thinking}</span>
+        <span>{[summary.thinking > 0 ? t("chat.activityThinking", { count: summary.thinking }) : "", summary.tools > 0 ? t("chat.activityTools", { count: summary.tools }) : ""].filter(Boolean).join(" · ")}</span>
+        {active ? <span className="subagent-process-active">{t("chat.running")}</span> : null}
+        {summary.issues > 0 ? <span className="turn-process-error"><IconCircleAlert size={14} aria-hidden />{t("chat.activityFailures", { count: summary.issues })}</span> : null}
+        <IconChevronRight size={12} aria-hidden />
+      </Button>
+      <div id={detailsId} ref={disclosure.bodyRef} hidden={!disclosure.open} inert={!disclosure.open} className="subagent-process-body" {...disclosure.bodyEvents}>
+        <DisclosureScope disclosure={disclosure}>
+          {rows.map((row) => row.kind === "tool" ? (
+            <Fragment key={row.message.id}>
+              <ToolRow message={row.message} />
+              <ReviewChangeCard message={row.message} readOnly />
+            </Fragment>
+          ) : <ThinkingRow key={row.message.id} message={row.message} streaming={isRunning && row.message.status === "streaming"} />)}
+        </DisclosureScope>
+      </div>
+    </div>
+  );
+}
+
+function SubagentAnswer({ row }: { row: SubagentRunItem }) {
+  return (
+    <div className="message-row assistant" data-message-id={row.message.id}>
+      <div className="message-col">
+        <div className="message-bubble">
+          {row.message.content ? <div className="prose-chat selectable"><Markdown source={row.message.content} /></div> : null}
+          {row.message.error ? <AssistantErrorMessage message={row.message} readOnly /> : null}
+        </div>
+      </div>
+    </div>
   );
 }

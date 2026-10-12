@@ -331,6 +331,7 @@ export const RacpInputRequestSchema = Type.Object({
   sessionId: Type.String({ minLength: 1 }),
   turnId: Type.String({ minLength: 1 }),
   expiresAt: Type.String(),
+  teamPending: Type.Optional(Type.Object({ deferredAt: Type.String(), requiresNewApproval: Type.Literal(true) })),
   agentName: Type.Optional(Type.String()),
   parentToolCallId: Type.Optional(Type.String()),
   nestedParentToolCallId: Type.Optional(Type.String()),
@@ -692,6 +693,7 @@ export function racpKindForAgentEvent(
       return { kind: options.interrupted ? "turn.interrupted" : "turn.completed", durable: true };
     case "error":
       return { kind: "turn.failed", durable: true };
+    case "context_insights":
     case "usage":
       return { kind: "turn.activity", durable: false };
     case "turn_start":
@@ -732,6 +734,7 @@ export function racpKindForAgentEvent(
 export const LOCAL_AGENT_EVENT_TYPES: readonly AgentEvent["type"][] = [
   "agent_start",
   "agent_end",
+  "context_insights",
   "turn_start",
   "turn_end",
   "usage",

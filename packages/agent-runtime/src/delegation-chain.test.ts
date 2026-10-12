@@ -68,6 +68,57 @@ describe("hydrate / lookup", () => {
   });
 });
 
+describe("recursive retention", () => {
+  it("retains a running subtree and cascades eviction once the last descendant settles", () => {
+    vi.useFakeTimers({ now: 1_700_000_000_000 });
+    const registry = new DelegationChainRegistry();
+    const oldest = start(registry, { delegateSessionId: "old-parent", delegationId: "old-run" });
+    const child = registry.start({ ownerId: oldest.delegateSessionId, delegateSessionId: "child", delegationId: "child-run", toolCallId: "nested", agentName: "explorer", originalTask: "Inspect.", objective: "Inspect." });
+    const grandchild = registry.start({ ownerId: child.delegateSessionId, delegateSessionId: "grandchild", delegationId: "grandchild-run", toolCallId: "grand-task", agentName: "explorer", originalTask: "Inspect.", objective: "Inspect." });
+    registry.settle(grandchild.delegateSessionId, "completed");
+    registry.settle(oldest.delegateSessionId, "failed");
+    for (let index = 0; index < MAX_RESUMABLE_CHAINS_PER_AGENT; index++) {
+      vi.advanceTimersByTime(1_000);
+      const next = start(registry, { delegateSessionId: `new-parent-${index}`, delegationId: `new-run-${index}` });
+      registry.settle(next.delegateSessionId, "completed");
+    }
+    expect(registry.lookup("old-run")).toBeDefined();
+    expect(registry.lookup("child-run")).toBeDefined();
+    registry.drop(oldest.delegateSessionId);
+    expect(registry.lookup("old-run")).toBeDefined();
+    registry.settle(child.delegateSessionId, "aborted");
+    expect(registry.lookup("old-run")).toBeUndefined();
+    expect(registry.lookup("child-run")).toBeUndefined();
+    expect(registry.lookup("grandchild-run")).toBeUndefined();
+    expect(registry.resumableList({ runningDelegationIds: NONE })).toHaveLength(MAX_RESUMABLE_CHAINS_PER_AGENT);
+  });
+
+  it("removes settled orphan history and defers pruning a running orphan until settlement", () => {
+    const registry = new DelegationChainRegistry();
+    const orphan = chain({ ownerId: "missing-owner", latestStatus: "running" });
+    registry.hydrate([orphan]);
+    expect(registry.lookup("del-3")).toBeDefined();
+    registry.settle(orphan.delegateSessionId, "completed");
+    expect(registry.lookup("del-3")).toBeUndefined();
+  });
+});
+
+describe("recursive ownership", () => {
+  it("isolates resume and reusable listings by stable parent chain identity", () => {
+    const registry = new DelegationChainRegistry();
+    const parent = start(registry, { delegateSessionId: "parent-chain", delegationId: "parent-run" });
+    const child = registry.start({ ownerId: "parent-chain", delegateSessionId: "child-chain", delegationId: "child-run", toolCallId: "nested-task", agentName: "explorer", originalTask: "Inspect nested.", objective: "Inspect nested." });
+    registry.settle(child.delegateSessionId, "completed");
+    expect(registry.resolveResume({ resume: "child-run", agentName: "explorer", runningDelegationIds: NONE })).toEqual({ ok: false, error: { kind: "unknown" } });
+    expect(registry.resolveResume({ resume: "child-run", ownerId: "sibling-chain", agentName: "explorer", runningDelegationIds: NONE })).toEqual({ ok: false, error: { kind: "unknown" } });
+    expect(registry.resolveResume({ resume: "child-run", ownerId: "parent-chain", agentName: "explorer", runningDelegationIds: NONE }).ok).toBe(true);
+    expect(registry.resumableList({ runningDelegationIds: NONE })).toEqual([]);
+    expect(registry.resumableList({ ownerId: "parent-chain", runningDelegationIds: NONE })).toHaveLength(1);
+    registry.hydrate([parent, { ...child, latestStatus: "completed" }]);
+    expect(registry.resolveResume({ resume: "child-run", ownerId: "parent-chain", agentName: "explorer", runningDelegationIds: NONE }).ok).toBe(true);
+  });
+});
+
 describe("resolveResume", () => {
   it("reports an unknown id", () => {
     const registry = new DelegationChainRegistry();

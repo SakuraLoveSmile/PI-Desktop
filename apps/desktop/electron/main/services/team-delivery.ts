@@ -2,9 +2,11 @@ import type { Principal } from "@pi-desktop/agent-host";
 import type {
   TeamMessageRecord,
   TeamRosterProjection,
+  TeamOrdinaryInboxProofResult,
 } from "@pi-desktop/shared";
 import type { AgentHostBridge } from "../agent-host-bridge";
 import type { HostProcess } from "../host-process";
+import { createOrdinaryTeamInbox } from "./ordinary-team-inbox.ts";
 
 type RuntimeContext = {
   teamSessionId: string;
@@ -18,6 +20,9 @@ export type TeamDeliveryDependencies = {
   getHost: () => HostProcess | null;
   getBridge: () => AgentHostBridge | null;
   activeTurns: Map<string, string>;
+  getRuntimeIdentity?: () => object | null;
+  isTurnDispatchable?: (sessionId: string, turnId: string) => boolean;
+  stopAtBoundary: (sessionId: string, turnId: string) => Promise<void>;
   log: (message: string, data: Record<string, unknown>) => void;
 };
 
@@ -68,6 +73,8 @@ export function createTeamDeliveryService(deps: TeamDeliveryDependencies) {
       if (teamOperations.get(teamSessionId) === tail) teamOperations.delete(teamSessionId);
     }
   }
+
+  const ordinaryInbox = createOrdinaryTeamInbox(deps, withTeamLock);
 
   async function rosterFor(host: HostProcess, teamSessionId: string): Promise<TeamRosterProjection> {
     return host.call<TeamRosterProjection>("team.getRoster", {
@@ -126,6 +133,10 @@ export function createTeamDeliveryService(deps: TeamDeliveryDependencies) {
     const message = await findMessage(host, teamSessionId, messageId);
     const roster = await rosterFor(host, teamSessionId);
     const bridge = deps.getBridge();
+    if (message.status === "cancelled" && message.taskDispatch && message.dispatchCancellation && !message.turnId) {
+      if (bridge) await bridge.agentHost.cancelSessionMessage(deps.principal, message.targetSessionId, message.id);
+      return { messageId, accepted: false, deliveryStatus: "cancelled", message };
+    }
     setTeamHold(bridge, roster, roster.paused);
     if (roster.paused) {
       return { messageId, accepted: false, deliveryStatus: "queued" };
@@ -208,6 +219,11 @@ export function createTeamDeliveryService(deps: TeamDeliveryDependencies) {
       throw deliveryError("TEAM_DELIVERY_PENDING", "The Host did not persist a Team turn receipt");
     }
 
+    const beforeAck = await findMessage(host, teamSessionId, message.id);
+    if (beforeAck.status === "cancelled" && beforeAck.taskDispatch && beforeAck.dispatchCancellation && !beforeAck.turnId) {
+      await bridge.agentHost.cancelSessionMessage(deps.principal, message.targetSessionId, message.id);
+      return { messageId, accepted: false, deliveryStatus: "cancelled", message: beforeAck };
+    }
     const acknowledged = await host.call<{ acknowledged: boolean }>("team.ackMessage", {
       teamSessionId,
       ackSessionId: message.targetSessionId,
@@ -242,6 +258,7 @@ export function createTeamDeliveryService(deps: TeamDeliveryDependencies) {
     const pendingMessageIds = await withTeamLock(teamSessionId, async () => {
       const host = requireHost();
       const roster = await rosterFor(host, teamSessionId);
+      await ordinaryInbox.reconcile(teamSessionId);
       setTeamHold(deps.getBridge(), roster, roster.paused);
       if (roster.paused) return [];
       const messages = await getPendingMessages(host, teamSessionId);
@@ -371,6 +388,71 @@ export function createTeamDeliveryService(deps: TeamDeliveryDependencies) {
     const input = params && typeof params === "object" && !Array.isArray(params)
       ? params as Record<string, unknown>
       : {};
+    if (method === "team.ordinaryInboxPersisted") {
+      const team = typeof input.teamSessionId === "string" ? input.teamSessionId : undefined;
+      const turn = typeof input.leadTurnId === "string" ? input.leadTurnId : undefined;
+      if (!team || !turn || !Array.isArray(input.messageIds)) return;
+      await withTeamLock(team, async () => {
+        const host = requireHost();
+        const bridge = deps.getBridge();
+        if (!bridge) return;
+        const verified: string[] = [];
+        for (const id of input.messageIds as unknown[]) {
+          if (typeof id !== "string") continue;
+          const response: TeamOrdinaryInboxProofResult = await host.call("team.getOrdinaryInboxProof", {
+            teamSessionId: team, messageId: id,
+          });
+          const proof = response.proof;
+          if (requireHost() !== host || deps.getBridge() !== bridge) return;
+          if (proof?.teamSessionId === team && proof.messageId === id && proof.leadTurnId === turn &&
+            (proof.phase === "persisted" || proof.phase === "acked")) verified.push(id);
+        }
+        bridge.agentHost.retireOrdinaryTeamInbox(team, turn, verified);
+      });
+      return;
+    }
+    if (method === "team.runLimitPauseRequested") {
+      const team = typeof input.teamSessionId === "string" ? input.teamSessionId : undefined;
+      if (!team) return;
+      await withTeamLock(team, async () => {
+        const host = requireHost();
+        const roster = await rosterFor(host, team);
+        if (requireHost() !== host || !roster.paused) return;
+        setTeamHold(deps.getBridge(), roster, true);
+        for (const sessionId of [team, ...roster.members.map((member) => member.memberSessionId)]) {
+          const turn = deps.activeTurns.get(sessionId);
+          if (!turn) continue;
+          await deps.stopAtBoundary(sessionId, turn);
+        }
+      });
+      return;
+    }
+    if (method === "team.changed") {
+      const team = typeof input.teamSessionId === "string" ? input.teamSessionId : undefined;
+      if (!team) return;
+      await withTeamLock(team, async () => {
+        const host = requireHost();
+        const bridge = deps.getBridge();
+        if (!bridge) return;
+        const roster = await rosterFor(host, team);
+        // The Host already retired durable queue rows transactionally. Remove
+        // only their authenticated, unstarted task dispatches from the mirror;
+        // ordinary FIFO mail and consumed/running results remain untouched.
+        for (const target of [team, ...roster.members.map(member => member.memberSessionId)]) {
+          for (const entry of bridge.agentHost.queue.list(target)) {
+            if (!entry.sessionMessageId || entry.idempotencyKey !== `team-message:${entry.sessionMessageId}`) continue;
+            const { message } = await host.call<{ message: TeamMessageRecord | null }>("team.getMessage", {
+              teamSessionId: team, callerSessionId: team, messageId: entry.sessionMessageId,
+            });
+            if (requireHost() !== host) throw deliveryError("HOST_UNAVAILABLE", "The Host changed during Team queue reconciliation");
+            if (message?.targetSessionId === target && message.status === "cancelled" && message.taskDispatch && message.dispatchCancellation && !message.turnId) {
+              await bridge.agentHost.cancelSessionMessage(deps.principal, target, message.id);
+            }
+          }
+        }
+      });
+      return;
+    }
     if (method === "team.executionInboxConsumed") {
       const team = typeof input.teamSessionId === "string" ? input.teamSessionId : undefined;
       const turn = typeof input.turnId === "string" ? input.turnId : undefined;
@@ -411,5 +493,7 @@ export function createTeamDeliveryService(deps: TeamDeliveryDependencies) {
     pauseTeam,
     resumeTeam,
     beforeUserStop,
+    ordinaryInboxRequest: ordinaryInbox.request,
+    dispose: ordinaryInbox.dispose,
   };
 }

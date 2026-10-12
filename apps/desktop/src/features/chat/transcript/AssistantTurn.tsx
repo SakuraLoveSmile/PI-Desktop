@@ -353,7 +353,7 @@ export const AssistantTurn = memo(function AssistantTurn({
 
   return (
     <div
-      className={`message-row assistant assistant-turn${streaming ? " streaming" : ""}`}
+      className={`message-row assistant assistant-turn${!groupProcess ? " compact" : ""}${streaming ? " streaming" : ""}`}
       data-minimap-id={entry.anchorId}
       data-row-role="assistant"
       onContextMenu={onContextMenu}

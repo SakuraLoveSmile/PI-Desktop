@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const memberTranscriptHook = await readFile(new URL("../src/hooks/useTeamMemberTranscript.ts", import.meta.url), "utf8");
+const activityModelSource = await readFile(new URL("../src/features/chat/activity/session-activity-model.ts", import.meta.url), "utf8");
 const [overviewSource, teamPanelSource, memberTranscriptSource, englishLocaleSource, chineseLocaleSource] = await Promise.all([
   readFile(new URL("../src/components/workpanel/OverviewTab.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/components/workpanel/TeamPanel.tsx", import.meta.url), "utf8"),
@@ -22,11 +23,14 @@ test("OverviewTab shares live Team progress and opens precise board destinations
 });
 
 test("OverviewTab derives subagent roster and opens subagent tab", () => {
-  assert.match(overviewSource, /isDelegationStartTool/);
-  assert.match(overviewSource, /delegationIdForMessage/);
-  assert.match(overviewSource, /delegateAgentName/);
-  assert.match(overviewSource, /delegateTaskDescription/);
-  assert.match(overviewSource, /openSubagentTab/);
+  // Overview and the inline activity rail share the same delegation projection.
+  assert.match(overviewSource, /activitySubagents\(messages, running\)/);
+  assert.match(activityModelSource, /message\.role !== "tool" \|\| !isDelegationStartTool\(message\.toolName\)/);
+  assert.match(activityModelSource, /delegationIdForMessage\(message\)/);
+  assert.match(activityModelSource, /delegateAgentName\(message\)/);
+  assert.match(activityModelSource, /delegateTaskDescription\(message\)/);
+  assert.match(activityModelSource, /if \(seen\.has\(delegationId\)\) continue/);
+  assert.match(overviewSource, /onClick=\{\(\) => openSubagentTab\(sub\.delegationId, sub\.agentName\)\}/);
   assert.match(overviewSource, /panel\.overview\.subagents/);
   assert.match(overviewSource, /panel\.overview\.noSubagents/);
 });

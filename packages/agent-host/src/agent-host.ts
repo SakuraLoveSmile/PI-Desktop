@@ -28,6 +28,7 @@ import type {
   GoalProgressChangedEvent,
   UiMessage,
   VoiceOrigin,
+  TeamOrdinaryInboxReadResult,
 } from "@pi-desktop/shared";
 import {
   RACP_ACTIVE_TURN_STATUSES,
@@ -63,6 +64,7 @@ import { TurnQueue } from "./turn-queue.js";
 export type AgentHostOptions = {
   runtime: RuntimePort;
   sessions: SessionPort;
+  readDurableInputs?: (sessionId: string) => Promise<Array<{ request: AskToolRequest; turnId: string }> | undefined>;
   approvals: ApprovalPort;
   queueStore?: QueueStore;
   clock?: Clock;
@@ -198,6 +200,8 @@ export class AgentHost {
   /** The dequeued turn whose runtime prompt acknowledgement is still pending. */
   private readonly startingQueuedTurns = new Map<string, TurnRecord>();
   private readonly idempotency = new Map<string, IdempotencyEntry>();
+  private readonly inputGenerations = new Map<string, number>();
+  private readonly readDurableInputs?: AgentHostOptions["readDurableInputs"];
   private readonly draining = new Set<string>();
   /** A pass that arrived while one was running: the queue must be looked at again. */
   private readonly drainPending = new Set<string>();
@@ -206,6 +210,7 @@ export class AgentHost {
   constructor(options: AgentHostOptions) {
     this.runtime = options.runtime;
     this.sessions = options.sessions;
+    this.readDurableInputs = options.readDurableInputs;
     this.clock = options.clock ?? new SystemClock();
     this.ids = options.ids ?? new RandomIds();
     this.limits = { ...RACP_DEFAULT_LIMITS, ...options.limits };
@@ -233,6 +238,8 @@ export class AgentHost {
    * the turn as aborted or stopped, so `agent_end` becomes `turn.interrupted`.
    */
   ingest(envelope: AgentEventEnvelope, meta: { interrupted?: boolean } = {}): void {
+    // Assembled contexts stay on the local diagnostics path, never RACP.
+    if (envelope.event.type === "context_insights") return;
     const state = this.state(envelope.sessionId);
     const event = envelope.event;
     const turnId = envelope.turnId ? this.resolveTurnId(state, envelope.turnId) : state.activeTurnId;
@@ -262,8 +269,10 @@ export class AgentHost {
           this.emit(state, "turn.activity", { event }, meta2);
           return;
         }
+        if (event.type === "agent_end" && turn && !isActive(turn.status)) return;
+        const interrupted = meta.interrupted || (event.type === "error" && event.error.code === "TURN_ABORTED");
         this.closeTurn(state, turn, {
-          status: event.type === "error" ? "failed" : meta.interrupted ? "interrupted" : "completed",
+          status: interrupted ? "interrupted" : event.type === "error" ? "failed" : "completed",
           endedAt: new Date(envelope.ts).toISOString(),
           ...(event.type === "error"
             ? {
@@ -275,7 +284,7 @@ export class AgentHost {
                 },
               }
             : {}),
-          kind: mapping.kind,
+          kind: interrupted ? "turn.interrupted" : mapping.kind,
           payload: { event },
           meta: meta2,
         });
@@ -338,6 +347,7 @@ export class AgentHost {
         const turn = turnId ? state.turns.get(turnId) : undefined;
         if (turn) turn.status = "waiting_input";
         const request = this.inputFromAsktool(event.request, state, turn?.id ?? turnId ?? "", envelope);
+        this.inputGenerations.set(state.id, (this.inputGenerations.get(state.id) ?? 0) + 1);
         state.pendingInputs.set(request.id, { request, original: event.request });
         this.emit(state, "input.requested", request, meta2);
         return;
@@ -421,6 +431,7 @@ export class AgentHost {
     const state = this.state(summary.id);
     state.permissionMode = summary.permissionMode;
     await this.syncPendingApprovals(state);
+    await this.refreshPendingInputs(summary.id);
     const role = params.role ?? highestRole(principal.roles);
     if (!principal.roles.includes(role) && !principal.roles.includes("owner")) {
       throw racpError("FORBIDDEN", `principal does not hold the ${role} role`);
@@ -498,6 +509,33 @@ export class AgentHost {
       turn: this.getTurn(result.turn.id),
       cursor: this.hub.stream(params.sessionId).cursor(),
     };
+  }
+
+  /** Trusted Main mirrors a durable user answer; it never restores execution authority. */
+  async admitPersistedAnswer(principal: Principal, record: QueuedTurnRecord, restored = false): Promise<void> {
+    if (!principal.roles.includes("owner") || !principal.pairedDevice ||
+        record.principalSubject !== principal.subject ||
+        record.id !== record.userMessageId || !record.id.startsWith("asktool-answer:") ||
+        record.sessionMessageId !== undefined) {
+      throw racpError("FORBIDDEN", "only the paired owner may admit a durable question answer");
+    }
+    await this.withAdmission(record.sessionId, async () => {
+      await this.requireSession(record.sessionId);
+      const state = this.state(record.sessionId);
+      const known = state.turns.get(record.id);
+      if (known && known.status !== "queued") return;
+      if (restored && !this.queue.find(record.id)) this.queue.hold(record.sessionId, "restore");
+      else if (!restored) this.queue.resume(record.sessionId, "restore");
+      const position = this.queue.adoptPersisted(record);
+      const turn = this.ensureTurn(state, record.id);
+      turn.status = "queued";
+      turn.admission = "queue";
+      turn.queuePosition = position;
+      turn.effectivePermissionMode = record.effectivePermissionMode;
+      turn.principalSubject = principal.subject;
+      this.notifyQueue(record.sessionId);
+    });
+    this.kick(record.sessionId);
   }
 
   private async startTurnAdmitted(
@@ -662,7 +700,7 @@ export class AgentHost {
     const active = state.activeTurnId ? state.turns.get(state.activeTurnId) : undefined;
     const queue = this.queue.list(state.id).map((record, index) => ({ queueEntryId: record.id, position: index + 1 }));
     const pendingApprovals = this.approvals.list(sessionId).length > 0;
-    const pendingInputs = state.pendingInputs.size > 0;
+    const pendingInputs = [...state.pendingInputs.values()].some(entry => !entry.original.teamPending);
     const activeStatus = active?.status;
     const workState: AgentWorkSnapshot["state"] = pendingApprovals || activeStatus === "waiting_approval"
       ? "waiting-permission"
@@ -800,6 +838,36 @@ export class AgentHost {
     return result;
   }
 
+  /** Host storage is authoritative for Team inputs, including after process restart. */
+  async refreshPendingInputs(sessionId: string): Promise<void> {
+    if (!this.readDurableInputs) return;
+    const generation = (this.inputGenerations.get(sessionId) ?? 0) + 1;
+    this.inputGenerations.set(sessionId, generation);
+    const inputs = await this.readDurableInputs(sessionId);
+    if (!inputs || this.inputGenerations.get(sessionId) !== generation) return;
+    const state = this.state(sessionId);
+    const ids = new Set(inputs.map(input => input.request.requestId));
+    for (const [id, entry] of state.pendingInputs) {
+      if (entry.original.teamManaged && !ids.has(id)) this.closePendingInput(sessionId, id);
+    }
+    for (const input of inputs) {
+      const original = { ...input.request, teamManaged: true as const };
+      const existing = state.pendingInputs.get(original.requestId);
+      if (existing && Boolean(existing.original.teamPending) === Boolean(original.teamPending)) continue;
+      const request = this.inputFromAsktool(original, state, input.turnId, { sessionId, turnId: input.turnId, ts: this.clock.now(), event: { type: "asktool_request", request: original } });
+      state.pendingInputs.set(request.id, { request, original });
+      this.emit(state, "input.requested", request, { turnId: input.turnId });
+    }
+  }
+
+  /** A trusted adapter settled the durable question through its user-input path. */
+  closePendingInput(sessionId: string, requestId: string): void {
+    const state = this.state(sessionId);
+    this.inputGenerations.set(sessionId, (this.inputGenerations.get(sessionId) ?? 0) + 1);
+    if (!state.pendingInputs.delete(requestId)) return;
+    this.emit(state, "input.resolved", { inputId: requestId, status: "resolved", by: "desktop" }, {});
+  }
+
   async respondInput(principal: Principal, response: RacpInputResponse): Promise<{ inputId: string; status: "resolved" }> {
     this.requireRole(principal, "input/respond");
     let found: { state: SessionState; entry: { request: RacpInputRequest; original: AskToolRequest } } | undefined;
@@ -812,12 +880,14 @@ export class AgentHost {
     if (response.answers.length !== entry.request.questions.length) {
       throw racpError("INVALID_ARGUMENT", "answers must match the number of questions");
     }
+    this.inputGenerations.set(state.id, (this.inputGenerations.get(state.id) ?? 0) + 1);
     await this.runtime.respondInput({
       requestId: entry.original.requestId,
       sessionId: entry.original.sessionId,
       answers: response.answers,
     });
     state.pendingInputs.delete(response.inputId);
+    this.inputGenerations.set(state.id, (this.inputGenerations.get(state.id) ?? 0) + 1);
     const turn = state.turns.get(entry.request.turnId);
     if (turn && turn.status === "waiting_input") turn.status = "running";
     this.emit(state, "input.resolved", { inputId: response.inputId, status: "resolved", by: principal.subject }, { turnId: entry.request.turnId });
@@ -839,6 +909,7 @@ export class AgentHost {
   }
 
   async snapshot(sessionId: string, summary?: SessionSummary): Promise<RacpSessionSnapshot> {
+    await this.refreshPendingInputs(sessionId);
     const resolved = summary ?? (await this.requireSession(sessionId));
     const state = this.state(sessionId);
     const page = await this.sessions.history(sessionId, { limit: this.snapshotItems });
@@ -937,6 +1008,45 @@ export class AgentHost {
     void this.drain(sessionId);
   }
 
+  /** Internal mailbox boundary, never a user steer or a new turn admission. */
+  async readOrdinaryTeamInbox(
+    sessionId: string,
+    runtimeTurnId: string,
+    read: () => Promise<TeamOrdinaryInboxReadResult>,
+  ): Promise<TeamOrdinaryInboxReadResult | null> {
+    return this.withAdmission(sessionId, async () => {
+      const state = this.state(sessionId);
+      const active = state.activeTurnId ? state.turns.get(state.activeTurnId) : undefined;
+      if (!active || (active.runtimeTurnId ?? active.id) !== runtimeTurnId || !isActive(active.status) ||
+        this.queue.isHeld(sessionId) || this.queue.list(sessionId).some(entry => entry.priority !== undefined) ||
+        [...state.turns.values()].some(turn => turn.deliveryPending)) return null;
+      const result = await read();
+      // Host already committed transcript/proof and retired durable queue rows.
+      // Even if the old turn ended during read, these entries must never run.
+      this.retireOrdinaryTeamInbox(sessionId, runtimeTurnId, result.messages.map(message => message.messageId));
+      const current = state.activeTurnId ? state.turns.get(state.activeTurnId) : undefined;
+      if (current !== active || !isActive(active.status) || this.queue.isHeld(sessionId)) {
+        throw racpError("CONFLICT", "ordinary Team inbox turn changed during admission");
+      }
+      return result;
+    });
+  }
+
+  /** Host-authenticated commit notification; this only removes exact mail mirrors. */
+  retireOrdinaryTeamInbox(sessionId: string, runtimeTurnId: string, messageIds: string[]): void {
+    const ids = new Set(messageIds);
+    const state = this.state(sessionId);
+    for (const entry of this.queue.list(sessionId)) {
+      if (!entry.sessionMessageId || !ids.has(entry.sessionMessageId) ||
+        entry.idempotencyKey !== `team-message:${entry.sessionMessageId}`) continue;
+      this.ensureTurn(state, entry.id);
+      this.markDeliveredIntoAnotherTurn(state, entry.id, runtimeTurnId);
+      this.queue.retirePersisted(sessionId, entry.id);
+    }
+    this.renumberQueue(state);
+    this.notifyQueue(sessionId);
+  }
+
   // -------------------------------------------------------------------------
   // Internals
   // -------------------------------------------------------------------------
@@ -972,6 +1082,7 @@ export class AgentHost {
       this.emit(state, "approval.resolved", closed, outcome.meta);
     }
     for (const [inputId] of state.pendingInputs) {
+      if (state.pendingInputs.get(inputId)?.original.teamPending) continue;
       state.pendingInputs.delete(inputId);
       this.emit(state, "input.resolved", { inputId, status: "canceled" }, outcome.meta);
     }
@@ -1348,6 +1459,7 @@ export class AgentHost {
       sessionId: state.id,
       turnId,
       expiresAt: new Date(this.clock.now() + this.approvalLifetime(state)).toISOString(),
+      ...(request.teamPending ? { teamPending: request.teamPending } : {}),
       ...(envelope.agentName ? { agentName: envelope.agentName } : {}),
       ...(envelope.parentToolCallId ? { parentToolCallId: envelope.parentToolCallId } : {}),
       ...(envelope.nestedParentToolCallId ? { nestedParentToolCallId: envelope.nestedParentToolCallId } : {}),

@@ -11,9 +11,10 @@ import {
 } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
 import { useAppStore } from "../../stores/app-store";
-import { Badge, Button, Checkbox, CheckboxGroup, Field, SegmentedControl, Textarea } from "../../components/ui";
+import { Button, Checkbox, CheckboxGroup, Field, HelpIcon, SegmentedControl, Textarea, TooltipButton } from "../../components/ui";
 import { SettingsMenuSelect } from "../../components/settings/SettingsMenuSelect";
-import { SettingsCard, SettingsRow } from "./primitives";
+import { AgentCapabilityPage, CapabilityGroupHeader, CapabilityPanel, CapabilityRow } from "../../components/settings/AgentCapabilityLayout";
+import { IconBot, IconPencil, IconX } from "../../components/icons";
 import {
   EXPERT_TEAM_USER_SCOPE,
   ExpertTeamSettingsConflict,
@@ -25,6 +26,7 @@ import {
   persistExpertTeamProjectRemoval,
 } from "./expert-team-settings";
 import "../../styles/settings-expert-team.css";
+import { TeamRunLimitsSettings } from "./TeamRunLimitsSettings";
 
 export function ExpertTeamSettingsPage() {
   const { t } = useTranslation();
@@ -82,64 +84,82 @@ export function ExpertTeamSettingsPage() {
   };
   return (
     <div className="expert-team-settings" data-testid="expert-team-settings">
-      <p className="expert-team-settings-description">{t("settings.expertTeam.description")}</p>
-      <SegmentedControl
-        value={scope}
-        onChange={changeScope}
-        label={t("settings.expertTeam.projectScope")}
-        role="tablist"
-        className="expert-team-scope-tabs"
-        disabled={saving}
-        options={[
-          { value: EXPERT_TEAM_USER_SCOPE, id: "expert-team-scope-user", label: t("settings.expertTeam.userScope"), controls: "expert-team-roles" },
-          ...projects.map((project, index) => ({ value: project.path, id: `expert-team-scope-project-${index}`,
-            label: <span title={project.path}>{project.name}{project.path === activeProjectPath
-              ? <span className="expert-team-current-project"> · {t("settings.expertTeam.currentProject")}</span> : null}</span>,
-            controls: "expert-team-roles" })),
-          ...missingProjects.map((path, index) => ({ value: path, id: `expert-team-scope-missing-${index}`, label: <span title={path}>
-            {path.split(/[/\\]/).at(-1)} <span aria-hidden>⚠</span>
-          </span>, controls: "expert-team-roles" })),
-        ]}
-      />
-      {loadFailed ? <div className="expert-team-load-error" role="alert">
-        {t("settings.expertTeam.loadFailed")}
-        <Button size="sm" variant="secondary" onClick={() => setReload((value) => value + 1)}>{t("errors.action.retry")}</Button>
-      </div> : loading ? <p role="status">{t("common.loading")}</p> : projects.length === 0
-        ? <p className="expert-team-settings-description">{t("settings.expertTeam.emptyProjects")}</p> : null}
-      <div className="expert-team-builtins-copy">
-        <h3>{t("settings.expertTeam.builtinTitle")}</h3>
-        <p>{t(scope ? "settings.expertTeam.projectInherit" : "settings.expertTeam.builtinDescription")}</p>
-        {scope ? <code className="expert-team-project-path">{scope}</code> : null}
-      </div>
-      {projectUnavailable ? <div className="expert-team-load-error" role="alert">
-        {t("settings.expertTeam.projectUnavailable")}
-        <Button size="sm" variant="secondary" disabled={saving} onClick={() => void removeUnavailableScope()}>{t("settings.expertTeam.removeProjectOverrides")}</Button>
-      </div> : null}
-      {scopeError ? <p className="expert-team-error" role="alert">{scopeError}</p> : null}
-      <div id="expert-team-roles" role="tabpanel" aria-label={t("settings.expertTeam.builtinTitle")} className="expert-team-role-list">
-        {EXPERT_TEAM_PRESET_IDS.map((role) => {
-          const saved = expertTeamScopeRole(settings.expertTeam, scope, role);
-          const effective = resolveExpertTeamRoleConfig(settings.expertTeam, role, scope);
-          return <SettingsCard key={role}>
-            <div className="expert-team-role-card" data-testid={`expert-team-role-${role}`}>
-              <div className="expert-team-role-heading">
-                <h4 className="settings-card-heading">{t(`settings.expertTeam.roles.${role}.name`)}</h4>
-                <Button variant="ghost" size="sm" disabled={saving || projectUnavailable} aria-expanded={editing === role}
-                  onClick={() => setEditing(editing === role ? null : role)}>
-                  {t(editing === role ? "settings.expertTeam.cancel" : "settings.expertTeam.edit")}
-                </Button>
-              </div>
-              <p>{t(`settings.expertTeam.roles.${role}.description`)}</p>
-              {Object.keys(effective).length ? <div className="expert-team-role-summary">
-                <Badge>{t(saved ? "settings.expertTeam.pinned" : "settings.expertTeam.inherited")}</Badge>
-                {effective.modelId ? <span>{effective.modelId}</span> : null}
-              </div> : null}
-              {editing === role ? <ExpertTeamRoleEditor key={`${scope}:${role}`} scope={scope} role={role}
-                expected={saved} onSaved={() => setEditing(null)} onBusy={setSaving} /> : null}
-            </div>
-          </SettingsCard>;
-        })}
-      </div>
+      <AgentCapabilityPage toolbar={
+        <div className="agent-capability-toolbar expert-team-toolbar">
+          <SegmentedControl
+            value={scope}
+            onChange={changeScope}
+            label={t("settings.expertTeam.projectScope")}
+            role="tablist"
+            className="expert-team-scope-tabs agent-capability-segment"
+            itemClassName="agent-capability-segment-btn"
+            disabled={saving}
+            options={[
+              { value: EXPERT_TEAM_USER_SCOPE, id: "expert-team-scope-user", label: t("settings.expertTeam.userScope"), controls: "expert-team-roles" },
+              ...projects.map((project, index) => ({ value: project.path, id: `expert-team-scope-project-${index}`,
+                label: <span title={project.path}>{project.name}{project.path === activeProjectPath
+                  ? <span className="expert-team-current-project"> · {t("settings.expertTeam.currentProject")}</span> : null}</span>,
+                controls: "expert-team-roles" })),
+              ...missingProjects.map((path, index) => ({ value: path, id: `expert-team-scope-missing-${index}`, label: <span title={path}>
+                {path.split(/[/\\]/).at(-1)} <span aria-hidden>⚠</span>
+              </span>, controls: "expert-team-roles" })),
+            ]}
+          />
+          <HelpIcon label={t("settings.expertTeam.description")} />
+        </div>
+      }>
+        {loadFailed ? <div className="expert-team-load-error" role="alert">
+          {t("settings.expertTeam.loadFailed")}
+          <Button size="sm" variant="secondary" onClick={() => setReload((value) => value + 1)}>{t("errors.action.retry")}</Button>
+        </div> : loading ? <p role="status">{t("common.loading")}</p> : projects.length === 0
+          ? <p className="expert-team-settings-description">{t("settings.expertTeam.emptyProjects")}</p> : null}
+        {projectUnavailable ? <div className="expert-team-load-error" role="alert">
+          {t("settings.expertTeam.projectUnavailable")}
+          <Button size="sm" variant="secondary" disabled={saving} onClick={() => void removeUnavailableScope()}>{t("settings.expertTeam.removeProjectOverrides")}</Button>
+        </div> : null}
+        {scopeError ? <p className="expert-team-error" role="alert">{scopeError}</p> : null}
+        {!scope && <TeamRunLimitsSettings />}
+        <div id="expert-team-roles" role="tabpanel" aria-label={t("settings.expertTeam.builtinTitle")}>
+          <CapabilityPanel loading={false} loadingLabel={t("common.loading")}>
+            <CapabilityGroupHeader
+              label={t("settings.expertTeam.builtinTitle")}
+              path={scope || undefined}
+              count={EXPERT_TEAM_PRESET_IDS.length}
+              action={<HelpIcon label={t(scope ? "settings.expertTeam.projectInherit" : "settings.expertTeam.builtinDescription")} />}
+            />
+            {EXPERT_TEAM_PRESET_IDS.map((role) => {
+              const saved = expertTeamScopeRole(settings.expertTeam, scope, role);
+              const effective = resolveExpertTeamRoleConfig(settings.expertTeam, role, scope);
+              const name = t(`settings.expertTeam.roles.${role}.name`);
+              const actionLabel = t(editing === role ? "settings.expertTeam.cancel" : "settings.expertTeam.edit");
+              return <div key={role} className="expert-team-role-card" data-testid={`expert-team-role-${role}`}>
+                <CapabilityRow
+                  glyph={<IconBot size={16} />}
+                  name={name}
+                  description={t(`settings.expertTeam.roles.${role}.description`)}
+                  badges={Object.keys(effective).length ? <span className="agent-capability-badge">
+                    {t(saved ? "settings.expertTeam.pinned" : "settings.expertTeam.inherited")}
+                  </span> : undefined}
+                  meta={effective.modelId ? <code>{effective.modelId}</code> : undefined}
+                  actions={<TooltipButton
+                    className="settings-icon-button"
+                    tooltip={actionLabel}
+                    ariaLabel={`${actionLabel} · ${name}`}
+                    disabled={saving || projectUnavailable}
+                    aria-expanded={editing === role}
+                    onClick={() => setEditing(editing === role ? null : role)}
+                  >
+                    {editing === role ? <IconX size={15} /> : <IconPencil size={15} />}
+                    <span className="sr-only">{actionLabel}</span>
+                  </TooltipButton>}
+                />
+                {editing === role ? <ExpertTeamRoleEditor key={`${scope}:${role}`} scope={scope} role={role}
+                  expected={saved} onSaved={() => setEditing(null)} onBusy={setSaving} /> : null}
+              </div>;
+            })}
+          </CapabilityPanel>
+        </div>
+      </AgentCapabilityPage>
     </div>
   );
 }
@@ -246,21 +266,23 @@ function ExpertTeamRoleEditor({ scope, role, expected, onSaved, onBusy }: {
         />
       </Field>
     </div>
-    <div>
-      <SettingsRow title={t("settings.expertTeam.tools")}>
-      <Checkbox label={t("settings.expertTeam.toolsInherit")} checked={draft.tools === undefined} disabled={saving}
-        onChange={(event) => setField("tools", event.target.checked ? undefined : [...(inherited.tools ?? [])])} />
-      </SettingsRow>
-      <CheckboxGroup label={t("settings.expertTeam.tools")} className="expert-team-tools"
-        options={EXPERT_TEAM_CONFIGURABLE_TOOLS.map((tool) => ({ value: tool, label: tool }))}
+    <div className="ext-field-group">
+      <div className="ext-field-label ext-field-label-row">
+        <span>{t("settings.expertTeam.tools")}</span>
+        <Checkbox label={t("settings.expertTeam.toolsInherit")} checked={draft.tools === undefined} disabled={saving}
+          onChange={(event) => setField("tools", event.target.checked ? undefined : [...(inherited.tools ?? [])])} />
+      </div>
+      <CheckboxGroup label={t("settings.expertTeam.tools")} className="expert-team-tools ext-tool-pick" itemClassName="ext-tool-opt"
+        options={EXPERT_TEAM_CONFIGURABLE_TOOLS.map((tool) => ({ value: tool, label: <code>{tool}</code> }))}
         values={draft.tools ?? inherited.tools ?? []} disabled={saving || draft.tools === undefined}
         onChange={(tools) => setField("tools", tools)} />
     </div>
-    <div>
-      <SettingsRow title={t("settings.expertTeam.instructions")}>
-      <Checkbox label={t("settings.expertTeam.instructionsInherit")} checked={draft.instructions === undefined}
-        disabled={saving} onChange={(event) => setField("instructions", event.target.checked ? undefined : inherited.instructions ?? "")} />
-      </SettingsRow>
+    <div className="ext-field-group">
+      <div className="ext-field-label ext-field-label-row">
+        <span>{t("settings.expertTeam.instructions")}</span>
+        <Checkbox label={t("settings.expertTeam.instructionsInherit")} checked={draft.instructions === undefined}
+          disabled={saving} onChange={(event) => setField("instructions", event.target.checked ? undefined : inherited.instructions ?? "")} />
+      </div>
       <Textarea rows={5} aria-label={t("settings.expertTeam.instructions")}
         placeholder={t("settings.expertTeam.instructionsPlaceholder")} value={draft.instructions ?? inherited.instructions ?? ""}
         disabled={saving || draft.instructions === undefined} aria-invalid={instructionsTooLong}

@@ -1,4 +1,4 @@
-# 04. Data Storage (Shared schema v19, Plus track v4)
+# 04. Data Storage (Shared schema v21, Plus track v7)
 
 ## 0. Ownership decision
 
@@ -322,9 +322,9 @@ PRAGMA trusted_schema = ON;       -- required by the FTS triggers (§4.8); the D
 PRAGMA auto_vacuum = INCREMENTAL; -- set at creation, before any table
 ```
 
-- The shared schema version lives in `PRAGMA user_version` (current v19 = `19`).
+- The shared schema version lives in `PRAGMA user_version` (current v21 = `21`).
   Plus-only structures are versioned separately in `plus_schema_meta` (current
-  Plus track v4, section 7.1). The v1 `meta` table is gone.
+  Plus track v7, section 7.1). The v1 `meta` table is gone.
 - host-core is the **single writer**; statements use `prepare_cached`; every
   multi-row write runs in one transaction.
 - Boot maintenance runs before RPC service: one transaction marks every
@@ -942,6 +942,26 @@ Expert Team state is stored in three Host-owned tables (ADR plus-expert-team-col
 - `team_tasks` stores the revisioned shared task board, owner, dependencies,
   advisory write scopes, status, and soft-delete marker.
 
+Host-managed execution claims for ordinary Agent Team tasks use the additive
+`team-task-attempt-v1` KV namespace. Keys encode `[teamSessionId, taskId]` as a
+JSON tuple; version-1 values store `schemaVersion`, Team/task identity, owner,
+associated turn/session, task revision, completion claim and settled status.
+Only explicit task status updates establish an association; opening a new turn
+never binds all owned tasks. There is no backfill for historical tasks.
+
+An active completion claim is persisted as `in_progress`, not `completed`.
+The matching turn's terminal CAS atomically settles the exact current attempt:
+completed with a claim → completed; error → failed; aborted → cancelled.
+Success without a completion claim leaves the task unfinished. Task/team
+revisions advance with changes, preserving stale-request protection. Metadata
+edits preserve a valid claim; explicit resets, reassignment, deletion and
+accepted structured Plan research results clear it. Failed/cancelled attempt
+markers prevent late completion claims until explicit retry or a new active
+verification turn. Startup recovery cancels matching interrupted attempts in
+its existing abort transaction. Team/session cleanup removes these records.
+Existing tasks without an attempt retain legacy semantics; no SQL schema or
+Plus track version changes are required for this versioned KV addition.
+
 Optional role/display-name presentation is stored in the existing Host KV
 store under namespace `team-member-presentation-v1`, keyed by durable member
 Session ID. It is copied from a `TeamLaunchReviewMember` only in the confirmed
@@ -1388,7 +1408,10 @@ CREATE INDEX idx_notifications_unread
   true, inserts `task.completed` for `completed` or `task.failed` for `error`
   in the **same transaction**. Electron passes false only when the main window
   is visible/focused and that exact session is the current chat. `aborted`
-  never inserts a row.
+  never inserts a row. Host-confirmed Team member `completed` turns also omit
+  independent success notifications (WP7), regardless of title or visibility.
+  Their turn, transcript, phase and Team report still persist. Member failures,
+  Lead/Goal and non-Team terminal outcomes retain the original rules.
 - Repeating a terminal update cannot duplicate a notification because
   `turn_id` is unique. The RPC result includes the record only when this call
   inserted it; otherwise the `notification` field is omitted.
@@ -1429,7 +1452,7 @@ is the source of truth, the index is derived and self-healing.
 | streaming reply checkpoint (`session.saveInflightMessage`, D299) | atomically replace `<id>.inflight.json`; no-op for an empty message or an id already indexed | — |
 | context checkpoint (`session.appendCompaction`) | append typed checkpoint line after its referenced message boundary | — (checkpoint is not searchable transcript content) |
 | tool succeeded (Write/Edit) | — | upsert `artifacts` + `audit_log` row, same tx as result persistence |
-| turn terminal via `session.endTurn` | `completed`/`error`: remove the in-flight checkpoint only when its id is already indexed; otherwise leave it for the outbox or boot (D327). `recoverInflight`: append the leftover as `complete` when the turn is `completed`, otherwise as `aborted`, when its final row never landed | update `turns`; for completed/error insert one notification and prune to 200 in the same tx; aborted inserts none; a promoted checkpoint gets an index row under the turn |
+| turn terminal via `session.endTurn` | `completed`/`error`: remove the in-flight checkpoint only when its id is already indexed; otherwise leave it for the outbox or boot (D327). `recoverInflight`: append the leftover as `complete` when the turn is `completed`, otherwise as `aborted`, when its final row never landed | update `turns`; for eligible completed/error insert one notification and prune to 200 in the same tx (WP7 omits Team member success); aborted inserts none; a promoted checkpoint gets an index row under the turn |
 | plan/goal submission | host writes the exact Markdown bytes to a new unique `<workspaceRoot>/.pi/<kind>/*.md` file | insert one `plan_approvals(pending)` row with the kind, structured title/question, artifact path/hash/size, and expiry before emitting the approval request |
 | plan/goal approval | verify the immutable artifact path/hash/size | atomically resolve `plan_approvals`, update `sessions.mode` and explicit `permission_mode`, and set `execution_state = 'queued'`; reject/expiry stay in the contract mode |
 | transcript truncate / retry / edit (`session.truncateFrom`) | host-owned suffix cut: abort leftover running turn, archive discarded regenerate tail, atomic prefix rewrite (temp + rename); preserve only a checkpoint whose boundary remains | single tx via `replace_messages`: delete index rows, bulk reinsert carrying each surviving message's owning `turn_id`, reset `last_seq`; drop inflight checkpoint |
@@ -1650,7 +1673,7 @@ and moves only when upstream migrations are merged (ADR
 plus-schema-version-track). Plus-only structures run on a second track in the
 same database, so merging upstream never renumbers or collides with Plus data.
 Plus steps are ordered, additive, and idempotent. They live in
-`crates/host-core/src/db/plus_schema.rs`, and the current track version is 4:
+`crates/host-core/src/db/plus_schema.rs`, and the current track version is 7:
 
 | Step | Adds |
 |---|---|
@@ -1658,6 +1681,9 @@ Plus steps are ordered, additive, and idempotent. They live in
 | P2 | `sessions.execution_profile` and the `teams`, `team_members`, and `team_tasks` tables |
 | P3 | execution provider/model bindings and revision intent fields on `plan_approvals`, and the `plan_execution_schedules` table |
 | P4 | `plan_approvals.execution_kind`, backfilled from `kind` for approved proposals |
+| P5 | session-owned `session_quick_notes` and `background_processes` tables |
+| P6 | `team_ordinary_inbox`, the authenticated Lead-input consumption journal |
+| P7 | `background_service_ownership`, including `owner_project_path`, and its session-deletion guard |
 
 P1 to P4 are the Plus-only changes earlier fork builds shipped as
 `user_version` 20 to 23. Every step probes before it changes anything, so a
@@ -1678,7 +1704,7 @@ edited.
 - **Legacy fork database.** A database with Plus structures, no
   `plus_schema_meta`, and `user_version` 20 to 23 was written by an earlier fork
   build. After a verified `pi.sqlite.legacy-v<N>.bak`, one transaction applies
-  every Plus step, writes the meta (track 4, shared 19), and sets
+  every Plus step, writes the meta (track 7, current shared chain), and sets
   `user_version` to 19. A failure rolls the transaction back and leaves the
   legacy database as it was.
 - **Older fork build.** An older fork build that opens a reconciled database
@@ -1691,8 +1717,35 @@ edited.
   since the meta was written, all steps are replayed, because an upstream step
   may have rebuilt a table that carries Plus columns, and the meta is
   re-synced.
-- **Fresh installs.** A new database runs the shared v19 DDL, then every Plus
+- **Fresh installs.** A new database runs the current shared DDL, then every Plus
   step, and records the track version. It takes no backup.
+- **Known candidate data.** Earlier local candidates wrote P6 and P7 before
+  their storage support reached `main`. These are supported formats, not a
+  reason to lower the database version or disable the newer-schema guard.
+  A P5 or P6 file upgrades behind a verified backup; a current P7 file retains
+  its journal, ownership rows, shared version, and Plus version on reopen.
+  Versions above P7 still fail closed before maintenance or mutation.
+- **Historical inbox recovery.** Host validates the journal against the
+  canonical collaboration ledger and the exact authenticated transcript input.
+  Prepared records recover through the existing file-first append path. Index
+  repair retains the recorded Lead turn; recording consumption and retiring
+  the durable queued message commit together. Repeated recovery cannot append
+  another copy or turn an authenticated input into new user authorization.
+  The same-turn inbox capability is now active for authenticated ordinary Agent
+  Lead wait boundaries. Old Hosts retain queued continuation; journal recovery
+  never starts a turn or provider request. See [ordinary inbox](team-ordinary-inbox.md).
+- **Historical service recovery.** On cold start, active historical services
+  record `host_restart` before the existing background-process recovery marks
+  them interrupted. Host never adopts their stored PID or replays a command.
+  Read-only activity metadata preserves service identity, deadline, and stop
+  reason. P7 did not store the originating platform or stop mechanism, so this
+  build omits `stopMode` rather than deriving a historical TERM/KILL or
+  JobObject outcome from its own platform. The recorded escalation flag stays
+  readable but does not identify that missing mechanism.
+  Explicit new services are now accepted only through the current authenticated
+  Agent Team launch and permission gates. Their live stop mechanism is reported
+  from the owned runner; historical rows never invent one. See
+  [managed services](team-managed-services.md).
 - **Offline relocation.** The cold storage migration's `--relocate-data` pass
   (section 2, user-selected storage location) opens SQLite directly and never
   goes through `Database::open`, so it does not reconcile a legacy fork
@@ -1776,7 +1829,8 @@ columns for anything the host filters, joins, sums, or indexes.
     branch cost the file nothing; a branch that leaves the transcript is stored
     in full first, and a file written only by an older build still reads back
     message-for-message.
-14. Completed and failed turns atomically create one durable notification;
+14. Eligible completed and failed turns atomically create one durable notification;
+    Team member success retains turn/report facts without an independent alert;
     repeated terminal updates do not duplicate it, aborted turns create none,
     and the newest-200 cap survives restart
 15. Notification list/unread, mark-read, mark-all-read, clear, and session
@@ -1937,3 +1991,96 @@ An unknown price is distinct from a known zero price; partial known costs remain
 on the individual operations. Late usage targets its captured turn and does not
 revive it or debit the currently active turn. Immediate nested parent and owning
 Task remain separate optional transcript/event fields.
+
+## Plus automatic memory and code index storage
+
+Automatic memory uses existing project/group memory collections and their
+32-KiB derived-context limit. The opt-in flag lives in Host `kv` namespace
+`projectAutoMemory`, keyed by `path:<canonical-path>` or `group:<id>`; it does not
+advance the shared schema. User and agent entries share the existing collection.
+Agent updates/deletions compare the entry's last title/content; editor Save
+compares the owner and complete loaded memory snapshot before atomic replacement.
+Conflicts preserve persisted notes and the user's unsaved editor draft. Legacy
+plain-text and entries-v1 values remain readable. While automatic recording is
+on, legacy batch RPCs without a snapshot are rejected to prevent lost updates.
+Existing project-memory configuration-sync eligibility remains unchanged; the
+local opt-in flag is not implicitly exported. Data relocation remaps path flags
+with the same relocated project paths.
+
+The disposable code cache is Rust-owned `<data>/index/index.db`, separate from
+`pi.sqlite`, with per-root rows and FTS5 trigram candidate indexing. Opening it
+is lazy: a missing/broken cache does not prevent Host startup; an index request
+reports errors instead of fabricating successful empty results. Clear deletes
+only the caller root's derived rows and never workspace files or memory.
+
+Search limits are 10,000 files, 1 MiB per file, 64 MiB total content, a five-second
+scan budget, at most 50 returned hits (default 20), 240-character line excerpts
+and a 32-KiB result budget. Budget skips, binary/unreadable files or observed
+filesystem changes yield `partial` coverage with `truncated: true`; zero hits in
+such a result cannot prove absence. Status reports the last completed scan, not
+a fresh filesystem validation. Sensitive-file exclusions and shared ignore
+rules apply before indexing; symlinks cannot expand the session root.
+### Session activity storage (Plus P5)
+
+`session_quick_notes` is keyed by session, stores exact content, revision and
+update time, and cascades on session deletion. Writes require the expected
+revision; stale writers receive NOTE_CONFLICT with the current snapshot. Notes
+are not transcript/model input and are not copied into a fork. Maximum content
+is 64KiB UTF-8, including whitespace and newlines.
+
+`background_processes` keeps session/tool-call identity, command, working
+directory, lifecycle/timing/exit metadata and bounded stdout/stderr. The unique
+session/tool-call constraint prevents duplicate launches. Unfinished records
+become interrupted at Host startup; persisted PIDs never grant control and no
+command resumes automatically. Deletion is refused while active rows exist.
+Terminal writes that fail keep a process-local finalization snapshot with output,
+visible diagnostics and one repair attempt per scoped resource request. Hard
+Host loss cannot preserve this unwritten snapshot. P5 does not advance the
+shared PRAGMA user_version. Current executable shared migration ownership is
+`crates/host-core/src/db.rs`; older shared-v19 examples above are historical.
+
+## Team dispatch metadata (WP10)
+
+The optional Host-owned `team-dispatch-metadata-v1` KV record is keyed by mailbox
+message ID and preserves immutable send-time facts and explicit board task
+association. Queued-only cancellation and completion transaction semantics are
+specified in [Team task dispatch](team-task-dispatch.md). Existing ledger rows,
+source proofs, permission ceilings and delivery keys remain intact; no schema
+migration or protocol version bump is introduced.
+### Team run-limit clock (WP8)
+
+Host `team-run-limits-v1` KV records retain the trusted strategy-scope `runId`,
+`startedAt`, nondecreasing `elapsedMs`, `softMessageId`, and `hardReachedAt`.
+Absent legacy records initialize on actual execution, never from Team creation
+age. Same-run pause/restart/mail do not reset; a newly admitted non-mail user scope
+creates a fresh record. Team deletion removes its KV record. Mailbox notices use
+`team-run-limit-soft:<runId>` and the exact stored message id is Host proof, not
+model text. No storage schema bump is required; old policy omissions use defaults.
+See [Team run limits](team-run-limits.md).
+### WP11 Team question and replacement KV ownership
+
+Rust owns `team-lead-ask-v1` durable question requests, original turn, Host time,
+waiting/pending/answered_live/answered/cancelled lifecycle, normalized answers
+and stable queued-answer ID. `team-lead-ask-cancel-v1` fences late registration
+for a stopped running turn. Late replies atomically enter the existing
+turn_queue under the same savepoint; deletion removes owned question records.
+`team-member-replacement-v1` records an immutable original/successor slot link,
+approved scope/review and exact selection/permission ceiling. Reviews and old
+member/task identities remain unchanged; Team dissolution deletes owned links.
+These versioned namespaces use existing KV storage and require no schema bump.
+
+## Plus Team reliability migrations P6/P7
+
+The independent Plus migration track adds `team_ordinary_inbox` in P6 and
+`background_service_ownership` in P7; the upstream schema version is unchanged.
+P6 is a prepared/persisted/ACKed authenticated-input journal, not another Team
+message body store or a change to collaboration turn uniqueness. P7 marks only
+explicit new service launches; old background rows retain ordinary command
+semantics. Upgrade/restart recovery never automatically runs a provider or
+relaunches a process. See [ordinary inbox](team-ordinary-inbox.md) for JSONL-first
+crash cuts and [services](team-managed-services.md) for owned stop/recovery state.
+
+New service launches persist `stopMode` in the existing KV namespace
+`background-service-stop-mode-v1`, in the same transaction as the process and
+ownership rows. Historical rows without that record keep `stopMode` absent;
+reopen never infers their stop mechanism from the current operating system.

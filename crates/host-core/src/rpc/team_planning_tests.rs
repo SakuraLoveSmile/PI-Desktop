@@ -92,6 +92,7 @@ async fn planning_rpc_preserves_submission_retry_revision_and_execution_permissi
         );
     }
     let mut tasks = vec![];
+    let mut research_turns = vec![];
     for member in members {
         tasks.push(call("team.createTask",json!({"teamSessionId":lead,"callerSessionId":lead,"ownerMemberName":member["name"],"subject":"Research source"})).await.unwrap());
         let message = call("team.sendMessage",json!({"teamSessionId":lead,"callerSessionId":lead,"target":member["name"],"content":"Inspect the current task"})).await.unwrap();
@@ -104,14 +105,26 @@ async fn planning_rpc_preserves_submission_retry_revision_and_execution_permissi
             None,
         )
         .unwrap();
-        sessions::end_turn(&st.db, &actual, "completed", None, None, false).unwrap();
-        crate::session_collaboration::settle_turn(&st.db, &actual).unwrap();
+        research_turns.push(actual);
     }
     let submission = |call_id: &str| json!({"sessionId":lead,"turnId":turn_id,"toolCallId":call_id,"kind":"plan","title":"Implementation plan","question":"Approve?","markdown":"# Plan\nBoth research areas inspected."});
     let early = call("plans.submit", submission("plan")).await.unwrap_err();
     assert_eq!(early.data.unwrap()["errorCode"], "TEAM_PLANNING_NOT_READY");
     for (index, member) in members.iter().enumerate() {
         call("team.submitResearchResult",json!({"teamSessionId":lead,"callerSessionId":member["memberSessionId"],"planningId":context["planningId"],"roundId":context["roundId"],"taskId":tasks[index]["task"]["taskId"],"expectedRevision":1,"structuredResult":{"summary":"Inspected source","findings":["File evidence"],"risks":["Lifecycle"],"recommendations":["Test transition"],"verifiedSources":["src/main.ts"]}})).await.unwrap();
+        {
+            let st = state.lock().await;
+            sessions::end_turn(
+                &st.db,
+                &research_turns[index],
+                "completed",
+                None,
+                None,
+                false,
+            )
+            .unwrap();
+            crate::session_collaboration::settle_turn(&st.db, &research_turns[index]).unwrap();
+        }
         if index == 0 {
             let status = call(
                 "team.getPlanning",
@@ -546,12 +559,17 @@ async fn direct_team_mutation_rpc_cannot_reuse_an_old_approval_for_a_new_pending
         let denied = call(method, args).await.unwrap_err();
         assert_eq!(denied.data.unwrap()["errorCode"], "TEAM_APPROVAL_REQUIRED");
     }
-    let after = call(
+    let mut after = call(
         "team.getSnapshot",
         json!({"teamSessionId":lead,"callerSessionId":lead}),
     )
     .await
     .unwrap();
+    assert!(
+        after["runLimits"]["elapsedMs"].as_i64().unwrap()
+            >= before["runLimits"]["elapsedMs"].as_i64().unwrap()
+    );
+    after["runLimits"]["elapsedMs"] = before["runLimits"]["elapsedMs"].clone();
     assert_eq!(after, before);
     let review = call("team.getLaunchReview", json!({"teamSessionId":lead}))
         .await
@@ -590,12 +608,19 @@ async fn direct_team_mutation_rpc_cannot_reuse_an_old_approval_for_a_new_pending
         let denied = call(method, args).await.unwrap_err();
         assert_eq!(denied.data.unwrap()["errorCode"], "TEAM_APPROVAL_REQUIRED");
     }
-    let after_subset = call(
+    let mut after_subset = call(
         "team.getSnapshot",
         json!({"teamSessionId":lead,"callerSessionId":lead}),
     )
     .await
     .unwrap();
+    // Read-only elapsed projection advances with wall clock, while every
+    // authority, budget identity and mutable Team field must stay unchanged.
+    assert!(
+        after_subset["runLimits"]["elapsedMs"].as_i64().unwrap()
+            >= before_subset["runLimits"]["elapsedMs"].as_i64().unwrap()
+    );
+    after_subset["runLimits"]["elapsedMs"] = before_subset["runLimits"]["elapsedMs"].clone();
     assert_eq!(after_subset, before_subset);
     {
         let st = state.lock().await;
@@ -652,12 +677,17 @@ async fn direct_team_mutation_rpc_cannot_reuse_an_old_approval_for_a_new_pending
     .unwrap();
     let replay=call("team.sendMessage",json!({"teamSessionId":lead,"callerSessionId":lead,"target":"worker","content":"Original dispatch","idempotencyKey":"old-dispatch"})).await.unwrap_err();
     assert_eq!(replay.data.unwrap()["errorCode"], "TEAM_APPROVAL_REQUIRED");
-    let after_replay = call(
+    let mut after_replay = call(
         "team.getSnapshot",
         json!({"teamSessionId":lead,"callerSessionId":lead}),
     )
     .await
     .unwrap();
+    assert!(
+        after_replay["runLimits"]["elapsedMs"].as_i64().unwrap()
+            >= before_replay["runLimits"]["elapsedMs"].as_i64().unwrap()
+    );
+    after_replay["runLimits"]["elapsedMs"] = before_replay["runLimits"]["elapsedMs"].clone();
     assert_eq!(
         after_replay, before_replay,
         "old expert execution cannot be adopted into a fresh approval"

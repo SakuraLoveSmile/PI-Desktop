@@ -1,3 +1,4 @@
+import type { ContextInsightsRequest, ContextInsightsEvent } from "../context-insights.js";
 /** Shared public types grouped by the owning application domain. */
 import type { ExecutionProfile } from "./common.js";
 import type { AppError } from "../errors.js";
@@ -243,6 +244,9 @@ export type AskToolRequest = {
   sessionId: string;
   toolCallId: string;
   questions: AskToolQuestion[];
+  /** Host-owned Team-only deferred question; grants no execution authority. */
+  teamManaged?: true;
+  teamPending?: { deferredAt: string; requiresNewApproval: true };
 };
 
 /**
@@ -281,6 +285,7 @@ export type AgentEvent =
   | { type: "agent_end"; messageIds: string[] }
   | { type: "turn_start" }
   | { type: "usage"; usage: MessageUsage }
+  | { type: "context_insights"; request?: ContextInsightsRequest; diagnosticEvent?: ContextInsightsEvent }
   | { type: "turn_end"; subagentUsage?: MessageUsage }
   | { type: "message_start"; message: UiMessage }
   | {
@@ -320,6 +325,7 @@ export type AgentEvent =
       reason: ContextCompactionReason;
       ok: boolean;
       tokensBefore?: number;
+      tokensAfter?: number;
       firstKeptMessageId?: string;
       willRetry: boolean;
       fallback?: ContextCompactionFallback;

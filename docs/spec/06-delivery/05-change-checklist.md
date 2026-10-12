@@ -120,6 +120,14 @@ After implementation (or alongside it):
 - [ ] Unit tests added or updated when the change's risk makes them necessary.
 - [ ] Integration tests added or updated when an IPC/RPC contract change or
   cross-component regression risk makes them necessary.
+- [ ] New tests assert behavior or stable contracts, not repository source/CSS
+  text; `pnpm check:test-quality -- --base <base>` passes against the actual base.
+- [ ] Retired source assertions lower their checked-in inventory; replacement
+  coverage is recorded and obsolete tests/scenario IDs are removed in the same PR.
+- [ ] Runtime domain tests/helpers stay within the 800-line per-file budget.
+- [ ] Pure copy/i18n/style exemptions record affected-surface verification and
+  residual risk; they do not exempt interaction, responsive, accessibility,
+  runtime-rule, or content-layout changes.
 - [ ] The smallest necessary targeted local checks passed, or local validation
   was assessed as unnecessary with no separate approval or waiver required.
 - [ ] Relevant E2E suites were selected and passed on a candidate that contains
@@ -179,7 +187,8 @@ explicit branch-only or draft-only requests retain their narrower scope:
   gate was inferred from the delivery request. Genuine blockers were reported.
 - [ ] Request worktree is removed after merge.
 - [ ] Merged request branch is deleted locally (`git branch -d`).
-- [ ] Any remotely published request branch is deleted after merge.
+- [ ] Any remotely published request branch is deleted after merge only when
+  the user explicitly authorized remote-branch deletion.
 - [ ] Issue reference is included when applicable (e.g. `Refs #12` or
   `Closes #12`).
 
@@ -192,14 +201,26 @@ merge happened remotely via PR/MR or locally in the primary checkout:
 
 - [ ] Expected commits are verified present in local `main`, and remote `main`
   when remote delivery was requested.
-- [ ] The request worktree is clean — no uncommitted or untracked request files
-  remain.
-- [ ] `git worktree remove <worktree-path>` succeeded without forcing.
+- [ ] Before direct removal, the request worktree is clean; otherwise a
+  verified recoverable archive preserves all remaining request contents.
+- [ ] `git worktree remove <worktree-path>` succeeded without forcing, or the
+  managed archive operation completed and the old checkout is absent.
 - [ ] `git branch -d <type>/<short-description>` succeeded (no `-D` fallback on
   an unmerged branch).
 - [ ] `git worktree prune` leaves `git worktree list` free of stale entries for
   this request.
-- [ ] No other agent's worktree or branch was removed.
+- [ ] Cleanup followed `AGENTS.md` §5 in the same task after the authorized
+  merge was verified, without another approval for this request's own resources.
+- [ ] Dirty/untracked contents and needed ignored artifacts were preserved in
+  verified recovery archives before removal.
+- [ ] Empty request containers/name-marker directories and obsolete integration
+  branches were retired; `git worktree list`, local branches and physical paths
+  agree that no redundant request resources remain in normal locations.
+- [ ] Backup snapshots are recoverable through archive refs or backup files,
+  with no temporary backup branches left under `refs/heads/`.
+- [ ] The primary checkout and active/unmerged work were preserved. Any other
+  task's resources were touched only within explicitly authorized batch scope.
+
 - [ ] If launch was requested after delivery, the app was built and started
   from the integrated `main` checkout and its development environment.
 

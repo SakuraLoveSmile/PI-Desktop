@@ -235,6 +235,7 @@ impl Database {
         plus_schema::apply_pending(&conn, path, fresh, version)?;
         let db = Self { conn, data_dir };
         db.boot_maintenance()?;
+        crate::team::ordinary_inbox::recover(&db)?;
         crate::session_collaboration::recover(&db)?;
         Ok(db)
     }

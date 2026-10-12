@@ -432,9 +432,12 @@ function parseInterleaved(value: unknown): ModelInterleaved | undefined {
  * Keep this list to verified responses-only ids; everything else falls back
  * to the provider-wide style (see #105).
  */
-const RESPONSES_ONLY_MODEL_IDS: ReadonlySet<string> = new Set([
-  "muse-spark-1.2-contributor",
-  "muse-spark-1.3-contributor",
+const RESPONSES_ONLY_MODEL_IDS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
+  ["opencode-go", new Set([
+    "muse-spark-1.2-contributor",
+    "muse-spark-1.3-contributor",
+  ])],
+  ["opencode", new Set(["muse-spark-1.3-contributor-free"])],
 ]);
 
 function modelFromRaw(
@@ -458,12 +461,12 @@ function modelFromRaw(
   const limit = parseLimit(raw.limit);
   const experimental = publishedExperimental(raw.experimental);
   const providerMetadata = publishedMetadata(raw.provider);
-  // Scoped to opencode-go on purpose: the same model ids exist under other
+  // Scoped to the verified OpenCode publisher: the same model ids exist under other
   // providers (e.g. meta, llmgateway) where the completions path is correct
   // and must not be rerouted (see #105).
   const modelApi =
     nonEmptyString(raw.api) ??
-    (providerKey === "opencode-go" && RESPONSES_ONLY_MODEL_IDS.has(modelId.toLowerCase())
+    (RESPONSES_ONLY_MODEL_IDS.get(providerKey)?.has(modelId.toLowerCase())
       ? "openai-responses"
       : undefined);
   const displayName = nonEmptyString(raw.name) ?? modelId;

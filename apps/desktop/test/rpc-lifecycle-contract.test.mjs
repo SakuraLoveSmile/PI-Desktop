@@ -2,6 +2,8 @@ import { readMainModule, readMainSource } from "./helpers/source-contracts.mjs";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { DEFAULT_COMMAND_TIMEOUT_MS, rpcTimeoutMs } from "@pi-desktop/shared";
+import { bashTimeoutPayload } from "../../../packages/agent-runtime/src/background-bash.ts";
 
 const sidecarSource = await readFile(
   new URL("../../../packages/host-runtime/src/agent-sidecar.ts", import.meta.url),
@@ -19,14 +21,6 @@ const mainSource = await readMainSource();
 const plansSource = await readMainModule("runtime/plans.ts");
 const shutdownModuleSource = await readMainModule("bootstrap/shutdown.ts");
 const mainIndexSource = await readMainModule("index.ts");
-const runtimeSource = await readFile(
-  new URL("../../../packages/agent-runtime/src/runtime.ts", import.meta.url),
-  "utf8",
-);
-const rpcTimeoutSource = await readFile(
-  new URL("../../../packages/shared/src/rpc-timeouts.ts", import.meta.url),
-  "utf8",
-);
 const agentSidecarEntrySource = await readFile(
   new URL("../../../packages/agent-runtime/src/sidecar.ts", import.meta.url),
   "utf8",
@@ -125,41 +119,14 @@ test("host transport retries transient RPC overload with a bounded backoff", () 
   assert.match(hostSource, /!isHostOverloaded\(error\)/);
 });
 
-test("host disposal closes stdin, observes exit, and force-kills only after grace", () => {
-  const disposeSource = hostSource.slice(hostSource.indexOf("async dispose()"));
-  const closeTransportSource = hostSource.slice(
-    hostSource.indexOf("private closeTransport"),
-    hostSource.indexOf("private cleanupProcessListeners"),
-  );
-
-  assert.match(hostSource, /private disposePromise\?: Promise<void>/);
-  assert.match(hostSource, /private waitForExit\(timeoutMs: number\)/);
-  const graceMatch = hostSource.match(/const HOST_DISPOSE_GRACE_MS = ([\d_]+);/);
-  assert.ok(graceMatch, "host disposal must define a graceful wait");
-  const graceMs = Number(graceMatch[1].replace(/_/g, ""));
-  assert.ok(
-    graceMs >= 2_500 && graceMs <= 3_000,
-    "host disposal must allow the documented process-tree cleanup time",
-  );
-  assert.match(hostSource, /this\.child\.kill\("SIGKILL"\)/);
-  assert.match(disposeSource, /if \(this\.disposePromise\) return this\.disposePromise/);
-  assert.ok(
-    disposeSource.indexOf("this.child.stdin.end()") <
-      disposeSource.indexOf("this.closeTransport("),
-    "stdin must close before pending RPCs are rejected",
-  );
-  assert.doesNotMatch(
-    closeTransportSource,
-    /removeAllListeners\("exit"\)|removeAllListeners\("error"\)/,
-  );
-});
-
+// Host disposal timing and duplicate cleanup are exercised with controlled
+// process/timer edges in packages/host-runtime/src/host-service-shutdown.test.ts.
 test("Bash execution remains bounded while permission transport has no deadline", () => {
-  assert.match(runtimeSource, /DEFAULT_COMMAND_TIMEOUT_MS/);
-  assert.match(runtimeSource, /defaults to a 60-second timeout/);
-  assert.match(runtimeSource, /timeoutMs,\n\s+}/);
-  assert.doesNotMatch(rpcTimeoutSource, /DEFAULT_BASH_RPC_TIMEOUT_MS/);
-  assert.match(rpcTimeoutSource, /if \(method === "tools\.execute"\) return undefined/);
+  assert.equal(DEFAULT_COMMAND_TIMEOUT_MS, 60_000);
+  assert.deepEqual(bashTimeoutPayload({ command: "fixture" }, DEFAULT_COMMAND_TIMEOUT_MS), { timeoutMs: 60_000 });
+  assert.deepEqual(bashTimeoutPayload({ run_in_background: true }, DEFAULT_COMMAND_TIMEOUT_MS), {});
+  assert.deepEqual(bashTimeoutPayload({ run_in_background: true, timeout: 120 }, 120_000), { timeoutMs: 120_000 });
+  assert.equal(rpcTimeoutMs("tools.execute", { toolName: "Bash", timeoutMs: 60_000 }), undefined);
 });
 
 test("turn ownership and execution queue wake only after durable turn settlement", () => {

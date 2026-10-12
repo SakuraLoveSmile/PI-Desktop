@@ -230,7 +230,8 @@ export async function turnProcessProbe() {
     check(activityHeader()?.getAttribute("aria-expanded") === "false", "compact activity defaults collapsed");
     check(!textIsVisible("Long English reasoning") && !textIsVisible("Inspecting architecture") && !textIsVisible("English command result"),
       "compact default hides English reasoning commands and outputs");
-    check(activityHeader()?.textContent?.includes("2 次工具操作"), "compact group shows localized action count");
+    check(activityHeader()?.textContent?.includes("1 个命令") && activityHeader()?.textContent?.includes("读取 1"), "compact group summarizes localized action categories");
+    check(container.querySelectorAll(".process-activity-group.grouped > button").length === 2, "compact singleton also has a summary disclosure");
     click(activityHeader());
     check(visible(row("bash")) && !row("bash")?.classList.contains("open"), "opening an activity leaves command details folded");
     check(row("bash")?.querySelector(".tool-row-name")?.textContent === i18n.t("chat.toolRan"), "compact command action is localized");
@@ -264,6 +265,13 @@ export async function turnProcessProbe() {
     render([zhIntro, bash], true, null, "compact-stream");
     check(visible(row("intro")) && !header(), "later tools never hide previously visible progress");
     check(!row("bash")?.classList.contains("open") && !textIsVisible("Inspecting architecture"), "a live singleton keeps English payload folded");
+    const singletonHeader = activityHeader();
+    check(singletonHeader?.getAttribute("aria-expanded") === "false", "live singleton has a collapsed summary");
+    click(singletonHeader);
+    render([zhIntro, bash, read], true, null, "compact-stream");
+    check(activityHeader() === singletonHeader && activityHeader()?.getAttribute("aria-expanded") === "true", "singleton growth retains header identity and manual expansion");
+    render([zhIntro, bash, read, zhAnswer], false, null, "compact-stream");
+    check(activityHeader()?.getAttribute("aria-expanded") === "true", "expanded singleton choice survives growth and completion");
     render(compactMessages, false,
       { sessionId: "s", messageId: "bash", query: "architecture", requestId: 1 }, "compact-search");
     check(activityHeader()?.getAttribute("aria-expanded") === "true" && row("bash")?.classList.contains("open"),
@@ -271,11 +279,12 @@ export async function turnProcessProbe() {
     check(textIsVisible("Inspecting architecture"), "search can read the full original command");
 
     render([zhIntro, { ...bash, toolStatus: "error", toolResult: { details: { stdout: "English failure output", exitCode: 1 } }, isError: true }, zhAnswer], true, null, "compact-error");
-    check(visible(row("bash")) && row("bash")?.textContent?.includes(i18n.t("chat.toolFailed")) && !row("bash")?.classList.contains("open"),
-      "compact error status stays visible without opening command output");
+    check(activityHeader()?.textContent?.includes("1 个问题") && !visible(row("bash")),
+      "compact singleton failure stays visible in the summary without opening command output");
     render([zhIntro, { ...bash, toolStatus: "denied", toolResult: undefined }, zhAnswer], false, null, "compact-denied");
-    check(row("bash")?.textContent?.includes(i18n.t("chat.toolDenied")) && !row("bash")?.classList.contains("open"),
-      "compact denial stays visible without opening payload");
+    check(activityHeader()?.textContent?.includes("1 个问题"), "compact denial remains visible in the summary");
+    click(activityHeader());
+    check(visible(row("bash")) && row("bash")?.textContent?.includes(i18n.t("chat.toolDenied")) && !row("bash")?.classList.contains("open"), "expanding a denied singleton reveals its status without opening payload");
     render([zhIntro, { ...bash, toolStatus: "error", toolResult: { details: { exitCode: 1 } } }, read, zhAnswer], false, null, "compact-group-error");
     check(activityHeader()?.textContent?.includes("1 个问题") && activityHeader()?.getAttribute("aria-expanded") === "false",
       "collapsed compact groups retain recorded issues");
@@ -292,6 +301,7 @@ export async function turnProcessProbe() {
     render([zhIntro, message("team-create", "tool", "created", {
       toolName: "task_create", toolStatus: "success", toolArgs: { title: "Very long English task instruction", description: "Detailed English plan" },
     }), zhAnswer], false, null, "compact-team");
+    click(activityHeader());
     check(row("team-create")?.querySelector(".tool-row-name")?.textContent === "创建任务" && !textIsVisible("Very long English"),
       "compact Team tool shows a Chinese action without English JSON");
 

@@ -1,0 +1,998 @@
+{
+  "version": 1,
+  "families": [
+    "composer",
+    "transcript",
+    "goals-team",
+    "settings-storage",
+    "extensions",
+    "runtime-provider",
+    "sessions",
+    "scheduling",
+    "shell",
+    "voice"
+  ],
+  "suites": [
+    {
+      "id": "edit-legacy",
+      "family": "runtime-provider",
+      "script": "scripts/e2e-edit-legacy.mjs",
+      "tier": "nightly",
+      "safety": "Isolated temporary Host/workspace and real tools RPC; no provider, Desktop instance or user profile."
+    },
+    {
+      "id": "agent-live",
+      "family": "runtime-provider",
+      "script": "scripts/e2e-agent-live.mjs",
+      "tier": "manual",
+      "safety": "Requires an explicitly chosen real provider, key and paid-model authorization."
+    },
+    {
+      "id": "asktool-card",
+      "family": "composer",
+      "script": "scripts/e2e-asktool-card.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "background-bash-limit",
+      "family": "shell",
+      "script": "scripts/e2e-background-bash-limit.mjs",
+      "tier": "nightly",
+      "safety": "Production Host/sidecar with isolated temporary data and local commands; no real provider calls."
+    },
+    {
+      "id": "capability-move",
+      "family": "extensions",
+      "script": "scripts/e2e-capability-move.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "code-index",
+      "family": "sessions",
+      "script": "scripts/e2e-code-index.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "composer-autocomplete",
+      "family": "composer",
+      "script": "scripts/e2e-composer-autocomplete.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "composer-ime-stack",
+      "family": "composer",
+      "script": "scripts/e2e-composer-ime-stack.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "composer-input-history",
+      "family": "composer",
+      "script": "scripts/e2e-composer-input-history.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "composer-mode-menus",
+      "family": "composer",
+      "script": "scripts/e2e-composer-mode-menus.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "composer-model-selection",
+      "family": "composer",
+      "script": "scripts/e2e-composer-model-selection.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "composer-paste",
+      "family": "composer",
+      "script": "scripts/e2e-composer-paste.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "composer-thinking-layout",
+      "family": "composer",
+      "script": "scripts/e2e-composer-thinking-layout.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "config-sync-multidevice",
+      "family": "settings-storage",
+      "script": "scripts/e2e-config-sync-multidevice.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "context-insights",
+      "family": "sessions",
+      "script": "scripts/e2e-context-insights.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "copy-conversation",
+      "family": "transcript",
+      "script": "scripts/e2e-copy-conversation.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "copy-tex",
+      "family": "transcript",
+      "script": "scripts/e2e-copy-tex.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "electron-boot",
+      "family": "shell",
+      "script": "scripts/e2e-electron-boot.mjs",
+      "tier": "smoke",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "expert-team-config",
+      "family": "goals-team",
+      "script": "scripts/e2e-expert-team-config.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "expert-team-settings",
+      "family": "goals-team",
+      "script": "scripts/e2e-expert-team-settings.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "file-ref-line-scroll",
+      "family": "transcript",
+      "script": "scripts/e2e-file-ref-line-scroll.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "fixed-tool-declarations",
+      "family": "runtime-provider",
+      "script": "scripts/e2e-fixed-tool-declarations.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "goal-report-canvas",
+      "family": "goals-team",
+      "script": "scripts/e2e-goal-report-canvas.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "goal-report-ui",
+      "family": "goals-team",
+      "script": "scripts/e2e-goal-report-ui.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "goal-report",
+      "family": "goals-team",
+      "script": "scripts/e2e-goal-report.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked.",
+      "scenarioIds": [
+        "E2E-GOAL-report-waits-for-settled-team",
+        "E2E-TEAM-completion-error-keeps-host-reason"
+      ]
+    },
+    {
+      "id": "goal-team-renderer-ui",
+      "family": "goals-team",
+      "script": "scripts/e2e-goal-team-renderer-ui.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "hosted-search",
+      "family": "extensions",
+      "script": "scripts/e2e-hosted-search.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked.",
+      "args": [
+        "--bundle",
+        "packages/agent-runtime/dist-bundle/sidecar.js"
+      ]
+    },
+    {
+      "id": "image-chat",
+      "family": "runtime-provider",
+      "script": "scripts/e2e-image-chat.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "image-generation-ui",
+      "family": "runtime-provider",
+      "script": "scripts/e2e-image-generation-ui.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "image-generation",
+      "family": "runtime-provider",
+      "script": "scripts/e2e-image-generation.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "ime-escape",
+      "family": "composer",
+      "script": "scripts/e2e-ime-escape.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "keep-awake",
+      "family": "settings-storage",
+      "script": "scripts/e2e-keep-awake.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "live-voice",
+      "family": "voice",
+      "script": "scripts/e2e-live-voice.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "local-network-manual-discovery",
+      "family": "settings-storage",
+      "script": "scripts/e2e-local-network-manual-discovery.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "long-conversation",
+      "family": "runtime-provider",
+      "script": "scripts/e2e-long-conversation.mjs",
+      "tier": "manual",
+      "safety": "Reads an external env file and sends a long real-model conversation; explicit account and cost authorization required."
+    },
+    {
+      "id": "mcp-control-settings",
+      "family": "extensions",
+      "script": "scripts/e2e-mcp-control-settings.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "mcp-market",
+      "family": "extensions",
+      "script": "scripts/e2e-mcp-market.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "mcp-session-chunk",
+      "family": "extensions",
+      "script": "scripts/e2e-mcp-session-chunk.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "mcp-timeout-clear",
+      "family": "extensions",
+      "script": "scripts/e2e-mcp-timeout-clear.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "message-edit-copy",
+      "family": "transcript",
+      "script": "scripts/e2e-message-edit-copy.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "notification-inbox",
+      "family": "sessions",
+      "script": "scripts/e2e-notification-inbox.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "overview-reference",
+      "family": "goals-team",
+      "script": "scripts/e2e-overview-reference.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "permission-card-layout",
+      "family": "composer",
+      "script": "scripts/e2e-permission-card-layout.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "pi-skill-discovery-ui",
+      "family": "extensions",
+      "script": "scripts/e2e-pi-skill-discovery-ui.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "plan-transcript-ui",
+      "family": "goals-team",
+      "script": "scripts/e2e-plan-transcript-ui.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "plan-ui",
+      "family": "goals-team",
+      "script": "scripts/e2e-plan-ui.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked.",
+      "excludedCoverage": [
+        "E2E-106-live-agent"
+      ]
+    },
+    {
+      "id": "plan",
+      "family": "goals-team",
+      "script": "scripts/e2e-plan.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked.",
+      "excludedCoverage": [
+        "E2E-107-late-expiry",
+        "E2E-111-shell-change",
+        "E2E-112-fallback",
+        "E2E-115-60s-default"
+      ]
+    },
+    {
+      "id": "plugin-detail-focus",
+      "family": "extensions",
+      "script": "scripts/e2e-plugin-detail-focus.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "plugin-import-deps",
+      "family": "extensions",
+      "script": "scripts/e2e-plugin-import-deps.mjs",
+      "tier": "manual",
+      "safety": "Downloads a pinned npm dependency through the real installer; explicit network-install authorization outside clean CI required."
+    },
+    {
+      "id": "plugin-ui-slots",
+      "family": "extensions",
+      "script": "scripts/e2e-plugin-ui-slots.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "plus-curated",
+      "family": "extensions",
+      "script": "scripts/e2e-plus-curated.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "project-auto-memory",
+      "family": "sessions",
+      "script": "scripts/e2e-project-auto-memory.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "project-context",
+      "family": "sessions",
+      "script": "scripts/e2e-project-context.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "project-edit",
+      "family": "settings-storage",
+      "script": "scripts/e2e-project-edit.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "provider-api-style",
+      "family": "runtime-provider",
+      "script": "scripts/e2e-provider-api-style.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "provider-certificate-ui",
+      "family": "runtime-provider",
+      "script": "scripts/e2e-provider-certificate-ui.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "provider-certificates",
+      "family": "runtime-provider",
+      "script": "scripts/e2e-provider-certificates.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "provider-order",
+      "family": "settings-storage",
+      "script": "scripts/e2e-provider-order.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "provider-recovery",
+      "family": "runtime-provider",
+      "script": "scripts/e2e-provider-recovery.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "remote-host",
+      "family": "sessions",
+      "script": "scripts/e2e-remote-host.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "rpc-unicode",
+      "family": "runtime-provider",
+      "script": "scripts/e2e-rpc-unicode.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "scheduled-calendar-intent",
+      "family": "scheduling",
+      "script": "scripts/e2e-scheduled-calendar-intent.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "scheduled-dispatch",
+      "family": "scheduling",
+      "script": "scripts/e2e-scheduled-dispatch.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "scheduled-hourly-update",
+      "family": "scheduling",
+      "script": "scripts/e2e-scheduled-hourly-update.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "scheduled-legacy-maintenance",
+      "family": "scheduling",
+      "script": "scripts/e2e-scheduled-legacy-maintenance.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "scheduled-paths",
+      "family": "scheduling",
+      "script": "scripts/e2e-scheduled-paths.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "scheduled-project-removal",
+      "family": "scheduling",
+      "script": "scripts/e2e-scheduled-project-removal.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "scheduled-workspace",
+      "family": "scheduling",
+      "script": "scripts/e2e-scheduled-workspace.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "scheduled",
+      "family": "scheduling",
+      "script": "scripts/e2e-scheduled.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "session-activity",
+      "family": "sessions",
+      "script": "scripts/e2e-session-activity.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "session-collaboration",
+      "family": "sessions",
+      "script": "scripts/e2e-session-collaboration.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "session-completion",
+      "family": "sessions",
+      "script": "scripts/e2e-session-completion.mjs",
+      "tier": "smoke",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "settings-memory",
+      "family": "settings-storage",
+      "script": "scripts/e2e-settings-memory.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "settings-scroll",
+      "family": "settings-storage",
+      "script": "scripts/e2e-settings-scroll.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "skill-market",
+      "family": "extensions",
+      "script": "scripts/e2e-skill-market.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "smoke",
+      "family": "sessions",
+      "script": "scripts/e2e-smoke.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked.",
+      "excludedCoverage": [
+        "E2E-008-live-model",
+        "E2E-009-stream"
+      ],
+      "env": {
+        "PI_DESKTOP_TEST_BASE_URL": "http://127.0.0.1:1/v1",
+        "PI_DESKTOP_TEST_MODEL": "ci-unused-fixture"
+      }
+    },
+    {
+      "id": "storage-bootstrap",
+      "family": "settings-storage",
+      "script": "scripts/e2e-storage-bootstrap.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "storage-migration",
+      "family": "settings-storage",
+      "script": "scripts/e2e-storage-migration.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "storage-settings",
+      "family": "settings-storage",
+      "script": "scripts/e2e-storage-settings.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "subagent-models",
+      "family": "runtime-provider",
+      "script": "scripts/e2e-subagent-models.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "subagent-recursion",
+      "family": "runtime-provider",
+      "script": "scripts/e2e-subagent-recursion.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "subagent-settings",
+      "family": "runtime-provider",
+      "script": "scripts/e2e-subagent-settings.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "subagents",
+      "family": "runtime-provider",
+      "script": "scripts/e2e-subagents.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "supervision",
+      "family": "shell",
+      "script": "scripts/e2e-supervision.mjs",
+      "tier": "smoke",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "system-transcript",
+      "family": "transcript",
+      "script": "scripts/e2e-system-transcript.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "team-approved-goal",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-approved-goal.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "team-forced",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-forced.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "team-planning",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-planning.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "team-review-ui",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-review-ui.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "team-member-failure",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-member-failure.mjs",
+      "tier": "nightly",
+      "safety": "Isolated real Host, production runtime wait/Main delivery/Agent Host queue; runtime port fake, no model calls or user profile.",
+      "scenarioIds": [
+        "E2E-TEAM-member-failure-wakes-lead"
+      ]
+    },
+    {
+      "id": "team-task-completion",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-task-completion.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "team",
+      "family": "goals-team",
+      "script": "scripts/e2e-team.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "temporary-goal",
+      "family": "goals-team",
+      "script": "scripts/e2e-temporary-goal.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "theme-surfaces",
+      "family": "shell",
+      "script": "scripts/e2e-theme-surfaces.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "three-column-layout",
+      "family": "shell",
+      "script": "scripts/e2e-three-column-layout.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "todo-checklist",
+      "family": "sessions",
+      "script": "scripts/e2e-todo-checklist.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "tool-admission",
+      "scenarioIds": [
+        "E2E-RUNTIME-shell-capacity-diagnostics"
+      ],
+      "family": "runtime-provider",
+      "script": "scripts/e2e-tool-admission.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "transcript-disclosure-anchor",
+      "family": "transcript",
+      "script": "scripts/e2e-transcript-disclosure-anchor.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "transcript-minimap-jump",
+      "family": "transcript",
+      "script": "scripts/e2e-transcript-minimap-jump.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "transcript-render",
+      "family": "transcript",
+      "script": "scripts/e2e-transcript-render.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked.",
+      "scenarioIds": [
+        "E2E-COMPOSER-compact-running-input",
+        "E2E-GOAL-inline-input-status",
+        "E2E-COMPOSER-toolbar-footer"
+      ]
+    },
+    {
+      "id": "trusted-extensions",
+      "family": "extensions",
+      "script": "scripts/e2e-trusted-extensions.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "turn-get",
+      "family": "sessions",
+      "script": "scripts/e2e-turn-get.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "window-controls",
+      "family": "shell",
+      "script": "scripts/e2e-window-controls.mjs",
+      "tier": "manual",
+      "safety": "Includes native Windows hit testing and edge dragging; requires an interactive Windows device and explicit device authorization."
+    },
+    {
+      "id": "work-panel-launcher",
+      "family": "shell",
+      "script": "scripts/e2e-work-panel-launcher.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "work-panel-reorder",
+      "family": "shell",
+      "script": "scripts/e2e-work-panel-reorder.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+    },
+    {
+      "id": "approval",
+      "family": "sessions",
+      "script": "scripts/e2e-suite-core.mjs",
+      "args": [
+        "approval"
+      ],
+      "tier": "smoke",
+      "scenarioIds": [
+        "E2E-CI-approval"
+      ],
+      "safety": "Public Host RPC against fresh temporary workspace/data; no model or external service."
+    },
+    {
+      "id": "restart",
+      "family": "sessions",
+      "script": "scripts/e2e-suite-core.mjs",
+      "args": [
+        "restart"
+      ],
+      "tier": "smoke",
+      "scenarioIds": [
+        "E2E-CI-restart"
+      ],
+      "safety": "Public Host RPC against fresh temporary workspace/data; no model or external service."
+    },
+    {
+      "id": "session-activity-aggregate",
+      "family": "sessions",
+      "script": "scripts/e2e-session-activity-aggregate.mjs",
+      "tier": "nightly",
+      "scenarioIds": [
+        "E2E-SESSION-activity-aggregate"
+      ],
+      "safety": "Real Host RPC, production IPC adapter and renderer reader against fresh temporary data; synthetic persisted messages, no provider or user profile."
+    },
+    {
+      "id": "session-activity-history",
+      "family": "sessions",
+      "script": "scripts/e2e-session-activity-history.mjs",
+      "tier": "nightly",
+      "scenarioIds": [
+        "E2E-SESSION-activity-full-history-ui"
+      ],
+      "safety": "Real isolated Rust Host and Electron renderer through the production IPC/reader/Overview; tail-only transcript and synthetic persisted evidence, no user profile or provider."
+    },
+    {
+      "id": "team-write-scope",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-write-scope.mjs",
+      "tier": "nightly",
+      "safety": "Isolated real Host, runtime tool/message boundaries and temporary Git; no model calls or user profile.",
+      "scenarioIds": [
+        "E2E-TEAM-write-scope-warning"
+      ]
+    },
+    {
+      "id": "team-agent-queued-report",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-agent-queued-report.mjs",
+      "tier": "nightly",
+      "scenarioIds": [
+        "E2E-TEAM-agent-lead-sees-queued-expert-report"
+      ],
+      "safety": "Isolated real Host, Main delivery, AgentHost and runtime with a fake external provider and disposable shell processes; no live provider or user profile."
+    },
+    {
+      "id": "team-shared-git-warning",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-shared-git-warning.mjs",
+      "tier": "nightly",
+      "scenarioIds": [
+        "E2E-TEAM-shared-git-warning"
+      ],
+      "safety": "Disposable Git repository and isolated Host/runtime data; no live model or user profile. Git operations affect fixture files only."
+    },
+    {
+      "id": "team-member-activity",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-member-activity.mjs",
+      "tier": "nightly",
+      "scenarioIds": [
+        "E2E-TEAM-member-activity-interrupt-guard"
+      ],
+      "safety": "Fresh temporary Host/workspace and fake model boundary; fixture background command only, no live provider or user profile."
+    },
+    {
+      "id": "team-run-limits-ui",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-run-limits-ui.mjs",
+      "tier": "nightly",
+      "scenarioIds": [
+        "E2E-TEAM-run-limits-ui"
+      ],
+      "safety": "Fresh sandboxed Electron profile and production React/settings store with fixture settings backend; no live provider or user settings."
+    },
+    {
+      "id": "team-member-interrupt",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-member-interrupt.mjs",
+      "tier": "nightly",
+      "scenarioIds": [
+        "E2E-TEAM-member-interrupt-production-chain"
+      ],
+      "safety": "Real isolated Host/Main/IPC/sidecar/runtime with loopback SSE provider and disposable shell processes. No live provider or user profile; accepted background tasks are explicitly stopped only during fixture cleanup."
+    },
+    {
+      "id": "team-lead-pending",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-lead-pending.mjs",
+      "tier": "nightly",
+      "safety": "Requires prebuilt JS packages and the existing Rust toolchain. Isolated Rust AppState RPC, production Node runtime/Main finalization and controlled fake provider/clock; no Desktop, user profile or real provider. Local runs reuse cached dependencies; clean CI resolves only locked Cargo dependencies."
+    },
+    {
+      "id": "team-agent-ordinary-inbox",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-agent-ordinary-inbox.mjs",
+      "tier": "nightly",
+      "scenarioIds": [
+        "E2E-TEAM-agent-lead-wait-boundary-ordinary-inbox"
+      ],
+      "safety": "Isolated production Rust Host, Main delivery, AgentHost and runtime with a scripted external model boundary; disposable shell processes, no user profile or paid provider."
+    },
+    {
+      "id": "team-managed-service",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-managed-service.mjs",
+      "tier": "nightly",
+      "scenarioIds": [
+        "E2E-TEAM-managed-service-lifecycle"
+      ],
+      "safety": "Isolated production Host and owned service process trees in temporary profiles/workspaces; no user data or real model provider."
+    },
+    {
+      "id": "team-reliability-budget-lifecycle",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-reliability-closeout.mjs",
+      "args": [
+        "--budget-only"
+      ],
+      "tier": "nightly",
+      "scenarioIds": [
+        "E2E-TEAM-bounded-run-limit"
+      ],
+      "safety": "Fresh isolated complete Electron/Host/Main/runtime and loopback model. Short configured wall-clock budgets, real settings and restart; no user profile, paid provider or ten-hour soak."
+    },
+    {
+      "id": "team-reliability-pending-lifecycle",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-reliability-closeout.mjs",
+      "tier": "manual",
+      "scenarioIds": [
+        "E2E-TEAM-lead-pending-ask-late-answer"
+      ],
+      "safety": "Explicit isolated full-app acceptance with a real thirty-minute question deadline, loopback model and fresh temporary profile. Does not use a paid model or user data; direct invocation avoids the automatic suite eight-minute timeout."
+    },
+    {
+      "id": "team-reliability-pending-recovery",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-reliability-closeout.mjs",
+      "args": [
+        "--recovery-only"
+      ],
+      "tier": "nightly",
+      "scenarioIds": [
+        "E2E-TEAM-lead-pending-ask-late-answer"
+      ],
+      "safety": "Isolated complete Electron/Host/runtime and loopback model. Restart a waiting question into durable pending and answer in a new authenticated turn; this quick recovery lane does not claim a thirty-minute expiry."
+    },
+    {
+      "id": "team-task-dispatch-lifecycle",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-task-dispatch-lifecycle.mjs",
+      "tier": "nightly",
+      "scenarioIds": [
+        "E2E-TEAM-busy-member-latest-task-dispatch",
+        "E2E-TEAM-completed-task-retires-queued-dispatch"
+      ],
+      "safety": "Production isolated Host/Main/bridge/AgentHost/sidecar/runtime with loopback provider gates. Proves cancellation and FIFO delivery; no real provider, user profile or forty-minute soak."
+    },
+    {
+      "id": "team-open-task-gate",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-open-task-gate.mjs",
+      "tier": "nightly",
+      "safety": "Real Host and DesktopAgentRuntime, temporary profile/workspace and loopback scripted provider; no user instance, credentials or paid API.",
+      "scenarioIds": [
+        "E2E-TEAM-open-tasks-block-final-answer"
+      ]
+    },
+    {
+      "id": "team-member-silence",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-member-silence.mjs",
+      "tier": "nightly",
+      "safety": "Temporary real Host and runtime inbox wait; no model calls, user profile or running Desktop instance.",
+      "scenarioIds": [
+        "E2E-TEAM-member-silent-completion-wakes-lead"
+      ]
+    },
+    {
+      "id": "team-lead-pseudo-tool-call",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-lead-pseudo-tool-call.mjs",
+      "tier": "nightly",
+      "safety": "Temporary real Host/Runtime/Pi transport with loopback scripted provider; no running user instance or paid service.",
+      "scenarioIds": [
+        "E2E-TEAM-lead-pseudo-tool-call-retried-once"
+      ]
+    }
+  ]
+}

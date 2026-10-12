@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type {
-  SessionThinkingLevel,
   TeamExecutionDecision,
   TeamLaunchReview,
   TeamLaunchReviewMember,
   TeamLaunchReviewSelectionUpdate,
 } from "@pi-desktop/shared";
+import { isSessionThinkingLevel, sessionThinkingMenuLevels } from "@pi-desktop/shared";
+import { thinkingProviderForModel } from "../../features/chat/composer/model";
+import { isSubagentModelProvider } from "../settings/subagent-models";
 import { api } from "../../lib/api";
 import { useAppStore } from "../../stores/app-store";
 import { Button, Select } from "../ui";
@@ -19,16 +21,6 @@ export type TeamLaunchReviewPanelProps = {
   onReviewChanged?: () => void;
 };
 
-const ALL_THINKING_LEVELS: SessionThinkingLevel[] = [
-  "off",
-  "minimal",
-  "low",
-  "medium",
-  "high",
-  "xhigh",
-  "max",
-];
-
 export function TeamLaunchReviewPanel({
   teamSessionId,
   review,
@@ -37,6 +29,15 @@ export function TeamLaunchReviewPanel({
 }: TeamLaunchReviewPanelProps) {
   const { t } = useTranslation();
   const providers = useAppStore((s) => s.providers);
+  const catalogs = useAppStore((s) => s.providerModels);
+  const selectableProviders = providers.filter((provider) =>
+    isSubagentModelProvider(provider) && provider.models.length > 0,
+  );
+  const thinkingLevelsFor = useCallback((selection: TeamLaunchReviewMember["selection"]) => {
+    const provider = providers.find((candidate) => candidate.id === selection.providerId);
+    const effective = thinkingProviderForModel(provider, selection.modelId, catalogs?.[selection.providerId]);
+    return sessionThinkingMenuLevels(effective?.supportsReasoning ? effective.supportedThinkingLevels : ["off"]);
+  }, [providers, catalogs]);
 
   const identity = `${teamSessionId}:${review.reviewId}`;
   const identityRef = useRef(identity);
@@ -101,20 +102,21 @@ export function TeamLaunchReviewPanel({
 
       const nextMembers = members.map((m) => {
         if (m.name !== name) return m;
-        return {
-          ...m,
-          selection: {
-            ...m.selection,
-            ...updates,
-          },
-        };
+        const selection = { ...m.selection, ...updates };
+        if (selection.providerId !== m.selection.providerId || selection.modelId !== m.selection.modelId) {
+          const levels = thinkingLevelsFor(selection);
+          if (!levels.includes(selection.thinkingLevel)) {
+            selection.thinkingLevel = levels.find((level) => level !== "omit") ?? "off";
+          }
+        }
+        return { ...m, selection };
       });
 
       setMembers(nextMembers);
       setSaving(true);
       setError(null);
 
-      const selectionsPayload: TeamLaunchReviewSelectionUpdate[] = nextMembers.map((m) => ({
+      const selectionsPayload: TeamLaunchReviewSelectionUpdate[] = nextMembers.filter((m) => m.name === name).map((m) => ({
         name: m.name,
         providerId: m.selection.providerId,
         modelId: m.selection.modelId,
@@ -148,7 +150,7 @@ export function TeamLaunchReviewPanel({
         if (isCurrentRequest(requestIdentity, requestGeneration)) setSaving(false);
       }
     },
-    [isPending, saving, awaitingConflictRefresh, members, teamSessionId, identity, onReviewChanged, t, isCurrentRequest, applyReview],
+    [isPending, saving, awaitingConflictRefresh, members, teamSessionId, identity, onReviewChanged, t, isCurrentRequest, applyReview, thinkingLevelsFor],
   );
 
   const handleConfirm = async () => {
@@ -288,9 +290,10 @@ export function TeamLaunchReviewPanel({
 
         <div className="team-launch-review-member-list">
           {members.map((member) => {
-            const currentProvider = providers.find((p) => p.id === member.selection.providerId);
+            const currentProvider = selectableProviders.find((p) => p.id === member.selection.providerId);
             const currentModelList = currentProvider?.models || [];
             const isReused = Boolean(member.memberSessionId);
+            const thinkingLevels = thinkingLevelsFor(member.selection);
 
             return (
               <div
@@ -331,8 +334,9 @@ export function TeamLaunchReviewPanel({
                       value={member.selection.providerId}
                       onChange={(e) => {
                         const newProviderId = e.target.value;
-                        const newProvider = providers.find((p) => p.id === newProviderId);
-                        const firstModel = newProvider?.models[0]?.id || member.selection.modelId;
+                        const newProvider = selectableProviders.find((p) => p.id === newProviderId);
+                        const firstModel = newProvider?.models[0]?.id;
+                        if (!firstModel) return;
                         void handleSelectionChange(member.name, {
                           providerId: newProviderId,
                           modelId: firstModel,
@@ -346,7 +350,7 @@ export function TeamLaunchReviewPanel({
                           {t("team.review.missingProvider", { id: member.selection.providerId })}
                         </option>
                       )}
-                      {providers.map((p) => (
+                      {selectableProviders.map((p) => (
                         <option key={p.id} value={p.id}>
                           {p.name || p.id}
                         </option>
@@ -386,16 +390,21 @@ export function TeamLaunchReviewPanel({
                       disabled={!isPending || saving || confirming || cancelling || awaitingConflictRefresh}
                       value={member.selection.thinkingLevel}
                       onChange={(e) => {
-                        void handleSelectionChange(member.name, {
-                          thinkingLevel: e.target.value as SessionThinkingLevel,
-                        });
+                        if (isSessionThinkingLevel(e.target.value)) {
+                          void handleSelectionChange(member.name, { thinkingLevel: e.target.value });
+                        }
                       }}
                       className="team-review-select"
                       data-testid={`review-thinking-${member.name}`}
                     >
-                      {ALL_THINKING_LEVELS.map((lvl) => (
+                      {!thinkingLevels.includes(member.selection.thinkingLevel) && (
+                        <option value={member.selection.thinkingLevel} disabled>
+                          {t(`team.review.thinkingLevel.${member.selection.thinkingLevel}`)}
+                        </option>
+                      )}
+                      {thinkingLevels.map((lvl) => (
                         <option key={lvl} value={lvl}>
-                          {t(`team.review.thinkingLevel.${lvl}`)}
+                          {lvl === "omit" ? t("extensions.subagents.thinkingOmit") : t(`team.review.thinkingLevel.${lvl}`)}
                         </option>
                       ))}
                     </Select>

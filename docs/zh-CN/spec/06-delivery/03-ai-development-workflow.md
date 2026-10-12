@@ -52,7 +52,9 @@
 - 仅请求提交并不授权远程发布。未获远程授权时，停在任务分支提交；不要为了跑 E2E 把任务合进本地 `main`。
 - 打开或更新 PR/MR 之前，获取 `origin/main` 并确认它是请求 head 的祖先（`git merge-base --is-ancestor origin/main HEAD` 或 `pnpm check:pr-base`）。私有分支用 rebase；已共享且不宜改写历史时用非破坏性合并。不得打开或更新落后于 `origin/main` 的 PR。
 - 获准远程交付后，按 `AGENTS.md` 的固定顺序：相对最新 `origin/main` 刷新，在工作树跑 task-candidate E2E，推送请求分支，打开面向 `main` 的 PR/MR，通过远程检查（含 PR-base 门）和审查后合并，再同步本地 `main`。
-- 合入 `main` 后立即删除自己的工作树和已合并分支。
+- 合并后的清理遵循 `AGENTS.md` §5「Verified merge and cleanup」。确认用户已授权的本地或远程合并及必要检查完成后，在同一任务中自动清理本次工作树和已合并分支，不再另问本次资源的清理许可。
+- 删除前将未提交、未跟踪内容及必要的安装包、截图、配置保存到经过校验的可恢复归档。清除 Git 登记和仅含名称标记的空父目录，并移除过期集成分支和普通分支列表中的临时备份分支；备份提交放在 `refs/heads/` 之外的归档引用或备份文件中。
+- 联合检查 `git worktree list`、本地分支及实际目录，单独报告清理结果；受阻时列出准确路径或引用及恢复状态。保留主工作区、活跃或未合并工作、归档及其他任务；批量清理需要明确的用户范围，远程分支删除不包含在该规则中。
 - 若用户要求启动应用，从已集成的 `main` 构建并启动。
 
 ### R5 — 先核实链接的 GitHub issue，再回复并关闭
@@ -310,12 +312,7 @@ git fetch origin main
 git worktree add -b <type>/<short-description> <worktree-path> origin/main
 ```
 
-如果在干净的主工作树中签出 `main`，则 `git switch main` 加上
-`git pull --ff-only origin main` 应在 `git worktree add` 之前运行。如果
-主工作树不干净或者位于另一个分支上，保持其不变并且
-直接从获取的 `origin/main` 创建请求工作树。从来没有
-仅仅为了满足这一点而丢弃、隐藏、移动或覆盖不相关的工作
-序列。
+直接从获取的 `origin/main` 创建请求工作树。主检出和本地 `main` 是协调面，不要为了开始任务同步、合并或处理无关的本地分叉。保留原有提交和改动；在任务自己的工作树更新远程 `main` 候选。
 
 环境重用是特定于资源的。包管理器存储和语言
 工具链通常会自动共享。忽略本地配置或
@@ -343,6 +340,7 @@ git merge --ff-only origin/main
 git worktree remove <worktree-path>
 git branch -d <type>/<short-description>
 git worktree prune
+# Only when the user explicitly authorized remote-branch deletion:
 git push origin --delete <type>/<short-description>
 ```
 
@@ -352,17 +350,7 @@ git push origin --delete <type>/<short-description>
 
 不要为了跑 E2E 或开 PR 把请求分支合进本地 `main`。无远程 PR/MR 的本地交付留在请求分支上，直到用户明确要求集成。
 
-拆卸前工作树必须清洁；提交或丢弃请求自己的
-首先进行剩余的更改。使用 `git branch -d` 而不是 `-D` 因此未合并
-分支拒绝删除。如果 `git worktree remove` 报告工作树为脏
-或锁定，解决该状态而不是强制删除，并且永远不要删除
-另一个请求的工作树。
-
-拆卸前工作树必须清洁；提交或丢弃请求自己的
-首先进行剩余的更改。使用 `git branch -d` 而不是 `-D` 因此未合并
-分支拒绝删除。如果 `git worktree remove` 报告工作树为脏
-或锁定，解决该状态而不是强制删除，并且永远不要删除
-另一个请求的工作树。
+直接删除前工作树必须干净。剩余改动及必要的忽略产物应先保存到经过校验的可恢复归档；清理不授予提交或丢弃这些内容的权限。也可通过托管归档保存内容并移除工作树。使用 `git branch -d`，不用 `-D` 强制删除未合并分支。若工作树为脏或锁定，先解决该状态，不强制删除。其他任务资源须纳入用户明确授权的批量清理范围。核验及报告按 `AGENTS.md` §5 执行。
 
 ---
 
@@ -458,3 +446,35 @@ D164 与 D260。 GitHub 发行说明并不能替代。
 - [ ] 在 R6.1 的临时类型限制生效期间，外部贡献只接受 `perf` 与 `fix` 类型的 pull request。
 
 - [ ] 更新所有索引（NAV、交付自述文件、规格自述文件、文档自述文件、董事会）。
+
+
+## Test quality, executable inventory and retirement
+
+Behavior and stable contracts are the test boundary. Do not add tests that read
+repository source/CSS and assert implementation text with regular expressions.
+Regex assertions on actual rendered or protocol output remain valid. Bug fixes
+need a red repro or explicit baseline and a regression test. Pure style, copy
+and i18n changes may omit new tests when existing/static validation proves the
+unchanged behavior; record the reason and residual risk instead of adding a
+quantity quota.
+
+`node scripts/check-test-quality.mjs --base <actual-base>` compares the AST
+source-provenance inventory and per-file/case signatures. Source/CSS assertions
+may only decrease; fixture reads are excluded. Retiring allowances requires
+`--write-baseline` and cannot introduce growth or later reuse retired capacity.
+Runtime domain tests and shared helpers under `src/runtime-tests` have an
+800-line per-file budget. These are maintenance limits, not coverage targets.
+
+PR CI runs five isolated smokes; the nightly fixture workflow runs the other
+automatic scene families. The [test plan](04-e2e-test-plan.md#10-ci-tiers-and-fixture-boundaries)
+and [generated index](08-scenario-index.md) describe actual commands and manual
+boundaries. Never count a skipped or catalog-only scenario as passed acceptance.
+Document-only scenarios do not require IDs. English and Chinese executable
+indexes come from one source, not a hand-maintained mirrored matrix.
+
+When behavior is replaced, delete its obsolete tests and executable IDs in the
+same change. The quarterly maintenance audit reports recent churn for review;
+without evidence that a test caught regressions, that fact remains unknown.
+High churn alone never authorizes deleting a test. Policy changes synchronize
+AGENTS/CLAUDE and their Policy-Sync token; `pnpm check:agent-policy` remains the
+mechanical gate.

@@ -488,10 +488,12 @@ may be retained while exactly one workspace supplies the visible shell context.
 
 #### Popover behavior
 
-- The list shows `task.failed` rows only and the bell badge counts only
-  unread failures. `task.completed` rows are still persisted and still drive
-  the sidebar outcome badge and the native notification, but the inbox hides
-  them so failures are not buried under routine completions (D295).
+- `All` shows every retained `task.completed` and `task.failed` row; `Unread`
+  filters only rows whose `readAt == null`. The bell badge uses the store's
+  Host-derived `unreadNotificationCount` for all durable task rows, matching
+  the Dock/taskbar count. Both rows and count rehydrate from Host persistence
+  after reload. This replaces D295's failure-only inbox and badge filter; the
+  original rationale is retained in the decision history.
 - Bell click toggles the non-modal popover; a second click, Escape, or outside
   press closes it. Escape restores focus to the bell.
 - Opening preserves the most recently selected `All` / `Unread` filter for the

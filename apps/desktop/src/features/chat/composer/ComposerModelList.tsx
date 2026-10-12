@@ -1,7 +1,8 @@
 import { formatTokenCount, type ModelInfo, type ProviderPublic } from "@pi-desktop/shared";
 import type { TFunction } from "i18next";
 import type { RefObject } from "react";
-import { IconCheck, IconEye, IconSearch, IconSparkles } from "../../../components/icons";
+import { IconBot, IconCheck, IconEye, IconSparkles } from "../../../components/icons";
+import { Button } from "../../../components/ui";
 import {
   composerModelBadges,
   composerModelBinding,
@@ -17,13 +18,10 @@ export type ComposerModelGroup = {
 
 /** Shared model list. Selection is owned by the caller, never by this view. */
 export function ComposerModelList({
-  t, query, setQuery, modelSearchRef, modelListRef, modelGroups,
+  t, modelListRef, modelGroups,
   modelHighlight, setModelHighlight, selectedProviderId, selectedModelId, selectModel,
 }: {
   t: TFunction;
-  query: string;
-  setQuery: (query: string) => void;
-  modelSearchRef: RefObject<HTMLInputElement | null>;
   modelListRef: RefObject<HTMLDivElement | null>;
   modelGroups: ComposerModelGroup[];
   modelHighlight: number;
@@ -34,21 +32,6 @@ export function ComposerModelList({
 }) {
   const flatModels = modelGroups.flatMap(group => group.models);
   return <>
-              <label className="composer-model-search">
-                <IconSearch size={13} aria-hidden="true" />
-                <span className="sr-only">{t("chat.searchModels")}</span>
-                <input
-                  ref={modelSearchRef}
-                  type="text"
-                  value={query}
-                  placeholder={t("chat.searchModels")}
-                  aria-label={t("chat.searchModels")}
-                  spellCheck={false}
-                  autoCorrect="off"
-                  autoCapitalize="off"
-                  onChange={(event) => setQuery(event.target.value)}
-                />
-              </label>
               <div className="composer-model-list" ref={modelListRef}>
                 {(() => {
                   let flatIndex = 0;
@@ -74,8 +57,10 @@ export function ComposerModelList({
                           group.provider,
                           model.modelId,
                         );
+                        const badges = composerModelBadges(model, group.provider);
                         return (
-                          <button
+                          <Button
+                            variant="ghost"
                             key={`${group.provider.id}:${model.modelId}`}
                             type="button"
                             data-model-index={index}
@@ -86,6 +71,13 @@ export function ComposerModelList({
                             onMouseMove={() => setModelHighlight(index)}
                             onClick={() => void selectModel(group.provider, model.modelId)}
                           >
+                            <span className="composer-model-option-icon" aria-hidden="true">
+                              {badges.includes("reasoning") ? (
+                                <IconSparkles size={18} />
+                              ) : (
+                                <IconBot size={18} />
+                              )}
+                            </span>
                             <span className="composer-model-option-main">
                               {/*
                                 One label per row, never both: the name the user
@@ -100,7 +92,15 @@ export function ComposerModelList({
                                 {alias || optionDisplayName}
                               </span>
                               <span className="composer-model-option-meta">
-                                {composerModelBadges(model, group.provider).map((badge) => {
+                                <span className="composer-model-option-provider">
+                                  {group.providerDisplayName}
+                                </span>
+                                {model.contextWindow ? (
+                                  <span className="composer-model-option-ctx">
+                                    {formatTokenCount(model.contextWindow)}
+                                  </span>
+                                ) : null}
+                                {badges.map((badge) => {
                                   const badgeLabel = t(
                                     badge === "reasoning"
                                       ? "chat.modelBadgeReasoning"
@@ -122,15 +122,10 @@ export function ComposerModelList({
                                     </span>
                                   );
                                 })}
-                                {model.contextWindow ? (
-                                  <span className="composer-model-option-ctx">
-                                    {formatTokenCount(model.contextWindow)}
-                                  </span>
-                                ) : null}
                               </span>
                             </span>
                             {active ? <IconCheck size={14} className="composer-model-check" aria-hidden="true" /> : null}
-                          </button>
+                          </Button>
                         );
                       })}
                     </div>

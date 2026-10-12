@@ -19,7 +19,7 @@
 | 本地权限确认 | 无自动截止时间；必须明确决定或取消 |
 | 允许会话范围 | 工具名称 |
 | 重击风格 | 非交互式；具有流输出的选定主机目录外壳 |
-| Edit 契约 | 行锚定操作 + 整文件 `tag`；不再有 `old_string`/`new_string`（ADR 0087） |
+| Edit 契约 | 行锚定操作 + 整文件 `tag`；`ops` 缺省时容忍旧式 `old_string`/`new_string`（D273） |
 | 询问工具 | 交互式多问题工具；无有效期期限；跳过的答案变成空输出字段 |
 
 ## 1. Goal
@@ -514,7 +514,11 @@ MVP 可以通过写入 SQLite 或日志文件来启动。
 
 标准 Agent 启用至少一个 subagent 时，提示词优先引导可分离的重要工作通过 Task 并行派发、TaskWait 汇总。几次工具调用的小任务和需要用户参与的步骤仍自行处理，保留不递归、不辩论、最多一次可选评审。全部停用时无委派提示或 Task*；Plan/Goal 保留已有声明，但模式执行门禁仍拒绝运行。标准模式没有委派硬保证。
 
-专家团独立工具目录要求所有工作均 delegate 至少一位专家，Host 拒绝全部 lead_only。Agent 执行仍需可信用户名单确认。Lead 的 Write/Edit/Bash 等实质操作由运行时及 Host 核验当前 authority：获批派遣的专家回合必须已实际启动，空闲成员和仅排队消息不够。此门禁不证明任务归属或完成贡献；普通权限、取消和模式检查仍适用。非空最终回复使用同一门禁，同一持久回合可恢复一次，重复拒绝以可见审批错误结束；普通未批准 Agent 回合可说明有效名单需要用户批准启动。已批准的 Team Plan/Goal 执行则在同一 Host 回合挂起等待名单确认，之后用 wait_for_updates 获取完整可信结果。专家启动仅授权实质工具；完成另要求当前记录派遣／专家回合结束、当前结果已消费。等待期间不得发出最终 agent_end 或释放 Goal 执行 token。内部 inbox 读取是 Host 授权的窄模型代理操作；可信 plans.bindExecutionTurn 不暴露给模型反向代理。
+专家团独立工具目录要求所有工作均 delegate 至少一位专家，Host 拒绝全部 lead_only。Agent 执行仍需可信用户名单确认。Lead 的 Write/Edit/Bash 等实质操作由运行时及 Host 核验当前 authority：获批派遣的专家回合必须已实际启动，空闲成员和仅排队消息不够。此门禁不证明任务归属或完成贡献；普通权限、取消和模式检查仍适用。非空最终回复使用同一门禁，同一持久回合可恢复一次，重复拒绝以可见审批错误结束；普通未批准 Agent 回合可说明有效名单需要用户批准启动。已批准的 Team Plan/Goal 执行则在同一 Host 回合挂起等待名单确认，之后用 wait_for_updates 获取完整可信结果。专家启动仅授权实质工具；完成另要求当前记录派遣／专家回合结束、当前结果已消费。等待期间不得发出最终 agent_end 或释放 Goal 执行 token。
+
+同回合获批执行的 guard 恢复登记绑定当前团队／回合的新鲜 Host／用户确认非空 delegate review，并捕获包含最新匹配成功声明的完整合法 assistant 工具 batch 与全部原始配对 tool results 快照；登记只读当前已批准 execution 开始边界之后的原始 entries，因此确认前压缩已归档的声明仍可登记，不读取前一次执行声明，也不修改 entries。最终模型转换在整个同一获批执行的每次请求中投影同 team／turn／review 的所有成功 `declare_team_strategy` 结果。包括工具轮次、重试及重建上下文；压缩归档原完整 batch 后，在最终模型视图重新包含完整 batch 和全部原始配对结果，不得有孤立 call／result；signed thinking／text／tool signatures 和兄弟调用／结果不裁剪，仅改变匹配 review 的声明结果。重复恢复保留同 owner／review／epoch 登记，wireCallId 碰撞不覆盖新工作。载荷和 details 均为已确认名单、`awaitingUserApproval=false`、以 `The user confirmed the execution roster` 开头的 `nextStep`，去掉不能由 review 刷新的旧 `memberSessionIds`，遥测记录相同投影载荷。投影幂等、copy-on-write，Agent 消息状态、原 pending 工具事件、entries、journal、压缩输入／summary／checkpoint、UI 历史和无关结果不变。pending、cancelled、被替换 review、结束／中断执行、Stop、普通回合及后一次执行不得复用旧投影；不同 reviewId、撤销或更高 revision 的较新可观察声明清登记，当前 mode／execution／turn／epoch 及取消／销毁／gracefulStop／Team budget fence 仍适用。首次登记时没有完整合法、全部配对的 assistant batch 内匹配成功声明就不造调用，保留既有 nudge 与三次完成恢复。不增加 Host 通知、review 读取或 RPC。普通 Team 与自动 Plan 研究不获得投影，`wait_for_updates` 直接消费确认的路径不变；不改变 Host 参与／结算门禁或工具权限。
+
+内部 inbox 读取是 Host 授权的窄模型代理操作；可信 plans.bindExecutionTurn 不暴露给模型反向代理。
 
 Team Plan 使用 Host 派生的 automatic_plan 策略和有效获批模型绑定自动启动只读专家，不能用等待研究名单批准的回复结束。SubmitPlan 另需完整结构化研究、专家回合及问题全部结束、未消费 Team 收件箱为空。方案产物和后续 Agent 名单仍需用户批准，automatic_plan 不授权 Agent 工作。Goal 协商权限不变。Team 不暴露 Task* 或插件 SessionTask。
 
@@ -588,3 +592,32 @@ sidecar 不附加覆盖，委托使用会话的有效权限模式；因此父会
 ## 图片生成与编辑
 
 `GenerateImages` 是仅供 Agent 使用的高风险能力，可信桌面执行请求前必须由 host-core 授权。即使处于 Auto，Plan/Goal 仍被拒绝。取消、限制和结果语义见[图片生成规格](/zh-CN/spec/03-runtime/21-image-generation)。
+
+
+## 托管后台 Bash：超时与等待（2026-10-11）
+
+`Bash` 的 `run_in_background` 默认为 false。后台命令沿用前台命令的权限、
+模式与团队策略、工作区、原生 shell、容量限制和进程树所有权。启动回执只返回
+进程 ID 和当前状态，不声称命令成功退出。默认超时仍为 60 秒；长命令应传
+`timeout`（秒，1–21,600）。两个参数的描述均明确这一限制。
+
+后台缺省超时不传 transport `timeoutMs`，由宿主应用同一默认值并保留来源。
+显式覆盖（包括 60 秒）保持显式；前台传输不变。`TOOL_TIMEOUT` 的已有持久化
+结果内容记录 `timeoutMs` 和 `timeoutIsDefault`；已有 `errorMessage` 说明实际
+限制是默认还是显式，并提示长命令传秒数。旧记录保持原消息，不猜测缺失来源。
+
+已有 `backgroundProcesses.changed` 仍只广播身份和修订号。团队
+`wait_for_updates` 只响应自身会话的事件，经 `backgroundProcesses.read` 读取
+终态，返回 `reason: background_process_completed` 和 `backgroundProcess`
+详情（含超时说明）。运行中输出不会结束等待；不新增邮箱消息，也不启动空闲
+Lead 回合。读取必须通过可信启动绑定与进程/会话归属检查。错误保持可见；
+取消、到期或回合更换后的迟到结果不会被消费，后续等待仍可收到。团队收件箱、
+权限、容量和取消语义不变。
+
+运行时按自身会话登记成功后台启动回执，在每次等待时核对这些未消费 ID，覆盖
+首次等待前和两次等待之间结束的情况。工具目录刷新保留登记，运行时销毁释放
+内存；不查询历史列表，也不承诺运行时重建后的持久化回放。
+
+### 显式团队服务（WP14）
+
+backgroundKind:"service" 是显式 background-only Bash 启动，不绕过权限。拒绝 timeout 覆盖，使用 Host 6 小时 TTL、当前已确认 Agent Team/run/turn owner、新 service caps 和原 permit；普通 command 默认不变。任何团队暂停停止显式服务，普通后台命令保留 WP8。owned process-tree 清理及 Activity metadata 见[显式服务](/zh-CN/spec/03-runtime/team-managed-services)。

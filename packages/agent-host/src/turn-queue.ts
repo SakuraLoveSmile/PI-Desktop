@@ -160,6 +160,16 @@ export class TurnQueue {
     return queue.length;
   }
 
+  /** Mirror a record already committed by the Host with its original identity. */
+  adoptPersisted(record: QueuedTurnRecord): number {
+    const existing = this.position(record.sessionId, record.id);
+    if (existing !== undefined) return existing;
+    const queue = this.bySession.get(record.sessionId) ?? [];
+    queue.push(record);
+    this.bySession.set(record.sessionId, orderQueue(queue));
+    return this.position(record.sessionId, record.id)!;
+  }
+
   async remove(sessionId: string, id: string): Promise<QueuedTurnRecord | undefined> {
     const queue = this.bySession.get(sessionId);
     if (!queue) return undefined;
@@ -170,6 +180,17 @@ export class TurnQueue {
     this.recoveryEligible.delete(id);
     if (queue.length === 0) this.bySession.delete(sessionId);
     return record;
+  }
+
+  /** Retire the live mirror only after its Host-owned durable row was removed. */
+  retirePersisted(sessionId: string, id: string): void {
+    const queue = this.bySession.get(sessionId);
+    if (!queue) return;
+    const index = queue.findIndex((record) => record.id === id);
+    if (index === -1) return;
+    queue.splice(index, 1);
+    this.recoveryEligible.delete(id);
+    if (queue.length === 0) this.bySession.delete(sessionId);
   }
 
   /** Take the head for execution. */

@@ -1581,6 +1581,25 @@
   gap: 12px;
 }
 
+.context-inspector-occupancy-track {
+  height: 6px;
+  margin: 10px 0;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--ds-bg-hover);
+}
+
+.context-inspector-occupancy-fill {
+  display: block;
+  height: 100%;
+  background: var(--ds-text-muted);
+}
+
+.context-inspector-compact-action.btn {
+  width: 100%;
+  margin-top: 12px;
+}
+
 .context-inspector-heading-value {
   min-width: 0;
   color: var(--ds-text-primary);
@@ -2355,156 +2374,24 @@
 /* Nodes are raised tiles on the group's tile; connectors are tinted 2px bars
    rather than hairlines, and the dotted canvas is gone (D297). */
 /* Compact Subagent Task progress card (ADR 0062 / 2026-09-30 plan image 7) */
-.subagent-tasks-card {
+.compact-subagent-activity {
   display: flex;
+  width: 100%;
+  min-width: 0;
   flex-direction: column;
-  gap: 8px;
-  margin: 6px 0;
-  padding: 10px 12px;
-  background: var(--ds-bg-secondary);
-  border: 1px solid var(--ds-border-default);
-  border-radius: var(--radius-sm);
 }
 
-.subagent-tasks-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-width: 0;
-}
-
-.subagent-tasks-title-group {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
-.subagent-tasks-title-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--ds-text-secondary);
-  flex-shrink: 0;
-}
-
-.subagent-tasks-title {
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--ds-text-primary);
-  white-space: nowrap;
-}
-
-.subagent-tasks-metrics {
-  font-size: var(--text-xs);
-  color: var(--ds-text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.subagent-tasks-action-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  font-size: var(--text-xs);
-  color: var(--ds-text-secondary);
-  background: var(--ds-bg-elevated);
-  border: 1px solid var(--ds-border-subtle);
-  border-radius: var(--radius-xs);
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-  transition: all var(--motion-duration-fast) var(--motion-ease-out);
-}
-
-.subagent-tasks-action-btn:hover {
-  background: var(--ds-bg-hover);
-  color: var(--ds-text-primary);
-  border-color: var(--ds-border-default);
-}
-
-.subagent-tasks-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.subagent-tasks-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  border-radius: var(--radius-xs);
-  background: var(--ds-bg-primary);
-  border: 1px solid var(--ds-border-subtle);
-  cursor: pointer;
-  user-select: none;
-  transition: background var(--motion-duration-fast) var(--motion-ease-out),
-    border-color var(--motion-duration-fast) var(--motion-ease-out);
-}
-
-.subagent-tasks-row:hover {
-  background: var(--ds-bg-hover);
-  border-color: var(--ds-border-default);
-}
-
-.subagent-tasks-row:focus-visible {
-  outline: 2px solid var(--ds-focus);
-  outline-offset: 1px;
-}
-
-.subagent-tasks-row-status {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-}
-
-.subagent-tasks-status-icon.is-running {
-  color: var(--ds-accent);
-}
-
-.subagent-tasks-status-icon.is-completed {
-  color: var(--ds-success);
-}
-
-.subagent-tasks-status-icon.is-failed {
-  color: var(--ds-error);
-}
-
-.subagent-tasks-status-icon.is-stopped {
-  color: var(--ds-warning);
-}
-
-.subagent-tasks-status-icon.is-idle {
-  color: var(--ds-text-muted);
-}
-
-.subagent-tasks-row-task {
-  flex: 1 1 auto;
-  min-width: 0;
-  font-size: var(--text-xs);
-  color: var(--ds-text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.subagent-tasks-row-agent {
-  flex-shrink: 0;
-  padding: 1px 6px;
-  font-size: var(--text-3xs);
-  font-weight: var(--font-weight-medium);
-  border-radius: var(--radius-full);
-  background: var(--ds-tile-deep);
-  color: var(--ds-text-secondary);
-}
+.subagent-tasks-card { display: flex; flex-direction: column; gap: 4px; margin: 6px 0; min-width: 0; }
+.subagent-tasks-list { display: flex; flex-direction: column; gap: 2px; }
+.subagent-activity-row { display: flex; align-items: center; width: 100%; min-width: 0; min-height: 38px; gap: 10px; padding: 5px 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ds-text-secondary); text-align: left; cursor: pointer; }
+.subagent-activity-row:hover { background: var(--ds-bg-hover); }
+.subagent-activity-row:focus-visible { outline: 2px solid var(--ds-focus); outline-offset: 2px; }
+.subagent-activity-avatar { width: 23px; height: 23px; flex-shrink: 0; border-radius: var(--radius-full); background: linear-gradient(160deg, #c8c2ee, #e9c2e8 45%, #acdded); }
+.subagent-activity-avatar[data-variant="1"] { background: linear-gradient(160deg, #f594c9, #e9c2e8 45%, #acdded); }
+.subagent-activity-avatar[data-variant="2"] { background: linear-gradient(160deg, #b8d7ee, #cfebde 45%, #dbd0ee); }
+.subagent-activity-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-sm); }
+.subagent-activity-name { color: var(--ds-text-primary); }
+.subagent-activity-elapsed { color: var(--ds-text-muted); }
 
 .subagent-topology {
   display: grid;
@@ -3745,4 +3632,36 @@
     animation: none;
     opacity: 0.7;
   }
+}
+
+/* Compact keeps prose as the reading surface; activity is a quiet footnote. */
+.assistant-turn.compact > .message-col {
+  gap: 12px;
+}
+
+.assistant-turn.compact > .message-col > .assistant-turn-fragment .prose-chat {
+  font-size: var(--text-lg);
+  line-height: var(--leading-prose);
+}
+
+.process-activity-group.compact {
+  margin-block: 2px;
+}
+
+.process-activity-group.compact > .tool-activity-header {
+  min-height: 28px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-md);
+  gap: 7px;
+}
+
+.process-activity-group.compact > .tool-activity-header > .tool-activity-label {
+  font-weight: var(--font-weight-normal);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+}
+
+.process-activity-group.compact > .tool-activity-header > .tool-activity-caret {
+  flex: none;
 }

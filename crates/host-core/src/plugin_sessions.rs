@@ -1142,8 +1142,9 @@ pub fn delete(db: &Database, plugin_id: &str, params_value: &Value) -> Result<Va
     if !owns_session(db, plugin_id, &session_id)? {
         return Err(not_found("session not found"));
     }
+    let tx = db.conn().unchecked_transaction()?;
     if mode == "purge" {
-        let changed = db.conn().execute(
+        let changed = tx.execute(
             "DELETE FROM sessions WHERE id = ?1 AND EXISTS (
                 SELECT 1 FROM session_import_origins
                 WHERE session_id = ?1 AND plugin_id = ?2
@@ -1153,10 +1154,8 @@ pub fn delete(db: &Database, plugin_id: &str, params_value: &Value) -> Result<Va
         if changed == 0 {
             return Err(not_found("session not found"));
         }
-        sessions::invalidate_transcript_layout(&session_id);
-        transcripts::remove_session_files(db.data_dir(), &session_id);
     } else {
-        db.conn().execute(
+        tx.execute(
             "UPDATE sessions SET deleted_at = ?1
              WHERE id = ?2 AND EXISTS (
                 SELECT 1 FROM session_import_origins
@@ -1164,6 +1163,15 @@ pub fn delete(db: &Database, plugin_id: &str, params_value: &Value) -> Result<Va
              )",
             params![now_ms(), session_id, plugin_id],
         )?;
+    }
+    tx.execute(
+        "DELETE FROM kv WHERE ns=?1 AND key=?2",
+        params![crate::context_insights::NAMESPACE, session_id],
+    )?;
+    tx.commit()?;
+    if mode == "purge" {
+        sessions::invalidate_transcript_layout(&session_id);
+        transcripts::remove_session_files(db.data_dir(), &session_id);
     }
     Ok(json!({ "deleted": true }))
 }
@@ -1460,5 +1468,30 @@ mod tests {
         assert_eq!(page["items"][0]["origin"], "external");
         assert_eq!(page["items"][0]["contentTruncated"], true);
         assert_eq!(page["nextCursor"], "1");
+    }
+    #[test]
+    fn diagnostic_cleanup_failure_rolls_back_plugin_session_deletion() {
+        for mode in ["trash", "purge"] {
+            let (_dir, db) = db();
+            let mut input = item("diagnostic-rollback", "2026-01-01T00:00:01Z");
+            input["source"] = json!("legacy");
+            let id = import(&db, "plugin.one", &input).unwrap()["sessionId"]
+                .as_str()
+                .unwrap()
+                .to_string();
+            db.kv_set(
+                crate::context_insights::NAMESPACE,
+                &id,
+                &json!({"private": "context"}),
+            )
+            .unwrap();
+            db.conn().execute_batch("CREATE TEMP TRIGGER fail_context_cleanup BEFORE DELETE ON kv WHEN OLD.ns='context-insights-v1' BEGIN SELECT RAISE(ABORT, 'fixture failure'); END;").unwrap();
+            assert!(delete(&db, "plugin.one", &json!({"sessionId": id, "mode": mode})).is_err());
+            assert!(get(&db, "plugin.one", &json!({"sessionId": id})).is_ok());
+            assert!(db
+                .kv_get(crate::context_insights::NAMESPACE, &id)
+                .unwrap()
+                .is_some());
+        }
     }
 }
