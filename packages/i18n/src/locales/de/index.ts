@@ -2148,6 +2148,7 @@ sklm: {
 
   "panel": {
     "activity": {
+      service: en.panel.activity.service,
       aggregateLoading: "Vollständige Sitzungsaktivität wird gelesen…",
       aggregateUnavailable: "Vollständige Aktivität nicht verfügbar; geladene Nachrichten werden angezeigt.",
       aggregateLimited: "Einige Aktivitätseinträge überschreiten die Anzeigegrenzen.",

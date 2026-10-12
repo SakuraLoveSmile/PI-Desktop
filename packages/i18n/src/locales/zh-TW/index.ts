@@ -2187,6 +2187,7 @@ sklm: {
   panel: {
     title: "工作面板",
     activity: {
+      service: en.panel.activity.service,
       aggregateLoading: "正在讀取全對話活動…",
       aggregateUnavailable: "暫時無法讀取全對話活動，目前顯示已載入訊息。",
       aggregateLimited: "部分活動記錄超出顯示限制。",

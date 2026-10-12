@@ -4,6 +4,7 @@ import { IconRefresh, IconSquare, IconX } from "../../../components/icons";
 import { Button, TooltipButton } from "../../../components/ui";
 import { ActivityStatus } from "./SessionActivityRail";
 import { useBackgroundProcessDetails } from "./useBackgroundProcessDetails";
+import { BackgroundServiceMetadata } from "./BackgroundServiceMetadata";
 
 export function BackgroundProcessDetails({ sessionId, id, visible, onClose }: {
   sessionId: string; id: string; visible: boolean; onClose: () => void;
@@ -35,6 +36,7 @@ export function BackgroundProcessDetails({ sessionId, id, visible, onClose }: {
         <dt>{t("panel.activity.command")}</dt><dd><code>{detail.process.command}</code></dd>
         <dt>{t("panel.activity.cwd")}</dt><dd><code>{detail.process.cwd}</code></dd>
       </dl>
+      <BackgroundServiceMetadata process={detail.process} />
       {backgroundProcessIsActive(detail.process.status) && <Button variant="secondary" size="sm" className="session-process-stop"
         disabled={stopping || detail.process.status === "stopping"} onClick={stop}>
         <IconSquare size={12} aria-hidden />{t(stopping || detail.process.status === "stopping" ? "panel.activity.status.stopping" : "panel.activity.stopProcess")}

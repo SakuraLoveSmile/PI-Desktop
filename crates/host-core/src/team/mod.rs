@@ -29,6 +29,7 @@ pub(crate) mod member_failure;
 #[cfg(test)]
 mod member_failure_tests;
 pub mod model;
+pub(crate) mod ordinary_inbox;
 pub mod planning;
 #[cfg(test)]
 mod planning_assignment_tests;

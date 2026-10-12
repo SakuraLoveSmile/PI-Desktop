@@ -2097,6 +2097,7 @@ export const ptBR = {
 
   panel: {
     activity: {
+      service: en.panel.activity.service,
       aggregateLoading: "Lendo a atividade completa da sessão…",
       aggregateUnavailable: "Atividade completa indisponível; mostrando mensagens carregadas.",
       aggregateLimited: "Alguns registros excedem os limites de exibição.",

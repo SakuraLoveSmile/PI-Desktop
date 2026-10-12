@@ -16,6 +16,8 @@ mod scheduled_tools;
 mod session_activity_rpc;
 mod session_notes_rpc;
 #[cfg(test)]
+mod storage_compatibility_tests;
+#[cfg(test)]
 mod subagent_settings_tests;
 #[cfg(test)]
 mod team_dispatch_age_tests;
@@ -4288,6 +4290,13 @@ async fn handle_request_inner(
             let call_started = std::time::Instant::now();
             let p: ToolsExecuteParams = serde_json::from_value(params.clone())
                 .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
+            if p.tool_name == "Bash"
+                && p.args
+                    .get("backgroundKind")
+                    .is_some_and(|kind| kind != "command")
+            {
+                return Err(rpc_err(1002, "This build can read historical services but cannot launch them; backgroundKind must be command", "INVALID_PARAMS"));
+            }
             let execution_timeout_ms = tools::effective_timeout_ms(&p.tool_name, p.timeout_ms);
             let background = if p.tool_name == "Bash" {
                 match p.args.get("run_in_background") {

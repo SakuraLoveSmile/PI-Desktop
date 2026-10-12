@@ -1,4 +1,4 @@
-# 04. Data Storage (Shared schema v19, Plus track v5)
+# 04. Data Storage (Shared schema v21, Plus track v7)
 
 ## 0. Ownership decision
 
@@ -322,9 +322,9 @@ PRAGMA trusted_schema = ON;       -- required by the FTS triggers (§4.8); the D
 PRAGMA auto_vacuum = INCREMENTAL; -- set at creation, before any table
 ```
 
-- The shared schema version lives in `PRAGMA user_version` (current v19 = `19`).
+- The shared schema version lives in `PRAGMA user_version` (current v21 = `21`).
   Plus-only structures are versioned separately in `plus_schema_meta` (current
-  Plus track v5, section 7.1). The v1 `meta` table is gone.
+  Plus track v7, section 7.1). The v1 `meta` table is gone.
 - host-core is the **single writer**; statements use `prepare_cached`; every
   multi-row write runs in one transaction.
 - Boot maintenance runs before RPC service: one transaction marks every
@@ -1670,7 +1670,7 @@ and moves only when upstream migrations are merged (ADR
 plus-schema-version-track). Plus-only structures run on a second track in the
 same database, so merging upstream never renumbers or collides with Plus data.
 Plus steps are ordered, additive, and idempotent. They live in
-`crates/host-core/src/db/plus_schema.rs`, and the current track version is 5:
+`crates/host-core/src/db/plus_schema.rs`, and the current track version is 7:
 
 | Step | Adds |
 |---|---|
@@ -1679,6 +1679,8 @@ Plus steps are ordered, additive, and idempotent. They live in
 | P3 | execution provider/model bindings and revision intent fields on `plan_approvals`, and the `plan_execution_schedules` table |
 | P4 | `plan_approvals.execution_kind`, backfilled from `kind` for approved proposals |
 | P5 | session-owned `session_quick_notes` and `background_processes` tables |
+| P6 | `team_ordinary_inbox`, the historical authenticated Lead-input consumption journal |
+| P7 | `background_service_ownership`, including `owner_project_path`, and its session-deletion guard |
 
 P1 to P4 are the Plus-only changes earlier fork builds shipped as
 `user_version` 20 to 23. Every step probes before it changes anything, so a
@@ -1699,7 +1701,7 @@ edited.
 - **Legacy fork database.** A database with Plus structures, no
   `plus_schema_meta`, and `user_version` 20 to 23 was written by an earlier fork
   build. After a verified `pi.sqlite.legacy-v<N>.bak`, one transaction applies
-  every Plus step, writes the meta (track 5, current shared chain), and sets
+  every Plus step, writes the meta (track 7, current shared chain), and sets
   `user_version` to 19. A failure rolls the transaction back and leaves the
   legacy database as it was.
 - **Older fork build.** An older fork build that opens a reconciled database
@@ -1712,8 +1714,32 @@ edited.
   since the meta was written, all steps are replayed, because an upstream step
   may have rebuilt a table that carries Plus columns, and the meta is
   re-synced.
-- **Fresh installs.** A new database runs the shared v19 DDL, then every Plus
+- **Fresh installs.** A new database runs the current shared DDL, then every Plus
   step, and records the track version. It takes no backup.
+- **Known candidate data.** Earlier local candidates wrote P6 and P7 before
+  their storage support reached `main`. These are supported formats, not a
+  reason to lower the database version or disable the newer-schema guard.
+  A P5 or P6 file upgrades behind a verified backup; a current P7 file retains
+  its journal, ownership rows, shared version, and Plus version on reopen.
+  Versions above P7 still fail closed before maintenance or mutation.
+- **Historical inbox recovery.** Host validates the journal against the
+  canonical collaboration ledger and the exact authenticated transcript input.
+  Prepared records recover through the existing file-first append path. Index
+  repair retains the recorded Lead turn; recording consumption and retiring
+  the durable queued message commit together. Repeated recovery cannot append
+  another copy or turn an authenticated input into new user authorization.
+  The existing queued continuation remains the delivery path; schema support
+  does not advertise the candidate's same-turn inbox capability.
+- **Historical service recovery.** On cold start, active historical services
+  record `host_restart` before the existing background-process recovery marks
+  them interrupted. Host never adopts their stored PID or replays a command.
+  Read-only activity metadata preserves service identity, deadline, and stop
+  reason. P7 did not store the originating platform or stop mechanism, so this
+  build omits `stopMode` rather than deriving a historical TERM/KILL or
+  JobObject outcome from its own platform. The recorded escalation flag stays
+  readable but does not identify that missing mechanism.
+  This build does not create managed services: Bash rejects an explicit
+  `backgroundKind: "service"` instead of silently launching an ordinary command.
 - **Offline relocation.** The cold storage migration's `--relocate-data` pass
   (section 2, user-selected storage location) opens SQLite directly and never
   goes through `Database::open`, so it does not reconcile a legacy fork

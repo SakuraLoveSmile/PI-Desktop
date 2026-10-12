@@ -15,6 +15,7 @@ mod provenance;
 mod repository;
 mod settlement;
 pub use provenance::{prepare_append, validate_replacement};
+pub(crate) use repository::origin as message_origin;
 pub use repository::{get, Message};
 pub use settlement::{begin_turn, recover, settle_turn};
 pub const SCHEMA: &str = include_str!("schema.sql");

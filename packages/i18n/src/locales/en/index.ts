@@ -2408,6 +2408,17 @@ sklm: {
   panel: {
     title: "Work panel",
     activity: {
+      service: {
+        label: "Service", kind: "Process kind", owner: "Owner session", team: "Team", run: "Team run",
+        deadline: "Service deadline", stopPolicy: "Stop policy", stopReason: "Stop reason", stopRequested: "Stop requested",
+        stopOutcome: "Stop outcome", escalated: "Escalated to KILL", termCompleted: "Stopped after TERM",
+        stopModes: { "unix-term-then-kill": "TERM, then KILL after up to 5 seconds", "windows-job-force": "Force stop with Windows JobObject" },
+        stopReasons: {
+          explicit_stop: "Explicit stop", team_paused: "Team paused", run_replaced: "Team run replaced", member_removed: "Member removed",
+          owner_workspace_changed: "Owner workspace changed", session_deleted: "Session deleted", team_ended: "Team ended", goal_ended: "Goal ended",
+          ttl_expired: "Six-hour service lifetime expired", host_shutdown: "Host shutdown", host_restart: "Interrupted by Host restart", owner_cancelled: "Owner cancelled",
+        },
+      },
       aggregateLoading: "Reading complete session activity…",
       aggregateUnavailable: "Complete session activity unavailable; showing loaded messages.",
       aggregateLimited: "Some recorded activity exceeds display limits.",
