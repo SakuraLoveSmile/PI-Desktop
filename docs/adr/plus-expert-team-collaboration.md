@@ -601,3 +601,28 @@ Runs that formerly ended with unfinished tasks must now close them explicitly.
 If bounded Lead recovery cannot achieve settlement, the execution surfaces
 `TEAM_APPROVAL_REQUIRED` instead of silently completing. This intentional
 compatibility change favors observable unfinished work over a misleading report.
+
+
+## 2026-10-13 amendment: silent completed members notify the Lead
+
+A dispatched member's completed turn is no longer sufficient to leave its Lead
+uninformed while open owned tasks remain. After task-attempt settlement, a
+Team-dispatched completed member turn that sent no source-proven Team mail to
+Lead creates one Host-authored `member_ended_without_report` notice. Direct
+member chats, aborted turns and fully terminal work do not trigger it. The
+existing mailbox envelope, permission ceiling and source-turn proof suffice;
+no schema, RPC or shared type is added.
+
+The reserved Host notification prefix list is shared by admission, session
+proof cleanup and activity projection. The silent prefix is not available to
+models. Existing member_failed behavior remains unchanged. Completed dispatch
+provenance permits inbox consumption, and unread notices block approved final
+answers/reports. Reading a notice grants neither task completion nor successful
+participation. Existing durable delivery wakes waiting/idle Leads; a Host kv
+marker suppresses repeat silent wakes after successful transport admission.
+The narrow send/marker crash window can replay the same durable message ID,
+not create another message. Startup mailbox recovery remains authoritative.
+
+Rejected alternatives include reenabling generic completion callbacks, counting
+notice consumption as expert success, or copying member output into notices.
+Those would confuse acknowledgements/results, weaken authority or leak content.

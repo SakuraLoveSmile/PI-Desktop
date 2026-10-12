@@ -16,18 +16,8 @@ pub(super) fn send_pending_member_failure(
     tx: &mpsc::UnboundedSender<String>,
     turn: &str,
 ) -> Result<(), JsonRpcError> {
-    if let Some(notice) = crate::team::member_failure::pending_for_turn(db, turn)
-        .map_err(|error| rpc_err(1000, error.to_string(), "INTERNAL"))?
-    {
-        send_notification(
-            tx,
-            "team.messageQueued",
-            json!({
-                "teamSessionId":notice.team_session_id,"messageId":notice.message_id
-            }),
-        );
-    }
-    Ok(())
+    crate::team::host_notices::send_pending(db, tx, turn)
+        .map_err(|error| rpc_err(1000, error.to_string(), "INTERNAL"))
 }
 
 pub(super) fn team_rpc_err(e: anyhow::Error) -> JsonRpcError {

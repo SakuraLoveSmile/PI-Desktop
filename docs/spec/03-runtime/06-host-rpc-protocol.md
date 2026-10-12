@@ -459,7 +459,8 @@ It does not authorize an automatic retry.
 The Host reserves `member-turn-failed:<turnId>` idempotency keys; model calls to
 `team.sendMessage` using this prefix return `TEAM_UNAUTHORIZED`. The terminal
 CAS, notice, Host-only source proof and Team revision commit together. Replay
-cannot add a notice; completion and user abort/cancel add none. After commit,
+cannot add a notice; user abort/cancel adds none. Completed turns use the
+separate silent-completion rule below. After commit,
 existing `team.messageQueued` wakes waiting Leads and Main's existing durable
 Team delivery admits idle Leads without changing Agent Host queue semantics.
 Restart recovers undelivered notices through the existing pending-mail drain.
@@ -475,6 +476,32 @@ Host failure delivery also survives post-commit checkpoint I/O errors: the error
 remains observable, while the already durable queued notice emits its existing
 wake event. A terminal replay may re-notify that same pending row; no second
 notice is inserted, and a consumed/running notice is not emitted again.
+
+A Lead-dispatched non-Lead member turn that settles as `completed` without a
+report atomically adds one Host-authored member-to-Lead notice when, after task
+attempt settlement, that member still owns non-deleted `pending` or
+`in_progress` tasks. The starting collaboration message must have `source=team`
+and the exact turn binding. A direct user conversation with a member, an
+aborted/cancelled turn, a member with no open tasks, or a turn that already sent
+Team mail to Lead produces no silent-completion notice. Existing source-turn
+proofs on outgoing Team mail determine whether the member reported; body text
+is never evidence.
+
+The existing message content is JSON
+`{kind:"member_ended_without_report",memberName,taskIds,suggestedAction}` without
+model output or paths. `member-turn-silent:<turnId>` is Host-reserved;
+model-authored sends using any Host notification prefix fail with
+`TEAM_UNAUTHORIZED`. The terminal CAS, notice, source proof in
+`team-message-source-turn-v1`, and Team revision commit together. Terminal
+replay never inserts another notice or repeats an already admitted wake. A
+Host-only kv event marker is written after transport admission; failed transport
+leaves pending recovery possible. A crash between admission and that marker may
+repeat the same message ID, which the durable delivery path deduplicates. Existing `team.messageQueued` delivery
+wakes the Lead, including an idle Lead. An unread notice from a current
+completed dispatch blocks approved completion until `wait_for_updates` consumes
+it. Completed dispatch provenance needs no error-turn `team-member-failure-v1`
+proof. Consuming a Host notice does not establish successful participation or
+complete tasks. Deleting either owning session removes notification proofs.
 
 The `wait_for_updates` tool subscribes before reading its baseline and wakes on
 matching `team.changed` / `team.messageQueued` notifications, debounced for

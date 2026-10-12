@@ -4407,6 +4407,7 @@ pub fn end_turn_settling(
             )?;
         }
         crate::team::member_failure::record(db, &tx, turn_id)?;
+        crate::team::member_silence::record(&tx, turn_id)?;
     }
     // A replay after startup recovery may complete accounting for a terminal
     // turn, but must never change its settled status or emit another notification.

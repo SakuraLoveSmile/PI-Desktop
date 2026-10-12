@@ -18406,3 +18406,24 @@ authenticated turn and never revives the old execution token.
   regressions also cover completed/failed/cancelled, deletion and ordinary scope.
 - **Milestone:** Plus Team reliability.
 - **Status:** Record actual candidate/base, suites, environment and results.
+
+
+### E2E-TEAM-member-silent-completion-wakes-lead
+
+- **Preconditions:** Temporary real Host profile/workspace and production runtime
+  wait tool, approved Team execution, dispatched core member with an open task.
+- **Steps:** Subscribe and wait, settle the member completed without Team mail,
+  replay settlement, try a model-authored reserved key, consume the notice and
+  explicitly fail the task with a reason.
+- **Expected:** Exactly one durable `member_ended_without_report` JSON notice
+  and one admitted `team.messageQueued` wake on normal replay. The wait receives
+  its full contents in the original execution. Unread current notices and open
+  tasks block completion independently. Consuming a notice neither completes
+  tasks nor supplies successful participation. Reserved keys are rejected.
+- **Specs:** Host RPC silent completion mail; Expert Team ADR 2026-10-13.
+- **Acceptance:** `node scripts/e2e-team-member-silence.mjs`; Rust tests cover
+  reported/direct/terminal-task/abort exclusions, rollback, participation and
+  source/event-proof deletion, plus transport and checkpoint failure recovery.
+- **Milestone:** Plus Team reliability.
+- **Status:** Record actual candidate/base and results; this does not prove real
+  model compliance or cross-process exactly-once transport during a crash.

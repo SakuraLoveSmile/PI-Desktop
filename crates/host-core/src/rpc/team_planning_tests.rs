@@ -92,6 +92,7 @@ async fn planning_rpc_preserves_submission_retry_revision_and_execution_permissi
         );
     }
     let mut tasks = vec![];
+    let mut research_turns = vec![];
     for member in members {
         tasks.push(call("team.createTask",json!({"teamSessionId":lead,"callerSessionId":lead,"ownerMemberName":member["name"],"subject":"Research source"})).await.unwrap());
         let message = call("team.sendMessage",json!({"teamSessionId":lead,"callerSessionId":lead,"target":member["name"],"content":"Inspect the current task"})).await.unwrap();
@@ -104,14 +105,26 @@ async fn planning_rpc_preserves_submission_retry_revision_and_execution_permissi
             None,
         )
         .unwrap();
-        sessions::end_turn(&st.db, &actual, "completed", None, None, false).unwrap();
-        crate::session_collaboration::settle_turn(&st.db, &actual).unwrap();
+        research_turns.push(actual);
     }
     let submission = |call_id: &str| json!({"sessionId":lead,"turnId":turn_id,"toolCallId":call_id,"kind":"plan","title":"Implementation plan","question":"Approve?","markdown":"# Plan\nBoth research areas inspected."});
     let early = call("plans.submit", submission("plan")).await.unwrap_err();
     assert_eq!(early.data.unwrap()["errorCode"], "TEAM_PLANNING_NOT_READY");
     for (index, member) in members.iter().enumerate() {
         call("team.submitResearchResult",json!({"teamSessionId":lead,"callerSessionId":member["memberSessionId"],"planningId":context["planningId"],"roundId":context["roundId"],"taskId":tasks[index]["task"]["taskId"],"expectedRevision":1,"structuredResult":{"summary":"Inspected source","findings":["File evidence"],"risks":["Lifecycle"],"recommendations":["Test transition"],"verifiedSources":["src/main.ts"]}})).await.unwrap();
+        {
+            let st = state.lock().await;
+            sessions::end_turn(
+                &st.db,
+                &research_turns[index],
+                "completed",
+                None,
+                None,
+                false,
+            )
+            .unwrap();
+            crate::session_collaboration::settle_turn(&st.db, &research_turns[index]).unwrap();
+        }
         if index == 0 {
             let status = call(
                 "team.getPlanning",

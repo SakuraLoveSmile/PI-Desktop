@@ -1,6 +1,6 @@
 //! Durable Host-authored member failures, within the terminal turn transaction.
 use crate::db::Database;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::json;
 use uuid::Uuid;
@@ -13,23 +13,12 @@ pub struct QueuedMemberFailure {
 }
 
 pub(super) fn validate_message_key(key: Option<&str>) -> Result<()> {
-    if key.is_some_and(|key| {
-        key.trim().starts_with("member-turn-failed:")
-            || key.trim().starts_with("team-run-limit-soft:")
-    }) {
-        return Err(anyhow!(
-            "TEAM_UNAUTHORIZED: member-turn-failed message keys are Host-owned"
-        ));
-    }
-    Ok(())
+    super::host_notices::validate_message_key(key)
 }
 
 /// Remove Host notice proofs before the owning mailbox rows cascade on deletion.
 pub(crate) fn cleanup_session(conn: &Connection, session: &str) -> Result<()> {
-    conn.execute("DELETE FROM kv WHERE ns IN ('team-member-failure-v1','team-message-source-turn-v1')
-        AND key IN (SELECT id FROM session_collaboration_messages WHERE
-          (source_session_id=?1 OR target_session_id=?1) AND idempotency_key LIKE 'member-turn-failed:%')", [session])?;
-    Ok(())
+    super::host_notices::cleanup_session(conn, session)
 }
 
 /// The caller owns the terminal CAS; aborts and replayed terminals never call us.
@@ -103,7 +92,7 @@ pub(crate) fn record(
             name,
             team,
             content,
-            format!("member-turn-failed:{turn}"),
+            format!("{}{turn}", super::host_notices::FAILED_PREFIX),
             ceiling,
             now
         ],
@@ -133,7 +122,7 @@ pub(crate) fn pending_for_turn(db: &Database, turn: &str) -> Result<Option<Queue
          JOIN kv k ON k.ns=?2 AND k.key=m.id AND json_extract(k.value_json,'$')=t.id
          JOIN kv s ON s.ns='team-message-source-turn-v1' AND s.key=m.id AND json_extract(s.value_json,'$')=t.id
          WHERE m.status='queued' AND m.kind='message' AND m.plugin_id='team:'||m.target_session_id
-           AND m.idempotency_key='member-turn-failed:'||t.id",
-        params![turn,PROOF_NS], |row|Ok(QueuedMemberFailure { team_session_id:row.get(0)?,message_id:row.get(1)? }),
+           AND m.idempotency_key=?3||t.id",
+        params![turn,PROOF_NS,super::host_notices::FAILED_PREFIX], |row|Ok(QueuedMemberFailure { team_session_id:row.get(0)?,message_id:row.get(1)? }),
     ).optional()?)
 }
