@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { createServer } from "vite";
 import { IPC } from "@pi-desktop/shared";
 
@@ -11,7 +12,7 @@ const request = {
 };
 
 test("E2E-TEAM-lead-pending-ask-late-answer: restore card and deliver a new authenticated user turn", async t => {
-  const server = await createServer({ root: new URL("..", import.meta.url).pathname, configFile: false,
+  const server = await createServer({ root: fileURLToPath(new URL("..", import.meta.url)), configFile: false,
     server: { middlewareMode: true, hmr: false, ws: false }, appType: "custom", optimizeDeps: { noDiscovery: true, include: [] } });
   t.after(() => server.close());
   const { createAgentHostBridge } = await server.ssrLoadModule("/electron/main/agent-host-bridge.ts");
@@ -43,7 +44,7 @@ test("E2E-TEAM-lead-pending-ask-late-answer: restore card and deliver a new auth
 });
 
 test("deferred questions survive tool and turn end while ordinary questions clear", async t => {
-  const server = await createServer({ root: new URL("..", import.meta.url).pathname, configFile: false,
+  const server = await createServer({ root: fileURLToPath(new URL("..", import.meta.url)), configFile: false,
     server: { middlewareMode: true, hmr: false, ws: false }, appType: "custom", optimizeDeps: { noDiscovery: true, include: [] } });
   t.after(() => server.close());
   const { enqueueAsk, removeAskForToolCall, clearSessionAsks } = await server.ssrLoadModule("/src/lib/pending-asks.ts");

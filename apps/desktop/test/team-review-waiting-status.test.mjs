@@ -4,10 +4,11 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import test from "node:test";
 import ts from "typescript";
+import { fileURLToPath } from "node:url";
 import * as shared from "@pi-desktop/shared";
 
 const require = createRequire(import.meta.url);
-const sourceRoot = new URL("../src/", import.meta.url).pathname;
+const sourceRoot = fileURLToPath(new URL("../src/", import.meta.url));
 const pendingLabel = "team.review.status.pending";
 const passthrough = ({ children }) => children;
 const empty = () => null;

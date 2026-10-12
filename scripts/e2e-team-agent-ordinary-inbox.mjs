@@ -108,7 +108,7 @@ try {
           onEvent(envelope) {
             const event = envelope.event;
             if (event.type === "tool_end") record("tool-return", { sessionId: request.sessionId, event });
-            
+
           } });
         runtimes.set(request.sessionId, runtime);
         runtime.models = { streamSimple(_model, context) {
