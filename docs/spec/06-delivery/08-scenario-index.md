@@ -253,5 +253,3 @@ IDs come from executable result/test calls and annotated dynamic suites. Documen
 | E2E-TURN-GET-001 | [scripts/e2e-turn-get.mjs:209](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-turn-get.mjs#L209) |
 | E2E-TURN-GET-002 | [scripts/e2e-turn-get.mjs:239](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-turn-get.mjs#L239) |
 | E2E-TURN-GET-003 | [scripts/e2e-turn-get.mjs:253](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-turn-get.mjs#L253) |
-
-| E2E-TEAM-approved-goal-roster-resume-weak-lead-dispatches | [Runtime scripted replay](../../../packages/agent-runtime/src/runtime-tests/runtime-team-roster-resume.test.ts); [helper coverage](../../../packages/agent-runtime/src/team/declare-strategy-result.test.ts). Real model attempt: Goal approved; confirmation recovery **NOT EXERCISED** (240-second harness pre-roster wait). |
