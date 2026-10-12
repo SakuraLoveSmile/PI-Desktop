@@ -5,8 +5,8 @@ Upstream v0.15.6 → v0.16.1 has been merged.
 - Builds from `main` can reopen local candidate data on Plus schema 7 without
   downgrading the database. Older profiles upgrade behind a verified backup;
   historical authenticated inbox records and service ownership recover safely.
-  Service history remains visible, but this build rejects new managed-service
-  launches explicitly. Unknown newer schema versions still refuse to open.
+  Service history remains visible without replay or PID adoption. Unknown newer
+  schema versions still refuse to open.
 
 - Team Goal reports wait for running/queued experts and unconsumed results before
   accepting a draft. Settlement denials name the experts, dispatches and open tasks;
@@ -75,10 +75,11 @@ Upstream v0.15.6 → v0.16.1 has been merged.
 - Expert Team uses the same compact capability rows, glyphs, badges and edit
   actions as Subagents, with shared scope controls and consistent form spacing.
 
-- Successful and failed task notifications both appear in the durable inbox.
-  The bell badge now counts every unread persisted task notification, matching
-  the Dock/taskbar badge; selection, mark-all-read, and clear stay synchronized
-  with Host persistence across reloads.
+- Task notifications appear in the durable inbox, except successful ordinary
+  Team expert turns, whose reports remain in Team/session history without a
+  separate notification. Expert failures, Lead results and other sources retain
+  their notification behavior. The bell and Dock/taskbar badges count unread
+  persisted rows; existing history and mark-read/clear remain synchronized.
 - The input footer exposes a clickable context progress track with the existing
   used/remaining preference, actual usage detail and guarded manual compaction.
   Missing usage is marked unavailable instead of showing a fabricated percent.
@@ -253,3 +254,32 @@ Validate count-to-dialog, keyboard/hover actions, project review/save, Ignore/co
 - Added composer project, local/Worktree and local-branch menus with search,
   current selection, safe branch creation/switching and managed linked worktrees.
   Existing sessions and source checkout changes remain available after navigation.
+
+### Integrated Team reliability and Composer changes (unreleased)
+
+- Bash can explicitly launch a Host-managed service for a confirmed Agent Team.
+  It keeps the existing shell permits, with Host 2/Team 1/session 1 service caps
+  and a fixed six-hour lifetime. Team pause/end, owner cancellation/removal,
+  workspace deletion/change and Host shutdown stop the owned process tree.
+  Ordinary background commands retain their 60-second default. Restart preserves
+  service history and interrupts unfinished ownership without replay.
+- An ordinary Agent Team Lead can receive authenticated expert reports in its
+  existing turn at `wait_for_updates`, in FIFO order. Repeated delivery/ACK
+  retires the same message identities without duplicate transcript input or a
+  new turn. Permission ceilings, human-steer priority and separate Plan/Goal
+  authority remain; older Hosts retain queued continuations.
+- Team guidance distinguishes unknown costs from zero, identifies legal tools
+  for restricted experts, and keeps completed experts' still-open shared tasks
+  visible without automatically settling or rerunning them. Member compaction
+  uses current context and preserves active task/caller identity.
+- The Composer uses a compact two-line input and keeps runtime hints visible
+  while work runs. Goal progress sits inside the same input card, with truthful
+  loading/indeterminate states instead of invented zero counts. The model and
+  reasoning picker is a single right-side control; a labeled context meter stays
+  in the footer, with existing menus, plugin slots and scheduled editing intact.
+- Isolated acceptance lanes cover dispatch supersession/completion and ordinary
+  mail FIFO, configured run-limit pause/restart/resume, and pending questions'
+  trusted late answers. Actual thirty-minute question expiry remains a direct
+  manual lane, separate from restart recovery. Candidate build receipts bind
+  source/base revisions and executable hashes; these entries make no release,
+  live-provider, Windows or user-acceptance claim.

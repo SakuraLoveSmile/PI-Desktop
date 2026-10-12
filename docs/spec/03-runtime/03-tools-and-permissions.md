@@ -732,15 +732,14 @@ workspace, pinned native shell and admission budget as foreground Bash. Accepted
 background launch returns a backgroundProcessId and starting/current lifecycle
 status, without fabricating exitCode zero. The command's outcome belongs to the
 session activity registry, not this launch receipt. The renderer can read/stop
-only the explicitly named local session resource. Background tasks retain the
+only the explicitly named local session resource. Ordinary background commands retain the
 same default and maximum command timeout, do not bypass approvals, and cannot
 turn arbitrary `command &` invocations into managed processes.
 
-Existing Plus P7 service history is readable through the activity registry.
-This build retains the ordinary timed-command capability: an explicit
-`backgroundKind: "service"` is rejected by Host as `INVALID_PARAMS`, before
-launch or permission admission, rather than treated as an ordinary command.
-Reading a historical service record never starts or adopts its old process.
+Existing Plus P7 service history remains readable through the activity registry.
+Explicit `backgroundKind: "service"` now uses the separate current Agent Team
+authority and lifetime contract below; it is never silently converted to an
+ordinary command. Reading a historical record never starts or adopts its PID.
 
 
 ### Background timeout visibility and waiting (2026-10-11)
@@ -772,3 +771,13 @@ The read is protected by the trusted launch binding and process/session owner
 checks. Errors remain visible; cancellation, deadline or a replaced turn never
 consumes a late outcome, so a later wait can receive it. Team inbox delivery,
 permission/admission limits and process cancellation rules are unchanged.
+
+### Explicit Team services (WP14)
+
+`backgroundKind:"service"` is an explicit background-only Bash launch, not a
+permission bypass. It rejects timeout overrides and uses a Host 6-hour TTL,
+current confirmed Agent Team/run/turn ownership, service caps and all original
+permits. Ordinary command defaults stay unchanged. Any Team pause stops explicit
+services while ordinary background commands retain WP8 behavior. Native owned
+process-tree cleanup, provenance and Activity metadata follow
+[managed services](team-managed-services.md).

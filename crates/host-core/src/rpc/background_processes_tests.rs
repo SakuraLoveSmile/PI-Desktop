@@ -521,6 +521,7 @@ async fn background_already_cancelled_runner_does_not_spawn() {
             allow_external_paths: false,
             hashline: None,
             bash_options: Some(tools::BashExecutionOptions {
+                service: false,
                 session_id: f.session,
                 tool_call_id: "already-cancelled".into(),
                 command_shell_id: f.shell,

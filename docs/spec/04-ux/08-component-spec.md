@@ -3153,17 +3153,16 @@ reasoning-level control.
 ```text
 +----------------------------------------------------------+
 | queued prompts, attachments and approval controls (when present) |
-| input (four empty lines, grows through seven visible lines)       |
+| input (two empty lines, grows through seven visible lines)        |
 | placeholder: welcome → command/file hint → keyboard hint          |
-| [+] [Agent/Expert Team ▾] [model · reasoning ▾] [Plan/Goal]         |
-|                                  [plugin] [enhance] [Live] [↑/⏹] |
-| context usage footer (when available)                            |
+| [+] [Agent/Expert Team ▾] [Plan/Goal] [plugin] [model · reasoning ▾] [enhance] [Live] [↑/⏹] |
+| context usage footer (Context label and meter, when available)                                  |
 +----------------------------------------------------------+
 ```
 
 ### 11.3 Layout
 
-- Height: four input lines before draft growth, through seven visible lines,
+- Height: two input lines before draft growth, through seven visible lines,
   then the editor scrolls internally
 - Workspace context: no project, Local, or branch rail is rendered or
   reserved above the shell in either home or thread-docked mode (D095)
@@ -3180,8 +3179,9 @@ reasoning-level control.
 - Padding: px-4 py-3 inner textarea
 - Font: text-sm for Agent, Plan, and Goal; mode changes semantics and tool
   controls, not the typography
-- Plan/Goal uses the existing compact contract indicator; the Agent operating
-  mode omits that extra indicator. The execution-profile chip carries the
+- Plan/Goal uses the existing compact contract indicator; hide the Goal contract
+  picker while Goal execution is active and keep it available during Goal
+  planning. The Agent operating mode omits that extra indicator. The execution-profile chip carries the
   Agent/Expert Team choice separately. Its labels remain single-line and
   ellipsize within their established responsive budgets. Cycling the profile
   cross-fades its icon and label in place. While the live turn is
@@ -3195,12 +3195,14 @@ reasoning-level control.
 - Permission and operating-mode controls retain their existing Add-menu and
   approval-card entry points. Repositioning the toolbar does not change
   permission defaults, mode gates or the separate execution-policy approval.
-- The left toolbar owns Add, execution profile and the combined model ×
-  reasoning-level chip, with 8px between controls. Plan/Goal remains a compact
-  indicator when active. The right toolbar retains plugin controls, prompt
-  enhancement, Live voice and the single Stop/Send slot. Send uses an upward
-  arrow in a neutral 32px rounded-square button; a running empty draft retains
-  Stop. Context usage stays in the existing footer. The chip shows Bot, the
+- The left toolbar owns Add, execution profile and Plan/Goal controls; left-side
+  plugin slots remain there in their existing order. Right-side plugin slots
+  retain their side and order, followed by the combined model × reasoning-level
+  chip, prompt enhancement, Live voice and the single Stop/Send slot. The model
+  chip remains one button and its anchored menu remains tied to that button.
+  Send and Stop use the same neutral 32px rounded-square footprint. Context
+  usage stays in the existing footer with the visible `chat.usageContextLabel`
+  beside its meter. The chip shows Bot, the
   current model name, and the
   current canonical reasoning level value separated by `·`; `off` omits the
   level text. The canonical value is rendered as-is (`low`, `high`, `xhigh`,
@@ -3231,7 +3233,8 @@ reasoning-level control.
   opens the existing Settings model page in the chat Composer; it creates no
   second preference store or model configuration path. The shared picker makes
   this navigation caller opt-in, so the scheduled-task editor retains its
-  unsaved draft and does not expose a cross-page management action.
+  unsaved draft and does not expose a cross-page management action. Its picker
+  placement and behavior remain unchanged.
 - Compact delegation activity renders the existing `SubagentTopology` task
   card directly at the first delegation's position. Ordinary tools before and
   after the card retain chronological order and collapsed category summaries.
@@ -3258,8 +3261,9 @@ reasoning-level control.
   of remaining visible beneath the floating shell or through its rounded outer
   corners, and the conversation pane's own surface stays visible behind the
   dock (issue #728, D624).
-- Empty draft height: `.composer-input` uses `min-height: 4lh`, with 16px
-  input inset and an unseparated bottom toolbar, in both Composer variants.
+- Empty draft height: the Composer dock uses `min-height: 2lh` and grows through
+  seven visible lines before scrolling internally, with 16px input inset and an
+  unseparated bottom toolbar. The Scheduled editor keeps its existing height.
 - Scroll stability: The thread scrollport reserves one stable trailing gutter,
   so the transcript does not shift when overflow appears while the minimap
   does not create a matching blank strip on the left.
@@ -3270,6 +3274,10 @@ reasoning-level control.
   shortcut hint. The selected copy stays stable while the page/session context
   is unchanged. Switching home/session views or active conversations advances
   to the next hint; there is no timer tied to focus, draft, or IME state. The
+  running empty Composer (no text or file draft) instead shows the localized
+  follow-up/steer hint. Its send shortcut reflects the Enter-to-send preference
+  and platform (`Enter` or `⌘/Ctrl+Enter`); the steer shortcut is `⌥/Alt+Enter`.
+  Adding a draft restores the contextual guidance. The
   visible copy is a keyed opacity fade while the native `placeholder` value
   remains in the textarea for assistive technology.
 - Queue rows: while a session is running, each accepted prompt is held in a
@@ -4724,7 +4732,8 @@ Conversation overflow                    Composer draft (unsent)
 6. PermissionCard shows tool name, risk, args, and three action buttons per [03-permission-ux.md](03-permission-ux.md)
 7. Composer: Enter sends when Enter-to-send is on; when it is off, Cmd/Ctrl+Enter
    sends and Enter inserts a newline; Shift+Enter always inserts a newline;
-   draft grows from one through seven visible lines then scrolls, and the single
+   empty Composer input starts at two lines and a draft grows through seven
+   visible lines then scrolls, and the single
    submit slot shows Send for a non-empty draft or an idle/empty draft, and Stop
    only for a running empty draft
 8. Composer model × reasoning chip shows the provider/model pair; remains
@@ -4976,6 +4985,19 @@ Overview section explicitly says Session checklist and keeps its independent
 inline ordered list. Both lists retain live updates and existing recovery/lifecycle
 semantics; this presentation supersedes the earlier centered-capsule geometry.
 
+The Goal disclosure is the first normal-flow child of the chat input card,
+above the editor and toolbar. It has no separate card border, corner radius,
+background or external gap; one bottom divider separates it from the editor.
+The header exposes one visible, live status: loading progress during its first
+read, the execution phase with an indeterminate indicator after a successful
+read without a snapshot, or the recorded count and execution phase once items
+exist. Missing progress never fabricates 0/0 or a percentage. Pending expert
+review overrides ordinary progress presentation; read failures stay visible.
+True counts remain announced without duplicating the visible state label.
+Disclosure, terminal report removal and session isolation retain their current
+behavior. Scheduled instruction cards do not mount this Goal disclosure and
+keep their existing shell appearance.
+
 ### Expert Team settings and reference-aligned Overview (2026-10-08)
 
 Settings exposes an Expert Team destination under Agent configuration. The page
@@ -5051,3 +5073,14 @@ Nested projects retain their relative subdirectory when entering another checkou
 or returning to Local. If the corresponding directory is unavailable, navigation
 reports failure and keeps the original session; it does not widen the execution
 root to the whole repository. A newly created worktree is retained for recovery.
+
+### Team expert success notification exception (WP7)
+
+Ordinary successful Team expert turns no longer create independent Host
+`task.completed` notifications. The inbox, bell/Dock/taskbar counts and native
+terminal popup therefore omit those new successes consistently; no renderer-only
+filter hides a durable row. Expert failure, pending ask/approval, Lead results,
+Goal terminal state and non-Team notifications retain their existing paths.
+This is based on real Host membership, never an expert-looking title. Existing
+historical inbox rows are not deleted. Team reports, turn/phase and transcript
+results remain accessible through their normal Team/session views.

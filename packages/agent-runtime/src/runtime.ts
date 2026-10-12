@@ -2,7 +2,7 @@ import { TeamRunLimitStop } from "./team/run-limit-stop.js";
 import { AskToolInputs } from "./ask-tool-inputs.js";
 import { waitForLeadAsk } from "./team/lead-ask-wait.js";
 import { BackgroundProcessUpdates } from "./team/background-process-updates.js";
-import { backgroundBashDescription, bashTimeoutPayload } from "./background-bash.js";
+import { backgroundBashDescription, backgroundKindDescription, validateBashBackgroundKind, bashTimeoutPayload } from "./background-bash.js";
 import { contextRequestObserver } from "./context-insights.js";
 import { TOOL_ACTIVATION_SECTION, toolDeclarationPolicy, toolActivationSection, restoredToolActivation, syncToolActivation, type ToolDeclarationPolicy } from "./fixed-tool-declarations.js";
 import { orderSystemRows, SystemTranscriptJournal } from "./system-transcript-journal.js";
@@ -159,6 +159,7 @@ import { withExplicitRequired } from "./tool-schema.js";
 import { createTeamTools, teamSystemPrompt } from "./team/index.js";
 import { ConfirmedDeclarationModelView } from "./team/confirmed-declaration-model-view.js";
 import { createTeamMailboxGuards } from "./team/mailbox-context-guards.js";
+import { OrdinaryTeamInbox } from "./team/ordinary-inbox.js";
 import { nestedDelegationPermission, type DelegationOwnerContext } from "./delegation-owner.js";
 import { expertToolDenial } from "./team/expert-policy.js";
 import { buildSessionContext } from "./session-context.js";
@@ -1750,6 +1751,7 @@ export class DesktopAgentRuntime {
   private writeLocks = new PathMutex();
   /** Complete tool registry; only the active subset is sent to the provider. */
   private toolCatalog = new Map<string, AgentTool>();
+  private unavailableToolNames = new Set<string>();
   /** Tools intentionally omitted from the initial provider request. */
   private deferredToolNames = new Set<string>();
   /** Deferred tools activated for this runtime and declaration epoch. */
@@ -1889,6 +1891,8 @@ export class DesktopAgentRuntime {
   private steeringContinuation = false;
   private steeringWaitAbort?: AbortController;
   private pendingSteering = new Map<AgentMessage, string>();
+  private pendingOrdinaryMessages = new Map<AgentMessage, string>();
+  private readonly ordinaryTeamInbox: OrdinaryTeamInbox;
   private pendingOverflow = false;
   private overflowRecoveryAttempted = false;
   private overflowRecoveryInProgress = false;
@@ -1932,6 +1936,7 @@ export class DesktopAgentRuntime {
     this.thinkingLevel = clampThinkingLevel(opts.provider, opts.thinkingLevel);
     this.infiniteProviderRetry = opts.infiniteProviderRetry === true;
     this.host = opts.host;
+    this.ordinaryTeamInbox = new OrdinaryTeamInbox(this.host);
     this.backgroundProcessUpdates = new BackgroundProcessUpdates(this.host, this.sessionId, () => this.disposed || this.runCancelled ? undefined : this.turnEpoch);
     this.onDiagnostic = opts.onDiagnostic ?? (() => undefined);
     this.hostCloseUnsubscribe = this.host.onClose?.(() => {
@@ -2595,7 +2600,7 @@ export class DesktopAgentRuntime {
     context: BeforeToolCallContext,
   ): Promise<BeforeToolCallResult | undefined> {
     const expertDenial = expertToolDenial(this.teamContext?.expertConfig, context.toolCall.name);
-    if (expertDenial) return { block: true, reason: expertDenial };
+    if (expertDenial) return { block: true, reason: this.currentToolDenial(context.toolCall.name) };
     if (this.deferredToolNames.has(context.toolCall.name) && !this.activeDeferredToolNames.has(context.toolCall.name)) {
       return { block: true, reason: `Call ${TOOL_SEARCH_NAME} to activate ${context.toolCall.name} before using it. A tool declaration does not grant execution permission.` };
     }
@@ -2614,7 +2619,7 @@ export class DesktopAgentRuntime {
     }
     if (!transition) {
       if (!this.isToolAllowedInMode(context.toolCall.name)) {
-        return { block: true, reason: modeToolDenial(context.toolCall.name, this.mode) };
+        return { block: true, reason: this.currentToolDenial(context.toolCall.name) };
       }
       return this.extensionToolCall(context);
     }
@@ -3345,6 +3350,9 @@ export class DesktopAgentRuntime {
       },
       Bash: {
         command: Type.String(),
+        backgroundKind: Type.Optional(Type.Union([Type.Literal("command"), Type.Literal("service")], {
+          description: backgroundKindDescription,
+        })),
         run_in_background: Type.Optional(Type.Boolean({
           description: backgroundBashDescription,
         })),
@@ -3355,7 +3363,7 @@ export class DesktopAgentRuntime {
             // runtime read the intent instead of burning the turn (D273 / D329).
             maximum: MAX_ACCEPTED_COMMAND_TIMEOUT,
             description:
-              `Optional command timeout in seconds from 1 to ${MAX_COMMAND_TIMEOUT_SECONDS}; defaults to 60 seconds. Pass timeout for long runs, including run_in_background.`,
+              `Optional command timeout in seconds from 1 to ${MAX_COMMAND_TIMEOUT_SECONDS}; defaults to 60 seconds. Pass timeout for long runs, including run_in_background. Not allowed with backgroundKind: service.`,
           }),
         ),
       },
@@ -3378,6 +3386,7 @@ export class DesktopAgentRuntime {
         await this.loadPathInstructions(toolName, params);
         const isBash = toolName === "Bash";
         const captureBackgroundReceipt = isBash ? this.backgroundProcessUpdates.captureReceipt() : undefined;
+        if (isBash) validateBashBackgroundKind(params);
         const timeoutMs = isBash ? commandTimeoutMs(params) : undefined;
         let progress = "";
         let progressDirty = false;
@@ -3904,6 +3913,30 @@ export class DesktopAgentRuntime {
             this.pendingTeamInboxYield = current;
           }),
           abortActiveTurn: this.teamContext?.abortActiveTurn,
+          captureOrdinaryInbox: () => {
+            const turnId = this.turnId, epoch = this.turnEpoch, team = this.teamContext;
+            const current = () => !this.disposed && !this.runCancelled && !this.turnHadError &&
+              !this.teamBudgetStop.requested && this.getStatus().isRunning && this.turnId === turnId &&
+              this.turnEpoch === epoch && this.teamContext === team && this.mode === "agent" &&
+              this.executionProfile === "team" && team?.isLead === true && !this.autonomousExecution;
+            if (!turnId || !team || !current()) return undefined;
+            return async (boundaryId, signal) => this.ordinaryTeamInbox.read({
+              teamSessionId: team.teamSessionId, callerSessionId: this.sessionId, leadTurnId: turnId, boundaryId,
+            }, { epoch, team }, () => {
+              signal?.throwIfAborted();
+              if (!current()) throw new Error("TEAM_TURN_INVALID: ordinary inbox context changed");
+            }, messages => {
+              // Already persisted by the authenticated Host/Main boundary. This
+              // internal pi queue neither echoes human steering nor grants consent.
+              for (const delivery of messages) {
+                const message: AgentMessage = { role: "user", timestamp: timestampMs(delivery.message.createdAt),
+                  content: formatSessionMessage(delivery.message.content, delivery.message.sessionMessage!),
+                };
+                this.pendingOrdinaryMessages.set(message, delivery.userMessageId);
+                this.agent.steer(message);
+              }
+            });
+          },
         })
       : [];
     const filteredPluginTools = isTeam
@@ -3969,7 +4002,13 @@ export class DesktopAgentRuntime {
    */
   private rebuildToolCatalog(): void {
     const catalog = new Map<string, AgentTool>();
+    const unavailable = new Set<string>();
+    if (!this.isToolAllowedInMode("TodoWrite")) unavailable.add("TodoWrite");
+    for (const tool of this.pluginTools) {
+      if (!this.isToolAllowedInMode(tool.name)) unavailable.add(tool.name);
+    }
     for (const tool of this.buildToolDefinitions()) {
+      if (!this.isToolAllowedInMode(tool.name)) unavailable.add(tool.name);
       if (!this.isToolAllowedInMode(tool.name) && (this.teamContext?.workPurpose === "plan_research" || expertToolDenial(this.teamContext?.expertConfig, tool.name) || !retainModeToolDeclaration(tool.name))) continue;
       // The execution mode is decided here, in one place, so no tool can grow
       // an accidental parallel batch: everything is sequential except `Task`.
@@ -3990,17 +4029,18 @@ export class DesktopAgentRuntime {
                   callerSessionId: this.sessionId,
                   getTurnId: () => this.turnId,
                   currentModeDenial: () => this.isToolAllowedInMode(tool.name)
-                    ? undefined : expertToolDenial(this.teamContext?.expertConfig, tool.name) ?? modeToolDenial(tool.name, this.mode),
+                    ? undefined : this.currentToolDenial(tool.name),
                 })
               : tool),
             executionMode:
               tool.name === SUBAGENT_TOOL_NAME ? "parallel" : "sequential",
           }),
-          () => this.isToolAllowedInMode(tool.name) ? undefined : expertToolDenial(this.teamContext?.expertConfig, tool.name) ?? modeToolDenial(tool.name, this.mode),
+          () => this.isToolAllowedInMode(tool.name) ? undefined : this.currentToolDenial(tool.name),
         ),
       );
     }
     this.toolCatalog = catalog;
+    this.unavailableToolNames = unavailable;
     this.deferredToolNames = new Set(
       [...this.toolCatalog.keys()].filter(
         (name) => !this.isCoreTool(name) && name !== TOOL_SEARCH_NAME,
@@ -4011,13 +4051,14 @@ export class DesktopAgentRuntime {
         this.activeDeferredToolNames.delete(name);
       }
     }
-    if (this.deferredToolNames.size > 0) {
+    if (this.deferredToolNames.size > 0 ||
+        (this.executionProfile === "team" && !this.teamContext?.isLead && unavailable.size > 0)) {
       this.toolCatalog.set(
         TOOL_SEARCH_NAME,
-        withExplicitRequired({
+        withModeExecutionGuard(withExplicitRequired({
           ...this.buildToolSearchTool(),
           executionMode: "sequential",
-        }),
+        }), () => this.isToolAllowedInMode(TOOL_SEARCH_NAME) ? undefined : this.currentToolDenial(TOOL_SEARCH_NAME)),
       );
     }
     if (this.model) this.refreshToolDeclarationPolicy();
@@ -4073,6 +4114,16 @@ export class DesktopAgentRuntime {
       CONTEXT_COMPACTION_TOOL_NAME,
       SUBMIT_TOOL_NAMES[kind],
     ]).has(name);
+  }
+
+  private currentToolDenial(name: string): string {
+    const denial = expertToolDenial(this.teamContext?.expertConfig, name)
+      ?? (this.teamContext?.workPurpose === "plan_research"
+        ? `${name} is unavailable in Plan research. Only Read, Glob, Grep and the permitted Team workflow tools are allowed; tool discovery does not grant additional capabilities.`
+        : modeToolDenial(name, this.mode));
+    return this.executionProfile === "team" && !this.teamContext?.isLead
+      ? `${denial} Use task_get or task_list to inspect your owned board tasks, then task_update with the current expectedRevision for a permitted update. Structured Plan research completion uses submit_research_result. Do not redo delegated work or substitute another tool to bypass this restriction.`
+      : denial;
   }
 
   private isCoreTool(name: string): boolean {
@@ -4182,6 +4233,12 @@ export class DesktopAgentRuntime {
           isRecord(params) && typeof params.query === "string"
             ? params.query.trim()
             : "";
+        const unavailable = [...this.unavailableToolNames].find(name => name.toLowerCase() === query.toLowerCase());
+        if (unavailable && !this.isToolAllowedInMode(unavailable)) {
+          return { content: [{ type: "text", text: this.currentToolDenial(unavailable) }],
+            details: { query, matches: [], activated: [], unavailableToolName: unavailable, mode: this.mode },
+            isError: true };
+        }
         const matches = this.findDeferredTools(query);
         const activated = matches.filter(
           (name) => !this.activeDeferredToolNames.has(name),
@@ -8152,6 +8209,12 @@ export class DesktopAgentRuntime {
       }
       case "message_end": {
         if (event.message.role === "user") {
+          const ordinaryId = this.pendingOrdinaryMessages.get(event.message);
+          if (ordinaryId) {
+            this.pendingOrdinaryMessages.delete(event.message);
+            this.appendLiveEntry(ordinaryId, event.message);
+            break;
+          }
           const steeringId = this.pendingSteering.get(event.message);
           const id = steeringId ?? this.pendingUserMessageId ?? randomUUID();
           if (steeringId) {
@@ -9353,6 +9416,13 @@ export class DesktopAgentRuntime {
       this.appendLiveEntry(id, message);
     }
     this.pendingSteering.clear();
+    // A cancelled/disposed admission remains in the durable transcript, not a
+    // queue carried into a replacement turn. Explicit continuation restores it.
+    for (const [message, id] of this.pendingOrdinaryMessages) {
+      if (!this.agent.state.messages.includes(message)) this.setAgentMessages([...this.agent.state.messages, message]);
+      this.appendLiveEntry(id, message);
+    }
+    this.pendingOrdinaryMessages.clear();
 
   }
   private async waitForIdleAndSteering(): Promise<void> {

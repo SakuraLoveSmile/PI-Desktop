@@ -90,3 +90,4 @@ export * from "./session-activity.js";
 export type { GitWorkspaceRequest, GitWorkspaceMutation, GitWorkspaceSnapshot, GitBranch, GitWorktree } from "./git-workspace.js";
 
 export * from "./context-insights.js";
+export * from "./team-ordinary-inbox.js";

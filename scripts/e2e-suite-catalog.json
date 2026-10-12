@@ -742,7 +742,12 @@
       "family": "transcript",
       "script": "scripts/e2e-transcript-render.mjs",
       "tier": "nightly",
-      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked.",
+      "scenarioIds": [
+        "E2E-COMPOSER-compact-running-input",
+        "E2E-GOAL-inline-input-status",
+        "E2E-COMPOSER-toolbar-footer"
+      ]
     },
     {
       "id": "trusted-extensions",
@@ -891,6 +896,73 @@
       "script": "scripts/e2e-team-lead-pending.mjs",
       "tier": "nightly",
       "safety": "Requires prebuilt JS packages and the existing Rust toolchain. Isolated Rust AppState RPC, production Node runtime/Main finalization and controlled fake provider/clock; no Desktop, user profile or real provider. Local runs reuse cached dependencies; clean CI resolves only locked Cargo dependencies."
+    },
+    {
+      "id": "team-agent-ordinary-inbox",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-agent-ordinary-inbox.mjs",
+      "tier": "nightly",
+      "scenarioIds": [
+        "E2E-TEAM-agent-lead-wait-boundary-ordinary-inbox"
+      ],
+      "safety": "Isolated production Rust Host, Main delivery, AgentHost and runtime with a scripted external model boundary; disposable shell processes, no user profile or paid provider."
+    },
+    {
+      "id": "team-managed-service",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-managed-service.mjs",
+      "tier": "nightly",
+      "scenarioIds": [
+        "E2E-TEAM-managed-service-lifecycle"
+      ],
+      "safety": "Isolated production Host and owned service process trees in temporary profiles/workspaces; no user data or real model provider."
+    },
+    {
+      "id": "team-reliability-budget-lifecycle",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-reliability-closeout.mjs",
+      "args": [
+        "--budget-only"
+      ],
+      "tier": "nightly",
+      "scenarioIds": [
+        "E2E-TEAM-bounded-run-limit"
+      ],
+      "safety": "Fresh isolated complete Electron/Host/Main/runtime and loopback model. Short configured wall-clock budgets, real settings and restart; no user profile, paid provider or ten-hour soak."
+    },
+    {
+      "id": "team-reliability-pending-lifecycle",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-reliability-closeout.mjs",
+      "tier": "manual",
+      "scenarioIds": [
+        "E2E-TEAM-lead-pending-ask-late-answer"
+      ],
+      "safety": "Explicit isolated full-app acceptance with a real thirty-minute question deadline, loopback model and fresh temporary profile. Does not use a paid model or user data; direct invocation avoids the automatic suite eight-minute timeout."
+    },
+    {
+      "id": "team-reliability-pending-recovery",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-reliability-closeout.mjs",
+      "args": [
+        "--recovery-only"
+      ],
+      "tier": "nightly",
+      "scenarioIds": [
+        "E2E-TEAM-lead-pending-ask-late-answer"
+      ],
+      "safety": "Isolated complete Electron/Host/runtime and loopback model. Restart a waiting question into durable pending and answer in a new authenticated turn; this quick recovery lane does not claim a thirty-minute expiry."
+    },
+    {
+      "id": "team-task-dispatch-lifecycle",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-task-dispatch-lifecycle.mjs",
+      "tier": "nightly",
+      "scenarioIds": [
+        "E2E-TEAM-busy-member-latest-task-dispatch",
+        "E2E-TEAM-completed-task-retires-queued-dispatch"
+      ],
+      "safety": "Production isolated Host/Main/bridge/AgentHost/sidecar/runtime with loopback provider gates. Proves cancellation and FIFO delivery; no real provider, user profile or forty-minute soak."
     }
   ]
 }

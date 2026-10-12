@@ -436,6 +436,7 @@ export function ContextUsageInspector({
           aria-controls={open ? panelId : undefined}
           onClick={toggleInspector}
         >
+          <span className="composer-usage-label">{t("chat.usageContextLabel")}</span>
           <span
             className="composer-usage-context-track"
             role="progressbar"

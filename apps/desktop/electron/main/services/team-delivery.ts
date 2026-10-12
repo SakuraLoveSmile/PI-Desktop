@@ -2,9 +2,11 @@ import type { Principal } from "@pi-desktop/agent-host";
 import type {
   TeamMessageRecord,
   TeamRosterProjection,
+  TeamOrdinaryInboxProofResult,
 } from "@pi-desktop/shared";
 import type { AgentHostBridge } from "../agent-host-bridge";
 import type { HostProcess } from "../host-process";
+import { createOrdinaryTeamInbox } from "./ordinary-team-inbox.ts";
 
 type RuntimeContext = {
   teamSessionId: string;
@@ -18,6 +20,8 @@ export type TeamDeliveryDependencies = {
   getHost: () => HostProcess | null;
   getBridge: () => AgentHostBridge | null;
   activeTurns: Map<string, string>;
+  getRuntimeIdentity?: () => object | null;
+  isTurnDispatchable?: (sessionId: string, turnId: string) => boolean;
   stopAtBoundary: (sessionId: string, turnId: string) => Promise<void>;
   log: (message: string, data: Record<string, unknown>) => void;
 };
@@ -69,6 +73,8 @@ export function createTeamDeliveryService(deps: TeamDeliveryDependencies) {
       if (teamOperations.get(teamSessionId) === tail) teamOperations.delete(teamSessionId);
     }
   }
+
+  const ordinaryInbox = createOrdinaryTeamInbox(deps, withTeamLock);
 
   async function rosterFor(host: HostProcess, teamSessionId: string): Promise<TeamRosterProjection> {
     return host.call<TeamRosterProjection>("team.getRoster", {
@@ -252,6 +258,7 @@ export function createTeamDeliveryService(deps: TeamDeliveryDependencies) {
     const pendingMessageIds = await withTeamLock(teamSessionId, async () => {
       const host = requireHost();
       const roster = await rosterFor(host, teamSessionId);
+      await ordinaryInbox.reconcile(teamSessionId);
       setTeamHold(deps.getBridge(), roster, roster.paused);
       if (roster.paused) return [];
       const messages = await getPendingMessages(host, teamSessionId);
@@ -381,6 +388,29 @@ export function createTeamDeliveryService(deps: TeamDeliveryDependencies) {
     const input = params && typeof params === "object" && !Array.isArray(params)
       ? params as Record<string, unknown>
       : {};
+    if (method === "team.ordinaryInboxPersisted") {
+      const team = typeof input.teamSessionId === "string" ? input.teamSessionId : undefined;
+      const turn = typeof input.leadTurnId === "string" ? input.leadTurnId : undefined;
+      if (!team || !turn || !Array.isArray(input.messageIds)) return;
+      await withTeamLock(team, async () => {
+        const host = requireHost();
+        const bridge = deps.getBridge();
+        if (!bridge) return;
+        const verified: string[] = [];
+        for (const id of input.messageIds as unknown[]) {
+          if (typeof id !== "string") continue;
+          const response: TeamOrdinaryInboxProofResult = await host.call("team.getOrdinaryInboxProof", {
+            teamSessionId: team, messageId: id,
+          });
+          const proof = response.proof;
+          if (requireHost() !== host || deps.getBridge() !== bridge) return;
+          if (proof?.teamSessionId === team && proof.messageId === id && proof.leadTurnId === turn &&
+            (proof.phase === "persisted" || proof.phase === "acked")) verified.push(id);
+        }
+        bridge.agentHost.retireOrdinaryTeamInbox(team, turn, verified);
+      });
+      return;
+    }
     if (method === "team.runLimitPauseRequested") {
       const team = typeof input.teamSessionId === "string" ? input.teamSessionId : undefined;
       if (!team) return;
@@ -463,5 +493,7 @@ export function createTeamDeliveryService(deps: TeamDeliveryDependencies) {
     pauseTeam,
     resumeTeam,
     beforeUserStop,
+    ordinaryInboxRequest: ordinaryInbox.request,
+    dispose: ordinaryInbox.dispose,
   };
 }

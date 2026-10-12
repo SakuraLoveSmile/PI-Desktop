@@ -74,20 +74,26 @@ pub(crate) fn bump_team_revision_conn(
 }
 
 pub fn pause_team(db: &Database, team_session_id: &str) -> Result<Team> {
-    let now = now_ms();
-    let rows = db.conn().execute(
-        "UPDATE teams
+    crate::sessions::with_savepoint(db.conn(), "team_activity", |_| {
+        let now = now_ms();
+        let rows = db.conn().execute(
+            "UPDATE teams
          SET paused = 1, revision = revision + 1, updated_at = ?2
          WHERE team_session_id = ?1",
-        params![team_session_id, now],
-    )?;
-    if rows == 0 {
-        return Err(anyhow!(
-            "TEAM_NOT_FOUND: team '{team_session_id}' not found"
-        ));
-    }
-    get_team(db, team_session_id)?
-        .ok_or_else(|| anyhow!("TEAM_NOT_FOUND: team '{team_session_id}' not found"))
+            params![team_session_id, now],
+        )?;
+        if rows == 0 {
+            return Err(anyhow!(
+                "TEAM_NOT_FOUND: team '{team_session_id}' not found"
+            ));
+        }
+        get_team(db, team_session_id)?
+            .ok_or_else(|| anyhow!("TEAM_NOT_FOUND: team '{team_session_id}' not found"))
+            .and_then(|team| {
+                crate::background_services::request_team(db, team_session_id, "team_paused", now)?;
+                Ok(team)
+            })
+    })
 }
 
 pub fn resume_team(db: &Database, team_session_id: &str) -> Result<Team> {

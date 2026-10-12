@@ -13,7 +13,10 @@ describe("Expert Team reliability guidance", () => {
     const prompt = teamSystemPrompt(options);
     expect(prompt).toContain("Do not poll with sleep");
     expect(prompt).toContain("Waiting with a foreground sleep also holds a shell slot");
-    expect(prompt).toContain("Long-lived background services require an explicit timeout");
+    expect(prompt).toContain("Ordinary long-running background commands require an explicit timeout");
+    expect(prompt).toContain("backgroundKind: service with run_in_background: true and no timeout");
+    expect(prompt).toContain("current confirmed Team Agent run");
+    expect(prompt).toContain("any Team pause or owner/run end");
     expect(prompt).toContain("timed_out is a timeout, not proof of a crash");
     expect(prompt).toContain("Never use nohup");
     expect(prompt).toContain("Revalidate only tests relevant to the diff");
@@ -43,10 +46,47 @@ describe("Expert Team reliability guidance", () => {
     expect(prompt).toContain("Record verified source locations.");
   });
 
+  it("directs restricted members to shared task updates without granting TodoWrite", () => {
+    const prompt = teamSystemPrompt({ isLead: false, mode: "agent", memberName: "reviewer",
+      expertConfig: { presetId: "reviewer", tools: ["Read", "Glob", "Grep"] } });
+
+    expect(prompt).toContain("TodoWrite is unavailable in your Host-approved expert tool configuration");
+    expect(prompt).toContain("Use task_get and task_update with expectedRevision");
+    expect(prompt).toContain("do not repeatedly search for or call TodoWrite");
+    expect(prompt).not.toContain("Use TodoWrite for your personal session checklist");
+  });
+
+  it.each([
+    undefined,
+    { presetId: "fullstack" as const, tools: ["Read", "Write", "TodoWrite"] },
+  ])("retains available Agent member checklists separately from shared tasks (%j)", (expertConfig) => {
+    const prompt = teamSystemPrompt({ isLead: false, mode: "agent", memberName: "builder", expertConfig });
+
+    expect(prompt).toContain("Use TodoWrite for your personal session checklist only when your current tool catalog exposes it");
+    expect(prompt).toContain("TodoWrite never changes task ownership or status");
+    expect(prompt).toContain("use task_update for shared work");
+    expect(prompt).not.toContain("TodoWrite is unavailable");
+  });
+
+  it("keeps research progress and structured completion distinct even with TodoWrite in a preset", () => {
+    const prompt = teamSystemPrompt({ isLead: false, mode: "plan", workPurpose: "plan_research",
+      expertConfig: { presetId: "researcher", tools: ["Read", "TodoWrite"] } });
+
+    expect(prompt).toContain("TodoWrite is unavailable in this read-only research role");
+    expect(prompt).toContain("task_update with expectedRevision for permitted progress");
+    expect(prompt).toContain("submit_research_result is still required for research completion");
+    expect(prompt).not.toContain("Use TodoWrite for your personal session checklist");
+  });
+
   it("limits queued-report turn-boundary instructions to ordinary Agent execution", () => {
     const prompt = teamSystemPrompt({ isLead: true, mode: "agent" });
     expect(prompt).toContain("In an ordinary Agent Lead turn outside approved Plan/Goal execution");
-    expect(prompt).toContain("report bodies arrive in authenticated continuations after you finish the current turn");
+    expect(prompt).toContain("Host supporting ordinary-team-inbox-v1");
+    expect(prompt).toContain("next wait_for_updates boundary in this same turn");
+    expect(prompt).toContain("older Host or unsupported transport");
+    expect(prompt).toContain("finish the current turn to receive authenticated continuations");
+    expect(prompt).toContain("tool result contains only delivery metadata, never the report body");
+    expect(prompt).toContain("grants no new user approval or Goal execution authority");
     expect(prompt).toContain("pending_mailbox_messages");
     expect(prompt).toContain("During approved Plan/Goal execution");
     expect(prompt).toContain("do not end that execution turn merely to receive reports");

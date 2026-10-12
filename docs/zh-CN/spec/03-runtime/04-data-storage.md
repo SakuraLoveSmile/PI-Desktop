@@ -1064,7 +1064,9 @@ CREATE INDEX idx_notifications_unread
   true，为 `completed` 插入 `task.completed` 或为 `error` 插入 `task.failed`
   在**同一笔交易**中。仅当主窗口时 Electron 才会传递 false
   是 visible/focused 并且该确切会话是当前聊天。 `aborted`
-  从不插入行。
+  从不插入行。WP7 的 Host 真实 Team member completed 也不创建独立成功通知，
+  不依赖标题/可见性；回合、正文、phase 和报告仍保存。成员失败、Lead/Goal、非团队
+  终态通知保留原规则。
 - 重复终端更新无法复制通知，因为
   `turn_id` 是独一无二的。仅当此调用时，RPC 结果才包含记录
   插入它；否则，`notification` 字段将被省略。
@@ -1286,7 +1288,7 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
 `PRAGMA user_version` 专用于与上游 PI-Desktop 共享的迁移链，只在合入上游迁移时才会前进
 （ADR plus-schema-version-track）。Plus 专有结构运行在同一数据库内的第二条轨道上，
 因此合入上游永远不会重编号，也不会与 Plus 数据冲突。Plus 步骤有序、仅增量且幂等。
-它们位于 `crates/host-core/src/db/plus_schema.rs`，当前轨道版本为 5：
+它们位于 `crates/host-core/src/db/plus_schema.rs`，当前轨道版本为 7：
 
 | 步骤 | 增加 |
 |---|---|
@@ -1295,6 +1297,8 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
 | P3 | `plan_approvals` 上的执行 provider/model 绑定和修订意图字段，以及 `plan_execution_schedules` 表 |
 | P4 | `plan_approvals.execution_kind`，对已批准的提案按 `kind` 回填 |
 | P5 | 会话拥有的 `session_quick_notes` 和 `background_processes` 表 |
+| P6 | `team_ordinary_inbox` 认证 Lead 输入消费日志 |
+| P7 | `background_service_ownership`、`owner_project_path` 和会话删除守卫 |
 
 P1 到 P4 是早期 fork 构建以 `user_version` 20 到 23 发布的 Plus 专有变更。每个步骤在改动前都会先探测，
 因此来自任一未发布 v20 形态（仅 Goal reports，或仅 workspace kind）的数据库都能保留数据完成升级，
@@ -1309,7 +1313,7 @@ P1 到 P4 是早期 fork 构建以 `user_version` 20 到 23 发布的 Plus 专�
   （`DB_SCHEMA_TOO_NEW`，见进程模型中的启动结果一节）。
 - **旧版 fork 数据库。** 含有 Plus 结构、没有 `plus_schema_meta` 且 `user_version` 为 20 到 23
   的数据库由早期 fork 构建写入。在经过校验的 `pi.sqlite.legacy-v<N>.bak` 之后，一个事务应用全部
-  Plus 步骤、写入 meta（轨道 5，当前共享迁移链），并把 `user_version` 设为 19。失败则回滚事务，
+  Plus 步骤、写入 meta（轨道 7，当前共享迁移链），并把 `user_version` 设为 19。失败则回滚事务，
   旧版数据库保持原样。
 - **较旧的 fork 构建。** 较旧的 fork 构建打开已对账的数据库时，会重新运行自己幂等的步骤，
   并把 `user_version` 留在 20 到 23。本构建下一次打开时先保留 `pi.sqlite.repair-v<N>.bak`，
@@ -1318,6 +1322,11 @@ P1 到 P4 是早期 fork 构建以 `user_version` 20 到 23 发布的 Plus 专�
   应用缺失的步骤并更新 meta。当共享版本在本次打开期间或自 meta 写入以来发生变化时，
   会重放全部步骤（上游步骤可能重建了带有 Plus 列的表），并重新同步 meta。
 - **全新安装。** 新数据库运行共享的 v19 DDL，再运行全部 Plus 步骤并记录轨道版本，不产生备份。
+
+- **已知候选数据。** P6/P7 均为支持格式；P5/P6 先保留已验证备份再升级，P7 重开保留日志、ownership 及版本。高于 P7 仍在维护或修改前拒绝，不能降低版本绕过校验。
+- **收件箱恢复。** Host 对照规范 mailbox 和精确认证 JSONL 校验日志，prepared 仍走文件优先恢复；索引修复保留原 Lead turn，消费记录与 durable queue 退休同一事务提交。重复恢复不追加副本、不授人工权限、不启动 provider。支持能力的普通 Agent Lead 在等待边界使用同轮次 inbox；旧 Host 保留队列 continuation。
+- **历史服务恢复。** 冷启动先记 `host_restart` 再标 unfinished process 为 interrupted，不认领旧 PID 或重放命令。历史 P7 未记录平台/stop mechanism，读取省略 `stopMode`，不从本机平台或 escalation flag 推断 TERM/KILL/JobObject。新服务仅经当前 Agent Team 身份、run 和权限闸门显式启动，机制由实际 owned runner 记录。
+- **离线迁移。** `--relocate-data` 直接打开 SQLite，不对账 Plus、不生成 Plus 备份或应用步骤；搬迁后的正常打开再执行。Plus 自有相对路径无须改写。
 
 ## 8. 保留和维护
 
@@ -1516,3 +1525,9 @@ Host 启动将未完成记录标 interrupted；持久化 PID 不授权进程控�
 每个有范围的资源请求仅尝试修复一次。Host 硬退出无法保留未写入快照。
 P5 不推进共享 PRAGMA user_version。当前可执行共享迁移由
 `crates/host-core/src/db.rs` 拥有；上文旧共享 v19 示例是历史记录。
+
+## Plus 团队可靠性迁移 P6/P7
+
+独立 Plus migration track 在 P6 增加 team_ordinary_inbox，在 P7 增加 background_service_ownership；不改 upstream schema。P6 是 prepared/persisted/ACKed 认证输入 journal，不是重复正文存储或协作 turn 唯一约束变更；P7 仅标记显式新服务，旧后台行仍是普通 command。升级/重启不自动启动 provider 或进程。JSONL-first 切点与 service stop/recovery 分别见[普通 inbox](/zh-CN/spec/03-runtime/team-ordinary-inbox)和[显式服务](/zh-CN/spec/03-runtime/team-managed-services)。
+
+新服务将 `stopMode` 写入既有 KV namespace `background-service-stop-mode-v1`，与 process/ownership 行同一事务。历史缺失仍省略 `stopMode`，重开不从当前操作系统推断停止机制。

@@ -299,6 +299,7 @@ export const ptBR = {
     placeholderHome: "Pergunte qualquer coisa",
     placeholderHint: "Digite / para comandos · @ para arquivos",
     placeholderHomeHint: "Digite / para comandos · @ para arquivos",
+    placeholderRunning: "{{sendShortcut}} para enviar uma mensagem de acompanhamento · {{steerShortcut}} para redirecionar agora",
     placeholderShortcut: "Shift+Enter para inserir uma quebra de linha · Use Enviar para enviar",
     addFiles: "Adicionar arquivos",
     filesAttached: "{{count}} item(ns) adicionado(s) ao rascunho",
@@ -682,7 +683,7 @@ export const ptBR = {
   goal: {
     progressLabel: "Progresso da meta",
     progressListLabel: "Lista de tarefas da meta",
-    progressInitializing: "Preparando…",
+    progressInitializing: "Carregando progresso…",
     progressFailed: "Progresso indisponível",
     planning: "Definindo objetivo",
     approvalRegion: "Aprovação do objetivo",
@@ -1956,7 +1957,7 @@ export const ptBR = {
   },
   askTool: {
     pending: "Resposta pendente",
-    pendingHelp: "O coordenador parou de esperar após 30 minutos. A resposta inicia um novo turno; retome ou aprove a execução explicitamente.",
+    pendingHelp: "O coordenador parou de esperar. A resposta inicia um novo turno; retome ou aprove a execução explicitamente.",
     completedTitle: "Perguntas esclarecidas",
     completedSkipped: "Ignorada",
     title: "Algumas perguntas",

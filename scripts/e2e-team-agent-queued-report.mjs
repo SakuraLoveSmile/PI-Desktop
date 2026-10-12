@@ -21,7 +21,7 @@ const concurrentMail = process.argv.includes("--concurrent-mail");
 assert.ok([baseline, timeoutAcceptance, concurrentMail].filter(Boolean).length <= 1, "Select one replay mode");
 const root = await mkdtemp(join(tmpdir(), "pi-agent-mailbox-"));
 const binary = resolveHostBinary();
-const evidence = { baseline, timeoutAcceptance, concurrentMail, base: "144b28bbb", hostBinarySha256: createHash("sha256").update(await readFile(binary)).digest("hex"), timeline: [] };
+const evidence = { baseline, timeoutAcceptance, concurrentMail, ordinaryInboxCapability: "legacy-unsupported", base: "26db5043860db8412a988cdce31362a424eea407", originalS1Baseline: "144b28bbb", hostBinarySha256: createHash("sha256").update(await readFile(binary)).digest("hex"), timeline: [] };
 const record = (stage, data = {}) => evidence.timeline.push({ at: Date.now(), stage, ...data });
 const principal = { subject: "fixture-owner", roles: ["owner"], pairedDevice: true };
 const waits = [60, 60, 60, 30, 5, 30, 15, 60];
@@ -59,6 +59,11 @@ try {
     let resolveDone;
     const done = new Promise(resolve => { resolveDone = resolve; });
     const runtimeHost = { async call(method, params) {
+      // This retained S1 scenario represents an older Host without the optional
+      // ordinary-inbox capability; the production RPC/queue path stays real.
+      if (method === "team.getOrdinaryInboxCapability") {
+        throw Object.assign(new Error("Legacy Host does not support ordinary inbox"), { code: -32601 });
+      }
       const concurrentParty = concurrentMail && method === "team.sendMessage" &&
         (params.content.startsWith("EXPERT_COMPLETE_BODY") ? "expert" : params.content.startsWith("LEAD_NOTICE_BODY") ? "lead" : undefined);
       if (concurrentParty) {

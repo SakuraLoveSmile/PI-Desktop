@@ -1408,7 +1408,10 @@ CREATE INDEX idx_notifications_unread
   true, inserts `task.completed` for `completed` or `task.failed` for `error`
   in the **same transaction**. Electron passes false only when the main window
   is visible/focused and that exact session is the current chat. `aborted`
-  never inserts a row.
+  never inserts a row. Host-confirmed Team member `completed` turns also omit
+  independent success notifications (WP7), regardless of title or visibility.
+  Their turn, transcript, phase and Team report still persist. Member failures,
+  Lead/Goal and non-Team terminal outcomes retain the original rules.
 - Repeating a terminal update cannot duplicate a notification because
   `turn_id` is unique. The RPC result includes the record only when this call
   inserted it; otherwise the `notification` field is omitted.
@@ -1449,7 +1452,7 @@ is the source of truth, the index is derived and self-healing.
 | streaming reply checkpoint (`session.saveInflightMessage`, D299) | atomically replace `<id>.inflight.json`; no-op for an empty message or an id already indexed | — |
 | context checkpoint (`session.appendCompaction`) | append typed checkpoint line after its referenced message boundary | — (checkpoint is not searchable transcript content) |
 | tool succeeded (Write/Edit) | — | upsert `artifacts` + `audit_log` row, same tx as result persistence |
-| turn terminal via `session.endTurn` | `completed`/`error`: remove the in-flight checkpoint only when its id is already indexed; otherwise leave it for the outbox or boot (D327). `recoverInflight`: append the leftover as `complete` when the turn is `completed`, otherwise as `aborted`, when its final row never landed | update `turns`; for completed/error insert one notification and prune to 200 in the same tx; aborted inserts none; a promoted checkpoint gets an index row under the turn |
+| turn terminal via `session.endTurn` | `completed`/`error`: remove the in-flight checkpoint only when its id is already indexed; otherwise leave it for the outbox or boot (D327). `recoverInflight`: append the leftover as `complete` when the turn is `completed`, otherwise as `aborted`, when its final row never landed | update `turns`; for eligible completed/error insert one notification and prune to 200 in the same tx (WP7 omits Team member success); aborted inserts none; a promoted checkpoint gets an index row under the turn |
 | plan/goal submission | host writes the exact Markdown bytes to a new unique `<workspaceRoot>/.pi/<kind>/*.md` file | insert one `plan_approvals(pending)` row with the kind, structured title/question, artifact path/hash/size, and expiry before emitting the approval request |
 | plan/goal approval | verify the immutable artifact path/hash/size | atomically resolve `plan_approvals`, update `sessions.mode` and explicit `permission_mode`, and set `execution_state = 'queued'`; reject/expiry stay in the contract mode |
 | transcript truncate / retry / edit (`session.truncateFrom`) | host-owned suffix cut: abort leftover running turn, archive discarded regenerate tail, atomic prefix rewrite (temp + rename); preserve only a checkpoint whose boundary remains | single tx via `replace_messages`: delete index rows, bulk reinsert carrying each surviving message's owning `turn_id`, reset `last_seq`; drop inflight checkpoint |
@@ -1679,7 +1682,7 @@ Plus steps are ordered, additive, and idempotent. They live in
 | P3 | execution provider/model bindings and revision intent fields on `plan_approvals`, and the `plan_execution_schedules` table |
 | P4 | `plan_approvals.execution_kind`, backfilled from `kind` for approved proposals |
 | P5 | session-owned `session_quick_notes` and `background_processes` tables |
-| P6 | `team_ordinary_inbox`, the historical authenticated Lead-input consumption journal |
+| P6 | `team_ordinary_inbox`, the authenticated Lead-input consumption journal |
 | P7 | `background_service_ownership`, including `owner_project_path`, and its session-deletion guard |
 
 P1 to P4 are the Plus-only changes earlier fork builds shipped as
@@ -1728,8 +1731,9 @@ edited.
   repair retains the recorded Lead turn; recording consumption and retiring
   the durable queued message commit together. Repeated recovery cannot append
   another copy or turn an authenticated input into new user authorization.
-  The existing queued continuation remains the delivery path; schema support
-  does not advertise the candidate's same-turn inbox capability.
+  The same-turn inbox capability is now active for authenticated ordinary Agent
+  Lead wait boundaries. Old Hosts retain queued continuation; journal recovery
+  never starts a turn or provider request. See [ordinary inbox](team-ordinary-inbox.md).
 - **Historical service recovery.** On cold start, active historical services
   record `host_restart` before the existing background-process recovery marks
   them interrupted. Host never adopts their stored PID or replays a command.
@@ -1738,8 +1742,10 @@ edited.
   build omits `stopMode` rather than deriving a historical TERM/KILL or
   JobObject outcome from its own platform. The recorded escalation flag stays
   readable but does not identify that missing mechanism.
-  This build does not create managed services: Bash rejects an explicit
-  `backgroundKind: "service"` instead of silently launching an ordinary command.
+  Explicit new services are now accepted only through the current authenticated
+  Agent Team launch and permission gates. Their live stop mechanism is reported
+  from the owned runner; historical rows never invent one. See
+  [managed services](team-managed-services.md).
 - **Offline relocation.** The cold storage migration's `--relocate-data` pass
   (section 2, user-selected storage location) opens SQLite directly and never
   goes through `Database::open`, so it does not reconcile a legacy fork
@@ -1823,7 +1829,8 @@ columns for anything the host filters, joins, sums, or indexes.
     branch cost the file nothing; a branch that leaves the transcript is stored
     in full first, and a file written only by an older build still reads back
     message-for-message.
-14. Completed and failed turns atomically create one durable notification;
+14. Eligible completed and failed turns atomically create one durable notification;
+    Team member success retains turn/report facts without an independent alert;
     repeated terminal updates do not duplicate it, aborted turns create none,
     and the newest-200 cap survives restart
 15. Notification list/unread, mark-read, mark-all-read, clear, and session
@@ -2061,3 +2068,19 @@ turn_queue under the same savepoint; deletion removes owned question records.
 approved scope/review and exact selection/permission ceiling. Reviews and old
 member/task identities remain unchanged; Team dissolution deletes owned links.
 These versioned namespaces use existing KV storage and require no schema bump.
+
+## Plus Team reliability migrations P6/P7
+
+The independent Plus migration track adds `team_ordinary_inbox` in P6 and
+`background_service_ownership` in P7; the upstream schema version is unchanged.
+P6 is a prepared/persisted/ACKed authenticated-input journal, not another Team
+message body store or a change to collaboration turn uniqueness. P7 marks only
+explicit new service launches; old background rows retain ordinary command
+semantics. Upgrade/restart recovery never automatically runs a provider or
+relaunches a process. See [ordinary inbox](team-ordinary-inbox.md) for JSONL-first
+crash cuts and [services](team-managed-services.md) for owned stop/recovery state.
+
+New service launches persist `stopMode` in the existing KV namespace
+`background-service-stop-mode-v1`, in the same transaction as the process and
+ownership rows. Historical rows without that record keep `stopMode` absent;
+reopen never infers their stop mechanism from the current operating system.

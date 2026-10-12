@@ -1,13 +1,24 @@
-//! Read compatibility for the released ordinary Lead consumption journal.
-//! This build recovers existing proofs only; it has no same-turn inbox writer.
-use crate::{db::Database, session_collaboration, sessions, transcripts};
+//! Authenticated ordinary Lead mail at an explicit wait boundary. This journal
+//! is separate from execution inbox authority and never owns a collaboration turn.
 use anyhow::{anyhow, Result};
 use rusqlite::{params, Connection, OptionalExtension};
-use serde::Serialize;
-use serde_json::json;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use uuid::Uuid;
+
+use crate::{db::Database, session_collaboration, sessions, transcripts};
 
 pub(crate) const SCHEMA: &str = include_str!("ordinary_inbox/schema.sql");
+pub(crate) const CAPABILITY: &str = "ordinary-team-inbox-v1";
 
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct ReadParams {
+    pub team_session_id: String,
+    pub caller_session_id: String,
+    pub lead_turn_id: String,
+    pub boundary_id: String,
+}
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Proof {
@@ -39,6 +50,77 @@ fn row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Proof> {
         source_turn_id: row.get(8)?,
         permission_ceiling: row.get(9)?,
     })
+}
+fn authorize(db: &Database, p: &ReadParams) -> Result<super::TeamExecutionDecision> {
+    super::validate_team_lead(db, &p.team_session_id)?;
+    if p.caller_session_id != p.team_session_id
+        || p.boundary_id.is_empty()
+        || p.boundary_id.len() > 256
+    {
+        return Err(anyhow!(
+            "TEAM_UNAUTHORIZED: ordinary inbox requires its Lead wait boundary"
+        ));
+    }
+    if sessions::session_mode(db, &p.team_session_id)?.as_deref() != Some("agent")
+        || sessions::running_turn_id(db, &p.team_session_id)?.as_deref() != Some(&p.lead_turn_id)
+        || super::get_team(db, &p.team_session_id)?.is_none_or(|team| team.paused)
+        || super::execution_inbox::state(
+            db,
+            &p.team_session_id,
+            &p.caller_session_id,
+            &p.lead_turn_id,
+        )?
+        .active
+    {
+        return Err(anyhow!(
+            "TEAM_TURN_INVALID: ordinary inbox is unavailable for this turn"
+        ));
+    }
+    let decision = super::authority::current_confirmed_decision(db, &p.team_session_id)?;
+    if super::run_limits::state(db, &p.team_session_id)?
+        .is_none_or(|run| run.run_id != decision.lead_turn_id || run.hard_reached_at.is_some())
+    {
+        return Err(anyhow!(
+            "TEAM_UNAUTHORIZED: ordinary inbox run scope changed"
+        ));
+    }
+    Ok(decision)
+}
+fn eligible(
+    db: &Database,
+    decision: &super::TeamExecutionDecision,
+    message: &session_collaboration::Message,
+) -> Result<bool> {
+    if message.target_session_id != decision.team_session_id
+        || message.kind != "message"
+        || message.plugin_id != super::team_plugin_origin(&decision.team_session_id)
+        || message.turn_id.is_some()
+        || !matches!(message.status.as_str(), "queued" | "completed")
+        || !decision
+            .member_session_ids
+            .contains(&message.source_session_id)
+        || super::replacements::replaced(db, &decision.team_session_id, &message.source_session_id)?
+    {
+        return Ok(false);
+    }
+    session_collaboration::permissions::check_team_target(
+        db,
+        &decision.team_session_id,
+        &message.permission_ceiling,
+    )?;
+    let source = db
+        .kv_get("team-message-source-turn-v1", &message.id)?
+        .and_then(|value| value.as_str().map(str::to_owned));
+    let Some(source) = source else {
+        return Ok(false);
+    };
+    for dispatch in &decision.message_ids {
+        let valid: bool = db.conn().query_row("SELECT EXISTS(SELECT 1 FROM session_collaboration_messages m JOIN turns t ON t.id=m.turn_id AND t.session_id=m.target_session_id WHERE m.id=?1 AND m.turn_id=?2 AND m.source_session_id=?3 AND m.target_session_id=?4 AND (t.status IN ('running','completed') OR (t.status='error' AND EXISTS(SELECT 1 FROM kv k WHERE k.ns=?5 AND k.key=?6 AND json_extract(k.value_json,'$')=t.id))))", params![dispatch,source,decision.team_session_id,message.source_session_id,super::member_failure::PROOF_NS,message.id], |r|r.get(0))?;
+        if valid {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 fn canonical(db: &Database, proof: &Proof) -> Result<sessions::UiMessage> {
     let delivery = session_collaboration::get(db, &proof.message_id)?
@@ -201,3 +283,122 @@ pub(crate) fn recover(db: &Database) -> Result<()> {
     }
     Ok(())
 }
+pub(crate) fn get_proof(db: &Database, team: &str, id: &str) -> Result<Value> {
+    super::validate_team_lead(db, team)?;
+    let proof = db
+        .conn()
+        .prepare_cached(&format!(
+            "{SELECT} WHERE message_id=?1 AND team_session_id=?2"
+        ))?
+        .query_row(params![id, team], row)
+        .optional()?;
+    if let Some(ref proof) = proof {
+        canonical(db, proof)?;
+    }
+    Ok(json!({"proof":proof}))
+}
+pub(crate) fn persisted_ids(db: &Database, p: &ReadParams) -> Result<Vec<String>> {
+    Ok(proofs(
+        db,
+        "team_session_id=?1 AND lead_turn_id=?2 AND phase='persisted'",
+        params![p.team_session_id, p.lead_turn_id],
+    )?
+    .into_iter()
+    .map(|proof| proof.message_id)
+    .collect())
+}
+
+pub(crate) fn read(db: &Database, p: &ReadParams) -> Result<Value> {
+    let decision = authorize(db, p)?;
+    // Retrying a transport read reconciles a file-first interrupted commit.
+    for proof in proofs(
+        db,
+        "team_session_id=?1 AND lead_turn_id=?2 AND phase='prepared'",
+        params![p.team_session_id, p.lead_turn_id],
+    )? {
+        recover_proof(db, &proof)?;
+    }
+    let pending = super::list_member_messages(db, &p.team_session_id, &p.team_session_id)?;
+    for pending in pending {
+        if pending.target_session_id != p.team_session_id
+            || pending.status != "queued"
+            || pending.turn_id.is_some()
+        {
+            continue;
+        }
+        let message = session_collaboration::get(db, &pending.id)?
+            .ok_or_else(|| anyhow!("TEAM_NOT_FOUND: ordinary inbox message missing"))?;
+        if !eligible(db, &decision, &message)? {
+            break;
+        }
+        let proof = Proof {
+            message_id: message.id,
+            user_message_id: Uuid::new_v4().to_string(),
+            team_session_id: p.team_session_id.clone(),
+            lead_turn_id: p.lead_turn_id.clone(),
+            scope_turn_id: decision.lead_turn_id.clone(),
+            boundary_id: p.boundary_id.clone(),
+            phase: "prepared".into(),
+            source_session_id: message.source_session_id,
+            source_turn_id: db
+                .kv_get("team-message-source-turn-v1", &pending.id)?
+                .and_then(|v| v.as_str().map(str::to_owned))
+                .ok_or_else(|| anyhow!("TEAM_UNAUTHORIZED: missing source turn"))?,
+            permission_ceiling: message.permission_ceiling,
+        };
+        db.conn().execute("INSERT INTO team_ordinary_inbox(message_id,user_message_id,team_session_id,lead_turn_id,scope_turn_id,boundary_id,source_session_id,source_turn_id,permission_ceiling,phase,created_at,updated_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,'prepared',?10,?10)",params![proof.message_id,proof.user_message_id,proof.team_session_id,proof.lead_turn_id,proof.scope_turn_id,proof.boundary_id,proof.source_session_id,proof.source_turn_id,proof.permission_ceiling,crate::db::now_ms()])?;
+        sessions::append_message(
+            db,
+            &proof.team_session_id,
+            &canonical(db, &proof)?,
+            Some(&proof.lead_turn_id),
+        )?;
+    }
+    let mut messages = vec![];
+    for proof in proofs(
+        db,
+        "team_session_id=?1 AND lead_turn_id=?2 AND phase='persisted'",
+        params![p.team_session_id, p.lead_turn_id],
+    )? {
+        let delivery = session_collaboration::get(db, &proof.message_id)?
+            .ok_or_else(|| anyhow!("TEAM_NOT_FOUND: inbox ledger missing"))?;
+        if proof.scope_turn_id != decision.lead_turn_id || !eligible(db, &decision, &delivery)? {
+            break;
+        }
+        let mut value = serde_json::to_value(&proof)?;
+        value["message"] = serde_json::to_value(canonical(db, &proof)?)?;
+        messages.push(value);
+    }
+    Ok(json!({"capability":CAPABILITY,"messages":messages}))
+}
+
+pub(crate) fn ack(db: &Database, p: &ReadParams, ids: &[String]) -> Result<Value> {
+    let decision = authorize(db, p)?;
+    let tx = db.conn().unchecked_transaction()?;
+    for id in ids {
+        // Runtime may retain an accepted body after a lost ACK response. Every
+        // re-ACK is a new admission fence, even when its proof is already acked.
+        let proof = tx.prepare_cached(&format!("{SELECT} WHERE message_id=?1 AND team_session_id=?2 AND lead_turn_id=?3 AND boundary_id=?4 AND phase IN ('persisted','acked')"))?
+            .query_row(params![id,p.team_session_id,p.lead_turn_id,p.boundary_id], row).optional()?
+            .ok_or_else(||anyhow!("TEAM_UNAUTHORIZED: ordinary inbox ACK proof mismatch"))?;
+        canonical(db, &proof)?;
+        let delivery = session_collaboration::get(db, id)?
+            .ok_or_else(|| anyhow!("TEAM_NOT_FOUND: inbox ledger missing"))?;
+        if proof.scope_turn_id != decision.lead_turn_id || !eligible(db, &decision, &delivery)? {
+            return Err(anyhow!(
+                "TEAM_UNAUTHORIZED: ordinary inbox ACK source authority changed"
+            ));
+        }
+        let changed = tx.execute("UPDATE team_ordinary_inbox SET phase='acked',updated_at=?5 WHERE message_id=?1 AND team_session_id=?2 AND lead_turn_id=?3 AND boundary_id=?4 AND phase IN ('persisted','acked')",params![id,p.team_session_id,p.lead_turn_id,p.boundary_id,crate::db::now_ms()])?;
+        if changed != 1 {
+            return Err(anyhow!(
+                "TEAM_UNAUTHORIZED: ordinary inbox ACK proof mismatch"
+            ));
+        }
+    }
+    tx.commit()?;
+    Ok(json!({"ok":true,"acknowledgedIds":ids}))
+}
+
+#[cfg(test)]
+mod tests;

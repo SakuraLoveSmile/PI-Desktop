@@ -300,6 +300,7 @@ export const fr = {
     "placeholderHome": "Demandez n'importe quoi",
     "placeholderHint": "Tapez / pour les commandes · @ pour les fichiers",
     "placeholderHomeHint": "Tapez / pour les commandes · @ pour les fichiers",
+    "placeholderRunning": "{{sendShortcut}} pour envoyer un message de suivi · {{steerShortcut}} pour réorienter maintenant",
     "placeholderShortcut": "Maj+Entrée pour une nouvelle ligne · Utilisez Envoyer pour soumettre",
     "addFiles": "Ajoutez des fichiers et plus encore",
     "filesAttached": "Ajout de {{count}} élément(s) au brouillon",
@@ -684,7 +685,7 @@ export const fr = {
   "goal": {
     "progressLabel": "Progression de l’objectif",
     "progressListLabel": "Liste des tâches de l’objectif",
-    "progressInitializing": "Préparation…",
+    "progressInitializing": "Chargement de la progression…",
     "progressFailed": "Progression indisponible",
     "planning": "Définition de l'objectif",
     "approvalRegion": "Approbation de l'objectif",

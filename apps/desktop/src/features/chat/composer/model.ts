@@ -4,10 +4,12 @@ import type {
   PermissionMode,
   ProviderPublic,
   SessionThinkingLevel,
+  ShortcutPlatform,
   ThinkingLevel,
 } from "@pi-desktop/shared";
 import {
   isSessionThinkingLevel,
+  keybindingDisplayParts,
   PERMISSION_MODES,
   sessionThinkingMenuLevels,
 } from "@pi-desktop/shared";
@@ -30,6 +32,32 @@ export const PLACEHOLDER_KEYS = {
     "chat.placeholderShortcut",
   ],
 } as const;
+
+export function resolveComposerPlaceholder({
+  variant,
+  index,
+  runActive,
+  hasDraft,
+  enterToSend,
+  platform,
+}: {
+  variant: "home" | "docked";
+  index: number;
+  runActive: boolean;
+  hasDraft: boolean;
+  enterToSend: boolean;
+  platform: ShortcutPlatform;
+}) {
+  const keys = PLACEHOLDER_KEYS[variant];
+  const separator = platform === "darwin" ? "" : "+";
+  return {
+    key: runActive && !hasDraft
+      ? "chat.placeholderRunning"
+      : keys[index % keys.length] ?? keys[0],
+    sendShortcut: keybindingDisplayParts(enterToSend ? "Enter" : "Mod+Enter", platform).join(separator),
+    steerShortcut: keybindingDisplayParts("Alt+Enter", platform).join(separator),
+  };
+}
 
 export const MODE_CYCLE: readonly Mode[] = ["agent", "plan", "goal"];
 
@@ -75,6 +103,13 @@ export type PromptEnhancementError = {
 export function nextMode(mode: Mode): Mode {
   const index = MODE_CYCLE.indexOf(mode);
   return MODE_CYCLE[(index + 1) % MODE_CYCLE.length] ?? "agent";
+}
+
+export function isComposerContractVisible(
+  mode: Mode,
+  goalExecutionActive: boolean,
+): boolean {
+  return mode !== "agent" && !(mode === "goal" && goalExecutionActive);
 }
 
 export function isThinkingLevel(value: unknown): value is SessionThinkingLevel {

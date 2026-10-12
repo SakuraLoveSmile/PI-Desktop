@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { isComposerContractVisible } from "../src/features/chat/composer/model.ts";
+
+test("contract indicator remains available for planning and hides during Goal execution", () => {
+  assert.equal(isComposerContractVisible("agent", false), false);
+  assert.equal(isComposerContractVisible("agent", true), false);
+  assert.equal(isComposerContractVisible("goal", false), true);
+  assert.equal(isComposerContractVisible("goal", true), false);
+  assert.equal(isComposerContractVisible("plan", false), true);
+  assert.equal(isComposerContractVisible("plan", true), true);
+});
 
 const [profilePickerSource, contractPickerSource, toolbarSource, composerSource, sessionSliceSource] =
   await Promise.all([
@@ -51,7 +61,6 @@ test("ComposerContractPicker renders compact indicator for active mode", () => {
   assert.match(contractPickerSource, /settings\.modePlan/);
   assert.match(contractPickerSource, /settings\.modeGoal/);
   assert.match(contractPickerSource, /ModeIcon/);
-  assert.match(contractPickerSource, /(?:effectiveMode|mode) === ["']agent["']/);
   assert.match(contractPickerSource, /displayMode/);
 });
 

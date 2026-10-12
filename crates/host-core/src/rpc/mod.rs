@@ -1,6 +1,8 @@
 mod background_processes_rpc;
 #[cfg(test)]
 mod background_processes_tests;
+#[cfg(test)]
+mod background_services_tests;
 mod config_sync_rpc;
 mod git_workspaces_rpc;
 mod goal_rpc;
@@ -30,6 +32,7 @@ mod team_lead_asks;
 mod team_mailbox;
 #[cfg(test)]
 mod team_member_activity_tests;
+mod team_ordinary_inbox;
 #[cfg(test)]
 mod team_pending_tests;
 #[cfg(test)]
@@ -2836,6 +2839,33 @@ async fn handle_request_inner(
                 .filter(|value| !value.is_empty())
                 .ok_or_else(|| rpc_err(1002, "projectPath required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
+            if background_processes_rpc::has_services(&st, session_id, false)? {
+                if sessions::session_has_running_turn(&st.db, session_id).map_err(plan_rpc_err)? {
+                    return Err(rpc_err(1008, "session is running", "CONFLICT"));
+                }
+                if plans::has_live_scratch_goal(&st.db, session_id).map_err(plan_rpc_err)? {
+                    return Err(plan_rpc_err("PLAN_CONFIGURATION_BLOCKED"));
+                }
+                let current_project: Option<String> = st.db.conn().query_row(
+                    "SELECT p.path FROM sessions s LEFT JOIN projects p ON p.id=s.project_id WHERE s.id=?1",
+                    [session_id], |row| row.get(0),
+                ).optional().map_err(|error| rpc_err(1000, error.to_string(), "INTERNAL"))?.flatten();
+                let project_changed =
+                    current_project != crate::db::canonical_project_path(project_path);
+                drop(st);
+                if project_changed {
+                    background_processes_rpc::cleanup_services(
+                        &state,
+                        session_id,
+                        false,
+                        "owner_workspace_changed",
+                    )
+                    .await?;
+                }
+            } else {
+                drop(st);
+            }
+            let st = state.lock().await;
             if crate::background_processes::has_pending_finalization(&st, session_id) {
                 return Err(rpc_err(
                     1008,
@@ -3025,6 +3055,25 @@ async fn handle_request_inner(
                 .get("id")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))?;
+            let st = state.lock().await;
+            if background_processes_rpc::has_services(&st, id, true)? {
+                crate::team::can_delete_session(&st.db, id).map_err(|error| {
+                    let message = error.to_string();
+                    if message.starts_with("TEAM_MEMBER_DELETION_BLOCKED:") {
+                        rpc_err(1002, message, "TEAM_MEMBER_DELETION_BLOCKED")
+                    } else {
+                        rpc_err(1000, message, "INTERNAL")
+                    }
+                })?;
+                if plans::has_live_scratch_goal(&st.db, id).map_err(plan_rpc_err)? {
+                    return Err(plan_rpc_err("PLAN_CONFIGURATION_BLOCKED"));
+                }
+                drop(st);
+                background_processes_rpc::cleanup_services(&state, id, true, "session_deleted")
+                    .await?;
+            } else {
+                drop(st);
+            }
             let st = state.lock().await;
             if crate::background_processes::has_pending_finalization(&st, id) {
                 return Err(rpc_err(
@@ -3441,6 +3490,38 @@ async fn handle_request_inner(
             if !st.allow_plugin_delete(plugin_id) {
                 return Err(rpc_err(1006, "plugin delete rate exceeded", "RATE_LIMITED"));
             }
+            if let Some(session_id) = params.get("sessionId").and_then(Value::as_str) {
+                if background_processes_rpc::has_services(&st, session_id, true)? {
+                    plugin_sessions::get(&st.db, plugin_id, &params)
+                        .map_err(plugin_session_rpc_err)?;
+                    if !matches!(
+                        params
+                            .get("mode")
+                            .and_then(Value::as_str)
+                            .unwrap_or("trash"),
+                        "trash" | "purge"
+                    ) {
+                        return Err(rpc_err(
+                            1002,
+                            "mode must be trash or purge",
+                            "INVALID_ARGUMENT",
+                        ));
+                    }
+                    drop(st);
+                    background_processes_rpc::cleanup_services(
+                        &state,
+                        session_id,
+                        true,
+                        "session_deleted",
+                    )
+                    .await?;
+                } else {
+                    drop(st);
+                }
+            } else {
+                drop(st);
+            }
+            let st = state.lock().await;
             if let Some(session_id) = params.get("sessionId").and_then(Value::as_str) {
                 if crate::background_processes::has_active(&st.db, session_id)
                     .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
@@ -4290,14 +4371,21 @@ async fn handle_request_inner(
             let call_started = std::time::Instant::now();
             let p: ToolsExecuteParams = serde_json::from_value(params.clone())
                 .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
-            if p.tool_name == "Bash"
-                && p.args
-                    .get("backgroundKind")
-                    .is_some_and(|kind| kind != "command")
-            {
-                return Err(rpc_err(1002, "This build can read historical services but cannot launch them; backgroundKind must be command", "INVALID_PARAMS"));
-            }
             let execution_timeout_ms = tools::effective_timeout_ms(&p.tool_name, p.timeout_ms);
+            let service_scope = if p.tool_name == "Bash" {
+                let st = state.lock().await;
+                crate::background_services::capture(
+                    &st.db,
+                    &p.session_id,
+                    p.turn_id.as_deref(),
+                    &p.args,
+                    p.timeout_ms,
+                    p.permission_scope.as_deref(),
+                )
+                .map_err(background_processes_rpc::service_err)?
+            } else {
+                None
+            };
             let background = if p.tool_name == "Bash" {
                 match p.args.get("run_in_background") {
                     None => false,
@@ -4473,6 +4561,7 @@ async fn handle_request_inner(
                         }
                         _ => effective_pm,
                     };
+                    let effective_pm = service_scope.as_ref().map(|scope| scope.permission_ceiling.clone()).unwrap_or(effective_pm);
                     // Resolve the tool root from the persisted session instead of
                     // the mutable global workspace. This keeps background turns
                     // isolated when the renderer switches between project tabs.
@@ -4816,6 +4905,7 @@ async fn handle_request_inner(
                         (effective.id.clone(), cancellation_receiver.clone())
                     };
                     bash_options = Some(tools::BashExecutionOptions {
+                        service: false,
                         session_id: p.session_id.clone(),
                         tool_call_id: p.tool_call_id.clone(),
                         command_shell_id: shell_id,
@@ -4836,6 +4926,7 @@ async fn handle_request_inner(
                         state.clone(),
                         tx.clone(),
                         crate::background_processes::ApprovedJob {
+                            service_scope: service_scope.clone(),
                             workspace,
                             scratch: scratch_path.clone(),
                             args: p.args.clone(),
@@ -4845,7 +4936,11 @@ async fn handle_request_inner(
                         },
                     )
                     .await
-                    .map_err(|e| rpc_err(1008, e.to_string(), "BACKGROUND_PROCESS_START_FAILED"))?;
+                    .map_err(|error| {
+                        let message = error.to_string();
+                        let code = if message.starts_with("TEAM_SERVICE_") || message.starts_with("TEAM_APPROVAL_REQUIRED") { message.split(':').next().unwrap_or("BACKGROUND_PROCESS_START_FAILED") } else { "BACKGROUND_PROCESS_START_FAILED" };
+                        rpc_err(1008,message.clone(),code)
+                    })?;
                     // The detached execution now owns cancellation and admission.
                     background_owned = true;
                     let st = state.lock().await;
@@ -4859,6 +4954,11 @@ async fn handle_request_inner(
                         }),
                     );
                     let mut content = json!({"backgroundProcessId": process.id, "status":"starting", "message":"Background process accepted. Read its output and terminal status through the background process manager."});
+                    if let Some(service) = process.service {
+                        if let Some(metadata) = serde_json::to_value(service).map_err(|error|rpc_err(1000,error.to_string(),"INTERNAL"))?.as_object() {
+                            for (key,value) in metadata { content[key] = value.clone(); }
+                        }
+                    }
                     crate::team::git_warnings::annotate_observable(&st.db, &git_warning_context, &p.tool_call_id, &mut content);
                     return Ok(json!({
                         "toolCallId": p.tool_call_id, "ok": true, "isError": false,

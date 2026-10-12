@@ -462,6 +462,7 @@ export const zhCN = {
     placeholderHome: "随便问问",
     placeholderHint: "输入 / 使用命令 · @ 引用文件",
     placeholderHomeHint: "输入 / 使用命令 · @ 引用文件",
+    placeholderRunning: "{{sendShortcut}} 发送后续消息 · {{steerShortcut}} 立即转向",
     placeholderShortcut: "Shift+Enter 换行 · 点击发送提交",
     addFiles: "添加文件",
     filesAttached: "已将 {{count}} 项加入草稿",
@@ -848,7 +849,7 @@ export const zhCN = {
   goal: {
     progressLabel: "目标进度",
     progressListLabel: "目标任务清单",
-    progressInitializing: "准备中…",
+    progressInitializing: "加载进度…",
     progressFailed: "进度读取失败",
     planning: "正在明确目标",
     approvalRegion: "目标审批",
@@ -2172,7 +2173,7 @@ sklm: {
   },
   askTool: {
     pending: "待回答",
-    pendingHelp: "Lead 已在 30 分钟后停止等待。回答将开启新回合；请明确恢复或重新批准执行。",
+    pendingHelp: "Lead 已停止等待。回答将开启新回合；请明确恢复或重新批准执行。",
     completedTitle: "问题澄清",
     completedSkipped: "已跳过",
     title: "需要回答几个问题",

@@ -34,6 +34,8 @@
 - [06-host-rpc-protocol.md](/zh-CN/spec/03-runtime/06-host-rpc-protocol)
 - [team-task-dispatch.md](/zh-CN/spec/03-runtime/team-task-dispatch)
 - [team-run-limits.md](/zh-CN/spec/03-runtime/team-run-limits)
+- [普通 Agent 等待边界邮箱](/zh-CN/spec/03-runtime/team-ordinary-inbox)
+- [显式团队服务](/zh-CN/spec/03-runtime/team-managed-services)
 - [07-process-model.md](/zh-CN/spec/03-runtime/07-process-model)
 - [08-error-codes.md](/zh-CN/spec/03-runtime/08-error-codes)
 - [09-logging-and-observability.md](/zh-CN/spec/03-runtime/09-logging-and-observability)

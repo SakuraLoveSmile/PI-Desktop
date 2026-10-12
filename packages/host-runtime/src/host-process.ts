@@ -9,7 +9,8 @@ import {
   stripProxyEnv,
 } from "@pi-desktop/shared";
 
-const HOST_DISPOSE_GRACE_MS = 3_000;
+// Service runners may need five seconds after TERM, followed by group reaping.
+const HOST_DISPOSE_GRACE_MS = 8_000;
 const HOST_FORCE_KILL_GRACE_MS = 1_000;
 const HOST_OVERLOAD_RETRY_DELAYS_MS = [50, 100, 200, 400] as const;
 

@@ -44,8 +44,10 @@ At soft, transactionally create one Host-authored mailbox wrap-up message with
 idempotency key `team-run-limit-soft:<runId>`, and persist its exact id. A matching
 `team.changed` notification prompts a localized toast/native banner. The Team panel
 retains the status after restart even if a transient native notification was missed.
-The message uses the existing authenticated user-role delivery path. Ordinary
-Agent mail waits for the current turn to end; approved execution may read this
+The message uses the existing authenticated user-role delivery path. This
+Host-authored notice remains queued until an ordinary Agent turn ends; S3's
+ordinary expert-report inbox does not broaden its source proof. Approved execution
+may read this
 specific Host-proof-bound message in its existing execution inbox. A model-written
 body or idempotency key cannot forge the proof, permissions, or execution scope.
 
@@ -61,7 +63,8 @@ infinite retry mode; it never cancels the Agent/tool signal. Stop admission pers
 until the next Host-admitted turn. Reopening runtime admission after explicit
 Resume does not reset the Host run clock. A model response arriving after hard cannot
 admit a new tool batch, while a batch admitted before hard finishes naturally. A foreground tool batch
-settles naturally; existing background processes are not stopped, and shell
+settles naturally; ordinary background commands are not stopped; explicit WP14 services stop on
+any Team pause under their [owned lifecycle](team-managed-services.md). Shell
 capacity/FIFO/timeout behavior is unchanged. During pending recovery, the safe
 boundary clears recovery before another iteration. Ordinary user Stop retains its
 existing behavior. Team panel distinguishes safe finishing from fully paused, and shows an explicit

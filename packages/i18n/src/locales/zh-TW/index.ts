@@ -302,6 +302,7 @@ export const zhTW = {
     placeholderHome: "隨便問問",
     placeholderHint: "輸入 / 使用命令 · @ 引用檔案",
     placeholderHomeHint: "輸入 / 使用命令 · @ 引用檔案",
+    placeholderRunning: "{{sendShortcut}} 傳送後續訊息 · {{steerShortcut}} 立即轉向",
     placeholderShortcut: "Shift+Enter 換行 · 點擊發送提交",
     addFiles: "新增檔案等內容",
     filesAttached: "已將 {{count}} 項加入草稿",
@@ -688,7 +689,7 @@ export const zhTW = {
   goal: {
     progressLabel: "目標進度",
     progressListLabel: "目標任務清單",
-    progressInitializing: "準備中…",
+    progressInitializing: "載入進度…",
     progressFailed: "進度讀取失敗",
     planning: "正在明確目標",
     approvalRegion: "目標審批",
@@ -2008,7 +2009,7 @@ sklm: {
   },
   askTool: {
     pending: "待回答",
-    pendingHelp: "Lead 已在 30 分鐘後停止等待。回答將開啟新回合；請明確恢復或重新核准執行。",
+    pendingHelp: "Lead 已停止等待。回答將開啟新回合；請明確恢復或重新核准執行。",
     completedTitle: "問題釐清",
     completedSkipped: "已略過",
     title: "需要回答幾個問題",

@@ -182,6 +182,17 @@ export class TurnQueue {
     return record;
   }
 
+  /** Retire the live mirror only after its Host-owned durable row was removed. */
+  retirePersisted(sessionId: string, id: string): void {
+    const queue = this.bySession.get(sessionId);
+    if (!queue) return;
+    const index = queue.findIndex((record) => record.id === id);
+    if (index === -1) return;
+    queue.splice(index, 1);
+    this.recoveryEligible.delete(id);
+    if (queue.length === 0) this.bySession.delete(sessionId);
+  }
+
   /** Take the head for execution. */
   async shift(sessionId: string): Promise<QueuedTurnRecord | undefined> {
     const head = this.peek(sessionId);

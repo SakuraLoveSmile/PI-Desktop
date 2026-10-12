@@ -145,3 +145,37 @@ fn launch_route_rejects_unavailable_routes_even_without_thinking() {
         assert!(validate_member_route(&db, "route-provider", "route-model", level).is_err());
     }
 }
+
+#[test]
+fn member_turn_route_rejection_explains_the_confirmed_route_and_keeps_it_admissible() {
+    let db = test_db();
+    let lead = create_test_lead(&db);
+    let lead_turn = sessions::begin_turn(&db, &lead, None, None).unwrap();
+    let (_, review) = declare_team_strategy(
+        &db,
+        DeclareStrategyParams {
+            team_session_id: &lead,
+            caller_session_id: &lead,
+            lead_turn_id: &lead_turn,
+            strategy: "delegate",
+            reason: "Approve a fixed member route",
+            members: Some(vec![expert_proposal("route-worker")]),
+        },
+    )
+    .unwrap();
+    let review = review.unwrap();
+    let (_, decision) =
+        confirm_launch_review(&db, &lead, &review.review_id, review.revision).unwrap();
+    let member = &decision.member_session_ids[0];
+    for (provider, model) in [(Some("other-provider"), None), (None, Some("other-model"))] {
+        let error = sessions::begin_turn(&db, member, provider, model)
+            .unwrap_err()
+            .to_string();
+        assert!(error.starts_with("TEAM_APPROVAL_REQUIRED:"));
+        assert!(error.contains("nextStep:"));
+        assert!(error.contains("team_status"));
+        assert!(error.contains("confirmed provider/model"));
+        assert!(!sessions::session_has_running_turn(&db, member).unwrap());
+    }
+    sessions::begin_turn(&db, member, Some("test-provider"), Some("test-model")).unwrap();
+}

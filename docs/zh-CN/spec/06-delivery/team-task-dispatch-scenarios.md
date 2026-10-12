@@ -22,3 +22,23 @@ node scripts/check-test-quality.mjs --base 144b28bbb
 ```
 
 为 Host-runtime 输入解析和 Agent Host 队列测试运行 runtime `team-dispatch`、`team-tools`、协作历史的 Vitest。fake 的 40 分钟时钟证明边界行为，不代表提供商真实运行了 40 分钟。真实设备验收应检查实际 Host session/turn 记录，而不是模型的自述。本变更不要求也未授权运行 `verify:ui:*`。
+
+## 生产投递链回放
+
+使用候选已有 JS 构建及 Host 二进制，运行
+`node --experimental-strip-types scripts/e2e-team-task-dispatch-lifecycle.mjs`。
+隔离的真实 Host、Main 投递服务、bridge、AgentHost 和 sidecar/runtime
+通过 loopback 模型 gate 保持成员回合。验证被替代派发的取消会删除 Main
+镜像、最新正文恰好一次接纳、无关普通邮件保留 FIFO、任务成功完成后排队
+重派在进入 provider 前退休。本路径补齐上表前两个语义 ID；可控四十分钟
+年龄仍由领域测试覆盖，不由本次短回放证明。
+
+### Candidate build receipt
+
+Run `node scripts/e2e/build-candidate.mjs` on the stable request candidate before
+`node --experimental-strip-types scripts/e2e-team-task-dispatch-lifecycle.mjs`.
+The build wrapper reuses the provisioned environment and records source HEAD,
+base, dirty/untracked identity and complete executable hashes. Select the
+receipt's debug Host with `PI_DESKTOP_HOST_BIN`, or use the request-local default.
+Start/end validation refuses stale source, base, modules, binary or a changed
+receipt before writing passing evidence; a historical compiled SHA is not proof.

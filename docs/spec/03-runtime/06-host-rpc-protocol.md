@@ -1863,8 +1863,9 @@ metadata does not prove that a stop completed. Cold-start ownership recovery
 records `host_restart` before interrupting active rows, without adopting a PID.
 P7 stored no originating platform or stop mechanism; the compatibility reader
 omits `stopMode` and does not interpret the raw escalation flag as TERM/KILL.
-This build explicitly rejects a new Bash `args.backgroundKind: "service"`
-with `INVALID_PARAMS`; schema compatibility does not grant a launch capability.
+New Bash `args.backgroundKind: "service"` launches require the authenticated
+current Agent Team/run and permission gates in [managed services](team-managed-services.md).
+Historical ownership alone grants no launch, PID adoption or replay authority.
 
 ### Local Git workspace RPC (Plus)
 
@@ -2082,3 +2083,32 @@ chains, another successor, active/queued sources and out-of-scope slots are
 rejected with a legal nextStep. The original handle no longer accepts dispatch,
 and its sessions/tasks/history remain. The eight-member limit still counts
 failed members; full rosters need a new trusted review.
+
+### Ordinary Agent Lead boundary inbox (WP16 S3)
+
+The internal `team.getOrdinaryInboxCapability`, `team.readOrdinaryInbox`,
+`team.ackOrdinaryInbox`, `team.getOrdinaryInboxProof` and identity-only
+`team.ordinaryInboxPersisted` notification use the exact binding/proof contract
+in [ordinary inbox](team-ordinary-inbox.md). Body-bearing reads are restricted
+to trusted launch plumbing, never generic model-selected proxy methods or tool
+results. Host validates ordinary current-turn authority; runtime epochs remain
+separately guarded by Main/AgentHost/Runtime. Plus P6 stores the prepared →
+persisted → ACKed journal with JSONL-first recoverable indexing; queue admission
+is not runtime/model consumption. Protocol 11 is unchanged.
+
+### Explicit Team service metadata (WP14)
+
+Bash `backgroundKind`, owner/cap/TTL checks and optional service fields on existing
+backgroundProcesses list/read/launch projections follow [managed services](team-managed-services.md).
+`backgroundProcesses.changed` remains the existing identity-only invalidation;
+read/stop remain session scoped. Plus P7 stores explicit ownership; older process
+rows do not become services. No shell-budget/FIFO, approved-execution authority
+or protocol-version expansion is introduced.
+
+### Team diagnostics and progress hints (WP7)
+
+Malformed strategy, presentation.role and displayName errors name their allowed
+values/range. Route/stale-scope/unapproved-dispatch refusals retain their existing
+codes/denial conditions with actionable nextStep. Runtime-only
+completedMembersWithOpenTasks and completedMemberOpenTaskNextStep derive from
+existing roster/task projections; they do not grant authority or settle tasks.

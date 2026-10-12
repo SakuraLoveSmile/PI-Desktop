@@ -300,6 +300,7 @@ export const es = {
     "placeholderHome": "Pregunte cualquier cosa",
     "placeholderHint": "Escriba / para comandos · @ para archivos",
     "placeholderHomeHint": "Escriba / para comandos · @ para archivos",
+    "placeholderRunning": "{{sendShortcut}} para enviar un mensaje de seguimiento · {{steerShortcut}} para redirigir ahora",
     "placeholderShortcut": "Mayús+Entrar para nueva línea · Utilice Enviar para enviar",
     "addFiles": "Agregar archivos y más",
     "filesAttached": "Se agregaron {{count}} elementos al borrador",
@@ -684,7 +685,7 @@ export const es = {
   "goal": {
     "progressLabel": "Progreso del objetivo",
     "progressListLabel": "Lista de tareas del objetivo",
-    "progressInitializing": "Preparando…",
+    "progressInitializing": "Cargando progreso…",
     "progressFailed": "Progreso no disponible",
     "planning": "Definición de meta",
     "approvalRegion": "Aprobación de meta",

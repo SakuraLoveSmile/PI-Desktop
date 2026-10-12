@@ -1,6 +1,116 @@
 use super::*;
 
 #[tokio::test]
+async fn strategy_validation_reports_allowed_values_without_consuming_the_review() {
+    let data = tempfile::tempdir().unwrap();
+    let workspace = tempfile::tempdir().unwrap();
+    let mut app = AppState::open(data.path()).unwrap();
+    app.handshook = true;
+    let state = Arc::new(Mutex::new(app));
+    let (tx, _rx) = mpsc::unbounded_channel();
+    let call =
+        |method: &'static str, params| handle_request(state.clone(), method, params, tx.clone());
+    let provider = call("providers.create", json!({"name":"Validation fixture","vendorKey":"custom","apiStyle":"chat_completions","authKind":"none","baseUrl":"http://127.0.0.1:9/v1","defaultModelId":"fixture","models":[{"id":"fixture","contextWindow":128000,"maxTokens":2048}]})).await.unwrap();
+    let created = call("session.create", json!({"mode":"agent","executionProfile":"team","providerId":provider["provider"]["id"],"modelId":"fixture","projectPath":workspace.path()})).await.unwrap();
+    let lead = created["session"]["id"].as_str().unwrap();
+    let turn = call("session.beginTurn", json!({"sessionId":lead}))
+        .await
+        .unwrap();
+    let valid = json!({"teamSessionId":lead,"callerSessionId":lead,"leadTurnId":turn["turnId"],"strategy":"delegate","members":[{"name":"expert","contextKind":"fresh","presetId":"qa","presentation":{"role":"reviewer","displayName":" Reviewer "}}]});
+    let mut missing_guidance = Vec::new();
+    for (field, value, code, allowed) in [
+        (
+            "strategy",
+            "delegate_all",
+            "TEAM_APPROVAL_REQUIRED",
+            vec!["strategy", "delegate"],
+        ),
+        (
+            "contextKind",
+            "copy",
+            "INVALID_PARAMS",
+            vec!["contextKind", "fresh", "fork"],
+        ),
+        (
+            "role",
+            "administrator",
+            "INVALID_PARAMS",
+            vec![
+                "presentation.role",
+                "researcher",
+                "executor",
+                "reviewer",
+                "planner",
+                "collaborator",
+            ],
+        ),
+        (
+            "presetId",
+            "administrator",
+            "INVALID_PARAMS",
+            vec![
+                "researcher",
+                "fullstack",
+                "qa",
+                "reviewer",
+                "ui",
+                "debugger",
+            ],
+        ),
+        (
+            "displayName",
+            "   ",
+            "INVALID_PARAMS",
+            vec!["presentation.displayName", "1 to 64", "trimming"],
+        ),
+        (
+            "displayName",
+            "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklm",
+            "INVALID_PARAMS",
+            vec!["presentation.displayName", "1 to 64", "trimming"],
+        ),
+    ] {
+        let mut invalid = valid.clone();
+        if field == "strategy" {
+            invalid[field] = json!(value);
+        } else if field == "role" || field == "displayName" {
+            invalid["members"][0]["presentation"][field] = json!(value);
+        } else {
+            invalid["members"][0][field] = json!(value);
+        }
+        let error = call("team.declareStrategy", invalid).await.unwrap_err();
+        assert_eq!(error.data.unwrap()["errorCode"], code);
+        for choice in allowed {
+            if !error.message.contains(choice) {
+                missing_guidance.push(format!("{field} missing {choice}: {}", error.message));
+            }
+        }
+        let st = state.lock().await;
+        assert!(crate::team::get_launch_review(&st.db, lead, None)
+            .unwrap()
+            .is_none());
+        assert!(crate::team::list_team_members(&st.db, lead)
+            .unwrap()
+            .is_empty());
+    }
+    let declared = call("team.declareStrategy", valid).await.unwrap();
+    assert_eq!(declared["review"]["status"], "pending");
+    assert_eq!(
+        declared["review"]["members"][0]["presentation"]["role"],
+        "reviewer"
+    );
+    assert_eq!(
+        declared["review"]["members"][0]["presentation"]["displayName"],
+        "Reviewer"
+    );
+    assert!(
+        missing_guidance.is_empty(),
+        "{}",
+        missing_guidance.join("\n")
+    );
+}
+
+#[tokio::test]
 async fn expert_settings_cas_rejects_lost_updates_and_never_persists_metadata() {
     let data = tempfile::tempdir().unwrap();
     let mut app = AppState::open(data.path()).unwrap();

@@ -38,7 +38,7 @@ const TEAM_LEAD_RELIABILITY_GUIDANCE = [
 
 const TEAM_EXECUTION_RELIABILITY_GUIDANCE = [
   "Do not poll with sleep. Use wait_for_updates for teammate replies and task progress. Waiting with a foreground sleep also holds a shell slot. Long sleep and managed background processes hold shell slots until they stop; run long commands in the background and check process status without shell polling.",
-  "Long-lived background services require an explicit timeout. Read the Host process outcome and reported limit: timed_out is a timeout, not proof of a crash. Never use nohup to bypass managed process lifetime.",
+  "Ordinary long-running background commands require an explicit timeout. A service in the current confirmed Team Agent run uses backgroundKind: service with run_in_background: true and no timeout; the Host enforces the six-hour service lifetime and cleans it up on any Team pause or owner/run end. Read the Host process outcome and reported limit: timed_out is a timeout, not proof of a crash. Never use nohup to bypass managed process lifetime.",
   "Revalidate only tests relevant to the diff. Assign any full test suite to one participant only; do not run the same full suite concurrently in the Lead and an expert.",
   "If the same acceptance check or blocker still fails after two attempts based on different evidence, stop blind retries and report the expected result, actual result and evidence. Do not start another repair/retest cycle without new evidence; continue independent authorized work.",
   "Never run git add -A or git stash in a shared working tree. Preserve other participants' changes and stage only explicitly owned paths.",
@@ -80,6 +80,7 @@ function teamCollaborationPrompt(options: TeamPromptOptions): string {
   if (options.workPurpose === "plan_research") {
     return ["## Expert Planning Research", `You are read-only research specialist ${options.memberName ?? "Teammate"}.`,
       "Inspect with Read, Glob and Grep only. Never run shell, edit files or invoke plugins. Work only on assigned tasks in the current round.",
+      "TodoWrite is unavailable in this read-only research role. Use task_get and task_update with expectedRevision for permitted progress on your assigned shared tasks; submit_research_result is still required for research completion. Do not try to activate TodoWrite or replace the shared task board with a personal session checklist.",
       "Use task_get to obtain task revision, then submit_research_result with taskId, expectedRevision and structuredResult (summary, findings, risks, recommendations, verifiedSources).",
       "A successful submit_research_result already reports your result to the Lead. Finish this research turn without sending a redundant completion message. Use send_message for meaningful additional updates or questions. Do not call SubmitPlan or create more experts."].join("\n");
   }
@@ -106,7 +107,7 @@ function teamCollaborationPrompt(options: TeamPromptOptions): string {
       `- For task_create and task_update subject: ${TEAM_TASK_SUBJECT_GUIDANCE}`,
       "- Use `send_message` to communicate with teammates.",
       "- Use `wait_for_updates` to pause and await replies or task completion from teammates.",
-      "- In an ordinary Agent Lead turn outside approved Plan/Goal execution, expert report bodies arrive in authenticated continuations after you finish the current turn. pending_mailbox_messages and team_status pending summaries show queued reports, not their bodies: do not keep polling or redo delegated work while holding the turn. During approved Plan/Goal execution, use wait_for_updates to consume the authenticated execution inbox in the current execution turn; do not end that execution turn merely to receive reports.",
+      "- In an ordinary Agent Lead turn outside approved Plan/Goal execution, a Host supporting ordinary-team-inbox-v1 delivers authenticated expert report bodies as agent-origin user input at the next wait_for_updates boundary in this same turn. The ordinary_inbox tool result contains only delivery metadata, never the report body, and grants no new user approval or Goal execution authority. team_status remains metadata-only. With an older Host or unsupported transport, pending_mailbox_messages retains queued delivery: finish the current turn to receive authenticated continuations instead of repeatedly polling. During approved Plan/Goal execution, use wait_for_updates to consume the authenticated execution inbox in the current execution turn; do not end that execution turn merely to receive reports.",
       "- Do not redo delegated work already confirmed complete. If completion is recorded but the report body is unread, handle its pending delivery first rather than claiming to have consumed it. If independent verification is necessary, explain the specific reason for independent verification before starting it and keep its scope relevant to the diff.",
       "- In the final response, list commands you launched separately from commands experts launched, including when you launched none. Base retry and file-write claims on tool/Host records; do not claim the whole team never retried while omitting your own repeated commands.",
       "- Use `interrupt_agent` if a teammate turn needs to be cancelled.",
@@ -120,6 +121,9 @@ function teamCollaborationPrompt(options: TeamPromptOptions): string {
     `You are teammate "${name}" in an Expert Team.`,
     "- Execute your assigned tasks from the shared task board.",
     "- Keep the task board updated: mark tasks as in_progress when starting and completed/failed when finished via `task_update`.",
+    options.expertConfig?.tools !== undefined && !options.expertConfig.tools.includes("TodoWrite")
+      ? "- TodoWrite is unavailable in your Host-approved expert tool configuration. Use task_get and task_update with expectedRevision for your assigned shared tasks; do not repeatedly search for or call TodoWrite, or try to activate a tool excluded by the configuration."
+      : "- Use TodoWrite for your personal session checklist only when your current tool catalog exposes it. The shared task board is separate: TodoWrite never changes task ownership or status; use task_update for shared work.",
     "- Always respect the CAS `expectedRevision` when updating tasks.",
     "- Report results and communicate with the Lead or fellow teammates using `send_message`.",
     "- Teammates cannot spawn other teammates or interrupt peers.",

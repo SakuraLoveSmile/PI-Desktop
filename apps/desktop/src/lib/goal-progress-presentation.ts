@@ -30,6 +30,7 @@ export function shouldShowGoalProgressBar({
 export type GoalCapsuleState =
   | { kind: "error"; message: string }
   | { kind: "initializing"; message: string }
+  | { kind: "indeterminate"; message: string }
   | { kind: "progress"; completedCount: number; totalCount: number; ratio: number };
 
 export type GoalProgressViewState = {
@@ -67,6 +68,7 @@ export function resolveGoalCapsuleState({
   progress: GoalProgressSnapshot | null;
   labels?: {
     initializing?: string;
+    running?: string;
     failed?: string;
   };
 }): GoalCapsuleState {
@@ -74,8 +76,11 @@ export function resolveGoalCapsuleState({
     return { kind: "error", message: labels?.failed ?? "进度读取失败" };
   }
   const items = progress?.items ?? [];
-  if (loading || items.length === 0) {
-    return { kind: "initializing", message: labels?.initializing ?? "准备中..." };
+  if (loading) {
+    return { kind: "initializing", message: labels?.initializing ?? "加载进度..." };
+  }
+  if (items.length === 0) {
+    return { kind: "indeterminate", message: labels?.running ?? "执行中" };
   }
   const totalCount = items.length;
   const completedCount = items.filter((i) => i.status === "completed").length;

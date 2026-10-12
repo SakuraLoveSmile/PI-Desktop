@@ -16,9 +16,9 @@ Host 使用墙上时钟限制专家团队反复验证/修复循环。本规则�
 
 `team/run_limits.rs` 管理以 Team id 为键的 `team-run-limits-v1` KV 记录：`{ runId, startedAt, elapsedMs, softMessageId, hardReachedAt }`。墙上时钟在暂停/离线期间继续计时；持久化的 `elapsedMs` 在一次运行内是非递减高水位，因此系统时钟回拨或重启不会退还已耗时间。不需要 SQLite schema/version 变更。RPC server 拥有一个每秒调度器，会跳过错过的 tick，并在关闭时终止。Host 调度延迟可能推迟检测；该边界不是实时进程终止期限。
 
-达到软限额时，在事务中创建一条 Host 编写的邮箱收尾消息，幂等键为 `team-run-limit-soft:<runId>`，并持久化其确切 ID。匹配的 `team.changed` 通知会触发本地化 toast/原生横幅。即使错过瞬时原生通知，团队面板在重启后仍会保留状态。消息使用现有认证 user-role 投递路径。普通 Agent 邮件需等当前回合结束；已批准执行可在其既有 execution inbox 中读取这条绑定特定 Host 证明的消息。模型撰写的正文或幂等键不能伪造证明、权限或执行范围。
+达到软限额时，在事务中创建一条 Host 编写的邮箱收尾消息，幂等键为 `team-run-limit-soft:<runId>`，并持久化其确切 ID。匹配的 `team.changed` 通知会触发本地化 toast/原生横幅。即使错过瞬时原生通知，团队面板在重启后仍会保留状态。消息使用现有认证 user-role 投递路径。此 Host 编写的通知仍等普通 Agent 回合结束才续接；S3 普通专家报告 inbox 不扩大其来源证明。已批准执行可在其既有 execution inbox 中读取这条绑定特定 Host 证明的消息。模型撰写的正文或幂等键不能伪造证明、权限或执行范围。
 
-达到硬限额时，复用现有持久化团队暂停与队列保持机制。手动暂停队列并不能豁免仍在运行的回合受到硬限额约束。Host 通过现有 Plan manager 将仍在运行的已批准 Goal 执行结束为 `interrupted`，包括令牌失效。Main 在下一个 assistant/tool-batch 边界请求安全停止运行时，使用仅 Host 可用的 `agent.stop({ sessionId, turnId, preserveRunningTools: true })` 扩展。此路径绕过普通用户停止的 peer-abort hook。仅作用于 provider 的 abort signal 会同时阻止请求级重试和外层流重试退避，包括无限重试模式；它绝不会取消 Agent/tool signal。停止准入状态持续到 Host 下次准入回合。显式恢复后重新开放 runtime 准入不会重置 Host 运行时钟。硬限额之后到达的模型响应不能准入新的工具批次；硬限额前已准入的批次会自然完成。前台工具批次自然结算；现有后台进程不会停止，shell 容量/FIFO/超时行为保持不变。待恢复期间，安全边界会先清除恢复状态，再进入下一轮迭代。普通用户 Stop 保留既有行为。团队面板会区分安全收尾与完全暂停，并在关闭或延长策略允许恢复时显示明确的可恢复提示。
+达到硬限额时，复用现有持久化团队暂停与队列保持机制。手动暂停队列并不能豁免仍在运行的回合受到硬限额约束。Host 通过现有 Plan manager 将仍在运行的已批准 Goal 执行结束为 `interrupted`，包括令牌失效。Main 在下一个 assistant/tool-batch 边界请求安全停止运行时，使用仅 Host 可用的 `agent.stop({ sessionId, turnId, preserveRunningTools: true })` 扩展。此路径绕过普通用户停止的 peer-abort hook。仅作用于 provider 的 abort signal 会同时阻止请求级重试和外层流重试退避，包括无限重试模式；它绝不会取消 Agent/tool signal。停止准入状态持续到 Host 下次准入回合。显式恢复后重新开放 runtime 准入不会重置 Host 运行时钟。硬限额之后到达的模型响应不能准入新的工具批次；硬限额前已准入的批次会自然完成。前台工具批次自然结算；普通后台命令不会停止；显式 WP14 服务按其[所属生命周期](/zh-CN/spec/03-runtime/team-managed-services)在任何团队暂停时停止。shell 容量/FIFO/普通命令超时不变。待恢复期间，安全边界会先清除恢复状态，再进入下一轮迭代。普通用户 Stop 保留既有行为。团队面板会区分安全收尾与完全暂停，并在关闭或延长策略允许恢复时显示明确的可恢复提示。
 
 如果投递失败或发生重启，调度器会针对同一暂停运行重试安全停止/Goal 结算；重复请求不会启动替代回合。邮件保持持久且暂停。WP8 不虚构费用估算或可选 LLM 调用次数限制；只实现墙上时钟限额。
 
