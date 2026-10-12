@@ -205,14 +205,14 @@ Host completion rejection: ${this.completionReason}` : TEAM_COMPLETION_NUDGE, {
         restore: () => {
           runtime.restore();
           this.inProgress = false;
-          this.suppressRunEnd = false;
+          this.suppressRunEnd = !!this.pending;
         },
       });
     } catch (cause) {
       if (ownsTurn()) runtime.abort(controller.signal.aborted ? undefined : classifyAgentError(cause));
     } finally {
       if (this.waitAbort === controller) this.waitAbort = undefined;
-      if (ownsTurn()) { this.inProgress = false; this.suppressRunEnd = false; }
+      if (ownsTurn()) { this.inProgress = false; this.suppressRunEnd = !!this.pending; }
     }
   }
 }
