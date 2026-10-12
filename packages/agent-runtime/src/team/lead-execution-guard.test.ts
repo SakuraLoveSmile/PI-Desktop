@@ -72,3 +72,55 @@ it.each(["cancelled", "interrupted"])("interrupts an approved execution if its r
     expect(vi.getTimerCount()).toBe(0);
   } finally { vi.useRealTimers(); }
 });
+
+it("retains terminal-event ownership when a continuation arms the next completion recovery", async () => {
+  const guard = new TeamLeadExecutionGuard();
+  const state = () => ({ turnId: "turn", epoch: 1, mode: "agent" as const, inactive: false });
+  const team = { teamSessionId: "lead", callerSessionId: "lead" };
+  let holdReview = false;
+  let resolveReviewRead!: () => void;
+  const reviewRead = new Promise<void>(resolve => { resolveReviewRead = resolve; });
+  let releaseReview!: () => void;
+  const heldReview = new Promise<void>(resolve => { releaseReview = resolve; });
+  const host: RuntimeHost = { call: async <T>(method: string) => {
+    if (method === "team.getLaunchReview") {
+      if (holdReview) { resolveReviewRead(); await heldReview; }
+      return { review: { teamSessionId: "lead", leadTurnId: "turn", status: "confirmed", members: [{ name: "expert" }] } } as T;
+    }
+    throw Object.assign(new Error("TEAM_APPROVAL_REQUIRED: the expert result is still pending"), { code: "TEAM_APPROVAL_REQUIRED" });
+  } };
+  let prompt = "approved execution";
+  let continuations = 0;
+  const callbacks = { host, team, state,
+    abort: () => { throw new Error("unexpected abort"); },
+    refreshDeclaration: () => {},
+    prepare: () => {}, getPrompt: () => prompt, setPrompt: (value: string) => { prompt = value; },
+    start: () => {}, restore: () => {},
+    continue: async () => {
+      continuations += 1;
+      if (continuations === 1) {
+        expect(await guard.authorizeCompletion(host, team, state)).toEqual({ kind: "recover" });
+      }
+    },
+  };
+  let secondRecovery: Promise<void> | undefined;
+  try {
+    expect(await guard.authorizeCompletion(host, team, state)).toEqual({ kind: "recover" });
+    await guard.recover(callbacks);
+    expect(guard.pending).toBeDefined();
+    expect(guard.suppressRunEnd).toBe(true);
+    holdReview = true;
+    secondRecovery = guard.recover(callbacks);
+    await reviewRead;
+    expect(guard.pending).toBeUndefined();
+    expect(guard.suppressRunEnd).toBe(true);
+    releaseReview();
+    await secondRecovery;
+    expect(continuations).toBe(2);
+    expect(guard.suppressRunEnd).toBe(false);
+  } finally {
+    releaseReview();
+    await secondRecovery;
+    guard.reset();
+  }
+});
