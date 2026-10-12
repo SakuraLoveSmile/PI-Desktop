@@ -331,6 +331,7 @@ export const RacpInputRequestSchema = Type.Object({
   sessionId: Type.String({ minLength: 1 }),
   turnId: Type.String({ minLength: 1 }),
   expiresAt: Type.String(),
+  teamPending: Type.Optional(Type.Object({ deferredAt: Type.String(), requiresNewApproval: Type.Literal(true) })),
   agentName: Type.Optional(Type.String()),
   parentToolCallId: Type.Optional(Type.String()),
   nestedParentToolCallId: Type.Optional(Type.String()),

@@ -20,6 +20,12 @@ Each ADR includes:
 
 | ID | Title | Status |
 |---|---|---|
+| team-lead-pending-questions-and-replacements | [Durable Lead questions and bounded replacement](team-lead-pending-questions-and-replacements.md) | Accepted for implementation |
+| team-run-limits | [Host-owned Team wall-clock limits](team-run-limits.md) | Accepted for implementation |
+| team-task-dispatch-age | [Explicit task dispatch and queue age](team-task-dispatch-age.md) | Accepted for implementation |
+| team-member-activity-and-interruption-guard | [Host activity and explicit interruption](team-member-activity-and-interruption-guard.md) | Accepted for implementation |
+| team-managed-service-processes | [Explicit Host-managed Team service processes](team-managed-service-processes.md) | Proposed; not implemented |
+| team-agent-mailbox-delivery | [Ordinary Agent Lead mailbox delivery within a running turn](team-agent-mailbox-delivery.md) | Proposed; delivery alternatives not implemented |
 | composer-native-git-workspaces | [Composer native Git workspace navigation](composer-native-git-workspaces.md) | Accepted (local implementation) |
 | context-insights-native-port | [Native Context Insights](context-insights-native-port.md) | Accepted for implementation under the requested plugin-first port |
 | session-activity-rail-and-managed-background-processes | [Session activity rail, managed background processes and Quick Notes](session-activity-rail-and-managed-background-processes.md) | Accepted |
@@ -369,3 +375,5 @@ Each ADR includes:
 | image-generation-capability | [Image generation as a configured Agent capability](image-generation-capability.md) | Accepted |
 | retained-browser-pages-per-tab | [Retain a host-owned browser page per resource tab](retained-browser-pages-per-tab.md) | Accepted |
 | 0318 | [Publish native Linux arm64 artifacts](0318-linux-arm64-release-lane.md) | Accepted (D638) |
+
+- [Explicit Team task dispatch and queued-message age](team-task-dispatch-age.md)

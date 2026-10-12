@@ -22,7 +22,7 @@ type InputItem = {
 type ProviderRequest = {
   tools: Array<{
     name?: string;
-    parameters?: { properties?: Record<string, { type?: string }>; required?: string[] };
+    parameters?: { properties?: Record<string, { type?: string; description?: string }>; required?: string[] };
   }>;
   input: InputItem[];
 };
@@ -36,14 +36,14 @@ const accepted = {
 };
 const finalText = "The command was accepted. Its eventual exit status is reported separately.";
 
-function respond(res: ServerResponse, args?: Record<string, unknown>) {
+function respond(res: ServerResponse, args?: Record<string, unknown>, toolName = "Bash") {
   res.writeHead(200, { "content-type": "text/event-stream" });
   const send = (data: { type: string; [key: string]: unknown }) => {
     res.write(`event: ${data.type}\ndata: ${JSON.stringify(data)}\n\n`);
   };
   send({ type: "response.created", response: { id: "resp_background_fixture" } });
   const item = args
-    ? { id: "fc_bash", type: "function_call", call_id: "call_bash", name: "Bash", arguments: JSON.stringify(args), status: "completed" }
+    ? { id: toolName === "Bash" ? "fc_bash" : "fc_wait", type: "function_call", call_id: toolName === "Bash" ? "call_bash" : "call_wait", name: toolName, arguments: JSON.stringify(args), status: "completed" }
     : { id: "msg_final", type: "message", role: "assistant", status: "completed", content: [{ type: "output_text", text: finalText, annotations: [] }] };
   send({ type: "response.output_item.added", output_index: 0, item: args
     ? { ...item, arguments: "", status: "in_progress" }
@@ -60,13 +60,14 @@ function respond(res: ServerResponse, args?: Record<string, unknown>) {
   res.end();
 }
 
-async function fixture(args: Record<string, unknown>) {
+async function fixture(args: Record<string, unknown>, waitAfterLaunch = false) {
   const requests: ProviderRequest[] = [];
   const server = createServer(async (req, res) => {
     let raw = "";
     for await (const part of req) raw += part;
     requests.push(JSON.parse(raw) as ProviderRequest);
-    respond(res, requests.length === 1 ? args : undefined);
+    if (waitAfterLaunch && requests.length === 2) respond(res, { timeoutSeconds: 1 }, "wait_for_updates");
+    else respond(res, requests.length === 1 ? args : undefined);
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   cleanups.push(async () => {
@@ -87,12 +88,21 @@ async function fixture(args: Record<string, unknown>) {
   let outputSubscriptions = 0;
   const runtime = new DesktopAgentRuntime({
     sessionId: "background-fixture", mode: "agent", provider, history: [], thinkingLevel: "off",
+    ...(waitAfterLaunch ? { executionProfile: "team", teamContext: {
+      teamSessionId: "team-fixture", callerSessionId: "background-fixture", isLead: false,
+    } } : {}),
     compactionSettings: { enabled: false, reserveTokens: 0, keepRecentTokens: 0 },
     commandShell: { id: "bash", label: "Bash", dialect: "posix", available: true, isDefault: true },
     host: {
       call: async <T>(method: string, params?: unknown): Promise<T> => {
         calls.push({ method, params });
         if (method === "session.appendMessage") return undefined as T;
+        if (waitAfterLaunch && method === "team.getBoard") return { revision: 1 } as T;
+        if (waitAfterLaunch && method === "team.listMessages") return { messages: [] } as T;
+        if (waitAfterLaunch && method === "backgroundProcesses.read") return {
+          process: { id: "process1", sessionId: "background-fixture", status: "completed" },
+          stdout: "already done", stderr: "", stdoutTruncated: false, stderrTruncated: false,
+        } as T;
         if (method !== "tools.execute") throw new Error(`Unexpected host action: ${method}`);
         const execution = params as { args: { run_in_background?: unknown } };
         const content = execution.args.run_in_background === true ? accepted : "fixture";
@@ -123,12 +133,16 @@ it.each([
   expect(f.requests).toHaveLength(2);
   const bash = f.requests[0].tools.find((tool) => tool.name === "Bash");
   expect(bash?.parameters?.properties?.run_in_background).toMatchObject({ type: "boolean" });
+  expect(bash?.parameters?.properties?.run_in_background?.description).toContain("default 60 seconds");
+  expect(bash?.parameters?.properties?.run_in_background?.description).toContain("21600");
+  expect(bash?.parameters?.properties?.timeout?.description).toContain("defaults to 60 seconds");
+  expect(bash?.parameters?.properties?.timeout?.description).toContain("run_in_background");
   expect(bash?.parameters?.required ?? []).not.toContain("run_in_background");
   expect(f.calls.filter((call) => call.method === "tools.execute")).toEqual([{
     method: "tools.execute",
     params: {
       sessionId: "background-fixture", turnId: expect.any(String), toolCallId: "call_bash|fc_bash", toolName: "Bash",
-      args: expectedArgs, mode: "agent", expectedCommandShellId: "bash", expectedCommandShellDialect: "posix", timeoutMs: 60000,
+      args: expectedArgs, mode: "agent", expectedCommandShellId: "bash", expectedCommandShellDialect: "posix", ...("run_in_background" in expectedArgs && expectedArgs.run_in_background === true ? {} : { timeoutMs: 60000 }),
     },
   }]);
   expect(f.requests[1].input.filter((item) => item.type === "function_call" && item.call_id === "call_bash"))
@@ -171,5 +185,24 @@ it("rejects an unconvertible string background flag before Host execution and re
   expect(f.events.some((event) => event.event.type === "error")).toBe(false);
   expect(f.events.some((event) => event.event.type === "agent_end")).toBe(true);
   expect(f.runtime.getStatus().isRunning).toBe(false);
+  expect(f.outputSubscriptions()).toBe(0);
+});
+
+it("keeps an explicit background timeout in seconds and forwards its exact millisecond limit", async () => {
+  const f = await fixture({ command, run_in_background: true, timeout: 60 });
+  expect(f.calls.find(call => call.method === "tools.execute")?.params).toMatchObject({
+    args: { timeout: 60 }, timeoutMs: 60000,
+  });
+});
+
+it("receives a background completion when the runtime launches before waiting and no notification was observed", async () => {
+  const f = await fixture({ command, run_in_background: true }, true);
+  expect(f.requests).toHaveLength(3);
+  expect(f.calls.filter(call => call.method === "backgroundProcesses.read")).toEqual([{
+    method: "backgroundProcesses.read", params: { sessionId: "background-fixture", id: "process1" },
+  }]);
+  const result = f.requests[2].input.find(item => item.type === "function_call_output" && item.call_id === "call_wait");
+  expect(result?.output).toContain("background_process_completed");
+  expect(result?.output).toContain("already done");
   expect(f.outputSubscriptions()).toBe(0);
 });

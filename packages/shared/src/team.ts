@@ -64,9 +64,21 @@ export type TeamDeliveryStatus =
   | "accepted"
   | "acknowledged"
   | "completed"
-  | "failed";
+  | "failed"
+  | "cancelled";
+
+/** Explicit Lead dispatch; message text never supplies task identity. */
+export type TeamTaskDispatch = { taskId: string; expectedRevision: number };
 
 export type TeamMessageRecord = {
+  sentAt?: string;
+  targetBusyAtSend?: boolean;
+  targetState?: "running" | "paused" | "idle";
+  /** One-based queued Team mailbox position, not the user turn queue position. */
+  queuePosition?: number;
+  taskDispatch?: TeamTaskDispatch;
+  dispatchCancellation?: "superseded" | "task_completed";
+  senderHead?: string;
   id: string;
   teamSessionId: string;
   sourceSessionId: string;
@@ -105,15 +117,41 @@ export type TeamTaskWriteScopeOverlapWarning = {
 };
 
 /** Frozen Host DTO for team.getRoster. */
+export type TeamMemberActivity = {
+  memberSessionId: string;
+  memberName: string;
+  observedAtMs: number;
+  activityWindowMs: number;
+  requiresForce: boolean;
+  lastActivityAtMs: number | null;
+  turn: { id: string; status: string; startedAtMs: number; durationMs: number } | null;
+  lastTool: { name: string; observedAtMs: number } | null;
+  runningBackgroundProcesses: Array<{ id: string; toolCallId: string; status: string; startedAt: string }>;
+  activeBashToolCallIds: string[];
+  /** Counts only usage first observed by this Host within the window, not requests in flight. */
+  recentUsage: { completedCallCount: number; totalTokens: number; windowMs: number; coverage: "host_observed_usage" };
+  incomingQueue: { count: number; oldestAgeMs: number | null };
+  outgoingQueue: { count: number; oldestAgeMs: number | null };
+};
+
 export type TeamRosterProjection = {
+  runLimits?: TeamRunLimitState & import("./expert-team-settings.js").TeamRunLimitSettings | null;
   teamSessionId: string;
   revision: number;
   paused: boolean;
   members: TeamMemberRecord[];
+  /** Additive Host evidence; includes Lead as well as the named members. */
+  memberActivity?: TeamMemberActivity[];
 };
 
 /** Frozen Host DTO for team.getBoard. */
 export type TeamBoardProjection = {
+  /** Advisory successful Write/Edit calls outside the active member task scopes. */
+  outOfScopeWriteCount?: number;
+  /** Advisory Bash calls containing shared-tree Git operations during another writer task. */
+  sharedGitWarningCount?: number;
+  sharedGitWarnings?: Array<{ memberSessionId: string; memberName: string; count: number }>;
+  outOfScopeWrites?: Array<{ memberSessionId: string; memberName: string; count: number }>;
   teamSessionId: string;
   revision: number;
   tasks: TeamTaskRecord[];
@@ -128,8 +166,13 @@ export type TeamBoardProjection = {
   }>;
 };
 
+export type TeamRunLimitState = {
+  runId: string; startedAt: number; elapsedMs: number; softMessageId: string | null; hardReachedAt: number | null;
+};
+
 /** Atomic Host-owned view used by Team overview, board, and panorama. */
 export type TeamSnapshot = {
+  runLimits?: TeamRunLimitState & import("./expert-team-settings.js").TeamRunLimitSettings;
   teamSessionId: string;
   revision: number;
   paused: boolean;
@@ -151,7 +194,9 @@ export type TeamChangedReason =
   | "mailbox"
   | "pause"
   | "resume"
-  | "dissolved";
+  | "dissolved"
+  | "run-limit-soft"
+  | "run-limit-hard";
 
 export type TeamChangedEvent = {
   teamSessionId: string;
@@ -203,13 +248,17 @@ export type SpawnTeammateResult = {
 };
 
 export type SendMessageArgs = {
+  taskDispatch?: TeamTaskDispatch;
   targetMemberName: string;
   content: string;
 };
 
-export type SendMessageResult = {
+export type SendMessageResult = Pick<TeamMessageRecord,
+  "sentAt" | "targetBusyAtSend" | "targetState" | "queuePosition" | "taskDispatch" | "dispatchCancellation"
+> & {
   messageId: string;
   delivered: boolean;
+  queuePositionScope?: "team_mailbox";
 };
 
 export type WaitForUpdatesArgs = {

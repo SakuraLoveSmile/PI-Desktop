@@ -760,6 +760,7 @@ export const fr = {
       operationError: "Impossible de lancer l’opération de stockage. {{error}}",
     },
     expertTeam: {
+      runLimits: en.settings.expertTeam.runLimits,
       title: "Équipe d’experts",
       description: "Configurez le modèle, le niveau de raisonnement, le sous-ensemble d’outils et les instructions supplémentaires des six experts intégrés. Les changements ne concernent que les experts lancés par la suite. Le modèle de Composer s’applique aussi au responsable et aux experts sans modèle épinglé. Les restrictions facultatives d’outils réduisent uniquement leur disponibilité et n’accordent jamais de permissions.",
       loadFailed: "Impossible de charger les paramètres des experts", currentProject: "Projet actuel",
@@ -1998,6 +1999,8 @@ sklm: {
     "queued_other": "{{count}} demande supplémentaire en attente"
   },
   "askTool": {
+    "pending": "Réponse en attente",
+    "pendingHelp": "Le coordinateur a cessé d’attendre après 30 minutes. Votre réponse ouvre un nouveau tour ; reprenez ou approuvez explicitement l’exécution.",
     "completedTitle": "Questions clarifiées",
     "completedSkipped": "Ignorée",
     "title": "Quelques questions",
@@ -2027,6 +2030,14 @@ sklm: {
     "close": "Fermer le widget"
   },
   "team": {
+    runLimitTitle: en.team.runLimitTitle,
+    runLimitSoft: en.team.runLimitSoft,
+    runLimitStopping: en.team.runLimitStopping,
+    runLimitPaused: en.team.runLimitPaused,
+    runLimitHours: en.team.runLimitHours,
+    runLimitReadyToResume: en.team.runLimitReadyToResume,
+    runLimitDisabled: en.team.runLimitDisabled,
+
     "title": "Équipe d'experts",
     "roster": "Membres de l'équipe",
     "board": "Tableau des tâches",

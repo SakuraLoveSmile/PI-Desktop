@@ -2,7 +2,7 @@ import type { AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { Mode, PlanSubmitResult, TeamLaunchReview } from "@pi-desktop/shared";
 import type { RuntimeHost } from "../host-client.js";
 import { createWaitForUpdatesTool } from "./wait-for-updates.js";
-import { classifyAgentError } from "../agent-errors.js";
+import { classifyAgentError, redactSensitiveErrorText } from "../agent-errors.js";
 import { recoverFinalAnswer, type FinalAnswerRecovery } from "../final-answer-recovery.js";
 
 interface LeadTurn { turnId: string | undefined; epoch: number; mode: Mode; inactive: boolean }
@@ -32,7 +32,8 @@ const TEAM_PLAN_COMPLETION_NUDGE = [
 export class TeamLeadExecutionGuard {
   pending?: LeadTurn;
   attempted = false;
-  private confirmedAttempted = false;
+  private confirmedAttempts = 0;
+  private completionReason?: string;
   inProgress = false;
   suppressRunEnd = false;
   private waitingForReview = false;
@@ -45,7 +46,8 @@ export class TeamLeadExecutionGuard {
     this.waitingForReview = false;
     this.pending = undefined;
     this.attempted = false;
-    this.confirmedAttempted = false;
+    this.confirmedAttempts = 0;
+    this.completionReason = undefined;
     this.inProgress = false;
     this.suppressRunEnd = false;
   }
@@ -69,6 +71,9 @@ export class TeamLeadExecutionGuard {
         const active = await host.call<{ active: boolean; reviewStatus?: string }>("team.getLeadExecutionState", {
           ...team, expectedTurnId: snapshot.turnId,
         });
+        if (!stale() && active?.active && (active.reviewStatus === "cancelled" || active.reviewStatus === "interrupted")) {
+          throw new DOMException("Approved expert roster was cancelled or interrupted.", "AbortError");
+        }
         if (!stale() && active?.active && active.reviewStatus === "pending") {
           this.pending = snapshot;
           this.waitingForReview = true;
@@ -100,12 +105,17 @@ export class TeamLeadExecutionGuard {
       else {
         const error = classifyAgentError(cause);
         const approvalRequired = error.code === "TEAM_APPROVAL_REQUIRED" ||
+          error.details?.providerCode === "TEAM_APPROVAL_REQUIRED" ||
           (cause instanceof Error && cause.message.startsWith("TEAM_APPROVAL_REQUIRED"));
+        // Host settlement diagnostics can exceed the provider classifier's
+        // display bound. Keep every expert while retaining the same redaction.
+        const completionReason = approvalRequired && cause instanceof Error
+          ? redactSensitiveErrorText(cause.message) : error.message;
         // Confirmation may arrive while the declaration response is ending,
         // after the preapproval nudge was already spent. It starts a distinct
         // dispatch phase, but never substitutes for Host participation proof.
-        if (approvalRequired && !(confirmedRoster ? this.confirmedAttempted : this.attempted)) {
-          if (confirmedRoster) this.confirmedAttempted = true;
+        if (approvalRequired && (confirmedRoster ? this.confirmedAttempts < 3 : !this.attempted)) {
+          if (confirmedRoster) { this.confirmedAttempts += 1; this.completionReason = completionReason; }
           else this.attempted = true;
           this.pending = snapshot;
           this.suppressRunEnd = true;
@@ -115,7 +125,7 @@ export class TeamLeadExecutionGuard {
           ...error,
           ...(approvalRequired ? {
             code: "TEAM_APPROVAL_REQUIRED",
-            message: snapshot.mode === "plan"
+            message: confirmedRoster ? completionReason : snapshot.mode === "plan"
               ? "Expert Team planning stopped because the Lead did not coordinate actual read-only expert research."
               : "Expert Team stopped because the Lead did not propose approved experts or coordinate actual expert participation.",
             retriable: true,
@@ -132,6 +142,7 @@ export class TeamLeadExecutionGuard {
     abort: (error?: ReturnType<typeof classifyAgentError>) => void;
     host: RuntimeHost;
     team: { teamSessionId: string; callerSessionId: string };
+    refreshDeclaration?: (review: TeamLaunchReview) => void;
   }): Promise<void> {
     const pending = this.pending;
     if (!pending) return;
@@ -159,7 +170,6 @@ export class TeamLeadExecutionGuard {
           if (update.details && typeof update.details === "object" && "error" in update.details) throw new Error(String(update.details.error));
         }
       }
-      this.suppressRunEnd = false;
       const current = runtime.state();
       if (pending.epoch !== current.epoch || pending.turnId !== current.turnId) return;
       if (current.inactive || pending.mode !== current.mode) { runtime.abort(); return; }
@@ -170,22 +180,39 @@ export class TeamLeadExecutionGuard {
         if (state.inactive || state.mode !== pending.mode) { runtime.abort(); return; }
         if (!execution.active || execution.reviewStatus !== "confirmed") { runtime.abort(); return; }
       }
+      if (runtime.refreshDeclaration) {
+        const { review } = await abortableHostCall<{ review: TeamLaunchReview | null }>(runtime.host,
+          "team.getLaunchReview", { teamSessionId: runtime.team.teamSessionId }, controller.signal);
+        const state = runtime.state();
+        if (!ownsTurn()) return;
+        if (controller.signal.aborted || state.inactive || state.mode !== pending.mode) { runtime.abort(); return; }
+        if (review && (review.launchPolicy ?? "user_confirmed") === "user_confirmed" &&
+            review.teamSessionId === runtime.team.teamSessionId && review.leadTurnId === pending.turnId) {
+          if (review.status === "cancelled" || review.status === "interrupted") { runtime.abort(); return; }
+          if (review.status === "confirmed" && (review.strategy ?? "delegate") === "delegate" &&
+              Array.isArray(review.members) && review.members.length > 0) runtime.refreshDeclaration(review);
+        }
+      }
+      this.suppressRunEnd = false;
       await recoverFinalAnswer(awaitingReview
         ? "The Host confirmed the expert roster for this SAME approved execution. Continue the exact approved contract without renegotiation. Call wait_for_updates to read authenticated confirmation mail, create owned tasks, dispatch approved experts, then call wait_for_updates to consume their full results within this turn. Keep GoalProgress and SubmitGoalReport bound to this execution."
-        : pending.mode === "plan" ? TEAM_PLAN_COMPLETION_NUDGE : TEAM_COMPLETION_NUDGE, {
+        : pending.mode === "plan" ? TEAM_PLAN_COMPLETION_NUDGE
+          : this.completionReason ? `${TEAM_COMPLETION_NUDGE}
+
+Host completion rejection: ${this.completionReason}` : TEAM_COMPLETION_NUDGE, {
         ...runtime,
         start: () => { this.inProgress = true; runtime.start(); },
         restore: () => {
           runtime.restore();
           this.inProgress = false;
-          this.suppressRunEnd = false;
+          this.suppressRunEnd = !!this.pending;
         },
       });
     } catch (cause) {
       if (ownsTurn()) runtime.abort(controller.signal.aborted ? undefined : classifyAgentError(cause));
     } finally {
       if (this.waitAbort === controller) this.waitAbort = undefined;
-      if (ownsTurn()) { this.inProgress = false; this.suppressRunEnd = false; }
+      if (ownsTurn()) { this.inProgress = false; this.suppressRunEnd = !!this.pending; }
     }
   }
 }

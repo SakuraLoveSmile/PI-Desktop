@@ -7,6 +7,7 @@ export const PROJECT_CONTEXT_METHODS = new Set([
   "project.history.search",
   "project.history.context",
   "project.codeSearch",
+  "backgroundProcesses.read",
 ]);
 
 /** Captures the trusted launch binding outside model-controlled tool arguments. */

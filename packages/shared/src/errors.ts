@@ -334,11 +334,14 @@ export const ErrorCodes = {
   /** The review revision changed after the caller read it. */
   TEAM_REVIEW_REVISION_CONFLICT: "TEAM_REVIEW_REVISION_CONFLICT",
   /** Expert preset settings changed since the caller read them. */
+  TEAM_RUN_LIMIT_REACHED: "TEAM_RUN_LIMIT_REACHED",
   TEAM_CONFIG_CONFLICT: "TEAM_CONFIG_CONFLICT",
   /** A proposed provider/model/thinking route cannot be launched. */
   TEAM_MODEL_SELECTION_INVALID: "TEAM_MODEL_SELECTION_INVALID",
   /** The member holds a running turn or reserved queued work on its route. */
   TEAM_MEMBER_MODEL_CHANGE_BLOCKED: "TEAM_MEMBER_MODEL_CHANGE_BLOCKED",
+  TEAM_MEMBER_ACTIVE: "TEAM_MEMBER_ACTIVE",
+  TEAM_INTERRUPT_REASON_REQUIRED: "TEAM_INTERRUPT_REASON_REQUIRED",
   /** A Lead with durable Team work cannot become a standard session. */
   TEAM_LEAD_CONFIGURATION_BLOCKED: "TEAM_LEAD_CONFIGURATION_BLOCKED",
 } as const;

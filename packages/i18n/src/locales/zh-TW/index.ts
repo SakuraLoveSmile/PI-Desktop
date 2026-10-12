@@ -764,6 +764,7 @@ export const zhTW = {
       operationError: "無法啟動儲存操作。{{error}}",
     },
     expertTeam: {
+      runLimits: en.settings.expertTeam.runLimits,
       title: "專家團",
       loadFailed: "無法載入專家設定",
       currentProject: "目前專案",
@@ -2006,6 +2007,8 @@ sklm: {
     queued_other: "還有 {{count}} 個請求在排隊",
   },
   askTool: {
+    pending: "待回答",
+    pendingHelp: "Lead 已在 30 分鐘後停止等待。回答將開啟新回合；請明確恢復或重新核准執行。",
     completedTitle: "問題釐清",
     completedSkipped: "已略過",
     title: "需要回答幾個問題",
@@ -2035,6 +2038,14 @@ sklm: {
     close: "關閉小工具",
   },
   team: {
+    runLimitTitle: en.team.runLimitTitle,
+    runLimitSoft: en.team.runLimitSoft,
+    runLimitStopping: en.team.runLimitStopping,
+    runLimitPaused: en.team.runLimitPaused,
+    runLimitHours: en.team.runLimitHours,
+    runLimitReadyToResume: en.team.runLimitReadyToResume,
+    runLimitDisabled: en.team.runLimitDisabled,
+
     viewMemberDetail: "查看成員 {{name}}",
     memberDetailUnavailable: "成員詳情無法使用",
     dispatchCardsLabel: "專家任務分派",

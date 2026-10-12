@@ -509,6 +509,10 @@ Team Plan 使用 Host 选择的 automatic_plan 策略和有效获批模型绑定
 
 用户已批准的 Team Plan/Goal 执行在原始运行中 Host 回合内等待执行名单确认及专家结算，等待期间不能发出最终 agent_end、结束 Goal 执行 token 或完成批准记录。确认后继续同一获批契约，wait_for_updates 通过 Host 授权收件箱读取完整可信确认／专家结果；取消中断原执行，不重放专家或发布完成报告。专家启动仅授权实质工具，获批执行完成另要求当前派遣与专家回合结束、当前结果已消费。Plan 使用可信不可变 execution-turn 绑定，Goal 继续使用 goal_reports 精确回合证明；窄内部 RPC 契约见 06-host-rpc-protocol。
 
+同回合 guard 恢复仅登记新鲜、由 Host 和用户确认、非空且绑定同一团队／获批执行回合的 delegate review，并捕获包含最新匹配成功声明的完整合法 assistant 工具 batch 与全部原始配对 tool results 快照。登记只读当前已批准 execution 开始边界之后的原始 entries，因此确认前压缩已归档的声明仍可登记，不读取前一次执行声明，也不修改 entries。从首次恢复请求到该获批执行结束，最终 `convertToLlm` 在 system journal 持久化之后，对每次请求里同 team／turn／review 的所有成功 `declare_team_strategy` 结果做模型视图投影：`status=confirmed`、`awaitingUserApproval=false`，`nextStep` 以 `The user confirmed the execution roster` 开头，不含过期的 `memberSessionIds`。工具轮次、重试、上下文重建后每次都幂等应用；压缩归档原完整 batch 后，最终模型视图重新包含登记的完整 batch 和全部配对结果，绝不插入孤立 call／result；signed thinking／text／tool signatures 和兄弟调用／结果不裁剪，仅改变匹配 review 的声明结果。重复 guard 恢复时，重建消息已归档声明仍保留同 owner／review／epoch 登记；wireCallId 与新工作碰撞不得覆盖新工作。provider 遥测与实际发送的投影载荷一致。
+
+投影采用 copy-on-write，不修改 Agent 消息状态、原 entries、journal、压缩输入／summary／checkpoint、持久化／UI 历史或无关工具结果。pending、cancelled 或被新 review 取代的名单不能登记或复用；执行完成、Stop／中断、取消／销毁／gracefulStop／Team budget stop、turn／epoch／模式变化及后一次执行使其失效，普通回合不能改写前次执行的声明。较新可观察声明出现不同 reviewId、撤销或更高 revision 时清登记。异步新鲜读取在登记前复核回合、epoch、模式与取消。首次登记时没有完整合法、全部配对的 assistant batch 内匹配成功声明就不造工具调用，保留既有 nudge／三次完成恢复。本次仅扩展 guard 恢复投影，不改变 `wait_for_updates` 自行消费确认的路径，不增加 Host 通知、review 读取、RPC、派遣、公共契约或重启恢复。
+
 仅批准 `approve` 和 `reject`。批准提交 `mode = agent`，
 显式权限模式、执行 ID 和 `execution_state = queued`
 一个主机事务中的相同 `plan_approvals` 行。的
@@ -1245,3 +1249,27 @@ line numbers and bounded text, and supports explicit status/clear actions. Each
 search reconciles current files and ignore rules, hashes eligible content, then
 verifies candidate contents live. This first version provides a persistent text
 cache, not semantic retrieval or a promised speedup. Grep remains unchanged.
+
+### Goal 报告要求 Team 执行结算
+
+获批 Team Goal 的现有 Lead 工具授权包装器在 `SubmitGoalReport` 校验和草稿持久化之前检查结算。当前排队派遣、运行中专家回合或尚未消费的当前专家结果会拒绝所有 verdict，包括 `partial` 和 `blocked`。先用 `wait_for_updates` 等待并消费，或中断已派遣专家。拒绝保持 `TEAM_APPROVAL_REQUIRED`，列出派遣 ID、专家、其未完成任务 ID 和未消费结果数量；这属于授权拒绝，不是持久化失败。
+
+队友消息由原始获批执行回合消费，其 inbox authority 保持 active。执行结束后的邮件续回合不会取得 Goal token 或报告工具。确认名单后最多三次带宿主原因的完成提示，三个续执行之后下一次拒绝以宿主原文和 `stage: team_completion` 结束。未确认名单仍限一次；普通非 Goal 最终回答语义不变。
+
+可信名单取消／中断即使发生在完成 guard 开始等待之前，也立即中断获批执行；不得消耗恢复次数、重启模型或创建等待监听器／计时器。
+
+
+### 专家团执行可靠性指导（2026-10-11）
+
+生成的团队提示词以当前可获得的 Host 成员状态及回合/进程证据判断活动，不用 Git 改动判断存活。换人或重派前先消费认证报告；待处理摘要不是正文。普通未批准 Agent 回合结束后才收到排队正文；获批 Plan/Goal 继续在原回合读取 execution inbox，不为取邮件提前结束执行；普通 Plan 聚合保持原让出机制。
+
+执行成员只重验 diff 相关测试，全量只交一个参与者运行；不以前台 sleep 轮询，常驻后台命令显式设置 timeout。timed_out 表示超时，不能据此推断崩溃，也不用 nohup 脱离管理。共享树禁止 git add -A/git stash，但不改变工具权限。针对同一验收项经过两次有不同依据的尝试仍失败，就报告阻塞，不盲目再开修复/重测循环；其他独立且已授权工作继续。
+
+已完成委派工作不重做，确需独立复核先说明具体理由。最终汇报分别列出 lead 与专家实际启动的命令，并以工具/Host 记录为准。提示词不构成模型遵循保证，不新增看门狗、额度、未读正文授权或自动批准。
+### 普通 Agent lead 待处理邮件可见性（2026-10-11）
+
+lead 的 team_status 从既有认证邮箱读取派生 pendingMessagesCount、pendingMessageSenders、oldestPendingMessageAgeSeconds。待处理指向本 lead 的入站非自身邮件，status=queued 且未绑定收件回合；队列 ACK 不代表正文已消费。外发、其他目标、running/completed/cancelled 邮件不计入。
+
+普通未批准 Agent lead 的 wait_for_updates 在初读已有邮件或后续 recheck 收到邮件时，立即返回 reason:pending_mailbox_messages，携带数量、发件人、年龄及当前回合投递指导。不结束回合、不带正文、不 ACK、不改队列；普通 lead 需结束回合，现有认证 role=user 续接才投递全文。摘要和提示不构成消费证明。
+
+普通 Plan lead 保留原让出优先和 terminate:true；获批 Plan/Goal 先消费执行 inbox，不能为读邮件结束批准执行。已有后台终态结果优先且仅交付一次，邮件在下一次 status/wait 仍可见。订阅先于 baseline、总 deadline、single-flight、取消与清理保持；回合/epoch/团队/模式变化使晚到摘要失效，读取错误不能伪装成零封。createdAt 为 Unix 毫秒数字字符串；发件人按邮箱顺序稳定去重，年龄为非负整数秒。空队列或任意 pending 时间无法解析时最老年龄为 null。不新增 Host RPC、持久化格式、额度、Agent 自动让出或回合内正文权限。回合内投递只见 proposed ADR /adr/team-agent-mailbox-delivery，尚未实现。

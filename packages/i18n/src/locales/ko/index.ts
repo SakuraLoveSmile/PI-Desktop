@@ -769,6 +769,7 @@ export const ko = {
       operationError: "저장 작업을 시작할 수 없습니다. {{error}}",
     },
     expertTeam: {
+      runLimits: en.settings.expertTeam.runLimits,
       title: "전문가 팀",
       description: "내장 전문가 6명의 모델, 사고 수준, 도구 하위 집합, 추가 지침을 설정합니다. 변경 사항은 이후에 시작되는 전문가에게만 적용됩니다. Composer 모델은 Lead와 모델을 고정하지 않은 전문가에도 적용됩니다. 선택적 도구 제한은 사용 가능한 범위만 좁히며 권한을 부여하지 않습니다.",
       loadFailed: "전문가 설정을 불러올 수 없습니다", currentProject: "현재 프로젝트",
@@ -2014,6 +2015,8 @@ sklm: {
     queued_other: "요청 {{count}}개가 더 대기 중",
   },
   askTool: {
+    pending: "답변 대기 중",
+    pendingHelp: "리드는 30분 후 대기를 중단했습니다. 답변은 새 턴을 시작합니다. 실행을 명시적으로 재개하거나 다시 승인하세요.",
     completedTitle: "질문 확인",
     completedSkipped: "건너뜀",
     title: "몇 가지 질문",
@@ -2043,6 +2046,14 @@ sklm: {
     close: "위젯 닫기",
   },
   team: {
+    runLimitTitle: en.team.runLimitTitle,
+    runLimitSoft: en.team.runLimitSoft,
+    runLimitStopping: en.team.runLimitStopping,
+    runLimitPaused: en.team.runLimitPaused,
+    runLimitHours: en.team.runLimitHours,
+    runLimitReadyToResume: en.team.runLimitReadyToResume,
+    runLimitDisabled: en.team.runLimitDisabled,
+
     title: "전문가 팀",
     roster: "팀 명단",
     board: "작업 보드",

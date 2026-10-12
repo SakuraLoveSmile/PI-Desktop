@@ -1,3 +1,8 @@
+import { TeamRunLimitStop } from "./team/run-limit-stop.js";
+import { AskToolInputs } from "./ask-tool-inputs.js";
+import { waitForLeadAsk } from "./team/lead-ask-wait.js";
+import { BackgroundProcessUpdates } from "./team/background-process-updates.js";
+import { backgroundBashDescription, bashTimeoutPayload } from "./background-bash.js";
 import { contextRequestObserver } from "./context-insights.js";
 import { TOOL_ACTIVATION_SECTION, toolDeclarationPolicy, toolActivationSection, restoredToolActivation, syncToolActivation, type ToolDeclarationPolicy } from "./fixed-tool-declarations.js";
 import { orderSystemRows, SystemTranscriptJournal } from "./system-transcript-journal.js";
@@ -152,6 +157,8 @@ import {
 } from "./agent-messages.js";
 import { withExplicitRequired } from "./tool-schema.js";
 import { createTeamTools, teamSystemPrompt } from "./team/index.js";
+import { ConfirmedDeclarationModelView } from "./team/confirmed-declaration-model-view.js";
+import { createTeamMailboxGuards } from "./team/mailbox-context-guards.js";
 import { nestedDelegationPermission, type DelegationOwnerContext } from "./delegation-owner.js";
 import { expertToolDenial } from "./team/expert-policy.js";
 import { buildSessionContext } from "./session-context.js";
@@ -1681,6 +1688,7 @@ export class DesktopAgentRuntime {
   private provider: RuntimeProviderConfig;
   private thinkingLevel: SessionThinkingLevel;
   private host: RuntimeHost;
+  private readonly backgroundProcessUpdates: BackgroundProcessUpdates;
   private onEvent: (envelope: AgentEventEnvelope) => void;
   private onDiagnostic: (diagnostic: AgentRuntimeDiagnostic) => void;
   private streamSink: StreamCoalescer;
@@ -1836,18 +1844,14 @@ export class DesktopAgentRuntime {
   private progressTurnRerunInProgress = false;
   private suppressProgressTurnRunEnd = false;
   private readonly teamLeadExecution = new TeamLeadExecutionGuard();
+  private readonly confirmedDeclarationView = new ConfirmedDeclarationModelView();
   private readonly goalReportRecovery = new GoalReportRecovery();
   private activeToolCalls = new Map<
     string,
     { toolName: string; args: unknown; startedAt: number }
   >();
-  private pendingAskTools = new Map<
-    string,
-    {
-      request: AskToolRequest;
-      resolve: (answers: Array<string[] | null>) => void;
-    }
-  >();
+  private teamAskDeferred = false;
+  private readonly askTools = new AskToolInputs(request => this.emit({ type: "asktool_request", request }));
   /** Host failures need to reach pi-agent-core's tool error channel without
    * discarding the structured diagnostics returned in `details`. */
   private failedHostToolCalls = new Set<string>();
@@ -1900,6 +1904,7 @@ export class DesktopAgentRuntime {
   private pendingModelCompaction = false;
   /** One-shot request to finish the current turn at the next boundary. */
   private gracefulStopRequested = false;
+  private readonly teamBudgetStop = new TeamRunLimitStop();
   /** Codex's `claim_*` flags: one of each reminder per context window. */
   private contextReminderClaimed = false;
   private contextFallbackReminderClaimed = false;
@@ -1927,6 +1932,7 @@ export class DesktopAgentRuntime {
     this.thinkingLevel = clampThinkingLevel(opts.provider, opts.thinkingLevel);
     this.infiniteProviderRetry = opts.infiniteProviderRetry === true;
     this.host = opts.host;
+    this.backgroundProcessUpdates = new BackgroundProcessUpdates(this.host, this.sessionId, () => this.disposed || this.runCancelled ? undefined : this.turnEpoch);
     this.onDiagnostic = opts.onDiagnostic ?? (() => undefined);
     this.hostCloseUnsubscribe = this.host.onClose?.(() => {
       this.cleanupActiveToolProgress();
@@ -2015,6 +2021,7 @@ export class DesktopAgentRuntime {
     const tools = this.declaredTools();
     this.agent = new Agent({
       streamFn: (m, context, options) => {
+        this.teamBudgetStop.assertModelAdmission();
         this.setAgentActivity({ phase: "waiting-model", since: Date.now() });
         this.providerResponseStatus = undefined;
         this.providerRetryHeaders = undefined;
@@ -2098,6 +2105,7 @@ export class DesktopAgentRuntime {
           signal: AbortSignal.any([
             ...(hookedOptions.signal ? [hookedOptions.signal] : []),
             stallAbort.signal,
+            this.teamBudgetStop.providerSignal,
           ]),
         };
         const usageTurnId = this.turnId;
@@ -2107,6 +2115,7 @@ export class DesktopAgentRuntime {
           context,
           attemptOptions,
           (retryOptions) => {
+            this.teamBudgetStop.assertModelAdmission();
             const observer = contextRequestObserver(m, context, { providerId: this.provider.id,
               turnId: usageTurnId, step: contextInsightsStep, mode: this.mode },
               request => this.emit({ type: "context_insights", request }, usageTurnId),
@@ -2164,8 +2173,13 @@ export class DesktopAgentRuntime {
             sessionId: this.sessionId, turnId: this.turnId, message,
           });
         });
+        const modelView = this.confirmedDeclarationView.project(messages, {
+          teamSessionId: this.sessionId, turnId: this.turnId, epoch: this.turnEpoch,
+          active: this.autonomousExecution && this.mode === "agent" && !this.disposed &&
+            !this.runCancelled && !this.gracefulStopRequested && !this.teamBudgetStop.requested,
+        });
         return alignRetainedReasoningIdentity(
-          convertToLlm(this.dropDuplicateToolCalls(messages)), this.reasoningReplayIdentity(),
+          convertToLlm(this.dropDuplicateToolCalls(modelView)), this.reasoningReplayIdentity(),
         );
       },
       prepareNextTurnWithContext: (context, signal) =>
@@ -2180,7 +2194,13 @@ export class DesktopAgentRuntime {
       // Plan transitions must be the only tool call in an assistant batch.
       // Sequential execution also makes the host-confirmed mode change visible
       // before the next model request in the same run.
-      beforeToolCall: (context) => this.beforeToolCall(context),
+      beforeToolCall: async (context) => {
+        const blocked = this.teamBudgetStop.denial(context);
+        if (blocked) return blocked;
+        const result = await this.beforeToolCall(context);
+        if (result?.block) return result;
+        return this.teamBudgetStop.beforeToolCall(context) ?? result;
+      },
       // Every tool except `Task` carries `executionMode: "sequential"`, and pi
       // runs a batch sequentially as soon as it contains one such tool. So the
       // only batch that actually runs concurrently is a batch of nothing but
@@ -2192,6 +2212,12 @@ export class DesktopAgentRuntime {
       // queued renderer prompt ends a completed turn at the next boundary,
       // without treating an error or abort as a graceful stop.
       finishTurn: async ({ message }) => {
+        if (this.teamBudgetStop.requested) {
+          this.gracefulStopRequested = false;
+          this.runCancelled = true;
+          this.resetRunRecoveryState();
+          return { action: "end" };
+        }
         if (this.pendingTeamInboxYield?.()) {
           return { action: "end" };
         }
@@ -2357,6 +2383,7 @@ export class DesktopAgentRuntime {
           ? [
               teamSystemPrompt({
                 mode: this.mode,
+                approvedExecution: this.autonomousExecution,
                 workPurpose: this.teamContext?.workPurpose,
                 expertConfig: this.teamContext?.expertConfig,
                 isLead: this.teamContext?.isLead ?? false,
@@ -3210,7 +3237,7 @@ export class DesktopAgentRuntime {
         case "Edit":
           return `Replace, insert, or delete lines in an existing file. Names positions and supplies new content only — never old_string. Required: path, tag (4 hex from the latest Read/Grep/Write/Edit), ops. Ops: PUT N.=M: replace inclusive lines N–M; PUT <N: insert before N; PUT >N: insert after N; PUT >$: append; CUT N.=M delete; REM delete the file; MV DEST rename after other ops. Body rows are + plus the final line text. Every PUT with body rows must include the trailing colon, for example PUT 48.=48:; PUT 48.=48 followed by + rows is invalid. A colonless PUT is only for a register paste such as PUT <1 @name. No -old or context rows. Ranges name only the lines being changed. Re-ground on the tag returned by every successful write. After one failed Edit, classify the error: Read the live file for a stale tag or unseen lines (or retry unchanged on a complete EDIT_LINES_UNSEEN reveal), but correct syntax or range errors directly; do not guess. Do not edit the same path concurrently.${scratchPathHint}${externalPathHint}`;
         case "Bash":
-          return `${commandShellToolDescription(this.commandShell, this.scratchDir)} Use Edit or Write instead of apply_patch, git apply, or patch; do not retry a failed shell patch command repeatedly.`;
+          return `${commandShellToolDescription(this.commandShell, this.scratchDir)} Use Edit or Write instead of apply_patch, git apply, or patch; do not retry a failed shell patch command repeatedly. Do not poll with sleep; in an Expert Team use wait_for_updates for teammate replies. Background processes and long sleep hold the same shell capacity until they stop. For a long command, use run_in_background and check its process status without shell polling.`;
         case "TodoWrite":
           return todoWriteDescription;
         case ASK_TOOL_NAME:
@@ -3294,13 +3321,13 @@ export class DesktopAgentRuntime {
         tag: Type.Optional(
           Type.String({
             description:
-              "4 uppercase hex from the latest Read, Grep, Write, or Edit for this path. Required unless legacy old_string/new_string is used.",
+              "4 uppercase hex from the latest Read, Grep, Write, or Edit for this path. Required when ops is supplied; ignored when ops is absent and legacy old_string/new_string is used.",
           }),
         ),
         ops: Type.Optional(
           Type.String({
             description:
-              "One or more operation headers with + body rows, newline separated. A PUT with body rows must end its header with `:` (for example, `PUT 48.=48:`); `PUT 48.=48` followed by + rows is invalid. A colonless PUT is only for a register paste such as `PUT <1 @name`. Required unless legacy old_string/new_string is used.",
+              "One or more operation headers with + body rows, newline separated. A PUT with body rows must end its header with `:` (for example, `PUT 48.=48:`); `PUT 48.=48` followed by + rows is invalid. A colonless PUT is only for a register paste such as `PUT <1 @name`. When supplied, ops takes precedence over old_string/new_string. Omit ops for legacy replacement.",
           }),
         ),
         old_string: Type.Optional(
@@ -3312,14 +3339,14 @@ export class DesktopAgentRuntime {
         new_string: Type.Optional(
           Type.String({
             description:
-              "Legacy text replacement: new text to replace old_string with.",
+              "Legacy text replacement: new text to replace old_string with; read only when ops is absent.",
           }),
         ),
       },
       Bash: {
         command: Type.String(),
         run_in_background: Type.Optional(Type.Boolean({
-          description: "Start a Host-managed background process and return its ID immediately. It remains visible in the session activity panel until stopped or completed. The command timeout still applies.",
+          description: backgroundBashDescription,
         })),
         timeout: Type.Optional(
           Type.Number({
@@ -3328,7 +3355,7 @@ export class DesktopAgentRuntime {
             // runtime read the intent instead of burning the turn (D273 / D329).
             maximum: MAX_ACCEPTED_COMMAND_TIMEOUT,
             description:
-              `Optional command timeout in seconds from 1 to ${MAX_COMMAND_TIMEOUT_SECONDS}; defaults to 60 seconds.`,
+              `Optional command timeout in seconds from 1 to ${MAX_COMMAND_TIMEOUT_SECONDS}; defaults to 60 seconds. Pass timeout for long runs, including run_in_background.`,
           }),
         ),
       },
@@ -3350,6 +3377,7 @@ export class DesktopAgentRuntime {
       ) => {
         await this.loadPathInstructions(toolName, params);
         const isBash = toolName === "Bash";
+        const captureBackgroundReceipt = isBash ? this.backgroundProcessUpdates.captureReceipt() : undefined;
         const timeoutMs = isBash ? commandTimeoutMs(params) : undefined;
         let progress = "";
         let progressDirty = false;
@@ -3459,7 +3487,7 @@ export class DesktopAgentRuntime {
                 ? {
                     expectedCommandShellId: this.commandShell.id,
                     expectedCommandShellDialect: this.commandShell.dialect,
-                    timeoutMs,
+                    ...bashTimeoutPayload(params, timeoutMs),
                   }
                 : {}),
               ...(toolName.startsWith("plugin_")
@@ -3485,6 +3513,7 @@ export class DesktopAgentRuntime {
                 ? { permissionScope: this.delegatePermissionScopes.get(toolCallId) }
                 : {}),
             });
+          captureBackgroundReceipt?.(result, signal);
         } catch (error) {
           executionFailed = true;
           executionError = error;
@@ -3742,7 +3771,17 @@ export class DesktopAgentRuntime {
           if (questionContext) {
             for (let index=0;index<questions.length;index++) await this.host.call("team.openPlanningQuestion", {...questionContext, questionId: `${request.requestId}:${index}`});
           }
-          const answers = await this.waitForAskTool(request, signal);
+          const answers = this.executionProfile === "team" && this.teamContext?.isLead && this.turnId
+            ? await waitForLeadAsk({ host: this.host, request, turnId: this.turnId, signal,
+                wait: (ask, waitSignal) => this.askTools.wait(ask, waitSignal),
+                pending: ask => { this.teamAskDeferred = true; if (ask) this.emit({ type: "asktool_request", request: ask }); },
+              })
+            : await this.askTools.wait(request, signal);
+          if (answers === undefined) {
+            this.terminatingToolCalls.add(toolCallId);
+            return { content: [{ type: "text", text: "The question remains pending after 30 minutes. This turn is interrupted, not completed. Wait for the user's authenticated answer; resume or obtain new execution approval explicitly." }],
+              details: { questions, requestId: request.requestId, pending: true }, terminate: true };
+          }
           return {content: [{type: "text", text: formatAskToolOutput(questions, answers)}], details: {questions, answers, resolvedAt: new Date().toISOString()}};
         } finally {
           if (questionContext) {
@@ -3853,23 +3892,17 @@ export class DesktopAgentRuntime {
           roundId: this.teamContext?.roundId,
           isLead: this.teamContext?.isLead ?? false,
           mode: this.mode,
-          host: this.host,
+          host: this.host, backgroundProcesses: this.backgroundProcessUpdates,
           getTurnId: () => this.turnId, approvedExecution: () => this.autonomousExecution,
-          captureInboxYield: () => {
-            const turnId = this.turnId;
-            const epoch = this.turnEpoch;
-            const team = this.teamContext;
-            const current = () => Boolean(turnId) && this.turnId === turnId && this.turnEpoch === epoch &&
-              this.teamContext === team && team?.isLead === true && this.executionProfile === "team" &&
-              this.mode === "plan" && !this.autonomousExecution && !this.disposed && !this.runCancelled;
-            if (!current()) return undefined;
-            return toolCallId => {
-              if (!current()) return false;
-              this.terminatingToolCalls.add(toolCallId);
-              this.pendingTeamInboxYield = current;
-              return true;
-            };
-          },
+          ...createTeamMailboxGuards(() => ({
+            turnId: this.turnId, epoch: this.turnEpoch, team: this.teamContext,
+            isLead: this.teamContext?.isLead ?? false, profile: this.executionProfile,
+            mode: this.mode, approvedExecution: this.autonomousExecution,
+            inactive: this.disposed || this.runCancelled,
+          }), (toolCallId, current) => {
+            this.terminatingToolCalls.add(toolCallId);
+            this.pendingTeamInboxYield = current;
+          }),
           abortActiveTurn: this.teamContext?.abortActiveTurn,
         })
       : [];
@@ -6041,72 +6074,8 @@ export class DesktopAgentRuntime {
     return questions.length > 0 && questions.length <= 20 ? questions : undefined;
   }
 
-  private waitForAskTool(
-    request: AskToolRequest,
-    signal?: AbortSignal,
-  ): Promise<Array<string[] | null>> {
-    return new Promise((resolve) => {
-      let settled = false;
-      const finish = (answers: Array<string[] | null>) => {
-        if (settled) return;
-        settled = true;
-        signal?.removeEventListener("abort", abort);
-        this.pendingAskTools.delete(request.requestId);
-        resolve(answers);
-      };
-      const abort = () => finish(request.questions.map(() => null));
-      this.pendingAskTools.set(request.requestId, { request, resolve: finish });
-      this.emit({ type: "asktool_request", request });
-      if (signal?.aborted) abort();
-      else signal?.addEventListener("abort", abort, { once: true });
-    });
-  }
-
   resolveAskTool(resolution: AskToolResolution): { ok: boolean } {
-    if (resolution.sessionId !== this.sessionId) {
-      throw Object.assign(new Error("asktool session mismatch"), {
-        errorCode: "ASKTOOL_NOT_FOUND",
-      });
-    }
-    const pending = this.pendingAskTools.get(resolution.requestId);
-    if (!pending) {
-      throw Object.assign(new Error("asktool request is no longer pending"), {
-        errorCode: "ASKTOOL_NOT_FOUND",
-      });
-    }
-    if (!Array.isArray(resolution.answers) || resolution.answers.length !== pending.request.questions.length) {
-      throw Object.assign(new Error("asktool answer count does not match questions"), {
-        errorCode: "ASKTOOL_INVALID_ARGUMENT",
-      });
-    }
-    const answers = resolution.answers.map((answer, index) => {
-      if (answer === null) return null;
-      if (!Array.isArray(answer)) {
-        throw Object.assign(new Error(`asktool answer ${index + 1} must be an array or null`), {
-          errorCode: "ASKTOOL_INVALID_ARGUMENT",
-        });
-      }
-      const values = answer
-        .filter((value): value is string => typeof value === "string")
-        .map((value) => value.trim())
-        .filter(Boolean);
-      if (!pending.request.questions[index].multiSelect && values.length > 1) {
-        throw Object.assign(new Error(`asktool question ${index + 1} accepts one answer`), {
-          errorCode: "ASKTOOL_INVALID_ARGUMENT",
-        });
-      }
-      return [...new Set(values)];
-    });
-    pending.resolve(answers);
-    return { ok: true };
-  }
-
-  private resolvePendingAskTools(): void {
-    const pending = [...this.pendingAskTools.values()];
-    this.pendingAskTools.clear();
-    for (const entry of pending) {
-      entry.resolve(entry.request.questions.map(() => null));
-    }
+    return this.askTools.resolve(resolution, this.sessionId);
   }
 
   private async loadPathInstructions(
@@ -6252,7 +6221,7 @@ export class DesktopAgentRuntime {
     error: ReturnType<typeof classifyAgentError>,
     phase: "request" | "stream",
   ): number | undefined {
-    if (!error.retriable || error.details?.origin === "local") return undefined;
+    if (this.teamBudgetStop.requested || this.runCancelled || !error.retriable || error.details?.origin === "local") return undefined;
     const infinite = this.infiniteProviderRetry;
     if (error.code === "PROVIDER_RATE_LIMITED") {
       if (
@@ -6392,6 +6361,7 @@ export class DesktopAgentRuntime {
     this.silentTurnRerunInProgress = false;
     this.suppressSilentTurnRunEnd = false;
     this.teamLeadExecution.reset();
+    this.confirmedDeclarationView.clear();
     this.goalReportRecovery.reset();
     this.pendingProgressTurnRerun = false;
     this.progressTurnRerunAttempted = false;
@@ -6404,11 +6374,13 @@ export class DesktopAgentRuntime {
     this.pendingMutationTermination = undefined;
     this.pendingSubmissionOutcome = undefined;
     this.pendingTeamInboxYield = undefined;
+    this.teamAskDeferred = false;
     this.terminatingToolCalls.clear();
     this.turnHadError = false;
   }
 
   private async retryPendingProviderFailure(): Promise<void> {
+    if (this.teamBudgetStop.requested || this.runCancelled) return;
     if (!this.pendingProviderRetry) return;
     const retryError = this.pendingProviderRetry;
     // Fall back to the budget the error actually draws from. Hardcoding 1 here
@@ -6460,11 +6432,14 @@ export class DesktopAgentRuntime {
       });
       await delayWithAbort(delayMs, this.providerRetryAbort.signal);
       if (this.disposed) throw new Error("runtime disposed");
+      if (this.teamBudgetStop.requested || this.runCancelled) return;
       // The failed attempt has already finished. Only its lifecycle events
       // are suppressed; the retry must close the visible run normally.
       this.suppressProviderRetryRunEnd = false;
       await this.agent.continue();
       await this.waitForIdleAndSteering();
+    } catch (error) {
+      if (!(this.teamBudgetStop.requested && error instanceof Error && error.name === "AbortError")) throw error;
     } finally {
       this.providerRetryAbort = undefined;
       this.activeProviderRetryAttempt = 0;
@@ -6474,6 +6449,7 @@ export class DesktopAgentRuntime {
   }
 
   private async rerunSilentTurn(): Promise<void> {
+    if (this.teamBudgetStop.requested || this.runCancelled) return;
     if (!this.pendingSilentTurnRerun) return;
     this.pendingSilentTurnRerun = false;
     this.suppressSilentTurnRunEnd = false;
@@ -6488,6 +6464,8 @@ export class DesktopAgentRuntime {
       },
       continue: async () => {
         if (this.disposed) throw new Error("runtime disposed");
+        if (this.teamBudgetStop.requested) return;
+        if (this.runCancelled) { this.closeStoppedRecovery(); return; }
         await this.agent.continue();
         await this.waitForIdleAndSteering();
       },
@@ -6511,15 +6489,37 @@ export class DesktopAgentRuntime {
    * Returns false when overflow recovery could not create a checkpoint and the
    * caller must stop; the error event is already emitted.
    */
+  private settleStoppedTeamBudget(): void {
+    if (!this.teamBudgetStop.requested || !this.teamBudgetStop.claimSettlement()) return;
+    this.gracefulStopRequested = false;
+    this.runCancelled = true;
+    this.closeStoppedRecovery({ code: "TURN_ABORTED", message: "Team paused at its hard run limit.", retriable: false });
+  }
+
+  /** Settle the terminal events held by a recovery without admitting a request. */
+  private closeStoppedRecovery(error?: ReturnType<typeof classifyAgentError>): void {
+    this.acceptingSteering = false;
+    this.resetRunRecoveryState();
+    this.autonomousExecution = false;
+    this.goalReportDraftManager = undefined;
+    this.goalProgressManager = undefined;
+    this.rebuildToolCatalog();
+    this.setAgentTools(this.activeTools());
+    this.clearAgentActivity();
+    this.finalizeCurrentAssistant("aborted");
+    if (error) this.emit({ type: "error", error });
+    this.emit({ type: "turn_end" });
+    this.emit({ type: "agent_end", messageIds: [] });
+  }
+
   private async runPendingRecoveries(): Promise<boolean> {
-    while (
-      this.pendingProviderRetry ||
-      this.pendingOverflow ||
-      this.pendingSilentTurnRerun ||
-      this.pendingProgressTurnRerun ||
-      this.goalReportRecovery.pending ||
-      this.teamLeadExecution.pending
-    ) {
+    for (;;) {
+      if (this.teamBudgetStop.requested) { this.settleStoppedTeamBudget(); return false; }
+      const pending = this.pendingProviderRetry || this.pendingOverflow ||
+        this.pendingSilentTurnRerun || this.pendingProgressTurnRerun ||
+        this.goalReportRecovery.pending || this.teamLeadExecution.pending;
+      if (this.runCancelled) { if (pending) this.closeStoppedRecovery(); return false; }
+      if (!pending) return true;
       if (this.pendingProviderRetry) {
         await this.retryPendingProviderFailure();
         continue;
@@ -6537,6 +6537,7 @@ export class DesktopAgentRuntime {
             true,
             "active_turn",
           );
+          if (this.teamBudgetStop.requested) { this.settleStoppedTeamBudget(); return false; }
           if (!compacted) {
             this.terminateParentTurn();
             if (this.compactionAborted) {
@@ -6557,6 +6558,7 @@ export class DesktopAgentRuntime {
             this.emit({ type: "error", error });
             return false;
           }
+          if (this.runCancelled) { this.closeStoppedRecovery(); return false; }
           this.turnHadError = false;
           this.requestStartedAt = Date.now();
           await this.agent.continue();
@@ -6580,7 +6582,6 @@ export class DesktopAgentRuntime {
       }
       await this.rerunGoalReportTurn();
     }
-    return true;
   }
 
   private prepareGoalReportRecovery(): boolean {
@@ -6598,23 +6599,12 @@ export class DesktopAgentRuntime {
   }
 
   private async rerunGoalReportTurn(): Promise<void> {
+    if (this.teamBudgetStop.requested) return;
     const epoch = this.turnEpoch;
-    const closeStoppedRecovery = () => {
-      this.goalReportRecovery.reset();
-      this.autonomousExecution = false;
-      this.goalReportDraftManager = undefined;
-      this.goalProgressManager = undefined;
-      this.rebuildToolCatalog();
-      this.setAgentTools(this.activeTools());
-      this.clearAgentActivity();
-      this.finalizeCurrentAssistant("aborted");
-      this.emit({ type: "turn_end" });
-      this.emit({ type: "agent_end", messageIds: [] });
-    };
     // The preceding loop's terminal events were held. A stop between that
     // loop and its recovery still needs to close the original execution.
     if (this.runCancelled || this.disposed) {
-      closeStoppedRecovery();
+      this.closeStoppedRecovery();
       return;
     }
     await this.goalReportRecovery.recover({
@@ -6627,8 +6617,9 @@ export class DesktopAgentRuntime {
       },
       continue: async () => {
         if (this.turnEpoch !== epoch) return;
+        if (this.teamBudgetStop.requested) return;
         if (this.disposed || this.runCancelled) {
-          closeStoppedRecovery();
+          this.closeStoppedRecovery();
           return;
         }
         await this.agent.continue();
@@ -6639,6 +6630,7 @@ export class DesktopAgentRuntime {
   }
 
   private async rerunProgressOnlyTurn(): Promise<void> {
+    if (this.teamBudgetStop.requested || this.runCancelled) return;
     if (!this.pendingProgressTurnRerun) return;
     this.pendingProgressTurnRerun = false;
     this.suppressProgressTurnRunEnd = false;
@@ -6654,6 +6646,8 @@ export class DesktopAgentRuntime {
       continue: async () => {
         if (this.disposed) throw new Error("runtime disposed");
         this.suppressProgressTurnRunEnd = false;
+        if (this.teamBudgetStop.requested) return;
+        if (this.runCancelled) { this.closeStoppedRecovery(); return; }
         await this.agent.continue();
         await this.waitForIdleAndSteering();
       },
@@ -6666,16 +6660,22 @@ export class DesktopAgentRuntime {
   }
 
   private async rerunTeamCompletionTurn(): Promise<void> {
+    if (this.teamBudgetStop.requested || this.runCancelled) return;
+    const executionStart = this.autonomousExecution ? this.executionContextStartIndex : null;
     await this.teamLeadExecution.recover({
       host: this.host, team: this.teamContext!,
+      refreshDeclaration: executionStart !== null
+        ? review => this.confirmedDeclarationView.register(review, this.turnEpoch,
+          entriesFromExecutionStart(this.fullEntries, executionStart).map(entry => entry.message))
+        : undefined,
       state: () => ({ turnId: this.turnId, epoch: this.turnEpoch, mode: this.mode,
         inactive: this.disposed || this.runCancelled }),
-      abort: error => { this.terminateParentTurn(); this.runCancelled = true; this.autonomousExecution = false; this.goalReportDraftManager = undefined; this.clearGoalProgressTool(); this.finalizeCurrentAssistant("aborted"); this.emit({ type: "error", error: error ?? { code: "TURN_ABORTED", message: "Approved Team execution interrupted.", retriable: false } }); this.emit({ type: "turn_end" }); this.emit({ type: "agent_end", messageIds: [] }); },
+      abort: error => { if (this.teamBudgetStop.requested) { this.settleStoppedTeamBudget(); return; } this.terminateParentTurn(); this.runCancelled = true; this.closeStoppedRecovery(error ?? { code: "TURN_ABORTED", message: "Approved Team execution interrupted.", retriable: false }); },
       prepare: () => this.setAgentMessages(removeTrailingAssistantMessages(this.agent.state.messages)),
       getPrompt: () => this.agentSystemPromptContent(),
       setPrompt: prompt => this.setAgentSystemPrompt(prompt),
       start: () => { this.requestStartedAt = Date.now(); this.setAgentActivity({ phase: "recovering", since: Date.now() }); },
-      continue: async () => { await this.agent.continue(); await this.waitForIdleAndSteering(); },
+      continue: async () => { if (this.teamBudgetStop.requested) return; if (this.runCancelled) { this.closeStoppedRecovery(); return; } await this.agent.continue(); await this.waitForIdleAndSteering(); },
       restore: () => this.applyPendingResumablePrompt(),
     });
   }
@@ -7035,6 +7035,7 @@ export class DesktopAgentRuntime {
     willRetry: boolean,
     retentionMode: CompactionRetentionMode = "completed_turn",
   ): Promise<boolean> {
+    if (this.teamBudgetStop.requested) { this.compactionAborted = true; return false; }
     if (this.compactionInProgress) return false;
     this.compactionInProgress = true;
     this.compactionAborted = false;
@@ -7054,6 +7055,7 @@ export class DesktopAgentRuntime {
         );
         if (decision?.cancel) return false;
       }
+      if (this.teamBudgetStop.requested) { this.compactionAborted = true; return false; }
       const compacted = await this.performCompaction(reason, willRetry, retentionMode);
       if (runner) {
         void runner.emit(compacted ? "session_compact" : "session_compact_failed", {
@@ -7955,7 +7957,7 @@ export class DesktopAgentRuntime {
     this.compactionAbort = new AbortController();
     let build: CheckpointBuild;
     try {
-      build = await this.buildCheckpoint(this.compactionAbort.signal, retentionMode);
+      build = await this.buildCheckpoint(AbortSignal.any([this.compactionAbort.signal, this.teamBudgetStop.providerSignal]), retentionMode);
     } finally {
       this.compactionAbort = undefined;
     }
@@ -8604,6 +8606,16 @@ export class DesktopAgentRuntime {
         }
         break;
       case "turn_end":
+        if (this.teamBudgetStop.requested) {
+          this.settleStoppedTeamBudget();
+          break;
+        }
+        if (this.teamAskDeferred) {
+          this.runCancelled = true;
+          this.emit({ type: "error", error: { code: "TURN_ABORTED", message: "Team question remains pending after 30 minutes. Answer the question, then explicitly resume or obtain new approval.", retriable: false } });
+          this.emit({ type: "turn_end" });
+          break;
+        }
         if (!messageRequestsTools(event.message) && this.prepareGoalReportRecovery()) break;
         if (
           this.suppressOverflowRunEnd ||
@@ -8623,6 +8635,20 @@ export class DesktopAgentRuntime {
         });
         break;
       case "agent_end": {
+        if (this.teamBudgetStop.requested) {
+          this.settleStoppedTeamBudget();
+          break;
+        }
+        if (this.teamAskDeferred) {
+          this.acceptingSteering = false;
+          this.autonomousExecution = false;
+          this.goalReportDraftManager = undefined;
+          this.goalProgressManager = undefined;
+          this.retainPendingSteering();
+          this.clearAgentActivity();
+          this.emit({ type: "agent_end", messageIds: [] });
+          break;
+        }
         if (this.pendingTeamInboxYield?.()) {
           this.pendingTeamInboxYield = undefined;
           this.acceptingSteering = false;
@@ -8860,6 +8886,7 @@ export class DesktopAgentRuntime {
     this.acceptingSteering = true;
     this.pendingUserMessageId = undefined;
     this.gracefulStopRequested = false;
+    this.teamBudgetStop.reset();
     this.runCancelled = false;
     this.resetRunRecoveryState();
     this.turnEpoch += 1;
@@ -8878,6 +8905,7 @@ export class DesktopAgentRuntime {
     this.requestStartedAt = Date.now();
     this.setMode("agent");
     this.autonomousExecution = true;
+    this.setAgentSystemPrompt(this.composeSystemPrompt());
     if (this.projectPath) await this.refreshAutoMemoryForTurn();
     try { ensureExecutionIsCurrent(); } catch (error) {
       this.terminateParentTurn();
@@ -9087,6 +9115,7 @@ export class DesktopAgentRuntime {
     this.turnId = nextTurnId;
     this.acceptingSteering = true;
     this.gracefulStopRequested = false;
+    this.teamBudgetStop.reset();
     this.runCancelled = false;
     this.turnSubagentUsage = undefined;
     // Capabilities and path-scoped instruction claims belong to one prompt.
@@ -9097,6 +9126,9 @@ export class DesktopAgentRuntime {
     this.pendingUserMessageId = userMessageId;
     this.resetRunRecoveryState();
     this.autonomousExecution = false;
+    if (this.executionProfile === "team" && this.teamContext?.isLead) {
+      this.setAgentSystemPrompt(this.composeSystemPrompt());
+    }
     if (this.goalReportDraftManager || this.goalProgressManager) {
       this.goalReportDraftManager = undefined;
       this.goalProgressManager = undefined;
@@ -9335,7 +9367,7 @@ export class DesktopAgentRuntime {
         this.suppressSilentTurnRunEnd || this.suppressProgressTurnRunEnd ||
         this.goalReportRecovery.suppressRunEnd ||
         this.teamLeadExecution.suppressRunEnd) return;
-    while (this.pendingSteering.size && this.acceptingSteering && !this.runCancelled && !this.turnHadError) {
+    while (this.pendingSteering.size && this.acceptingSteering && !this.runCancelled && !this.teamBudgetStop.requested && !this.turnHadError) {
       this.steeringContinuation = true;
       try {
         await this.agent.continue();
@@ -9360,13 +9392,14 @@ export class DesktopAgentRuntime {
   async abort(): Promise<void> {
     this.acceptingSteering = false;
     this.gracefulStopRequested = false;
+    // Keep a requested budget stop's settlement claim until the next turn.
     this.runCancelled = true;
     this.projectMemoryRefreshAbort?.abort();
     this.teamLeadExecution.cancel();
     this.clearGoalProgressTool();
     this.steeringWaitAbort?.abort();
     this.extensionRunner?.cancelPending();
-    this.resolvePendingAskTools();
+    this.askTools.cancelAll();
     this.abortRunningDelegations();
     this.turnSubagentUsage = undefined;
     this.agent.abort();
@@ -9376,7 +9409,16 @@ export class DesktopAgentRuntime {
   }
 
   /** Ask pi-agent-core to stop after the current assistant/tool turn. */
-  requestGracefulStop(): { requested: boolean } {
+  requestGracefulStop(preserveRunningTools = false): { requested: boolean } {
+    if (preserveRunningTools) {
+      if (this.disposed || !this.getStatus().isRunning) return { requested: false };
+      this.acceptingSteering = false;
+      this.gracefulStopRequested = true;
+      this.teamBudgetStop.request();
+      if (this.compactionInProgress) this.compactionAborted = true;
+      if (!this.agent.state.isStreaming) this.settleStoppedTeamBudget();
+      return { requested: true };
+    }
     if (this.teamLeadExecution.suppressRunEnd || this.goalReportRecovery.suppressRunEnd) { void this.abort(); return { requested: true }; }
     if (this.disposed || !this.agent.state.isStreaming) {
       return { requested: false };
@@ -9406,6 +9448,7 @@ export class DesktopAgentRuntime {
 
   async dispose(): Promise<void> {
     if (this.disposed) return;
+    this.backgroundProcessUpdates.dispose();
     const runner = this.extensionRunner;
     this.extensionRunner = undefined;
     const closingExtensions = typeof runner?.dispose === "function" ? runner.dispose() : undefined;
@@ -9420,7 +9463,7 @@ export class DesktopAgentRuntime {
     this.projectMemoryRefreshAbort?.abort();
     this.teamLeadExecution.cancel();
     this.steeringWaitAbort?.abort();
-    this.resolvePendingAskTools();
+    this.askTools.cancelAll();
     this.abortRunningDelegations();
     this.delegationWaitTargets = undefined;
     this.pathInstructionClaims.clear();
@@ -9434,6 +9477,7 @@ export class DesktopAgentRuntime {
     this.delegateToolCalls.clear();
     this.appendedDelegationRowIds.clear();
     this.gracefulStopRequested = false;
+    this.teamBudgetStop.reset();
     this.hostCloseUnsubscribe?.();
     this.hostCloseUnsubscribe = undefined;
     this.agent.abort();

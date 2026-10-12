@@ -1522,7 +1522,7 @@ fn tool_edit(
         legacy_new,
     ) {
         (Some(tag), Some(ops), _, _) => (tag.to_string(), ops.to_string()),
-        (None, None, Some(old), Some(new)) => {
+        (_, None, Some(old), Some(new)) => {
             let file = hashline::normalize_file(&live);
             let tag = hashline::tag_of_lf_text(&file.text);
             let matches: Vec<_> = file
@@ -1565,7 +1565,10 @@ fn tool_edit(
             ));
         }
         (_, None, _, _) => {
-            return Err(hashline::ToolError::new("INVALID_ARGUMENT", "ops required"));
+            return Err(hashline::ToolError::new(
+                "INVALID_ARGUMENT",
+                "ops required unless old_string and new_string are both supplied; example: PUT 48.=48:\n+replacement\nnew_string is read only when ops is absent",
+            ));
         }
     };
     let display = display_tool_path(root_kind, root, &resolved);
@@ -3020,14 +3023,14 @@ pub fn builtin_tool_defs() -> Value {
                 "Run a non-interactive shell command in the workspace. stdout keeps its first {}KB, stderr its \
                  last {}KB, and anything over budget is spilled to a file named in the truncation marker. \
                  Use Read/Glob/Grep for reading and searching instead of shell equivalents; when a shell search \
-                 is genuinely needed prefer `rg` and exclude build output.",
+                 is genuinely needed prefer `rg` and exclude build output. Do not poll with sleep; in an Expert Team use wait_for_updates for teammate replies. Background processes and long sleep hold shell slots until they stop; for long commands use run_in_background and check process status without shell polling.",
                 BUDGET_SHELL.max_bytes / 1024,
                 BUDGET_SHELL_ERR.max_bytes / 1024
             ),
             "risk": "high",
             "parameters": {
                 "type": "object",
-                "properties": { "command": { "type": "string" }, "run_in_background": { "type": "boolean", "default": false, "description": "Start a Host-managed background process after normal approval; return its ID immediately. It keeps the same timeout and tool capacity until it stops." } },
+                "properties": { "command": { "type": "string" }, "run_in_background": { "type": "boolean", "default": false, "description": "Start a Host-managed background process after normal approval; return its ID immediately. It keeps the same timeout and tool capacity until it stops: default 60 seconds; pass timeout in seconds (1-21600) for long runs." } },
                 "required": ["command"]
             }
         }
@@ -4775,6 +4778,115 @@ mod tests {
             not_found.error_code.as_deref(),
             Some("EDIT_LEGACY_MATCH_FAILED")
         );
+    }
+
+    #[tokio::test]
+    async fn edit_accepts_tag_with_legacy_arguments() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("legacy.txt");
+        std::fs::write(&target, "before\nunique\nafter\n").unwrap();
+        let result = execute_tool(
+            Some(dir.path()),
+            None,
+            "Edit",
+            &json!({
+                "path": "legacy.txt", "tag": "stale-ignored",
+                "old_string": "unique", "new_string": "replacement"
+            }),
+            5_000,
+        )
+        .await;
+        assert!(result.ok, "{:?}", result.content);
+        assert_eq!(
+            std::fs::read_to_string(&target).unwrap(),
+            "before\nreplacement\nafter\n"
+        );
+        assert_eq!(result.content["tag"].as_str().unwrap().len(), 4);
+        for old in ["missing", "repeated"] {
+            std::fs::write(&target, "repeated\nrepeated\n").unwrap();
+            let result = execute_tool(
+                Some(dir.path()),
+                None,
+                "Edit",
+                &json!({
+                    "path": "legacy.txt", "tag": "stale-ignored",
+                    "old_string": old, "new_string": "replacement"
+                }),
+                5_000,
+            )
+            .await;
+            assert_eq!(
+                result.error_code.as_deref(),
+                Some("EDIT_LEGACY_MATCH_FAILED")
+            );
+            assert_eq!(
+                std::fs::read_to_string(&target).unwrap(),
+                "repeated\nrepeated\n"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn edit_ops_take_precedence_over_legacy_arguments() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("anchored.txt");
+        std::fs::write(&target, "original\n").unwrap();
+        let read = execute_tool(
+            Some(dir.path()),
+            None,
+            "Read",
+            &json!({"path": "anchored.txt"}),
+            5_000,
+        )
+        .await;
+        let result = execute_tool(
+            Some(dir.path()),
+            None,
+            "Edit",
+            &json!({
+                "path": "anchored.txt", "tag": read.content["tag"],
+                "ops": "PUT 1.=1:\n+anchored\n",
+                "old_string": "original", "new_string": "legacy"
+            }),
+            5_000,
+        )
+        .await;
+        assert!(result.ok, "{:?}", result.content);
+        assert_eq!(std::fs::read_to_string(&target).unwrap(), "anchored\n");
+    }
+
+    #[tokio::test]
+    async fn edit_missing_ops_and_body_explain_the_operation_shape() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("shape.txt");
+        std::fs::write(&target, "original\n").unwrap();
+        let read = execute_tool(
+            Some(dir.path()),
+            None,
+            "Read",
+            &json!({"path": "shape.txt"}),
+            5_000,
+        )
+        .await;
+        for (ops, code) in [
+            (None, "INVALID_ARGUMENT"),
+            (Some("PUT 1.=1:"), "EDIT_PARSE_FAILED"),
+        ] {
+            let mut args =
+                json!({"path": "shape.txt", "tag": read.content["tag"], "new_string": "ignored"});
+            if let Some(ops) = ops {
+                args["ops"] = json!(ops);
+            }
+            let result = execute_tool(Some(dir.path()), None, "Edit", &args, 5_000).await;
+            assert_eq!(result.error_code.as_deref(), Some(code));
+            let message = result.content["error"].as_str().unwrap();
+            assert!(message.contains("PUT 48.=48:\n+replacement"), "{message}");
+            assert!(
+                message.contains("new_string is read only when ops is absent"),
+                "{message}"
+            );
+            assert_eq!(std::fs::read_to_string(&target).unwrap(), "original\n");
+        }
     }
 
     #[tokio::test]

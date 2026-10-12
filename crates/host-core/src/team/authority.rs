@@ -13,6 +13,7 @@ pub(crate) fn record_user_turn(db: &Database, session: &str, turn: &str) -> Resu
         && super::get_team_member_by_session_id(db, session)?.is_none()
     {
         db.kv_set(SCOPE_NS, session, &serde_json::json!(turn))?;
+        super::run_limits::start_user_run(db, session, turn, crate::db::now_ms())?;
     }
     Ok(())
 }
@@ -80,6 +81,14 @@ pub(crate) fn validate_lead_tool(db: &Database, session: &str, tool: &str) -> Re
     ) {
         return Ok(());
     }
+    // A report must explain queued work even before the first expert starts.
+    // Final-answer participation and non-execution authority keep their order.
+    if tool == "SubmitGoalReport" {
+        let turn = sessions::running_turn_id(db, session)?.unwrap_or_default();
+        if super::execution_inbox::state(db, session, session, &turn)?.active {
+            super::execution_inbox::require_settled(db, &decision)?;
+        }
+    }
     require_expert_participation(db, &decision)?;
     if tool == "TeamFinalAnswer" {
         let turn = sessions::running_turn_id(db, session)?.unwrap_or_default();
@@ -94,10 +103,13 @@ pub(crate) fn require_confirmed_strategy(db: &Database, team: &str) -> Result<()
     current_confirmed_decision(db, team).map(|_| ())
 }
 
-fn current_confirmed_decision(db: &Database, team: &str) -> Result<super::TeamExecutionDecision> {
+pub(super) fn current_confirmed_decision(
+    db: &Database,
+    team: &str,
+) -> Result<super::TeamExecutionDecision> {
     let deny = || {
         anyhow!(
-            "TEAM_APPROVAL_REQUIRED: user confirmation of this turn's Team strategy is required"
+            "TEAM_APPROVAL_REQUIRED: user confirmation of this turn's Team strategy is required; nextStep: declare_team_strategy and wait for trusted roster review"
         )
     };
     let Some(scope) = db
@@ -168,7 +180,10 @@ fn current_confirmed_decision(db: &Database, team: &str) -> Result<super::TeamEx
     };
     let confirmation = decision.message_ids.contains(&message_id)
         && key == format!("team-review:{review_id}:confirmed");
-    if confirmation || decision.member_session_ids.contains(&source) {
+    if confirmation
+        || decision.member_session_ids.contains(&source)
+        || super::run_limits::is_soft_notice(db, team, &message_id)?
+    {
         return Ok(decision);
     }
     Err(deny())
@@ -205,6 +220,11 @@ pub(crate) fn validate_current_expert(db: &Database, team: &str, target: &str) -
         Some(member) => Some(member),
         None => super::get_team_member_by_session_id(db, target)?,
     };
+    if let Some(ref member) = member {
+        if super::replacements::replaced(db, team, &member.member_session_id)? {
+            return Err(anyhow!("TEAM_REPLACED_MEMBER: source slot already has a successor; nextStep: dispatch to the replacement or request trusted review"));
+        }
+    }
     if decision.strategy.as_deref() == Some("delegate")
         && member.is_some_and(|member| {
             member.team_session_id == team

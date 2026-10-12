@@ -8,7 +8,7 @@ import {
 import { AskToolRichText } from "./AskToolRichText";
 import type { PendingAsk } from "../lib/pending-asks";
 import { useAppStore } from "../stores/app-store";
-import { Button } from "./ui";
+import { Badge, Button } from "./ui";
 
 type DraftAnswer = {
   values: string[];
@@ -134,6 +134,7 @@ export function AskToolCard({ request, queued = 0 }: { request: PendingAsk; queu
           <span className="asktool-card-title" role="status" aria-live="polite">
             {t("askTool.title")}
           </span>
+          {request.teamPending ? <Badge>{t("askTool.pending")}</Badge> : null}
           <span className="asktool-card-progress">
             {t("askTool.progress", { current: index + 1, total: request.questions.length })}
             {queued > 0 ? <span> · {t("askTool.queued", { count: queued })}</span> : null}
@@ -169,6 +170,7 @@ export function AskToolCard({ request, queued = 0 }: { request: PendingAsk; queu
         </div>
       </div>
 
+      {request.teamPending ? <p role="status">{t("askTool.pendingHelp")}</p> : null}
       <h3 className="asktool-question">
         <span className="asktool-question-number">
           {t("askTool.questionNumber", { number: index + 1 })}

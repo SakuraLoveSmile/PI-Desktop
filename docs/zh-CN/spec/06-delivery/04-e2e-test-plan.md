@@ -267,6 +267,21 @@ task-candidate E2E 从请求工作树运行，但使用主工作区已经准备�
 - **里程碑**：M5
 - **状态**：已记录；自动化待定
 
+#### E2E-RUNTIME-shell-capacity-diagnostics：Shell 准入说明额度饱和
+
+- **前置条件**：隔离 Host/profile 和本地 shell 夹具，不调用 provider。
+- **步骤**：占满四个 shell 槽并排队十二个调用。独立 Read/Write 成功后，
+  排空这一轮；在独立阶段占满四个 shell 槽，让另一 Bash 调用触发真实
+  30 秒准入超时，随后释放夹具门并排空已接受任务。
+- **预期**：被拒绝命令不会启动。`HOST_OVERLOADED` 保持可重试属性，
+  `content.capacity` 在拒绝时显示 host 运行 4/排队 1、请求会话运行 0/排队 1，
+  并列出四个安全的 Bash 占用会话。文案包含 `wait_for_updates`、长 `sleep`
+  以及后台仍占同一额度。不含命令或路径。超时排队项被清除，既有 FIFO/取消
+  测试通过，最终全部计数归零。
+- **自动化**：`node scripts/e2e-tool-admission.mjs`；运行时 Bash 结果透传与
+  Team 提示词使用假 host 测试。
+- **关联规格**：`03-runtime/06-host-rpc-protocol.md`、`03-runtime/08-error-codes.md`
+
 ### 启动和健康检查
 
 #### E2E-001：应用程序启动并显示主窗口
@@ -9593,6 +9608,7 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **前提：** 已构建的隔离生产 Electron/Main/Host/sidecar、临时项目、真实专家会话及确定性本机 SSE provider。不访问用户 profile、真实 provider 或付费服务。
 - **步骤：** 从真实输入框协商 Team Goal，使用批准卡选择 Auto 并批准契约。模型提出非空专家执行名单并试图结束等待；确认原 Host turn 仍 running，只有一个 pending Goal report，executionStatus 尚未完成且没有专家启动。通过真实 Team 确认按钮批准名单，暂停真实专家，验证 GoalProgress 在原 executionId 生效、原 currentTurnId 不变。释放专家实际 Read、完成任务并发送完整验证结果；Lead 通过 wait_for_updates 在原回合消费结果，更新进度并提交结构化 Goal report。
 - **预期：** 只有一次执行、一次 SubmitGoalReport 和一个 completed／met／structured 报告；进度 revision 从 1 到 2，专家报告完整可见，原 Host turn 最后才 completed。确认／专家消息不成为新用户回合，不重复 mailbox kickoff，也不更换 executionId 或 token。
+- **整个执行的名单可见性：** guard 恢复后检查直到执行结束的每个 provider 请求，至少包含三个连续工具轮次及重试／重建／压缩边界。同 team／turn／review 的所有匹配成功 `declare_team_strategy` 结果持续为 `status=confirmed`、`awaitingUserApproval=false`、确认版 `nextStep`，无过期 `memberSessionIds`；遥测与实际模型载荷一致。登记只读当前已批准 execution 开始边界之后的原始 entries，确认前压缩不能隐藏本次声明，也不能引入前次执行声明。压缩归档完整 batch 后，最终模型视图保留已登记的完整合法 assistant 工具 batch 与全部原始配对结果，不裁剪 signed thinking／text／tool signatures 或兄弟调用／结果，仅改变匹配声明结果；不插入孤立 call／result 或修改 summary／checkpoint。重复恢复保留同 owner／review／epoch 登记，wireCallId 碰撞不覆盖新工作；首次登记缺少完整合法配对 batch 内匹配成功声明不造调用，保留 fallback。原 pending entries／journal／UI 和无关结果不变。pending／cancelled／被替换 review、Stop、完成后普通回合与第二次执行不得复用旧投影。runtime 重放／纯函数覆盖这些边界；现有 Electron suite 不单独证明逐请求或真实模型覆盖。`wait_for_updates` 直接消费确认路径不变。新构建真实模型验证保持 **NOT RUN**，仅经用户另行同意后，使用相同 CPA 与 gemini-3.7-flash-high、独立 HOME／profile／data／scratch、新标记和 park-aware TEST-4，检查每个确认后 lead providerPayload，保留 teardown 后证据。
 - **取消路径：** 创建另一个 Team Goal，从真实输入框协商并批准，名单 pending 时通过可信 Main 取消。原 turn 必须 aborted，executionStatus interrupted；不启动专家、不再调用 provider、不发布已完成报告。历史 pending 报告记录可保留，不能被当作完成报告展示。
 - **关联契约：** trusted plans.bindExecutionTurn 的不可变精确 Plan-turn 绑定、Goal 的 goal_reports 精确证明、execution inbox 独立消费 ledger、不写 message.turn_id、不对模型开放绑定 RPC，另由 Host／runtime／代理回归覆盖。
 - **规格：** 02-agent-runtime、03-tools-and-permissions、06-host-rpc-protocol、08-component-spec 及 Expert Team ADR。
@@ -9765,3 +9781,135 @@ Overview layout validation also checks long titles, project paths and model name
 320/360/570px in both themes. Metadata retains positive visible width and no
 header/resources/references horizontal overflow is introduced. Selected reference
 options retain pressed states and switching behavior.
+
+### Team Goal 结算与完成原因
+
+- `E2E-GOAL-report-waits-for-settled-team`：获批 Team Goal 派遣专家；专家运行时提交报告被拒绝，诊断精确包含成员、派遣、任务且不持久化草稿；专家结束后的未消费证据继续阻挡，原始回合通过 `wait_for_updates` 消费完整结果后报告成功。
+- `E2E-TEAM-completion-error-keeps-host-reason`：真实宿主拒绝经运行时 guard 和三次具体原因提示，第四次拒绝的终态错误与宿主原因完全相同。
+
+自动执行 `scripts/e2e-goal-report.mjs`（隔离真实 Host RPC 和运行时工具／guard）及 `scripts/e2e-team-approved-goal.mjs`（隔离 Electron、回环假 provider）。不访问真实会话、profile 或模型。
+
+### E2E-RUNTIME-edit-accepts-tag-with-legacy-arguments
+
+- **前提：** 候选源码构建的 Host 二进制、隔离临时数据和工作区；不使用提供商或运行中的 Desktop。
+- **步骤：** 读取文件，不带 `ops`，同时传 `tag`、`old_string`、`new_string` 编辑。
+  再只传 `tag` + `ops`、以及混合旧式字段编辑。尝试零处/多处旧文本匹配、缺少操作和没有正文的冒号 PUT。
+- **预期：** 旧式替换应用一次；`ops` 优先，普通锚定编辑保留原有检查。零处/多处匹配拒绝且不写入。
+  两种形态错误包含 `PUT 48.=48:` 与 `+replacement` 行，并说明 `new_string` 仅在 `ops` 缺省时读取。
+  三次失败终止仍由既有 mutation-guard 测试覆盖。
+- **覆盖：** `node scripts/e2e-edit-legacy.mjs`，`PI_DESKTOP_HOST_BIN` 指向任务候选；Host Edit 和 runtime mutation-guard 测试。
+- **规格：** runtime 规格 18 §2.1 / §11；D273 修订。
+
+
+### E2E-TEAM-member-failure-wakes-lead
+
+- **前置条件：** 本候选 Host/runtime 构建，隔离数据和工作目录；配置无认证 loopback
+  路由但不调用模型，也不访问用户 profile。
+- **步骤：** 批准 Goal 团队，先成功结束一次专家贡献；lead 等待时让成员在任务预完成
+  后失败，消费通知前尝试完成，再通过真实 wait 工具消费。重放终结，检查失败任务。
+  lead 结束后让下一成员 turn 失败；将真实 Host 通知交给生产 Main 投递服务与真实
+  Agent Host/Host 持久化队列，重放通知；另让成员 abort。
+- **预期：** 恰好一次完整 `member_failed`，包含成员、净化错误码、建议重试标记、任务 ID；
+  未读通知阻止完成，消费后 settled 闸门通过但仍要求成功参与。等待及空闲 lead 均唤醒，
+  重复事件不重复启动，abort 不通知，非法错误文本不泄漏路径。
+- **自动化：** `node scripts/e2e-team-member-failure.mjs`，真实 Host stdio、runtime wait、
+  Main 投递与 Agent Host 队列；仅模型 runtime port 替身启动真实认证 mailbox turn。
+  Rust 补事务回滚、伪造正文/证明、保留键和删除清理；假时钟 runtime 测试补完整正文及计时器。
+- **规格：** 03-runtime/06-host-rpc-protocol；Team ADR 的失败邮件修订。
+
+
+提交后检查点 I/O 失败仍保留原错误，并对已落盘且尚在 queued 状态的失败邮件发出既有
+唤醒事件。终结重放可以再次唤醒同一 pending 邮件，但不新建第二条；已消费或 running
+的邮件不再发出事件。
+
+
+### E2E-RUNTIME-background-bash-timeout-is-visible
+
+- **前置条件：** 记录候选版本构建的 Host/runtime/sidecar，隔离临时数据与工作区，
+  不调用模型的本地 provider 夹具。
+- **步骤：** 建立已批准团队与成功的专家参与；等待期间运行显式 1 秒的后台命令，
+  再验证正常退出和缺省 60 秒超时。检查等待结果与持久化详情；覆盖首次等待
+  前与两次等待之间结束的进程，每个终态仅交付一次。
+- **预期：** 超时准确说明默认/显式限制并提示 `timeout` 秒数（1–21,600）。
+  退出和超时经真实 HostProcess/AgentSidecar 唤醒已有等待，运行中输出不结束等待。
+  不插入邮箱、不调用真实模型、不授予进程修改或跨会话读取。旧消息不补造默认来源。
+- **覆盖：** `scripts/e2e-background-bash-limit.mjs`，Rust 后台 RPC、运行时
+  schema/载荷、团队等待生命周期与启动绑定代理回归。
+- **状态：** 记录候选执行结果；Windows 仍需平台验收。
+
+### E2E-TEAM-write-scope-warning
+
+- **前置条件：** 候选 Host/runtime，隔离 Git/profile，真实批准 builder、mailbox
+  和任务 turn 绑定；不调用模型。
+- **步骤：** 声明 owned 范围，在 HEAD A 派发；交付前提交 HEAD B、重放派发，解析
+  成员输入并保存认证历史。开始任务，范围内 Write、范围外 Write/Edit、失败 Edit，
+  读取 team_status；清空 scopes 后再次写入。成员回复通过原批准 Goal turn 的
+  wait_for_updates 消费并携带发送时 HEAD。
+- **预期：** 范围内和空 scopes 无告警；范围外仍成功且返回 TEAM_WRITE_SCOPE_WARNING，
+  仅两次成功范围外调用计数。目录相似前缀不扩大范围。重放保留 A，成员模型与历史
+  均可见；伪造来源 HEAD 由 Host 覆盖。失败/Bash/scratch 不计数。
+- **自动化：** node scripts/e2e-team-write-scope.mjs 使用真实 Host stdio、生产 team
+  工具、消息解析/格式化和临时原生 Git；Rust 覆盖软链接、任务绑定、重复计数和统计
+  故障可见，runtime 测试检查成功告警文本和详情。
+- **规格：** 团队协作决策 docs/adr/plus-expert-team-collaboration.md 的建议性范围修订（2026-10-11）及 03-runtime/06-host-rpc-protocol。
+- **验收：** P1 共享树协作；不拒绝写入，不增加 RPC 或迁移。
+- **状态：** 隔离 Host 和 runtime 契约夹具自动化。
+
+
+### 专家团协作可靠性指导
+
+生成后提示词回归覆盖 lead/成员、普通 Agent 排队正文、普通 Plan 让出与批准执行 inbox 指导。runtime 的模型边界夹具经 executeApprovedPlan 跑批准 Plan/Goal 两条路径，验证同回合认证 inbox 和模型实际系统提示；不能代替真实模型遵循证明。入口 packages/agent-runtime/src/team/team-prompt.test.ts，新指导不使用源码文本断言。排队报告用户路径另按 Host 进程记录核对专家/lead 数量。
+
+### E2E-TEAM-shared-git-warning
+
+- **前提：** 候选 Host/runtime、一次性 Git 仓库、隔离数据/配置和已确认团队；不调用模型。
+- **步骤：** 委派写任务并置为 in_progress；Lead 对双方文件执行
+  git add -A && git commit、git stash、无效 git reset --hard；读取真实 team_status。
+  再由唯一写入者暂存，并在任务完成后重试 Git 命令。
+- **预期：** 混合提交和 stash 实际成功并告警；无效 reset 保留失败与真实退出码。
+  状态累计三个归属调用者的 Git 警告，与 Write/Edit 计数分离；唯一写入者及已完成任务不误报。
+- **覆盖：** node scripts/e2e-team-shared-git-warning.mjs；Host RPC 覆盖六种操作、
+  后台准入、跨团队/空范围排除、幂等、重启持久化和删除竞态；runtime 验证可见投影与旧字段缺省。
+- **规格：** 03-runtime/06-host-rpc-protocol 的共享 Git 建议性警告。
+- **状态：** 记录实际候选结果；不代表真实模型或 Windows 验收，动态 shell 形式不保证覆盖。
+### E2E-TEAM-agent-lead-sees-queued-expert-report
+
+- **前提：** 候选 Host/runtime、隔离目录/数据、普通 Agent team lead，无批准执行，确定性 fake provider。
+- **步骤：** 委派专家两条后台命令，lead 长回合等待时专家发完整报告；分别记录入库、通知、ACK、kick、回合结束、出队与正文入模，重放同一投递。结束 lead 前查询 status/wait。
+- **预期：** 基线在准入和 kick 及时完成时仍积压三分多钟、lead 重跑命令；候选下一次 status/wait 立即给摘要，不泄正文、不 ACK、不自动结束，lead 主动结束普通回合后认证全文恰好一次。宿主进程数专家 2、lead 0。
+- **验收：** --timeout-acceptance 运行 sleep 5/timeout2 和 sleep75/缺省timeout，读取约 2/60 秒 timed_out/TOOL_TIMEOUT 并核对会话计数。既有回归保留 Plan yield、批准 inbox、取消/上下文变化和 WP5 间隙补收；不当作取消验收。
+- **自动化：** scripts/e2e-team-agent-queued-report.mjs 与 pending/wait/status/runtime/Main/AgentHost 行为回归。
+- **规格：** 03-runtime/02-agent-runtime、06-host-rpc-protocol；WP16 S3 仍为 proposed ADR，未实现回合内正文能力。
+#### E2E-TEAM-member-activity-interrupt-guard
+
+- **范围：** Lead 团队工具 → Host 活动投影 → 精确回合中断。
+- **夹具：** 隔离 Host 数据与目录、确定性假 provider，不使用用户实例或付费模型。
+- **步骤：** 批准 tester、派发任务、启动不产生 Git 活动的后台测试；Lead 查看 team_status，依次请求普通中断、无理由 force、有理由 force。
+- **预期：** 状态展示真实后台进程和回合；前两次分别返回 TEAM_MEMBER_ACTIVE、TEAM_INTERRUPT_REASON_REQUIRED 且不发送中断通知；只有有理由 force 产生一次绑定成员和 turn 的通知并写审计，权限和审批不变。
+- **自动化：** `scripts/e2e-team-member-activity.mjs` 使用真实 Host/运行时工具与假 provider；Host RPC 测试控制时间回放二十分钟测试、空转、前台 Bash、权限与审计；领域测试覆盖 ACK 后五小时队列和 usage 重启/重放；工具测试验证证据与 force/reason 透传。
+- **证据限制：** 二十分钟和五小时是确定性时间夹具，不代表真实长跑、Windows 或真实模型验收。
+### E2E-TEAM-run-limits-ui
+
+候选源码在隔离 Electron profile 执行 `node scripts/e2e-team-run-limits-ui.mjs`，以真实点击/输入覆盖默认启用 6/10 小时、非法输入、关闭后保存、保留并发角色设置及策略冲突拒绝。生产状态组件覆盖收尾、安全结束、暂停及关闭限额。设置后端是夹具；Host 时钟持久化、重启和暂停/恢复权限由独立领域/RPC 验证，不代表真实 provider、系统通知或十小时长跑。
+
+
+### E2E-TEAM-member-interrupt-production-chain
+
+隔离 Host 和 loopback provider 经真实 Main、bridge、IPC、sidecar/runtime 重放成员中断；验证普通请求拒绝、前台进程终止和 interrupted 状态。阻塞真实 session gate 后替换回合，再释放并重放旧通知，新回合不受影响。已接受后台任务在 abort/dispose 后保留，清理阶段显式停止；不以后台归零作为回合取消契约。入口 `node --experimental-strip-types scripts/e2e-team-member-interrupt.mjs`。
+### WP11 无人值守提问与失败 slot 替换
+
+`E2E-TEAM-lead-pending-ask-late-answer` 回放 Lead 05:05 提问、05:35 中断并
+保留待回答卡、迟到回答开启一个认证新用户回合。不得恢复旧执行令牌或
+自动批准。原生隔离 Ask 卡验证徽标、提示和可回答控件。宿主 RPC 完整路径
+验证已批准成员 failed 后一次替换、幂等重试、继承权限与模型、新成员派发
+和回合接纳；旧成员和第二次替换拒绝。补充超时/回答竞态、ACK、重启恢复、
+队列满回滚和取消围栏检查。真实供应商通宵验收与受控回放分开报告。
+
+The explicit nightly lane `node scripts/e2e-team-lead-pending.mjs` requires the
+existing environment's `pnpm build:js` output. It runs the opt-in Rust
+cross-language fixture with `--ignored`, then records
+`E2E-TEAM-approved-lead-ask-interrupted`. The default pure Rust CI does not
+require Node/JS dependencies. The fixture exercises approved Goal dispatch,
+30-minute controlled wait, actual Main finalization/outbox, Rust interrupted
+execution, no successful report, and rejection of a genuine old progress token.
+It uses no provider service, test-only production backdoor, or system-clock edit.

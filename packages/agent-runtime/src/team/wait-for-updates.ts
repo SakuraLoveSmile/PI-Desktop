@@ -1,14 +1,20 @@
+import { BackgroundProcessUpdates } from "./background-process-updates.js";
 import { Type } from "@earendil-works/pi-ai";
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
-import type { TeamBoardProjection, TeamMessageRecord } from "@pi-desktop/shared";
+import type { TeamBoardProjection } from "@pi-desktop/shared";
 import type { RuntimeHost } from "../host-client.js";
+import { pendingMailboxNextStep, readPendingMailbox, type PendingMailboxSummary } from "./pending-mailbox.js";
 
 interface WaitForUpdatesOptions {
   teamSessionId: string;
   callerSessionId: string;
   host: RuntimeHost;
+  backgroundProcesses?: BackgroundProcessUpdates;
   getTurnId?: () => string | undefined;
   approvedExecution?: () => boolean;
+  isLead?: boolean;
+  mode?: string;
+  captureMailboxGuard?: () => (() => boolean);
   /** Capture an ordinary Plan Lead turn and yield only while it still owns the wait. */
   captureInboxYield?: () => ((toolCallId: string) => boolean) | undefined;
 }
@@ -31,11 +37,12 @@ function errorResult(error: unknown): AgentToolResult {
 export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool {
   const { teamSessionId, callerSessionId, host } = opts;
   const consumed = new Set<string>();
+  const background = opts.backgroundProcesses ?? new BackgroundProcessUpdates(host, callerSessionId);
   return {
     name: "wait_for_updates",
     label: "Wait for Updates",
     description:
-      "Wait for teammate updates (mailbox messages, task board updates) with a timeout in seconds.",
+      "Wait for teammate updates (mailbox messages, task board updates) or an owned background process ending, with a timeout in seconds.",
     parameters: Type.Object({
       timeoutSeconds: Type.Optional(Type.Number({
         description: "Timeout in seconds (1-60, default 10).",
@@ -45,13 +52,21 @@ export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool
     }),
     execute: async (toolCallId, params, signal): Promise<AgentToolResult> => {
       const expectedTurnId = opts.getTurnId?.();
+      const ownsMailbox = opts.captureMailboxGuard?.();
+      const assertCurrent = () => {
+        signal?.throwIfAborted();
+        if ((opts.getTurnId && opts.getTurnId() !== expectedTurnId) || ownsMailbox?.() === false) {
+          throw new Error("TEAM_PLANNING_STALE: team mailbox context changed");
+        }
+      };
+      background.prime();
       const yieldInbox = opts.approvedExecution?.() ? undefined : opts.captureInboxYield?.();
       const readInbox = async () => {
         if (!opts.approvedExecution?.() || !expectedTurnId) return undefined;
         const inbox = await host.call<{ turnId: string; messages: Array<{ id: string; content: string }> }>("team.readExecutionInbox", {
           teamSessionId, callerSessionId, expectedTurnId,
         });
-        signal?.throwIfAborted();
+        assertCurrent();
         if (opts.getTurnId?.() !== expectedTurnId || inbox.turnId !== expectedTurnId) throw new Error("TEAM_PLANNING_STALE: approved execution changed");
         const messages = inbox.messages.filter(message => !consumed.has(message.id));
         return messages.length ? result({ updated: true, reason: "execution_inbox", messages }) : undefined;
@@ -79,6 +94,13 @@ export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool
           if (settled) return;
           settled = true;
           const details = value.details;
+          if (details && typeof details === "object" && "backgroundProcess" in details) {
+            const detail = details.backgroundProcess;
+            if (detail && typeof detail === "object" && "process" in detail && detail.process &&
+                typeof detail.process === "object" && "id" in detail.process && typeof detail.process.id === "string") {
+              background.consume(detail.process.id);
+            }
+          }
           if (details && typeof details === "object" && "reason" in details &&
               details.reason === "execution_inbox" && "messages" in details && Array.isArray(details.messages)) {
             for (const message of details.messages) {
@@ -104,21 +126,23 @@ export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool
           // Keep the read single-flight even when one RPC rejects before its peer settles.
           const [board, mailbox] = await Promise.allSettled([
             host.call<TeamBoardProjection>("team.getBoard", { teamSessionId, callerSessionId }),
-            host.call<{ messages: TeamMessageRecord[] }>("team.listMessages", {
-              teamSessionId, callerSessionId, sessionId: callerSessionId,
-            }),
+            readPendingMailbox(host, teamSessionId, callerSessionId),
           ]);
           if (board.status === "rejected") throw board.reason;
           if (mailbox.status === "rejected") throw mailbox.reason;
-          const pendingCount = mailbox.value.messages.filter(message =>
-            message.targetSessionId === callerSessionId && message.sourceSessionId !== callerSessionId &&
-            message.status === "queued" && message.turnId == null).length;
-          return { revision: board.value.revision, count: mailbox.value.messages.length, pendingCount };
+          assertCurrent();
+          return { revision: board.value.revision, ...mailbox.value };
         };
-        const yieldPendingInbox = (pendingCount: number): boolean => {
-          if (!pendingCount || settled || signal?.aborted || Date.now() >= deadline ||
+        const yieldPendingInbox = (summary: PendingMailboxSummary): boolean => {
+          if (!summary.pendingMessagesCount || settled || signal?.aborted || Date.now() >= deadline ||
               opts.approvedExecution?.() || !yieldInbox?.(toolCallId)) return false;
-          finish({ ...result({ updated: true, reason: "pending_mailbox_messages", count: pendingCount }), terminate: true });
+          finish({ ...result({ updated: true, reason: "pending_mailbox_messages", count: summary.pendingMessagesCount, ...summary }), terminate: true });
+          return true;
+        };
+        const showPendingInbox = (summary: PendingMailboxSummary): boolean => {
+          if (!opts.isLead || opts.mode === "plan" || opts.approvedExecution?.() || !summary.pendingMessagesCount) return false;
+          finish(result({ updated: true, reason: "pending_mailbox_messages", count: summary.pendingMessagesCount,
+            ...summary, nextStep: pendingMailboxNextStep(opts.mode, false) }));
           return true;
         };
         const scheduleFallback = () => {
@@ -152,6 +176,16 @@ export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool
           try {
             const inbox = await readInbox();
             if (inbox && !settled) { finish(inbox); return; }
+            let backgroundProcess;
+            try {
+              backgroundProcess = await background.read(signal, () => !settled && ownsMailbox?.() !== false && (!expectedTurnId || opts.getTurnId?.() === expectedTurnId));
+            } catch (error) {
+              if (!settled) finish(errorResult(error));
+              return;
+            }
+            if (settled) return;
+            if (Date.now() >= deadline) { finishDeadline(); return; }
+            if (backgroundProcess) { finish(result({ updated: true, reason: "background_process_completed", backgroundProcess })); return; }
             const current = await readState();
             if (settled) return;
             if (Date.now() >= deadline) {
@@ -159,14 +193,16 @@ export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool
               return;
             }
             successfulRecheck = true;
-            if (yieldPendingInbox(current.pendingCount)) return;
+            if (yieldPendingInbox(current.summary) || showPendingInbox(current.summary)) return;
             if (current.revision !== baseline.revision) {
               finish(result({ updated: true, reason: "task_board_changed", revision: current.revision }));
             } else if (current.count !== baseline.count) {
               finish(result({ updated: true, reason: "new_mailbox_messages", count: current.count }));
             }
           } catch (error) {
-            recheckError = errorResult(error);
+            if ((opts.getTurnId && opts.getTurnId() !== expectedTurnId) || ownsMailbox?.() === false) {
+              finish(errorResult(error));
+            } else recheckError = errorResult(error);
           } finally {
             checking = false;
             if (!settled) {
@@ -190,9 +226,11 @@ export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool
         try {
           // Subscribe before reading the baseline so a concurrent mutation wakes us.
           unsubscribe = host.onNotification?.((method, payload) => {
-            if (settled || (method !== "team.changed" && method !== "team.messageQueued") ||
-                !payload || typeof payload !== "object" ||
-                !("teamSessionId" in payload) || payload.teamSessionId !== teamSessionId) return;
+            if (settled) return;
+            const processChanged = background.changed(method, payload);
+            const teamChanged = (method === "team.changed" || method === "team.messageQueued") &&
+              payload && typeof payload === "object" && "teamSessionId" in payload && payload.teamSessionId === teamSessionId;
+            if (!processChanged && !teamChanged) return;
             clearTimeout(notificationTimer);
             notificationTimer = setTimeout(() => {
               notificationTimer = undefined;
@@ -219,8 +257,10 @@ export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool
               return;
             }
             baseline = initial;
-            if (yieldPendingInbox(initial.pendingCount)) return;
-            if (dirty) void recheck();
+            if (yieldPendingInbox(initial.summary)) return;
+            // Existing background outcomes retain their once-only priority.
+            if (!background.hasPending() && showPendingInbox(initial.summary)) return;
+            if (dirty || background.hasPending()) void recheck();
             else scheduleFallback();
           };
           void initialize().catch((error: unknown) => finish(errorResult(error)));

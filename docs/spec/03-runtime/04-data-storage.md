@@ -2005,3 +2005,33 @@ visible diagnostics and one repair attempt per scoped resource request. Hard
 Host loss cannot preserve this unwritten snapshot. P5 does not advance the
 shared PRAGMA user_version. Current executable shared migration ownership is
 `crates/host-core/src/db.rs`; older shared-v19 examples above are historical.
+
+## Team dispatch metadata (WP10)
+
+The optional Host-owned `team-dispatch-metadata-v1` KV record is keyed by mailbox
+message ID and preserves immutable send-time facts and explicit board task
+association. Queued-only cancellation and completion transaction semantics are
+specified in [Team task dispatch](team-task-dispatch.md). Existing ledger rows,
+source proofs, permission ceilings and delivery keys remain intact; no schema
+migration or protocol version bump is introduced.
+### Team run-limit clock (WP8)
+
+Host `team-run-limits-v1` KV records retain the trusted strategy-scope `runId`,
+`startedAt`, nondecreasing `elapsedMs`, `softMessageId`, and `hardReachedAt`.
+Absent legacy records initialize on actual execution, never from Team creation
+age. Same-run pause/restart/mail do not reset; a newly admitted non-mail user scope
+creates a fresh record. Team deletion removes its KV record. Mailbox notices use
+`team-run-limit-soft:<runId>` and the exact stored message id is Host proof, not
+model text. No storage schema bump is required; old policy omissions use defaults.
+See [Team run limits](team-run-limits.md).
+### WP11 Team question and replacement KV ownership
+
+Rust owns `team-lead-ask-v1` durable question requests, original turn, Host time,
+waiting/pending/answered_live/answered/cancelled lifecycle, normalized answers
+and stable queued-answer ID. `team-lead-ask-cancel-v1` fences late registration
+for a stopped running turn. Late replies atomically enter the existing
+turn_queue under the same savepoint; deletion removes owned question records.
+`team-member-replacement-v1` records an immutable original/successor slot link,
+approved scope/review and exact selection/permission ceiling. Reviews and old
+member/task identities remain unchanged; Team dissolution deletes owned links.
+These versioned namespaces use existing KV storage and require no schema bump.

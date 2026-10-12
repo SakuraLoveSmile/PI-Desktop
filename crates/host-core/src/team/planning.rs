@@ -383,6 +383,7 @@ pub fn submit(db: &Database, p: SubmitResearch<'_>) -> Result<ResearchResult> {
             return Err(anyhow!("TEAM_TASK_REVISION_CONFLICT: task changed"));
         }
         super::task_attempts::clear_task(conn, p.team, p.task_id)?;
+        super::dispatch_metadata::task_completed(conn, p.team, p.task_id)?;
         save(db, &state)
     })?;
     Ok(result)

@@ -89,6 +89,12 @@ type AppError = {
 stdio 与 Tokio 的动态阻塞池隔离，因此后一种情况
 不会将临时线程压力转变为主机进程退出。
 
+对于 shell 准入，`HOST_OVERLOADED` 的 `content.capacity` 提供 host 和请求
+会话的运行/排队数量、shell 数量及安全的 Bash 占用会话标识（见 RPC §2.1）。
+错误建议使用 `wait_for_updates` 代替 `sleep` 轮询，并说明后台命令会一直
+占用同一 shell 槽直至结束。不包含命令或路径。错误码、可重试语义与
+30 秒准入等待时限不变。
+
 ### 3. 2 Agent/会话
 
 | 代码 | 可重审的 | 意义 |
@@ -375,12 +381,14 @@ ADR 0285）。渲染进程除了一个标识徽章外看不到本地/远程之�
 | `TEAM_MAILBOX_FULL` | 是 | 收件人的待处理团队消息已达到上限 |
 | `TEAM_MESSAGE_PAYLOAD_TOO_LARGE` | 否 | 团队消息超过 64 KiB 载荷上限 |
 | `TEAM_DELIVERY_PENDING` | 是 | Host 尚未持久化收件人的队列或 turn 回执 |
-| `TEAM_APPROVAL_REQUIRED` | 否 | 缺少当前 Team 启动 authority 或获批专家实际启动；Agent 需要用户确认，Plan 研究自动启动。 |
+| `TEAM_APPROVAL_REQUIRED` | 否 | 缺少当前 Team 启动 authority、获批专家实际启动或获批执行结算；Agent 需要用户确认，Plan 研究自动启动。 |
 | `TEAM_REVIEW_REVISION_CONFLICT` | 是 | 启动审查版本在调用方读取后已发生变化 |
 | `TEAM_CONFIG_CONFLICT` | yes | expert preset settings changed after the caller read them; reload before retry |
 | `TEAM_MODEL_SELECTION_INVALID` | 否 | 提议的模型/提供商/思考路线无法启动 |
 | `TEAM_MEMBER_MODEL_CHANGE_BLOCKED` | 否 | 该成员在其路线上持有活跃 turn 或排队任务 |
 | `TEAM_LEAD_CONFIGURATION_BLOCKED` | 否 | Lead 仍有团队数据时不能切换为普通执行模式 |
+| `TEAM_MEMBER_ACTIVE` | 否 | 十分钟内有 Host 活动或仍有活动 Bash；先查看 team_status，确需中断时显式 force 并说明理由 |
+| `TEAM_INTERRUPT_REASON_REQUIRED` | 否 | force:true 必须提供裁剪后非空的中断理由 |
 
 ## 4. 映射规则
 
@@ -552,3 +560,7 @@ transcript 保留稳定错误码、传输 errno 和原始 details，但使用本
 | `BACKGROUND_PROCESS_START_FAILED` | yes | 已授权后台执行器无法启动 |
 | `BACKGROUND_PROCESS_PERSISTENCE_FAILED` | yes | 托管进程状态无法存储；修复存储后重试 |
 | `SESSION_HAS_BACKGROUND_PROCESSES` | yes | 删除或移动会话前停止活动托管进程 |
+
+### Team Goal 结算拒绝（2026-10-11）
+
+获批 Team 执行仍有排队／运行派遣或未消费专家结果时，`TEAM_APPROVAL_REQUIRED` 也会在 `SubmitGoalReport` 主体之前拒绝。消息标明派遣、成员、分配的未完成任务和未消费数量。已确认名单最多三次带该原因的完成恢复提示，再次拒绝保留宿主原文（正常传输分类／脱敏后），阶段保持 `team_completion`。不得替换成缺少名单的说明，也不得把工具主体之前的授权拒绝归为草稿持久化失败。

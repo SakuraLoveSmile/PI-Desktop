@@ -125,6 +125,7 @@ function toAskToolRequest(
     // supplies it as `parentToolCallId` when the input came from a subagent,
     // and leaves it undefined for the top-level agent.
     toolCallId: input.parentToolCallId ?? "",
+    ...(input.teamPending ? { teamManaged: true as const, teamPending: input.teamPending } : {}),
     questions: input.questions.map((question) => ({
       question: question.question,
       options: question.options,

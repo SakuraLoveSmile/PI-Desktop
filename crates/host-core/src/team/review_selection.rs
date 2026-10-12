@@ -91,8 +91,11 @@ pub(super) fn require_approved_member(
             }
         }
     }
+    if super::replacements::require_approved(db, team_session_id, member_session_id)? {
+        return Ok(());
+    }
     Err(anyhow!(
-        "TEAM_APPROVAL_REQUIRED: member execution requires a confirmed launch review"
+        "TEAM_APPROVAL_REQUIRED: member execution requires a confirmed launch review; nextStep: request trusted roster review"
     ))
 }
 

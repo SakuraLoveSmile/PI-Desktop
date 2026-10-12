@@ -118,8 +118,8 @@ export async function asktoolCardProbe({ keepEvidence = false } = {}) {
   // question independent of the active locale.
   const questionText = () =>
     element(".asktool-question").textContent ?? "";
-  const mount = (requestId: string, questions = QUESTIONS) => {
-    const request = askRequest(requestId, questions);
+  const mount = (requestId: string, questions = QUESTIONS, pending = false) => {
+    const request = { ...askRequest(requestId, questions), ...(pending ? { teamPending: { deferredAt: new Date().toISOString(), requiresNewApproval: true as const } } : {}) };
     useAppStore.setState({
       pendingAsks: { [SESSION_ID]: [request] },
     });
@@ -300,6 +300,11 @@ export async function asktoolCardProbe({ keepEvidence = false } = {}) {
     flushSync(() => headerButtons().primary.click());
     await until(() => resolutions.length === 6, "rich table option submits");
     assert(JSON.stringify(resolutions[5]!.answers) === JSON.stringify([[richLabel]]), "rich option answer must preserve its original Markdown label");
+    mount("ask-team-pending", QUESTIONS, true);
+    await frame();
+    assert(host.textContent?.includes("Pending answer"), "Team pending badge is visible");
+    assert(host.textContent?.includes("explicitly resume or approve execution again"), "pending question explains the new approval boundary");
+    assert(!headerButtons().primary.disabled && options().length > 0, "deferred question remains answerable");
     if (keepEvidence) {
       document.documentElement.setAttribute("data-theme", "dark");
       host.style.width = "100%";

@@ -777,6 +777,23 @@ identify the platform validation still needed.
   session, global, mutation, queue bounds, fairness, cancellation, and timeout
   are unit-covered by `tool_budget/tests.rs`; restart coverage remains pending.
 
+#### E2E-RUNTIME-shell-capacity-diagnostics: Shell admission explains saturation
+
+- **Preconditions**: Isolated Host/profile and local shell fixtures; no provider.
+- **Steps**: Hold four shell slots and queue twelve calls. Run independent Read
+  and Write successfully, then drain this burst. In a separate phase, hold four
+  shell slots and let another Bash call hit the real 30-second admission deadline.
+  Release the fixture gate and drain all accepted work.
+- **Expected**: Rejected Bash never starts. `HOST_OVERLOADED` retains retryable
+  semantics; `content.capacity` shows host 4 in-flight/1 queued and requesting
+  session 0 in-flight/1 queued at rejection, with four safe Bash session holders.
+  Text names `wait_for_updates`, long `sleep`, and background retention of the
+  same capacity. No command/path appears. Rejected admission is removed from the
+  queue, existing FIFO/cancellation coverage stays green, and all counters drain.
+- **Automation**: `node scripts/e2e-tool-admission.mjs`; runtime Bash-result
+  passthrough and Team prompt guidance use fixture-host tests.
+- **Specs linked**: `03-runtime/06-host-rpc-protocol.md`, `03-runtime/08-error-codes.md`
+
 ### Release & Packaging
 
 #### E2E-192: Linux release publishes a system-Electron ASAR asset
@@ -16901,6 +16918,35 @@ renderer's durable transcript reads. No real model or provider is contacted.
   persistence and restart contracts are covered by `mcp-control-settings.test.mjs`.
 
 
+### E2E-TEAM-member-failure-wakes-lead
+
+- **Preconditions:** Candidate Host and runtime build; isolated Host data and
+  workspace, a configured no-auth loopback route that is never invoked.
+- **Steps:** Approve a Goal Team roster, settle one successful contribution,
+  then fail a member after a provisional task claim while the Lead waits.
+  Attempt completion before reading the notice. Consume it through the production
+  wait tool, replay the terminal event, and inspect the failed task. End the Lead,
+  fail a later dispatched member turn, and feed the actual Host notification to
+  production Main delivery with the real Agent Host/durable Host queue. Replay
+  the notification and abort another member turn.
+- **Expected:** Exactly one full `member_failed` notice names the member, error
+  code, advisory retry classification and affected task. Unread notice blocks
+  completion; consumed notice permits the settled gate while preserving the
+  separate successful-participation rule. Existing notification wakes the wait
+  and idle Lead; duplicate terminal/notification cannot create another prompt.
+  User abort creates no failure notice. Invalid error text cannot leak paths.
+  A post-commit checkpoint I/O error remains observable while the durable notice
+  still wakes an idle Lead. Replayed terminals re-notify only the same queued
+  row; after consumption/admission no additional wake event is emitted.
+- **Automation:** `node scripts/e2e-team-member-failure.mjs` (real Host stdio,
+  production runtime wait/Main delivery/Agent Host queue; the model runtime port
+  is a fake that starts an authenticated Host mailbox turn). Rust additionally
+  covers transaction rollback, counterfeit body/proof rejection, reserved keys
+  and deletion cleanup; runtime fake-clock tests cover complete body and timers.
+- **Specs:** 03-runtime/06-host-rpc-protocol;
+  [Team collaboration decision](../../adr/plus-expert-team-collaboration.md),
+  Host-authored member failure amendment.
+
 ### E2E-TEAM-task-completion
 
 - **Preconditions:** Isolated Host data/workspace, configured no-auth fixture
@@ -17526,6 +17572,30 @@ a fresh expert roster review and integrate a real approved expert contribution.
   expert result is consumed before the original Host turn completes.
   Confirmation/expert mail never becomes a detached user turn or duplicate
   mailbox kickoff and never changes the executionId or ends its token early.
+- **Execution-wide roster visibility:** After guarded roster recovery, inspect
+  every provider request through execution completion, including at least three
+  consecutive tool-loop requests and retry/rebuild/compaction boundaries.
+  Every successful `declare_team_strategy` result matching the same
+  team/turn/review stays `status=confirmed`,
+  `awaitingUserApproval=false`, with confirmed `nextStep` and no stale
+  `memberSessionIds`; provider telemetry matches the transmitted model view.
+  Registration reads only original entries since the current approved
+  execution's start, so preconfirmation compaction cannot hide its declaration
+  and cannot import a previous execution's declaration. After compaction
+  archives the complete assistant tool batch, that registered
+  batch and all original paired results are present in the final model view
+  only. Signed thinking/text/tool signatures and sibling calls/results remain
+  intact; no orphan call/result or persisted summary/checkpoint rewrite occurs.
+  Repeated recovery retains same-owner/review/epoch registration after archival;
+  wire-call ID collisions cannot replace newer work. If no matching declaration
+  in a fully paired valid batch exists at initial registration, no call is
+  invented and fallback remains unchanged.
+  Original pending entries/journal/UI and unrelated tool results remain intact.
+  Pending/cancelled/replaced reviews, Stop, execution completion followed by an
+  ordinary turn, and a second execution cannot reuse the earlier projection.
+  Runtime replay/helper tests cover these boundaries; the existing Electron
+  suite alone does not establish all-request or real-model coverage. Direct
+  `wait_for_updates` confirmation consumption remains unchanged.
 - **Cancellation path:** Negotiate and approve a second Team Goal through the
   Composer, then cancel its pending roster through trusted Main. The original
   turn becomes aborted and executionStatus interrupted; no expert starts,
@@ -17851,3 +17921,276 @@ keyboard selection, opaque surfaces and narrow footer geometry in the real rende
 RPC tests execute native Git against temporary repositories; renderer interaction
 fixtures mock only the external Host/session API edge and use the real store and
 components. They do not establish SSH server connectivity or a packaged release.
+
+### Team Goal settlement and completion reasons
+
+- `E2E-GOAL-report-waits-for-settled-team`: an approved Team Goal dispatches an
+  expert, attempts a report while that expert runs, and receives the exact
+  member/dispatch/task diagnostic without persisting a draft. After the expert
+  finishes, unconsumed evidence still blocks the report; `wait_for_updates` consumes
+  full results in the original turn and the report then succeeds.
+- `E2E-TEAM-completion-error-keeps-host-reason`: the real Host settlement denial
+  passes through the runtime guard and three reason-specific recovery prompts;
+  the fourth denial produces a terminal error with the identical Host reason.
+
+Automated by `scripts/e2e-goal-report.mjs` (real isolated Host RPC with runtime
+tools/guard) and `scripts/e2e-team-approved-goal.mjs` (isolated Electron and fake
+loopback provider). No live session, profile or real model is accessed.
+
+### E2E-RUNTIME-edit-accepts-tag-with-legacy-arguments
+
+- **Preconditions:** Candidate-built Host binary, isolated temporary data and workspace;
+  no provider or running Desktop instance.
+- **Steps:** Read a file, Edit with `tag` + `old_string` + `new_string` and no `ops`;
+  then Edit with `tag` + `ops` alone and with mixed legacy fields. Attempt missing
+  and repeated old text, missing operations and a colon PUT without body rows.
+- **Expected:** Legacy edit applies once; `ops` wins and ordinary anchored edits
+  retain their checks. Missing/multiple legacy matches reject without writing.
+  Both shape errors include `PUT 48.=48:` with a `+replacement` row and explain
+  that `new_string` is read only when `ops` is absent. Three-failure runtime
+  mutation termination remains covered by the existing mutation-guard suite.
+- **Coverage:** `node scripts/e2e-edit-legacy.mjs` with `PI_DESKTOP_HOST_BIN`
+  pointing to the task candidate; Host Edit tests and runtime mutation-guard tests.
+- **Specs:** runtime spec 18 §2.1 / §11; D273 amendment.
+
+
+### E2E-RUNTIME-background-bash-timeout-is-visible
+
+- **Preconditions:** Candidate Host/runtime/sidecar built from the recorded task
+  revision; isolated temporary data/workspace and a no-call provider fixture.
+- **Steps:** Establish an approved Team and successful expert participation.
+  Start an owned background command with an explicit one-second limit while
+  waiting. Repeat with normal exit and with no timeout override (60 seconds).
+  Inspect the returned scoped terminal detail and reread the stored result.
+  Complete a launch before the first wait, then complete a known running job
+  between two waits; each terminal outcome is delivered once.
+- **Expected:** Timeout reports the exact explicit/default limit and tells the
+  model to pass timeout in seconds (1–21,600). Default remains 60 seconds.
+  Exit/timeout wakes the existing wait through production HostProcess and
+  AgentSidecar transports; live output does not finish it. No mailbox insertion,
+  real model call, process mutation capability or cross-session read is added.
+  Old terminal messages remain readable without fabricated default metadata.
+- **Coverage:** `scripts/e2e-background-bash-limit.mjs`; Rust background RPC,
+  runtime schema/payload, Team wait lifecycle and launch-bound proxy regressions.
+- **Status:** Run on the recorded task candidate; Windows execution remains
+  subject to platform acceptance.
+
+
+### E2E-TEAM-write-scope-warning
+
+- **Preconditions:** Candidate Host/runtime, isolated Git workspace/profile,
+  confirmed builder and real mailbox/task-turn binding. No model calls.
+- **Steps:** Declare owned scopes, dispatch from HEAD A, commit HEAD B before
+  delivery, replay dispatch, resolve member input and persist its authenticated
+  transcript row. Start the assigned task; Write inside, Write/Edit outside,
+  fail an Edit, read team_status, clear scopes and Write again. Send a member
+  reply and consume its stamped result in the original approved Goal turn.
+- **Expected:** Inside and empty-scope mutations have no warning. Outside writes
+  succeed with TEAM_WRITE_SCOPE_WARNING; status counts only the two successful
+  outside calls. Directory-prefix lookalikes grant no scope. Replay preserves A,
+  visible in member model framing/history; forged HEAD provenance is replaced
+  by Host metadata. Failed calls, Bash and scratch do not count.
+- **Automation:** node scripts/e2e-team-write-scope.mjs runs real Host stdio,
+  production team tools, message-input resolver/framing and temporary native Git.
+  Rust covers symlinks, active task association, duplicate count identity and
+  observable tracking failure; runtime tests check successful warning text/details.
+- **Specs:** [Team collaboration decision](../../adr/plus-expert-team-collaboration.md), advisory amendment dated 2026-10-11; 03-runtime/06-host-rpc-protocol.
+- **Acceptance:** P1 shared-tree coordination; no write denial/new RPC/migration.
+- **Status:** Automated isolated Host and runtime-contract fixture.
+
+
+### Expert Team coordination reliability guidance
+
+Generated-prompt regressions cover Lead/member guidance, ordinary Agent queued
+mail, ordinary Plan yield and approved execution inbox instructions. The runtime
+provider-boundary fixture executes both approved Plan and Goal paths through
+`executeApprovedPlan`, consumes authenticated inbox content in the same turn and
+asserts the generated model prompt. It does not establish real-model obedience.
+See `packages/agent-runtime/src/team/team-prompt.test.ts`; no source-text assertion
+is used for the new guidance. The queued-report user-path scenario separately
+checks actual expert/Lead Host process counts.
+
+### E2E-TEAM-shared-git-warning
+
+- **Preconditions:** Candidate Host/runtime; disposable native Git repository,
+  temporary data/profile and confirmed Team roster. No provider calls.
+- **Steps:** Dispatch an owned writer task and mark it in progress. The Lead
+  runs `git add -A && git commit` across both authors' fixture files, then
+  `git stash`, and an invalid `git reset --hard`. Read production team_status.
+  Repeat Git staging as the sole writer and after the task has completed.
+- **Expected:** Actual mixed commit and stash succeed with advisory warnings;
+  the invalid reset retains its failure/exit code. Status shows three separate
+  caller-attributed Git warnings and zero Write/Edit scope warnings. Sole writer
+  and completed tasks do not warn. Permissions and shell admission are unchanged.
+- **Coverage:** `node scripts/e2e-team-shared-git-warning.mjs`; Host RPC covers
+  all six operations, background acceptance, cross-team/empty-scope exclusion,
+  idempotent counts, restart persistence and deletion races. Runtime contract
+  tests verify status projection and legacy defaults. Literal detection tests
+  cover quotes, options, command combinations and output-text false positives.
+- **Spec:** 03-runtime/06-host-rpc-protocol, Team shared-tree Git advisory.
+- **Status:** Record the candidate result; no real-model or Windows acceptance
+  is implied. Dynamic shell forms are outside the bounded advisory coverage.
+## Team task dispatch reliability (WP10)
+
+See [Team task dispatch scenarios](team-task-dispatch-scenarios.md) for busy-member
+conflicting dispatch, successful task completion cleanup, authenticated age framing
+and replay/validation acceptance IDs.
+### E2E-TEAM-agent-lead-sees-queued-expert-report
+
+- **Preconditions:** Candidate Host/runtime, isolated workspace/data, ordinary
+  Team Agent Lead without an approved execution; deterministic fake provider.
+- **Steps:** Delegate two background commands to an expert. Send its complete
+  report while the Lead waits in a long running turn. Record storage, notification,
+  ACK, kick, turn settlement, dequeue and body admission separately. Replay an
+  identical delivery. Query pending status/wait before ending the Lead turn.
+- **Expected:** Baseline report waits over three minutes despite timely admission
+  and kick; the baseline Lead duplicates the commands. The candidate's next
+  status/wait reveals metadata without bodies, ACK or auto-termination; the Lead
+  ends its ordinary turn and receives the authenticated full report exactly once.
+  Host process counts are expert 2 and Lead 0, not a model claim.
+- **Acceptance:** The --timeout-acceptance variant runs sleep 5 with timeout 2 and
+  sleep 75 with no timeout, consumes timed_out/TOOL_TIMEOUT at approximately 2
+  and 60 seconds and checks the same per-session counts. Plan yield, approved
+  inbox, cancellation/context changes and WP5 gap recovery remain covered by
+  their existing runtime/Host regressions. This is not cancellation acceptance.
+- **Automation:** scripts/e2e-team-agent-queued-report.mjs; runtime Team mailbox,
+  pending metadata, wait/status, Main delivery and AgentHost queue regressions.
+- **Specs:** 03-runtime/02-agent-runtime and 06-host-rpc-protocol; WP16 S3 is a
+  separate proposed delivery ADR and has no adopted in-turn capability.
+#### E2E-TEAM-member-activity-interrupt-guard
+
+- **Scope:** Lead Team tools → Host activity projection → exact-turn interruption.
+- **Fixture:** Isolated Host data/workspace and deterministic fake provider; no paid model or user profile.
+- **Steps:** Approve a tester, dispatch work, start a quiet managed background test without Git activity. Lead reads `team_status`, tries unforced `interrupt_agent`, tries force without reason, then supplies a justified reason.
+- **Expected:** Status shows the real running process and turn. The first two stops return `TEAM_MEMBER_ACTIVE` and `TEAM_INTERRUPT_REASON_REQUIRED` with no interruption notification. Only the reasoned force emits one exact-member/turn stop and an audit record. Role/approval boundaries stay unchanged.
+- **Automation:** `scripts/e2e-team-member-activity.mjs` runs real Host + runtime tools through the fake provider. `rpc::team_member_activity_tests` additionally controls Host timestamps to replay a twenty-minute job and eligible inactive turn, verifies active foreground Bash protection, unauthorized force refusal and audit contents. `team::member_activity_tests` covers five-hour queue ages after ACK and usage replay/restart; runtime tool tests preserve projection and optional force/reason forwarding.
+- **Evidence limit:** Twenty minutes and five hours are deterministic timestamp fixtures, not wall-clock soak runs; no Windows or real-provider test is claimed.
+### E2E-TEAM-bounded-run-limit
+
+- **Title:** Bound repeated expert validation/fix loops without killing tools.
+- **Preconditions:** Dedicated request candidate containing WP1–WP6; isolated
+  Host data/workspace and fake provider; controlled Host clock; no real profile/API.
+- **Steps:** Start an ordinary Team run and an approved Goal run. Replay repeated
+  validate → discover defect → fix → validate loops. Advance past soft, repeat
+  the sweep, then advance past hard while a foreground tool/recovery is pending.
+  Queue expert mail, restart Host/runtime, attempt Resume, extend/disable policy,
+  explicitly resume, and finally admit a fresh non-mail user scope. Repeat with
+  a completed idle Team, a disabled policy, and a manual queue pause while a
+  turn is still running. Save settings while another role
+  is edited in a different window.
+- **Expected:** One soft notice and notification per run; hard persisted pause,
+  safe current-batch finish, no background process stop and no next-loop request.
+  Running Goal becomes interrupted and its token is invalid. Queued mail cannot
+  wake a paused run; restart retains run id/time/pause. Resume never refunds time
+  and rejects an exceeded live limit. Policy changes alone do not unpause. A new
+  admitted user scope gets a new budget. Completed idle Teams get no alert/wake-up.
+  Settings preserve unrelated role edits and reject same-policy conflicts.
+- **Specs:** [Team run limits](../03-runtime/team-run-limits.md).
+- **Coverage:** Host `run_limits_tests`, RPC `team_run_limits_tests`, execution
+  inbox tests, runtime `runtime-team-run-limit-stop.test.ts`, Desktop Team delivery
+  and expert settings persistence tests. Native settings/status UI must be checked
+  on the final integration candidate; deterministic coverage is not a live 10-hour
+  provider run.
+- **Acceptance:** Record candidate/base revisions, fixture results and native UI
+  evidence separately. No provider cost or publication is implied.
+- **Milestone:** WP8.
+- **Status:** Implementation/verification in request worktree; user acceptance pending.
+
+
+### E2E-TEAM-run-limits-ui
+
+Run `node scripts/e2e-team-run-limits-ui.mjs` with the candidate sources and isolated Electron profile. Real clicks and text input cover enabled 6/10-hour defaults, invalid input, disabled persistence, role-preserving CAS rebasing and policy-conflict refusal. Render the production notice for soft, safe finishing, paused and disabled states. The settings backend is a fixture; Host durable clock, restart and pause/resume authority remain separate domain/RPC acceptance. No live provider, OS-notification presentation or ten-hour soak result is implied.
+
+
+### E2E-TEAM-member-interrupt-production-chain
+
+`node --experimental-strip-types scripts/e2e-team-member-interrupt.mjs` replays real Host interruption through Main delivery, bridge, IPC, sidecar and runtime using a loopback provider. Assert unforced refusal, foreground process termination and interrupted turn state. Block the real session gate, replace the old turn, then release and replay its notification: the replacement remains active. Accepted background work survives abort/dispose and is explicitly stopped in cleanup; background zero is not the turn-cancellation contract.
+### WP11 Team unattended questions and failed-slot replacement
+
+- `E2E-TEAM-lead-pending-ask-late-answer`: fake-provider Lead asks at 05:05; at
+  05:35 the original turn is interrupted and the question remains pending. UI
+  restore retains the card; a late trusted reply queues exactly one new user
+  turn with stable identity, no Team origin or old execution token.
+- Native Ask-card interaction mounts the pending badge, new-approval guidance
+  and enabled answer controls using the existing isolated Electron harness.
+- Host RPC replacement path confirms a roster, fails a member, replaces it once,
+  dispatches the successor and admits its turn without a second review. Replay
+  reuses its identity; a second successor or old-handle dispatch is rejected.
+- Host regressions cover deadline/answer races, ACK/orphan recovery, queue-full
+  rollback, cancellation fences, stale owner/turn, route/config/permission
+  inheritance and the frozen roster limit. Real-provider overnight acceptance
+  is separate from these controlled replay checks.
+
+The explicit nightly lane `node scripts/e2e-team-lead-pending.mjs` requires the
+existing environment's `pnpm build:js` output. It runs the opt-in Rust
+cross-language fixture with `--ignored`, then records
+`E2E-TEAM-approved-lead-ask-interrupted`. The default pure Rust CI does not
+require Node/JS dependencies. The fixture exercises approved Goal dispatch,
+30-minute controlled wait, actual Main finalization/outbox, Rust interrupted
+execution, no successful report, and rejection of a genuine old progress token.
+It uses no provider service, test-only production backdoor, or system-clock edit.
+
+
+### E2E-TEAM-approved-goal-roster-resume-weak-lead-dispatches
+
+- **Preconditions:** Request candidate based on `26db50438`; isolated approved
+  Team Goal, Host and provider boundary fixtures. The scripted weak Lead ignores
+  system nudges and follows only the last conversational tool result.
+- **Steps:** Declare a delegate roster, explain it without tool calls, and park
+  the original approved execution. Confirm the roster later through trusted Host
+  state. Inspect every resumed provider request through execution completion,
+  including at least three consecutive requests around wait_for_updates,
+  task_create/send_message and a further wait. Dispatch an owned task,
+  consume full expert results and submit the Goal
+  report. Repeat cancellation, interruption, Stop, confirmation between Host
+  reads and missing declaration-result cases.
+- **Expected:** Every resumed request contains confirmed content for every
+  successful declaration matching the same team/turn/review, with
+  awaitingUserApproval=false, confirmed nextStep and no stale memberSessionIds,
+  throughout the same approved execution. After compaction archives the original
+  complete assistant tool batch, the registered batch and all paired results
+  remain in the final model view only, with signed thinking/text/tool signatures
+  and sibling calls/results intact. Repeated recovery retains registration after
+  archival, and wire-call ID collisions cannot replace newer work. No fully
+  paired valid batch at initial registration means unchanged fallback, not an
+  invented tool invocation.
+  Tool-loop context rebuilds, retries and compaction cannot restore a stale
+  matching result. One roster
+  resume starts owned dispatch in the same turn/execution without
+  TEAM_APPROVAL_REQUIRED or Goal interruption. Original UI/persisted declaration
+  evidence stays pending; projection is copy-on-write and model-only. Pending,
+  cancelled or replaced reviews cannot project; completion/Stop and later
+  ordinary turns or executions cannot reuse an old projection.
+  Cancellation/Stop cannot refresh or dispatch; missing
+  matches retain all three completion retries and observable terminal denial.
+- **Specs:** 03-runtime/02-agent-runtime and 03-tools-and-permissions, approved
+  Team same-turn recovery.
+- **Acceptance:** Runtime regression and copy-on-write/helper coverage establish
+  the changed provider context and scripted dispatch, not real-model compliance.
+- **Automation:** packages/agent-runtime/src/runtime-tests/runtime-team-roster-resume.test.ts
+  and src/team/declare-strategy-result.test.ts.
+- **Milestone:** Maintenance.
+- **Status:** Scripted baseline replay reproduces four confirmation wakeups,
+  TEAM_APPROVAL_REQUIRED and zero dispatch on `26db50438`. Record candidate test
+  results separately. Real model: attempted on candidate `3968c4160882` with
+  MINIKV-GOAL-TEST-2, but **confirmation recovery NOT EXERCISED**: Goal UI
+  approval succeeded, then the harness's 240-second pre-roster wait expired
+  without a declaration, task or expert. No provider or TEAM error was recorded;
+  the wait's cause remains unknown. This does not establish a recovery failure
+  or real-model acceptance. See docs/project/team-roster-resume-validation.md.
+- **Execution-wide baseline:** Read-only TEST-4 evidence on `961a4e480`
+  confirms the declaration at step 8 but retains stale content at steps 9–41;
+  the task still completed. This is a robustness gap in later model views, not
+  an observed task failure or evidence for this fix.
+- **Real-model follow-up: NOT RUN.** Only after separate user consent, rerun the
+  park-aware TEST-4 flow on this fix branch with a new marker and independent
+  HOME/profile/data/scratch project. Keep CPA first-token precheck (10 seconds,
+  total 30 seconds), the same provider and gemini-3.7-flash-high Lead. Confirm
+  through the real trusted roster UI after observed parking. Audit every
+  postconfirmation lead providerPayload through execution end for the same
+  review's confirmed result and preserved original history; do not limit the
+  check to the first request. Record missing/truncated coverage and provider
+  silence separately, retain all evidence after teardown, and independently
+  rerun C1–C5 on a project copy, auditing C6–C8 against real Host/tool records.
+  See the validation record for the exact method.
+  No new live-model result or prompt-cache behavior is claimed.

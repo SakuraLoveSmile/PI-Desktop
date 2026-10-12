@@ -559,7 +559,7 @@ async function handle(method: string, params: any): Promise<unknown> {
       if (!matchesExpectedTurnId(runtime?.getStatus().currentTurnId, turnId)) {
         return { requested: false };
       }
-      return runtime?.requestGracefulStop() ?? { requested: false };
+      return runtime?.requestGracefulStop(params.preserveRunningTools === true) ?? { requested: false };
     }
     case "asktool.resolve": {
       const sessionId = String(params.sessionId ?? "");
