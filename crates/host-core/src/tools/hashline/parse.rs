@@ -120,7 +120,7 @@ pub fn parse_ops(ops: &str) -> Result<ParsedOps, ParseError> {
                     if body.is_empty() {
                         return Err(ParseError::new(
                             "EDIT_PARSE_FAILED",
-                            "PUT with a colon requires at least one + body row; use CUT to delete",
+                            "PUT with a colon requires at least one + body row; example: PUT 48.=48:\n+replacement\nuse CUT to delete; new_string is read only when ops is absent",
                         ));
                     }
                     parsed.push(ParsedOp::Put {

@@ -322,6 +322,9 @@ export function createHostRuntime({
       sendToRenderer(IPC.event.backgroundProcessesChanged, params);
     } else if (method === "team.changed") {
       sendToRenderer(IPC.event.teamChanged, params);
+      void onTeamNotification?.(method, params).catch((error: unknown) => {
+        logger.app("runtime", "warn", "Team queue reconciliation failed", { data: String(error) });
+      });
     } else if (method === "todos.changed") {
       sendToRenderer(IPC.event.todosChanged, params);
     } else if (method === "configSync.changed") {
@@ -332,6 +335,7 @@ export function createHostRuntime({
       // request's own answer is still the outcome.
       sendToRenderer(IPC.event.configSyncProgress, params);
     } else if (
+      method === "team.runLimitPauseRequested" ||
       method === "team.messageQueued" ||
       method === "team.queueChanged" ||
       method === "team.interruptRequested" ||

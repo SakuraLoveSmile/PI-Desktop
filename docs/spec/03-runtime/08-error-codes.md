@@ -88,6 +88,13 @@ process resources returns `PROCESS_RESOURCE_EXHAUSTED`. Host-core's control
 stdio is isolated from Tokio's dynamic blocking pool so the latter condition
 does not turn temporary thread pressure into a host process exit.
 
+For shell admission, `HOST_OVERLOADED` includes `content.capacity` with host
+and requesting-session in-flight/queued counts, shell-only counts and safe Bash
+holder session identities (see RPC §2.1). The error suggests `wait_for_updates`
+instead of `sleep` polling and explains that managed background commands retain
+the same shell slot until they stop. It never includes command text or paths.
+The code, retryability and 30-second admission deadline remain unchanged.
+
 ### 3.2 Agent / session
 
 | code | retriable | meaning |
@@ -383,12 +390,14 @@ with teammates, shared task boards, and peer mailboxes.
 | `TEAM_MAILBOX_FULL` | yes | the recipient has reached the queued Team message limit |
 | `TEAM_MESSAGE_PAYLOAD_TOO_LARGE` | no | the Team message exceeds the 64 KiB payload limit |
 | `TEAM_DELIVERY_PENDING` | yes | the Host has not yet persisted a durable recipient queue or turn receipt |
-| `TEAM_APPROVAL_REQUIRED` | no | current Team launch authority or actual approved expert start is missing; Agent requires user confirmation, Plan research launches automatically |
+| `TEAM_APPROVAL_REQUIRED` | no | current Team launch authority, actual approved expert start, or approved execution settlement is missing; Agent requires user confirmation, Plan research launches automatically |
 | `TEAM_REVIEW_REVISION_CONFLICT` | yes | the launch review revision changed after the caller read it |
 | `TEAM_CONFIG_CONFLICT` | yes | expert preset settings changed after the caller read them; reload before retry |
 | `TEAM_MODEL_SELECTION_INVALID` | no | a proposed provider/model/thinking route cannot be launched |
 | `TEAM_MEMBER_MODEL_CHANGE_BLOCKED` | no | the member holds an active turn or queued work on its route |
 | `TEAM_LEAD_CONFIGURATION_BLOCKED` | no | a Lead with durable Team data cannot change to the standard profile |
+| `TEAM_MEMBER_ACTIVE` | no | current Host activity within ten minutes or active Bash ownership protects the member; inspect team_status before an explicit force with reason |
+| `TEAM_INTERRUPT_REASON_REQUIRED` | no | force:true requires a trimmed nonempty interruption reason |
 
 ## 4. Mapping rules
 
@@ -608,3 +617,22 @@ remain idempotent. Cancelled roster waits interrupt execution, not complete it.
 | `BACKGROUND_PROCESS_START_FAILED` | yes | Authorized background runner could not start |
 | `BACKGROUND_PROCESS_PERSISTENCE_FAILED` | yes | Managed process state could not be stored; restore storage and retry |
 | `SESSION_HAS_BACKGROUND_PROCESSES` | yes | Stop active managed jobs before deleting or moving their session |
+
+### Team Goal settlement denials (2026-10-11)
+
+`TEAM_APPROVAL_REQUIRED` also rejects `SubmitGoalReport` before its body runs when
+an approved Team execution has queued/running dispatches or unconsumed expert
+results. The message identifies dispatches, members, assigned open tasks and the
+unconsumed count. Confirmed rosters receive three bounded completion nudges that
+include that reason; the following rejection retains the Host message verbatim
+(after normal transport classification/redaction), with `stage: team_completion`.
+The runtime must not replace it with a missing-roster explanation or classify
+the pre-tool authorization denial as draft-persistence failure.
+
+### Team wall-clock pause (WP8)
+
+`TEAM_RUN_LIMIT_REACHED` means the current Team run is hard-paused, or Resume
+was requested while its persisted elapsed time still exceeds the enabled live
+hard limit. Extend/disable the policy in Settings → Expert team, then explicitly
+resume; a queued new message cannot reset/unpause the old run. A new session is an
+independent task. No permission or shell-capacity meaning is attached to this code.

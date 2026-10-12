@@ -83,6 +83,8 @@ fn send_record(db: &Database, input: &Value, target: &str, kind: &str) -> Result
     }
     let at = ms_to_ts(now_ms());
     let message = Message {
+        sender_head: None,
+        team_metadata: None,
         id: Uuid::new_v4().to_string(),
         plugin_id: plugin.into(),
         source_session_id: source.into(),

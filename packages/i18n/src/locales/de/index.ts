@@ -760,6 +760,7 @@ export const de = {
       operationError: "Der Speichervorgang konnte nicht gestartet werden. {{error}}",
     },
     expertTeam: {
+      runLimits: en.settings.expertTeam.runLimits,
       title: "Expertenteam",
       description: "Konfigurieren Sie Modell, Denkstufe, Werkzeugauswahl und zusätzliche Anweisungen für die sechs integrierten Experten. Änderungen gelten nur für neu gestartete Experten. Das Composer-Modell gilt auch für den Lead und Experten ohne festgelegtes Modell. Optionale Werkzeugeinschränkungen begrenzen nur die Verfügbarkeit und erteilen keine Berechtigungen.",
       loadFailed: "Experteneinstellungen konnten nicht geladen werden",
@@ -2001,6 +2002,8 @@ sklm: {
     "queued_other": "{{count}} weitere Anfragen warten"
   },
   "askTool": {
+    "pending": "Antwort ausstehend",
+    "pendingHelp": "Der Lead wartet nach 30 Minuten nicht weiter. Ihre Antwort startet einen neuen Durchlauf. Setzen Sie die Ausführung ausdrücklich fort oder genehmigen Sie sie erneut.",
     "completedTitle": "Fragen geklärt",
     "completedSkipped": "Übersprungen",
     "title": "Ein paar Fragen",
@@ -2030,6 +2033,14 @@ sklm: {
     "close": "Widget schließen"
   },
   "team": {
+    runLimitTitle: en.team.runLimitTitle,
+    runLimitSoft: en.team.runLimitSoft,
+    runLimitStopping: en.team.runLimitStopping,
+    runLimitPaused: en.team.runLimitPaused,
+    runLimitHours: en.team.runLimitHours,
+    runLimitReadyToResume: en.team.runLimitReadyToResume,
+    runLimitDisabled: en.team.runLimitDisabled,
+
     "title": "Expertenteam",
     "roster": "Team-Dienstplan",
     "board": "Aufgabenboard",

@@ -322,6 +322,7 @@ export function createEventsSlice({
         void flushPendingSessionConfiguration(envelope.sessionId);
         void get().refreshQueuedPrompts(envelope.sessionId);
       } else if (event.type === "agent_end" || event.type === "error") {
+        void get().restorePendingInteractive(envelope.sessionId);
         set((state) => ({
           runningSessions: {
             ...state.runningSessions,
@@ -338,6 +339,7 @@ export function createEventsSlice({
           pendingAsks: clearSessionAsks(
             state.pendingAsks,
             envelope.sessionId,
+            true,
           ),
           latestTurnResults:
             event.type === "error" && event.error.code === "TURN_ABORTED"

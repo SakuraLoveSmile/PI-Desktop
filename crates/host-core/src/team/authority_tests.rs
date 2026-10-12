@@ -121,6 +121,9 @@ fn expert_turn_is_required_beyond_consent_and_new_user_scopes_cannot_inherit_it(
         session_collaboration::begin_turn(&db, &message.target_session_id, &message.id, None, None)
             .unwrap();
     validate_lead_tool(&db, &lead, "Write").unwrap();
+    validate_lead_tool(&db, &lead, "TeamFinalAnswer").unwrap();
+    validate_lead_tool(&db, &lead, "SubmitGoalReport").unwrap();
+    validate_lead_tool(&db, &message.target_session_id, "SubmitGoalReport").unwrap();
     db.conn()
         .execute(
             "UPDATE turns SET status='failed' WHERE id=?1",

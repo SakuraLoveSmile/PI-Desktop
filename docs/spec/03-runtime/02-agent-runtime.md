@@ -712,13 +712,13 @@ nonempty final replies require a current approved expert dispatch whose turn
 has actually started. Idle members or queued messages are insufficient. This
 participation gate does not prove task ownership or completed expert work.
 
-A Lead has one bounded no-participation recovery before approval and one
-independent recovery after a trusted, nonempty delegate roster is confirmed for
+A Lead has one bounded no-participation recovery before approval and three
+bounded independent recoveries after a trusted, nonempty delegate roster is confirmed for
 that same original Agent turn. Fast confirmation during the declaration reply
 must not exhaust the dispatch recovery just because the preapproval correction
 was already used. Confirmation does not authorize completion: Host still checks
 actual expert participation, and continued no-dispatch replies fail after the
-single postconfirmation correction. Stale reviews, other teams and automatic
+three postconfirmation corrections. Stale reviews, other teams and automatic
 Plan rosters cannot acquire this execution-phase recovery.
 
 Team Plan research automatically launches read-only experts using Host-selected
@@ -746,6 +746,42 @@ An approved Team Plan/Goal execution waits for execution-roster confirmation
 and expert settlement inside its original running Host turn. It must not emit
 final agent_end, end the Goal execution token or complete the approval while
 waiting. Confirmation resumes the same approved contract.
+Same-turn guard recovery registers a fresh Host-confirmed, user-confirmed,
+nonempty delegate review bound to the same team and approved execution turn.
+Registration reads only the original entries from the current approved
+execution boundary, capturing the complete valid assistant tool batch containing
+the latest successful matching declaration with every original paired result.
+A declaration archived by compaction before confirmation remains eligible;
+entries from an earlier execution are never used.
+It preserves signed thinking, text, tool signatures and sibling calls/results;
+only matching declaration results change. From the first resumed request
+through execution end, final model conversion projects all successful results
+matching that team/turn/review using the confirmed roster,
+`awaitingUserApproval=false` and the shared tool payload builder. Its `nextStep`
+begins with `The user confirmed the execution roster`; stale `memberSessionIds`
+are omitted. Every subsequent tool-loop request, retry and context rebuild
+applies the same idempotent, copy-on-write projection. If compaction archives
+that batch, final conversion includes the complete registered batch and all its
+paired results in the model view only. It never invents an orphan call/result
+or trims signed content. Repeated guard recovery retains a registration with
+the same owner/review/epoch when rebuilt messages no longer contain the batch.
+Wire-call ID collisions with newer work never replace that newer work. Provider
+telemetry captures that projected model payload.
+The projection runs after system-journal persistence; original entries, journal,
+compaction input and persisted/UI timeline remain unchanged. Pending, cancelled
+or replaced reviews cannot register or reuse it; a newer observable declaration
+with a different reviewId, cancellation or higher revision clears registration.
+Execution completion, Stop, cancellation/disposal/graceful stop, Team budget
+stop, turn/epoch or mode changes and a subsequent execution invalidate its scope;
+ordinary turns cannot refresh an earlier execution's declaration. A fresh review
+read rechecks turn/epoch, mode and cancellation before registration. With no
+matching successful declaration in a fully paired valid assistant batch at
+initial registration, no batch is invented and the existing nudge and three-attempt completion guard
+remain. Reinserted model batches are never written to Agent state, entries,
+compaction summary/checkpoint or journal. No additional Host notification,
+review read or RPC is introduced. This projection only extends guard recovery; `wait_for_updates` consuming confirmation directly
+keeps its existing path. No Host dispatch, public contract or restart recovery
+is added.
 An earlier pending review snapshot cannot authorize completion if confirmation
 commits before the execution-state read: Host final authorization still runs,
 and the bound confirmed execution receives its dispatch recovery when needed.
@@ -1959,3 +1995,80 @@ line numbers and bounded text, and supports explicit status/clear actions. Each
 search reconciles current files and ignore rules, hashes eligible content, then
 verifies candidate contents live. This first version provides a persistent text
 cache, not semantic retrieval or a promised speedup. Grep remains unchanged.
+
+### Goal reports require settled Team execution
+
+For an approved Team Goal, the existing Lead tool authorization wrapper checks
+`SubmitGoalReport` before validation or draft persistence. Current queued dispatches,
+running expert turns and unconsumed current expert results reject every verdict,
+including `partial` and `blocked`. Wait with `wait_for_updates` or interrupt the
+assigned experts before reporting. The denial retains `TEAM_APPROVAL_REQUIRED`
+and names dispatch IDs, experts, their open task IDs and the unconsumed-result
+count. This is an authorization failure, not a draft-persistence failure.
+
+Member mail is consumed inside the original approved execution turn; its inbox
+authority remains active. A post-execution mailbox continuation does not acquire
+a Goal token or report tool. Confirmed rosters receive up to three reason-specific
+completion nudges; after those three continuations, the next rejection terminates
+with the Host reason and `stage: team_completion`. Unconfirmed-roster recovery
+remains limited to one nudge. Ordinary non-Goal final-answer authority is unchanged.
+
+A trusted cancelled/interrupted roster aborts approved execution even when it
+arrives before the completion guard begins its review wait. It does not spend a
+nudge, restart model work, or install a waiting listener/timer.
+
+
+### Expert Team execution reliability guidance (2026-10-11)
+
+Generated Team prompts use available Host-backed member phase and turn/process
+evidence for liveness, never Git activity. They require consuming authenticated
+reports before replacement or redispatch; a pending-mail summary is not its body.
+Ordinary unapproved Agent turns receive queued bodies only after their current
+turn ends; approved Plan/Goal executions instead keep their original turn open
+and consume the execution inbox. Ordinary Plan aggregation retains its yield.
+
+Execution participants run only diff-related revalidation, assign a full suite
+to one participant, avoid foreground sleep polling and declare explicit limits
+for long-lived background commands. `timed_out` is a timeout, not proof of a
+crash; `nohup` is not a managed-lifetime workaround. Shared-tree `git add -A` and
+`git stash` are forbidden by guidance, without changing tool authorization.
+After two attempts based on different evidence still fail the same acceptance
+check, report the blocker rather than blindly start another repair/retest cycle.
+Independent authorized work can continue.
+
+A Lead does not redo completed delegated work without first explaining a concrete
+independent-review reason. Final reporting distinguishes commands the Lead
+actually launched from commands experts launched, and relies on tool/Host
+records. Guidance does not mechanically enforce model obedience, add a watchdog,
+change quotas, or authorize unread report content or user consent.
+### Ordinary Agent Lead pending-mail visibility (2026-10-11)
+
+A Lead's team_status exposes pendingMessagesCount, pendingMessageSenders and
+oldestPendingMessageAgeSeconds from the existing authenticated mailbox read.
+Pending means inbound, non-self, queued and not yet bound to a recipient turn.
+An acknowledged queue receipt does not establish body consumption. Outbound,
+other-recipient, running, completed and cancelled rows are excluded.
+
+An ordinary unapproved Agent Lead's wait_for_updates returns
+reason: pending_mailbox_messages immediately when its initial read already has
+pending mail, or on a later recheck when mail arrives. It includes count, sender
+names, age and the current-turn delivery guidance; it does not terminate the
+turn, include bodies, acknowledge messages or modify queue state. The Lead must
+finish its ordinary turn before the existing authenticated role=user mailbox
+continuation can deliver full content. Counts and prompts are not consumption.
+
+Ordinary Plan Lead yield retains priority and terminate:true. Approved Plan/Goal
+execution reads its authenticated execution inbox first and never receives an
+instruction to end that execution to fetch mail. Owned background terminal
+results retain their existing priority and once-only delivery; pending mail
+remains visible on the next status/wait call.
+
+Initial subscription precedes baseline reads. The total deadline, single-flight
+rechecks, abort and cleanup remain bounded. Reads pin turn, epoch, Team identity
+and mode; replacement or disposal invalidates late metadata. A read failure is
+observable, not a zero-mail success. Sender names are stable-deduplicated in
+mailbox order; createdAt is a Unix-millisecond numeric string. Ages are nonnegative
+whole seconds; empty queues or any unparseable pending timestamp return null
+for the unknown oldest age. No new Host RPC, schema, quota, automatic Agent
+yield or in-turn body capability is added. See the proposed
+[delivery alternatives](../../adr/team-agent-mailbox-delivery.md), not implemented.

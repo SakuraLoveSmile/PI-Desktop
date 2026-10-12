@@ -56,7 +56,9 @@ fn message_from_row(
     let turn_id: Option<String> = row.get(9)?;
     let acknowledged: bool = row.get(10)?;
     let accepted: bool = row.get(11)?;
-    let delivery_status = if acknowledged {
+    let delivery_status = if status == "cancelled" {
+        "cancelled"
+    } else if acknowledged {
         "acknowledged"
     } else {
         match status.as_str() {
@@ -68,6 +70,13 @@ fn message_from_row(
         }
     };
     Ok(TeamMessage {
+        sent_at: None,
+        target_busy_at_send: None,
+        target_state: None,
+        queue_position: None,
+        task_dispatch: None,
+        dispatch_cancellation: None,
+        sender_head: row.get(12)?,
         id: row.get(0)?,
         team_session_id: team_session_id.to_string(),
         source_session_id: row.get(1)?,
@@ -89,7 +98,7 @@ fn get_message(
     message_id: &str,
 ) -> Result<Option<TeamMessage>> {
     let plugin_id = team_plugin_origin(team_session_id);
-    Ok(db
+    let mut message = db
         .conn()
         .prepare_cached(
             "SELECT m.id, m.source_session_id, m.source_title, m.target_session_id,
@@ -97,17 +106,30 @@ fn get_message(
                     EXISTS(SELECT 1 FROM session_collaboration_messages receipt
                            WHERE receipt.kind = 'completion'
                              AND receipt.reply_to_message_id = m.id),
-                    EXISTS(SELECT 1 FROM turn_queue q WHERE q.session_message_id = m.id)
+                    EXISTS(SELECT 1 FROM turn_queue q WHERE q.session_message_id = m.id),
+                    (SELECT json_extract(value_json,'$.sha') FROM kv WHERE ns='team-dispatch-head-v1' AND key=m.id)
              FROM session_collaboration_messages m
              WHERE m.id = ?1 AND m.plugin_id = ?2 AND m.kind = ?3",
         )?
         .query_row(params![message_id, plugin_id, TEAM_MESSAGE_KIND], |row| {
             message_from_row(row, team_session_id)
         })
-        .optional()?)
+        .optional()?;
+    if let Some(message) = &mut message {
+        super::dispatch_metadata::project(db, message)?;
+    }
+    Ok(message)
 }
 
 pub fn send_team_message(db: &Database, params: SendMessageParams<'_>) -> Result<TeamMessage> {
+    send_team_message_with_dispatch(db, params, None)
+}
+
+pub fn send_team_message_with_dispatch(
+    db: &Database,
+    params: SendMessageParams<'_>,
+    dispatch: Option<&super::dispatch_metadata::TaskDispatch>,
+) -> Result<TeamMessage> {
     let SendMessageParams {
         team_session_id,
         caller_session_id,
@@ -162,23 +184,11 @@ pub fn send_team_message(db: &Database, params: SendMessageParams<'_>) -> Result
             }
         }
     }
+    super::member_failure::validate_message_key(idempotency_key)?;
     let permission_ceiling =
         validate_participant_permissions(db, caller_session_id, &target_session_id)?;
 
     let plugin_id = team_plugin_origin(team_session_id);
-
-    // 4. Enforce mailbox queue limit (<= 64 pending messages)
-    let queued_count: i64 = db.conn().query_row(
-        "SELECT COUNT(*) FROM session_collaboration_messages
-         WHERE plugin_id = ?1 AND kind = ?2 AND target_session_id = ?3 AND status = 'queued'",
-        params![plugin_id, TEAM_MESSAGE_KIND, target_session_id],
-        |row| row.get(0),
-    )?;
-    if queued_count >= MAX_MEMBER_QUEUED_MESSAGES {
-        return Err(anyhow!(
-            "TEAM_MAILBOX_FULL: recipient mailbox is full ({MAX_MEMBER_QUEUED_MESSAGES} queued messages)"
-        ));
-    }
 
     let now = now_ms();
     let message_id = Uuid::new_v4().to_string();
@@ -193,7 +203,8 @@ pub fn send_team_message(db: &Database, params: SendMessageParams<'_>) -> Result
                     EXISTS(SELECT 1 FROM session_collaboration_messages receipt
                            WHERE receipt.kind = 'completion'
                              AND receipt.reply_to_message_id = m.id),
-                    EXISTS(SELECT 1 FROM turn_queue q WHERE q.session_message_id = m.id)
+                    EXISTS(SELECT 1 FROM turn_queue q WHERE q.session_message_id = m.id),
+                    (SELECT json_extract(value_json,'$.sha') FROM kv WHERE ns='team-dispatch-head-v1' AND key=m.id)
              FROM session_collaboration_messages m
              WHERE m.plugin_id = ?1 AND m.source_session_id = ?2
                AND m.idempotency_key = ?3 AND m.kind = ?4",
@@ -207,7 +218,23 @@ pub fn send_team_message(db: &Database, params: SendMessageParams<'_>) -> Result
                 "IDEMPOTENCY_CONFLICT: key was already used for another team message"
             ));
         }
+        let existing = get_message(db, team_session_id, &existing.id)?
+            .ok_or_else(|| anyhow!("TEAM_MESSAGE_PERSISTENCE_FAILED"))?;
+        if existing.task_dispatch.as_ref() != dispatch {
+            return Err(anyhow!(
+                "IDEMPOTENCY_CONFLICT: task dispatch association differs"
+            ));
+        }
         return Ok(existing);
+    }
+    if let Some(dispatch) = dispatch {
+        super::dispatch_metadata::validate(
+            db,
+            team_session_id,
+            caller_session_id,
+            &target_session_id,
+            dispatch,
+        )?;
     }
 
     sessions::with_savepoint(db.conn(), "team_mailbox", |conn| {
@@ -233,6 +260,14 @@ pub fn send_team_message(db: &Database, params: SendMessageParams<'_>) -> Result
             ],
         )?;
         if inserted > 0 {
+            let message = get_message(db, team_session_id, &message_id)?
+                .ok_or_else(|| anyhow!("TEAM_MESSAGE_PERSISTENCE_FAILED"))?;
+            super::dispatch_metadata::record(db, &message, dispatch)?;
+            // Supersession frees this task's slot before the queue limit check.
+            let queued_count: i64 = conn.query_row("SELECT COUNT(*) FROM session_collaboration_messages WHERE plugin_id=?1 AND kind=?2 AND target_session_id=?3 AND status='queued'", params![plugin_id, TEAM_MESSAGE_KIND, target_session_id], |row| row.get(0))?;
+            if queued_count > MAX_MEMBER_QUEUED_MESSAGES {
+                return Err(anyhow!("TEAM_MAILBOX_FULL: recipient mailbox is full ({MAX_MEMBER_QUEUED_MESSAGES} queued messages)"));
+            }
             if caller_session_id != team_session_id {
                 if let Some(turn) = sessions::running_turn_id(db, caller_session_id)? {
                     db.kv_set(
@@ -302,7 +337,8 @@ pub fn list_pending_team_messages(
                 EXISTS(SELECT 1 FROM session_collaboration_messages receipt
                        WHERE receipt.kind = 'completion'
                          AND receipt.reply_to_message_id = m.id),
-                EXISTS(SELECT 1 FROM turn_queue q WHERE q.session_message_id = m.id)
+                EXISTS(SELECT 1 FROM turn_queue q WHERE q.session_message_id = m.id),
+                    (SELECT json_extract(value_json,'$.sha') FROM kv WHERE ns='team-dispatch-head-v1' AND key=m.id)
          FROM session_collaboration_messages m
          LEFT JOIN teams t ON t.team_session_id = ?2
          WHERE m.plugin_id = ?1 AND m.kind = ?3 AND m.status = 'queued'
@@ -310,12 +346,15 @@ pub fn list_pending_team_messages(
            AND COALESCE(t.paused, 0) = 0
          ORDER BY m.created_at ASC, m.id ASC",
     )?;
-    let messages = stmt
+    let mut messages = stmt
         .query_map(
             params![plugin_id, team_session_id, TEAM_MESSAGE_KIND],
             |row| message_from_row(row, team_session_id),
         )?
         .collect::<rusqlite::Result<Vec<_>>>()?;
+    for message in &mut messages {
+        super::dispatch_metadata::project(db, message)?;
+    }
     Ok(messages)
 }
 
@@ -331,17 +370,21 @@ pub fn list_member_messages(
                 EXISTS(SELECT 1 FROM session_collaboration_messages receipt
                        WHERE receipt.kind = 'completion'
                          AND receipt.reply_to_message_id = m.id),
-                EXISTS(SELECT 1 FROM turn_queue q WHERE q.session_message_id = m.id)
+                EXISTS(SELECT 1 FROM turn_queue q WHERE q.session_message_id = m.id),
+                    (SELECT json_extract(value_json,'$.sha') FROM kv WHERE ns='team-dispatch-head-v1' AND key=m.id)
          FROM session_collaboration_messages m
          WHERE plugin_id = ?1 AND kind = ?3
            AND (source_session_id = ?2 OR target_session_id = ?2)
          ORDER BY created_at ASC, id ASC",
     )?;
-    let msgs = stmt
+    let mut msgs = stmt
         .query_map(params![plugin_id, session_id, TEAM_MESSAGE_KIND], |row| {
             message_from_row(row, team_session_id)
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
+    for message in &mut msgs {
+        super::dispatch_metadata::project(db, message)?;
+    }
     Ok(msgs)
 }
 

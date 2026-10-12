@@ -3,6 +3,7 @@ import type {
   ExpertTeamPresetId,
   ExpertTeamRoleConfig,
   ExpertTeamSettings,
+  TeamRunLimitSettings,
   ModelInfo,
   ProviderPublic,
   SessionThinkingLevel,
@@ -143,4 +144,20 @@ async function persistExpertTeamMutation({ isCurrent, getSettings, setSettings, 
     return getSettings();
   }
   throw new ExpertTeamSettingsConflict();
+}
+
+/** User-wide live budget policy; reuse the same Host CAS as expert role edits. */
+export function persistTeamRunLimits(input: {
+  config: TeamRunLimitSettings; expected: TeamRunLimitSettings | undefined;
+  isCurrent: () => boolean; getSettings: () => Promise<AppSettings>;
+  setSettings: (settings: ExpertTeamWrite) => Promise<unknown>;
+}): Promise<AppSettings | null> {
+  return persistExpertTeamMutation({ ...input, mutate: (latest) => {
+    if (JSON.stringify(latest.expertTeam?.runLimits) !== JSON.stringify(input.expected)) {
+      throw new ExpertTeamSettingsConflict(latest);
+    }
+    return { ...latest, expertTeam: { ...(latest.expertTeam ?? {
+      schemaVersion: 1, userDefaults: {}, projectOverrides: {},
+    }), runLimits: input.config } };
+  } });
 }

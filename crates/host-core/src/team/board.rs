@@ -482,6 +482,9 @@ pub fn update_team_task(db: &Database, params: UpdateTaskParams<'_>) -> Result<T
             params![team_session_id, now],
         )?;
 
+        if final_status == "completed" {
+            super::dispatch_metadata::task_completed(conn, team_session_id, task_id)?;
+        }
         Ok(final_status)
     })?;
 
@@ -543,6 +546,8 @@ pub fn get_team_board_projection(
 
     // Compute write scope overlaps
     let scope_overlaps = compute_scope_overlaps(&tasks);
+    let out_of_scope_writes = super::write_scopes::counts(db, team_session_id)?;
+    let shared_git_warnings = super::git_warnings::counts(db, team_session_id)?;
 
     Ok(TeamBoardProjection {
         team_session_id: team_session_id.to_string(),
@@ -550,6 +555,10 @@ pub fn get_team_board_projection(
         tasks,
         readiness,
         scope_overlaps,
+        shared_git_warning_count: shared_git_warnings.iter().map(|member| member.count).sum(),
+        shared_git_warnings,
+        out_of_scope_write_count: out_of_scope_writes.iter().map(|member| member.count).sum(),
+        out_of_scope_writes,
     })
 }
 

@@ -758,6 +758,7 @@ export const ptBR = {
       operationError: "Não foi possível iniciar a operação de armazenamento. {{error}}",
     },
     expertTeam: {
+      runLimits: en.settings.expertTeam.runLimits,
       title: "Equipe de especialistas",
       description: "Configure modelo, nível de raciocínio, subconjunto de ferramentas e instruções adicionais para os seis especialistas integrados. As alterações afetam somente especialistas iniciados depois. O modelo do Composer também vale para o Líder e especialistas sem modelo fixado. Restrições opcionais de ferramentas apenas reduzem a disponibilidade; nunca concedem permissões.",
       loadFailed: "Não foi possível carregar as configurações dos especialistas", currentProject: "Projeto atual",
@@ -1954,6 +1955,8 @@ export const ptBR = {
     queued_other: "Mais {{count}} solicitações aguardando",
   },
   askTool: {
+    pending: "Resposta pendente",
+    pendingHelp: "O coordenador parou de esperar após 30 minutos. A resposta inicia um novo turno; retome ou aprove a execução explicitamente.",
     completedTitle: "Perguntas esclarecidas",
     completedSkipped: "Ignorada",
     title: "Algumas perguntas",
@@ -1979,6 +1982,14 @@ export const ptBR = {
     close: "Fechar widget"
   },
   team: {
+    runLimitTitle: en.team.runLimitTitle,
+    runLimitSoft: en.team.runLimitSoft,
+    runLimitStopping: en.team.runLimitStopping,
+    runLimitPaused: en.team.runLimitPaused,
+    runLimitHours: en.team.runLimitHours,
+    runLimitReadyToResume: en.team.runLimitReadyToResume,
+    runLimitDisabled: en.team.runLimitDisabled,
+
     title: "Equipe de especialistas",
     roster: "Lista da equipe",
     board: "Quadro de tarefas",

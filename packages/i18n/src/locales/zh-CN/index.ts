@@ -924,6 +924,11 @@ export const zhCN = {
       operationError: "无法启动存储操作。{{error}}",
     },
     expertTeam: {
+      runLimits: {
+        title: "团队运行上限", enabled: "启用墙钟上限", soft: "提醒收尾时间（小时）", hard: "暂停时间（小时）",
+        description: "默认 6 小时提醒收尾、10 小时暂停。暂停和重启保留当前运行时钟；实际获准开始的新用户任务开启新周期。硬上限等待当前工具批次安全结束，不主动停止后台进程。超限后先延长或关闭限制，再恢复暂停的运行。",
+        invalid: "请输入正数小时，暂停上限必须大于收尾上限。",
+      },
       title: "专家团",
       loadFailed: "无法加载专家设置",
       currentProject: "当前项目",
@@ -2166,6 +2171,8 @@ sklm: {
     queued_other: "还有 {{count}} 个请求在排队",
   },
   askTool: {
+    pending: "待回答",
+    pendingHelp: "Lead 已在 30 分钟后停止等待。回答将开启新回合；请明确恢复或重新批准执行。",
     completedTitle: "问题澄清",
     completedSkipped: "已跳过",
     title: "需要回答几个问题",
@@ -2195,6 +2202,14 @@ sklm: {
     close: "关闭挂件",
   },
   team: {
+    runLimitReadyToResume: "团队仍暂停，当前限额已允许恢复。点击“恢复团队”继续，运行时钟不会清零。",
+    runLimitDisabled: "已关闭墙钟上限，当前运行时钟仍保留。",
+    runLimitTitle: "团队运行上限",
+    runLimitSoft: "已到收尾上限，请收集专家结果并结束当前任务。",
+    runLimitStopping: "已到硬上限：正在等待当前工具批次安全结束，后台进程仍保留运行。",
+    runLimitPaused: "已因硬上限暂停。请先在设置中延长或关闭团队运行上限，再恢复；新建会话可开始独立运行。",
+    runLimitHours: "当前运行 {{elapsed}} 小时 · 收尾 {{soft}} 小时 · 暂停 {{hard}} 小时",
+
     viewMemberDetail: "查看成员 {{name}}",
     memberDetailUnavailable: "成员详情不可用",
     dispatchCardsLabel: "专家任务分派",

@@ -161,7 +161,7 @@ describe("DesktopAgentRuntime configuration matching", () => {
     await runtime.dispose();
   });
 
-  it("executes an edit with legacy old_string and new_string parameters", async () => {
+  it.each([undefined, "A1B2"])("executes legacy old_string/new_string with tag %s", async (tag) => {
     let capturedArgs: any;
     const host = {
       call: vi.fn(async (method: string, params: any) => {
@@ -179,6 +179,7 @@ describe("DesktopAgentRuntime configuration matching", () => {
     const edit = agent.state.tools.find((tool: any) => tool.name === "Edit");
     const args = {
       path: "src/example.ts",
+      ...(tag ? { tag } : {}),
       old_string: "const a = 1;",
       new_string: "const a = 2;",
     };
@@ -187,6 +188,7 @@ describe("DesktopAgentRuntime configuration matching", () => {
     expect(result.isError).toBe(false);
     expect(capturedArgs).toMatchObject({
       path: "src/example.ts",
+      ...(tag ? { tag } : {}),
       old_string: "const a = 1;",
       new_string: "const a = 2;",
     });

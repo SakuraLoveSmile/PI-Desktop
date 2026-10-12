@@ -8,6 +8,9 @@ mod plan_schedule_rpc;
 mod project_auto_memory;
 mod project_code_search;
 mod project_history;
+#[cfg(test)]
+#[path = "../team/run_limits_pending_tests.rs"]
+mod run_limits_pending_tests;
 mod scheduled_rpc;
 mod scheduled_tools;
 mod session_activity_rpc;
@@ -15,10 +18,26 @@ mod session_notes_rpc;
 #[cfg(test)]
 mod subagent_settings_tests;
 #[cfg(test)]
+mod team_dispatch_age_tests;
+mod team_dispatch_head;
+#[cfg(test)]
 mod team_expert_config_tests;
+#[cfg(test)]
+mod team_git_warning_tests;
+mod team_lead_asks;
+mod team_mailbox;
+#[cfg(test)]
+mod team_member_activity_tests;
+#[cfg(test)]
+mod team_pending_tests;
 #[cfg(test)]
 mod team_planning_tests;
 mod team_rpc;
+mod team_run_limits;
+#[cfg(test)]
+mod team_run_limits_tests;
+#[cfg(test)]
+mod team_write_scope_tests;
 mod todos;
 
 #[cfg(test)]
@@ -340,6 +359,7 @@ pub async fn serve(state: Arc<Mutex<AppState>>) -> Result<()> {
             return Err(anyhow!("host stdin reader unavailable: {error}"));
         }
     };
+    let team_limit_scheduler = team_run_limits::start(state.clone(), tx.clone());
     let config_sync_scheduler = tokio::spawn({
         let state = state.clone();
         let tx = tx.clone();
@@ -486,6 +506,8 @@ pub async fn serve(state: Arc<Mutex<AppState>>) -> Result<()> {
         }
     }
 
+    team_limit_scheduler.abort();
+    let _ = team_limit_scheduler.await;
     config_sync_scheduler.abort();
     let _ = config_sync_scheduler.await;
     {
@@ -3562,8 +3584,9 @@ async fn handle_request_inner(
                         .get("recoverInflight")
                         .and_then(|v| v.as_bool())
                         .unwrap_or(false),
-                )
-                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+                );
+                team_rpc::send_pending_member_failure(&st.db, &tx, turn_id)?;
+                let result = result.map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
                 if result.updated {
                     let turn_session_id: Option<String> = st
                         .db
@@ -4282,6 +4305,16 @@ async fn handle_request_inner(
                 false
             };
             let mut background_owned = false;
+            let scope_context = {
+                let st = state.lock().await;
+                crate::team::write_scopes::capture(
+                    &st.db,
+                    &p.session_id,
+                    p.turn_id.as_deref(),
+                    &p.tool_name,
+                )
+                .map_err(team_rpc_err)?
+            };
             {
                 let st = state.lock().await;
                 crate::team::planning::validate_tool(&st.db, &p.session_id, &p.tool_name)
@@ -4673,6 +4706,7 @@ async fn handle_request_inner(
                             tool = %p.tool_name,
                             session_id = %p.session_id,
                             error_code = error.code(),
+                            capacity = ?error.diagnostics(),
                             "tool admission rejected"
                         );
                         let mut result = json!({
@@ -4687,6 +4721,9 @@ async fn handle_request_inner(
                             "denied": false,
                             "errorCode": error.code()
                         });
+                        if let Some(capacity) = error.diagnostics() {
+                            result["content"]["capacity"] = json!(capacity);
+                        }
                         if let Some(shell_id) = permission_shell_id.as_deref() {
                             result["commandShellId"] = json!(shell_id);
                         }
@@ -4695,6 +4732,10 @@ async fn handle_request_inner(
                 };
 
                 let ws_path = workspace_path.map(PathBuf::from);
+                let git_warning_context = {
+                    let st = state.lock().await;
+                    crate::team::git_warnings::capture(&st.db, &p.session_id, p.turn_id.as_deref(), &p.tool_name, &p.args)
+                };
                 let (data_dir, hashline_store) = {
                     let st = state.lock().await;
                     (st.data_dir.clone(), st.hashline.clone())
@@ -4791,6 +4832,7 @@ async fn handle_request_inner(
                             args: p.args.clone(),
                             options,
                             permit: _tool_permit,
+                            timeout_is_default: p.timeout_ms.is_none(),
                         },
                     )
                     .await
@@ -4807,12 +4849,11 @@ async fn handle_request_inner(
                             "prompted": prompted, "permissionWaitMs": permission_wait_ms,
                         }),
                     );
+                    let mut content = json!({"backgroundProcessId": process.id, "status":"starting", "message":"Background process accepted. Read its output and terminal status through the background process manager."});
+                    crate::team::git_warnings::annotate_observable(&st.db, &git_warning_context, &p.tool_call_id, &mut content);
                     return Ok(json!({
                         "toolCallId": p.tool_call_id, "ok": true, "isError": false,
-                        "content": {
-                            "backgroundProcessId": process.id, "status": "starting",
-                            "message": "Background process accepted. Read its output and terminal status through the background process manager.",
-                        },
+                        "content": content,
                         "durationMs": call_started.elapsed().as_millis() as u64,
                         "denied": false, "commandShellId": command_shell_id,
                     }));
@@ -4886,6 +4927,8 @@ async fn handle_request_inner(
                 // Scratch files are temp by definition: keep them out of the
                 // artifacts table so the work panel file list only shows
                 // workspace deliverables (D114).
+                crate::team::write_scopes::annotate_observable(&st.db, scope_context.as_ref(), ws_path.as_deref(), &p.tool_call_id, &mut result);
+                crate::team::git_warnings::annotate_observable(&st.db, &git_warning_context, &p.tool_call_id, &mut result.content);
                 let result_root = result.content.get("root").and_then(|v| v.as_str());
                 if result.ok
                     && result_root == Some("workspace")

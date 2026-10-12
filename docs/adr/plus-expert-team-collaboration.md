@@ -477,3 +477,98 @@ research results keep their distinct atomic result/submission completion
 contract and clear any ordinary attempt. The behavior contract and recovery
 cases live in the storage/RPC specs and executable regressions; this decision
 is not evidence that a model satisfied a task's semantic acceptance criteria.
+
+## 2026-10-11 amendment: settled Goal reports and precise completion recovery
+
+The existing runtime Lead-tool authorization boundary now applies the approved
+execution settlement rule to `SubmitGoalReport` as well as `TeamFinalAnswer`.
+Participation alone authorizes substantive work, not report submission. All report
+verdicts wait for dispatched turns and their full results to settle; partial or
+blocked reports require waiting or interruption first. No Team dependency is
+added to Goal persistence and no new RPC or schema is introduced.
+
+Host denials enumerate dispatches, experts, assigned open task IDs and unconsumed
+result counts without copying result bodies. Confirmed-roster completion recovery
+has three bounded nudges with the current Host reason, then a terminal rejection
+retains that reason. The pre-confirmation path and ordinary non-Goal final-answer
+semantics are preserved. Goal tools remain exclusive to the original approved
+execution; late member-mail continuations do not regain them.
+
+Trusted roster cancellation/interruption is terminal for approved execution both
+before and during the review wait. Treating it as another consent retry would
+restart cancelled work; no recovery prompt or waiting resource is created.
+
+
+## Amendment: Host-authored member failure mail (2026-10-11)
+
+Member error settlement previously updated phase/tasks but emitted no Lead result:
+Team dispatches deliberately disable ordinary collaboration completion callbacks.
+A dedicated Team helper now inserts an informational `member_failed` JSON body
+into the existing message envelope in the same terminal transaction. This avoids
+turning delivery acknowledgements into results or changing shared callback rules.
+The Host reserves the failure idempotency prefix, sanitizes codes, includes the
+exact failed attempt's task ids, stores source-turn/Host-only proofs and bumps
+revision. Errors alone generate notices; aborts and replays do not.
+
+Existing post-commit `team.messageQueued`, Main Team delivery and Agent Host
+queue persistence wake both waiting and idle Leads. Approved execution consumes
+these authenticated error results in its original turn and cannot complete with
+an unread failure. A read failure never establishes successful participation.
+No schema migration, RPC, new delivery queue or automatic member retry is added.
+The retriable flag is conservative code-derived advice because terminal RPC
+currently carries an error code, not the runtime's full error classification.
+Permission ceilings remain bounded by the starting dispatch/member authority.
+
+
+Host failure delivery also survives post-commit checkpoint I/O errors: the error
+remains observable, while the already durable queued notice emits its existing
+wake event. A terminal replay may re-notify that same pending row; no second
+notice is inserted, and a consumed/running notice is not emitted again.
+
+
+## Amendment: Advisory write scopes and dispatch HEAD (2026-10-11)
+
+The shared tree remains a coordination surface, not a per-member worktree or a
+new permission boundary. The Host attributes successful Write/Edit calls only
+to non-deleted, owned tasks explicitly started in the member's current turn at
+their current revision. Non-empty task scopes are combined for that turn;
+unstarted/historical owned tasks grant no scope. Canonical paths and directory
+component boundaries follow the existing filesystem resolver. Empty scopes,
+session scratch files, failed mutations and Bash writes are excluded.
+
+An out-of-scope mutation succeeds and carries an informational `scopeWarning`.
+The existing KV track keeps one count per member/turn/tool-call identity; the
+existing board RPC exposes total and per-member counts. Tracking failures stay
+observable without falsifying a committed write as a failed mutation. The Lead
+prompt asks file-editing tasks to declare scopes before parallel dispatch.
+
+Team sends also capture the sender project's Git commit identity outside the
+state lock with bounded, hardened metadata execution. After the await, Host
+rechecks project ownership and ordinary Team authorization. The immutable body,
+permission ceiling and idempotency semantics are preserved. A Host-only KV
+stamp is carried by optional `senderHead` collaboration/origin metadata into
+live member input and restored history; replay retains the original stamp.
+Non-Git/unborn senders omit it; unexpected probe failures log a bounded diagnostic
+and do not block dispatch. Only the commit SHA is exposed, never paths, Git
+configuration or stderr. Deletion cleans owned counts/stamps. No new RPC,
+SQLite migration, automatic abort or stronger write restriction is introduced.
+
+
+## Amendment: Shared-tree Git warnings (2026-10-11)
+
+The shared Git index and working tree can mix or remove another expert's changes
+without crossing a filesystem permission boundary. A permission denial or a new
+per-member worktree model would change execution semantics, so this increment
+adds only Host-owned diagnostics after existing Bash authorization/admission.
+Literal risky Git command forms are compared with other Team participants'
+in-progress non-empty task scopes. Tool results and the existing board/status
+projection carry a warning and caller-attributed count; a command's real failure
+or background acceptance remains intact. Counts use the existing KV lifecycle
+and separate identities from successful Write/Edit scope warnings.
+
+The bounded lexical detector is not a shell parser or sandbox: dynamic commands,
+aliases and target-repository inference are not guaranteed. Warning presence does
+not prove a mutation occurred, and absence does not establish safety. This avoids
+inventing a shell execution path, changing permissions, or blocking legitimate
+single-writer Git use. Per-member worktrees and a scoped team_commit tool remain
+outside this increment.

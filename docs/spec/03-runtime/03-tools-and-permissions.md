@@ -16,7 +16,7 @@
 | Local permission approval | No automatic deadline; explicit decision or cancellation required |
 | allow-session scope | toolName |
 | Bash style | non-interactive; selected host catalog shell with streamed output |
-| Edit contract | line-anchored ops + whole-file `tag`; no `old_string`/`new_string` (ADR 0087) |
+| Edit contract | line-anchored ops + whole-file `tag`; legacy `old_string`/`new_string` tolerated only without `ops` (D273) |
 | asktool | interactive multi-question tool; no validity deadline; skipped answers become empty output fields |
 
 ## 1. Goal
@@ -337,7 +337,7 @@ Host execution baseline:
 - A project-bound session workspace is required
 - Default cwd = the originating session's `workspaceRoot`
 - Confirmation required by default
-- Set a mandatory 60s timeout; accept a 1s–21,600s override (D329)
+- Set a mandatory 60s timeout, including managed background Bash; accept a 1s–21,600s override (D329). For long commands, pass `timeout` in seconds.
 - Stream stdout and stderr separately, then return bounded final output
 - Truncate large output without mixing the two streams
 - No interactive TTY (MVP)
@@ -571,8 +571,9 @@ recheck current Host authority: an approved dispatched expert turn must have
 actually started. Idle members and queued messages cannot grant authority.
 The gate does not itself require task ownership or a completed contribution.
 Tool permissions, cancellation and mode checks continue to apply after authority.
-A nonempty final reply uses the same gate; one recovery is allowed in the same
-durable turn, then repeated refusal ends with an observable approval error.
+A nonempty final reply uses the same gate; one preconfirmation recovery and
+three confirmed-roster completion retries are allowed in the same durable turn,
+then repeated refusal ends with an observable approval error.
 An ordinary unapproved Agent turn with a valid pending roster may explain that
 user confirmation is needed. An already-approved Team Plan/Goal execution
 instead suspends inside the same Host turn until trusted roster confirmation,
@@ -580,6 +581,48 @@ then consumes full authenticated results with wait_for_updates. Expert-start
 authority only unlocks substantive tools; completion additionally requires
 recorded expert dispatches/turns settled and their current results consumed.
 No final agent_end or Goal execution-token release is permitted while waiting.
+On same-turn approved execution guard recovery, a fresh Host-confirmed,
+user-confirmed nonempty delegate review bound to the same team/turn is registered
+for the current approved execution only. Registration reads original entries
+from that execution's start boundary, including a declaration already archived
+by compaction before confirmation, to capture the latest matching successful
+declaration's complete valid assistant batch and all its original paired
+results. It never reads a declaration from an earlier execution for this scope. Signed thinking/text/tool signatures and sibling
+calls/results remain intact; only matching declaration results are projected.
+Final model conversion projects every successful `declare_team_strategy` result
+matching that team/turn/review on each request from the first recovery request
+until execution ends, including later tool loops, retries and rebuilt contexts.
+If compaction archives that batch, final conversion includes the complete
+registered batch and all paired results only in the model view, never an
+orphan call/result. Repeated recovery keeps same-owner/review/epoch registration
+when rebuilt messages have archived it. Wire-call ID collisions do not overwrite
+newer work. Payload and
+details use the confirmed roster, `awaitingUserApproval=false` and a `nextStep`
+beginning `The user confirmed the execution roster`; declaration-time
+`memberSessionIds` are omitted because the review read cannot refresh them.
+Provider telemetry reflects this same projected payload. Copy-on-write and
+idempotence preserve unrelated results and all original pending tool events,
+entries, journal, compaction input and visible UI history. Pending, cancelled or
+replaced reviews, completed/interrupted executions, Stop, ordinary turns and a
+later execution cannot reuse an earlier projection. A newer observable
+declaration with a different reviewId, cancellation or higher revision clears
+registration; current Agent mode, execution, turn/epoch and cancellation,
+disposal/graceful-stop/Team-budget fences also apply. Without a matching
+successful declaration and fully paired valid assistant batch at initial
+registration, no tool call is invented and the existing nudge/three completion retries remain. Reinserted
+batches are not saved to Agent state, entries, compaction summary/checkpoint or
+journal. No additional Host notification, review read or RPC is added. Ordinary
+Team turns and automatic Plan research do not acquire this projection; direct
+confirmation consumption through
+`wait_for_updates` is unchanged. This model-view correction grants no authority
+and does not alter Host participation/settlement gates or tool permissions.
+Pending approved-execution guidance permits either wait_for_updates or ending
+only the assistant message: the Host keeps the execution open and resumes it
+with the confirmed roster. Ordinary unapproved Team turns still stop for trusted
+user confirmation, and Plan research still launches automatically. Presentation
+role descriptions enumerate researcher/executor/reviewer/planner/collaborator;
+implementation builders use executor. The allowed values and permission
+contracts are unchanged.
 The internal inbox reads are narrow, Host-authorized model-proxy operations;
 trusted plans.bindExecutionTurn is never exposed to the model reverse proxy.
 
@@ -692,3 +735,34 @@ session activity registry, not this launch receipt. The renderer can read/stop
 only the explicitly named local session resource. Background tasks retain the
 same default and maximum command timeout, do not bypass approvals, and cannot
 turn arbitrary `command &` invocations into managed processes.
+
+
+### Background timeout visibility and waiting (2026-10-11)
+
+Both `run_in_background` and `timeout` descriptions state the default 60-second
+limit and the 1–21,600-second override. The default stays unchanged. Background
+launches without a model `timeout` omit transport `timeoutMs`, letting the Host
+apply the same default and retain its provenance; explicit overrides, including
+60 seconds, remain explicit. Foreground transport behavior is unchanged.
+
+On `TOOL_TIMEOUT`, the existing persisted result content includes `timeoutMs`
+and `timeoutIsDefault`. Its existing `errorMessage` identifies the applied
+limit as default or explicit and tells the model to pass `timeout` in seconds
+for long runs. Historical records keep their original message; missing
+provenance is not inferred as a default.
+
+The existing `backgroundProcesses.changed` event remains an identity-only
+invalidation. Team `wait_for_updates` observes events for its owning session,
+reads the process through `backgroundProcesses.read`, and returns a terminal
+outcome as `reason: background_process_completed` with `backgroundProcess`
+detail, including timeout guidance. Running/output changes do not finish the
+wait. This does not enqueue mailbox messages or start an idle Lead turn.
+A session-owned runtime tracker registers successful background launch receipts
+and reconciles only those unconsumed IDs at every wait, including completions
+before the first wait or between waits. Tool catalog rebuilds retain the tracker;
+runtime disposal releases it. No historical background list is queried. This
+in-memory receipt tracking does not promise replay after runtime replacement.
+The read is protected by the trusted launch binding and process/session owner
+checks. Errors remain visible; cancellation, deadline or a replaced turn never
+consumes a late outcome, so a later wait can receive it. Team inbox delivery,
+permission/admission limits and process cancellation rules are unchanged.

@@ -2,10 +2,13 @@
  * DSH 9 Expert Team Agent Tools (ADR 0304).
  */
 
+import type { BackgroundProcessUpdates } from "./background-process-updates.js";
 import { Type } from "@earendil-works/pi-ai";
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { RuntimeHost } from "../host-client.js";
 import { createWaitForUpdatesTool } from "./wait-for-updates.js";
+import { buildDeclareStrategyResult } from "./declare-strategy-result.js";
+import { pendingMailboxNextStep, readPendingMailbox } from "./pending-mailbox.js";
 import {
   TEAM_TASK_SUBJECT_GUIDANCE,
   TEAM_STRATEGY_REASON_GUIDANCE,
@@ -39,8 +42,10 @@ export interface TeamToolsOptions {
   planningId?: string;
   roundId?: string;
   host: RuntimeHost;
+  backgroundProcesses?: BackgroundProcessUpdates;
   getTurnId?: () => string | undefined;
   approvedExecution?: () => boolean;
+  captureMailboxGuard?: () => (() => boolean);
   captureInboxYield?: () => ((toolCallId: string) => boolean) | undefined;
   abortActiveTurn?: (memberSessionId: string) => Promise<boolean>;
 }
@@ -51,7 +56,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
     name: DECLARE_TEAM_STRATEGY_TOOL_NAME,
     label: "Declare Team Strategy",
     description:
-      "Expert Team mode requires expert delegation. Declare at least one named expert with a role and context. In Plan mode, the Host automatically starts a read-only research roster without user confirmation; immediately assign owned tasks and dispatch researchers. In Agent execution mode, stop for trusted user launch review before dispatch. Solo execution and lead_only are unavailable. " + TEAM_EXPERT_PRESET_GUIDANCE,
+      "Expert Team mode requires expert delegation. Declare at least one named expert with a role and context. In Plan mode, the Host automatically starts a read-only research roster without user confirmation; immediately assign owned tasks and dispatch researchers. In Agent execution mode, trusted user launch review is required before dispatch. Solo execution and lead_only are unavailable. " + TEAM_EXPERT_PRESET_GUIDANCE,
     parameters: Type.Object({
       strategy: Type.Literal("delegate", {
         description: "Required delegation strategy. Expert Team mode does not permit lead_only.",
@@ -87,7 +92,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
                   Type.Literal("reviewer"),
                   Type.Literal("planner"),
                   Type.Literal("collaborator"),
-                ]),
+                ], { description: "Presentation role: researcher, executor, reviewer, planner, or collaborator. Use executor for a builder or implementation expert; builder is not an allowed role." }),
                 displayName: Type.String({ description: TEAM_MEMBER_DISPLAY_NAME_GUIDANCE, minLength: 1, maxLength: 64 }),
               }),
             ),
@@ -135,39 +140,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
           ...(p.strategy === "delegate" ? { members: p.members } : {}),
         });
 
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({
-                strategy: result.decision.strategy,
-                reason: result.decision.reason,
-                reviewId: result.review?.reviewId,
-                status: result.review?.status ?? "none",
-                launchPolicy: result.review?.launchPolicy ?? "user_confirmed",
-                awaitingUserApproval: result.review?.status === "pending",
-                ...(result.review?.status === "pending" ? {
-                  nextStep: opts.approvedExecution?.()
-                    ? "Explain the proposal and keep this approved execution open while waiting for trusted roster confirmation. After confirmation use wait_for_updates to consume authenticated Team messages in this same execution; dispatch owned expert tasks and await their full results before completion."
-                    : "Explain the proposal and stop this turn. Wait for trusted user review confirmation before executing work or submitting a plan.",
-                } : result.review?.status === "confirmed" ? {
-                  nextStep: result.review.launchPolicy === "automatic_plan"
-                    ? "The read-only researchers are ready automatically. Do not ask for roster confirmation or stop to explain dispatch: create owned research tasks, send_message each taskId to its researcher, and await full structured research results. Synthesize settled findings and questions, then call SubmitPlan for user approval of the implementation plan."
-                    : "The user confirmed the execution roster. Create owned tasks and dispatch the approved experts; await actual expert participation before substantive execution or completion.",
-                } : {}),
-                memberSessionIds: result.decision.memberSessionIds,
-                members: result.review?.members?.map(
-                  (m: { name: string; selection: { modelId: string; providerId: string } }) => ({
-                    name: m.name,
-                    modelId: m.selection.modelId,
-                    providerId: m.selection.providerId,
-                  }),
-                ),
-              }),
-            },
-          ],
-          details: result,
-        };
+        return buildDeclareStrategyResult(result, opts.approvedExecution?.() ?? false);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {
@@ -196,6 +169,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
         minLength: 1,
         maxLength: 64,
       }),
+      replaces: Type.Optional(Type.String({ description: "Immutable name of an approved failed expert to replace once. Use a new unique name; omit route, context and role overrides. The Host inherits the frozen approved configuration." })),
       description: Type.Optional(
         Type.String({ description: "Role or specialty description." }),
       ),
@@ -233,6 +207,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
       try {
         const p = params as {
           name: string;
+          replaces?: string;
           description?: string;
           contextKind?: TeamContextKind;
           modelId?: string;
@@ -246,7 +221,8 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
             callerSessionId,
             name: p.name,
             description: p.description,
-            contextKind: p.contextKind ?? "fresh",
+            replaces: p.replaces,
+            contextKind: p.replaces ? p.contextKind : p.contextKind ?? "fresh",
             modelId: p.modelId,
             providerId: p.providerId,
           },
@@ -258,6 +234,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
             callerSessionId,
             target: result.member.name,
             content: p.prompt,
+            ...(p.replaces ? { idempotencyKey: `team-replacement:${result.member.memberSessionId}:initial` } : {}),
           });
         }
 
@@ -299,10 +276,14 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
         description: "Name of the recipient teammate, or 'Lead'.",
       }),
       content: Type.String({ description: "Message body (up to 64 KiB)." }),
+      taskDispatch: Type.Optional(Type.Object({
+        taskId: Type.String({ description: "Explicit task dispatch by Lead to its current owner. Supersedes only unstarted queued dispatches for this same task and recipient. Omit for reports, questions and ordinary mail." }),
+        expectedRevision: Type.Integer({ minimum: 1, description: "Current task revision from task_create, task_get or task_update." }),
+      })),
     }),
     execute: async (_toolCallId, params): Promise<AgentToolResult> => {
       try {
-        const p = params as { targetMemberName: string; content: string };
+        const p = params as { targetMemberName: string; content: string; taskDispatch?: { taskId: string; expectedRevision: number } };
         const result = await host.call<{
           message: {
             id: string;
@@ -310,12 +291,19 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
             target_member_name?: string;
             status: string;
             deliveryStatus?: string;
+            sentAt?: string;
+            targetBusyAtSend?: boolean;
+            targetState?: string;
+            queuePosition?: number;
+            taskDispatch?: { taskId: string; expectedRevision: number };
+            dispatchCancellation?: string;
           };
         }>("team.sendMessage", {
           teamSessionId,
           callerSessionId,
           target: p.targetMemberName,
           content: p.content,
+          ...(p.taskDispatch ? { taskDispatch: p.taskDispatch } : {}),
         });
 
         return {
@@ -328,6 +316,13 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
                 status: result.message.status,
                 deliveryStatus: result.message.deliveryStatus ?? "queued",
                 delivered: false,
+                sentAt: result.message.sentAt,
+                targetBusyAtSend: result.message.targetBusyAtSend,
+                targetState: result.message.targetState,
+                queuePosition: result.message.queuePosition,
+                queuePositionScope: "team_mailbox",
+                taskDispatch: result.message.taskDispatch,
+                dispatchCancellation: result.message.dispatchCancellation,
               }),
             },
           ],
@@ -356,11 +351,13 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
     name: "interrupt_agent",
     label: "Interrupt Agent",
     description:
-      "Interrupt the current running turn of a named teammate. Only available to the Team Lead.",
+      "Interrupt a teammate turn. Host activity within 10 minutes or an active Bash process requires force:true and a nonempty reason. Only the Team Lead may interrupt.",
     parameters: Type.Object({
       memberName: Type.String({
         description: "Name of the teammate to interrupt.",
       }),
+      force: Type.Optional(Type.Boolean({ description: "Override the Host activity safeguard, without changing authority or permissions." })),
+      reason: Type.Optional(Type.String({ minLength: 1, maxLength: 1000, description: "Required with force:true; explain why stopping this active work is necessary." })),
     }),
     execute: async (_toolCallId, params): Promise<AgentToolResult> => {
       if (!isLead) {
@@ -375,7 +372,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
         };
       }
       try {
-        const p = params as { memberName: string };
+        const p = params as { memberName: string; force?: boolean; reason?: string };
         const roster = await host.call<{ members: TeamMemberRecord[] }>(
           "team.getRoster",
           { teamSessionId, callerSessionId },
@@ -395,7 +392,10 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
 
         const interrupt = await host.call<{ interrupted?: boolean }>(
           "team.interruptMember",
-          { teamSessionId, callerSessionId, memberName: p.memberName },
+          { teamSessionId, callerSessionId, memberName: p.memberName,
+            ...(p.force !== undefined ? { force: p.force } : {}),
+            ...(p.reason !== undefined ? { reason: p.reason } : {}),
+          },
         );
         const interrupted = interrupt.interrupted === true;
 
@@ -411,7 +411,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
             },
           ],
           details: {
-            interrupted: true,
+            interrupted,
             memberName: p.memberName,
             turnInterrupted: interrupted,
           },
@@ -672,11 +672,14 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
     name: "team_status",
     label: "Team Status",
     description:
-      "Get full Expert Team status, including roster of members, task board, and current paused state.",
+      "Get full Expert Team status, including roster, task board, paused state, and Host-owned member activity evidence; queued mail is not proof of execution.",
     parameters: Type.Object({}),
-    execute: async (): Promise<AgentToolResult> => {
+    execute: async (_id, _params, signal): Promise<AgentToolResult> => {
       try {
-        const [roster, board, planning] = await Promise.all([
+        signal?.throwIfAborted();
+        const expectedTurnId = opts.getTurnId?.();
+        const ownsMailbox = opts.captureMailboxGuard?.();
+        const [roster, board, planning, mailbox] = await Promise.all([
           host.call<TeamRosterProjection>("team.getRoster", {
             teamSessionId,
             callerSessionId,
@@ -686,7 +689,16 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
             callerSessionId,
           }),
           host.call<TeamPlanningProjection | null>("team.getPlanning", {teamSessionId, callerSessionId}),
+          isLead ? readPendingMailbox(host, teamSessionId, callerSessionId) : undefined,
         ]);
+        signal?.throwIfAborted();
+        if ((opts.getTurnId && opts.getTurnId() !== expectedTurnId) || ownsMailbox?.() === false) {
+          throw new Error("TEAM_PLANNING_STALE: team mailbox context changed");
+        }
+        const pending = mailbox?.summary;
+        const summary = pending ? { ...pending, ...(pending.pendingMessagesCount > 0 ? {
+          nextStep: pendingMailboxNextStep(opts.mode, opts.approvedExecution?.() === true),
+        } : {}) } : {};
 
         return {
           content: [
@@ -694,20 +706,24 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
               type: "text",
               text: JSON.stringify({
                 planning,
-                ...(isLead && planning && (planning.pendingMessagesCount ?? 0) > 0 ? {
-                  nextStep: "Expert messages are pending. Finish the current aggregation turn to let the mailbox consume their full contents; do not keep waiting while holding the Lead turn. Resume synthesis after those messages are consumed, then call SubmitPlan.",
-                } : {}),
+                ...summary,
                 teamSessionId: roster.teamSessionId,
                 paused: roster.paused,
+                ...(roster.runLimits ? { runLimits: roster.runLimits } : {}),
                 revision: board.revision,
                 members: roster.members,
+                ...(roster.memberActivity ? { memberActivity: roster.memberActivity } : {}),
                 tasks: board.tasks,
                 readiness: board.readiness,
                 scopeOverlaps: board.scopeOverlaps,
+                sharedGitWarningCount: board.sharedGitWarningCount ?? 0,
+                sharedGitWarnings: board.sharedGitWarnings ?? [],
+                outOfScopeWriteCount: board.outOfScopeWriteCount ?? 0,
+                outOfScopeWrites: board.outOfScopeWrites ?? [],
               }),
             },
           ],
-          details: { roster, board, planning },
+          details: { roster, board, planning, ...summary },
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
