@@ -11,6 +11,7 @@ import type {
   ExecutionProfile,
   Mode,
   PermissionMode,
+  ShortcutPlatform,
 } from "@pi-desktop/shared";
 import {
   initialThinkingLevelForBinding,
@@ -34,7 +35,7 @@ import { AskToolCard } from "./AskToolCard";
 import {
   COMPOSER_MAX_VISIBLE_ROWS,
   COMPOSER_MIN_HEIGHT_PX,
-  PLACEHOLDER_KEYS,
+  resolveComposerPlaceholder,
   cssPixels,
   isPermissionMode,
   isThinkingLevel,
@@ -259,10 +260,23 @@ export function Composer({
     }
     editQueuedPrompt(id);
   };
-  const placeholderKeys = PLACEHOLDER_KEYS[variant];
-  const placeholderKey =
-    placeholderKeys[placeholderIndex % placeholderKeys.length] ?? placeholderKeys[0];
-  const placeholderText = t(placeholderKey);
+  const enterToSend = settings?.enterToSend ?? true;
+  const hasDraftContent = Boolean(value.trim() || activeFileReferences.length);
+  const desktopPlatform = window.piDesktop?.platform;
+  const platform: ShortcutPlatform =
+    desktopPlatform === "win32" || desktopPlatform === "linux" ? desktopPlatform : "darwin";
+  const placeholder = resolveComposerPlaceholder({
+    variant,
+    index: placeholderIndex,
+    runActive,
+    hasDraft: hasDraftContent,
+    enterToSend,
+    platform,
+  });
+  const placeholderText = t(placeholder.key, {
+    sendShortcut: placeholder.sendShortcut,
+    steerShortcut: placeholder.steerShortcut,
+  });
 
   const textareaMetricsRef = useRef<{ lineHeight: number; verticalChrome: number } | null>(null);
   const appliedHeightRef = useRef<number | null>(null);
@@ -445,9 +459,6 @@ export function Composer({
     }
     return sendPrompt(content, snapshot, targetSessionId, onAccepted, options);
   };
-  const enterToSend = settings?.enterToSend ?? true;
-  const hasDraftContent = Boolean(value.trim() || activeFileReferences.length);
-
   const submitController = useComposerSubmit({
     value,
     draftKey,
@@ -617,14 +628,6 @@ export function Composer({
           dismissDroppedDirectories={dismissDroppedDirectories}
         />
         <ComposerImageAttachments controller={draft.imagePreview} onRemove={draft.removeImage} disabled={inputBlocked} />
-        {planCheckpoint &&
-        (planCheckpoint.executionKind ?? planCheckpoint.kind) === "goal" &&
-        activeSessionId ? (
-          <GoalProgressBar
-            sessionId={activeSessionId}
-            proposal={planCheckpoint}
-          />
-        ) : null}
         <div
           ref={composerShellRef}
           className={`composer-shell${inputBlocked ? " is-gated" : ""}${
@@ -635,6 +638,14 @@ export function Composer({
           onDragLeave={onComposerDragLeave}
           onDrop={onComposerDrop}
         >
+          {planCheckpoint &&
+          (planCheckpoint.executionKind ?? planCheckpoint.kind) === "goal" &&
+          activeSessionId ? (
+            <GoalProgressBar
+              sessionId={activeSessionId}
+              proposal={planCheckpoint}
+            />
+          ) : null}
           {inputFocused ? (
             <ComposerAutocomplete
               anchorRef={composerShellRef}
@@ -681,6 +692,7 @@ export function Composer({
             displayMode={displayMode}
             executionProfile={executionProfile}
             planningLive={planningLive}
+            goalExecutionActive={executionActive}
             providerId={provider?.id}
             modelId={modelId}
             thinkingLevel={thinkingLevel}

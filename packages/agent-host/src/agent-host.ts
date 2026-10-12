@@ -28,6 +28,7 @@ import type {
   GoalProgressChangedEvent,
   UiMessage,
   VoiceOrigin,
+  TeamOrdinaryInboxReadResult,
 } from "@pi-desktop/shared";
 import {
   RACP_ACTIVE_TURN_STATUSES,
@@ -1005,6 +1006,45 @@ export class AgentHost {
   /** Let the queue of an idle session run, e.g. after the runtime became free. */
   kick(sessionId: string): void {
     void this.drain(sessionId);
+  }
+
+  /** Internal mailbox boundary, never a user steer or a new turn admission. */
+  async readOrdinaryTeamInbox(
+    sessionId: string,
+    runtimeTurnId: string,
+    read: () => Promise<TeamOrdinaryInboxReadResult>,
+  ): Promise<TeamOrdinaryInboxReadResult | null> {
+    return this.withAdmission(sessionId, async () => {
+      const state = this.state(sessionId);
+      const active = state.activeTurnId ? state.turns.get(state.activeTurnId) : undefined;
+      if (!active || (active.runtimeTurnId ?? active.id) !== runtimeTurnId || !isActive(active.status) ||
+        this.queue.isHeld(sessionId) || this.queue.list(sessionId).some(entry => entry.priority !== undefined) ||
+        [...state.turns.values()].some(turn => turn.deliveryPending)) return null;
+      const result = await read();
+      // Host already committed transcript/proof and retired durable queue rows.
+      // Even if the old turn ended during read, these entries must never run.
+      this.retireOrdinaryTeamInbox(sessionId, runtimeTurnId, result.messages.map(message => message.messageId));
+      const current = state.activeTurnId ? state.turns.get(state.activeTurnId) : undefined;
+      if (current !== active || !isActive(active.status) || this.queue.isHeld(sessionId)) {
+        throw racpError("CONFLICT", "ordinary Team inbox turn changed during admission");
+      }
+      return result;
+    });
+  }
+
+  /** Host-authenticated commit notification; this only removes exact mail mirrors. */
+  retireOrdinaryTeamInbox(sessionId: string, runtimeTurnId: string, messageIds: string[]): void {
+    const ids = new Set(messageIds);
+    const state = this.state(sessionId);
+    for (const entry of this.queue.list(sessionId)) {
+      if (!entry.sessionMessageId || !ids.has(entry.sessionMessageId) ||
+        entry.idempotencyKey !== `team-message:${entry.sessionMessageId}`) continue;
+      this.ensureTurn(state, entry.id);
+      this.markDeliveredIntoAnotherTurn(state, entry.id, runtimeTurnId);
+      this.queue.retirePersisted(sessionId, entry.id);
+    }
+    this.renumberQueue(state);
+    this.notifyQueue(sessionId);
   }
 
   // -------------------------------------------------------------------------

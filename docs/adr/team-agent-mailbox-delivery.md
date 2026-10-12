@@ -1,116 +1,94 @@
-# ADR: Ordinary Agent Lead mailbox delivery within a running turn
+# ADR: Ordinary Agent Lead mailbox delivery at a wait boundary
 
-- Status: Proposed; delivery alternatives are not implemented
+- Status: Accepted decision; candidate implementation and acceptance are tracked separately
 - Date: 2026-10-11
 - Related: [Expert Team collaboration](plus-expert-team-collaboration.md),
   [session collaboration messages](0239-session-collaboration-messages.md)
-- Scope: WP16 S3; reassess after the S1 visibility candidate is exercised
+- Scope: WP16 S3, adopted alternative B
 
 ## Context
 
-An ordinary Agent Team Lead can hold its running turn while repeatedly waiting
-for an expert report. Main persists that report through the authenticated Team
-mailbox and admits it to AgentHost with `admission: "queue"`. A busy AgentHost
-does not drain an ordinary queue entry until the active turn settles. Queue
-acknowledgement proves durable admission, not that the Lead read its body.
+An ordinary Agent Lead can wait within a long turn while its expert's complete
+report is already durable in the Team mailbox. Ordinary AgentHost queue admission
+previously deferred the body until that turn settled. A queue ACK proves admission,
+not that the Lead or provider consumed the body. S1 made this backlog visible but
+did not remove the delivery delay or mechanically prevent duplicate work.
 
-The existing same-turn execution inbox is narrower: Host authorizes it against
-the original approved Plan/Goal execution and its exact Lead turn. Ordinary
-Plan aggregation instead yields for pending mail, then receives authenticated
-continuations. Neither path authorizes arbitrary ordinary Agent inbox reads.
-
-WP16 S1 exposes pending-mail metadata without consuming mail or ending an Agent
-turn. Together with coordination instructions, that may remove blind waits and
-duplicate commands. It cannot mechanically prevent a model from repeating work.
-Evidence of remaining delay or repeated execution is required before changing
-delivery semantics. This ADR proposes alternatives; it is not a grant of
-implementation, new approval, or stronger runtime authority.
+The approved Plan/Goal execution inbox is authorized against its original
+execution and exact Lead turn. Ordinary Plan aggregation yields for pending mail.
+Neither contract should be broadened to grant execution authority to an ordinary
+Agent Lead. Public human steering also clears Team provenance and denotes new
+human input, so reusing it would misrepresent the expert's report.
 
 ## Decision
 
-Keep ordinary Agent Team delivery unchanged for the visibility candidate. Do
-not set queue priority to impersonate the user's Send now action. Do not extend
-`team.readExecutionInbox` by accepting historical approvals or omitting its
-execution/turn proofs. Preserve the current authenticated `role=user` mailbox
-continuation, `team-message:<id>` idempotency key, permission ceiling, FIFO,
-pause holds, and cancellation behavior.
+Adopt a separate ordinary Lead inbox only at `wait_for_updates` boundaries.
+The Host validates a current confirmed delegate strategy, current Team run,
+exact running ordinary Agent Lead turn, recipient, authenticated expert/source
+turn and permission ceiling. Main, AgentHost and Runtime validate their captured
+turn/epoch and lifecycle state after asynchronous work. The model cannot supply
+an epoch or a historical approval as authority.
 
-Before adopting either alternative below, obtain a separate decision on its
-user-visible timing and contract. Define its persisted consumption proof and
-restart behavior in the normative runtime and Host protocol specifications,
-then cover producers and consumers with contract and user-path regressions.
+Admit each body as authenticated `role=user` input with its expert origin through
+a dedicated internal runtime operation. Keep the same Lead turn open. Tool output
+contains metadata only. Neither report text nor this transport supplies new user
+consent, an execution tool grant, a Goal token or a new Team run budget. Human
+steering has priority; eligible expert reports retain mailbox FIFO order.
 
-### Alternative A: Authenticate and steer ordinary Team mail into its live turn
+The capability is `ordinary-team-inbox-v1`. Old Hosts lacking it retain queued
+continuations and S1 metadata guidance. Ordinary Plan yield and the approved
+execution inbox remain separate. See the normative [ordinary inbox contract](../spec/03-runtime/team-ordinary-inbox.md).
 
-Main would request a dedicated Team delivery operation, not reuse user priority.
-Host/AgentHost would validate the message's Team ledger origin, caller/recipient,
-current session, live turn and epoch, pause state, and permission ceiling before
-the runtime admits its body. The runtime would preserve the full authenticated
-message provenance and `role=user` framing without presenting it as new user
-consent. A refusal must leave the original durable queue entry intact.
+## Persistence and recovery
 
-Advantages: reuse the existing runtime steering boundary and keep the original
-Lead turn active. Costs: mailbox admission becomes observable during an active
-model/tool run; the ordering contract must cover a concurrent real user steer,
-multiple Team reports, tool batches and cancellation.
+Plus P6 adds a dedicated message-identity journal, without changing upstream
+schema version or the collaboration ledger's unique turn binding. Each journal
+row pins its stable user-message ID, Lead turn, user scope and wait boundary.
+The phases are `prepared`, `persisted` and `acked`.
 
-### Alternative B: Introduce an ordinary Lead inbox consumption boundary
+Preparation is durable before the authenticated JSONL append. JSONL is written
+first; indexing, persisted proof, mailbox completion and durable queue retirement
+then commit together in SQLite. A filesystem append and a SQLite transaction are
+not one atomic transaction. Runtime buffer acceptance is followed by a separate
+exact-proof ACK and a fresh lifecycle check before synchronous queue flush.
+Persistent delivery and model consumption remain different facts.
 
-Host could authorize a separate ordinary Lead operation against a current,
-confirmed Team strategy, exact active Lead turn, recipient and authenticated
-message source. It must remain distinct from approved-execution authorization.
-Successful consumption would atomically persist a turn-specific proof and retire
-eligible queue receipts, with Main and runtime deduplicating against the same
-durable message identity. It cannot obtain execution tools or restore a Goal
-token. Whether bodies remain authenticated `role=user` input rather than tool
-output is a required explicit contract choice, not an implementation detail.
+Startup recovery deletes a preparation with no file row and leaves its mail
+queued. When the authenticated file row exists, it repairs the index and completes
+queue retirement. Persisted/ACKed bodies remain authenticated history. Recovery
+never starts a turn or provider request, adopts a stale turn, or promises that a
+provider read a report exactly once. A transport retry uses the same identities;
+Main retires the live queue mirror only after the Host proof permits it.
 
-Advantages: explicit pull and transactional consumption at existing wait points.
-Costs: a new authority and consumption contract, recovery semantics and event
-ordering across Host/Main/runtime. Reusing the approved inbox without a separate
-ordinary identity would blur the approval and execution-token boundary.
+## Threats and alternatives
 
-## Threats and required invariants
+- Report prose is task data, including instructions embedded within it. Origin,
+  body, IDs, recipient, source dispatch and permission ceiling are Host checked;
+  a claimed origin or `steering:true` cannot forge that evidence.
+- Pause, hard limit, cancellation, run/turn replacement and disposal fence late
+  responses. A stale mailbox head cannot be silently overtaken. The ordinary
+  proof cannot consume an approved execution inbox.
+- Repeated notifications, lost responses, ACK retries and concurrent queue drains
+  deduplicate through durable message identity and unchanged `team-message:<id>`
+  keys. A proof is not inferred from a live queue receipt or model claim.
+- Diagnostics expose scoped identities/counts/timings rather than report bodies
+  or credentials. Waiting uses existing bounded cleanup, not busy-loop retries.
 
-- **Untrusted report text:** instructions inside a report do not grant consent,
-  spawn authority, permission or an execution token. Validate the ledger identity
-  and preserve origin; never infer trust from a body claiming to be a report.
-- **Cross-session or stale delivery:** pin recipient and exact live turn/epoch
-  across every await. After replacement, cancellation, pause or restart, an old
-  callback must not insert into a new run. Preserve the existing no-replay fence.
-- **Duplicate delivery:** repeated notifications, ACK/resume retries, a lost
-  transport response and a simultaneous drain must resolve through the durable
-  message ID and the unchanged idempotency key. A queue ACK is not consumption.
-- **Ordering:** define whether real user steering precedes pending Team mail,
-  keep per-recipient mail ordering, and prevent a later report from overtaking an
-  earlier unconsumed one silently. A model tool batch is not an atomic mail read.
-- **Interrupted consumption:** consumption, receipt retirement and runtime
-  admission must have a recoverable commit boundary. Persisting a consumption
-  proof before the body is admitted may lose mail; admitting without durable
-  deduplication may repeat it after a crash. Choose and test the boundary first.
-- **Execution token invalidation:** neither proposal changes an interrupted
-  Goal back to running, grants approved-execution tools to an ordinary turn, or
-  binds a mailbox continuation as the original approved turn. Approved Plan/Goal
-  inbox and ordinary Plan yield retain their existing semantics.
-- **Resources and privacy:** dispose listeners and pending reads on every run
-  transition. Scope diagnostics to IDs/counts and timings, avoiding bodies,
-  credentials and arbitrary workspace paths. Do not add a busy-loop retry or
-  bypass shell limits to mask an unread report.
+Alternative A, immediate in-turn steering on arrival, was not selected: it adds
+admission during arbitrary model/tool execution and has a broader ordering
+surface. Extending the approved execution inbox was rejected because it conflates
+ordinary collaboration with approved execution authority. Raising queue priority
+to imitate Send now was rejected because that priority belongs to human input.
 
-## Consequences
+## Consequences and acceptance
 
-The visibility candidate makes backlog visible while keeping persistence,
-transport, permissions and execution lifecycle compatible. The Lead still has
-to finish an ordinary Agent turn to receive queued bodies. This is a known
-limitation, not proof that same-turn delivery is already supported.
+The Lead can receive expert bodies without an extra visible final reply or new
+turn, while Host persistence remains authoritative. It adds an internal transport
+and a recoverable journal rather than altering permission/token ownership.
+The cost is explicit ordering, lifecycle fencing and recovery across three
+process owners. Legacy clients continue safely with queued delivery.
 
-Neither alternative requires a new process boundary, but both change a frozen
-message/authority boundary. Adoption therefore needs an explicit decision,
-specification, failure/recovery coverage and migration analysis for queued mail
-from older Hosts. Unknown or older clients must retain safe queued delivery,
-not silently acquire an in-turn capability.
-
-The follow-up decision is conditional on S1 evidence: record report admission,
-queue receipt, turn settlement and actual body delivery separately; count
-expert and Lead background processes from Host records. Simulated providers
-cannot establish arbitrary real-model obedience or production acceptance.
+Acceptance records journal crash cuts, repeat ACK/read, source spoofing, current
+scope/turn/epoch fences, human-steer ordering and unchanged Plan/Goal paths. The
+isolated incident replay counts processes by session: expert 2, Lead 0. Unit or
+fake-provider success does not establish real-model compliance or user acceptance.

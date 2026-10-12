@@ -467,6 +467,7 @@ export const en = {
     placeholderHome: "Ask anything",
     placeholderHint: "Type / for commands · @ for files",
     placeholderHomeHint: "Type / for commands · @ for files",
+    placeholderRunning: "{{sendShortcut}} to send a follow-up · {{steerShortcut}} to steer now",
     placeholderShortcut: "Shift+Enter for newline · Use Send to submit",
     addFiles: "Add files",
     filesAttached: "Added {{count}} item(s) to the draft",
@@ -856,7 +857,7 @@ export const en = {
   goal: {
     progressLabel: "Goal progress",
     progressListLabel: "Goal task list",
-    progressInitializing: "Preparing…",
+    progressInitializing: "Loading progress…",
     progressFailed: "Progress unavailable",
     planning: "Defining goal",
     approvalRegion: "Goal approval",
@@ -2211,7 +2212,7 @@ sklm: {
   },
   askTool: {
     pending: "Pending answer",
-    pendingHelp: "The Lead stopped waiting after 30 minutes. Your answer starts a new turn; explicitly resume or approve execution again.",
+    pendingHelp: "The Lead stopped waiting. Your answer starts a new turn; explicitly resume or approve execution again.",
     completedTitle: "Question clarification",
     completedSkipped: "Skipped",
     title: "A few questions",

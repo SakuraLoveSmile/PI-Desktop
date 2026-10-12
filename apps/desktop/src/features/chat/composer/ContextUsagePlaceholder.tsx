@@ -8,6 +8,7 @@ export function ContextUsagePlaceholder() {
     <div className="composer-usage-item composer-usage-context" data-unavailable="true">
       <TooltipButton type="button" disabled className="composer-usage-btn composer-usage-context-btn"
         ariaLabel={t("chat.usageContextUnavailable")} tooltip={t("chat.usageContextUnavailable")}>
+        <span className="composer-usage-label">{t("chat.usageContextLabel")}</span>
         <span className="composer-usage-context-track" aria-hidden="true" />
         <span className="composer-usage-value">—</span>
       </TooltipButton>

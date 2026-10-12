@@ -201,22 +201,39 @@ test("Overview presents the active execution as waiting and preserves completed 
   assert.match(running, /Wait for expert review.*chat.todo.status.in_progress/);
 });
 
-test("the current Goal capsule waits for review then restores its preparing and running labels", () => {
+test("the current Goal capsule waits for review then restores one loading status", () => {
   const f = fixture();
   const proposal = f.state.planCheckpoints.lead;
   const capsule = (value = proposal) => f.component("features/chat/composer/GoalProgressBar", "GoalProgressBar", {
     sessionId: "lead", proposal: value,
   });
   const waiting = f.render(capsule());
-  assert.equal(waiting.split(pendingLabel).length - 1, 2);
-  assert.doesNotMatch(waiting, /goal.progressInitializing|chat.scheduleExecutionState.running/);
+  assert.equal(waiting.split(pendingLabel).length - 1, 1);
+  assert.equal(f.nodes.filter((node) => node.props?.role === "status").length, 1);
+  assert.equal(f.nodes.find((node) => node.props?.role === "status").props.children, pendingLabel);
   assert.equal(proposal.executionState, "running");
   assert.equal(f.snapshot.review.status, "pending");
   f.snapshot.review.status = "confirmed";
   const resumed = f.render(capsule());
-  assert.match(resumed, /goal.progressInitializing/);
-  assert.match(resumed, /chat.scheduleExecutionState.running/);
-  assert.doesNotMatch(resumed, new RegExp(pendingLabel));
+  assert.equal(resumed.split("goal.progressInitializing").length - 1, 1);
+  assert.equal(f.nodes.find((node) => node.props?.role === "status").props.children, "goal.progressInitializing");
+  assert.equal(f.nodes.filter((node) => node.props?.role === "status").length, 1);
+
+  f.progressView.loading = false;
+  for (const progress of [null, { items: [] }]) {
+    f.progressView.progress = progress;
+    const running = f.render(capsule());
+    assert.equal(running.split("chat.scheduleExecutionState.running").length - 1, 1);
+    assert.equal(f.nodes.some((node) => node.props?.className === "goal-progress-total-num"), false);
+    assert.ok(f.nodes.some((node) => node.props?.className === "goal-progress-indeterminate"));
+    assert.ok(!f.nodes.some((node) => node.props?.className === "goal-progress-ring"));
+    assert.equal(f.nodes.filter((node) => node.props?.role === "status").length, 1);
+  }
+  for (const executionState of ["queued", "completed"]) {
+    const terminal = f.render(capsule({ ...proposal, executionState }));
+    assert.ok(terminal.includes(`chat.scheduleExecutionState.${executionState}`));
+    assert.equal(f.nodes.find((node) => node.props?.role === "status").props.children, `chat.scheduleExecutionState.${executionState}`);
+  }
 });
 
 test("a pending review for the current Goal cannot rewrite another execution's capsule", () => {
@@ -248,12 +265,17 @@ test("Goal waiting preserves loaded progress and keeps progress read errors obse
   });
   assert.match(f.render(capsule()), new RegExp(pendingLabel));
   assert.ok(!f.nodes.some((node) => node.props?.className === "goal-progress-ring"));
+  assert.equal(f.nodes.find((node) => node.props?.role === "status").props["aria-label"], pendingLabel);
   f.snapshot.review.status = "confirmed";
   f.render(capsule());
   assert.equal(f.nodes.find((node) => node.props?.className === "goal-progress-completed-num").props.children, 1);
   assert.deepEqual(f.nodes.find((node) => node.props?.className === "goal-progress-total-num").props.children, ["/", 2]);
+  assert.equal(f.nodes.find((node) => node.props?.role === "status").props["aria-label"],
+    "goal.progressLabel 1/2 · chat.scheduleExecutionState.running");
   f.snapshot.review.status = "pending";
   f.progressView.error = "progress unavailable";
-  assert.match(f.render(capsule()), /goal.progressFailed/);
+  const failed = f.render(capsule());
+  assert.equal(failed.split("goal.progressFailed").length - 1, 1);
+  assert.equal(f.nodes.find((node) => node.props?.role === "status").props.children, "goal.progressFailed");
   assert.equal(f.state.planCheckpoints.lead.executionState, "running");
 });

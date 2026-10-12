@@ -1,4 +1,4 @@
-import { IPC, type AgentEventEnvelope, type UiMessage } from "@pi-desktop/shared";
+import { IPC, type AgentEventEnvelope, type UiMessage, type TeamOrdinaryInboxReadResult } from "@pi-desktop/shared";
 import {
   findSubagentProviderSource,
   modelConfigWithBinding,
@@ -61,6 +61,7 @@ export type SidecarRuntimeDependencies = {
   activeUserSkills: (projectPath: string | undefined) => Promise<any[]>;
   pluginActiveInProject: (pluginId: string, projectPath: string | null | undefined) => boolean;
   currentNetworkProxy: () => any;
+  ordinaryInboxRequest: (method: string, params: Record<string, unknown>) => Promise<unknown>;
 };
 
 export function createSidecarRuntime({
@@ -91,6 +92,7 @@ export function createSidecarRuntime({
   activeUserSkills,
   pluginActiveInProject,
   currentNetworkProxy,
+  ordinaryInboxRequest,
 }: SidecarRuntimeDependencies): {
   emitAgentEvent: (envelope: AgentEventEnvelope) => void;
   wireSidecar: (sidecar: AgentSidecar) => void;
@@ -183,6 +185,25 @@ export function createSidecarRuntime({
     }
   };
   const wireSidecar = (s: AgentSidecar) => {
+  const displayedOrdinaryMessages = new Map<string, Set<string>>();
+  s.setOrdinaryTeamInboxHandler(async (method, params) => {
+    if (runtimeState.sidecar !== s || isQuitting()) throw Object.assign(new Error("ordinary inbox runtime is unavailable"), { errorCode: "TEAM_TURN_INVALID" });
+    const result = await ordinaryInboxRequest(method, params);
+    if (runtimeState.sidecar !== s || isQuitting()) throw Object.assign(new Error("ordinary inbox runtime changed during admission"), { errorCode: "TEAM_TURN_INVALID" });
+    if (method === "team.readOrdinaryInbox") {
+      for (const delivery of (result as TeamOrdinaryInboxReadResult).messages) {
+        const key = `${delivery.teamSessionId}:${delivery.leadTurnId}`;
+        const displayed = displayedOrdinaryMessages.get(key) ?? new Set<string>();
+        if (displayed.has(delivery.userMessageId)) continue;
+        displayed.add(delivery.userMessageId);
+        displayedOrdinaryMessages.set(key, displayed);
+        // Host already wrote the canonical row. Fan out without persistence echo.
+        emitAgentEvent({ sessionId: delivery.teamSessionId, turnId: delivery.leadTurnId,
+          ts: Date.now(), event: { type: "message_end", message: delivery.message } });
+      }
+    }
+    return result;
+  });
 
   s.onNotification((method, params) => {
     if (method === "native.agent.event") {
@@ -194,6 +215,7 @@ export function createSidecarRuntime({
     if (method === "agent.event") {
       const envelope = params as AgentEventEnvelope;
       const event = envelope.event;
+      if (event.type === "agent_end") displayedOrdinaryMessages.delete(`${envelope.sessionId}:${envelope.turnId}`);
       if (event.type === "tool_start") {
         activeToolCalls.set(toolKey(envelope.sessionId, event.toolCallId), {
           sessionId: envelope.sessionId,
@@ -286,6 +308,7 @@ export function createSidecarRuntime({
     // sidecar no longer relays it (agent-sidecar.setHost filters it out).
   });
   s.onExit(({ code, signal, intentional, stderrTail }) => {
+    displayedOrdinaryMessages.clear();
     if (runtimeState.sidecar !== s) return;
     logger.flushChild("agent");
     const interruptedToolCalls = [...activeToolCalls.values()];

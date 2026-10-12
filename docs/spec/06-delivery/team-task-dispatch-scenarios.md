@@ -26,3 +26,20 @@ Host-runtime input resolution and Agent Host queue tests. A fake 40-minute clock
 proves boundary behavior, not 40 minutes of real provider reliability. Real-device
 acceptance should inspect actual Host session/turn records rather than model
 claims. No `verify:ui:*` is required or authorized by this change.
+
+## Production delivery-chain replay
+
+Run `node --experimental-strip-types scripts/e2e-team-task-dispatch-lifecycle.mjs`
+after `node scripts/e2e/build-candidate.mjs` has built and recorded the stable
+request candidate. Set `PI_DESKTOP_HOST_BIN` to the receipt's selected debug Host
+binary (or leave it unset for the request-local default). The receipt verifies
+HEAD, base, dirty/untracked source and artifact hashes at run start and after
+cleanup; changed source, base, output or receipt fails before passing evidence.
+An older compiled commit or a post-hoc artifact hash alone is insufficient.
+The isolated real Host,
+Main delivery service, bridge, AgentHost and sidecar/runtime use a loopback model
+gate to hold a member turn. Assert superseded dispatch cancellation removes the
+Main mirror, the latest body is admitted exactly once, unrelated mail retains
+FIFO, and successful task completion retires a queued repeat before it reaches
+the provider. This supplements the first two semantic IDs above; controlled
+forty-minute age coverage remains in the domain tests, not this short replay.

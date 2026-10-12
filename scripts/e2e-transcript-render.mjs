@@ -88,7 +88,7 @@ try {
     if (!asset.endsWith(".css")) continue;
     const body = await readFile(join(renderer, "assets", asset), "utf8");
     const path = `./assets/${asset}`;
-    if ((body.includes(".session-activity-rail{") || body.includes(".session-quick-notes{") || body.includes(".subagent-detail-header{") || body.includes(".session-skill-suggestions{")) && !css.includes(path)) css.push(path);
+    if ((body.includes(".scheduled-instruction-input") || body.includes(".session-activity-rail{") || body.includes(".session-quick-notes{") || body.includes(".subagent-detail-header{") || body.includes(".session-skill-suggestions{")) && !css.includes(path)) css.push(path);
   }
   assert(
     css.length,

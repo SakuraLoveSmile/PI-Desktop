@@ -60,7 +60,7 @@ function respond(res: ServerResponse, args?: Record<string, unknown>, toolName =
   res.end();
 }
 
-async function fixture(args: Record<string, unknown>, waitAfterLaunch = false) {
+async function fixture(args: Record<string, unknown>, waitAfterLaunch = false, teamLaunch = false) {
   const requests: ProviderRequest[] = [];
   const server = createServer(async (req, res) => {
     let raw = "";
@@ -88,7 +88,7 @@ async function fixture(args: Record<string, unknown>, waitAfterLaunch = false) {
   let outputSubscriptions = 0;
   const runtime = new DesktopAgentRuntime({
     sessionId: "background-fixture", mode: "agent", provider, history: [], thinkingLevel: "off",
-    ...(waitAfterLaunch ? { executionProfile: "team", teamContext: {
+    ...(waitAfterLaunch || teamLaunch ? { executionProfile: "team", teamContext: {
       teamSessionId: "team-fixture", callerSessionId: "background-fixture", isLead: false,
     } } : {}),
     compactionSettings: { enabled: false, reserveTokens: 0, keepRecentTokens: 0 },
@@ -169,6 +169,34 @@ it.each([
   expect(f.calls.filter((call) => call.method !== "session.appendMessage").map((call) => call.method))
     .toEqual(["tools.execute"]);
   expect(f.outputSubscriptions()).toBe(0);
+});
+
+it("a Team Agent can explicitly request a service through Bash without transporting a command timeout", async () => {
+  const args = { command, run_in_background: true, backgroundKind: "service" };
+  const f = await fixture(args, false, true);
+  const bash = f.requests[0].tools.find((tool) => tool.name === "Bash");
+  expect(bash?.parameters?.properties?.backgroundKind?.description).toContain("six hours");
+  expect(bash?.parameters?.properties?.timeout?.description).toContain("Not allowed");
+  const launch = f.calls.find((call) => call.method === "tools.execute");
+  expect(launch?.params).toMatchObject({ sessionId: "background-fixture", toolName: "Bash", args });
+  expect(launch?.params).not.toHaveProperty("timeoutMs");
+  const result = f.requests[1].input.find((item) => item.type === "function_call_output" && item.call_id === "call_bash");
+  expect(result?.output).toEqual(JSON.stringify(accepted, null, 2));
+  await f.runtime.dispose();
+  expect(f.calls.some((call) => call.method === "tools.abort")).toBe(false);
+});
+
+it.each([
+  { command, backgroundKind: "service" },
+  { command, run_in_background: false, backgroundKind: "service" },
+  { command, run_in_background: true, backgroundKind: "service", timeout: 60 },
+])("invalid service parameters produce a paired tool error without Host launch: %j", async (args) => {
+  const f = await fixture(args, false, true);
+  expect(f.calls.filter((call) => call.method === "tools.execute")).toEqual([]);
+  const results = f.requests[1].input.filter((item) => item.type === "function_call_output" && item.call_id === "call_bash");
+  expect(results).toHaveLength(1);
+  expect(results[0].output).toContain("service");
+  expect(f.events.find((event) => event.event.type === "tool_end")?.event).toMatchObject({ type: "tool_end", isError: true });
 });
 
 it("rejects an unconvertible string background flag before Host execution and returns a paired tool error", async () => {

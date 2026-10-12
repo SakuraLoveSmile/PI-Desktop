@@ -120,12 +120,16 @@ test("abort waits for prompt admission before dispatching to the sidecar", async
   const promptGate = new Promise((resolve) => { releasePrompt = resolve; });
   const sessionGate = new Promise((resolve) => { releaseSessionOperation = resolve; });
   const host = {
-    async call(method) {
+    async call(method, params) {
       calls.push(method);
       if (method === "settings.get") return {};
       if (method === "session.get") return { session: { id: "target", messages: [] } };
       if (method === "session.beginTurn") return { turnId: "turn-1" };
       if (method === "session.appendMessage") return {};
+      if (method === "team.cancelLeadAsks") {
+        assert.deepEqual(params, { sessionId: "target", expectedTurnId: "turn-1" });
+        return { ok: true };
+      }
       assert.fail(`unexpected RPC ${method}`);
     },
   };

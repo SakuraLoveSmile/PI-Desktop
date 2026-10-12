@@ -299,6 +299,11 @@ impl AppState {
 
     pub fn shutdown(&mut self) {
         self.shutting_down = true;
+        if let Err(error) =
+            crate::background_services::request_all(self, "host_shutdown", crate::db::now_ms())
+        {
+            tracing::error!(%error, "background service shutdown request failed; live cancellations remain authoritative");
+        }
         for sender in self.active_bash_cancellations.values() {
             let _ = sender.send(true);
         }

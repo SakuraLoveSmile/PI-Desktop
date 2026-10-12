@@ -43,8 +43,9 @@ export async function readPendingMailbox(host: RuntimeHost, teamSessionId: strin
   return { count: messages.length, summary: summarizePendingMailbox(messages, callerSessionId, Date.now()) };
 }
 
-export function pendingMailboxNextStep(mode: string | undefined, approvedExecution: boolean): string {
+export function pendingMailboxNextStep(mode: string | undefined, approvedExecution: boolean, ordinaryWaitBoundary = false): string {
   if (approvedExecution) return "Expert messages are pending. Use wait_for_updates to consume the authenticated execution inbox in this approved turn; do not end the execution turn to retrieve reports.";
   if (mode === "plan") return "Expert messages are pending. Finish the current aggregation turn to let the mailbox consume their full contents; do not keep waiting while holding the Lead turn. Resume synthesis after those messages are consumed, then call SubmitPlan.";
+  if (ordinaryWaitBoundary) return "Expert reports are queued. Use wait_for_updates to request their authenticated bodies at the ordinary Agent inbox boundary when supported. This team_status summary does not consume their contents. If wait_for_updates returns pending_mailbox_messages instead, finish this turn to receive the queued reports through authenticated continuations. Do not redo delegated work that has already completed.";
   return "Expert reports are queued and their authenticated bodies will arrive after you end the current turn. This summary does not consume their contents. Do not redo delegated work that has already completed; finish this turn to receive the reports.";
 }

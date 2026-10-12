@@ -617,3 +617,7 @@ Lead 回合。读取必须通过可信启动绑定与进程/会话归属检查�
 运行时按自身会话登记成功后台启动回执，在每次等待时核对这些未消费 ID，覆盖
 首次等待前和两次等待之间结束的情况。工具目录刷新保留登记，运行时销毁释放
 内存；不查询历史列表，也不承诺运行时重建后的持久化回放。
+
+### 显式团队服务（WP14）
+
+backgroundKind:"service" 是显式 background-only Bash 启动，不绕过权限。拒绝 timeout 覆盖，使用 Host 6 小时 TTL、当前已确认 Agent Team/run/turn owner、新 service caps 和原 permit；普通 command 默认不变。任何团队暂停停止显式服务，普通后台命令保留 WP8。owned process-tree 清理及 Activity metadata 见[显式服务](/zh-CN/spec/03-runtime/team-managed-services)。

@@ -16,7 +16,7 @@ function deferred<T>() {
 }
 
 /** Real rail and details; only the IPC host boundary is replaced. No real process starts. */
-export async function sessionActivityRailProbe() {
+export async function sessionActivityRailProbe(capture?: (stage: "service-list" | "service-terminal") => Promise<void>) {
   const i18n = createInstance();
   await i18n.init({ lng: "en", interpolation: { escapeValue: false }, resources: { en: { translation: en } } });
   const host = document.createElement("div");
@@ -229,6 +229,32 @@ export async function sessionActivityRailProbe() {
     click(host.querySelector('[aria-label="' + i18n.t("panel.activity.refresh") + '"]')); await paint();
     reads[14].task.resolve(detail({ ...otherProcess, status: "completed", exitCode: 0 })); await paint();
     check(!host.querySelector('[role="alert"]') && host.textContent?.includes("bounded stdout") && !stopButton(), "manual refresh clears recovered persistence error without losing output");
+    const service: BackgroundProcessSummary = {
+      ...process, id: "service", status: "running", backgroundKind: "service",
+      teamSessionId: "team-owned", teamRunId: "run-owned", deadlineAt: "2026-10-09T06:00:00Z", stopMode: "unix-term-then-kill",
+    };
+    renderRail({ ...railProps, processes: [service], onOpenProcess: (id) => renderDetails(service.sessionId, id) });
+    check(host.querySelector('[data-process-id="service"]')?.textContent?.includes("Service · long-background-command.js"), "explicit service is identified in the Activity list");
+    await capture?.("service-list");
+    click(host.querySelector('[data-process-id="service"]')); await paint();
+    check(reads.at(-1)?.sessionId === service.sessionId && reads.at(-1)?.id === service.id, "opening a service preserves its exact session and process identity");
+    reads.at(-1)!.task.resolve(detail(service)); await paint();
+    check(host.textContent?.includes("team-owned") && host.textContent?.includes("run-owned")
+      && host.querySelector('time[datetime="2026-10-09T06:00:00Z"]'), "service details show authenticated owner/run and recorded deadline");
+    check(host.textContent?.includes("TERM, then KILL after up to 5 seconds") && !host.textContent?.includes("Escalated to KILL"), "active service shows stop policy without fabricating a stop outcome");
+    const stopCount = stops.length;
+    click(stopButton());
+    check(stops.length === stopCount + 1 && stops.at(-1)?.sessionId === service.sessionId && stops.at(-1)?.id === service.id,
+      "service stop uses the existing session-scoped action");
+    const stoppingService = { ...service, status: "stopping" as const, stopReason: "explicit_stop" as const, stopRequestedAt: "2026-10-09T00:10:00Z" };
+    stops.at(-1)!.task.resolve({ process: stoppingService }); await paint();
+    reads.at(-1)!.task.resolve(detail(stoppingService)); await paint();
+    check((stopButton() as HTMLButtonElement)?.disabled && host.textContent?.includes("Explicit stop"), "stopping service remains disabled and retains its recorded reason");
+    emit(service.sessionId, service.id); await paint();
+    reads.at(-1)!.task.resolve(detail({ ...stoppingService, status: "stopped", serviceStopEscalated: true })); await paint();
+    check(!stopButton() && host.textContent?.includes("Escalated to KILL") && host.textContent?.includes("bounded stdout"),
+      "terminal service preserves output and truthful escalation result without another stop control");
+    await capture?.("service-terminal");
     return { ok: true, checks };
   } finally {
     flushSync(() => root.unmount()); host.remove();

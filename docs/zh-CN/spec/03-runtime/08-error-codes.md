@@ -564,3 +564,9 @@ transcript 保留稳定错误码、传输 errno 和原始 details，但使用本
 ### Team Goal 结算拒绝（2026-10-11）
 
 获批 Team 执行仍有排队／运行派遣或未消费专家结果时，`TEAM_APPROVAL_REQUIRED` 也会在 `SubmitGoalReport` 主体之前拒绝。消息标明派遣、成员、分配的未完成任务和未消费数量。已确认名单最多三次带该原因的完成恢复提示，再次拒绝保留宿主原文（正常传输分类／脱敏后），阶段保持 `team_completion`。不得替换成缺少名单的说明，也不得把工具主体之前的授权拒绝归为草稿持久化失败。
+
+### 显式团队服务准入（WP14）
+
+TEAM_SERVICE_UNAUTHORIZED 拒绝缺少当前认证 Agent Team/run/turn owner 的服务，包括研究、被替换/过期路由或超权限范围。TEAM_APPROVAL_REQUIRED 保持当前确认名单含义。TEAM_SERVICE_LIMIT_REACHED 表示 Host2/Team1/session1 活服务上限，与原 global/session/shell 准入不同。INVALID_PARAMS 拒绝非法 kind、前台 service 或 service timeout 覆盖。修正范围/参数或先停止 owned service，不绕权或忙重试。
+
+普通 inbox 来源伪造仍为 PERMISSION_DENIED，过期精确回合/proof/authority 保留 Team 拒绝码。明确 ACK transport loss 可留下仅摘要 pending IDs，authority 错误不允许 flush 正文。

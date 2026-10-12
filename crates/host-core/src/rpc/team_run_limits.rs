@@ -26,6 +26,9 @@ pub(super) fn sweep(
     tx: &mpsc::UnboundedSender<String>,
     now: i64,
 ) -> anyhow::Result<()> {
+    if let Err(error) = crate::background_services::sweep(st, now) {
+        tracing::warn!(%error, "background service lifecycle sweep failed; Team run limits remain independent");
+    }
     for team in crate::team::run_limits::teams(&st.db)? {
         let events = crate::team::run_limits::evaluate_at(&st.db, &team, now)?;
         // Retry interrupted Goal settlement independently of the one-shot limit

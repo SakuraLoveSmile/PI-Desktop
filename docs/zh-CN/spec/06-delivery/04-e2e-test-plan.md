@@ -902,12 +902,16 @@ task-candidate E2E 从请求工作树运行，但使用主工作区已经准备�
 
 - **先决条件**：英文和简体中文语言环境可用；已配置提供商；可以打开空首页和两个会话。
 - **步骤**：1）在空首页记录欢迎占位符，并等待超过 4 秒确认其不变。2）打开会话 A，记录提示，
-  输入并清空文本、聚焦并失焦文本区域后等待，确认文案不变。3）切换到会话 B，再切回 A，
-  分别记录提示变化。4）在首页和会话间切换，检查命令/文件和快捷键提示。5）输入 `/` 并检查斜杠菜单，包含英文/中文长描述、短描述、无描述、
+  输入并清空文本、聚焦并失焦文本区域后等待，确认文案不变。3）开始一个没有文本或文件草稿的回合，
+  确认出现后续消息/转向提示。分别检查开启和关闭 Enter 发送偏好，并验证 macOS 与 Windows/Linux
+  上显示的发送、转向快捷键。回合运行期间添加草稿，确认上下文提示恢复。4）切换到会话 B，再切回 A，
+  分别记录提示变化。5）在首页和会话间切换，检查命令/文件和快捷键提示。6）输入 `/` 并检查斜杠菜单，包含英文/中文长描述、短描述、无描述、
   独立标题和参数提示以及超长斜杠名称的 Skill；再检查 `@` 模式中的长文件名。
   在 800px 和 1680px 视口、320px 和 640px 输入框宽度下重复。
-  6）切换到 zh-CN，重复上下文切换检查。
-- **预期**：首次渲染的上下文从欢迎语开始，在页面/会话上下文变化前保持不变。每次上下文切换才推进到
+  7）切换到 zh-CN，重复上下文切换检查。
+- **预期**：首次渲染的上下文从欢迎语开始，在页面/会话上下文变化前保持不变。回合运行且草稿没有
+  文本或文件引用时，显示本地化的后续消息/转向提示。发送快捷键遵循 Enter 发送偏好和平台；macOS
+  使用 Option+Enter 转向，Windows/Linux 使用 Alt+Enter。添加草稿后恢复上下文提示。每次上下文切换才推进到
   下一条本地化命令/文件或快捷键提示，并使用透明度渐变；不存在计时器驱动的变化。快捷键提示包含
   Shift+Enter 和提交提示，命令/文件提示包含 `/` 和 `@`。斜杠菜单仍包含 `/new`、`/compact`、`/agent-mode`、
   `/plan-mode` 和 `/goal-mode`。zh-CN 显示对应文案，包括 `Shift+Enter 换行 · 点击发送提交`。
@@ -919,7 +923,9 @@ task-candidate E2E 从请求工作树运行，但使用主工作区已经准备�
 - **里程碑**：M2
 - **状态**：源代码覆盖（`composer-placeholder-context.test.mjs`）；斜杠菜单布局由 `pnpm build:js`
   后运行 `pnpm test:e2e:composer-autocomplete` 覆盖（真实 React/Chromium、生产 CSS、
-  确定性命令夹具，无需提供商）。完整提供商/会话场景仍为草案；分支执行不替代合并后 E2E
+  确定性命令夹具，无需提供商）。运行中空草稿与两行 Composer 路径由 transcript-render
+  夹具中的 `E2E-COMPOSER-compact-running-input` 覆盖。完整提供商/会话场景仍为草案；
+  分支执行不替代合并后 E2E。
 
 #### E2E-089：Composer 模型菜单向上打开并切换模型
 
@@ -5807,7 +5813,9 @@ nightly 按目录中的场景族运行其余自动套件，具备干净构建、
 - 空首页和会话输入框分别从本地化欢迎语开始：`chat.placeholderHome` / `chat.placeholder`。
 - 当前提示在页面/会话上下文变化前保持不变；切换上下文时才推进到本地化 `/`/`@` 命令/文件提示和
   `Shift+Enter 换行 · 点击发送提交` 快捷键提示，并使用透明度渐变。
-- 等待、聚焦、编辑、清空或组合输入都不会改变文案。
+- 回合运行且没有文本或文件草稿时，显示本地化的后续消息/转向提示。发送快捷键遵循 Enter 发送偏好和平台；
+  macOS 使用 Option+Enter 转向，Windows/Linux 使用 Alt+Enter。添加草稿后恢复上下文提示。
+  空闲时等待、聚焦、编辑或清空不会改变文案。
 - 占位符墨水在浅色和深色浮动板上清晰可见。
 
 ### US-UI-31 Home 空垂直堆栈 (D111/D204/D206)
@@ -9879,7 +9887,7 @@ options retain pressed states and switching behavior.
 - **预期：** 基线在准入和 kick 及时完成时仍积压三分多钟、lead 重跑命令；候选下一次 status/wait 立即给摘要，不泄正文、不 ACK、不自动结束，lead 主动结束普通回合后认证全文恰好一次。宿主进程数专家 2、lead 0。
 - **验收：** --timeout-acceptance 运行 sleep 5/timeout2 和 sleep75/缺省timeout，读取约 2/60 秒 timed_out/TOOL_TIMEOUT 并核对会话计数。既有回归保留 Plan yield、批准 inbox、取消/上下文变化和 WP5 间隙补收；不当作取消验收。
 - **自动化：** scripts/e2e-team-agent-queued-report.mjs 与 pending/wait/status/runtime/Main/AgentHost 行为回归。
-- **规格：** 03-runtime/02-agent-runtime、06-host-rpc-protocol；WP16 S3 仍为 proposed ADR，未实现回合内正文能力。
+- **规格：** 03-runtime/02-agent-runtime、06-host-rpc-protocol；WP16 S3 已采纳独立等待边界 ADR；本场景保留 S1/旧 Host 队列兼容验收，支持能力的 S3 见独立场景。
 #### E2E-TEAM-member-activity-interrupt-guard
 
 - **范围：** Lead 团队工具 → Host 活动投影 → 精确回合中断。
@@ -9913,3 +9921,76 @@ require Node/JS dependencies. The fixture exercises approved Goal dispatch,
 30-minute controlled wait, actual Main finalization/outbox, Rust interrupted
 execution, no successful report, and rejection of a genuine old progress token.
 It uses no provider service, test-only production backdoor, or system-clock edit.
+
+
+## 专家团后续可靠性（WP7 / WP14 / WP16 S3）
+
+### E2E-TEAM-agent-lead-wait-boundary-ordinary-inbox
+
+- **前提：** 已构建且记录 request/base 的候选，隔离 Host 数据/目录，当前确认的普通 Agent Lead/专家；只在外部 provider 边界使用脚本夹具，不使用用户 profile 或付费 API。
+- **步骤：** 专家仅执行两条命令，Lead 原长回合内发送两份报告；Lead 先查 team_status，再两次 wait。分别记录 file/proof 持久化、FIFO provider 输入、runtime ACK、live/durable queue 退休、回合结束；重放 ACK 和通知。
+- **预期：** status/工具不泄正文；首次等待边界按 FIFO 将带专家来源认证 role=user 全文放入原 Lead 回合，使用稳定 user-message ID，且早于回合结束。重放不重复正文或新开 Lead 回合。Host 进程数专家 2/Lead 0，不授 Goal 权限/人工同意，不提升权限或提前最终回复。
+- **自动化：** node scripts/e2e-team-agent-ordinary-inbox.mjs 用真实 Host、Main delivery、AgentHost 和 runtime，仅 provider 脚本化。另由 Host/RPC/runtime/Main 契约覆盖来源/proof 错误、崩溃切点、stale epoch/turn、pause/cancel/dispose、用户 steer 排序、ACK 丢失、旧 Host fallback、Plan/批准执行不变；主事故脚本不能代替所有恢复/并发分支。
+- **规格：** [普通 inbox](/zh-CN/spec/03-runtime/team-ordinary-inbox)及 /adr/team-agent-mailbox-delivery。
+- **验收：** C/E/F/Security；记录 source/base/binary hash、timing，持久输入和 runtime ACK 与模型消费分开。
+- **里程碑：** WP16 S3。
+- **状态：** 候选实现/验证；用户和真实 provider 验收独立，生成 index 只映射实际 executable。
+
+### E2E-TEAM-managed-service-lifecycle
+
+- **前提：** 候选 Host/runtime、隔离数据/目录、认证 Agent 团队和真实 disposable child/grandchild；无真实 provider、用户实例或生产 daemon。
+- **步骤：** 启动显式 service 和普通 command，service 超过 60 秒而普通 command 保持默认。验 caps、手动/hard pause、友好/忽略 TERM 的树、真实工作结算后的 Team end、run replacement、shutdown/restart；普通 command 跨 pause 保留。
+- **预期：** service 超过 60 秒存活、普通 command 约 60 秒 timed_out/TOOL_TIMEOUT。service 保持原 permit 和 Host2/Team1/session1、固定 TTL6h。暂停仅停显式服务，成员 completed phase 不等于团队完成。Unix TERM 最多5秒后 KILL/reap，首次原因/输出保留、树退出才释放 permit；重启 interrupted、不 replay/认领 PID。
+- **自动化：** node scripts/e2e-team-managed-service.mjs。--quick 跳过真实 >60 秒/默认命令对照，不能通过该项。Host 受控时钟契约补 TTL、Goal end、owner cancel/removal/workspace/delete、伪造范围、拒写/重复清理；组件测本地化 metadata；原生候选呈现和 Windows JobObject/tree 单独记录。
+- **规格：** [显式服务](/zh-CN/spec/03-runtime/team-managed-services)、/adr/team-managed-service-processes 与 run-limit service 例外。
+- **验收：** C/E/F/Security/Localization；完整/quick、平台证据和 candidate/base 分开。
+- **里程碑：** WP14，WP12 仍条件触发。
+- **状态：** 候选实现/验证；Unix 不证明 Windows，均不等于用户验收。
+
+### WP7 代表路径与覆盖层级
+
+| 验收路径 | 预期 | 当前覆盖 |
+| --- | --- | --- |
+| 未知费用及人工/外部阶段的 Goal 协商 | unknown 非零、不宣称 Host hard 金额保障、不从模型文字造审批，SubmitGoal 前说明依赖 | mode/team 生成提示词回归，不证明真实模型遵循 |
+| 标准 Agent TodoWrite；受限/研究成员精确查禁用工具后合法更新任务 | 标准 checklist 保留，明确拒绝并指导 task_update；研究仍 structured submit，不开放权限 | runtime provider/tool-catalog integration、team prompt |
+| completed 专家仍拥有开放任务，Lead 查状态再核报告 | 精确 owner taskIds、独立提示，pending-mail nextStep 优先，不自动结算/重跑 | runtime team_status 用户路径 |
+| 专家成功/失败、Lead/non-Team/Goal 终态及通知 list/count | 专家成功无新 durable inbox/badge/popup 来源、报告/turn 保留，其余来源不变 | 真 Host terminal transaction/list/reopen；原生 popup 独立 |
+| 成员当前上下文阈值内、soft/hard 前置、inline 增长 | 当前 context 决定原预算，checkpoint 先于下次请求，保留任务/caller，不改阈值/watchdog | 真 compaction wiring + fake 外部 provider/Host，不是全 Main/Rust E2E |
+
+对应 mode-prompts.test.ts、team/team-prompt.test.ts、runtime-tests/runtime-team-tool-discovery.test.ts、team/team-status-owned-open.test.ts、runtime-tests/runtime-team-member-compaction.test.ts 和 Host notifications 回归。既有 Team/Goal/notification 用户旅程保护周边路径。这是 unit/integration 验收映射，不能生成无脚本 executable 或据此标原生/真实 provider 验收通过。
+### 完整应用的团队可靠性生命周期验收
+
+`node scripts/e2e-team-reliability-closeout.mjs --budget-only` 补齐
+`E2E-TEAM-bounded-run-limit` 的完整隔离 Electron/preload/Main/Host/runtime
+链路：真实设置持久化、可配置的短 soft/hard 墙钟预算、当前工具安全收尾、
+整应用重启与显式恢复。不代表十小时长跑或系统通知展示已验收。
+
+直接显式运行 `node scripts/e2e-team-reliability-closeout.mjs` 补齐
+`E2E-TEAM-lead-pending-ask-late-answer`：真实三十分钟 Team lead 提问期限、
+持久待回答卡、renderer reload、整应用重启与认证迟答。自动套件期限只有
+八分钟，因此该入口归为 manual。两条路径均使用全新临时 profile 和 loopback
+模型，不使用用户数据、生产时钟覆盖或付费供应商。记录实际候选、产物身份
+与运行结果，不能把场景说明当成通过证据。
+
+nightly 的 `--recovery-only` 变体把仍在 waiting 的问题经进程重启恢复为
+持久 pending，再验证同一认证迟答分支。结果与手动实际三十分钟到期路径
+分开记录；重启恢复不能当作超时证据。
+
+待答卡提示只说明 Lead 已停止等待，不声称所有 pending 问题都等待了三十
+分钟，因为重启可能提前转入 pending。默认到期仍为三十分钟；迟答仍开启
+认证新回合，永不复活旧执行令牌。
+#### E2E-GOAL-inline-input-status
+
+在聊天输入区执行已批准目标：目标披露条与编辑器位于同一输入卡，只有分隔线。
+首次进度读取未完成时只显示加载状态；读取为空后只显示执行中和不确定态，
+不显示准备中或 0/0。发布真实条目，验证计数、披露开关、待专家确认、读取错误、
+会话切换和报告就绪移除。窄窗口与放大字号下仍可访问标题和状态。
+定时任务指令编辑器的原有卡片与最小高度不变。
+### E2E-COMPOSER-toolbar-footer
+
+- **前提条件：** 已构建候选版本、隔离的 Composer fixture、生产 renderer 组件与 CSS，以及确定性的会话/Goal 快照。不使用用户 profile 或模型提供商。
+- **步骤：** 检查完整 Composer 工具栏并打开组合的模型 × 推理控件；确认菜单锚定在触发按钮上，且键盘操作有效。对比打开菜单前后的左右插件控件槽位。切换 Goal 规划与已批准的 Goal 执行，也检查 Plan 模式。检查发送与运行中空草稿的停止控件、上下文量表页脚，以及 ScheduledEditor 中共用的模型选择器。
+- **预期：** 组合的模型 × 推理控件作为一个按钮位于右侧，原有锚定菜单和插件槽位的位置/顺序保持不变。Goal 规划期间仍显示合约选择器，Goal 执行期间隐藏；Plan 控件仍可用。发送与停止按钮共用 32px 圆角方形尺寸。上下文量表旁可见 `chat.usageContextLabel`。ScheduledEditor 保持原有模型选择器位置与行为。窄布局中控件留在 Composer 内，不重叠。
+- **规格：** `04-ux/08-component-spec.md` §11。
+- **自动化：** `node scripts/e2e-transcript-render.mjs`。
+- **状态：** 对照确切的任务候选和基线版本记录结果。

@@ -74,7 +74,14 @@ fn finalize(st: &mut AppState, id: &str) {
             .lock()
             .map_err(|_| anyhow!("background output lock poisoned"))?;
         let process = &pending.process;
-        let changed=st.db.conn.execute(
+        let transaction = st.db.conn.unchecked_transaction()?;
+        if let Some(service) = &process.service {
+            if let (Some(reason), Some(at)) = (&service.stop_reason, &service.stop_requested_at) {
+                let at = chrono::DateTime::parse_from_rfc3339(at)?.timestamp_millis();
+                transaction.execute("UPDATE background_service_ownership SET stop_reason=COALESCE(stop_reason,?2),stop_requested_at=COALESCE(stop_requested_at,?3),stop_escalated=?4 WHERE process_id=?1",params![id,reason,at,service.service_stop_escalated])?;
+            }
+        }
+        let changed=transaction.execute(
             "UPDATE background_processes SET status=?2,ended_at=?3,exit_code=?4,
              stdout=?5,stderr=?6,stdout_truncated=?7,stderr_truncated=?8,result_json=?9 WHERE id=?1",
             params![id,process.status,process.ended_at,process.exit_code,out.stdout,out.stderr,
@@ -83,6 +90,7 @@ fn finalize(st: &mut AppState, id: &str) {
         if changed != 1 {
             return Err(anyhow!("background process row missing"));
         }
+        transaction.commit()?;
         Ok(())
     })();
     match result {
@@ -221,6 +229,9 @@ pub fn duplicate_view(
 
 #[derive(Debug)]
 pub struct BackgroundOutput {
+    terminal_signal: tokio::sync::watch::Sender<bool>,
+    service_stop: Option<crate::background_services::StopRequest>,
+    service_stop_escalated: Option<bool>,
     stdout: String,
     stderr: String,
     stdout_truncated: bool,
@@ -235,6 +246,9 @@ pub struct BackgroundOutput {
 impl BackgroundOutput {
     fn new(session: String, id: String, tx: mpsc::UnboundedSender<String>) -> Self {
         Self {
+            terminal_signal: tokio::sync::watch::channel(false).0,
+            service_stop: None,
+            service_stop_escalated: None,
             stdout: String::new(),
             stderr: String::new(),
             stdout_truncated: false,
@@ -246,6 +260,20 @@ impl BackgroundOutput {
             last_changed: Instant::now(),
             tx,
         }
+    }
+    pub(crate) fn terminal_receiver(&self) -> tokio::sync::watch::Receiver<bool> {
+        self.terminal_signal.subscribe()
+    }
+    pub(crate) fn request_service_stop(
+        &mut self,
+        request: crate::background_services::StopRequest,
+    ) -> crate::background_services::StopRequest {
+        let request = self.service_stop.get_or_insert(request).clone();
+        self.changed();
+        request
+    }
+    pub(crate) fn finish_service_stop(&mut self, escalated: bool) {
+        self.service_stop_escalated = Some(escalated);
     }
     pub fn push(&mut self, stderr: bool, chunk: &str) {
         let (text, truncated) = if stderr {
@@ -340,6 +368,7 @@ pub fn read(st: &AppState, session: &str, id: &str) -> Result<Value> {
 }
 
 pub struct ApprovedJob {
+    pub(crate) service_scope: Option<crate::background_services::LaunchScope>,
     pub workspace: PathBuf,
     pub scratch: Option<PathBuf>,
     pub args: Value,
@@ -373,6 +402,11 @@ pub async fn start(
     if duplicate(&st.db, &session, &call)?.is_some() {
         return Err(anyhow!("TOOL_BUSY"));
     }
+    if let Some(scope) = &job.service_scope {
+        crate::background_services::revalidate(&st.db, &session, scope, &job.args)?;
+        job.options.service = true;
+        job.options.timeout_ms = Some(crate::background_services::TTL_MS as u64);
+    }
     let summary = BackgroundProcessSummary {
         service: None,
         id: uuid::Uuid::new_v4().to_string(),
@@ -385,7 +419,14 @@ pub async fn start(
         ended_at: None,
         exit_code: None,
     };
-    st.db.conn.execute("INSERT INTO background_processes(id,session_id,tool_call_id,command,cwd,status,started_at) VALUES(?1,?2,?3,?4,?5,?6,?7)",params![summary.id,summary.session_id,summary.tool_call_id,summary.command,summary.cwd,summary.status,summary.started_at])?;
+    let transaction = st.db.conn.unchecked_transaction()?;
+    transaction.execute("INSERT INTO background_processes(id,session_id,tool_call_id,command,cwd,status,started_at) VALUES(?1,?2,?3,?4,?5,?6,?7)",params![summary.id,summary.session_id,summary.tool_call_id,summary.command,summary.cwd,summary.status,summary.started_at])?;
+    if let Some(scope) = &job.service_scope {
+        crate::background_services::persist_owner(&st.db, &summary.id, scope, now_ms())?;
+    }
+    transaction.commit()?;
+    let mut summary = summary;
+    summary.service = crate::background_services::metadata(&st.db, &summary.id)?;
     let output = Arc::new(StdMutex::new(BackgroundOutput::new(
         session.clone(),
         summary.id.clone(),
@@ -398,6 +439,11 @@ pub async fn start(
         .insert(summary.id.clone(), output.clone());
     let id = summary.id.clone();
     let task_state = state.clone();
+    let terminal_signal = output
+        .lock()
+        .map_err(|_| anyhow!("background output lock poisoned"))?
+        .terminal_signal
+        .clone();
     let mut terminal_summary = summary.clone();
     let task = tokio::spawn(async move {
         let _permit = job.permit;
@@ -428,13 +474,55 @@ pub async fn start(
             },
         )
         .await;
-        annotate_timeout(&mut result, timeout_ms, timeout_is_default);
+        if job.service_scope.is_none() {
+            annotate_timeout(&mut result, timeout_ms, timeout_is_default);
+        }
         let mut st = task_state.lock().await;
+        if let Some(service) = &mut terminal_summary.service {
+            let durable_request = match crate::background_services::recorded_stop(&st.db, &id) {
+                Ok(request) => request,
+                Err(error) => {
+                    tracing::error!(%error, "service stop intent read failed; retaining live owner result");
+                    None
+                }
+            };
+            if let Ok(output) = output.lock() {
+                let request = durable_request
+                    .or_else(|| output.service_stop.clone())
+                    .or_else(|| {
+                        (st.shutting_down
+                            || matches!(
+                                result.error_code.as_deref(),
+                                Some("TOOL_ABORTED" | "TOOL_TIMEOUT")
+                            ))
+                        .then(|| {
+                            crate::background_services::StopRequest {
+                                reason: if st.shutting_down {
+                                    "host_shutdown"
+                                } else if result.error_code.as_deref() == Some("TOOL_TIMEOUT") {
+                                    "ttl_expired"
+                                } else {
+                                    "owner_cancelled"
+                                }
+                                .into(),
+                                at: now_ms(),
+                            }
+                        })
+                    });
+                if let Some(request) = request {
+                    service.stop_reason = Some(request.reason);
+                    service.stop_requested_at =
+                        crate::background_services::timestamp(request.at).ok();
+                }
+                service.service_stop_escalated = output.service_stop_escalated;
+            }
+        }
         let status = if st.shutting_down {
             "interrupted"
         } else {
             match result.error_code.as_deref() {
                 Some("TOOL_ABORTED") => "stopped",
+                Some("TOOL_TIMEOUT") if terminal_summary.service.is_some() => "stopped",
                 Some("TOOL_TIMEOUT") => "timed_out",
                 _ if result.ok => "completed",
                 _ => "failed",
@@ -469,6 +557,9 @@ pub async fn start(
             json!({"id":id,"toolCallId":call,"status":status,"durationMs":started.elapsed().as_millis() as u64,"at":now_ms()}),
         );
         st.clear_bash_cancellation(&session, &call);
+        drop(st);
+        drop(_permit);
+        terminal_signal.send_replace(true);
     });
     st.background_jobs.insert(summary.id.clone(), task);
     Ok(summary)

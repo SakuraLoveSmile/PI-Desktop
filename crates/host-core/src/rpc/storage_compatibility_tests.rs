@@ -465,7 +465,7 @@ fn service_owner_loss_and_process_interruption_rollback_together() {
 }
 
 #[tokio::test]
-async fn main_rejects_new_service_launch_without_starting_a_command() {
+async fn service_launch_without_a_current_team_turn_cannot_fall_through_to_a_command() {
     let dir = tempfile::tempdir().unwrap();
     let mut app = AppState::open(dir.path()).unwrap();
     app.handshook = true;
@@ -501,7 +501,10 @@ async fn main_rejects_new_service_launch_without_starting_a_command() {
         job.await.unwrap();
     }
     let error = result.expect_err("service arguments must not fall through to command launch");
-    assert_eq!(error.data.unwrap()["errorCode"], "INVALID_PARAMS");
+    assert_eq!(
+        error.data.unwrap()["errorCode"],
+        "TEAM_SERVICE_UNAUTHORIZED"
+    );
     assert!(
         crate::background_processes::list(&state.lock().await.db, &session.id)
             .unwrap()

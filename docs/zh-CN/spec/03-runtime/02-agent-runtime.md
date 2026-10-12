@@ -1261,7 +1261,7 @@ cache, not semantic retrieval or a promised speedup. Grep remains unchanged.
 
 ### 专家团执行可靠性指导（2026-10-11）
 
-生成的团队提示词以当前可获得的 Host 成员状态及回合/进程证据判断活动，不用 Git 改动判断存活。换人或重派前先消费认证报告；待处理摘要不是正文。普通未批准 Agent 回合结束后才收到排队正文；获批 Plan/Goal 继续在原回合读取 execution inbox，不为取邮件提前结束执行；普通 Plan 聚合保持原让出机制。
+生成的团队提示词以当前可获得的 Host 成员状态及回合/进程证据判断活动，不用 Git 改动判断存活。换人或重派前先消费认证报告；待处理摘要不是正文。支持新能力的普通 Agent Lead 在 wait_for_updates 边界通过独立 ordinary inbox 同回合收到认证专家正文；旧 Host 仍在当前回合结束后续接。获批 Plan/Goal 保持原回合 execution inbox，普通 Plan 保持原让出；专家正文不成为新的人工授权。
 
 执行成员只重验 diff 相关测试，全量只交一个参与者运行；不以前台 sleep 轮询，常驻后台命令显式设置 timeout。timed_out 表示超时，不能据此推断崩溃，也不用 nohup 脱离管理。共享树禁止 git add -A/git stash，但不改变工具权限。针对同一验收项经过两次有不同依据的尝试仍失败，就报告阻塞，不盲目再开修复/重测循环；其他独立且已授权工作继续。
 
@@ -1270,6 +1270,16 @@ cache, not semantic retrieval or a promised speedup. Grep remains unchanged.
 
 lead 的 team_status 从既有认证邮箱读取派生 pendingMessagesCount、pendingMessageSenders、oldestPendingMessageAgeSeconds。待处理指向本 lead 的入站非自身邮件，status=queued 且未绑定收件回合；队列 ACK 不代表正文已消费。外发、其他目标、running/completed/cancelled 邮件不计入。
 
-普通未批准 Agent lead 的 wait_for_updates 在初读已有邮件或后续 recheck 收到邮件时，立即返回 reason:pending_mailbox_messages，携带数量、发件人、年龄及当前回合投递指导。不结束回合、不带正文、不 ACK、不改队列；普通 lead 需结束回合，现有认证 role=user 续接才投递全文。摘要和提示不构成消费证明。
+旧/不支持能力的 Host 保留 S1：普通 Agent Lead 的 wait_for_updates 初读或后续检查已有邮件时立即返回 reason:pending_mailbox_messages 和数量/发件人/年龄，不带正文、不 ACK、不改队列、不结束回合；结束后由认证 role=user 续接投递。支持能力的 Host 采用 WP16 S3 独立等待边界 inbox：Host 先持久认证专家正文并退休 durable receipt，runtime 专用内部操作接纳验证 buffer、ACK 精确证明，再重验生命周期并同步放入原 Lead 回合内部队列。工具仍仅摘要，不授 Goal token 或新人工授权，不自动让出。权限、FIFO、用户 steer 优先和恢复切点见[普通 inbox 规格](/zh-CN/spec/03-runtime/team-ordinary-inbox)。
 
-普通 Plan lead 保留原让出优先和 terminate:true；获批 Plan/Goal 先消费执行 inbox，不能为读邮件结束批准执行。已有后台终态结果优先且仅交付一次，邮件在下一次 status/wait 仍可见。订阅先于 baseline、总 deadline、single-flight、取消与清理保持；回合/epoch/团队/模式变化使晚到摘要失效，读取错误不能伪装成零封。createdAt 为 Unix 毫秒数字字符串；发件人按邮箱顺序稳定去重，年龄为非负整数秒。空队列或任意 pending 时间无法解析时最老年龄为 null。不新增 Host RPC、持久化格式、额度、Agent 自动让出或回合内正文权限。回合内投递只见 proposed ADR /adr/team-agent-mailbox-delivery，尚未实现。
+普通 Plan lead 保留原让出优先和 terminate:true；获批 Plan/Goal 先消费执行 inbox，不能为读邮件结束批准执行。已有后台终态结果优先且仅交付一次，邮件在下一次 status/wait 仍可见。订阅先于 baseline、总 deadline、single-flight、取消与清理保持；回合/epoch/团队/模式变化使晚到摘要失效，读取错误不能伪装成零封。createdAt 为 Unix 毫秒数字字符串；发件人按邮箱顺序稳定去重，年龄为非负整数秒。空队列或任意 pending 时间无法解析时最老年龄为 null。S1 摘要不增加权限或额度；S3 的附加内部 RPC/Plus P6 journal 是独立持久证明，见已采纳 ADR /adr/team-agent-mailbox-delivery。决定和场景定义不能证明模型遵循或用户验收。
+
+### Goal 协商与团队进度可靠性（WP7）
+
+SubmitGoal 前说明验收中需要人工参与或外部证据的项目。未知 provider 价格/费用不是零；Markdown 金额帽没有 Host hard spending 保障。收费、发布和人工批准以阶段边界协商，未满足时停止请求决定/证据；模型批准文字或解析的 Markdown 不成为可信审批。
+
+标准 Agent 在真实目录暴露时仍有 TodoWrite。受限专家不能通过 ToolSearch 开放已排除工具；精确查找返回明确拒绝及 task_get/task_list、带当前 expectedRevision 的 task_update 合法指导。研究模式仍只读并以 submit_research_result 完成，不用个人 TodoWrite 代替共享任务板，也不能另找工具绕过。
+
+team_status 增加 completedMembersWithOpenTasks，按精确 ownerSessionId 列出 completed 成员及未删除 pending/in_progress taskIds；completedMemberOpenTaskNextStep 要求先检查认证报告/证据，再按最新 revision 更新或显式重派，不因任务板开放就重做。phase completed 只说明上个回合成功。pending 邮件 nextStep 优先；不自动更新任务。
+
+既有压缩按当前请求上下文计量，不按累计 usage。1M window 的 headroom/hard/soft 为 50K/950K/855K；真实压缩 wiring 的成员夹具覆盖阈值内、soft/hard 请求前及 inline 增长，保证 summary/checkpoint 先于下一请求持久化，保留当前任务和认证 caller。未发现产品 defect，因此不改阈值或新增看门狗。这是 runtime 外边界 fake 覆盖，不是真实模型或完整 Main/Rust 事故回放。

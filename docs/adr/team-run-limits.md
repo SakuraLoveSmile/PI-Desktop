@@ -18,8 +18,12 @@ boundary, keyed by Team and bound to the existing trusted strategy-scope user
 turn. Default limits are enabled at six/ten hours and user-adjustable. Soft emits
 one Host-authored wrap-up mailbox notice plus a UI notification. Hard reuses Team
 pause/queue hold and existing Goal interruption/token invalidation. Main requests
-a runtime safe batch boundary; it does not kill foreground/background processes
-or route through the ordinary user-stop peer-abort hook. Existing user Stop keeps
+a runtime safe batch boundary; it does not kill foreground batches or ordinary
+background commands, or route through the ordinary user-stop peer-abort hook.
+The approved WP14 [explicit service lifecycle](team-managed-service-processes.md)
+adds an exception: any Team pause stops owned explicit services, including hard
+pause. Shell quotas and ordinary command behavior remain unchanged. Existing
+user Stop keeps
 its prior semantics. A provider-only abort signal fences request/stream retry
 backoff even in infinite retry mode, and an admitted-batch proof separates an
 already-started tool batch from a late model response. This signal never cancels

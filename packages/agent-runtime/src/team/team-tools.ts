@@ -9,6 +9,7 @@ import type { RuntimeHost } from "../host-client.js";
 import { createWaitForUpdatesTool } from "./wait-for-updates.js";
 import { buildDeclareStrategyResult } from "./declare-strategy-result.js";
 import { pendingMailboxNextStep, readPendingMailbox } from "./pending-mailbox.js";
+import type { OrdinaryInboxSummary } from "./ordinary-inbox.js";
 import {
   TEAM_TASK_SUBJECT_GUIDANCE,
   TEAM_STRATEGY_REASON_GUIDANCE,
@@ -47,6 +48,7 @@ export interface TeamToolsOptions {
   approvedExecution?: () => boolean;
   captureMailboxGuard?: () => (() => boolean);
   captureInboxYield?: () => ((toolCallId: string) => boolean) | undefined;
+  captureOrdinaryInbox?: () => ((boundaryId: string, signal?: AbortSignal) => Promise<OrdinaryInboxSummary | undefined>) | undefined;
   abortActiveTurn?: (memberSessionId: string) => Promise<boolean>;
 }
 
@@ -672,7 +674,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
     name: "team_status",
     label: "Team Status",
     description:
-      "Get full Expert Team status, including roster, task board, paused state, and Host-owned member activity evidence; queued mail is not proof of execution.",
+      "Get full Expert Team status, including roster, task board, paused state, and Host-owned member activity evidence; queued mail is not proof of execution. Completed member phases do not close their owned board tasks; any open-task advisory requires checking evidence before updating or explicitly reassigning work.",
     parameters: Type.Object({}),
     execute: async (_id, _params, signal): Promise<AgentToolResult> => {
       try {
@@ -697,8 +699,20 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
         }
         const pending = mailbox?.summary;
         const summary = pending ? { ...pending, ...(pending.pendingMessagesCount > 0 ? {
-          nextStep: pendingMailboxNextStep(opts.mode, opts.approvedExecution?.() === true),
+          nextStep: pendingMailboxNextStep(opts.mode, opts.approvedExecution?.() === true, opts.mode === "agent"),
         } : {}) } : {};
+        const completedMembersWithOpenTasks = roster.members.filter(member => member.phase === "completed")
+          .map(member => ({ memberSessionId: member.memberSessionId, memberName: member.name,
+            taskIds: board.tasks.filter(task => !task.deleted && task.ownerSessionId === member.memberSessionId &&
+              (task.status === "pending" || task.status === "in_progress")).map(task => task.taskId),
+          })).filter(member => member.taskIds.length > 0);
+        const taskAdvisory: Record<string, string> = completedMembersWithOpenTasks.length > 0 ? {
+          completedMemberOpenTaskNextStep: "A completed member phase only means its last turn ended successfully; the listed owned tasks remain open. Inspect the authenticated report and task evidence, then use task_update with the current expectedRevision or explicitly reassign/dispatch remaining work. Do not redo delegated work merely because the board is open.",
+        } : {};
+        const taskSummary = { completedMembersWithOpenTasks, ...taskAdvisory,
+          ...(!(pending && pending.pendingMessagesCount > 0) && taskAdvisory.completedMemberOpenTaskNextStep
+            ? { nextStep: taskAdvisory.completedMemberOpenTaskNextStep } : {}),
+        };
 
         return {
           content: [
@@ -706,6 +720,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
               type: "text",
               text: JSON.stringify({
                 planning,
+                ...taskSummary,
                 ...summary,
                 teamSessionId: roster.teamSessionId,
                 paused: roster.paused,
@@ -723,7 +738,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
               }),
             },
           ],
-          details: { roster, board, planning, ...summary },
+          details: { roster, board, planning, ...taskSummary, ...summary },
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

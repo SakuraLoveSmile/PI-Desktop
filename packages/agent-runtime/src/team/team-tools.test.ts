@@ -758,7 +758,7 @@ describe("Lead pending mailbox status", () => {
       if (outcome.content[0].type !== "text") throw new Error("Missing status text");
       const visible: { nextStep: string } = JSON.parse(outcome.content[0].text);
       expect(visible).toMatchObject(expected);
-      expect(visible.nextStep).toContain(mode === "approved" ? "wait_for_updates" : mode === "plan" ? "Finish the current aggregation turn" : "after you end the current turn");
+      expect(visible.nextStep).toContain(mode === "approved" ? "wait_for_updates" : mode === "plan" ? "Finish the current aggregation turn" : "ordinary Agent inbox boundary when supported");
       if (mode === "approved") expect(visible.nextStep).not.toContain("end the current turn");
       expect(JSON.stringify(outcome)).not.toContain(mail.content);
       expect(call.mock.calls.map(([method]) => method)).not.toContain("team.ackMessage");

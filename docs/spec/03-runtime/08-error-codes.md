@@ -636,3 +636,18 @@ was requested while its persisted elapsed time still exceeds the enabled live
 hard limit. Extend/disable the policy in Settings → Expert team, then explicitly
 resume; a queued new message cannot reset/unpause the old run. A new session is an
 independent task. No permission or shell-capacity meaning is attached to this code.
+
+### Explicit Team service admission (WP14)
+
+`TEAM_SERVICE_UNAUTHORIZED` rejects a service without current authenticated
+Agent Team/run/turn ownership, including research, replaced/stale route or
+excessive permission scope. `TEAM_APPROVAL_REQUIRED` retains its confirmed-roster
+meaning. `TEAM_SERVICE_LIMIT_REACHED` rejects active service caps (Host 2/Team
+1/session 1); it is separate from the existing global/session/shell admission
+limits. `INVALID_PARAMS` rejects an invalid kind, foreground service or
+any service timeout override. Correct the declared scope/arguments or stop an
+owned service before a fresh attempt; do not bypass permissions or busy-retry.
+
+Ordinary inbox provenance violations remain `PERMISSION_DENIED`; stale precise
+turn/proof/authority errors retain Team denial codes. A recognized ACK transport
+loss can leave summary-only pending IDs, but authority errors cannot flush a body.

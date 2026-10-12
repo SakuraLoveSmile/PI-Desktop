@@ -2,12 +2,14 @@ import type { TFunction } from "i18next";
 import type { Mode } from "@pi-desktop/shared";
 import { TooltipButton } from "../../../components/ui";
 import { ModeIcon } from "./ComposerModeIcon";
+import { isComposerContractVisible } from "./model";
 
 export type ComposerContractPickerProps = {
   t: TFunction;
   mode: Mode;
   displayMode?: Mode;
   planningLive: boolean;
+  goalExecutionActive?: boolean;
   disabled?: boolean;
   controlsBlocked?: boolean;
   onClick: () => void;
@@ -22,12 +24,13 @@ export function ComposerContractPicker({
   mode,
   displayMode,
   planningLive,
+  goalExecutionActive = false,
   disabled = false,
   controlsBlocked = false,
   onClick,
 }: ComposerContractPickerProps) {
   const effectiveMode = displayMode ?? mode;
-  if (effectiveMode === "agent") {
+  if (!isComposerContractVisible(effectiveMode, goalExecutionActive)) {
     return null;
   }
 

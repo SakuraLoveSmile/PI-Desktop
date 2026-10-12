@@ -1364,3 +1364,15 @@ Lead/运行回合；回答、取消和恢复读取仅通过可信 Main，不暴�
 slot 只允许一次替换；原审查、会话、任务和日志保留，任务需明确重新分配。
 旧成员不能再收到派发；旧成员仍计入 8 人上限。二次失败、阵容满或修改
 权限/模型需要新的可信审查，拒绝信息给出合法下一步。
+
+### 普通 Agent Lead 边界 inbox（WP16 S3）
+
+内部 team.getOrdinaryInboxCapability、team.readOrdinaryInbox、team.ackOrdinaryInbox、team.getOrdinaryInboxProof 与仅身份提示 team.ordinaryInboxPersisted，遵循[普通 inbox](/zh-CN/spec/03-runtime/team-ordinary-inbox)的精确绑定/证明。正文读取只在可信 launch plumbing 内部，不暴露为模型可选代理或工具输出。Host 核验当前普通回合 authority；Main/AgentHost/Runtime 独立校验 epoch。Plus P6 保存 prepared → persisted → ACKed 证明及 JSONL-first 恢复；队列准入不等于 runtime/模型消费。协议 11 不变。
+
+### 显式团队服务投影（WP14）
+
+Bash backgroundKind、owner/caps/TTL 及原 backgroundProcesses list/read/launch 的可选字段遵循[显式服务](/zh-CN/spec/03-runtime/team-managed-services)。changed 仍仅身份失效提示；读取/停止仍限 session。Plus P7 保存显式 ownership，旧进程不推断为服务。不扩大 shell budget/FIFO、批准执行权限或协议版本。
+
+### 团队诊断与进度提示（WP7）
+
+strategy、presentation.role、displayName 参数错误说明合法值/范围；路由/过期范围/未批准派遣拒绝保持原 code 和条件，增加可操作 nextStep。runtime 的 completedMembersWithOpenTasks 和 completedMemberOpenTaskNextStep 仅由既有名单/任务投影派生，不授权限或结算任务。

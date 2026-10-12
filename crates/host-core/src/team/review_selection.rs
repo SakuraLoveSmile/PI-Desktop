@@ -133,7 +133,7 @@ pub(crate) fn gate_team_member_turn(
         || model_id.is_some_and(|model| session.summary.model_id.as_deref() != Some(model))
     {
         return Err(anyhow!(
-            "TEAM_APPROVAL_REQUIRED: turn route must match the confirmed member selection"
+            "TEAM_APPROVAL_REQUIRED: turn route must match the confirmed member selection; nextStep: read team_status and use the confirmed provider/model; ask the Lead for a new trusted roster review before changing the route"
         ));
     }
     Ok(())

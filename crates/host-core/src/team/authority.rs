@@ -33,7 +33,7 @@ pub(crate) fn review_belongs_to_current_scope(
 pub(crate) fn validate_review_scope(db: &Database, team: &str, turn: &str) -> Result<()> {
     if !review_belongs_to_current_scope(db, team, turn)? {
         return Err(anyhow!(
-            "TEAM_REVIEW_REVISION_CONFLICT: review does not belong to the current user turn"
+            "TEAM_REVIEW_REVISION_CONFLICT: review does not belong to the current user turn; nextStep: read team_status and declare_team_strategy for the current Lead turn, then follow its launch review policy"
         ));
     }
     Ok(())
@@ -236,7 +236,7 @@ pub(crate) fn validate_current_expert(db: &Database, team: &str, target: &str) -
         return Ok(());
     }
     Err(anyhow!(
-        "TEAM_APPROVAL_REQUIRED: expert is not approved by this turn's delegate review"
+        "TEAM_APPROVAL_REQUIRED: expert is not approved by this turn's delegate review; nextStep: read team_status and dispatch to a currently approved expert; request trusted roster review before using a different expert"
     ))
 }
 
@@ -259,7 +259,7 @@ pub(crate) fn record_dispatch(
         || message.status != "queued"
     {
         return Err(anyhow!(
-            "TEAM_APPROVAL_REQUIRED: dispatch must originate in the current approved expert scope"
+            "TEAM_APPROVAL_REQUIRED: dispatch must originate in the current approved expert scope; nextStep: read team_status and send work from the current Lead turn to an approved expert; request trusted roster review if the scope must change"
         ));
     }
     decision.message_ids.push(message.id.clone());

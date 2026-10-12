@@ -309,6 +309,7 @@ export const ko = {
     placeholderHome: "무엇이든 물어보세요",
     placeholderHint: "명령은 / · 파일은 @ 입력",
     placeholderHomeHint: "명령은 / · 파일은 @ 입력",
+    placeholderRunning: "{{sendShortcut}} 후속 메시지 보내기 · {{steerShortcut}} 지금 방향 전환",
     placeholderShortcut: "줄바꿈은 Shift+Enter · 보내기를 눌러 제출",
     addFiles: "파일 추가",
     filesAttached: "초안에 항목 {{count}}개 추가됨",
@@ -693,7 +694,7 @@ export const ko = {
   goal: {
     progressLabel: "목표 진행 상황",
     progressListLabel: "목표 작업 목록",
-    progressInitializing: "준비 중…",
+    progressInitializing: "진행 상황 불러오는 중…",
     progressFailed: "진행 상황을 사용할 수 없음",
     planning: "목표 정의 중",
     approvalRegion: "목표 승인",
@@ -2016,7 +2017,7 @@ sklm: {
   },
   askTool: {
     pending: "답변 대기 중",
-    pendingHelp: "리드는 30분 후 대기를 중단했습니다. 답변은 새 턴을 시작합니다. 실행을 명시적으로 재개하거나 다시 승인하세요.",
+    pendingHelp: "리드는 대기를 중단했습니다. 답변은 새 턴을 시작합니다. 실행을 명시적으로 재개하거나 다시 승인하세요.",
     completedTitle: "질문 확인",
     completedSkipped: "건너뜀",
     title: "몇 가지 질문",

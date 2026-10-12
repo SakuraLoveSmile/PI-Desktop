@@ -4,6 +4,8 @@ import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { TeamBoardProjection } from "@pi-desktop/shared";
 import type { RuntimeHost } from "../host-client.js";
 import { pendingMailboxNextStep, readPendingMailbox, type PendingMailboxSummary } from "./pending-mailbox.js";
+import { randomUUID } from "node:crypto";
+import type { OrdinaryInboxSummary } from "./ordinary-inbox.js";
 
 interface WaitForUpdatesOptions {
   teamSessionId: string;
@@ -17,6 +19,7 @@ interface WaitForUpdatesOptions {
   captureMailboxGuard?: () => (() => boolean);
   /** Capture an ordinary Plan Lead turn and yield only while it still owns the wait. */
   captureInboxYield?: () => ((toolCallId: string) => boolean) | undefined;
+  captureOrdinaryInbox?: () => ((boundaryId: string, signal?: AbortSignal) => Promise<OrdinaryInboxSummary | undefined>) | undefined;
 }
 
 function result(details: NonNullable<AgentToolResult["details"]>): AgentToolResult {
@@ -53,6 +56,11 @@ export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool
     execute: async (toolCallId, params, signal): Promise<AgentToolResult> => {
       const expectedTurnId = opts.getTurnId?.();
       const ownsMailbox = opts.captureMailboxGuard?.();
+      const ordinaryInbox = opts.isLead && opts.mode === "agent" && !opts.approvedExecution?.()
+        ? opts.captureOrdinaryInbox?.() : undefined;
+      const boundaryId = randomUUID();
+      const waitAbort = new AbortController();
+      const ordinarySignal = AbortSignal.any([waitAbort.signal, ...(signal ? [signal] : [])]);
       const assertCurrent = () => {
         signal?.throwIfAborted();
         if ((opts.getTurnId && opts.getTurnId() !== expectedTurnId) || ownsMailbox?.() === false) {
@@ -62,6 +70,11 @@ export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool
       background.prime();
       const yieldInbox = opts.approvedExecution?.() ? undefined : opts.captureInboxYield?.();
       const readInbox = async () => {
+        if (ordinaryInbox) {
+          const summary = await ordinaryInbox(boundaryId, ordinarySignal);
+          assertCurrent();
+          if (summary) return result(summary);
+        }
         if (!opts.approvedExecution?.() || !expectedTurnId) return undefined;
         const inbox = await host.call<{ turnId: string; messages: Array<{ id: string; content: string }> }>("team.readExecutionInbox", {
           teamSessionId, callerSessionId, expectedTurnId,
@@ -93,6 +106,7 @@ export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool
         const finish = (value: AgentToolResult) => {
           if (settled) return;
           settled = true;
+          waitAbort.abort();
           const details = value.details;
           if (details && typeof details === "object" && "backgroundProcess" in details) {
             const detail = details.backgroundProcess;
@@ -245,7 +259,7 @@ export function createWaitForUpdatesTool(opts: WaitForUpdatesOptions): AgentTool
           const initialize = async () => {
             // The listener and total deadline own every read, including inbox
             // consumption. An idle call must still subscribe synchronously.
-            if (opts.approvedExecution?.() && expectedTurnId) {
+            if (ordinaryInbox || (opts.approvedExecution?.() && expectedTurnId)) {
               const inbox = await readInbox();
               if (settled) return;
               if (inbox) { finish(inbox); return; }

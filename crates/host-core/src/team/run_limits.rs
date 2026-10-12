@@ -96,6 +96,7 @@ pub(crate) fn start_user_run(db: &Database, team: &str, turn: &str, now: i64) ->
             hard_reached_at: None,
         })?,
     )?;
+    crate::background_services::request_team(db, team, "run_replaced", now)?;
     Ok(())
 }
 pub fn projection(db: &Database, team: &str, now: i64) -> Result<Option<RunLimitProjection>> {
@@ -183,7 +184,7 @@ pub fn evaluate_at(db: &Database, team: &str, now: i64) -> Result<Vec<LimitEvent
     }
     if policy.enabled && budget.hard_reached_at.is_none() && budget.elapsed_ms >= policy.hard_ms {
         budget.hard_reached_at = Some(now);
-        // Reuse the Team pause primitive within this transaction; no process is killed.
+        // Foreground/ordinary Bash keeps safe finishing; explicit services stop.
         super::pause_team(db, team)?;
         events.push(LimitEvent {
             team: team.into(),
@@ -196,7 +197,7 @@ pub fn evaluate_at(db: &Database, team: &str, now: i64) -> Result<Vec<LimitEvent
         && budget.soft_message_id.is_none()
     {
         let id = uuid::Uuid::new_v4().to_string();
-        let content = "Host Team run limit: the soft wall-clock limit has been reached. Stop expanding scope, collect expert results, and conclude with verified work and remaining gaps. The hard limit pauses this Team without killing its background processes.";
+        let content = "Host Team run limit: the soft wall-clock limit has been reached. Stop expanding scope, collect expert results, and conclude with verified work and remaining gaps. The hard limit pauses this Team, stops explicitly managed services, and preserves ordinary background commands and admitted foreground tools.";
         let ceiling = crate::session_collaboration::permissions::effective_mode(db, team)?;
         tx.execute("INSERT INTO session_collaboration_messages(id,plugin_id,source_session_id,source_title,target_session_id,target_title,kind,content,status,notify_on_completion,idempotency_key,remaining_hops,permission_ceiling,created_at,updated_at)
           VALUES(?1,?2,?3,'Host run limit',?3,'Lead','message',?4,'queued',0,?5,1,?6,?7,?7)", params![id, super::team_plugin_origin(team), team, content, format!("team-run-limit-soft:{}", budget.run_id), ceiling,now])?;

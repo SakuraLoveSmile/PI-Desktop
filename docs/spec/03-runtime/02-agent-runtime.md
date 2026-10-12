@@ -2023,9 +2023,11 @@ nudge, restart model work, or install a waiting listener/timer.
 Generated Team prompts use available Host-backed member phase and turn/process
 evidence for liveness, never Git activity. They require consuming authenticated
 reports before replacement or redispatch; a pending-mail summary is not its body.
-Ordinary unapproved Agent turns receive queued bodies only after their current
-turn ends; approved Plan/Goal executions instead keep their original turn open
-and consume the execution inbox. Ordinary Plan aggregation retains its yield.
+Ordinary Agent Leads on capable Hosts receive authenticated expert bodies at
+`wait_for_updates` boundaries through the separate ordinary inbox. Old Hosts
+retain queued continuations after turn settlement. Approved Plan/Goal executions
+keep their original turn open and consume their execution inbox; ordinary Plan
+aggregation retains its yield. Neither expert body grants new user authority.
 
 Execution participants run only diff-related revalidation, assign a full suite
 to one participant, avoid foreground sleep polling and declare explicit limits
@@ -2049,13 +2051,19 @@ Pending means inbound, non-self, queued and not yet bound to a recipient turn.
 An acknowledged queue receipt does not establish body consumption. Outbound,
 other-recipient, running, completed and cancelled rows are excluded.
 
-An ordinary unapproved Agent Lead's wait_for_updates returns
-reason: pending_mailbox_messages immediately when its initial read already has
-pending mail, or on a later recheck when mail arrives. It includes count, sender
-names, age and the current-turn delivery guidance; it does not terminate the
-turn, include bodies, acknowledge messages or modify queue state. The Lead must
-finish its ordinary turn before the existing authenticated role=user mailbox
-continuation can deliver full content. Counts and prompts are not consumption.
+On an unsupported/older Host, an ordinary Agent Lead's wait_for_updates returns
+reason: pending_mailbox_messages immediately when mail is present, with count,
+sender names, age and queued-continuation guidance. It does not consume bodies,
+ACK mail or terminate the turn; ending that turn enables legacy role=user
+continuation delivery. This remains S1's compatibility behavior.
+
+On a capable Host, WP16 S3 adopts a separate boundary-only ordinary inbox. The
+Host persists authenticated expert role=user input and retires durable receipts;
+a dedicated runtime operation accepts the verified buffer, ACKs its exact proof
+and rechecks lifecycle before same-turn internal queue admission. Tool output remains metadata only, never a second body channel.
+No Goal token, new user approval or automatic Agent yield is supplied. The
+[ordinary inbox spec](team-ordinary-inbox.md) defines authority, provenance,
+human-steer priority, FIFO, journal crash cuts and old-Host fallback.
 
 Ordinary Plan Lead yield retains priority and terminate:true. Approved Plan/Goal
 execution reads its authenticated execution inbox first and never receives an
@@ -2069,6 +2077,39 @@ and mode; replacement or disposal invalidates late metadata. A read failure is
 observable, not a zero-mail success. Sender names are stable-deduplicated in
 mailbox order; createdAt is a Unix-millisecond numeric string. Ages are nonnegative
 whole seconds; empty queues or any unparseable pending timestamp return null
-for the unknown oldest age. No new Host RPC, schema, quota, automatic Agent
-yield or in-turn body capability is added. See the proposed
-[delivery alternatives](../../adr/team-agent-mailbox-delivery.md), not implemented.
+for the unknown oldest age. S1 metadata adds no authority or quota. S3's additive
+internal RPC/Plus P6 proof
+journal is distinct from this non-consuming summary; the adopted
+[delivery decision](../../adr/team-agent-mailbox-delivery.md) does not establish
+model obedience or user acceptance.
+
+### Goal negotiation and Team progress reliability (WP7)
+
+Goal negotiation states whether acceptance requires human participation or external
+evidence before SubmitGoal. Unknown provider pricing/cost is unknown, not zero;
+Markdown monetary caps do not supply Host-enforced hard spending guarantees.
+Negotiate paid actions, publication and human decisions as stage boundaries and
+stop at unmet ones. Model approval text/parsed Markdown cannot create trusted
+approval or authorize work on the user's behalf.
+
+Standard Agent retains TodoWrite when exposed by its actual catalog. Restricted
+expert profiles do not acquire it through ToolSearch; exact lookup of an excluded
+tool returns an explicit denial and legal shared-board task_get/task_list and
+CAS task_update guidance. Research stays read-only and still requires
+submit_research_result, rather than a personal TodoWrite checklist. Discovery
+never grants permission or substitutes a bypass tool.
+
+team_status adds completedMembersWithOpenTasks: entries identify memberSessionId,
+memberName and owned taskIds whose non-deleted status is pending/in_progress.
+completedMemberOpenTaskNextStep asks for authenticated report/evidence review and
+current-revision updates or explicit reassignment/dispatch, not duplicate work.
+A member phase completed describes its last successful turn, not board completion.
+Pending-mail guidance retains nextStep priority; no task is automatically changed.
+
+The existing compaction budget uses current request context, not accumulated usage.
+For a 1M window the derived headroom/hard/soft values are 50K/950K/855K. The
+member fixture covers below-soft, soft/hard preflight and inline growth with real
+compaction wiring and external fake provider/Host boundaries. Checkpoint/summary
+persist before the next request, preserving active task and authenticated caller.
+It found no product defect; thresholds and watchdog behavior remain unchanged.
+This is runtime coverage, not a real-model or Main/Rust incident replay.

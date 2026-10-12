@@ -207,6 +207,12 @@ pub(super) async fn handle(
     let st = state.lock().await;
     super::team_dispatch_head::validate(&st.db, dispatch_head.as_ref())?;
     match method {
+        "team.getOrdinaryInboxCapability"
+        | "team.getOrdinaryInboxProof"
+        | "team.readOrdinaryInbox"
+        | "team.ackOrdinaryInbox" => {
+            super::team_ordinary_inbox::handle(&st.db, method, &params, &tx)
+        }
         "team.registerLeadAsk"
         | "team.deferLeadAsk"
         | "team.ackLeadAsk"

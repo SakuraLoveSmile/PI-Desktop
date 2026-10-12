@@ -112,6 +112,9 @@ const HOST_PROXY_ALLOWED = new Set([
   "team.listMessages",
   "team.getLeadExecutionState",
   "team.readExecutionInbox",
+  "team.getOrdinaryInboxCapability",
+  "team.readOrdinaryInbox",
+  "team.ackOrdinaryInbox",
   "team.sendMessage",
   "team.updateTask",
 ]);
@@ -180,6 +183,7 @@ export class AgentSidecar {
   private exitNotified = false;
   private stderrTail: string[] = [];
   private host: SidecarHostLink | null = null;
+  private ordinaryTeamInboxHandler?: (method: string, params: Record<string, unknown>) => Promise<unknown>;
   private unsubscribeHost: (() => void) | null = null;
   private unsubscribeHostExit: (() => void) | null = null;
   private stdoutReader?: ReturnType<typeof readNdjsonLines>;
@@ -248,6 +252,7 @@ export class AgentSidecar {
     this.unsubscribeHostExit?.();
     this.unsubscribeHostExit = null;
     this.host = null;
+    this.ordinaryTeamInboxHandler = undefined;
     for (const [, p] of this.pending) {
       if (p.timer) clearTimeout(p.timer);
       p.reject(error);
@@ -436,6 +441,11 @@ export class AgentSidecar {
     });
   }
 
+  /** Internal Main admission path; mailbox bodies must never bypass its gate. */
+  setOrdinaryTeamInboxHandler(handler: (method: string, params: Record<string, unknown>) => Promise<unknown>): void {
+    this.ordinaryTeamInboxHandler = handler;
+  }
+
   /**
    * Answer one `provider.resolveAuth` request. Refuses anything the session was
    * not launched with: the provider row has to be in this session's bindings,
@@ -515,6 +525,19 @@ export class AgentSidecar {
           );
         }
         const params = (msg.params?.params ?? {}) as Record<string, unknown>;
+        if (method === "team.getOrdinaryInboxCapability" || method === "team.readOrdinaryInbox" || method === "team.ackOrdinaryInbox") {
+          const handler = this.ordinaryTeamInboxHandler;
+          const host = this.host;
+          if (!handler) throw Object.assign(new Error("ordinary Team inbox capability unavailable"), { code: -32601 });
+          if (!host || this.disposed || this.closed) throw Object.assign(new Error("ordinary Team inbox admission unavailable"), { errorCode: "TEAM_TURN_INVALID" });
+          const result = method === "team.getOrdinaryInboxCapability"
+            ? await host.call(method, {}) : await handler(method, params);
+          if (this.disposed || this.closed || this.host !== host || this.ordinaryTeamInboxHandler !== handler) {
+            throw Object.assign(new Error("ordinary Team inbox transport changed during admission"), { errorCode: "TEAM_TURN_INVALID" });
+          }
+          this.writeToChild(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result }) + "\n");
+          return;
+        }
         const requestedToolName = String(params.toolName ?? "");
         const planLocalTool =
           requestedToolName === "Skill" ||

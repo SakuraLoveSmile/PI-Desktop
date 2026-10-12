@@ -2405,16 +2405,24 @@ identify the platform validation still needed.
 - **Steps**: 1) On empty home, record the welcome placeholder and wait longer
   than 4 seconds to confirm it is unchanged. 2) Open conversation A, record
   its guidance, type and clear text, focus and blur the textarea, and wait;
-  confirm the copy is unchanged. 3) Switch to conversation B and then back to
-  A, recording each guidance change. 4) Switch between home and a conversation
-  and inspect the command/file and keyboard hints. 5) Type `/` and inspect the
+  confirm the copy is unchanged. 3) Start a turn with no text or file draft and
+  confirm the follow-up/steer hint appears. Check Enter-to-send on and off, and
+  verify the displayed send and steer shortcuts on macOS and Windows/Linux.
+  Add a draft while the turn is active and confirm contextual guidance returns.
+  4) Switch to conversation B and then back to A, recording each guidance
+  change. 5) Switch between home and a conversation and inspect the command/file
+  and keyboard hints. 6) Type `/` and inspect the
   slash menu. Include Skills with long English/CJK descriptions, short/no
   descriptions, a separate title/argument hint, and an exceptionally long slash
   name; also inspect a long filename in `@` mode. Repeat at 800px and 1680px
-  viewport widths with 320px and 640px composer widths. 6) Switch to zh-CN and
+  viewport widths with 320px and 640px composer widths. 7) Switch to zh-CN and
   repeat the context-switch checks.
 - **Expected**: The initially rendered context starts with its welcome copy and stays stable until
-  the page/session context changes. Each context switch advances to the next
+  the page/session context changes. While a turn is active and the draft has no
+  text or file references, the localized follow-up/steer hint replaces it. The
+  send shortcut follows the Enter-to-send preference and platform; the steer
+  shortcut is Option+Enter on macOS and Alt+Enter on Windows/Linux. Adding a
+  draft restores the contextual hint. Each context switch advances to the next
   localized command/file or keyboard hint with an opacity fade; no timer-driven
   changes occur. The keyboard hint includes Shift+Enter and a submit hint, while the
   command/file hint includes `/` and `@`. The slash menu still contains `/new`,
@@ -2435,8 +2443,10 @@ identify the platform validation still needed.
 - **Status**: Source-covered (`composer-placeholder-context.test.mjs`);
   slash-menu layout covered by `pnpm test:e2e:composer-autocomplete` after
   `pnpm build:js` (real React/Chromium and production CSS, deterministic command
-  fixtures; no provider required). Full provider/session scenario Draft;
-  branch runs do not replace post-integration E2E
+  fixtures; no provider required). The running-empty two-line Composer path is
+  covered by `E2E-COMPOSER-compact-running-input` in the transcript-render
+  fixture. Full provider/session scenario Draft; branch runs do not replace
+  post-integration E2E.
 
 #### E2E-089: Composer model menu opens upward and switches model
 
@@ -2488,7 +2498,7 @@ identify the platform validation still needed.
   slot remains reachable. Both mode menus are visible and pointer-accessible,
   and each selection updates its trigger. The execution-profile labels
   `智能体` and `专家团` remain fully visible at desktop and narrow composer widths.
-  Home and thread-docked composers match, with four-line empty input, a neutral
+  Home and thread-docked composers match, with two-line empty input, a neutral
   outline and unseparated toolbar. Profile menu options have at least 6px vertical
   separation; switching profiles preserves model, reasoning and permission.
   The task-progress card and activity rail both open the existing read-only
@@ -9837,7 +9847,12 @@ This test plan spec is accepted when:
 - The selected guidance stays unchanged until the page/session context changes;
   switching context advances to localized `/`/`@` command/file guidance and the
   keyboard hint `Shift+Enter for newline · Use Send to submit`, with an opacity fade.
-- Waiting, focusing, editing, clearing, or composing does not change the copy.
+- While a turn is active and there is no text or file draft, the localized
+  follow-up/steer hint replaces the contextual guidance. Its send shortcut
+  follows the Enter-to-send preference and platform; the steer shortcut is
+  Option+Enter on macOS and Alt+Enter on Windows/Linux. Adding a draft restores
+  contextual guidance. Waiting, focusing, editing, or clearing while idle does
+  not change the copy.
 - Placeholder ink is legible on light and dark floating plates.
 
 ### US-UI-31 Home empty vertical stack (D111/D204/D206)
@@ -17713,6 +17728,17 @@ isolated renderer fixture also checks narrow layout, existing out-of-order
 Goal updates, session switching, report completion, and interrupted execution.
 No live model or user profile is used.
 
+#### E2E-GOAL-inline-input-status
+
+Start an approved Goal in the chat Composer. Its title disclosure is inside the
+same input card, above the editor, with only a divider. While the first progress
+read is pending show one loading status; resolve it without a snapshot and show
+one Running status with an indeterminate indicator, never Preparing or 0/0.
+Publish real items and check count updates, expand/collapse the labeled list,
+pending expert review, visible read errors, session switching and ready-report
+removal. At narrow widths and enlarged text the title/status remain reachable.
+The scheduled instruction editor keeps its original card and minimum height.
+
 ### Session checklist relocation to Overview
 
 `node scripts/e2e-todo-checklist.mjs` mounts the actual OverviewTab with real
@@ -17924,6 +17950,28 @@ prove account/region eligibility or call a real model.
 
 The composer footer shows the current session's project, local/remote host, and known local Git branch. Unavailable project/branch metadata is omitted; remote sessions never borrow a local branch. Model menus list all models without a search field. Generation speed, full-turn token totals, cache metrics and context details are available from the bottom-right context meter. Subagent entries use transparent gradient-avatar rows with name, task, localized status and measured elapsed time; clicking a row opens read-only details, with no panorama entry. Validate model keyboard selection, footer metadata, context details and agent navigation in the isolated composer/transcript fixtures, including narrow layouts.
 
+### E2E-COMPOSER-toolbar-footer
+
+- **Preconditions:** Built candidate, isolated Composer fixture, production
+  renderer components and CSS, and deterministic session/Goal snapshots. No user
+  profile or model provider.
+- **Steps:** Inspect the complete Composer toolbar and activate the combined
+  model × reasoning control. Verify the menu opens from its trigger and remains
+  usable by keyboard. Compare the left and right plugin control slots before
+  and after opening it. Switch between Goal planning and approved Goal execution;
+  also inspect Plan mode. Check the Send and running-empty Stop controls, the
+  context meter footer, and the shared model picker in ScheduledEditor.
+- **Expected:** The combined model × reasoning control sits on the right as one
+  button, with the existing anchored menu and plugin slot sides/order preserved.
+  The Goal contract picker remains during planning and is hidden during Goal
+  execution; Plan remains available. Send and Stop share a 32px rounded-square
+  footprint. The context meter visibly includes `chat.usageContextLabel`.
+  ScheduledEditor retains its existing picker placement and behavior. Narrow
+  layouts keep controls within the Composer without overlap.
+- **Specs:** `04-ux/08-component-spec.md` §11.
+- **Automation:** `node scripts/e2e-transcript-render.mjs`.
+- **Status:** Record results against the exact task candidate and base revision.
+
 ### Recorded outputs, delegate details and project Skill suggestions
 
 Output rows display file basenames with a file-type icon plate and a full-path tooltip. They retain existing file navigation, omit status badges and use the current neutral theme. Delegate details show the recorded agent identity/state, bounded expandable task prompts, and collapsed contiguous thinking/tool groups with real counts. Follow-up turns, Markdown, search and scroll remain available; delegate errors/reviews have no Continue, dismiss or rollback mutation controls.
@@ -18089,7 +18137,8 @@ and replay/validation acceptance IDs.
 - **Automation:** scripts/e2e-team-agent-queued-report.mjs; runtime Team mailbox,
   pending metadata, wait/status, Main delivery and AgentHost queue regressions.
 - **Specs:** 03-runtime/02-agent-runtime and 06-host-rpc-protocol; WP16 S3 is a
-  separate proposed delivery ADR and has no adopted in-turn capability.
+  separate adopted wait-boundary delivery ADR. This S1 scenario retains legacy
+  queued/fallback acceptance; capable-Host S3 is the distinct scenario below.
 #### E2E-TEAM-member-activity-interrupt-guard
 
 - **Scope:** Lead Team tools → Host activity projection → exact-turn interruption.
@@ -18112,7 +18161,9 @@ and replay/validation acceptance IDs.
   turn is still running. Save settings while another role
   is edited in a different window.
 - **Expected:** One soft notice and notification per run; hard persisted pause,
-  safe current-batch finish, no background process stop and no next-loop request.
+  safe current-batch finish, no ordinary background-command stop and no next-loop
+  request. Explicit WP14 services stop on any Team pause; the separate service
+  lifecycle scenario covers that approved exception.
   Running Goal becomes interrupted and its token is invalid. Queued mail cannot
   wake a paused run; restart retains run id/time/pause. Resume never refunds time
   and rejects an exceeded live limit. Policy changes alone do not unpause. A new
@@ -18227,3 +18278,110 @@ It uses no provider service, test-only production backdoor, or system-clock edit
   rerun C1–C5 on a project copy, auditing C6–C8 against real Host/tool records.
   See the validation record for the exact method.
   No new live-model result or prompt-cache behavior is claimed.
+## Expert Team follow-up reliability (WP7 / WP14 / WP16 S3)
+
+### E2E-TEAM-agent-lead-wait-boundary-ordinary-inbox
+
+- **Preconditions:** Built recorded request/base candidate, temporary Host data and
+  workspace, ordinary Agent Team Lead with current confirmed experts, scripted
+  provider at the external boundary; no user profile or paid API.
+- **Steps:** Delegate exactly two commands to an expert. Send two reports while
+  the same Lead turn is running. Read team_status, call wait_for_updates twice,
+  and record file/proof persistence, FIFO provider inputs, runtime ACK, live/durable
+  queue retirement and turn settlement. Replay ACK and mailbox notifications.
+- **Expected:** Status/tool results expose no report bodies. At the first wait
+  boundary both authenticated agent-origin role=user bodies enter the original
+  Lead turn in FIFO order, before settlement, with stable user-message IDs.
+  Repeat wait/ACK/notifications neither duplicate body rows nor start a new Lead
+  turn. Host background process inventory is expert 2/Lead 0. No Goal authority,
+  human consent, permission elevation or premature final response is created.
+- **Automation:** `node scripts/e2e-team-agent-ordinary-inbox.mjs` exercises real
+  Host, Main delivery, AgentHost and Runtime with only the provider scripted.
+  Host/RPC/runtime/Main contracts separately cover wrong source/proof, crash
+  cuts, stale epoch/turn, pause/cancel/dispose, human-steer ordering, transport
+  ACK loss, old-Host fallback and unchanged Plan/approved-execution behavior.
+  These separate contracts must pass; the main incident script alone does not
+  establish every recovery or concurrency branch.
+- **Specs:** [ordinary inbox](../03-runtime/team-ordinary-inbox.md),
+  [delivery ADR](../../adr/team-agent-mailbox-delivery.md).
+- **Acceptance:** C / E / F / Security; record source/base/binary hashes, timings,
+  durable input and runtime ACK independently of model consumption.
+- **Milestone:** WP16 S3.
+- **Status:** Candidate implementation/validation; user and real-provider acceptance
+  are separate. A generated scenario index maps executable entries only.
+
+### E2E-TEAM-managed-service-lifecycle
+
+- **Preconditions:** Candidate Host/runtime, fresh data/workspaces, authenticated
+  Agent Teams and real disposable owned child/grandchild process trees. No paid
+  provider, running user instance or production daemon.
+- **Steps:** Explicitly launch a service and an ordinary background command. Keep
+  the service past 60 seconds while the ordinary command uses the same default.
+  Exercise Host/Team/session caps, manual and hard pause, friendly and TERM-ignoring
+  groups, Team end after genuine work settles, run replacement, Host shutdown and
+  restart. Preserve an ordinary command across Team pause.
+- **Expected:** Service stays alive beyond 60 seconds; ordinary command becomes
+  timed_out/TOOL_TIMEOUT around 60 seconds. Services hold original permits, respect
+  Host 2/Team 1/session 1 caps and fixed 6h TTL. Pause stops only explicit services;
+  member completed phase alone does not end their Team. Unix TERM gets at most 5s
+  before KILL/reap, first reason/output survives, tree exit releases permits.
+  Restart marks ownership interrupted without replay or PID adoption.
+- **Automation:** `node scripts/e2e-team-managed-service.mjs` runs real Host/process
+  paths. `--quick` skips the real >60s/default-command comparison and cannot pass
+  that acceptance item. Controlled-clock Host contracts separately cover TTL,
+  Goal execution end, owner cancellation/removal/workspace/deletion, forged scopes,
+  storage refusal and repeated cleanup. Component tests verify localized service
+  metadata; native candidate rendering and Windows JobObject/tree behavior require
+  their own recorded evidence.
+- **Specs:** [managed services](../03-runtime/team-managed-services.md),
+  [service ADR](../../adr/team-managed-service-processes.md), Team run-limit exception.
+- **Acceptance:** C / E / F / Security / Localization; report full-vs-quick and
+  platform evidence separately, with known candidate/base revisions.
+- **Milestone:** WP14; WP12 pool redesign remains conditional.
+- **Status:** Candidate implementation/validation; no user acceptance or Windows
+  success follows from Unix fixture results.
+
+### WP7 representative paths and coverage boundaries
+
+| Acceptance path | Expected result | Current coverage layer |
+| --- | --- | --- |
+| Goal negotiation with unknown pricing and an external/human stage | Unknown is not zero; no Host hard cost guarantee or model-created approval; stage dependency explained before SubmitGoal | Generated mode/team prompt regressions; no live provider compliance claim |
+| Standard Agent → TodoWrite; restricted/research member → exact excluded-tool discovery → shared task update | Standard checklist remains; explicit restriction and legal task_update guidance; research still submits structured result, without permission expansion | Runtime provider/tool-catalog integration and team prompt tests |
+| Expert successful turn with owned open tasks → Lead team_status → evidence review | Exact owner taskIds remain open, separate nextStep; pending-mail guidance wins; no automatic task settlement/re-run | Runtime team_status user-path tests |
+| Expert success/failure → Lead/non-Team/Goal terminal outcomes → notification list/count | Expert success has no new durable inbox/badge/popup source; report/turn persist; expert failure and other original sources remain | Real Host terminal transaction/list/reopen tests; native popup presentation is separate |
+| Member current context below soft → soft/hard preflight → inline context growth | Current context drives existing budgets; checkpoint precedes next request, active task/caller preserved; no threshold/watchdog change | Runtime with actual compaction wiring, fake external provider/Host; not full Main/Rust E2E |
+
+These are behavioral unit/integration acceptance mappings, not independent full
+Electron E2E runs. `mode-prompts.test.ts`, `team/team-prompt.test.ts`,
+`runtime-tests/runtime-team-tool-discovery.test.ts`,
+`team/team-status-owned-open.test.ts`,
+`runtime-tests/runtime-team-member-compaction.test.ts` and Host `notifications`
+regressions provide the named coverage. Existing Team/Goal and notification
+journeys protect the surrounding public paths. Do not add a catalog-only
+executable or mark native/real-provider acceptance passed from these tests.
+### Full-application Team reliability lifecycle acceptance
+
+`node scripts/e2e-team-reliability-closeout.mjs --budget-only` complements
+`E2E-TEAM-bounded-run-limit` with the complete isolated Electron/preload/Main/Host/
+runtime path: real settings persistence, short configured soft/hard wall-clock
+budgets, safe current-tool finishing, application restart and explicit Resume.
+It does not claim a ten-hour soak or system-notification presentation.
+
+The direct, explicitly invoked `node scripts/e2e-team-reliability-closeout.mjs`
+lane complements `E2E-TEAM-lead-pending-ask-late-answer`: a real thirty-minute
+Team Lead question deadline, durable pending card, renderer reload, application
+restart and trusted late answer. It is classified manual because the automatic
+suite deadline is eight minutes. Both lanes use fresh temporary profiles and a
+loopback model; no user data, production clock override or paid provider. Record
+actual candidate/artifact identities and results rather than treating this
+scenario description as evidence of a passing run.
+
+The nightly `--recovery-only` variant restarts a still-waiting question into
+durable pending and exercises the same trusted late-answer branch. Keep its
+result separate from the manually invoked actual thirty-minute expiry lane;
+restart recovery is not timeout evidence.
+
+The pending-card help describes that the Lead stopped waiting without claiming
+that every pending question waited thirty minutes: restart can defer it earlier.
+The default expiry remains thirty minutes; a late answer still starts a new
+authenticated turn and never revives the old execution token.

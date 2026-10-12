@@ -28,3 +28,6 @@
 - [Portable configuration sync](22-config-sync.md)
 
 - [Context Insights](context-insights.md) — native captured-request diagnostics.
+
+- [Ordinary Agent Team wait-boundary inbox](team-ordinary-inbox.md)
+- [Explicit Host-managed Team services](team-managed-services.md)

@@ -21,6 +21,7 @@ use crate::workspace::{resolve_tool_path_with_external, simple_canonicalize, Too
 mod grep_rg;
 pub mod hashline;
 pub mod ignore_rules;
+mod service_control;
 pub mod shell;
 
 pub use hashline::{HashlineContext, HashlineStore};
@@ -214,6 +215,8 @@ struct ToolRunnerStartConfig {
     scratch_dir: Option<PathBuf>,
     #[serde(default)]
     env_path: Option<String>,
+    #[serde(default)]
+    service: bool,
 }
 
 fn path_has_nul(path: &Path) -> bool {
@@ -382,6 +385,16 @@ pub async fn run_internal_tool_runner() -> Result<i32> {
     let config = read_runner_config(&mut control)
         .await
         .map_err(|error| anyhow!(error))?;
+    // Keep the runner alive while its shell handles group TERM. A caught signal
+    // is reset on exec, so the shell and descendants retain normal TERM behavior.
+    #[cfg(unix)]
+    let _service_term = if config.service {
+        Some(tokio::signal::unix::signal(
+            tokio::signal::unix::SignalKind::terminate(),
+        )?)
+    } else {
+        None
+    };
 
     let mut command = Command::new(&config.program);
     command
@@ -755,6 +768,7 @@ fn spill_output(scratch: Option<&Path>, label: &str, text: &str) -> Option<PathB
 
 #[derive(Debug)]
 pub struct BashExecutionOptions {
+    pub(crate) service: bool,
     pub session_id: String,
     pub tool_call_id: String,
     pub command_shell_id: String,
@@ -768,6 +782,7 @@ pub struct BashExecutionOptions {
 impl BashExecutionOptions {
     fn local(command_shell_id: String, timeout_ms: Option<u64>) -> Self {
         Self {
+            service: false,
             session_id: "local".into(),
             tool_call_id: "local".into(),
             command_shell_id,
@@ -2719,6 +2734,7 @@ async fn tool_bash(
         workspace: root.to_path_buf(),
         scratch_dir: scratch.map(Path::to_path_buf),
         env_path: shell::user_login_path().map(str::to_string),
+        service: options.service,
     };
     // A managed background job may be stopped while waiting to begin. Never
     // spawn an already-cancelled call solely to kill it afterwards.
@@ -2765,14 +2781,14 @@ async fn tool_bash(
                 notifier.flush_due();
             }
             _ = &mut timeout_future => {
-                match kill_and_reap(pid, &mut ownership, &mut control, &mut wait_task).await {
+                match service_control::stop_or_kill(&options, service_control::Runner { pid, ownership: &mut ownership, control: &mut control, wait_task: &mut wait_task }, service_control::Output { rx: &mut output_rx, closed: &mut output_closed, stdout: &mut stdout, stderr: &mut stderr, notifier: &mut notifier }).await {
                     Ok(()) => break BashStop::TimedOut,
                     Err(error) => break BashStop::LifecycleFailed(error),
                 }
             }
             cancelled = wait_for_cancellation(&mut cancellation) => {
                 if cancelled {
-                    match kill_and_reap(pid, &mut ownership, &mut control, &mut wait_task).await {
+                    match service_control::stop_or_kill(&options, service_control::Runner { pid, ownership: &mut ownership, control: &mut control, wait_task: &mut wait_task }, service_control::Output { rx: &mut output_rx, closed: &mut output_closed, stdout: &mut stdout, stderr: &mut stderr, notifier: &mut notifier }).await {
                         Ok(()) => break BashStop::Aborted,
                         Err(error) => break BashStop::LifecycleFailed(error),
                     }
@@ -3030,7 +3046,7 @@ pub fn builtin_tool_defs() -> Value {
             "risk": "high",
             "parameters": {
                 "type": "object",
-                "properties": { "command": { "type": "string" }, "run_in_background": { "type": "boolean", "default": false, "description": "Start a Host-managed background process after normal approval; return its ID immediately. It keeps the same timeout and tool capacity until it stops: default 60 seconds; pass timeout in seconds (1-21600) for long runs." } },
+                "properties": { "command": { "type": "string" }, "backgroundKind": { "type":"string", "enum":["command","service"], "default":"command", "description":"command preserves the existing timeout. Explicit service requires an approved current Agent Team/run and run_in_background=true; do not pass timeout. Host-owned TTL is 6 hours; Team pause/end and owner cancellation stop it. Services hold the existing tool/shell permit, with an additional Host limit of 2 and Team/session limit of 1." }, "run_in_background": { "type": "boolean", "default": false, "description": "Start a Host-managed background process after normal approval; return its ID immediately. Ordinary commands keep the same timeout and tool capacity until they stop: default 60 seconds; pass timeout in seconds (1-21600) for finite long runs." } },
                 "required": ["command"]
             }
         }
@@ -3136,6 +3152,7 @@ mod tests {
     #[test]
     fn runner_config_frame_validation_rejects_malformed_payloads() {
         let config = ToolRunnerStartConfig {
+            service: false,
             program: PathBuf::from("resolved-shell"),
             args: vec!["-c".into(), "printf test".into()],
             workspace: PathBuf::from("workspace"),
@@ -3154,6 +3171,7 @@ mod tests {
         assert!(decode_runner_config(&invalid_json).is_err());
 
         let nul_config = ToolRunnerStartConfig {
+            service: false,
             program: PathBuf::from("resolved-shell"),
             args: vec!["bad\0arg".into()],
             workspace: PathBuf::from("workspace"),
@@ -4515,6 +4533,7 @@ mod tests {
             &serde_json::json!({ "command": command }),
             Some(15_000),
             Some(BashExecutionOptions {
+                service: false,
                 session_id: "bounded-session".into(),
                 tool_call_id: "bounded-call".into(),
                 command_shell_id: shell_id,
@@ -4585,6 +4604,7 @@ mod tests {
     fn output_notifications_have_a_per_call_cap() {
         let (tx, rx) = mpsc::unbounded_channel();
         let options = BashExecutionOptions {
+            service: false,
             session_id: "notification-session".into(),
             tool_call_id: "notification-call".into(),
             command_shell_id: shell::default_shell_id().into(),
@@ -4611,6 +4631,7 @@ mod tests {
         let workspace = root.path().join("cwd with spaces");
         std::fs::create_dir_all(&workspace).unwrap();
         let options = || BashExecutionOptions {
+            service: false,
             session_id: "powershell-session".into(),
             tool_call_id: "powershell-call".into(),
             command_shell_id: shell::WINDOWS_POWERSHELL_ID.into(),

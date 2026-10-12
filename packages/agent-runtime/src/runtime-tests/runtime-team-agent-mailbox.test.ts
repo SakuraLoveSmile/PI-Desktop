@@ -44,7 +44,7 @@ describe("ordinary Agent Lead queued expert reports", () => {
     } finally { await runtime.dispose(); }
   });
 
-  it("shows metadata in a mixed wait/status turn, then receives the full report only in an authenticated continuation", async () => {
+  it("uses legacy Host metadata in a mixed wait/status turn, then receives the report in an authenticated continuation", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(1_800_000_000_000);
     const events: AgentEventEnvelope["event"][] = [];
@@ -54,6 +54,7 @@ describe("ordinary Agent Lead queued expert reports", () => {
       if (method === "team.getLaunchReview") return { review: null };
       if (method === "session.appendMessage") return { ok: true };
       if (method === "team.getLeadExecutionState") return { active: false };
+      if (method === "team.getOrdinaryInboxCapability") throw Object.assign(new Error("method not found"), { code: -32601 });
       if (method === "team.authorizeLeadTool") return { authorized: true };
       if (method === "team.getBoard") return { revision: 1, tasks: [] };
       if (method === "team.getRoster") return { teamSessionId: "session-1", members: [], paused: false };
