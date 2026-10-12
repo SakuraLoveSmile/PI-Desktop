@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 export function createApprovedGoalFixture(projectPath) {
   let expertStarted = false, expertRead = false, resultSeen = false, reportRejected = false;
+  let rosterConfirmed = false;
   let releaseExpert, signalStarted;
   const started = new Promise(resolve => { signalStarted = resolve; });
   const markdown = "# Approved Team Goal\n\n## Acceptance criteria\n- Expert reads approved-goal-source.md and returns APPROVED_GOAL_VERIFIED.\n";
@@ -32,6 +33,12 @@ export function createApprovedGoalFixture(projectPath) {
         return { finalText: "Expert verification complete." };
       }
       if (userText.includes("Approved goal title:")) {
+        if (rosterConfirmed) {
+          const ids = new Set(allMessages.flatMap(m => m.tool_calls ?? []).filter(c => c.function?.name === "declare_team_strategy").map(c => c.id));
+          const results = allMessages.filter(m => m.role === "tool" && ids.has(m.tool_call_id)).map(m => JSON.parse(m.content));
+          assert.ok(results.some(r => r.status === "confirmed" && r.awaitingUserApproval === false), "confirmed declaration missing from Lead request");
+          assert.ok(results.every(r => r.status !== "pending" && r.awaitingUserApproval !== true), "pending declaration replayed after confirmation");
+        }
         assert.ok(toolNames.includes("UpdateGoalProgress")); assert.ok(toolNames.includes("SubmitGoalReport"));
         if (!has("declare_team_strategy")) return tool("declare_team_strategy", { strategy: "delegate", reason: "An expert must verify the approved source.", members: [{ name: "goal_expert", description: "Verify assigned source", contextKind: "fresh", presentation: { role: "executor", displayName: "Sam" } }] });
         if (!activeToolText.includes('"reason":"execution_inbox"')) return JSON.stringify(allMessages).includes("The Host confirmed the expert roster")
@@ -88,6 +95,7 @@ export function createApprovedGoalFixture(projectPath) {
       assert.equal((await invoke("agentGetStatus", goal.id)).status.currentTurnId, originalTurn);
       assert.equal(expertStarted, false, "view navigation cannot authorize experts");
       await saveScreenshot(sendCdp, "team-approved-goal-pending-review.png");
+      rosterConfirmed = true;
       await evaluate(`document.querySelector('[data-testid="team-launch-review-confirm-btn"]').click()`);
       await waitFor(() => expertStarted, "real Host-owned expert turn");
       const member = (await invoke("teamGetRoster", { teamSessionId: goal.id })).members.find(member => member.name === "goal_expert"); assert.ok(member);
@@ -113,6 +121,7 @@ export function createApprovedGoalFixture(projectPath) {
       assert.equal(detail.messages.filter(message => message.toolName === "SubmitGoalReport").length, 2);
       await saveScreenshot(sendCdp, "team-approved-goal-completed.png");
       console.log("PASS approved Team Goal: negotiation, same running execution through review/expert, effective progress, full in-turn result, unique structured report/completion");
+      rosterConfirmed = false;
       const cancelled = (await invoke("sessionCreate", { title: "Cancelled Team Goal", mode: "goal", executionProfile: "team", projectPath, providerId: goal.providerId, modelId: goal.modelId, permissionMode: "auto" })).session;
       await sendCdp("Page.reload");
       await waitFor(() => evaluate(`!!document.querySelector('[data-sidebar-session-row="${cancelled.id}"]') && !document.querySelector('.startup-splash')`), "cancel Goal session");
