@@ -2148,3 +2148,21 @@ values/range. Route/stale-scope/unapproved-dispatch refusals retain their existi
 codes/denial conditions with actionable nextStep. Runtime-only
 completedMembersWithOpenTasks and completedMemberOpenTaskNextStep derive from
 existing roster/task projections; they do not grant authority or settle tasks.
+
+
+### Bounded Lead pseudo-tool-call recovery (2026-10-13)
+
+For Team Lead Agent/Plan turns, final text whose unfenced trailing fragment
+matches `call:<namespace>:<tool>{...}` receives one dedicated runtime recovery
+before Host completion authorization. The nudge explains that text did not
+invoke a tool and asks for the real tool-calling interface or an ordinary final
+answer. Syntax quoted inside fenced code or followed by explanatory body text
+does not trigger this rule. The detector parses nested braces and quoted content
+without interpreting or executing the text.
+
+The allowance resets with the guard's turn reset. A second matching answer goes
+through ordinary Host authorization; it cannot bypass approved task/dispatch/
+inbox settlement. This allowance is independent of the existing maximum-three
+confirmed-roster settlement nudges. Members and non-Team sessions are outside
+this rule. No tools are inferred or executed from textual pseudo calls, and
+normal final-answer/event/usage semantics remain unchanged.

@@ -2,8 +2,10 @@ import { expect, it, vi } from "vitest";
 import type { RuntimeHost } from "../host-client.js";
 import { TeamLeadExecutionGuard } from "./lead-execution-guard.js";
 
-it.each(["direct", "rpc"])("gives a confirmed roster three reason-specific nudges then preserves the %s Host error", async transport => {
-  const reason = `${transport === "rpc" ? "team.authorizeLeadTool: " : ""}TEAM_APPROVAL_REQUIRED: pending dispatch dispatch-1 for expert (tasks task-1); 1 unconsumed expert result; use wait_for_updates`;
+it.each(["direct", "rpc", "open-tasks"])("gives a confirmed roster three reason-specific nudges then preserves the %s Host error", async transport => {
+  const reason = transport === "open-tasks"
+    ? "TEAM_APPROVAL_REQUIRED: open decision tasks ui_dev(ui-task), qa_engineer(qa-task); send_message to dispatch, or task_update to cancelled/failed with a reason, then retry; use wait_for_updates"
+    : `${transport === "rpc" ? "team.authorizeLeadTool: " : ""}TEAM_APPROVAL_REQUIRED: pending dispatch dispatch-1 for expert (tasks task-1); 1 unconsumed expert result; use wait_for_updates`;
   const host: RuntimeHost = { call: async <T>(method: string) => {
     if (method === "team.getLaunchReview") return { review: { teamSessionId: "lead", leadTurnId: "turn", status: "confirmed", members: [{ name: "expert" }] } } as T;
     throw Object.assign(new Error(reason), { [transport === "rpc" ? "errorCode" : "code"]: "TEAM_APPROVAL_REQUIRED" });
@@ -26,6 +28,45 @@ it.each(["direct", "rpc"])("gives a confirmed roster three reason-specific nudge
   expect(terminal).toMatchObject({ kind: "error", error: { code: "TEAM_APPROVAL_REQUIRED", message: reason, details: { stage: "team_completion" } } });
   guard.reset();
   expect(await guard.authorizeCompletion(host, team, state)).toEqual({ kind: "recover" });
+});
+
+it.each(["agent", "plan"] as const)("recovers a %s Lead pseudo tool call once before Host authorization and resets the budget", async mode => {
+  const call = vi.fn(async (method: string, _params?: unknown) => method === "team.getLaunchReview"
+    ? { review: null } : { authorized: true });
+  const host: RuntimeHost = { call: async <T>(method: string, params?: unknown) => await call(method, params) as T };
+  const guard = new TeamLeadExecutionGuard();
+  const state = () => ({ turnId: "turn", epoch: 1, mode, inactive: false });
+  const team = { teamSessionId: "lead", callerSessionId: "lead" };
+  const text = "...!call:default_api:ProjectHistory{action:search,query:只要有 remote_file_id}";
+  expect(await guard.authorizeCompletion(host, team, state, false, text)).toEqual({ kind: "recover" });
+  expect(call).not.toHaveBeenCalled();
+  let prompt = "original prompt";
+  await guard.recover({ host, team, state, abort: () => { throw new Error("unexpected abort"); },
+    prepare: () => {}, getPrompt: () => prompt, setPrompt: value => { prompt = value; },
+    start: () => {}, continue: async () => {
+      expect(prompt).toContain("<pseudo_tool_call_recovery>");
+      expect(prompt).toContain("tool-calling interface");
+      expect(prompt).not.toContain("<team_completion_recovery>");
+    }, restore: () => {},
+  });
+  expect(prompt).toBe("original prompt");
+  expect(await guard.authorizeCompletion(host, team, state, false, text)).toEqual({ kind: "authorized" });
+  expect(call).toHaveBeenCalledWith("team.authorizeLeadTool", expect.objectContaining({ toolName: "TeamFinalAnswer" }));
+  guard.reset();
+  call.mockClear();
+  expect(await guard.authorizeCompletion(host, team, state, false, text)).toEqual({ kind: "recover" });
+  expect(call).not.toHaveBeenCalled();
+});
+
+it("does not intercept a member's pseudo tool call", async () => {
+  const call = vi.fn(async (method: string) => method === "team.getLaunchReview"
+    ? { review: null } : { authorized: true });
+  const host: RuntimeHost = { call: async <T>(method: string) => await call(method) as T };
+  const guard = new TeamLeadExecutionGuard();
+  expect(await guard.authorizeCompletion(host, { teamSessionId: "lead", callerSessionId: "member" },
+    () => ({ turnId: "member-turn", epoch: 1, mode: "agent", inactive: false }), false,
+    "call:default_api:ProjectHistory{action:search}")).toEqual({ kind: "authorized" });
+  expect(guard.pending).toBeUndefined();
 });
 
 it("preserves every member in a long Host denial while redacting secrets", async () => {

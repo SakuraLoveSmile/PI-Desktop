@@ -626,3 +626,21 @@ not create another message. Startup mailbox recovery remains authoritative.
 Rejected alternatives include reenabling generic completion callbacks, counting
 notice consumption as expert success, or copying member output into notices.
 Those would confuse acknowledgements/results, weaken authority or leak content.
+
+
+## 2026-10-13 amendment: one recovery for textual pseudo calls
+
+The incident Lead ended with `!call:default_api:ProjectHistory{...}` as plain
+text, without a protocol tool call. A small pure runtime detector now recognizes
+only the unfenced final fragment of this shape and gives Team Lead Agent/Plan
+turns one dedicated recovery before Host final authorization. The second match
+uses the normal Host barrier. Reset clears the allowance; fenced examples and
+mid-response explanations do not trigger it. Existing three-attempt settlement
+recovery remains independent.
+
+Rejected alternatives are executing parsed text as a tool call, unbounded
+retry, and extending this policy to members/non-Team sessions without a separate
+decision. The bounded nudge preserves tool protocol authority and can recover a
+weak Lead without concealing unfinished tasks. A provider may still ignore it;
+Host settlement then remains the final authority. No persistent data or shared
+protocol change is required.
