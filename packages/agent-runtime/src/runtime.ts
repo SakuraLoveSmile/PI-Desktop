@@ -6457,7 +6457,8 @@ export class DesktopAgentRuntime {
       },
       continue: async () => {
         if (this.disposed) throw new Error("runtime disposed");
-        if (this.teamBudgetStop.requested || this.runCancelled) return;
+        if (this.teamBudgetStop.requested) return;
+        if (this.runCancelled) { this.closeStoppedRecovery(); return; }
         await this.agent.continue();
         await this.waitForIdleAndSteering();
       },
@@ -6483,30 +6484,35 @@ export class DesktopAgentRuntime {
    */
   private settleStoppedTeamBudget(): void {
     if (!this.teamBudgetStop.requested || !this.teamBudgetStop.claimSettlement()) return;
-    this.acceptingSteering = false;
     this.gracefulStopRequested = false;
     this.runCancelled = true;
+    this.closeStoppedRecovery({ code: "TURN_ABORTED", message: "Team paused at its hard run limit.", retriable: false });
+  }
+
+  /** Settle the terminal events held by a recovery without admitting a request. */
+  private closeStoppedRecovery(error?: ReturnType<typeof classifyAgentError>): void {
+    this.acceptingSteering = false;
     this.resetRunRecoveryState();
+    this.autonomousExecution = false;
+    this.goalReportDraftManager = undefined;
+    this.goalProgressManager = undefined;
+    this.rebuildToolCatalog();
+    this.setAgentTools(this.activeTools());
     this.clearAgentActivity();
     this.finalizeCurrentAssistant("aborted");
-    this.emit({ type: "error", error: { code: "TURN_ABORTED", message: "Team paused at its hard run limit.", retriable: false } });
+    if (error) this.emit({ type: "error", error });
     this.emit({ type: "turn_end" });
     this.emit({ type: "agent_end", messageIds: [] });
   }
 
   private async runPendingRecoveries(): Promise<boolean> {
-    if (this.teamBudgetStop.requested) { this.settleStoppedTeamBudget(); return false; }
-    if (this.runCancelled) return false;
-    while (
-      this.pendingProviderRetry ||
-      this.pendingOverflow ||
-      this.pendingSilentTurnRerun ||
-      this.pendingProgressTurnRerun ||
-      this.goalReportRecovery.pending ||
-      this.teamLeadExecution.pending
-    ) {
+    for (;;) {
       if (this.teamBudgetStop.requested) { this.settleStoppedTeamBudget(); return false; }
-      if (this.runCancelled) return false;
+      const pending = this.pendingProviderRetry || this.pendingOverflow ||
+        this.pendingSilentTurnRerun || this.pendingProgressTurnRerun ||
+        this.goalReportRecovery.pending || this.teamLeadExecution.pending;
+      if (this.runCancelled) { if (pending) this.closeStoppedRecovery(); return false; }
+      if (!pending) return true;
       if (this.pendingProviderRetry) {
         await this.retryPendingProviderFailure();
         continue;
@@ -6524,6 +6530,7 @@ export class DesktopAgentRuntime {
             true,
             "active_turn",
           );
+          if (this.teamBudgetStop.requested) { this.settleStoppedTeamBudget(); return false; }
           if (!compacted) {
             this.terminateParentTurn();
             if (this.compactionAborted) {
@@ -6544,7 +6551,7 @@ export class DesktopAgentRuntime {
             this.emit({ type: "error", error });
             return false;
           }
-          if (this.teamBudgetStop.requested || this.runCancelled) return false;
+          if (this.runCancelled) { this.closeStoppedRecovery(); return false; }
           this.turnHadError = false;
           this.requestStartedAt = Date.now();
           await this.agent.continue();
@@ -6568,8 +6575,6 @@ export class DesktopAgentRuntime {
       }
       await this.rerunGoalReportTurn();
     }
-    if (this.teamBudgetStop.requested) { this.settleStoppedTeamBudget(); return false; }
-    return !this.runCancelled;
   }
 
   private prepareGoalReportRecovery(): boolean {
@@ -6587,24 +6592,12 @@ export class DesktopAgentRuntime {
   }
 
   private async rerunGoalReportTurn(): Promise<void> {
-    if (this.teamBudgetStop.requested || this.runCancelled) return;
+    if (this.teamBudgetStop.requested) return;
     const epoch = this.turnEpoch;
-    const closeStoppedRecovery = () => {
-      this.goalReportRecovery.reset();
-      this.autonomousExecution = false;
-      this.goalReportDraftManager = undefined;
-      this.goalProgressManager = undefined;
-      this.rebuildToolCatalog();
-      this.setAgentTools(this.activeTools());
-      this.clearAgentActivity();
-      this.finalizeCurrentAssistant("aborted");
-      this.emit({ type: "turn_end" });
-      this.emit({ type: "agent_end", messageIds: [] });
-    };
     // The preceding loop's terminal events were held. A stop between that
     // loop and its recovery still needs to close the original execution.
     if (this.runCancelled || this.disposed) {
-      closeStoppedRecovery();
+      this.closeStoppedRecovery();
       return;
     }
     await this.goalReportRecovery.recover({
@@ -6617,11 +6610,11 @@ export class DesktopAgentRuntime {
       },
       continue: async () => {
         if (this.turnEpoch !== epoch) return;
+        if (this.teamBudgetStop.requested) return;
         if (this.disposed || this.runCancelled) {
-          closeStoppedRecovery();
+          this.closeStoppedRecovery();
           return;
         }
-        if (this.teamBudgetStop.requested || this.runCancelled) return;
         await this.agent.continue();
         await this.waitForIdleAndSteering();
       },
@@ -6646,7 +6639,8 @@ export class DesktopAgentRuntime {
       continue: async () => {
         if (this.disposed) throw new Error("runtime disposed");
         this.suppressProgressTurnRunEnd = false;
-        if (this.teamBudgetStop.requested || this.runCancelled) return;
+        if (this.teamBudgetStop.requested) return;
+        if (this.runCancelled) { this.closeStoppedRecovery(); return; }
         await this.agent.continue();
         await this.waitForIdleAndSteering();
       },
@@ -6667,12 +6661,12 @@ export class DesktopAgentRuntime {
         : undefined,
       state: () => ({ turnId: this.turnId, epoch: this.turnEpoch, mode: this.mode,
         inactive: this.disposed || this.runCancelled }),
-      abort: error => { this.terminateParentTurn(); this.runCancelled = true; this.autonomousExecution = false; this.goalReportDraftManager = undefined; this.clearGoalProgressTool(); this.finalizeCurrentAssistant("aborted"); this.emit({ type: "error", error: error ?? { code: "TURN_ABORTED", message: "Approved Team execution interrupted.", retriable: false } }); this.emit({ type: "turn_end" }); this.emit({ type: "agent_end", messageIds: [] }); },
+      abort: error => { if (this.teamBudgetStop.requested) { this.settleStoppedTeamBudget(); return; } this.terminateParentTurn(); this.runCancelled = true; this.closeStoppedRecovery(error ?? { code: "TURN_ABORTED", message: "Approved Team execution interrupted.", retriable: false }); },
       prepare: () => this.setAgentMessages(removeTrailingAssistantMessages(this.agent.state.messages)),
       getPrompt: () => this.agentSystemPromptContent(),
       setPrompt: prompt => this.setAgentSystemPrompt(prompt),
       start: () => { this.requestStartedAt = Date.now(); this.setAgentActivity({ phase: "recovering", since: Date.now() }); },
-      continue: async () => { if (this.teamBudgetStop.requested || this.runCancelled) return; await this.agent.continue(); await this.waitForIdleAndSteering(); },
+      continue: async () => { if (this.teamBudgetStop.requested) return; if (this.runCancelled) { this.closeStoppedRecovery(); return; } await this.agent.continue(); await this.waitForIdleAndSteering(); },
       restore: () => this.applyPendingResumablePrompt(),
     });
   }
@@ -9389,7 +9383,7 @@ export class DesktopAgentRuntime {
   async abort(): Promise<void> {
     this.acceptingSteering = false;
     this.gracefulStopRequested = false;
-    this.teamBudgetStop.reset();
+    // Keep a requested budget stop's settlement claim until the next turn.
     this.runCancelled = true;
     this.projectMemoryRefreshAbort?.abort();
     this.teamLeadExecution.cancel();
