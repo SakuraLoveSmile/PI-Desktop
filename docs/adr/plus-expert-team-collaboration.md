@@ -572,3 +572,32 @@ not prove a mutation occurred, and absence does not establish safety. This avoid
 inventing a shell execution path, changing permissions, or blocking legitimate
 single-writer Git use. Per-member worktrees and a scoped team_commit tool remain
 outside this increment.
+
+
+## 2026-10-13 amendment: decision-owned open tasks prevent silent completion
+
+Incident session `67b8868e` ended after a dispatched member produced only text,
+while two other members' pending tasks were never dispatched. Dispatch and
+mailbox settlement alone could authorize a final answer and fallback Goal
+report despite unfinished work.
+
+The approved-execution settlement barrier now checks non-deleted open tasks
+owned by its current decision as well as outstanding dispatches and unread
+results. Lead task creation atomically enrolls IDs in the existing decision
+ledger; the old implementation never populated that field, and creation
+millisecond timestamps cannot reliably identify the owning turn. Only
+`completed`, `failed`, and `cancelled` are settled. Ordinary Agent execution
+keeps its existing behavior. Rejection preserves `TEAM_APPROVAL_REQUIRED`,
+explains which member/task remains open, and directs the Lead to dispatch or
+honestly cancel/fail with reasons, and consume results with `wait_for_updates`.
+
+Rejected alternatives: changing execution to `interrupted` would alter Goal
+finalization/persistence semantics; checking every historical Team task would
+trap later executions; checking only dispatched tasks would retain the incident
+failure for experts that never started. No schema, migration, IPC/preload or
+shared envelope changes are required.
+
+Runs that formerly ended with unfinished tasks must now close them explicitly.
+If bounded Lead recovery cannot achieve settlement, the execution surfaces
+`TEAM_APPROVAL_REQUIRED` instead of silently completing. This intentional
+compatibility change favors observable unfinished work over a misleading report.

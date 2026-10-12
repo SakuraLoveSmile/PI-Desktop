@@ -386,6 +386,14 @@ fn goal_report_waits_for_dispatches_and_results_in_original_execution() {
         },
     )
     .unwrap();
+    update_gate_task(
+        &db,
+        &lead,
+        &decision.member_session_ids[0],
+        "goal-task",
+        Some("completed"),
+        None,
+    );
     sessions::end_turn(&db, &member_turn, "completed", None, None, false).unwrap();
     session_collaboration::settle_turn(&db, &member_turn).unwrap();
     // Member mail wakes wait_for_updates inside the original Goal turn, not a new turn.
@@ -462,4 +470,220 @@ fn host_soft_notice_enters_approved_inbox_without_authorizing_forged_body() {
     );
     assert!(!super::run_limits::is_soft_notice(&db, &lead, "model-authored-soft-id").unwrap());
     assert_eq!(sessions::running_turn_id(&db, &lead).unwrap(), Some(turn));
+}
+
+fn approved_task_fixture() -> (crate::db::Database, String, String) {
+    let (db, lead, turn) = fixture();
+    create_gate_task(&db, &lead, "old-pending", None);
+    let review = declare_team_strategy(
+        &db,
+        DeclareStrategyParams {
+            team_session_id: &lead,
+            caller_session_id: &lead,
+            lead_turn_id: &turn,
+            strategy: "delegate",
+            reason: "Replay silent completion",
+            members: Some(
+                ["core_dev", "ui_dev", "qa_engineer"]
+                    .into_iter()
+                    .map(super::test_support::expert_proposal)
+                    .collect(),
+            ),
+        },
+    )
+    .unwrap()
+    .1
+    .unwrap();
+    confirm_launch_review(&db, &lead, &review.review_id, review.revision).unwrap();
+    read(&db, &lead, &lead, &turn).unwrap();
+    (db, lead, turn)
+}
+
+fn create_gate_task(db: &crate::db::Database, lead: &str, id: &str, owner: Option<&str>) {
+    create_team_task(
+        db,
+        CreateTaskParams {
+            team_session_id: lead,
+            caller_session_id: lead,
+            task_id: Some(id),
+            subject: "Verify assigned work",
+            description: None,
+            blocked_by: None,
+            write_scopes: None,
+            owner_session_id: None,
+            owner_member_name: owner,
+        },
+    )
+    .unwrap();
+}
+
+fn update_gate_task(
+    db: &crate::db::Database,
+    lead: &str,
+    caller: &str,
+    id: &str,
+    status: Option<&str>,
+    deleted: Option<bool>,
+) -> TeamTask {
+    let task = get_team_task(db, lead, id).unwrap().unwrap();
+    update_team_task(
+        db,
+        UpdateTaskParams {
+            team_session_id: lead,
+            caller_session_id: caller,
+            task_id: id,
+            expected_revision: task.revision,
+            subject: None,
+            description: Some("Explicitly settled or deferred with reason"),
+            status,
+            owner_session_id: None,
+            owner_member_name: None,
+            blocked_by: None,
+            write_scopes: None,
+            deleted,
+        },
+    )
+    .unwrap()
+}
+
+#[test]
+fn approved_completion_rejects_never_dispatched_decision_tasks() {
+    let (db, lead, turn) = approved_task_fixture();
+    let core = get_team_member_by_name(&db, &lead, "core_dev")
+        .unwrap()
+        .unwrap()
+        .member_session_id;
+    super::test_support::complete_approved_expert_turn(&db, &lead, &core);
+    create_gate_task(&db, &lead, "ui-task", Some("ui_dev"));
+    create_gate_task(&db, &lead, "qa-task", Some("qa_engineer"));
+    for tool in ["TeamFinalAnswer", "SubmitGoalReport"] {
+        let error = super::authority::validate_lead_tool(&db, &lead, tool)
+            .expect_err("never-dispatched tasks must block approved completion")
+            .to_string();
+        for text in [
+            "TEAM_APPROVAL_REQUIRED:",
+            "ui_dev",
+            "ui-task",
+            "qa_engineer",
+            "qa-task",
+            "send_message",
+            "task_update",
+            "cancelled/failed",
+            "reason",
+            "wait_for_updates",
+        ] {
+            assert!(error.contains(text), "missing {text}: {error}");
+        }
+    }
+    let decision = get_execution_decision(&db, &lead, &turn).unwrap().unwrap();
+    assert_eq!(decision.task_ids, ["ui-task", "qa-task"]);
+    assert_eq!(
+        update_gate_task(&db, &lead, &lead, "ui-task", Some("cancelled"), None).status,
+        "cancelled"
+    );
+    assert_eq!(
+        update_gate_task(&db, &lead, &lead, "qa-task", Some("failed"), None).status,
+        "failed"
+    );
+    for tool in ["TeamFinalAnswer", "SubmitGoalReport"] {
+        super::authority::validate_lead_tool(&db, &lead, tool).unwrap();
+    }
+    assert_eq!(
+        get_team_task(&db, &lead, "old-pending")
+            .unwrap()
+            .unwrap()
+            .status,
+        "pending"
+    );
+}
+
+#[test]
+fn silent_completed_member_cannot_leave_in_progress_task_behind() {
+    let (db, lead, turn) = approved_task_fixture();
+    create_gate_task(&db, &lead, "core-task", Some("core_dev"));
+    let dispatch = send_team_message(
+        &db,
+        SendMessageParams {
+            team_session_id: &lead,
+            caller_session_id: &lead,
+            target_identifier: "core_dev",
+            content: "Implement assigned work",
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    super::authority::record_dispatch(&db, &lead, &dispatch, false).unwrap();
+    let member = get_team_member_by_name(&db, &lead, "core_dev")
+        .unwrap()
+        .unwrap()
+        .member_session_id;
+    let member_turn =
+        session_collaboration::begin_turn(&db, &member, &dispatch.id, None, None).unwrap();
+    update_gate_task(&db, &lead, &member, "core-task", Some("in_progress"), None);
+    sessions::end_turn(&db, &member_turn, "completed", None, None, false).unwrap();
+    session_collaboration::settle_turn(&db, &member_turn).unwrap();
+    // Consume any Host notice: an open task remains a separate settlement barrier.
+    read(&db, &lead, &lead, &turn).unwrap();
+    for tool in ["TeamFinalAnswer", "SubmitGoalReport"] {
+        let error = super::authority::validate_lead_tool(&db, &lead, tool)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("core_dev") && error.contains("core-task"),
+            "{error}"
+        );
+    }
+    update_gate_task(&db, &lead, &lead, "core-task", Some("failed"), None);
+    super::authority::validate_lead_tool(&db, &lead, "TeamFinalAnswer").unwrap();
+}
+
+#[test]
+fn completed_and_deleted_tasks_allow_completion_without_changing_ordinary_turns() {
+    let (db, lead, turn) = approved_task_fixture();
+    create_gate_task(&db, &lead, "finished", Some("core_dev"));
+    create_gate_task(&db, &lead, "removed", Some("ui_dev"));
+    let dispatch = send_team_message(
+        &db,
+        SendMessageParams {
+            team_session_id: &lead,
+            caller_session_id: &lead,
+            target_identifier: "core_dev",
+            content: "Complete verified work",
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    super::authority::record_dispatch(&db, &lead, &dispatch, false).unwrap();
+    let member = get_team_member_by_name(&db, &lead, "core_dev")
+        .unwrap()
+        .unwrap()
+        .member_session_id;
+    let member_turn =
+        session_collaboration::begin_turn(&db, &member, &dispatch.id, None, None).unwrap();
+    assert_eq!(
+        update_gate_task(&db, &lead, &member, "finished", Some("completed"), None).status,
+        "in_progress"
+    );
+    sessions::end_turn(&db, &member_turn, "completed", None, None, false).unwrap();
+    session_collaboration::settle_turn(&db, &member_turn).unwrap();
+    assert_eq!(
+        get_team_task(&db, &lead, "finished")
+            .unwrap()
+            .unwrap()
+            .status,
+        "completed"
+    );
+    update_gate_task(&db, &lead, &lead, "removed", None, Some(true));
+    read(&db, &lead, &lead, &turn).unwrap();
+    for tool in ["TeamFinalAnswer", "SubmitGoalReport"] {
+        super::authority::validate_lead_tool(&db, &lead, tool).unwrap();
+    }
+    create_gate_task(&db, &lead, "ordinary-open", Some("qa_engineer"));
+    db.conn()
+        .execute("UPDATE plan_approvals SET execution_state='completed'", [])
+        .unwrap();
+    assert!(!state(&db, &lead, &lead, &turn).unwrap().active);
+    for tool in ["TeamFinalAnswer", "SubmitGoalReport"] {
+        super::authority::validate_lead_tool(&db, &lead, tool).unwrap();
+    }
 }
