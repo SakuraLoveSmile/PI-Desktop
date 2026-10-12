@@ -6,6 +6,22 @@ import { candidateIdentity, root } from "../e2e-suite-runtime.mjs";
 
 export const receiptPath = join(root, ".review-evidence/build-candidate.json");
 
+export function candidateTargetDirectory(directory, overlay, configuredTarget) {
+  return resolve(directory, overlay && configuredTarget ? configuredTarget : "target");
+}
+
+/** Complete worktree-local Desktop dependency build, without package-manager mutation. */
+export function directOverlayBuildPlan(targetDir) {
+  assert.equal(typeof targetDir, "string", "Receipt must identify the complete candidate build target");
+  assert.equal(resolve(targetDir), targetDir, "Receipt must identify the complete candidate build absolute target");
+  return [
+    ...["shared", "i18n", "plugin-sdk", "agent-host", "agent-runtime", "host-runtime", "racp", "voice-runtime", "plugin-devkit"]
+      .map(name => ({ command: "node_modules/.bin/tsc", args: [name === "voice-runtime" ? "--build" : "-p", `packages/${name}/tsconfig.json`], cwd: "." })),
+    { command: "node_modules/.bin/electron-vite", args: ["build"], cwd: "apps/desktop" },
+    { command: "cargo", args: ["build", "--locked", "-p", "host-core", "--target-dir", targetDir], cwd: "." },
+  ];
+}
+
 export async function sourceIdentity(directory = root) {
   const identity = await candidateIdentity(directory);
   // Executable hashes are recorded separately; the source identity uses the
@@ -41,7 +57,14 @@ export async function artifactIdentity(hostBinary, directory = root) {
 export async function verifyBuildReceipt(hostBinary, { directory = root, path = receiptPath, expected } = {}) {
   const receipt = JSON.parse(await readFile(path, "utf8"));
   assert.equal(receipt.version, 1, "Unsupported candidate build receipt");
-  assert.deepEqual(receipt.commands, ["pnpm build:js", "cargo build --locked -p host-core"], "Receipt must identify the complete candidate build");
+  assert.ok(receipt.buildMode === undefined || receipt.buildMode === "direct-overlay", "Unsupported candidate build mode");
+  const commands = receipt.buildMode === "direct-overlay" ? directOverlayBuildPlan(receipt.cargoTargetDir)
+    : ["pnpm build:js", "cargo build --locked -p host-core"];
+  assert.deepEqual(receipt.commands, commands, "Receipt must identify the complete candidate build");
+  if (receipt.buildMode === "direct-overlay") {
+    assert.equal(resolve(hostBinary), join(receipt.cargoTargetDir, "debug", process.platform === "win32"
+      ? "pi-desktop-host-core.exe" : "pi-desktop-host-core"), "Receipt must identify the complete candidate build Host target");
+  }
   assert.equal(receipt.hostBinary, resolve(hostBinary), "Receipt must match the selected Host binary");
   assert.deepEqual(await sourceIdentity(directory), receipt.source, "Candidate source/base changed since build; rebuild the candidate receipt");
   assert.deepEqual(await artifactIdentity(hostBinary, directory), receipt.artifacts, "Candidate artifacts changed since build; rebuild the candidate receipt");

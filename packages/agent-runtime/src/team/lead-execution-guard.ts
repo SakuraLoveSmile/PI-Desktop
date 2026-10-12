@@ -4,6 +4,7 @@ import type { RuntimeHost } from "../host-client.js";
 import { createWaitForUpdatesTool } from "./wait-for-updates.js";
 import { classifyAgentError, redactSensitiveErrorText } from "../agent-errors.js";
 import { recoverFinalAnswer, type FinalAnswerRecovery } from "../final-answer-recovery.js";
+import { endsWithPseudoToolCall, PSEUDO_TOOL_CALL_NUDGE } from "./pseudo-tool-call.js";
 
 interface LeadTurn { turnId: string | undefined; epoch: number; mode: Mode; inactive: boolean }
 type Completion = { kind: "authorized" | "stale" | "superseded" | "recover" }
@@ -34,6 +35,8 @@ export class TeamLeadExecutionGuard {
   attempted = false;
   private confirmedAttempts = 0;
   private completionReason?: string;
+  private pseudoCallRetried = false;
+  private recoveryNudge?: string;
   inProgress = false;
   suppressRunEnd = false;
   private waitingForReview = false;
@@ -48,13 +51,24 @@ export class TeamLeadExecutionGuard {
     this.attempted = false;
     this.confirmedAttempts = 0;
     this.completionReason = undefined;
+    this.pseudoCallRetried = false;
+    this.recoveryNudge = undefined;
     this.inProgress = false;
     this.suppressRunEnd = false;
   }
 
   async authorizeCompletion(host: RuntimeHost,
-    team: { teamSessionId: string; callerSessionId: string }, state: () => LeadTurn, approvedExecution = false): Promise<Completion> {
+    team: { teamSessionId: string; callerSessionId: string }, state: () => LeadTurn,
+    approvedExecution = false, responseText = ""): Promise<Completion> {
     const snapshot = state();
+    if (!snapshot.inactive && (snapshot.mode === "agent" || snapshot.mode === "plan") &&
+        team.callerSessionId === team.teamSessionId && !this.pseudoCallRetried && endsWithPseudoToolCall(responseText)) {
+      this.pseudoCallRetried = true;
+      this.recoveryNudge = PSEUDO_TOOL_CALL_NUDGE;
+      this.pending = snapshot;
+      this.suppressRunEnd = true;
+      return { kind: "recover" };
+    }
     const superseded = () => snapshot.turnId !== state().turnId || snapshot.epoch !== state().epoch;
     const stale = () => superseded() || snapshot.mode !== state().mode || state().inactive;
     let outcome: Completion = { kind: "authorized" };
@@ -147,6 +161,8 @@ export class TeamLeadExecutionGuard {
     const pending = this.pending;
     if (!pending) return;
     this.pending = undefined;
+    const recoveryNudge = this.recoveryNudge;
+    this.recoveryNudge = undefined;
     const awaitingReview = this.waitingForReview;
     this.waitingForReview = false;
     const controller = new AbortController();
@@ -194,12 +210,12 @@ export class TeamLeadExecutionGuard {
         }
       }
       this.suppressRunEnd = false;
-      await recoverFinalAnswer(awaitingReview
+      await recoverFinalAnswer(recoveryNudge ?? (awaitingReview
         ? "The Host confirmed the expert roster for this SAME approved execution. Continue the exact approved contract without renegotiation. Call wait_for_updates to read authenticated confirmation mail, create owned tasks, dispatch approved experts, then call wait_for_updates to consume their full results within this turn. Keep GoalProgress and SubmitGoalReport bound to this execution."
         : pending.mode === "plan" ? TEAM_PLAN_COMPLETION_NUDGE
           : this.completionReason ? `${TEAM_COMPLETION_NUDGE}
 
-Host completion rejection: ${this.completionReason}` : TEAM_COMPLETION_NUDGE, {
+Host completion rejection: ${this.completionReason}` : TEAM_COMPLETION_NUDGE), {
         ...runtime,
         start: () => { this.inProgress = true; runtime.start(); },
         restore: () => {

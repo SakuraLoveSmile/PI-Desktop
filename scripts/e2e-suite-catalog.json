@@ -983,6 +983,16 @@
       "scenarioIds": [
         "E2E-TEAM-member-silent-completion-wakes-lead"
       ]
+    },
+    {
+      "id": "team-lead-pseudo-tool-call",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-lead-pseudo-tool-call.mjs",
+      "tier": "nightly",
+      "safety": "Temporary real Host/Runtime/Pi transport with loopback scripted provider; no running user instance or paid service.",
+      "scenarioIds": [
+        "E2E-TEAM-lead-pseudo-tool-call-retried-once"
+      ]
     }
   ]
 }

@@ -8340,7 +8340,7 @@ export class DesktopAgentRuntime {
           ) {
             const completion = await this.teamLeadExecution.authorizeCompletion(this.host, this.teamContext,
               () => ({ turnId: this.turnId, epoch: this.turnEpoch, mode: this.mode,
-                inactive: this.disposed || this.runCancelled }), this.autonomousExecution);
+                inactive: this.disposed || this.runCancelled }), this.autonomousExecution, responseText);
             if (completion.kind === "superseded") break;
             if (completion.kind === "stale") aborted = true;
             if (completion.kind === "recover") {

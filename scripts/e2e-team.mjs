@@ -1294,9 +1294,14 @@ try {
   releaseModelRequest("taskMutation");
   await waitFor(() => modelGates.taskUpdate.entered, "task update held after Host mutation");
   const updatedBoard = await invoke("teamGetBoard", { teamSessionId: lead.id });
-  assert.equal(updatedBoard.tasks.find((task) => task.taskId === boardTaskId)?.status, "completed", "completed board fixture did not persist");
+  assert.equal(updatedBoard.tasks.find((task) => task.taskId === boardTaskId)?.status, "in_progress", "completion claim must remain pending until its execution turn settles");
+  assert.equal((await invoke("agentGetStatus", lead.id)).status?.isRunning, true, "completion claim must not end the gated Lead turn");
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.completed === '0' && document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.total === '7'`), "mounted Overview excludes the unsettled completion claim");
+  releaseModelRequest("taskUpdate");
+  await waitFor(async () => (await invoke("agentGetStatus", lead.id)).status?.isRunning === false, "Lead settled after task completion fixture");
+  await waitFor(async () => (await invoke("teamGetBoard", { teamSessionId: lead.id })).tasks.find((task) => task.taskId === boardTaskId)?.status === "completed", "settled completion claim persists as completed");
   try {
-  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.completed === '1' && document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.total === '7'`), "mounted Overview refreshes before the running turn settles");
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.completed === '1' && document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.total === '7'`), "mounted Overview refreshes when the completion claim settles");
   } catch (error) {
     console.error("TEAM_PROGRESS_REFRESH", JSON.stringify(await evaluate(`(() => {
       const section = document.querySelector('[data-testid="overview-team-progress"] section.team-progress');
@@ -1307,8 +1312,6 @@ try {
     })()`)));
     throw error;
   }
-  releaseModelRequest("taskUpdate");
-  await waitFor(async () => (await invoke("agentGetStatus", lead.id)).status?.isRunning === false, "Lead settled after task completion fixture");
   await evaluate(`document.querySelector('[data-work-panel-tab-id="${liveTaskTabId}"] .work-panel-tab-button')?.click()`);
   await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-task-tab"] .team-task-glyph[data-state="completed"] svg')`), "stored task tab reflects completed snapshot state");
   await assertTeamSuccessGlyph(evaluate, '[data-testid="team-task-tab"] .team-task-glyph[data-state="completed"] svg', "task");

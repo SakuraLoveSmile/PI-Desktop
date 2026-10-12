@@ -565,9 +565,11 @@ export function createPlanningFixture(projectPath) {
       // renderer's session-list store update. Reload only after all old work
       // has settled, then enter the persisted session through the real sidebar.
       await sendCdp("Page.reload");
-      await waitFor(() => evaluate(`!!document.querySelector('[data-sidebar-session-row="${structuredLead.id}"]')`), "structured-only Plan session visible");
+      await waitFor(() => evaluate(`!!document.querySelector('[data-sidebar-session-row="${structuredLead.id}"]') && !document.querySelector('.startup-splash')`), "structured-only Plan session visible after startup");
       await evaluate(`document.querySelector('[data-sidebar-session-row="${structuredLead.id}"] button.thread-item-main').click()`);
+      await waitFor(() => evaluate(`!!document.querySelector('[data-sidebar-session-row="${structuredLead.id}"].active')`), "structured-only Plan session selected");
       await waitFor(() => evaluate(`!!document.querySelector('.composer-contract-chip[data-mode="plan"]')`), "structured-only Team Plan Composer");
+      await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
       await prompt("TP_STRUCTURED_ONLY_LEAD: automatically research both sources and submit a plan using only complete structured results; await actual updates without duplicate completion mail.");
       await waitFor(() => structuredGates.every(gate => gate.entered) && calls.some(call => call.userText.includes("TP_STRUCTURED_ONLY_LEAD") && call.tool === "wait_for_updates"), "Lead really waits while two structured-only researchers are held");
       structuredGates.forEach(gate => gate.release());
@@ -598,8 +600,11 @@ export function createPlanningFixture(projectPath) {
         providerId: planLead.providerId, modelId: planLead.modelId, permissionMode: "auto",
       })).session;
       await sendCdp("Page.reload");
-      await waitFor(() => evaluate(`!!document.querySelector('[data-sidebar-session-row="${inboxLead.id}"]')`), "inbox recovery session visible");
+      await waitFor(() => evaluate(`!!document.querySelector('[data-sidebar-session-row="${inboxLead.id}"]') && !document.querySelector('.startup-splash')`), "inbox recovery session visible after startup");
       await evaluate(`document.querySelector('[data-sidebar-session-row="${inboxLead.id}"] button.thread-item-main').click()`);
+      await waitFor(() => evaluate(`!!document.querySelector('[data-sidebar-session-row="${inboxLead.id}"].active')`), "inbox recovery session selected");
+      await waitFor(() => evaluate(`!!document.querySelector('.composer-contract-chip[data-mode="plan"]')`), "inbox recovery Plan Composer");
+      await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
       await prompt("TP_INBOX_WAIT_LEAD: keep waiting for expert reports without voluntarily ending the turn or submitting a plan.");
       await waitFor(() => inboxLeadEntered && inboxWorkerEntered, "busy Lead and read-only researcher held at explicit sync points");
       await context.activateOverviewTab(sendCdp, evaluate);
@@ -625,7 +630,12 @@ export function createPlanningFixture(projectPath) {
       for (const report of inboxReports) assert.ok(recovered.markdown.includes(report));
       const queueAfter = (await invoke("agentQueueList", { sessionId: inboxLead.id })).entries;
       assert.deepEqual(queueAfter.map(entry => entry.content), [inboxUserPrompt]);
-      const recoveredSession = (await invoke("sessionGet", { id: inboxLead.id })).session;
+      const recoveredSession = await waitFor(async () => {
+        const session = (await invoke("sessionGet", { id: inboxLead.id })).session;
+        const submissions = session.messages.filter(message => message.toolName === "SubmitPlan");
+        assert.ok(submissions.length <= 1, "inbox recovery must persist SubmitPlan exactly once");
+        return submissions.length === 1 ? session : null;
+      }, "recovered SubmitPlan result durably persisted");
       const admitted = recoveredSession.messages.filter(message => message.role === "user" && message.sessionMessage);
       assert.deepEqual(admitted.map(message => message.sessionMessage.messageId), queued.map(entry => entry.sessionMessageId), "full report continuations must preserve FIFO identity exactly once");
       assert.equal(recoveredSession.messages.filter(message => message.toolName === "SubmitPlan").length, 1);

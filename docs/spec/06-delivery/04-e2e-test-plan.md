@@ -17606,7 +17606,9 @@ a fresh expert roster review and integrate a real approved expert contribution.
   execution roster and try to finish awaiting confirmation. Assert the original
   Host turn remains running, exactly one Goal report is pending with no completed
   executionStatus, and no expert started. The displayed contract remains Goal;
-  the aggregate Team confirmation card opens automatically despite that mode.
+  during execution the Goal capsule replaces the planning contract chip. Its
+  accessible status reports the staffing wait. The aggregate Team confirmation
+  card opens automatically despite that mode.
   Assert the Goal capsule shows waiting for team confirmation instead of preparing.
   Navigate to Overview and assert waiting for team confirmation; use the
   transcript review action to reopen the card. Confirm through the real Team button,
@@ -18427,3 +18429,48 @@ authenticated turn and never revives the old execution token.
 - **Milestone:** Plus Team reliability.
 - **Status:** Record actual candidate/base and results; this does not prove real
   model compliance or cross-process exactly-once transport during a crash.
+
+
+### E2E-TEAM-lead-pseudo-tool-call-retried-once
+
+- **Preconditions:** Temporary real Host/Runtime profile, approved Team execution
+  with settled work, and a loopback scripted provider.
+- **Steps:** Return the incident's textual pseudo call, repeat it, then run a
+  separate case that uses the actual tool interface after the recovery. Compare
+  to an ordinary settled final answer.
+- **Expected:** First match gives one dedicated nudge with no Host final-answer
+  authorization. Repetition goes through normal authorization; there is exactly
+  one pseudo-call recovery. An actual `task_get` tool result reaches the provider
+  in the invocation case. Normal completion needs no retry and emits one final
+  agent boundary. Guard reset renews the allowance; non-Lead/non-Team turns are
+  unaffected, and fenced/mid-response examples do not match.
+- **Specs:** Host RPC bounded Lead pseudo-tool-call recovery; Expert Team ADR
+  amendment 2026-10-13.
+- **Acceptance:** `node scripts/e2e-team-lead-pseudo-tool-call.mjs`; pure detector,
+  guard lifecycle and real runtime event-stream regressions.
+- **Milestone:** Plus Team reliability.
+- **Status:** Record actual candidate/base and results; scripted compliance is
+  not evidence that a real provider will obey the nudge.
+
+
+Candidate fixture synchronization (2026-10-13): the complete Team Overview
+journey asserts an active completion claim remains `in_progress` and is excluded
+from completed progress. After the declaring turn settles successfully, the
+same mounted Overview updates from 0/7 to 1/7 without being reopened. Team Plan
+reload journeys wait for startup completion, the intended selected session and
+Plan Composer before input, allowing the renderer's draft effect to settle at
+animation-frame boundaries; they still submit through the actual Composer.
+The recovered plan journey waits for exactly one durably persisted SubmitPlan
+result before checking its transcript, since runtime idle does not flush the
+asynchronous persistence outbox. Duplicate submission fails immediately.
+
+For a request worktree using an installed dependency overlay, build its complete
+Desktop candidate without invoking a package manager:
+`CARGO_TARGET_DIR=/tmp/<request-target> PI_DESKTOP_HOST_BIN=/tmp/<request-target>/debug/pi-desktop-host-core node scripts/e2e/build-candidate.mjs --overlay`.
+This mode records the exact direct compiler, Electron builder and locked Cargo
+commands, with source and artifact hashes. The receipt gate rejects incomplete
+plans, altered commands/targets, changed source/artifacts and replaced receipts.
+The default provisioned package-manager build path remains available. A human
+chosen local-main base exception must be recorded separately from the receipt's
+existing `origin/main` metadata; the exception never implies remote refresh,
+push or PR authorization.
