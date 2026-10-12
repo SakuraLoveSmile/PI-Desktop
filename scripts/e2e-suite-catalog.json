@@ -963,6 +963,16 @@
         "E2E-TEAM-completed-task-retires-queued-dispatch"
       ],
       "safety": "Production isolated Host/Main/bridge/AgentHost/sidecar/runtime with loopback provider gates. Proves cancellation and FIFO delivery; no real provider, user profile or forty-minute soak."
+    },
+    {
+      "id": "team-open-task-gate",
+      "family": "goals-team",
+      "script": "scripts/e2e-team-open-task-gate.mjs",
+      "tier": "nightly",
+      "safety": "Real Host and DesktopAgentRuntime, temporary profile/workspace and loopback scripted provider; no user instance, credentials or paid API.",
+      "scenarioIds": [
+        "E2E-TEAM-open-tasks-block-final-answer"
+      ]
     }
   ]
 }

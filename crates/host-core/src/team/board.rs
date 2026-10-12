@@ -249,6 +249,7 @@ pub fn create_team_task(db: &Database, params: CreateTaskParams<'_>) -> Result<T
             false,
             "pending",
         )?;
+        super::execution_inbox::enrol_task(db, team_session_id, caller_session_id, task_id)?;
         Ok(())
     })?;
 

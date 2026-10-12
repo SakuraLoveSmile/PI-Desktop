@@ -91,7 +91,7 @@ async function scenarioSettledTeam(binary, tempRoot) {
     const memberId = approval.decision.memberSessionIds[0];
     const wait = createWaitForUpdatesTool({ ...team, host, getTurnId: () => turnId, approvedExecution: () => true });
     await wait.execute("confirmation", { timeoutSeconds: 1 });
-    await host.call("team.createTask", { ...team, taskId: "verify-report", subject: "Verify report", ownerMemberName: "report_expert" });
+    const { task } = await host.call("team.createTask", { ...team, taskId: "verify-report", subject: "Verify report", ownerMemberName: "report_expert" });
     const { message } = await host.call("team.sendMessage", { ...team, target: "report_expert", content: "Verify report evidence" });
     try {
       await host.call("team.authorizeLeadTool", { ...team, toolName: "SubmitGoalReport" });
@@ -128,6 +128,8 @@ async function scenarioSettledTeam(binary, tempRoot) {
     assert(terminal.kind === "error" && terminal.error.message === hostReason, shortJson(terminal));
     record("E2E-TEAM-completion-error-keeps-host-reason", true, "three bounded runtime nudges; terminal reason equals native Host rejection");
     const result = await host.call("team.sendMessage", { teamSessionId: session.id, callerSessionId: memberId, target: "Lead", content: "Verified full report evidence" });
+    await host.call("team.updateTask", { teamSessionId: session.id, callerSessionId: memberId,
+      taskId: task.taskId, expectedRevision: task.revision, status: "completed" });
     await endTurn(host, memberTurn);
     await expectRpcError(() => reportTool.execute("unconsumed-report", draft), ["TEAM_APPROVAL_REQUIRED"]);
     const update = await wait.execute("consume-result", { timeoutSeconds: 1 });

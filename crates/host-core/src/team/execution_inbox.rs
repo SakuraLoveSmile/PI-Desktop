@@ -71,6 +71,33 @@ pub fn state(
     })
 }
 
+/// Called inside task creation's savepoint so undispatched Lead work has the
+/// same exact execution identity as dispatched work, without timestamp inference.
+pub(super) fn enrol_task(db: &Database, team: &str, caller: &str, task: &str) -> Result<()> {
+    if caller != team {
+        return Ok(());
+    }
+    let Some(turn) = sessions::running_turn_id(db, team)? else {
+        return Ok(());
+    };
+    if active_review(db, team, team, &turn)?.is_none() {
+        return Ok(());
+    }
+    let mut decision = super::get_execution_decision(db, team, &turn)?
+        .ok_or_else(|| anyhow!("TEAM_APPROVAL_REQUIRED: current execution decision missing"))?;
+    if !decision.task_ids.iter().any(|id| id == task) {
+        decision.task_ids.push(task.into());
+        decision.updated_at =
+            chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        db.kv_set(
+            super::TEAM_EXECUTION_DECISION_NS,
+            &format!("{team}:{turn}"),
+            &serde_json::to_value(decision)?,
+        )?;
+    }
+    Ok(())
+}
+
 pub fn read(db: &Database, team: &str, caller: &str, expected: &str) -> Result<Vec<TeamMessage>> {
     let review = active_review(db, team, caller, expected)?
         .ok_or_else(|| anyhow!("TEAM_PLANNING_STALE: approved execution turn changed"))?;
@@ -127,13 +154,30 @@ pub fn read(db: &Database, team: &str, caller: &str, expected: &str) -> Result<V
         .collect())
 }
 
-/// An approved execution cannot complete while its experts or incoming results
-/// still belong to it. Participation alone only grants substantive tools.
+/// An approved execution cannot complete while its tasks, experts or incoming
+/// results still belong to it. Participation alone only grants substantive tools.
 pub(super) fn require_settled(
     db: &Database,
     decision: &super::TeamExecutionDecision,
 ) -> Result<()> {
     let tasks = super::list_team_tasks(db, &decision.team_session_id)?;
+    let open_tasks = tasks
+        .iter()
+        .filter(|task| {
+            decision.task_ids.contains(&task.task_id)
+                && matches!(task.status.as_str(), "pending" | "in_progress")
+        })
+        .map(|task| {
+            format!(
+                "{} ({})",
+                task.owner_member_name
+                    .as_deref()
+                    .or(task.owner_session_id.as_deref())
+                    .unwrap_or("unassigned"),
+                task.task_id
+            )
+        })
+        .collect::<Vec<_>>();
     let describe = |member: &str, session: &str| {
         let owned = tasks
             .iter()
@@ -181,9 +225,9 @@ pub(super) fn require_settled(
             ));
         }
     }
-    if !pending.is_empty() || !unconsumed.is_empty() {
-        return Err(anyhow!("TEAM_APPROVAL_REQUIRED: pending dispatches [{}]; {} unconsumed expert results [{}]; await assigned experts and consume their full results with wait_for_updates before completing approved execution",
-            pending.join("; "), unconsumed.len(), unconsumed.join("; ")));
+    if !pending.is_empty() || !unconsumed.is_empty() || !open_tasks.is_empty() {
+        return Err(anyhow!("TEAM_APPROVAL_REQUIRED: pending dispatches [{}]; {} unconsumed expert results [{}]; open decision tasks [{}]; await assigned experts and consume their full results with wait_for_updates before completing approved execution. Dispatch open tasks with send_message, or use task_update to mark them cancelled/failed with a reason, then retry",
+            pending.join("; "), unconsumed.len(), unconsumed.join("; "), open_tasks.join("; ")));
     }
     Ok(())
 }

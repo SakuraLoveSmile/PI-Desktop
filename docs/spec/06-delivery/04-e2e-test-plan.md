@@ -18385,3 +18385,24 @@ The pending-card help describes that the Lead stopped waiting without claiming
 that every pending question waited thirty minutes: restart can defer it earlier.
 The default expiry remains thirty minutes; a late answer still starts a new
 authenticated turn and never revives the old execution token.
+
+
+### E2E-TEAM-open-tasks-block-final-answer
+
+- **Preconditions:** Local-main task candidate, temporary Host profile/workspace,
+  real runtime tools, and a loopback scripted provider; approved Team execution.
+- **Steps:** Create current-decision pending tasks for never-dispatched UI/QA
+  experts and an in-progress task for a completed core expert. Attempt a text
+  final answer and Goal report. Consume Host notices and use real Lead
+  `task_update` tools to close tasks with explicit unsuccessful reasons.
+- **Expected:** Both completion tools reject open decision tasks with
+  `TEAM_APPROVAL_REQUIRED`, member/task identities, dispatch/close guidance and
+  the existing `wait_for_updates` guidance. Text completion receives bounded
+  recovery; terminal tasks then permit normal completion. Historical unrelated,
+  deleted tasks and ordinary execution retain their previous behavior.
+- **Specs:** Host RPC approved execution inbox and settled Goal authorization;
+  Expert Team ADR amendment dated 2026-10-13.
+- **Acceptance:** `node scripts/e2e-team-open-task-gate.mjs`; Rust scoped task
+  regressions also cover completed/failed/cancelled, deletion and ordinary scope.
+- **Milestone:** Plus Team reliability.
+- **Status:** Record actual candidate/base, suites, environment and results.

@@ -1777,9 +1777,14 @@ within its owned runtime turn while preserving full results across recovery.
 
 Participation still authorizes substantive Lead tools. TeamFinalAnswer for an
 approved execution additionally rejects completion while recorded current
-expert dispatches are queued/running or their authenticated results remain
-unconsumed. This separate settlement barrier does not turn participation into
-proof of task ownership or require results beyond the current dispatch scope.
+expert dispatches are queued/running, their authenticated results remain
+unconsumed, or current decision-owned tasks are `pending`/`in_progress`.
+Lead task creation inside the Host-proven active approved execution atomically
+enrolls the task ID in that decision's existing `taskIds`, including tasks never
+dispatched. Only those non-deleted tasks are checked; older decisions' tasks do
+not extend the barrier. Task terminal states are `completed`, `failed`, and
+`cancelled`, allowing an honest unsuccessful close. Participation remains a
+separate predicate and is not granted by task state or Host notification reads.
 Plan research's structured result/inbox submission barrier is separate. Goal
 progress and its sole completion report retain the original execution identity.
 
@@ -1914,7 +1919,11 @@ predicate to both `TeamFinalAnswer` and `SubmitGoalReport`. The latter is checke
 by the runtime's existing Lead wrapper before the report tool body runs. No RPC
 or payload field is added. A rejection includes all pending dispatch IDs and
 member names, assigned open task IDs, and the count and identities of unconsumed
-current-expert results; the next action remains `wait_for_updates`. Settlement is
+current-expert results. It retains the `TEAM_APPROVAL_REQUIRED` prefix and
+`wait_for_updates` guidance, and lists each open decision task as member (task
+ID). The Lead must dispatch with `send_message`, or use `task_update` to mark
+unworkable tasks `cancelled`/`failed` with a reason, then retry. Existing task
+completion claims still require their normal terminal settlement. Settlement is
 bound to the Host-proven original execution turn, never inferred from a historical
 session approval. Post-execution mail does not extend Goal lifecycle authority.
 
