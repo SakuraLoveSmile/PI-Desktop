@@ -155,68 +155,68 @@ pub fn push(db: &Database, input: QueuedTurnInput) -> Result<QueuedTurn> {
             return Err(anyhow!("IDEMPOTENCY_CONFLICT"));
         }
     }
-    let tx = conn.unchecked_transaction()?;
-    let (count, max_position): (i64, i64) = tx.query_row(
-        "SELECT COUNT(*), COALESCE(MAX(position), 0) FROM turn_queue WHERE session_id = ?1",
-        params![input.session_id],
-        |row| Ok((row.get(0)?, row.get(1)?)),
-    )?;
-    if count >= MAX_QUEUED_TURNS_PER_SESSION {
-        return Err(anyhow!("QUEUE_FULL"));
-    }
-    let id = input
-        .id
-        .filter(|id| !id.trim().is_empty())
-        .unwrap_or_else(|| Uuid::new_v4().to_string());
-    let attachments_json = input
-        .attachments
-        .as_ref()
-        .map(serde_json::to_string)
-        .transpose()?;
-    let voice_origin_json = input
-        .voice_origin
-        .as_ref()
-        .map(serde_json::to_string)
-        .transpose()?;
-    let created_at = now_ms();
-    tx.execute(
-        "INSERT INTO turn_queue (
+    crate::sessions::with_savepoint(conn, "turn_queue_push", |tx| {
+        let (count, max_position): (i64, i64) = tx.query_row(
+            "SELECT COUNT(*), COALESCE(MAX(position), 0) FROM turn_queue WHERE session_id = ?1",
+            params![input.session_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+        if count >= MAX_QUEUED_TURNS_PER_SESSION {
+            return Err(anyhow!("QUEUE_FULL"));
+        }
+        let id = input
+            .id
+            .filter(|id| !id.trim().is_empty())
+            .unwrap_or_else(|| Uuid::new_v4().to_string());
+        let attachments_json = input
+            .attachments
+            .as_ref()
+            .map(serde_json::to_string)
+            .transpose()?;
+        let voice_origin_json = input
+            .voice_origin
+            .as_ref()
+            .map(serde_json::to_string)
+            .transpose()?;
+        let created_at = now_ms();
+        tx.execute(
+            "INSERT INTO turn_queue (
             id, session_id, principal, idempotency_key, input_hash, content,
             attachments_json, permission_mode, position, created_at, session_message_id,
             user_message_id, voice_origin_json
          ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
-        params![
+            params![
+                id,
+                input.session_id,
+                input.principal,
+                input.idempotency_key,
+                input.input_hash,
+                input.content,
+                attachments_json,
+                input.permission_mode,
+                max_position + 1,
+                created_at,
+                input.session_message_id,
+                input.user_message_id,
+                voice_origin_json
+            ],
+        )?;
+        Ok(QueuedTurn {
             id,
-            input.session_id,
-            input.principal,
-            input.idempotency_key,
-            input.input_hash,
-            input.content,
-            attachments_json,
-            input.permission_mode,
-            max_position + 1,
-            created_at,
-            input.session_message_id,
-            input.user_message_id,
-            voice_origin_json
-        ],
-    )?;
-    tx.commit()?;
-    Ok(QueuedTurn {
-        id,
-        session_id: input.session_id,
-        principal: input.principal,
-        idempotency_key: input.idempotency_key,
-        input_hash: input.input_hash,
-        content: input.content,
-        session_message_id: input.session_message_id,
-        user_message_id: input.user_message_id,
-        voice_origin: input.voice_origin,
-        attachments: input.attachments,
-        permission_mode: input.permission_mode,
-        position: max_position + 1,
-        priority: None,
-        created_at: ms_to_ts(created_at),
+            session_id: input.session_id,
+            principal: input.principal,
+            idempotency_key: input.idempotency_key,
+            input_hash: input.input_hash,
+            content: input.content,
+            session_message_id: input.session_message_id,
+            user_message_id: input.user_message_id,
+            voice_origin: input.voice_origin,
+            attachments: input.attachments,
+            permission_mode: input.permission_mode,
+            position: max_position + 1,
+            priority: None,
+            created_at: ms_to_ts(created_at),
+        })
     })
 }
 

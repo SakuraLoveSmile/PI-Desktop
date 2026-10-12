@@ -40,6 +40,26 @@ disagrees, so a green `check:release-docs` is a precondition, not a substitute.
 |---|---|---|
 | `dev-electron.mjs` | `pnpm dev`, through `predev` | Launch Electron against the dev server. On macOS it builds and reuses the fingerprinted branded host bundle under `.cache/electron-dev/` |
 
+### Candidate build receipts
+
+`node scripts/e2e/build-candidate.mjs` runs `pnpm build:js` and
+`cargo build --locked -p host-core --target-dir <request-worktree>/target`, reusing
+provisioned dependencies and caches. Run it after the candidate source is stable;
+no dependency installation or provider call is performed. It deletes an older
+receipt before building and writes `.review-evidence/build-candidate.json` only
+when both builds pass and source/base fingerprints remain unchanged. The receipt
+records HEAD, `origin/main`, dirty/untracked source identity, the selected Host,
+all four runtime-package `dist` trees and the Desktop `out` tree. Set
+`PI_DESKTOP_HOST_BIN` to this request's `target/debug/pi-desktop-host-core` (with
+`.exe` on Windows), or omit it to use that default.
+
+`e2e-team-task-dispatch-lifecycle.mjs` validates the receipt before launching any
+fixture and again after cleanup, before writing passing evidence. Changing a
+source file, base revision, selected binary, generated module or receipt requires
+rebuilding; a historical commit number alone cannot validate reused artifacts.
+`node --test scripts/build-candidate-receipt.test.mjs` exercises those rejection
+paths in a disposable Git fixture, without building the application.
+
 ## End-to-end
 
 Run relevant task-candidate E2E from the dedicated request worktree, reusing

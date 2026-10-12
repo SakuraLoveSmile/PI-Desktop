@@ -65,4 +65,37 @@ describe("mode-specific system prompts", () => {
     expect(prompt).not.toContain("Do not use Write, Edit");
     expect(prompt).not.toContain("SubmitGoal");
   });
+
+  it("explains unknown costs and resolves spending boundaries before Goal submission", () => {
+    const prompt = composeModeSystemPrompt("goal");
+
+    expect(prompt).toContain("Unknown provider pricing or usage cost is unknown, not zero");
+    expect(prompt).toContain("not a Host-enforced spending limit");
+    expect(prompt).toContain("whether cost can actually be measured and constrained");
+    expect(prompt).toContain("use asktool to resolve any unsettled spending boundary");
+    expect(prompt).toContain("do not claim a hard monetary guarantee you cannot enforce");
+  });
+
+  it("negotiates human and external dependencies without inventing trusted approval", () => {
+    const prompt = composeModeSystemPrompt("goal");
+
+    expect(prompt).toContain("which checks you can actually perform");
+    expect(prompt).toContain("which require user participation or external evidence");
+    expect(prompt).toContain("Negotiate human approvals, paid actions, publication");
+    expect(prompt).toContain("explicit stage boundaries or user-participation items before SubmitGoal");
+    expect(prompt).toContain("Stop at an unmet boundary");
+    expect(prompt).toContain("Never approve on the user's behalf");
+    expect(prompt).toContain("scanned Markdown or model-authored approval text");
+    expect(prompt).not.toContain("Every acceptance criterion must be objectively checkable by you");
+  });
+
+  it("keeps ordinary Agent checklists while respecting a restricted tool catalog", () => {
+    const prompt = composeModeSystemPrompt("agent");
+
+    expect(prompt).toContain("when TodoWrite is available in your current tool catalog");
+    expect(prompt).toContain("keep the user's session checklist current with TodoWrite");
+    expect(prompt).toContain("keep at most one item in progress");
+    expect(prompt).toContain("follow that role's progress workflow");
+    expect(prompt).not.toContain("Host-enforced spending limit");
+  });
 });

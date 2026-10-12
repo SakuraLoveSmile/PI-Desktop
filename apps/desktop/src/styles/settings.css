@@ -968,6 +968,18 @@
   flex: 1;
 }
 
+.memory-settings .settings-row-copy {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.memory-settings-path {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .settings-row-title {
   color: var(--ds-text-primary);
   font-size: var(--text-md-plus);

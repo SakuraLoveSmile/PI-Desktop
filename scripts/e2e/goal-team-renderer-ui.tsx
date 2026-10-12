@@ -1,3 +1,4 @@
+import { GoalActivityRow } from "../../apps/desktop/src/features/chat/activity/GoalActivityRow";
 import { act, createElement, Fragment } from "react";
 import { createRoot } from "react-dom/client";
 import { createInstance } from "i18next";
@@ -70,16 +71,16 @@ globalThis.goalTeamRendererUiProbe = async () => {
   const reportListeners = new Map<string, Array<(event: GoalReportChangedEvent) => void>>();
   const initialProgress = new Map<string, ReturnType<typeof deferred<{ progress: GoalProgressSnapshot | null }>>>();
   const initialProgressUsed = new Set<string>();
-  const reportReads = new Map<string, ReturnType<typeof deferred<{ report: { status: string } | null }>>>();
+  const reportReads = new Map<string, ReturnType<typeof deferred<{ state: string; report: { sessionId: string; executionId: string; integrity: { kind: string } } | null }>>>();
   const laterProgress: Array<ReturnType<typeof deferred<{ progress: GoalProgressSnapshot | null }>>> = [];
   const originalGetTodos = api.getTodos;
   const originalGetGoalProgress = api.getGoalProgress;
   const originalGetGoalReport = api.getGoalReport;
+  const originalHostStatus = api.onHostStatus;
   const originalProgressListener = api.onGoalProgressChanged;
   const originalReportListener = api.onGoalReportChanged;
   const originalTeamSnapshot = api.getTeamSnapshot;
   const originalTeamChanged = api.onTeamChanged;
-  const originalHostStatus = api.onHostStatus;
   const originalStoreMethod = useAppStore.getState().openWorkPanelTabForSession;
   const openedTabs: Array<{ sessionId: string; tab: { id: string; label?: string; teamTarget?: unknown } }> = [];
   try {
@@ -100,9 +101,10 @@ globalThis.goalTeamRendererUiProbe = async () => {
       laterProgress.push(request);
       return request.promise;
     };
+    api.onHostStatus = () => () => {};
     api.getGoalReport = async ({ executionId }) => {
       const report = reportReads.get(executionId ?? "");
-      return report ? report.promise : { report: null };
+      return report ? report.promise : { state: "not_found", report: null };
     };
     api.onGoalProgressChanged = (listener) => {
       const list = progressListeners.get("current") ?? [];
@@ -164,6 +166,9 @@ globalThis.goalTeamRendererUiProbe = async () => {
     const renderAll = (proposal: PlanProposal, sessionId = "goal-session", joining = false) => createElement(I18nextProvider, { i18n },
       createElement(Fragment, null,
         createElement(GoalProgressBar, { sessionId, proposal }),
+        createElement(GoalActivityRow, { sessionId, proposal, visible: true,
+          onOpenArtifact: () => openedTabs.push({ sessionId, tab: { id: "goal-contract", kind: "file", resource: "contract.md" } }),
+        }),
         createElement(TeamDispatchCardsGroup, { cards: [card], joining }),
       ));
     await act(async () => { root.render(renderAll(oldProposal)); });
@@ -219,11 +224,21 @@ globalThis.goalTeamRendererUiProbe = async () => {
     const readyHandlers = [...(reportListeners.get("current") ?? [])];
     assert(readyHandlers.length > 0, "active goal must have a report status listener");
     await act(async () => { root.render(renderAll({ ...newProposal, executionState: "completed" })); });
+    await until(() => laterProgress.length === 4, "fresh shared read after returning to Goal session");
+    await act(async () => laterProgress[3].resolve({ progress: progress("execution-new", 3, "Newest work", "completed") }));
     assert(Boolean(container.querySelector('[data-testid="goal-progress-bar"]')), "terminal execution waits for its report");
     assert(container.querySelector(".goal-progress-badge")?.getAttribute("data-state") === "completed", "terminal execution state must reach the rendered component");
     await act(async () => readyHandlers.forEach((listener) => listener({ sessionId: "other-session", reportId: "report-new", executionId: "execution-new", proposalId: "proposal-new", status: "ready" })));
-    await act(async () => reportReads.get("execution-new")?.resolve({ report: { status: "ready" } }));
+    await act(async () => reportReads.get("execution-new")?.resolve({ state: "ready", report: { sessionId: "goal-session", executionId: "execution-new", integrity: { kind: "fallback" } } }));
     await until(() => !container.querySelector('[data-testid="goal-progress-bar"]'), `ready report hides completed execution (listeners=${readyHandlers.length})`);
+    const goalRow = container.querySelector('[data-goal-execution-id="execution-new"]');
+    assert(goalRow?.textContent?.includes("1/1"), "Overview shares the final authoritative progress");
+    assert(goalRow?.textContent?.includes(i18n.t("panel.activity.goal.reportFallback")), "Overview retains report degradation after capsule hides");
+    await act(async () => goalRow?.querySelector<HTMLButtonElement>(".session-activity-goal-title-action")?.click());
+    assert(openedTabs.at(-1)?.tab.resource === "contract.md", "Goal contract navigation disappeared");
+    await act(async () => goalRow?.querySelector<HTMLButtonElement>(".session-activity-goal-report-action")?.click());
+    assert(openedTabs.at(-1)?.sessionId === "goal-session" && openedTabs.at(-1)?.tab.resource === "execution-new", "Overview report opened the wrong session/execution");
+
     await act(async () => { root.render(renderAll({ ...newProposal, executionState: "interrupted" })); });
     assert(!container.querySelector('[data-testid="goal-progress-bar"]'), "interrupted execution ends progress without waiting for any report");
 
@@ -238,6 +253,7 @@ globalThis.goalTeamRendererUiProbe = async () => {
       return { className: element.className, height: element.getBoundingClientRect().height, fontSize: style.fontSize, lineHeight: style.lineHeight };
     });
     assert(cardHeight >= 58 && cardHeight <= 66, `dispatch card height must be within [58, 66], got ${cardHeight}: ${JSON.stringify(cardMetrics)}`);
+    openedTabs.length = 0;
     await act(async () => container.querySelector<HTMLButtonElement>(".team-dispatch-card-open")?.click());
     assert(openedTabs.length === 1, "one card click must open exactly one work panel target");
     assert(openedTabs[0].sessionId === "lead-session", "card click must open from the active session");
@@ -432,11 +448,11 @@ globalThis.goalTeamRendererUiProbe = async () => {
     api.getTodos = originalGetTodos;
     api.getGoalProgress = originalGetGoalProgress;
     api.getGoalReport = originalGetGoalReport;
+    api.onHostStatus = originalHostStatus;
     api.onGoalProgressChanged = originalProgressListener;
     api.onGoalReportChanged = originalReportListener;
     api.getTeamSnapshot = originalTeamSnapshot;
     api.onTeamChanged = originalTeamChanged;
-    api.onHostStatus = originalHostStatus;
     useAppStore.setState({ openWorkPanelTabForSession: originalStoreMethod });
   }
   return { ok: true, cardHeight, reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches, scenarios: ["goal execution and session switch", "cross-session event isolation", "stale report event", "out-of-order progress revisions", "ready report completion", "interruption without a result card or stuck progress", "completed report navigation", "single task navigation", "distinct Goal/session counts and disclosures", "320px light/dark progress layout", "expert joining feedback", "Team chronological transcript", "Compact and ordinary turn preservation", "card search/navigation", "live tail and section approval"] };

@@ -1,4 +1,4 @@
-# 04. 数据存储（共享架构 v19，Plus 轨道 v4）
+# 04. 数据存储（共享架构 v19，Plus 轨道 v5）
 
 > **翻译说明：** 本页是与 [英文源规格](/spec/03-runtime/04-data-storage) 一一对应的机器辅助翻译。代码、协议字段和标识符保持原文；如翻译与英文源事实有歧义，以英文版本为准。
 
@@ -183,7 +183,7 @@ PRAGMA auto_vacuum = INCREMENTAL; -- set at creation, before any table
 ```
 
 - 共享架构版本位于 `PRAGMA user_version`（当前 v19 = `19`）中。Plus 专有结构
-  单独由 `plus_schema_meta` 版本化（当前 Plus 轨道 v4，第 7.1 节）。v1 `meta`
+  单独由 `plus_schema_meta` 版本化（当前 Plus 轨道 v5，第 7.1 节）。v1 `meta`
   桌子不见了。
 - host-core 是**单一作者**；语句使用 `prepare_cached`；每个
   多行写入在一个事务中运行。
@@ -705,6 +705,20 @@ Expert Team 状态由 Host 存在三个表中（ADR plus-expert-team-collaborati
 - `team_tasks` 保存有 revision 的共享任务板、所有者、依赖、建议写入范围、
   状态和软删除标记。
 
+普通 Agent Team 任务的 Host 执行归属使用增量 `team-task-attempt-v1` KV 命名空间。
+key 将 `[teamSessionId, taskId]` 编码为 JSON tuple；v1 value 保存 `schemaVersion`、
+Team/任务身份、所有者、关联回合/会话、任务 revision、完成声明和结束状态。
+只有显式任务状态更新建立关联；打开新回合不会绑定全部已拥有任务，不回填历史任务。
+
+活动中的完成声明持久化为 `in_progress`，而不是 `completed`。
+匹配回合的终态 CAS 原子结算精确的当前 attempt：回合 completed 且已有完成声明才标 completed；
+error 标 failed；aborted 标 cancelled。没有完成声明的成功回合仍保留未完成任务。
+任务/Team revision 随变化推进以拒绝陈旧请求。元数据编辑保留有效声明；显式重置、改派、
+删除或接受结构化 Plan 研究结果会清掉声明。failed/cancelled 标记阻止迟到完成声明，
+直到显式重试或新的活动验证回合。启动恢复在已有中止事务里取消匹配的中断 attempt，
+Team/会话清理删除这些记录。没有 attempt 的任务保留遗留语义；此版本化 KV 增量不改变
+SQL schema 或 Plus 轨道版本。
+
 属于 Team 的 member session 不允许删除。删除 Lead 时会以一个事务将成员重置为
 `standard` 并移除 Team 状态；成员 session 及其转录仍作为独立会话保留。
 
@@ -1050,7 +1064,9 @@ CREATE INDEX idx_notifications_unread
   true，为 `completed` 插入 `task.completed` 或为 `error` 插入 `task.failed`
   在**同一笔交易**中。仅当主窗口时 Electron 才会传递 false
   是 visible/focused 并且该确切会话是当前聊天。 `aborted`
-  从不插入行。
+  从不插入行。WP7 的 Host 真实 Team member completed 也不创建独立成功通知，
+  不依赖标题/可见性；回合、正文、phase 和报告仍保存。成员失败、Lead/Goal、非团队
+  终态通知保留原规则。
 - 重复终端更新无法复制通知，因为
   `turn_id` 是独一无二的。仅当此调用时，RPC 结果才包含记录
   插入它；否则，`notification` 字段将被省略。
@@ -1272,7 +1288,7 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
 `PRAGMA user_version` 专用于与上游 PI-Desktop 共享的迁移链，只在合入上游迁移时才会前进
 （ADR plus-schema-version-track）。Plus 专有结构运行在同一数据库内的第二条轨道上，
 因此合入上游永远不会重编号，也不会与 Plus 数据冲突。Plus 步骤有序、仅增量且幂等。
-它们位于 `crates/host-core/src/db/plus_schema.rs`，当前轨道版本为 4：
+它们位于 `crates/host-core/src/db/plus_schema.rs`，当前轨道版本为 7：
 
 | 步骤 | 增加 |
 |---|---|
@@ -1280,6 +1296,9 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
 | P2 | `sessions.execution_profile` 以及 `teams`、`team_members`、`team_tasks` 表 |
 | P3 | `plan_approvals` 上的执行 provider/model 绑定和修订意图字段，以及 `plan_execution_schedules` 表 |
 | P4 | `plan_approvals.execution_kind`，对已批准的提案按 `kind` 回填 |
+| P5 | 会话拥有的 `session_quick_notes` 和 `background_processes` 表 |
+| P6 | `team_ordinary_inbox` 认证 Lead 输入消费日志 |
+| P7 | `background_service_ownership`、`owner_project_path` 和会话删除守卫 |
 
 P1 到 P4 是早期 fork 构建以 `user_version` 20 到 23 发布的 Plus 专有变更。每个步骤在改动前都会先探测，
 因此来自任一未发布 v20 形态（仅 Goal reports，或仅 workspace kind）的数据库都能保留数据完成升级，
@@ -1294,7 +1313,7 @@ P1 到 P4 是早期 fork 构建以 `user_version` 20 到 23 发布的 Plus 专�
   （`DB_SCHEMA_TOO_NEW`，见进程模型中的启动结果一节）。
 - **旧版 fork 数据库。** 含有 Plus 结构、没有 `plus_schema_meta` 且 `user_version` 为 20 到 23
   的数据库由早期 fork 构建写入。在经过校验的 `pi.sqlite.legacy-v<N>.bak` 之后，一个事务应用全部
-  Plus 步骤、写入 meta（轨道 4，共享 19），并把 `user_version` 设为 19。失败则回滚事务，
+  Plus 步骤、写入 meta（轨道 7，当前共享迁移链），并把 `user_version` 设为 19。失败则回滚事务，
   旧版数据库保持原样。
 - **较旧的 fork 构建。** 较旧的 fork 构建打开已对账的数据库时，会重新运行自己幂等的步骤，
   并把 `user_version` 留在 20 到 23。本构建下一次打开时先保留 `pi.sqlite.repair-v<N>.bak`，
@@ -1303,6 +1322,11 @@ P1 到 P4 是早期 fork 构建以 `user_version` 20 到 23 发布的 Plus 专�
   应用缺失的步骤并更新 meta。当共享版本在本次打开期间或自 meta 写入以来发生变化时，
   会重放全部步骤（上游步骤可能重建了带有 Plus 列的表），并重新同步 meta。
 - **全新安装。** 新数据库运行共享的 v19 DDL，再运行全部 Plus 步骤并记录轨道版本，不产生备份。
+
+- **已知候选数据。** P6/P7 均为支持格式；P5/P6 先保留已验证备份再升级，P7 重开保留日志、ownership 及版本。高于 P7 仍在维护或修改前拒绝，不能降低版本绕过校验。
+- **收件箱恢复。** Host 对照规范 mailbox 和精确认证 JSONL 校验日志，prepared 仍走文件优先恢复；索引修复保留原 Lead turn，消费记录与 durable queue 退休同一事务提交。重复恢复不追加副本、不授人工权限、不启动 provider。支持能力的普通 Agent Lead 在等待边界使用同轮次 inbox；旧 Host 保留队列 continuation。
+- **历史服务恢复。** 冷启动先记 `host_restart` 再标 unfinished process 为 interrupted，不认领旧 PID 或重放命令。历史 P7 未记录平台/stop mechanism，读取省略 `stopMode`，不从本机平台或 escalation flag 推断 TERM/KILL/JobObject。新服务仅经当前 Agent Team 身份、run 和权限闸门显式启动，机制由实际 owned runner 记录。
+- **离线迁移。** `--relocate-data` 直接打开 SQLite，不对账 Plus、不生成 Plus 备份或应用步骤；搬迁后的正常打开再执行。Plus 自有相对路径无须改写。
 
 ## 8. 保留和维护
 
@@ -1458,3 +1482,52 @@ An unknown price is distinct from a known zero price; partial known costs remain
 on the individual operations. Late usage targets its captured turn and does not
 revive it or debit the currently active turn. Immediate nested parent and owning
 Task remain separate optional transcript/event fields.
+
+## Plus automatic memory and code index storage
+
+Automatic memory uses existing project/group memory collections and their
+32-KiB derived-context limit. The opt-in flag lives in Host `kv` namespace
+`projectAutoMemory`, keyed by `path:<canonical-path>` or `group:<id>`; it does not
+advance the shared schema. User and agent entries share the existing collection.
+Agent updates/deletions compare the entry's last title/content; editor Save
+compares the owner and complete loaded memory snapshot before atomic replacement.
+Conflicts preserve persisted notes and the user's unsaved editor draft. Legacy
+plain-text and entries-v1 values remain readable. While automatic recording is
+on, legacy batch RPCs without a snapshot are rejected to prevent lost updates.
+Existing project-memory configuration-sync eligibility remains unchanged; the
+local opt-in flag is not implicitly exported. Data relocation remaps path flags
+with the same relocated project paths.
+
+The disposable code cache is Rust-owned `<data>/index/index.db`, separate from
+`pi.sqlite`, with per-root rows and FTS5 trigram candidate indexing. Opening it
+is lazy: a missing/broken cache does not prevent Host startup; an index request
+reports errors instead of fabricating successful empty results. Clear deletes
+only the caller root's derived rows and never workspace files or memory.
+
+Search limits are 10,000 files, 1 MiB per file, 64 MiB total content, a five-second
+scan budget, at most 50 returned hits (default 20), 240-character line excerpts
+and a 32-KiB result budget. Budget skips, binary/unreadable files or observed
+filesystem changes yield `partial` coverage with `truncated: true`; zero hits in
+such a result cannot prove absence. Status reports the last completed scan, not
+a fresh filesystem validation. Sensitive-file exclusions and shared ignore
+rules apply before indexing; symlinks cannot expand the session root.
+
+### 会话活动存储（Plus P5）
+
+`session_quick_notes` 以会话为键，保存原样内容、revision 和更新时间，删除会话时级联删除。
+写入必须携带 expected revision；陈旧写入返回 NOTE_CONFLICT 及当前快照。
+笔记不进入转录/模型输入，不复制到 fork。内容最多 64KiB UTF-8，空格/换行计入。
+
+`background_processes` 保留会话/工具调用身份、命令、工作目录、生命周期/时间/退出元数据
+和有界 stdout/stderr。唯一的会话/工具调用约束防止重复启动。
+Host 启动将未完成记录标 interrupted；持久化 PID 不授权进程控制，命令不自动恢复。
+存在活动记录时拒绝删除。终态写入失败时保留进程本地最终快照及输出、可见诊断，
+每个有范围的资源请求仅尝试修复一次。Host 硬退出无法保留未写入快照。
+P5 不推进共享 PRAGMA user_version。当前可执行共享迁移由
+`crates/host-core/src/db.rs` 拥有；上文旧共享 v19 示例是历史记录。
+
+## Plus 团队可靠性迁移 P6/P7
+
+独立 Plus migration track 在 P6 增加 team_ordinary_inbox，在 P7 增加 background_service_ownership；不改 upstream schema。P6 是 prepared/persisted/ACKed 认证输入 journal，不是重复正文存储或协作 turn 唯一约束变更；P7 仅标记显式新服务，旧后台行仍是普通 command。升级/重启不自动启动 provider 或进程。JSONL-first 切点与 service stop/recovery 分别见[普通 inbox](/zh-CN/spec/03-runtime/team-ordinary-inbox)和[显式服务](/zh-CN/spec/03-runtime/team-managed-services)。
+
+新服务将 `stopMode` 写入既有 KV namespace `background-service-stop-mode-v1`，与 process/ownership 行同一事务。历史缺失仍省略 `stopMode`，重开不从当前操作系统推断停止机制。

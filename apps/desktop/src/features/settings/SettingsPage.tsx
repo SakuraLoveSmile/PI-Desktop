@@ -65,6 +65,7 @@ import { PluginScenicThemesDestination } from "../../components/settings/PluginS
 import { ConfigSyncPage } from "../../components/settings/ConfigSyncPage";
 import { StorageSettingsSection } from "./StorageSettingsSection";
 import { ExpertTeamSettingsPage } from "./ExpertTeamSettingsPage";
+import { MemorySettingsPage } from "./MemorySettingsPage";
 
 type SettingsTab = ReturnType<typeof useAppStore.getState>["settingsTab"];
 
@@ -249,6 +250,7 @@ export function SettingsPage() {
       expertTeam: <IconBot size={14} />,
       import: <IconDownload size={14} />,
       projects: <IconArchive size={14} />,
+      memory: <IconBookOpen size={14} />,
       sync: <IconCloudDown size={14} />,
       remoteHosts: <IconGlobe size={14} />,
       voice: <IconMic size={14} />,
@@ -656,6 +658,7 @@ export function SettingsPage() {
 
           {tab === "expertTeam" && settings && <ExpertTeamSettingsPage />}
           {tab === "projects" && <ProjectsPage />}
+          {tab === "memory" && <MemorySettingsPage />}
 
           {tab === "sync" && !tabHidden && <ConfigSyncPage />}
 

@@ -654,6 +654,7 @@ let emitAgentEvent: (envelope: AgentEventEnvelope) => void = () => undefined;
 
 const collaborationRuntime = createCollaborationRuntime({
   activeTurns,
+  isTurnDispatchable,
   principal: DESKTOP_PRINCIPAL,
   getHost,
   getSidecar,
@@ -727,6 +728,7 @@ const { persistAgentEvent } = eventPersistence;
 
 const sidecarRuntime = createSidecarRuntime({
   runtimeState,
+  ordinaryInboxRequest: teamDelivery.ordinaryInboxRequest,
   steeringReplies,
   logger,
   sendToRenderer,
@@ -1034,6 +1036,7 @@ registerApplicationStartup({
 
 registerShutdownHandlers({
   hasSingleInstanceLock,
+  disposeTeamDelivery: () => teamDelivery.dispose(),
   state: shutdownState,
   getHost,
   getSidecar,

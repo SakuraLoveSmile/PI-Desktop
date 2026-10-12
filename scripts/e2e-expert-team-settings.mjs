@@ -3,12 +3,15 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
+import { createServer } from "node:http";
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { pathToFileURL } from "node:url";
 import { dirname, join, resolve, basename } from "node:path";
 import { repositoryRoot, resolveElectronBinary } from "./e2e/boot.mjs";
 
 const root = repositoryRoot();
+const serve = process.argv.includes("--serve");
 const { build } = createRequire(join(root, "packages/agent-runtime/package.json"))("esbuild");
 const evidenceDir = process.env.PI_EXPERT_SETTINGS_EVIDENCE_DIR || join(root, ".review-evidence");
 await mkdir(evidenceDir, { recursive: true });
@@ -39,12 +42,51 @@ try {
       "react-i18next": join(root, "apps/desktop/node_modules/react-i18next") },
     nodePaths: [join(root, "apps/desktop/node_modules")],
   });
-  const { compile } = createRequire(join(root, "apps/desktop/package.json"))("tailwindcss");
-  const cssPath = join(temp, "renderer.css");
-  const compiledCss = await compile(await readFile(cssPath, "utf8"));
-  await writeFile(cssPath, compiledCss.build(["block", "space-y-1.5", "text-sm", "text-text-secondary"]));
-  await writeFile(join(temp, "index.html"), `<!doctype html><html data-platform="darwin"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:"><link rel="stylesheet" href="renderer.css"></head><body><script type="module" src="renderer.js"></script></body></html>`);
-  await writeFile(join(temp, "main.cjs"), `
+  const desktopRequire = createRequire(join(root, "apps/desktop/package.json"));
+  const vite = await import(pathToFileURL(desktopRequire.resolve("vite")).href);
+  const { default: tailwind } = await import(pathToFileURL(desktopRequire.resolve("@tailwindcss/vite")).href);
+  // Use the real renderer entry and feature stylesheet, in production order.
+  // A short import entry joins both outputs without changing repository files.
+  const stylesEntry = join(temp, "production-styles.mjs");
+  await writeFile(stylesEntry, ["globals.css", "settings-expert-team.css"].map((name) =>
+    `import ${JSON.stringify(join(root, "apps/desktop/src/styles", name))};`).join("\n"));
+  const styles = await vite.build({
+    configFile: false, root: join(root, "apps/desktop"), logLevel: "error", plugins: [tailwind()],
+    build: { write: false, assetsInlineLimit: () => true, rollupOptions: { input: stylesEntry } },
+  });
+  const cssAssets = (Array.isArray(styles) ? styles : [styles]).flatMap((result) => result.output)
+    .filter((entry) => entry.type === "asset" && entry.fileName.endsWith(".css"));
+  assert(cssAssets.length, "Production renderer CSS was not compiled");
+  await writeFile(join(temp, "renderer.css"), cssAssets.map((entry) => entry.source).join("\n"));
+  await writeFile(join(temp, "index.html"), `<!doctype html><html data-platform="darwin"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:"><link rel="stylesheet" href="renderer.css"></head><body><script type="module" src="renderer.js"></script>${serve ? '<script type="module" src="preview.js"></script>' : ""}</body></html>`);
+  if (serve) {
+    await writeFile(join(temp, "preview.js"), `import "./renderer.js";
+const params = new URLSearchParams(location.search);
+await globalThis.expertTeamSettingsProbe({ preview: true, locale: params.get("locale") === "en" ? "en" : "zh-CN", theme: params.get("theme") === "light" ? "light" : "dark" });`);
+    const server = createServer(async (request, response) => {
+      const path = new URL(request.url || "/", "http://127.0.0.1").pathname;
+      const name = path === "/" ? "index.html" : path.slice(1);
+      // The server exposes only generated preview assets, never workspace files.
+      if (name !== basename(name) || !/\.(?:html|js|css|woff2?|ttf)$/.test(name)) {
+        response.writeHead(404); response.end(); return;
+      }
+      try {
+        response.setHeader("content-type", name.endsWith("html") ? "text/html" : name.endsWith("css") ? "text/css" : name.endsWith("js") ? "text/javascript" : "application/octet-stream");
+        response.end(await readFile(join(temp, name)));
+      } catch { response.writeHead(404); response.end(); }
+    });
+    await new Promise((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
+    console.log(`EXPERT_TEAM_SETTINGS_PREVIEW_URL http://127.0.0.1:${server.address().port}/?locale=zh-CN&theme=dark`);
+    try {
+      await new Promise((resolveStop) => {
+        process.once("SIGINT", resolveStop); process.once("SIGTERM", resolveStop);
+      });
+    } finally {
+      server.closeAllConnections();
+      await new Promise((resolveClose) => server.close(resolveClose));
+    }
+  } else {
+    await writeFile(join(temp, "main.cjs"), `
 const { app, BrowserWindow } = require("electron");
 const path = require("node:path");
 const { writeFileSync } = require("node:fs");
@@ -57,6 +99,17 @@ app.whenReady().then(async () => {
     await win.loadFile(path.join(__dirname, "index.html"));
     win.webContents.setZoomFactor(0.8);
     const result = await win.webContents.executeJavaScript("globalThis.expertTeamSettingsProbe()");
+    result.productionCss = await win.webContents.executeJavaScript("(" + (() => {
+      const hidden = document.querySelector(".expert-team-settings .settings-icon-button .sr-only");
+      if (!hidden) throw new Error("Missing screen-reader-only edit label");
+      const style = getComputedStyle(hidden);
+      if (style.position !== "absolute" || parseFloat(style.width) > 1.1 || parseFloat(style.height) > 1.1 || style.overflow !== "hidden") {
+        throw new Error("Production CSS must visually hide screen-reader-only edit labels: " + JSON.stringify({ position: style.position, width: style.width, height: style.height, overflow: style.overflow, clip: style.clip, clipPath: style.clipPath }));
+      }
+      return { srOnlyHidden: true };
+    }).toString() + ")()");
+    result.overviewStyles = [];
+    for (const theme of ["light", "dark"]) result.overviewStyles.push(await win.webContents.executeJavaScript("globalThis.expertTeamSettingsStyleProbe(" + JSON.stringify(theme) + ")"));
     result.overview = { viewport: await win.webContents.executeJavaScript("window.innerWidth"), zoom: win.webContents.getZoomFactor() };
     await win.webContents.executeJavaScript("new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
     const screenshot = await win.capturePage();
@@ -64,27 +117,33 @@ app.whenReady().then(async () => {
     win.webContents.setZoomFactor(1);
     win.setSize(800, 840);
     result.narrow = await win.webContents.executeJavaScript("globalThis.expertTeamSettingsViewportProbe()");
+    await win.webContents.executeJavaScript('globalThis.expertTeamSettingsStyleProbe("light")');
     await win.webContents.executeJavaScript("new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
     writeFileSync(process.env.PI_E2E_EVIDENCE_PATH.replace(/\\.png$/, "-narrow-light.png"), (await win.capturePage()).toPNG());
+    win.setSize(560, 840);
+    result.compact = [];
+    for (const theme of ["light", "dark"]) result.compact.push(await win.webContents.executeJavaScript("globalThis.expertTeamSettingsStyleProbe(" + JSON.stringify(theme) + ")"));
+    writeFileSync(process.env.PI_E2E_EVIDENCE_PATH.replace(/\\.png$/, "-compact-dark.png"), (await win.capturePage()).toPNG());
     await win.webContents.executeJavaScript("globalThis.expertTeamSettingsCleanup?.()");
     console.log("EXPERT_TEAM_SETTINGS " + JSON.stringify(result));
     app.exit(0);
   } catch (error) { console.error(error); app.exit(1); }
 });
 `);
-  const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
-  env.PI_E2E_EVIDENCE_PATH = evidencePath;
-  const child = spawn(resolveElectronBinary(root).electronBinary, [join(temp, "main.cjs")], { env, stdio: ["ignore", "pipe", "pipe"] });
-  let output = "";
-  for (const stream of [child.stdout, child.stderr]) stream.on("data", (chunk) => { output += chunk; });
-  const timer = setTimeout(() => child.kill("SIGKILL"), 30_000);
-  let code;
-  try { code = await new Promise((resolve, reject) => { child.once("error", reject); child.once("close", resolve); }); }
-  finally { clearTimeout(timer); }
-  assert.equal(code, 0, output);
-  const result = output.split(/\r?\n/).find((line) => line.startsWith("EXPERT_TEAM_SETTINGS "));
-  assert(result, output);
-  console.log(result);
-  console.log(`EXPERT_TEAM_SETTINGS_SCREENSHOT ${evidencePath}`);
-  assert.equal(JSON.parse(result.slice("EXPERT_TEAM_SETTINGS ".length)).ok, true);
+    const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
+    env.PI_E2E_EVIDENCE_PATH = evidencePath;
+    const child = spawn(resolveElectronBinary(root).electronBinary, [join(temp, "main.cjs")], { env, stdio: ["ignore", "pipe", "pipe"] });
+    let output = "";
+    for (const stream of [child.stdout, child.stderr]) stream.on("data", (chunk) => { output += chunk; });
+    const timer = setTimeout(() => child.kill("SIGKILL"), 30_000);
+    let code;
+    try { code = await new Promise((resolve, reject) => { child.once("error", reject); child.once("close", resolve); }); }
+    finally { clearTimeout(timer); }
+    assert.equal(code, 0, output);
+    const result = output.split(/\r?\n/).find((line) => line.startsWith("EXPERT_TEAM_SETTINGS "));
+    assert(result, output);
+    console.log(result);
+    console.log(`EXPERT_TEAM_SETTINGS_SCREENSHOT ${evidencePath}`);
+    assert.equal(JSON.parse(result.slice("EXPERT_TEAM_SETTINGS ".length)).ok, true);
+  }
 } finally { await rm(temp, { recursive: true, force: true }); }

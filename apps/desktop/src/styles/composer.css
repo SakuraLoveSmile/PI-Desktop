@@ -208,7 +208,8 @@
   /* Positioning context for the autocomplete panel (D123–D125, ADR 0024). */
   position: relative;
   width: 100%;
-  border-radius: var(--ds-composer-radius, var(--radius-2xl));
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--radius-lg);
   background: var(--ds-bg-composer);
   box-shadow: var(--ds-shadow-composer);
   isolation: isolate;
@@ -218,8 +219,9 @@
     transform var(--motion-duration-normal) var(--motion-ease-out);
 }
 
-/* Focus deepens the lift; the shell never gains a stroke (D297). */
+/* The approved composer outline stays neutral in both themes. */
 .composer-shell:focus-within {
+  border-color: var(--ds-border-default);
   box-shadow: 0 7px 24px color-mix(in oklab, var(--ds-text-primary) 9%, transparent);
 }
 
@@ -234,7 +236,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  padding: 10px 12px 0;
+  padding: 16px 16px 0;
   min-height: 44px;
 }
 
@@ -314,7 +316,7 @@
 
 .composer-input {
   width: 100%;
-  min-height: 3lh;
+  min-height: 4lh;
   max-height: 7lh;
   overflow-y: hidden;
   resize: none;
@@ -327,6 +329,11 @@
   white-space: pre-wrap;
   overflow-wrap: break-word;
   cursor: text;
+}
+
+/* Compact chat drafts without changing the shared scheduled-editor surface. */
+.composer-dock .composer-input {
+  min-height: 2lh;
 }
 
 /* Atomic inline attachment chip inside the editable draft. */
@@ -411,13 +418,13 @@
   gap: 8px;
   flex-wrap: nowrap;
   min-width: 0;
-  padding: 4px 8px 8px;
+  padding: 8px 10px 10px;
 }
 
 .composer-left {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   min-width: 0;
   flex: 0 1 auto;
 }
@@ -469,12 +476,12 @@
 
 .send-btn {
   display: inline-flex;
-  height: 28px;
-  width: 28px; /* Codex spacing-token-button-composer = 28px */
-  flex: 0 0 28px;
+  height: 32px;
+  width: 32px;
+  flex: 0 0 32px;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-sm);
   background: var(--ds-accent);
   color: var(--ds-bg-primary);
   transition: opacity var(--motion-duration-fast) var(--motion-ease-out), transform var(--motion-duration-fast) var(--motion-ease-out);
@@ -515,12 +522,12 @@
 
 .stop-btn {
   display: inline-flex;
-  height: 28px;
-  width: 28px;
-  flex: 0 0 28px;
+  height: 32px;
+  width: 32px;
+  flex: 0 0 32px;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-sm);
   background: color-mix(in oklab, var(--ds-text-primary) 16%, transparent);
   color: var(--ds-text-primary);
   transition:
@@ -964,6 +971,38 @@
   color: var(--ds-danger);
 }
 
+.composer-usage-context {
+  margin-left: auto;
+}
+
+.composer-usage-context-track {
+  display: block;
+  width: 72px;
+  height: 5px;
+  flex: 0 0 72px;
+  overflow: hidden;
+  border-radius: var(--radius-2xs);
+  background: var(--ds-bg-hover);
+}
+
+.composer-usage-context-fill {
+  display: block;
+  height: 100%;
+  background: var(--ds-text-muted);
+}
+
+.composer-usage-context[data-level="warning"] .composer-usage-context-fill {
+  background: var(--ds-warning);
+}
+
+.composer-usage-context[data-level="critical"] .composer-usage-context-fill {
+  background: var(--ds-danger);
+}
+
+.composer-usage-context[data-unavailable="true"] .composer-usage-value {
+  color: var(--ds-text-muted);
+}
+
 .composer-bottom-footer {
   display: flex;
   flex-wrap: wrap;
@@ -976,5 +1015,12 @@
 }
 
 .composer-bottom-footer .composer-usage-footer {
+  width: auto;
+  margin-left: auto;
   min-width: 0;
 }
+
+.composer-workspace-context { display: flex; flex: 1; min-width: 0; align-items: center; gap: 16px; color: var(--ds-text-muted); font-size: var(--text-xs); }
+.composer-workspace-item { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
+.composer-workspace-item svg { flex-shrink: 0; }
+.composer-workspace-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

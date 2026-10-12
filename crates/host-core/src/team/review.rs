@@ -81,7 +81,7 @@ pub fn declare_team_strategy(
     validate_team_lead(db, team_session_id)?;
 
     if strategy != "delegate" {
-        return Err(anyhow!("TEAM_APPROVAL_REQUIRED: Expert Team requires delegate with at least one expert; switch to standard for solo work"));
+        return Err(anyhow!("TEAM_APPROVAL_REQUIRED: Expert Team requires strategy='delegate' with at least one expert; switch to standard for solo work"));
     }
     if lead_turn_id.trim().is_empty() {
         return Err(anyhow!("INVALID_PARAMS: leadTurnId must not be empty"));
@@ -882,11 +882,16 @@ fn validate_presentation(
         "collaborator",
     ];
     let display_name = presentation.display_name.trim();
-    if !ROLES.contains(&presentation.role.as_str())
-        || display_name.is_empty()
-        || display_name.chars().count() > 64
-    {
-        return Err(anyhow!("INVALID_PARAMS: invalid team member presentation"));
+    if !ROLES.contains(&presentation.role.as_str()) {
+        return Err(anyhow!(
+            "INVALID_PARAMS: presentation.role must be one of: {}",
+            ROLES.join(", ")
+        ));
+    }
+    if display_name.is_empty() || display_name.chars().count() > 64 {
+        return Err(anyhow!(
+            "INVALID_PARAMS: presentation.displayName must contain 1 to 64 characters after trimming"
+        ));
     }
     Ok(super::model::TeamMemberPresentation {
         role: presentation.role,

@@ -6,6 +6,7 @@
 import { randomUUID } from "node:crypto";
 import type { ModelAuth } from "@earendil-works/pi-ai";
 import { ParentHostProxy } from "./parent-host-proxy.js";
+import { bindProjectContextHost } from "./project-context-host.js";
 import { visionFromModelConfig } from "./model-capabilities.js";
 import { hydrateAttachmentHistory } from "./attachment-history.js";
 import { classifyAgentError } from "./agent-errors.js";
@@ -63,6 +64,7 @@ async function getNativePiService() {
 }
 
 const runtimes: RuntimeMap = new Map();
+const runtimeProjectBindings = new WeakMap<DesktopAgentRuntime, string | undefined>();
 const hostProxy = new ParentHostProxy();
 const testRuntimeIds = new WeakMap<DesktopAgentRuntime, string>();
 function testRuntimeIdentity(sessionId: string) {
@@ -116,6 +118,8 @@ type RuntimeParams = {
   trustedExtensions?: TrustedExtensionSpec[];
   /** Delegates this session may spawn through `Task` (ADR 0062). */
   subagents?: SubagentDefinition[];
+  subagentMaxDepth?: number;
+  subagentMaxConcurrency?: number;
   /** Provider bindings for pinned models, keyed by `subagentModelKey`. */
   subagentProviders?: Record<string, RuntimeProviderConfig>;
   /** Opted-in override keys, separate from definition-only pinned bindings. */
@@ -123,6 +127,8 @@ type RuntimeParams = {
   scratchDir?: string;
   /** Session-bound workspace root supplied by Electron main. */
   projectPath?: string;
+  /** Parent-issued capability for this session's registered project root. */
+  projectContextBindingId?: string;
   customSystemPrompt?: CustomSystemPrompt;
   projectInstructions?: ProjectInstructions;
   projectMemory?: string;
@@ -228,7 +234,7 @@ async function runtimeFor(
       errorCode: "AGENT_BUSY",
     });
   }
-  const reusable = existing?.matches({
+  const reusable = existing && runtimeProjectBindings.get(existing) === params.projectContextBindingId && existing.matches({
     mode,
     executionProfile,
     teamContext: params.teamContext,
@@ -240,6 +246,8 @@ async function runtimeFor(
     subagents,
     subagentProviders,
     subagentModelKeys,
+    subagentMaxDepth: params.subagentMaxDepth,
+    subagentMaxConcurrency: params.subagentMaxConcurrency,
     projectInstructions: params.projectInstructions,
     customSystemPrompt: params.customSystemPrompt,
     projectMemory: params.projectMemory,
@@ -296,7 +304,7 @@ async function runtimeFor(
     }
   }
   const runtime = new DesktopAgentRuntime({
-    host: hostProxy,
+    host: bindProjectContextHost(hostProxy, sessionId, params.projectContextBindingId),
     sessionId,
     mode,
     executionProfile,
@@ -315,6 +323,8 @@ async function runtimeFor(
     subagents,
     subagentProviders,
     subagentModelKeys,
+    subagentMaxDepth: params.subagentMaxDepth,
+    subagentMaxConcurrency: params.subagentMaxConcurrency,
     projectPath: params.projectPath,
     customSystemPrompt: params.customSystemPrompt,
     projectInstructions: params.projectInstructions,
@@ -327,6 +337,7 @@ async function runtimeFor(
     onDiagnostic: (diagnostic) => notify("agent.diagnostic", diagnostic),
   });
   runtimes.set(sessionId, runtime);
+  runtimeProjectBindings.set(runtime, params.projectContextBindingId);
   // Load failures are diagnostics, never a failed prompt (spec 16 §4.4).
   await runtime.loadTrustedExtensions().catch(() => undefined);
   if (provider.extensionAgentKey) {
@@ -548,7 +559,7 @@ async function handle(method: string, params: any): Promise<unknown> {
       if (!matchesExpectedTurnId(runtime?.getStatus().currentTurnId, turnId)) {
         return { requested: false };
       }
-      return runtime?.requestGracefulStop() ?? { requested: false };
+      return runtime?.requestGracefulStop(params.preserveRunningTools === true) ?? { requested: false };
     }
     case "asktool.resolve": {
       const sessionId = String(params.sessionId ?? "");

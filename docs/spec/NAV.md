@@ -29,6 +29,10 @@
 - [04-data-storage.md](03-runtime/04-data-storage.md)
 - [05-host-core-rust.md](03-runtime/05-host-core-rust.md)
 - [06-host-rpc-protocol.md](03-runtime/06-host-rpc-protocol.md)
+- [team-task-dispatch.md](03-runtime/team-task-dispatch.md)
+- [team-run-limits.md](03-runtime/team-run-limits.md)
+- [team-ordinary-inbox.md](03-runtime/team-ordinary-inbox.md)
+- [team-managed-services.md](03-runtime/team-managed-services.md)
 - [07-process-model.md](03-runtime/07-process-model.md)
 - [08-error-codes.md](03-runtime/08-error-codes.md)
 - [09-logging-and-observability.md](03-runtime/09-logging-and-observability.md)
@@ -75,9 +79,13 @@
 - [02-acceptance-criteria.md](06-delivery/02-acceptance-criteria.md)
 - [03-ai-development-workflow.md](06-delivery/03-ai-development-workflow.md)
 - [04-e2e-test-plan.md](06-delivery/04-e2e-test-plan.md)
+- [team-task-dispatch-scenarios.md](06-delivery/team-task-dispatch-scenarios.md)
 - [05-change-checklist.md](06-delivery/05-change-checklist.md)
 - [06-release-runbook.md](06-delivery/06-release-runbook.md)
 - [07-remote-control-rollout.md](06-delivery/07-remote-control-rollout.md)
+
+- [07-test-maintenance.md](06-delivery/07-test-maintenance.md)
+- [08-scenario-index.md](06-delivery/08-scenario-index.md)
 
 ## 7. Plugins
 - [README.md](07-plugins/README.md)
@@ -106,3 +114,6 @@
 
 ## ADR
 - [../adr/README.md](../adr/README.md)
+
+- [Context Insights](03-runtime/context-insights.md) — captured requests, provider payloads, retention and native inspection.
+- [Session Activity Projection](03-runtime/session-activity-projection.md) — complete canonical session summaries and paged Host reads.

@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Policy-Sync: 2026-09-26.1
+Policy-Sync: 2026-10-10.1
 
 Instructions for Claude Code CLI and Claude Cowork on PI-Desktop.
 
@@ -40,7 +40,8 @@ Every request uses:
 
 - Never develop on `main` or in the primary checkout.
 - Never merge unvalidated task code into local `main`.
-- Never reuse, modify, or delete another agent's branch or worktree.
+- Never reuse or modify another agent's branch or worktree. Delete another
+  task's resources only within an explicitly user-authorized batch cleanup.
 - Never discard unrelated work in the primary checkout.
 - Resolve conflicts only inside your own task worktree.
 
@@ -79,6 +80,34 @@ Branch names: `feat/...`, `fix/...`, `docs/...`, `refactor/...`, `chore/...`.
 ```
 
 Do **not** insert `merge task → local main` between refresh and task-candidate E2E. The task branch itself is the local integration candidate after incorporating latest `origin/main`. Do not open or update a PR that is behind `origin/main`. Run `pnpm check:pr-base` before opening or updating a PR.
+
+
+### Verified merge and cleanup
+
+Post-merge cleanup is mandatory and part of delivery. After verifying a
+user-authorized merge and its integration checks, clean up this request's own
+resources in the same task without another cleanup approval. Verify local
+`main` for local-only delivery; remote delivery also verifies remote `main`
+and safely synchronizes local `main`.
+
+- Archive dirty/untracked work and needed ignored packages, screenshots and
+  configuration recoverably before removal; do not discard unsaved data or
+  force-delete an unmerged branch.
+- Remove/archive request-owned worktrees, prune stale registrations, and remove
+  empty parent directories only when they contain no other data beyond name
+  markers. Prefer the managed archive operation for managed worktrees.
+- Delete verified merged task/obsolete integration branches.
+  Do not keep backup snapshots as normal local branches. Preserve backup
+  commits through archive refs outside `refs/heads/` or verified backup files
+  before retiring visible temporary branch refs.
+- Verify `git worktree list`, local branches and physical request paths, then
+  report cleanup separately. A leftover worktree, empty container or visible
+  backup branch means cleanup is incomplete; name its path/ref and recovery
+  state if blocked.
+
+Preserve the primary checkout, active/unmerged work, needed archives and other
+requests. Another task needs explicit user-authorized batch cleanup. This rule
+adds no merge, push or remote-branch-deletion authorization.
 
 Record E2E evidence:
 
@@ -200,6 +229,28 @@ Before coding, decide "direct change" vs "refactor first". Refactor (or make it 
 | Docs / no-logic config | Verify links, paths, commands, facts; no unit tests required |
 
 "Diff is small", "no time", "typecheck passed", "manually clicked through" are not reasons to skip tests. When you skip, state the basis, alternative verification you ran, and residual risk.
+
+Assert behavior or stable contracts, not repository source/CSS text. Freeze new
+source/CSS regex assertions with `pnpm check:test-quality -- --base <base>`:
+per-file, per-case signature inventories only decrease against the established
+base. Initial bootstrap uses the maintenance spec's immutable trusted
+pre-governance snapshot.
+Fixture reads and regex on executed component output remain allowed. Never
+increase or reset the baseline; lower it after retirement using `--write-baseline`
+against the same base. Runtime domain tests and helpers in
+`packages/agent-runtime/src/runtime-tests/`, plus old `runtime.test.ts`, stay
+within an 800-line file budget.
+
+Pure copy, i18n, documentation, and visual styling need no new tests when they
+change no runtime rule, interaction, responsive usability, accessibility, or
+content layout; verify the affected surface and state basis and residual risk.
+Bug fixes still require a behavioral regression test. Remove superseded tests
+and obsolete scenario IDs in the same PR after mapping replacement coverage;
+do not delete live coverage to meet budgets. Quarterly run
+`pnpm audit:test-maintenance` and review high-churn suites using actual
+regression-catching evidence. Missing evidence means unknown. The audit never
+deletes tests automatically. See
+[test maintenance](docs/spec/06-delivery/07-test-maintenance.md).
 
 ### Delivery report
 

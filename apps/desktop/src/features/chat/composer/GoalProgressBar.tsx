@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { GoalReportChangedEvent, PlanProposal } from "@pi-desktop/shared";
-import { api } from "../../../lib/api";
+import type { PlanProposal } from "@pi-desktop/shared";
+import { useGoalActivity } from "../../../hooks/useGoalActivity";
 import { Button } from "../../../components/ui";
 import { IconChevronDown, IconChevronRight } from "../../../components/icons";
 import { usePendingTeamExecutionReview } from "../../../hooks/useTeamExecutionReview";
@@ -9,9 +9,6 @@ import { useAppStore } from "../../../stores/app-store";
 import {
   shouldShowGoalProgressBar,
   resolveGoalCapsuleState,
-  selectExecutionProgressState,
-  shouldAcceptGoalProgressSnapshot,
-  type GoalProgressViewState,
 } from "../../../lib/goal-progress-presentation";
 
 const sessionCollapsePreferences = new Map<string, boolean>();
@@ -32,17 +29,7 @@ export function GoalProgressBar({ sessionId, proposal }: GoalProgressBarProps) {
   const [expanded, setExpanded] = useState<boolean>(() => {
     return sessionCollapsePreferences.get(sessionId) ?? false;
   });
-  const executionId = proposal.executionId ?? "";
-  const stateKey = `${sessionId}\u0000${executionId}`;
-  const [progressState, setProgressState] = useState<GoalProgressViewState>(() => ({
-    executionId: stateKey,
-    progress: null,
-    reportReady: false,
-    error: null,
-    loading: Boolean(executionId),
-  }));
-  const currentState = selectExecutionProgressState(progressState, stateKey);
-  const { progress, loading, error, reportReady } = currentState;
+  const { progress, loading, error, reportReady } = useGoalActivity(sessionId, proposal.executionId);
 
   useEffect(() => {
     setExpanded(sessionCollapsePreferences.get(sessionId) ?? false);
@@ -56,151 +43,37 @@ export function GoalProgressBar({ sessionId, proposal }: GoalProgressBarProps) {
     });
   };
 
-  // Poll / subscribe to report status and progress snapshot
-  useEffect(() => {
-    if (!executionId) {
-      setProgressState({
-        executionId: stateKey,
-        progress: null,
-        reportReady: false,
-        error: null,
-        loading: false,
-      });
-      return;
-    }
-
-    let isMounted = true;
-    let progressRequestSequence = 0;
-    const resetState = () => setProgressState({
-      executionId: stateKey,
-      progress: null,
-      reportReady: false,
-      error: null,
-      loading: true,
-    });
-    resetState();
-
-    // Check existing report status
-    api.getGoalReport({ sessionId, executionId })
-      .then((res) => {
-        if (isMounted && res?.report?.status === "ready") {
-          setProgressState((state) => state.executionId === stateKey
-            ? { ...state, reportReady: true }
-            : state);
-        }
-      })
-      .catch(() => {
-        // Report might not exist yet
-      });
-
-    // Check existing progress
-    const initialRequestSequence = ++progressRequestSequence;
-    api.getGoalProgress({ sessionId, executionId })
-      .then((res) => {
-        if (isMounted && initialRequestSequence === progressRequestSequence) {
-          const candidate = res?.progress ?? null;
-          const incoming = candidate?.executionId === executionId && candidate.sessionId === sessionId
-            ? candidate
-            : null;
-          setProgressState((state) => {
-            if (state.executionId !== stateKey) return state;
-            return {
-              ...state,
-              progress: shouldAcceptGoalProgressSnapshot(state.progress, incoming)
-                ? incoming
-                : state.progress,
-              error: null,
-              loading: false,
-            };
-          });
-        }
-      })
-      .catch((err: unknown) => {
-        if (isMounted && initialRequestSequence === progressRequestSequence) {
-          setProgressState((state) => state.executionId === stateKey
-            ? { ...state, error: err instanceof Error ? err.message : String(err), loading: false }
-            : state);
-        }
-      });
-
-    // Subscribe to report changes
-    const unsubReport = api.onGoalReportChanged((event: GoalReportChangedEvent) => {
-      if (!isMounted) return;
-      if (event?.sessionId === sessionId && event?.executionId === executionId && event?.status === "ready") {
-        setProgressState((state) => state.executionId === stateKey
-          ? { ...state, reportReady: true }
-          : state);
-      }
-    });
-
-    // Subscribe to progress changes
-    const unsubProgress = api.onGoalProgressChanged((event) => {
-      if (!isMounted) return;
-      if (event?.sessionId === sessionId && event?.executionId === executionId) {
-        const requestSequence = ++progressRequestSequence;
-        api.getGoalProgress({ sessionId, executionId })
-          .then((res) => {
-            if (isMounted && requestSequence === progressRequestSequence) {
-              const candidate = res?.progress ?? null;
-              const incoming = candidate?.executionId === executionId && candidate.sessionId === sessionId
-                ? candidate
-                : null;
-              setProgressState((state) => {
-                if (state.executionId !== stateKey) return state;
-                return {
-                  ...state,
-                  progress: shouldAcceptGoalProgressSnapshot(state.progress, incoming)
-                    ? incoming
-                    : state.progress,
-                  error: null,
-                  loading: false,
-                };
-              });
-            }
-          })
-          .catch((err: unknown) => {
-            if (isMounted && requestSequence === progressRequestSequence) {
-              setProgressState((state) => state.executionId === stateKey
-                ? { ...state, error: err instanceof Error ? err.message : String(err) }
-                : state);
-            }
-          });
-      }
-    });
-
-    return () => {
-      isMounted = false;
-      unsubReport();
-      unsubProgress();
-    };
-  }, [sessionId, executionId, stateKey]);
-
   if (!shouldShowGoalProgressBar({ proposal, reportReady })) {
     return null;
   }
 
-  const capsuleState = resolveGoalCapsuleState({
-    loading,
-    error,
-    progress,
-    labels: {
-      initializing: t("goal.progressInitializing", "准备中..."),
-      failed: t("goal.progressFailed", "进度读取失败"),
-    },
-  });
-
-  const items = progress?.items ?? [];
-
-  const stateBadgeText =
-    pendingTeamReview
-      ? t("team.review.status.pending")
-      : proposal.executionState === "queued"
+  const executionBadgeText =
+    proposal.executionState === "queued"
       ? t("chat.scheduleExecutionState.queued", "排队中")
       : proposal.executionState === "interrupted"
       ? t("chat.scheduleExecutionState.interrupted", "已中断")
       : proposal.executionState === "completed"
       ? t("chat.scheduleExecutionState.completed", "已完成")
       : t("chat.scheduleExecutionState.running", "执行中");
+
+  const capsuleState = resolveGoalCapsuleState({
+    loading,
+    error,
+    progress,
+    labels: {
+      initializing: t("goal.progressInitializing", "加载进度..."),
+      running: executionBadgeText,
+      failed: t("goal.progressFailed", "进度读取失败"),
+    },
+  });
+  const stateBadgeText = capsuleState.kind === "error"
+    ? capsuleState.message
+    : pendingTeamReview
+    ? t("team.review.status.pending")
+    : capsuleState.kind === "progress"
+    ? executionBadgeText
+    : capsuleState.message;
+  const items = progress?.items ?? [];
 
   const circumference = 37.7; // 2 * pi * 6
   const dashOffset =
@@ -222,17 +95,11 @@ export function GoalProgressBar({ sessionId, proposal }: GoalProgressBarProps) {
           aria-label={`${t("goal.progressLabel")} · ${proposal.title} · ${expanded ? t("chat.subagentTaskCollapse") : t("chat.subagentTaskExpand")}`}
         >
           <span className="goal-progress-bar-left">
-            <span className="goal-progress-capsule" role="status" aria-live="polite">
+            <span className="goal-progress-capsule">
               <span className="goal-progress-scope">{t("goal.progressLabel")}</span>
-              {pendingTeamReview && capsuleState.kind !== "error" ? (
-                <span className="goal-progress-status-text">
-                  {t("team.review.status.pending")}
-                </span>
-              ) : capsuleState.kind === "error" || capsuleState.kind === "initializing" ? (
-                <span className="goal-progress-status-text">
-                  {capsuleState.message}
-                </span>
-              ) : (
+              {!pendingTeamReview && (capsuleState.kind === "initializing" || capsuleState.kind === "indeterminate") ? (
+                <span className="goal-progress-indeterminate" aria-hidden="true" />
+              ) : !pendingTeamReview && capsuleState.kind === "progress" ? (
                 <>
                   <svg
                     width={16}
@@ -272,11 +139,20 @@ export function GoalProgressBar({ sessionId, proposal }: GoalProgressBarProps) {
                     </span>
                   </span>
                 </>
-              )}
+              ) : null}
             </span>
             <span className="goal-progress-bar-title" title={proposal.title}>{proposal.title}</span>
           </span>
-          <span className="goal-progress-badge" data-state={proposal.executionState}>{stateBadgeText}</span>
+          <span
+            className="goal-progress-badge"
+            data-state={proposal.executionState}
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            aria-label={!pendingTeamReview && capsuleState.kind === "progress"
+              ? `${t("goal.progressLabel")} ${capsuleState.completedCount}/${capsuleState.totalCount} · ${stateBadgeText}`
+              : stateBadgeText}
+          >{stateBadgeText}</span>
           {expanded ? <IconChevronDown size={14} aria-hidden /> : <IconChevronRight size={14} aria-hidden />}
         </Button>
 

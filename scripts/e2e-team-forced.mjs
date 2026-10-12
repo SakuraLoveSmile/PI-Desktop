@@ -15,6 +15,8 @@ export function createForcedFixture(projectPath) {
   let pendingAction = "execute";
   let resultEntered = false;
   let releaseResult;
+  const fastApproval = process.env.PI_E2E_TEAM_FAST_APPROVAL === "1";
+  let fastConfirmed = false, finalHeld = false, releaseFinal;
   let expertStarted = false;
   let releaseExpertStarted;
   const noToolRequests = { recover: 0, persistent: 0, planRecover: 0 };
@@ -33,7 +35,7 @@ export function createForcedFixture(projectPath) {
   };
   const exists = async path => { try { await access(path); return true; } catch (error) { if (error.code === "ENOENT") return false; throw error; } };
   return {
-    release() { releaseRetry?.(); releaseResult?.(); releaseExpertStarted?.(); },
+    release() { releaseRetry?.(); releaseResult?.(); releaseExpertStarted?.(); releaseFinal?.(); },
     async respond({ userText, priorToolNames, activeToolText, activeTurnMessages, toolNames, allMessages }) {
       const has = name => priorToolNames.includes(name);
       const history = JSON.stringify(allMessages);
@@ -53,8 +55,15 @@ export function createForcedFixture(projectPath) {
         expertStarted = false;
         return { toolCall: delegate };
       }
-      if (history.includes("FORCE_TEXT_RECOVER")) {
-        if (has("declare_team_strategy")) return { finalText: "Waiting for the required expert launch review." };
+      if (history.includes("FORCE_TEXT_RECOVER") && !userText.includes("FORCE_EXPERT_WORK") && !userText.includes("FORCE_EXPERT_RESULT")) {
+        if (fastApproval && fastConfirmed) {
+          if (userText.includes("Team review") && userText.includes("confirmed")) return { finalText: "The approved expert is running." };
+          return dispatchExpert();
+        }
+        if (has("declare_team_strategy")) {
+          if (fastApproval) { finalHeld = true; await new Promise(resolve => { releaseFinal = resolve; }); }
+          return { finalText: "Waiting for the required expert launch review." };
+        }
         noToolRequests.recover += 1;
         return noToolRequests.recover === 1 ? { finalText: "MODEL_PLAIN_DONE: I handled the entire task myself." } : { toolCall: delegate };
       }
@@ -209,6 +218,30 @@ export function createForcedFixture(projectPath) {
         const current = (await invoke("teamGetLaunchReview", { teamSessionId: completionSessions.recover.id })).review;
         return current?.status === "pending" && current.members.length === 1 ? current : null;
       }, "one text-only recovery creates nonempty expert review");
+      if (fastApproval) {
+        await waitFor(() => finalHeld, "declaration response held before original turn ends");
+        assert.equal((await invoke("agentGetStatus", completionSessions.recover.id)).status.isRunning, true);
+        await noSideEffects(completionSessions.recover);
+        await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-launch-review-confirm-btn"]:not(:disabled)')`), "fast approval available while Lead runs");
+        await evaluate(`document.querySelector('[data-testid="team-launch-review-confirm-btn"]').click()`);
+        await waitFor(async () => (await invoke("teamGetLaunchReview", { teamSessionId: completionSessions.recover.id })).review?.status === "confirmed", "fast approval committed");
+        fastConfirmed = true;
+        releaseFinal();
+        await waitFor(() => resultEntered, "confirmed original turn actually dispatched an expert and received its result");
+        const original = await invoke("turnGet", { sessionId: completionSessions.recover.id, turnId: recoveredReview.leadTurnId });
+        assert.equal(original.status, "completed", "fast approval failed the original Lead turn");
+        const board = (await invoke("teamGetBoard", { teamSessionId: completionSessions.recover.id })).tasks;
+        assert.equal(board.length, 1); assert.equal(board[0].status, "completed");
+        assert.ok(calls.some(call => call.userText.includes("FORCE_EXPERT_WORK") && call.tool === "Read"));
+        assert.equal(noToolRequests.recover, 2, "preapproval recovery was not exercised");
+        releaseResult();
+        await waitFor(async () => (await invoke("sessionGet", { id: completionSessions.recover.id })).session.messages.some(row => row.content?.includes("FORCED_EXPERT_DONE") && row.status === "complete"), "expert-backed completion");
+        await idle(completionSessions.recover);
+        assert.equal(await evaluate(`document.querySelectorAll('.message-error').length`), 0);
+        await saveScreenshot(sendCdp, "team-fast-approval-complete.png");
+        console.log("PASS fast Team confirmation: consumed preapproval recovery, confirmed while original Lead runs, real owned expert dispatch/read/result and healthy completion");
+        return;
+      }
       await idle(completionSessions.recover);
       assert.equal(noToolRequests.recover, 2, "text-only completion must use one bounded recovery");
       const recoveredMessages = (await invoke("sessionGet", { id: completionSessions.recover.id })).session.messages;

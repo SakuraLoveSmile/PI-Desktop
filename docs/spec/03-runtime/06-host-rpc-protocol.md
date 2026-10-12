@@ -42,7 +42,7 @@ The RPC dispatcher caps active requests at 32. `tools.execute` then enters a
 bounded execution budget:
 
 - 16 total tool executions
-- 4 concurrent `Bash` processes globally, 2 per session
+- 4 concurrent `Bash` processes globally, subject to the 4-tool per-session limit
 - 8 read/search tools globally
 - 2 mutating tools globally, 1 per session
 - 4 plugin tools globally
@@ -61,6 +61,22 @@ Dropping a waiting admission future or letting it time out removes its queue
 entry and releases any reservation made before the caller receives its permit. The health counters report only
 fully admitted reservations, including those awaiting delivery to the caller;
 `queued` counts only requests still waiting for capacity.
+
+A rejected `Bash` admission adds `content.capacity` to the existing tool result.
+It contains `host` and requesting `session` counts (`inFlight`, `queued`,
+`shellInFlight`, `shellQueued`) and `holders`, a sorted list of `{ sessionId,
+tool: "Bash", inFlight }`. Counts are captured atomically at rejection, before
+removing the rejected call's queue entry: a timed-out call is included in queued
+counts; a queue-full call was never queued and is excluded. Granted reservations
+count as in-flight, never queued. Diagnostics and admission logs contain only
+session/tool identities and counts, never commands, paths or command output.
+The English error explains that managed background processes and long `sleep`
+hold a shell slot until they stop. Use `wait_for_updates` for Team replies, or
+start long commands in the background and check their process status after
+capacity returns; background execution uses the same limits. Bash descriptions
+and execution Team prompts repeat the no-sleep-polling guidance. Non-shell
+rejections keep their existing message and omit `capacity`; limits, retryability,
+FIFO among eligible requests, approval and cancellation semantics are unchanged.
 
 Electron's `HostProcess` treats an explicit `HOST_OVERLOADED` response as
 retryable backpressure for renderer-facing calls. It waits 50, 100, 200, and
@@ -184,7 +200,7 @@ checkpoint architecture remains host-owned.
 The shared host-core storage chain is v19. Plus-only structures, including
 approved execution provider/model bindings, durable revision intent fields, and
 the `plan_execution_schedules` table, are versioned by the separate Plus track
-recorded in `plus_schema_meta` (current v4; see the data-storage spec, section
+recorded in `plus_schema_meta` (current v5; see the data-storage spec, section
 7.1), so a Plus persistence increment does not move `user_version`. Protocol v11
 remains the wire version; persistence increments on either track do not add a
 JSON-RPC version field.
@@ -363,6 +379,9 @@ to later refresh and inference; the vendor picker does not collect them.
   data stay with the session. Blank ids or paths are `INVALID_PARAMS`, an
   unknown session is `NOT_FOUND`, and a session with a running turn is
   `CONFLICT` so a live agent never switches instruction roots mid-turn.
+  Active managed background jobs return `SESSION_HAS_BACKGROUND_PROCESSES`;
+  an unsaved terminal job returns `BACKGROUND_PROCESS_PERSISTENCE_FAILED`.
+  Stop jobs and persist terminal state before moving their owning session.
   Additive RPC; no protocol version bump.
 - `session.appendMessage`
 - `session.saveInflightMessage` — Electron-main-only checkpoint of the
@@ -425,6 +444,64 @@ to later refresh and inference; the vendor picker does not collect them.
   delivery. Host resolves the sender's effective permission mode (including
   `inherit` against the current default) and stores it as the message ceiling;
   `session.beginTurn` enforces that ceiling before a recipient turn starts.
+
+A member turn that wins terminal settlement with `status: "error"` atomically
+adds one Host-authored mailbox notice. It retains the existing ledger
+`kind: "message"` and string `content` envelope; the content is JSON:
+`{kind:"member_failed",memberName,errorCode,retriable,taskIds,suggestedAction}`.
+The error is a sanitized code, never raw text, a path or credentials. Task ids
+include open owned tasks and tasks failed by that exact settled attempt.
+`retriable` is conservative advisory guidance: only unambiguous transient codes
+(`HOST_OVERLOADED`, `HOST_UNAVAILABLE`, `PROVIDER_RATE_LIMITED`, `TIMEOUT`)
+are true; other/unknown failures require inspection before explicit re-dispatch.
+It does not authorize an automatic retry.
+
+The Host reserves `member-turn-failed:<turnId>` idempotency keys; model calls to
+`team.sendMessage` using this prefix return `TEAM_UNAUTHORIZED`. The terminal
+CAS, notice, Host-only source proof and Team revision commit together. Replay
+cannot add a notice; user abort/cancel adds none. Completed turns use the
+separate silent-completion rule below. After commit,
+existing `team.messageQueued` wakes waiting Leads and Main's existing durable
+Team delivery admits idle Leads without changing Agent Host queue semantics.
+Restart recovers undelivered notices through the existing pending-mail drain.
+
+For an approved execution, the notice has `team-message-source-turn-v1` plus a
+Host-owned `team-member-failure-v1` proof. Only this proof permits an error-ended
+current dispatch result to enter the execution inbox; arbitrary member text
+claiming `member_failed` is not proof, and aborted turns remain excluded.
+The unread notice blocks completion until `wait_for_updates` consumes its full
+body. Consuming a failure does not count as successful expert participation.
+
+Host failure delivery also survives post-commit checkpoint I/O errors: the error
+remains observable, while the already durable queued notice emits its existing
+wake event. A terminal replay may re-notify that same pending row; no second
+notice is inserted, and a consumed/running notice is not emitted again.
+
+A Lead-dispatched non-Lead member turn that settles as `completed` without a
+report atomically adds one Host-authored member-to-Lead notice when, after task
+attempt settlement, that member still owns non-deleted `pending` or
+`in_progress` tasks. The starting collaboration message must have `source=team`
+and the exact turn binding. A direct user conversation with a member, an
+aborted/cancelled turn, a member with no open tasks, or a turn that already sent
+Team mail to Lead produces no silent-completion notice. Existing source-turn
+proofs on outgoing Team mail determine whether the member reported; body text
+is never evidence.
+
+The existing message content is JSON
+`{kind:"member_ended_without_report",memberName,taskIds,suggestedAction}` without
+model output or paths. `member-turn-silent:<turnId>` is Host-reserved;
+model-authored sends using any Host notification prefix fail with
+`TEAM_UNAUTHORIZED`. The terminal CAS, notice, source proof in
+`team-message-source-turn-v1`, and Team revision commit together. Terminal
+replay never inserts another notice or repeats an already admitted wake. A
+Host-only kv event marker is written after transport admission; failed transport
+leaves pending recovery possible. A crash between admission and that marker may
+repeat the same message ID, which the durable delivery path deduplicates. Existing `team.messageQueued` delivery
+wakes the Lead, including an idle Lead. An unread notice from a current
+completed dispatch blocks approved completion until `wait_for_updates` consumes
+it. Completed dispatch provenance needs no error-turn `team-member-failure-v1`
+proof. Consuming a Host notice does not establish successful participation or
+complete tasks. Deleting either owning session removes notification proofs.
 
 The `wait_for_updates` tool subscribes before reading its baseline and wakes on
 matching `team.changed` / `team.messageQueued` notifications, debounced for
@@ -687,6 +764,12 @@ contract is being negotiated.
 
 - `goalReports.get` / `goalReports.list` / `goalReports.submitDraft` / `goalReports.invalidateDraft` /
   `goalReports.finalizeReport` / `goalReports.markFailed` / `goalReports.getAsset`
+  - `goalReports.submitDraft` rejects a `met` claim when the latest matching Goal progress
+    contains any item not marked completed. Expected draft validation failures return
+    `INVALID_ARGUMENT` (RPC code 1002), with correction guidance, and do not mark the
+    report as a persistence failure. Reconcile progress and retry; honest partial/blocked
+    claims and legacy callers without a progress snapshot remain supported.
+    Finalization rechecks progress so a later update cannot publish a stale `met` claim.
   - `goalReports.finalizeReport` and report Retry require the Host's persisted execution state `completed`.
     Attempting to finalize/retry an execution that is `interrupted`, `queued`, `running`, or missing completion
     is rejected with `GOAL_EXECUTION_NOT_TERMINAL`, without writing report files or broadcasting ready.
@@ -1575,6 +1658,39 @@ also require every approved research member's active turn to end. The Lead's
 own active synthesis turn is permitted; existing Team activity revisions wake
 wait_for_updates after research settlement.
 
+### Expert Team launch route validation
+
+Launch review edits validate enabled providers and configured or cached model
+identities without making provider calls. The configured model binding owns
+non-empty `thinkingLevels`; deprecated provider compatibility reasoning/level
+fields do not override it. `off` and `omit` remain valid (`omit` sends no
+provider parameter). An empty configured binding permits canonical manual
+thinking requests, with the selected native model's final normalization still
+owned by runtime. Catalog-only capability labels do not imply an effort ladder:
+without a binding, only `off`/`omit` are accepted. Missing/disabled routes and
+unsupported explicit binding levels retain `TEAM_MODEL_SELECTION_INVALID`.
+Trusted review edits may update a single member; confirmation always revalidates
+the entire review before creating or updating any expert session.
+
+### Ordinary Team task completion claims
+
+`team.updateTask` may include optional `expectedCallerTurnId`, captured by the
+runtime rather than exposed as a model parameter. Host checks it against the
+caller's current running turn under the mutation lock; a stale identity returns
+`TEAM_TURN_INVALID` before changing the task. Legacy clients omitting it remain
+compatible.
+
+An explicit in-progress/completed update associates the task with its active
+owner turn, or the reporting caller's running turn when the owner is idle.
+A completed request returns `task.status = in_progress` until that exact turn
+ends successfully. The runtime explains that the claim was recorded and must
+not be resubmitted merely because the status is still in-progress. Error and
+abort settle associated attempts as failed and cancelled respectively, with a
+Team activity notification for the refreshed board. Duplicate/stale terminals
+cannot change retries; historical/unassociated tasks remain untouched. A normal
+turn end never completes a task lacking a completion claim. Accepted immutable
+Plan research results retain their existing atomic result/completion contract.
+
 ### Mandatory Expert Team delegation
 
 Expert Team requires `delegate` with at least one named expert. `lead_only` is
@@ -1688,9 +1804,14 @@ within its owned runtime turn while preserving full results across recovery.
 
 Participation still authorizes substantive Lead tools. TeamFinalAnswer for an
 approved execution additionally rejects completion while recorded current
-expert dispatches are queued/running or their authenticated results remain
-unconsumed. This separate settlement barrier does not turn participation into
-proof of task ownership or require results beyond the current dispatch scope.
+expert dispatches are queued/running, their authenticated results remain
+unconsumed, or current decision-owned tasks are `pending`/`in_progress`.
+Lead task creation inside the Host-proven active approved execution atomically
+enrolls the task ID in that decision's existing `taskIds`, including tasks never
+dispatched. Only those non-deleted tasks are checked; older decisions' tasks do
+not extend the barrier. Task terminal states are `completed`, `failed`, and
+`cancelled`, allowing an honest unsuccessful close. Participation remains a
+separate predicate and is not granted by task state or Host notification reads.
 Plan research's structured result/inbox submission barrier is separate. Goal
 progress and its sole completion report retain the original execution identity.
 
@@ -1717,3 +1838,331 @@ is rejected; unchanged legacy roundtrips remain readable. Ordinary renderer
 settings writes omit expertTeam unless submitted by this dedicated CAS editor.
 Main applies the complete committed Host settings to network/menu/developer
 side effects, so a partial request cannot reset unrelated runtime policy.
+
+## Plus project context RPCs
+
+| Method | Parameters | Result |
+| --- | --- | --- |
+| `project.memory.editor.get` | `path` | `{editor: {owner, memory, autoRecordEnabled}}` |
+| `project.memory.editor.save` | `path, expectedOwner, expectedMemory, entries` | `{editor}` after owner/snapshot CAS |
+| `project.autoMemory.setEnabled` | `path, expectedOwner, enabled` | `{autoRecordEnabled}` |
+| `project.autoMemory.agentList` | trusted `sessionId, boundPath` | `{memory, autoRecordEnabled}` |
+| `project.autoMemory.agentUpsert` | binding plus optional `id`, `title`, `content`, update's `expectedTitle, expectedContent` | current runtime memory state |
+| `project.autoMemory.agentDelete` | binding plus `id, expectedTitle, expectedContent` | current runtime memory state |
+| `project.history.search` | binding plus literal `query` (1–500 characters), optional `limit` (1–20, default 10) | `{hits, hasMore}` |
+| `project.history.context` | binding plus `targetSessionId, messageId`, optional `query` | `{sessionId, title, messages, truncated}` |
+| `project.codeSearch` | binding plus optional `action` (`search` default, `status`, `clear`), search `query` (1–500 characters), optional `limit` (1–50, default 20) | `{hits, truncated, index}` |
+
+Agent RPCs resolve the stored session project and reject a stale/mismatched
+`boundPath`. The parent proxy additionally requires its opaque launch binding,
+rewrites the path from trusted session launch state and forwards only approved
+fields. Agent memory writes require opt-in and Agent execution mode; Plan/Goal
+are read-only, including code-cache clear. Invalid input and CAS/owner conflicts
+are observable errors; no partial memory save is published. History search is
+scoped before pagination. Context reads enforce the same current group membership
+and exclude deleted sources. Code index scanning runs outside the async worker
+and binding is rechecked after the blocking operation.
+## Session activity RPCs
+
+Local Desktop resources add `sessionNotes.get({sessionId})` and
+`sessionNotes.set({sessionId,content,expectedRevision})`, returning `{note}`.
+An existing session without a note reads exact empty content/revision zero;
+nonexistent sessions are NOT_FOUND and conflicting writes are NOTE_CONFLICT.
+
+`backgroundProcesses.list({sessionId})` returns `{processes}`: all active jobs
+plus latest 100 terminal records. `read({sessionId,id})` returns `{process,
+stdout,stderr,stdoutTruncated,stderrTruncated}` and optional execution errorCode,
+errorMessage and persistenceError. `stop({sessionId,id})` returns `{process}` and
+is idempotent for settled jobs. Cross-session IDs cannot read or stop another
+owner. `backgroundProcesses.changed({sessionId,id,revision})` invalidates visible
+reads; no command output is broadcast with the event. Explicit stopping remains
+effective if its state write fails, while the storage error is reported.
+
+Output notifications include a trailing flush within the existing 250 ms
+  throttle, so output followed by silence remains visible before termination.
+
+Background start is the existing authorized `tools.execute` Bash path with
+`args.run_in_background: true`; the immediate result is a launch receipt, not
+an exit status. Permit/cancellation ownership transfers to the Host job until
+its runner tree exits. The ordinary command timeout still applies. EOF/shutdown
+joins jobs; startup recovers unfinished rows as interrupted without replay.
+
+Historical Plus P7 rows additionally return optional service metadata using
+`BackgroundProcessSummary`: `backgroundKind`, `teamSessionId`, `teamRunId`,
+`deadlineAt`, `stopReason`, `stopRequestedAt`, `stopMode`, and
+`serviceStopEscalated`. A missing kind remains an ordinary command. Policy
+metadata does not prove that a stop completed. Cold-start ownership recovery
+records `host_restart` before interrupting active rows, without adopting a PID.
+P7 stored no originating platform or stop mechanism; the compatibility reader
+omits `stopMode` and does not interpret the raw escalation flag as TERM/KILL.
+New Bash `args.backgroundKind: "service"` launches require the authenticated
+current Agent Team/run and permission gates in [managed services](team-managed-services.md).
+Historical ownership alone grants no launch, PID adoption or replay authority.
+
+### Local Git workspace RPC (Plus)
+
+`workspace.git.get` takes `{projectPath, sessionId?}` and returns `{git}` where
+`git` is null for a non-Git directory. `workspace.git.switchBranch`,
+`workspace.git.createBranch`, and `workspace.git.createWorktree` additionally
+require `{branch, expectedHead, expectedBranch}`; both expected fields are
+explicitly nullable. They return `{git}`; createWorktree also returns `{worktree}`.
+The shared `GitWorkspaceSnapshot` defines checkout roots, primary path, HEAD,
+branch, dirt, local branches with occupied paths and the Git worktree registry.
+
+Host validates the requested path against the owning local session or active
+workspace; imported sessions and remote origins are refused. Mutation ownership
+also excludes team members. Branch operations reject active turns, Bash tools,
+and managed background processes in the checkout or a descendant directory.
+Host serializes admission with its state lock. Expected branch and HEAD must
+still match when executing; no reset, force checkout or automatic stash occurs.
+Worktree targets are allocated by Host under its data directory, never supplied
+by the renderer. Git's registry remains the durable source of checkout identity;
+no session-mode or database schema field is added. Failures keep existing user
+changes and successfully created worktrees recoverable.
+
+Read-only metadata copies validated ownership under the state lock, then releases
+it before invoking Git. Mutation lock admission is bounded; Git has per-command
+and operation deadlines, bounded output, and owned child cleanup. Effective Git
+root must contain the canonical project path; an unrelated `core.worktree`
+redirection is refused. Repositories that require executable file filters (such
+as LFS conversion) are rejected for checkout mutations rather than silently
+producing repository-format files. Metadata remains readable without executing
+hooks or filters. A globally installed but unused filter does not block an
+ordinary repository.
+
+### Complete session activity summaries
+
+The additive `sessionActivity.get({sessionId,offset?,limit?})` and post-commit
+`sessionActivity.changed({sessionId})` serve the owning local Desktop session's
+complete canonical history, independently of display windows. The bounded v1
+page and monotonic Task settlement contracts are defined in
+[Complete session activity projection](session-activity-projection.md).
+No protocol-version/schema bump, model call or new plugin capability is added.
+
+### Settled Team Goal report authorization (2026-10-11)
+
+`team.authorizeLeadTool` applies the existing approved-execution settlement
+predicate to both `TeamFinalAnswer` and `SubmitGoalReport`. The latter is checked
+by the runtime's existing Lead wrapper before the report tool body runs. No RPC
+or payload field is added. A rejection includes all pending dispatch IDs and
+member names, assigned open task IDs, and the count and identities of unconsumed
+current-expert results. It retains the `TEAM_APPROVAL_REQUIRED` prefix and
+`wait_for_updates` guidance, and lists each open decision task as member (task
+ID). The Lead must dispatch with `send_message`, or use `task_update` to mark
+unworkable tasks `cancelled`/`failed` with a reason, then retry. Existing task
+completion claims still require their normal terminal settlement. Settlement is
+bound to the Host-proven original execution turn, never inferred from a historical
+session approval. Post-execution mail does not extend Goal lifecycle authority.
+
+
+Background timeout visibility (2026-10-11): the existing `errorMessage` on a
+`TOOL_TIMEOUT` read states the applied default/explicit limit and the seconds
+parameter guidance. The persisted tool-result content records `timeoutMs` and
+`timeoutIsDefault`; older rows are not backfilled with invented provenance.
+No summary field, migration, RPC or event field is added. Sidecar reads use the
+existing opaque project launch binding, forward only `{sessionId,id}`, and
+recheck binding generation plus the returned process owner after the await.
+Only `read` is admitted; sidecar `list` and `stop` remain unavailable.
+Team waits return the scoped terminal detail after an existing changed event;
+output/start events only trigger a read and do not finish the wait.
+
+The runtime tracks only successful owned launch receipts across tool rebuilds;
+each wait reconciles their unconsumed IDs to avoid missing terminal events
+between waits. Disposal revokes the in-memory tracker. Historical listing and
+restart replay are not granted by this read capability.
+
+
+### Team advisory write scopes and send-time HEAD
+
+After an otherwise authorized, successful member Write/Edit, `tools.execute`
+may append `content.scopeWarning` with
+`{code:"TEAM_WRITE_SCOPE_WARNING",taskIds,message}` when the canonical path is
+outside the union of non-empty `writeScopes` on tasks explicitly associated
+with the current member turn at their current revision. No raw path is added.
+Warnings never change ok/isError, permissions, retry budgets or task status.
+Empty scopes, scratch, Bash, failed mutations and unstarted/historical tasks
+are excluded. Advisory resolution/storage errors remain visible through
+`content.scopeTrackingError` without falsifying a successful mutation. A Team
+owner detached during execution leaves a visible `content.scopeTrackingSkipped`
+notice and no orphan count.
+
+`team.getBoard` adds optional `outOfScopeWriteCount` and `outOfScopeWrites`
+(`{memberSessionId,memberName,count}[]`); new Hosts return zero/empty if clean,
+and `team_status` defaults missing legacy fields to zero. Counts are cumulative
+for the member in its team, at most once per successful turn/tool-call identity.
+Existing KV preserves them across restart; session/team deletion cleans them.
+These counts are neither permissions nor semantic completion verdicts.
+
+`team.sendMessage` captures the sender's Host-resolved project HEAD at send
+admission outside the state lock through a bounded, hardened read-only Git
+probe. Caller project, running-turn identity, Lead user scope and normal Team authority
+are revalidated after await; changed turns/scopes return TEAM_TURN_INVALID
+before a message or stamp is written.
+The Host-only KV stamp is immutable on idempotent replay. Optional `senderHead`
+appears in Team mailbox projections (including readExecutionInbox/wait_for_updates),
+`session.collaboration.message` and authenticated SessionMessageOrigin,
+so live and restored member framing show the same SHA. Message body, provenance
+validation and permission ceilings remain unchanged. Non-Git/unborn/legacy
+messages omit it; unexpected probe errors log a bounded Host diagnostic without
+blocking dispatch. Only SHA is exposed, not paths, Git stderr or secrets.
+No new RPC, protocol version or schema migration is introduced.
+
+
+### Team shared-tree Git advisory
+
+After ordinary authorization and tool admission, Host recognizes common literal
+Bash Git command forms: `add -A`/`--all`, `stash` (except `list`/`show`),
+`reset --hard`, `checkout .`, `clean`, and `commit -a`/`--all`. When a different
+current Team participant owns a non-deleted `in_progress` task with non-empty
+`writeScopes`, the result includes `content.gitWarning`:
+`{code:"TEAM_SHARED_GIT_WARNING",operations,conflictingTasks,message}`.
+Each conflicting task identifies `taskId`, `memberSessionId`, and `memberName`;
+no scope paths or command text are copied into diagnostic persistence.
+
+This is a coordination warning, not a permission boundary or a shell sandbox.
+It does not change permission prompts, tool admission, FIFO, shell limits,
+`ok`, `isError`, `exitCode`, cancellation or timeout behavior. Failed commands
+retain their real failure and warning. Background acceptance carries the same
+warning without pretending the command has already succeeded. Common quoted
+arguments, escaped words, `&&`/`;`/pipeline/newline combinations and Git global
+options are recognized lexically. Aliases, variables, interpreter scripts and
+other computed command forms are not guaranteed; target-repository inference
+is not performed. Use explicit scoped staging and coordinate with other writers.
+Read-only status/diff, stash list/show, the caller's own sole writer task,
+empty scopes and completed/deleted/other-team tasks do not trigger this warning.
+
+`team.getBoard` and `team_status` add optional `sharedGitWarningCount` and
+`sharedGitWarnings` (`{memberSessionId,memberName,count}[]`), with zero/empty
+legacy defaults. Counts record advisory-bearing executed/admitted Bash calls,
+including failures, at most once per caller/session turn/tool-call identity;
+they are separate from successful out-of-scope Write/Edit counts. Existing KV
+preserves counts across restart; session/team deletion cleans them. Capture or
+storage errors are visible as `content.gitTrackingError` and never change the
+Bash result. A detached owner receives `content.gitTrackingSkipped` with no
+orphan count. No RPC, protocol version, schema migration, member worktree or
+`team_commit` tool is introduced.
+## Explicit task dispatch and mailbox age (WP10)
+
+The additive `taskDispatch` send contract, Host-owned age/provenance fields and
+queued-only cancellation semantics are defined in [Team task dispatch](team-task-dispatch.md).
+### Runtime-only pending Team mailbox metadata
+
+team_status and ordinary Agent Lead wait_for_updates project metadata from
+team.listMessages with the caller's own recipient session. The existing Host
+authority and response are unchanged. Runtime exposes pendingMessagesCount,
+pendingMessageSenders and oldestPendingMessageAgeSeconds; pending wait also
+retains count and reason: pending_mailbox_messages. Both tool text and details
+exclude the fetched message bodies and raw mailbox rows. Summary reads are
+non-consuming: no ACK, receipt removal, provenance change, execution proof or
+new RPC/event. Full bodies continue through authenticated role=user delivery or
+the existing approved execution inbox as appropriate. Metadata reads validate
+current turn/epoch/Team/mode after awaits. An ACKed queued/unbound row is pending;
+createdAt is milliseconds encoded as a string, not ISO. Unknown oldest age is
+null, including mixed known/unknown pending timestamps.
+### Team member activity and interruption (WP9)
+
+`team.getRoster` returns additive `memberActivity` for the Lead and every member;
+`team_status` preserves it verbatim. Each item contains session/name, Host
+observation time, ten-minute window, latest turn status/duration, last tool
+name/time, active Bash ids and managed background process ids/status/start time,
+recent completed usage call/token counts, and incoming/outgoing queued Team mail
+counts/oldest age. Counts cover first Host-observed usage only; legacy untimed
+usage and requests in flight are unknown. There are no report bodies, commands,
+paths, Git-derived signals or credentials in this projection.
+
+Queue age uses durable millisecond creation times. A durable queue ACK is
+admission, not consumption: queued messages remain counted once until consumed.
+Incoming queues never prove recipient execution activity. A member's actual
+outbound response does, excluding Host-authored approval/failure notices.
+
+`team.interruptMember({ teamSessionId, callerSessionId, memberName, force?, reason? })`
+retains existing Lead-only and stop-only authority. Omitted force is false. Host
+turn start, tool, completed reported usage, actual outbound response or background
+start/completion within ten minutes requires force. Running managed background
+processes and owned foreground Bash protect members regardless of duration.
+Default refusal is `TEAM_MEMBER_ACTIVE`. `force:true` requires a trimmed nonempty
+reason (maximum 1000 characters) or returns `TEAM_INTERRUPT_REASON_REQUIRED`.
+The override bypasses only activity protection, not authority or approval.
+The accepted exact-turn stop request is audited as `team_member_interrupt` before
+notification; persistence failure emits no interruption. No active turn returns
+`{ interrupted: false }`. No inactivity watchdog, shell budget, queue scheduling,
+mailbox delivery or execution-token behavior changes. Additive local RPC; no
+protocol bump or database migration. See ADR
+[team-member-activity-and-interruption-guard](../../adr/team-member-activity-and-interruption-guard.md).
+### Expert Team run limits (WP8)
+
+`team.getSnapshot` and `team.getRoster` expose compatible optional `runLimits`
+containing the live policy and durable run state. A roster with no started run may
+return `runLimits: null`; a snapshot omits it. `team.resume` rejects a still-exceeded
+live hard limit with `TEAM_RUN_LIMIT_REACHED`; policy adjustment never unpauses
+by itself. Host `team.changed` adds reasons `run-limit-soft` / `run-limit-hard`.
+Host-only `team.runLimitPauseRequested({teamSessionId})` asks Main to hold queues
+and request safe runtime boundaries; it is not a renderer/model command or an
+execution permission. See [Team run limits](team-run-limits.md) for run identity,
+clock, notices, Goal interruption and compatible internal stop behavior.
+### Team Lead unanswered questions and failed-slot successors (WP11)
+
+`team.registerLeadAsk`, `team.deferLeadAsk`, and `team.ackLeadAsk` require the
+actual Lead session and its running turn. Host fixes a 30-minute question wait.
+Trusted Main alone reads/resolves/cancels durable asks; resolve atomically
+persists a late response and an existing turn_queue user record. New replies
+start a new user scope and never bind the former Plan/Goal execution token.
+Optional Team pending metadata on AskToolRequest/RACP input requests is display
+data, not approval. No ordinary permission or asktool deadline is introduced.
+
+`team.createMember` accepts optional `replaces` for one approved failed slot.
+It requires a new unique name and inherits the original confirmed route, role,
+configuration and permission mode; route/role/fork overrides fail closed.
+Host-only replacement links extend the same decision without changing its
+approved review. Replaying the same replacement is idempotent; replacement
+chains, another successor, active/queued sources and out-of-scope slots are
+rejected with a legal nextStep. The original handle no longer accepts dispatch,
+and its sessions/tasks/history remain. The eight-member limit still counts
+failed members; full rosters need a new trusted review.
+
+### Ordinary Agent Lead boundary inbox (WP16 S3)
+
+The internal `team.getOrdinaryInboxCapability`, `team.readOrdinaryInbox`,
+`team.ackOrdinaryInbox`, `team.getOrdinaryInboxProof` and identity-only
+`team.ordinaryInboxPersisted` notification use the exact binding/proof contract
+in [ordinary inbox](team-ordinary-inbox.md). Body-bearing reads are restricted
+to trusted launch plumbing, never generic model-selected proxy methods or tool
+results. Host validates ordinary current-turn authority; runtime epochs remain
+separately guarded by Main/AgentHost/Runtime. Plus P6 stores the prepared →
+persisted → ACKed journal with JSONL-first recoverable indexing; queue admission
+is not runtime/model consumption. Protocol 11 is unchanged.
+
+### Explicit Team service metadata (WP14)
+
+Bash `backgroundKind`, owner/cap/TTL checks and optional service fields on existing
+backgroundProcesses list/read/launch projections follow [managed services](team-managed-services.md).
+`backgroundProcesses.changed` remains the existing identity-only invalidation;
+read/stop remain session scoped. Plus P7 stores explicit ownership; older process
+rows do not become services. No shell-budget/FIFO, approved-execution authority
+or protocol-version expansion is introduced.
+
+### Team diagnostics and progress hints (WP7)
+
+Malformed strategy, presentation.role and displayName errors name their allowed
+values/range. Route/stale-scope/unapproved-dispatch refusals retain their existing
+codes/denial conditions with actionable nextStep. Runtime-only
+completedMembersWithOpenTasks and completedMemberOpenTaskNextStep derive from
+existing roster/task projections; they do not grant authority or settle tasks.
+
+
+### Bounded Lead pseudo-tool-call recovery (2026-10-13)
+
+For Team Lead Agent/Plan turns, final text whose unfenced trailing fragment
+matches `call:<namespace>:<tool>{...}` receives one dedicated runtime recovery
+before Host completion authorization. The nudge explains that text did not
+invoke a tool and asks for the real tool-calling interface or an ordinary final
+answer. Syntax quoted inside fenced code or followed by explanatory body text
+does not trigger this rule. The detector parses nested braces and quoted content
+without interpreting or executing the text.
+
+The allowance resets with the guard's turn reset. A second matching answer goes
+through ordinary Host authorization; it cannot bypass approved task/dispatch/
+inbox settlement. This allowance is independent of the existing maximum-three
+confirmed-roster settlement nudges. Members and non-Team sessions are outside
+this rule. No tools are inferred or executed from textual pseudo calls, and
+normal final-answer/event/usage semantics remain unchanged.

@@ -13,6 +13,11 @@ pub fn prepare_append(
     input: &UiMessage,
     turn_id: Option<&str>,
 ) -> Result<UiMessage> {
+    if let Some(message) =
+        crate::team::ordinary_inbox::prepare_append(db, session_id, input, turn_id)?
+    {
+        return Ok(message);
+    }
     let delivery = match turn_id {
         Some(turn) => db
             .conn()

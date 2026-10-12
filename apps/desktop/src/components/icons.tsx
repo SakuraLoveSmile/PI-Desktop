@@ -33,6 +33,7 @@ import {
   Clock,
   CloudDownload,
   Code2,
+  Compass,
   Database,
   Download,
   Copy,
@@ -162,6 +163,7 @@ function icon(Lucide: LucideIcon) {
 }
 
 export const IconPlus = icon(Plus);
+export const IconCompass = icon(Compass);
 export const IconPower = icon(Power);
 export const IconPlay = icon(Play);
 export const IconBookOpen = icon(BookOpen);

@@ -1,4 +1,11 @@
 import type {
+  GitWorkspaceRequest, GitWorkspaceMutation, GitWorkspaceSnapshot, GitWorktree,
+  SessionQuickNote,
+  SessionActivityPage,
+  SessionActivityChanged,
+  BackgroundProcessSummary,
+  BackgroundProcessDetail,
+  BackgroundProcessesChanged,
   ScheduledTaskRun,
   ActivationScope,
   AgentCapabilityMove,
@@ -74,6 +81,7 @@ import type {
   ProjectGroupRecord,
   ProjectMemory,
   ProjectMemoryEntry,
+  ProjectMemoryEditor,
   ProjectWorkspace,
   ScheduledTask,
   ProviderCreateInput,
@@ -565,6 +573,10 @@ function normalizePlansChangedEvent(value: unknown): PlanningStateEvent {
 }
 
 export const api = {
+  getContextInsights: (sessionId: string, options?: { includeContent?: boolean; requestId?: string }) =>
+    invoke<import("@pi-desktop/shared").ContextInsightsSnapshot>(
+      IPC.invoke.contextInsightsGet, { sessionId, ...options },
+    ),
   getVersion: () => invoke<AppVersionInfo>(IPC.invoke.appGetVersion),
   health: () => invoke<HostHealth>(IPC.invoke.appHealth),
   getOnboarding: () => invoke<OnboardingState>(IPC.invoke.appGetOnboarding),
@@ -626,6 +638,43 @@ export const api = {
     })),
   getSessionCollaboration: (sessionId: string) =>
     invoke<SessionCollaborationSummary>(IPC.invoke.sessionCollaboration, { sessionId }),
+  getWorkspaceGit: (request: GitWorkspaceRequest) =>
+    invoke<{ git: GitWorkspaceSnapshot | null }>(IPC.invoke.workspaceGitGet, request),
+  switchWorkspaceBranch: (request: GitWorkspaceMutation) =>
+    invoke<{ git: GitWorkspaceSnapshot }>(IPC.invoke.workspaceGitSwitch, request),
+  createWorkspaceBranch: (request: GitWorkspaceMutation) =>
+    invoke<{ git: GitWorkspaceSnapshot }>(IPC.invoke.workspaceGitCreateBranch, request),
+  createWorkspaceWorktree: (request: GitWorkspaceMutation) =>
+    invoke<{ git: GitWorkspaceSnapshot; worktree: GitWorktree }>(IPC.invoke.workspaceGitCreateWorktree, request),
+  getSessionActivity: (sessionId: string, offset = 0) =>
+    invoke<{ activity: SessionActivityPage }>(IPC.invoke.sessionActivityGet, { sessionId, offset }),
+  onSessionActivityChanged: (listener: (event: SessionActivityChanged) => void) => {
+    if (!window.piDesktop?.on) return () => {};
+    return window.piDesktop.on(IPC.event.sessionActivityChanged, (payload) => {
+      if (payload && typeof payload === "object" && "sessionId" in payload && typeof payload.sessionId === "string") listener({ sessionId: payload.sessionId });
+    });
+  },
+  getSessionQuickNote: (sessionId: string) =>
+    invoke<{ note: SessionQuickNote }>(IPC.invoke.sessionNotesGet, { sessionId }),
+  saveSessionQuickNote: (sessionId: string, content: string, expectedRevision: number) =>
+    invoke<{ note: SessionQuickNote }>(IPC.invoke.sessionNotesSet, { sessionId, content, expectedRevision }),
+  listBackgroundProcesses: (sessionId: string) =>
+    invoke<{ processes: BackgroundProcessSummary[] }>(IPC.invoke.backgroundProcessesList, { sessionId }),
+  readBackgroundProcess: (sessionId: string, id: string) =>
+    invoke<BackgroundProcessDetail>(IPC.invoke.backgroundProcessesRead, { sessionId, id }),
+  stopBackgroundProcess: (sessionId: string, id: string) =>
+    invoke<{ process: BackgroundProcessSummary }>(IPC.invoke.backgroundProcessesStop, { sessionId, id }),
+  onBackgroundProcessesChanged: (listener: (event: BackgroundProcessesChanged) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.backgroundProcessesChanged, (payload) => {
+      if (!payload || typeof payload !== "object" || Array.isArray(payload)) return;
+      const event = payload as Record<string, unknown>;
+      if (typeof event.sessionId === "string" && typeof event.id === "string" &&
+          typeof event.revision === "number" && Number.isSafeInteger(event.revision) && event.revision > 0) {
+        listener({ sessionId: event.sessionId, id: event.id, revision: event.revision });
+      }
+    });
+  },
   deleteSession: (id: string) => invoke(IPC.invoke.sessionDelete, id),
   getSessionScratchPath: (sessionId: string) =>
     invoke<{ path: string }>(IPC.invoke.sessionGetScratchPath, { sessionId }),
@@ -935,6 +984,15 @@ export const api = {
     invoke<{ folders: string[]; canceled?: boolean }>(IPC.invoke.projectPickFolders),
   getProjectMemory: (projectPath: string) =>
     invoke<{ memory: ProjectMemory }>(IPC.invoke.projectMemoryGet, { projectPath }),
+  getProjectMemoryEditor: (projectPath: string) =>
+    invoke<{ editor: ProjectMemoryEditor }>(IPC.invoke.projectMemoryEditorGet, { projectPath }),
+  saveProjectMemoryEditor: (projectPath: string, input: {
+    expectedOwner: string;
+    expectedMemory: ProjectMemory;
+    entries: ProjectMemoryEntry[];
+  }) => invoke<{ editor: ProjectMemoryEditor }>(IPC.invoke.projectMemoryEditorSave, { projectPath, ...input }),
+  setProjectAutoMemoryEnabled: (projectPath: string, expectedOwner: string, enabled: boolean) =>
+    invoke<{ autoRecordEnabled: boolean }>(IPC.invoke.projectAutoMemorySetEnabled, { projectPath, expectedOwner, enabled }),
   saveProjectMemory: (projectPath: string, entries: ProjectMemoryEntry[]) =>
     invoke<{ memory: ProjectMemory }>(IPC.invoke.projectMemorySave, {
       projectPath,
@@ -1648,6 +1706,12 @@ export const api = {
     if (!window.piDesktop?.on) return () => undefined;
     return window.piDesktop.on(IPC.event.browserPreview, (payload) =>
       listener(payload as { sessionId: string; path?: string; url?: string }),
+    );
+  },
+  onContextInsightsChanged: (listener: (event: { sessionId: string }) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.contextInsightsChanged, (payload) =>
+      listener(payload as { sessionId: string }),
     );
   },
   onAgentEvent: (listener: (event: AgentEventEnvelope) => void) => {

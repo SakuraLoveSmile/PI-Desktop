@@ -31,23 +31,13 @@ export const TOOLBAR_PROPS = {
   modelMenu: {
     open: false,
     setOpen: noop,
-    view: "root",
-    query: "",
-    setQuery: noop,
     modelHighlight: -1,
     setModelHighlight: noop,
-    thinkingHighlight: -1,
-    setThinkingHighlight: noop,
-    rootMenuRef: { current: null },
-    modelSearchRef: { current: null },
     modelListRef: { current: null },
-    thinkingListRef: { current: null },
     modelGroups: [],
     thinkingMenuLevels: [],
-    showView: noop,
     selectModel: noop,
     commitThinkingLevel: noop,
-    selectThinkingLevel: noop,
     onMenuKeyDown: noop,
   },
   modelLabel: "Model",
@@ -86,5 +76,5 @@ export async function composerToolbar(t, ssr) {
     else delete globalThis.window;
   });
   const { ComposerToolbar } = await ssr.load("/src/features/chat/composer/ComposerToolbar.tsx");
-  return () => ssr.render(createElement(ComposerToolbar, TOOLBAR_PROPS), { sessionId: null });
+  return (props = {}) => ssr.render(createElement(ComposerToolbar, { ...TOOLBAR_PROPS, ...props }), { sessionId: null });
 }

@@ -3,6 +3,7 @@
 - Status: Accepted
 - Date: 2026-10-02
 - Updated: 2026-10-03, by the first upstream sync (shared chain at 21)
+- Updated: 2026-10-12, by support for known candidate storage through Plus P7
 - Amends: [Temporary Goal sessions own a persistent scratch workspace](temporary-goal-scratch-workspace.md),
   and the storage notes of the Expert Team and Plan/Goal revision records, which
   count their schema changes as versions 20 to 23 of the shared chain
@@ -46,10 +47,15 @@ second, independent version track in the same database file.
    baseline DDL (`SCHEMA_LATEST`, `PLAN_APPROVALS_SCHEMA`).
 2. **Plus track.** Plus structures are created by an ordered list of additive,
    idempotent steps in `crates/host-core/src/db/plus_schema.rs`, versioned by
-   `PLUS_SCHEMA_VERSION` (currently 4). P1 to P4 are the former fork v20 to
+   `PLUS_SCHEMA_VERSION` (currently 7). P1 to P4 are the former fork v20 to
    v23 changes with their effect unchanged; Team DDL lives in
    `team/schema.sql`. A new Plus change appends a step and bumps the constant.
    An applied step is not edited.
+   P5 adds session notes and background commands. P6 and P7 preserve the
+   ordinary Lead-input journal and service ownership written by earlier local
+   candidates. Their storage recovery joins `main` without advertising new
+   same-turn inbox or managed-service launch capabilities. The storage spec
+   defines the exact recovery and explicit unsupported-service behavior.
 3. **State.** `plus_schema_meta` holds one row: `plus_version`, and
    `upstream_version`, the `user_version` the last Plus-aware open left
    behind. The Plus track creates the table itself, so the shared DDL stays

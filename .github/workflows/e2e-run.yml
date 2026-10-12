@@ -1,0 +1,60 @@
+name: Isolated E2E runner
+
+on:
+  workflow_call:
+    inputs:
+      tier:
+        type: string
+        required: true
+      family:
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  fixture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Provision Electron display and native libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb openbox libnss3 libatk-bridge2.0-0t64 libgtk-3-0t64 libgbm1 libasound2t64 openssl zip fonts-noto-cjk
+          # Enable Electron's own user-namespace sandbox on this ephemeral CI VM.
+          # No --no-sandbox or renderer sandbox bypass is used.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Install clean-runner dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build the candidate Host
+        run: cargo build -p host-core --locked
+      - name: Build workspace and Desktop
+        run: pnpm build:js
+      - name: Bundle the candidate sidecar
+        run: pnpm --filter @pi-desktop/agent-runtime bundle
+      - name: Verify suite and generated scenario catalog
+        run: node scripts/generate-scenario-index.mjs --check
+      - name: Run isolated fixture suites
+        env:
+          E2E_TIER: ${{ inputs.tier }}
+          E2E_FAMILY: ${{ inputs.family }}
+          PI_DESKTOP_HOST_BIN: ${{ github.workspace }}/target/debug/pi-desktop-host-core
+        run: |
+          mkdir -p .artifacts/e2e
+          xvfb-run -a sh -c 'openbox > /tmp/pi-e2e-openbox.log 2>&1 & node scripts/e2e-suite.mjs --tier "$E2E_TIER" ${E2E_FAMILY:+--family "$E2E_FAMILY"} --report .artifacts/e2e/result.json'
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: e2e-${{ inputs.tier }}-${{ inputs.family || 'smoke' }}
+          path: .artifacts/e2e/

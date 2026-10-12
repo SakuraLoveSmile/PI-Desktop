@@ -11,9 +11,11 @@ use std::sync::{Mutex, OnceLock};
 
 use crate::transcripts::{self, CompactionRecord, MessageRecord, RevisionRecord};
 
+mod delegation_updates;
 mod fork_files;
 mod model_system;
 mod usage;
+pub(crate) use usage::operations as physical_usage_operations;
 pub use usage::record_usage;
 
 pub const MODES: [&str; 3] = ["plan", "goal", "agent"];
@@ -34,6 +36,10 @@ pub(crate) fn with_savepoint<T>(
             | "team_create_task"
             | "team_update_task"
             | "team_research_result"
+            | "team_replacement"
+            | "team_ask_answer"
+            | "team_ask_cancel"
+            | "turn_queue_push"
     ) {
         return Err(anyhow!("invalid internal savepoint name"));
     }
@@ -2449,8 +2455,15 @@ pub fn delete_session(db: &Database, id: &str) -> Result<bool> {
     }
     let tx = db.conn().unchecked_transaction()?;
     crate::goal_progress::cleanup_session_conn(&tx, id)?;
+    crate::team::task_attempts::cleanup_session(&tx, id)?;
+    crate::team::member_failure::cleanup_session(&tx, id)?;
+    crate::team::lead_asks::cleanup(&tx, id)?;
+    crate::team::write_scopes::cleanup_session(&tx, id)?;
+    crate::team::dispatch_head::cleanup_session(&tx, id)?;
+    crate::team::dispatch_metadata::cleanup_session(&tx, id)?;
+    crate::team::member_activity::cleanup_session(&tx, id)?;
     tx.execute(
-        "DELETE FROM kv WHERE ns IN ('team-planning-v1','team-member-purpose-v1','team-strategy-scope-v1','team-member-expert-config-v1') AND key=?1",
+        "DELETE FROM kv WHERE ns IN ('team-planning-v1','team-member-purpose-v1','team-strategy-scope-v1','team-member-expert-config-v1','context-insights-v1') AND key=?1",
         [id],
     )?;
     let n = tx.execute("DELETE FROM sessions WHERE id = ?1", params![id])?;
@@ -2474,8 +2487,15 @@ pub fn delete_session_with_team_cleanup(db: &Database, id: &str) -> Result<bool>
     let tx = db.conn().unchecked_transaction()?;
     crate::team::lifecycle::cleanup_team_on_lead_delete_conn(&tx, id)?;
     crate::goal_progress::cleanup_session_conn(&tx, id)?;
+    crate::team::task_attempts::cleanup_session(&tx, id)?;
+    crate::team::member_failure::cleanup_session(&tx, id)?;
+    crate::team::lead_asks::cleanup(&tx, id)?;
+    crate::team::write_scopes::cleanup_session(&tx, id)?;
+    crate::team::dispatch_head::cleanup_session(&tx, id)?;
+    crate::team::dispatch_metadata::cleanup_session(&tx, id)?;
+    crate::team::member_activity::cleanup_session(&tx, id)?;
     tx.execute(
-        "DELETE FROM kv WHERE ns IN ('team-planning-v1','team-member-purpose-v1','team-strategy-scope-v1','team-member-expert-config-v1') AND key=?1",
+        "DELETE FROM kv WHERE ns IN ('team-planning-v1','team-member-purpose-v1','team-strategy-scope-v1','team-member-expert-config-v1','context-insights-v1') AND key=?1",
         [id],
     )?;
     let deleted = tx.execute("DELETE FROM sessions WHERE id=?1", [id])? > 0;
@@ -2618,6 +2638,7 @@ pub fn append_message(
     let message = crate::session_collaboration::prepare_append(db, session_id, message, turn_id)?;
     let session_created = ensure_session_for_append(db, session_id)?;
     let (mut record, text) = ui_to_record(&message);
+    let provided_turn_id = turn_id;
     let had_turn_reference = turn_id.is_some();
     let turn_id = valid_turn_reference(db, session_id, turn_id)?;
     let stale_turn_reference = had_turn_reference && turn_id.is_none();
@@ -2643,6 +2664,7 @@ pub fn append_message(
                 params![session_id, record.id, text, record.is_error],
             )?;
         } else {
+            delegation_updates::refresh(db, session_id, &message, provided_turn_id)?;
             return Ok(());
         }
     } else {
@@ -2651,6 +2673,16 @@ pub fn append_message(
                 let original_id = record.id.clone();
                 record.id = namespaced_message_id(session_id, &record.id);
                 if message_indexed(db, session_id, &record.id)? {
+                    // A replay arrives with the original provider identity, while the
+                    // canonical receipt belongs to this session's namespaced index row.
+                    let mut canonical_message = message.clone();
+                    canonical_message.id = record.id.clone();
+                    delegation_updates::refresh(
+                        db,
+                        session_id,
+                        &canonical_message,
+                        provided_turn_id,
+                    )?;
                     return Ok(());
                 }
                 // Old hosts wrote JSONL then failed UNIQUE. Replaying that
@@ -2662,8 +2694,9 @@ pub fn append_message(
                 return Ok(());
             }
         }
-        let transcript_repaired =
-            stale_turn_reference && repair_unindexed_transcript_message(db, session_id, &record)?;
+        let transcript_repaired = (stale_turn_reference
+            || crate::team::ordinary_inbox::owns_input(db, session_id, &record.id)?)
+            && repair_unindexed_transcript_message(db, session_id, &record)?;
         if !transcript_repaired {
             append_record(
                 db,
@@ -2840,7 +2873,9 @@ fn rebuild_session_message_index(
             &tx,
             session_id,
             seq,
-            existing_turns.get(&record.id).map(String::as_str),
+            crate::team::ordinary_inbox::finalize_append(db, &tx, session_id, record)?
+                .as_deref()
+                .or_else(|| existing_turns.get(&record.id).map(String::as_str)),
             record,
             text.as_deref(),
         )?;
@@ -2913,6 +2948,7 @@ fn append_record(
         return Err(anyhow!("session not found: {session_id}"));
     };
     insert_index_row(&tx, session_id, seq - 1, turn_id, record, text)?;
+    crate::team::ordinary_inbox::finalize_append(db, &tx, session_id, record)?;
     tx.commit()?;
     Ok(())
 }
@@ -4260,6 +4296,7 @@ fn begin_turn_inner(
             }
             return Err(anyhow!("AGENT_BUSY"));
         }
+        crate::team::run_limits::start_conn(conn, session_id, now_ms())?;
         crate::team::roster::update_member_turn_phase_conn(conn, session_id, "running", None)?;
         Ok(())
     })?;
@@ -4355,6 +4392,7 @@ pub fn end_turn_settling(
             turn_id,
         ])?;
     if n > 0 {
+        crate::team::task_attempts::settle_turn(&tx, turn_id, status)?;
         let phase = match status {
             "completed" => "completed",
             "error" => "failed",
@@ -4368,6 +4406,8 @@ pub fn end_turn_settling(
                 (status == "error").then_some(error_code.unwrap_or("TURN_FAILED")),
             )?;
         }
+        crate::team::member_failure::record(db, &tx, turn_id)?;
+        crate::team::member_silence::record(&tx, turn_id)?;
     }
     // A replay after startup recovery may complete accounting for a terminal
     // turn, but must never change its settled status or emit another notification.

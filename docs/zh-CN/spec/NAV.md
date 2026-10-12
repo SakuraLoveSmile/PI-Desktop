@@ -32,6 +32,10 @@
 - [04-data-storage.md](/zh-CN/spec/03-runtime/04-data-storage)
 - [05-host-core-rust.md](/zh-CN/spec/03-runtime/05-host-core-rust)
 - [06-host-rpc-protocol.md](/zh-CN/spec/03-runtime/06-host-rpc-protocol)
+- [team-task-dispatch.md](/zh-CN/spec/03-runtime/team-task-dispatch)
+- [team-run-limits.md](/zh-CN/spec/03-runtime/team-run-limits)
+- [普通 Agent 等待边界邮箱](/zh-CN/spec/03-runtime/team-ordinary-inbox)
+- [显式团队服务](/zh-CN/spec/03-runtime/team-managed-services)
 - [07-process-model.md](/zh-CN/spec/03-runtime/07-process-model)
 - [08-error-codes.md](/zh-CN/spec/03-runtime/08-error-codes)
 - [09-logging-and-observability.md](/zh-CN/spec/03-runtime/09-logging-and-observability)
@@ -81,6 +85,12 @@
 - [05-change-checklist.md](/zh-CN/spec/06-delivery/05-change-checklist)
 - [06-release-runbook.md](/zh-CN/spec/06-delivery/06-release-runbook)
 - [07-remote-control-rollout.md](/zh-CN/spec/06-delivery/07-remote-control-rollout)
+
+- [07-test-maintenance.md](/zh-CN/spec/06-delivery/07-test-maintenance)
+- [08-scenario-index.md](/zh-CN/spec/06-delivery/08-scenario-index)
+- [team-task-dispatch-scenarios.md](/zh-CN/spec/06-delivery/team-task-dispatch-scenarios)
+- [会话活动投影](/zh-CN/spec/03-runtime/session-activity-projection)
+- [上下文洞察](/zh-CN/spec/03-runtime/context-insights)
 
 ## 7. 插件
 - [README.md](/zh-CN/spec/07-plugins/README)

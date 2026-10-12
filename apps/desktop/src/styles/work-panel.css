@@ -97,17 +97,20 @@
 }
 
 .work-panel-overview-header {
-  display: flex;
-  gap: 12px;
-  padding: 20px 20px 16px;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px 10px;
+  flex: 0 0 auto;
+  padding: 18px 16px;
   border-bottom: 1px solid var(--ds-border-default);
   background: var(--ds-bg-dock-raised);
 }
 
 .work-panel-overview-icon {
   display: grid;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   flex: 0 0 auto;
   place-items: center;
   border-radius: var(--radius-sm);
@@ -116,12 +119,12 @@
 }
 
 .work-panel-overview-heading {
-  min-width: 0;
-  flex: 1;
+  display: contents;
 }
 
 .work-panel-overview-heading h2 {
-  margin: 0 0 12px;
+  min-width: 0;
+  margin: 0;
   overflow: hidden;
   font-size: var(--text-md-plus);
   font-weight: var(--font-weight-semibold);
@@ -131,14 +134,23 @@
 
 .work-panel-overview-meta {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 6px 12px;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px 16px;
   margin: 0;
   font-size: var(--text-sm);
 }
 
 .work-panel-overview-meta div {
-  display: contents;
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 10px;
+}
+
+.work-panel-overview-meta div:nth-child(-n + 2) {
+  grid-column: 1 / -1;
 }
 
 .work-panel-overview-meta dt {
@@ -159,11 +171,11 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: clip;
-  padding: 4px 12px 24px;
+  padding: 4px 16px 24px;
 }
 
 .work-panel-overview-section {
-  border-bottom: 1px dashed var(--ds-border-default);
+  border-bottom: 1px solid var(--ds-border-subtle);
 }
 
 .work-panel-overview-section summary {
@@ -172,9 +184,9 @@
   gap: 8px;
   min-height: 48px;
   padding: 0;
-  color: var(--ds-text-secondary);
+  color: var(--ds-text-primary);
   font-size: var(--text-base);
-  font-weight: var(--font-weight-normal);
+  font-weight: var(--font-weight-medium);
   list-style: none;
   cursor: pointer;
 }
@@ -195,7 +207,19 @@
 .work-panel-overview-section:not([open]) > summary .work-panel-overview-chevron { transform: rotate(-90deg); }
 
 .work-panel-overview-section-body {
-  padding: 0 0 12px;
+  padding: 0 0 16px;
+}
+
+.work-panel-overview .team-progress-title,
+.work-panel-overview .session-todo-checklist-header {
+  color: var(--ds-text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.work-panel-overview-section > summary:focus-visible {
+  outline: 2px solid var(--ds-accent);
+  outline-offset: -2px;
+  border-radius: var(--radius-xs);
 }
 
 .work-panel-overview-artifact-group + .work-panel-overview-artifact-group { margin-top: 16px; }
@@ -212,18 +236,28 @@
   color: var(--ds-text-muted);
   font-size: var(--text-sm);
 }
-.work-panel-overview-reference-tabs { display: flex; gap: 16px; margin-bottom: 10px; }
+.work-panel-overview-reference-tabs {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  gap: 4px;
+  margin-bottom: 12px;
+  padding: 3px;
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--ds-bg-sunken);
+}
 .work-panel-overview-reference-tab.btn {
-  padding: 0 0 8px;
+  padding: 4px 12px;
   min-height: 32px;
-  border-radius: 0;
-  border-bottom: 2px solid transparent;
+  border-radius: var(--radius-xs);
   color: var(--ds-text-secondary);
   font-size: var(--text-base);
 }
 .work-panel-overview-reference-tab.btn[aria-pressed="true"] {
-  border-bottom-color: var(--ds-success);
+  background: var(--ds-bg-dock-raised);
   color: var(--ds-text-primary);
+  box-shadow: var(--ds-raised-shadow);
 }
 .work-panel-overview-reference-list { margin: 0; padding: 0; list-style: none; }
 .work-panel-overview-recorded-reference {
@@ -370,6 +404,7 @@
   min-width: 0;
   flex-direction: column;
   gap: 2px;
+  flex: 1;
 }
 
 .work-panel-overview-file-label,
@@ -466,7 +501,7 @@
 
 .work-panel-overview-empty-copy {
   margin: 0;
-  padding: 0;
+  padding: 4px 0;
   font-size: var(--text-md);
 }
 
@@ -760,8 +795,7 @@
 /*
  * A delegation renders as a conversation: the tab reuses the main transcript's
  * message-list classes for its rows, so the only tab-specific layout is the
- * column (scroll area above a read-only composer) and the composer itself.
- * The scroll area owns the only scrollbar; the composer never scrolls.
+ * column. The display-only scroll area owns the only scrollbar.
  */
 .subagent-transcript-tab {
   display: flex;
@@ -803,24 +837,10 @@
 }
 
 .subagent-transcript-jump {
-  bottom: calc(var(--st-composer-dock-height, 68px) + 8px);
+  bottom: 16px;
   z-index: 6;
 }
 
-.subagent-transcript-composer {
-  flex: none;
-  border-top: 1px solid var(--ds-border-subtle);
-  padding: 10px 14px;
-}
-
-.subagent-transcript-composer textarea {
-  font-size: var(--text-base);
-  line-height: var(--leading-chat);
-  display: block;
-  width: 100%;
-  min-height: calc(var(--leading-chat) * 2em);
-  resize: none;
-}
 /* Shared per-tool empty state used by Files and plugin fallback surfaces. */
 .work-tab-empty {
   display: flex;
@@ -865,34 +885,58 @@
 .work-panel-launcher {
   display: flex;
   width: 100%;
+  min-height: 0;
+  flex: 1;
   flex-direction: column;
-  gap: 8px;
-  padding: 14px 10px;
+  align-items: center;
+  gap: 34px;
+  overflow-y: auto;
+  scrollbar-gutter: stable both-edges;
+  padding: 32px 24px;
+}
+
+.work-panel-launcher-emblem {
+  display: flex;
+  flex: 0 0 auto;
+  margin-top: auto;
+  color: var(--ds-text-faint);
 }
 
 .work-panel-launcher-title {
-  padding: 0 8px 4px;
-  color: var(--ds-text-muted);
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-semibold);
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .work-panel-launcher-list {
   display: flex;
+  width: 100%;
+  max-width: 380px;
+  flex: 0 0 auto;
   flex-direction: column;
-  gap: 2px;
+  gap: 14px;
+  margin-bottom: auto;
 }
 
 .work-panel-launcher-row {
   display: flex;
+  width: 100%;
   min-width: 0;
-  height: 40px;
+  min-height: 56px;
+  flex: 0 0 auto;
   align-items: center;
-  gap: 10px;
-  padding: 0 10px;
-  border-radius: var(--radius-sm);
+  justify-content: flex-start;
+  gap: 18px;
+  padding: 14px 22px;
+  border: 1px solid var(--ds-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--ds-tile);
   color: var(--ds-text-primary);
-  font-size: var(--text-md);
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-normal);
   text-align: left;
   transition:
     background var(--motion-duration-fast) var(--motion-ease-out),
@@ -910,24 +954,37 @@
 
 .work-panel-launcher-icon {
   display: inline-flex;
-  width: 18px;
+  width: 20px;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   color: var(--ds-text-secondary);
 }
 
+.work-panel-launcher-row[data-work-panel-launcher-item="pi.file-manager/manager"] .work-panel-launcher-icon {
+  color: var(--ds-warning);
+}
+
+.work-panel-launcher-row[data-work-panel-launcher-item="review"] .work-panel-launcher-icon {
+  color: var(--ds-success);
+}
+
 .work-panel-launcher-label {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .work-panel-launcher-row kbd {
   margin-left: auto;
   color: var(--ds-text-muted);
   font-size: var(--text-2xs);
+}
+
+@media (max-width: 640px) {
+  .work-panel-launcher {
+    padding-inline: 16px;
+  }
 }
 
 /* Work panel — review tab */

@@ -1,12 +1,59 @@
 # 04. E2E Test Plan
 
 > Scope: MVP acceptance scenarios plus current shipped product increments for PI-Desktop
-> Status: Accepted (protocol/Electron automation is active; full desktop Playwright remains planned)
+> Status: Accepted (protocol/Electron automation is active; scene-family nightly fixtures and PR smokes are active)
 > Cross-references: [acceptance-criteria](02-acceptance-criteria.md) · [milestones](01-mvp-milestones.md) · [ai-development-workflow](03-ai-development-workflow.md) · [change-checklist](05-change-checklist.md)
 
 ---
 
 ## 1. Goals
+
+### E2E-SUBAGENT-bounded-recursive-execution
+
+- **Preconditions:** Dedicated current-main candidate; built runtime/Host,
+  isolated temporary HOME, workspace and data; deterministic local model fixture.
+- **Steps:** Dispatch a child and grandchild; converge their reports. Repeat with
+  depth 1 and depth 0, a full tree-wide running cap, sibling-scoped lifecycle and
+  resume ids, a read-only parent delegating a writing definition, cancellation
+  during nested work, and an execution expert with a restricted tool snapshot.
+  Confirm Lead/research isolation and save/reload limits through Settings.
+- **Expected:** Meaningful assignments are supported at every allowed level;
+  over-limit calls fail visibly; controls cannot reach sibling branches or
+  elevate tool/permission scope. Parent delivery settles descendants, Stop
+  cleans the subtree, attribution uses actual parent Task ids, usage is counted
+  once, and experts retain their owned Team identity.
+- **Coverage:** `pnpm test:e2e:subagent-recursion` plus runtime user-path,
+  launch, `pnpm test:e2e:subagent-settings`, settings persistence and Host validation regression suites. Local model
+  fixtures validate mechanics; they do not prove real-model delegation frequency.
+- **Specs:** runtime §5f and tools/permissions §10.2; ADR 0089 amendment.
+- **Acceptance:** Candidate result and environment recorded in delivery notes.
+- **Milestone:** Post-MVP maintenance.
+- **Status:** Automated fixture coverage; record exact task-candidate results.
+
+### E2E-CONTEXT-INSIGHTS-native-port
+
+- **Preconditions:** Request worktree containing current remote-main base,
+  shared compatible host dependencies, isolated data/profile/workspace and
+  deterministic provider fixture. No running user Desktop or paid API.
+- **Steps:** Open Context Insights from the sidebar, filter usage and session
+  cards, select a session, open its Work Panel Context tab and invoke `/context`.
+  Submit a fixture turn with tool calls; inspect request composition, schemas,
+  actual usage, raw/Markdown content and trend selection. Switch sessions while
+  a detail read is pending, trigger the existing compaction path, refresh, restart
+  the Host, and remove the fixture session. Exercise retention and malformed
+  read/write inputs at the Host boundary.
+- **Expected:** Inspection never submits a provider call. Actual dispatched
+  contents and usage remain distinct from estimates; uncaptured/omitted/truncated
+  data is labelled. Stale detail reads cannot cross session/request ownership.
+  Captures survive restart and disappear with session deletion. Late writes fail
+  closed. Overview reads omit large contents; bounded history does not replace
+  authoritative billing. Existing chat, compaction and permission behavior stays
+  intact. Keyboard/focus, English/Chinese and narrow-panel reading remain usable.
+- **Specs:** [Context Insights](../03-runtime/context-insights.md),
+  [Builtin commands](../04-ux/04-builtin-commands.md).
+- **Status:** Implementation and task-candidate verification tracked separately;
+  no real-provider, published-release or user acceptance is inferred.
+
 
 ### E2E-STORAGE-custom-location-and-maintenance
 
@@ -569,7 +616,7 @@ levels does not waive the relevant E2E gate.
 |---|---|---|
 | **Vitest** | Unit + integration (TS side) | Active (`pnpm test`, shared package) |
 | **Rust #[test]** | Host-core unit tests | Active (`cargo test -p host-core`) |
-| **Protocol smoke** | Host RPC + tools + plugins headless | Active (`test:e2e`, 22 checks) |
+| **PR fixture smoke** | Boot, loopback message, approvals, durable restart and crash recovery | Active (`test:e2e:smoke`, five suites) |
 | **Electron probes** | Boot bridge, session-list responsiveness, and crash supervision | Active (`test:e2e:boot`, `test:e2e:supervision`) |
 | **Playwright** | Full UI-driven journeys | Planned (post-M5) |
 
@@ -584,10 +631,10 @@ levels does not waive the relevant E2E gate.
 | Requirement | Detail |
 |---|---|
 | Platform | macOS arm64 and Intel x64, Windows x64, and Linux x64 and arm64 release targets (D126/D285, D638 / ADR 0318) |
-| Profile | Clean `~/.pi-desktop` profile (no prior config) |
+| Profile | Fresh temporary data, HOME and Chromium user-data directory |
 | Fixtures | Sample project directory (`examples/fixtures/sample-project/`) |
 | Sample plugin | `examples/plugins/hello` loaded from local path |
-| Provider | At least one provider with a valid key (test account) |
+| Provider | Loopback synthetic provider; real account only with explicit authorization |
 | Display | Headless-capable Electron or real display |
 
 ---
@@ -597,7 +644,7 @@ levels does not waive the relevant E2E gate.
 Each scenario is documented in this format:
 
 ```markdown
-### E2E-<ID>: <title>
+### <title> (optional stable executable ID)
 
 - **Preconditions**: what must be true before steps start
 - **Steps**: ordered list of user / system actions
@@ -605,7 +652,7 @@ Each scenario is documented in this format:
 - **Specs linked**: relevant spec file(s)
 - **Acceptance criterion**: which A–H letter(s) this verifies
 - **Milestone**: M1–M6 target
-- **Status**: Draft | Documented | Partially automated | Automated | Passed
+- **Coverage / gaps**: executable test reference or manual acceptance boundary
 ```
 
 ---
@@ -644,12 +691,12 @@ and record the reason. Clean CI and release runners may install from lockfiles.
 Use the root `package.json` as the source of truth for executable commands.
 The minimum selection is:
 
-- Cross-cutting runtime, host, or IPC: `pnpm test:e2e`.
-- Electron startup, preload, or window lifecycle: `pnpm test:e2e` and
+- Cross-cutting runtime, host, or IPC: `pnpm test:e2e:smoke`.
+- Electron startup, preload, or window lifecycle: `pnpm test:e2e:smoke` and
   `pnpm test:e2e:boot`.
   The boot probe checks that unmodified Ctrl+R is consumed by the app shell
   before Chromium can reload the renderer.
-- Session-list refresh or model capability lookup: `pnpm test:e2e` and
+- Session-list refresh or model capability lookup: `pnpm test:e2e:smoke` and
   `pnpm test:e2e:boot`, including the synthetic large-list responsiveness check.
 - Settings/composer/plugin search theme surfaces: `pnpm build:js` followed by
   `pnpm test:e2e:theme-surfaces`.
@@ -657,26 +704,26 @@ The minimum selection is:
 - Composer slash-menu name/description layout: `pnpm build:js` followed by
   `pnpm test:e2e:composer-autocomplete`.
 - Transcript render boundaries and cross-part delegation display: `pnpm test:e2e:transcript`.
-- Plan host/runtime behavior: `pnpm test:e2e` and `pnpm test:e2e:plan`.
+- Plan host/runtime behavior: `pnpm test:e2e:smoke` and `pnpm test:e2e:plan`.
 - Plan UI behavior: `pnpm test:e2e:plan` and `pnpm test:e2e:plan-ui`.
-- Host supervision, crash recovery, or restart behavior: `pnpm test:e2e` and
+- Host supervision, crash recovery, or restart behavior: `pnpm test:e2e:smoke` and
   `pnpm test:e2e:supervision`.
-- Subagent lifecycle: `pnpm test:e2e` and `pnpm test:e2e:subagents`.
+- Subagent lifecycle: `pnpm test:e2e:smoke` and `pnpm test:e2e:subagents`.
 - Imported-extension dependency installation or registry-boundary changes: `pnpm test:e2e:plugin-import-deps`.
 - Trusted extension or plugin-extension changes: `pnpm test:e2e:trusted-extensions`.
 - Session collaboration / Session Orchestrator: `pnpm test:e2e:collaboration`.
 - Completion-notice silence or the silent-turn contract (D193 / D446): `pnpm test:e2e:session-completion`.
 - Changes spanning multiple surfaces use the union of the applicable suites.
 
-`pnpm test:e2e` is the default cross-system smoke suite for host RPC, IPC,
+`pnpm test:e2e:smoke` is the default cross-system smoke suite for host RPC, IPC,
 agent execution, plugins, persistence integration, and shared runtime
 contracts. A required suite that cannot run because of a missing display,
 platform, credential, hardware resource, or other environment capability must
 be recorded as `NOT RUN` with its reason, alternative validation, and remaining
 risk. The pull request may still be opened with that record so the change can
 be validated in a capable environment, but the gate is not satisfied and
-delivery remains incomplete until the suite passes against the integrated
-`main` that carries the change.
+delivery remains incomplete until the suite passes against a candidate containing the latest `origin/main`
+and the change.
 
 Required results must apply to the executable commit the gate ran on, and any
 later commit that changes the landed executable content requires a rerun of
@@ -691,7 +738,7 @@ A failed required E2E blocks the branch push, the pull request, and declaring
 the integrated delivery complete until the failure is classified as an
 implementation regression, test regression, environment failure, or known
 flaky infrastructure. Fix the product or test defect and rerun the affected
-suite against the integrated `main`. Do not delete scenarios, weaken
+suite against the refreshed task or PR integration candidate. Do not delete scenarios, weaken
 assertions, or add retries that hide a deterministic failure. When a scenario
 is not automated on the required platform, keep its status documented and
 identify the platform validation still needed.
@@ -729,6 +776,23 @@ identify the platform validation still needed.
   `node scripts/e2e-tool-admission.mjs` against an isolated real host. Class,
   session, global, mutation, queue bounds, fairness, cancellation, and timeout
   are unit-covered by `tool_budget/tests.rs`; restart coverage remains pending.
+
+#### E2E-RUNTIME-shell-capacity-diagnostics: Shell admission explains saturation
+
+- **Preconditions**: Isolated Host/profile and local shell fixtures; no provider.
+- **Steps**: Hold four shell slots and queue twelve calls. Run independent Read
+  and Write successfully, then drain this burst. In a separate phase, hold four
+  shell slots and let another Bash call hit the real 30-second admission deadline.
+  Release the fixture gate and drain all accepted work.
+- **Expected**: Rejected Bash never starts. `HOST_OVERLOADED` retains retryable
+  semantics; `content.capacity` shows host 4 in-flight/1 queued and requesting
+  session 0 in-flight/1 queued at rejection, with four safe Bash session holders.
+  Text names `wait_for_updates`, long `sleep`, and background retention of the
+  same capacity. No command/path appears. Rejected admission is removed from the
+  queue, existing FIFO/cancellation coverage stays green, and all counters drain.
+- **Automation**: `node scripts/e2e-tool-admission.mjs`; runtime Bash-result
+  passthrough and Team prompt guidance use fixture-host tests.
+- **Specs linked**: `03-runtime/06-host-rpc-protocol.md`, `03-runtime/08-error-codes.md`
 
 ### Release & Packaging
 
@@ -2341,16 +2405,24 @@ identify the platform validation still needed.
 - **Steps**: 1) On empty home, record the welcome placeholder and wait longer
   than 4 seconds to confirm it is unchanged. 2) Open conversation A, record
   its guidance, type and clear text, focus and blur the textarea, and wait;
-  confirm the copy is unchanged. 3) Switch to conversation B and then back to
-  A, recording each guidance change. 4) Switch between home and a conversation
-  and inspect the command/file and keyboard hints. 5) Type `/` and inspect the
+  confirm the copy is unchanged. 3) Start a turn with no text or file draft and
+  confirm the follow-up/steer hint appears. Check Enter-to-send on and off, and
+  verify the displayed send and steer shortcuts on macOS and Windows/Linux.
+  Add a draft while the turn is active and confirm contextual guidance returns.
+  4) Switch to conversation B and then back to A, recording each guidance
+  change. 5) Switch between home and a conversation and inspect the command/file
+  and keyboard hints. 6) Type `/` and inspect the
   slash menu. Include Skills with long English/CJK descriptions, short/no
   descriptions, a separate title/argument hint, and an exceptionally long slash
   name; also inspect a long filename in `@` mode. Repeat at 800px and 1680px
-  viewport widths with 320px and 640px composer widths. 6) Switch to zh-CN and
+  viewport widths with 320px and 640px composer widths. 7) Switch to zh-CN and
   repeat the context-switch checks.
 - **Expected**: The initially rendered context starts with its welcome copy and stays stable until
-  the page/session context changes. Each context switch advances to the next
+  the page/session context changes. While a turn is active and the draft has no
+  text or file references, the localized follow-up/steer hint replaces it. The
+  send shortcut follows the Enter-to-send preference and platform; the steer
+  shortcut is Option+Enter on macOS and Alt+Enter on Windows/Linux. Adding a
+  draft restores the contextual hint. Each context switch advances to the next
   localized command/file or keyboard hint with an opacity fade; no timer-driven
   changes occur. The keyboard hint includes Shift+Enter and a submit hint, while the
   command/file hint includes `/` and `@`. The slash menu still contains `/new`,
@@ -2371,29 +2443,30 @@ identify the platform validation still needed.
 - **Status**: Source-covered (`composer-placeholder-context.test.mjs`);
   slash-menu layout covered by `pnpm test:e2e:composer-autocomplete` after
   `pnpm build:js` (real React/Chromium and production CSS, deterministic command
-  fixtures; no provider required). Full provider/session scenario Draft;
-  branch runs do not replace post-integration E2E
+  fixtures; no provider required). The running-empty two-line Composer path is
+  covered by `E2E-COMPOSER-compact-running-input` in the transcript-render
+  fixture. Full provider/session scenario Draft; branch runs do not replace
+  post-integration E2E.
 
 #### E2E-089: Composer model menu opens upward and switches model
 
 - **Preconditions**: Chat route active; provider configured with two reasoning
   models whose binding defaults differ.
-- **Steps**: 1) Click the Composer-right model × reasoning chip. 2) Confirm the
-  menu opens upward from the bottom composer. 3) Enter Model, select a different
-  provider/model, and return to the root. 4) Confirm its default thinking level,
-  choose another supported level, then reselect the same model. 5) Open Settings
-  from the command palette or application menu.
+- **Steps**: 1) Click the Composer-left model × reasoning chip. 2) Confirm the
+  menu opens upward directly to the searchable model list, with no Default/Custom
+  tabs. 3) Select a different provider/model. 4) Confirm its default thinking
+  level, choose another supported level, then reselect the same model. 5) Use
+  Model configurations in the popup to open the existing Settings model page.
 - **Expected**: The trigger uses a Bot icon while retaining the current model
-  and reasoning labels. The root shows only Model and Reasoning level entries.
-  The Model submenu lists enabled runnable providers and only the model bindings
-  saved for each provider, with each model row visibly indented beneath its provider
-  heading. Cached or freshly discovered models may supply display names and
+  and reasoning labels. The popup shows the model list immediately. Each row has
+  a neutral icon, one display name and actual provider, context and capability
+  metadata. It lists enabled runnable providers and only their saved bindings. Cached or freshly discovered models may supply display names and
   metadata for those bindings, but unconfigured discovery results are absent;
-  configured IDs remain available when discovery is unavailable. The root slider
+  configured IDs remain available when discovery is unavailable. The slider
   lists the selected model's supported levels. Selecting a different model
   updates the active session to that binding's default thinking level; selecting
-  the already-active model preserves a manually selected level. Settings opens
-  from the command palette/menu. The Composer model trigger ellipsizes long IDs.
+  the already-active model preserves a manually selected level. Model
+  configurations closes the popup and opens the existing model Settings page. The Composer model trigger ellipsizes long IDs.
   Each option shows one display name only, and hovering a long option exposes its
   complete display name in the tooltip without changing the menu layout or adding
   a visible model ID.
@@ -2425,7 +2498,11 @@ identify the platform validation still needed.
   slot remains reachable. Both mode menus are visible and pointer-accessible,
   and each selection updates its trigger. The execution-profile labels
   `智能体` and `专家团` remain fully visible at desktop and narrow composer widths.
-  Home and thread-docked composers match.
+  Home and thread-docked composers match, with two-line empty input, a neutral
+  outline and unseparated toolbar. Profile menu options have at least 6px vertical
+  separation; switching profiles preserves model, reasoning and permission.
+  The task-progress card and activity rail both open the existing read-only
+  subagent transcript tab, while the composer stays in the reading region.
 - **Specs linked**: `04-ux/08-component-spec.md` (§11)
 - **Acceptance**: C (send/UI), Quality
 - **Milestone**: M2
@@ -4745,7 +4822,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   binding still contains the legacy 128k generic seed.
 - **Steps**: 1) Open the session. 2) Confirm the completed turn shows a model
   badge and no context inspector under the answer. 3) Hover the composer
-  toolbar inspector trigger, confirm the panel stays closed, then click it.
+  footer meter trigger, confirm the panel stays closed, then click it.
   4) Inspect the remaining-token-plus-percentage heading, used/window counts,
   unboxed turn/speed values, one inline provider-usage summary, and one
   aggregate tool-usage summary, with no doubled heading rule and no inner
@@ -4757,20 +4834,24 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   context inspector, and confirm the summary stays inside the conversation pane:
   fully visible, clear of the panel column, and narrowed rather than clipped on
   a narrow pane. 8) Click Retry on that turn while idle. 9) Confirm a session
-  without usage still offers Retry on completed turns and omits the composer
-  inspector.
+  without usage still offers Retry on completed turns and shows the disabled
+  unknown meter. 10) In an idle editable Desktop session, activate Compact
+  context and confirm the existing workflow starts once. Repeat while running,
+  awaiting approval, or viewing a read-only session; the action is disabled.
+  Switch sessions with the popup open and confirm it closes.
 - **Expected**: Model badge appears under completed assistant answers when a
   model id exists. The compact Context inspector appears in the composer
-  right toolbar, left of the model picker, once any usage exists, and always
-  mirrors the newest usage-bearing assistant turn. The trigger shows the ring
-  plus remaining-capacity percentage (no Context label) and low-space
+  footer at its right edge, and always mirrors the newest usage-bearing
+  assistant turn. The trigger shows a horizontal progress bar plus the
+  configured used/remaining percentage (no Context label) and low-space
   warning/error states; click or keyboard activation toggles the same compact
   summary while pointer hover alone never opens or closes it. An open panel
   survives the pointer leaving it and closes on a second trigger activation,
   an outside click, or Escape, which returns focus to the trigger. Provider
   values remain exact, tool values remain visibly approximate through the `~`
-  aggregate total, and no per-tool list, source badge, progress bar, or
-  explanatory estimate paragraph is rendered. Occupancy, turn total, and
+  aggregate total. An additional used-occupancy bar and Compact context action
+  appear in the footer popup; no invented System/Skill shares or per-tool source
+  list is rendered. Missing usage remains `—`, rather than a made-up percentage. Occupancy, turn total, and
   provider cache/input/output/reasoning/hit-rate are the last usage-bearing
   assistant message, not the summed tool-loop, so cache read stays on the
   same scale as the context window. The cache hit rate is omitted
@@ -4902,6 +4983,12 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 #### E2E-064: Durable notification inbox records terminal task outcomes
 
+- **Success-only/shared-count regression coverage**:
+  `node scripts/e2e-notification-inbox.mjs` uses isolated SQLite and Electron
+  to cover persisted-list restoration after renderer reload, both outcome
+  kinds, All/Unread, row navigation, read/clear actions, and native Dock count
+  readback on macOS. No real provider or native notification banner is used.
+
 - **Preconditions**: Two durable sessions exist; a deterministic provider can
   complete one turn, fail one turn with a stable error code, and abort one
   turn; notification inbox starts empty.
@@ -4918,10 +5005,12 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   eligible terminal turns. 11) Use Mark all read, then Clear. 12) While a
   native task banner and a renderer refresh are still in flight, deliver a
   delayed `notification.changed` payload for a cleared/read durable id and a
-  duplicate payload for an id that is already present. 13) On Windows, create
-  one unread successful outcome while the bell has no failure rows. Open the
-  empty bell popover, use Mark all read, then create another success and use
-  Clear. 14) Create enough unread outcomes for a two-digit count and inspect
+  duplicate payload for an id that is already present. 13) In the isolated
+  profile, create one success-only unread outcome, restart the app, open All
+  and Unread, then select its row. 14) Create one completed and one failed
+  unread row; compare All and Unread, mark one row read, and verify only that
+  row leaves Unread. Use Mark all read, then create another unread row and use
+  Clear. 15) Create enough unread outcomes for a two-digit count and inspect
   the taskbar overlay before and after marking all outcomes read.
 - **Expected**: A's visible-current completion creates no row or terminal
   sidebar mark. Restoring/focusing the app with A already visible clears A's
@@ -4945,9 +5034,14 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   duplicate, delayed, and historical rows do not replay it. On Windows, the
   taskbar overlay is a smooth black circular badge with a centered white system-font numeral. Its visual weight matches common
   Windows taskbar badges for both single- and two-digit counts. A success-only
-  outcome increments the taskbar badge without adding a bell row or bell
-  count; both toolbar actions remain enabled when relevant and clear the
-  taskbar badge. The badge also clears when no unread outcomes remain. The
+  outcome persists across app reload, appears in both All and Unread, and
+  increments the bell and taskbar/Dock badges to one. Selecting that row marks
+  it read and navigates to its session; Mark all read and Clear each clear the
+  unread count, and Clear removes the durable row without changing the session.
+  With mixed completed and failed rows, All shows both kinds and Unread shows
+  exactly rows whose `readAt` is null; marking one row read removes only that
+  row from Unread and decrements both badges. The badge clears when no unread
+  outcomes remain. The
   underlying taskbar button keeps the
   PI-Desktop `P` icon and PI-Desktop name while the overlay is present.
 - **Specs linked**: `03-runtime/04-data-storage.md`,
@@ -7430,7 +7524,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   `apps/desktop/test/rpc-lifecycle-contract.test.mjs` (client precheck),
   `packages/shared/src/rpc-limits.test.ts`. Desktop journey remains Draft.
 
-#### E2E-248: Subagent details open as closable work-panel tabs with a read-only composer
+#### E2E-248: Subagent details open as closable display-only work-panel tabs
 
 - **Preconditions**: A project-bound Agent session whose assistant emits at
   least two `Task` calls — one named `explorer` and one resumed `explorer`
@@ -7448,8 +7542,8 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
      delegate rows, `user: follow-up prompt`, delegate rows — the same
      message-list language as the main transcript (user bubbles, tool rows,
      thinking rows, markdown answers).
-  5. Verify the composer at the foot is a disabled two-row textarea whose
-     placeholder reads the read-only hint, in every supported locale.
+  5. Verify there is no composer or disabled input placeholder at the foot;
+     the transcript fills the available height and has no send path.
   6. Wait for the failed delegate to settle, open its tab, and verify the
      ended tab persists until manually closed.
   7. Switch to another session and back. Verify the tabs are restored per
@@ -9458,187 +9552,62 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   desktop and host. Host-core and targeted renderer tests are companion checks,
   not substitutes for the Electron journey.
 
-## 8. Traceability Matrix
+## 8. Generated executable traceability
 
-| Acceptance | Scenarios |
-|---|---|
-| E / Quality — Standard Agent delegate-first prompt and Task report convergence | E2E-DELEGATION-standard-delegates-to-subagents |
-| C / E / Quality — Mandatory Team delegation, expert-start gate and catalog isolation | E2E-TEAM-lead-delegates-to-experts, E2E-TEAM-forced-delegation |
-| C / Quality / Security — Automatic read-only Team planning | E2E-TEAM-approved-plan-research-and-execution, E2E-TEAM-automatic-plan-research |
-| C / Quality / Security — Research task ownership and legacy recovery | E2E-TEAM-research-owner-required |
-| C / Quality / Security — Team Plan inbox settlement | E2E-TEAM-plan-inbox-before-approval, E2E-TEAM-wait-inbox-yield-and-live-overview |
-| C / E / Quality / Security — Approved Team Goal same-turn execution and cancellation | E2E-TEAM-approved-goal-same-turn-and-cancel |
-| C / Quality — Independent Team panorama/task/member tabs | E2E-TEAM-panorama-and-member-tabs |
-| C / Quality — Live dispatch card and single task target | E2E-TEAM-dispatch-card-live-status-and-joining |
-| C / Quality — Chronological Team turn timeline with inline dispatch cards | E2E-TEAM-turn-renders-chronological-timeline |
-| C / E / F / Quality / Security — Session Todo checklist | E2E-CHAT-session-todo-checklist |
-| C / E / Security / Quality — Live Voice four-stage interaction | E2E-LIVE-VOICE-four-stage-ui |
-| C / F — Hourly task updates | E2E-SCHEDULED-manual-to-hourly |
-| C / F / Quality — Saved project isolation | E2E-SCHEDULED-manual-workspace-binding |
-| C / F / Quality — Desktop automations | E2E-SCHEDULED-desktop-automation-lifecycle |
-| F / Security / Quality — Portable configuration sync | E2E-CONFIG-SYNC-webdav-portable-configuration |
-| A / C — Unicode stdio framing | E2E-RPC-unicode-separators |
-| C / G / Quality — Plugins navigation | E2E-NAV-plugins-button-goes-back |
-| C / D / Quality — Sidebar row states | E2E-LAYOUT-sidebar-row-states |
-| A / C / Quality — Sidebar material and settings return | E2E-LAYOUT-sidebar-settings |
-| C / Quality — Destination loading and focus | E2E-087b |
-| A / H / Quality — Renderer process crash recovery | E2E-RUNTIME-renderer-crash-recovery |
-| C / F / Quality — Project folder with chats detaches and deletes safely | E2E-048c |
-| B / F / Security — Provider copy | E2E-PROVIDER-copy-config-without-credentials |
-| B / F / Quality — Selected model order | E2E-MODEL-selected-order-persists |
-| E / F / Quality — MCP server timeout override | E2E-261 |
-| A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079, E2E-092, E2E-097, E2E-143, E2E-150, E2E-168, E2E-204 |
-| A / C / F / Quality — Tray session navigation | E2E-TRAY-bounded-session-navigation |
-| B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080, E2E-082, E2E-102c, E2E-102d, E2E-102e, E2E-151, E2E-154, E2E-163, E2E-166, E2E-172, E2E-174, E2E-197, E2E-005G, E2E-005J, E2E-199, E2E-201, E2E-202, E2E-203, E2E-205, E2E-206, E2E-209 |
-| C — Conversation & stream | E2E-PLAN-chronological-card-and-markdown-export, E2E-CHAT-long-history-stream-keeps-responsive, E2E-CHAT-running-status-survives-output-pauses, E2E-008, E2E-008d, E2E-008e, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-011d, E2E-011e, E2E-011g, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-088b, E2E-089, E2E-090, E2E-COMPOSER-narrow-controls, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102g, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-121, E2E-218, E2E-259, E2E-219, E2E-AGENTS-001, E2E-142, E2E-144, E2E-145, E2E-146, E2E-146a, E2E-147, E2E-151, E2E-154, E2E-155, E2E-158, E2E-159, E2E-161, E2E-162, E2E-166, E2E-172, E2E-173, E2E-174, E2E-177, E2E-178, E2E-179, E2E-180, E2E-182, E2E-183, E2E-187, E2E-198, E2E-199, E2E-202, E2E-203, E2E-207, E2E-208, E2E-CHAT-content-width-handles, E2E-250, E2E-102i, E2E-PLUGIN-session-orchestrator-real-workers, E2E-SUBAGENT-settlement-updates-before-parent-poll, E2E-SUBAGENT-resume-a-settled-delegation |
-| C — Conversation & stream (composer drafts) | E2E-011c, E2E-011c-1, E2E-COMPOSER-input-history |
-| D — Workspace | E2E-012, E2E-013, E2E-022B, E2E-024I, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068, E2E-075, E2E-078, E2E-153, E2E-158, E2E-182, E2E-187, E2E-252 |
-| D — Workspace (project ordering) | E2E-253 |
-| E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102d, E2E-102e, E2E-102g, E2E-103, E2E-105, E2E-106, E2E-107, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-119, E2E-121, E2E-122, E2E-142, E2E-145, E2E-147, E2E-155, E2E-158, E2E-166, E2E-181, E2E-PLUGIN-imported-pi-package-skills |
-| F — Persistence | E2E-020, E2E-021, E2E-021a, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-096, E2E-098, E2E-102, E2E-102b, E2E-102c, E2E-102d, E2E-102g, E2E-102i, E2E-103, E2E-AGENTS-001, E2E-061a, E2E-073a, E2E-104, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-118, E2E-119, E2E-120, E2E-121, E2E-123, E2E-142, E2E-146, E2E-146a, E2E-148, E2E-151, E2E-158, E2E-160, E2E-168, E2E-171, E2E-177, E2E-178, E2E-183, E2E-186, E2E-005J, E2E-PLUGIN-session-orchestrator-real-workers |
-| F — Persistence (project ordering) | E2E-251 |
-| G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024AA, E2E-024E, E2E-024W, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M, E2E-024N, E2E-024O, E2E-024P, E2E-025, E2E-026, E2E-105, E2E-117, E2E-120, E2E-122, E2E-123, E2E-024Q, E2E-148, E2E-152, E2E-153, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-imported-pi-package-wrapper, E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency, E2E-PLUGIN-global-shortcut-owns-only-its-own-command, E2E-PLUGIN-permission-gate-for-real-time-capabilities, E2E-PLUGIN-background-audio-and-realtime-connection, E2E-PLUGIN-fs-root-follows-the-calling-session |
-| H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042, E2E-096, E2E-098, E2E-104, E2E-107, E2E-108, E2E-109, E2E-110, E2E-113, E2E-115, E2E-116, E2E-118, E2E-121, E2E-146, E2E-146a, E2E-155, E2E-159, E2E-176, E2E-194, E2E-195 |
-| Security | E2E-028, E2E-029, E2E-030, E2E-024J, E2E-024K, E2E-024M, E2E-049, E2E-068, E2E-086, E2E-102c, E2E-102d, E2E-102e, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-113, E2E-115, E2E-116, E2E-117, E2E-119, E2E-121, E2E-122, E2E-123, E2E-142, E2E-148, E2E-151, E2E-153, E2E-158, E2E-187, E2E-196c, E2E-196b, E2E-196, E2E-PLUGIN-fs-root-follows-the-calling-session |
-| Quality | E2E-CHAT-long-history-stream-keeps-responsive, E2E-CHAT-running-status-survives-output-pauses, E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-103, E2E-AGENTS-001, E2E-021a, E2E-024N, E2E-059a, E2E-060b, E2E-060c, E2E-061a, E2E-073a, E2E-111, E2E-114, E2E-117, E2E-118, E2E-119, E2E-120, E2E-122, E2E-123, E2E-142, E2E-143, E2E-144, E2E-145, E2E-146, E2E-147, E2E-148, E2E-150, E2E-151, E2E-153, E2E-155, E2E-158, E2E-159, E2E-160, E2E-161, E2E-162, E2E-163, E2E-168, E2E-172, E2E-173, E2E-174, E2E-011g, E2E-176, E2E-177, E2E-178, E2E-179, E2E-180, E2E-181, E2E-182, E2E-183, E2E-186, E2E-187, E2E-194, E2E-195, E2E-196a, E2E-196b, E2E-196c, E2E-198, E2E-199, E2E-200, E2E-196, E2E-201, E2E-204, E2E-202, E2E-203, E2E-205, E2E-206, E2E-207, E2E-208, E2E-209, E2E-210, E2E-UPDATE-preference-and-once-only-reminder, E2E-218, E2E-259, E2E-219, E2E-250, E2E-252, E2E-102i, E2E-SUBAGENT-settlement-updates-before-parent-poll, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-fs-root-follows-the-calling-session, E2E-SUBAGENT-resume-a-settled-delegation |
-| Quality (project ordering) | E2E-253 |
-| C — Conversation & stream (IME slash alias) | E2E-255 |
-| E — Tools & permissions (Skill residency) | E2E-254 |
-| Quality (Skill residency and IME slash alias) | E2E-254, E2E-255 |
-| C — Conversation & stream (import visibility) | E2E-257 |
-| F — Persistence (import visibility) | E2E-257 |
-| G — Plugins (import visibility) | E2E-257 |
-| Quality (import visibility) | E2E-257 |
-| Quality (Windows updater cache) | E2E-260 |
-| G — Plugins (Session Orchestrator) | E2E-PLUGIN-session-orchestrator-real-workers |
-| Security (Session Orchestrator) | E2E-PLUGIN-session-orchestrator-real-workers |
-| Quality (Session Orchestrator) | E2E-PLUGIN-session-orchestrator-real-workers |
-| C — Conversation & stream (Session list responsiveness) | E2E-SESSION-list-refresh-keeps-desktop-responsive |
-| Quality (Session list responsiveness) | E2E-SESSION-list-refresh-keeps-desktop-responsive |
-| Security (imported extension dependencies) | E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency |
-| Quality (imported extension dependencies) | E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency |
-| F / G / Security / Quality — Imported extension npm recovery | E2E-PLUGIN-import-extension-recovers-missing-npm |
-| G — Plugins (desktop tool dispatch budget) | E2E-PLUGIN-slow-tool-is-not-cut-off-by-host-dispatch |
-| C — Conversation & stream (Independent session communication) | E2E-SESSION-independent-top-level-communication |
-| D — Plugin security (Independent session communication) | E2E-SESSION-independent-top-level-communication |
-| G — Plugins (Independent session communication) | E2E-SESSION-independent-top-level-communication |
-| Quality (Independent session communication) | E2E-SESSION-independent-top-level-communication, E2E-SESSION-hover-card-model-and-links |
-| C — Conversation & stream (Hover card model and links) | E2E-SESSION-hover-card-model-and-links |
-| C — Conversation & stream (Chat file references) | E2E-CHAT-shorthand-file-ref-opens-the-matching-file, E2E-CHAT-file-ref-opens-the-surface-that-owns-it |
-| C / Quality / Security (Conversation MP4 attachments) | E2E-CHAT-mp4-attachment-opens-in-system-player |
-| G — Plugins (Chat file references) | E2E-CHAT-file-ref-opens-the-surface-that-owns-it, E2E-PLUGIN-file-view-collapse-persists |
-| Quality (Chat file references) | E2E-CHAT-shorthand-file-ref-opens-the-matching-file, E2E-CHAT-file-ref-opens-the-surface-that-owns-it, E2E-PLUGIN-file-view-collapse-persists |
-| G — Plugins (project folder roots) | E2E-PLUGIN-file-view-switches-folder-per-project |
-| Security (project folder roots) | E2E-PLUGIN-file-view-switches-folder-per-project |
-| Quality (project folder roots) | E2E-PLUGIN-file-view-switches-folder-per-project |
-| D — Workspace (project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
-| F — Persistence (project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
-| Quality (project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
-| Quality (two-click delete) | E2E-SESSION-two-click-delete-arms-first |
-| Security (plugin real-time capabilities) | E2E-PLUGIN-global-shortcut-owns-only-its-own-command, E2E-PLUGIN-permission-gate-for-real-time-capabilities, E2E-PLUGIN-background-audio-and-realtime-connection |
-| C — Conversation & stream (disclosure reading position) | E2E-CHAT-disclosure-toggle-keeps-reading-position |
-| E — Tools & permissions (disclosure reading position) | E2E-CHAT-disclosure-toggle-keeps-reading-position |
-| E — Tools & permissions (capability level move) | E2E-CAPABILITY-move-across-levels |
-| F — Persistence (capability level move) | E2E-CAPABILITY-move-across-levels |
-| Quality (capability level move) | E2E-CAPABILITY-move-across-levels |
+The [executable scenario index](08-scenario-index.md) replaces the handwritten
+ID-to-script matrix. It is generated from executable test/result calls and the
+annotated suite catalog, with direct source links, scene families, run tiers and
+explicit manual/excluded boundaries. It never claims a suite passed.
 
-| Milestone | Scenarios |
-|---|---|
-| Post-MVP experimental interaction maintenance | E2E-LIVE-VOICE-four-stage-ui |
-| M1 | E2E-001, E2E-002, E2E-003, E2E-028, E2E-029 |
-| M2 | E2E-004, E2E-005, E2E-006, E2E-007, E2E-008, E2E-008d, E2E-008e, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-011d, E2E-011e, E2E-011g, E2E-020, E2E-021, E2E-021a, E2E-027, E2E-031, E2E-036, E2E-037, E2E-042, E2E-087, E2E-088, E2E-088b, E2E-089, E2E-090, E2E-COMPOSER-narrow-controls, E2E-COMPOSER-input-history, E2E-144, E2E-005J, E2E-201, E2E-202, E2E-207, E2E-206 |
-| M3 | E2E-012, E2E-013, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040 |
-| M4 | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026, E2E-030, E2E-038 |
-| M5 | E2E-CHAT-long-history-stream-keeps-responsive, E2E-CHAT-running-status-survives-output-pauses, E2E-008a, E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-AGENTS-001, E2E-059a, E2E-060b, E2E-060c, E2E-061a, E2E-073a, E2E-094, E2E-095, E2E-143, E2E-145, E2E-146, E2E-146a, E2E-147, E2E-177, E2E-178, E2E-180, E2E-181, E2E-182, E2E-183, E2E-186, E2E-187, E2E-194, E2E-195, E2E-204, E2E-208, E2E-CHAT-content-width-handles, E2E-250, E2E-252, E2E-102i |
-| M5 (project ordering) | E2E-253 |
-| M2 (IME slash alias) | E2E-255 |
-| M5 (Skill residency) | E2E-254 |
-| M6 | E2E-104, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-103, E2E-172 |
-| M6+ | E2E-121, E2E-122, E2E-148, E2E-150, E2E-151, E2E-154, E2E-155, E2E-158, E2E-159, E2E-160, E2E-161, E2E-162, E2E-163, E2E-166, E2E-168, E2E-173, E2E-174, E2E-176, E2E-179, E2E-196a, E2E-196b, E2E-196c, E2E-198, E2E-199, E2E-200, E2E-202, E2E-203, E2E-205, E2E-209, E2E-210, E2E-UPDATE-preference-and-once-only-reminder, E2E-212, E2E-213, E2E-214, E2E-215, E2E-216, E2E-217, E2E-218, E2E-259, E2E-219, E2E-257, E2E-SUBAGENT-settlement-updates-before-parent-poll, E2E-PLUGIN-fs-root-follows-the-calling-session, E2E-SUBAGENT-resume-a-settled-delegation |
-| M6+ (Session Orchestrator) | E2E-PLUGIN-session-orchestrator-real-workers |
-| M6+ (Selected model order) | E2E-MODEL-selected-order-persists |
-| M6+ (MCP server timeout override) | E2E-261 |
-| M6+ (Destination loading and focus) | E2E-087b |
-| M6+ (Session list responsiveness) | E2E-SESSION-list-refresh-keeps-desktop-responsive |
-| M6+ (Windows updater cache) | E2E-260 |
-| M6+ (Independent session communication) | E2E-SESSION-independent-top-level-communication, E2E-SESSION-hover-card-model-and-links |
-| M5 (Chat file references) | E2E-CHAT-shorthand-file-ref-opens-the-matching-file, E2E-CHAT-file-ref-opens-the-surface-that-owns-it |
-| M5 (Conversation MP4 attachments) | E2E-CHAT-mp4-attachment-opens-in-system-player |
-| M6+ (Chat file references) | E2E-PLUGIN-file-view-collapse-persists |
-| M6+ (project folder roots) | E2E-PLUGIN-file-view-switches-folder-per-project |
-| Post-MVP | E2E-PLUGIN-pi-npm-skill-discovery, E2E-022A, E2E-022B, E2E-022C, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M (plugin roadmap R2/R3/R6) |
-| Post-baseline local automation | E2E-220 |
-| Post-baseline local automation (MCP `pi_session_get` large compaction) | E2E-MCP-session-get-projects-large-compaction |
-| Post-MVP remote control | E2E-221, E2E-222, E2E-223, E2E-224, E2E-225, E2E-226, E2E-227, E2E-228, E2E-229, E2E-230, E2E-231, E2E-232 |
-| Trusted extensions (R7 v1) | E2E-DIALOG-long-text-boundaries, E2E-241, E2E-242, E2E-HOOKS-prompt-chain, E2E-HOOKS-cancel-and-dispose, E2E-TRUSTED-EXTENSION-custom-agent-stream-and-binding, E2E-243, E2E-244, E2E-245, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency, E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list |
-| Trusted extensions (R7 v1 npm recovery) | E2E-PLUGIN-import-extension-recovers-missing-npm |
-| Post-MVP regression coverage (plugin tool dispatch) | E2E-PLUGIN-slow-tool-is-not-cut-off-by-host-dispatch |
-| M6+ (Project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
-| M6+ (Two-click delete) | E2E-SESSION-two-click-delete-arms-first |
-| C — Conversation & stream (model fallback) | E2E-SUBAGENT-ordered-model-fallback-preserves-work |
-| Quality (model fallback isolation) | E2E-SUBAGENT-ordered-model-fallback-preserves-work |
-| C — Conversation & stream (legacy subagent turn limit) | E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored |
-| Quality (legacy subagent turn limit) | E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored |
-| M6+ (disclosure reading position) | E2E-CHAT-disclosure-toggle-keeps-reading-position |
-| M6+ (capability level move) | E2E-CAPABILITY-move-across-levels |
-| E — Tools & permissions (builtin subagent defaults) | E2E-SUBAGENT-settings-lists-builtin-defaults |
-| Quality (builtin subagent defaults) | E2E-SUBAGENT-settings-lists-builtin-defaults |
-| C — Conversation & stream (opaque floating surfaces) | E2E-CHAT-opaque-floating-decision-and-retry-surfaces |
-| Quality (opaque floating surfaces) | E2E-CHAT-opaque-floating-decision-and-retry-surfaces |
-| M6 (opaque floating surfaces) | E2E-CHAT-opaque-floating-decision-and-retry-surfaces |
-| B — Model config (catalog window provenance) | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
-| B / F / Quality / Security — Manual model-list intent and the macOS Local Network trigger | E2E-MAC-local-network-manual-discovery |
-| F — Persistence (catalog window provenance) | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
-| Quality (catalog window provenance) | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
-| M6+ (catalog window provenance) | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
-| C — Conversation & stream (delegate context budget) | E2E-SUBAGENT-context-overflow-compacts-before-failing, E2E-SUBAGENT-context-overflow-reports-actionable-failure, E2E-SUBAGENT-resume-seeds-within-context-budget |
-| Quality (delegate context budget) | E2E-SUBAGENT-context-overflow-compacts-before-failing, E2E-SUBAGENT-context-overflow-reports-actionable-failure, E2E-SUBAGENT-resume-seeds-within-context-budget |
-| M6+ (delegate context budget) | E2E-SUBAGENT-context-overflow-compacts-before-failing, E2E-SUBAGENT-context-overflow-reports-actionable-failure, E2E-SUBAGENT-resume-seeds-within-context-budget |
-| C / F / Quality — The context estimate stays safe (calibration) | E2E-CONTEXT-estimate-calibration-stays-safe |
-| C — Conversation & stream (unique tool-call ids) | E2E-RUNTIME-unique-tool-call-ids-per-request |
-| F — Persistence (stored model binding array) | E2E-PROVIDER-stored-binding-array-reads-entry-by-entry |
-| Quality (stored model binding array) | E2E-PROVIDER-stored-binding-array-reads-entry-by-entry |
-| Quality (unique tool-call ids) | E2E-RUNTIME-unique-tool-call-ids-per-request |
-| C — Conversation & stream (loop context ownership) | E2E-RUNTIME-loop-context-ownership |
-| Quality (loop context ownership) | E2E-RUNTIME-loop-context-ownership |
-| G — Plugin host lifecycle (crash report) | E2E-PLUGIN-crash-report-names-the-exit-code |
-| Quality (crash report) | E2E-PLUGIN-crash-report-names-the-exit-code |
+Descriptive acceptance requirements below stay authoritative. A document-only
+case does not need an ID; an existing historical ID remains citable. Retiring or
+replacing executable behavior removes its test and generated ID in the same
+change. Run `node scripts/generate-scenario-index.mjs` and its `--check` gate;
+do not edit either locale's generated index by hand.
 
-The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
-Codex parity decisions in [decisions-log §D](../08-meta/decisions-log.md)
-rather than the A–H criteria; their gold source is the capture suite.
+## 9. Maintaining scenarios
 
-The release artifact paths are covered by E2E-192, E2E-192a, E2E-196a,
-E2E-196b, E2E-196c, and E2E-200 (Quality, M6+).
+1. Describe changed user/protocol behavior, preconditions and expected results.
+   Document-only cases need no numeric ID or boilerplate status block.
+2. Keep durable IDs in executable test/result names or annotate dynamically
+   assembled result IDs in `scripts/e2e-suite-catalog.json`.
+3. Add every E2E entrypoint to a scene family and either automated or explicitly
+   manual tier; preserve an established alias when it remains useful.
+4. Regenerate both locale indexes together. CI rejects catalog or index drift.
+5. Delete superseded tests and executable IDs in the same change; historical
+   acceptance requirements remain unless the product contract also retires.
 
----
+## 10. CI tiers and fixture boundaries
 
-## 9. How AI Must Update This Doc
+`node scripts/e2e-suite.mjs --tier smoke` runs five required PR paths:
+Electron boot/preload/IPC, a real sidecar message through a loopback SSE model,
+Write denial/one-time approval, durable conversation recovery after Host restart,
+and built-Desktop crash supervision/RPC recovery. No live-model case is counted
+as smoke coverage. The existing script bodies, production wiring and common
+Host/fixture/boot helpers are reused.
 
-When adding or changing a feature that affects user-visible or protocol-visible behavior:
+Nightly CI dispatches the remaining automatic suites by the catalog's scene
+families with a clean build, Rust Host, sidecar bundle, Xvfb, window manager and
+Electron native dependencies. Use `--family <name>` or `--suite <id>` to run the
+same candidate subset locally; `--list` explains selection, `--matrix` supplies
+the CI families. Compatibility script aliases remain. Missing/failed smoke
+checks fail CI; an unexpected `SKIP` fails the dispatcher. Catalogued excluded
+cases are recorded separately and never establish their acceptance.
 
-1. **Add a new scenario** using the template in §6. Assign the next available ID
-   (`E2E-<N>`). IDs retired by ADR 0268 are never reused.
-2. **Link it** to the relevant acceptance criterion (A–H) and milestone (M1–M6
-   or M6+ for the current product increment).
-3. **Set status** to `Draft` unless an automated test already exists.
-4. **Update the traceability matrix** in §8.
-5. **Commit** the update as part of the change (per [ai-development-workflow](03-ai-development-workflow.md) R3).
+The dispatcher provides a fresh HOME/XDG/temp state and an allowlisted tool and
+display environment; provider credentials, personal profiles, preview overrides
+and arbitrary `NODE_OPTIONS` are not inherited. Only the explicit candidate
+Host binary survives. Automatic model endpoints are local fixtures. Manual
+real-provider, long-chat, npm-installer and interactive Windows suites cannot be
+launched through the automatic dispatcher. Run them directly only with explicit
+account/cost/network/device authorization and record their separate evidence.
+`verify:ui:*` is never a fixture-suite dependency or unattended command.
 
----
-
-## 10. Future Automation Mapping
-
-When E2E automation is implemented (post-M5):
-
-- Each `Draft` scenario → Playwright test file.
-- Scenario ID becomes test case name: `e2e-001-app-launches`.
-- Fixtures and test data paths defined in a `tests/e2e/fixtures/` directory.
-- CI gate: all E2E scenarios must pass before release.
-
-Automation section will be expanded in a future ADR when the tooling decision is finalized.
-
----
+The reusable workflow builds the Host before the JS workspace/Desktop and
+sidecar, then verifies the index and runs the selected executable suites. Clean
+CI installs from the lockfile; local request worktrees still reuse provisioned
+dependencies and caches. All results identify the candidate commit/base and
+environment; a scheduled workflow definition is not proof of a hosted run.
 
 ## 11. Acceptance Criteria
 
@@ -9647,8 +9616,8 @@ This test plan spec is accepted when:
 - [ ] All MVP acceptance criteria (A–H) have at least one E2E scenario.
 - [ ] All security acceptance items have at least one E2E scenario.
 - [ ] Every scenario links to at least one spec document.
-- [ ] Traceability matrix is complete (scenarios ↔ acceptance ↔ milestones).
-- [ ] Scenario template is defined and all entries follow it.
+- [ ] Generated executable index is current; manual acceptance gaps are explicit.
+- [ ] Scenarios state preconditions, actions and observable expectations without mandatory document-only IDs.
 - [ ] AI update rules are documented and cross-linked to workflow spec.
 - [ ] Environment requirements match baseline (native macOS arm64/Intel x64,
   clean profile).
@@ -9878,7 +9847,12 @@ This test plan spec is accepted when:
 - The selected guidance stays unchanged until the page/session context changes;
   switching context advances to localized `/`/`@` command/file guidance and the
   keyboard hint `Shift+Enter for newline · Use Send to submit`, with an opacity fade.
-- Waiting, focusing, editing, clearing, or composing does not change the copy.
+- While a turn is active and there is no text or file draft, the localized
+  follow-up/steer hint replaces the contextual guidance. Its send shortcut
+  follows the Enter-to-send preference and platform; the steer shortcut is
+  Option+Enter on macOS and Alt+Enter on Windows/Linux. Adding a draft restores
+  contextual guidance. Waiting, focusing, editing, or clearing while idle does
+  not change the copy.
 - Placeholder ink is legible on light and dark floating plates.
 
 ### US-UI-31 Home empty vertical stack (D111/D204/D206)
@@ -10228,7 +10202,7 @@ This test plan spec is accepted when:
   `03-runtime/04-data-storage.md`, `04-ux/08-component-spec.md` §3.9, ADR 0251
 - **Acceptance criterion**: D (workspace), F (persistence), Quality
 - **Milestone**: M6+
-- **Status**: Partially automated — `pnpm test:e2e` covers the host contract
+- **Status**: Partially automated — `pnpm test:e2e:smoke` covers the host contract
   (project row, owned sessions, on-disk transcripts and scratch, project
   memory, isolation from other projects, the running-task refusal, the
   group-root refusal, and the idempotent unknown path), and
@@ -10826,7 +10800,9 @@ This test plan spec is accepted when:
      shows the title "New" and Review plus Browser/in-scope plugin-view rows —
      not a blank area below the title bar.
   2) Tab into the available rows and confirm each takes a visible focus ring
-     and that hovering a row shows only a background fill.
+     and that hovering a card changes its background fill without moving it.
+     Confirm a centered compass above a single column of rounded, outlined
+     cards (at most 380px wide, at least 56px tall, separated by 14px).
   3) Activate Browser or a plugin view and confirm its singleton tab is created
      and selected; the empty body and its view list disappear.
   4) Click `+` to create a New launcher tab, activate the same view from its
@@ -10840,6 +10816,11 @@ This test plan spec is accepted when:
   New launcher lists the same Review/plugin-view entries as its `+`-created
   page; a row creates or selects that singleton view. Each `+` click creates a
   separate closable New tab. Closing the final tab leaves the panel open on New.
+  Long contributed labels wrap inside their cards; short panels scroll
+  vertically and never overflow horizontally. The isolated production-renderer
+  journey in `node scripts/e2e-work-panel-launcher.mjs` checks card geometry,
+  both themes, English/Chinese, and New → Review → New → singleton reuse.
+  It does not validate native plugin content.
   The no-tab empty body is not exposed as a `tabpanel`; explicit New tabs are
   labelled tabpanels. Their rows are buttons in a `role="group"` labelled
   Tools. Panel empty states share the app's empty-state
@@ -13648,6 +13629,41 @@ are withdrawn with ADR 0165.
   `tools/call` for both oversized and under-limit `pi_session_get` results. The
   separate full Electron-to-Host journey remains release qualification.
 
+#### E2E-MCP-session-get-chunk
+
+- **Native producer regression coverage**: The same isolated script drives a real
+  Node AgentSidecar over stdio, the production session IPC and authenticated MCP.
+  A large Unicode native Pi transcript is reconstructed losslessly; older/empty/
+  clamped pages, restart hash stability and unchanged source JSONL bytes are
+  checked. Ordinary native pagination exposes the existing physical end/after
+  metadata required by the chunk consumer. No user session or provider is used.
+
+- **Preconditions**: Start an isolated local MCP listener with a durable
+  one-message transcript page whose complete JSON exceeds the ordinary 512 KiB
+  control result envelope. No model/provider or user profile is required.
+- **Steps**: 1) Authenticate and initialize. 2) Confirm `tools/list` advertises
+  `pi_session_get_chunk` with a read risk and the documented schema. 3) Observe
+  the ordinary `pi_session_get` truncation envelope. 4) Read chunk offset zero,
+  then continue using `nextOffset` and `expectedSha256`. 5) Decode and combine
+  base64 bytes, verify total length/hash and JSON session identity. 6) Change
+  the page between chunks; test invalid arguments, foreign identity, invalid
+  physical pagination, offset bounds, and a page larger than 16 MiB.
+- **Expected**: The complete Unicode transcript survives byte-for-byte. Each
+  read uses authoritative `session/get` with `messageLimit: 1` and no content
+  limit. Each chunk is at most 64 KiB, the final `nextOffset` is explicit null,
+  and every continuation re-reads the page. Changed content fails with
+  `CONFLICT` without retry or partial evidence; invalid inputs/results and the
+  total limit fail explicitly. Ordinary reads and auth boundaries remain intact.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` §13d
+- **Acceptance**: C (sessions), Quality
+- **Milestone**: M6+
+- **Status**: Authenticated local HTTP contract covered by
+  `apps/desktop/test/mcp-control.test.mjs`. Run
+  `PI_DESKTOP_HOST_BIN=<compatible host binary> node scripts/e2e-mcp-session-chunk.mjs`
+  for the real isolated Host, production session IPC and authenticated MCP
+  journey, including older-message pagination and restart. Installed-app
+  evidence and any model execution must be reported separately.
+
 #### E2E-234: Workspace security denylist and ignore layers
 
 - **Preconditions**: A project containing `.env`, `.env.example`,
@@ -14751,19 +14767,19 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Preconditions**: An Agent session has completed at least one turn that
   reported token usage. Settings → AI → Defaults is reachable.
 - **Steps**:
-  1. Confirm the composer toolbar context ring shows remaining capacity
-     (ring nearly full, percentage ≈ remaining %, tooltip and aria-label
+  1. Confirm the composer footer context track shows remaining capacity
+     (track nearly full, percentage ≈ remaining %, tooltip and aria-label
      use remaining vocabulary).
   2. Open Settings → AI → Defaults and switch the Context usage display
      segmented control from Remaining to Used.
-  3. Return to the chat and inspect the context ring: the ring arc now
+  3. Return to the chat and inspect the context meter: the track now
      fills by `usedRatio` (nearly empty at low occupancy), the percentage
      shows ≈ used %, the popover heading shows used tokens + percentage,
      and the tooltip/aria-label use used-capacity vocabulary.
-  4. Confirm warning/critical ring colors still follow remaining capacity:
-     at remaining > 25 % the ring stays neutral even when used % is high.
+  4. Confirm warning/critical track colors still follow remaining capacity:
+     at remaining > 25 % the track stays neutral even when used % is high.
   5. Switch back to Remaining and confirm the original display returns.
-- **Expected**: The display mode flips the ring arc, percentage, token
+- **Expected**: The display mode flips the track fill, percentage, token
   count, heading, tooltip, and aria-label consistently. Color thresholds
   remain based on remaining capacity in both modes. The default for a
   fresh profile is Remaining.
@@ -15973,7 +15989,10 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   toggles, parent close/reopen, a singleton segment, literal-final-item leaf
   selection, failure/denial/recovery, retained-pane remounts and a legacy search
   reveal. Repeat in Compact with permission/question/plan/goal cards, a stopped
-  partial answer, an assistant error and delegated child work.
+  partial answer, an assistant error and delegated child work. Check Compact
+  singleton and mixed-category summaries, their expansion, search reveal and
+  failure/denial badges. Check built typography and horizontal containment in
+  dark/light themes at 450px and 960px preferred reading bands.
 - **Expected:** Detailed uses one whole-process disclosure and leaves the final
   answer, assistant errors, stopped trailing text and pending actions outside it.
   Detailed starts active processes open; untouched processes collapse at
@@ -15995,6 +16014,10 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Validation scope for the 2026-09-20 change:** Nested disclosure and activity
   group presentation only; precise item-level transcript search targeting is out
   of scope and keeps the existing message-level search behavior.
+- **Readability:** Compact tools, including singleton calls, start behind a
+  category-count summary; progress and answer remain visible. Failures and
+  denials retain an issue count while folded. Prose uses a larger type scale
+  than summaries; narrow bands wrap the summary without horizontal overflow.
 - **Automation:** `pnpm test:e2e:transcript` covers default and active-to-completed
   process disclosure behavior; `pnpm test:e2e:transcript-disclosure` verifies
   manual-open retention and viewport anchoring; `apps/desktop/test/turn-process.test.mjs`
@@ -16677,6 +16700,20 @@ renderer's durable transcript reads. No real model or provider is contacted.
   and progress responses; terminal settlement revokes writes, retains readable progress,
   and session deletion removes it. Failed Team operations do not change dispatch cards;
   successful task updates to failed remain visible. Member and task links open their own detail.
+- **Draft consistency regression:** Submit a report, then call TodoWrite,
+  UpdateGoalProgress, ToolSearch, and known read-only tools; the structured draft
+  survives. Evidence-changing/unknown tools or steering require resubmission.
+  Successful execution without a valid draft gets one report-only continuation,
+  no duplicate terminal lifecycle, and no recovery on abort/error. A second
+  missing draft falls back without further model calls.
+  Submit `met` while Goal progress has pending/in-progress/failed items and
+  verify rejection; update the actual checklist to completed and resubmit.
+  Honest partial/blocked reports remain valid. Change progress after a `met`
+  draft and verify it cannot publish a contradictory completion claim.
+  Invalidate a draft with mixed progress and verify fallback retains the same
+  execution's items, marks unresolved work explicitly, and yields partial
+  rather than unknown when completed work exists. Empty/no-progress fallback
+  remains unknown; no fallback auto-completes the progress snapshot.
 - **Recovery and failure:** Ready reports remain readable after restart.
   Invalid or failed draft persistence never publishes a stale or misleading
   ready report. A late draft submission after `ready` or `failed` is rejected
@@ -16896,6 +16933,62 @@ renderer's durable transcript reads. No real model or provider is contacted.
   persistence and restart contracts are covered by `mcp-control-settings.test.mjs`.
 
 
+### E2E-TEAM-member-failure-wakes-lead
+
+- **Preconditions:** Candidate Host and runtime build; isolated Host data and
+  workspace, a configured no-auth loopback route that is never invoked.
+- **Steps:** Approve a Goal Team roster, settle one successful contribution,
+  then fail a member after a provisional task claim while the Lead waits.
+  Attempt completion before reading the notice. Consume it through the production
+  wait tool, replay the terminal event, and inspect the failed task. End the Lead,
+  fail a later dispatched member turn, and feed the actual Host notification to
+  production Main delivery with the real Agent Host/durable Host queue. Replay
+  the notification and abort another member turn.
+- **Expected:** Exactly one full `member_failed` notice names the member, error
+  code, advisory retry classification and affected task. Unread notice blocks
+  completion; consumed notice permits the settled gate while preserving the
+  separate successful-participation rule. Existing notification wakes the wait
+  and idle Lead; duplicate terminal/notification cannot create another prompt.
+  User abort creates no failure notice. Invalid error text cannot leak paths.
+  A post-commit checkpoint I/O error remains observable while the durable notice
+  still wakes an idle Lead. Replayed terminals re-notify only the same queued
+  row; after consumption/admission no additional wake event is emitted.
+- **Automation:** `node scripts/e2e-team-member-failure.mjs` (real Host stdio,
+  production runtime wait/Main delivery/Agent Host queue; the model runtime port
+  is a fake that starts an authenticated Host mailbox turn). Rust additionally
+  covers transaction rollback, counterfeit body/proof rejection, reserved keys
+  and deletion cleanup; runtime fake-clock tests cover complete body and timers.
+- **Specs:** 03-runtime/06-host-rpc-protocol;
+  [Team collaboration decision](../../adr/plus-expert-team-collaboration.md),
+  Host-authored member failure amendment.
+
+### E2E-TEAM-task-completion
+
+- **Preconditions:** Isolated Host data/workspace, configured no-auth fixture
+  route, approved Team roster; no live provider or user profile.
+- **Steps:** Enter the actual approved mailbox turn, create owned tasks, and
+  use the production runtime task_update tool against real Host RPC. Claim
+  completion in an active member turn, then settle it with
+  MUTATION_RETRY_BUDGET_EXHAUSTED. Start an explicit retry, reject the old caller
+  turn, claim completion and settle successfully. Deliver duplicate old ends.
+- **Expected:** Running completion claims stay in_progress. The failed task is
+  failed; prior completed and unstarted tasks retain their states. Retry cannot
+  become completed before successful settlement, and the Host publishes the
+  changed Team snapshot. Old tool/terminal identities cannot overwrite retry.
+- **Additional regression coverage:** Abort/startup interruption cancels exact
+  attempts; metadata edits preserve pending claims; reset, reassignment,
+  deletion and session/Team cleanup clear associations; failed transactions
+  roll back claims with task/turn changes. Success without a claim does not
+  auto-complete. Plan structured result submission retains its existing contract.
+- **Automation:** Build the candidate Host and agent-runtime, then run
+  `node scripts/e2e-team-task-completion.mjs` (stdio Host + production runtime
+  tools; the terminal error is a controlled RPC input, not a live model failure).
+  Runtime mutation-budget tests cover the error event producer; Host attempt
+  tests cover durable settlement and recovery. Existing Team presentation and
+  dispatch tests cover failed/cancelled/completed board display.
+- **Specs:** 03-runtime/04-data-storage, 06-host-rpc-protocol; ADR
+  plus-expert-team-collaboration task completion amendment.
+
 ### E2E-TEAM-reviewed-launch
 
 - **Preconditions:** Isolated Desktop profile and workspace, local fake provider,
@@ -16913,6 +17006,15 @@ renderer's durable transcript reads. No real model or provider is contacted.
   and fake provider); `node scripts/e2e-team-review-ui.mjs` (component interaction
   at the API boundary); `cargo test -p host-core --locked team` and the
   `team_rpc_full_journey` contract test. Real-model quality is outside this gate.
+
+The review route regression covers disabled/empty providers, per-model thinking
+choices, localized omit, provider/model changes that adjust incompatible effort,
+and editing one expert while another has an unavailable route. The actual
+isolated Electron component uses production selection wiring with mocks only at
+the API/store boundary. Host route tests cover declared review → selection edit
+→ confirmation → persisted expert session for obsolete compatibility overrides,
+omit on off-only bindings and generic empty bindings; missing/disabled routes and
+unsupported explicit levels stay rejected. These fixtures make no paid calls.
 
 The review component fixture also uses the Chinese catalog, concise supplied
 reason/responsibility and a proposed display identity. Confirm the visible role/name
@@ -17007,7 +17109,7 @@ current CAS revision. Legacy descriptions and reviews without presentation are r
   2. Verify confirmed members keep their routing handles and receive the proposed display identities. Start controlled member turns and update task state independently. Let the Lead become idle while a member remains running; verify the Lead stays idle with a waiting label and the member shows its Host phase.
   3. Start one approved Plan/Goal execution and capture the fake title-summary request. Replay the same execution event and reload the renderer. Verify one request total, no member title request, and that a manual rename or newer execution wins over a delayed title result.
   4. Queue eight ordinary Composer prompts. Fold and expand the queue, then execute an existing row action. Verify the mailbox and Composer queue remain separate and disclosure does not send or remove work by itself.
-  5. From Overview, measure the 48px progress/header chrome and 50px task rows at 100% font scale. Check dashed separators and one right chevron per summary. Collapse/reopen the Ad-hocs group and whole progress section; verify visible rows and extra status/activity disappear and return. Confirm Team status/proposals stay inside progress, while a standard session retains its separate Progress disclosure. Open a progress row in its own task tab without changing the selected Lead or replacing the aggregate tab; re-click the row and verify its existing tab activates. Select the aggregate tab to return. Open the compact board, filter and search, enter task detail, then return with filter/query/scroll preserved. Confirm cancelled tasks remain reachable through All and completed tasks never display as blocked.
+  5. From Overview, measure the 48px progress/header chrome and 68px task rows at 100% font scale. Check solid subtle-border separators and one right chevron per summary. Verify six visible task rows and the View all path for a seventh task. Collapse/reopen the whole progress section; verify visible rows and extra status/activity disappear and return. Confirm Team status/proposals stay inside progress, while a standard session retains its separate Progress disclosure. Open a progress row in its own task tab without changing the selected Lead or replacing the aggregate tab; re-click the row and verify its existing tab activates. Select the aggregate tab to return. Open the compact board, filter and search, enter task detail, then return with filter/query/scroll preserved. Confirm cancelled tasks remain reachable through All and completed tasks never display as blocked.
   6. Open the separate Team panorama tab and verify its localized label/tooltip. Check 276×86px nodes and 32px avatars. Exercise long English, Chinese and unbroken identity/task text on root and child nodes: each stays within its card with single-line ellipsis, while full hover text remains available. Then zoom to 80%, pan, and deliver a controlled Team revision with new member objects/status. Verify the transform and subsequent drag remain continuous. Open a child focus task or member in its own tab, then select the retained panorama tab and verify its viewport survives. Explicit Fit and Reset still work.
   7. Expand the Lead sidebar group, select a member, collapse/reopen and reload. Verify one visible Lead group plus the real member sessions, stable identities, individual actions, and unchanged session IDs/transcripts.
   8. Open a standard Agent session and run its ordinary Task delegate path. Compare its history/counts with the Team sessions and board. Switch back, pause, queue Team mail, reload, and Resume; verify held mail is delivered once and standard delegates remain separate.
@@ -17022,10 +17124,12 @@ current CAS revision. Legacy descriptions and reviews without presentation are r
 - **Steps:**
   1. Keep an aggregate tab open. Open panorama and check its stable tab ID,
      users icon, localized label and matching hover title.
-  2. Click a member with a focus task and verify its own task tab, captured
-     subject, message-circle icon and active Lead session. Select the panorama
-     tab, then click a member without tasks and verify its own member tab and
-     display-name label. The root is not clickable.
+  2. With dispatched tasks, verify one panorama node per task id and click a
+     task to open its own task tab, captured subject, message-circle icon and
+     active Lead session. Open its owner to the independent member tab, then
+     return through the member's focus task. Idle members do not create task
+     stages. A roster with no tasks uses the member fallback projection (covered
+     by overview-reference-alignment). The root is not clickable.
   3. Open a task from Overview or a dispatch card, then repeat the same action;
      verify one tab per target and activation of the existing target.
   4. Switch among aggregate, task/member and panorama tabs. Verify aggregate
@@ -17115,6 +17219,39 @@ current CAS revision. Legacy descriptions and reviews without presentation are r
   later upstream sync.
 - **Milestone:** Maintenance.
 - **Command:** `cargo test -p host-core --locked plus_schema`.
+
+### E2E-STORAGE-main-opens-known-plus7-data
+
+- **Preconditions:** Current `main` plus the repair candidate, shared schema
+  21, and isolated existing-profile fixtures at Plus 5, 6, and 7. P7 fixtures
+  include authenticated ordinary-inbox journal rows and historical service
+  ownership. No user profile, live provider, or paid API is a test environment.
+- **Steps:** Open the candidate through Host startup, read the session list,
+  stop and reopen it. Exercise prepared inbox recovery with and without the
+  file-first transcript record; rebuild the turn index and repeat recovery.
+  Reopen historical active service records. Attempt an unsupported service
+  launch and an ordinary background command. Finally open a copy stamped P8.
+- **Expected:** P5/P6 upgrade behind verified backups; P7 remains P7 with its
+  session and journal data intact, without the downgrade banner. Recovery
+  validates exact ledger origin/content and preserves Lead-turn indexing,
+  completing consumption and queue retirement atomically with no duplicate
+  input or new provider turn. Historical services record `host_restart` and
+  become interrupted without claiming a PID or replaying a command. Read-only
+  service history shows its identity and stop metadata. New service requests
+  fail explicitly; ordinary commands and `main`'s existing roster/stop recovery
+  keep working. P8 refuses before mutation.
+- **Automation:** Host Plus-schema, historical inbox, background-process and
+  RPC regression tests; `background-service-presentation.test.mjs`; packaged
+  Electron boot through `PI_DESKTOP_BOOT_PROBE=1` with a throwaway profile.
+  Existing-profile compatibility is also verified on a private database copy
+  without credentials or provider calls. Record source/base revisions and
+  packaged Host hashes; never use the user's live profile for automated E2E.
+- **Specs:** 03-runtime/04-data-storage section 7.1;
+  ADR plus-schema-version-track.
+- **Acceptance:** A build containing current `main` opens supported existing
+  Plus data safely; restoring an earlier candidate or lowering DB metadata
+  does not count as this repair.
+- **Milestone:** Maintenance.
 
 #### E2E-260: Windows updater cache can be relocated and reclaimed safely
 
@@ -17348,7 +17485,7 @@ never use a real provider or the user's running application as its fixture.
 - **Coverage**: `pnpm test:e2e:subagent-models` exercises provider prompt/tool
   assertions, one Task launch, and explicit-ID TaskWait report convergence.
   `packages/agent-runtime/src/runtime.test.ts` covers the disabled-standard
-  prompt/catalog state, Team catalog isolation, and retained Plan/Goal
+  prompt/catalog state, Team Lead/research isolation and expert delegation, and retained Plan/Goal
   declarations with execution denied. Multi-worker parallel dispatch while the
   parent continues independent work is NOT RUN by this scenario. Real-model
   behavior validation is separately NOT RUN; it requires provider
@@ -17371,7 +17508,8 @@ never use a real provider or the user's running application as its fixture.
   cannot unlock substantive Lead actions. Start the approved expert turn, then
   verify Lead integration and standard-session coexistence.
 - **Expected**: All Team work, including trivial requests, requires an expert.
-  Task* and SessionTask remain absent. The authority gate proves an approved
+  Lead Task* and SessionTask remain absent; execution experts may use bounded
+  Task delegation. The authority gate proves an approved
   expert turn started, not task ownership or a completed contribution. Complete
   Plan research is enforced by its separate submission barrier.
 - **Coverage**: `node scripts/e2e-team.mjs`, `node scripts/e2e-team-forced.mjs`
@@ -17468,7 +17606,9 @@ a fresh expert roster review and integrate a real approved expert contribution.
   execution roster and try to finish awaiting confirmation. Assert the original
   Host turn remains running, exactly one Goal report is pending with no completed
   executionStatus, and no expert started. The displayed contract remains Goal;
-  the aggregate Team confirmation card opens automatically despite that mode.
+  during execution the Goal capsule replaces the planning contract chip. Its
+  accessible status reports the staffing wait. The aggregate Team confirmation
+  card opens automatically despite that mode.
   Assert the Goal capsule shows waiting for team confirmation instead of preparing.
   Navigate to Overview and assert waiting for team confirmation; use the
   transcript review action to reopen the card. Confirm through the real Team button,
@@ -17482,6 +17622,30 @@ a fresh expert roster review and integrate a real approved expert contribution.
   expert result is consumed before the original Host turn completes.
   Confirmation/expert mail never becomes a detached user turn or duplicate
   mailbox kickoff and never changes the executionId or ends its token early.
+- **Execution-wide roster visibility:** After guarded roster recovery, inspect
+  every provider request through execution completion, including at least three
+  consecutive tool-loop requests and retry/rebuild/compaction boundaries.
+  Every successful `declare_team_strategy` result matching the same
+  team/turn/review stays `status=confirmed`,
+  `awaitingUserApproval=false`, with confirmed `nextStep` and no stale
+  `memberSessionIds`; provider telemetry matches the transmitted model view.
+  Registration reads only original entries since the current approved
+  execution's start, so preconfirmation compaction cannot hide its declaration
+  and cannot import a previous execution's declaration. After compaction
+  archives the complete assistant tool batch, that registered
+  batch and all original paired results are present in the final model view
+  only. Signed thinking/text/tool signatures and sibling calls/results remain
+  intact; no orphan call/result or persisted summary/checkpoint rewrite occurs.
+  Repeated recovery retains same-owner/review/epoch registration after archival;
+  wire-call ID collisions cannot replace newer work. If no matching declaration
+  in a fully paired valid batch exists at initial registration, no call is
+  invented and fallback remains unchanged.
+  Original pending entries/journal/UI and unrelated tool results remain intact.
+  Pending/cancelled/replaced reviews, Stop, execution completion followed by an
+  ordinary turn, and a second execution cannot reuse the earlier projection.
+  Runtime replay/helper tests cover these boundaries; the existing Electron
+  suite alone does not establish all-request or real-model coverage. Direct
+  `wait_for_updates` confirmation consumption remains unchanged.
 - **Cancellation path:** Negotiate and approve a second Team Goal through the
   Composer, then cancel its pending roster through trusted Main. The original
   turn becomes aborted and executionStatus interrupted; no expert starts,
@@ -17566,6 +17730,17 @@ isolated renderer fixture also checks narrow layout, existing out-of-order
 Goal updates, session switching, report completion, and interrupted execution.
 No live model or user profile is used.
 
+#### E2E-GOAL-inline-input-status
+
+Start an approved Goal in the chat Composer. Its title disclosure is inside the
+same input card, above the editor, with only a divider. While the first progress
+read is pending show one loading status; resolve it without a snapshot and show
+one Running status with an indeterminate indicator, never Preparing or 0/0.
+Publish real items and check count updates, expand/collapse the labeled list,
+pending expert review, visible read errors, session switching and ready-report
+removal. At narrow widths and enlarged text the title/status remain reachable.
+The scheduled instruction editor keeps its original card and minimum height.
+
 ### Session checklist relocation to Overview
 
 `node scripts/e2e-todo-checklist.mjs` mounts the actual OverviewTab with real
@@ -17582,7 +17757,8 @@ with Overview; the Composer has no Session checklist mounting or popup.
   new navigation, all six roles, provider/model/thinking/tools/instructions,
   save/reopen, project inheritance/isolation/reset, failure draft retention,
   interleaved CAS conflicts, missing model/project recovery, navigation during
-  an outstanding read, dark cards and narrow light editor. Host API is the
+  an outstanding read, shared Subagents row/glyph/badge/action styles in both
+  themes, and narrow editor containment. Host API is the
   controlled external boundary; no model or user profile is used.
 - node scripts/e2e-expert-team-config.mjs uses a real isolated SQLite/stdio Host
   and the shared schema to verify settings persistence, user/project resolution,
@@ -17594,6 +17770,10 @@ with Overview; the Composer has no Session checklist mounting or popup.
   task navigation, Spec/file links, reference tabs, task dependency cards/edges,
   repeated owners, collapse, zoom/fit and narrow light layout. Native captures
   compare the actual candidate to the supplied reference.
+  Overview layout also exercises long titles, project paths and model names at
+  320/360/570px in both themes: metadata values retain positive visible width,
+  and header/resources/references introduce no horizontal overflow. Selected
+  reference options retain their existing pressed states and switching path.
 - node --test apps/desktop/test/settings-ipc-partial-write.test.mjs protects
   full committed Main network/menu/developer policy after partial writes and
   guarantees no side effects on rejected configuration. Host/runtime/component
@@ -17620,3 +17800,677 @@ decisions preserve session/request identity. Pending decisions cannot repeat;
 failed decisions remain retryable and known/unknown reasons remain honest.
 Only external clipboard and resolution boundaries are fixtures; no actual
 user permission is granted or denied. Save a native screenshot for visual QA.
+
+### Targeted Team execution gate
+
+For execution/lifecycle changes with no Team panel layout changes,
+`PI_E2E_TEAM_CORE_ONLY=1 node scripts/e2e-team.mjs` runs the same approval,
+expert dispatch, task/member navigation, messages, queue, pause/restart/resume
+and locale reload checks while omitting the full font/theme/resize matrix.
+The default command retains that matrix. A core-only pass must be reported
+separately and never presented as full layout acceptance.
+
+
+### E2E-TEAM-fast-confirmation-after-recovery
+
+- Preconditions: isolated production Electron/Main/Host/sidecar, temporary
+  profile/workspace and localhost deterministic provider; no paid or live API.
+- Steps: emit a text-only Lead answer, use the preapproval recovery to declare
+  an expert, hold the declaration's final response, confirm in the Team panel,
+  then release that response. The postconfirmation correction creates an owned
+  task and dispatches the approved expert, who reads a source and returns results.
+- Expected: the original turn completes without TEAM_APPROVAL_REQUIRED; the
+  expert task completes and its full result reaches the Lead. Persistent
+  no-dispatch answers fail after one postconfirmation correction. Stale and
+  foreign reviews retain the existing participation gate.
+- Automation: `PI_E2E_TEAM_FAST_APPROVAL=1 node scripts/e2e-team-forced.mjs`
+  and the runtime forced-Team-completion regression tests.
+- Specs: [Team runtime](../03-runtime/02-agent-runtime.md).
+
+### E2E-PLUS-project-context: Record memory, recall sources, and search current code
+
+- **Preconditions**: Isolated data/profile with two project groups; one group has
+  multiple local roots. Built candidate
+  Host and Node sidecar; deterministic loopback model (no paid provider).
+- **Steps**: Open Settings > Memory with developer mode off. Verify the project
+  groups are listed, an empty list links to Project archive, and a failed list
+  read can be retried. Open a group's memory editor, add and save a note, edit it,
+  remove it, then enable automatic recording and ask the Agent to remember a
+  stable package-manager preference. Continue a fresh user turn. Attempt a stale editor
+  save, then explicitly reload. Search historical verification and read the
+  returned session/message source. Search a code marker; edit/create/rename/delete
+  matching files and change ignore rules, repeating search. Disable recording,
+  switch project, restart both processes, and ask about the saved preference.
+  Inspect/clear the code cache, then search again. Repeat memory edit/forget after
+  moving a secondary root out of and back into its group.
+- **Expected**: Memory is a regular Workspace settings destination and remains
+  visible with developer mode off. The settings list uses Host project groups and
+  the existing editor; it does not create a second storage path. Recording
+  defaults off. Enabled Agent writes are durable; no
+  background model/embedding request is made. Disabled recording retains saved
+  context and removes writes. Stale snapshot/entry CAS is `CONFLICT`, changed owner
+  is `PROJECT_CHANGED`; failures never overwrite notes or silently lose drafts.
+  Opening the same group from Project archive shows the same notes. Notes and
+  recording settings are shared across roots in one group and isolated from the
+  other group. Root reattachment cannot duplicate or resurrect forgotten group notes. History
+  stays within current group membership, cites stable source IDs and excludes
+  deleted/native sessions. CodeSearch stays within the caller session root,
+  returns path/line excerpts, reconciles file/ignore changes and flags partial
+  coverage. Sensitive files and escaping symlinks are excluded; bounds are
+  explicit. Clear only affects that root's derived cache and is denied in
+  Plan/Goal. Parent binding spoofing and restricted expert-tool access are denied.
+  Grep's existing behavior is unchanged.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`, `02-agent-runtime.md`,
+  `04-data-storage.md`, `06-host-rpc-protocol.md`; `04-ux/06-settings-ia.md`.
+- **Acceptance**: C (runtime tools), D (editor), F (persistence), Localization.
+- **Milestone**: Plus.
+- **Automation**: `node scripts/e2e-project-context.mjs` (real sidecar/proxy/Host,
+  controlled HTTP model); `node scripts/e2e-code-index.mjs` (real Host/filesystem);
+  `node scripts/e2e-project-auto-memory.mjs` (real editor/production CSS in
+  isolated Electron, fixture IPC); `node scripts/e2e-settings-memory.mjs`
+  (`pnpm test:e2e:settings-memory`) mounts the
+  production SettingsPage and ProjectMemoryDialog with React and production CSS
+  in isolated Electron, using fixture IPC only. The settings test covers
+  navigation, project-group listing, empty/error retry, editor opening, and
+  editing/recording controls; it does not exercise real Host persistence.
+  Host unit tests cover CAS, group lifecycle, relocation, config-sync eligibility
+  and mode/expert permissions. Existing real Host/loopback runs are prior evidence
+  and are not a claim that they were rerun for this change.
+- **Status**: Settings renderer candidate validated with isolated fixture IPC;
+  real Host behavior is unchanged and was not rerun for this navigation change.
+
+| Plus scenario | User path | Automated entry |
+| --- | --- | --- |
+| E2E-PLUS-project-context | Remember → later turn/restart recall → source lookup → current code search | project-context, code-index, project-auto-memory scripts |
+### OpenCode Zen Muse Spark contributor free routing
+
+Load the bundled OpenCode catalog, select `muse-spark-1.3-contributor-free`
+through the normal provider model binding and verify runtime uses the
+`openai-responses` adapter with the Zen base URL and exact model ID. Keep
+OpenCode Go's previous Muse routes, other publishers, ordinary completions
+models and explicit per-model API overrides unchanged. Existing provider
+API-style Electron checks remain applicable. This isolated validation does not
+prove account/region eligibility or call a real model.
+### E2E-CHAT-session-activity
+
+- **Preconditions:** Built request candidate, isolated local Desktop sessions A/B,
+  temporary database/project, synthetic provider/IPC fixtures, production Host
+  runner, a wide chat surface and a narrow surface/work-panel layout.
+- **Steps:** Use Settings to select Compact and confirm the conversation has no
+  duplicate switch. Review plan/agent/source records and expand activity groups.
+  Confirm live-status/artifact sections, separate Team members and role labels,
+  state glyphs in Overview while transcript avatars remain. Click attention for a
+  failed agent beyond the five-row preview and for the seventh terminal timeout
+  behind two collapsed process groups; verify expansion, focus and later manual
+  collapse. Test pending-approval attention without resolving it. Inspect recorded
+  source-domain reference counts, merged output counts/timestamps and known Host
+  diff metrics; unknown/legacy snippets must omit totals. Open, locate and copy an
+  output; use per-group Load earlier through the actual bounded history service
+  and return to latest. Inspect recommendation rationale, inline Ignore and its
+  remount persistence, plus five-row Show all/Show less for references.
+  Verify two-line agent identity/task/timing and unprefixed status badges. Check
+  readable script titles and full-command tooltips, per-group counts/status,
+  and timeout warning distinct from failure. Collapse a group, switch sessions
+  and return; retain its choice, then introduce a new failure and verify expansion.
+  Expand Ended N and Clear; only terminal view records disappear, with no stop
+  request or log deletion. Open a Goal artifact and its report separately; verify
+  the same Host count in Overview and the capsule, session/execution ownership,
+  fallback visibility after capsule completion, and unavailable/missing states.
+  Confirm Quick Notes is absent in the wide rail and narrow work panel, with
+  no note reads/writes. Confirm flat suggestion headers/counts. Start an approved background
+  Bash job, inspect live streams, stop it and attempt a foreign-session stop.
+  Exercise nonzero/timeout/start failure, capped output, storage-write refusal,
+  an old active job with 100 newer terminal jobs, and deletion/move prechecks.
+  Verify short startup output followed by silence refreshes before completion.
+  Attempt moving an idle-turn session while its background job runs: refuse,
+  then stop/persist the job and verify moving succeeds. Test
+  Host EOF, graceful app dispose and forced loss with owned child/grandchild
+  markers, then restart. Keep a detail panel open during Host recovery. Open
+  the activity work-panel fallback at a narrow chat width.
+- **Expected:** Original display preference/default and chronological reading
+  remain intact. The rail does not overlap chat/composer and yields to the work
+  panel. Hidden panes do not read another owner; async navigation/read/stop never
+  overrides a new session/request. Retained legacy notes stay stored without UI
+  reads/writes and never enter transcripts or forks. Every active process stays manageable; explicit stop reaches the runner
+  despite storage refusal, permit release follows actual tree exit, and storage
+  failure retains observable terminal output pending repair. Startup marks
+  unfinished jobs interrupted without re-execution or stale-PID control.
+- **Specs:** 04-ux/08-component-spec §13.3-13.4, 04-ux/06-settings-ia,
+  03-runtime/03-tools-and-permissions, 03-runtime/04-data-storage §7.1,
+  03-runtime/06-host-rpc-protocol; ADR session-activity-rail-and-managed-background-processes.
+- **Acceptance:** C / E / Quality / Security.
+- **Milestone:** M6+.
+- **Automation:** `test:e2e:transcript` (real React/Chromium shell and interaction
+  fixtures), `node scripts/e2e-goal-team-renderer-ui.mjs` (shared Goal reader,
+  report/artifact navigation and native layout), `test:e2e:session-activity`
+  (real isolated production Host), focused
+  note/process/permission/migration and Runtime contract tests.
+- **Status:** Local candidate verification; Windows process-tree acceptance
+  remains separate. No user profile or real model provider is a test fixture.
+
+### Composer metadata and compact agent rows
+
+The composer footer shows the current session's project, local/remote host, and known local Git branch. Unavailable project/branch metadata is omitted; remote sessions never borrow a local branch. Model menus list all models without a search field. Generation speed, full-turn token totals, cache metrics and context details are available from the bottom-right context meter. Subagent entries use transparent gradient-avatar rows with name, task, localized status and measured elapsed time; clicking a row opens read-only details, with no panorama entry. Validate model keyboard selection, footer metadata, context details and agent navigation in the isolated composer/transcript fixtures, including narrow layouts.
+
+### E2E-COMPOSER-toolbar-footer
+
+- **Preconditions:** Built candidate, isolated Composer fixture, production
+  renderer components and CSS, and deterministic session/Goal snapshots. No user
+  profile or model provider.
+- **Steps:** Inspect the complete Composer toolbar and activate the combined
+  model × reasoning control. Verify the menu opens from its trigger and remains
+  usable by keyboard. Compare the left and right plugin control slots before
+  and after opening it. Switch between Goal planning and approved Goal execution;
+  also inspect Plan mode. Check the Send and running-empty Stop controls, the
+  context meter footer, and the shared model picker in ScheduledEditor.
+- **Expected:** The combined model × reasoning control sits on the right as one
+  button, with the existing anchored menu and plugin slot sides/order preserved.
+  The Goal contract picker remains during planning and is hidden during Goal
+  execution; Plan remains available. Send and Stop share a 32px rounded-square
+  footprint. The context meter visibly includes `chat.usageContextLabel`.
+  ScheduledEditor retains its existing picker placement and behavior. Narrow
+  layouts keep controls within the Composer without overlap.
+- **Specs:** `04-ux/08-component-spec.md` §11.
+- **Automation:** `node scripts/e2e-transcript-render.mjs`.
+- **Status:** Record results against the exact task candidate and base revision.
+
+### Recorded outputs, delegate details and project Skill suggestions
+
+Output rows display file basenames with a file-type icon plate and a full-path tooltip. They retain existing file navigation, omit status badges and use the current neutral theme. Delegate details show the recorded agent identity/state, bounded expandable task prompts, and collapsed contiguous thinking/tool groups with real counts. Follow-up turns, Markdown, search and scroll remain available; delegate errors/reviews have no Continue, dismiss or rollback mutation controls.
+
+Self-evolution suggestions are generated only through an explicit action in an idle, local, writable project conversation. The normal session send workflow requests evidence-based reusable lessons as a bounded `skill-suggestions` JSON fence. Only settled top-level assistant responses are accepted; malformed, oversized, nested and untrusted-role blocks do not become suggestions. Suggestions remain transcript-backed across reloads. Each draft opens the existing Skill editor for review before using `skills.create` at the captured owning project path; it is disabled by default, may be enabled by the reviewer, and never overwrites an existing skill. No project, partial loaded history, running/queued execution, approvals, imported/remote/read-only conversations and Team members disable generation/creation. Session/project changes close the editor and prevent stale saves. Generation uses the configured model when the user explicitly requests it; no background generation occurs.
+
+Acceptance covers file names/navigation, delegate prompt/group disclosure and absence of mutation actions, generation through the real send workflow, review edits, duplicate-save locking, failed-save draft preservation, late generation/save during session switches, parser validation and isolated Host project-Skill creation/list/read/no-overwrite. The reference pinned card is a progress-summary example; it does not imply automatic memory generation. Quick Notes is not exposed in the current UI; previously stored data is retained.
+
+### Skills and MCP sidebar with suggestion dialog
+
+The sidebar uses a flat Skills & MCP heading and a title-only icon list of recorded Skill/MCP references plus pending suggestions. References are removed from the separate Sources list; web sources remain there. Same-kind/name references are deduplicated, and a pending same-name Skill uses one row. The pending count is a compact rectangular action opening an opaque, viewport-bounded anchored dialog headed Self-evolution suggestions. Rows show a name and a two-line description; hover, keyboard focus and touch reveal Create/Ignore actions. Create opens the existing project Skill review editor before saving. Ignore hides only that recorded suggestion in the sidebar/count/dialog.
+
+Ignore preferences are renderer-owned UI preferences under an independent version-1 key, identified by owning session, source message, name and content fingerprint. They survive remount/reload, do not alter task messages or Skill files, and keep only the latest 200 identities. A regenerated source or revised content is independent. Invalid/unavailable storage is visible and failed writes do not remove a row. Escape/outside pointer closes the dialog; Escape returns focus to its count; changing sessions closes it without opening another owner's editor.
+
+Validate count-to-dialog, keyboard/hover actions, project review/save, Ignore/count/list updates, remount persistence, session/content isolation, recorded references and viewport bounds. Preview examples are synthetic.
+
+### Composer workspace menus (Plus)
+
+Use isolated repositories/profiles only. Cover project name/path search, current
+checks, same-path no-op, new workspace dialog, SSH settings routing, and no-workspace
+creation without rebinding old content or discarding its draft. Cover branch search,
+switch, create-and-switch, dirty/occupied/uncommitted/stale rejection, and running
+turn/Bash/background ownership guards. Create a real managed worktree, reopen it
+from registry metadata, return to Local, and verify each new session's execution
+path and original checkout changes. A result arriving after a session switch must
+not navigate or replace the new session's branch. Check Escape/focus return,
+keyboard selection, opaque surfaces and narrow footer geometry in the real renderer.
+RPC tests execute native Git against temporary repositories; renderer interaction
+fixtures mock only the external Host/session API edge and use the real store and
+components. They do not establish SSH server connectivity or a packaged release.
+
+### Team Goal settlement and completion reasons
+
+- `E2E-GOAL-report-waits-for-settled-team`: an approved Team Goal dispatches an
+  expert, attempts a report while that expert runs, and receives the exact
+  member/dispatch/task diagnostic without persisting a draft. After the expert
+  finishes, unconsumed evidence still blocks the report; `wait_for_updates` consumes
+  full results in the original turn and the report then succeeds.
+- `E2E-TEAM-completion-error-keeps-host-reason`: the real Host settlement denial
+  passes through the runtime guard and three reason-specific recovery prompts;
+  the fourth denial produces a terminal error with the identical Host reason.
+
+Automated by `scripts/e2e-goal-report.mjs` (real isolated Host RPC with runtime
+tools/guard) and `scripts/e2e-team-approved-goal.mjs` (isolated Electron and fake
+loopback provider). No live session, profile or real model is accessed.
+
+### E2E-RUNTIME-edit-accepts-tag-with-legacy-arguments
+
+- **Preconditions:** Candidate-built Host binary, isolated temporary data and workspace;
+  no provider or running Desktop instance.
+- **Steps:** Read a file, Edit with `tag` + `old_string` + `new_string` and no `ops`;
+  then Edit with `tag` + `ops` alone and with mixed legacy fields. Attempt missing
+  and repeated old text, missing operations and a colon PUT without body rows.
+- **Expected:** Legacy edit applies once; `ops` wins and ordinary anchored edits
+  retain their checks. Missing/multiple legacy matches reject without writing.
+  Both shape errors include `PUT 48.=48:` with a `+replacement` row and explain
+  that `new_string` is read only when `ops` is absent. Three-failure runtime
+  mutation termination remains covered by the existing mutation-guard suite.
+- **Coverage:** `node scripts/e2e-edit-legacy.mjs` with `PI_DESKTOP_HOST_BIN`
+  pointing to the task candidate; Host Edit tests and runtime mutation-guard tests.
+- **Specs:** runtime spec 18 §2.1 / §11; D273 amendment.
+
+
+### E2E-RUNTIME-background-bash-timeout-is-visible
+
+- **Preconditions:** Candidate Host/runtime/sidecar built from the recorded task
+  revision; isolated temporary data/workspace and a no-call provider fixture.
+- **Steps:** Establish an approved Team and successful expert participation.
+  Start an owned background command with an explicit one-second limit while
+  waiting. Repeat with normal exit and with no timeout override (60 seconds).
+  Inspect the returned scoped terminal detail and reread the stored result.
+  Complete a launch before the first wait, then complete a known running job
+  between two waits; each terminal outcome is delivered once.
+- **Expected:** Timeout reports the exact explicit/default limit and tells the
+  model to pass timeout in seconds (1–21,600). Default remains 60 seconds.
+  Exit/timeout wakes the existing wait through production HostProcess and
+  AgentSidecar transports; live output does not finish it. No mailbox insertion,
+  real model call, process mutation capability or cross-session read is added.
+  Old terminal messages remain readable without fabricated default metadata.
+- **Coverage:** `scripts/e2e-background-bash-limit.mjs`; Rust background RPC,
+  runtime schema/payload, Team wait lifecycle and launch-bound proxy regressions.
+- **Status:** Run on the recorded task candidate; Windows execution remains
+  subject to platform acceptance.
+
+
+### E2E-TEAM-write-scope-warning
+
+- **Preconditions:** Candidate Host/runtime, isolated Git workspace/profile,
+  confirmed builder and real mailbox/task-turn binding. No model calls.
+- **Steps:** Declare owned scopes, dispatch from HEAD A, commit HEAD B before
+  delivery, replay dispatch, resolve member input and persist its authenticated
+  transcript row. Start the assigned task; Write inside, Write/Edit outside,
+  fail an Edit, read team_status, clear scopes and Write again. Send a member
+  reply and consume its stamped result in the original approved Goal turn.
+- **Expected:** Inside and empty-scope mutations have no warning. Outside writes
+  succeed with TEAM_WRITE_SCOPE_WARNING; status counts only the two successful
+  outside calls. Directory-prefix lookalikes grant no scope. Replay preserves A,
+  visible in member model framing/history; forged HEAD provenance is replaced
+  by Host metadata. Failed calls, Bash and scratch do not count.
+- **Automation:** node scripts/e2e-team-write-scope.mjs runs real Host stdio,
+  production team tools, message-input resolver/framing and temporary native Git.
+  Rust covers symlinks, active task association, duplicate count identity and
+  observable tracking failure; runtime tests check successful warning text/details.
+- **Specs:** [Team collaboration decision](../../adr/plus-expert-team-collaboration.md), advisory amendment dated 2026-10-11; 03-runtime/06-host-rpc-protocol.
+- **Acceptance:** P1 shared-tree coordination; no write denial/new RPC/migration.
+- **Status:** Automated isolated Host and runtime-contract fixture.
+
+
+### Expert Team coordination reliability guidance
+
+Generated-prompt regressions cover Lead/member guidance, ordinary Agent queued
+mail, ordinary Plan yield and approved execution inbox instructions. The runtime
+provider-boundary fixture executes both approved Plan and Goal paths through
+`executeApprovedPlan`, consumes authenticated inbox content in the same turn and
+asserts the generated model prompt. It does not establish real-model obedience.
+See `packages/agent-runtime/src/team/team-prompt.test.ts`; no source-text assertion
+is used for the new guidance. The queued-report user-path scenario separately
+checks actual expert/Lead Host process counts.
+
+### E2E-TEAM-shared-git-warning
+
+- **Preconditions:** Candidate Host/runtime; disposable native Git repository,
+  temporary data/profile and confirmed Team roster. No provider calls.
+- **Steps:** Dispatch an owned writer task and mark it in progress. The Lead
+  runs `git add -A && git commit` across both authors' fixture files, then
+  `git stash`, and an invalid `git reset --hard`. Read production team_status.
+  Repeat Git staging as the sole writer and after the task has completed.
+- **Expected:** Actual mixed commit and stash succeed with advisory warnings;
+  the invalid reset retains its failure/exit code. Status shows three separate
+  caller-attributed Git warnings and zero Write/Edit scope warnings. Sole writer
+  and completed tasks do not warn. Permissions and shell admission are unchanged.
+- **Coverage:** `node scripts/e2e-team-shared-git-warning.mjs`; Host RPC covers
+  all six operations, background acceptance, cross-team/empty-scope exclusion,
+  idempotent counts, restart persistence and deletion races. Runtime contract
+  tests verify status projection and legacy defaults. Literal detection tests
+  cover quotes, options, command combinations and output-text false positives.
+- **Spec:** 03-runtime/06-host-rpc-protocol, Team shared-tree Git advisory.
+- **Status:** Record the candidate result; no real-model or Windows acceptance
+  is implied. Dynamic shell forms are outside the bounded advisory coverage.
+## Team task dispatch reliability (WP10)
+
+See [Team task dispatch scenarios](team-task-dispatch-scenarios.md) for busy-member
+conflicting dispatch, successful task completion cleanup, authenticated age framing
+and replay/validation acceptance IDs.
+### E2E-TEAM-agent-lead-sees-queued-expert-report
+
+- **Preconditions:** Candidate Host/runtime, isolated workspace/data, ordinary
+  Team Agent Lead without an approved execution; deterministic fake provider.
+- **Steps:** Delegate two background commands to an expert. Send its complete
+  report while the Lead waits in a long running turn. Record storage, notification,
+  ACK, kick, turn settlement, dequeue and body admission separately. Replay an
+  identical delivery. Query pending status/wait before ending the Lead turn.
+- **Expected:** Baseline report waits over three minutes despite timely admission
+  and kick; the baseline Lead duplicates the commands. The candidate's next
+  status/wait reveals metadata without bodies, ACK or auto-termination; the Lead
+  ends its ordinary turn and receives the authenticated full report exactly once.
+  Host process counts are expert 2 and Lead 0, not a model claim.
+- **Acceptance:** The --timeout-acceptance variant runs sleep 5 with timeout 2 and
+  sleep 75 with no timeout, consumes timed_out/TOOL_TIMEOUT at approximately 2
+  and 60 seconds and checks the same per-session counts. Plan yield, approved
+  inbox, cancellation/context changes and WP5 gap recovery remain covered by
+  their existing runtime/Host regressions. This is not cancellation acceptance.
+- **Automation:** scripts/e2e-team-agent-queued-report.mjs; runtime Team mailbox,
+  pending metadata, wait/status, Main delivery and AgentHost queue regressions.
+- **Specs:** 03-runtime/02-agent-runtime and 06-host-rpc-protocol; WP16 S3 is a
+  separate adopted wait-boundary delivery ADR. This S1 scenario retains legacy
+  queued/fallback acceptance; capable-Host S3 is the distinct scenario below.
+#### E2E-TEAM-member-activity-interrupt-guard
+
+- **Scope:** Lead Team tools → Host activity projection → exact-turn interruption.
+- **Fixture:** Isolated Host data/workspace and deterministic fake provider; no paid model or user profile.
+- **Steps:** Approve a tester, dispatch work, start a quiet managed background test without Git activity. Lead reads `team_status`, tries unforced `interrupt_agent`, tries force without reason, then supplies a justified reason.
+- **Expected:** Status shows the real running process and turn. The first two stops return `TEAM_MEMBER_ACTIVE` and `TEAM_INTERRUPT_REASON_REQUIRED` with no interruption notification. Only the reasoned force emits one exact-member/turn stop and an audit record. Role/approval boundaries stay unchanged.
+- **Automation:** `scripts/e2e-team-member-activity.mjs` runs real Host + runtime tools through the fake provider. `rpc::team_member_activity_tests` additionally controls Host timestamps to replay a twenty-minute job and eligible inactive turn, verifies active foreground Bash protection, unauthorized force refusal and audit contents. `team::member_activity_tests` covers five-hour queue ages after ACK and usage replay/restart; runtime tool tests preserve projection and optional force/reason forwarding.
+- **Evidence limit:** Twenty minutes and five hours are deterministic timestamp fixtures, not wall-clock soak runs; no Windows or real-provider test is claimed.
+### E2E-TEAM-bounded-run-limit
+
+- **Title:** Bound repeated expert validation/fix loops without killing tools.
+- **Preconditions:** Dedicated request candidate containing WP1–WP6; isolated
+  Host data/workspace and fake provider; controlled Host clock; no real profile/API.
+- **Steps:** Start an ordinary Team run and an approved Goal run. Replay repeated
+  validate → discover defect → fix → validate loops. Advance past soft, repeat
+  the sweep, then advance past hard while a foreground tool/recovery is pending.
+  Queue expert mail, restart Host/runtime, attempt Resume, extend/disable policy,
+  explicitly resume, and finally admit a fresh non-mail user scope. Repeat with
+  a completed idle Team, a disabled policy, and a manual queue pause while a
+  turn is still running. Save settings while another role
+  is edited in a different window.
+- **Expected:** One soft notice and notification per run; hard persisted pause,
+  safe current-batch finish, no ordinary background-command stop and no next-loop
+  request. Explicit WP14 services stop on any Team pause; the separate service
+  lifecycle scenario covers that approved exception.
+  Running Goal becomes interrupted and its token is invalid. Queued mail cannot
+  wake a paused run; restart retains run id/time/pause. Resume never refunds time
+  and rejects an exceeded live limit. Policy changes alone do not unpause. A new
+  admitted user scope gets a new budget. Completed idle Teams get no alert/wake-up.
+  Settings preserve unrelated role edits and reject same-policy conflicts.
+- **Specs:** [Team run limits](../03-runtime/team-run-limits.md).
+- **Coverage:** Host `run_limits_tests`, RPC `team_run_limits_tests`, execution
+  inbox tests, runtime `runtime-team-run-limit-stop.test.ts`, Desktop Team delivery
+  and expert settings persistence tests. Native settings/status UI must be checked
+  on the final integration candidate; deterministic coverage is not a live 10-hour
+  provider run.
+- **Acceptance:** Record candidate/base revisions, fixture results and native UI
+  evidence separately. No provider cost or publication is implied.
+- **Milestone:** WP8.
+- **Status:** Implementation/verification in request worktree; user acceptance pending.
+
+
+### E2E-TEAM-run-limits-ui
+
+Run `node scripts/e2e-team-run-limits-ui.mjs` with the candidate sources and isolated Electron profile. Real clicks and text input cover enabled 6/10-hour defaults, invalid input, disabled persistence, role-preserving CAS rebasing and policy-conflict refusal. Render the production notice for soft, safe finishing, paused and disabled states. The settings backend is a fixture; Host durable clock, restart and pause/resume authority remain separate domain/RPC acceptance. No live provider, OS-notification presentation or ten-hour soak result is implied.
+
+
+### E2E-TEAM-member-interrupt-production-chain
+
+`node --experimental-strip-types scripts/e2e-team-member-interrupt.mjs` replays real Host interruption through Main delivery, bridge, IPC, sidecar and runtime using a loopback provider. Assert unforced refusal, foreground process termination and interrupted turn state. Block the real session gate, replace the old turn, then release and replay its notification: the replacement remains active. Accepted background work survives abort/dispose and is explicitly stopped in cleanup; background zero is not the turn-cancellation contract.
+### WP11 Team unattended questions and failed-slot replacement
+
+- `E2E-TEAM-lead-pending-ask-late-answer`: fake-provider Lead asks at 05:05; at
+  05:35 the original turn is interrupted and the question remains pending. UI
+  restore retains the card; a late trusted reply queues exactly one new user
+  turn with stable identity, no Team origin or old execution token.
+- Native Ask-card interaction mounts the pending badge, new-approval guidance
+  and enabled answer controls using the existing isolated Electron harness.
+- Host RPC replacement path confirms a roster, fails a member, replaces it once,
+  dispatches the successor and admits its turn without a second review. Replay
+  reuses its identity; a second successor or old-handle dispatch is rejected.
+- Host regressions cover deadline/answer races, ACK/orphan recovery, queue-full
+  rollback, cancellation fences, stale owner/turn, route/config/permission
+  inheritance and the frozen roster limit. Real-provider overnight acceptance
+  is separate from these controlled replay checks.
+
+The explicit nightly lane `node scripts/e2e-team-lead-pending.mjs` requires the
+existing environment's `pnpm build:js` output. It runs the opt-in Rust
+cross-language fixture with `--ignored`, then records
+`E2E-TEAM-approved-lead-ask-interrupted`. The default pure Rust CI does not
+require Node/JS dependencies. The fixture exercises approved Goal dispatch,
+30-minute controlled wait, actual Main finalization/outbox, Rust interrupted
+execution, no successful report, and rejection of a genuine old progress token.
+It uses no provider service, test-only production backdoor, or system-clock edit.
+
+
+### E2E-TEAM-approved-goal-roster-resume-weak-lead-dispatches
+
+- **Preconditions:** Request candidate based on `26db50438`; isolated approved
+  Team Goal, Host and provider boundary fixtures. The scripted weak Lead ignores
+  system nudges and follows only the last conversational tool result.
+- **Steps:** Declare a delegate roster, explain it without tool calls, and park
+  the original approved execution. Confirm the roster later through trusted Host
+  state. Inspect every resumed provider request through execution completion,
+  including at least three consecutive requests around wait_for_updates,
+  task_create/send_message and a further wait. Dispatch an owned task,
+  consume full expert results and submit the Goal
+  report. Repeat cancellation, interruption, Stop, confirmation between Host
+  reads and missing declaration-result cases.
+- **Expected:** Every resumed request contains confirmed content for every
+  successful declaration matching the same team/turn/review, with
+  awaitingUserApproval=false, confirmed nextStep and no stale memberSessionIds,
+  throughout the same approved execution. After compaction archives the original
+  complete assistant tool batch, the registered batch and all paired results
+  remain in the final model view only, with signed thinking/text/tool signatures
+  and sibling calls/results intact. Repeated recovery retains registration after
+  archival, and wire-call ID collisions cannot replace newer work. No fully
+  paired valid batch at initial registration means unchanged fallback, not an
+  invented tool invocation.
+  Tool-loop context rebuilds, retries and compaction cannot restore a stale
+  matching result. One roster
+  resume starts owned dispatch in the same turn/execution without
+  TEAM_APPROVAL_REQUIRED or Goal interruption. Original UI/persisted declaration
+  evidence stays pending; projection is copy-on-write and model-only. Pending,
+  cancelled or replaced reviews cannot project; completion/Stop and later
+  ordinary turns or executions cannot reuse an old projection.
+  Cancellation/Stop cannot refresh or dispatch; missing
+  matches retain all three completion retries and observable terminal denial.
+- **Specs:** 03-runtime/02-agent-runtime and 03-tools-and-permissions, approved
+  Team same-turn recovery.
+- **Acceptance:** Runtime regression and copy-on-write/helper coverage establish
+  the changed provider context and scripted dispatch, not real-model compliance.
+- **Automation:** packages/agent-runtime/src/runtime-tests/runtime-team-roster-resume.test.ts
+  and src/team/declare-strategy-result.test.ts.
+- **Milestone:** Maintenance.
+- **Status:** Scripted baseline replay reproduces four confirmation wakeups,
+  TEAM_APPROVAL_REQUIRED and zero dispatch on `26db50438`. Record candidate test
+  results separately. Real model: attempted on candidate `3968c4160882` with
+  MINIKV-GOAL-TEST-2, but **confirmation recovery NOT EXERCISED**: Goal UI
+  approval succeeded, then the harness's 240-second pre-roster wait expired
+  without a declaration, task or expert. No provider or TEAM error was recorded;
+  the wait's cause remains unknown. This does not establish a recovery failure
+  or real-model acceptance. See docs/project/team-roster-resume-validation.md.
+- **Execution-wide baseline:** Read-only TEST-4 evidence on `961a4e480`
+  confirms the declaration at step 8 but retains stale content at steps 9–41;
+  the task still completed. This is a robustness gap in later model views, not
+  an observed task failure or evidence for this fix.
+- **Real-model follow-up: NOT RUN.** Only after separate user consent, rerun the
+  park-aware TEST-4 flow on this fix branch with a new marker and independent
+  HOME/profile/data/scratch project. Keep CPA first-token precheck (10 seconds,
+  total 30 seconds), the same provider and gemini-3.7-flash-high Lead. Confirm
+  through the real trusted roster UI after observed parking. Audit every
+  postconfirmation lead providerPayload through execution end for the same
+  review's confirmed result and preserved original history; do not limit the
+  check to the first request. Record missing/truncated coverage and provider
+  silence separately, retain all evidence after teardown, and independently
+  rerun C1–C5 on a project copy, auditing C6–C8 against real Host/tool records.
+  See the validation record for the exact method.
+  No new live-model result or prompt-cache behavior is claimed.
+## Expert Team follow-up reliability (WP7 / WP14 / WP16 S3)
+
+### E2E-TEAM-agent-lead-wait-boundary-ordinary-inbox
+
+- **Preconditions:** Built recorded request/base candidate, temporary Host data and
+  workspace, ordinary Agent Team Lead with current confirmed experts, scripted
+  provider at the external boundary; no user profile or paid API.
+- **Steps:** Delegate exactly two commands to an expert. Send two reports while
+  the same Lead turn is running. Read team_status, call wait_for_updates twice,
+  and record file/proof persistence, FIFO provider inputs, runtime ACK, live/durable
+  queue retirement and turn settlement. Replay ACK and mailbox notifications.
+- **Expected:** Status/tool results expose no report bodies. At the first wait
+  boundary both authenticated agent-origin role=user bodies enter the original
+  Lead turn in FIFO order, before settlement, with stable user-message IDs.
+  Repeat wait/ACK/notifications neither duplicate body rows nor start a new Lead
+  turn. Host background process inventory is expert 2/Lead 0. No Goal authority,
+  human consent, permission elevation or premature final response is created.
+- **Automation:** `node scripts/e2e-team-agent-ordinary-inbox.mjs` exercises real
+  Host, Main delivery, AgentHost and Runtime with only the provider scripted.
+  Host/RPC/runtime/Main contracts separately cover wrong source/proof, crash
+  cuts, stale epoch/turn, pause/cancel/dispose, human-steer ordering, transport
+  ACK loss, old-Host fallback and unchanged Plan/approved-execution behavior.
+  These separate contracts must pass; the main incident script alone does not
+  establish every recovery or concurrency branch.
+- **Specs:** [ordinary inbox](../03-runtime/team-ordinary-inbox.md),
+  [delivery ADR](../../adr/team-agent-mailbox-delivery.md).
+- **Acceptance:** C / E / F / Security; record source/base/binary hashes, timings,
+  durable input and runtime ACK independently of model consumption.
+- **Milestone:** WP16 S3.
+- **Status:** Candidate implementation/validation; user and real-provider acceptance
+  are separate. A generated scenario index maps executable entries only.
+
+### E2E-TEAM-managed-service-lifecycle
+
+- **Preconditions:** Candidate Host/runtime, fresh data/workspaces, authenticated
+  Agent Teams and real disposable owned child/grandchild process trees. No paid
+  provider, running user instance or production daemon.
+- **Steps:** Explicitly launch a service and an ordinary background command. Keep
+  the service past 60 seconds while the ordinary command uses the same default.
+  Exercise Host/Team/session caps, manual and hard pause, friendly and TERM-ignoring
+  groups, Team end after genuine work settles, run replacement, Host shutdown and
+  restart. Preserve an ordinary command across Team pause.
+- **Expected:** Service stays alive beyond 60 seconds; ordinary command becomes
+  timed_out/TOOL_TIMEOUT around 60 seconds. Services hold original permits, respect
+  Host 2/Team 1/session 1 caps and fixed 6h TTL. Pause stops only explicit services;
+  member completed phase alone does not end their Team. Unix TERM gets at most 5s
+  before KILL/reap, first reason/output survives, tree exit releases permits.
+  Restart marks ownership interrupted without replay or PID adoption.
+- **Automation:** `node scripts/e2e-team-managed-service.mjs` runs real Host/process
+  paths. `--quick` skips the real >60s/default-command comparison and cannot pass
+  that acceptance item. Controlled-clock Host contracts separately cover TTL,
+  Goal execution end, owner cancellation/removal/workspace/deletion, forged scopes,
+  storage refusal and repeated cleanup. Component tests verify localized service
+  metadata; native candidate rendering and Windows JobObject/tree behavior require
+  their own recorded evidence.
+- **Specs:** [managed services](../03-runtime/team-managed-services.md),
+  [service ADR](../../adr/team-managed-service-processes.md), Team run-limit exception.
+- **Acceptance:** C / E / F / Security / Localization; report full-vs-quick and
+  platform evidence separately, with known candidate/base revisions.
+- **Milestone:** WP14; WP12 pool redesign remains conditional.
+- **Status:** Candidate implementation/validation; no user acceptance or Windows
+  success follows from Unix fixture results.
+
+### WP7 representative paths and coverage boundaries
+
+| Acceptance path | Expected result | Current coverage layer |
+| --- | --- | --- |
+| Goal negotiation with unknown pricing and an external/human stage | Unknown is not zero; no Host hard cost guarantee or model-created approval; stage dependency explained before SubmitGoal | Generated mode/team prompt regressions; no live provider compliance claim |
+| Standard Agent → TodoWrite; restricted/research member → exact excluded-tool discovery → shared task update | Standard checklist remains; explicit restriction and legal task_update guidance; research still submits structured result, without permission expansion | Runtime provider/tool-catalog integration and team prompt tests |
+| Expert successful turn with owned open tasks → Lead team_status → evidence review | Exact owner taskIds remain open, separate nextStep; pending-mail guidance wins; no automatic task settlement/re-run | Runtime team_status user-path tests |
+| Expert success/failure → Lead/non-Team/Goal terminal outcomes → notification list/count | Expert success has no new durable inbox/badge/popup source; report/turn persist; expert failure and other original sources remain | Real Host terminal transaction/list/reopen tests; native popup presentation is separate |
+| Member current context below soft → soft/hard preflight → inline context growth | Current context drives existing budgets; checkpoint precedes next request, active task/caller preserved; no threshold/watchdog change | Runtime with actual compaction wiring, fake external provider/Host; not full Main/Rust E2E |
+
+These are behavioral unit/integration acceptance mappings, not independent full
+Electron E2E runs. `mode-prompts.test.ts`, `team/team-prompt.test.ts`,
+`runtime-tests/runtime-team-tool-discovery.test.ts`,
+`team/team-status-owned-open.test.ts`,
+`runtime-tests/runtime-team-member-compaction.test.ts` and Host `notifications`
+regressions provide the named coverage. Existing Team/Goal and notification
+journeys protect the surrounding public paths. Do not add a catalog-only
+executable or mark native/real-provider acceptance passed from these tests.
+### Full-application Team reliability lifecycle acceptance
+
+`node scripts/e2e-team-reliability-closeout.mjs --budget-only` complements
+`E2E-TEAM-bounded-run-limit` with the complete isolated Electron/preload/Main/Host/
+runtime path: real settings persistence, short configured soft/hard wall-clock
+budgets, safe current-tool finishing, application restart and explicit Resume.
+It does not claim a ten-hour soak or system-notification presentation.
+
+The direct, explicitly invoked `node scripts/e2e-team-reliability-closeout.mjs`
+lane complements `E2E-TEAM-lead-pending-ask-late-answer`: a real thirty-minute
+Team Lead question deadline, durable pending card, renderer reload, application
+restart and trusted late answer. It is classified manual because the automatic
+suite deadline is eight minutes. Both lanes use fresh temporary profiles and a
+loopback model; no user data, production clock override or paid provider. Record
+actual candidate/artifact identities and results rather than treating this
+scenario description as evidence of a passing run.
+
+The nightly `--recovery-only` variant restarts a still-waiting question into
+durable pending and exercises the same trusted late-answer branch. Keep its
+result separate from the manually invoked actual thirty-minute expiry lane;
+restart recovery is not timeout evidence.
+
+The pending-card help describes that the Lead stopped waiting without claiming
+that every pending question waited thirty minutes: restart can defer it earlier.
+The default expiry remains thirty minutes; a late answer still starts a new
+authenticated turn and never revives the old execution token.
+
+
+### E2E-TEAM-open-tasks-block-final-answer
+
+- **Preconditions:** Local-main task candidate, temporary Host profile/workspace,
+  real runtime tools, and a loopback scripted provider; approved Team execution.
+- **Steps:** Create current-decision pending tasks for never-dispatched UI/QA
+  experts and an in-progress task for a completed core expert. Attempt a text
+  final answer and Goal report. Consume Host notices and use real Lead
+  `task_update` tools to close tasks with explicit unsuccessful reasons.
+- **Expected:** Both completion tools reject open decision tasks with
+  `TEAM_APPROVAL_REQUIRED`, member/task identities, dispatch/close guidance and
+  the existing `wait_for_updates` guidance. Text completion receives bounded
+  recovery; terminal tasks then permit normal completion. Historical unrelated,
+  deleted tasks and ordinary execution retain their previous behavior.
+- **Specs:** Host RPC approved execution inbox and settled Goal authorization;
+  Expert Team ADR amendment dated 2026-10-13.
+- **Acceptance:** `node scripts/e2e-team-open-task-gate.mjs`; Rust scoped task
+  regressions also cover completed/failed/cancelled, deletion and ordinary scope.
+- **Milestone:** Plus Team reliability.
+- **Status:** Record actual candidate/base, suites, environment and results.
+
+
+### E2E-TEAM-member-silent-completion-wakes-lead
+
+- **Preconditions:** Temporary real Host profile/workspace and production runtime
+  wait tool, approved Team execution, dispatched core member with an open task.
+- **Steps:** Subscribe and wait, settle the member completed without Team mail,
+  replay settlement, try a model-authored reserved key, consume the notice and
+  explicitly fail the task with a reason.
+- **Expected:** Exactly one durable `member_ended_without_report` JSON notice
+  and one admitted `team.messageQueued` wake on normal replay. The wait receives
+  its full contents in the original execution. Unread current notices and open
+  tasks block completion independently. Consuming a notice neither completes
+  tasks nor supplies successful participation. Reserved keys are rejected.
+- **Specs:** Host RPC silent completion mail; Expert Team ADR 2026-10-13.
+- **Acceptance:** `node scripts/e2e-team-member-silence.mjs`; Rust tests cover
+  reported/direct/terminal-task/abort exclusions, rollback, participation and
+  source/event-proof deletion, plus transport and checkpoint failure recovery.
+- **Milestone:** Plus Team reliability.
+- **Status:** Record actual candidate/base and results; this does not prove real
+  model compliance or cross-process exactly-once transport during a crash.
+
+
+### E2E-TEAM-lead-pseudo-tool-call-retried-once
+
+- **Preconditions:** Temporary real Host/Runtime profile, approved Team execution
+  with settled work, and a loopback scripted provider.
+- **Steps:** Return the incident's textual pseudo call, repeat it, then run a
+  separate case that uses the actual tool interface after the recovery. Compare
+  to an ordinary settled final answer.
+- **Expected:** First match gives one dedicated nudge with no Host final-answer
+  authorization. Repetition goes through normal authorization; there is exactly
+  one pseudo-call recovery. An actual `task_get` tool result reaches the provider
+  in the invocation case. Normal completion needs no retry and emits one final
+  agent boundary. Guard reset renews the allowance; non-Lead/non-Team turns are
+  unaffected, and fenced/mid-response examples do not match.
+- **Specs:** Host RPC bounded Lead pseudo-tool-call recovery; Expert Team ADR
+  amendment 2026-10-13.
+- **Acceptance:** `node scripts/e2e-team-lead-pseudo-tool-call.mjs`; pure detector,
+  guard lifecycle and real runtime event-stream regressions.
+- **Milestone:** Plus Team reliability.
+- **Status:** Record actual candidate/base and results; scripted compliance is
+  not evidence that a real provider will obey the nudge.
+
+
+Candidate fixture synchronization (2026-10-13): the complete Team Overview
+journey asserts an active completion claim remains `in_progress` and is excluded
+from completed progress. After the declaring turn settles successfully, the
+same mounted Overview updates from 0/7 to 1/7 without being reopened. Team Plan
+reload journeys wait for startup completion, the intended selected session and
+Plan Composer before input, allowing the renderer's draft effect to settle at
+animation-frame boundaries; they still submit through the actual Composer.
+The recovered plan journey waits for exactly one durably persisted SubmitPlan
+result before checking its transcript, since runtime idle does not flush the
+asynchronous persistence outbox. Duplicate submission fails immediately.
+
+For a request worktree using an installed dependency overlay, build its complete
+Desktop candidate without invoking a package manager:
+`CARGO_TARGET_DIR=/tmp/<request-target> PI_DESKTOP_HOST_BIN=/tmp/<request-target>/debug/pi-desktop-host-core node scripts/e2e/build-candidate.mjs --overlay`.
+This mode records the exact direct compiler, Electron builder and locked Cargo
+commands, with source and artifact hashes. The receipt gate rejects incomplete
+plans, altered commands/targets, changed source/artifacts and replaced receipts.
+The default provisioned package-manager build path remains available. A human
+chosen local-main base exception must be recorded separately from the receipt's
+existing `origin/main` metadata; the exception never implies remote refresh,
+push or PR authorization.

@@ -112,7 +112,8 @@ accept_prompt
    事务，未见的 `completed` 插入 `task.completed`，未见的 `error`
    插入 `task.failed`，并且结果已在焦点当前中可见
    聊天或任何 `aborted` 回合不会插入任何通知 (D117)。重复终端
-   调用是无操作的。
+   调用是无操作的。WP7 另按 Host 真实 Team member 身份省略成功独立通知，
+   回合/正文/报告仍持久；成员失败、Lead/Goal、非团队终态仍按原规则。
 9. Whole-session fork is idle-only. A running Desktop source may fork a
    completed assistant prefix with no indexed rows owned by a running turn.
    The parent continues and the child starts idle. Other busy forks return
@@ -153,7 +154,7 @@ accept_prompt
 
 - 用户消息：接受时
 - 转运行行：开始+终端`session.endTurn`更新
-- 通知行：与看不见的 completed/error 终端相同的交易
+- 通知行：与符合条件且不可见的 completed/error 终态同一事务；Team member 成功不创建
   更新；决不会为了可见的当前结果或中止
 - assistant/tool 消息：在 message_end/tool_end 上。完成的助手快照在
   outbox 追加之前先做检查点；握手在冷启动 `session.get` 之前等待该
@@ -192,8 +193,8 @@ accept_prompt
 3. waiting_permission在UI状态中可见
 4. 两个保留的项目选项卡中的会话可以独立运行，无需
    转录事件或工作空间根交叉
-5. 每个未见过的 completed/failed 回合恰好产生一条通知记录
-   而可见当前结果或中止的回合不会产生任何结果
+5. 每个符合条件且未见过的 completed/failed 回合恰好产生一条通知记录；Team member
+   成功不创建独立通知但保留回合/正文/报告；可见当前结果或中止的回合也不创建通知
 6. A fork starts as an independent idle session; a busy Desktop source may
    fork only a completed assistant prefix outside its running turn
 7. 消息范围的分叉排除后面的行并且从没有源运行时开始

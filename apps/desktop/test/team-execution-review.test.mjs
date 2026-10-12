@@ -285,6 +285,7 @@ test("TeamPanel preserves user approval history but never renders automatic rese
       "../../lib/team-presentation": presentation,
       "./TeamLaunchReviewPanel": { TeamLaunchReviewPanel: reviewPanel },
       "../icons": {}, "../ui": {}, "./team/TeamMemberTranscript": {},
+      "./team/TeamRunLimitNotice": { TeamRunLimitNotice: () => null },
       "./team/TeamTaskBrief": {}, "./team/CompactTeamBoard": {},
       "./team/TeamStatusBadge": {}, "./team/TeamTaskProgress": {}, "../../styles/team-panel.css": {},
     });

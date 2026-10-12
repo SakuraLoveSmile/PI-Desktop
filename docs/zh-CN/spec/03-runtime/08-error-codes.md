@@ -89,6 +89,12 @@ type AppError = {
 stdio 与 Tokio 的动态阻塞池隔离，因此后一种情况
 不会将临时线程压力转变为主机进程退出。
 
+对于 shell 准入，`HOST_OVERLOADED` 的 `content.capacity` 提供 host 和请求
+会话的运行/排队数量、shell 数量及安全的 Bash 占用会话标识（见 RPC §2.1）。
+错误建议使用 `wait_for_updates` 代替 `sleep` 轮询，并说明后台命令会一直
+占用同一 shell 槽直至结束。不包含命令或路径。错误码、可重试语义与
+30 秒准入等待时限不变。
+
 ### 3. 2 Agent/会话
 
 | 代码 | 可重审的 | 意义 |
@@ -375,12 +381,14 @@ ADR 0285）。渲染进程除了一个标识徽章外看不到本地/远程之�
 | `TEAM_MAILBOX_FULL` | 是 | 收件人的待处理团队消息已达到上限 |
 | `TEAM_MESSAGE_PAYLOAD_TOO_LARGE` | 否 | 团队消息超过 64 KiB 载荷上限 |
 | `TEAM_DELIVERY_PENDING` | 是 | Host 尚未持久化收件人的队列或 turn 回执 |
-| `TEAM_APPROVAL_REQUIRED` | 否 | 缺少当前 Team 启动 authority 或获批专家实际启动；Agent 需要用户确认，Plan 研究自动启动。 |
+| `TEAM_APPROVAL_REQUIRED` | 否 | 缺少当前 Team 启动 authority、获批专家实际启动或获批执行结算；Agent 需要用户确认，Plan 研究自动启动。 |
 | `TEAM_REVIEW_REVISION_CONFLICT` | 是 | 启动审查版本在调用方读取后已发生变化 |
 | `TEAM_CONFIG_CONFLICT` | yes | expert preset settings changed after the caller read them; reload before retry |
 | `TEAM_MODEL_SELECTION_INVALID` | 否 | 提议的模型/提供商/思考路线无法启动 |
 | `TEAM_MEMBER_MODEL_CHANGE_BLOCKED` | 否 | 该成员在其路线上持有活跃 turn 或排队任务 |
 | `TEAM_LEAD_CONFIGURATION_BLOCKED` | 否 | Lead 仍有团队数据时不能切换为普通执行模式 |
+| `TEAM_MEMBER_ACTIVE` | 否 | 十分钟内有 Host 活动或仍有活动 Bash；先查看 team_status，确需中断时显式 force 并说明理由 |
+| `TEAM_INTERRUPT_REASON_REQUIRED` | 否 | force:true 必须提供裁剪后非空的中断理由 |
 
 ## 4. 映射规则
 
@@ -541,3 +549,24 @@ transcript 保留稳定错误码、传输 errno 和原始 details，但使用本
 专家团规划新增 TEAM_PLANNING_NOT_READY（研究或问题未完成）、TEAM_PLANNING_STALE（旧轮次）、TEAM_PLANNING_CLOSED（关闭后的修改）、TEAM_RESEARCH_INVALID（非法或超限结果、普通完成绕过）及 TEAM_RESEARCH_READ_ONLY（研究成员调用非读取工具）。错误代码由 Rust RPC 和 Host 侧车代理完整保留。
 
 已批准 Team 执行的当前专家派遣／回合或完整结果尚未结算时，完成检查也返回 TEAM_APPROVAL_REQUIRED。execution inbox 对非 Lead 身份返回 TEAM_UNAUTHORIZED，对无效精确回合消费返回 TEAM_PLANNING_STALE。可信 Plan 执行绑定的 execution/session/turn scope 无效时返回 PLAN_EXECUTION_STALE，试图改变不可变绑定时返回 PLAN_EXECUTION_CONFLICT；相同重试幂等。取消名单等待会中断执行，不能标记完成。
+
+### Plus 会话活动
+
+| code | retriable | 含义 |
+|---|---|---|
+| `NOTE_CONFLICT` | yes | Quick Note revision 改变；保留草稿，保存前重新加载 |
+| `SESSION_NOTES_UNSUPPORTED` | no | 原生或远程会话不提供 Quick Notes |
+| `BACKGROUND_PROCESS_NOT_FOUND` | no | 托管进程不属于请求的会话 |
+| `BACKGROUND_PROCESS_START_FAILED` | yes | 已授权后台执行器无法启动 |
+| `BACKGROUND_PROCESS_PERSISTENCE_FAILED` | yes | 托管进程状态无法存储；修复存储后重试 |
+| `SESSION_HAS_BACKGROUND_PROCESSES` | yes | 删除或移动会话前停止活动托管进程 |
+
+### Team Goal 结算拒绝（2026-10-11）
+
+获批 Team 执行仍有排队／运行派遣或未消费专家结果时，`TEAM_APPROVAL_REQUIRED` 也会在 `SubmitGoalReport` 主体之前拒绝。消息标明派遣、成员、分配的未完成任务和未消费数量。已确认名单最多三次带该原因的完成恢复提示，再次拒绝保留宿主原文（正常传输分类／脱敏后），阶段保持 `team_completion`。不得替换成缺少名单的说明，也不得把工具主体之前的授权拒绝归为草稿持久化失败。
+
+### 显式团队服务准入（WP14）
+
+TEAM_SERVICE_UNAUTHORIZED 拒绝缺少当前认证 Agent Team/run/turn owner 的服务，包括研究、被替换/过期路由或超权限范围。TEAM_APPROVAL_REQUIRED 保持当前确认名单含义。TEAM_SERVICE_LIMIT_REACHED 表示 Host2/Team1/session1 活服务上限，与原 global/session/shell 准入不同。INVALID_PARAMS 拒绝非法 kind、前台 service 或 service timeout 覆盖。修正范围/参数或先停止 owned service，不绕权或忙重试。
+
+普通 inbox 来源伪造仍为 PERMISSION_DENIED，过期精确回合/proof/authority 保留 Team 拒绝码。明确 ACK transport loss 可留下仅摘要 pending IDs，authority 错误不允许 flush 正文。

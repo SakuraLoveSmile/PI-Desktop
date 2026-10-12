@@ -6,6 +6,8 @@ import {
   useRef,
   useState,
 } from "react";
+import { readContextInsightsPreferences } from "../features/context-insights/preferences";
+import { openContextInsightsDialog } from "../features/context-entry/dialog-state";
 import { portalToBody } from "../lib/portal-visibility";
 import { useTranslation } from "react-i18next";
 import {
@@ -14,13 +16,15 @@ import {
   type UiMessage,
 } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
-import { TooltipButton } from "./ui";
+import { Button, TooltipButton } from "./ui";
+import { ContextCompactionAction } from "./ContextCompactionAction";
 import {
   aggregateToolTokenUsage,
   calculateCacheRate,
   calculateContextUsage,
   calculateTokenRate,
   contextOccupancyTokens,
+  usageTokenTotal,
   contextUsageView,
   resolveContextUsageDisplay,
 } from "../lib/context-usage";
@@ -53,6 +57,7 @@ export function ContextUsageInspector({
 }) {
   const { t } = useTranslation();
   const panelId = useId();
+  const sessionId = useAppStore((state) => state.activeSessionId);
   // The transcript shows one row per compaction; the inspector adds what those
   // rows cannot — how much of the model context the newest summary occupies.
   const compaction = useAppStore((state) =>
@@ -62,6 +67,7 @@ export function ContextUsageInspector({
   );
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const openedSessionId = useRef<string | undefined>(undefined);
   const [open, setOpen] = useState(false);
   const [popoverPosition, setPopoverPosition] =
     useState<ContextInspectorPlacement | null>(null);
@@ -72,10 +78,9 @@ export function ContextUsageInspector({
     resolveContextUsageDisplay(state.settings?.contextUsageDisplay),
   );
   const display = contextUsageView(context, usageDisplay);
-  // Occupancy, turn total, and provider cache/input/output are the last
-  // model request. Summing every tool-loop call inflates cache read past
-  // the window (OpenCode last-message accounting).
-  const turnTotal = contextOccupancyTokens(usage);
+  // Context occupancy and provider usage describe the last request. The
+  // footer retains the full turn total formerly shown beside the composer.
+  const turnTotal = variant === "footer" ? usageTokenTotal(turnUsage) : contextOccupancyTokens(usage);
   const throughput = calculateTokenRate(
     responseOutputTokens ?? turnUsage.outputTokens,
     responseDurationMs,
@@ -116,11 +121,20 @@ export function ContextUsageInspector({
   // breakdown takes long enough that a pointer leaving the trigger should not
   // dismiss it.
   const toggleInspector = useCallback(() => {
+    if (!open && variant === "footer") {
+      openedSessionId.current = useAppStore.getState().activeSessionId;
+    }
     setOpen((previous) => {
       if (previous) setPopoverPosition(null);
       return !previous;
     });
-  }, []);
+  }, [open, variant]);
+
+  useEffect(() => {
+    if (variant === "footer" && sessionId !== openedSessionId.current) {
+      closeInspector();
+    }
+  }, [closeInspector, sessionId, variant]);
 
   const updatePopoverPosition = useCallback(() => {
     const trigger = triggerRef.current;
@@ -136,14 +150,17 @@ export function ContextUsageInspector({
       return;
     }
     const popoverRect = popover.getBoundingClientRect();
-    // Clamp against the conversation pane rather than the viewport: the pane
-    // ends where the work panel begins, and the panel's native browser/plugin
-    // surfaces composite above every renderer layer, so whatever part of the
-    // popover crosses that edge is covered whatever z-index it carries (D357).
-    const paneRect = trigger.closest(".main-pane")?.getBoundingClientRect();
+    // The footer belongs to the reading column, which ends before the activity
+    // rail. Ring consumers retain the conversation-pane clamp (D357).
+    const mainPaneRect = trigger.closest(".main-pane")?.getBoundingClientRect();
+    const paneRect = variant === "footer"
+      ? trigger.closest(".composer-stack")?.getBoundingClientRect() ?? mainPaneRect
+      : mainPaneRect;
     const placement = placeContextInspector({
       trigger: {
-        left: triggerRect.left,
+        left: variant === "footer"
+          ? triggerRect.right - popoverRect.width
+          : triggerRect.left,
         top: triggerRect.top,
         bottom: triggerRect.bottom,
       },
@@ -164,7 +181,7 @@ export function ContextUsageInspector({
         ? previous
         : placement,
     );
-  }, []);
+  }, [variant]);
 
   useLayoutEffect(() => {
     if (!open) return;
@@ -210,11 +227,14 @@ export function ContextUsageInspector({
   useEffect(() => {
     if (!open || typeof ResizeObserver === "undefined") return;
     const pane = triggerRef.current?.closest(".main-pane");
-    if (!pane) return;
     const observer = new ResizeObserver(updatePopoverPosition);
-    observer.observe(pane);
+    if (pane) observer.observe(pane);
+    const composer = variant === "footer"
+      ? triggerRef.current?.closest(".composer-stack")
+      : null;
+    if (composer) observer.observe(composer);
     return () => observer.disconnect();
-  }, [open, updatePopoverPosition]);
+  }, [open, updatePopoverPosition, variant]);
 
   useEffect(() => {
     if (!open) return;
@@ -285,10 +305,29 @@ export function ContextUsageInspector({
           {context.usedPercent}%
         </span>
       </div>
+      {variant === "footer" ? (
+        <span
+          className="context-inspector-occupancy-track"
+          role="progressbar"
+          aria-label={t("chat.usageContextAria", {
+            percent: context.usedPercent,
+            count: formatCompactTokenCount(context.usedTokens),
+            state: t("chat.usageContextAriaUsed"),
+          })}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={context.usedPercent}
+        >
+          <span
+            className="context-inspector-occupancy-fill"
+            style={{ width: `${context.usedRatio * 100}%` }}
+          />
+        </span>
+      ) : null}
       <div className="context-inspector-kpis">
         <div>
           <span>{t("chat.usageTurnTotal")}</span>
-          <strong>{formatCompactTokenCount(turnTotal)}</strong>
+          <strong>{variant === "footer" && turnTotal <= 0 ? t("chat.usageThroughputUnavailable") : formatCompactTokenCount(turnTotal)}</strong>
         </div>
         <div>
           <span>{t("chat.usageThroughputLabel")}</span>
@@ -325,6 +364,8 @@ export function ContextUsageInspector({
               <span>
                 {t("chat.usageCacheRate")} {cacheRate}%
               </span>
+            ) : variant === "footer" ? (
+              <span>{t("chat.usageCacheRateUnavailableLabel")}</span>
             ) : null}
             {usage.cacheWriteTokens !== undefined ? (
               <span>
@@ -351,6 +392,14 @@ export function ContextUsageInspector({
           </span>
         </div>
       </div>
+      <Button onClick={() => {
+        const store = useAppStore.getState();
+        if (store.activeSessionId) {
+          if (readContextInsightsPreferences().placement === "modal") openContextInsightsDialog(store.activeSessionId);
+          else store.openWorkPanelTabForSession(store.activeSessionId, { id: "context", kind: "context" });
+          closeInspector();
+        }
+      }}>{t("contextInsights.openDashboard")}</Button>
       {compaction ? (
         <div className="context-inspector-compaction">
           <span>
@@ -358,6 +407,13 @@ export function ContextUsageInspector({
           </span>
           <strong title={compaction.summarized && !compaction.fallback && compaction.summary?.trim() ? compaction.summary : undefined}>~{formatCompactTokenCount(compaction.summaryTokens)}</strong>
         </div>
+      ) : null}
+      {variant === "footer" ? (
+        <ContextCompactionAction
+          sessionId={openedSessionId.current}
+          hasUsage={context.usedTokens > 0}
+          onStarted={closeInspector}
+        />
       ) : null}
     </div>
   ) : null;
@@ -380,14 +436,22 @@ export function ContextUsageInspector({
           aria-controls={open ? panelId : undefined}
           onClick={toggleInspector}
         >
-          <span className="composer-usage-label">
-            {t("chat.usageContextLabel")}
+          <span className="composer-usage-label">{t("chat.usageContextLabel")}</span>
+          <span
+            className="composer-usage-context-track"
+            role="progressbar"
+            aria-label={t("chat.usageContextAria", ariaArguments)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={display.percent}
+          >
+            <span
+              className="composer-usage-context-fill"
+              style={{ width: `${display.ratio * 100}%` }}
+            />
           </span>
           <span className="composer-usage-value">
-            {display.percent}%{" "}
-            {display.display === "used"
-              ? t("chat.usageContextAriaUsed")
-              : t("chat.usageContextAriaRemaining")}
+            {display.percent}%
           </span>
         </TooltipButton>
         {popover && typeof document !== "undefined"

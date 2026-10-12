@@ -678,20 +678,48 @@ no editing, delegation, fake user message or transcript deletion occurs.
 Other deferred/plugin tools keep their existing visibility rules. See
 [the declaration/permission decision](../../adr/plan-tool-declarations-and-execution-denials.md).
 
-In standard Agent mode with at least one enabled subagent, the system prompt
-uses delegate-first guidance for separable, substantial work: dispatch suitable
-independent tasks with `Task`, then converge through `TaskWait`. The parent
-handles work needing only a few tool calls and work requiring user input. The
-guidance retains the no-recursion, no-debate, and at-most-one-optional-review
-limits; it steers the model but does not guarantee delegation. With all
-subagents disabled, neither the delegation prompt section nor `Task*` tools
-are included. Expert Team execution uses its Lead-to-expert task-board policy
-and isolated Team tool catalog instead of standard subagent delegation. Team
+Standard Agent sessions and Agent-mode execution experts use the same
+proactive delegation policy: identify meaningful independent work, assign
+bounded owned tasks, dispatch them in parallel, continue independent parent
+work, and converge before delivery. Trivial indivisible work and user decisions
+stay with the parent. Child agents may apply the same policy within the
+configured depth and running-count limits; no agent debates or duplicate work.
+This steers the model but does not force a model call for every request.
+
+Settings `subagentMaxDepth` (integer 0–8, default 1) counts the root as depth 0.
+Depth 0 disables delegation; depth 1 permits direct children only. Settings
+`subagentMaxConcurrency` (integer 1–32, default 10) caps all running descendants
+in a single root runtime, including parents waiting for their children. Each
+Team execution expert owns an independent root tree with the same settings.
+Exceeding a limit returns an observable tool error, never an implicit queue.
+Limits are snapshotted at launch; changing them invalidates idle runtime reuse.
+Missing or invalid legacy settings use defaults; no data migration is needed.
+
+Descendant work tools cannot exceed the parent tool scope or Host-approved
+expert tool policy; nested permission scope cannot elevate the ancestor.
+TaskWait/TaskList/TaskStop and resume are scoped to the caller's direct children.
+Child settlement converges its descendants; cancellation, failure and disposal
+stop the affected subtree. Nested tool rows keep their actual spawning Task
+parent id for live and reloaded attribution. Descendant usage is counted once.
+
+With no enabled definitions or depth 0, the delegation prompt and Task tools
+are absent. Plan/Goal keep existing execution denials; Team research remains
+read-only with no delegation. Team Lead retains the Team task-board catalog
+instead of Task. Team
 requires `delegate` with at least one expert, including trivial tasks; Host
 rejects `lead_only` and historical solo approvals. Substantive Lead tools and
 nonempty final replies require a current approved expert dispatch whose turn
 has actually started. Idle members or queued messages are insufficient. This
 participation gate does not prove task ownership or completed expert work.
+
+A Lead has one bounded no-participation recovery before approval and three
+bounded independent recoveries after a trusted, nonempty delegate roster is confirmed for
+that same original Agent turn. Fast confirmation during the declaration reply
+must not exhaust the dispatch recovery just because the preapproval correction
+was already used. Confirmation does not authorize completion: Host still checks
+actual expert participation, and continued no-dispatch replies fail after the
+three postconfirmation corrections. Stale reviews, other teams and automatic
+Plan rosters cannot acquire this execution-phase recovery.
 
 Team Plan research automatically launches read-only experts using Host-selected
 `automatic_plan` authority and valid approved model bindings, without staffing
@@ -717,8 +745,47 @@ from Team notifications; it does not require a tab switch or a completed Lead tu
 An approved Team Plan/Goal execution waits for execution-roster confirmation
 and expert settlement inside its original running Host turn. It must not emit
 final agent_end, end the Goal execution token or complete the approval while
-waiting. Confirmation resumes the same approved contract. wait_for_updates
-consumes full authenticated confirmation/expert content in that turn through
+waiting. Confirmation resumes the same approved contract.
+Same-turn guard recovery registers a fresh Host-confirmed, user-confirmed,
+nonempty delegate review bound to the same team and approved execution turn.
+Registration reads only the original entries from the current approved
+execution boundary, capturing the complete valid assistant tool batch containing
+the latest successful matching declaration with every original paired result.
+A declaration archived by compaction before confirmation remains eligible;
+entries from an earlier execution are never used.
+It preserves signed thinking, text, tool signatures and sibling calls/results;
+only matching declaration results change. From the first resumed request
+through execution end, final model conversion projects all successful results
+matching that team/turn/review using the confirmed roster,
+`awaitingUserApproval=false` and the shared tool payload builder. Its `nextStep`
+begins with `The user confirmed the execution roster`; stale `memberSessionIds`
+are omitted. Every subsequent tool-loop request, retry and context rebuild
+applies the same idempotent, copy-on-write projection. If compaction archives
+that batch, final conversion includes the complete registered batch and all its
+paired results in the model view only. It never invents an orphan call/result
+or trims signed content. Repeated guard recovery retains a registration with
+the same owner/review/epoch when rebuilt messages no longer contain the batch.
+Wire-call ID collisions with newer work never replace that newer work. Provider
+telemetry captures that projected model payload.
+The projection runs after system-journal persistence; original entries, journal,
+compaction input and persisted/UI timeline remain unchanged. Pending, cancelled
+or replaced reviews cannot register or reuse it; a newer observable declaration
+with a different reviewId, cancellation or higher revision clears registration.
+Execution completion, Stop, cancellation/disposal/graceful stop, Team budget
+stop, turn/epoch or mode changes and a subsequent execution invalidate its scope;
+ordinary turns cannot refresh an earlier execution's declaration. A fresh review
+read rechecks turn/epoch, mode and cancellation before registration. With no
+matching successful declaration in a fully paired valid assistant batch at
+initial registration, no batch is invented and the existing nudge and three-attempt completion guard
+remain. Reinserted model batches are never written to Agent state, entries,
+compaction summary/checkpoint or journal. No additional Host notification,
+review read or RPC is introduced. This projection only extends guard recovery; `wait_for_updates` consuming confirmation directly
+keeps its existing path. No Host dispatch, public contract or restart recovery
+is added.
+An earlier pending review snapshot cannot authorize completion if confirmation
+commits before the execution-state read: Host final authorization still runs,
+and the bound confirmed execution receives its dispatch recovery when needed.
+wait_for_updates consumes full authenticated confirmation/expert content in that turn through
 Host-authorized execution inbox reads; cancellation interrupts it without
 expert replay or a completion report. Expert-start authority permits
 substantive tools, while approved execution completion separately requires
@@ -802,6 +869,34 @@ token (`writeToken`) from the Host and exposes the `UpdateGoalProgress` tool to 
   is maintained internally by the runtime and is never leaked to public transcript messages, model prompt contexts, or UI payloads.
 - **Lifecycle Cleanup:** When the goal execution completes, aborts, errors, or the runtime is disposed,
   the tool is removed and the write token is invalidated on the Host.
+
+### Goal completion report consistency
+
+Approved Goal execution instructions require `UpdateGoalProgress` for the Goal
+checklist when that tool is available. `TodoWrite` manages the separate session
+checklist and does not replace Goal progress updates. Before claiming `met`,
+the Agent must reconcile every Goal item to `completed`; runtime and Host reject
+`met` drafts with pending, in-progress, or failed items. An absent snapshot stays
+compatible with existing callers. Honest `partial`, `blocked`, and `unknown`
+reports may retain unfinished items; no report silently marks them completed.
+The Host also checks the latest progress at finalization.
+
+`SubmitGoalReport` records a draft, not a finalized result. Known read-only tools
+and bookkeeping (`TodoWrite`, `UpdateGoalProgress`, `ToolSearch`) preserve the
+draft. Evidence-changing tools, unknown extension tools, and user steering
+invalidate it; the tool result warns the Agent to resubmit after such work.
+If successful Goal execution ends without a valid draft, the runtime requests
+one report-only continuation at most, preserving the same execution and single
+terminal lifecycle. Errors, cancellation, and interruption do not trigger it.
+If this continuation still leaves no valid report, normal Host fallback applies.
+
+A fallback retains bounded steps from the same execution's last Goal progress
+snapshot. Completed and failed items keep those statuses; pending/in-progress
+items are shown as skipped with their exact snapshot status in the detail,
+without claiming they were completed. At least one completed item yields
+`partial`, failed-only work yields `blocked`, and no demonstrated completion or
+failure remains `unknown`. Fallback integrity stays visible and never implies
+that the Goal contract was met. No existing stored reports are rewritten.
 
 ## 5c. Thinking capability and stream contract
 
@@ -1510,7 +1605,7 @@ execution activation rules:
   `# Skills` section and a user-typed `/skill-id` both ask the model to call
   it, and a tool that is missing from the schema cannot be called at all
 - Agent: `Task`, `TaskWait`, `TaskList`, and `TaskStop` as well, whenever the
-  subagent catalog is non-empty (§5f) — prompted for delegate-first orchestration
+  subagent catalog is non-empty and configured depth allows delegation (§5f) — prompted for delegate-first orchestration
   of separable, substantial work, and worth the extra schemas per request
 - Plan: `Read`, `Glob`, `Grep`, `BrowserPreview`, and `Bash`
 - both modes: `ToolSearch` when at least one deferred capability exists
@@ -1858,18 +1953,163 @@ parent and owning Task remain distinct. The migration does not add coding-agent
 AgentSession, Codemode or virtual routing. See the coding-agent design review for
 future adoption conditions.
 
-### Standard delegation and Team startup isolation
+### Standard delegation and Team expert startup
 
-The effective execution profile is resolved before ordinary Task discovery.
-Team Lead/member launches do not read the user subagent registry or builtin
-switches, load Task definitions, resolve their pinned/fallback models, expand
-availableForSubagents bindings, or register unused delegate OAuth bindings.
-Their ordinary delegation fields are empty. Team still resolves its own model
-and obtains the authoritative Host team context; missing context fails closed.
+The effective profile and authoritative Host Team context are resolved before
+Task discovery. Team Leads and planning researchers do not read the ordinary
+subagent registry, builtin switches or delegate model/auth bindings. Missing
+Team context fails closed. Standard agents and execution experts load the same
+scope-filtered definitions, opted-in models, pins, fallback bindings and
+availability diagnostics on launch. Their idle reuse compares these catalogs
+and runtime limits as well as model/profile/expert policy. Team Leads retain
+their existing catalog isolation and mandatory expert participation gate.
 
-Standard launches retain existing per-prompt discovery, model selection,
-credentials, availability filtering and diagnostics. An idle Team runtime
-ignores ordinary Task configuration when deciding reuse, including legacy
-callers that pass it; actual changes to its model, profile or Host expert policy
-still invalidate reuse. Standard reuse still compares all Task configuration.
-This separation does not permit Task inside Team or change active-turn guards.
+## Plus project context tools
+
+Project-bound Desktop sessions expose `ProjectHistory` and `CodeSearch`; native
+Pi sessions and projectless sessions do not acquire these capabilities. Both
+read tools remain available in Agent, Plan and Goal. CodeSearch's explicit
+`clear` action is unavailable in Plan/Goal. Results are historical or filesystem
+evidence, never higher-priority instructions. The model must verify old facts
+against current code and must disclose incomplete search coverage.
+
+Automatic project recording is opt-in and defaults off. At each user turn and
+approved-plan execution, the runtime refreshes the Host-owned project/group
+memory once. A failed refresh clears the old projection and write guidance and
+reports the failure; cancellation/disposal discards late responses. Enabling
+recording exposes `ProjectMemory` (list/upsert/delete) in Agent mode only. Turning
+it off revokes writes while retaining read context. No extraction model or
+embedding provider is called. Requests capture a trusted session binding in the
+runtime's Host closure and the parent sidecar proxy verifies it before forwarding.
+
+ProjectHistory searches literal phrases in the current logical project's saved
+Desktop sessions. Search returns at most 20 sessions, two matching excerpts per
+session and stable session/message IDs. Read validates that the source remains
+in the same group and returns at most five user/assistant messages, each capped
+at 2,000 characters. Deleted chats are excluded; native Pi history is not mixed
+in without a Host-owned project identity.
+
+CodeSearch performs case-insensitive literal search in the session's root (not
+the foreground workspace or arbitrary model-selected roots), returns paths,
+line numbers and bounded text, and supports explicit status/clear actions. Each
+search reconciles current files and ignore rules, hashes eligible content, then
+verifies candidate contents live. This first version provides a persistent text
+cache, not semantic retrieval or a promised speedup. Grep remains unchanged.
+
+### Goal reports require settled Team execution
+
+For an approved Team Goal, the existing Lead tool authorization wrapper checks
+`SubmitGoalReport` before validation or draft persistence. Current queued dispatches,
+running expert turns and unconsumed current expert results reject every verdict,
+including `partial` and `blocked`. Wait with `wait_for_updates` or interrupt the
+assigned experts before reporting. The denial retains `TEAM_APPROVAL_REQUIRED`
+and names dispatch IDs, experts, their open task IDs and the unconsumed-result
+count. This is an authorization failure, not a draft-persistence failure.
+
+Member mail is consumed inside the original approved execution turn; its inbox
+authority remains active. A post-execution mailbox continuation does not acquire
+a Goal token or report tool. Confirmed rosters receive up to three reason-specific
+completion nudges; after those three continuations, the next rejection terminates
+with the Host reason and `stage: team_completion`. Unconfirmed-roster recovery
+remains limited to one nudge. Ordinary non-Goal final-answer authority is unchanged.
+
+A trusted cancelled/interrupted roster aborts approved execution even when it
+arrives before the completion guard begins its review wait. It does not spend a
+nudge, restart model work, or install a waiting listener/timer.
+
+
+### Expert Team execution reliability guidance (2026-10-11)
+
+Generated Team prompts use available Host-backed member phase and turn/process
+evidence for liveness, never Git activity. They require consuming authenticated
+reports before replacement or redispatch; a pending-mail summary is not its body.
+Ordinary Agent Leads on capable Hosts receive authenticated expert bodies at
+`wait_for_updates` boundaries through the separate ordinary inbox. Old Hosts
+retain queued continuations after turn settlement. Approved Plan/Goal executions
+keep their original turn open and consume their execution inbox; ordinary Plan
+aggregation retains its yield. Neither expert body grants new user authority.
+
+Execution participants run only diff-related revalidation, assign a full suite
+to one participant, avoid foreground sleep polling and declare explicit limits
+for long-lived background commands. `timed_out` is a timeout, not proof of a
+crash; `nohup` is not a managed-lifetime workaround. Shared-tree `git add -A` and
+`git stash` are forbidden by guidance, without changing tool authorization.
+After two attempts based on different evidence still fail the same acceptance
+check, report the blocker rather than blindly start another repair/retest cycle.
+Independent authorized work can continue.
+
+A Lead does not redo completed delegated work without first explaining a concrete
+independent-review reason. Final reporting distinguishes commands the Lead
+actually launched from commands experts launched, and relies on tool/Host
+records. Guidance does not mechanically enforce model obedience, add a watchdog,
+change quotas, or authorize unread report content or user consent.
+### Ordinary Agent Lead pending-mail visibility (2026-10-11)
+
+A Lead's team_status exposes pendingMessagesCount, pendingMessageSenders and
+oldestPendingMessageAgeSeconds from the existing authenticated mailbox read.
+Pending means inbound, non-self, queued and not yet bound to a recipient turn.
+An acknowledged queue receipt does not establish body consumption. Outbound,
+other-recipient, running, completed and cancelled rows are excluded.
+
+On an unsupported/older Host, an ordinary Agent Lead's wait_for_updates returns
+reason: pending_mailbox_messages immediately when mail is present, with count,
+sender names, age and queued-continuation guidance. It does not consume bodies,
+ACK mail or terminate the turn; ending that turn enables legacy role=user
+continuation delivery. This remains S1's compatibility behavior.
+
+On a capable Host, WP16 S3 adopts a separate boundary-only ordinary inbox. The
+Host persists authenticated expert role=user input and retires durable receipts;
+a dedicated runtime operation accepts the verified buffer, ACKs its exact proof
+and rechecks lifecycle before same-turn internal queue admission. Tool output remains metadata only, never a second body channel.
+No Goal token, new user approval or automatic Agent yield is supplied. The
+[ordinary inbox spec](team-ordinary-inbox.md) defines authority, provenance,
+human-steer priority, FIFO, journal crash cuts and old-Host fallback.
+
+Ordinary Plan Lead yield retains priority and terminate:true. Approved Plan/Goal
+execution reads its authenticated execution inbox first and never receives an
+instruction to end that execution to fetch mail. Owned background terminal
+results retain their existing priority and once-only delivery; pending mail
+remains visible on the next status/wait call.
+
+Initial subscription precedes baseline reads. The total deadline, single-flight
+rechecks, abort and cleanup remain bounded. Reads pin turn, epoch, Team identity
+and mode; replacement or disposal invalidates late metadata. A read failure is
+observable, not a zero-mail success. Sender names are stable-deduplicated in
+mailbox order; createdAt is a Unix-millisecond numeric string. Ages are nonnegative
+whole seconds; empty queues or any unparseable pending timestamp return null
+for the unknown oldest age. S1 metadata adds no authority or quota. S3's additive
+internal RPC/Plus P6 proof
+journal is distinct from this non-consuming summary; the adopted
+[delivery decision](../../adr/team-agent-mailbox-delivery.md) does not establish
+model obedience or user acceptance.
+
+### Goal negotiation and Team progress reliability (WP7)
+
+Goal negotiation states whether acceptance requires human participation or external
+evidence before SubmitGoal. Unknown provider pricing/cost is unknown, not zero;
+Markdown monetary caps do not supply Host-enforced hard spending guarantees.
+Negotiate paid actions, publication and human decisions as stage boundaries and
+stop at unmet ones. Model approval text/parsed Markdown cannot create trusted
+approval or authorize work on the user's behalf.
+
+Standard Agent retains TodoWrite when exposed by its actual catalog. Restricted
+expert profiles do not acquire it through ToolSearch; exact lookup of an excluded
+tool returns an explicit denial and legal shared-board task_get/task_list and
+CAS task_update guidance. Research stays read-only and still requires
+submit_research_result, rather than a personal TodoWrite checklist. Discovery
+never grants permission or substitutes a bypass tool.
+
+team_status adds completedMembersWithOpenTasks: entries identify memberSessionId,
+memberName and owned taskIds whose non-deleted status is pending/in_progress.
+completedMemberOpenTaskNextStep asks for authenticated report/evidence review and
+current-revision updates or explicit reassignment/dispatch, not duplicate work.
+A member phase completed describes its last successful turn, not board completion.
+Pending-mail guidance retains nextStep priority; no task is automatically changed.
+
+The existing compaction budget uses current request context, not accumulated usage.
+For a 1M window the derived headroom/hard/soft values are 50K/950K/855K. The
+member fixture covers below-soft, soft/hard preflight and inline growth with real
+compaction wiring and external fake provider/Host boundaries. Checkpoint/summary
+persist before the next request, preserving active task and authenticated caller.
+It found no product defect; thresholds and watchdog behavior remain unchanged.
+This is runtime coverage, not a real-model or Main/Rust incident replay.

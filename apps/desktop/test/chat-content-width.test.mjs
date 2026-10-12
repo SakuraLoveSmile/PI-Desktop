@@ -35,10 +35,15 @@ test("chat width handles are invisible at rest and show a quiet capsule on hover
   );
   assert.match(
     styles,
-    /\.chat-surface\[data-chat-resizing="true"\] \.chat-width-handle::before/,
+    /\.chat-session-main\[data-chat-resizing="true"\] \.chat-width-handle::before/,
   );
 });
 
+
+test("dragging disables transitions on the new session width owner", () => {
+  assert.match(styles, /\.chat-session-main\[data-chat-resizing="true"\] \.thread-content,/);
+  assert.match(styles, /\.chat-session-main\[data-chat-resizing="true"\] \.composer-stack,/);
+});
 
 test("a squeezed pane keeps min\(100%, preferred\) and does not force 640px", () => {
   assert.match(styles, /--chat-content-max-width:\s*760px/);

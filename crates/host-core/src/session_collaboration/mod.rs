@@ -15,6 +15,7 @@ mod provenance;
 mod repository;
 mod settlement;
 pub use provenance::{prepare_append, validate_replacement};
+pub(crate) use repository::origin as message_origin;
 pub use repository::{get, Message};
 pub use settlement::{begin_turn, recover, settle_turn};
 pub const SCHEMA: &str = include_str!("schema.sql");
@@ -83,6 +84,8 @@ fn send_record(db: &Database, input: &Value, target: &str, kind: &str) -> Result
     }
     let at = ms_to_ts(now_ms());
     let message = Message {
+        sender_head: None,
+        team_metadata: None,
         id: Uuid::new_v4().to_string(),
         plugin_id: plugin.into(),
         source_session_id: source.into(),

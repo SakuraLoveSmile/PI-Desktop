@@ -10,3 +10,5 @@
 - Pi 1.0.1 adoption: [`pi-101-adoption.md`](pi-101-adoption.md)
 - GitHub Issues + Milestones: repository Issues page
 - GitHub Projects: create after adding the `project` token scope
+
+- [Plus project context implementation and validation](memory-index-validation.md)

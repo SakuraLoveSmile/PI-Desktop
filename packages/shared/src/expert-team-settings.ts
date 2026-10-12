@@ -15,7 +15,16 @@ export type ExpertTeamRoleConfig = {
   tools?: string[];
   instructions?: string;
 };
+export type TeamRunLimitSettings = { enabled: boolean; softMs: number; hardMs: number };
+export const DEFAULT_TEAM_RUN_LIMITS: Readonly<TeamRunLimitSettings> = { enabled: true, softMs: 6 * 60 * 60 * 1000, hardMs: 10 * 60 * 60 * 1000 };
+export function validateTeamRunLimits(value: unknown): value is TeamRunLimitSettings {
+  return object(value) && Object.keys(value).every((key) => ["enabled", "softMs", "hardMs"].includes(key)) &&
+    typeof value.enabled === "boolean" && typeof value.softMs === "number" && typeof value.hardMs === "number" &&
+    Number.isSafeInteger(value.softMs) && Number.isSafeInteger(value.hardMs) && value.softMs > 0 && value.hardMs > value.softMs;
+}
 export type ExpertTeamSettings = {
+  /** Live user policy. Missing legacy settings use six/ten hours. */
+  runLimits?: TeamRunLimitSettings;
   schemaVersion: 1;
   userDefaults: Partial<Record<ExpertTeamPresetId, ExpertTeamRoleConfig>>;
   /** Keys are canonical paths from the Host's existing project catalog. */
@@ -58,7 +67,8 @@ function validRoles(value: unknown): boolean {
 /** Structural validation; the Host also verifies project and provider ownership. */
 export function validateExpertTeamSettings(value: unknown): value is ExpertTeamSettings {
   return object(value) && value.schemaVersion === 1 &&
-    Object.keys(value).every((key) => ["schemaVersion", "userDefaults", "projectOverrides"].includes(key)) &&
+    Object.keys(value).every((key) => ["schemaVersion", "userDefaults", "projectOverrides", "runLimits"].includes(key)) &&
+    (value.runLimits === undefined || validateTeamRunLimits(value.runLimits)) &&
     validRoles(value.userDefaults) && object(value.projectOverrides) &&
     Object.keys(value.projectOverrides).length <= 1024 &&
     Object.entries(value.projectOverrides).every(([path, roles]) => boundedId(path, 4096) && validRoles(roles));

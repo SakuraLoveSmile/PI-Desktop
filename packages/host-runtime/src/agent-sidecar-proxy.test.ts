@@ -32,6 +32,8 @@ describe("sidecar host proxy allowlist", () => {
   it("keeps unrelated state and arbitrary Team mutations outside the proxy", () => {
     expect(isHostProxyAllowed("settings.set")).toBe(false);
     expect(isHostProxyAllowed("session.delete")).toBe(false);
+    for (const method of ["team.registerLeadAsk", "team.deferLeadAsk", "team.ackLeadAsk"]) expect(isHostProxyAllowed(method)).toBe(true);
+    for (const method of ["team.resolveLeadAsk", "team.cancelLeadAsks", "team.listLeadAsks"]) expect(isHostProxyAllowed(method)).toBe(false);
     expect(isHostProxyAllowed("team.pause")).toBe(false);
     expect(isHostProxyAllowed("team.ackMessage")).toBe(false);
     expect(isHostProxyAllowed("team.updateLaunchReview")).toBe(false);

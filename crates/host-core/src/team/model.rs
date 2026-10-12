@@ -98,11 +98,31 @@ pub struct TeamBoardProjection {
     pub tasks: Vec<TeamTask>,
     pub readiness: Vec<TeamTaskReadiness>,
     pub scope_overlaps: Vec<WriteScopeOverlap>,
+    pub shared_git_warning_count: u64,
+    pub shared_git_warnings: Vec<super::write_scopes::MemberWriteCount>,
+    pub out_of_scope_write_count: u64,
+    pub out_of_scope_writes: Vec<super::write_scopes::MemberWriteCount>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TeamMessage {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sent_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_busy_at_send: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_state: Option<String>,
+    /// One-based position among this target's queued Team mailbox messages,
+    /// including accepted mail. This is not the user turn queue position.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub queue_position: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub task_dispatch: Option<super::dispatch_metadata::TaskDispatch>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dispatch_cancellation: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sender_head: Option<String>,
     pub id: String,
     pub team_session_id: String,
     pub source_session_id: String,
@@ -181,6 +201,8 @@ pub struct TeamLaunchReviewMember {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TeamSnapshot {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub run_limits: Option<super::run_limits::RunLimitProjection>,
     pub team_session_id: String,
     pub revision: i64,
     pub paused: bool,

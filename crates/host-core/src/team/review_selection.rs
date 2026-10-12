@@ -91,8 +91,11 @@ pub(super) fn require_approved_member(
             }
         }
     }
+    if super::replacements::require_approved(db, team_session_id, member_session_id)? {
+        return Ok(());
+    }
     Err(anyhow!(
-        "TEAM_APPROVAL_REQUIRED: member execution requires a confirmed launch review"
+        "TEAM_APPROVAL_REQUIRED: member execution requires a confirmed launch review; nextStep: request trusted roster review"
     ))
 }
 
@@ -130,7 +133,7 @@ pub(crate) fn gate_team_member_turn(
         || model_id.is_some_and(|model| session.summary.model_id.as_deref() != Some(model))
     {
         return Err(anyhow!(
-            "TEAM_APPROVAL_REQUIRED: turn route must match the confirmed member selection"
+            "TEAM_APPROVAL_REQUIRED: turn route must match the confirmed member selection; nextStep: read team_status and use the confirmed provider/model; ask the Lead for a new trusted roster review before changing the route"
         ));
     }
     Ok(())
@@ -268,10 +271,10 @@ pub(crate) fn validate_member_route(
     let catalog_model = db
         .conn()
         .query_row(
-            "SELECT capabilities_json FROM models
+            "SELECT 1 FROM models
              WHERE provider_id = ?1 AND model_id = ?2 AND deprecated = 0",
             params![provider_id, model_id],
-            |row| row.get::<_, String>(0),
+            |_| Ok(()),
         )
         .optional()?;
     if !enabled || (model.is_none() && catalog_model.is_none()) {
@@ -279,22 +282,20 @@ pub(crate) fn validate_member_route(
             "TEAM_MODEL_SELECTION_INVALID: provider/model route is unavailable"
         ));
     }
-    let provider_levels = crate::providers::config_thinking_levels_override(&config_json);
-    let model_levels = model
-        .map(|model| model.thinking_levels.as_slice())
-        .unwrap_or(&[]);
-    let allowed_levels = provider_levels.as_deref().unwrap_or(model_levels);
-    let reasoning_disabled =
-        crate::providers::config_reasoning_override(&config_json) == Some(false);
-    let thinking_supported = if thinking_level == "off" {
-        true
-    } else if reasoning_disabled {
-        false
-    } else if thinking_level == "omit" {
-        allowed_levels.iter().any(|level| level != "off")
-    } else {
-        allowed_levels.iter().any(|level| level == thinking_level)
-    };
+    // Binding levels own the endpoint's configuration. Legacy provider-level
+    // compatibility fields no longer affect runtime capability resolution.
+    // Empty configured bindings retain the generic manual opt-in ladder; an
+    // explicit off-only binding disables it. Cached capability labels cannot
+    // establish an exact ladder for a route without a configured binding.
+    // Runtime still applies the selected native model's published restrictions.
+    let thinking_supported = matches!(thinking_level, "off" | "omit")
+        || model.is_some_and(|model| {
+            model.thinking_levels.is_empty()
+                || model
+                    .thinking_levels
+                    .iter()
+                    .any(|level| level == thinking_level)
+        });
     if !thinking_supported {
         return Err(anyhow!(
             "TEAM_MODEL_SELECTION_INVALID: thinking level is unsupported by the selected model"

@@ -29,6 +29,7 @@ function fixture() {
   const finished = [];
   const emitted = [];
   const enqueued = [];
+  let acknowledgeDiagnostics;
 
   const persistence = createEventPersistence({
     runtimeState: { host: null },
@@ -42,6 +43,7 @@ function fixture() {
     planSubmissionTurnKey: coordination.planSubmissionTurnKey,
     inflightCheckpointer: { observe() {}, flush: async () => {}, settle() {}, settleIf() {} },
     persistenceOutbox: {
+      setContextInsightsAcknowledgedHandler: (handler) => { acknowledgeDiagnostics = handler; },
       size: () => 0,
       enqueue: async (entry) => {
         enqueued.push(entry);
@@ -75,6 +77,7 @@ function fixture() {
     emitted,
     enqueued,
     envelope,
+    acknowledgeDiagnostics: (sessionId) => acknowledgeDiagnostics(sessionId),
   };
 }
 
@@ -221,4 +224,18 @@ test("a cancellation lock is scoped to its own turn and never inferred", () => {
   assert.equal(f.coordination.peekAbortReason(SESSION, LIVE_TURN), "aborted");
   f.coordination.clearAbortReason(SESSION, LIVE_TURN);
   assert.equal(f.coordination.peekAbortReason(SESSION, LIVE_TURN), undefined);
+});
+
+
+test("context reads are invalidated only after diagnostic acknowledgement and without private content", async () => {
+  const f = fixture();
+  f.persistence.persistAgentEvent(f.envelope({ type: "context_insights", request: { id: "request", entries: [{ content: "private context fixture" }] } }, LIVE_TURN));
+  await Promise.resolve();
+  assert.equal(f.enqueued.length, 1);
+  assert.equal(f.emitted.length, 0);
+  f.acknowledgeDiagnostics(SESSION);
+  assert.equal(f.emitted.length, 1);
+  assert.deepEqual(f.emitted[0].event, { type: "context_insights" });
+  assert.equal(f.emitted[0].sessionId, SESSION);
+  assert.doesNotMatch(JSON.stringify(f.emitted), /private context fixture/);
 });

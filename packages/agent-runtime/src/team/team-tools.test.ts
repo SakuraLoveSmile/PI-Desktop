@@ -271,6 +271,18 @@ describe("Expert Team tools and prompt (ADR 0304)", () => {
     }));
   });
 
+  it("replacement spawn inherits Host authority and gives the initial message a stable identity", async () => {
+    const host = createMockHost({
+      "team.createMember": async () => ({ member: { memberSessionId: "successor-id", name: "successor", phase: "idle" } }),
+      "team.sendMessage": async () => ({ message: { id: "initial-message" } }),
+    });
+    const tools = createTeamTools({ host, teamSessionId: "lead", callerSessionId: "lead", isLead: true });
+    const tool = tools.find(candidate => candidate.name === "spawn_teammate")!;
+    for (const id of ["attempt-1", "retry"]) await tool.execute(id, { name: "successor", replaces: "failed", prompt: "Complete the approved task" });
+    expect(host.call).toHaveBeenCalledWith("team.createMember", expect.objectContaining({ name: "successor", replaces: "failed", contextKind: undefined, providerId: undefined, modelId: undefined }));
+    expect(host.call).toHaveBeenCalledWith("team.sendMessage", expect.objectContaining({ target: "successor", idempotencyKey: "team-replacement:successor-id:initial", content: "Complete the approved task" }));
+  });
+
   it("spawn_teammate rejects non-lead and succeeds for lead", async () => {
     const host = createMockHost({
       "team.createMember": async (params) => ({
@@ -399,6 +411,28 @@ describe("Expert Team tools and prompt (ADR 0304)", () => {
       callerSessionId: "team-1",
       memberName: "worker-1",
     });
+  });
+
+  it("explains deferred completion without asking the agent to resubmit it", async () => {
+    const host = createMockHost({ "team.updateTask": async () => ({ task: {
+      taskId: "task-pending-completion", revision: 2, status: "in_progress",
+    } }) });
+    const tool = createTeamTools({ teamSessionId: "team-1", callerSessionId: "member-1",
+      isLead: false, host, getTurnId: () => "turn-owned",
+    }).find((item) => item.name === "task_update");
+    expect(tool).toBeDefined();
+    const result = await tool!.execute("claim-complete", {
+      taskId: "task-pending-completion", expectedRevision: 1, status: "completed",
+    });
+    expect(host.call).toHaveBeenCalledWith("team.updateTask", expect.objectContaining({
+      expectedCallerTurnId: "turn-owned", status: "completed",
+    }));
+    expect(result.content[0].type).toBe("text");
+    if (result.content[0].type !== "text") throw new Error("Expected task feedback");
+    const feedback = JSON.parse(result.content[0].text);
+    expect(feedback.task.status).toBe("in_progress");
+    expect(feedback.nextStep).toContain("successful");
+    expect(feedback.nextStep).toContain("Do not repeat");
   });
 
   it("task_create and task_update interact with host task board", async () => {
@@ -610,9 +644,10 @@ describe("planning research boundary", () => {
       if (method === "team.getRoster") return { teamSessionId: "lead", paused: false, members: [] };
       if (method === "team.getBoard") return { teamSessionId: "lead", revision: 1, tasks: [] };
       if (method === "team.getPlanning") return planning;
+      if (method === "team.listMessages") return { messages: [1, 2].map(id => ({ id: String(id), sourceSessionId: "expert", sourceMemberName: "expert", targetSessionId: "lead", status: "queued", turnId: null })) };
       throw new Error(`Unexpected ${method}`);
     });
-    const tools = createTeamTools({ teamSessionId: "lead", callerSessionId: "lead", isLead: true, host: { call } as unknown as RuntimeHost });
+    const tools = createTeamTools({ teamSessionId: "lead", callerSessionId: "lead", isLead: true, mode: "plan", host: { call } as unknown as RuntimeHost });
     const status = await tools.find(tool => tool.name === "team_status")!.execute("status", {});
     expect(status.content[0]).toEqual({ type: "text", text: expect.stringContaining("Finish the current aggregation turn") });
     expect(status.details).toMatchObject({ planning });
@@ -621,16 +656,42 @@ describe("planning research boundary", () => {
 });
 
 describe("approved Lead execution inbox", () => {
+  it("includes advisory write counts in the visible team status", async () => {
+    const counts = [{ memberSessionId: "member", memberName: "Builder", count: 2 }];
+    const call = vi.fn(async (method: string): Promise<unknown> => {
+      if (method === "team.getRoster") return { teamSessionId: "lead", paused: false, members: [] };
+      if (method === "team.getBoard") return { teamSessionId: "lead", revision: 3, tasks: [], readiness: [], scopeOverlaps: [], outOfScopeWriteCount: 2, outOfScopeWrites: counts, sharedGitWarningCount: 3, sharedGitWarnings: [{ memberSessionId: "lead", memberName: "Lead", count: 3 }] };
+      if (method === "team.getPlanning") return null;
+      if (method === "team.listMessages") return { messages: [] };
+      throw new Error(`Unexpected ${method}`);
+    });
+    const tools = createTeamTools({ teamSessionId: "lead", callerSessionId: "lead", isLead: true, host: { call } as unknown as RuntimeHost });
+    const status = await tools.find(tool => tool.name === "team_status")!.execute("status", {});
+    if (status.content[0].type !== "text") throw new Error("Missing Team status text");
+    expect(JSON.parse(status.content[0].text)).toMatchObject({ outOfScopeWriteCount: 2, outOfScopeWrites: counts, sharedGitWarningCount: 3, sharedGitWarnings: [{ memberSessionId: "lead", memberName: "Lead", count: 3 }] });
+    call.mockImplementation(async (method: string) => {
+      if (method === "team.getRoster") return { teamSessionId: "lead", paused: false, members: [] };
+      if (method === "team.getBoard") return { teamSessionId: "lead", revision: 1, tasks: [], readiness: [], scopeOverlaps: [] };
+      if (method === "team.getPlanning") return null;
+      if (method === "team.listMessages") return { messages: [] };
+      throw new Error(`Unexpected ${method}`);
+    });
+    const legacy = await tools.find(tool => tool.name === "team_status")!.execute("legacy-status", {});
+    if (legacy.content[0].type !== "text") throw new Error("Missing legacy Team status text");
+    expect(JSON.parse(legacy.content[0].text)).toMatchObject({ sharedGitWarningCount: 0, sharedGitWarnings: [] });
+    expect(status.details).toMatchObject({ pendingMessagesCount: 0, pendingMessageSenders: [], oldestPendingMessageAgeSeconds: null });
+  });
   it("returns full authenticated messages as Team tool results and suppresses reread duplicates", async () => {
     const calls: unknown[] = [];
     const host: RuntimeHost = { call: async <T>(method: string, params?: unknown): Promise<T> => {
       calls.push([method, params]);
-      return { turnId: "approved-turn", messages: [{ id: "result", content: "Complete expert source findings", sourceSessionId: "expert", sourceMemberName: "Researcher" }] } as T;
+      return { turnId: "approved-turn", messages: [{ id: "result", content: "Complete expert source findings", senderHead: "a".repeat(40), sourceSessionId: "expert", sourceMemberName: "Researcher" }] } as T;
     } };
     const wait = createTeamTools({ teamSessionId: "lead", callerSessionId: "lead", isLead: true, host,
       getTurnId: () => "approved-turn", approvedExecution: () => true }).find(tool => tool.name === "wait_for_updates")!;
     const first = await wait.execute("read-first", {});
     expect(first.content).toEqual([{ type: "text", text: expect.stringContaining("Complete expert source findings") }]);
+    expect(first.details).toMatchObject({ messages: [expect.objectContaining({ senderHead: "a".repeat(40) })] });
     expect(calls).toEqual([["team.readExecutionInbox", { teamSessionId: "lead", callerSessionId: "lead", expectedTurnId: "approved-turn" }]]);
     const controller = new AbortController(); controller.abort();
     const duplicate = await wait.execute("read-again", {}, controller.signal);
@@ -648,5 +709,70 @@ describe("approved Lead execution inbox", () => {
     const result = await wait.execute("late-read", {});
     expect(JSON.stringify(result)).toContain("TEAM_PLANNING_STALE");
     expect(JSON.stringify(result)).not.toContain("Stale findings");
+  });
+});
+
+describe("Lead pending mailbox status", () => {
+  it.each(["cancel", "turn", "context"])("does not publish metadata from a stale status read after %s", async change => {
+    const controller = new AbortController();
+    let turnId = "turn", current = true;
+    const call = async <T>(method: string): Promise<T> => {
+      if (method === "team.getPlanning") return null as T;
+      if (method === "team.listMessages") {
+        if (change === "cancel") controller.abort();
+        if (change === "turn") turnId = "replacement";
+        if (change === "context") current = false;
+        return { messages: [{ id: "report", sourceSessionId: "expert", sourceMemberName: "expert", targetSessionId: "lead", status: "queued", turnId: null }] } as T;
+      }
+      return { members: [], tasks: [] } as T;
+    };
+    const tools = createTeamTools({ teamSessionId: "lead", callerSessionId: "lead", isLead: true, mode: "agent", host: { call },
+      getTurnId: () => turnId, captureMailboxGuard: () => () => current });
+    const outcome = await tools.find(tool => tool.name === "team_status")!.execute("status", {}, controller.signal);
+    expect(outcome.details).toHaveProperty("error");
+    expect(outcome.details).not.toHaveProperty("pendingMessagesCount");
+    expect(outcome.terminate).toBeUndefined();
+  });
+
+  it.each(["agent", "plan", "approved"])("projects authorized summaries with %s guidance and no body consumption", async mode => {
+    const now = vi.spyOn(Date, "now").mockReturnValue(1_800_000_000_000);
+    const mail = { id: "report", sourceSessionId: "expert-session", sourceMemberName: "expert", targetSessionId: "lead",
+      status: "queued", deliveryStatus: "acknowledged", turnId: null, createdAt: "1799999770100", content: "PRIVATE_BODY_AND_PATH" };
+    const call = vi.fn(async (method: string, params?: unknown) => {
+      if (method === "team.getRoster") return { teamSessionId: "lead", members: [], paused: false };
+      if (method === "team.getBoard") return { revision: 1, tasks: [] };
+      if (method === "team.getPlanning") return null;
+      if (method === "team.listMessages") {
+        expect(params).toEqual({ teamSessionId: "lead", callerSessionId: "lead", sessionId: "lead" });
+        return { messages: [mail, { ...mail, id: "outgoing", sourceSessionId: "lead", targetSessionId: "expert-session" },
+          { ...mail, id: "bound", turnId: "consumed-turn" }, { ...mail, id: "finished", status: "completed" }] };
+      }
+      throw new Error(`Unexpected ${method}`);
+    });
+    try {
+      const tools = createTeamTools({ teamSessionId: "lead", callerSessionId: "lead", isLead: true, mode: mode === "plan" ? "plan" : "agent",
+        approvedExecution: () => mode === "approved", host: { call } as RuntimeHost });
+      const outcome = await tools.find(tool => tool.name === "team_status")!.execute("status", {});
+      const expected = { pendingMessagesCount: 1, pendingMessageSenders: ["expert"], oldestPendingMessageAgeSeconds: 229 };
+      expect(outcome.details).toMatchObject(expected);
+      if (outcome.content[0].type !== "text") throw new Error("Missing status text");
+      const visible: { nextStep: string } = JSON.parse(outcome.content[0].text);
+      expect(visible).toMatchObject(expected);
+      expect(visible.nextStep).toContain(mode === "approved" ? "wait_for_updates" : mode === "plan" ? "Finish the current aggregation turn" : "ordinary Agent inbox boundary when supported");
+      if (mode === "approved") expect(visible.nextStep).not.toContain("end the current turn");
+      expect(JSON.stringify(outcome)).not.toContain(mail.content);
+      expect(call.mock.calls.map(([method]) => method)).not.toContain("team.ackMessage");
+      expect(outcome.terminate).toBeUndefined();
+    } finally { now.mockRestore(); }
+  });
+
+  it("keeps failed mailbox reads observable instead of reporting zero pending messages", async () => {
+    const call = async <T>(method: string): Promise<T> => {
+      if (method === "team.getPlanning") return null as T;
+      if (method === "team.listMessages") throw new Error("Mailbox unavailable");
+      return { members: [], tasks: [] } as T;
+    };
+    const tools = createTeamTools({ teamSessionId: "lead", callerSessionId: "lead", isLead: true, mode: "agent", host: { call } });
+    expect((await tools.find(tool => tool.name === "team_status")!.execute("status", {})).details).toEqual({ error: "Mailbox unavailable" });
   });
 });

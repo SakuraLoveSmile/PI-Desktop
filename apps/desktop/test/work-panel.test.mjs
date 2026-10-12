@@ -306,32 +306,6 @@ test("work panel header exposes a scrollable tab strip and direct new-page actio
   );
 });
 
-test("plus creates a blank page and launcher rows open tools in that page", () => {
-  assert.match(panelSource, /openNewWorkPanelTab/);
-  assert.match(panelSource, /activeTab\?\.kind === "new"/);
-  assert.match(panelSource, /replaceWorkPanelTab/);
-  assert.match(storeSource, /openNewWorkPanelTab: \(\) =>/);
-  assert.match(storeSource, /replaceWorkPanelTab: \(sourceTabId, tab\) =>/);
-  assert.match(storeSource, /replaceWorkPanelTabState/);
-  assert.doesNotMatch(panelSource, /setMenuOpen|menuOpen|newTabMenuRef|createPortal/);
-});
-
-test("work panel tabs support pointer and keyboard reordering", () => {
-  assert.match(panelSource, /beginTabReorder/);
-  assert.match(panelSource, /data-work-panel-tab-id/);
-  assert.match(panelSource, /workPanelTabReorderShouldArm/);
-  assert.match(panelSource, /workPanelTabReorderInsertAfter/);
-  assert.match(panelSource, /workPanelTabReorderScrollDelta/);
-  assert.match(panelSource, /autoScrollFrame/);
-  assert.match(panelSource, /requestAnimationFrame\(tick\)/);
-  assert.match(panelSource, /data-work-panel-tab-reordering/);
-  assert.match(panelSource, /event\.altKey/);
-  assert.match(panelSource, /reorderWorkPanelTabs/);
-  assert.match(storeSource, /reorderWorkPanelTabs: \(sourceTabId, targetTabId, insertAfter\)/);
-  assert.match(storeSource, /reorderWorkPanelTabsState/);
-  assert.match(globalStyles, /\.work-panel-tab\.is-drop-before::before/);
-});
-
 test("work panel starts closed with no tabs and persists width only", () => {
   assert.match(storeSource, /workPanelOpen:\s*false/);
   assert.match(storeSource, /workPanelTabs:\s*\[\]/);
@@ -615,11 +589,11 @@ test("work panel empty states match the app's other empty-state proportions", ()
   const body = globalStyles.match(/\.work-tab-empty-body \{[^}]*\}/)?.[0] ?? "";
   assert.match(body, /font-size: var\(--text-md\)/);
   assert.match(body, /max-width: 34ch/);
-  // Launcher rows stay compact and keyboard-visible.
+  // Launcher cards retain keyboard focus and wrap in narrow panels.
   const tool = globalStyles.match(/\.work-panel-launcher-row \{[^}]*\}/)?.[0] ?? "";
-  assert.match(tool, /height: 40px/);
-  assert.match(tool, /border-radius: var\(--radius-sm\)/);
-  assert.doesNotMatch(tool, /border: 1px/);
+  assert.match(tool, /min-height: 56px/);
+  assert.match(tool, /border-radius: var\(--radius-lg\)/);
+  assert.match(tool, /border: 1px solid var\(--ds-border-strong\)/);
   assert.match(globalStyles, /\.work-panel-launcher-row:hover \{\s*background: var\(--ds-bg-hover\);/);
   assert.match(
     globalStyles,

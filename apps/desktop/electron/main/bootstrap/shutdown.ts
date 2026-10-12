@@ -49,6 +49,7 @@ export type ShutdownDependencies = {
   confirmQuitDialog: () => Promise<boolean>;
   disposePowerSaveBlockers: () => void;
   stopPlanSchedulePoller: () => void;
+  disposeTeamDelivery?: () => void;
   liveCallService?: Pick<LiveCallService, "endForLifecycle">;
 };
 
@@ -73,6 +74,7 @@ export function registerShutdownHandlers({
   confirmQuitDialog,
   disposePowerSaveBlockers,
   stopPlanSchedulePoller,
+  disposeTeamDelivery,
   liveCallService,
 }: ShutdownDependencies): void {
   app.on("window-all-closed", () => {
@@ -123,6 +125,7 @@ export function registerShutdownHandlers({
     }
 
     state.quitting = true;
+    disposeTeamDelivery?.();
     stopPlanSchedulePoller();
     disposePowerSaveBlockers();
     state.tray?.destroy();

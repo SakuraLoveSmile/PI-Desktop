@@ -59,6 +59,9 @@ pub struct AppState {
     pub plugin_batch_import_rates: HashMap<String, Vec<Instant>>,
     pub plugin_delete_rates: HashMap<String, Vec<Instant>>,
     pub tool_budget: ToolBudget,
+    pub background_jobs: crate::background_processes::JobRegistry,
+    pub background_outputs: crate::background_processes::OutputRegistry,
+    pub pending_background_finalizations: crate::background_processes::FinalizationRegistry,
     /// (session_id, tool_call_id) -> cancellation signal for an active Bash
     /// process. The signal is removed by the execution owner in all outcomes.
     pub active_bash_cancellations: HashMap<(String, String), tokio::sync::watch::Sender<bool>>,
@@ -79,6 +82,7 @@ pub struct AppState {
 impl AppState {
     pub fn open(data_dir: &std::path::Path) -> Result<Self> {
         let db = Database::open_in_dir(data_dir)?;
+        crate::background_processes::recover(&db)?;
         crate::scheduled::automation::recover(&db)?;
         crate::team::planning::recover(&db)?;
         // Replies that were still streaming when the previous process ended
@@ -147,6 +151,9 @@ impl AppState {
             plugin_batch_import_rates: HashMap::new(),
             plugin_delete_rates: HashMap::new(),
             tool_budget: ToolBudget::new(),
+            background_jobs: HashMap::new(),
+            background_outputs: HashMap::new(),
+            pending_background_finalizations: HashMap::new(),
             active_bash_cancellations: HashMap::new(),
             pending_permissions: HashMap::new(),
             pending_bash_aborts: HashMap::new(),
@@ -292,6 +299,11 @@ impl AppState {
 
     pub fn shutdown(&mut self) {
         self.shutting_down = true;
+        if let Err(error) =
+            crate::background_services::request_all(self, "host_shutdown", crate::db::now_ms())
+        {
+            tracing::error!(%error, "background service shutdown request failed; live cancellations remain authoritative");
+        }
         for sender in self.active_bash_cancellations.values() {
             let _ = sender.send(true);
         }

@@ -4,7 +4,7 @@
 use super::{TeamLaunchReview, TeamMessage};
 use crate::{db::Database, sessions};
 use anyhow::{anyhow, Result};
-use rusqlite::params;
+use rusqlite::{params, OptionalExtension};
 use serde::Serialize;
 const INBOX_NS: &str = "team-execution-inbox-v1";
 
@@ -71,6 +71,33 @@ pub fn state(
     })
 }
 
+/// Called inside task creation's savepoint so undispatched Lead work has the
+/// same exact execution identity as dispatched work, without timestamp inference.
+pub(super) fn enrol_task(db: &Database, team: &str, caller: &str, task: &str) -> Result<()> {
+    if caller != team {
+        return Ok(());
+    }
+    let Some(turn) = sessions::running_turn_id(db, team)? else {
+        return Ok(());
+    };
+    if active_review(db, team, team, &turn)?.is_none() {
+        return Ok(());
+    }
+    let mut decision = super::get_execution_decision(db, team, &turn)?
+        .ok_or_else(|| anyhow!("TEAM_APPROVAL_REQUIRED: current execution decision missing"))?;
+    if !decision.task_ids.iter().any(|id| id == task) {
+        decision.task_ids.push(task.into());
+        decision.updated_at =
+            chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        db.kv_set(
+            super::TEAM_EXECUTION_DECISION_NS,
+            &format!("{team}:{turn}"),
+            &serde_json::to_value(decision)?,
+        )?;
+    }
+    Ok(())
+}
+
 pub fn read(db: &Database, team: &str, caller: &str, expected: &str) -> Result<Vec<TeamMessage>> {
     let review = active_review(db, team, caller, expected)?
         .ok_or_else(|| anyhow!("TEAM_PLANNING_STALE: approved execution turn changed"))?;
@@ -100,6 +127,7 @@ pub fn read(db: &Database, team: &str, caller: &str, expected: &str) -> Result<V
             params![message.id, format!("team-review:{}:confirmed", review.review_id)], |r| r.get(0))?;
         if !(confirmation && decision.message_ids.contains(&message.id))
             && !current_expert_result(db, &decision, message)?
+            && !super::run_limits::is_soft_notice(db, team, &message.id)?
         {
             continue;
         }
@@ -126,34 +154,84 @@ pub fn read(db: &Database, team: &str, caller: &str, expected: &str) -> Result<V
         .collect())
 }
 
-/// An approved execution cannot complete while its experts or incoming results
-/// still belong to it. Participation alone only grants substantive tools.
+/// An approved execution cannot complete while its tasks, experts or incoming
+/// results still belong to it. Participation alone only grants substantive tools.
 pub(super) fn require_settled(
     db: &Database,
     decision: &super::TeamExecutionDecision,
 ) -> Result<()> {
+    let tasks = super::list_team_tasks(db, &decision.team_session_id)?;
+    let open_tasks = tasks
+        .iter()
+        .filter(|task| {
+            decision.task_ids.contains(&task.task_id)
+                && matches!(task.status.as_str(), "pending" | "in_progress")
+        })
+        .map(|task| {
+            format!(
+                "{} ({})",
+                task.owner_member_name
+                    .as_deref()
+                    .or(task.owner_session_id.as_deref())
+                    .unwrap_or("unassigned"),
+                task.task_id
+            )
+        })
+        .collect::<Vec<_>>();
+    let describe = |member: &str, session: &str| {
+        let owned = tasks
+            .iter()
+            .filter(|task| {
+                task.owner_session_id.as_deref() == Some(session)
+                    && matches!(task.status.as_str(), "pending" | "in_progress")
+            })
+            .map(|task| task.task_id.as_str())
+            .collect::<Vec<_>>();
+        if owned.is_empty() {
+            member.to_owned()
+        } else {
+            format!("{member} (tasks {})", owned.join(", "))
+        }
+    };
+    let mut pending = Vec::new();
     for dispatch in &decision.message_ids {
-        let pending: bool = db.conn().query_row(
-            "SELECT EXISTS(SELECT 1 FROM session_collaboration_messages m
+        let row: Option<(String, String, String)> = db.conn().query_row(
+            "SELECT COALESCE(member.name,m.target_session_id), m.target_session_id,
+                    CASE WHEN t.status='running' THEN 'running' ELSE 'queued' END
+             FROM session_collaboration_messages m
              LEFT JOIN turns t ON t.id=m.turn_id AND t.session_id=m.target_session_id
+             LEFT JOIN team_members member ON member.team_session_id=?2 AND member.member_session_id=m.target_session_id
              WHERE m.id=?1 AND m.source_session_id=?2 AND m.target_session_id<>?2
-             AND (m.status='queued' OR t.status='running'))",
+             AND (m.status='queued' OR t.status='running')",
             params![dispatch, decision.team_session_id],
-            |r| r.get(0),
-        )?;
-        if pending {
-            return Err(anyhow!("TEAM_APPROVAL_REQUIRED: await assigned experts and consume their full results with wait_for_updates before completing approved execution"));
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        ).optional()?;
+        if let Some((member, session, status)) = row {
+            pending.push(format!(
+                "{dispatch} {status}: {}",
+                describe(&member, &session)
+            ));
         }
     }
+    let mut unconsumed = Vec::new();
     for message in
         super::list_member_messages(db, &decision.team_session_id, &decision.team_session_id)?
     {
         if message.status == "queued" && current_expert_result(db, decision, &message)? {
-            return Err(anyhow!("TEAM_APPROVAL_REQUIRED: consume the current approved experts' full results with wait_for_updates"));
+            unconsumed.push(format!(
+                "{}: {}",
+                message.id,
+                describe(&message.source_member_name, &message.source_session_id)
+            ));
         }
+    }
+    if !pending.is_empty() || !unconsumed.is_empty() || !open_tasks.is_empty() {
+        return Err(anyhow!("TEAM_APPROVAL_REQUIRED: pending dispatches [{}]; {} unconsumed expert results [{}]; open decision tasks [{}]; await assigned experts and consume their full results with wait_for_updates before completing approved execution. Dispatch open tasks with send_message, or use task_update to mark them cancelled/failed with a reason, then retry",
+            pending.join("; "), unconsumed.len(), unconsumed.join("; "), open_tasks.join("; ")));
     }
     Ok(())
 }
+
 fn current_expert_result(
     db: &Database,
     decision: &super::TeamExecutionDecision,
@@ -174,8 +252,9 @@ fn current_expert_result(
     };
     for dispatch in &decision.message_ids {
         let matches: bool = db.conn().query_row("SELECT EXISTS(SELECT 1 FROM session_collaboration_messages m JOIN turns t ON t.id=m.turn_id AND t.session_id=m.target_session_id
-            WHERE m.id=?1 AND m.turn_id=?2 AND m.source_session_id=?3 AND m.target_session_id=?4 AND t.status IN ('running','completed'))",
-            params![dispatch, source, decision.team_session_id, message.source_session_id], |r|r.get(0))?;
+            WHERE m.id=?1 AND m.turn_id=?2 AND m.source_session_id=?3 AND m.target_session_id=?4 AND (t.status IN ('running','completed') OR (t.status='error' AND EXISTS(
+              SELECT 1 FROM kv k WHERE k.ns=?5 AND k.key=?6 AND json_extract(k.value_json,'$')=t.id))))",
+            params![dispatch, source, decision.team_session_id, message.source_session_id, super::member_failure::PROOF_NS, message.id], |r|r.get(0))?;
         if matches {
             return Ok(true);
         }

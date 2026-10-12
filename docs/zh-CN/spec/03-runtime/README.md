@@ -28,3 +28,6 @@
 | [live-voice.md](/zh-CN/spec/03-runtime/live-voice) | 应用托管的实时语音通话 |
 
 - [图片生成与编辑](/zh-CN/spec/03-runtime/21-image-generation)
+
+- [普通 Agent 等待边界邮箱](/zh-CN/spec/03-runtime/team-ordinary-inbox)
+- [显式 Host 团队服务](/zh-CN/spec/03-runtime/team-managed-services)

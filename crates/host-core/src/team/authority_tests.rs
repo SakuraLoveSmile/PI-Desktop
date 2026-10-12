@@ -74,6 +74,52 @@ fn solo_and_empty_declarations_are_rejected_without_consuming_the_delegate_retry
 }
 
 #[test]
+fn stale_review_and_unapproved_expert_errors_explain_recovery_without_granting_authority() {
+    let db = test_db();
+    let lead = create_test_lead(&db);
+    let turn = sessions::begin_turn(&db, &lead, None, None).unwrap();
+    let review = proposal(&db, &lead, &turn);
+    confirm_launch_review(&db, &lead, &review.review_id, review.revision).unwrap();
+    let error = validate_current_expert(&db, &lead, "unapproved")
+        .unwrap_err()
+        .to_string();
+    assert!(error.starts_with("TEAM_APPROVAL_REQUIRED:"));
+    assert!(error.contains("nextStep:"));
+    assert!(error.contains("team_status"));
+    assert!(error.contains("trusted roster review"));
+    validate_current_expert(&db, &lead, "expert").unwrap();
+    let message = send_team_message(
+        &db,
+        SendMessageParams {
+            team_session_id: &lead,
+            caller_session_id: &lead,
+            target_identifier: "expert",
+            content: "Inspect the assigned task",
+            idempotency_key: None,
+        },
+    )
+    .unwrap();
+    let before = current_confirmed_decision(&db, &lead).unwrap();
+    let error = record_dispatch(&db, &lead, &message, true)
+        .unwrap_err()
+        .to_string();
+    assert!(error.starts_with("TEAM_APPROVAL_REQUIRED:"));
+    assert!(error.contains("nextStep:"));
+    assert!(error.contains("team_status"));
+    assert_eq!(current_confirmed_decision(&db, &lead).unwrap(), before);
+    record_dispatch(&db, &lead, &message, false).unwrap();
+    finish_test_turn(&db, &turn);
+    sessions::begin_turn(&db, &lead, None, None).unwrap();
+    let error = validate_review_scope(&db, &lead, &turn)
+        .unwrap_err()
+        .to_string();
+    assert!(error.starts_with("TEAM_REVIEW_REVISION_CONFLICT:"));
+    assert!(error.contains("nextStep:"));
+    assert!(error.contains("declare_team_strategy"));
+    assert!(validate_current_expert(&db, &lead, "expert").is_err());
+}
+
+#[test]
 fn expert_turn_is_required_beyond_consent_and_new_user_scopes_cannot_inherit_it() {
     let db = test_db();
     let lead = create_test_lead(&db);
@@ -121,6 +167,9 @@ fn expert_turn_is_required_beyond_consent_and_new_user_scopes_cannot_inherit_it(
         session_collaboration::begin_turn(&db, &message.target_session_id, &message.id, None, None)
             .unwrap();
     validate_lead_tool(&db, &lead, "Write").unwrap();
+    validate_lead_tool(&db, &lead, "TeamFinalAnswer").unwrap();
+    validate_lead_tool(&db, &lead, "SubmitGoalReport").unwrap();
+    validate_lead_tool(&db, &message.target_session_id, "SubmitGoalReport").unwrap();
     db.conn()
         .execute(
             "UPDATE turns SET status='failed' WHERE id=?1",

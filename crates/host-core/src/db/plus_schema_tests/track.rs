@@ -351,3 +351,30 @@ fn plus_columns_keep_their_constraints() {
         "plan_execution_schedules accepted state 'bogus'"
     );
 }
+
+#[test]
+fn plus_v5_upgrade_adds_ordinary_inbox_with_a_recoverable_backup() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("pi.sqlite");
+    {
+        let db = Database::open(&path).unwrap();
+        seed_rows(db.conn());
+        db.conn()
+            .execute_batch(
+                "DROP TABLE team_ordinary_inbox; UPDATE plus_schema_meta SET plus_version=5;",
+            )
+            .unwrap();
+    }
+    let db = Database::open(&path).unwrap();
+    assert_eq!(meta(db.conn()), Some(plus_meta(SCHEMA_VERSION)));
+    assert!(table_exists(db.conn(), "team_ordinary_inbox"));
+    assert_eq!(user_version(db.conn()), SCHEMA_VERSION);
+    assert_seed_rows_survive(db.conn(), Some(LegacyShape::V23));
+    let backup = open_plus_backup(&path, "plus-v5", SCHEMA_VERSION);
+    assert!(!table_exists(&backup, "team_ordinary_inbox"));
+    drop(backup);
+    drop(db);
+    let reopened = Database::open(&path).unwrap();
+    assert!(table_exists(reopened.conn(), "team_ordinary_inbox"));
+    assert_eq!(backup_files(dir.path()), vec!["pi.sqlite.plus-v5.bak"]);
+}

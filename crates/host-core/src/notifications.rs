@@ -38,7 +38,7 @@ const NOTIFICATION_SELECT: &str =
             n.created_at, n.read_at
      FROM notifications n";
 
-/// Insert the durable fact for a newly terminal turn. The caller owns the
+/// Insert a durable user notification for a newly terminal turn. The caller owns the
 /// transaction so the turn update and notification cannot diverge.
 pub fn insert_for_terminal_turn(
     tx: &Transaction<'_>,
@@ -51,18 +51,30 @@ pub fn insert_for_terminal_turn(
         "error" => "task.failed",
         _ => return Ok(None),
     };
-    let Some((session_id, session_title)) = tx
+    let Some((session_id, session_title, is_team_member)) = tx
         .query_row(
-            "SELECT t.session_id, s.title
+            "SELECT t.session_id, s.title,
+                    EXISTS(SELECT 1 FROM team_members m WHERE m.member_session_id = s.id)
              FROM turns t JOIN sessions s ON s.id = t.session_id
              WHERE t.id = ?1",
             params![turn_id],
-            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, bool>(2)?,
+                ))
+            },
         )
         .optional()?
     else {
         return Ok(None);
     };
+    // Experts report through the Team mailbox. Their successful turns keep
+    // durable turn/transcript facts without a separate completion alert.
+    if status == "completed" && is_team_member {
+        return Ok(None);
+    }
 
     let id = Uuid::new_v4().to_string();
     let created_at = now_ms();
@@ -162,6 +174,142 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("pi-desktop-test-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         Database::open(&dir.join("test.sqlite")).unwrap()
+    }
+
+    #[test]
+    fn expert_success_keeps_turn_and_report_facts_without_a_separate_notification() {
+        use crate::team;
+        use serde_json::json;
+
+        let data = tempfile::tempdir().unwrap();
+        let path = data.path().join("test.sqlite");
+        let db = Database::open(&path).unwrap();
+        db.conn().execute(
+            "INSERT INTO providers (id, name, config_json, created_at, updated_at) VALUES ('fixture', 'Fixture', ?1, 0, 0)",
+            [json!({"models":[{"id":"fixture-model","thinkingLevels":[]}]}).to_string()],
+        ).unwrap();
+        let lead = sessions::create_session_with_options(
+            &db,
+            sessions::SessionCreateOptions {
+                title: Some("Team Lead".into()),
+                mode: Some("agent".into()),
+                execution_profile: Some("team".into()),
+                provider_id: Some("fixture".into()),
+                model_id: Some("fixture-model".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let lead_turn = sessions::begin_turn(&db, &lead.id, None, None).unwrap();
+        let proposal = serde_json::from_value(json!({"name":"expert"})).unwrap();
+        let (_, review) = team::declare_team_strategy(
+            &db,
+            team::DeclareStrategyParams {
+                team_session_id: &lead.id,
+                caller_session_id: &lead.id,
+                lead_turn_id: &lead_turn,
+                strategy: "delegate",
+                reason: "Run one approved expert",
+                members: Some(vec![proposal]),
+            },
+        )
+        .unwrap();
+        let review = review.unwrap();
+        let (_, decision) =
+            team::confirm_launch_review(&db, &lead.id, &review.review_id, review.revision).unwrap();
+        let expert = &decision.member_session_ids[0];
+        let turn = sessions::begin_turn(&db, expert, None, None).unwrap();
+        let reply = serde_json::from_value(json!({"id":"expert-reply","role":"assistant","content":"Completed the assigned work","createdAt":"2026-10-11T00:00:00Z","status":"complete"})).unwrap();
+        sessions::append_message(&db, expert, &reply, Some(&turn)).unwrap();
+        let report = team::send_team_message(
+            &db,
+            team::SendMessageParams {
+                team_session_id: &lead.id,
+                caller_session_id: expert,
+                target_identifier: &lead.id,
+                content: "The expert completed the assigned work",
+                idempotency_key: Some("expert-report"),
+            },
+        )
+        .unwrap();
+        let result = sessions::end_turn(&db, &turn, "completed", None, None, true).unwrap();
+        assert!(result.updated);
+        assert!(result.notification.is_none());
+        assert!(list(&db, false, 50).unwrap().0.is_empty());
+        assert_eq!(list(&db, true, 50).unwrap().1, 0);
+        let stored_status: String = db
+            .conn()
+            .query_row("SELECT status FROM turns WHERE id=?1", [&turn], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(stored_status, "completed");
+        let transcript = sessions::get_session(&db, expert).unwrap().unwrap();
+        assert_eq!(transcript.messages.len(), 1);
+        assert_eq!(transcript.messages[0].content, reply.content);
+        assert_eq!(
+            team::get_team_member_by_session_id(&db, expert)
+                .unwrap()
+                .unwrap()
+                .phase,
+            "completed"
+        );
+        assert_eq!(
+            team::get_team_message(&db, &lead.id, &lead.id, &report.id)
+                .unwrap()
+                .unwrap()
+                .content,
+            report.content
+        );
+        let duplicate = sessions::end_turn(&db, &turn, "completed", None, None, true).unwrap();
+        assert!(!duplicate.updated);
+        assert!(duplicate.notification.is_none());
+
+        let failed = sessions::begin_turn(&db, expert, None, None).unwrap();
+        let failure =
+            sessions::end_turn(&db, &failed, "error", Some("MODEL_ERROR"), None, true).unwrap();
+        let notification = failure.notification.unwrap();
+        assert_eq!(notification.kind, "task.failed");
+        assert_eq!(notification.error_code.as_deref(), Some("MODEL_ERROR"));
+        assert_eq!(list(&db, true, 50).unwrap().1, 1);
+        let completed = sessions::end_turn(&db, &lead_turn, "completed", None, None, true).unwrap();
+        assert_eq!(completed.notification.unwrap().kind, "task.completed");
+        assert_eq!(list(&db, true, 50).unwrap().1, 2);
+        drop(db);
+        let reopened = Database::open(&path).unwrap();
+        let (items, unread) = list(&reopened, false, 50).unwrap();
+        assert_eq!(unread, 2);
+        assert!(!items.iter().any(|item| item.turn_id == turn));
+        assert_eq!(
+            sessions::get_session(&reopened, expert)
+                .unwrap()
+                .unwrap()
+                .messages[0]
+                .content,
+            reply.content
+        );
+    }
+
+    #[test]
+    fn lead_goal_and_standard_success_notifications_are_preserved() {
+        let data = tempfile::tempdir().unwrap();
+        let db = Database::open(&data.path().join("test.sqlite")).unwrap();
+        for (mode, profile) in [("agent", "team"), ("goal", "team"), ("agent", "standard")] {
+            let session = sessions::create_session_with_options(
+                &db,
+                sessions::SessionCreateOptions {
+                    title: Some("Expert-looking title".into()),
+                    mode: Some(mode.into()),
+                    execution_profile: Some(profile.into()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            let turn = sessions::begin_turn(&db, &session.id, None, None).unwrap();
+            let result = sessions::end_turn(&db, &turn, "completed", None, None, true).unwrap();
+            assert_eq!(result.notification.unwrap().kind, "task.completed");
+        }
+        assert_eq!(list(&db, true, 50).unwrap().1, 3);
     }
 
     #[test]

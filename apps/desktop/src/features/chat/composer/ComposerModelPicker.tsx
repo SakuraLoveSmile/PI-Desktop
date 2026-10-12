@@ -1,14 +1,13 @@
 import type { TFunction } from "i18next";
 import type { ReactNode } from "react";
-import { ComposerModelList } from "./ComposerModelList";
-import { AnchoredMenu } from "../../../components/settings/AnchoredMenu";
 import {
   IconBot,
   IconChevronDown,
-  IconChevronLeft,
-  IconChevronRight,
+  IconSettings,
 } from "../../../components/icons";
-import { TooltipButton } from "../../../components/ui";
+import { AnchoredMenu } from "../../../components/settings/AnchoredMenu";
+import { Button, TooltipButton } from "../../../components/ui";
+import { ComposerModelList } from "./ComposerModelList";
 import type { useComposerModelMenu } from "./hooks/useComposerModelMenu";
 import { ThinkingLevelSlider } from "./ThinkingLevelSlider";
 
@@ -25,6 +24,7 @@ export type ComposerModelPickerProps = {
   controlsBlocked: boolean;
   onCloseOtherMenus: () => void;
   rootActions?: ReactNode;
+  onOpenModelSettings?: () => void;
 };
 
 /** Model/reasoning picker with its keyboard and focus contract intact. */
@@ -39,21 +39,16 @@ export function ComposerModelPicker({
   controlsBlocked,
   onCloseOtherMenus,
   rootActions,
+  onOpenModelSettings,
 }: ComposerModelPickerProps) {
   const {
     open,
     setOpen,
-    view,
-    query,
-    setQuery,
     modelHighlight,
     setModelHighlight,
-    rootMenuRef,
-    modelSearchRef,
     modelListRef,
     modelGroups,
     thinkingMenuLevels,
-    showView,
     selectModel,
     commitThinkingLevel,
     onMenuKeyDown,
@@ -84,8 +79,6 @@ export function ComposerModelPicker({
           onClick={() => {
             onCloseOtherMenus();
             if (!open) {
-              showView("root");
-              setQuery("");
               setModelHighlight(-1);
             }
             setOpen((current) => !current);
@@ -105,54 +98,40 @@ export function ComposerModelPicker({
         </TooltipButton>
       )}
     >
-      {view === "root" ? (
-        <div className="composer-menu-root" ref={rootMenuRef}>
-          {rootActions}
-          <button
-            type="button"
-            className="composer-menu-entry"
-            role="menuitem"
-            aria-haspopup="menu"
-            onClick={() => showView("model")}
-          >
-            <IconBot size={14} aria-hidden="true" />
-            <span className="composer-menu-entry-label">{t("chat.model")}</span>
-            <span className="composer-menu-entry-value" title={modelLabel}>{modelLabel}</span>
-            <IconChevronRight size={14} aria-hidden="true" />
-          </button>
-          {/* The level is one drag away on the slider below (issue #417): the
-              menu has no separate reasoning view left to open. */}
-          {thinkingMenuLevels.length > 1 ? (
-            <ThinkingLevelSlider
-              key={`${selectedProviderId}:${selectedModelId}:${thinkingMenuLevels.join("|")}`}
-              levels={thinkingMenuLevels}
-              level={thinkingLevel}
-              label={t("chat.reasoningLevel")}
-              commit={commitThinkingLevel}
-            />
-          ) : null}
-        </div>
-      ) : (
+      {rootActions}
+      <ComposerModelList
+        t={t} modelListRef={modelListRef}
+        modelGroups={modelGroups} modelHighlight={modelHighlight}
+        setModelHighlight={setModelHighlight} selectModel={selectModel}
+        selectedProviderId={selectedProviderId} selectedModelId={selectedModelId}
+      />
+      {thinkingMenuLevels.length > 1 ? (
+        <ThinkingLevelSlider
+          key={`${selectedProviderId}:${selectedModelId}:${thinkingMenuLevels.join("|")}`}
+          levels={thinkingMenuLevels}
+          level={thinkingLevel}
+          label={t("chat.reasoningLevel")}
+          commit={commitThinkingLevel}
+        />
+      ) : null}
+      {onOpenModelSettings ? (
         <>
-          <button
-            type="button"
-            className="composer-menu-back"
-            role="menuitem"
-            onClick={() => showView("root")}
-          >
-            <IconChevronLeft size={14} aria-hidden="true" />
-            <span>{t("chat.model")}</span>
-          </button>
           <div className="composer-menu-separator" />
-          <ComposerModelList
-            t={t} query={query} setQuery={setQuery}
-            modelSearchRef={modelSearchRef} modelListRef={modelListRef}
-            modelGroups={modelGroups} modelHighlight={modelHighlight}
-            setModelHighlight={setModelHighlight} selectModel={selectModel}
-            selectedProviderId={selectedProviderId} selectedModelId={selectedModelId}
-          />
+          <Button
+            type="button"
+            variant="ghost"
+            className="composer-model-settings"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              onOpenModelSettings();
+            }}
+          >
+            <IconSettings size={15} aria-hidden="true" />
+            <span>{t("settings.modelConfigurations")}</span>
+          </Button>
         </>
-      )}
+      ) : null}
     </AnchoredMenu>
   );
 }

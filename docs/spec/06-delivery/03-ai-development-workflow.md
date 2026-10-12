@@ -42,8 +42,8 @@ The rules below govern every change to the PI-Desktop codebase and documentation
 > requires that head to contain the latest `origin/main`.**
 
 - Before editing, preserve any existing uncommitted work, fetch `origin/main`,
-  fast-forward local `main` when its worktree is clean, and create a new request
-  branch and worktree from that up-to-date commit. Existing work in the primary
+  create a new request branch and worktree directly from current `origin/main`.
+  Local `main` remains a coordination surface. Existing work in the primary
   checkout must never be moved, stashed, or overwritten merely to start a new
   request.
 - Use one short-lived branch per request. Name it
@@ -87,11 +87,18 @@ The rules below govern every change to the PI-Desktop codebase and documentation
   (R7). If a gate, authentication, permissions, or required review prevents
   integration, report the actual blocker and remaining work; the requested
   integration is not Done.
-- Worktree cleanup is mandatory and immediate. As soon as the request branch is
-  integrated into remote `main` (or the user-authorized local-only delivery is
-  complete), remove the worktree and delete the merged branch. A merged request
-  must not leave a worktree on disk. Remove only your own worktree and branch,
-  and only after verifying the merge commits are present in `main`.
+- Post-merge cleanup follows `AGENTS.md` §5 "Verified merge and cleanup".
+  After verifying the user-authorized local or remote integration and its
+  checks, automatically clean this request's worktrees and merged branches in
+  the same task; no separate cleanup approval is needed for its own resources.
+  Preserve dirty/untracked contents and needed ignored artifacts in verified
+  recovery archives first. Prune registrations and retire empty parent/name
+  marker containers, obsolete integration branches and visible snapshot branches.
+  Backup commits belong in archive refs outside `refs/heads/` or verified files.
+  Check Git worktrees, local branches and physical paths, and report any blocker
+  by its exact path/ref. Preserve the primary checkout, active/unmerged work,
+  archives and unrelated tasks; batch cleanup needs explicit user scope, and
+  remote-branch deletion is not implied.
 - If the user requests a launch after delivery, build and start the app from
   the integrated `main` checkout and its development environment.
 
@@ -293,7 +300,7 @@ Every change follows this sequence. Steps may be iterated if the implementation 
 |---|---|---|
 | **0. Issue verify** | When a GitHub issue is linked, fetch it and independently verify that the reported problem exists. Stop here (comment, and close only if conclusive) when it does not. | Verified issue, or a comment and close/leave-open decision. |
 | **0b. PR review** | When a GitHub pull request is linked, fetch it and independently verify that it fixes the reported root cause with the smallest coherent change. Merge only when it does; start follow-up only after it is in `main`. Stop (comment, do not rewrite) when it does not. | Merged contributor PR plus follow-up plan, or a comment and no merge. |
-| **1. Branch + worktree** | Preserve existing work, update from `origin/main`, and create a dedicated request branch in a dedicated worktree. Reuse the primary checkout's environment where safe. | Isolated task files on current `main` with a consistent development environment. |
+| **1. Branch + worktree** | Preserve existing work, update from `origin/main`, and create a dedicated request branch in a dedicated worktree. Reuse the primary checkout's environment where safe. | Isolated task files on current `origin/main` with a consistent development environment. |
 | **2. Read** | Read `00-baseline.md` and any specs relevant to the change area. | Mental model of constraints. |
 | **3. Plan** | Describe the intended change. List every spec, ADR, and e2e scenario that will need updates, and assess whether local validation is necessary. | Change plan + impact and validation list. |
 | **4. Implement** | Write code, config, or assets. | Changed files. |
@@ -450,7 +457,7 @@ The repository uses a mandatory request-branch and worktree workflow:
   not develop or create development commits on it, or push it directly.
 - **Request branches and worktrees** are mandatory for every development request,
   including docs, chores, and small fixes. Create each branch and worktree from
-  an up-to-date `main`, then remove both immediately after the branch is merged
+  current `origin/main`, then remove both immediately after the branch is merged
   into `main`.
 - **Branch names** use `<type>/<short-description>` with a lowercase,
   kebab-case description. Allowed type prefixes mirror §4.1.
@@ -478,14 +485,11 @@ git fetch origin main
 git worktree add -b <type>/<short-description> <worktree-path> origin/main
 ```
 
-If `main` is checked out in a clean primary worktree, `git switch main` plus
-`git fetch origin main` and `git pull --ff-only origin main` should be run
-before `git worktree add`. If local `main` has diverged, synchronize with
-`git merge origin/main` and resolve the divergence before starting new work
-without discarding commits. If the primary worktree is not
-clean or is on another branch, leave it untouched and create the request
-worktree directly from the fetched `origin/main`. Never discard, stash, move,
-or overwrite unrelated work merely to satisfy this sequence.
+Start directly from the fetched `origin/main`. The primary checkout and local
+`main` are coordination surfaces; do not synchronize, merge or resolve unrelated
+local divergence merely to start request work. Preserve all existing commits and
+changes. Refresh the request candidate against remote `main` in its own worktree.
+
 
 Environment reuse is resource-specific. Package-manager stores and language
 toolchains are normally shared automatically. A compatible dependency tree
@@ -516,6 +520,7 @@ git merge --ff-only origin/main
 git worktree remove <worktree-path>
 git branch -d <type>/<short-description>
 git worktree prune
+# Only when the user explicitly authorized remote-branch deletion:
 git push origin --delete <type>/<short-description>
 ```
 
@@ -530,11 +535,14 @@ Do not merge the request branch into local `main` to create an E2E candidate
 or to open a PR. Local-only delivery (no remote PR/MR) stays on the request
 branch until the user explicitly asks to integrate it.
 
-The worktree must be clean before removal; commit or discard the request's own
-leftover changes first. Use `git branch -d` rather than `-D` so an unmerged
-branch refuses to delete. If `git worktree remove` reports the worktree as dirty
-or locked, resolve that state instead of forcing removal, and never remove
-another request's worktree.
+Before direct removal, the worktree must be clean. Preserve any remaining
+changes and needed ignored artifacts in a verified recoverable archive;
+cleanup does not authorize committing or discarding them. A managed archive
+operation may preserve the contents and retire the checkout instead. Use
+`git branch -d` rather than `-D` so an unmerged branch refuses to delete.
+If removal reports the worktree as dirty or locked, resolve that state without
+forcing removal. Other requests' resources require an explicitly authorized
+batch cleanup. Follow `AGENTS.md` §5 for verification and reporting.
 
 ---
 
@@ -632,7 +640,7 @@ This workflow spec itself is accepted when:
 - [ ] Spec update matrix covers all change types in the baseline.
 - [ ] Git commit rules match existing repo commit style (`docs:`, `chore:`).
 - [ ] Every development request is required to use a dedicated branch and
-      worktree created from current `main`.
+      worktree created from current `origin/main`.
 - [ ] Request worktrees reuse the primary checkout's environment where safe
       without committing local environment state.
 - [ ] Opening or updating a PR/MR requires `origin/main` to be an ancestor of
@@ -662,3 +670,35 @@ This workflow spec itself is accepted when:
       the temporary type restriction in R6.1 is in force.
 
 - [ ] All indexes updated (NAV, delivery README, spec README, docs README, BOARD).
+
+
+## Test quality, executable inventory and retirement
+
+Behavior and stable contracts are the test boundary. Do not add tests that read
+repository source/CSS and assert implementation text with regular expressions.
+Regex assertions on actual rendered or protocol output remain valid. Bug fixes
+need a red repro or explicit baseline and a regression test. Pure style, copy
+and i18n changes may omit new tests when existing/static validation proves the
+unchanged behavior; record the reason and residual risk instead of adding a
+quantity quota.
+
+`node scripts/check-test-quality.mjs --base <actual-base>` compares the AST
+source-provenance inventory and per-file/case signatures. Source/CSS assertions
+may only decrease; fixture reads are excluded. Retiring allowances requires
+`--write-baseline` and cannot introduce growth or later reuse retired capacity.
+Runtime domain tests and shared helpers under `src/runtime-tests` have an
+800-line per-file budget. These are maintenance limits, not coverage targets.
+
+PR CI runs five isolated smokes; the nightly fixture workflow runs the other
+automatic scene families. The [test plan](04-e2e-test-plan.md#10-ci-tiers-and-fixture-boundaries)
+and [generated index](08-scenario-index.md) describe actual commands and manual
+boundaries. Never count a skipped or catalog-only scenario as passed acceptance.
+Document-only scenarios do not require IDs. English and Chinese executable
+indexes come from one source, not a hand-maintained mirrored matrix.
+
+When behavior is replaced, delete its obsolete tests and executable IDs in the
+same change. The quarterly maintenance audit reports recent churn for review;
+without evidence that a test caught regressions, that fact remains unknown.
+High churn alone never authorizes deleting a test. Policy changes synchronize
+AGENTS/CLAUDE and their Policy-Sync token; `pnpm check:agent-policy` remains the
+mechanical gate.
