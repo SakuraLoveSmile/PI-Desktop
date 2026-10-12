@@ -250,6 +250,12 @@ describe("approved Goal report reconciliation", () => {
         type: "message_end", message: expect.objectContaining({ status: "aborted" }),
       }));
       expect(f.agent.state.tools.map((tool) => tool.name)).not.toContain("SubmitGoalReport");
+      const view = f.runtime as unknown as { autonomousExecution: boolean; goalReportRecovery: { pending: boolean; suppressRunEnd: boolean } };
+      expect(view.autonomousExecution).toBe(false);
+      expect(view.goalReportRecovery.pending).toBe(false);
+      expect(view.goalReportRecovery.suppressRunEnd).toBe(false);
+      expect(f.events().filter(event => event.type === "turn_end" || event.type === "agent_end").map(event => event.type))
+        .toEqual(["turn_end", "agent_end"]);
       expect(f.runtime.getStatus().isRunning).toBe(false);
     } finally { await f.runtime.dispose(); }
   });
