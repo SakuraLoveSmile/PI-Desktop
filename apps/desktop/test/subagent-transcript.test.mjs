@@ -6,6 +6,7 @@ import {
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 const transcriptSource = await readTranscriptSource();
 const runtimeSource = await readFile(
@@ -431,7 +432,7 @@ test("subagent details present task, chronological process groups and resumed an
   const { I18nextProvider } = await import("react-i18next");
   const { catalogs } = await import("@pi-desktop/i18n");
   const server = await createServer({
-    root: new URL("..", import.meta.url).pathname,
+    root: fileURLToPath(new URL("..", import.meta.url)),
     configFile: false,
     server: { middlewareMode: true, hmr: false, ws: false },
     esbuild: { jsx: "automatic" },
