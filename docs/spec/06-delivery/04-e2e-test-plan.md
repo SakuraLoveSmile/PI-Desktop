@@ -17205,6 +17205,39 @@ current CAS revision. Legacy descriptions and reviews without presentation are r
 - **Milestone:** Maintenance.
 - **Command:** `cargo test -p host-core --locked plus_schema`.
 
+### E2E-STORAGE-main-opens-known-plus7-data
+
+- **Preconditions:** Current `main` plus the repair candidate, shared schema
+  21, and isolated existing-profile fixtures at Plus 5, 6, and 7. P7 fixtures
+  include authenticated ordinary-inbox journal rows and historical service
+  ownership. No user profile, live provider, or paid API is a test environment.
+- **Steps:** Open the candidate through Host startup, read the session list,
+  stop and reopen it. Exercise prepared inbox recovery with and without the
+  file-first transcript record; rebuild the turn index and repeat recovery.
+  Reopen historical active service records. Attempt an unsupported service
+  launch and an ordinary background command. Finally open a copy stamped P8.
+- **Expected:** P5/P6 upgrade behind verified backups; P7 remains P7 with its
+  session and journal data intact, without the downgrade banner. Recovery
+  validates exact ledger origin/content and preserves Lead-turn indexing,
+  completing consumption and queue retirement atomically with no duplicate
+  input or new provider turn. Historical services record `host_restart` and
+  become interrupted without claiming a PID or replaying a command. Read-only
+  service history shows its identity and stop metadata. New service requests
+  fail explicitly; ordinary commands and `main`'s existing roster/stop recovery
+  keep working. P8 refuses before mutation.
+- **Automation:** Host Plus-schema, historical inbox, background-process and
+  RPC regression tests; `background-service-presentation.test.mjs`; packaged
+  Electron boot through `PI_DESKTOP_BOOT_PROBE=1` with a throwaway profile.
+  Existing-profile compatibility is also verified on a private database copy
+  without credentials or provider calls. Record source/base revisions and
+  packaged Host hashes; never use the user's live profile for automated E2E.
+- **Specs:** 03-runtime/04-data-storage section 7.1;
+  ADR plus-schema-version-track.
+- **Acceptance:** A build containing current `main` opens supported existing
+  Plus data safely; restoring an earlier candidate or lowering DB metadata
+  does not count as this repair.
+- **Milestone:** Maintenance.
+
 #### E2E-260: Windows updater cache can be relocated and reclaimed safely
 
 - **Preconditions:** Packaged Windows x64 NSIS install, isolated user profile, and a writable cache directory on a non-system volume. Use a local updater-feed fixture; do not contact GitHub or a paid service.

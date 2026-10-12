@@ -18,7 +18,7 @@ use std::ops::RangeInclusive;
 
 /// Plus track version produced by this build. Add the step to [`STEPS`]
 /// together with every bump.
-pub(crate) const PLUS_SCHEMA_VERSION: i64 = 5;
+pub(crate) const PLUS_SCHEMA_VERSION: i64 = 7;
 
 /// `user_version` a legacy fork database is reset to: the last number the
 /// fork shared with upstream before it used v20..=v23 for Plus-only changes.
@@ -31,14 +31,16 @@ pub(super) const LEGACY_FORK_VERSIONS: RangeInclusive<i64> = 20..=23;
 
 /// Tables only the Plus track creates. Their presence proves a Plus build
 /// touched the file; keep in sync with [`STEPS`] (a test enforces it).
-pub(super) const PLUS_TABLES: [&str; 7] = [
+pub(super) const PLUS_TABLES: [&str; 9] = [
     "goal_reports",
     "session_quick_notes",
     "background_processes",
+    "background_service_ownership",
     "plan_execution_schedules",
     "team_members",
     "team_tasks",
     "teams",
+    "team_ordinary_inbox",
 ];
 
 /// Columns only the Plus track adds, as `(table, column)`. Same contract as
@@ -68,7 +70,9 @@ type Step = fn(&Connection) -> Result<()>;
 /// the Plus-only changes that earlier fork builds shipped as v20..=v23 of the
 /// shared chain. Every step must stay idempotent: [`apply_pending`] replays
 /// all of them to re-verify a database an upstream step may have rebuilt.
-const STEPS: [Step; PLUS_SCHEMA_VERSION as usize] = [step_p1, step_p2, step_p3, step_p4, step_p5];
+const STEPS: [Step; PLUS_SCHEMA_VERSION as usize] = [
+    step_p1, step_p2, step_p3, step_p4, step_p5, step_p6, step_p7,
+];
 
 /// Meta row of a database a Plus-aware build has opened.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -158,6 +162,24 @@ fn step_p4(conn: &Connection) -> Result<()> {
 fn step_p5(conn: &Connection) -> Result<()> {
     conn.execute_batch(crate::session_notes::SCHEMA)?;
     conn.execute_batch(crate::background_processes::SCHEMA)?;
+    Ok(())
+}
+
+/// P6: ordinary Agent Lead wait-boundary consumption journal.
+fn step_p6(conn: &Connection) -> Result<()> {
+    conn.execute_batch(crate::team::ordinary_inbox::SCHEMA)?;
+    Ok(())
+}
+
+/// P7: explicit Team service ownership; historical Bash rows stay commands.
+fn step_p7(conn: &Connection) -> Result<()> {
+    conn.execute_batch(crate::background_services::SCHEMA)?;
+    add_column_if_missing(
+        conn,
+        "background_service_ownership",
+        "owner_project_path",
+        "TEXT",
+    )?;
     Ok(())
 }
 

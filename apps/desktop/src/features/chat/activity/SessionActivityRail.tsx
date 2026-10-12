@@ -94,7 +94,9 @@ function SessionActivityRailContent({ sessionId, visible, agentsNotice, resource
       renderItems={kind === "output" ? (visibleItems) => <ActivityOutputRows items={visibleItems} now={now} /> : undefined} />
     : <p className="session-activity-empty">{t(`panel.activity.${emptyKey}`)}</p>;
   const processRow = (process: BackgroundProcessSummary) => {
-    const title = backgroundProcessTitle(process.command);
+    const commandTitle = backgroundProcessTitle(process.command);
+    const title = process.backgroundKind === "service"
+      ? `${t("panel.activity.service.label")} · ${commandTitle}` : commandTitle;
     const open = () => onOpenProcess(process.id);
     return <div className="session-activity-row-shell">
       <TooltipButton type="button" className="session-activity-row session-activity-process" data-process-id={process.id}

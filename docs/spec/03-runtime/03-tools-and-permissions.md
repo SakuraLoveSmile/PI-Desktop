@@ -736,6 +736,12 @@ only the explicitly named local session resource. Background tasks retain the
 same default and maximum command timeout, do not bypass approvals, and cannot
 turn arbitrary `command &` invocations into managed processes.
 
+Existing Plus P7 service history is readable through the activity registry.
+This build retains the ordinary timed-command capability: an explicit
+`backgroundKind: "service"` is rejected by Host as `INVALID_PARAMS`, before
+launch or permission admission, rather than treated as an ordinary command.
+Reading a historical service record never starts or adopts its old process.
+
 
 ### Background timeout visibility and waiting (2026-10-11)
 

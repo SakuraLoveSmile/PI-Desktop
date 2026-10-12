@@ -1855,6 +1855,17 @@ an exit status. Permit/cancellation ownership transfers to the Host job until
 its runner tree exits. The ordinary command timeout still applies. EOF/shutdown
 joins jobs; startup recovers unfinished rows as interrupted without replay.
 
+Historical Plus P7 rows additionally return optional service metadata using
+`BackgroundProcessSummary`: `backgroundKind`, `teamSessionId`, `teamRunId`,
+`deadlineAt`, `stopReason`, `stopRequestedAt`, `stopMode`, and
+`serviceStopEscalated`. A missing kind remains an ordinary command. Policy
+metadata does not prove that a stop completed. Cold-start ownership recovery
+records `host_restart` before interrupting active rows, without adopting a PID.
+P7 stored no originating platform or stop mechanism; the compatibility reader
+omits `stopMode` and does not interpret the raw escalation flag as TERM/KILL.
+This build explicitly rejects a new Bash `args.backgroundKind: "service"`
+with `INVALID_PARAMS`; schema compatibility does not grant a launch capability.
+
 ### Local Git workspace RPC (Plus)
 
 `workspace.git.get` takes `{projectPath, sessionId?}` and returns `{git}` where

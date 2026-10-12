@@ -118,6 +118,8 @@ pub fn list_view(st: &AppState, session: &str) -> Result<Vec<BackgroundProcessSu
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BackgroundProcessSummary {
+    #[serde(flatten)]
+    pub(crate) service: Option<crate::background_services::ServiceMetadata>,
     pub id: String,
     pub session_id: String,
     pub tool_call_id: String,
@@ -132,6 +134,7 @@ pub struct BackgroundProcessSummary {
 }
 fn row(r: &rusqlite::Row<'_>) -> rusqlite::Result<BackgroundProcessSummary> {
     Ok(BackgroundProcessSummary {
+        service: None,
         id: r.get(0)?,
         session_id: r.get(1)?,
         tool_call_id: r.get(2)?,
@@ -144,7 +147,10 @@ fn row(r: &rusqlite::Row<'_>) -> rusqlite::Result<BackgroundProcessSummary> {
     })
 }
 pub fn recover(db: &Database) -> Result<()> {
-    db.conn.execute("UPDATE background_processes SET status='interrupted',ended_at=?1 WHERE status IN ('starting','running','stopping')", [chrono::Utc::now().to_rfc3339()])?;
+    let tx = db.conn.unchecked_transaction()?;
+    crate::background_services::recover(db, now_ms())?;
+    tx.execute("UPDATE background_processes SET status='interrupted',ended_at=?1 WHERE status IN ('starting','running','stopping')", [chrono::Utc::now().to_rfc3339()])?;
+    tx.commit()?;
     Ok(())
 }
 pub fn has_active(db: &Database, session: &str) -> Result<bool> {
@@ -159,34 +165,45 @@ pub fn list(db: &Database, session: &str) -> Result<Vec<BackgroundProcessSummary
                ORDER BY started_at DESC,id DESC LIMIT 100
              )) ORDER BY started_at DESC,id DESC"
     ))?;
-    let rows = stmt
+    let mut rows: Vec<BackgroundProcessSummary> = stmt
         .query_map([session], row)?
         .collect::<rusqlite::Result<_>>()?;
+    for process in &mut rows {
+        process.service = crate::background_services::metadata(db, &process.id)?;
+    }
     Ok(rows)
 }
 pub fn get(db: &Database, session: &str, id: &str) -> Result<Option<BackgroundProcessSummary>> {
-    Ok(db
+    let mut process = db
         .conn
         .query_row(
             &format!("{SELECT} WHERE session_id=?1 AND id=?2"),
             params![session, id],
             row,
         )
-        .optional()?)
+        .optional()?;
+    if let Some(process) = &mut process {
+        process.service = crate::background_services::metadata(db, &process.id)?;
+    }
+    Ok(process)
 }
 pub fn duplicate(
     db: &Database,
     session: &str,
     call: &str,
 ) -> Result<Option<BackgroundProcessSummary>> {
-    Ok(db
+    let mut process = db
         .conn
         .query_row(
             &format!("{SELECT} WHERE session_id=?1 AND tool_call_id=?2"),
             params![session, call],
             row,
         )
-        .optional()?)
+        .optional()?;
+    if let Some(process) = &mut process {
+        process.service = crate::background_services::metadata(db, &process.id)?;
+    }
+    Ok(process)
 }
 
 pub fn duplicate_view(
@@ -357,6 +374,7 @@ pub async fn start(
         return Err(anyhow!("TOOL_BUSY"));
     }
     let summary = BackgroundProcessSummary {
+        service: None,
         id: uuid::Uuid::new_v4().to_string(),
         session_id: session.clone(),
         tool_call_id: call.clone(),

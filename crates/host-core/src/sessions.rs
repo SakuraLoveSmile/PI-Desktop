@@ -2694,8 +2694,9 @@ pub fn append_message(
                 return Ok(());
             }
         }
-        let transcript_repaired =
-            stale_turn_reference && repair_unindexed_transcript_message(db, session_id, &record)?;
+        let transcript_repaired = (stale_turn_reference
+            || crate::team::ordinary_inbox::owns_input(db, session_id, &record.id)?)
+            && repair_unindexed_transcript_message(db, session_id, &record)?;
         if !transcript_repaired {
             append_record(
                 db,
@@ -2872,7 +2873,9 @@ fn rebuild_session_message_index(
             &tx,
             session_id,
             seq,
-            existing_turns.get(&record.id).map(String::as_str),
+            crate::team::ordinary_inbox::finalize_append(db, &tx, session_id, record)?
+                .as_deref()
+                .or_else(|| existing_turns.get(&record.id).map(String::as_str)),
             record,
             text.as_deref(),
         )?;
@@ -2945,6 +2948,7 @@ fn append_record(
         return Err(anyhow!("session not found: {session_id}"));
     };
     insert_index_row(&tx, session_id, seq - 1, turn_id, record, text)?;
+    crate::team::ordinary_inbox::finalize_append(db, &tx, session_id, record)?;
     tx.commit()?;
     Ok(())
 }

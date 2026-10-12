@@ -2151,6 +2151,7 @@ sklm: {
 
   panel: {
     activity: {
+      service: en.panel.activity.service,
       aggregateLoading: "Oturumun tüm etkinliği okunuyor…",
       aggregateUnavailable: "Tam etkinlik kullanılamıyor; yüklenen iletiler gösteriliyor.",
       aggregateLimited: "Bazı etkinlik kayıtları görüntüleme sınırlarını aşıyor.",

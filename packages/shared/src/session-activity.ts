@@ -12,6 +12,13 @@ export type BackgroundProcessStatus =
   | "starting" | "running" | "stopping"
   | "completed" | "failed" | "stopped" | "timed_out" | "interrupted";
 
+export type BackgroundServiceStopReason =
+  | "explicit_stop" | "team_paused" | "run_replaced" | "member_removed"
+  | "owner_workspace_changed" | "session_deleted" | "team_ended" | "goal_ended"
+  | "ttl_expired" | "host_shutdown" | "host_restart" | "owner_cancelled";
+
+export type BackgroundServiceStopMode = "unix-term-then-kill" | "windows-job-force";
+
 export type BackgroundProcessSummary = {
   id: string;
   sessionId: string;
@@ -22,6 +29,17 @@ export type BackgroundProcessSummary = {
   startedAt: string;
   endedAt?: string;
   exitCode?: number;
+  /** Missing kind on legacy rows means an ordinary timed command. */
+  backgroundKind?: "command" | "service";
+  teamSessionId?: string;
+  teamRunId?: string;
+  deadlineAt?: string;
+  stopReason?: BackgroundServiceStopReason;
+  stopRequestedAt?: string;
+  /** Shutdown mechanism, present from launch; not proof it has already run. */
+  stopMode?: BackgroundServiceStopMode;
+  /** Reported only when a service has reached a stopping terminal outcome. */
+  serviceStopEscalated?: boolean;
 };
 
 export type BackgroundProcessDetail = {

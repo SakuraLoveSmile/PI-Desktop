@@ -2,6 +2,12 @@
 
 Upstream v0.15.6 → v0.16.1 has been merged.
 
+- Builds from `main` can reopen local candidate data on Plus schema 7 without
+  downgrading the database. Older profiles upgrade behind a verified backup;
+  historical authenticated inbox records and service ownership recover safely.
+  Service history remains visible, but this build rejects new managed-service
+  launches explicitly. Unknown newer schema versions still refuse to open.
+
 - Team Goal reports wait for running/queued experts and unconsumed results before
   accepting a draft. Settlement denials name the experts, dispatches and open tasks;
   confirmed teams receive three bounded completion reminders and terminal errors

@@ -2351,6 +2351,17 @@ sklm: {
   panel: {
     title: "工作面板",
     activity: {
+      service: {
+        label: "服务", kind: "进程类型", owner: "所属会话", team: "所属团队", run: "团队运行",
+        deadline: "服务截止时间", stopPolicy: "停止策略", stopReason: "停止原因", stopRequested: "停止请求时间",
+        stopOutcome: "停止结果", escalated: "升级为 KILL", termCompleted: "通过 TERM 停止",
+        stopModes: { "unix-term-then-kill": "先 TERM，最多 5 秒后 KILL", "windows-job-force": "通过 Windows JobObject 强制停止" },
+        stopReasons: {
+          explicit_stop: "主动停止", team_paused: "团队已暂停", run_replaced: "团队运行已替换", member_removed: "成员已移除",
+          owner_workspace_changed: "所属工作区已变化", session_deleted: "会话已删除", team_ended: "团队已结束", goal_ended: "Goal 已结束",
+          ttl_expired: "服务的 6 小时期限已到", host_shutdown: "Host 已关闭", host_restart: "Host 重启导致中断", owner_cancelled: "所属会话已取消",
+        },
+      },
       aggregateLoading: "正在读取全会话活动…",
       aggregateUnavailable: "暂时无法读取全会话活动，当前显示已加载消息。",
       aggregateLimited: "部分活动记录超出显示限制。",

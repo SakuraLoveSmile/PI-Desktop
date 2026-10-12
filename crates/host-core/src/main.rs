@@ -3,6 +3,7 @@ mod agent_capabilities;
 mod artifacts;
 mod audit;
 mod background_processes;
+mod background_services;
 mod config_sync;
 mod context_insights;
 mod data_relocation;
