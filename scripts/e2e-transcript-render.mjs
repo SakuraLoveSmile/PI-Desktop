@@ -167,7 +167,8 @@ app.whenReady().then(async () => {
       await require("node:fs/promises").writeFile(process.env.PI_TRANSCRIPT_SCREENSHOT, (await window.webContents.capturePage()).toPNG());
     }
     await window.webContents.executeJavaScript("globalThis.cleanupReadabilityProbe()");
-    result.activityIntegration = await window.webContents.executeJavaScript("globalThis.sessionActivityIntegrationProbe()");
+    result.activityIntegration = await window.webContents.executeJavaScript("globalThis.sessionActivityIntegrationProbe().catch(error => ({ ok: false, error: error?.stack ?? String(error) }))");
+    if (!result.activityIntegration.ok) throw new Error(result.activityIntegration.error);
     result.ok = result.ok && result.activityIntegration.ok;
     if (process.env.PI_SESSION_ACTIVITY_SCREENSHOT) {
       await require("node:fs/promises").writeFile(process.env.PI_SESSION_ACTIVITY_SCREENSHOT, (await window.webContents.capturePage()).toPNG());
@@ -188,7 +189,8 @@ app.whenReady().then(async () => {
       const fs = require("node:fs/promises");
       await fs.mkdir(process.env.PI_COMPOSER_SCREENSHOT_DIR, { recursive: true });
       for (const scene of ["default", "profile", "models", "subagent", "narrow", "context", "outputs", "skills-list", "skills", "project-menu", "location-menu", "branch-menu", "worktree-create"]) {
-        await window.webContents.executeJavaScript("globalThis.composerDesignScene(" + JSON.stringify(scene) + ")");
+        const sceneResult = await window.webContents.executeJavaScript("globalThis.composerDesignScene(" + JSON.stringify(scene) + ").then(() => ({ ok: true })).catch(error => ({ ok: false, error: error?.stack ?? String(error) }))");
+        if (!sceneResult.ok) throw new Error("Composer screenshot scene " + scene + ": " + sceneResult.error);
         if (scene === "skills") {
           const point = await window.webContents.executeJavaScript("(() => { const rect = document.querySelector('.session-pane[data-visible=true] .session-skill-suggestions-toggle').getBoundingClientRect(); return { x: Math.round(rect.x + rect.width / 2), y: Math.round(rect.y + rect.height / 2) }; })()");
           window.webContents.sendInputEvent({ type: "mouseMove", ...point });
