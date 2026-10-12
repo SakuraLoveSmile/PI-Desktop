@@ -581,16 +581,41 @@ then consumes full authenticated results with wait_for_updates. Expert-start
 authority only unlocks substantive tools; completion additionally requires
 recorded expert dispatches/turns settled and their current results consumed.
 No final agent_end or Goal execution-token release is permitted while waiting.
-On same-turn approved execution recovery, a fresh Host-confirmed, user-confirmed
-nonempty delegate review bound to the same team/turn refreshes the latest matching
-non-error declare_team_strategy result in the model-only context before the first
-recovery request. Its payload and details use the confirmed roster and
-awaitingUserApproval=false; declaration-time memberSessionIds are omitted because
-the review read cannot refresh them. The original pending tool event, visible
-UI transcript and persisted history remain unchanged. Later normal context
-rebuilding uses that original history. Missing/compacted/mismatched/error results
-retain the existing recovery nudge and three confirmed-roster completion retries.
-Ordinary Team turns and automatic Plan research do not acquire this projection.
+On same-turn approved execution guard recovery, a fresh Host-confirmed,
+user-confirmed nonempty delegate review bound to the same team/turn is registered
+for the current approved execution only. Registration reads original entries
+from that execution's start boundary, including a declaration already archived
+by compaction before confirmation, to capture the latest matching successful
+declaration's complete valid assistant batch and all its original paired
+results. It never reads a declaration from an earlier execution for this scope. Signed thinking/text/tool signatures and sibling
+calls/results remain intact; only matching declaration results are projected.
+Final model conversion projects every successful `declare_team_strategy` result
+matching that team/turn/review on each request from the first recovery request
+until execution ends, including later tool loops, retries and rebuilt contexts.
+If compaction archives that batch, final conversion includes the complete
+registered batch and all paired results only in the model view, never an
+orphan call/result. Repeated recovery keeps same-owner/review/epoch registration
+when rebuilt messages have archived it. Wire-call ID collisions do not overwrite
+newer work. Payload and
+details use the confirmed roster, `awaitingUserApproval=false` and a `nextStep`
+beginning `The user confirmed the execution roster`; declaration-time
+`memberSessionIds` are omitted because the review read cannot refresh them.
+Provider telemetry reflects this same projected payload. Copy-on-write and
+idempotence preserve unrelated results and all original pending tool events,
+entries, journal, compaction input and visible UI history. Pending, cancelled or
+replaced reviews, completed/interrupted executions, Stop, ordinary turns and a
+later execution cannot reuse an earlier projection. A newer observable
+declaration with a different reviewId, cancellation or higher revision clears
+registration; current Agent mode, execution, turn/epoch and cancellation,
+disposal/graceful-stop/Team-budget fences also apply. Without a matching
+successful declaration and fully paired valid assistant batch at initial
+registration, no tool call is invented and the existing nudge/three completion retries remain. Reinserted
+batches are not saved to Agent state, entries, compaction summary/checkpoint or
+journal. No additional Host notification, review read or RPC is added. Ordinary
+Team turns and automatic Plan research do not acquire this projection; direct
+confirmation consumption through
+`wait_for_updates` is unchanged. This model-view correction grants no authority
+and does not alter Host participation/settlement gates or tool permissions.
 Pending approved-execution guidance permits either wait_for_updates or ending
 only the assistant message: the Host keeps the execution open and resumes it
 with the confirmed roster. Ordinary unapproved Team turns still stop for trusted
