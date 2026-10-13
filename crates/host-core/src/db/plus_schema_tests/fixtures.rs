@@ -125,6 +125,7 @@ fn strip_all_plus_structures(conn: &Connection) {
     drop_tables(
         conn,
         &[
+            "goal_execution_holds",
             "team_ordinary_inbox",
             "background_service_ownership",
             "background_processes",

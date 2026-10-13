@@ -26,6 +26,7 @@ pub(crate) fn execution_from_proposal(proposal: &PlanProposal) -> Result<Option<
         execution_provider_id: proposal.execution_provider_id.clone(),
         execution_model_id: proposal.execution_model_id.clone(),
         state,
+        hold: None,
     }))
 }
 
@@ -117,6 +118,34 @@ impl PlanManager {
         let Some(current) = self.proposal_for_execution(db, execution_id)? else {
             return Err(plan_error("PLAN_EXECUTION_NOT_FOUND"));
         };
+        if status == EXECUTION_COMPLETED
+            && current.execution_kind.as_deref().unwrap_or(&current.kind) == KIND_GOAL
+            && current.execution_state.as_deref() != Some(EXECUTION_COMPLETED)
+            && !crate::goal_holds::completion_reasons(db, execution_id)?.is_empty()
+        {
+            return Err(plan_error("GOAL_REPORT_NOT_VERIFIED"));
+        }
+        if status == EXECUTION_COMPLETED
+            && current.execution_kind.as_deref().unwrap_or(&current.kind) == KIND_GOAL
+            && matches!(
+                current.execution_state.as_deref(),
+                Some(EXECUTION_QUEUED | EXECUTION_RUNNING)
+            )
+        {
+            let result = crate::goal_holds::settle(
+                db,
+                &current.session_id,
+                execution_id,
+                crate::goal_holds::GoalSettlement {
+                    ended: "agent_stopped",
+                    error_code: None,
+                    stop_hint: None,
+                    barrier_failed: false,
+                    durable_seq: 0,
+                },
+            )?;
+            return serde_json::from_value(result["execution"].clone()).map_err(Into::into);
+        }
         if matches!(
             current.execution_state.as_deref(),
             Some(EXECUTION_COMPLETED) | Some(EXECUTION_INTERRUPTED)

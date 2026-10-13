@@ -12,6 +12,11 @@ pub(crate) fn record_user_turn(db: &Database, session: &str, turn: &str) -> Resu
     if sessions::session_execution_profile(db, session)?.as_deref() == Some("team")
         && super::get_team_member_by_session_id(db, session)?.is_none()
     {
+        let first = crate::goal_holds::active_resume_scope(db, session)?;
+        if let Some(first) = first {
+            db.kv_set(SCOPE_NS, session, &serde_json::json!(first))?;
+            return Ok(());
+        }
         db.kv_set(SCOPE_NS, session, &serde_json::json!(turn))?;
         super::run_limits::start_user_run(db, session, turn, crate::db::now_ms())?;
     }
@@ -129,7 +134,8 @@ pub(super) fn current_confirmed_decision(
     else {
         return Err(deny());
     };
-    let direct = get_execution_decision(db, team, &turn)?;
+    let resumed_goal: bool = db.conn().query_row("SELECT EXISTS(SELECT 1 FROM goal_execution_holds h JOIN plan_approvals p ON p.execution_id=h.execution_id JOIN goal_reports r ON r.execution_id=p.execution_id WHERE h.session_id=?1 AND h.state='resumed' AND h.first_turn_id=?2 AND p.execution_state='running' AND r.turn_id=?3)",rusqlite::params![team,scope,turn],|row|row.get(0))?;
+    let direct = get_execution_decision(db, team, if resumed_goal { &scope } else { &turn })?;
     let decision = match direct {
         Some(decision) if decision.lead_turn_id == scope => decision,
         Some(_) => return Err(deny()),
@@ -161,6 +167,9 @@ pub(super) fn current_confirmed_decision(
         return Err(deny());
     }
     if turn == scope {
+        return Ok(decision);
+    }
+    if resumed_goal {
         return Ok(decision);
     }
     // A model cannot manufacture a continuation by supplying content or an

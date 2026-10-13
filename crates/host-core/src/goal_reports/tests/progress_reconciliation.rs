@@ -48,7 +48,16 @@ fn finish(db: &Database) -> Value {
             [],
         )
         .unwrap();
-    finalize_report(db, "execution-progress", 1, Some("completed"), None).unwrap();
+    finalize_with_closure(
+        db,
+        "execution-progress",
+        1,
+        Some("completed"),
+        None,
+        "user_accepted",
+        true,
+    )
+    .unwrap();
     read_report(db, "session-progress", "execution-progress")
         .unwrap()
         .report
@@ -93,7 +102,7 @@ fn met_report_requires_progress_reconciliation_then_publishes_structured() {
 }
 
 #[test]
-fn fallback_retains_latest_progress_without_inventing_completion() {
+fn accepted_host_facts_retains_latest_progress_without_inventing_completion() {
     let (_dir, db) = create_test_db();
     let token = start_goal(&db);
     update(&db, &token, &["pending"]);
@@ -129,7 +138,7 @@ fn fallback_retains_latest_progress_without_inventing_completion() {
 }
 
 #[test]
-fn fallback_verdict_does_not_claim_unverified_success() {
+fn accepted_host_facts_verdict_does_not_claim_unverified_success() {
     for (statuses, expected) in [
         (vec!["pending", "in_progress"], "unknown"),
         (vec!["failed", "pending"], "blocked"),
@@ -162,7 +171,7 @@ fn changed_progress_prevents_a_stale_met_draft_from_finalizing() {
 }
 
 #[test]
-fn fallback_bounds_steps_and_discloses_omitted_progress() {
+fn accepted_host_facts_bounds_steps_and_discloses_omitted_progress() {
     let (_dir, db) = create_test_db();
     let token = start_goal(&db);
     let mut statuses = vec!["pending"; MAX_STEPS + 1];
@@ -183,7 +192,7 @@ fn fallback_bounds_steps_and_discloses_omitted_progress() {
 }
 
 #[test]
-fn fallback_bounds_large_utf8_and_escaped_progress_strings() {
+fn accepted_host_facts_bounds_large_utf8_and_escaped_progress_strings() {
     let (_dir, db) = create_test_db();
     let token = start_goal(&db);
     goal_progress::update_progress(
@@ -219,7 +228,7 @@ fn fallback_bounds_large_utf8_and_escaped_progress_strings() {
 }
 
 #[test]
-fn fallback_never_includes_another_execution_proposal_or_session_snapshot() {
+fn accepted_host_facts_never_includes_another_execution_proposal_or_session_snapshot() {
     for field in ["executionId", "proposalId", "sessionId"] {
         let (_dir, db) = create_test_db();
         let token = start_goal(&db);

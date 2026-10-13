@@ -282,11 +282,11 @@ export function formatAskToolOutput(
 
 export type AgentEvent =
   | { type: "agent_start" }
-  | { type: "agent_end"; messageIds: string[] }
+  | { type: "agent_end"; messageIds: string[]; stopHint?: "team_unsettled" }
   | { type: "turn_start" }
   | { type: "usage"; usage: MessageUsage }
   | { type: "context_insights"; request?: ContextInsightsRequest; diagnosticEvent?: ContextInsightsEvent }
-  | { type: "turn_end"; subagentUsage?: MessageUsage }
+  | { type: "turn_end"; subagentUsage?: MessageUsage; stopHint?: "team_unsettled" }
   | { type: "message_start"; message: UiMessage }
   | {
       type: "message_update";

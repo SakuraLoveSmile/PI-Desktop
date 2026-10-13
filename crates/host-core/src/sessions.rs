@@ -4242,6 +4242,7 @@ pub(crate) fn begin_turn_for_team_mail(
         ));
     }
     crate::team::validate_team_participant(db, team_session_id, session_id)?;
+    crate::team::require_unpaused(db, team_session_id)?;
     if crate::team::get_team_member_by_session_id(db, session_id)?.is_some() {
         let member = get_session(db, session_id)?
             .ok_or_else(|| anyhow!("TEAM_NOT_FOUND: member session not found"))?;
