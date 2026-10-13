@@ -47,6 +47,8 @@ export type TurnEndedInfo = {
   turnId: string;
   reason: TurnEndReason;
   errorCode?: string;
+  stopHint?: "team_unsettled";
+  userStopped?: true;
   /** Whether host-core acknowledged the durable end of this turn. */
   settled: boolean;
 };
@@ -75,7 +77,7 @@ export type RuntimeServiceOptions = {
   checkpointIntervalMs?: number;
 };
 
-type FinishTurnOptions = { turnId: string; recoverInflight?: boolean };
+type FinishTurnOptions = { turnId: string; recoverInflight?: boolean; stopHint?: "team_unsettled" };
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -111,6 +113,8 @@ function errorCodeOf(error: unknown): string | undefined {
 export class RuntimeService implements RuntimePort {
   private readonly activeTurns = new Map<string, string>();
   private readonly turnFinalizations = new Map<string, Promise<void>>();
+  private readonly userStops = new Set<string>();
+  private readonly goalTeamPauses = new Map<string, Promise<void>>();
   private readonly pendingAbortReasons = new Map<string, TurnEndReason>();
   private readonly sessionOperations = new Map<string, Promise<void>>();
   private readonly listeners = new Set<(envelope: AgentEventEnvelope) => void>();
@@ -145,6 +149,15 @@ export class RuntimeService implements RuntimePort {
   attachHost(host: RuntimeHostLink): void {
     const off = host.onNotification((method, params) => {
       if (this.options.getHost() !== host) return;
+      if (method === "goalExecutions.changed") {
+        const change = params as { sessionId?: unknown; hold?: { state?: unknown } } | null;
+        if (typeof change?.sessionId === "string" && change.hold?.state === "blocked") {
+          void this.pauseGoalTeam(change.sessionId).catch((error: unknown) => {
+            this.options.log("error", "blocked Goal Team cancellation failed", { sessionId: change.sessionId, error: String(error) });
+          });
+        }
+        return;
+      }
       if (method !== "permissions.request") return;
       const permission = params as {
         requestId: string;
@@ -244,9 +257,41 @@ export class RuntimeService implements RuntimePort {
     return this.events.flushPersistence(sessionId);
   }
 
+  /** Host has paused this Goal's Team; stop only member turns present at the block. */
+  pauseGoalTeam(sessionId: string): Promise<void> {
+    const existing = this.goalTeamPauses.get(sessionId);
+    if (existing) return existing;
+    const turns = new Map(this.activeTurns);
+    const run = async (): Promise<void> => {
+      const host = this.options.getHost();
+      if (!host) throw typedError("Host unavailable during Team cancellation", ErrorCodes.HOST_UNAVAILABLE);
+      const detail = await host.call<{ session?: { executionProfile?: string } }>("session.get", {
+        id: sessionId, messageLimit: 0,
+      });
+      if (detail.session?.executionProfile !== "team") return;
+      const roster = await host.call<{ paused?: boolean; members?: Array<{ memberSessionId?: string }> }>("team.getRoster", {
+        teamSessionId: sessionId, callerSessionId: sessionId,
+      });
+      // A delayed blocked notification after resume cannot cancel the new segment.
+      if (!roster.paused) return;
+      const members = (roster.members ?? []).flatMap((member) => {
+        const id = member.memberSessionId;
+        const turnId = id ? turns.get(id) : undefined;
+        return id && id !== sessionId && turnId && this.activeTurns.get(id) === turnId ? [{ id, turnId }] : [];
+      });
+      await Promise.all(members.map(({ id, turnId }) => this.abort(id, turnId)));
+    };
+    const record = Promise.resolve().then(run).finally(() => {
+      if (this.goalTeamPauses.get(sessionId) === record) this.goalTeamPauses.delete(sessionId);
+    });
+    this.goalTeamPauses.set(sessionId, record);
+    return record;
+  }
+
   async dispose(): Promise<void> {
     this.disposed = true;
     for (const detach of this.detachers.splice(0)) detach();
+    await Promise.allSettled(this.goalTeamPauses.values());
     await this.events.dispose();
     this.listeners.clear();
     this.turnEndListeners.clear();
@@ -357,6 +402,7 @@ export class RuntimeService implements RuntimePort {
 
     let result: { accepted: boolean; turnId: string };
     try {
+      if (!this.isTurnDispatchable(sessionId, turnId)) throw typedError("Turn was cancelled before dispatch", "TURN_ABORTED");
       result = await sidecar.call<{ accepted: boolean; turnId: string }>("agent.prompt", {
         ...launch.sidecarParams,
         // The host-created durable turn is the approval identity used by
@@ -425,8 +471,17 @@ export class RuntimeService implements RuntimePort {
     this.options.log("info", "prompt graceful stop requested", { sessionId });
     // The runtime owns the boundary decision: agent_end arrives after the
     // current reply/tool batch completes and finishes it as a completed turn.
-    const result = await sidecar.call<{ requested?: boolean }>("agent.stop", { sessionId });
-    return { requested: result?.requested ?? false };
+    const turnId = this.activeTurns.get(sessionId);
+    const key = turnId ? turnKey(sessionId, turnId) : undefined;
+    if (key) this.userStops.add(key);
+    try {
+      const result = await sidecar.call<{ requested?: boolean }>("agent.stop", { sessionId });
+      if (!result?.requested && key) this.userStops.delete(key);
+      return { requested: result?.requested ?? false };
+    } catch (error) {
+      if (key) this.userStops.delete(key);
+      throw error;
+    }
   }
 
   async abort(sessionId: string, turnId?: string): Promise<void> {
@@ -593,6 +648,7 @@ export class RuntimeService implements RuntimePort {
       return Promise.resolve();
     }
     const reason = this.pendingAbortReasons.get(key) ?? status;
+    const userStopped = this.userStops.has(key);
     const turnUsage = this.events.takeTurnUsage(id);
     const recoverInflight = options.recoverInflight === true;
     let settled = false;
@@ -627,7 +683,9 @@ export class RuntimeService implements RuntimePort {
       if (this.turnFinalizations.get(key) !== record) return;
       this.turnFinalizations.delete(key);
       this.pendingAbortReasons.delete(key);
-      const info: TurnEndedInfo = { sessionId: id, turnId, reason, ...(errorCode ? { errorCode } : {}), settled };
+      this.userStops.delete(key);
+      const info: TurnEndedInfo = { sessionId: id, turnId, reason, ...(errorCode ? { errorCode } : {}),
+        ...(options.stopHint ? { stopHint: options.stopHint } : {}), ...(userStopped ? { userStopped: true } : {}), settled };
       for (const listener of this.turnEndListeners) {
         try {
           listener(info);

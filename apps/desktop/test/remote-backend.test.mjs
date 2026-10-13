@@ -500,3 +500,61 @@ test("an unknown channel is a bug and surfaces INTERNAL", async () => {
     (error) => error.errorCode === "INTERNAL",
   );
 });
+
+
+test("remote blocked Goal reads the existing v1 report list and recovery fails closed", async () => {
+  const hold = { executionId: "goal", sessionId: HOST_SESSION_ID, state: "blocked", reasons: [{ code: "report_missing" }], version: 2,
+    progress: { sessionId: HOST_SESSION_ID, executionId: "goal", items: [] } };
+  const summary = { reportId: "report", sessionId: HOST_SESSION_ID, executionId: "goal", goalTitle: "Existing v1 Goal", status: "pending", hold };
+  const { backend, client } = makeBackend({ "goalReports/list": { reports: [
+    { ...summary, executionId: "old", hold: { ...hold, executionId: "old", state: "accepted" } }, summary,
+  ] }, "goalReports/get": { status: "pending", sessionId: HOST_SESSION_ID, executionId: "goal", hold } });
+  const result = await backend.invoke(IPC.invoke.goalExecutionGet, [{ sessionId: REMOTE_SESSION_ID }]);
+  assert.equal(result.hold.state, "blocked");
+  assert.equal(result.hold.executionId, "goal");
+  assert.equal(result.title, "Existing v1 Goal");
+  assert.equal(result.hold.sessionId, REMOTE_SESSION_ID);
+  assert.equal(result.hold.progress.sessionId, REMOTE_SESSION_ID);
+  const list = await backend.invoke(IPC.invoke.goalReportList, [{ sessionId: REMOTE_SESSION_ID }]);
+  assert.equal(list.reports[1].sessionId, REMOTE_SESSION_ID);
+  assert.equal(list.reports[1].hold.sessionId, REMOTE_SESSION_ID);
+  assert.equal(list.reports[1].hold.progress.sessionId, REMOTE_SESSION_ID);
+  const report = await backend.invoke(IPC.invoke.goalReportGet, [{ sessionId: REMOTE_SESSION_ID, executionId: "goal" }]);
+  assert.equal(report.hold.sessionId, REMOTE_SESSION_ID);
+  assert.equal(report.hold.progress.sessionId, REMOTE_SESSION_ID);
+  for (const channel of [IPC.invoke.goalResume, IPC.invoke.goalClose]) {
+    assert.equal(backend.handles(channel), true);
+    await assert.rejects(backend.invoke(channel, [{ sessionId: REMOTE_SESSION_ID, executionId: "goal" }]), { errorCode: "CAPABILITY_UNAVAILABLE" });
+  }
+  assert.deepEqual(client.calls.map(call => call.method), ["goalReports/list", "goalReports/list", "goalReports/get"]);
+  assert.equal(hold.sessionId, HOST_SESSION_ID, "mapping never mutates the remote response");
+});
+
+test("remote execution read selects an explicit historical hold without inventing a descriptor", async () => {
+  const { backend } = makeBackend({ "goalReports/list": { reports: [{ executionId: "old", goalTitle: "Old", hold: { executionId: "old", sessionId: HOST_SESSION_ID, state: "accepted" } }] } });
+  const result = await backend.invoke(IPC.invoke.goalExecutionGet, [{ sessionId: REMOTE_SESSION_ID, executionId: "old" }]);
+  assert.equal(result.hold.state, "accepted");
+  assert.equal(result.execution, undefined);
+  assert.deepEqual(await backend.invoke(IPC.invoke.goalExecutionGet, [{ sessionId: REMOTE_SESSION_ID }]), {});
+});
+
+test("remote held Goal read traverses the actual RACP v1 operation registry", async () => {
+  const { createOperations } = await import("../../../packages/racp/src/operations.ts");
+  const operations = createOperations();
+  const calls = [];
+  const hold = { executionId: "goal", sessionId: HOST_SESSION_ID, state: "blocked", version: 1 };
+  const context = { operations: { goalReports: {
+    list: async sessionId => ({ reports: [{ executionId: "goal", sessionId, goalTitle: "Held", hold }] }),
+  } } };
+  const backend = createRemoteBackend({ hostKey: HOST_KEY, client: {
+    async request(method, params) {
+      calls.push(method);
+      const operation = operations.get(method);
+      assert.ok(operation, `RACP v1 operation must exist: ${method}`);
+      return operation(context, params);
+    },
+  } });
+  const result = await backend.invoke(IPC.invoke.goalExecutionGet, [{ sessionId: REMOTE_SESSION_ID }]);
+  assert.equal(result.hold.sessionId, REMOTE_SESSION_ID);
+  assert.deepEqual(calls, ["goalReports/list"]);
+});

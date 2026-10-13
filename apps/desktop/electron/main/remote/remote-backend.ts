@@ -10,6 +10,7 @@
  * transport (spec §3.4). Channels the remote profile does not cover return
  * `false` from {@link RemoteBackend.handles} and fall back to the local handler.
  */
+import { remapGoalSession } from "./goal-identities";
 import { ErrorCodes, IPC } from "@pi-desktop/shared";
 import type {
   AgentCompactResponse,
@@ -19,6 +20,7 @@ import type {
   AgentStatus,
   AgentStopResponse,
   GoalProgressSnapshot,
+  GoalReportSummary,
   AskToolResolution,
   PlanResolutionResult,
   PlanResolveRequest,
@@ -85,6 +87,9 @@ const HANDLED_CHANNELS: ReadonlySet<string> = new Set([
   IPC.invoke.plansCancelSchedule,
   IPC.invoke.plansMarkRevisionFailed,
   IPC.invoke.plansPending,
+  IPC.invoke.goalExecutionGet,
+  IPC.invoke.goalResume,
+  IPC.invoke.goalClose,
   IPC.invoke.goalReportGet,
   IPC.invoke.goalReportList,
   IPC.invoke.goalReportRetry,
@@ -332,21 +337,31 @@ export function createRemoteBackend(options: RemoteBackendOptions): RemoteBacken
         });
         return { ok: true };
       }
+      case IPC.invoke.goalResume:
+      case IPC.invoke.goalClose:
+        throw capabilityUnavailable("Remote Goal recovery is read-only in v1");
+      case IPC.invoke.goalExecutionGet: {
+        const req = args[0] as { executionId?: string };
+        // RACP v1 exposes only report reads; holds ride the existing list.
+        const { reports } = await client.request<{ reports: GoalReportSummary[] }>("goalReports/list", { sessionId: hostIdFor(args) });
+        const report = reports.find(item => req.executionId ? item.executionId === req.executionId : item.hold?.state === "blocked");
+        return report ? { hold: remapGoalSession(report.hold, remoteIdFor(args)), title: report.goalTitle } : {};
+      }
       case IPC.invoke.goalReportGet: {
         const req = args[0] as { sessionId: string; reportId?: string; executionId?: string };
         const hostSessionId = parseRemoteSessionId(req.sessionId)?.hostSessionId ?? hostIdFor(args);
-        return client.request("goalReports/get", {
+        const result = await client.request("goalReports/get", {
           sessionId: hostSessionId,
           ...(req.reportId ? { reportId: req.reportId } : {}),
           ...(req.executionId ? { executionId: req.executionId } : {}),
         });
+        return remapGoalSession(result, remoteIdFor(args));
       }
       case IPC.invoke.goalReportList: {
         const req = args[0] as { sessionId: string };
         const hostSessionId = parseRemoteSessionId(req.sessionId)?.hostSessionId ?? hostIdFor(args);
-        return client.request("goalReports/list", {
-          sessionId: hostSessionId,
-        });
+        const result = await client.request<{ reports: GoalReportSummary[] }>("goalReports/list", { sessionId: hostSessionId });
+        return { ...result, reports: result.reports.map(report => remapGoalSession(report, remoteIdFor(args))) };
       }
       case IPC.invoke.goalReportRetry: {
         const req = args[0] as { sessionId: string; executionId: string };

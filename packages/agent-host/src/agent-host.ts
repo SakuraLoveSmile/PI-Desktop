@@ -26,6 +26,7 @@ import type {
   RacpTurn,
   RacpTurnAdmission,
   GoalProgressChangedEvent,
+  GoalExecutionChangedEvent,
   UiMessage,
   VoiceOrigin,
   TeamOrdinaryInboxReadResult,
@@ -409,6 +410,14 @@ export class AgentHost {
     if (summary.planningState) state.planningState = summary.planningState;
     if (kind !== "session.created") this.emit(state, "session.changed", { session: summary }, {});
     this.hub.publish({ scope: "host", sessionId: summary.id, revision: state.revision, kind, payload: { session: summary } });
+  }
+
+  /** Read-only v1 clients observe holds through the existing session stream. */
+  publishGoalExecutionChanged(event: GoalExecutionChangedEvent): void {
+    if (!event || typeof event.sessionId !== "string" || typeof event.executionId !== "string") return;
+    const sessionId = event.sessionId.trim();
+    if (!sessionId || !event.executionId.trim()) return;
+    this.emit(this.state(sessionId), "session.changed", { goalExecution: { ...event, sessionId } }, {});
   }
 
   /** Publish a durable session event for a Host-owned Goal Progress update. */
