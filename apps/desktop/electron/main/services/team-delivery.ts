@@ -22,6 +22,7 @@ export type TeamDeliveryDependencies = {
   activeTurns: Map<string, string>;
   getRuntimeIdentity?: () => object | null;
   isTurnDispatchable?: (sessionId: string, turnId: string) => boolean;
+  abortMemberTurn?: (sessionId: string, turnId: string) => Promise<void>;
   stopAtBoundary: (sessionId: string, turnId: string) => Promise<void>;
   log: (message: string, data: Record<string, unknown>) => void;
 };
@@ -38,6 +39,12 @@ function requiredText(params: Record<string, unknown>, key: string): string {
 
 function deliveryError(code: string, message: string): Error {
   return Object.assign(new Error(message), { errorCode: code, code });
+}
+
+/** Only Host-authenticated, unstarted retirement receipts may remove a mirror. */
+function isRetiredDelivery(message: TeamMessageRecord): boolean {
+  return message.status === "cancelled" && !message.turnId &&
+    Boolean(message.dispatchCancellation && (message.taskDispatch || message.dispatchCancellation === "superseded"));
 }
 
 function isQueueReceipt(
@@ -133,7 +140,7 @@ export function createTeamDeliveryService(deps: TeamDeliveryDependencies) {
     const message = await findMessage(host, teamSessionId, messageId);
     const roster = await rosterFor(host, teamSessionId);
     const bridge = deps.getBridge();
-    if (message.status === "cancelled" && message.taskDispatch && message.dispatchCancellation && !message.turnId) {
+    if (isRetiredDelivery(message)) {
       if (bridge) await bridge.agentHost.cancelSessionMessage(deps.principal, message.targetSessionId, message.id);
       return { messageId, accepted: false, deliveryStatus: "cancelled", message };
     }
@@ -220,7 +227,7 @@ export function createTeamDeliveryService(deps: TeamDeliveryDependencies) {
     }
 
     const beforeAck = await findMessage(host, teamSessionId, message.id);
-    if (beforeAck.status === "cancelled" && beforeAck.taskDispatch && beforeAck.dispatchCancellation && !beforeAck.turnId) {
+    if (isRetiredDelivery(beforeAck)) {
       await bridge.agentHost.cancelSessionMessage(deps.principal, message.targetSessionId, message.id);
       return { messageId, accepted: false, deliveryStatus: "cancelled", message: beforeAck };
     }
@@ -373,6 +380,37 @@ export function createTeamDeliveryService(deps: TeamDeliveryDependencies) {
     });
   }
 
+  async function settleBlockedGoal(sessionId: string): Promise<void> {
+    const host = requireHost();
+    const context = await host.call<RuntimeContext | null>("team.getRuntimeContext", { sessionId });
+    if (!context?.isLead) return;
+    await withTeamLock(context.teamSessionId, async () => {
+      const roster = await rosterFor(host, context.teamSessionId);
+      if (requireHost() !== host || !roster.paused) return;
+      setTeamHold(deps.getBridge(), roster, true);
+      // The Lead already ended. Abort members directly without recursively
+      // invoking the ordinary user-stop Team hook, then await durable settlement.
+      for (const member of roster.members) {
+        const turnId = deps.activeTurns.get(member.memberSessionId);
+        if (!turnId) continue;
+        if (!deps.abortMemberTurn) throw new Error("Team member cancellation unavailable");
+        await deps.abortMemberTurn(member.memberSessionId, turnId);
+      }
+    });
+  }
+
+  async function reconcileResumedGoal(sessionId: string): Promise<void> {
+    const host = requireHost();
+    const context = await host.call<RuntimeContext | null>("team.getRuntimeContext", { sessionId });
+    if (!context?.isLead) return;
+    await withTeamLock(context.teamSessionId, async () => {
+      const roster = await rosterFor(host, context.teamSessionId);
+      if (requireHost() !== host) throw new Error("Host changed during Goal resume");
+      setTeamHold(deps.getBridge(), roster, roster.paused);
+    });
+    await drainPending(context.teamSessionId);
+  }
+
   async function beforeUserStop(sessionId: string): Promise<void> {
     const host = deps.getHost();
     if (!host?.isAvailable()) return;
@@ -436,8 +474,8 @@ export function createTeamDeliveryService(deps: TeamDeliveryDependencies) {
         if (!bridge) return;
         const roster = await rosterFor(host, team);
         // The Host already retired durable queue rows transactionally. Remove
-        // only their authenticated, unstarted task dispatches from the mirror;
-        // ordinary FIFO mail and consumed/running results remain untouched.
+        // only their authenticated, unstarted retirement receipts from the mirror;
+        // Other ordinary FIFO mail and consumed/running results remain untouched.
         for (const target of [team, ...roster.members.map(member => member.memberSessionId)]) {
           for (const entry of bridge.agentHost.queue.list(target)) {
             if (!entry.sessionMessageId || entry.idempotencyKey !== `team-message:${entry.sessionMessageId}`) continue;
@@ -445,7 +483,7 @@ export function createTeamDeliveryService(deps: TeamDeliveryDependencies) {
               teamSessionId: team, callerSessionId: team, messageId: entry.sessionMessageId,
             });
             if (requireHost() !== host) throw deliveryError("HOST_UNAVAILABLE", "The Host changed during Team queue reconciliation");
-            if (message?.targetSessionId === target && message.status === "cancelled" && message.taskDispatch && message.dispatchCancellation && !message.turnId) {
+            if (message?.targetSessionId === target && isRetiredDelivery(message)) {
               await bridge.agentHost.cancelSessionMessage(deps.principal, target, message.id);
             }
           }
@@ -490,6 +528,8 @@ export function createTeamDeliveryService(deps: TeamDeliveryDependencies) {
     dispatchMessage,
     drainPending,
     onNotification,
+    settleBlockedGoal,
+    reconcileResumedGoal,
     pauseTeam,
     resumeTeam,
     beforeUserStop,

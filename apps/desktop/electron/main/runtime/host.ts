@@ -27,6 +27,7 @@ export type HostRuntimeDependencies = {
     executionId: string,
     status: PlanExecutionFinishStatus,
     errorCode?: string,
+    options?: import("./plans").ExecutionSettlementOptions,
   ) => Promise<void>;
   /**
    * Last synchronous gate before a plugin side effect. A turn that was cancelled
@@ -309,6 +310,9 @@ export function createHostRuntime({
       );
     } else if (method === "plans.changed") {
       sendToRenderer(IPC.event.plansChanged, params);
+    } else if (method === "goalExecutions.changed") {
+      runtimeState.agentHostBridge?.agentHost.publishGoalExecutionChanged(params as import("@pi-desktop/shared").GoalExecutionChangedEvent);
+      sendToRenderer(IPC.event.goalExecutionChanged, params);
     } else if (method === "goalReports.changed") {
       sendToRenderer(IPC.event.goalReportChanged, params);
     } else if (method === "goalProgress.changed") {
@@ -360,6 +364,7 @@ export function createHostRuntime({
         const interruptedTurnId = activeTurns.get(sessionId);
         if (interruptedTurnId) {
           void finishTurn(sessionId, "aborted", "PLAN_EXECUTION_INTERRUPTED", {
+            executionError: true,
             turnId: interruptedTurnId,
           }).catch((error: unknown) => {
             // Nothing above can await this: the host is already gone. Log it
@@ -374,7 +379,8 @@ export function createHostRuntime({
       void finishApprovedExecution(
         executionId,
         "interrupted",
-        "PLAN_EXECUTION_INTERRUPTED",
+        "HOST_UNAVAILABLE",
+        { ended: "errored" },
       );
     }
     logger.app("runtime", "error", "host-core exited unexpectedly", {

@@ -24,6 +24,7 @@ describe("sidecar host proxy allowlist", () => {
       "goalReports.submitDraft",
       "goalReports.invalidateDraft",
       "goalReports.markFailed",
+      "goalProgress.get",
       "goalProgress.issueToken",
       "goalProgress.update",
     ].every(isHostProxyAllowed)).toBe(true);
@@ -41,10 +42,12 @@ describe("sidecar host proxy allowlist", () => {
     expect(isHostProxyAllowed("team.cancelLaunchReview")).toBe(false);
     expect(isHostProxyAllowed("goalReports.get")).toBe(false);
     expect(isHostProxyAllowed("goalReports.retry")).toBe(false);
-    expect(isHostProxyAllowed("goalProgress.get")).toBe(false);
+    expect(isHostProxyAllowed("goalExecutions.resume")).toBe(false);
+    expect(isHostProxyAllowed("goalExecutions.close")).toBe(false);
+    expect(isHostProxyAllowed("goalExecutions.settle")).toBe(false);
   });
 
-  it("routes approved progress token and update calls over the real sidecar transport", async () => {
+  it("routes resumed progress reads, token issuance and updates over the real sidecar transport", async () => {
     const proxyUrl = new URL("../../agent-runtime/src/parent-host-proxy.ts", import.meta.url).href;
     const source = `
       import { createInterface } from 'node:readline';
@@ -69,6 +72,15 @@ describe("sidecar host proxy allowlist", () => {
     const host: SidecarHostLink = {
       async call<T>(method: string, params?: unknown): Promise<T> {
         calls.push({ method, params });
+        if (method === "goalProgress.get") {
+          const input = params as { sessionId?: string; executionId?: string };
+          if (input.sessionId !== "session-1" || input.executionId !== "execution-1") {
+            throw Object.assign(new Error("execution does not belong to session"), {
+              code: 1001, data: { errorCode: "UNAUTHORIZED" },
+            });
+          }
+          return { progress: { revision: 3, items: [{ id: "M0", status: "completed" }] } } as T;
+        }
         if (method === "goalProgress.issueToken") return { writeToken: "approved-token" } as T;
         if (method === "goalProgress.update") return { progress: { revision: 1 } } as T;
         throw new Error(`unexpected ${method}`);
@@ -78,6 +90,12 @@ describe("sidecar host proxy allowlist", () => {
     };
     sidecar.setHost(host);
 
+    const readInput = { sessionId: "session-1", executionId: "execution-1" };
+    const resumed = await sidecar.call<{ progress: { revision: number; items: Array<{ id: string; status: string }> } }>("probe", {
+      method: "goalProgress.get", params: readInput,
+    });
+    expect(resumed.progress).toEqual({ revision: 3, items: [{ id: "M0", status: "completed" }] });
+    expect(calls[0]).toEqual({ method: "goalProgress.get", params: readInput });
     const issued = await sidecar.call<{ writeToken: string }>("probe", {
       method: "goalProgress.issueToken",
       params: { sessionId: "session-1", executionId: "execution-1", turnId: "turn-1" },
@@ -89,8 +107,18 @@ describe("sidecar host proxy allowlist", () => {
 
     expect(issued.writeToken).toBe("approved-token");
     expect(updated.progress.revision).toBe(1);
-    expect(calls.map((call) => call.method)).toEqual(["goalProgress.issueToken", "goalProgress.update"]);
-    await expect(sidecar.call("probe", { method: "goalProgress.get", params: { sessionId: "session-1", executionId: "execution-1" } })).rejects.toMatchObject({ code: -32601 });
-    expect(calls).toHaveLength(2);
+    expect(calls.map((call) => call.method)).toEqual(["goalProgress.get", "goalProgress.issueToken", "goalProgress.update"]);
+    const foreignInput = { sessionId: "other-session", executionId: "execution-1" };
+    await expect(sidecar.call("probe", { method: "goalProgress.get", params: foreignInput }))
+      .rejects.toMatchObject({ code: 1001, data: { errorCode: "UNAUTHORIZED" } });
+    expect(calls.at(-1)).toEqual({ method: "goalProgress.get", params: foreignInput });
+    const count = calls.length;
+    for (const params of [{ executionId: "execution-1" }, { sessionId: "session-1" }, { sessionId: " ", executionId: "execution-1" }]) {
+      await expect(sidecar.call("probe", { method: "goalProgress.get", params }))
+        .rejects.toMatchObject({ code: -32602, data: { errorCode: "INVALID_ARGUMENT" } });
+    }
+    await expect(sidecar.call("probe", { method: "goalExecutions.resume", params: readInput }))
+      .rejects.toMatchObject({ code: -32601 });
+    expect(calls).toHaveLength(count);
   });
 });
