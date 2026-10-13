@@ -1203,6 +1203,27 @@
   margin: 6px 0 0 28px;
 }
 
+.goal-blocked-card .goal-report-card-summary {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+  overflow-wrap: anywhere;
+}
+
+.goal-blocked-card ul.goal-report-card-summary,
+.goal-blocked-card .goal-report-card-summary ul {
+  padding-left: 20px;
+}
+
+.goal-blocked-card .goal-report-card-actions {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.goal-blocked-card .goal-report-card-icon {
+  color: var(--ds-warning);
+}
+
 .goal-report-card-open-btn {
   display: inline-flex;
   align-items: center;
