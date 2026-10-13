@@ -1,4 +1,4 @@
-# 04. 数据存储（共享架构 v19，Plus 轨道 v5）
+# 04. 数据存储（共享架构 v21，Plus 轨道 v8）
 
 > **翻译说明：** 本页是与 [英文源规格](/spec/03-runtime/04-data-storage) 一一对应的机器辅助翻译。代码、协议字段和标识符保持原文；如翻译与英文源事实有歧义，以英文版本为准。
 
@@ -183,7 +183,7 @@ PRAGMA auto_vacuum = INCREMENTAL; -- set at creation, before any table
 ```
 
 - 共享架构版本位于 `PRAGMA user_version`（当前 v19 = `19`）中。Plus 专有结构
-  单独由 `plus_schema_meta` 版本化（当前 Plus 轨道 v5，第 7.1 节）。v1 `meta`
+  单独由 `plus_schema_meta` 版本化（当前 Plus 轨道 v8，第 7.1 节）。v1 `meta`
   桌子不见了。
 - host-core 是**单一作者**；语句使用 `prepare_cached`；每个
   多行写入在一个事务中运行。
@@ -1288,7 +1288,7 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
 `PRAGMA user_version` 专用于与上游 PI-Desktop 共享的迁移链，只在合入上游迁移时才会前进
 （ADR plus-schema-version-track）。Plus 专有结构运行在同一数据库内的第二条轨道上，
 因此合入上游永远不会重编号，也不会与 Plus 数据冲突。Plus 步骤有序、仅增量且幂等。
-它们位于 `crates/host-core/src/db/plus_schema.rs`，当前轨道版本为 7：
+它们位于 `crates/host-core/src/db/plus_schema.rs`，当前轨道版本为 8：
 
 | 步骤 | 增加 |
 |---|---|
@@ -1299,6 +1299,7 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
 | P5 | 会话拥有的 `session_quick_notes` 和 `background_processes` 表 |
 | P6 | `team_ordinary_inbox` 认证 Lead 输入消费日志 |
 | P7 | `background_service_ownership`、`owner_project_path` 和会话删除守卫 |
+| P8 | `goal_execution_holds`, the durable blocked/resume/explicit-close lifecycle |
 
 P1 到 P4 是早期 fork 构建以 `user_version` 20 到 23 发布的 Plus 专有变更。每个步骤在改动前都会先探测，
 因此来自任一未发布 v20 形态（仅 Goal reports，或仅 workspace kind）的数据库都能保留数据完成升级，
@@ -1313,7 +1314,7 @@ P1 到 P4 是早期 fork 构建以 `user_version` 20 到 23 发布的 Plus 专�
   （`DB_SCHEMA_TOO_NEW`，见进程模型中的启动结果一节）。
 - **旧版 fork 数据库。** 含有 Plus 结构、没有 `plus_schema_meta` 且 `user_version` 为 20 到 23
   的数据库由早期 fork 构建写入。在经过校验的 `pi.sqlite.legacy-v<N>.bak` 之后，一个事务应用全部
-  Plus 步骤、写入 meta（轨道 7，当前共享迁移链），并把 `user_version` 设为 19。失败则回滚事务，
+  Plus 步骤、写入 meta（轨道 8，当前共享迁移链），并把 `user_version` 设为 19。失败则回滚事务，
   旧版数据库保持原样。
 - **较旧的 fork 构建。** 较旧的 fork 构建打开已对账的数据库时，会重新运行自己幂等的步骤，
   并把 `user_version` 留在 20 到 23。本构建下一次打开时先保留 `pi.sqlite.repair-v<N>.bak`，
@@ -1323,7 +1324,7 @@ P1 到 P4 是早期 fork 构建以 `user_version` 20 到 23 发布的 Plus 专�
   会重放全部步骤（上游步骤可能重建了带有 Plus 列的表），并重新同步 meta。
 - **全新安装。** 新数据库运行共享的 v19 DDL，再运行全部 Plus 步骤并记录轨道版本，不产生备份。
 
-- **已知候选数据。** P6/P7 均为支持格式；P5/P6 先保留已验证备份再升级，P7 重开保留日志、ownership 及版本。高于 P7 仍在维护或修改前拒绝，不能降低版本绕过校验。
+- **已知候选数据。** P6/P7 均为支持格式；P5/P6 先保留已验证备份再升级，P7 重开保留日志、ownership 及版本。高于 P8 仍在维护或修改前拒绝，不能降低版本绕过校验。
 - **收件箱恢复。** Host 对照规范 mailbox 和精确认证 JSONL 校验日志，prepared 仍走文件优先恢复；索引修复保留原 Lead turn，消费记录与 durable queue 退休同一事务提交。重复恢复不追加副本、不授人工权限、不启动 provider。支持能力的普通 Agent Lead 在等待边界使用同轮次 inbox；旧 Host 保留队列 continuation。
 - **历史服务恢复。** 冷启动先记 `host_restart` 再标 unfinished process 为 interrupted，不认领旧 PID 或重放命令。历史 P7 未记录平台/stop mechanism，读取省略 `stopMode`，不从本机平台或 escalation flag 推断 TERM/KILL/JobObject。新服务仅经当前 Agent Team 身份、run 和权限闸门显式启动，机制由实际 owned runner 记录。
 - **离线迁移。** `--relocate-data` 直接打开 SQLite，不对账 Plus、不生成 Plus 备份或应用步骤；搬迁后的正常打开再执行。Plus 自有相对路径无须改写。
@@ -1531,3 +1532,20 @@ P5 不推进共享 PRAGMA user_version。当前可执行共享迁移由
 独立 Plus migration track 在 P6 增加 team_ordinary_inbox，在 P7 增加 background_service_ownership；不改 upstream schema。P6 是 prepared/persisted/ACKed 认证输入 journal，不是重复正文存储或协作 turn 唯一约束变更；P7 仅标记显式新服务，旧后台行仍是普通 command。升级/重启不自动启动 provider 或进程。JSONL-first 切点与 service stop/recovery 分别见[普通 inbox](/zh-CN/spec/03-runtime/team-ordinary-inbox)和[显式服务](/zh-CN/spec/03-runtime/team-managed-services)。
 
 新服务将 `stopMode` 写入既有 KV namespace `background-service-stop-mode-v1`，与 process/ownership 行同一事务。历史缺失仍省略 `stopMode`，重开不从当前操作系统推断停止机制。
+
+
+### Goal execution holds (Plus P8)
+
+The [English source](/spec/03-runtime/04-data-storage) is authoritative for P8.
+`goal_execution_holds` persists blocked/resumed/accepted/abandoned/superseded,
+reasons, first turn, segments/blocks, resume count, owned Team pause and CAS
+version. Shared rows retain interrupted/GOAL_BLOCKED with no CHECK rebuild.
+A verified upgrade backup precedes P8; blocked state survives restart without
+replay. New automatic reports require structured met; only explicit acceptance
+may publish non-met with user_accepted closure. Schema-v1 historical reports
+stay unchanged. Old Plus v7 refuses v8 before mutation; interrupted encoding
+alone does not permit whole-database downgrade. The user accepted H as legacy
+interrupted-column/CHECK compatibility plus safe refusal of old Plus v7 opening.
+
+
+Final lifecycle and evidence scope: The boot fence creates blocked holds for queued/running effective Goals before generic Plan interruption and retains Host crash reasons. Existing holds are unchanged. Supersession atomically releases only hold-owned Team pause state, preserving independent user pauses.

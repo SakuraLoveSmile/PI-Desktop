@@ -46,6 +46,12 @@ fn report_matrix_never_completes_unverified() {
             assert_eq!(result["execution"]["state"], "completed");
             assert_eq!(result["report"]["integrity"], "structured");
             assert_eq!(
+                goal_reports::list_reports(&db, "s").unwrap()[0]
+                    .closure
+                    .as_deref(),
+                Some("agent_verified")
+            );
+            assert_eq!(
                 goal_reports::read_report(&db, "s", "e")
                     .unwrap()
                     .report
@@ -55,6 +61,9 @@ fn report_matrix_never_completes_unverified() {
         } else {
             assert_eq!(result["execution"]["state"], "interrupted");
             assert_eq!(result["hold"]["state"], "blocked");
+            assert!(goal_reports::list_reports(&db, "s").unwrap()[0]
+                .closure
+                .is_none());
             let code = verdict
                 .map(|v| format!("verdict_{v}"))
                 .unwrap_or("report_missing".into());
@@ -194,6 +203,9 @@ fn abandon_and_supersede_leave_reports_unpublished() {
         );
         assert!(!db.data_dir().join("goal_reports/s/e.json").exists());
         assert!(resume(&db, "s", "e", 1, None).is_err());
+        assert!(goal_reports::list_reports(&db, "s").unwrap()[0]
+            .closure
+            .is_none());
     }
 }
 #[test]

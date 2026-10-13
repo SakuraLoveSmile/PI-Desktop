@@ -406,14 +406,18 @@ pub fn list_reports(db: &Database, session_id: &str) -> Result<Vec<GoalReportSum
     for row in rows {
         let mut summary = row?;
         summary.hold = crate::goal_holds::get_hold(db, session_id, &summary.execution_id)?;
-        summary.closure = summary.hold.as_ref().map(|hold| {
-            if hold.state == "accepted" {
-                "user_accepted"
-            } else {
-                "agent_verified"
-            }
-            .into()
-        });
+        summary.closure = if summary.execution_status.as_deref() == Some("completed") {
+            summary
+                .hold
+                .as_ref()
+                .and_then(|hold| match hold.state.as_str() {
+                    "accepted" => Some("user_accepted".into()),
+                    "resumed" => Some("agent_verified".into()),
+                    _ => None,
+                })
+        } else {
+            None
+        };
         results.push(summary);
     }
     Ok(results)

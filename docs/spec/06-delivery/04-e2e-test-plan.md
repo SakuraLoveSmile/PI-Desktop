@@ -16685,10 +16685,13 @@ renderer's durable transcript reads. No real model or provider is contacted.
   execution. The transcript card opens the matching report; the report shows
   its conclusion, execution status, evidence and limitations. A criterion is
   presented as met only when the structured report and durable evidence support
-  it. A fallback report identifies unknown or missing evidence.
-- **Interrupted execution:** Stop/abort, graceful Goal stop, provider cancellation and
-  execution failure must settle the approved Goal as interrupted and never finalize a
-  result report. Deliver `agent_end` while the cancellation RPC is held; a locked abort
+  it. Automatic completion requires structured `met`, completed existing Goal
+  progress and settled current Team work. Historical fallback reports retain
+  explicit missing/unknown evidence and their original bytes.
+- **Interrupted execution:** User Stop/abort, graceful Goal stop and explicit
+  cancellation settle the approved Goal as interrupted and never finalize a
+  result report. Agent/dispatch errors instead produce a blocked hold with
+  `agent_error:<code>`; they do not publish a result report. Deliver `agent_end` while the cancellation RPC is held; a locked abort
   must not become completion. Keep the ordinary graceful-stop turn semantics intact.
   Verify pending/draft executions, manual finalize/Retry and misleading status overrides
   cannot publish an interrupted report or mutate its draft/metadata. Restart and verify
@@ -16705,15 +16708,16 @@ renderer's durable transcript reads. No real model or provider is contacted.
   survives. Evidence-changing/unknown tools or steering require resubmission.
   Successful execution without a valid draft gets one report-only continuation,
   no duplicate terminal lifecycle, and no recovery on abort/error. A second
-  missing draft falls back without further model calls.
+  missing draft produces a blocked hold without further model calls.
   Submit `met` while Goal progress has pending/in-progress/failed items and
   verify rejection; update the actual checklist to completed and resubmit.
-  Honest partial/blocked reports remain valid. Change progress after a `met`
-  draft and verify it cannot publish a contradictory completion claim.
-  Invalidate a draft with mixed progress and verify fallback retains the same
-  execution's items, marks unresolved work explicitly, and yields partial
-  rather than unknown when completed work exists. Empty/no-progress fallback
-  remains unknown; no fallback auto-completes the progress snapshot.
+  Honest partial/blocked drafts remain valid but produce blocked holds, not
+  automatic completed reports. Change progress after a `met` draft and verify
+  it cannot publish a contradictory completion claim. Invalidate a draft with
+  mixed progress and verify settlement retains the execution's actual checklist,
+  blocks as `report_missing`/`report_invalid`, writes no report file and sends
+  no ready/completed notification. No progress snapshot is auto-completed.
+  The resumed segment receives its own single report-only allowance.
 - **Recovery and failure:** Ready reports remain readable after restart.
   Invalid or failed draft persistence never publishes a stale or misleading
   ready report. A late draft submission after `ready` or `failed` is rejected
@@ -18012,9 +18016,13 @@ components. They do not establish SSH server connectivity or a packaged release.
   member/dispatch/task diagnostic without persisting a draft. After the expert
   finishes, unconsumed evidence still blocks the report; `wait_for_updates` consumes
   full results in the original turn and the report then succeeds.
-- `E2E-TEAM-completion-error-keeps-host-reason`: the real Host settlement denial
-  passes through the runtime guard and three reason-specific recovery prompts;
-  the fourth denial produces a terminal error with the identical Host reason.
+- `E2E-TEAM-completion-blocked-keeps-host-reason`: the real Host settlement denial
+  passes through the runtime guard and three reason-specific recovery prompts.
+  On an approved Goal the fourth denial ends the segment with
+  `stop_hint = team_unsettled`, persisting a blocked hold with the exact current
+  member/task diagnostics and pausing the Team. It emits no completed report or
+  `TEAM_APPROVAL_REQUIRED` terminal interruption. Non-Goal execution retains
+  the terminal error with the identical Host reason.
 
 Automated by `scripts/e2e-goal-report.mjs` (real isolated Host RPC with runtime
 tools/guard) and `scripts/e2e-team-approved-goal.mjs` (isolated Electron and fake
@@ -18391,7 +18399,7 @@ authenticated turn and never revives the old execution token.
 
 ### E2E-TEAM-open-tasks-block-final-answer
 
-- **Preconditions:** Local-main task candidate, temporary Host profile/workspace,
+- **Preconditions:** Request-worktree task candidate, temporary Host profile/workspace,
   real runtime tools, and a loopback scripted provider; approved Team execution.
 - **Steps:** Create current-decision pending tasks for never-dispatched UI/QA
   experts and an in-progress task for a completed core expert. Attempt a text
@@ -18400,7 +18408,10 @@ authenticated turn and never revives the old execution token.
 - **Expected:** Both completion tools reject open decision tasks with
   `TEAM_APPROVAL_REQUIRED`, member/task identities, dispatch/close guidance and
   the existing `wait_for_updates` guidance. Text completion receives bounded
-  recovery; terminal tasks then permit normal completion. Historical unrelated,
+  recovery; exhausting three settlement continuations on an approved Goal
+  produces `blocked(team_unsettled)`, pauses the Team and publishes no completion
+  report/notification. Closing terminal tasks in a resumed segment then permits
+  verified `met` completion. Historical unrelated,
   deleted tasks and ordinary execution retain their previous behavior.
 - **Specs:** Host RPC approved execution inbox and settled Goal authorization;
   Expert Team ADR amendment dated 2026-10-13.
@@ -18422,7 +18433,7 @@ authenticated turn and never revives the old execution token.
   its full contents in the original execution. Unread current notices and open
   tasks block completion independently. Consuming a notice neither completes
   tasks nor supplies successful participation. Reserved keys are rejected.
-- **Specs:** Host RPC silent completion mail; Expert Team ADR 2026-10-13.
+- **Specs:** Host RPC silent completion mail; Expert Team ADR amendment dated 2026-10-13.
 - **Acceptance:** `node scripts/e2e-team-member-silence.mjs`; Rust tests cover
   reported/direct/terminal-task/abort exclusions, rollback, participation and
   source/event-proof deletion, plus transport and checkpoint failure recovery.
@@ -18440,7 +18451,10 @@ authenticated turn and never revives the old execution token.
   to an ordinary settled final answer.
 - **Expected:** First match gives one dedicated nudge with no Host final-answer
   authorization. Repetition goes through normal authorization; there is exactly
-  one pseudo-call recovery. An actual `task_get` tool result reaches the provider
+  one pseudo-call recovery. In the open-task Goal case, one pseudo-call nudge
+  plus three settlement continuations cannot complete the Goal: the final
+  outcome is a `team_unsettled` hold with the original pending/in-progress task
+  identities and a paused Team. An actual `task_get` tool result reaches the provider
   in the invocation case. Normal completion needs no retry and emits one final
   agent boundary. Guard reset renews the allowance; non-Lead/non-Team turns are
   unaffected, and fenced/mid-response examples do not match.
@@ -18474,3 +18488,90 @@ The default provisioned package-manager build path remains available. A human
 chosen local-main base exception must be recorded separately from the receipt's
 existing `origin/main` metadata; the exception never implies remote refresh,
 push or PR authorization.
+
+
+### E2E-GOAL-blocked-resume
+
+- **Preconditions:** Candidate-built Desktop, Host and runtime in the request
+  worktree, fresh temporary profile/data/workspace and a loopback scripted model.
+  No real provider, user profile or incident report is modified. Record the
+  tested candidate/base commits and build receipt; this description is not
+  evidence of a passing test.
+- **Acceptance journey:** Approve a Goal, execute to a hold, inspect its
+  transcript card/checklist, continue with guidance/current model, then inspect
+  the final report. Separate cases use Accept current result and finish,
+  Abandon, replacement approval, reload and application restart. Evidence is
+  split between native Host/runtime lifecycle, Main/preload contracts and the
+  real sandboxed Renderer with fixture preload; do not present these separate
+  lanes as one full installed-application journey.
+- **A — Missing report:** After the single report-only continuation still has no
+  draft, execution is `interrupted/GOAL_BLOCKED`, hold is blocked/report_missing,
+  report row stays pending/draft and no report file, ready broadcast or
+  task-completed notification exists. Show real M0–M4 states and all three actions.
+- **B — Incident-shaped Team hold:** Repeated Lead pseudo tool-call text receives
+  one pseudo-call retry and three settlement continuations. Two current tasks
+  remain pending and one remains in progress; hold reasons name all three and
+  their members. Team is paused, no held member can run/be dispatched, and the
+  result is neither completed nor a `TEAM_APPROVAL_REQUIRED` interruption.
+- **C — Same-identity continuation:** Send guidance that the spelling table does
+  not exist, stop searching and dispatch UI/QA in parallel. Preserve execution
+  ID, approved contract and permission mode; bind a new turn and revoke old
+  draft/token. The provider sees the contract, available prior execution context
+  and the visible guidance once. The owned Team pause is lifted. Verified `met`
+  finishes with a structured report, original startedAt, two segments and one
+  block. Also cover missing context-start entry after restart/compaction.
+- **D — User acceptance:** A valid partial draft holds with verdict_partial and
+  shows Agent limitations/next steps. Acceptance completes with user_accepted,
+  preserving partial and showing User accepted closure (unverified), without
+  labeling the new result as fallback completion. Missing/invalid draft acceptance
+  uses Host facts and never claims verification. Concurrent stale CAS responses
+  cannot resume or close the new hold version.
+- **E — Abandon/replacement:** Abandon leaves interrupted/GOAL_ABANDONED with no
+  report. Approval of a new Goal warns about replacement and atomically records
+  the old hold superseded with GOAL_SUPERSEDED. Release only the old hold-owned
+  Team pause atomically so the replacement can use its Team; preserve independent
+  user pauses. The old contract remains readable.
+- **F — Recovery/errors:** Application restart restores blocked read-only facts
+  without classifying it as running or dispatching work. Continue remains usable.
+  Agent error and initial dispatch failure produce agent_error holds; failures
+  during resume return to resume_failed holds. Queued/running effective Goals
+  after Host crash become blocked with `agent_error:HOST_RESTARTED`
+  before the generic Plan fence; already blocked holds keep their state/version
+  and no work replays. Team pause ownership is retained.
+- **G — Preserved boundaries:** Plan completion, explicit user Stop/cancellation,
+  ordinary Team execution and existing completed/fallback reports keep their
+  behavior. The incident's old report is not rewritten, retried or reopened.
+  Dismissing the Composer chip sends an ordinary message, not a Goal resume.
+  Text and ordinary file references reach the resumed instruction; unsupported
+  image/plugin attachments preserve the full draft and show the ordinary-send
+  hint instead of being discarded. Session switches cannot apply stale hold
+  actions. Remote v1 holds are read-only. Historical evidence uses disposable
+  database/report fixtures; the production 67b8868e session is never opened or
+  modified by these tests.
+- **H — Accepted compatibility boundary:** Shared execution rows retain the old
+  interrupted encoding and unchanged CHECK. An old Plus v7 binary rejects a new
+  Plus v8 database through the existing newer-schema guard before mutation.
+  The user accepted this boundary: assert old interrupted-column/CHECK decoding
+  separately from safe whole-database downgrade refusal. Whole-database opening
+  by Plus v7 is unsupported; do not claim the old app opens v8 without an error.
+- **Automation:** `node scripts/e2e-goal-blocked-resume.mjs`, updated
+  `scripts/e2e-goal-report.mjs`, `scripts/e2e-team-open-task-gate.mjs` and
+  `scripts/e2e-team-lead-pseudo-tool-call.mjs`; register executable scenarios in
+  the suite catalog and regenerate its scenario index. Host matrix/CAS/Team
+  lifecycle tests and runtime/Renderer interaction tests supplement these
+  cross-process cases. Native scenario IDs are E2E-GOAL-BLOCKED-001 through
+  E2E-GOAL-BLOCKED-010; 010 launches a real AgentSidecar child with ParentHostProxy,
+  verifies authorized goalProgress.get, a renewed write token, retained context
+  and same-ID completion. 009 creates an isolated legacy database/report using
+  PI_DESKTOP_LEGACY_HOST_BIN; without that known old binary, report 009 NOT RUN.
+  The UI lane is node scripts/e2e-goal-blocked-ui.mjs, scenario
+  E2E-GOAL-BLOCKED-UI-001: production components, Composer, store and reader in
+  sandboxed Electron with a fake preload API boundary, nine interaction groups
+  and viewport checks at 1000px/420px. It proves Renderer behavior, not native
+  Main/Host IPC wiring or real-model compliance. The native lane proves real
+  Host/runtime/proxy wiring, not the complete Desktop Renderer journey. Report
+  actual results and remaining cross-layer coverage separately; descriptions
+  and scenario registration alone do not establish a passing run.
+- **Specs:** Runtime Goal completion, Host execution holds, storage Plus P8,
+  GoalBlockedCard/Composer resume intent, remote read-only projection and
+  [Goal blocked-state ADR](../../adr/goal-blocked-state.md).
