@@ -9,6 +9,7 @@ mod context_insights;
 mod data_relocation;
 mod db;
 mod git_workspaces;
+mod goal_holds;
 mod goal_progress;
 mod goal_reports;
 mod keyboard;

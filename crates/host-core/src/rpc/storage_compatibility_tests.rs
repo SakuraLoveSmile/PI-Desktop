@@ -74,7 +74,7 @@ async fn schema7_reopens_nonempty_journal_and_service_history_without_replay() {
                 .query_row("SELECT plus_version FROM plus_schema_meta", [], |r| r
                     .get::<_, i64>(0))
                 .unwrap(),
-            7
+            8
         );
         assert_eq!(
             db.conn()
@@ -186,7 +186,7 @@ fn schema5_upgrade_preserves_rows_backs_up_and_applies_exact_released_ddl() {
             .query_row("SELECT plus_version FROM plus_schema_meta", [], |r| r
                 .get::<_, i64>(0))
             .unwrap(),
-        7
+        8
     );
     assert!(dir.path().join("pi.sqlite.plus-v5.bak").is_file());
     let released = rusqlite::Connection::open_in_memory().unwrap();
@@ -214,22 +214,22 @@ fn schema5_upgrade_preserves_rows_backs_up_and_applies_exact_released_ddl() {
 }
 
 #[test]
-fn schema8_is_refused_without_rewriting_versions_or_rows() {
+fn schema9_is_refused_without_rewriting_versions_or_rows() {
     let (dir, _, _) = seed();
     let path = dir.path().join("pi.sqlite");
     let conn = rusqlite::Connection::open(&path).unwrap();
-    conn.execute("UPDATE plus_schema_meta SET plus_version=8", [])
+    conn.execute("UPDATE plus_schema_meta SET plus_version=9", [])
         .unwrap();
     assert!(Database::open(&path)
         .err()
         .unwrap()
         .to_string()
-        .contains("Plus schema version 8 is newer than supported"));
+        .contains("Plus schema version 9 is newer than supported"));
     assert_eq!(
         conn.query_row("SELECT plus_version FROM plus_schema_meta", [], |r| r
             .get::<_, i64>(0))
             .unwrap(),
-        8
+        9
     );
     assert_eq!(
         conn.query_row("SELECT COUNT(*) FROM team_ordinary_inbox", [], |r| r

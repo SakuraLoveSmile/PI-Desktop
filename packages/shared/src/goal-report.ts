@@ -1,11 +1,14 @@
 /**
- * Goal Completion Report v1 contract and validation.
+ * Versioned Goal Completion Report contracts and validation.
  *
  * Owned by Host persistence; submitted as a structured draft by the autonomous
  * Goal agent and finalized into an immutable snapshot upon turn settlement.
  */
 
-export const GOAL_REPORT_SCHEMA_VERSION = 1 as const;
+import type { GoalExecutionSegment, GoalExecutionBlock, GoalHold } from "./types/plans.js";
+
+export const GOAL_REPORT_SCHEMA_VERSION = 2 as const;
+export type GoalReportClosure = "agent_verified" | "user_accepted";
 export const HOST_DB_SCHEMA_VERSION = 22 as const;
 
 export const GOAL_REPORT_MAX_JSON_BYTES = 256 * 1024; // 256 KiB
@@ -129,10 +132,13 @@ export type GoalReportScreenshot = {
 };
 
 /**
- * Full Goal Completion Report snapshot (schema version 1).
+ * Full Goal Completion Report snapshot, retaining v1 history and v2 closure metadata.
  */
 export type GoalReport = {
-  schemaVersion: typeof GOAL_REPORT_SCHEMA_VERSION;
+  schemaVersion: 1 | typeof GOAL_REPORT_SCHEMA_VERSION;
+  closure?: GoalReportClosure;
+  segments?: GoalExecutionSegment[];
+  blocks?: GoalExecutionBlock[];
   reportId: string;
   sessionId: string;
   executionId: string;
@@ -223,6 +229,8 @@ export type GoalReportAssetChunk = {
  * Condensed report summary for session listings.
  */
 export type GoalReportSummary = {
+  hold?: GoalHold;
+  closure?: GoalReportClosure;
   reportId: string;
   sessionId: string;
   executionId: string;
@@ -301,7 +309,7 @@ export function validateGoalReportDraft(
   // resolution, hashes or assets is rejected rather than silently ignored, so
   // a model cannot claim host verification.
   if (options.hostOwned !== "accept") {
-    for (const reserved of ["evidenceResolution", "checkObservations", "verificationSource", "assets", "reportSha256"]) {
+    for (const reserved of ["evidenceResolution", "checkObservations", "verificationSource", "assets", "reportSha256", "closure", "segments", "blocks"]) {
       if (input[reserved] !== undefined) {
         return { ok: false, error: `${reserved} is host-owned and cannot be submitted in a draft` };
       }
@@ -696,7 +704,7 @@ export function validateGoalReport(input: unknown): ValidationResult<GoalReport>
     return { ok: false, error: "Report snapshot must be a JSON object" };
   }
 
-  if (input.schemaVersion !== GOAL_REPORT_SCHEMA_VERSION) {
+  if (input.schemaVersion !== 1 && input.schemaVersion !== GOAL_REPORT_SCHEMA_VERSION) {
     return {
       ok: false,
       error: `Unsupported report schemaVersion: ${String(input.schemaVersion)} (expected ${GOAL_REPORT_SCHEMA_VERSION})`,
@@ -726,6 +734,18 @@ export function validateGoalReport(input: unknown): ValidationResult<GoalReport>
     return { ok: false, error: "Report integrity kind must be 'structured' or 'fallback'" };
   }
 
+  if (input.closure !== undefined && input.closure !== "agent_verified" && input.closure !== "user_accepted") {
+    return { ok: false, error: "Invalid report closure" };
+  }
+  if (input.closure === "agent_verified" && (input.verdict !== "met" || input.integrity.kind !== "structured")) {
+    return { ok: false, error: "Agent-verified closure requires a structured met report" };
+  }
+  if (input.segments !== undefined && (!Array.isArray(input.segments) || !input.segments.every(isGoalExecutionSegment))) {
+    return { ok: false, error: "Invalid execution segments" };
+  }
+  if (input.blocks !== undefined && (!Array.isArray(input.blocks) || !input.blocks.every(isGoalExecutionBlock))) {
+    return { ok: false, error: "Invalid execution blocks" };
+  }
   const draftResult = validateGoalReportDraft(input, { hostOwned: "accept" });
   if (!draftResult.ok) {
     return draftResult;
@@ -735,7 +755,10 @@ export function validateGoalReport(input: unknown): ValidationResult<GoalReport>
   return {
     ok: true,
     value: {
-      schemaVersion: GOAL_REPORT_SCHEMA_VERSION,
+      schemaVersion: input.schemaVersion,
+      ...(input.closure === "agent_verified" || input.closure === "user_accepted" ? { closure: input.closure } : {}),
+      ...(Array.isArray(input.segments) ? { segments: input.segments.filter(isGoalExecutionSegment) } : {}),
+      ...(Array.isArray(input.blocks) ? { blocks: input.blocks.filter(isGoalExecutionBlock) } : {}),
       reportId: (input.reportId as string).trim(),
       sessionId: (input.sessionId as string).trim(),
       executionId: (input.executionId as string).trim(),
@@ -784,4 +807,20 @@ export function validateGoalReport(input: unknown): ValidationResult<GoalReport>
       checkObservations: parseCheckObservations(input.checkObservations),
     },
   };
+}
+
+function isGoalExecutionSegment(value: unknown): value is GoalExecutionSegment {
+  return isRecord(value) && typeof value.turnId === "string" && value.turnId.length > 0
+    && typeof value.startedAt === "number" && Number.isFinite(value.startedAt)
+    && (value.endedAt === undefined || (typeof value.endedAt === "number" && Number.isFinite(value.endedAt) && value.endedAt >= value.startedAt));
+}
+function isGoalExecutionBlock(value: unknown): value is GoalExecutionBlock {
+  return isRecord(value) && typeof value.at === "number" && Number.isFinite(value.at)
+    && Array.isArray(value.reasons) && value.reasons.every(reason => isRecord(reason)
+      && typeof reason.code === "string"
+      && (["report_missing", "report_invalid", "verdict_partial", "verdict_blocked", "verdict_unknown", "team_unsettled", "resume_failed"].includes(reason.code) || /^agent_error:.+/.test(reason.code))
+      && (reason.detail === undefined || typeof reason.detail === "string")
+      && (reason.tasks === undefined || (Array.isArray(reason.tasks) && reason.tasks.every(task => isRecord(task)
+        && typeof task.id === "string" && typeof task.title === "string" && typeof task.status === "string"
+        && (task.assigneeId === undefined || typeof task.assigneeId === "string")))));
 }

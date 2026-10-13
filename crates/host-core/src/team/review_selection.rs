@@ -126,6 +126,7 @@ pub(crate) fn gate_team_member_turn(
     let Some(member) = get_team_member_by_session_id(db, session_id)? else {
         return Ok(());
     };
+    super::require_unpaused(db, &member.team_session_id)?;
     require_approved_member(db, &member.team_session_id, session_id)?;
     let session = sessions::get_session(db, session_id)?
         .ok_or_else(|| anyhow!("TEAM_NOT_FOUND: member session not found"))?;

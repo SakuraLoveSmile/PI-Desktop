@@ -128,7 +128,7 @@ pub(crate) fn record(
     Ok(())
 }
 
-fn cancel(conn: &Connection, id: &str, reason: &str) -> Result<()> {
+pub(crate) fn cancel(conn: &Connection, id: &str, reason: &str) -> Result<()> {
     let changed = conn.execute("UPDATE session_collaboration_messages SET status='cancelled',updated_at=?2 WHERE id=?1 AND status='queued' AND turn_id IS NULL",params![id,now_ms()])?;
     if changed == 0 {
         return Ok(());

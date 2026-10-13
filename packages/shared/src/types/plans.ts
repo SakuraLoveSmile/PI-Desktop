@@ -1,4 +1,6 @@
 /** Shared public types grouped by the owning application domain. */
+import type { GoalProgressSnapshot } from "../goal-progress.js";
+import type { SubmitGoalReportDraftInput } from "../goal-report.js";
 import type { Mode } from "./common.js";
 import type { GlobalPermissionMode } from "./permissions.js";
 import type { SessionThinkingLevel } from "./models.js";
@@ -54,6 +56,39 @@ export type PlanExecutionState =
   | "running"
   | "completed"
   | "interrupted";
+
+export type GoalBlockReasonCode =
+  | "report_missing" | "report_invalid"
+  | "verdict_partial" | "verdict_blocked" | "verdict_unknown"
+  | "team_unsettled" | "resume_failed" | `agent_error:${string}`;
+
+export type GoalBlockReason = {
+  code: GoalBlockReasonCode;
+  detail?: string;
+  tasks?: Array<{ id: string; title: string; status: string; assigneeId?: string }>;
+};
+export type GoalExecutionSegment = { turnId: string; startedAt: number; endedAt?: number };
+export type GoalExecutionBlock = { at: number; reasons: GoalBlockReason[] };
+export type GoalHold = {
+  executionId: string;
+  sessionId: string;
+  state: "blocked" | "resumed" | "accepted" | "abandoned" | "superseded";
+  reasons: GoalBlockReason[];
+  firstTurnId?: string;
+  segments: GoalExecutionSegment[];
+  blocks: GoalExecutionBlock[];
+  resumeCount: number;
+  pausedTeam: boolean;
+  version: number;
+  createdAt: number;
+  updatedAt: number;
+  draft?: SubmitGoalReportDraftInput;
+  progress?: GoalProgressSnapshot;
+};
+export type GoalResumeContext = { reasons: GoalBlockReason[]; userMessage?: string; segment: number };
+export type GoalModelOverride = { providerId: string; modelId: string };
+export type GoalExecutionResult = { execution?: PlanExecution; hold?: GoalHold };
+export type GoalExecutionChangedEvent = GoalExecutionResult & { sessionId: string; executionId: string };
 
 export type PlanScheduleState = "scheduled" | "missed" | "claimed" | "cancelled";
 export type PlanRevisionDraftFileReference = {
@@ -115,6 +150,7 @@ export type PlanProposal = {
   errorCode?: string;
   executionId?: string;
   executionState?: PlanExecutionState;
+  hold?: GoalHold;
   planningProviderId?: string;
   planningModelId?: string;
   executionProviderId?: string;
@@ -146,6 +182,8 @@ export type PlanExecution = {
   executionProviderId?: string;
   executionModelId?: string;
   state: PlanExecutionState;
+  /** Durable blocked state supplements the legacy interrupted encoding. */
+  hold?: GoalHold;
 };
 
 export type PlanExecutionDescriptor = PlanExecution;
