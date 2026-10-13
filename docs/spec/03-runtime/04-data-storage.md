@@ -1,4 +1,4 @@
-# 04. Data Storage (Shared schema v21, Plus track v7)
+# 04. Data Storage (Shared schema v21, Plus track v8)
 
 ## 0. Ownership decision
 
@@ -324,14 +324,16 @@ PRAGMA auto_vacuum = INCREMENTAL; -- set at creation, before any table
 
 - The shared schema version lives in `PRAGMA user_version` (current v21 = `21`).
   Plus-only structures are versioned separately in `plus_schema_meta` (current
-  Plus track v7, section 7.1). The v1 `meta` table is gone.
+  Plus track v8, section 7.1). The v1 `meta` table is gone.
 - host-core is the **single writer**; statements use `prepare_cached`; every
   multi-row write runs in one transaction.
 - Boot maintenance runs before RPC service: one transaction marks every
   `plan_approvals` row with `status='pending'` as `interrupted` and every row
   with `execution_state IN ('queued', 'running')` as `interrupted`; it also
   aborts running turns and appends the recovery audit records. No process epoch
-is serialized. An already-approved queued/running Plan/Goal interruption leaves
+is serialized. Before the generic fence, queued/running effective Goal
+  executions settle into durable blocked holds with `agent_error:HOST_RESTARTED` reasons. Existing blocked holds are unchanged; no
+  execution is replayed. Other Plan startup interruption leaves
   `sessions.mode = 'agent'`. The transaction then proceeds to the normal
   `PRAGMA incremental_vacuum` and audit retention pruning (§9).
 
@@ -749,9 +751,11 @@ state. The schedule is claimed at most once; an overdue unclaimed snapshot is
 `missed` and requires explicit Run now confirmation. Cancellation is allowed
 only before claim. This table is separate from recurring `scheduled_tasks`.
 
-At startup, before serving RPC, one transaction changes every `pending` row to
-`interrupted` and every `queued` or `running` execution state to `interrupted`.
-The associated running turn is aborted. There is no serialized process-epoch
+At startup, before serving RPC, one transaction settles queued/running effective
+Goals into blocked holds with `agent_error:HOST_RESTARTED`, then preserves the
+existing generic Plan fence: pending approval rows become interrupted and
+remaining queued/running executions become interrupted. Already blocked holds
+are unchanged. The associated running turn is aborted. There is no serialized process-epoch
 column and no replay. A pending interruption leaves the session in its contract
 mode, while an already-approved queued/running interruption leaves it Agent.
 Renderer reload within the same host can list the pending row and its original
@@ -910,9 +914,9 @@ CREATE UNIQUE INDEX idx_session_collaboration_receipt
   collaboration input from becoming ordinary human input. This metadata is
   additive and does not require a column in `messages`.
 
-### 4.6d Goal reports and Expert Team state (Plus track P1-P2)
+### 4.6d Goal reports, execution holds and Expert Team state (Plus track P1-P2/P8)
 
-The structures in this section are created by Plus steps P1 and P2 (section
+The structures in this section are created by Plus steps P1, P2 and P8 (section
 7.1), never by the shared `user_version` chain.
 
 Goal report identity and lifecycle are Host-owned in `goal_reports`, keyed by
@@ -922,9 +926,44 @@ hash, byte size, and durable transcript sequence. Status is `draft`, `pending`,
 `ready`, or `failed`; integrity is `structured` or `fallback`, and the verdict
 is `met`, `partial`, `blocked`, or `unknown`. Session deletion cascades the row
 and removes the corresponding report files. Report content is not inferred
-from transcript text.
+from transcript text. New automatic reports are structured, verified `met`;
+non-`met` publication requires explicit user acceptance. Report schema v2 adds
+optional `closure` (`agent_verified | user_accepted`), `segments` and `blocks`.
+Existing schema-v1 files and completed/fallback rows remain unchanged; report
+Retry may repair a failed completed report from bounded Host facts.
 Submitting a late draft cannot move a `ready` or `failed` report back to
 `draft`; the Host rejects it before changing either the report file or row.
+
+Plus step P8 adds `goal_execution_holds`, keyed by `execution_id` and scoped by
+`session_id`. It stores `state` (`blocked | resumed | accepted | abandoned |
+superseded`), `reasons_json`, `first_turn_id`, `segments_json`, `blocks_json`, `resume_count`,
+`paused_team`, CAS `version`, `created_at` and `updated_at`. JSON fields retain
+bounded reason diagnostics and execution history; private progress tokens are
+not persisted in hold payloads. The existing `plan_approvals` execution CHECK
+and shared schema version are unchanged. A blocked execution is stored as
+`interrupted/GOAL_BLOCKED`; accepted becomes completed, abandoned/superseded
+remain interrupted with `GOAL_ABANDONED`/`GOAL_SUPERSEDED` respectively.
+
+Settlement updates hold, execution, token revocation, owned Team pause, audit
+and attention notification atomically. Resume uses the expected hold version,
+requires an idle session and no competing queued/running execution, and
+preserves execution identity/permission mode and the first segment's start.
+Only Team work paused by this hold is resumed. Supersession atomically clears
+only the old hold-owned Team pause; an independent user pause clears hold pause
+ownership and remains unchanged by resume/supersede.
+Startup recovery settles queued/running effective Goals into holds before the
+generic Plan fence, retaining Host crash diagnostics. It leaves already blocked
+holds unchanged, never replays execution and never rewrites old report rows/files. A blocked scratch execution
+remains live for workspace retention; session deletion removes its hold.
+
+P8 upgrades an existing supported Plus database behind the normal verified
+Plus backup. Encoding blocked as legacy `interrupted` preserves the shared row
+vocabulary, but it does not make the whole v8 database openable by an old Plus
+v7 binary: the existing newer-Plus-version guard rejects it before mutation.
+Downgrade requires a separately designed migration or the verified pre-upgrade
+backup; do not lower `plus_schema_meta` or bypass that guard. The accepted compatibility boundary is shared execution-column decoding with
+the existing CHECK; whole-database downgrade to Plus v7 is unsupported. Do not
+claim that the old application can open the new database without an error.
 
 Real-time goal progress snapshots are stored in Host KV under namespace `goal_progress_v1`,
 keyed by `executionId`. The snapshot payload follows `GoalProgressSnapshot`:
@@ -1673,7 +1712,7 @@ and moves only when upstream migrations are merged (ADR
 plus-schema-version-track). Plus-only structures run on a second track in the
 same database, so merging upstream never renumbers or collides with Plus data.
 Plus steps are ordered, additive, and idempotent. They live in
-`crates/host-core/src/db/plus_schema.rs`, and the current track version is 7:
+`crates/host-core/src/db/plus_schema.rs`, and the current track version is 8:
 
 | Step | Adds |
 |---|---|
@@ -1684,6 +1723,7 @@ Plus steps are ordered, additive, and idempotent. They live in
 | P5 | session-owned `session_quick_notes` and `background_processes` tables |
 | P6 | `team_ordinary_inbox`, the authenticated Lead-input consumption journal |
 | P7 | `background_service_ownership`, including `owner_project_path`, and its session-deletion guard |
+| P8 | `goal_execution_holds`, the durable blocked/resume/explicit-close lifecycle |
 
 P1 to P4 are the Plus-only changes earlier fork builds shipped as
 `user_version` 20 to 23. Every step probes before it changes anything, so a
@@ -1704,7 +1744,7 @@ edited.
 - **Legacy fork database.** A database with Plus structures, no
   `plus_schema_meta`, and `user_version` 20 to 23 was written by an earlier fork
   build. After a verified `pi.sqlite.legacy-v<N>.bak`, one transaction applies
-  every Plus step, writes the meta (track 7, current shared chain), and sets
+  every Plus step, writes the meta (track 8, current shared chain), and sets
   `user_version` to 19. A failure rolls the transaction back and leaves the
   legacy database as it was.
 - **Older fork build.** An older fork build that opens a reconciled database
@@ -1724,7 +1764,7 @@ edited.
   reason to lower the database version or disable the newer-schema guard.
   A P5 or P6 file upgrades behind a verified backup; a current P7 file retains
   its journal, ownership rows, shared version, and Plus version on reopen.
-  Versions above P7 still fail closed before maintenance or mutation.
+  Versions above P8 still fail closed before maintenance or mutation.
 - **Historical inbox recovery.** Host validates the journal against the
   canonical collaboration ledger and the exact authenticated transcript input.
   Prepared records recover through the existing file-first append path. Index

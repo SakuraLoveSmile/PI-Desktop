@@ -1376,3 +1376,21 @@ Bash backgroundKind、owner/caps/TTL 及原 backgroundProcesses list/read/launch
 ### 团队诊断与进度提示（WP7）
 
 strategy、presentation.role、displayName 参数错误说明合法值/范围；路由/过期范围/未批准派遣拒绝保持原 code 和条件，增加可操作 nextStep。runtime 的 completedMembersWithOpenTasks 和 completedMemberOpenTaskNextStep 仅由既有名单/任务投影派生，不授权限或结算任务。
+
+
+### Goal execution hold RPC amendment (2026-10-13)
+
+Host-owned goalExecutions.get/settle/resume/close and goalExecutions.changed
+retain the existing PlanExecutionState vocabulary. get is session scoped and
+may omit executionId for the latest blocked Goal. settle distinguishes normal
+Agent stop/error and returns execution/hold/report as applicable. resume/close
+require execution/session/expectedVersion; resume requires idle and no competing
+execution, preserves permissions and audits model override. close accepts or
+abandons a blocked hold. Readers include optional holds and no private token.
+Automatic finalization rejects missing/non-met drafts with
+GOAL_REPORT_NOT_VERIFIED. Only user acceptance or historical completed-report
+Retry may use Host facts. Shared schema v21 and Plus v8 are independent.
+See the [English source](/spec/03-runtime/06-host-rpc-protocol) for exact payloads.
+
+
+Final lifecycle and evidence scope: Host startup settles queued/running effective Goals with `agent_error:HOST_RESTARTED` reasons before generic Plan interruption. Already blocked holds remain unchanged. Replacement approval atomically releases only the superseded hold-owned Team pause.
