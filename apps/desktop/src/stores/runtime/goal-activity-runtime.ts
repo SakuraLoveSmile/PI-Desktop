@@ -1,7 +1,7 @@
-import type { GoalProgressChangedEvent, GoalProgressSnapshot, GoalReportChangedEvent } from "@pi-desktop/shared";
+import type { GoalHold, GoalExecutionChangedEvent, GoalProgressChangedEvent, GoalProgressSnapshot, GoalReportChangedEvent } from "@pi-desktop/shared";
 import { shouldAcceptGoalProgressSnapshot } from "../../lib/goal-progress-presentation";
 
-export type GoalActivityReportState = "none" | "generating" | "ready" | "fallback" | "failed";
+export type GoalActivityReportState = "none" | "generating" | "ready" | "fallback" | "failed" | "blocked";
 export type GoalActivityState = {
   progress: GoalProgressSnapshot | null;
   loading: boolean;
@@ -9,12 +9,15 @@ export type GoalActivityState = {
   reportState: GoalActivityReportState;
   reportError: string | null;
   reportKnown: boolean;
+  hold?: GoalHold;
 };
 export type GoalActivityTransport = {
   readProgress: (params: { sessionId: string; executionId: string }) => Promise<{ progress: GoalProgressSnapshot | null }>;
   readReport: (params: { sessionId: string; executionId: string }) => Promise<{ state: string; report: unknown; detail?: string }>;
   onProgress: (listener: (event: GoalProgressChangedEvent) => void) => () => void;
   onReport: (listener: (event: GoalReportChangedEvent) => void) => () => void;
+  readExecution?: (params: { sessionId: string; executionId: string }) => Promise<{ hold?: GoalHold }>;
+  onExecution?: (listener: (event: GoalExecutionChangedEvent) => void) => () => void;
   onHostRestart?: (listener: () => void) => () => void;
   onFocus?: (listener: () => void) => () => void;
   onIdle?: (isIdle: () => boolean) => void;
@@ -32,6 +35,7 @@ export function createGoalActivityReader(sessionId: string, executionId: string,
   let generation = 0;
   let progressSequence = 0;
   let reportSequence = 0;
+  let executionSequence = 0;
   let remove: (() => void)[] = [];
   const matches = (value: { sessionId: string; executionId: string }) => value.sessionId === sessionId && value.executionId === executionId;
   const publish = (next: GoalActivityState) => { state = next; for (const listener of listeners) listener(); };
@@ -62,17 +66,32 @@ export function createGoalActivityReader(sessionId: string, executionId: string,
           throw new Error("GOAL_REPORT_SCOPE_MISMATCH");
         }
         if (report.integrity.kind !== "structured" && report.integrity.kind !== "fallback") throw new Error("GOAL_REPORT_INVALID_INTEGRITY");
-        reportState = report.integrity.kind === "fallback" ? "fallback" : "ready";
+        reportState = report.integrity.kind === "fallback" && report.closure !== "user_accepted" ? "fallback" : "ready";
       } else if (response.state === "draft" || response.state === "pending") reportState = "generating";
       else if (response.state === "not_found") reportState = "none";
       else if (response.state === "failed" || response.state === "corrupt" || response.state === "truncated") reportState = "failed";
       else throw new Error("GOAL_REPORT_INVALID_STATE");
-      publish({ ...state, reportState, reportKnown: true, reportError: reportState === "failed" ? response.detail ?? null : null });
+      publish({ ...state, reportState: state.hold?.state === "blocked" ? "blocked" : reportState, reportKnown: true, reportError: reportState === "failed" ? response.detail ?? null : null });
     } catch (error: unknown) {
       if (active && generation === currentGeneration && sequence === reportSequence) publish({ ...state, reportError: message(error) });
     }
   };
-  const refresh = async () => { if (active) await Promise.all([refreshProgress(), refreshReport()]); };
+  const refreshExecution = async () => {
+    if (!active || !transport.readExecution) return;
+    const currentGeneration = generation;
+    const sequence = ++executionSequence;
+    try {
+      const { hold } = await transport.readExecution({ sessionId, executionId });
+      if (!active || generation !== currentGeneration || sequence !== executionSequence) return;
+      if (hold && !matches(hold)) throw new Error("GOAL_EXECUTION_SCOPE_MISMATCH");
+      if (hold && state.hold && hold.version < state.hold.version) return;
+      publish({ ...state, hold, reportKnown: hold?.state === "blocked" || state.reportKnown,
+        reportState: hold?.state === "blocked" ? "blocked" : state.reportState === "blocked" ? "none" : state.reportState });
+    } catch (error: unknown) {
+      if (active && generation === currentGeneration && sequence === executionSequence) publish({ ...state, reportError: message(error) });
+    }
+  };
+  const refresh = async () => { if (active) await Promise.all([refreshProgress(), refreshReport(), refreshExecution()]); };
   return {
     getState: () => state,
     refresh,
@@ -85,6 +104,8 @@ export function createGoalActivityReader(sessionId: string, executionId: string,
           transport.onProgress((event) => { if (matches(event) && (!state.progress || event.revision > state.progress.revision)) void refreshProgress(); }),
           transport.onReport((event) => { if (matches(event)) void refreshReport(); }),
         ];
+        const execution = transport.onExecution?.((event) => { if (matches(event)) void refresh(); });
+        if (execution) remove.push(execution);
         const restart = transport.onHostRestart?.(() => {
           generation += 1;
           // Durable revisions stay monotonic; old requests no longer own state.

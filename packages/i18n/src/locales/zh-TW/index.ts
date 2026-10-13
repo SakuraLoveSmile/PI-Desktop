@@ -687,6 +687,44 @@ export const zhTW = {
     artifactScratchUnavailable: "暫存對話目錄不可用。",
   },
   goal: {
+    blocked: {
+      sessionRefreshFailed: "目標已繼續執行，但工作階段設定未能重新整理。請重新開啟工作階段更新顯示。",
+      attachmentsUnsupported: "續跑支援文字和檔案參照。圖片或外掛附件請改為一般訊息傳送。",
+      title: "目標受阻 · 等待處理",
+      resume: "繼續執行",
+      accept: "接受現況並結束",
+      abandon: "放棄目標",
+      sendContinues: "傳送將繼續目標 {{title}}",
+      normalMessage: "改為一般訊息",
+      supersede: "核准此目標將取代受阻目標 {{title}}。",
+      userAccepted: "使用者確認結束（未驗證）",
+      actionFailed: "操作未能完成，請重新整理後重試。",
+      remoteReadOnly: "請在目標所屬裝置處理此受阻目標。",
+      notificationTitle: "目標受阻，需要處理",
+      notificationBody: "請查看原因並選擇下一步操作。",
+      activityTitle: "{{title}} · 目標受阻",
+      timeline: "執行記錄",
+      timelineStarted: "開始執行",
+      timelineResumed: "繼續執行",
+      timelineBlocked: "目標受阻",
+      reasons: {
+        reportMissing: "未提交有效的完成報告。",
+        reportInvalid: "提交的報告未通過驗收。",
+        verdictPartial: "Agent 報告僅部分達成目標。",
+        verdictBlocked: "Agent 報告目標受阻。",
+        verdictUnknown: "無法確認目標是否達成。",
+        teamUnsettled: "團隊仍有未完成任務。",
+        resumeFailed: "未能繼續執行。",
+        agentError: "執行因錯誤結束。",
+        unknown: "目標需要處理。"
+      },
+      progress: {
+        pending: "待執行",
+        in_progress: "執行中",
+        completed: "已完成",
+        failed: "失敗"
+      }
+    },
     progressLabel: "目標進度",
     progressListLabel: "目標任務清單",
     progressInitializing: "載入進度…",
@@ -2227,6 +2265,7 @@ sklm: {
       endedProcesses: "已結束 {{count}}",
       clearEndedProcesses: "清除已結束程序",
       goal: {
+        reportBlocked: "目標受阻",
         reportPending: "報告待產生",
         reportUnavailable: "報告暫不可用",
         reportGenerating: "報告產生中",

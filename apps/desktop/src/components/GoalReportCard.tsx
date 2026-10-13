@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { GoalReportSummary } from "@pi-desktop/shared";
+import { BlockedGoalSessionCard } from "../features/chat/goal/BlockedGoalSessionCard";
 import {
   IconCheckCheck,
   IconCircleAlert,
@@ -15,6 +16,7 @@ export type GoalReportCardProps = {
 
 export function GoalReportCard({ report, onOpenReport }: GoalReportCardProps) {
   const { t } = useTranslation();
+  if (report.hold?.state === "blocked") return <BlockedGoalSessionCard sessionId={report.sessionId} />;
 
   const executionStatus = report.executionStatus;
   const isFallback = report.integrity === "fallback";
@@ -56,9 +58,9 @@ export function GoalReportCard({ report, onOpenReport }: GoalReportCardProps) {
                   : t("goalReport.view.statusInterrupted")}
               </span>
             ) : null}
-            {isFallback && (
+            {(isFallback || report.closure === "user_accepted") && (
               <span className="goal-report-card-fallback-badge">
-                {t("goalReport.view.fallback")}
+                {t(report.closure === "user_accepted" ? "goal.blocked.userAccepted" : "goalReport.view.fallback")}
               </span>
             )}
             {report.completedAt ? (
