@@ -32,6 +32,8 @@ import {
   UPDATE_GOAL_PROGRESS_TOOL_NAME,
 } from "./goal-progress-tool.js";
 import { GoalReportRecovery } from "./goal-report-recovery.js";
+import { approvedGoalInstruction, parseGoalResume, type RuntimeGoalResume } from "./goal-execution-context.js";
+import { createGoalProgressCapability } from "./goal-progress-capability.js";
 import { randomUUID } from "node:crypto";
 import {
   settledDelegationMessage,
@@ -68,7 +70,6 @@ import {
 import {
   DEFAULT_COMMAND_TIMEOUT_MS,
   OAUTH_AUTH_KIND,
-  validateGoalProgressSnapshot,
   type TrustedExtensionCommand,
   type TrustedExtensionDiagnostic,
   type TrustedExtensionSpec,
@@ -1848,6 +1849,7 @@ export class DesktopAgentRuntime {
   private readonly teamLeadExecution = new TeamLeadExecutionGuard();
   private readonly confirmedDeclarationView = new ConfirmedDeclarationModelView();
   private readonly goalReportRecovery = new GoalReportRecovery();
+  private goalStopHint?: "team_unsettled";
   private activeToolCalls = new Map<
     string,
     { toolName: string; args: unknown; startedAt: number }
@@ -6420,6 +6422,7 @@ export class DesktopAgentRuntime {
     this.teamLeadExecution.reset();
     this.confirmedDeclarationView.clear();
     this.goalReportRecovery.reset();
+    this.goalStopHint = undefined;
     this.pendingProgressTurnRerun = false;
     this.progressTurnRerunAttempted = false;
     this.progressTurnRerunInProgress = false;
@@ -6643,7 +6646,7 @@ export class DesktopAgentRuntime {
 
   private prepareGoalReportRecovery(): boolean {
     if (
-      !this.autonomousExecution || !this.goalReportDraftManager ||
+      !this.autonomousExecution || !this.goalReportDraftManager || this.goalStopHint ||
       this.goalReportDraftManager.isDraftValid() || this.disposed ||
       this.runCancelled || this.gracefulStopRequested || this.turnHadError ||
       this.pendingSubmissionOutcome || this.pendingMutationTermination ||
@@ -8340,7 +8343,7 @@ export class DesktopAgentRuntime {
           ) {
             const completion = await this.teamLeadExecution.authorizeCompletion(this.host, this.teamContext,
               () => ({ turnId: this.turnId, epoch: this.turnEpoch, mode: this.mode,
-                inactive: this.disposed || this.runCancelled }), this.autonomousExecution, responseText);
+                inactive: this.disposed || this.runCancelled }), this.autonomousExecution, responseText, !!this.goalReportDraftManager);
             if (completion.kind === "superseded") break;
             if (completion.kind === "stale") aborted = true;
             if (completion.kind === "recover") {
@@ -8350,11 +8353,12 @@ export class DesktopAgentRuntime {
               this.streamStartedAt = undefined;
               break;
             }
+            if (completion.kind === "blocked") this.goalStopHint = "team_unsettled";
             if (completion.kind === "error") { teamCompletionFailed = true; classifiedError = completion.error; }
           }
           // Re-run an invisible answer once before surfacing a finished turn.
           const silence =
-            !teamCompletionFailed &&
+            !teamCompletionFailed && !this.goalStopHint &&
             !failed &&
             !aborted &&
             responseText.trim().length === 0 &&
@@ -8411,7 +8415,7 @@ export class DesktopAgentRuntime {
           // Autonomous plan/goal: clearly forward-looking text without a tool
           // call is probably progress, not a final answer. Nudge once (#43).
           const progressOnlyTurn =
-            !teamCompletionFailed &&
+            !teamCompletionFailed && !this.goalStopHint &&
             !failed &&
             !aborted &&
             !silentTurn &&
@@ -8695,6 +8699,7 @@ export class DesktopAgentRuntime {
         this.emit({
           type: "turn_end",
           ...(subagentUsage ? { subagentUsage } : {}),
+          ...(this.goalStopHint ? { stopHint: this.goalStopHint } : {}),
         });
         break;
       case "agent_end": {
@@ -8768,6 +8773,7 @@ export class DesktopAgentRuntime {
         this.emit({
           type: "agent_end",
           messageIds: [],
+          ...(this.goalStopHint ? { stopHint: this.goalStopHint } : {}),
         });
         break;
       }
@@ -8922,9 +8928,14 @@ export class DesktopAgentRuntime {
   async executeApprovedPlan(
     execution: PlanExecution,
     durableTurnId: string,
+    resume?: RuntimeGoalResume,
   ): Promise<{ turnId: string }> {
     if (this.disposed) throw new Error("runtime disposed");
     this.assertNotRunning();
+    resume = parseGoalResume(resume);
+    if (resume && execution.kind !== "goal") {
+      throw Object.assign(new Error("Only an approved Goal can resume"), { errorCode: "INVALID_ARGUMENT" });
+    }
     this.retainPendingSteering();
     if (execution.sessionId !== this.sessionId) {
       throw Object.assign(new Error("approved plan belongs to another session"), {
@@ -8978,7 +8989,9 @@ export class DesktopAgentRuntime {
     // contract and subsequent work, never planning turns from another model.
     // The system state is transcript rows too, so entriesFromExecutionStart
     // keeps it.
-    this.executionContextStartIndex = this.fullEntries.length;
+    const priorGoalStart = resume && execution.kind === "goal"
+      ? this.fullEntries.findIndex(entry => entry.id === `approved-goal:${execution.id}`) : -1;
+    this.executionContextStartIndex = priorGoalStart >= 0 ? priorGoalStart : this.fullEntries.length;
 
     const kind = execution.kind === "goal" ? "goal" : "plan";
     if (kind === "goal") {
@@ -8988,7 +9001,7 @@ export class DesktopAgentRuntime {
         getProgressSnapshot: () => this.goalProgressManager?.snapshot,
         onDraftSubmitted: async (draft) => {
           // No catch here: a swallowed failure would make the tool report
-          // success while the Host publishes a fallback report instead. The
+          // success while the Host cannot verify the report. The
           // error propagates into the SubmitGoalReport tool result so the
           // executing Agent can retry.
           await this.host.call("goalReports.submitDraft", {
@@ -9016,58 +9029,11 @@ export class DesktopAgentRuntime {
           );
         },
       });
-      let tokenRes: unknown;
-      let tokenRequestFailed = false;
-      try {
-        tokenRes = await this.host.call<unknown>("goalProgress.issueToken", {
-          sessionId: execution.sessionId,
-          executionId: execution.id,
-          turnId: durableTurnId,
-        });
-      } catch (error: unknown) {
-        ensureExecutionIsCurrent();
-        tokenRequestFailed = true;
-        this.logGoalProgressTokenFailure(execution.id, error);
-      }
-      ensureExecutionIsCurrent();
-      if (!tokenRequestFailed) {
-        const writeToken =
-          tokenRes !== null && typeof tokenRes === "object" && !Array.isArray(tokenRes)
-            ? (tokenRes as Record<string, unknown>).writeToken
-            : undefined;
-        if (typeof writeToken === "string" && writeToken.trim()) {
-          this.goalProgressManager = new GoalProgressManager({
-            sessionId: execution.sessionId,
-            executionId: execution.id,
-            writeToken,
-            onUpdate: async (items) => {
-              const res = await this.host.call<unknown>("goalProgress.update", {
-                sessionId: execution.sessionId,
-                executionId: execution.id,
-                writeToken,
-                items,
-              });
-              const snapshot =
-                res !== null && typeof res === "object" && !Array.isArray(res)
-                  ? (res as Record<string, unknown>).progress
-                  : undefined;
-              if (
-                !validateGoalProgressSnapshot(snapshot) ||
-                snapshot.sessionId !== execution.sessionId ||
-                snapshot.executionId !== execution.id
-              ) {
-                throw new Error("Host returned an invalid goal progress snapshot");
-              }
-              return snapshot;
-            },
-          });
-        } else {
-          this.logGoalProgressTokenFailure(
-            execution.id,
-            new Error("Host returned no valid write token"),
-          );
-        }
-      }
+      this.goalProgressManager = await createGoalProgressCapability({
+        host: this.host, execution, turnId: durableTurnId, resumed: !!resume,
+        assertCurrent: ensureExecutionIsCurrent,
+        tokenFailure: error => this.logGoalProgressTokenFailure(execution.id, error),
+      });
       ensureExecutionIsCurrent();
       this.rebuildToolCatalog();
       this.setAgentTools(this.activeTools());
@@ -9081,21 +9047,7 @@ export class DesktopAgentRuntime {
     }
     const instruction =
       kind === "goal"
-        ? [
-            "The user approved the goal contract below. Reach that goal now, autonomously.",
-            `Use the host-created goal artifact at the workspace-relative path: ${execution.artifact.relativePath}`,
-            `Approved goal title: ${execution.title}`,
-            `Approval question: ${execution.question}`,
-            "Treat the following Markdown as the exact approved contract. Do not renegotiate it, replace it with a new contract, or ask for approval again.",
-            "<approved-goal-markdown>",
-            execution.plan,
-            "</approved-goal-markdown>",
-            "Choose your own approach with the normal Agent tools. Then verify every acceptance criterion yourself, running the checks the contract names rather than assuming they pass.",
-            "Keep working while a criterion is still unmet and you have an untried approach. Stop early only if a boundary in the contract blocks you or a criterion cannot be verified; say which one and why.",
-            "Use UpdateGoalProgress to maintain the approved Goal checklist from the start and whenever a milestone starts, completes, or fails. TodoWrite is a separate working checklist and does not update Goal progress. Before SubmitGoalReport, reconcile every existing progress item with the observed outcome; use partial or blocked when work remains incomplete.",
-            "Finish with a report that walks the acceptance criteria one by one, each marked met or unmet with the evidence you observed.",
-            "Call SubmitGoalReport with your final structured report (summary, verdict, metrics, criteria checklist, steps, and verification evidence) once your verification is complete.",
-          ].join("\n")
+        ? approvedGoalInstruction(execution, resume, this.goalProgressManager?.snapshot)
         : [
             "Execute the approved implementation plan now.",
             `Use the host-created plan artifact at the workspace-relative path: ${execution.artifact.relativePath}`,
@@ -9107,7 +9059,14 @@ export class DesktopAgentRuntime {
             "</approved-plan-markdown>",
             "Implement the approved plan with the normal Agent tools, then report the result.",
           ].join("\n");
-    const internalId = `approved-${kind}:${execution.id}`;
+    if (resume?.userMessage?.trim()) {
+      // Main persists and echoes the supplement once; this is its model-facing row.
+      this.appendLiveEntry(`approved-goal-resume-user:${execution.id}:${resume.segment}`, {
+        role: "user", content: resume.userMessage, timestamp: Date.now(),
+      });
+    }
+    const internalId = resume && kind === "goal"
+      ? `approved-goal-resume:${execution.id}:${resume.segment}` : `approved-${kind}:${execution.id}`;
     const internalMessage: AgentMessage = {
       role: "user",
       content: instruction,
@@ -9159,6 +9118,7 @@ export class DesktopAgentRuntime {
       this.terminateParentTurn();
       return { turnId: this.turnId };
     }
+    if (this.goalStopHint) return { turnId: this.turnId };
     await this.resumeAfterDelegations();
     return { turnId: this.turnId };
   }
