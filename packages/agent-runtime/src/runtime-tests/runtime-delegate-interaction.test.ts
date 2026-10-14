@@ -161,4 +161,32 @@ describe("unattended delegation admission", () => {
       expect(parent.runtime.getStatus().isRunning).toBe(false);
     } finally { releaseChild(); await parent.runtime.dispose(); }
   });
+
+  it("preserves the parent's fatal terminal when an aborted child delivers a late asktool response", async () => {
+    let releaseChild = () => {};
+    const gate = new Promise<void>(resolve => { releaseChild = resolve; });
+    const requests = childProvider([ask, bash], false, gate);
+    const task: ToolCall = { type: "toolCall", name: "Task", id: "task", arguments: { agent: "worker", task: "Fixture" } };
+    const response: NonNullable<Parameters<typeof fixture>[3]> = { terminal: "error", terminalRound: 2, observe: envelope => {
+      if (envelope.event.type === "error") releaseChild();
+    } };
+    const parent = fixture([[task], []], "unattended", "agent", response, {
+      subagents: [{ name: "worker", description: "Fixture", tools: ["Bash"], prompt: "Fixture", source: "builtin" }],
+    });
+    try {
+      await parent.runtime.prompt("Parent fails before child", "user", "turn");
+      await vi.waitFor(() => expect(parent.events.some(envelope => envelope.event.type === "message_end" &&
+        envelope.event.message.role === "tool" && envelope.event.message.toolName === "Task" &&
+        (envelope.event.message.toolResult as { details?: { status?: string } })?.details?.status === "failed")).toBe(true));
+      expect(requests).toHaveLength(1);
+      expect(parent.requests).toHaveLength(2);
+      expect(parent.effects).toEqual([]);
+      const errors = parent.events.filter(envelope => envelope.event.type === "error");
+      expect(errors).toHaveLength(1);
+      expect(errors[0]?.event).toMatchObject({ type: "error", error: { code: "PROVIDER_UNAUTHORIZED" } });
+      expect(parent.events.filter(envelope => ["error", "turn_end", "agent_end"].includes(envelope.event.type))
+        .map(envelope => envelope.event.type)).toEqual(["error", "turn_end", "agent_end"]);
+      expect(parent.runtime.getStatus().isRunning).toBe(false);
+    } finally { releaseChild(); await parent.runtime.dispose(); }
+  });
 });
