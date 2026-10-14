@@ -2,6 +2,13 @@
 
 Upstream v0.15.6 → v0.16.1 has been merged.
 
+- External schedulers can select a durable unattended interaction policy.
+  `asktool` is hidden from discovery and a forbidden call stops the complete
+  response before any tool executes, returning durable structured questions.
+  Prompt admission checks the expected policy atomically; delegated sessions
+  inherit it. Ordinary interactive sessions keep their existing question flow.
+  Plus schema 8 adds the policy and terminal details behind an upgrade backup.
+
 - Builds from `main` can reopen local candidate data on Plus schema 7 without
   downgrading the database. Older profiles upgrade behind a verified backup;
   historical authenticated inbox records and service ownership recover safely.

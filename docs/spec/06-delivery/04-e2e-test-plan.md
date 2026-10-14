@@ -376,6 +376,33 @@
   column without widening the card, and long question content keeps choices
   visible. Selecting and submitting still returns the original option label.
 
+### E2E-INTERACTION-unattended-hard-boundary
+
+- **Preconditions:** A candidate build receipt, isolated Host data/profile and
+  workspace, the production sidecar/headless lifecycle and authenticated MCP,
+  and a loopback SSE provider. No real provider or user data is used.
+- **Steps:** Persist unattended session policy and read its explicit versioned
+  receipt. Force the provider to emit `asktool` at either end of a batch with a
+  filesystem-writing tool, including invalid arguments and missing-catalog
+  calls. Read the terminal state through `pi_turn_get`, restart the Host and
+  read it again. Switch an idle session back to interactive and answer a real
+  ask through the production resolver.
+- **Expected:** Unattended declarations/discovery omit asktool; interception
+  executes no tool from the forbidden batch, emits no ask request or waiter,
+  sends no subsequent model request and preserves structured
+  `INTERACTION_REQUIRED` details durably. Invalid arguments remain explicit.
+  Ordinary interactive ask/resolve continues to work and runtime reuse cannot
+  retain a previous interaction policy.
+- **Specs linked:** `03-runtime/17-asktool-questions.md`,
+  `03-runtime/04-data-storage.md`, `03-runtime/06-host-rpc-protocol.md`,
+  ADR `unattended-interaction-policy`.
+- **Acceptance:** `node scripts/e2e-unattended-interaction.mjs` with the
+  candidate receipt and selected candidate Host binary; targeted runtime and
+  Host migration/lifecycle regression tests supply the complementary coverage.
+- **Milestone:** Plus scheduler interoperability.
+- **Status:** Automated fixture; execution evidence belongs to the exact
+  candidate fingerprint recorded by the script.
+
 ### E2E-POWER-keep-awake-setting
 
 - **Preconditions:** An isolated desktop profile with the setting absent; no

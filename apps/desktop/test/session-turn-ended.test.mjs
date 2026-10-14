@@ -53,7 +53,7 @@ function fixture() {
     addActiveTurnUsage() {},
     logger: { app() {} },
     finishTurn: (sessionId, status, errorCode, options) => {
-      finished.push({ sessionId, status, errorCode, turnId: options.turnId });
+      finished.push({ sessionId, status, errorCode, turnId: options.turnId, ...(options.errorDetails !== undefined ? { errorDetails: options.errorDetails } : {}) });
       return Promise.resolve();
     },
     isStaleTerminalEvent: coordination.isStaleTerminalEvent,
@@ -238,4 +238,11 @@ test("context reads are invalidated only after diagnostic acknowledgement and wi
   assert.deepEqual(f.emitted[0].event, { type: "context_insights" });
   assert.equal(f.emitted[0].sessionId, SESSION);
   assert.doesNotMatch(JSON.stringify(f.emitted), /private context fixture/);
+});
+
+test("interaction-required details travel with the owning terminal event", () => {
+  const f = fixture();
+  const details = { kind: "interaction_required", toolName: "asktool", toolCallId: "ask", questions: [] };
+  f.persistence.persistAgentEvent(f.envelope({ type: "error", error: { code: "INTERACTION_REQUIRED", message: "blocked", details } }, LIVE_TURN));
+  assert.deepEqual(f.finished, [{ sessionId: SESSION, status: "error", errorCode: "INTERACTION_REQUIRED", turnId: LIVE_TURN, errorDetails: details }]);
 });

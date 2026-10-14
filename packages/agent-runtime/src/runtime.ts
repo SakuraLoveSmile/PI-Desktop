@@ -1,5 +1,6 @@
 import { TeamRunLimitStop } from "./team/run-limit-stop.js";
 import { AskToolInputs } from "./ask-tool-inputs.js";
+import { interactionRequiredError, normalizeInteractionQuestions, readInteractionRequiredError, withInteractionPolicy } from "./interaction-policy.js";
 import { waitForLeadAsk } from "./team/lead-ask-wait.js";
 import { BackgroundProcessUpdates } from "./team/background-process-updates.js";
 import { backgroundBashDescription, backgroundKindDescription, validateBashBackgroundKind, bashTimeoutPayload } from "./background-bash.js";
@@ -97,6 +98,7 @@ import type {
   ContextCompactionSettings,
   MessageUsage,
   Mode,
+  InteractionMode,
   MessageAttachment,
   SessionMessageOrigin,
   PlanExecution,
@@ -985,6 +987,8 @@ export type AgentRuntimeOptions = {
   host: RuntimeHost;
   sessionId: string;
   mode: Mode;
+  /** Host-owned interaction policy; omission preserves interactive sessions. */
+  interactionMode?: InteractionMode;
   /** Durable host turn ID for the current prompt, used by plan identity. */
   turnId?: string;
   provider: RuntimeProviderConfig;
@@ -1060,6 +1064,7 @@ export type AgentRuntimeDiagnostic = {
 export type RuntimeMatchConfig = {
   executionProfile?: ExecutionProfile;
   mode: Mode;
+  interactionMode?: InteractionMode;
   provider: RuntimeProviderConfig;
   thinkingLevel: SessionThinkingLevel;
   pluginTools?: PluginToolDef[];
@@ -1684,6 +1689,9 @@ export class DesktopAgentRuntime {
   private disposed = false;
   readonly sessionId: string;
   private mode: Mode;
+  private readonly interactionMode: InteractionMode;
+  private delegatedInteractionRequired?: ReturnType<typeof classifyAgentError>;
+  private delegatedInteractionCompletion?: Promise<void>;
   private executionProfile: ExecutionProfile;
   private teamContext?: AgentRuntimeOptions["teamContext"];
   private provider: RuntimeProviderConfig;
@@ -1926,6 +1934,10 @@ export class DesktopAgentRuntime {
   };
 
   constructor(opts: AgentRuntimeOptions) {
+    if (opts.interactionMode !== undefined && opts.interactionMode !== "interactive" && opts.interactionMode !== "unattended") {
+      throw Object.assign(new Error("Invalid interaction mode"), { errorCode: "INVALID_ARGUMENT" });
+    }
+    this.interactionMode = opts.interactionMode ?? "interactive";
     this.sessionId = opts.sessionId;
     this.turnId = opts.turnId;
     this.mode = opts.mode;
@@ -2026,6 +2038,10 @@ export class DesktopAgentRuntime {
     const tools = this.declaredTools();
     this.agent = new Agent({
       streamFn: (m, context, options) => {
+        if (this.delegatedInteractionRequired) {
+          const error = this.delegatedInteractionRequired;
+          throw Object.assign(new Error(error.message), error);
+        }
         this.teamBudgetStop.assertModelAdmission();
         this.setAgentActivity({ phase: "waiting-model", since: Date.now() });
         this.providerResponseStatus = undefined;
@@ -2162,9 +2178,9 @@ export class DesktopAgentRuntime {
         // configured budget ends as a STREAM_FAILED error and re-enters the
         // shared transient retry path instead of hanging the turn on a
         // connection the provider never closes.
-        return withStreamIdleTimeout(retryStream, m, streamIdleTimeoutMs(), () =>
+        return withInteractionPolicy(withStreamIdleTimeout(retryStream, m, streamIdleTimeoutMs(), () =>
           stallAbort.abort(),
-        );
+        ), this.interactionMode, normalizeInteractionQuestions);
       },
       // A vendor account has no long-lived key. Leaving it unset keeps pi-ai
       // from overriding the auth the provider just resolved for this request.
@@ -2200,6 +2216,7 @@ export class DesktopAgentRuntime {
       // Sequential execution also makes the host-confirmed mode change visible
       // before the next model request in the same run.
       beforeToolCall: async (context) => {
+        if (this.delegatedInteractionRequired) return { block: true, terminate: true, reason: this.delegatedInteractionRequired.message };
         const blocked = this.teamBudgetStop.denial(context);
         if (blocked) return blocked;
         const result = await this.beforeToolCall(context);
@@ -2698,6 +2715,7 @@ export class DesktopAgentRuntime {
       !this.disposed &&
       providerMatches &&
       this.mode === config.mode &&
+      this.interactionMode === (config.interactionMode ?? "interactive") &&
       this.executionProfile === (config.executionProfile ?? "standard") &&
       this.thinkingLevel ===
         clampThinkingLevel(config.provider, config.thinkingLevel) &&
@@ -3753,6 +3771,11 @@ export class DesktopAgentRuntime {
       }),
       executionMode: "sequential",
       execute: async (toolCallId, params, signal) => {
+        // Defense for retained direct execute references outside the model loop.
+        if (this.interactionMode === "unattended") {
+          const error = interactionRequiredError(toolCallId, normalizeInteractionQuestions(params));
+          throw Object.assign(new Error(error.message), error, { errorCode: error.code });
+        }
         const questions = this.normalizeAskQuestions(params);
         if (!questions) {
           return {
@@ -4008,6 +4031,8 @@ export class DesktopAgentRuntime {
       if (!this.isToolAllowedInMode(tool.name)) unavailable.add(tool.name);
     }
     for (const tool of this.buildToolDefinitions()) {
+      // Also excludes plugins/extensions attempting to register this name.
+      if (this.interactionMode === "unattended" && tool.name === ASK_TOOL_NAME) continue;
       if (!this.isToolAllowedInMode(tool.name)) unavailable.add(tool.name);
       if (!this.isToolAllowedInMode(tool.name) && (this.teamContext?.workPurpose === "plan_research" || expertToolDenial(this.teamContext?.expertConfig, tool.name) || !retainModeToolDeclaration(tool.name))) continue;
       // The execution mode is decided here, in one place, so no tool can grow
@@ -5020,6 +5045,8 @@ export class DesktopAgentRuntime {
             task,
             provider,
             infiniteProviderRetry: this.infiniteProviderRetry,
+            interactionMode: this.interactionMode,
+            onInteractionRequired: error => this.stopForDelegateInteraction(record, error),
             thinkingLevel,
             fallbackModels: (definition.fallbackModels ?? []).map((pin) => ({
               key: subagentModelKey(pin),
@@ -5189,7 +5216,8 @@ export class DesktopAgentRuntime {
     // effects may strand TaskWait or the parent's idle auto-resume.
     record.resolveCompletion();
     try {
-      if (result.usage) {
+      if (result.usage && record.startedEpoch === this.turnEpoch &&
+          (!this.delegatedInteractionRequired || record.completion === this.delegatedInteractionCompletion)) {
         this.turnSubagentUsage = addUsage(this.turnSubagentUsage, result.usage);
       }
       this.delegationChains.settle(record.delegateSessionId, record.status);
@@ -5208,6 +5236,23 @@ export class DesktopAgentRuntime {
       this.refreshDelegationWait();
       this.refreshResumablePrompt();
       this.pruneFinishedDelegations();
+      if (result.error?.code === "INTERACTION_REQUIRED" && this.delegatedInteractionRequired && record.completion === this.delegatedInteractionCompletion) {
+        // The child has accounted its final response before this terminal claim.
+        const error = this.delegatedInteractionRequired;
+        this.autonomousExecution = false;
+        if (this.goalReportDraftManager || this.goalProgressManager) {
+          this.goalReportDraftManager = undefined;
+          this.goalProgressManager = undefined;
+          this.rebuildToolCatalog();
+          this.setAgentTools(this.activeTools());
+        }
+        this.finalizeCurrentAssistant("error", error);
+        this.emit({ type: "error", error });
+        const subagentUsage = this.turnSubagentUsage;
+        this.turnSubagentUsage = undefined;
+        this.emit({ type: "turn_end", ...(subagentUsage ? { subagentUsage } : {}) });
+        this.emit({ type: "agent_end", messageIds: [] });
+      }
     }
   }
 
@@ -5295,6 +5340,17 @@ export class DesktopAgentRuntime {
     this.abortRunningDelegations();
     this.delegationWaitTargets = undefined;
     this.clearAgentActivity();
+  }
+
+  private stopForDelegateInteraction(record: DelegationRecord, error: ReturnType<typeof classifyAgentError>): void {
+    if (this.disposed || this.runCancelled || this.turnHadError || record.startedEpoch !== this.turnEpoch || this.delegatedInteractionRequired) return;
+    this.delegatedInteractionRequired = error;
+    this.delegatedInteractionCompletion = record.completion;
+    this.resetRunRecoveryState();
+    this.runCancelled = true;
+    this.terminateParentTurn();
+    this.agent.abort();
+    // Settlement owns the terminal events, including the final child usage.
   }
 
   /** D328 keeps the turn open on parent idle, not on a fatal parent error. */
@@ -5476,6 +5532,7 @@ export class DesktopAgentRuntime {
   private async resumeAfterDelegations(): Promise<void> {
     if (this.disposed || this.runCancelled || this.turnHadError) {
       if (this.turnHadError) this.terminateParentTurn();
+      await this.delegatedInteractionCompletion;
       return;
     }
     const epoch = this.turnEpoch;
@@ -5510,6 +5567,7 @@ export class DesktopAgentRuntime {
         epoch !== this.turnEpoch
       ) {
         if (this.turnHadError) this.terminateParentTurn();
+        await this.delegatedInteractionCompletion;
         return;
       }
       const settled = targets.filter(
@@ -8081,6 +8139,11 @@ export class DesktopAgentRuntime {
 
   private async handleAgentEvent(event: AgentEvent) {
     this.forwardAgentEventToExtensions(event);
+    // A fatal child decision owns settlement; an interrupted parent stream
+    // cannot replace it with an abort or publish a second terminal lifecycle.
+    if (this.delegatedInteractionRequired &&
+        (event.type === "turn_end" || event.type === "agent_end" ||
+         ((event.type === "message_start" || event.type === "message_update" || event.type === "message_end") && event.message.role === "assistant"))) return;
     switch (event.type) {
       case "agent_start":
         if (this.steeringContinuation) break;
@@ -8240,8 +8303,9 @@ export class DesktopAgentRuntime {
           // (stopReason "error"/"aborted" + errorMessage) and resolves the
           // prompt normally, so this is where provider/model errors surface.
           const stopReason = event.message.stopReason;
+          const interactionError = readInteractionRequiredError(event.message);
           const localError = readLocalRequestErrorDetails(event.message);
-          const overflow = !localError && isContextOverflow(
+          const overflow = !interactionError && !localError && isContextOverflow(
             event.message,
             effectiveModelContextWindow(this.model) || DEFAULT_CONTEXT_WINDOW,
           );
@@ -8255,7 +8319,7 @@ export class DesktopAgentRuntime {
               : failed
                 ? "provider stream failed"
                 : undefined;
-          let classifiedError = overflow
+          let classifiedError = interactionError ?? (overflow
             ? errorMessage
               ? classifyAgentError(errorMessage)
               : {
@@ -8266,7 +8330,7 @@ export class DesktopAgentRuntime {
                 }
             : errorMessage
               ? classifyProviderError(event.message, this.providerResponseStatus)
-              : undefined;
+              : undefined);
           const nextText = content.hasText
             ? content.text
             : this.currentAssistant.content;
@@ -8317,7 +8381,7 @@ export class DesktopAgentRuntime {
             this.streamStartedAt !== undefined
               ? Math.max(0, endedAt - this.streamStartedAt)
               : undefined;
-          if (classifiedError) {
+          if (classifiedError && !interactionError) {
             classifiedError = this.providerErrorWithDiagnostics(
               classifiedError,
               "stream",
@@ -8471,6 +8535,7 @@ export class DesktopAgentRuntime {
           const diagnosticError = classifiedError;
           const retryProviderAttempt =
             !overflow &&
+            !interactionError &&
             diagnosticError !== undefined &&
             diagnosticError.details?.origin !== "local"
               ? this.claimProviderRetry(diagnosticError, "stream")
@@ -8951,6 +9016,8 @@ export class DesktopAgentRuntime {
     this.gracefulStopRequested = false;
     this.teamBudgetStop.reset();
     this.runCancelled = false;
+    this.delegatedInteractionRequired = undefined;
+    this.delegatedInteractionCompletion = undefined;
     this.resetRunRecoveryState();
     this.turnEpoch += 1;
     const executionTurnEpoch = this.turnEpoch;
@@ -9180,6 +9247,8 @@ export class DesktopAgentRuntime {
     this.gracefulStopRequested = false;
     this.teamBudgetStop.reset();
     this.runCancelled = false;
+    this.delegatedInteractionRequired = undefined;
+    this.delegatedInteractionCompletion = undefined;
     this.turnSubagentUsage = undefined;
     // Capabilities and path-scoped instruction claims belong to one prompt.
     this.subagentOverrideProviders = {};
@@ -9427,6 +9496,7 @@ export class DesktopAgentRuntime {
   }
   private async waitForIdleAndSteering(): Promise<void> {
     await this.agent.waitForIdle();
+    await this.delegatedInteractionCompletion;
     if (!this.acceptingSteering || this.runCancelled || this.turnHadError) {
       this.retainPendingSteering();
       return;

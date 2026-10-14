@@ -1,5 +1,5 @@
 import type { PersistenceOutbox } from "../persistence-outbox";
-import { ErrorCodes, IPC, type AgentEventEnvelope, type AppNotification, type PlanExecution, type PlanExecutionFinishStatus, type UiMessage } from "@pi-desktop/shared";
+import { ErrorCodes, IPC, normalizeInteractionRequiredDetails, type AgentEventEnvelope, type AppNotification, type PlanExecution, type PlanExecutionFinishStatus, type UiMessage } from "@pi-desktop/shared";
 import { executionFromResponse, executionListFromResponse, planExecutionFromUnknown } from "@pi-desktop/host-runtime";
 import type { RuntimeState } from "./context";
 import type { PlanSchedulePollResult } from "./plan-schedule-poller";
@@ -19,6 +19,7 @@ export type FinishTurnOptions = {
   turnId: string;
   createNotification?: boolean;
   recoverInflight?: boolean;
+  errorDetails?: unknown;
 };
 
 /**
@@ -251,6 +252,8 @@ function finishTurn(
             turnId,
             status: reason,
             errorCode,
+            ...(reason === "error" && errorCode === "INTERACTION_REQUIRED"
+                ? { errorDetails: normalizeInteractionRequiredDetails(options.errorDetails) } : {}),
             createNotification,
             ...(turnUsage ? { usage: turnUsage } : {}),
             // The reply can no longer finish on its own: promote its last
@@ -551,6 +554,7 @@ async function dispatchApprovedPlan(rawExecution: unknown): Promise<void> {
       sessionId: execution.sessionId,
       providerId: launch.providerId,
       modelId: launch.modelId,
+      expectedInteractionMode: sessionResult.session.interactionMode === undefined ? "interactive" : sessionResult.session.interactionMode,
     });
     turnId = String(turn.turnId || "").trim();
     if (!turnId) throw new Error("execution turn was not created");
@@ -597,7 +601,7 @@ async function dispatchApprovedPlan(rawExecution: unknown): Promise<void> {
     // The identity captured before the awaits is the one this turn owns; the
     // finalizer refuses it when the session has moved on.
     if (turnId) {
-      await finishTurn(initial.sessionId, "error", errorCode, { turnId });
+      await finishTurn(initial.sessionId, "error", errorCode, { turnId, errorDetails: (error as { details?: unknown; data?: { details?: unknown } })?.details ?? (error as { data?: { details?: unknown } })?.data?.details });
     }
     if (claimed) {
       await finishApprovedExecution(initial.id, "interrupted", errorCode);

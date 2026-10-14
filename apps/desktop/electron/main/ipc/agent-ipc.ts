@@ -461,6 +461,13 @@ export function registerAgentIpc({
       session,
       settings,
     );
+    const interactionMode = session.interactionMode === undefined ? "interactive" : session.interactionMode;
+    if (req.expectedInteractionMode !== undefined && req.expectedInteractionMode !== "interactive" && req.expectedInteractionMode !== "unattended") {
+      throw Object.assign(new Error("expectedInteractionMode must be interactive or unattended"), { errorCode: ErrorCodes.INVALID_PARAMS });
+    }
+    if (req.expectedInteractionMode !== undefined && req.expectedInteractionMode !== interactionMode) {
+      throw Object.assign(new Error("session interaction policy changed before turn admission"), { errorCode: ErrorCodes.INTERACTION_POLICY_MISMATCH });
+    }
     sidecar.setProjectInstructionRoot(req.sessionId, launch.projectPath);
 
     // Open a durable turn row, then persist the user message under it.
@@ -468,6 +475,7 @@ export function registerAgentIpc({
       sessionId: req.sessionId,
       providerId: launch.providerId,
       modelId: launch.modelId,
+      expectedInteractionMode: interactionMode,
       ...(req.revisionProposalId
         ? { revisionProposalId: req.revisionProposalId, revisionContent: req.content }
         : {}),
@@ -560,6 +568,7 @@ export function registerAgentIpc({
     } catch (error) {
       await finishTurn(req.sessionId, "error", (error as any)?.errorCode, {
         turnId: durableTurnId,
+        errorDetails: (error as { details?: unknown; data?: { details?: unknown } })?.details ?? (error as { data?: { details?: unknown } })?.data?.details,
       });
       throw error;
     }
@@ -634,7 +643,7 @@ export function registerAgentIpc({
         (error as { data?: { errorCode?: string }; errorCode?: string })?.data
           ?.errorCode ??
           (error as { errorCode?: string })?.errorCode,
-        { turnId: durableTurnId },
+        { turnId: durableTurnId, errorDetails: (error as { details?: unknown; data?: { details?: unknown } })?.details ?? (error as { data?: { details?: unknown } })?.data?.details },
       );
       // A turn whose user message could not be appended must not be started:
       // restarting it here would run a prompt the transcript does not contain.
@@ -693,6 +702,7 @@ export function registerAgentIpc({
     } catch (e) {
       await finishTurn(req.sessionId, "error", (e as any)?.errorCode, {
         turnId: durableTurnId,
+        errorDetails: (e as { details?: unknown; data?: { details?: unknown } })?.details ?? (e as { data?: { details?: unknown } })?.data?.details,
       });
       throw e;
     }

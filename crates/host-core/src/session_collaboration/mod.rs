@@ -181,6 +181,7 @@ fn spawn(db: &Database, input: &Value) -> Result<Value> {
             project_name: parent.summary.project_name,
             thinking_level: Some(parent.summary.thinking_level),
             permission_mode: Some(parent.summary.permission_mode),
+            interaction_mode: Some(parent.summary.interaction_mode),
             execution_profile: None,
         },
     )?;

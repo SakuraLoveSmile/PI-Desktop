@@ -34,6 +34,7 @@ export interface HostRpcPort {
 
 export type TurnStartRequest = {
   sessionId: string;
+  expectedInteractionMode?: import("@pi-desktop/shared").InteractionMode;
   content: string;
   sessionMessageId?: string;
   /** Client-chosen id for the durable user row (D288); the runtime mints one otherwise. */

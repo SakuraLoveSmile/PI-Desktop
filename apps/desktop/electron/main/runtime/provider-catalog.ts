@@ -50,6 +50,7 @@ export type RuntimeProvider = {
 };
 
 export type RuntimeSession = {
+  interactionMode?: import("@pi-desktop/shared").InteractionMode;
   providerId?: string;
   modelId?: string;
   thinkingLevel?: SessionThinkingLevel;

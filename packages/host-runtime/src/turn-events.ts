@@ -39,7 +39,7 @@ export type TurnOwnership = {
     sessionId: string,
     status: "completed" | "aborted" | "error",
     errorCode: string | undefined,
-    options: { turnId: string },
+    options: { turnId: string; errorDetails?: unknown },
   ): Promise<void>;
 };
 
@@ -204,9 +204,9 @@ export class TurnEventPipeline {
       }
     }
 
-    const finish = (status: "completed" | "aborted" | "error", errorCode: string | undefined) =>
+    const finish = (status: "completed" | "aborted" | "error", errorCode: string | undefined, errorDetails?: unknown) =>
       this.options.ownership
-        .finishTurn(sessionId, status, errorCode, { turnId: envelope.turnId ?? "" })
+        .finishTurn(sessionId, status, errorCode, { turnId: envelope.turnId ?? "", ...(errorDetails !== undefined ? { errorDetails } : {}) })
         .catch((error: unknown) => {
           this.options.log("warn", "turn finalization failed", { sessionId, error: String(error) });
         });
@@ -231,7 +231,7 @@ export class TurnEventPipeline {
           retriable: event.error.retriable,
         });
         if (this.options.ownership.isStaleTerminalEvent(envelope)) return;
-        void finish(event.error.code === "TURN_ABORTED" ? "aborted" : "error", event.error.code);
+        void finish(event.error.code === "TURN_ABORTED" ? "aborted" : "error", event.error.code, event.error.details);
         return;
       case "agent_end":
         if (this.options.ownership.isStaleTerminalEvent(envelope)) return;

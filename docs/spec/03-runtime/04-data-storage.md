@@ -533,6 +533,8 @@ CREATE TABLE sessions (
                 CHECK (permission_mode IN ('inherit', 'ask', 'accept-edits', 'auto')),
   execution_profile TEXT NOT NULL DEFAULT 'standard'
                 CHECK (execution_profile IN ('standard', 'team')),
+  interaction_mode TEXT NOT NULL DEFAULT 'interactive' -- Plus P8
+                CHECK (interaction_mode IN ('interactive', 'unattended')),
   source      TEXT,                            -- import origin: claude-code | codex | opencode | pi
   deleted_at  INTEGER,                         -- plugin trash marker; null means active
   pinned      INTEGER NOT NULL DEFAULT 0,
@@ -652,6 +654,7 @@ CREATE TABLE turns (
   provider_id   TEXT,                            -- snapshot at run time, no FK
   model_id      TEXT,                            -- snapshot at run time
   error_code    TEXT,
+  error_details_json TEXT,                       -- Plus P8: structured terminal details
   input_tokens  INTEGER NOT NULL DEFAULT 0,
   output_tokens INTEGER NOT NULL DEFAULT 0,
   usage_json    TEXT,                            -- full provider usage (cached breakdown, …)
@@ -661,6 +664,15 @@ CREATE TABLE turns (
 CREATE INDEX idx_turns_session ON turns(session_id, started_at DESC);
 CREATE INDEX idx_turns_ended_at ON turns(ended_at DESC);
 ```
+
+Plus P8 adds the two columns through the independent Plus migration track,
+without changing shared baseline DDL or `PRAGMA user_version`. Older sessions
+default to interactive; an omitted configure field preserves the stored value
+and forks copy it. `interactionPolicyVersion: 1` is a Host response constant,
+not a database column. A running-turn terminal CAS stores `error_details_json`
+atomically with its reason and does not let duplicate terminal events replace
+it. The structured unattended question result is specified in
+[asktool](17-asktool-questions.md#host-owned-unattended-sessions).
 
 ### 4.6a plan_approvals — immutable checkpoint and execution fields (schema v11)
 
