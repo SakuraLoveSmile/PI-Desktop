@@ -5343,7 +5343,7 @@ export class DesktopAgentRuntime {
   }
 
   private stopForDelegateInteraction(record: DelegationRecord, error: ReturnType<typeof classifyAgentError>): void {
-    if (this.disposed || this.runCancelled || record.startedEpoch !== this.turnEpoch || this.delegatedInteractionRequired) return;
+    if (this.disposed || this.runCancelled || this.turnHadError || record.startedEpoch !== this.turnEpoch || this.delegatedInteractionRequired) return;
     this.delegatedInteractionRequired = error;
     this.delegatedInteractionCompletion = record.completion;
     this.resetRunRecoveryState();

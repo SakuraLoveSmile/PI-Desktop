@@ -129,6 +129,7 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
         agentName: "explorer",
         prompt: "sub-prompt",
         startedAt: Date.now(),
+        startedEpoch: (runtime as unknown as { turnEpoch: number }).turnEpoch,
         status: "running",
         resolveCompletion: () => {},
         abort: () => {},

@@ -20,7 +20,7 @@ export const ask: ToolCall = { type: "toolCall", name: "asktool", id: "ask", arg
 export const bash: ToolCall = { type: "toolCall", name: "Bash", id: "bash", arguments: { command: "printf fixture" } };
 
 export function fixture(batches: ToolCall[][], mode?: "interactive" | "unattended", runtimeMode: "agent" | "plan" = "plan",
-  response: { terminal?: "error" | "aborted"; resultOnly?: boolean; observe?: (event: AgentEventEnvelope) => void;
+  response: { terminal?: "error" | "aborted"; terminalRound?: number; resultOnly?: boolean; observe?: (event: AgentEventEnvelope) => void;
     beforeFinish?: (round: number, signal?: AbortSignal) => Promise<void> } = {}, overrides: Partial<AgentRuntimeOptions> = {}) {
   const events: AgentEventEnvelope[] = [];
   const requests: Context[] = [];
@@ -51,10 +51,11 @@ export function fixture(batches: ToolCall[][], mode?: "interactive" | "unattende
     requests.push({ ...context, messages: [...context.messages] });
     const calls = batches[round++] ?? [];
     const requestRound = round;
+    const terminal = response.terminalRound === undefined || response.terminalRound === requestRound ? response.terminal : undefined;
     const message: AssistantMessage = { role: "assistant", api: "openai-completions", provider: "fixture",
       model: "fixture-model", content: calls.length ? calls : [{ type: "text", text: "Fixture complete." }],
-      stopReason: response.terminal ?? (calls.length ? "toolUse" : "stop"), timestamp: round,
-      ...(response.terminal ? { errorMessage: response.terminal === "error" ? "401: authentication failed" : "Cancelled" } : {}),
+      stopReason: terminal ?? (calls.length ? "toolUse" : "stop"), timestamp: round,
+      ...(terminal ? { errorMessage: terminal === "error" ? "401: authentication failed" : "Cancelled" } : {}),
       usage: { input: 7, output: 3, cacheRead: 0, cacheWrite: 0, totalTokens: 10,
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } };
     const stream = createAssistantMessageEventStream();
