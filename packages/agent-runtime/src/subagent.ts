@@ -48,6 +48,8 @@ import {
 } from "@pi-desktop/shared";
 import { classifyAgentError } from "./agent-errors.js";
 import { readLocalRequestErrorDetails } from "./local-request-errors.js";
+import { normalizeInteractionQuestions, readInteractionRequiredError, withInteractionPolicy } from "./interaction-policy.js";
+import type { InteractionMode } from "@pi-desktop/shared";
 import { withProviderFetchFailure } from "./provider-transport-recovery.js";
 import {
   assistantContent,
@@ -119,6 +121,7 @@ export type SubagentRunResult = {
   error?: {
     code: string;
     message: string;
+    details?: Record<string, unknown>;
     resumeId?: string;
     charactersProduced?: number;
   };
@@ -130,6 +133,9 @@ export type SubagentToolOutcome = {
 };
 
 export type SubagentRunOptions = {
+  interactionMode?: InteractionMode;
+  /** Fatal unattended decision, handed directly to the owning turn. */
+  onInteractionRequired?: (error: ReturnType<typeof classifyAgentError>) => void;
   definition: SubagentDefinition;
   sessionId: string;
   /** Parent durable turn; child rows are attributed to the same turn. */
@@ -245,13 +251,14 @@ export { addUsage };
 export class SubagentRun {
   private readonly agent: Agent;
   private readonly opts: SubagentRunOptions;
+  private readonly interactionMode: InteractionMode;
   private currentAssistant?: UiMessage;
   private lastReportText = "";
   private lastReportTruncated = false;
   private turns = 0;
   private toolCalls = 0;
   private usage?: MessageUsage;
-  private streamError?: { code: string; message: string };
+  private streamError?: { code: string; message: string; details?: Record<string, unknown> };
   /** Set when a settled message reads as a cancel — `stopReason: "aborted"`, or
    * a local marker whose preserved cause name is `AbortError`. pi-ai can wrap
    * an abort that fired before the parent signal flipped, so this is the only
@@ -277,7 +284,11 @@ export class SubagentRun {
   private readonly runAbortController = new AbortController();
 
   constructor(opts: SubagentRunOptions) {
+    if (opts.interactionMode !== undefined && opts.interactionMode !== "interactive" && opts.interactionMode !== "unattended") {
+      throw Object.assign(new Error("Invalid interaction mode"), { errorCode: "INVALID_ARGUMENT" });
+    }
     this.opts = opts;
+    this.interactionMode = opts.interactionMode ?? "interactive";
     this.provider = opts.provider;
     this.thinkingLevel = opts.thinkingLevel;
     this.attemptedModels.add(`${opts.provider.id}/${opts.provider.modelId}`);
@@ -296,7 +307,7 @@ export class SubagentRun {
       initialState: {
         systemPrompt: opts.systemPrompt,
         model: binding.model,
-        tools: opts.tools,
+        tools: this.interactionMode === "unattended" ? opts.tools.filter(tool => tool.name !== "asktool") : opts.tools,
         thinkingLevel: binding.agentThinkingLevel,
         messages: opts.initialMessages ? [...opts.initialMessages] : [],
       },
@@ -388,6 +399,9 @@ export class SubagentRun {
       this.finalizeCurrentAssistant();
     }
 
+    if (this.streamError?.code === "INTERACTION_REQUIRED") {
+      return this.result("failed", "", this.streamError);
+    }
     if (signal?.aborted) {
       return this.result("aborted", "The delegated task was aborted.");
     }
@@ -449,7 +463,7 @@ export class SubagentRun {
     provider: RuntimeProviderConfig,
     thinkingLevel: SubagentThinkingLevel,
   ) {
-    return subagentModelBinding({
+    const binding = subagentModelBinding({
       provider,
       thinkingLevel,
       sessionId: this.opts.sessionId,
@@ -459,6 +473,9 @@ export class SubagentRun {
       parentToolCallId: this.opts.parentToolCallId,
       onContext: request => this.emit({ type: "context_insights", request }),
     }, this.retryState);
+    if (this.interactionMode === "interactive") return binding;
+    return { ...binding, streamFn: (...args: Parameters<typeof binding.streamFn>) =>
+      withInteractionPolicy(binding.streamFn(...args), this.interactionMode, normalizeInteractionQuestions) };
   }
 
   private installContextOutcome(
@@ -543,7 +560,8 @@ export class SubagentRun {
   private useNextModel(): boolean {
     // An aborted turn never continues, whether the signal flipped yet or the
     // cancel was only visible on the settled message.
-    if (this.runSignal().aborted || this.turnAborted || !this.streamError || this.streamError.code === "TURN_ABORTED") return false;
+    if (this.runSignal().aborted || this.turnAborted || !this.streamError ||
+        this.streamError.code === "TURN_ABORTED" || this.streamError.code === "INTERACTION_REQUIRED") return false;
     if (!this.opts.fallbackModels?.length) return false;
     const failed = this.agent.state.messages.at(-1);
     // Only a provider's terminal assistant error permits fallback. Host/tool
@@ -673,7 +691,7 @@ export class SubagentRun {
    * 5) — but only here, after `useNextModel` had its chance, so a larger
    * fallback window still rescues the run.
    */
-  private terminalError(error: { code: string; message: string }): { code: string; message: string } {
+  private terminalError(error: { code: string; message: string; details?: Record<string, unknown> }): { code: string; message: string; details?: Record<string, unknown> } {
     if (error.code === "CONTEXT_TOO_LARGE" || error.code === "SUBAGENT_CONTEXT_OVERFLOW") {
       return subagentContextOverflowError(this.provider.modelId);
     }
@@ -705,6 +723,7 @@ export class SubagentRun {
     error?: {
       code: string;
       message: string;
+      details?: Record<string, unknown>;
       resumeId?: string;
       charactersProduced?: number;
     },
@@ -893,6 +912,7 @@ export class SubagentRun {
         // trace of the Stop. An abort is not a failure, so it neither retries
         // nor produces an error row; other local errors stay terminal below.
         const localError = readLocalRequestErrorDetails(message);
+        const interactionError = readInteractionRequiredError(message);
         const aborted =
           stopReason === "aborted" || localError?.causeName === "AbortError";
         if (aborted) this.turnAborted = true;
@@ -902,7 +922,10 @@ export class SubagentRun {
         if (failed) {
           const overflow = this.pendingContextOverflow;
           this.pendingContextOverflow = undefined;
-          if (overflow) {
+          if (interactionError) {
+            classifiedError = interactionError;
+            this.streamError = interactionError;
+          } else if (overflow) {
             // The boundary guard threw after degradation still did not fit.
             // The synthetic failure message carries the thrown text; keep the
             // actionable code instead of classifying it as a provider error.
@@ -962,12 +985,13 @@ export class SubagentRun {
           status: failed ? "error" : aborted ? "aborted" : "complete",
           ...(messageUsage ? { usage: messageUsage } : {}),
           ...(failed ? { isError: true } : {}),
-          ...(classifiedError?.details?.origin === "local" ||
+          ...(interactionError || classifiedError?.details?.origin === "local" ||
               isCertificateVerificationError(classifiedError?.details?.networkCode)
             ? { error: classifiedError } : {}),
         };
         this.currentAssistant = undefined;
-        this.emit({ type: "message_end", message: row });
+        try { this.emit({ type: "message_end", message: row }); }
+        finally { if (interactionError) this.opts.onInteractionRequired?.(interactionError); }
         break;
       }
       case "tool_execution_start":

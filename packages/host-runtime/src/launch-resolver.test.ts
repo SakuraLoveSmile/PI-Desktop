@@ -77,6 +77,18 @@ describe("createHeadlessLaunchResolver", () => {
     expect(calls.some((call) => call.method === "providers.getSecret")).toBe(true);
   });
 
+  it("preserves the durable interaction policy and rejects unknown policies", async () => {
+    const { host } = hostWith([provider], { p1: "sk-test" });
+    const resolver = createHeadlessLaunchResolver({ getHost: () => host, dataDir: "/data", log: () => undefined });
+    for (const mode of ["interactive", "unattended"]) {
+      expect((await resolver.resolve("s", { interactionMode: mode }, {})).sidecarParams.interactionMode).toBe(mode);
+    }
+    expect((await resolver.resolve("s", {}, {})).sidecarParams.interactionMode).toBe("interactive");
+    for (const invalid of ["unknown", null, true]) {
+      await expect(resolver.resolve("s", { interactionMode: invalid }, {})).rejects.toMatchObject({ errorCode: "INVALID_PARAMS" });
+    }
+  });
+
   it("uses only the full wire ID binding for a routed model, retaining its request ID", async () => {
     const routedId = "proxy/model";
     const row: HostProviderRecord = {

@@ -171,7 +171,7 @@ function persistAgentEvent(envelope: AgentEventEnvelope): UiMessage | undefined 
       envelope.sessionId,
       event.error.code === "TURN_ABORTED" ? "aborted" : "error",
       event.error.code,
-      { turnId: envelope.turnId ?? "" },
+      { turnId: envelope.turnId ?? "", errorDetails: event.error.details },
     );
     void turnFinalization
       .then(() =>

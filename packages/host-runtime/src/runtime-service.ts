@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { RuntimePort, TurnStartRequest, TurnSteerRequest } from "@pi-desktop/agent-host";
 import {
   ErrorCodes,
+  normalizeInteractionRequiredDetails,
   compactionRecordId,
   isRpcTimeoutError,
   type AgentEventEnvelope,
@@ -75,7 +76,7 @@ export type RuntimeServiceOptions = {
   checkpointIntervalMs?: number;
 };
 
-type FinishTurnOptions = { turnId: string; recoverInflight?: boolean };
+type FinishTurnOptions = { turnId: string; recoverInflight?: boolean; errorDetails?: unknown };
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -317,9 +318,16 @@ export class RuntimeService implements RuntimePort {
       throw typedError("Session already has an active turn", ErrorCodes.AGENT_BUSY);
     }
     const launch = await this.options.launch.resolve(sessionId, session, settings ?? {});
+    const interactionMode = session.interactionMode === undefined ? "interactive" : session.interactionMode;
+    if (request.expectedInteractionMode !== undefined && request.expectedInteractionMode !== "interactive" && request.expectedInteractionMode !== "unattended") {
+      throw typedError("expectedInteractionMode must be interactive or unattended", ErrorCodes.INVALID_PARAMS);
+    }
+    if (request.expectedInteractionMode !== undefined && request.expectedInteractionMode !== interactionMode) {
+      throw typedError("session interaction policy changed before turn admission", ErrorCodes.INTERACTION_POLICY_MISMATCH);
+    }
     sidecar.setProjectInstructionRoot(sessionId, launch.projectPath);
 
-    const turnId = await this.beginTurn(sessionId, launch.providerId, launch.modelId, sessionMessage?.origin.messageId);
+    const turnId = await this.beginTurn(sessionId, launch.providerId, launch.modelId, sessionMessage?.origin.messageId, interactionMode as import("@pi-desktop/shared").InteractionMode);
 
     let content = sessionMessage?.content ?? request.content;
     let command: string | undefined;
@@ -347,7 +355,7 @@ export class RuntimeService implements RuntimePort {
     try {
       await host.call("session.appendMessage", { sessionId, message: userMessage, turnId });
     } catch (error) {
-      await this.finishTurn(sessionId, "error", errorCodeOf(error), { turnId });
+      await this.finishTurn(sessionId, "error", errorCodeOf(error), { turnId, errorDetails: (error as { details?: unknown; data?: { details?: unknown } })?.details ?? (error as { data?: { details?: unknown } })?.data?.details });
       // A turn whose user message could not be appended must not be started:
       // running it would execute a prompt the transcript does not contain.
       throw error;
@@ -375,7 +383,7 @@ export class RuntimeService implements RuntimePort {
           : {}),
       });
     } catch (error) {
-      await this.finishTurn(sessionId, "error", errorCodeOf(error), { turnId });
+      await this.finishTurn(sessionId, "error", errorCodeOf(error), { turnId, errorDetails: (error as { details?: unknown; data?: { details?: unknown } })?.details ?? (error as { data?: { details?: unknown } })?.data?.details });
       throw error;
     }
     this.options.log("info", "prompt accepted", {
@@ -528,11 +536,12 @@ export class RuntimeService implements RuntimePort {
   }
 
   /** Open a durable turn row and take ownership of the session for it. */
-  async beginTurn(sessionId: string, providerId: string, modelId: string, sessionMessageId?: string): Promise<string> {
+  async beginTurn(sessionId: string, providerId: string, modelId: string, sessionMessageId?: string, expectedInteractionMode?: import("@pi-desktop/shared").InteractionMode): Promise<string> {
     const turn = await this.requireHost().call<{ turnId?: string }>("session.beginTurn", {
       sessionId,
       providerId,
       modelId,
+      ...(expectedInteractionMode ? { expectedInteractionMode } : {}),
       ...(sessionMessageId ? { sessionMessageId } : {}),
     });
     const turnId = String(turn?.turnId ?? "").trim();
@@ -606,6 +615,8 @@ export class RuntimeService implements RuntimePort {
               turnId,
               status: reason,
               errorCode,
+              ...(reason === "error" && errorCode === "INTERACTION_REQUIRED"
+                ? { errorDetails: normalizeInteractionRequiredDetails(options.errorDetails) } : {}),
               createNotification: false,
               ...(turnUsage ? { usage: turnUsage } : {}),
               ...(recoverInflight ? { recoverInflight: true } : {}),

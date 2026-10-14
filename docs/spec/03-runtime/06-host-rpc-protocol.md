@@ -316,12 +316,16 @@ to later refresh and inference; the vendor picker does not collect them.
   `inheritPermissionFromSessionId`; when present, the host copies the existing
   session's persisted permission mode atomically, while omission preserves the
   existing `inherit` default. Missing/null thinking level defaults to `off`.
+  Optional `interactionMode` is `interactive | unattended` and defaults to
+  interactive. Host summaries explicitly return the stored policy plus
+  `interactionPolicyVersion: 1`; clients must not synthesize support for older
+  responses. Unknown or null interaction modes are invalid.
 - `session.fork` — accepts `sessionId`, an optional caller-provided display
   `title`, and optional `throughMessageId`; creates
   one independent session from the source's current active canonical
   transcript, truncated inclusively at the selected message when supplied.
   The child inherits project/provider/model/mode/thinking and
-  permission configuration, receives new message/tool-call ids, and starts
+  permission and interaction configuration, receives new message/tool-call ids, and starts
   without turns, revisions, notifications, artifacts, grants, or scratch data.
   Missing sources or anchors return `NOT_FOUND`. While a Desktop source runs,
   only a completed assistant prefix containing no indexed messages owned by a
@@ -351,12 +355,14 @@ to later refresh and inference; the vendor picker does not collect them.
   cursors. Ordinary and uncapped reads omit this navigation-only field.
 - `session.getTurn({ sessionId, turnId })` — read-only, additive to protocol
   v11. Returns one persisted turn's state as
-  `{ sessionId, turnId, status, errorCode?, endedAt? }`, where `status` is the
+  `{ sessionId, turnId, status, errorCode?, errorDetails?, endedAt? }`, where `status` is the
   durable domain `running | completed | error | aborted` and `endedAt` is the
   RFC3339 instant of the terminal write (`session.endTurn`). The row is matched
   on `turnId` **and** `sessionId`, so a turn id belonging to another session,
   like an unknown one, returns `NOT_FOUND`; blank ids are `INVALID_PARAMS`. The
-  response never carries prompt, transcript, or credential material.
+  response never carries prompt, transcript, or credential material. The
+  `INTERACTION_REQUIRED` error may carry the structured questions described in
+  [asktool](17-asktool-questions.md#host-owned-unattended-sessions).
 - `session.delete`
 - `session.getScratchPath` — the session's scratch directory (D114), created
   on demand
@@ -372,6 +378,9 @@ to later refresh and inference; the vendor picker does not collect them.
   `INVALID_PARAMS`; mode is `plan | goal | agent` and changing any session
   configuration is allowed only while idle and without a pending/queued/running
   Plan or Goal record
+  Optional `interactionMode` is persisted under the same active-work fence;
+  omission preserves its current value. Permission auto approval does not
+  replace this interaction policy.
 - `session.moveProject({ sessionId, projectPath })` moves an idle session to a
   project and returns `{ session }` carrying the canonical project path. It
   upserts the project row and updates only `sessions.project_id` and
@@ -572,12 +581,17 @@ unchanged.
   last archive is lost. When the family is present in the durable transcript,
   the prefix in front of the restored branch is taken from there rather than
   from the caller. Surviving messages keep their owning `turn_id`
-- `session.beginTurn({ sessionId, providerId?, modelId?, sessionMessageId? })` —
+- `session.beginTurn({ sessionId, providerId?, modelId?, sessionMessageId?, expectedInteractionMode? })` —
   starts one durable turn. When `sessionMessageId` is present, host-core
   atomically verifies that the queued collaboration delivery targets this
   session, rechecks its permission ceiling, claims the delivery, and binds the
   new turn to its message id. A collaboration turn cannot be started from
   caller-supplied replacement text.
+  The optional expected interaction policy is checked against durable session
+  state in the same admission transaction. A mismatch returns
+  `INTERACTION_POLICY_MISMATCH` without admitting the turn. Desktop/headless
+  launchers supply their policy snapshot, and `pi_agent_prompt` accepts the
+  same optional condition for external callers.
 - `session.queuePush` / `session.queueList` / `session.queueRemove` /
   `session.queuePrioritize` / `session.queueReorder` — the Host-owned turn queue
   (D386 / ADR 0213 / ADR 0265, schema v18); push is idempotent per principal and
@@ -596,6 +610,9 @@ unchanged.
   checkpoint whose final row never landed into the transcript as an `aborted`
   assistant message and returns it as `recovered`; a plain `aborted` (user
   Stop) leaves the checkpoint for the arriving final row to supersede
+  Optional structured `errorDetails` is stored with the first terminal write.
+  Duplicate or stale terminal events cannot overwrite its error identity or
+  question details. Desktop and headless paths preserve this field.
 - `session.import` — atomically imports one converted session; a non-empty
   project path is normalized and upserted into `projects` before the session
   references it; returns `{ imported, skipped }`

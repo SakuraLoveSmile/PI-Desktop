@@ -14,6 +14,13 @@
   ],
   "suites": [
     {
+      "id": "unattended-interaction",
+      "family": "runtime-provider",
+      "script": "scripts/e2e-unattended-interaction.mjs",
+      "tier": "nightly",
+      "safety": "Production Host, sidecar, headless lifecycle and authenticated MCP with an isolated profile and local malicious SSE provider; no production data or paid provider calls."
+    },
+    {
       "id": "edit-legacy",
       "family": "runtime-provider",
       "script": "scripts/e2e-edit-legacy.mjs",
