@@ -378,3 +378,47 @@ fn plus_v5_upgrade_adds_ordinary_inbox_with_a_recoverable_backup() {
     assert!(table_exists(reopened.conn(), "team_ordinary_inbox"));
     assert_eq!(backup_files(dir.path()), vec!["pi.sqlite.plus-v5.bak"]);
 }
+
+#[test]
+fn p8_upgrades_p7_with_backup_defaults_and_constraints() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("pi.sqlite");
+    let db = Database::open(&path).unwrap();
+    db.conn()
+        .execute_batch(
+            "INSERT INTO sessions(id,title,created_at,updated_at) VALUES ('old','Keep me',1,1);
+        ALTER TABLE sessions DROP COLUMN interaction_mode;
+        ALTER TABLE turns DROP COLUMN error_details_json;
+        UPDATE plus_schema_meta SET plus_version=7;",
+        )
+        .unwrap();
+    drop(db);
+    let db = Database::open(&path).unwrap();
+    assert_eq!(user_version(db.conn()), SCHEMA_VERSION);
+    assert_eq!(meta(db.conn()).unwrap().plus_version, 8);
+    let saved: (String, String) = db
+        .conn()
+        .query_row(
+            "SELECT title,interaction_mode FROM sessions WHERE id='old'",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(saved, ("Keep me".into(), "interactive".into()));
+    assert!(db
+        .conn()
+        .execute(
+            "UPDATE sessions SET interaction_mode='other' WHERE id='old'",
+            []
+        )
+        .is_err());
+    assert!(db.conn().execute("INSERT INTO turns(id,session_id,status,error_details_json,started_at) VALUES ('bad','old','error','broken',1)",[]).is_err());
+    assert_eq!(backup_files(dir.path()), vec!["pi.sqlite.plus-v7.bak"]);
+    let backup = open_plus_backup(&path, "plus-v7", SCHEMA_VERSION);
+    assert!(!column_exists(&backup, "sessions", "interaction_mode"));
+    assert!(!column_exists(&backup, "turns", "error_details_json"));
+    drop(backup);
+    drop(db);
+    let _ = Database::open(&path).unwrap();
+    assert_eq!(backup_files(dir.path()), vec!["pi.sqlite.plus-v7.bak"]);
+}

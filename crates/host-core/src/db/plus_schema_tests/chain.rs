@@ -43,6 +43,8 @@ fn seed_plus_values(conn: &Connection) {
     conn.execute_batch(
         "INSERT INTO sessions (id, execution_profile, created_at, updated_at)
            VALUES ('m1', 'team', 4, 4);
+         UPDATE sessions SET interaction_mode='unattended' WHERE id='s2';
+         INSERT INTO turns(id,session_id,status,started_at,error_details_json) VALUES ('p8-turn','s2','error',1,'{\"kind\":\"interaction_required\"}');
          INSERT INTO team_members (
            team_session_id, member_session_id, name, description, context_kind, phase,
            model_id, provider_id, created_at, updated_at
@@ -84,7 +86,11 @@ fn plus_values(conn: &Connection) -> Vec<(String, Vec<Vec<SqlValue>>)> {
         let rows = dump_rows(conn, &format!("SELECT * FROM {table} ORDER BY 1, 2"));
         snapshot.push((table.to_string(), rows));
     }
-    let keyed_tables = [("plan_approvals", "request_id"), ("sessions", "id")];
+    let keyed_tables = [
+        ("plan_approvals", "request_id"),
+        ("sessions", "id"),
+        ("turns", "id"),
+    ];
     for (table, _) in PLUS_COLUMNS {
         assert!(
             keyed_tables.iter().any(|(keyed, _)| *keyed == table),

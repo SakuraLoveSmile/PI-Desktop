@@ -78,3 +78,18 @@ describe("usage ledger ingress", () => {
     expect(writes.at(-1)?.params).toMatchObject({ turnId: "old-turn", usage: { operationId: "late" } });
   });
 });
+
+ it("forwards terminal interaction details to the owning turn", async () => {
+   const finished: unknown[] = [];
+   const pipeline = new TurnEventPipeline({
+     getHost: () => null,
+     ownership: { activeTurnId: () => "t", isStaleTerminalEvent: () => false,
+       finishTurn: async (...args) => { finished.push(args); } },
+     emit: () => undefined, log: () => undefined,
+   });
+   const details = { kind: "interaction_required", toolName: "asktool", toolCallId: "ask", questions: [] };
+   pipeline.handle({ sessionId: "s", turnId: "t", ts: 1,
+     event: { type: "error", error: { code: "INTERACTION_REQUIRED", message: "blocked", details } } });
+   await pipeline.dispose();
+   expect(finished).toEqual([["s", "error", "INTERACTION_REQUIRED", { turnId: "t", errorDetails: details }]]);
+ });

@@ -12,6 +12,8 @@ import type { RacpPermissionMode } from "../racp.js";
 
 export type AgentPromptRequest = {
   sessionId: string;
+  /** Refuse turn admission if the durable session policy differs. */
+  expectedInteractionMode?: import("./sessions.js").InteractionMode;
   content: string;
   /** Host-owned collaboration delivery; its durable record supplies the input. */
   sessionMessageId?: string;
@@ -238,6 +240,54 @@ export type AskToolQuestion = {
   options: AskToolOption[];
   multiSelect?: boolean;
 };
+
+export type InteractionRequiredDetails = {
+  kind: "interaction_required";
+  toolName: "asktool";
+  toolCallId: string;
+  questions: AskToolQuestion[];
+  invalidArguments?: boolean;
+};
+
+/** Validate the unattended terminal contract and remove non-public fields. */
+export function normalizeInteractionRequiredDetails(value: unknown): InteractionRequiredDetails | undefined {
+  const record = (item: unknown): item is Record<string, unknown> =>
+    item !== null && typeof item === "object" && !Array.isArray(item);
+  if (!record(value) || value.kind !== "interaction_required" || value.toolName !== "asktool" ||
+      typeof value.toolCallId !== "string" || !value.toolCallId.trim() ||
+      new TextEncoder().encode(value.toolCallId).length > 512 || !Array.isArray(value.questions) ||
+      (value.invalidArguments !== undefined && typeof value.invalidArguments !== "boolean")) return undefined;
+  const questions: AskToolQuestion[] = [];
+  if (value.invalidArguments === true) {
+    if (value.questions.length !== 0) return undefined;
+  } else {
+    if (value.questions.length < 1 || value.questions.length > 20) return undefined;
+    for (const raw of value.questions) {
+      if (!record(raw) || typeof raw.question !== "string" || !raw.question.trim() ||
+          !Array.isArray(raw.options) || raw.options.length < 1 || raw.options.length > 100 ||
+          (raw.multiSelect !== undefined && typeof raw.multiSelect !== "boolean")) return undefined;
+      const options: AskToolOption[] = [];
+      const seen = new Set<string>();
+      for (const rawOption of raw.options) {
+        if (typeof rawOption !== "string" && (!record(rawOption) || typeof rawOption.label !== "string" ||
+            (rawOption.description !== undefined && typeof rawOption.description !== "string"))) return undefined;
+        const option = normalizeAskToolOption(rawOption);
+        if (!option) continue;
+        const label = askToolOptionLabel(option);
+        if (seen.has(label)) continue;
+        seen.add(label);
+        options.push(option);
+      }
+      if (!options.length) return undefined;
+      questions.push({ question: raw.question.trim(), options, ...(raw.multiSelect === true ? { multiSelect: true } : {}) });
+    }
+  }
+  const details: InteractionRequiredDetails = {
+    kind: "interaction_required", toolName: "asktool", toolCallId: value.toolCallId,
+    questions, ...(value.invalidArguments === true ? { invalidArguments: true } : {}),
+  };
+  return new TextEncoder().encode(JSON.stringify(details)).length <= 65536 ? details : undefined;
+}
 
 export type AskToolRequest = {
   requestId: string;

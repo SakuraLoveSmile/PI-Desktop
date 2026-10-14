@@ -724,6 +724,21 @@ fn plugin_session_rpc_err(error: impl ToString) -> JsonRpcError {
     rpc_err(rpc_code, message, &code)
 }
 
+/// Parse the strict optional durable interaction policy.
+fn interaction_mode_param(params: &Value) -> Result<Option<&str>, JsonRpcError> {
+    match params.get("interactionMode") {
+        None => Ok(None),
+        Some(value) => {
+            let mode = value.as_str().ok_or_else(|| {
+                rpc_err(1002, "interactionMode must be a string", "INVALID_PARAMS")
+            })?;
+            sessions::validate_interaction_mode(mode)
+                .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
+            Ok(Some(mode))
+        }
+    }
+}
+
 /// Parse the optional session thinking selector at the RPC boundary.  A
 /// missing/null value keeps the backwards-compatible default; present values
 /// must be strings from the host's allowlist rather than being silently
@@ -2734,9 +2749,35 @@ async fn handle_request_inner(
             Ok(json!({ "sessions": sessions }))
         }
         "session.create" => {
+            let interaction_mode = interaction_mode_param(&params)?;
             let thinking_level = thinking_level_param(&params)?;
             let permission_parent = permission_parent_param(&params)?;
             let st = state.lock().await;
+            let inherited_interaction_mode: Option<String> = match permission_parent.as_deref() {
+                Some(parent_id) => st
+                    .db
+                    .conn()
+                    .query_row(
+                        "SELECT interaction_mode FROM sessions WHERE id=?1",
+                        [parent_id],
+                        |row| row.get(0),
+                    )
+                    .optional()
+                    .map_err(|error| rpc_err(1000, error.to_string(), "INTERNAL"))?,
+                None => None,
+            };
+            if inherited_interaction_mode.as_deref() == Some("unattended")
+                && interaction_mode == Some("interactive")
+            {
+                return Err(rpc_err(
+                    1002,
+                    "a worker cannot weaken its parent's interaction policy",
+                    "INVALID_PARAMS",
+                ));
+            }
+            let interaction_mode = interaction_mode
+                .map(str::to_string)
+                .or(inherited_interaction_mode);
             let permission_mode = if let Some(parent_id) = permission_parent {
                 Some(
                     sessions::session_permission_mode(&st.db, &parent_id)
@@ -2793,6 +2834,7 @@ async fn handle_request_inner(
                 project_name,
                 thinking_level,
                 permission_mode,
+                interaction_mode,
                 execution_profile,
             };
             let session = if create_team_record {
@@ -3014,6 +3056,7 @@ async fn handle_request_inner(
                 .get("mode")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "mode required", "INVALID_PARAMS"))?;
+            let interaction_mode = interaction_mode_param(&params)?;
             let thinking_level = thinking_level_param(&params)?;
             let execution_profile = match params.get("executionProfile") {
                 Some(v) => {
@@ -3027,7 +3070,7 @@ async fn handle_request_inner(
                 None => None,
             };
             let st = state.lock().await;
-            let session = sessions::configure_session_with_profile(
+            let session = sessions::configure_session_with_interaction(
                 &st.db,
                 id,
                 mode,
@@ -3036,6 +3079,7 @@ async fn handle_request_inner(
                 thinking_level.as_deref(),
                 params.get("permissionMode").and_then(|v| v.as_str()),
                 execution_profile,
+                interaction_mode,
             )
             .map_err(|e| {
                 let message = e.to_string();
@@ -3571,6 +3615,34 @@ async fn handle_request_inner(
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
+            if let Some(value) = params.get("expectedInteractionMode") {
+                let expected = value.as_str().ok_or_else(|| {
+                    rpc_err(
+                        1002,
+                        "expectedInteractionMode must be a string",
+                        "INVALID_PARAMS",
+                    )
+                })?;
+                sessions::validate_interaction_mode(expected)
+                    .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
+                let actual: Option<String> = st
+                    .db
+                    .conn()
+                    .query_row(
+                        "SELECT interaction_mode FROM sessions WHERE id=?1",
+                        [session_id],
+                        |row| row.get(0),
+                    )
+                    .optional()
+                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+                if actual.as_deref() != Some(expected) {
+                    return Err(rpc_err(
+                        1008,
+                        "session interaction policy changed before turn admission",
+                        "INTERACTION_POLICY_MISMATCH",
+                    ));
+                }
+            }
             let provider = params.get("providerId").and_then(Value::as_str);
             let model = params.get("modelId").and_then(Value::as_str);
             if let Some(proposal_id) = params.get("revisionProposalId").and_then(Value::as_str) {
@@ -3653,7 +3725,7 @@ async fn handle_request_inner(
                 .unwrap_or("completed");
             let (result, revision) = {
                 let st = state.lock().await;
-                let result = sessions::end_turn_settling(
+                let result = sessions::end_turn_settling_with_details(
                     &st.db,
                     turn_id,
                     status,
@@ -3667,6 +3739,7 @@ async fn handle_request_inner(
                         .get("recoverInflight")
                         .and_then(|v| v.as_bool())
                         .unwrap_or(false),
+                    params.get("errorDetails"),
                 );
                 team_rpc::send_pending_member_failure(&st.db, &tx, turn_id)?;
                 let result = result.map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
@@ -7152,6 +7225,148 @@ mod tests {
         assert_eq!(
             groups_after_delete["groups"][0]["primaryPath"],
             json!(remaining_canonical)
+        );
+    }
+
+    #[tokio::test]
+    async fn unattended_policy_and_terminal_details_are_durable_and_fenced() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut app = AppState::open(dir.path()).unwrap();
+        app.handshook = true;
+        let state = Arc::new(Mutex::new(app));
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let created = handle_request(
+            state.clone(),
+            "session.create",
+            json!({"interactionMode":"unattended"}),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        let id = created["session"]["id"].as_str().unwrap();
+        let inherited = handle_request(
+            state.clone(),
+            "session.create",
+            json!({"inheritPermissionFromSessionId":id}),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(inherited["session"]["interactionMode"], "unattended");
+        assert!(handle_request(
+            state.clone(),
+            "session.create",
+            json!({"inheritPermissionFromSessionId":id,"interactionMode":"interactive"}),
+            tx.clone()
+        )
+        .await
+        .is_err());
+        let fork = handle_request(
+            state.clone(),
+            "session.fork",
+            json!({"sessionId":id}),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(fork["session"]["interactionMode"], "unattended");
+        assert_eq!(created["session"]["interactionMode"], "unattended");
+        assert_eq!(created["session"]["interactionPolicyVersion"], 1);
+        for invalid in [json!("unknown"), json!(true), Value::Null] {
+            let error = handle_request(
+                state.clone(),
+                "session.create",
+                json!({"interactionMode":invalid}),
+                tx.clone(),
+            )
+            .await
+            .unwrap_err();
+            assert_eq!(error.data.unwrap()["errorCode"], "INVALID_PARAMS");
+        }
+        let unchanged = handle_request(
+            state.clone(),
+            "session.configure",
+            json!({"id":id,"mode":"agent"}),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(unchanged["session"]["interactionMode"], "unattended");
+        let mismatch = handle_request(
+            state.clone(),
+            "session.beginTurn",
+            json!({"sessionId":id,"expectedInteractionMode":"interactive"}),
+            tx.clone(),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            mismatch.data.unwrap()["errorCode"],
+            "INTERACTION_POLICY_MISMATCH"
+        );
+        let st = state.lock().await;
+        let turn_count: i64 = st
+            .db
+            .conn()
+            .query_row(
+                "SELECT COUNT(*) FROM turns WHERE session_id=?1",
+                [id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(turn_count, 0);
+        drop(st);
+        let turn = handle_request(
+            state.clone(),
+            "session.beginTurn",
+            json!({"sessionId":id,"expectedInteractionMode":"unattended"}),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        let turn_id = turn["turnId"].as_str().unwrap();
+        assert!(handle_request(
+            state.clone(),
+            "session.configure",
+            json!({"id":id,"mode":"agent","interactionMode":"interactive"}),
+            tx.clone()
+        )
+        .await
+        .is_err());
+        let details = json!({"kind":"interaction_required","toolName":"asktool","toolCallId":"ask-1","questions":[],"invalidArguments":true});
+        handle_request(state.clone(), "session.endTurn", json!({"turnId":turn_id,"status":"error","errorCode":"INTERACTION_REQUIRED","errorDetails":details}), tx.clone()).await.unwrap();
+        handle_request(
+            state.clone(),
+            "session.endTurn",
+            json!({"turnId":turn_id,"status":"completed","errorDetails":{"overwrite":true}}),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        let st = state.lock().await;
+        let durable = sessions::get_turn_state(&st.db, id, turn_id)
+            .unwrap()
+            .unwrap();
+        let wire = serde_json::to_value(durable).unwrap();
+        assert_eq!(wire["status"], "error");
+        assert_eq!(wire["errorCode"], "INTERACTION_REQUIRED");
+        assert_eq!(wire["errorDetails"], details);
+        drop(st);
+        drop(state);
+        let reopened = AppState::open(dir.path()).unwrap();
+        assert_eq!(
+            serde_json::to_value(sessions::get_session(&reopened.db, id).unwrap().unwrap())
+                .unwrap()["interactionMode"],
+            "unattended"
+        );
+        assert_eq!(
+            serde_json::to_value(
+                sessions::get_turn_state(&reopened.db, id, turn_id)
+                    .unwrap()
+                    .unwrap()
+            )
+            .unwrap()["errorDetails"],
+            details
         );
     }
 

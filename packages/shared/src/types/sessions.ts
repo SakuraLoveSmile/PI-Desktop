@@ -15,6 +15,18 @@ import type { PlanningState } from "./plans.js";
  *   over RACP-WS. The renderer treats it exactly like a `desktop` session apart
  *   from a display badge; the local/remote split is resolved in Electron main.
  */
+/** Durable policy for tools that require a human answer. */
+export type InteractionMode = "interactive" | "unattended";
+
+export type TurnState = {
+  sessionId: string;
+  turnId: string;
+  status: "running" | "completed" | "error" | "aborted";
+  errorCode?: string;
+  errorDetails?: unknown;
+  endedAt?: string;
+};
+
 export type SessionSource = "desktop" | "pi-native" | "remote";
 
 export type SessionCapabilities = {
@@ -59,6 +71,9 @@ export type SessionSummary = {
   thinkingLevel: SessionThinkingLevel;
   /** Per-session permission mode; `inherit` follows the global default (D115). */
   permissionMode: PermissionMode;
+  interactionMode?: InteractionMode;
+  /** Version of the hard runtime interaction policy supported by this host. */
+  interactionPolicyVersion?: 1;
   /** Execution profile: standard single agent or team lead. Defaults to `standard`. */
   executionProfile?: ExecutionProfile;
   /** Host-derived parent/member relationship for sidebar grouping. */

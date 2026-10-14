@@ -13,6 +13,7 @@ class FakeHost implements RuntimeHostLink {
   private turnCounter = 0;
   messages = new Map<string, UiMessage[]>();
   failAppend = false;
+  beforeBegin: (() => void) | null = null;
   session: Record<string, unknown> = { id: "s1", mode: "agent", permissionMode: "ask", providerId: "p1", modelId: "m1" };
 
   async call<T = unknown>(method: string, params: Record<string, unknown> = {}): Promise<T> {
@@ -23,6 +24,10 @@ class FakeHost implements RuntimeHostLink {
       case "session.get":
         return { session: { ...this.session, id: params.id, messages: this.messages.get(String(params.id)) ?? [] } } as T;
       case "session.beginTurn":
+        this.beforeBegin?.();
+        if (params.expectedInteractionMode !== undefined && params.expectedInteractionMode !== (this.session.interactionMode ?? "interactive")) {
+          throw Object.assign(new Error("session interaction policy changed before turn admission"), { data: { errorCode: "INTERACTION_POLICY_MISMATCH" } });
+        }
         this.turnCounter += 1;
         return { turnId: `turn-${this.turnCounter}` } as T;
       case "session.appendMessage": {
@@ -62,6 +67,7 @@ class FakeSidecar implements RuntimeSidecarLink {
   exit: ((info: { intentional: boolean; code: number | null; signal: NodeJS.Signals | null }) => void) | null = null;
   roots = new Map<string, string | undefined>();
   rejectPrompt = false;
+  promptError: Error | null = null;
   running = false;
   /** Error `agent.compact` answers with; `null` accepts the compaction. */
   compactError: Error | null = null;
@@ -72,6 +78,7 @@ class FakeSidecar implements RuntimeSidecarLink {
     this.calls.push({ method, params });
     switch (method) {
       case "agent.prompt":
+        if (this.promptError) throw this.promptError;
         if (this.rejectPrompt) throw Object.assign(new Error("model not configured"), { data: { errorCode: "MODEL_NOT_CONFIGURED" } });
         this.running = true;
         return { accepted: true, turnId: params.turnId } as T;
@@ -224,6 +231,47 @@ describe("RuntimeService prompt lifecycle", () => {
     const userRow = (events[0]!.event as { message: UiMessage }).message;
     expect(userRow.role).toBe("user");
     expect(host.messages.get("s1")?.[0]?.id).toBe(userRow.id);
+  });
+
+  it("settles structured interaction errors exactly once even when agent_end follows", async () => {
+    const { host, sidecar, service } = build();
+    await service.prompt({ sessionId: "s1", content: "hello", effectivePermissionMode: "ask", principal: owner });
+    const details = { kind: "interaction_required", toolName: "asktool", toolCallId: "ask", questions: [{ question: "Choose?", options: ["Yes"] }] };
+    sidecar.notify?.("agent.event", { sessionId: "s1", turnId: "turn-1", ts: 1, event: { type: "error", error: { code: "INTERACTION_REQUIRED", message: "blocked", details } } });
+    sidecar.notify?.("agent.event", { sessionId: "s1", turnId: "turn-1", ts: 2, event: { type: "agent_end", messageIds: [] } });
+    await settle();
+    const ends = host.calls.filter((call) => call.method === "session.endTurn");
+    expect(ends).toHaveLength(1);
+    expect(ends[0]?.params).toMatchObject({ status: "error", errorCode: "INTERACTION_REQUIRED", errorDetails: details });
+    await service.dispose();
+  });
+
+  it("preserves rejection details from the sidecar RPC wire", async () => {
+    const { host, sidecar, service } = build();
+    const details = { kind: "interaction_required", toolName: "asktool", toolCallId: "ask", questions: [], invalidArguments: true };
+    sidecar.promptError = Object.assign(new Error("blocked"), { data: { errorCode: "INTERACTION_REQUIRED", details } });
+    await expect(service.prompt({ sessionId: "s1", content: "hello", effectivePermissionMode: "ask", principal: owner })).rejects.toThrow("blocked");
+    expect(host.calls.find((call) => call.method === "session.endTurn")?.params).toMatchObject({ status: "error", errorCode: "INTERACTION_REQUIRED", errorDetails: details });
+    await service.dispose();
+  });
+
+  it("fences the launch snapshot at admission with zero runtime requests on a policy race", async () => {
+    const { host, sidecar, service } = build();
+    host.session.interactionMode = "unattended";
+    host.beforeBegin = () => { host.session.interactionMode = "interactive"; };
+    await expect(service.prompt({ sessionId: "s1", expectedInteractionMode: "unattended", content: "hello", effectivePermissionMode: "ask", principal: owner })).rejects.toMatchObject({ data: { errorCode: "INTERACTION_POLICY_MISMATCH" } });
+    expect(host.calls.find((call) => call.method === "session.beginTurn")?.params.expectedInteractionMode).toBe("unattended");
+    expect(sidecar.calls.some((call) => call.method === "agent.prompt")).toBe(false);
+    expect(host.calls.some((call) => call.method === "session.appendMessage" || call.method === "session.endTurn")).toBe(false);
+    await service.dispose();
+  });
+
+  it("refuses an explicit unattended expectation against an interactive session before admission", async () => {
+    const { host, sidecar, service } = build();
+    await expect(service.prompt({ sessionId: "s1", expectedInteractionMode: "unattended", content: "hello", effectivePermissionMode: "ask", principal: owner })).rejects.toMatchObject({ errorCode: "INTERACTION_POLICY_MISMATCH" });
+    expect(host.calls.some((call) => call.method === "session.beginTurn")).toBe(false);
+    expect(sidecar.calls.some((call) => call.method === "agent.prompt")).toBe(false);
+    await service.dispose();
   });
 
   it("keeps a client-chosen UUID as the durable user row id", async () => {

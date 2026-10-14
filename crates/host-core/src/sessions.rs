@@ -197,6 +197,20 @@ fn validate_permission_mode(mode: &str) -> Result<()> {
     }
 }
 
+fn default_interaction_mode() -> String {
+    "interactive".into()
+}
+fn interaction_policy_version() -> u8 {
+    1
+}
+pub fn validate_interaction_mode(mode: &str) -> Result<()> {
+    if matches!(mode, "interactive" | "unattended") {
+        Ok(())
+    } else {
+        Err(anyhow!("interactionMode must be interactive or unattended"))
+    }
+}
+
 /// Maximum code points accepted for a project display name.
 ///
 /// Matches `MAX_PROJECT_GROUP_NAME_CHARS` and the renderer's name field so a
@@ -318,6 +332,10 @@ pub struct SessionSummary {
     pub thinking_level: String,
     #[serde(default = "default_permission_mode")]
     pub permission_mode: String,
+    #[serde(default = "default_interaction_mode")]
+    pub interaction_mode: String,
+    #[serde(default = "interaction_policy_version")]
+    pub interaction_policy_version: u8,
     #[serde(default = "default_execution_profile")]
     pub execution_profile: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1456,7 +1474,7 @@ const SUMMARY_SELECT: &str =
             CASE WHEN lead.team_session_id IS NOT NULL THEN 'lead'
                  WHEN member.team_session_id IS NOT NULL THEN 'member' END,
             COALESCE(member.team_session_id, lead.team_session_id), member.name,
-            EXISTS (SELECT 1 FROM task_runs r WHERE r.session_id = s.id) AS scheduled_run
+            EXISTS (SELECT 1 FROM task_runs r WHERE r.session_id = s.id) AS scheduled_run, s.interaction_mode
      FROM sessions s LEFT JOIN projects p ON p.id = s.project_id
      LEFT JOIN teams lead ON lead.team_session_id = s.id
      LEFT JOIN team_members member ON member.member_session_id = s.id
@@ -1473,6 +1491,8 @@ pub(crate) fn summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Sess
         mode: row.get(6)?,
         thinking_level: row.get(7)?,
         permission_mode: row.get(8)?,
+        interaction_mode: row.get("interaction_mode")?,
+        interaction_policy_version: interaction_policy_version(),
         execution_profile: row
             .get::<_, Option<String>>(9)?
             .unwrap_or_else(default_execution_profile),
@@ -1571,6 +1591,7 @@ pub struct SessionCreateOptions {
     pub project_name: Option<String>,
     pub thinking_level: Option<String>,
     pub permission_mode: Option<String>,
+    pub interaction_mode: Option<String>,
     pub execution_profile: Option<String>,
 }
 
@@ -1594,6 +1615,7 @@ pub fn create_session_with_thinking(
             project_name: None,
             thinking_level,
             permission_mode: None,
+            interaction_mode: None,
             execution_profile: None,
         },
     )
@@ -1638,6 +1660,7 @@ fn create_session_with_options_inner(
         project_name,
         thinking_level,
         permission_mode,
+        interaction_mode,
         execution_profile,
     } = options;
     let now = now_ms();
@@ -1652,6 +1675,8 @@ fn create_session_with_options_inner(
     validate_thinking_level(&thinking_level)?;
     let permission_mode = permission_mode.unwrap_or_else(default_permission_mode);
     validate_permission_mode(&permission_mode)?;
+    let interaction_mode = interaction_mode.unwrap_or_else(default_interaction_mode);
+    validate_interaction_mode(&interaction_mode)?;
     let execution_profile = match execution_profile {
         Some(profile) => {
             validate_execution_profile(&profile)?;
@@ -1699,8 +1724,8 @@ fn create_session_with_options_inner(
         conn.prepare_cached(
             "INSERT INTO sessions (
                 id, title, project_id, provider_id, model_id, mode, thinking_level,
-                permission_mode, execution_profile, created_at, updated_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)",
+                permission_mode, execution_profile, interaction_mode, created_at, updated_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?11)",
         )?
         .execute(params![
             id,
@@ -1712,6 +1737,7 @@ fn create_session_with_options_inner(
             thinking_level,
             permission_mode,
             execution_profile,
+            interaction_mode,
             now
         ])?;
         if create_team_record {
@@ -1738,6 +1764,8 @@ fn create_session_with_options_inner(
         mode,
         thinking_level,
         permission_mode,
+        interaction_mode,
+        interaction_policy_version: interaction_policy_version(),
         execution_profile,
         project_name: effective_name,
         team: None,
@@ -2201,10 +2229,10 @@ fn fork_session_snapshot(
             .prepare_cached(
                 "INSERT INTO sessions (
                     id, title, project_id, provider_id, model_id, mode, thinking_level,
-                    permission_mode, execution_profile, source, pinned, last_seq, created_at, updated_at
+                    permission_mode, execution_profile, interaction_mode, source, pinned, last_seq, created_at, updated_at
                  )
                  SELECT ?1, ?2, project_id, provider_id, model_id, mode, thinking_level,
-                        permission_mode, execution_profile, NULL, 0, ?3, ?4, ?4
+                        permission_mode, execution_profile, interaction_mode, NULL, 0, ?3, ?4, ?4
                  FROM sessions WHERE id = ?5",
             )?
             .execute(params![id, title, records.len() as i64, now, source_id])?;
@@ -2236,6 +2264,8 @@ fn fork_session_snapshot(
         mode: source.summary.mode,
         thinking_level: source.summary.thinking_level,
         permission_mode: source.summary.permission_mode,
+        interaction_mode: source.summary.interaction_mode,
+        interaction_policy_version: interaction_policy_version(),
         execution_profile: source.summary.execution_profile,
         project_name: source.summary.project_name,
         team: None,
@@ -2304,6 +2334,45 @@ pub fn configure_session_with_profile(
     permission_mode: Option<&str>,
     execution_profile: Option<&str>,
 ) -> Result<Option<SessionSummary>> {
+    configure_session_with_interaction(
+        db,
+        id,
+        mode,
+        provider_id,
+        model_id,
+        thinking_level,
+        permission_mode,
+        execution_profile,
+        None,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn configure_session_with_interaction(
+    db: &Database,
+    id: &str,
+    mode: &str,
+    provider_id: Option<&str>,
+    model_id: Option<&str>,
+    thinking_level: Option<&str>,
+    permission_mode: Option<&str>,
+    execution_profile: Option<&str>,
+    interaction_mode: Option<&str>,
+) -> Result<Option<SessionSummary>> {
+    if let Some(policy) = interaction_mode {
+        validate_interaction_mode(policy)?;
+        let blocked: bool = db.conn().query_row(
+            "SELECT EXISTS(SELECT 1 FROM sessions s WHERE s.id=?1 AND s.interaction_mode<>?2
+             AND (EXISTS(SELECT 1 FROM turns WHERE session_id=?1 AND status='running')
+               OR EXISTS(SELECT 1 FROM plan_approvals WHERE session_id=?1 AND (status='pending' OR execution_state IN ('queued','running')))
+               OR EXISTS(SELECT 1 FROM session_collaboration_messages WHERE target_session_id=?1 AND status IN ('queued','running'))
+               OR EXISTS(SELECT 1 FROM team_tasks WHERE (owner_session_id=?1 OR team_session_id=?1) AND deleted=0 AND status='in_progress')
+               OR EXISTS(SELECT 1 FROM team_members WHERE team_session_id=?1 OR member_session_id=?1)))",
+            params![id, policy], |row| row.get(0))?;
+        if blocked {
+            return Err(anyhow!("PLAN_CONFIGURATION_BLOCKED"));
+        }
+    }
     if !(is_valid_mode(mode) || mode == "chat") {
         return Err(anyhow!("mode must be plan or agent"));
     }
@@ -2350,7 +2419,7 @@ pub fn configure_session_with_profile(
                  thinking_level = COALESCE(?5, thinking_level),
                  permission_mode = COALESCE(?6, permission_mode),
                  execution_profile = COALESCE(?7, execution_profile),
-                 updated_at = ?8
+                 updated_at = ?8, interaction_mode = COALESCE(?9, interaction_mode)
              WHERE id = ?1",
             )?
             .execute(params![
@@ -2361,7 +2430,8 @@ pub fn configure_session_with_profile(
                 thinking_level,
                 permission_mode,
                 execution_profile,
-                now_ms()
+                now_ms(),
+                interaction_mode
             ])?;
         if changed > 0 {
             conn.execute(
@@ -4108,6 +4178,7 @@ pub fn import_session(
             }
             "external".to_string()
         });
+        validate_interaction_mode(&summary.interaction_mode)?;
         let execution_profile = match summary.execution_profile.as_str() {
             p if is_valid_execution_profile(p) => p,
             _ => "standard",
@@ -4115,9 +4186,9 @@ pub fn import_session(
         tx.prepare_cached(
             "INSERT INTO sessions (
                 id, title, project_id, provider_id, model_id, mode, thinking_level,
-                permission_mode, execution_profile, source,
+                permission_mode, execution_profile, interaction_mode, source,
                 last_seq, created_at, updated_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
         )?
         .execute(params![
             summary.id,
@@ -4129,6 +4200,7 @@ pub fn import_session(
             summary.thinking_level,
             summary.permission_mode,
             execution_profile,
+            summary.interaction_mode,
             source,
             records.len() as i64,
             ts_to_ms(&summary.created_at),
@@ -4175,28 +4247,125 @@ pub struct TurnState {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_code: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_details: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ended_at: Option<String>,
+}
+
+/// Only the normalized interaction-required contract crosses the durable error boundary.
+fn normalize_interaction_required_details(value: &Value) -> Option<Value> {
+    let raw = value.as_object()?;
+    if raw.get("kind")?.as_str()? != "interaction_required"
+        || raw.get("toolName")?.as_str()? != "asktool"
+    {
+        return None;
+    }
+    let id = raw.get("toolCallId")?.as_str()?;
+    if id.trim().is_empty() || id.len() > 512 {
+        return None;
+    }
+    let invalid = match raw.get("invalidArguments") {
+        None => false,
+        Some(value) => value.as_bool()?,
+    };
+    let input = raw.get("questions")?.as_array()?;
+    let mut questions = Vec::new();
+    if invalid {
+        if !input.is_empty() {
+            return None;
+        }
+    } else {
+        if input.is_empty() || input.len() > 20 {
+            return None;
+        }
+        for q in input {
+            let q = q.as_object()?;
+            let question = q.get("question")?.as_str()?.trim();
+            if question.is_empty() {
+                return None;
+            }
+            let multi = match q.get("multiSelect") {
+                None => false,
+                Some(value) => value.as_bool()?,
+            };
+            let input_options = q.get("options")?.as_array()?;
+            if input_options.is_empty() || input_options.len() > 100 {
+                return None;
+            }
+            let mut options = Vec::new();
+            let mut labels = std::collections::HashSet::new();
+            for option in input_options {
+                let (label, description, structured) = if let Some(label) = option.as_str() {
+                    (label.trim(), None, false)
+                } else {
+                    let option = option.as_object()?;
+                    let label = option.get("label")?.as_str()?.trim();
+                    let description = match option.get("description") {
+                        None => None,
+                        Some(value) => Some(value.as_str()?.trim()),
+                    };
+                    (label, description.filter(|text| !text.is_empty()), true)
+                };
+                if label.is_empty() || !labels.insert(label) {
+                    continue;
+                }
+                let next = if structured {
+                    let mut next = json!({"label":label});
+                    if let Some(description) = description {
+                        next["description"] = json!(description);
+                    }
+                    next
+                } else {
+                    json!(label)
+                };
+                options.push(next);
+            }
+            if options.is_empty() {
+                return None;
+            }
+            let mut next = json!({"question":question,"options":options});
+            if multi {
+                next["multiSelect"] = json!(true);
+            }
+            questions.push(next);
+        }
+    }
+    let mut details = json!({"kind":"interaction_required","toolName":"asktool","toolCallId":id,"questions":questions});
+    if invalid {
+        details["invalidArguments"] = json!(true);
+    }
+    if details.to_string().len() > 65536 {
+        return None;
+    }
+    Some(details)
 }
 
 /// Fetch a turn's state. A missing row and a turn owned by another session
 /// both yield `Ok(None)` so callers cannot probe turns across sessions.
 pub fn get_turn_state(db: &Database, session_id: &str, turn_id: &str) -> Result<Option<TurnState>> {
-    let row: Option<(String, Option<String>, Option<i64>)> = db
+    type TurnStateRow = (String, Option<String>, Option<i64>, Option<String>);
+    let row: Option<TurnStateRow> = db
         .conn()
         .prepare_cached(
-            "SELECT status, error_code, ended_at FROM turns WHERE id = ?1 AND session_id = ?2",
+            "SELECT status, error_code, ended_at, error_details_json FROM turns WHERE id = ?1 AND session_id = ?2",
         )?
         .query_row(params![turn_id, session_id], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
         })
         .optional()?;
-    Ok(row.map(|(status, error_code, ended_at)| TurnState {
-        session_id: session_id.to_string(),
-        turn_id: turn_id.to_string(),
-        status,
-        error_code,
-        ended_at: ended_at.map(ms_to_ts),
-    }))
+    row.map(
+        |(status, error_code, ended_at, details)| -> Result<TurnState> {
+            Ok(TurnState {
+                session_id: session_id.to_string(),
+                turn_id: turn_id.to_string(),
+                status,
+                error_code,
+                error_details: details.as_deref().map(serde_json::from_str).transpose()?,
+                ended_at: ended_at.map(ms_to_ts),
+            })
+        },
+    )
+    .transpose()
 }
 
 // ---- turns ------------------------------------------------------------------
@@ -4343,9 +4512,37 @@ pub fn end_turn_settling(
     create_notification: bool,
     recover_inflight: bool,
 ) -> Result<EndTurnResult> {
+    end_turn_settling_with_details(
+        db,
+        turn_id,
+        status,
+        error_code,
+        usage,
+        create_notification,
+        recover_inflight,
+        None,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn end_turn_settling_with_details(
+    db: &Database,
+    turn_id: &str,
+    status: &str,
+    error_code: Option<&str>,
+    usage: Option<&Value>,
+    create_notification: bool,
+    recover_inflight: bool,
+    error_details: Option<&Value>,
+) -> Result<EndTurnResult> {
     let status = match status {
         "completed" | "aborted" | "error" => status,
         _ => "completed",
+    };
+    let error_details = if status == "error" && error_code == Some("INTERACTION_REQUIRED") {
+        error_details.and_then(normalize_interaction_required_details)
+    } else {
+        None
     };
     let existing_usage: Option<String> = db
         .conn()
@@ -4379,7 +4576,7 @@ pub fn end_turn_settling(
             "UPDATE turns SET status = ?1, error_code = ?2, ended_at = ?3,
                 input_tokens = COALESCE(?4, input_tokens),
                 output_tokens = COALESCE(?5, output_tokens),
-                usage_json = COALESCE(?6, usage_json)
+                usage_json = COALESCE(?6, usage_json), error_details_json = ?8
              WHERE id = ?7 AND status = 'running'",
         )?
         .execute(params![
@@ -4390,6 +4587,7 @@ pub fn end_turn_settling(
             output_tokens,
             usage.map(|u| u.to_string()),
             turn_id,
+            error_details.as_ref().map(Value::to_string),
         ])?;
     if n > 0 {
         crate::team::task_attempts::settle_turn(&tx, turn_id, status)?;
@@ -5229,6 +5427,151 @@ mod tests {
     }
 
     #[test]
+    fn interaction_policy_is_frozen_for_queued_work_and_sanitizes_terminal_details() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = Database::open(&dir.path().join("pi.sqlite")).unwrap();
+        let session = create_session_with_options(
+            &db,
+            SessionCreateOptions {
+                interaction_mode: Some("unattended".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        db.conn().execute("INSERT INTO session_collaboration_messages(id,plugin_id,source_session_id,source_title,target_session_id,target_title,kind,content,status,idempotency_key,remaining_hops,permission_ceiling,created_at,updated_at) VALUES ('q','plugin','source','source',?1,'target','task','queued','queued','key',1,'ask',1,1)", [&session.id]).unwrap();
+        assert!(configure_session_with_interaction(
+            &db,
+            &session.id,
+            "agent",
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some("interactive")
+        )
+        .is_err());
+        assert_eq!(
+            configure_session_with_interaction(
+                &db,
+                &session.id,
+                "agent",
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some("unattended")
+            )
+            .unwrap()
+            .unwrap()
+            .interaction_mode,
+            "unattended"
+        );
+        db.conn()
+            .execute(
+                "UPDATE session_collaboration_messages SET status='completed' WHERE id='q'",
+                [],
+            )
+            .unwrap();
+        assert_eq!(
+            configure_session_with_interaction(
+                &db,
+                &session.id,
+                "agent",
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some("interactive")
+            )
+            .unwrap()
+            .unwrap()
+            .interaction_mode,
+            "interactive"
+        );
+        let good = json!({"kind":"interaction_required","toolName":"asktool","toolCallId":"ask","questions":[{"question":" Choose? ","options":[{"label":" Yes ","raw":"secret"}],"raw":"secret"}],"rawArguments":"secret"});
+        for (code, details, expected) in [
+            (
+                "INTERACTION_REQUIRED",
+                good,
+                json!({"kind":"interaction_required","toolName":"asktool","toolCallId":"ask","questions":[{"question":"Choose?","options":[{"label":"Yes"}]}]}),
+            ),
+            ("PROVIDER_ERROR", json!({"token":"secret"}), Value::Null),
+            ("INTERACTION_REQUIRED", json!(true), Value::Null),
+            (
+                "INTERACTION_REQUIRED",
+                json!({"kind":"interaction_required","toolName":"asktool","toolCallId":"ask","questions":[]}),
+                Value::Null,
+            ),
+        ] {
+            let turn = begin_turn(&db, &session.id, None, None).unwrap();
+            end_turn_settling_with_details(
+                &db,
+                &turn,
+                "error",
+                Some(code),
+                None,
+                false,
+                false,
+                Some(&details),
+            )
+            .unwrap();
+            let wire =
+                serde_json::to_value(get_turn_state(&db, &session.id, &turn).unwrap().unwrap())
+                    .unwrap();
+            assert_eq!(wire["status"], "error");
+            assert_eq!(wire["errorDetails"], expected);
+        }
+    }
+
+    #[test]
+    fn interaction_policy_cannot_diverge_inside_an_idle_team_roster() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = Database::open(&dir.path().join("pi.sqlite")).unwrap();
+        let lead = create_session_with_options(
+            &db,
+            SessionCreateOptions {
+                interaction_mode: Some("unattended".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let child = create_session_with_options(
+            &db,
+            SessionCreateOptions {
+                interaction_mode: Some("unattended".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        db.conn().execute("INSERT INTO team_members(team_session_id,member_session_id,name,phase,created_at,updated_at) VALUES (?1,?2,'member','idle',1,1)",params![lead.id,child.id]).unwrap();
+        for id in [&lead.id, &child.id] {
+            assert!(configure_session_with_interaction(
+                &db,
+                id,
+                "agent",
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some("interactive")
+            )
+            .is_err());
+            assert_eq!(
+                get_session(&db, id)
+                    .unwrap()
+                    .unwrap()
+                    .summary
+                    .interaction_mode,
+                "unattended"
+            );
+        }
+    }
+
+    #[test]
     fn create_session_permission_mode_is_optional_and_validated() {
         let db = test_db();
         let default_session = create_session(&db, None, None, None, None, None).unwrap();
@@ -5837,6 +6180,8 @@ mod tests {
             mode: "agent".into(),
             thinking_level: "off".into(),
             permission_mode: "inherit".into(),
+            interaction_mode: default_interaction_mode(),
+            interaction_policy_version: interaction_policy_version(),
             execution_profile: "standard".into(),
             project_name: None,
             team: None,
@@ -5892,6 +6237,8 @@ mod tests {
             mode: "agent".into(),
             thinking_level: "off".into(),
             permission_mode: "inherit".into(),
+            interaction_mode: default_interaction_mode(),
+            interaction_policy_version: interaction_policy_version(),
             execution_profile: "standard".into(),
             project_name: None,
             team: None,
@@ -6726,6 +7073,8 @@ mod tests {
             mode: "agent".into(),
             thinking_level: "medium".into(),
             permission_mode: "inherit".into(),
+            interaction_mode: default_interaction_mode(),
+            interaction_policy_version: interaction_policy_version(),
             execution_profile: "standard".into(),
             project_name: None,
             team: None,

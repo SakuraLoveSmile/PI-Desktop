@@ -7,6 +7,47 @@ questions. It is available in Agent, Plan, and Goal mode and is separate from
 permission approval: it does not authorize an operation. Ordinary questions have
 no validity deadline; the Team Lead wait exception below preserves the unanswered question.
 
+### Host-owned unattended sessions
+
+Sessions default to `interactionMode: "interactive"`. A scheduler may persist
+`"unattended"` through session creation/configuration and must verify the
+returned policy plus `interactionPolicyVersion: 1` before sending a prompt.
+Permission mode is independent of this policy. Omitting the policy preserves
+the current value; forks inherit it, and active work blocks changes.
+The prompt's `expectedInteractionMode` is compared atomically at Host turn
+admission. Schedulers send `"unattended"`; launchers bind admission to the launch
+snapshot. A mismatch admits no turn or model request. Policy changes on an
+existing Team lead/member cannot weaken the inherited tree policy.
+
+In unattended sessions, model declarations and discovery omit `asktool`.
+The final assistant response is checked before any tool lookup, validation, or
+execution. A response containing `asktool`, even with malformed arguments or
+other tool calls before it, dispatches none of that batch and ends immediately
+with non-retriable `INTERACTION_REQUIRED`. No question request or waiter is
+created and no further model request is admitted. Retained execute references
+cannot create a waiter either. This is runtime enforcement, independent of
+prompt compliance or trusted extension success.
+
+The existing terminal `error` state carries durable `errorDetails`:
+`{kind: "interaction_required", toolName: "asktool", toolCallId, questions}`.
+Questions use the request shape below. Malformed arguments instead carry an
+empty question list and `invalidArguments: true`, without arbitrary raw input.
+Desktop and headless termination persist these details atomically; `pi_turn_get`
+returns them after restart. Clients present these questions in their own user
+workflow; the runtime does not answer them or resume automatically.
+
+Multiple calls contribute all questions in call order; `toolCallId` names the
+first call and the transcript retains the remaining identities. Any malformed
+call invalidates the whole list. Normalized compact UTF-8 JSON is at most
+64 KiB, with 1–20 questions, 1–100 options per question and a call identity of
+at most 512 UTF-8 bytes. Invalid identities use `invalid-tool-call-id` only as
+an invalid marker with `invalidArguments: true`. Invalid details never produce
+a question form. Terminal persistence strips unknown metadata and accepts
+details only for `error` / `INTERACTION_REQUIRED`.
+
+See [the policy ADR](../../adr/unattended-interaction-policy.md). Ordinary
+interactive sessions retain all behavior described below.
+
 ## 2. Request shape
 
 The tool accepts a non-empty `questions` array. Each question contains:

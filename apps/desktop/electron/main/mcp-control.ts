@@ -361,6 +361,7 @@ const CORE_TOOL_SPECS = [
         "Persistent workspace display name; requires projectPath. Omit to keep the directory basename.",
       ),
       mode: { type: "string", enum: ["agent", "plan", "goal"] },
+      interactionMode: { type: "string", enum: ["interactive", "unattended"] },
       providerId: stringSchema(),
       modelId: stringSchema(),
       thinkingLevel: { type: "string", enum: ["off", "minimal", "low", "medium", "high", "xhigh", "max"] },
@@ -420,6 +421,7 @@ const CORE_TOOL_SPECS = [
     objectSchema({
       id: stringSchema("Session id."),
       mode: { type: "string", enum: ["agent", "plan", "goal"] },
+      interactionMode: { type: "string", enum: ["interactive", "unattended"] },
       providerId: stringSchema(),
       modelId: stringSchema(),
       thinkingLevel: { type: "string", enum: ["off", "minimal", "low", "medium", "high", "xhigh", "max"] },
@@ -438,6 +440,7 @@ const CORE_TOOL_SPECS = [
     objectSchema({
       sessionId: stringSchema("Target session id."),
       content: stringSchema("Prompt text."),
+      expectedInteractionMode: { type: "string", enum: ["interactive", "unattended"] },
       viewingSessionId: stringSchema(),
       attachments: { type: "array", items: anySchema() },
     }, ["sessionId", "content"]),

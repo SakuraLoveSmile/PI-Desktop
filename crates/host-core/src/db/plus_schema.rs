@@ -18,7 +18,7 @@ use std::ops::RangeInclusive;
 
 /// Plus track version produced by this build. Add the step to [`STEPS`]
 /// together with every bump.
-pub(crate) const PLUS_SCHEMA_VERSION: i64 = 7;
+pub(crate) const PLUS_SCHEMA_VERSION: i64 = 8;
 
 /// `user_version` a legacy fork database is reset to: the last number the
 /// fork shared with upstream before it used v20..=v23 for Plus-only changes.
@@ -45,7 +45,7 @@ pub(super) const PLUS_TABLES: [&str; 9] = [
 
 /// Columns only the Plus track adds, as `(table, column)`. Same contract as
 /// [`PLUS_TABLES`].
-pub(super) const PLUS_COLUMNS: [(&str, &str); 9] = [
+pub(super) const PLUS_COLUMNS: [(&str, &str); 11] = [
     ("plan_approvals", "artifact_workspace_kind"),
     ("plan_approvals", "execution_kind"),
     ("plan_approvals", "execution_model_id"),
@@ -55,6 +55,8 @@ pub(super) const PLUS_COLUMNS: [(&str, &str); 9] = [
     ("plan_approvals", "revision_state"),
     ("plan_approvals", "revision_turn_id"),
     ("sessions", "execution_profile"),
+    ("sessions", "interaction_mode"),
+    ("turns", "error_details_json"),
 ];
 
 const META_SCHEMA: &str = "CREATE TABLE IF NOT EXISTS plus_schema_meta (
@@ -71,8 +73,21 @@ type Step = fn(&Connection) -> Result<()>;
 /// shared chain. Every step must stay idempotent: [`apply_pending`] replays
 /// all of them to re-verify a database an upstream step may have rebuilt.
 const STEPS: [Step; PLUS_SCHEMA_VERSION as usize] = [
-    step_p1, step_p2, step_p3, step_p4, step_p5, step_p6, step_p7,
+    step_p1, step_p2, step_p3, step_p4, step_p5, step_p6, step_p7, step_p8,
 ];
+
+/// P8: durable unattended interaction policy and atomic terminal details.
+fn step_p8(conn: &Connection) -> Result<()> {
+    add_column_if_missing(conn, "sessions", "interaction_mode",
+        "TEXT NOT NULL DEFAULT 'interactive' CHECK (interaction_mode IN ('interactive', 'unattended'))")?;
+    add_column_if_missing(
+        conn,
+        "turns",
+        "error_details_json",
+        "TEXT CHECK (error_details_json IS NULL OR json_valid(error_details_json))",
+    )?;
+    Ok(())
+}
 
 /// Meta row of a database a Plus-aware build has opened.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

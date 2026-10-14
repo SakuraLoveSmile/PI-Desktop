@@ -104,6 +104,7 @@ function testRuntimeIdentity(sessionId: string) {
 type RuntimeParams = {
   sessionId: string;
   mode?: Mode;
+  interactionMode?: import("@pi-desktop/shared").InteractionMode;
   executionProfile?: import("@pi-desktop/shared").ExecutionProfile;
   teamContext?: import("@pi-desktop/shared").TeamRuntimeContextProjection;
   /** Durable host turn ID for the prompt currently being executed. */
@@ -181,6 +182,12 @@ async function runtimeFor(
 ): Promise<DesktopAgentRuntime> {
   const sessionId = String(params.sessionId);
   const mode = normalizeMode(params.mode);
+  const interactionMode = params.interactionMode === undefined ? "interactive" : params.interactionMode;
+  if (interactionMode !== "interactive" && interactionMode !== "unattended") {
+    throw Object.assign(new Error("interactionMode must be interactive or unattended"), {
+      rpcCode: -32602, errorCode: "INVALID_PARAMS",
+    });
+  }
   const executionProfile = normalizeExecutionProfile(params.executionProfile);
   if (executionProfile === "team" && !params.teamContext) {
     throw Object.assign(new Error("Team runtime context unavailable"), {
@@ -236,6 +243,7 @@ async function runtimeFor(
   }
   const reusable = existing && runtimeProjectBindings.get(existing) === params.projectContextBindingId && existing.matches({
     mode,
+    interactionMode,
     executionProfile,
     teamContext: params.teamContext,
     provider,
@@ -307,6 +315,7 @@ async function runtimeFor(
     host: bindProjectContextHost(hostProxy, sessionId, params.projectContextBindingId),
     sessionId,
     mode,
+    interactionMode,
     executionProfile,
     teamContext: params.teamContext,
     turnId: params.turnId,

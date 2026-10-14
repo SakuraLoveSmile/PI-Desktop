@@ -281,6 +281,7 @@ fn create_team_member_impl(
                 project_name: None,
                 thinking_level: Some(lead_summary.thinking_level),
                 permission_mode: Some(lead_summary.permission_mode),
+                interaction_mode: Some(lead_summary.interaction_mode),
                 execution_profile: Some("team".into()),
             },
         )?;

@@ -267,6 +267,9 @@ export function createSessionLaunchRuntime({
       executionProfile?: ExecutionProfile;
     } = {},
   ) {
+    if (session.interactionMode !== undefined && session.interactionMode !== "interactive" && session.interactionMode !== "unattended") {
+      throw Object.assign(new Error("interactionMode must be interactive or unattended"), { errorCode: "INVALID_PARAMS" });
+    }
     if (!runtimeState.host) throw new Error("host unavailable");
     const executionProfile = normalizeExecutionProfile(
       overrides.executionProfile ?? session.executionProfile ?? "standard",
@@ -646,6 +649,7 @@ export function createSessionLaunchRuntime({
       projectPath,
       sidecarParams: {
         sessionId,
+        interactionMode: session.interactionMode === undefined ? "interactive" : session.interactionMode,
         mode: normalizeMode(
           overrides.mode ?? session.mode ?? settings.defaultMode ?? "agent",
         ),
