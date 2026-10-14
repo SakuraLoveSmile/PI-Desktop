@@ -126,7 +126,7 @@ function fixture(t, { ownOAuth = false, forbidDelegation = false, missingTeam = 
   });
   const session = { providerId: own.id, modelId: "parent", projectPath: root };
   const launch = (executionProfile, overrides = {}, settings = {}) => runtime.resolveAgentRuntimeLaunch("session", { ...session, executionProfile }, settings, overrides);
-  return { launch, hostCalls, vendorCalls, modelCalls, warnings, authBindings, context, documentPath, brokenPath, own, delegate, vendor };
+  return { launch, session, hostCalls, vendorCalls, modelCalls, warnings, authBindings, context, documentPath, brokenPath, own, delegate, vendor };
 }
 
 for (const role of ["lead", "researcher"]) {
@@ -215,4 +215,15 @@ test("Team launch still rejects missing Host Team authority", async (t) => {
   const f = fixture(t, { missingTeam: true });
   await assert.rejects(f.launch("team"), { errorCode: "TEAM_CONTEXT_UNAVAILABLE" });
   assert.deepEqual(f.authBindings, [], "an unauthorized launch cannot publish credential bindings");
+});
+
+test("launch preserves durable unattended policy and rejects unknown policy values", async (t) => {
+  const f = fixture(t);
+  assert.equal((await f.launch("standard")).sidecarParams.interactionMode, "interactive");
+  f.session.interactionMode = "unattended";
+  assert.equal((await f.launch("standard")).sidecarParams.interactionMode, "unattended");
+  for (const invalid of ["unknown", null, true]) {
+    f.session.interactionMode = invalid;
+    await assert.rejects(f.launch("standard"), { errorCode: "INVALID_PARAMS" });
+  }
 });

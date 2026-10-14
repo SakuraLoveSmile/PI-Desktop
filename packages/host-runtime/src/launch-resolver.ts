@@ -210,6 +210,9 @@ export function createHeadlessLaunchResolver(options: HeadlessLaunchResolverOpti
     settings: Record<string, unknown>,
     overrides: LaunchOverrides = {},
   ): Promise<ResolvedLaunch> {
+    if (session.interactionMode !== undefined && session.interactionMode !== "interactive" && session.interactionMode !== "unattended") {
+      throw Object.assign(new Error("interactionMode must be interactive or unattended"), { errorCode: "INVALID_PARAMS" });
+    }
     const host = requireHost();
     const commandShell = (await resolveEffectiveCommandShell()).effective!;
     const providers = await host.call<{ providers: HostProviderRecord[] }>("providers.list", {
@@ -372,6 +375,7 @@ export function createHeadlessLaunchResolver(options: HeadlessLaunchResolverOpti
       projectPath,
       sidecarParams: {
         sessionId,
+        interactionMode: session.interactionMode === undefined ? "interactive" : session.interactionMode,
         mode: normalizeMode(overrides.mode ?? sessionMode ?? defaultMode ?? "agent"),
         ...(overrides.turnId ? { turnId: overrides.turnId } : {}),
         thinkingLevel,

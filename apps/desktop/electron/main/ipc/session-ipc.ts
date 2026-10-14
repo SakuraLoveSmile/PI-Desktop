@@ -599,6 +599,7 @@ export function registerSessionIpc({
         providerId?: string;
         modelId?: string;
         thinkingLevel?: SessionThinkingLevel;
+        interactionMode?: "interactive" | "unattended";
         permissionMode?: "inherit" | "ask" | "accept-edits" | "auto";
       },
     ) => {
