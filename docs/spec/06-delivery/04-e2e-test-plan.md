@@ -18630,3 +18630,37 @@ push or PR authorization.
 | Plus scenario | User path | Automated entry |
 | --- | --- | --- |
 | E2E-PLUS-worktree-memory-owner | Slot launch → subsequent turn → update/delete → mapping invalidation | project-context --worktree-memory; Rust + launch/runtime tests |
+### E2E-RUNTIME-execution-ask-relay
+
+- **Preconditions:** Dedicated task worktree, current recorded main base,
+  production Rust Host and bundled sidecar, isolated profile/workspace and a
+  deterministic loopback SSE provider. Optional linked KaneoPilot root uses
+  an isolated database and its real core command/runtime HTTP path. No real
+  provider, installed App replacement or production task is allowed.
+- **Steps:** Produce an ordinary ask in the Goal contract turn and execution
+  turn; discover it through status and typed pending; answer through the typed
+  MCP tool. Repeat with Desktop-first and competing Desktop/MCP replies,
+  a stale tool-call identity, Team/native exclusions, graceful stop, abort and
+  sidecar restart. Mount the real Renderer to verify removal/reconstruction.
+  With KaneoPilot, exercise discovery, draft/submit, injected lost response,
+  explicit same-answer retry, overlapping waits, six-hour and max-wait fake
+  clocks, scope renewal, dead/concurrent observers and engine-off answering.
+- **Expected:** The original turn and tool call receive deterministic spec17
+  output, one reply wins, stale/unauthorized requests never answer, and the
+  other surface gets not_pending. MCP answers record the controller principal;
+  Desktop answers retain Desktop. Graceful stop closes ordinary asks as skips
+  and completed; abort is aborted; restart loses ordinary waiters. Card removal
+  is asserted in Renderer, independently of the pending response. Unknown
+  writes are not automatically resent or classified not_applied from a pending
+  snapshot. Waiting never consumes execution/automation duration twice.
+- **Specs:** Runtime spec17 §5, IPC §13d, external-ask-answering-over-mcp ADR;
+  KaneoPilot protocol §5.28 for linked scenarios.
+- **Acceptance:** Planned script `scripts/e2e-execution-ask-relay.mjs` and
+  linked `scripts/validate_execution_questions.py`, plus targeted
+  MCP/bridge/waiter/runtime tests and isolated native KaneoPilot UI/notification
+  checks. Add the runnable suite catalog entry only when the script exists;
+  keep generated scenario indexes synchronized at that point.
+- **Milestone:** Local execution ask relay (P1/P7).
+- **Status:** NOT RUN; implementation pending. Record candidate/base/source and
+  artifact hashes, fixture safety, actual results and remaining UI/paid-model
+  limitations. Synthetic provider behavior is not paid-model evidence.

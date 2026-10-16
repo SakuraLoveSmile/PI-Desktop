@@ -870,14 +870,18 @@ export class AgentHost {
   }
 
   /** A trusted adapter settled the durable question through its user-input path. */
-  closePendingInput(sessionId: string, requestId: string): void {
+  closePendingInput(sessionId: string, requestId: string, principal?: Principal): void {
+    if (principal) this.requireRole(principal, "input/respond");
     const state = this.state(sessionId);
     this.inputGenerations.set(sessionId, (this.inputGenerations.get(sessionId) ?? 0) + 1);
+    const entry = state.pendingInputs.get(requestId);
     if (!state.pendingInputs.delete(requestId)) return;
-    this.emit(state, "input.resolved", { inputId: requestId, status: "resolved", by: "desktop" }, {});
+    const turn = entry ? state.turns.get(entry.request.turnId) : undefined;
+    if (turn?.status === "waiting_input") turn.status = "running";
+    this.emit(state, "input.resolved", { inputId: requestId, status: "resolved", by: principal?.subject ?? "desktop" }, entry ? { turnId: entry.request.turnId } : {});
   }
 
-  async respondInput(principal: Principal, response: RacpInputResponse): Promise<{ inputId: string; status: "resolved" }> {
+  async respondInput(principal: Principal, response: RacpInputResponse, expectedToolCallId?: string): Promise<{ inputId: string; status: "resolved" }> {
     this.requireRole(principal, "input/respond");
     let found: { state: SessionState; entry: { request: RacpInputRequest; original: AskToolRequest } } | undefined;
     for (const state of this.states.values()) {
@@ -893,6 +897,7 @@ export class AgentHost {
     await this.runtime.respondInput({
       requestId: entry.original.requestId,
       sessionId: entry.original.sessionId,
+      ...(expectedToolCallId !== undefined ? { expectedToolCallId } : {}),
       answers: response.answers,
     });
     state.pendingInputs.delete(response.inputId);
@@ -901,6 +906,14 @@ export class AgentHost {
     if (turn && turn.status === "waiting_input") turn.status = "running";
     this.emit(state, "input.resolved", { inputId: response.inputId, status: "resolved", by: principal.subject }, { turnId: entry.request.turnId });
     return { inputId: response.inputId, status: "resolved" };
+  }
+
+  /** Read identity only; externally supplied request ids never select another session. */
+  pendingInputSession(requestId: string): string | undefined {
+    for (const state of this.states.values()) {
+      if (state.pendingInputs.has(requestId)) return state.id;
+    }
+    return undefined;
   }
 
   async history(

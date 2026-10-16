@@ -21,6 +21,13 @@
       "safety": "Production Host, sidecar, headless lifecycle and authenticated MCP with an isolated profile and local malicious SSE provider; no production data or paid provider calls."
     },
     {
+      "id": "execution-ask-relay",
+      "family": "runtime-provider",
+      "script": "scripts/e2e-execution-ask-relay.mjs",
+      "tier": "nightly",
+      "safety": "Real isolated Electron bootstrap, Rust Host, release sidecar bundle, authenticated HTTP MCP and loopback model SSE; real Renderer ask answer/reload/stop/abort, no production data or paid provider calls."
+    },
+    {
       "id": "edit-legacy",
       "family": "runtime-provider",
       "script": "scripts/e2e-edit-legacy.mjs",
