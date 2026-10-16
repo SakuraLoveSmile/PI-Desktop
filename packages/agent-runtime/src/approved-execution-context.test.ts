@@ -39,6 +39,11 @@ describe("entriesFromExecutionStart", () => {
     ]);
   });
 
+  it("retains explicit earlier segments without admitting intervening ordinary rows", () => {
+    expect(entriesFromExecutionStart(entries, 4, new Set(["instruction"])).map(({ id }) => id))
+      .toEqual(["base", "tools", "instruction", "late-state"]);
+  });
+
   it("is the whole transcript when execution starts at its beginning", () => {
     expect(entriesFromExecutionStart(entries, 0)).toEqual(entries);
   });

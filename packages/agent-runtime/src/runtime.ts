@@ -1895,7 +1895,9 @@ export class DesktopAgentRuntime {
   private terminatingToolCalls = new Set<string>();
   /** A scoped normal yield, including batches with other non-terminating tools. */
   private pendingTeamInboxYield?: () => boolean;
+  private readonly entryTurnIds = new Map<string, string>();
   private fullEntries: MessageEntry[];
+  private executionContextPriorEntryIds?: ReadonlySet<string>;
   private executionContextStartIndex: number | null = null;
   private readonly systemJournal = new SystemTranscriptJournal();
   private composedSections: Record<string, string> = {};
@@ -3043,7 +3045,7 @@ export class DesktopAgentRuntime {
           | undefined
       )?.requiresReasoningContentOnAssistantMessages === true;
     const entries: MessageEntry[] = [];
-    const append = (id: string, message: AgentMessage): MessageEntry => {
+    const append = (id: string, message: AgentMessage, turnId?: string): MessageEntry => {
       const entry: MessageEntry = {
         type: "message",
         id,
@@ -3052,6 +3054,7 @@ export class DesktopAgentRuntime {
         timestamp: timestampMs(message.timestamp),
         message,
       };
+      if (turnId) this.entryTurnIds.set(id, turnId);
       entries.push(entry);
       return entry;
     };
@@ -3059,6 +3062,7 @@ export class DesktopAgentRuntime {
     // (the nearest one above), keeping each call adjacent to its result as
     // the provider APIs require.
     let toolCarrier: AssistantMessage | undefined;
+    let toolCarrierTurnId: string | undefined;
     for (const m of orderSystemRows(history)) {
       // Subagent rows belong to the transcript and to review, never to the
       // parent's model context (ADR 0062): the parent only ever saw the `Task`
@@ -3068,7 +3072,7 @@ export class DesktopAgentRuntime {
       const timestamp = Date.parse(m.createdAt) || Date.now();
       if (m.role === "system" && m.modelSystem) {
         toolCarrier = undefined;
-        append(m.id, this.systemJournal.restore(m));
+        append(m.id, this.systemJournal.restore(m), m.turnId);
       } else if (m.role === "user") {
         toolCarrier = undefined;
         const attachments = (m.attachments ?? []).map((attachment) =>
@@ -3087,7 +3091,7 @@ export class DesktopAgentRuntime {
         ) {
           continue;
         }
-        append(m.id, { role: "user", content, timestamp });
+        append(m.id, { role: "user", content, timestamp }, m.turnId);
       } else if (m.role === "assistant") {
         toolCarrier = undefined;
         // Failed provider responses belong in the transcript for diagnosis,
@@ -3127,10 +3131,13 @@ export class DesktopAgentRuntime {
           stopReason: "stop",
           timestamp,
         };
-        append(m.id, assistant);
+        append(m.id, assistant, m.turnId);
         toolCarrier = assistant;
+        toolCarrierTurnId = m.turnId;
       } else if (m.role === "tool") {
         if (!m.toolCallId || !m.toolName) continue;
+        // A carrier from a different durable turn cannot own this tool call.
+        if (toolCarrierTurnId !== m.turnId) toolCarrier = undefined;
         if (!toolCarrier) {
           // Tool row whose assistant row was lost (truncated branch):
           // synthesize a carrier so the call/result pair stays well-formed.
@@ -3144,7 +3151,8 @@ export class DesktopAgentRuntime {
             stopReason: "toolUse",
             timestamp,
           };
-          append(`${m.id}:carrier`, toolCarrier);
+          append(`${m.id}:carrier`, toolCarrier, m.turnId);
+          toolCarrierTurnId = m.turnId;
         }
         toolCarrier.content.push({
           type: "toolCall",
@@ -3153,7 +3161,7 @@ export class DesktopAgentRuntime {
           arguments: toJsonObject(m.toolArgs),
         });
         toolCarrier.stopReason = "toolUse";
-        append(m.id, toolResultFromUi(m, timestamp));
+        append(m.id, toolResultFromUi(m, timestamp), m.turnId);
       }
     }
     return entries.filter(
@@ -3190,7 +3198,7 @@ export class DesktopAgentRuntime {
   ): Entry[] {
     const entries: Entry[] = this.executionContextStartIndex === null
       ? [...this.fullEntries]
-      : entriesFromExecutionStart(this.fullEntries, this.executionContextStartIndex);
+      : entriesFromExecutionStart(this.fullEntries, this.executionContextStartIndex, this.executionContextPriorEntryIds);
     if (!checkpoint) return entries;
     if (isRecord(checkpoint.details) && checkpoint.details.systemMessageJson) {
       this.systemJournal.rememberCheckpoint(checkpoint.details.systemMessageJson);
@@ -3229,6 +3237,7 @@ export class DesktopAgentRuntime {
 
   private appendLiveEntry(id: string, message: AgentMessage): void {
     if (!id || this.fullEntries.some((entry) => entry.id === id)) return;
+    if (this.turnId) this.entryTurnIds.set(id, this.turnId);
     this.fullEntries.push({
       type: "message",
       id,
@@ -6818,7 +6827,7 @@ export class DesktopAgentRuntime {
       host: this.host, team: this.teamContext!,
       refreshDeclaration: executionStart !== null
         ? review => this.confirmedDeclarationView.register(review, this.turnEpoch,
-          entriesFromExecutionStart(this.fullEntries, executionStart).map(entry => entry.message))
+          entriesFromExecutionStart(this.fullEntries, executionStart, this.executionContextPriorEntryIds).map(entry => entry.message))
         : undefined,
       state: () => ({ turnId: this.turnId, epoch: this.turnEpoch, mode: this.mode,
         inactive: this.disposed || this.runCancelled }),
@@ -9091,9 +9100,24 @@ export class DesktopAgentRuntime {
     // contract and subsequent work, never planning turns from another model.
     // The system state is transcript rows too, so entriesFromExecutionStart
     // keeps it.
-    const priorGoalStart = resume && execution.kind === "goal"
-      ? this.fullEntries.findIndex(entry => entry.id === `approved-goal:${execution.id}`) : -1;
-    this.executionContextStartIndex = priorGoalStart >= 0 ? priorGoalStart : this.fullEntries.length;
+    this.executionContextPriorEntryIds = undefined;
+    if (resume?.priorTurnIds) {
+      const priorTurns = new Set(resume.priorTurnIds);
+      this.executionContextPriorEntryIds = new Set(this.fullEntries
+        .filter(entry => {
+          const owner = this.entryTurnIds.get(entry.id);
+          return owner !== undefined && priorTurns.has(owner);
+        }).map(entry => entry.id));
+      this.executionContextStartIndex = this.fullEntries.length;
+      // Session checkpoints have no execution ownership. Rebuild from the
+      // complete source rows, then compact this selected context if needed.
+      this.activeCompaction = undefined;
+    } else {
+      // Compatibility for older callers without durable segment identities.
+      const priorGoalStart = resume && execution.kind === "goal"
+        ? this.fullEntries.findIndex(entry => entry.id === `approved-goal:${execution.id}`) : -1;
+      this.executionContextStartIndex = priorGoalStart >= 0 ? priorGoalStart : this.fullEntries.length;
+    }
 
     const kind = execution.kind === "goal" ? "goal" : "plan";
     if (kind === "goal") {

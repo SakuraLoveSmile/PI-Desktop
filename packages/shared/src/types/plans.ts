@@ -85,7 +85,13 @@ export type GoalHold = {
   draft?: SubmitGoalReportDraftInput;
   progress?: GoalProgressSnapshot;
 };
-export type GoalResumeContext = { reasons: GoalBlockReason[]; userMessage?: string; segment: number };
+export type GoalResumeContext = {
+  reasons: GoalBlockReason[];
+  userMessage?: string;
+  segment: number;
+  /** Host-owned prior execution segments; never inferred from transcript text or time. */
+  priorTurnIds?: string[];
+};
 export type GoalModelOverride = { providerId: string; modelId: string };
 export type GoalExecutionResult = { execution?: PlanExecution; hold?: GoalHold };
 export type GoalExecutionChangedEvent = GoalExecutionResult & { sessionId: string; executionId: string };

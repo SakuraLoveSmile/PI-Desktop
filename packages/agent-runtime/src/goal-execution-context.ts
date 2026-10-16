@@ -6,6 +6,9 @@ const reasonCodes: readonly GoalBlockReasonCode[] = ["report_missing", "report_i
   "verdict_blocked", "verdict_unknown", "team_unsettled", "resume_failed"];
 const record = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
+function turnIds(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every(turn => typeof turn === "string" && turn.trim().length > 0);
+}
 function reasonCode(value: unknown): value is GoalBlockReasonCode {
   return typeof value === "string" && (reasonCodes.some(code => code === value) ||
     (value.startsWith("agent_error:") && value.length > "agent_error:".length));
@@ -23,11 +26,13 @@ export function parseGoalResume(value: unknown): GoalResumeContext | undefined {
   if (value === undefined) return undefined;
   if (!record(value) || !Array.isArray(value.reasons) || !value.reasons.every(reason) ||
       !Number.isSafeInteger(value.segment) || typeof value.segment !== "number" || value.segment < 2 ||
-      (value.userMessage !== undefined && typeof value.userMessage !== "string")) {
+      (value.userMessage !== undefined && typeof value.userMessage !== "string") ||
+      (value.priorTurnIds !== undefined && !turnIds(value.priorTurnIds))) {
     throw Object.assign(new Error("Invalid Goal resume context"), { errorCode: "INVALID_ARGUMENT" });
   }
   return { reasons: value.reasons, segment: value.segment,
-    ...(typeof value.userMessage === "string" ? { userMessage: value.userMessage } : {}) };
+    ...(typeof value.userMessage === "string" ? { userMessage: value.userMessage } : {}),
+    ...(turnIds(value.priorTurnIds) ? { priorTurnIds: [...new Set(value.priorTurnIds)] } : {}) };
 }
 
 /** Replay the immutable contract even when compaction no longer retains its anchor. */

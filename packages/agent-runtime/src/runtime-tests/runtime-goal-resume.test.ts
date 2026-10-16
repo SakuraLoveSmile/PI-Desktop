@@ -2,8 +2,9 @@ import "./runtime-test-harness.js";
 import { describe, expect, it, vi } from "vitest";
 import type { Agent } from "@earendil-works/pi-agent-core";
 import { createAssistantMessageEventStream, type AssistantMessage, type Models } from "@earendil-works/pi-ai";
-import type { AgentEventEnvelope, GoalProgressSnapshot, PlanExecution } from "@pi-desktop/shared";
+import type { AgentEventEnvelope, GoalProgressSnapshot, PlanExecution, UiMessage } from "@pi-desktop/shared";
 import { assistantMessage, createRuntime } from "./runtime-test-harness.js";
+import type { AgentRuntimeOptions } from "../runtime.js";
 
 const execution: PlanExecution = {
   id: "resume-goal", proposalId: "resume-proposal", sessionId: "session-1", kind: "goal",
@@ -13,7 +14,7 @@ const execution: PlanExecution = {
 };
 type Step = string | { name: string; arguments: unknown };
 
-function fixture(steps: Step[], team = false) {
+function fixture(steps: Step[], team = false, restored: Partial<Pick<AgentRuntimeOptions, "history" | "compaction">> = {}) {
   let progress: GoalProgressSnapshot | null = null;
   let token = 0;
   const host = { call: vi.fn<(method: string, params: unknown) => Promise<unknown>>(async (method, params) => {
@@ -35,13 +36,14 @@ function fixture(steps: Step[], team = false) {
   const onEvent = vi.fn();
   const runtime = createRuntime({ host, onEvent,
     history: [{ id: "planning", role: "assistant", content: "Unapproved planning discussion", createdAt: "2026-10-13T00:00:00Z" }],
+    ...restored,
     ...(team ? { executionProfile: "team" as const, teamContext: {
       teamSessionId: "session-1", callerSessionId: "session-1", isLead: true } } : {}),
   });
   const view = runtime as unknown as { agent: Agent; models: Pick<Models, "streamSimple"> };
-  const requests: Array<{ messages: string; prompt: string }> = [];
+  const requests: Array<{ messages: string; prompt: string; context: Agent["state"]["messages"] }> = [];
   view.models = { streamSimple: () => {
-    requests.push({ messages: JSON.stringify(view.agent.state.messages), prompt: String(view.agent.state.systemPrompt) });
+    requests.push({ messages: JSON.stringify(view.agent.state.messages), prompt: String(view.agent.state.systemPrompt), context: [...view.agent.state.messages] });
     const step = steps[requests.length - 1];
     if (!step) throw new Error("Unexpected extra provider request");
     const reason = typeof step === "string" ? "stop" : "toolUse";
@@ -144,6 +146,72 @@ describe("approved Goal continuation", () => {
       expect(f.requests[0].messages).toContain("report_missing");
       expect(f.requests[0].messages).toContain("SubmitGoalReport");
       expect(f.requests[0].messages).not.toContain("Unapproved planning discussion");
+    } finally { await f.runtime.dispose(); }
+  });
+
+  it.each([false, true])("restores only Host-owned Goal segments after a model switch, with checkpoint=%s", async checkpoint => {
+    const at = "2026-10-13T00:00:00Z";
+    const history: UiMessage[] = [
+      { id: "planning", turnId: "planning-turn", role: "assistant", content: "Unapproved planning discussion", createdAt: at },
+      { id: "goal-first", turnId: "goal-turn-1", role: "assistant", content: "Prior Goal segment found the missing spelling table.", createdAt: at, providerId: "previous-provider", modelId: "previous-model" },
+      { id: "ordinary-user", turnId: "ordinary-turn", role: "user", content: "Unrelated ordinary request", createdAt: at },
+      { id: "ordinary-answer", turnId: "ordinary-turn", role: "assistant", content: "Unrelated ordinary answer", createdAt: at },
+      { id: "goal-orphan-tool", turnId: "goal-turn-1", role: "tool", content: "", createdAt: at,
+        toolCallId: "orphan-call", toolName: "Read", toolArgs: { path: "prior.json" },
+        toolResult: { content: [{ type: "text", text: "First segment orphan tool evidence" }] }, toolStatus: "success" },
+      { id: "goal-tool-carrier", turnId: "goal-turn-2", role: "assistant", content: "Prior Goal verification", createdAt: at },
+      { id: "goal-tool", turnId: "goal-turn-2", role: "tool", content: "", createdAt: at,
+        toolCallId: "prior-call", toolName: "Read", toolArgs: { path: "spelling.json" },
+        toolResult: { content: [{ type: "text", text: "Verified spelling data" }] }, toolStatus: "success" },
+      { id: "unknown-owner", role: "assistant", content: "Unowned transcript row", createdAt: at },
+    ];
+    const f = fixture(Array(4).fill("Still blocked pending evidence."), false, {
+      history,
+      ...(checkpoint ? { compaction: { id: "session-checkpoint", summary: "Unrelated ordinary checkpoint summary",
+        throughMessageId: "goal-tool", tokensBefore: 100, createdAt: at } } : {}),
+    });
+    try {
+      await f.runtime.executeApprovedPlan(execution, "new-model-turn", {
+        reasons: [{ code: "verdict_blocked" }], segment: 3,
+        priorTurnIds: ["goal-turn-1", "goal-turn-2"], userMessage: "Use the supplied spelling table.",
+      });
+      const request = f.requests[0];
+      expect(request.messages).toContain("Prior Goal segment found the missing spelling table");
+      expect(request.messages).toContain("Prior Goal verification");
+      expect(request.messages).toContain("Verified spelling data");
+      expect(request.messages).toContain("First segment orphan tool evidence");
+      expect(request.context).toContainEqual(expect.objectContaining({ role: "assistant", content: expect.arrayContaining([
+        expect.objectContaining({ type: "toolCall", id: "orphan-call" }),
+      ]) }));
+      expect(request.context).toContainEqual(expect.objectContaining({ role: "toolResult", toolCallId: "orphan-call" }));
+      expect(request.messages).toContain("Use the supplied spelling table");
+      expect(request.messages).toContain(execution.plan.replaceAll("\n", "\\n"));
+      expect(request.messages).not.toContain("Unapproved planning discussion");
+      expect(request.messages).not.toContain("Unrelated ordinary");
+      expect(request.messages).not.toContain("Unowned transcript row");
+      expect(request.context).toContainEqual(expect.objectContaining({ role: "assistant", content: expect.arrayContaining([
+        expect.objectContaining({ type: "toolCall", id: "prior-call", name: "Read" }),
+      ]) }));
+      expect(request.context).toContainEqual(expect.objectContaining({ role: "toolResult", toolCallId: "prior-call" }));
+      expect(request.context.some(message => message.role === "system")).toBe(true);
+    } finally { await f.runtime.dispose(); }
+  });
+
+  it("excludes intervening ordinary turns when reusing a runtime for a resumed Goal", async () => {
+    const f = fixture([
+      { name: "SubmitGoalReport", arguments: { summary: "Need input", verdict: "blocked" } }, "Prior live Goal evidence.",
+      "Unrelated live ordinary answer.",
+      { name: "SubmitGoalReport", arguments: { summary: "Need more input", verdict: "blocked" } }, "Continued Goal.",
+    ]);
+    try {
+      await f.runtime.executeApprovedPlan(execution, "first-live-goal");
+      await f.runtime.prompt("Unrelated live ordinary request", "ordinary-message", "ordinary-turn");
+      await f.runtime.executeApprovedPlan(execution, "second-live-goal", {
+        reasons: [{ code: "verdict_blocked" }], segment: 2, priorTurnIds: ["first-live-goal"],
+      });
+      expect(f.requests[3].messages).toContain("Prior live Goal evidence");
+      expect(f.requests[3].messages).not.toContain("Unrelated live ordinary");
+      expect(f.requests[3].messages).not.toContain("Unapproved planning discussion");
     } finally { await f.runtime.dispose(); }
   });
 

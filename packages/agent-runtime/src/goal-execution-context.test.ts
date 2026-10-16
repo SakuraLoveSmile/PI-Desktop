@@ -17,6 +17,18 @@ it.each([
   { segment: 2, reasons: [{ code: "team_unsettled", detail: 1 }] },
   { segment: 2, reasons: [{ code: "team_unsettled", tasks: [{ id: "task" }] }] },
   { segment: 2, reasons: [], userMessage: 42 },
+  { segment: 2, reasons: [], priorTurnIds: null },
+  { segment: 2, reasons: [], priorTurnIds: "turn" },
+  { segment: 2, reasons: [], priorTurnIds: [42] },
+  { segment: 2, reasons: [], priorTurnIds: [""] },
+  { segment: 2, reasons: [], priorTurnIds: ["  "] },
 ])("rejects invalid resume payload %# before execution", value => {
   expect(() => parseGoalResume(value)).toThrow("Invalid Goal resume context");
+});
+
+it("retains and deduplicates explicit Host segment identities, including an empty scope", () => {
+  expect(parseGoalResume({ segment: 3, reasons: [], priorTurnIds: ["first", "second", "first"] }))
+    .toEqual({ segment: 3, reasons: [], priorTurnIds: ["first", "second"] });
+  expect(parseGoalResume({ segment: 2, reasons: [], priorTurnIds: [] }))
+    .toEqual({ segment: 2, reasons: [], priorTurnIds: [] });
 });

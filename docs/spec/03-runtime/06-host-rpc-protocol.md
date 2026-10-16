@@ -797,15 +797,21 @@ not direct persistence access.
   create a hold. Transcript-barrier failure retains report `markFailed` semantics
   and must never publish stale ready evidence.
 - `goalExecutions.resume({ sessionId, executionId, expectedVersion, modelOverride? })`
-  returns `{ execution, hold, resume: { reasons, segment } }`. The optional override
+  returns `{ execution, hold, resume: { reasons, segment, priorTurnIds } }`. The optional override
   is `{ providerId, modelId }`. The hold must be blocked with its expected CAS
   version and the matching execution must be `interrupted/GOAL_BLOCKED`. The
   session must be idle with no other queued/running execution. Resume clears
   the error, changes execution to running, increments the segment/resume count,
   audits model choice and resumes only the Team pause owned by this hold. Main
   locks the session operation, begins a turn, binds it (invalidating the old
-  draft) and calls `agent.executeApprovedPlan` with resume metadata. Any admission
-  or dispatch failure settles back to a `resume_failed` hold.
+  draft) and calls `agent.executeApprovedPlan` with resume metadata. `priorTurnIds`
+  lists this hold's previously bound segment turn IDs in execution order, before
+  the new turn is bound. It is additive/optional for older callers; current Host
+  producers always supply the array, including an empty scope. Runtime matches
+  these identities to Host-projected `UiMessage.turnId`; it never selects by
+  timestamps or includes intervening ordinary turns. Malformed supplied IDs are
+  rejected before runtime admission. Any admission or dispatch failure settles
+  back to a `resume_failed` hold.
 - `goalExecutions.close({ sessionId, executionId, expectedVersion, action })`
   returns `{ execution, hold, report? }`; `action` is `accept | abandon`. Acceptance
   is the only path to completed/non-`met`, records `closure = user_accepted`, and

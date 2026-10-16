@@ -114,6 +114,7 @@ fn resume_cas_preserves_identity_and_segment_history() {
     assert_eq!(resumed["execution"]["id"], "e");
     assert_eq!(resumed["execution"]["state"], "running");
     assert_eq!(resumed["resume"]["segment"], 2);
+    assert_eq!(resumed["resume"]["priorTurnIds"], json!(["t"]));
     assert!(resume(&db, "s", "e", version, None).is_err());
     assert!(close(&db, "s", "e", version, "accept").is_err());
     db.conn().execute("INSERT INTO turns(id,session_id,started_at,ended_at,status) VALUES('t2','s',30,40,'completed')",[]).unwrap();
@@ -593,4 +594,36 @@ fn late_agent_draft_cannot_mutate_blocked_goal() {
         before
     );
     assert!(!db.data_dir().join("goal_reports/s/e.draft.json").is_file());
+}
+
+#[test]
+fn resume_returns_only_durable_goal_segment_turns_after_reopen() {
+    let (dir, db) = setup();
+    let blocked = block(&db);
+    resume(
+        &db,
+        "s",
+        "e",
+        blocked["hold"]["version"].as_i64().unwrap(),
+        None,
+    )
+    .unwrap();
+    db.conn()
+        .execute_batch(
+            "INSERT INTO turns(id,session_id,started_at,ended_at,status) VALUES
+           ('ordinary','s',10,20,'completed'), ('second-goal','s',10,20,'completed');",
+        )
+        .unwrap();
+    goal_reports::bind_execution_turn(&db, "e", "second-goal").unwrap();
+    let blocked = block(&db);
+    let version = blocked["hold"]["version"].as_i64().unwrap();
+    drop(db);
+    let reopened = Database::open(&dir.path().join("db.sqlite")).unwrap();
+    let resumed = resume(&reopened, "s", "e", version, None).unwrap();
+    assert_eq!(resumed["resume"]["segment"], 3);
+    assert_eq!(
+        resumed["resume"]["priorTurnIds"],
+        json!(["t", "second-goal"])
+    );
+    assert_eq!(resumed["execution"]["id"], "e");
 }

@@ -1294,6 +1294,14 @@ blocked hold with no completed report or notification. Explicit user Stop
 remains interrupted. A hold pauses Team work, survives restart and retains the
 same execution/contract. User continuation uses a new turn and current model,
 invalidates the draft, reissues the token and restores the contract/context.
+Host supplies `resume.priorTurnIds` from durable hold segments. Runtime matches
+only those turns through Host-projected `UiMessage.turnId`, retaining current
+segment rows and system state while excluding planning, intervening ordinary
+turns and unknown ownership after restart/model switch. Text and timestamps do
+not establish ownership. Tool pairs stay within their owning turn. Unscoped
+session checkpoints are rebuilt from selected source rows and compacted again
+when needed. Older callers omitting the additive field keep the in-memory anchor
+behavior.
 Only explicit acceptance produces a non-met completed result with user_accepted;
 abandon/supersede create GOAL_ABANDONED/GOAL_SUPERSEDED without a report.
 Exhausted approved-Goal Team settlement recovery produces team_unsettled hold;
