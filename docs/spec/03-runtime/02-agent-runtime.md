@@ -920,10 +920,17 @@ new private progress token. It uses the Composer's selected provider/model and
 audits that change. User guidance appears once as a visible user message. The
 internal resume instruction contains reasons, the complete contract and the
 requirements to avoid renegotiation, resubmit `SubmitGoalReport`, and verify each
-criterion before claiming `met`. Context starts at `approved-goal:<executionId>`
-when retained; after restart/compaction without that entry, the current context
-boundary and full contract replay preserve the same obligation. A resume startup
-failure returns to a blocked hold with `resume_failed`.
+criterion before claiming `met`. Host supplies `resume.priorTurnIds` from the
+hold's durable execution segments. Runtime retains those turns through the
+Host-projected `UiMessage.turnId`, plus the current segment and model system
+state. Planning, intervening ordinary turns and rows without an owning turn are
+excluded, including after a sidecar restart or model switch; message text and
+timestamps never establish ownership. Tool calls and results retain their owning
+turn together. Session compaction checkpoints have no execution ownership, so
+resume reconstructs the selected context from complete source rows and compacts
+it again if needed rather than replaying an unrelated summary. Older callers
+omitting `priorTurnIds` retain the existing in-memory anchor behavior. A resume
+startup failure returns to a blocked hold with `resume_failed`.
 
 Only explicit acceptance may complete a non-`met` Goal. The report records
 `closure = user_accepted`, preserving the draft verdict and limitations; missing

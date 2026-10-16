@@ -404,7 +404,11 @@ try {
     const messages = JSON.stringify(request.messages);
     assert.ok(messages.includes(supplement) && messages.includes(proxied.execution.plan.replaceAll("\n", "\\n")));
     assert.equal(request.messages.filter(message => message.role === "user" && message.content === supplement).length, 1);
-    if (step === 1) { assert.ok(messages.includes("Existing progress snapshot")); return tool("UpdateGoalProgress", { items: items.map(item => ({ ...item, status: "completed" })) }); }
+    if (step === 1) {
+      assert.ok(messages.includes("Prior sidecar work: spelling table is unavailable."), "Restarted sidecar must retain the prior Goal segment evidence");
+      assert.ok(messages.includes("Existing progress snapshot"));
+      return tool("UpdateGoalProgress", { items: items.map(item => ({ ...item, status: "completed" })) });
+    }
     if (step === 2) return tool("SubmitGoalReport", metReport);
     return "Actual child sidecar verified every original criterion.";
   });

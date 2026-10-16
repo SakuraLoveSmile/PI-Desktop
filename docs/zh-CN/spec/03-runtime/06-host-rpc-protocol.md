@@ -1385,7 +1385,12 @@ retain the existing PlanExecutionState vocabulary. get is session scoped and
 may omit executionId for the latest blocked Goal. settle distinguishes normal
 Agent stop/error and returns execution/hold/report as applicable. resume/close
 require execution/session/expectedVersion; resume requires idle and no competing
-execution, preserves permissions and audits model override. close accepts or
+execution, preserves permissions and audits model override. Its response includes
+`resume: { reasons, segment, priorTurnIds }`; Host derives ordered prior IDs only
+from the hold's bound segments before the new turn is bound. The additive array
+is optional for older callers, but current Host always sends it. Runtime validates
+supplied IDs and selects Host-projected `UiMessage.turnId` ownership, never
+message text, timestamps or intervening ordinary turns. close accepts or
 abandons a blocked hold. Readers include optional holds and no private token.
 Automatic finalization rejects missing/non-met drafts with
 GOAL_REPORT_NOT_VERIFIED. Only user acceptance or historical completed-report

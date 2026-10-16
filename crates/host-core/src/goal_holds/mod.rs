@@ -404,7 +404,8 @@ pub fn resume(
         return Err(error);
     }
     let mut result = get(db, session, Some(id))?;
-    result["resume"] = json!({"reasons":hold.reasons,"segment":hold.resume_count+1});
+    result["resume"] = json!({"reasons":hold.reasons,"segment":hold.resume_count+1,
+        "priorTurnIds":hold.segments.iter().map(|segment| &segment.turn_id).collect::<Vec<_>>()});
     Ok(result)
 }
 
