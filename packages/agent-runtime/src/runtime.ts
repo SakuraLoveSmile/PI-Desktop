@@ -1916,6 +1916,8 @@ export class DesktopAgentRuntime {
   private pendingModelCompaction = false;
   /** One-shot request to finish the current turn at the next boundary. */
   private gracefulStopRequested = false;
+  /** Running Bash calls by tool call id, so a queued send-now can end one. */
+  private readonly runningBashAborts = new Map<string, () => void>();
   private readonly teamBudgetStop = new TeamRunLimitStop();
   /** Codex's `claim_*` flags: one of each reminder per context window. */
   private contextReminderClaimed = false;
@@ -3475,8 +3477,10 @@ export class DesktopAgentRuntime {
           unsubscribeOutput?.();
           signal?.removeEventListener("abort", abort);
           this.activeToolProgressCleanups.delete(cleanup);
+          if (isBash) this.runningBashAborts.delete(toolCallId);
         };
         this.activeToolProgressCleanups.add(cleanup);
+        if (isBash) this.runningBashAborts.set(toolCallId, abort);
         if (signal?.aborted) {
           cleanup(false);
           throw Object.assign(new Error("tool execution aborted before it started"), {
@@ -9546,6 +9550,20 @@ export class DesktopAgentRuntime {
     this.providerRetryAbort?.abort();
     if (this.compactionInProgress) this.compactionAborted = true;
     this.compactionAbort?.abort();
+  }
+
+  /**
+   * Abort one running Bash call so a queued send-now can reach its boundary.
+   * The graceful stop goes first: killing the call alone lets the model read
+   * the error and carry on, possibly re-running the same command. The kill
+   * reuses the Bash call's own abort path, which asks the host to stop it.
+   */
+  abortRunningBash(toolCallId: string): { found: boolean; requested: boolean } {
+    const abort = this.runningBashAborts.get(toolCallId);
+    if (!abort) return { found: false, requested: false };
+    if (!this.requestGracefulStop().requested) return { found: true, requested: false };
+    abort();
+    return { found: true, requested: true };
   }
 
   /** Ask pi-agent-core to stop after the current assistant/tool turn. */

@@ -570,6 +570,16 @@ async function handle(method: string, params: any): Promise<unknown> {
       }
       return runtime?.requestGracefulStop(params.preserveRunningTools === true) ?? { requested: false };
     }
+    case "agent.abortTool": {
+      const sessionId = String(params.sessionId);
+      const turnId = typeof params.turnId === "string" ? params.turnId : undefined;
+      const runtime = runtimes.get(sessionId);
+      // Unlike agent.stop, an abort without a turn id must not match any turn.
+      if (!turnId || !matchesExpectedTurnId(runtime?.getStatus().currentTurnId, turnId)) {
+        return { found: false, requested: false };
+      }
+      return runtime?.abortRunningBash(String(params.toolCallId ?? "")) ?? { found: false, requested: false };
+    }
     case "asktool.resolve": {
       const sessionId = String(params.sessionId ?? "");
       const runtime = runtimes.get(sessionId);
