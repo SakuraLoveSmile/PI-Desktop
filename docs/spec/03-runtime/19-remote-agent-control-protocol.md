@@ -362,6 +362,11 @@ mapping is fixed:
 
 `turn.completed` therefore maps to the local `agent_end`, never to the local
 `turn_end`, which only closes one model round (`01-ipc-protocol.md` §6).
+A completed turn is not a completed Goal: the Host's execution/hold settlement
+is authoritative. `goalExecutions.changed` is forwarded to refresh the owning
+remote session projection. A blocked Goal retains the legacy execution encoding
+`interrupted/GOAL_BLOCKED` plus its optional hold, localized reasons and readable
+progress; it must not be shown as completed or trigger completion notifications.
 
 `terminal.changed` (durable) records a terminal opening, closing, or exiting.
 `terminal.output` (ephemeral) carries pty bytes; it is recoverable only from
@@ -573,6 +578,15 @@ MUST use capability discovery rather than assuming optional operations exist.
 
 ### 6.2 Remote-host profile (v1.1, required by rollout R2)
 
+Goal holds in the v1 remote profile are read-only projections through existing
+report/progress readers. The new local `goalExecutions.resume`/`close` and
+settlement RPCs are not remote-control operations in this version. Hide those
+mutation controls and direct users to the owning Host; do not synthesize a new
+Goal or send an ordinary prompt while claiming to resume the old execution.
+Future remote mutation support needs an explicitly versioned contract and role
+checks. Completed-report Retry remains a persistence repair and cannot resume
+or accept a held Goal.
+
 When the desktop is the Remote Client of a `pi-host` on another machine, the
 renderer expects the session controls it has locally. These operations are
 part of the contract from v1.1 and are advertised through the
@@ -590,8 +604,8 @@ session root as working directory and stream through `terminal.output`.
 | `session/delete` | owner | Delete a session and its transcript on the Host |
 | `session/compact` | controller | Run a manual context checkpoint on the active session |
 | `goalProgress/get` | viewer | Read the named execution snapshot within the requested session; progress writes and token issuance remain private sidecar operations |
-| `goalReports/get` | viewer | Read a report or its bounded Host state for the named session; another session's report is indistinguishable from a missing report |
-| `goalReports/list` | viewer | List durable report summaries for the named session |
+| `goalReports/get` | viewer | Read a report or its bounded Host state, including an optional blocked hold, for the named session; another session's report is indistinguishable from a missing report |
+| `goalReports/list` | viewer | List durable report summaries and optional execution holds for the named session |
 | `goalReports/retry` | controller | Re-finalize a failed report from Host-owned durable facts after transcript persistence succeeds; never reruns the Goal |
 | `workspace/list` | viewer | List entries under the session root, bounded, honoring the Host ignore rules |
 | `workspace/read` | viewer | Read one bounded file under the session root; images as data URLs |

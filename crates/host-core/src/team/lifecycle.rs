@@ -76,6 +76,11 @@ pub(crate) fn bump_team_revision_conn(
 pub fn pause_team(db: &Database, team_session_id: &str) -> Result<Team> {
     crate::sessions::with_savepoint(db.conn(), "team_activity", |_| {
         let now = now_ms();
+        // A separate user or run-limit pause takes ownership from a Goal hold.
+        db.conn().execute(
+            "UPDATE goal_execution_holds SET paused_team=0 WHERE session_id=?1 AND paused_team=1",
+            [team_session_id],
+        )?;
         let rows = db.conn().execute(
             "UPDATE teams
          SET paused = 1, revision = revision + 1, updated_at = ?2
@@ -97,6 +102,16 @@ pub fn pause_team(db: &Database, team_session_id: &str) -> Result<Team> {
 }
 
 pub fn resume_team(db: &Database, team_session_id: &str) -> Result<Team> {
+    let blocked: bool = db.conn().query_row(
+        "SELECT EXISTS(SELECT 1 FROM goal_execution_holds WHERE session_id=?1 AND state='blocked')",
+        [team_session_id],
+        |row| row.get(0),
+    )?;
+    if blocked {
+        return Err(anyhow!(
+            "GOAL_BLOCKED: resume the owning goal before resuming its team"
+        ));
+    }
     crate::sessions::with_savepoint(db.conn(), "team_activity", |_| {
         super::run_limits::authorize_resume(db, team_session_id, now_ms())?;
         let now = now_ms();
@@ -282,6 +297,10 @@ pub fn get_team_snapshot(
         }
         review => review,
     };
+    let decision = match crate::goal_holds::active_resume_scope(db, team_session_id)? {
+        Some(scope) => super::review::get_execution_decision(db, team_session_id, &scope)?,
+        None => super::review::get_latest_execution_decision(db, team_session_id)?,
+    };
     Ok(super::model::TeamSnapshot {
         team_session_id: team_session_id.to_string(),
         revision: team.revision,
@@ -293,7 +312,22 @@ pub fn get_team_snapshot(
         lead_phase,
         queued_message_count,
         review,
-        decision: super::review::get_latest_execution_decision(db, team_session_id)?,
+        decision,
         run_limits: super::run_limits::projection(db, team_session_id, crate::db::now_ms())?,
     })
+}
+
+/// Applied both to direct member turns and durable dispatch entry points.
+pub(crate) fn require_unpaused(db: &Database, team_session_id: &str) -> Result<()> {
+    let blocked: bool = db.conn().query_row(
+        "SELECT EXISTS(SELECT 1 FROM goal_execution_holds WHERE session_id=?1 AND state='blocked')",
+        [team_session_id],
+        |row| row.get(0),
+    )?;
+    if blocked || get_team(db, team_session_id)?.is_some_and(|team| team.paused) {
+        return Err(anyhow!(
+            "TEAM_PAUSED: resume the owning goal or team before dispatching work"
+        ));
+    }
+    Ok(())
 }

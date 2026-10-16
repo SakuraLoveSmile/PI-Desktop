@@ -10,6 +10,7 @@ import { bindProjectContextHost } from "./project-context-host.js";
 import { visionFromModelConfig } from "./model-capabilities.js";
 import { hydrateAttachmentHistory } from "./attachment-history.js";
 import { classifyAgentError } from "./agent-errors.js";
+import { parseGoalResume } from "./goal-execution-context.js";
 import { readLocalRequestErrorDetails } from "./local-request-errors.js";
 import {
   DesktopAgentRuntime,
@@ -515,18 +516,22 @@ async function handle(method: string, params: any): Promise<unknown> {
       const sessionId = String(params.sessionId ?? "");
       const turnId = String(params.turnId ?? "").trim();
       const execution = params.execution as PlanExecution | undefined;
+      const resume = parseGoalResume(params.resume);
       if (!sessionId || !turnId || !execution) {
         throw Object.assign(new Error("approved plan execution parameters required"), {
           errorCode: "PLAN_EXECUTION_NOT_FOUND",
         });
+      }
+      if (resume && execution.kind !== "goal") {
+        throw Object.assign(new Error("Only an approved Goal can resume"), { errorCode: "INVALID_ARGUMENT" });
       }
       const runtime = await runtimeFor({
         ...params,
         sessionId,
         mode: "agent",
         turnId,
-      });
-      void runtime.executeApprovedPlan(execution, turnId).catch((err) => {
+      }, resume?.userMessage);
+      void runtime.executeApprovedPlan(execution, turnId, resume).catch((err) => {
         notify("agent.event", {
           sessionId,
           turnId,

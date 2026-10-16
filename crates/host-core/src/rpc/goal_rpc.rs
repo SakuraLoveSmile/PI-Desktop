@@ -23,6 +23,9 @@ fn goal_report_rpc_err(error: impl ToString) -> JsonRpcError {
             "NOT_FOUND",
         );
     }
+    if message.starts_with("GOAL_REPORT_NOT_VERIFIED") {
+        return rpc_err(1002, message, "GOAL_REPORT_NOT_VERIFIED");
+    }
     if message.starts_with("GOAL_EXECUTION_NOT_TERMINAL") {
         return rpc_err(
             1002,
@@ -57,6 +60,92 @@ pub(super) async fn handle(
     tx: mpsc::UnboundedSender<String>,
 ) -> Result<Value, JsonRpcError> {
     match method {
+        "goalExecutions.get"
+        | "goalExecutions.settle"
+        | "goalExecutions.resume"
+        | "goalExecutions.close" => {
+            let session = params
+                .get("sessionId")
+                .and_then(Value::as_str)
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let execution_id = params
+                .get("executionId")
+                .and_then(Value::as_str)
+                .filter(|id| !id.trim().is_empty());
+            let result = {
+                let st = state.lock().await;
+                if method == "goalExecutions.get" {
+                    crate::goal_holds::get(&st.db, session, execution_id)
+                } else {
+                    let id = execution_id
+                        .ok_or_else(|| rpc_err(1002, "executionId required", "INVALID_PARAMS"))?;
+                    match method {
+                        "goalExecutions.settle" => crate::goal_holds::settle(
+                            &st.db,
+                            session,
+                            id,
+                            crate::goal_holds::GoalSettlement {
+                                ended: params.get("ended").and_then(Value::as_str).unwrap_or(""),
+                                error_code: params.get("errorCode").and_then(Value::as_str),
+                                stop_hint: params.get("stopHint").and_then(Value::as_str),
+                                barrier_failed: params
+                                    .get("persistenceBarrierFailed")
+                                    .and_then(Value::as_bool)
+                                    .unwrap_or(false),
+                                durable_seq: params
+                                    .get("durableSeq")
+                                    .and_then(Value::as_i64)
+                                    .unwrap_or(0),
+                            },
+                        ),
+                        "goalExecutions.resume" => crate::goal_holds::resume(
+                            &st.db,
+                            session,
+                            id,
+                            params
+                                .get("expectedVersion")
+                                .and_then(Value::as_i64)
+                                .ok_or_else(|| {
+                                    rpc_err(1002, "expectedVersion required", "INVALID_PARAMS")
+                                })?,
+                            params.get("modelOverride"),
+                        ),
+                        _ => crate::goal_holds::close(
+                            &st.db,
+                            session,
+                            id,
+                            params
+                                .get("expectedVersion")
+                                .and_then(Value::as_i64)
+                                .ok_or_else(|| {
+                                    rpc_err(1002, "expectedVersion required", "INVALID_PARAMS")
+                                })?,
+                            params.get("action").and_then(Value::as_str).unwrap_or(""),
+                        ),
+                    }
+                }
+                .map_err(goal_execution_rpc_err)?
+            };
+            if method != "goalExecutions.get" {
+                let mut event = json!({"sessionId":session,"executionId":execution_id,"execution":result.get("execution")});
+                if let Some(hold) = result.get("hold") {
+                    event["hold"] = hold.clone();
+                }
+                emit_notification(&tx, "goalExecutions.changed", event).await;
+                if let Some(report) = result.get("report") {
+                    emit_notification(&tx, "goalReports.changed", report.clone()).await;
+                }
+                emit_notification(&tx, "notifications.changed", json!({"sessionId":session})).await;
+                if result
+                    .get("hold")
+                    .is_some_and(|hold| hold["pausedTeam"] == true)
+                {
+                    emit_notification(&tx, "team.changed", json!({"teamSessionId":session})).await;
+                }
+            }
+            Ok(result)
+        }
         "goalReports.bindExecutionTurn" => {
             let execution_id = params
                 .get("executionId")
@@ -209,6 +298,7 @@ pub(super) async fn handle(
                 "integrity": read.integrity,
                 "verdict": read.verdict,
                 "detail": read.detail,
+                "hold": read.execution_id.as_deref().map(|id| crate::goal_holds::get_hold(&st.db, session_id, id)).transpose().map_err(goal_execution_rpc_err)?.flatten(),
             }))
         }
         "goalReports.list" => {
@@ -399,10 +489,145 @@ pub(super) async fn handle(
     }
 }
 
+fn goal_execution_rpc_err(error: impl ToString) -> JsonRpcError {
+    let message = error.to_string();
+    let code = message.split(':').next().unwrap_or("INTERNAL");
+    let code = if matches!(
+        code,
+        "CONFLICT"
+            | "INVALID_ARGUMENT"
+            | "NOT_FOUND"
+            | "PERMISSION_DENIED"
+            | "GOAL_REPORT_NOT_VERIFIED"
+            | "TEAM_PAUSED"
+    ) {
+        code
+    } else {
+        "INTERNAL"
+    };
+    rpc_err(
+        if code == "CONFLICT" { 1008 } else { 1002 },
+        message.clone(),
+        code,
+    )
+}
+
+pub(super) fn replacement_events(
+    db: &crate::db::Database,
+    session: &str,
+    ids: Vec<String>,
+) -> anyhow::Result<(Vec<Value>, Option<Value>)> {
+    let mut events = vec![];
+    for id in ids {
+        let mut event = crate::goal_holds::get(db, session, Some(&id))?;
+        if event["hold"]["state"] == "superseded" {
+            event["sessionId"] = json!(session);
+            event["executionId"] = json!(id);
+            events.push(event);
+        }
+    }
+    let team_event = if !events.is_empty() {
+        crate::team::get_team(db, session)?
+            .map(|team| json!({"teamSessionId":session,"revision":team.revision}))
+    } else {
+        None
+    };
+    Ok((events, team_event))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use rusqlite::params;
+
+    #[test]
+    fn verification_failure_keeps_actionable_rpc_error_code() {
+        assert_eq!(
+            goal_report_rpc_err("GOAL_REPORT_NOT_VERIFIED: report absent")
+                .data
+                .unwrap()["errorCode"],
+            "GOAL_REPORT_NOT_VERIFIED"
+        );
+        assert_eq!(
+            super::super::plan_rpc_err("GOAL_REPORT_NOT_VERIFIED")
+                .data
+                .unwrap()["errorCode"],
+            "GOAL_REPORT_NOT_VERIFIED"
+        );
+    }
+
+    #[tokio::test]
+    async fn same_version_resume_and_accept_contend_for_one_rpc_transition() {
+        let (dir, db) = crate::goal_holds::tests::setup();
+        let mut app = AppState::open(dir.path()).unwrap();
+        app.db = db;
+        let state = Arc::new(Mutex::new(app));
+        let (tx, _) = mpsc::unbounded_channel();
+        let blocked = handle(
+            state.clone(),
+            "goalExecutions.settle",
+            json!({"sessionId":"s","executionId":"e","ended":"agent_stopped"}),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        let version = blocked["hold"]["version"].as_i64().unwrap();
+        let barrier = Arc::new(tokio::sync::Barrier::new(2));
+        let mut jobs = vec![];
+        for method in ["goalExecutions.resume", "goalExecutions.close"] {
+            let state = state.clone();
+            let tx = tx.clone();
+            let barrier = barrier.clone();
+            jobs.push(tokio::spawn(async move {barrier.wait().await;handle(state,method,json!({"sessionId":"s","executionId":"e","expectedVersion":version,"action":"accept"}),tx).await}));
+        }
+        let a = jobs.remove(0).await.unwrap();
+        let b = jobs.remove(0).await.unwrap();
+        assert_eq!(usize::from(a.is_ok()) + usize::from(b.is_ok()), 1);
+        let error = match (a, b) {
+            (Err(error), Ok(_)) | (Ok(_), Err(error)) => error,
+            _ => panic!("exactly one competing transition must succeed"),
+        };
+        assert_eq!(error.data.unwrap()["errorCode"], "CONFLICT");
+        let current = handle(
+            state,
+            "goalExecutions.get",
+            json!({"sessionId":"s","executionId":"e"}),
+            tx,
+        )
+        .await
+        .unwrap();
+        match current["hold"]["state"].as_str().unwrap() {
+            "accepted" => assert_eq!(current["execution"]["state"], "completed"),
+            "resumed" => assert_eq!(current["execution"]["state"], "running"),
+            state => panic!("unexpected final state {state}"),
+        }
+        assert_eq!(current["hold"]["version"], version + 1);
+    }
+
+    #[tokio::test]
+    async fn model_draft_cannot_forge_host_closure_or_timeline() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = Arc::new(Mutex::new(AppState::open(dir.path()).unwrap()));
+        let (tx, _) = mpsc::unbounded_channel();
+        for field in ["closure", "segments", "blocks"] {
+            let mut draft = json!({"summary":"Unverified","verdict":"partial"});
+            draft[field] = if field == "closure" {
+                json!("user_accepted")
+            } else {
+                json!([])
+            };
+            let error = handle(
+                state.clone(),
+                "goalReports.submitDraft",
+                json!({"executionId":"untrusted","draft":draft}),
+                tx.clone(),
+            )
+            .await
+            .unwrap_err();
+            assert!(error.message.starts_with("INVALID_ARGUMENT:"));
+            assert!(!dir.path().join("goal_reports").exists());
+        }
+    }
 
     #[tokio::test]
     async fn submit_draft_progress_mismatch_returns_actionable_validation_error() {

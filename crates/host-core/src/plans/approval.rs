@@ -677,6 +677,9 @@ impl PlanManager {
         let execution_id = (action == "approve").then(|| Uuid::new_v4().to_string());
         let tx = db.conn().unchecked_transaction()?;
         if approving {
+            if effective_execution_kind == Some(KIND_GOAL) {
+                crate::goal_holds::supersede(&tx, session_id)?;
+            }
             let active_execution: bool = tx.query_row(
                 "SELECT EXISTS(
                  SELECT 1 FROM plan_approvals

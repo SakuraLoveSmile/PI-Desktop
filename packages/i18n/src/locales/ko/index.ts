@@ -692,6 +692,7 @@ export const ko = {
     artifactScratchUnavailable: "임시 세션 디렉터리를 사용할 수 없습니다.",
   },
   goal: {
+    blocked: en.goal.blocked,
     progressLabel: "목표 진행 상황",
     progressListLabel: "목표 작업 목록",
     progressInitializing: "진행 상황 불러오는 중…",
@@ -2201,6 +2202,7 @@ sklm: {
       endedProcesses: "종료 {{count}}개",
       clearEndedProcesses: "종료된 프로세스 지우기",
       goal: {
+        reportBlocked: en.panel.activity.goal.reportBlocked,
         reportPending: "보고서 대기 중",
         reportUnavailable: "보고서를 사용할 수 없음",
         reportGenerating: "보고서 생성 중",

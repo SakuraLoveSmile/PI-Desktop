@@ -676,11 +676,12 @@ export function useAppShellRuntime() {
       if (!accepted) return;
       playNotificationChime();
       const failed = notification.kind === "task.failed";
+      const blocked = failed && notification.errorCode === "GOAL_BLOCKED";
       const title = t(
-        failed ? "notifications.failedTitle" : "notifications.completedTitle",
+        blocked ? "goal.blocked.notificationTitle" : failed ? "notifications.failedTitle" : "notifications.completedTitle",
         { sessionTitle: notification.sessionTitle },
       );
-      const body = failed
+      const body = blocked ? t("goal.blocked.notificationBody") : failed
         ? notification.errorCode
           ? t("notifications.failedBodyWithCode", { code: notification.errorCode })
           : t("notifications.failedBody")

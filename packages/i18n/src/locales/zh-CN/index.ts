@@ -847,6 +847,44 @@ export const zhCN = {
     artifactScratchUnavailable: "临时会话目录不可用。",
   },
   goal: {
+    blocked: {
+      sessionRefreshFailed: "目标已继续执行，但会话设置未能刷新。请重新打开会话刷新显示。",
+      attachmentsUnsupported: "续跑支持文字和文件引用。图片或插件附件请改为普通消息发送。",
+      title: "目标受阻 · 等待处理",
+      resume: "继续执行",
+      accept: "接受现状并结束",
+      abandon: "放弃目标",
+      sendContinues: "发送将继续目标 {{title}}",
+      normalMessage: "改为普通消息",
+      supersede: "批准此目标将取代受阻目标 {{title}}。",
+      userAccepted: "用户确认结束（未验证）",
+      actionFailed: "操作未能完成，请刷新后重试。",
+      remoteReadOnly: "请在目标所属设备处理此受阻目标。",
+      notificationTitle: "目标受阻，需要处理",
+      notificationBody: "请查看原因并选择下一步操作。",
+      activityTitle: "{{title}} · 目标受阻",
+      timeline: "执行记录",
+      timelineStarted: "开始执行",
+      timelineResumed: "继续执行",
+      timelineBlocked: "目标受阻",
+      reasons: {
+        reportMissing: "未提交有效的完成报告。",
+        reportInvalid: "提交的报告未通过验收。",
+        verdictPartial: "Agent 报告仅部分达成目标。",
+        verdictBlocked: "Agent 报告目标受阻。",
+        verdictUnknown: "无法确认目标是否达成。",
+        teamUnsettled: "团队仍有未完成任务。",
+        resumeFailed: "未能继续执行。",
+        agentError: "执行因错误结束。",
+        unknown: "目标需要处理。"
+      },
+      progress: {
+        pending: "待执行",
+        in_progress: "执行中",
+        completed: "已完成",
+        failed: "失败"
+      }
+    },
     progressLabel: "目标进度",
     progressListLabel: "目标任务清单",
     progressInitializing: "加载进度…",
@@ -2401,6 +2439,7 @@ sklm: {
       endedProcesses: "已结束 {{count}}",
       clearEndedProcesses: "清除已结束进程",
       goal: {
+        reportBlocked: "目标受阻",
         reportPending: "报告待生成",
         reportUnavailable: "报告暂不可用",
         reportGenerating: "报告生成中",

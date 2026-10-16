@@ -4,7 +4,7 @@ import { AgentHost } from "@pi-desktop/agent-host";
 import { createTeamDeliveryService } from "../electron/main/services/team-delivery.ts";
 import { restoreAgentHostThenDrain } from "../electron/main/runtime/team-startup.ts";
 
-function fixture({ paused = false, queueReceipt = false, failFirstAck = false, deferFirstRoster = false, noPendingMessages = false, agentHost: providedAgentHost, stopAtBoundary } = {}) {
+function fixture({ paused = false, queueReceipt = false, failFirstAck = false, deferFirstRoster = false, noPendingMessages = false, agentHost: providedAgentHost, stopAtBoundary, abortMemberTurn } = {}) {
   const order = [];
   const queueEntries = queueReceipt
     ? [{ sessionId: "member-1", sessionMessageId: "message-1" }]
@@ -125,6 +125,7 @@ function fixture({ paused = false, queueReceipt = false, failFirstAck = false, d
     getHost: () => currentHost,
     getBridge: () => bridge,
     activeTurns,
+    abortMemberTurn,
     stopAtBoundary: stopAtBoundary ?? (async () => {}),
     log: (...args) => order.push(args),
   });
@@ -418,4 +419,77 @@ test("a stale budget event after explicit resume cannot stop a newer run", async
   f.activeTurns.set("lead", "new-turn");
   await f.service.onNotification("team.runLimitPauseRequested", { teamSessionId: "lead" });
   assert.equal(stopped, 0);
+});
+
+
+test("blocked Goal holds all queues, awaits member abortion, and leaves the finished Lead alone", async () => {
+  let releaseAbort, enteredAbort;
+  const entered = new Promise(resolve => { enteredAbort = resolve; });
+  const gate = new Promise(resolve => { releaseAbort = resolve; });
+  const aborted = [];
+  const f = fixture({ paused: true, abortMemberTurn: async (session, turn) => { aborted.push([session, turn]); enteredAbort(); await gate; f.activeTurns.delete(session); } });
+  f.activeTurns.set("lead", "finished-lead");
+  f.activeTurns.set("member-1", "expert-turn");
+  const settlement = f.service.settleBlockedGoal("lead");
+  await entered;
+  let settled = false;
+  settlement.then(() => { settled = true; });
+  const dispatch = f.service.dispatchMessage({ teamSessionId: "lead", messageId: "message-1" });
+  assert.equal(settled, false);
+  releaseAbort();
+  await settlement;
+  await dispatch;
+  assert.deepEqual(aborted, [["member-1", "expert-turn"]]);
+  assert.equal(f.activeTurns.get("lead"), "finished-lead");
+  assert.equal(f.activeTurns.has("member-1"), false);
+  assert.ok(f.order.includes("hold:member-1:team:lead"));
+  assert.equal(f.order.includes("enqueue"), false);
+});
+
+test("blocked Goal cancels members even when Team pause was already owned by the user", async () => {
+  const aborted = [];
+  const f = fixture({ paused: true, abortMemberTurn: async (sessionId, turnId) => { aborted.push([sessionId, turnId]); f.activeTurns.delete(sessionId); } });
+  f.activeTurns.set("member-1", "old-member-turn");
+  await f.service.settleBlockedGoal("lead");
+  assert.deepEqual(aborted, [["member-1", "old-member-turn"]]);
+  assert.equal(f.hostCalls.some(([method]) => method === "team.resume"), false);
+  assert.equal(f.roster.paused, true);
+});
+
+async function retiredOrdinaryReceiptFixture() {
+  const state = userQueueFixture();
+  Object.assign(state.message, { status: "cancelled", dispatchCancellation: "superseded" });
+  for (const [id, messageId, idempotencyKey] of [
+    ["retired", state.message.id, `team-message:${state.message.id}`],
+    ["ordinary", "user-followup", "session-message:user-followup"],
+  ]) {
+    await state.agentHost.queue.push({ id, sessionId: "member-1", sessionMessageId: messageId, idempotencyKey,
+      principalSubject: "desktop", content: "Fixture mail", effectivePermissionMode: "ask", inputHash: id, priority: 1, createdAt: 1 });
+  }
+  return state;
+}
+
+test("Host superseded receipt cancels a mirrored ordinary outbound message without a task-dispatch flag", async () => {
+  const state = await retiredOrdinaryReceiptFixture();
+  assert.equal(state.message.taskDispatch, undefined);
+  await state.service.onNotification("team.changed", { teamSessionId: "lead", reason: "goal.superseded" });
+  assert.deepEqual(state.agentHost.queue.list("member-1").map(item => item.id), ["ordinary"]);
+  assert.deepEqual(state.prompts, []);
+});
+
+test("dispatch retry retires a Host-cancelled ordinary superseded receipt without acknowledgment or launch", async () => {
+  const state = await retiredOrdinaryReceiptFixture();
+  const result = await state.service.dispatchMessage({ teamSessionId: "lead", messageId: state.message.id });
+  assert.equal(result.accepted, false);
+  assert.equal(result.deliveryStatus, "cancelled");
+  assert.deepEqual(state.agentHost.queue.list("member-1").map(item => item.id), ["ordinary"]);
+  assert.equal(state.hostCalls.some(([method]) => method === "team.ackMessage"), false);
+  assert.deepEqual(state.prompts, []);
+});
+
+test("superseded cancellation does not retire a receipt already bound to a turn", async () => {
+  const state = await retiredOrdinaryReceiptFixture();
+  state.message.turnId = "consumed-turn";
+  await state.service.onNotification("team.changed", { teamSessionId: "lead" });
+  assert.deepEqual(state.agentHost.queue.list("member-1").map(item => item.id), ["retired", "ordinary"]);
 });

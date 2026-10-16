@@ -1333,7 +1333,9 @@ fn plan_rpc_err(error: impl ToString) -> JsonRpcError {
         .split_whitespace()
         .next()
         .map(|code| code.trim_end_matches(':'))
-        .filter(|code| code.starts_with("PLAN_") || code.starts_with("TEAM_"))
+        .filter(|code| {
+            code.starts_with("PLAN_") || code.starts_with("TEAM_") || code.starts_with("GOAL_")
+        })
         .unwrap_or("PLAN_INTERNAL")
         .to_string();
     rpc_err(1015, message, &error_code)
@@ -1926,7 +1928,11 @@ async fn handle_request_inner(
     match method {
         "sessionActivity.get" => session_activity_rpc::handle(state, &params).await,
         method if method.starts_with("team.") => team_rpc::handle(state, method, params, tx).await,
-        method if method.starts_with("goalReports.") || method.starts_with("goalProgress.") => {
+        method
+            if method.starts_with("goalReports.")
+                || method.starts_with("goalProgress.")
+                || method.starts_with("goalExecutions.") =>
+        {
             goal_rpc::handle(state, method, params, tx).await
         }
         "plans.markMissedSchedules"
@@ -4197,7 +4203,7 @@ async fn handle_request_inner(
             let action = params.get("action").and_then(|v| v.as_str()).unwrap_or("");
             let version = params.get("version").and_then(|v| v.as_i64());
             let target = params.get("targetPermissionMode").and_then(|v| v.as_str());
-            let resolution = {
+            let (resolution, goal_events, team_event) = {
                 let guard = state.lock().await;
                 let st = &*guard;
                 let workspace = if action == "approve" || action == "schedule" {
@@ -4232,7 +4238,10 @@ async fn handle_request_inner(
                 } else {
                     None
                 };
-                st.plans
+                let blocked_ids =
+                    crate::goal_holds::blocked_ids(&st.db, session_id).map_err(plan_rpc_err)?;
+                let resolution = st
+                    .plans
                     .resolve_with_options(
                         &st.db,
                         crate::plans::PlanResolveParams {
@@ -4260,8 +4269,18 @@ async fn handle_request_inner(
                             execution_kind: params.get("executionKind").and_then(|v| v.as_str()),
                         },
                     )
-                    .map_err(plan_rpc_err)?
+                    .map_err(plan_rpc_err)?;
+                let (goal_events, team_event) =
+                    goal_rpc::replacement_events(&st.db, session_id, blocked_ids)
+                        .map_err(plan_rpc_err)?;
+                (resolution, goal_events, team_event)
             };
+            for event in goal_events {
+                emit_notification(&tx, "goalExecutions.changed", event).await;
+            }
+            if let Some(event) = team_event {
+                emit_notification(&tx, "team.changed", event).await;
+            }
             let state_name = if resolution.status == plans::STATUS_APPROVED {
                 "inactive"
             } else {

@@ -681,6 +681,7 @@ export const ptBR = {
     artifactScratchUnavailable: "O diretório temporário da sessão está indisponível.",
   },
   goal: {
+    blocked: en.goal.blocked,
     progressLabel: "Progresso da meta",
     progressListLabel: "Lista de tarefas da meta",
     progressInitializing: "Carregando progresso…",
@@ -2137,6 +2138,7 @@ export const ptBR = {
       endedProcesses: "Encerrados {{count}}",
       clearEndedProcesses: "Limpar processos encerrados",
       goal: {
+        reportBlocked: en.panel.activity.goal.reportBlocked,
         reportPending: "Relatório pendente",
         reportUnavailable: "Relatório indisponível",
         reportGenerating: "Gerando relatório",

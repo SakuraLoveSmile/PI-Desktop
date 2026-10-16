@@ -22,6 +22,10 @@ export function GoalReportHeader({ report }: { report: GoalReport }) {
   const context = report.deliveryContext;
   const subtitle = [report.goal.title, context?.sourceLabel, context?.targetVersion, context?.revisionLabel]
     .filter(Boolean).join(" · ");
+  const events = [
+    ...(report.segments ?? []).map((segment, index) => ({ at: segment.startedAt, label: t(index ? "goal.blocked.timelineResumed" : "goal.blocked.timelineStarted"), key: `segment:${segment.turnId}` })),
+    ...(report.blocks ?? []).map((block, index) => ({ at: block.at, label: t("goal.blocked.timelineBlocked"), key: `block:${index}` })),
+  ].sort((left, right) => left.at - right.at);
   return <header className="goal-report-header-section" data-testid="goal-report-header">
     <h1 className="goal-report-title">{t("goalReport.view.deliveryTitle")}</h1>
     {subtitle && <p className="goal-report-subtitle">{subtitle}</p>}
@@ -33,12 +37,20 @@ export function GoalReportHeader({ report }: { report: GoalReport }) {
         {metric.source && <span className="goal-report-metric-source">{metric.source}</span>}
       </div>)}
     </div>}
-    {report.integrity.kind === "fallback" && <div className="goal-report-notice-box fallback" data-testid="goal-report-fallback-notice">
+    {(report.integrity.kind === "fallback" || report.closure === "user_accepted") && <div className="goal-report-notice-box fallback" data-testid={report.closure === "user_accepted" ? "goal-report-user-accepted-notice" : "goal-report-fallback-notice"}>
       <IconInfo size={16} />
-      <div><strong>{t("goalReport.view.fallbackNotice")}</strong>
+      <div><strong>{t(report.closure === "user_accepted" ? "goal.blocked.userAccepted" : "goalReport.view.fallbackNotice")}</strong>
         {report.integrity.truncationNotice && <p>{report.integrity.truncationNotice}</p>}
       </div>
     </div>}
+    {events.length > 0 && <section aria-label={t("goal.blocked.timeline")} data-testid="goal-report-execution-timeline">
+      <h2>{t("goal.blocked.timeline")}</h2>
+      <ol className="goal-report-steps-list">{events.map((event) => <li className="goal-report-step-item" key={event.key}>
+        <span className="goal-report-step-track" aria-hidden><span className="goal-report-step-dot" /></span>
+        <div className="goal-report-step-content"><strong>{event.label}</strong>{" · "}
+          <time dateTime={new Date(event.at).toISOString()}>{new Date(event.at).toLocaleString()}</time></div>
+      </li>)}</ol>
+    </section>}
   </header>;
 }
 
@@ -55,7 +67,7 @@ export function GoalReportMetadata({ report }: { report: GoalReport }) {
         {t(report.execution.status === "completed" ? "goalReport.view.statusCompleted" : "goalReport.view.statusInterrupted")}
       </Badge>
       <Badge className={`goal-report-badge integrity-${report.integrity.kind}`}>
-        {t(report.integrity.kind === "fallback" ? "goalReport.view.fallback" : "goalReport.view.structured")}
+        {t(report.closure === "user_accepted" ? "goal.blocked.userAccepted" : report.integrity.kind === "fallback" ? "goalReport.view.fallback" : "goalReport.view.structured")}
       </Badge>
       {durationSec !== null && report.execution.timingSource === "turn" && <Badge className="goal-report-badge time">
         {durationSec >= 60 ? `${Math.floor(durationSec / 60)}m ${durationSec % 60}s` : `${durationSec}s`}

@@ -4,7 +4,7 @@
  *
  * Exercises the host RPC protocol for Goal completion reports:
  * - Structured draft submission and ready report lifecycle
- * - Completed-only publication, interruption refusal, and completed fallback generation
+ * - Completed-only publication, interruption refusal, and blocked unverified executions
  * - Session isolation, scope validation, and cascade deletion
  * - Persistence and host restart recovery
  * - Bounds enforcement (size limits, metrics, criteria)
@@ -15,7 +15,6 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { setTimeout as delay } from "node:timers/promises";
 
 import { assert, shortJson, expectRpcError } from "./e2e/assert.mjs";
 import { resolveHostBinary } from "./e2e/host.mjs";
@@ -117,16 +116,16 @@ async function scenarioSettledTeam(binary, tempRoot) {
     const state = () => ({ turnId, epoch: 1, mode: "agent", inactive: false });
     let prompt = "approved goal";
     for (let index = 0; index < 3; index++) {
-      const outcome = await guard.authorizeCompletion(host, team, state, true);
+      const outcome = await guard.authorizeCompletion(host, team, state, true, "", true);
       assert(outcome.kind === "recover", shortJson(outcome));
       await guard.recover({ host, team, state, abort: () => { throw new Error("Unexpected recovery abort"); },
         prepare: () => {}, getPrompt: () => prompt, setPrompt: value => { prompt = value; }, start: () => {},
         continue: async () => { assert(prompt.includes(hostReason), "Recovery dropped the Host reason"); }, restore: () => {},
       });
     }
-    const terminal = await guard.authorizeCompletion(host, team, state, true);
-    assert(terminal.kind === "error" && terminal.error.message === hostReason, shortJson(terminal));
-    record("E2E-TEAM-completion-error-keeps-host-reason", true, "three bounded runtime nudges; terminal reason equals native Host rejection");
+    const terminal = await guard.authorizeCompletion(host, team, state, true, "", true);
+    assert(terminal.kind === "blocked", shortJson(terminal));
+    record("E2E-TEAM-completion-blocked-keeps-host-reason", true, "three bounded runtime nudges; Goal ends blocked after native Host rejection");
     const result = await host.call("team.sendMessage", { teamSessionId: session.id, callerSessionId: memberId, target: "Lead", content: "Verified full report evidence" });
     await host.call("team.updateTask", { teamSessionId: session.id, callerSessionId: memberId,
       taskId: task.taskId, expectedRevision: task.revision, status: "completed" });
@@ -137,7 +136,7 @@ async function scenarioSettledTeam(binary, tempRoot) {
     assert((await host.call("team.getLeadExecutionState", { ...team, expectedTurnId: turnId })).active, "Member wake replaced original execution");
     const accepted = await reportTool.execute("settled-report", draft);
     assert(accepted.details.ok && manager.isDraftValid(), shortJson(accepted));
-    assert((await guard.authorizeCompletion(host, team, state, true)).kind === "authorized", "Settled completion denied");
+    assert((await guard.authorizeCompletion(host, team, state, true, "", true)).kind === "authorized", "Settled completion denied");
   }, binary, tempRoot);
 }
 
@@ -246,7 +245,6 @@ async function scenarioStructuredReport(binary, tempRoot) {
     assert(finalizeRes.report?.integrity === "structured", shortJson(finalizeRes));
     assert(finalizeRes.report?.verdict === "met", shortJson(finalizeRes));
 
-    await delay(50);
     const notifications = ctx.host.matchingNotifications("goalReports.changed");
     assert(notifications.length >= 1, "goalReports.changed notification not emitted");
     const changed = notifications[notifications.length - 1].params;
@@ -261,7 +259,7 @@ async function scenarioStructuredReport(binary, tempRoot) {
     });
     const report = getRes.report;
     assert(report, "report not returned");
-    assert(report.schemaVersion === 1, shortJson(report));
+    assert(report.schemaVersion === 2, shortJson(report));
     assert(report.execution?.status === "completed", shortJson(report));
     assert(report.integrity?.kind === "structured", shortJson(report));
     assert(report.verdict === "met", shortJson(report));
@@ -298,7 +296,7 @@ async function scenarioStructuredReport(binary, tempRoot) {
     const fileBytes = await readFile(reportFilePath, "utf8");
     const parsedFile = JSON.parse(fileBytes);
     assert(parsedFile.executionId === executionId, "file JSON executionId mismatch");
-    assert(parsedFile.schemaVersion === 1, "file JSON schemaVersion mismatch");
+    assert(parsedFile.schemaVersion === 2, "file JSON schemaVersion mismatch");
 
     await expectRpcError(
       () => ctx.host.call("goalReports.submitDraft", {
@@ -324,9 +322,9 @@ async function scenarioStructuredReport(binary, tempRoot) {
   }, binary, tempRoot);
 }
 
-async function scenarioFallbackReport(binary, tempRoot) {
+async function scenarioBlockedReport(binary, tempRoot) {
   return withScenario("E2E-GOAL-REPORT-002", async (ctx) => {
-    const title = "Fallback Invalidation Run";
+    const title = "Blocked Invalidation Run";
     const { session, turnId, executionId } = await approvedGoalExecution(ctx, title, true);
 
     await ctx.host.call("goalReports.bindExecutionTurn", {
@@ -367,32 +365,28 @@ async function scenarioFallbackReport(binary, tempRoot) {
     });
     assert(progress.progress?.revision === 1, shortJson(progress));
 
-    // A completed execution without a valid draft still produces Host fallback facts.
-    await ctx.host.call("plans.finishExecution", { executionId, status: "completed" });
-    const finalizeRes = await ctx.host.call("goalReports.finalizeReport", {
-      executionId,
-      status: "completed",
-    });
-    assert(finalizeRes.report?.status === "ready", shortJson(finalizeRes));
-    assert(finalizeRes.report?.integrity === "fallback", shortJson(finalizeRes));
-
-    const getRes = await ctx.host.call("goalReports.get", {
-      sessionId: session.id,
-      executionId,
-    });
-    const report = getRes.report;
-    assert(report?.execution?.status === "completed", shortJson(report));
-    assert(report?.integrity?.kind === "fallback", shortJson(report));
-    assert(report?.verdict === "partial", shortJson(report));
-    assert(report.steps?.length === 4, shortJson(report));
-    assert(report.steps.map(step => step.status).join(",") === "completed,skipped,skipped,failed", shortJson(report));
-    assert(report.steps[1].detail.includes("in_progress"), shortJson(report));
-    assert(report.steps[2].detail.includes("pending"), shortJson(report));
-    const snapshot = await ctx.host.call("goalProgress.get", { sessionId: session.id, executionId });
-    assert(snapshot.progress?.items[1]?.status === "in_progress", "fallback must not fabricate completed progress");
-
+    ctx.host.clearNotifications();
     await endTurn(ctx.host, turnId);
-    return `reportId=${report.reportId} integrity=fallback verdict=${report.verdict}`;
+    const settled = await ctx.host.call("goalExecutions.settle", {
+      sessionId: session.id, executionId, ended: "agent_stopped",
+    });
+    assert(settled.execution?.state === "interrupted", shortJson(settled));
+    const { history } = await ctx.host.call("plans.pending", { sessionId: session.id });
+    assert(history.find(proposal => proposal.executionId === executionId)?.errorCode === "GOAL_BLOCKED", shortJson(history));
+    assert(settled.hold?.state === "blocked" && settled.hold.reasons.some(reason => reason.code === "report_missing"), shortJson(settled));
+    const read = await ctx.host.call("goalReports.get", { sessionId: session.id, executionId });
+    assert(read.state !== "ready" && read.report?.schemaVersion == null, shortJson(read));
+    assert(!existsSync(join(ctx.dataDir, "goal_reports", session.id, `${executionId}.json`)), "blocked Goal published a report file");
+    assert(!ctx.host.matchingNotifications("goalReports.changed").some(note => note.params.status === "ready"), "blocked Goal broadcast ready");
+    const notices = await ctx.host.call("notification.list");
+    assert(!notices.notifications.some(note => note.sessionId === session.id && note.kind === "task.completed"), shortJson(notices));
+    assert(notices.notifications.some(note => note.sessionId === session.id && note.kind === "task.failed" && note.errorCode === "GOAL_BLOCKED"), shortJson(notices));
+    const snapshot = await ctx.host.call("goalProgress.get", { sessionId: session.id, executionId });
+    assert(snapshot.progress?.items[1]?.status === "in_progress", "blocking fabricated completed progress");
+    await expectRpcError(() => ctx.host.call("goalProgress.update", {
+      sessionId: session.id, executionId, writeToken, items: [],
+    }), ["GOAL_PROGRESS_NOT_RUNNING"]);
+    return "hold=blocked report_missing noArtifact=true noCompletedNotification=true progressRetained=true";
   }, binary, tempRoot);
 }
 
@@ -463,6 +457,7 @@ async function scenarioSessionIsolation(binary, tempRoot) {
       true,
     );
     await ctx.host.call("goalReports.bindExecutionTurn", { executionId: execA, turnId: turnA });
+    await ctx.host.call("goalReports.submitDraft", { executionId: execA, draft: { verdict: "met", summary: "Verified session A." } });
     await ctx.host.call("plans.finishExecution", { executionId: execA, status: "completed" });
     await ctx.host.call("goalReports.finalizeReport", { executionId: execA, status: "completed" });
 
@@ -472,6 +467,7 @@ async function scenarioSessionIsolation(binary, tempRoot) {
       true,
     );
     await ctx.host.call("goalReports.bindExecutionTurn", { executionId: execB, turnId: turnB });
+    await ctx.host.call("goalReports.submitDraft", { executionId: execB, draft: { verdict: "met", summary: "Verified session B." } });
     await ctx.host.call("plans.finishExecution", { executionId: execB, status: "completed" });
     await ctx.host.call("goalReports.finalizeReport", { executionId: execB, status: "completed" });
 
@@ -698,7 +694,7 @@ async function main() {
   try {
     await runScenario("E2E-GOAL-report-waits-for-settled-team", () => scenarioSettledTeam(binary, tempRoot));
     await runScenario("E2E-GOAL-REPORT-001", () => scenarioStructuredReport(binary, tempRoot));
-    await runScenario("E2E-GOAL-REPORT-002", () => scenarioFallbackReport(binary, tempRoot));
+    await runScenario("E2E-GOAL-REPORT-002", () => scenarioBlockedReport(binary, tempRoot));
     await runScenario("E2E-GOAL-REPORT-003", () => scenarioSessionIsolation(binary, tempRoot));
     await runScenario("E2E-GOAL-REPORT-004", () => scenarioRestartRecovery(binary, tempRoot));
     await runScenario("E2E-GOAL-REPORT-005", () => scenarioDraftBounds(binary, tempRoot));

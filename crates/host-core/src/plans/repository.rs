@@ -124,7 +124,7 @@ pub(crate) fn has_live_scratch_goal(db: &Database, session_id: &str) -> Result<b
              SELECT 1 FROM plan_approvals
              WHERE session_id = ?1
                AND artifact_workspace_kind = 'scratch'
-               AND (status = 'pending' OR execution_state IN ('queued', 'running'))
+               AND (status = 'pending' OR execution_state IN ('queued', 'running') OR EXISTS(SELECT 1 FROM goal_execution_holds h WHERE h.execution_id=plan_approvals.execution_id AND h.state='blocked'))
          )",
         params![session_id],
         |row| row.get(0),

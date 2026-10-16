@@ -1,7 +1,7 @@
 use super::{execution_inbox::*, tests::*, *};
 use crate::{session_collaboration, sessions};
 use rusqlite::params;
-fn fixture() -> (crate::db::Database, String, String) {
+pub(super) fn fixture() -> (crate::db::Database, String, String) {
     let db = test_db();
     let lead = create_test_lead(&db);
     let turn = sessions::begin_turn(&db, &lead, None, None).unwrap();
