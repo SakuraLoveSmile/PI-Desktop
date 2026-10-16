@@ -1,21 +1,22 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Agent, AgentMessage } from "@earendil-works/pi-agent-core";
 import { createAssistantMessageEventStream, getCurrentTools, type AssistantMessage, type Models } from "@earendil-works/pi-ai";
-import type { Mode, ProjectMemoryEntry, ProjectMemoryRuntimeState } from "@pi-desktop/shared";
+import type { Mode, ProjectMemoryAlias, ProjectMemoryEntry, ProjectMemoryRuntimeState } from "@pi-desktop/shared";
 import type { RuntimeHost } from "./host-client.js";
 import { createAutoMemoryTool, loadAutoMemory } from "./project-auto-memory.js";
-import { DesktopAgentRuntime } from "./runtime.js";
+import { DesktopAgentRuntime, type AgentRuntimeOptions } from "./runtime.js";
 
 const runtimes: DesktopAgentRuntime[] = [];
 afterEach(async () => { await Promise.all(runtimes.splice(0).map(runtime => runtime.dispose())); });
 
-function fixture(options: { mode?: Mode; projectPath?: string; host?: RuntimeHost } = {}) {
+function fixture(options: { mode?: Mode; projectPath?: string; host?: RuntimeHost; memoryAlias?: ProjectMemoryAlias } = {}) {
   let enabled = true;
   let failReads = false;
   let entries: ProjectMemoryEntry[] = [{ id: "style", title: "Style", content: "Prefer concise replies." }];
-  const state = (): ProjectMemoryRuntimeState => ({ memory: {
+  let memoryAlias = options.memoryAlias;
+  const state = (): ProjectMemoryRuntimeState => ({ memory: memoryAlias?.memory ?? {
     content: entries.map(entry => `${entry.title}\n${entry.content}`).join("\n\n"), entries: [...entries],
-  }, autoRecordEnabled: enabled });
+  }, autoRecordEnabled: memoryAlias ? false : enabled, ...(memoryAlias ? { memoryAlias } : {}) });
   const call = vi.fn(async (method: string, params?: Record<string, unknown>) => {
     if (method === "project.autoMemory.agentList") {
       if (failReads) throw new Error("fixture unavailable");
@@ -35,15 +36,18 @@ function fixture(options: { mode?: Mode; projectPath?: string; host?: RuntimeHos
     return {};
   });
   const host: RuntimeHost = options.host ?? { call: <T>(method: string, params?: unknown) => call(method, params as Record<string, unknown>) as Promise<T> };
-  const runtime = new DesktopAgentRuntime({
+  const runtimeOptions: AgentRuntimeOptions = {
     host, sessionId: "real-session", mode: options.mode ?? "agent", projectPath: options.projectPath ?? "/fixture/project",
     projectMemory: "Stale launch note.", thinkingLevel: "off",
+    projectInstructions: { entries: [{ source: "AGENTS.md", content: "Slot file instructions." }] },
+    projectMemoryAlias: options.memoryAlias,
     provider: { id: "local", name: "Fixture", baseUrl: "http://127.0.0.1:1/v1", modelId: "fixture-model", apiKey: "", authKind: "none",
       supportsReasoning: false, supportedThinkingLevels: ["off"],
       modelConfig: { source: "generic", name: "Fixture", baseUrl: "http://127.0.0.1:1/v1", reasoning: false,
         input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 256_000, maxTokens: 32_000 } },
     commandShell: { id: "bash", label: "Bash", dialect: "posix", available: true, isDefault: true }, onEvent: () => {},
-  });
+  };
+  const runtime = new DesktopAgentRuntime(runtimeOptions);
   runtimes.push(runtime);
   const probe = runtime as unknown as { agent: Agent; models: Pick<Models, "streamSimple">; agentSystemPromptContent(): string };
   const requests: Array<{ prompt: string; tools: string[]; messages: AgentMessage[] }> = [];
@@ -61,11 +65,63 @@ function fixture(options: { mode?: Mode; projectPath?: string; host?: RuntimeHos
       return stream;
     },
   };
-  return { runtime, probe, requests, responses, call, state, setEnabled: (value: boolean) => { enabled = value; },
-    deleteNotes: () => { entries = []; }, failReads: () => { failReads = true; } };
+  return { runtime, runtimeOptions, probe, requests, responses, call, state, setEnabled: (value: boolean) => { enabled = value; },
+    deleteNotes: () => { entries = []; }, failReads: () => { failReads = true; },
+    setMemoryAlias: (value: ProjectMemoryAlias | undefined) => { memoryAlias = value; } };
 }
 
 describe("automatic project memory user path", () => {
+  it("retires a runtime when its launch alias instructions change", () => {
+    const memoryAlias = { memory: { content: "Owner notes.", entries: [] }, instructions: "Original owner rules." };
+    const f = fixture({ memoryAlias });
+    expect(f.runtime.matches(f.runtimeOptions)).toBe(true);
+    expect(f.runtime.matches({ ...f.runtimeOptions, projectMemoryAlias: { ...memoryAlias, instructions: "New owner rules." } })).toBe(false);
+    expect(f.runtime.matches({ ...f.runtimeOptions, projectMemoryAlias: undefined })).toBe(false);
+  });
+
+  it.each(["plan", "goal"] as const)("refreshes aliased memory and instructions without moving the %s workspace", async mode => {
+    const alias = { memory: { content: "Real project notes.", entries: [] }, instructions: "Real group instructions." };
+    const f = fixture({ mode, projectPath: "/fixture/pool/repo/slot-1", memoryAlias: alias });
+    expect(f.probe.agentSystemPromptContent()).toContain("Real group instructions.");
+    await f.runtime.prompt("first question");
+    expect(f.requests.at(-1)?.prompt).toContain("Real project notes.");
+    expect(f.requests.at(-1)?.prompt).toContain("Real group instructions.");
+    expect(f.requests.at(-1)?.prompt).toContain("Slot file instructions.");
+    f.setMemoryAlias({ memory: { content: "Updated real notes.", entries: [] }, instructions: "Updated group instructions." });
+    await f.runtime.prompt("second question");
+    expect(f.requests.at(-1)?.prompt).toContain("Updated real notes.");
+    expect(f.requests.at(-1)?.prompt).toContain("Updated group instructions.");
+    expect(f.requests.at(-1)?.prompt).not.toContain("Real project notes.");
+    expect(f.requests.at(-1)?.prompt).not.toContain("Real group instructions.");
+    f.setMemoryAlias({ memory: { content: "", entries: [] }, instructions: "" });
+    await f.runtime.prompt("after delete");
+    expect(f.requests.at(-1)?.prompt).not.toContain("Updated real notes.");
+    expect(f.requests.at(-1)?.prompt).not.toContain("Updated group instructions.");
+    expect(f.requests.at(-1)?.prompt).not.toContain("Prefer concise replies.");
+    expect(f.requests.at(-1)?.prompt).toContain("Slot file instructions.");
+    expect(f.requests.at(-1)?.prompt).not.toContain("# Updating project memory");
+    expect(f.probe.agent.state.tools.some(tool => tool.name === "ProjectMemory")).toBe(false);
+    expect(f.call.mock.calls.filter(([method]) => method === "project.autoMemory.agentList")).toHaveLength(3);
+    expect(f.call.mock.calls.some(([method]) => method === "project.autoMemory.agentUpsert")).toBe(false);
+  });
+
+  it.each(["invalidated", "failed"] as const)("clears aliased instructions when the next owner read is %s", async outcome => {
+    const f = fixture({ memoryAlias: { memory: { content: "Private owner notes.", entries: [] }, instructions: "Private owner instructions." } });
+    await f.runtime.prompt("first question");
+    expect(f.requests.at(-1)?.prompt).toContain("Private owner notes.");
+    expect(f.requests.at(-1)?.prompt).toContain("Private owner instructions.");
+    expect(f.requests.at(-1)?.prompt).not.toContain("# Updating project memory");
+    expect(f.probe.agent.state.tools.some(tool => tool.name === "ProjectMemory")).toBe(false);
+    if (outcome === "invalidated") f.setMemoryAlias(undefined);
+    else f.failReads();
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try { await f.runtime.prompt("second question"); } finally { warning.mockRestore(); }
+    expect(f.requests.at(-1)?.prompt).not.toContain("Private owner notes.");
+    expect(f.requests.at(-1)?.prompt).not.toContain("Private owner instructions.");
+    expect(f.requests.at(-1)?.prompt).toContain("Slot file instructions.");
+    if (outcome === "invalidated") expect(f.requests.at(-1)?.prompt).toContain("Prefer concise replies.");
+  });
+
   it("remembers during conversation, refreshes on the next turn and preserves reads when recording is disabled", async () => {
     const f = fixture();
     f.responses.push([{ type: "toolCall", id: "remember", name: "ProjectMemory", arguments: { action: "upsert", title: "Stack", content: "Use pnpm." } }]);
@@ -184,10 +240,12 @@ describe("automatic project memory user path", () => {
     await reading;
     await f.runtime[action]();
     await rejected;
-    resolveRead({ memory: { content: "Late deleted note", entries: [] }, autoRecordEnabled: true });
+    resolveRead({ memory: { content: "Late deleted note", entries: [] }, autoRecordEnabled: false,
+      memoryAlias: { memory: { content: "Late deleted note", entries: [] }, instructions: "Late owner instructions" } });
     await Promise.resolve();
     expect(f.requests).toHaveLength(0);
     expect(f.probe.agentSystemPromptContent()).not.toContain("Late deleted note");
+    expect(f.probe.agentSystemPromptContent()).not.toContain("Late owner instructions");
     expect(f.probe.agent.state.tools.some(tool => tool.name === "ProjectMemory")).toBe(false);
   });
 });
@@ -208,5 +266,9 @@ describe("project memory tool boundary", () => {
   it("rejects malformed host state instead of retaining or enabling old memory", async () => {
     await expect(loadAutoMemory({ call: async <T>() => ({ memory: { content: "bad", entries: [{}] }, autoRecordEnabled: true }) as T }, "real-session"))
       .rejects.toThrow("Invalid project memory response");
+    for (const memoryAlias of [null, {}, { instructions: "bad", memory: { content: 123 } }, { memory: { content: "bad", entries: [] } }]) {
+      await expect(loadAutoMemory({ call: async <T>() => ({ memory: { content: "", entries: [] }, autoRecordEnabled: false, memoryAlias }) as T }, "real-session"))
+        .rejects.toThrow("Invalid project memory response");
+    }
   });
 });

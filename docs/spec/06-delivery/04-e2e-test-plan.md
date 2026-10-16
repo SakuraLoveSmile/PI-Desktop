@@ -18501,3 +18501,32 @@ The default provisioned package-manager build path remains available. A human
 chosen local-main base exception must be recorded separately from the receipt's
 existing `origin/main` metadata; the exception never implies remote refresh,
 push or PR authorization.
+
+### E2E-PLUS-worktree-memory-owner
+
+- **Preconditions:** Current-main request candidate; rebuilt Rust Host and Node
+  sidecar; isolated HOME/data/profile, real temporary Git repository and two
+  detached slots; localhost deterministic provider only.
+- **Steps:** Store real project/group memory and instructions, register slots
+  through the fixed schema-1 projection, and launch Plan/Goal slot sessions.
+  Capture provider requests on the first and subsequent turns. Update/delete
+  memory and instructions; invalidate the mapping and repeat. Exercise a
+  multi-root owner and a second slot. Check forged binding and write refusals.
+- **Expected:** Both launch and later turns see the real memory/instructions
+  without real root lists or real untracked AGENTS; cwd/tool roots remain slot.
+  Empty/deleted/invalid alias context does not revive old notes. Plan/Goal and
+  all alias writes are refused. Real Host reads leave all kv rows unchanged.
+  Ordinary group context and sessions retain their existing behavior.
+- **Specs:** Runtime worktree context; Host verified aliases; storage memory
+  ownership; [ADR](../../adr/worktree-memory-owner.md).
+- **Automation:** `node scripts/e2e-project-context.mjs --worktree-memory`;
+  resolver/RPC Rust tests and launch/runtime behavior suites; existing isolated
+  Electron memory editor fixture remains the UI regression.
+- **Acceptance:** Candidate executable provenance, prompt captures, isolation
+  and actual checks are recorded separately from installation/paid-model tests.
+- **Milestone:** Plus.
+- **Status:** Implementation candidate; do not infer a run from this definition.
+
+| Plus scenario | User path | Automated entry |
+| --- | --- | --- |
+| E2E-PLUS-worktree-memory-owner | Slot launch → subsequent turn → update/delete → mapping invalidation | project-context --worktree-memory; Rust + launch/runtime tests |
