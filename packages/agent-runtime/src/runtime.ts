@@ -104,6 +104,7 @@ import type {
   SessionMessageOrigin,
   PlanExecution,
   PlanProposal,
+  ProjectMemoryAlias,
   PlanningState,
   Risk,
   SubagentDefinition,
@@ -1005,6 +1006,8 @@ export type AgentRuntimeOptions = {
   projectInstructions?: ProjectInstructions;
   /** Durable project context loaded from host-owned project memory. */
   projectMemory?: string;
+  /** Memory-only alias; never changes the session workspace or instruction files. */
+  projectMemoryAlias?: ProjectMemoryAlias;
   /** Persisted transcript to seed the agent with (session isolation: each
    * session's agent carries only its own history). */
   history?: UiMessage[];
@@ -1074,6 +1077,7 @@ export type RuntimeMatchConfig = {
   customSystemPrompt?: CustomSystemPrompt;
   projectInstructions?: ProjectInstructions;
   projectMemory?: string;
+  projectMemoryAlias?: ProjectMemoryAlias;
   projectPath?: string;
   commandShell: CommandShellOption;
   subagents?: SubagentDefinition[];
@@ -1774,6 +1778,8 @@ export class DesktopAgentRuntime {
   private baseProjectInstructions?: ProjectInstructions;
   private projectInstructions?: ProjectInstructions;
   private projectMemory?: string;
+  private launchProjectMemoryAlias?: ProjectMemoryAlias;
+  private projectMemoryAlias?: ProjectMemoryAlias;
   private turnProjectMemory?: string;
   private autoMemoryEnabled = false;
   private projectMemoryRefreshAbort?: AbortController;
@@ -1977,7 +1983,9 @@ export class DesktopAgentRuntime {
     this.customSystemPrompt = opts.customSystemPrompt;
     this.baseProjectInstructions = opts.projectInstructions;
     this.projectInstructions = opts.projectInstructions;
-    this.projectMemory = opts.projectMemory?.trim() || undefined;
+    this.launchProjectMemoryAlias = opts.projectMemoryAlias;
+    this.projectMemoryAlias = opts.projectMemoryAlias;
+    this.projectMemory = (opts.projectMemoryAlias?.memory.content ?? opts.projectMemory)?.trim() || undefined;
     this.turnProjectMemory = this.projectPath ? this.projectMemory : undefined;
     this.compactionEnabled = compactionEnabled(opts.compactionSettings);
     this.compactionStrategy = resolveCompactionStrategy(opts.compactionStrategy);
@@ -2384,8 +2392,17 @@ export class DesktopAgentRuntime {
       : this.agent.state.systemPrompt;
   }
 
+  private effectiveProjectInstructions(): ProjectInstructions | undefined {
+    const instructions = this.projectMemoryAlias?.instructions.trim();
+    if (!instructions) return this.projectInstructions;
+    return { entries: [
+      ...(this.projectInstructions?.entries ?? []),
+      { source: "ChatGPT Project instructions", content: instructions },
+    ] };
+  }
+
   private composeSystemPrompt(): string {
-    const projectPrompt = projectInstructionsPrompt(this.projectInstructions);
+    const projectPrompt = projectInstructionsPrompt(this.effectiveProjectInstructions());
     const memoryPrompt = projectMemoryPrompt(this.projectPath ? this.turnProjectMemory : this.projectMemory);
     const automaticPrompt = this.autoMemoryEnabled && this.mode === "agent" ? autoMemoryPrompt() : undefined;
     const optionalToolsPrompt = this.optionalToolsPrompt();
@@ -2435,10 +2452,12 @@ export class DesktopAgentRuntime {
     this.projectMemoryRefreshAbort = controller;
     let enabled = false;
     let content: string | undefined;
+    let memoryAlias: ProjectMemoryAlias | undefined;
     try {
       const state = await loadAutoMemory(this.host, this.sessionId, controller.signal);
       enabled = state.autoRecordEnabled;
-      content = state.memory.content;
+      memoryAlias = state.memoryAlias;
+      content = (memoryAlias?.memory ?? state.memory).content;
     } catch (error) {
       // Do not log memory bytes, host parameters, or capability tokens.
       if (!controller.signal.aborted) console.warn("project memory unavailable for this turn", {
@@ -2451,6 +2470,7 @@ export class DesktopAgentRuntime {
     this.autoMemoryEnabled = enabled;
     // Refresh failures must never reuse notes the user may have deleted.
     this.turnProjectMemory = content;
+    this.projectMemoryAlias = memoryAlias;
     this.rebuildToolCatalog();
     this.setAgentTools(this.activeTools());
     this.setAgentSystemPrompt(this.composeSystemPrompt());
@@ -2729,7 +2749,8 @@ export class DesktopAgentRuntime {
       // prompt recomposes from the fresh content.
       safeJson(this.customSystemPrompt ?? null) ===
         safeJson(config.customSystemPrompt ?? null) &&
-      (this.projectMemory ?? "") === (config.projectMemory?.trim() ?? "") &&
+      (this.projectMemory ?? "") === ((config.projectMemoryAlias?.memory.content ?? config.projectMemory)?.trim() ?? "") &&
+      safeJson(this.launchProjectMemoryAlias ?? null) === safeJson(config.projectMemoryAlias ?? null) &&
       (this.projectPath ?? "") === (config.projectPath?.trim() ?? "") &&
       // Only standard sessions compare Task inputs; Team reuse follows Host context.
       (!this.canDelegate() && this.executionProfile === "team" || (
@@ -4529,7 +4550,7 @@ export class DesktopAgentRuntime {
       const skillsPrompt = pluginSkillsPrompt(this.pluginSkills);
       if (skillsPrompt) blocks.push(skillsPrompt);
     }
-    const projectPrompt = projectInstructionsPrompt(this.projectInstructions);
+    const projectPrompt = projectInstructionsPrompt(this.effectiveProjectInstructions());
     if (projectPrompt) blocks.push(projectPrompt);
     return blocks;
   }

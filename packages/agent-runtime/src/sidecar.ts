@@ -20,7 +20,7 @@ import {
   type RuntimeProviderConfig,
 } from "./runtime.js";
 import type { PluginSkillDef } from "./plugin-skills-prompt.js";
-import type { SessionMessageOrigin, TrustedExtensionSpec } from "@pi-desktop/shared";
+import type { ProjectMemoryAlias, SessionMessageOrigin, TrustedExtensionSpec } from "@pi-desktop/shared";
 import type { ProjectInstructions } from "./project-instructions.js";
 import type { CustomSystemPrompt } from "./custom-system-prompt.js";
 import {
@@ -134,6 +134,7 @@ type RuntimeParams = {
   customSystemPrompt?: CustomSystemPrompt;
   projectInstructions?: ProjectInstructions;
   projectMemory?: string;
+  projectMemoryAlias?: ProjectMemoryAlias;
   compactionSettings?: ContextCompactionSettings;
   attachmentsDir?: string;
   userMessageId?: string;
@@ -260,6 +261,7 @@ async function runtimeFor(
     projectInstructions: params.projectInstructions,
     customSystemPrompt: params.customSystemPrompt,
     projectMemory: params.projectMemory,
+    projectMemoryAlias: params.projectMemoryAlias,
     projectPath: params.projectPath,
     commandShell: params.commandShell,
   })
@@ -339,6 +341,7 @@ async function runtimeFor(
     customSystemPrompt: params.customSystemPrompt,
     projectInstructions: params.projectInstructions,
     projectMemory: params.projectMemory,
+    projectMemoryAlias: params.projectMemoryAlias,
     scratchDir:
       typeof params.scratchDir === "string" && params.scratchDir
         ? params.scratchDir

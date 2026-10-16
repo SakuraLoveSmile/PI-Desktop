@@ -1941,7 +1941,7 @@ side effects, so a partial request cannot reset unrelated runtime policy.
 | `project.memory.editor.get` | `path` | `{editor: {owner, memory, autoRecordEnabled}}` |
 | `project.memory.editor.save` | `path, expectedOwner, expectedMemory, entries` | `{editor}` after owner/snapshot CAS |
 | `project.autoMemory.setEnabled` | `path, expectedOwner, enabled` | `{autoRecordEnabled}` |
-| `project.autoMemory.agentList` | trusted `sessionId, boundPath` | `{memory, autoRecordEnabled}` |
+| `project.autoMemory.agentList` | trusted `sessionId, boundPath` | `{memory, autoRecordEnabled, memoryAlias?}` |
 | `project.autoMemory.agentUpsert` | binding plus optional `id`, `title`, `content`, update's `expectedTitle, expectedContent` | current runtime memory state |
 | `project.autoMemory.agentDelete` | binding plus `id, expectedTitle, expectedContent` | current runtime memory state |
 | `project.history.search` | binding plus literal `query` (1–500 characters), optional `limit` (1–20, default 10) | `{hits, hasMore}` |
@@ -2261,3 +2261,28 @@ inbox settlement. This allowance is independent of the existing maximum-three
 confirmed-roster settlement nudges. Members and non-Team sessions are outside
 this rule. No tools are inferred or executed from textual pseudo calls, and
 normal final-answer/event/usage semantics remain unchanged.
+
+## Verified worktree memory aliases
+
+`project.group.context({path})` may additionally return
+`memoryAlias: {memory: ProjectMemory, instructions: string}`. Its existing
+`context` remains the requested slot's actual group context, including null;
+the alias never carries the owner's roots or changes group membership. Presence
+is authoritative even for empty memory/instructions. Ordinary responses omit
+the additive field. `project.memory.get` resolves the same verified owner as
+the fallback memory reader.
+
+`project.autoMemory.agentList` resolves the stored session project after the
+existing trusted binding check and returns the same optional alias. File/Git
+validation runs outside the Host mutex and SQLite transactions; the Host then
+rechecks the session binding before reading memory. Agent callers cannot
+substitute the real root as `boundPath`. Alias reads do not migrate or write
+`kv`; effective `autoRecordEnabled` is false. Plan/Goal writes retain
+`TOOL_DISABLED_IN_PLAN`. Other alias writes (legacy memory setter, snapshot
+editor save, setEnabled and agent mutations) are rejected rather than
+redirected. Group-id setters keep their existing explicit group semantics.
+
+A missing/invalid projection produces bounded diagnostics without memory bytes
+or credentials and preserves ordinary slot ownership semantics. A later
+missing alias or failed refresh revokes the previous alias instructions and
+notes, including when the prior response was nonempty.

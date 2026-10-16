@@ -41,9 +41,17 @@ export type ProjectMemoryEntry = {
   content: string;
 };
 
+/** Read-only context from a verified worktree's memory owner, without roots. */
+export type ProjectMemoryAlias = {
+  memory: ProjectMemory;
+  instructions: string;
+};
+
 export type ProjectMemoryRuntimeState = {
   memory: ProjectMemory;
   autoRecordEnabled: boolean;
+  /** Presence is authoritative even when both context values are empty. */
+  memoryAlias?: ProjectMemoryAlias;
 };
 
 export type ProjectMemoryEditor = ProjectMemoryRuntimeState & {

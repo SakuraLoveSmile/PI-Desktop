@@ -18580,7 +18580,7 @@ push or PR authorization.
   Plus v9 database through the existing newer-schema guard before mutation.
   The user accepted this boundary: assert old interrupted-column/CHECK decoding
   separately from safe whole-database downgrade refusal. Whole-database opening
-  by Plus v7 is unsupported; do not claim the old app opens v8 without an error.
+  by Plus v7 is unsupported; do not claim the old app opens v9 without an error.
 - **Automation:** `node scripts/e2e-goal-blocked-resume.mjs`, updated
   `scripts/e2e-goal-report.mjs`, `scripts/e2e-team-open-task-gate.mjs` and
   `scripts/e2e-team-lead-pseudo-tool-call.mjs`; register executable scenarios in
@@ -18602,3 +18602,31 @@ push or PR authorization.
 - **Specs:** Runtime Goal completion, Host execution holds, storage Plus P9,
   GoalBlockedCard/Composer resume intent, remote read-only projection and
   [Goal blocked-state ADR](../../adr/goal-blocked-state.md).
+### E2E-PLUS-worktree-memory-owner
+
+- **Preconditions:** Current-main request candidate; rebuilt Rust Host and Node
+  sidecar; isolated HOME/data/profile, real temporary Git repository and two
+  detached slots; localhost deterministic provider only.
+- **Steps:** Store real project/group memory and instructions, register slots
+  through the fixed schema-1 projection, and launch Plan/Goal slot sessions.
+  Capture provider requests on the first and subsequent turns. Update/delete
+  memory and instructions; invalidate the mapping and repeat. Exercise a
+  multi-root owner and a second slot. Check forged binding and write refusals.
+- **Expected:** Both launch and later turns see the real memory/instructions
+  without real root lists or real untracked AGENTS; cwd/tool roots remain slot.
+  Empty/deleted/invalid alias context does not revive old notes. Plan/Goal and
+  all alias writes are refused. Real Host reads leave all kv rows unchanged.
+  Ordinary group context and sessions retain their existing behavior.
+- **Specs:** Runtime worktree context; Host verified aliases; storage memory
+  ownership; [ADR](../../adr/worktree-memory-owner.md).
+- **Automation:** `node scripts/e2e-project-context.mjs --worktree-memory`;
+  resolver/RPC Rust tests and launch/runtime behavior suites; existing isolated
+  Electron memory editor fixture remains the UI regression.
+- **Acceptance:** Candidate executable provenance, prompt captures, isolation
+  and actual checks are recorded separately from installation/paid-model tests.
+- **Milestone:** Plus.
+- **Status:** Implementation candidate; do not infer a run from this definition.
+
+| Plus scenario | User path | Automated entry |
+| --- | --- | --- |
+| E2E-PLUS-worktree-memory-owner | Slot launch → subsequent turn → update/delete → mapping invalidation | project-context --worktree-memory; Rust + launch/runtime tests |
