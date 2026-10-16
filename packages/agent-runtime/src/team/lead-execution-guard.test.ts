@@ -2,6 +2,27 @@ import { expect, it, vi } from "vitest";
 import type { RuntimeHost } from "../host-client.js";
 import { TeamLeadExecutionGuard } from "./lead-execution-guard.js";
 
+it("blocks an approved Goal after three settlement recoveries without weakening ordinary completion", async () => {
+  const host: RuntimeHost = { call: async <T>(method: string) => {
+    if (method === "team.getLaunchReview") return { review: { teamSessionId: "lead", leadTurnId: "turn", status: "confirmed", members: [{ name: "expert" }] } } as T;
+    if (method === "team.getLeadExecutionState") return { active: true, reviewStatus: "confirmed" } as T;
+    throw Object.assign(new Error("TEAM_APPROVAL_REQUIRED: open decision tasks expert(task-1)"), { code: "TEAM_APPROVAL_REQUIRED" });
+  } };
+  const guard = new TeamLeadExecutionGuard();
+  const state = () => ({ turnId: "turn", epoch: 1, mode: "agent" as const, inactive: false });
+  const team = { teamSessionId: "lead", callerSessionId: "lead" };
+  let prompt = "approved goal";
+  for (let i = 0; i < 3; i++) {
+    expect(await guard.authorizeCompletion(host, team, state, true, "Expert task remains pending.", true)).toEqual({ kind: "recover" });
+    await guard.recover({ host, team, state, abort: () => { throw new Error("unexpected abort"); },
+      prepare: () => {}, getPrompt: () => prompt, setPrompt: value => { prompt = value; },
+      start: () => {}, continue: async () => {}, restore: () => {},
+    });
+  }
+  expect(await guard.authorizeCompletion(host, team, state, true, "Expert task remains pending.", true)).toEqual({ kind: "blocked" });
+  expect(guard.suppressRunEnd).toBe(false);
+});
+
 it.each(["direct", "rpc", "open-tasks"])("gives a confirmed roster three reason-specific nudges then preserves the %s Host error", async transport => {
   const reason = transport === "open-tasks"
     ? "TEAM_APPROVAL_REQUIRED: open decision tasks ui_dev(ui-task), qa_engineer(qa-task); send_message to dispatch, or task_update to cancelled/failed with a reason, then retry; use wait_for_updates"

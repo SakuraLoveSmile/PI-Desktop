@@ -185,6 +185,8 @@ pub struct PlanExecution {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub execution_model_id: Option<String>,
     pub state: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hold: Option<crate::goal_holds::GoalHold>,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -10,6 +10,7 @@ import { createTeamDeliveryService } from "./team-delivery";
 
 export type CollaborationRuntimeDependencies = {
   activeTurns: Map<string, string>;
+  settleMemberTurn?: (sessionId: string, turnId: string) => Promise<void>;
   principal: Principal;
   getHost: () => HostProcess | null;
   getSidecar: () => AgentSidecar | null;
@@ -47,6 +48,15 @@ export function createCollaborationRuntime(deps: CollaborationRuntimeDependencie
     activeTurns: deps.activeTurns,
     getRuntimeIdentity: deps.getSidecar,
     isTurnDispatchable: deps.isTurnDispatchable,
+    abortMemberTurn: async (sessionId, turnId) => {
+      if (deps.activeTurns.get(sessionId) !== turnId) return;
+      const sidecar = deps.getSidecar();
+      try {
+        if (sidecar) await sidecar.call("agent.abort", { sessionId, turnId });
+      } finally {
+        await deps.settleMemberTurn?.(sessionId, turnId);
+      }
+    },
     stopAtBoundary: async (sessionId, turnId) => {
       const sidecar = deps.getSidecar();
       if (!sidecar || deps.activeTurns.get(sessionId) !== turnId) return;

@@ -1,3 +1,4 @@
+import { createGoalResumeRuntime } from "./goal-resume";
 import type { PersistenceOutbox } from "../persistence-outbox";
 import { ErrorCodes, IPC, normalizeInteractionRequiredDetails, type AgentEventEnvelope, type AppNotification, type PlanExecution, type PlanExecutionFinishStatus, type UiMessage } from "@pi-desktop/shared";
 import { executionFromResponse, executionListFromResponse, planExecutionFromUnknown } from "@pi-desktop/host-runtime";
@@ -20,6 +21,8 @@ export type FinishTurnOptions = {
   createNotification?: boolean;
   recoverInflight?: boolean;
   errorDetails?: unknown;
+  stopHint?: "team_unsettled";
+  executionError?: boolean;
 };
 
 /**
@@ -37,8 +40,10 @@ export type FinishTurn = (
 export type LockExecutionInterruption = (
   sessionId: string,
   turnId: string | null | undefined,
-  options?: { goalOnly?: boolean; errorCode?: string },
+  options?: { goalOnly?: boolean; errorCode?: string; errored?: boolean; stopHint?: "resume_failed" },
 ) => string | undefined;
+
+export type ExecutionSettlementOptions = { ended?: "errored"; stopHint?: "team_unsettled" | "resume_failed" };
 
 export type PlanRuntimeState = {
   approvedExecutionDrain: Promise<void> | null;
@@ -77,6 +82,8 @@ export type PlanRuntimeDependencies = {
   isQuitting: () => boolean;
   onTurnSettled?: (sessionId: string, turnId: string) => Promise<void>;
   persistenceOutbox?: PersistenceOutbox;
+  onGoalBlocked?: (sessionId: string) => Promise<void>;
+  onGoalResumed?: (sessionId: string) => Promise<void>;
 };
 
 export function createPlanRuntime({
@@ -103,10 +110,15 @@ export function createPlanRuntime({
   isQuitting,
   onTurnSettled,
   persistenceOutbox,
+  onGoalBlocked,
+  onGoalResumed,
 }: PlanRuntimeDependencies): {
+  resumeBlockedGoal: ReturnType<typeof createGoalResumeRuntime>;
   finishTurn: FinishTurn;
   lockExecutionInterruption: LockExecutionInterruption;
-  finishApprovedExecution: (executionId: string, status: PlanExecutionFinishStatus, errorCode?: string) => Promise<void>;
+  finishApprovedExecution: (executionId: string, status: PlanExecutionFinishStatus, errorCode?: string, options?: ExecutionSettlementOptions) => Promise<void>;
+  waitForExecutionSettlement: (executionId: string) => Promise<void>;
+  registerResumedExecution: (execution: PlanExecution, turnId?: string) => void;
   dispatchApprovedPlan: (rawExecution: unknown) => Promise<void>;
   drainApprovedPlanExecutions: () => Promise<void>;
   dispatchExecutionForProposal: (proposalId: string) => Promise<void>;
@@ -116,6 +128,7 @@ export function createPlanRuntime({
 // Read the shared turn state once, by the names the finalizer below uses. The
 // instance is owned by the coordination factory; this module only reads it.
 const approvedExecutionKinds = new Map<string, string>();
+const executionSettlements = new Map<string, Promise<void>>();
 let scheduledPoll: Promise<PlanSchedulePollResult> | null = null;
 const {
   activeTurns,
@@ -140,11 +153,11 @@ function executionIdForTurn(sessionId: string, turnId: string | null | undefined
   return executionId;
 }
 
-function freezeExecutionFinish(executionId: string, status: PlanExecutionFinishStatus, errorCode?: string): void {
+function freezeExecutionFinish(executionId: string, status: PlanExecutionFinishStatus, errorCode?: string, options?: ExecutionSettlementOptions): void {
   // The existing first-terminal-decision record is also used for intent before
   // I/O. Stops and late events cannot rewrite a terminal decision already frozen.
   if (!pendingExecutionFinishes.has(executionId)) {
-    pendingExecutionFinishes.set(executionId, { status, errorCode });
+    pendingExecutionFinishes.set(executionId, { status, errorCode, ...options });
   }
 }
 
@@ -152,7 +165,7 @@ const lockExecutionInterruption: LockExecutionInterruption = (sessionId, turnId,
   const executionId = executionIdForTurn(sessionId, turnId);
   if (!executionId) return undefined;
   if (options?.goalOnly && approvedExecutionKinds.get(executionId) !== "goal") return undefined;
-  freezeExecutionFinish(executionId, "interrupted", options?.errorCode ?? ErrorCodes.PLAN_EXECUTION_INTERRUPTED);
+  freezeExecutionFinish(executionId, "interrupted", options?.errorCode ?? ErrorCodes.PLAN_EXECUTION_INTERRUPTED, options?.errored ? { ended: "errored", ...(options.stopHint ? { stopHint: options.stopHint } : {}) } : undefined);
   return executionId;
 };
 /** The Agent Host turn state for one settled turn. */
@@ -228,7 +241,7 @@ function finishTurn(
   const reason = peekAbortReason(id, turnId) ?? status;
   const executionId = executionIdForTurn(id, turnId);
   if (executionId) {
-    freezeExecutionFinish(executionId, reason === "completed" ? "completed" : "interrupted", errorCode);
+    freezeExecutionFinish(executionId, reason === "completed" ? "completed" : "interrupted", errorCode, { ...(reason === "error" || options.executionError ? { ended: "errored" } : {}), ...(options.stopHint ? { stopHint: options.stopHint } : {}) });
   }
   const turnUsage = activeTurnUsages.get(id);
   activeTurnUsages.delete(id);
@@ -236,8 +249,9 @@ function finishTurn(
   if (runId) scheduledRunsBySession.delete(id);
   const wasPlanSubmission = planSubmissionTurnIds.has(finalizationKey);
   const createNotification =
-    options.createNotification ??
-    (!wasPlanSubmission && shouldCreateTaskNotification(id));
+    executionId && approvedExecutionKinds.get(executionId) === "goal"
+      ? false
+      : options.createNotification ?? (!wasPlanSubmission && shouldCreateTaskNotification(id));
   const recoverInflight = options.recoverInflight === true;
 
   const runFinalization = async (): Promise<void> => {
@@ -375,14 +389,15 @@ function finishTurn(
   return finalization;
 }
 
-async function finishApprovedExecution(
+async function runExecutionFinish(
   executionId: string,
   status: PlanExecutionFinishStatus,
   errorCode?: string,
+  options?: ExecutionSettlementOptions,
 ): Promise<void> {
   if (finishedApprovedExecutions.has(executionId)) return;
   if (inFlightExecutionFinishes.has(executionId)) return;
-  freezeExecutionFinish(executionId, status, errorCode);
+  freezeExecutionFinish(executionId, status, errorCode, options);
   inFlightExecutionFinishes.add(executionId);
   if (!runtimeState.host) {
     inFlightExecutionFinishes.delete(executionId);
@@ -413,12 +428,25 @@ async function finishApprovedExecution(
         });
       }
     }
-    await runtimeState.host.call("plans.finishExecution", {
-      executionId,
-      status: pending.status,
-      ...(pending.errorCode ? { errorCode: pending.errorCode } : {}),
-    });
     const execKind = approvedExecutionKinds.get(executionId);
+    if (execKind === "goal" && (pending.status === "completed" || pending.ended === "errored")) {
+      if (!sessionId) throw new Error("Goal execution session unavailable");
+      const result = await runtimeState.host.call<{ hold?: { state: string } }>("goalExecutions.settle", {
+        sessionId,
+        executionId,
+        ended: pending.ended ?? "agent_stopped",
+        ...(pending.errorCode ? { errorCode: pending.errorCode } : {}),
+        ...(pending.stopHint ? { stopHint: pending.stopHint } : {}),
+        ...(persistenceBarrierFailed ? { persistenceBarrierFailed: true } : {}),
+      });
+      if (result.hold?.state === "blocked") await onGoalBlocked?.(sessionId);
+    } else {
+      await runtimeState.host.call("plans.finishExecution", {
+        executionId,
+        status: pending.status,
+        ...(pending.errorCode ? { errorCode: pending.errorCode } : {}),
+      });
+    }
     approvedExecutionKinds.delete(executionId);
     // The execution is terminal independently of whether its report can be published.
     finishedApprovedExecutions.add(executionId);
@@ -429,31 +457,7 @@ async function finishApprovedExecution(
     }
     approvedExecutionTurns.delete(executionId);
     claimedExecutionSessions.delete(executionId);
-    if (execKind !== "plan" && pending.status === "completed") {
-      try {
-        if (persistenceBarrierFailed) {
-          if (!sessionId) throw new Error("Goal report session unavailable after persistence barrier failure");
-          await runtimeState.host.call("goalReports.markFailed", {
-            sessionId,
-            executionId,
-            errorCode: ErrorCodes.REPORT_PERSISTENCE_BARRIER_FAILED,
-          });
-        } else {
-          await runtimeState.host.call("goalReports.finalizeReport", {
-            executionId,
-            status: pending.status,
-            ...(pending.errorCode ? { errorCode: pending.errorCode } : {}),
-          });
-        }
-      } catch (reportErr: any) {
-        // INVALID_ARGUMENT is expected if the execution was not a goal; log other failures
-        if (!String(reportErr?.message || reportErr).includes("not a goal")) {
-          logger.app("runtime", "warn", "goal report finalization notice", {
-            data: { executionId, error: String(reportErr) },
-          });
-        }
-      }
-    }
+
   } catch (error) {
     logger.app("runtime", "warn", "approved plan execution finalization failed", {
       data: { executionId, error: String(error) },
@@ -461,6 +465,33 @@ async function finishApprovedExecution(
   } finally {
     inFlightExecutionFinishes.delete(executionId);
   }
+}
+
+function finishApprovedExecution(executionId: string, status: PlanExecutionFinishStatus, errorCode?: string, options?: ExecutionSettlementOptions): Promise<void> {
+  const existing = executionSettlements.get(executionId);
+  if (existing) return existing;
+  const settlement = runExecutionFinish(executionId, status, errorCode, options).finally(() => {
+    if (executionSettlements.get(executionId) === settlement) executionSettlements.delete(executionId);
+  });
+  executionSettlements.set(executionId, settlement);
+  return settlement;
+}
+
+async function waitForExecutionSettlement(executionId: string): Promise<void> {
+  await executionSettlements.get(executionId);
+}
+
+function registerResumedExecution(execution: PlanExecution, turnId?: string): void {
+  finishedApprovedExecutions.delete(execution.id);
+  pendingExecutionFinishes.delete(execution.id);
+  claimedExecutionSessions.set(execution.id, execution.sessionId);
+  approvedExecutionKinds.set(execution.id, execution.kind);
+  if (!turnId) return;
+  activeTurns.set(execution.sessionId, turnId);
+  activeTurnUsages.delete(execution.sessionId);
+  approvedExecutionIdsBySession.set(execution.sessionId, execution.id);
+  approvedExecutionTurns.set(execution.id, { sessionId: execution.sessionId, turnId });
+  startedApprovedExecutions.add(execution.id);
 }
 
 async function dispatchApprovedPlan(rawExecution: unknown): Promise<void> {
@@ -555,6 +586,7 @@ async function dispatchApprovedPlan(rawExecution: unknown): Promise<void> {
       providerId: launch.providerId,
       modelId: launch.modelId,
       expectedInteractionMode: sessionResult.session.interactionMode === undefined ? "interactive" : sessionResult.session.interactionMode,
+      ...(execution.kind === "goal" ? { createNotification: false } : {}),
     });
     turnId = String(turn.turnId || "").trim();
     if (!turnId) throw new Error("execution turn was not created");
@@ -604,7 +636,7 @@ async function dispatchApprovedPlan(rawExecution: unknown): Promise<void> {
       await finishTurn(initial.sessionId, "error", errorCode, { turnId, errorDetails: (error as { details?: unknown; data?: { details?: unknown } })?.details ?? (error as { data?: { details?: unknown } })?.data?.details });
     }
     if (claimed) {
-      await finishApprovedExecution(initial.id, "interrupted", errorCode);
+      await finishApprovedExecution(initial.id, "interrupted", errorCode, { ended: "errored" });
     }
     logger.app("runtime", "warn", "approved plan execution failed to start", {
       sessionId: initial.sessionId,
@@ -707,8 +739,17 @@ async function pollPlanSchedules(): Promise<PlanSchedulePollResult> {
     scheduledPoll = null;
   }
 }
+  const resumeBlockedGoal = createGoalResumeRuntime({
+    runtimeState, activeTurns, acquireSessionOperation, resolveAgentRuntimeLaunch,
+    waitForExecutionSettlement, registerResumedExecution, finishTurn,
+    emitAgentEvent, lockExecutionInterruption, finishApprovedExecution,
+    onGoalResumed: onGoalResumed ?? (async () => undefined),
+  });
   return {
+    resumeBlockedGoal,
     finishTurn,
+    waitForExecutionSettlement,
+    registerResumedExecution,
     lockExecutionInterruption,
     finishApprovedExecution,
     dispatchApprovedPlan,

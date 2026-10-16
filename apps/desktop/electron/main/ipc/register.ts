@@ -159,6 +159,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     lockExecutionInterruption,
     finishApprovedExecution,
     dispatchApprovedPlan,
+    resumeBlockedGoal,
     dispatchExecutionForProposal,
     waitForTurnSettlement,
     emitAgentEvent,
@@ -273,7 +274,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     acquireSessionOperation,
     stripWinLongPrefix,
   });
-  registerGoalReportIpc({ handle, getHost });
+  registerGoalReportIpc({ handle, getHost, resumeBlockedGoal });
   registerSessionActivityIpc({ handle, getHost });
   registerWorkspaceGitIpc({ handle, getHost });
   registerGoalProgressIpc({ handle, getHost });

@@ -7,7 +7,7 @@ import { recoverFinalAnswer, type FinalAnswerRecovery } from "../final-answer-re
 import { endsWithPseudoToolCall, PSEUDO_TOOL_CALL_NUDGE } from "./pseudo-tool-call.js";
 
 interface LeadTurn { turnId: string | undefined; epoch: number; mode: Mode; inactive: boolean }
-type Completion = { kind: "authorized" | "stale" | "superseded" | "recover" }
+type Completion = { kind: "authorized" | "stale" | "superseded" | "recover" | "blocked" }
   | { kind: "error"; error: ReturnType<typeof classifyAgentError> };
 
 const TEAM_COMPLETION_NUDGE = [
@@ -59,7 +59,7 @@ export class TeamLeadExecutionGuard {
 
   async authorizeCompletion(host: RuntimeHost,
     team: { teamSessionId: string; callerSessionId: string }, state: () => LeadTurn,
-    approvedExecution = false, responseText = ""): Promise<Completion> {
+    approvedExecution = false, responseText = "", approvedGoal = false): Promise<Completion> {
     const snapshot = state();
     if (!snapshot.inactive && (snapshot.mode === "agent" || snapshot.mode === "plan") &&
         team.callerSessionId === team.teamSessionId && !this.pseudoCallRetried && endsWithPseudoToolCall(responseText)) {
@@ -135,17 +135,21 @@ export class TeamLeadExecutionGuard {
           this.suppressRunEnd = true;
           return { kind: "recover" };
         }
-        outcome = { kind: "error", error: {
-          ...error,
-          ...(approvalRequired ? {
-            code: "TEAM_APPROVAL_REQUIRED",
-            message: confirmedRoster ? completionReason : snapshot.mode === "plan"
-              ? "Expert Team planning stopped because the Lead did not coordinate actual read-only expert research."
-              : "Expert Team stopped because the Lead did not propose approved experts or coordinate actual expert participation.",
-            retriable: true,
-          } : {}),
-          details: { ...error.details, origin: "local", stage: "team_completion" },
-        } };
+        if (approvedExecution && approvedGoal && approvalRequired) {
+          outcome = { kind: "blocked" };
+        } else {
+          outcome = { kind: "error", error: {
+            ...error,
+            ...(approvalRequired ? {
+              code: "TEAM_APPROVAL_REQUIRED",
+              message: confirmedRoster ? completionReason : snapshot.mode === "plan"
+                ? "Expert Team planning stopped because the Lead did not coordinate actual read-only expert research."
+                : "Expert Team stopped because the Lead did not propose approved experts or coordinate actual expert participation.",
+              retriable: true,
+            } : {}),
+            details: { ...error.details, origin: "local", stage: "team_completion" },
+          } };
+        }
       }
     }
     return superseded() ? { kind: "superseded" } : outcome;

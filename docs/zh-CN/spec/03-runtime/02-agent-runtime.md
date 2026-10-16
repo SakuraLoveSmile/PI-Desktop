@@ -1283,3 +1283,23 @@ SubmitGoal 前说明验收中需要人工参与或外部证据的项目。未知
 team_status 增加 completedMembersWithOpenTasks，按精确 ownerSessionId 列出 completed 成员及未删除 pending/in_progress taskIds；completedMemberOpenTaskNextStep 要求先检查认证报告/证据，再按最新 revision 更新或显式重派，不因任务板开放就重做。phase completed 只说明上个回合成功。pending 邮件 nextStep 优先；不自动更新任务。
 
 既有压缩按当前请求上下文计量，不按累计 usage。1M window 的 headroom/hard/soft 为 50K/950K/855K；真实压缩 wiring 的成员夹具覆盖阈值内、soft/hard 请求前及 inline 增长，保证 summary/checkpoint 先于下一请求持久化，保留当前任务和认证 caller。未发现产品 defect，因此不改阈值或新增看门狗。这是 runtime 外边界 fake 覆盖，不是真实模型或完整 Main/Rust 事故回放。
+
+
+### Goal completion and continuation amendment (2026-10-13)
+
+Automatic completion requires structured met, all items in an existing Goal
+progress snapshot completed, and settled current Team work. Missing/invalid
+reports, partial/blocked/unknown, Agent errors and dispatch failures create a
+blocked hold with no completed report or notification. Explicit user Stop
+remains interrupted. A hold pauses Team work, survives restart and retains the
+same execution/contract. User continuation uses a new turn and current model,
+invalidates the draft, reissues the token and restores the contract/context.
+Only explicit acceptance produces a non-met completed result with user_accepted;
+abandon/supersede create GOAL_ABANDONED/GOAL_SUPERSEDED without a report.
+Exhausted approved-Goal Team settlement recovery produces team_unsettled hold;
+non-Goal behavior stays unchanged. One report-only recovery is allowed per
+segment; no automatic blocked retry or historical-report reopening is added.
+See the [English source](/spec/03-runtime/02-agent-runtime) for the full contract.
+
+
+Final lifecycle and evidence scope: Host boot settles queued/running effective Goals into `agent_error:HOST_RESTARTED` holds before the generic Plan fence. Already blocked holds remain unchanged; no work replays. Supersession releases only hold-owned Team pauses; independent user pauses persist.

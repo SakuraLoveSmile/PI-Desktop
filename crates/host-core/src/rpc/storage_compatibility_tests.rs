@@ -1,6 +1,9 @@
 //! Reopen released Plus data through the real Host startup and read RPCs.
 use super::*;
-use crate::{db::Database, session_collaboration, transcripts};
+use crate::{
+    db::{Database, PLUS_SCHEMA_VERSION},
+    session_collaboration, transcripts,
+};
 use rusqlite::params;
 
 const RELEASED_SCHEMA: &str = include_str!("fixtures/plus7.sql");
@@ -74,7 +77,7 @@ async fn schema7_reopens_nonempty_journal_and_service_history_without_replay() {
                 .query_row("SELECT plus_version FROM plus_schema_meta", [], |r| r
                     .get::<_, i64>(0))
                 .unwrap(),
-            8
+            PLUS_SCHEMA_VERSION
         );
         assert_eq!(
             db.conn()
@@ -186,7 +189,7 @@ fn schema5_upgrade_preserves_rows_backs_up_and_applies_exact_released_ddl() {
             .query_row("SELECT plus_version FROM plus_schema_meta", [], |r| r
                 .get::<_, i64>(0))
             .unwrap(),
-        8
+        PLUS_SCHEMA_VERSION
     );
     assert!(dir.path().join("pi.sqlite.plus-v5.bak").is_file());
     let released = rusqlite::Connection::open_in_memory().unwrap();
@@ -214,11 +217,11 @@ fn schema5_upgrade_preserves_rows_backs_up_and_applies_exact_released_ddl() {
 }
 
 #[test]
-fn schema9_is_refused_without_rewriting_versions_or_rows() {
+fn newer_plus_schema_is_refused_without_rewriting_versions_or_rows() {
     let (dir, _, _) = seed();
     let path = dir.path().join("pi.sqlite");
     let conn = rusqlite::Connection::open(&path).unwrap();
-    let future_version = 9;
+    let future_version = PLUS_SCHEMA_VERSION + 1;
     conn.execute(
         "UPDATE plus_schema_meta SET plus_version=?1",
         [future_version],

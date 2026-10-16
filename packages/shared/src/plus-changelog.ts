@@ -9,6 +9,7 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
+        "Keep unmet Goals blocked with preserved progress; continue the same contract, accept the current result explicitly, or abandon it.",
         "Show queued expert-report metadata during Lead turns, protect active members with reasoned interruption, retire stale task dispatches and warn about shared-tree Git commands without blocking them.",
         "Keep Team Lead questions answerable after a thirty-minute pause, and replace a failed approved expert once while retaining its permissions and history.",
         "Bound expert-team runs with adjustable six-hour wrap-up and ten-hour safe-pause limits; retain the current run budget across pauses and restarts without killing background processes.",
@@ -27,6 +28,7 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
+        "未达成的目标会保留进度并进入受阻；可沿用同一契约继续执行、明确接受现状或放弃。",
         "Lead 回合可见待处理专家报告摘要；中断活跃成员需要明确理由，未开始的过期任务派发会撤销，共享树 Git 操作仅警告、不拦截。",
         "团队 Lead 问题等待 30 分钟后释放回合但保留可回答卡片；失败的已批准专家可替换一次，继承原权限并保留历史。",
         "专家团默认 6 小时提醒收尾、10 小时安全暂停，可在设置调整；暂停和重启保留当前周期预算，不主动停止后台进程。",
@@ -45,6 +47,7 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
+        "未達成的目標會保留進度並進入受阻；可沿用同一契約繼續執行、明確接受現況或放棄。",
         "Lead 回合可見待處理專家報告摘要；中斷活躍成員需要明確理由，未開始的過期任務派發會撤銷，共用樹 Git 操作僅警告、不攔截。",
         "團隊 Lead 問題等待 30 分鐘後釋放回合但保留可回答卡片；失敗的已核准專家可替換一次，繼承原權限並保留歷史。",
         "專家團預設 6 小時提醒收尾、10 小時安全暫停，可在設定調整；暫停與重啟保留目前週期預算，不主動停止背景程序。",
@@ -63,6 +66,7 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
+        "Tamamlanmayan hedefler ilerlemeyi koruyarak engellenir; aynı sözleşmeyle devam edin, mevcut sonucu açıkça kabul edin veya vazgeçin.",
         "Lider turlarında bekleyen uzman raporlarını gösterir; etkin üyeleri gerekçeli kesintilerle korur, eski görev gönderimlerini iptal eder ve ortak Git işlemlerinde engellemeden uyarır.",
         "Ekip lideri soruları otuz dakika sonra turu serbest bırakır ve yanıtlanabilir kalır; başarısız onaylı uzman, izinleri ve geçmişi korunarak bir kez değiştirilebilir.",
         "Uzman ekiplerde ayarlanabilir sınırlar: altı saatte tamamlama uyarısı, on saatte güvenli duraklatma; duraklatma ve yeniden başlatma süreyi korur, arka plan süreçlerini durdurmaz.",
@@ -81,6 +85,7 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
+        "Nicht erreichte Ziele bleiben mit ihrem Fortschritt blockiert; denselben Auftrag fortsetzen, den aktuellen Stand ausdrücklich akzeptieren oder aufgeben.",
         "Zeigt ausstehende Expertenberichte im Lead-Durchlauf, schützt aktive Mitglieder mit begründeten Unterbrechungen, verwirft veraltete Aufgaben und warnt bei gemeinsamem Git ohne Blockierung.",
         "Team-Lead-Fragen bleiben nach dreißig Minuten beantwortbar; ein fehlgeschlagener genehmigter Experte kann einmal mit bestehenden Rechten und Verlauf ersetzt werden.",
         "Experten-Teams erhalten einstellbare Grenzen: Abschluss nach sechs Stunden, sichere Pause nach zehn Stunden; Pausen und Neustarts behalten das Zeitbudget, Hintergrundprozesse laufen weiter.",
@@ -99,6 +104,7 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
+        "Los objetivos no alcanzados quedan bloqueados conservando su progreso; continúe el mismo contrato, acepte explícitamente el resultado actual o abandone.",
         "Muestra informes pendientes al Lead, protege miembros activos con interrupciones justificadas, retira tareas obsoletas y advierte sobre Git compartido sin bloquear.",
         "Las preguntas del Lead liberan el turno tras treinta minutos y siguen disponibles; un experto aprobado que falle puede sustituirse una vez conservando permisos e historial.",
         "Los equipos expertos tienen límites ajustables: aviso de cierre a las seis horas y pausa segura a las diez; las pausas y los reinicios conservan el tiempo y los procesos en segundo plano siguen activos.",
@@ -117,6 +123,7 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
+        "Les objectifs non atteints restent bloqués avec leur progression ; poursuivez le même contrat, acceptez explicitement le résultat actuel ou abandonnez.",
         "Affiche les rapports en attente au Lead, protège les membres actifs par une interruption motivée, retire les tâches périmées et avertit pour Git partagé sans bloquer.",
         "Les questions du Lead libèrent le tour après trente minutes et restent accessibles ; un expert approuvé en échec peut être remplacé une fois en conservant droits et historique.",
         "Les équipes ont des limites réglables : rappel de conclusion après six heures et pause sûre après dix ; les pauses et redémarrages conservent le temps, sans arrêter les processus en arrière-plan.",
@@ -135,6 +142,7 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
+        "달성하지 못한 목표는 진행 상황을 보존하고 차단됩니다. 같은 계약으로 계속하거나, 현재 결과를 명시적으로 수락하거나, 포기할 수 있습니다.",
         "Lead 실행 중 대기 중인 전문가 보고서 요약을 표시하고, 활성 구성원 중단에는 이유를 요구합니다. 오래된 작업 전달을 취소하고 공유 Git 명령은 차단 없이 경고합니다.",
         "팀 Lead 질문은 30분 후 실행을 해제해도 답변할 수 있습니다. 실패한 승인 전문가는 기존 권한과 기록을 유지하며 한 번 교체할 수 있습니다.",
         "전문가 팀에 조정 가능한 실행 제한을 추가했습니다. 기본 6시간 후 마무리 알림, 10시간 후 안전하게 일시 중지하며 재시작해도 실행 시간을 유지하고 백그라운드 프로세스는 종료하지 않습니다.",
@@ -153,6 +161,7 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
+        "Metas não alcançadas ficam bloqueadas com o progresso preservado; continue o mesmo contrato, aceite explicitamente o resultado atual ou abandone.",
         "Mostra relatórios pendentes ao Lead, protege membros ativos com interrupção justificada, retira tarefas obsoletas e alerta sobre Git compartilhado sem bloquear.",
         "Perguntas do Lead liberam o turno após trinta minutos e continuam disponíveis; um especialista aprovado que falhar pode ser substituído uma vez, preservando permissões e histórico.",
         "Equipes têm limites ajustáveis: aviso de conclusão após seis horas e pausa segura após dez; pausas e reinícios preservam o tempo, sem encerrar processos em segundo plano.",
