@@ -2113,3 +2113,21 @@ compaction wiring and external fake provider/Host boundaries. Checkpoint/summary
 persist before the next request, preserving active task and authenticated caller.
 It found no product defect; thresholds and watchdog behavior remain unchanged.
 This is runtime coverage, not a real-model or Main/Rust incident replay.
+
+## Worktree slot memory context
+
+Desktop and headless launch use the same context composition helper. A verified
+Host `memoryAlias` supplies only the owner's memory and group instructions;
+`projectPath`, cwd, the slot's file-instruction chain (including its checked-out
+AGENTS files), and all tool roots stay bound to the slot. Real owner roots must
+not appear as Primary/Additional roots in the prompt. Untracked instructions
+from the real repository are not copied or loaded.
+
+Launch passes the alias separately from the base instruction chain. Every user
+turn refreshes memory and alias instructions through the session-bound Host
+agentList response. Empty values delete old context; absent aliases or failed
+reads clear only the previous alias layer, keeping the slot/global instruction
+chain. Cancellation, disposal and turn epochs reject late reads. Reusable
+runtimes compare the alias launch configuration. Alias reads never expose
+ProjectMemory writes even if recording is enabled for the real project;
+Plan/Goal remain read-only.

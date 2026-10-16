@@ -31,6 +31,7 @@ import {
   visionFromModelConfig,
   type UserSubagentDocument,
 } from "@pi-desktop/agent-runtime";
+import { resolveLaunchProjectContext } from "@pi-desktop/host-runtime";
 import { builtinSkills } from "../builtin-skills";
 import { OAUTH_AUTH_KIND, type VendorOAuth } from "../oauth";
 import {
@@ -384,64 +385,12 @@ export function createSessionLaunchRuntime({
       typeof session.projectPath === "string" && session.projectPath.trim()
         ? session.projectPath.trim()
         : undefined;
-    let projectInstructions = await loadInstructionChain(projectPath);
+    const { projectInstructions, projectMemory, projectMemoryAlias } = await resolveLaunchProjectContext(
+      runtimeState.host!, projectPath, await loadInstructionChain(projectPath),
+    );
     // pi-compatible SYSTEM.md / APPEND_SYSTEM.md (issue #542): resolved once
     // per launch; a change retires the runtime through the reuse match.
     const customSystemPrompt = await loadCustomSystemPrompt(projectPath);
-    let projectMemory: string | undefined;
-    if (projectPath) {
-      try {
-        const result = await runtimeState.host!.call<{
-          context?: {
-            roots?: Array<{ path?: string }>;
-            instructions?: string;
-            memory?: { content?: string };
-          } | null;
-        }>("project.group.context", { path: projectPath });
-        const groupRoots = result.context?.roots ?? [];
-        const groupRootGuide = groupRoots.length > 1
-          ? [
-              `Primary root: ${groupRoots[0]?.path ?? projectPath}`,
-              ...groupRoots.slice(1).map((root) => `Additional root: ${root.path}`),
-              "Use an absolute path when reading or editing an additional root.",
-            ].join("\n")
-          : "";
-        const groupInstructions = result.context?.instructions?.trim();
-        if (groupRootGuide || groupInstructions) {
-          projectInstructions = {
-            entries: [
-              ...(projectInstructions?.entries ?? []),
-              ...(groupRootGuide
-                ? [{ source: "ChatGPT Project folders", content: groupRootGuide }]
-                : []),
-              ...(groupInstructions
-                ? [{ source: "ChatGPT Project instructions", content: groupInstructions }]
-                : []),
-            ],
-          };
-        }
-        const groupMemory = result.context?.memory?.content?.trim();
-        if (groupMemory) projectMemory = groupMemory;
-        if (!result.context) {
-          const legacy = await runtimeState.host!.call<{
-            memory?: { content?: string };
-          }>("project.memory.get", { path: projectPath });
-          const content = legacy.memory?.content?.trim();
-          if (content) projectMemory = content;
-        }
-      } catch {
-        // Project context is best effort; it must never prevent a session launch.
-        try {
-          const legacy = await runtimeState.host!.call<{
-            memory?: { content?: string };
-          }>("project.memory.get", { path: projectPath });
-          const content = legacy.memory?.content?.trim();
-          if (content) projectMemory = content;
-        } catch {
-          // Legacy memory is also best effort.
-        }
-      }
-    }
     sessionProjects.set(sessionId, projectPath ?? null);
     // Everything below is filtered by activation scope: a plugin, MCP server or
     // skill limited to certain projects must be invisible to a session on any
@@ -667,6 +616,7 @@ export function createSessionLaunchRuntime({
         customSystemPrompt,
         projectInstructions,
         projectMemory,
+        projectMemoryAlias,
         provider: {
           id: provider.id,
           name: provider.name,
