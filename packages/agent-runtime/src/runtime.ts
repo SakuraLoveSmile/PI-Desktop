@@ -2248,7 +2248,9 @@ export class DesktopAgentRuntime {
         }
         if (!this.gracefulStopRequested) return;
         if (message.stopReason === "error" || message.stopReason === "aborted") return;
-        this.gracefulStopRequested = false;
+        // Retain the stop through agent_end so approved Goal report recovery
+        // cannot restart the execution after this assistant/tool boundary.
+        if (!this.autonomousExecution || !this.goalReportDraftManager) this.gracefulStopRequested = false;
         return { action: "end" };
       },
     });
@@ -3793,6 +3795,8 @@ export class DesktopAgentRuntime {
           requestId: randomUUID(),
           sessionId: this.sessionId,
           toolCallId,
+          ...(this.turnId ? { turnId: this.turnId } : {}),
+          createdAt: new Date().toISOString(),
           questions,
         };
         const planning = this.mode === "plan" && this.teamContext?.isLead
@@ -3814,7 +3818,8 @@ export class DesktopAgentRuntime {
             return { content: [{ type: "text", text: "The question remains pending after 30 minutes. This turn is interrupted, not completed. Wait for the user's authenticated answer; resume or obtain new execution approval explicitly." }],
               details: { questions, requestId: request.requestId, pending: true }, terminate: true };
           }
-          return {content: [{type: "text", text: formatAskToolOutput(questions, answers)}], details: {questions, answers, resolvedAt: new Date().toISOString()}};
+          const resolutionKind = this.executionProfile === "team" && this.teamContext?.isLead ? undefined : this.askTools.resolutionKind(answers);
+          return {content: [{type: "text", text: formatAskToolOutput(questions, answers)}], details: {questions, answers, resolvedAt: new Date().toISOString(), ...(resolutionKind ? { resolutionKind } : {})}};
         } finally {
           if (questionContext) {
             for (let index=0;index<questions.length;index++) await this.host.call("team.closePlanningQuestion", {...questionContext, questionId: `${request.requestId}:${index}`});
@@ -8819,6 +8824,7 @@ export class DesktopAgentRuntime {
         )
           break;
         if (this.prepareGoalReportRecovery()) break;
+        this.gracefulStopRequested = false;
         this.acceptingSteering = false;
         this.retainPendingSteering();
         this.autonomousExecution = false;
@@ -9565,6 +9571,7 @@ export class DesktopAgentRuntime {
     }
     this.acceptingSteering = false;
     this.gracefulStopRequested = true;
+    this.askTools.cancelAll("stopped", true);
     return { requested: true };
   }
 
