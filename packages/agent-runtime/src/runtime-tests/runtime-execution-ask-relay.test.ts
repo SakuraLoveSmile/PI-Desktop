@@ -2,6 +2,47 @@ import { expect, it } from "vitest";
 import type { PlanExecution } from "@pi-desktop/shared";
 import { ask, bash, fixture, runtimeAccess } from "./runtime-interaction-fixture.js";
 
+it.each(["ordinary", "goal"] as const)("graceful stop skips later questions in the same %s assistant batch", async kind => {
+  let requested!: () => void;
+  const pending = new Promise<void>(resolve => { requested = resolve; });
+  const test = fixture([[ask, { ...ask, id: "ask-later" }], [bash]], "interactive", "agent", {
+    autoAnswer: false, observe: envelope => {
+      if (envelope.event.type !== "asktool_request") return;
+      if (envelope.event.request.toolCallId === "ask") requested();
+      // Release a regressed late waiter so the failing baseline cannot hang.
+      else test.runtime.resolveAskTool({ sessionId: envelope.sessionId, requestId: envelope.event.request.requestId, answers: [null] });
+    },
+  }, { host: { call: async <T>(method: string): Promise<T> => {
+    if (method === "goalProgress.issueToken") return { writeToken: "same-batch-goal-token" } as T;
+    return undefined as T;
+  } } });
+  const execution: PlanExecution = {
+    id: "same-batch-goal", proposalId: "same-batch-approval", sessionId: "policy-fixture", kind: "goal",
+    plan: "# Approved Goal\nWait for a decision.", title: "Stopped Goal", question: "Proceed?",
+    artifact: { relativePath: ".pi/goal/same-batch.md", sha256: "hash", sizeBytes: 36 },
+    targetPermissionMode: "auto", state: "running",
+  };
+  const turn = kind === "goal" ? test.runtime.executeApprovedPlan(execution, "same-batch-turn")
+    : test.runtime.prompt("Wait for decisions", "user", "same-batch-turn");
+  try {
+    await pending;
+    expect(test.runtime.requestGracefulStop()).toEqual({ requested: true });
+    await turn;
+    expect(test.events.filter(event => event.event.type === "asktool_request")).toHaveLength(1);
+    expect(test.requests).toHaveLength(1);
+    expect(runtimeAccess(test.runtime).askTools.pending.size).toBe(0);
+    const results = runtimeAccess(test.runtime).agent.state.messages.filter(message => message.role === "toolResult");
+    expect(results).toHaveLength(2);
+    expect(results).toEqual(expect.arrayContaining([
+      expect.objectContaining({ toolCallId: "ask", details: expect.objectContaining({ answers: [null], resolutionKind: "stopped" }) }),
+      expect.objectContaining({ toolCallId: "ask-later", details: expect.objectContaining({ answers: [null], resolutionKind: "stopped" }) }),
+    ]));
+    expect(test.events.filter(event => event.event.type === "error")).toEqual([]);
+    expect(test.events.filter(event => event.event.type === "agent_end")).toHaveLength(1);
+    expect(test.runtime.getStatus().isRunning).toBe(false);
+  } finally { await test.runtime.abort(); await turn; await test.runtime.dispose(); }
+});
+
 it("graceful stop closes an approved Goal question without recovering or starting more work", async () => {
   let requested!: () => void;
   const pending = new Promise<void>(resolve => { requested = resolve; });

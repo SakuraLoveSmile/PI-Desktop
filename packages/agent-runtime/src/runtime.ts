@@ -3814,6 +3814,14 @@ export class DesktopAgentRuntime {
             isError: true,
           };
         }
+        if (this.gracefulStopRequested && !this.teamBudgetStop.requested &&
+            !(this.executionProfile === "team" && this.teamContext?.isLead && this.turnId)) {
+          const answers = questions.map(() => null);
+          return {
+            content: [{ type: "text", text: formatAskToolOutput(questions, answers) }],
+            details: { questions, answers, resolvedAt: new Date().toISOString(), resolutionKind: "stopped" },
+          };
+        }
         const request: AskToolRequest = {
           requestId: randomUUID(),
           sessionId: this.sessionId,
