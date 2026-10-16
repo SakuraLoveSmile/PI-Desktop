@@ -78,6 +78,8 @@ otherwise it records a skip. `Skip` explicitly records a skip and advances.
 For ordinary questions there is no timer, countdown, or automatic expiration. The card remains pending
 until the user submits or the turn is stopped. If the turn is stopped while a
 card is open, the runtime resolves every remaining question as skipped.
+Later ordinary asktool calls in the same assistant tool batch also return
+skipped results without registering another waiter or opening a new card.
 
 When an ask arrives, the app shows an in-app toast with a stable localized
 prompt title and the first question; background sessions also follow the
@@ -152,10 +154,9 @@ access surface. See [the decision](../../adr/external-ask-answering-over-mcp.md)
   event; reload reconstructs from pendingInteractive. An empty MCP list alone
   is not evidence that the Renderer card was removed.
 
-The existing ordinary stop rule in §3 requires behavioral verification: the
-current graceful-stop runtime path sets a flag without cancelling ask waiters.
-The relay implementation must first reproduce and then close ordinary waiters
-as skips, preserving graceful stop's `completed` settlement. Abort independently
+The ordinary stop rule in §3 closes current ordinary waiters as skips and
+fences later ordinary asktool calls in the same assistant batch before waiter
+registration, preserving graceful stop's `completed` settlement. Abort independently
 settles `aborted`; Team and preserveRunningTools behavior remains unchanged.
 Sidecar restart discards in-memory waiters; external schedulers must retain
 their own question history and use durable turn evidence to classify expiry.
