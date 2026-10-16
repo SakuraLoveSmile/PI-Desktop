@@ -293,6 +293,8 @@ export type AskToolRequest = {
   requestId: string;
   sessionId: string;
   toolCallId: string;
+  turnId?: string;
+  createdAt?: string;
   questions: AskToolQuestion[];
   /** Host-owned Team-only deferred question; grants no execution authority. */
   teamManaged?: true;
@@ -314,6 +316,8 @@ export type PendingInteractiveRequests = {
 export type AskToolResolution = {
   requestId: string;
   sessionId: string;
+  /** Optional for existing Desktop callers; external controllers pin the live tool identity. */
+  expectedToolCallId?: string;
   answers: Array<string[] | null>;
 };
 

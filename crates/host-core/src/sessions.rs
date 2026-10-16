@@ -400,6 +400,9 @@ pub struct MessageAttachment {
 #[serde(rename_all = "camelCase")]
 pub struct UiMessage {
     pub id: String,
+    /// Read-side ownership from the same session's durable message index.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub turn_id: Option<String>,
     pub role: String,
     pub content: String,
     /// Original text for a slash template or Skill invocation.
@@ -847,6 +850,7 @@ pub(crate) fn record_to_ui(record: MessageRecord) -> UiMessage {
             .map(|s| s.to_string())
             .unwrap_or_default();
         UiMessage {
+            turn_id: None,
             id: record.id,
             role: record.role,
             content: text,
@@ -901,6 +905,7 @@ pub(crate) fn record_to_ui(record: MessageRecord) -> UiMessage {
             .collect::<Vec<_>>()
             .join("");
         UiMessage {
+            turn_id: None,
             id: record.id,
             role: record.role,
             content,
@@ -1945,7 +1950,7 @@ pub fn get_session_with_options(
     // renderer window may additionally request a display cap so a single
     // pasted or tool-produced multi-megabyte message never crosses the UI IPC
     // boundary. The uncapped path remains lossless for model reconstruction.
-    let messages: Vec<UiMessage> = match options.content_limit {
+    let mut messages: Vec<UiMessage> = match options.content_limit {
         Some(limit) => records
             .into_iter()
             .map(|record| {
@@ -1964,13 +1969,17 @@ pub fn get_session_with_options(
             .collect(),
         None => records.into_iter().map(record_to_ui).collect(),
     };
+    let ownership = owning_turns_for(db, id, &messages)?;
+    for message in &mut messages {
+        message.turn_id = ownership.get(&message.id).cloned();
+    }
     let parent_call_id = options.message_around.as_deref().and_then(|target| {
         messages
             .iter()
             .find(|message| message.id == target)
             .and_then(|message| message.parent_tool_call_id.as_deref())
     });
-    let navigation_parent = match parent_call_id {
+    let mut navigation_parent = match parent_call_id {
         Some(call_id) => {
             transcripts::read_tool_call(db.data_dir(), id, &session_layout(db, id)?, call_id)?.map(
                 |record| match options.content_limit {
@@ -1981,6 +1990,9 @@ pub fn get_session_with_options(
         }
         None => None,
     };
+    if let Some(parent) = &mut navigation_parent {
+        parent.turn_id = owning_turns_for(db, id, std::slice::from_ref(parent))?.remove(&parent.id);
+    }
     Ok(Some(SessionDetail {
         summary,
         navigation_parent,
@@ -3636,8 +3648,9 @@ fn owning_turns_for(
     messages: &[UiMessage],
 ) -> Result<HashMap<String, String>> {
     let mut stmt = db.conn().prepare_cached(
-        "SELECT id, turn_id FROM messages
-         WHERE session_id = ?1 AND turn_id IS NOT NULL",
+        "SELECT m.id, m.turn_id FROM messages m
+         JOIN turns t ON t.id = m.turn_id AND t.session_id = m.session_id
+         WHERE m.session_id = ?1 AND m.turn_id IS NOT NULL",
     )?;
     let rows = stmt.query_map(params![session_id], |row| {
         Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
@@ -4993,6 +5006,7 @@ mod tests {
 
     fn user_msg(id: &str, content: &str, ts: &str) -> UiMessage {
         UiMessage {
+            turn_id: None,
             id: id.into(),
             role: "user".into(),
             content: content.into(),
@@ -5048,6 +5062,85 @@ mod tests {
             model_id: Some("model-1".into()),
             created_at: "2026-07-28T00:00:03Z".into(),
         }
+    }
+
+    #[test]
+    fn session_read_projects_durable_turn_ownership_without_guessing() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let goal = begin_turn(&db, &session.id, None, None).unwrap();
+        let mut question = user_msg("goal-ask", "goal answer", "2026-10-14T00:00:00Z");
+        question.role = "tool".into();
+        append_message(&db, &session.id, &question, Some(&goal)).unwrap();
+        end_turn(&db, &goal, "completed", None, None, false).unwrap();
+        let execution = begin_turn(&db, &session.id, None, None).unwrap();
+        question.id = "execution-ask".into();
+        append_message(&db, &session.id, &question, Some(&execution)).unwrap();
+        let mut replay = question.clone();
+        replay.id = "goal-ask".into();
+        replay.content = "a late duplicate must not own the new turn".into();
+        append_message(&db, &session.id, &replay, Some(&execution)).unwrap();
+        let mut unknown = user_msg("unknown", "unowned", "2026-10-14T00:00:02Z");
+        unknown.turn_id = Some(execution.clone()); // A supplied field is not an ownership receipt.
+        append_message(&db, &session.id, &unknown, None).unwrap();
+        for content_limit in [None, Some(32)] {
+            let detail = get_session_with_options(
+                &db,
+                &session.id,
+                SessionReadOptions {
+                    message_limit: Some(10),
+                    content_limit,
+                    ..Default::default()
+                },
+            )
+            .unwrap()
+            .unwrap();
+            assert_eq!(detail.messages[0].turn_id.as_deref(), Some(goal.as_str()));
+            assert_eq!(detail.messages[0].content, "goal answer");
+            assert_eq!(
+                detail.messages[1].turn_id.as_deref(),
+                Some(execution.as_str())
+            );
+            assert_eq!(detail.messages[2].turn_id, None);
+            assert!(serde_json::to_value(&detail.messages[2])
+                .unwrap()
+                .get("turnId")
+                .is_none());
+        }
+        let other = create_session(&db, None, None, None, None, None).unwrap();
+        let foreign_turn = begin_turn(&db, &other.id, None, None).unwrap();
+        db.conn()
+            .execute(
+                "UPDATE messages SET turn_id = ?1 WHERE session_id = ?2 AND id = 'unknown'",
+                params![foreign_turn, session.id],
+            )
+            .unwrap();
+        let detail = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(
+            detail.messages[2].turn_id, None,
+            "a foreign turn index must not be projected"
+        );
+        // Deliberately simulate a damaged historical index; normal writes enforce FK integrity.
+        db.conn()
+            .execute_batch("PRAGMA foreign_keys = OFF")
+            .unwrap();
+        db.conn().execute("UPDATE messages SET turn_id = 'missing-turn' WHERE session_id = ?1 AND id = 'unknown'", params![session.id]).unwrap();
+        db.conn().execute_batch("PRAGMA foreign_keys = ON").unwrap();
+        assert_eq!(
+            get_session(&db, &session.id).unwrap().unwrap().messages[2].turn_id,
+            None
+        );
+        db.conn()
+            .execute(
+                "DELETE FROM messages WHERE session_id = ?1 AND id = 'unknown'",
+                params![session.id],
+            )
+            .unwrap();
+        assert_eq!(
+            get_session(&db, &session.id).unwrap().unwrap().messages[2].turn_id,
+            None,
+            "a transcript row with no index must stay unowned"
+        );
     }
 
     #[test]
@@ -6322,6 +6415,7 @@ mod tests {
         )
         .unwrap();
         let tool = UiMessage {
+            turn_id: None,
             id: "m2".into(),
             role: "tool".into(),
             content: "ok".into(),
@@ -6830,6 +6924,7 @@ mod tests {
         let db = test_db();
         let session = create_session(&db, None, None, None, None, None).unwrap();
         let assistant = UiMessage {
+            turn_id: None,
             id: "assistant-1".into(),
             role: "assistant".into(),
             content: "final answer".into(),
@@ -6919,6 +7014,7 @@ mod tests {
         let db = test_db();
         let session = create_session(&db, None, None, None, None, None).unwrap();
         let assistant = UiMessage {
+            turn_id: None,
             id: "assistant-search-1".into(),
             role: "assistant".into(),
             content: "answer with sources".into(),
