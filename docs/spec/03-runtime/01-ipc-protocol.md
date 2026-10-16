@@ -296,6 +296,10 @@ finalized as `completed`; the request does not abort the provider stream,
 cancel running tools, or open a second concurrent turn. An idle session returns
 `requested: false`.
 
+A running Bash call is not ended by this request. To end one, use
+`pi-desktop/agent/tool/abort` (see 5.6a). It requests the same graceful stop
+first, so the queued prompt can start at the boundary.
+
 The renderer owns the removable, in-memory queued-prompt list per session. It
 calls this channel only for a queued item's **Send now** action and releases
 that item through the ordinary `agent/prompt` flow after the terminal event.
@@ -653,6 +657,62 @@ authoritative for the queue: the terminal event can be dropped (a terminal event
 naming a turn Main no longer owns never reaches the module) or never emitted, so
 the settlement closes the turn inside the module and releases the queue the turn
 was holding.
+
+### 5.6a Abort a running Bash call (`pi-desktop/agent/tool/abort`)
+
+```ts
+type AgentAbortToolRequest = {
+ sessionId: string;
+ turnId?: string;
+ toolCallId: string;
+};
+
+type AgentAbortToolResponse = {
+ found: boolean;
+ requested: boolean;
+};
+```
+
+No renderer entry point calls this channel yet. A future one may call it only
+when a queued item is already promoted ("Send now" has requested a graceful
+stop) and a Bash call is still running.
+Main requires a non-empty `toolCallId` and checks that `turnId`, when given,
+matches the session's active turn. A mismatch or an idle session returns
+`{ found: false, requested: false }` without reaching the runtime. Main then
+forwards the request to the sidecar method `agent.abortTool`, and the runtime
+handles it in this order:
+
+- Only registered running Bash calls are considered. An unknown, settled, or
+  already aborted call returns `found: false`.
+- The graceful stop is requested first, using the same one-shot request as 5.2.
+  If that returns `requested: false`, the result is `found: true,
+  requested: false` and nothing is aborted.
+- Only after a successful stop request does the Bash call's own abort path ask
+  the Host to `tools.abort`, which ends its process group.
+
+Use `found` as the result. For an unknown id the Host also returns
+`aborted: true` (a tombstone), so that field does not show whether anything was
+aborted.
+
+The aborted call returns an error tool result to the model. Tools after it in
+the same batch still run: a batch runs in order, and only the agent-level abort
+signal interrupts it. When the batch ends, the graceful stop ends the turn at
+the boundary as `completed`, and the queued prompt starts next. Each other
+running Bash call in that batch needs its own abort.
+
+Known limits:
+
+- A Bash call inside a subagent is also registered, because it shares the
+  parent's `sessionId`. The parent boundary still waits for the subagent, so
+  aborting it does not start the queued prompt. The UI should offer the action
+  only on top-level Bash rows.
+- Only the Bash call's process group is ended. Descendants outside that group,
+  such as a Gradle daemon, are not ended and may keep running.
+- In Goal or Team `suppressRunEnd` modes, `requestGracefulStop` hard-aborts the
+  whole turn (existing behavior), and this channel follows it. That path has no
+  end-to-end test yet.
+- A remote session's turn is not in this machine's `activeTurns`, so it returns
+  `found: false`. The channel is not in the remote backend's handled list.
 
 ### 5.7 Session collaboration projection
 

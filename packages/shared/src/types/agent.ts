@@ -140,6 +140,18 @@ export type AgentStopResponse = {
   requested: boolean;
 };
 
+/** Ends one running Bash call so a queued send-now can reach its boundary. */
+export type AgentAbortToolRequest = {
+  sessionId: string;
+  turnId?: string;
+  toolCallId: string;
+};
+
+export type AgentAbortToolResponse = {
+  found: boolean;
+  requested: boolean;
+};
+
 /** One entry of the Host-owned turn queue as the renderer mirrors it (D386). */
 export type QueuedTurnSummary = {
   id: string;
