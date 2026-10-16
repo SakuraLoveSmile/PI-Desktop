@@ -2176,18 +2176,7 @@ async fn handle_request_inner(
                 .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
             Ok(json!({ "content": content }))
         }
-        "project.group.context" => {
-            let path = params
-                .get("path")
-                .and_then(Value::as_str)
-                .ok_or_else(|| rpc_err(1002, "path required", "INVALID_PARAMS"))?;
-            let st = state.lock().await;
-            let context = st
-                .db
-                .project_group_context_for_path(path)
-                .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
-            Ok(json!({ "context": context }))
-        }
+        "project.group.context" => project_auto_memory::context(state, params).await,
         "projects.create" => {
             let path = params
                 .get("path")
@@ -2344,7 +2333,9 @@ async fn handle_request_inner(
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "removed": removed, "sessionsRemoved": sessions_removed }))
         }
-        "project.memory.editor.get"
+        "project.memory.get"
+        | "project.memory.set"
+        | "project.memory.editor.get"
         | "project.memory.editor.save"
         | "project.autoMemory.setEnabled"
         | "project.autoMemory.agentList"
@@ -2356,42 +2347,6 @@ async fn handle_request_inner(
             project_history::handle(state, method, params).await
         }
         "project.codeSearch" => project_code_search::handle(state, params).await,
-        "project.memory.get" => {
-            let path = params
-                .get("path")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| rpc_err(1002, "path required", "INVALID_PARAMS"))?;
-            let st = state.lock().await;
-            let memory = st
-                .db
-                .get_project_memory(path)
-                .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
-            Ok(json!({ "memory": memory }))
-        }
-        "project.memory.set" => {
-            let path = params
-                .get("path")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| rpc_err(1002, "path required", "INVALID_PARAMS"))?;
-            let st = state.lock().await;
-            project_auto_memory::ensure_legacy_write_allowed(&st.db, path)?;
-            if let Some(entries) = params.get("entries") {
-                let memory = st
-                    .db
-                    .set_project_memory_entries(path, entries)
-                    .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
-                return Ok(json!({ "memory": memory }));
-            }
-            let content = params
-                .get("content")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| rpc_err(1002, "content required", "INVALID_PARAMS"))?;
-            let memory = st
-                .db
-                .set_project_memory(path, content)
-                .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
-            Ok(json!({ "memory": memory }))
-        }
         "workspace.set" => {
             let path = params
                 .get("path")

@@ -31,7 +31,7 @@ test.after(() => {
   rmSync(fixtureHome, { recursive: true, force: true });
 });
 
-function fixture(t, { ownOAuth = false, forbidDelegation = false, missingTeam = false } = {}) {
+function fixture(t, { ownOAuth = false, forbidDelegation = false, missingTeam = false, projectContext } = {}) {
   const root = mkdtempSync(join(fixtureHome, "project-"));
   const documentPath = join(root, "private-reviewer.md");
   const brokenPath = join(root, "broken.md");
@@ -88,7 +88,7 @@ function fixture(t, { ownOAuth = false, forbidDelegation = false, missingTeam = 
           }
           if (method === "skills.active") return { skills: [] };
           if (method === "mcp.active") return { servers: [] };
-          if (method === "project.group.context") return { context: { memory: { content: "Fixture memory." } } };
+          if (method === "project.group.context") return projectContext ?? { context: { memory: { content: "Fixture memory." } } };
           if (method === "team.getRuntimeContext") return missingTeam ? null : context;
           throw new Error(`Unexpected Host call ${method}`);
         },
@@ -227,3 +227,22 @@ test("launch preserves durable unattended policy and rejects unknown policy valu
     await assert.rejects(f.launch("standard"), { errorCode: "INVALID_PARAMS" });
   }
 });
+
+for (const empty of [false, true]) {
+  test(`slot launch prefers the memory-only alias without importing owner roots (empty=${empty})`, async (t) => {
+    const memoryAlias = { memory: { content: empty ? "" : "Owner notes.", entries: [] }, instructions: empty ? "" : "Owner group instructions." };
+    const f = fixture(t, { projectContext: { context: {
+      roots: [{ path: "/real/owner" }, { path: "/real/additional" }],
+      instructions: "Stale slot group instructions.", memory: { content: "Stale slot notes." },
+    }, memoryAlias } });
+    const params = (await f.launch("standard")).sidecarParams;
+    assert.equal(params.projectPath, f.session.projectPath);
+    assert.equal(params.projectMemory, empty ? undefined : "Owner notes.");
+    assert.deepEqual(params.projectMemoryAlias, memoryAlias);
+    assert.ok(params.projectInstructions.entries.some(entry => entry.content === "Fixture project instructions."));
+    assert.equal(JSON.stringify(params.projectInstructions).includes("/real/"), false);
+    assert.equal(JSON.stringify(params.projectInstructions).includes("Stale slot group instructions."), false);
+    assert.equal(params.customSystemPrompt.append, "Fixture appended prompt.");
+    assert.equal(f.hostCalls.some(({ method }) => method === "project.memory.get"), false);
+  });
+}

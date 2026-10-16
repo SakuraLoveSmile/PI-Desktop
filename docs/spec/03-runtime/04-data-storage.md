@@ -2138,3 +2138,30 @@ New service launches persist `stopMode` in the existing KV namespace
 `background-service-stop-mode-v1`, in the same transaction as the process and
 ownership rows. Historical rows without that record keep `stopMode` absent;
 reopen never infers their stop mechanism from the current operating system.
+
+## Read-only memory ownership for KaneoPilot worktree slots
+
+The Host may resolve a detached planning/review slot to a memory owner using
+`~/Library/Application Support/KaneoPilot/worktree-slots.json`. KaneoPilot's
+SQLite remains authoritative for slots; this file is its derived, read-only
+projection, never a new Plus state store. Plus neither repairs the projection
+nor changes its own project groups, session paths or memory records while
+reading aliases. No schema migration is introduced.
+
+Schema 1 contains `updated_at`, `worktrees_root` and `slots`; each slot contains
+`slot_id`, `path`, `repository`, `git_common_dir`, `repo_key` and `state`. The
+Host bounds the file to 1 MiB / 4096 slots and rejects unknown schemas, duplicate
+paths or ids, relative/dot-dot paths, and symlinks inside the pool. OS path
+aliases are canonicalized first. A requested path must exactly name a registered
+`pool/<repo_key>/slot-[1-9][0-9]*` root, detached in Git's worktree registry. Its
+canonical common directory must match the declared repository's primary Git
+worktree and the SHA256-derived 16-character repo key. No arbitrary mapping
+path is accepted from RPC/model arguments. Slot state is diagnostic, not a
+permission grant. Disk-stale, forged or cross-repository entries never alias.
+
+Memory reads resolve the existing owner group or legacy collection without
+legacy migration or any `kv` write. Effective automatic recording is false for
+an alias; the real owner's stored flag is untouched. Editors and write APIs
+cannot write through an alias. Normal paths preserve their existing behavior.
+The common project-group resolver and tool workspace containment do not alias.
+See [memory-owner decision](../../adr/worktree-memory-owner.md).

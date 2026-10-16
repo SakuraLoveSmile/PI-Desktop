@@ -103,6 +103,59 @@ impl Database {
         Ok(())
     }
 
+    /// Resolve an already validated memory owner without preview migration or
+    /// writes. This method must never perform filesystem/Git I/O.
+    pub(crate) fn get_project_memory_readonly(&self, path: &str) -> Result<ProjectMemoryRecord> {
+        let group = self.project_group_for_path(path)?;
+        let mut memory = match group.as_ref().filter(|group| !group.legacy) {
+            Some(group) => self.get_project_group_memory(&group.id)?,
+            None => self.get_project_memory(path)?,
+        };
+        let Some(group) = group else {
+            return Ok(memory);
+        };
+        let key = if group.legacy {
+            format!(
+                "path:{}",
+                canonical_project_path(path).ok_or_else(|| anyhow!("project path required"))?
+            )
+        } else {
+            format!("group:{}", group.id)
+        };
+        let old = self.legacy_auto_memory(&key)?;
+        if !old.entries.is_empty() {
+            let mut entries = super::project_memory_editor::memory_entries(&memory);
+            for old in old.entries {
+                let mut id = old.id;
+                while entries.iter().any(|entry| entry.id == id) {
+                    id = format!("legacy-auto:{id}");
+                }
+                entries.push(ProjectMemoryEntryRecord {
+                    id,
+                    title: old.title,
+                    content: old.content,
+                });
+            }
+            memory.content = super::repositories::render_project_memory_entries(&entries);
+            if memory.content.len() > MAX_PROJECT_MEMORY_BYTES {
+                return Err(anyhow!(
+                    "project memory exceeds {MAX_PROJECT_MEMORY_BYTES} bytes"
+                ));
+            }
+            memory.entries = Some(entries);
+        }
+        Ok(memory)
+    }
+
+    pub(crate) fn get_auto_record_enabled_readonly(&self, path: &str) -> Result<bool> {
+        if self.project_group_for_path(path)?.is_none() {
+            return Ok(false);
+        }
+        Ok(self
+            .legacy_auto_memory(&self.auto_memory_key(path)?)?
+            .enabled)
+    }
+
     pub fn get_auto_record_enabled(&self, path: &str) -> Result<bool> {
         self.migrate_legacy_auto_entries(path)?;
         Ok(self
