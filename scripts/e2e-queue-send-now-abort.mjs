@@ -48,6 +48,7 @@ const QUEUED_REPLY = "Queued reply finished.";
 const ABORT_OFFER_DELAY_MS = 30_000;
 const HIDDEN_CHECKS_MS = [5_000, 25_000];
 const VISIBLE_BY_MS = 40_000;
+const FRAME_WAIT_FALLBACK_MS = 1_000;
 const marker = String(randomInt(100_000, 1_000_000));
 const bashCommand = `echo start-${marker}; sleep 297.${marker}; echo end-${marker}`;
 // Real abort evidence in the tool result: the partial output or an abort word.
@@ -260,7 +261,20 @@ async function typeAndSend(cdp, text) {
   })()`);
   if (!focused) throw new Error("composer editor missing");
   await cdp.send("Input.insertText", { text });
-  await cdp.evaluate(`new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
+  // Two frames normally finish within milliseconds. A hidden or minimized
+  // window paints no frames, so the timer ends the wait instead of the CDP bound.
+  // The Send-enabled wait below still has to pass before the click.
+  const frameWait = await cdp.evaluate(`new Promise((resolve) => {
+    const started = performance.now();
+    const timer = setTimeout(() => resolve({ won: "timer", ms: Math.round(performance.now() - started), visibility: document.visibilityState }), ${FRAME_WAIT_FALLBACK_MS});
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      clearTimeout(timer);
+      resolve({ won: "frames", ms: Math.round(performance.now() - started), visibility: document.visibilityState });
+    }));
+  })`);
+  if (frameWait.won === "timer") {
+    console.log(`INFO ${text.split(" ")[0]} frame wait fell back to the ${FRAME_WAIT_FALLBACK_MS} ms timer after ${frameWait.ms} ms (visibility ${frameWait.visibility})`);
+  }
   try {
     await waitFor(() => cdp.evaluate(`Boolean(document.querySelector(".composer-shell .send-btn:not(:disabled)"))`), "composer Send enabled", 15_000);
   } catch (error) {
