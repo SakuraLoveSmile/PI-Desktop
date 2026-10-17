@@ -2246,7 +2246,9 @@ identify the platform validation still needed.
 #### E2E-QUEUE-send-now-abort-offer-after-30s: Abort command appears on the head promoted row after 30 seconds
 
 - **Preconditions**: A provider fixture makes the model issue one foreground
-  Bash call running `sleep 600`; the turn holds one waiting queued row.
+  Bash call running `echo start-<marker>; sleep 297.<marker>; echo end-<marker>`
+  with `timeout: 300`. The marker is random, so the script can find only its
+  own processes. The turn holds one waiting queued row.
 - **Steps**: 1) Start the turn and wait until the Bash row shows running. 2)
   Choose Send now on the waiting row. 3) Before 30 seconds, confirm the row has
   no Abort command button. 4) At 30 seconds, confirm exactly one Abort command
@@ -2266,12 +2268,20 @@ identify the platform validation still needed.
 - **Specs linked**: `04-ux/08-component-spec.md` (§11), `03-runtime/01-ipc-protocol.md` (§5.6a)
 - **Acceptance**: C (chat)
 - **Milestone**: M6+
-- **Status**: Draft; the offer, its gating, and the store action are covered by
-  `apps/desktop/test/queue-send-now-tool-abort.test.mjs`; the Host-side abort
-  path by `packages/agent-runtime/src/runtime-tests/runtime-abort-tool.test.ts`
-  and `apps/desktop/test/agent-ipc-abort-tool.test.mjs`. Not run in Electron: no
-  automated suite drives a model-issued Bash call through the renderer, so this
-  stays a manual local-provider scenario.
+- **Status**: Partly automated. `scripts/e2e-queue-send-now-abort.mjs`
+  (`pnpm test:e2e:queue-send-now-abort`) runs in Electron with an isolated
+  profile, host and loopback model fixture. It checks steps 1–4 and 6: no offer
+  at 5 s or 25 s; one offer by 40 s; a press stops the Bash row; no process of
+  the stuck command remains; the queued prompt is answered; the model gets no
+  turn between the kill and the queued prompt; and the queued request carries
+  the aborted call's own `TOOL_ABORTED` result. Step 4 counts the offers in
+  Electron; the head-row rule is a unit-level case. Not run in Electron: step 5
+  (disabled while the press is in flight), step 7 (the unit cases in
+  `apps/desktop/test/queue-send-now-tool-abort.test.mjs` cover the subagent,
+  remote and approval gates) and step 8 (a call that finishes before the press).
+  The Host-side abort path is covered by
+  `packages/agent-runtime/src/runtime-tests/runtime-abort-tool.test.ts` and
+  `apps/desktop/test/agent-ipc-abort-tool.test.mjs`.
 
 #### E2E-QUEUE-cancel-next-during-start: The next waiting message stays cancelable
 

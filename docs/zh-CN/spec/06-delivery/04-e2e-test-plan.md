@@ -8291,7 +8291,8 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 
 #### E2E-QUEUE-send-now-abort-offer-after-30s：队首优先行 30 秒后才出现“中止命令”
 
-- **前提条件**：提供方可以让模型发出一个前台 Bash 调用 `sleep 600`；队列中有一条等待行。
+- **前提条件**：提供方可以让模型发出一个前台 Bash 调用 `echo start-<marker>; sleep 297.<marker>; echo end-<marker>`，
+  `timeout: 300`；`<marker>` 为随机数，使脚本只能找到自己的进程。队列中有一条等待行。
 - **步骤**：
   1. 开始回合，等到 Bash 行显示为运行中。
   2. 对等待行点击“立即发送”。
@@ -8307,9 +8308,13 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 - **链接规格**：`04-ux/08-component-spec.md`（§11）、`03-runtime/01-ipc-protocol.md`（§5.6a）
 - **验收**：C（对话与流）
 - **里程碑**：M6+
-- **状态**：草稿；按钮出现条件与 store 动作由 `queue-send-now-tool-abort.test.mjs` 覆盖；Host 侧中止路径由
-  `runtime-abort-tool.test.ts` 与 `agent-ipc-abort-tool.test.mjs` 覆盖。尚未在 Electron 中运行：没有自动化套件
-  让模型发出的 Bash 调用经过渲染器，因此该场景仍是手动的本地提供方场景。
+- **状态**：部分自动化。`scripts/e2e-queue-send-now-abort.mjs`（`pnpm test:e2e:queue-send-now-abort`）在 Electron 中运行，
+  使用隔离的 profile、Host 与回环模型夹具。覆盖步骤 1–4 和 6：5 秒与 25 秒时没有按钮；40 秒内出现一个按钮；点击会停止
+  Bash 行；卡住命令的进程全部退出；排队行得到回复；在中止与排队提示之间模型没有新回合；排队请求携带被中止调用自己的
+  `TOOL_ABORTED` 结果。步骤 4 在 Electron 中只统计按钮数量，“只在队首优先行上出现”由单元用例覆盖。未在 Electron 中覆盖：
+  步骤 5（请求进行中的禁用状态）、步骤 7（子代理、远程与审批的门控由 `queue-send-now-tool-abort.test.mjs` 的单元用例覆盖）
+  以及步骤 8（点击前调用已自行结束）。Host 侧中止路径仍由 `runtime-abort-tool.test.ts` 与
+  `agent-ipc-abort-tool.test.mjs` 覆盖。
 
 #### E2E-QUEUE-edit-restores-draft-only-when-input-empty：编辑仅在输入框为空时回填草稿
 
