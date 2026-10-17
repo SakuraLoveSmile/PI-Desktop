@@ -25,6 +25,8 @@ pub mod ignore_rules;
 mod residual;
 mod service_control;
 pub mod shell;
+#[cfg(test)]
+pub(crate) mod test_output;
 
 pub use hashline::{HashlineContext, HashlineStore};
 
@@ -3225,7 +3227,7 @@ mod tests {
             Some(dir.path()),
             None,
             "Bash",
-            &serde_json::json!({ "command": command }),
+            &serde_json::json!({ "command": test_output::mark_output(command) }),
             15_000,
         )
         .await;
@@ -3234,7 +3236,10 @@ mod tests {
         assert_eq!(result.is_error, Some(true));
         assert_eq!(result.error_code.as_deref(), Some("TOOL_FAILED"));
         assert_eq!(result.content["exitCode"].as_i64(), Some(7));
-        assert_eq!(result.content["stderr"].as_str(), Some("diagnostic"));
+        assert_eq!(
+            test_output::after_output_start(&result.content["stderr"]),
+            "diagnostic"
+        );
     }
 
     #[tokio::test]
