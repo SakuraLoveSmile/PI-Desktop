@@ -442,13 +442,20 @@ async function run() {
 
     await typeAndSend(cdp, `${QUEUED_MARK} after the stuck command.`);
     await waitFor(() => cdp.evaluate(`document.querySelectorAll('[data-testid="queued-prompt"]').length === 1`), "one waiting queued row");
-    const sentAt = Date.now();
-    const sent = await cdp.evaluate(`(() => {
-      const button = document.querySelector(".composer-queued-prompt-send-now:not(:disabled)");
-      if (!button) return false;
-      button.click();
-      return true;
-    })()`);
+    // Send now is disabled while the row is pending (its id has the pending:
+    // prefix). Check and click in one evaluate, retrying until it is enabled.
+    // sentAt is set when each attempt starts, so the attempt that clicks leaves
+    // it at or before the click and the offer timings below start there.
+    let sentAt = 0;
+    const sent = await waitFor(() => {
+      sentAt = Date.now();
+      return cdp.evaluate(`(() => {
+        const button = document.querySelector(".composer-queued-prompt-send-now:not(:disabled)");
+        if (!button) return false;
+        button.click();
+        return true;
+      })()`);
+    }, "queued prompt accepted by the host (Send now enabled)");
     check("Send now promoted the queued row", sent === true);
     await waitFor(() => cdp.evaluate(`Boolean(document.querySelector(".composer-queued-prompt-send-now:disabled"))`), "promoted queued row");
 
