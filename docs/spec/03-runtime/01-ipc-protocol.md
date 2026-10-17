@@ -673,9 +673,14 @@ type AgentAbortToolResponse = {
 };
 ```
 
-No renderer entry point calls this channel yet. A future one may call it only
-when a queued item is already promoted ("Send now" has requested a graceful
-stop) and a Bash call is still running.
+The renderer calls this channel only from the head promoted queue row, and only
+after a top-level Bash call has run for 30 seconds since "Send now" promoted the
+row. The delay is renderer-side; the Host does not time it. The row never
+aborts on its own: the user presses the offer. The request carries no `turnId`,
+because `toolCallId` already identifies one call and main matches the active
+turn itself. `found: false` means the call already settled; `found: true,
+requested: false` means no graceful stop could be requested. Remote sessions
+never offer it, because their turns run on another host.
 Main requires a non-empty `toolCallId` and checks that `turnId`, when given,
 matches the session's active turn. A mismatch or an idle session returns
 `{ found: false, requested: false }` without reaching the runtime. Main then

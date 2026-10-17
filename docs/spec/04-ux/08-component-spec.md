@@ -3371,7 +3371,8 @@ reasoning-level control.
   different session's queue is not affected by switching sessions. Running with
   an empty draft changes this same submit slot to Stop. Clear the draft to
   expose the immediate-stop action.
-- Queued row: the text, then move up, move down, Send now, edit, and remove.
+- Queued row: the text, then move up, move down, Send now, edit, and remove
+  (the head promoted row adds Abort command after Send now, see below).
   Move up/down swaps the row with its adjacent waiting neighbour and mirrors the
   Host's durable `position`; at the waiting-block boundary it is a no-op and
   never crosses into the promoted block. Edit removes the row and returns its
@@ -3386,6 +3387,16 @@ reasoning-level control.
   current reply/tool batch completes normally, before every waiting row. The
   first promoted row starts the turn and the rest join it as adjacent user
   messages, so the block is answered once. When idle it starts immediately.
+- Abort command: the head promoted row offers it only 30 seconds after its Send
+  now, and only while a top-level Bash call runs in the active session. Subagent
+  calls, remote sessions, and a pending approval never offer it. The button
+  calls `agent/tool/abort` with the running call's `toolCallId` (IPC §5.6a), is
+  disabled while the request is in flight, and never fires on its own.
+  `found: false` says the command already finished; `requested: false` says the
+  stop could not be requested; a failed request shows the stop-failed toast.
+  When the Bash call settles, the turn ends at its batch boundary and the
+  promoted row starts. A later top-level Bash call in the same batch offers the
+  button again at once, because the delay has already passed.
 - A pending queue row is locked until Host admission returns its durable id: move
   up/down, Send now, edit, and remove are disabled. All five tooltips explain
   that it is saving; Send now also displays the localized Saving label. Direct edit/remove actions leave the pending row and draft
