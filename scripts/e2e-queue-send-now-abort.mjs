@@ -277,20 +277,27 @@ async function typeAndSend(cdp, text) {
   })()`));
   if (!focused) throw new Error("composer editor missing");
   await step(cdp, "typeAndSend.insertText", () => cdp.send("Input.insertText", { text }));
-  // Two frames normally finish within milliseconds. A hidden or minimized
-  // window paints no frames, so the timer ends the wait instead of the CDP bound.
+  // Two frames normally finish within milliseconds. A hidden or minimized window
+  // paints no frames, so the timer may end the wait, but only for a hidden window.
+  // A visible window that misses its frames is a stall and fails with the step name.
   // The Send-enabled wait below still has to pass before the click.
-  const frameWait = await step(cdp, "typeAndSend.frameWait", () => cdp.evaluate(`new Promise((resolve) => {
-    const started = performance.now();
-    const timer = setTimeout(() => resolve({ won: "timer", ms: Math.round(performance.now() - started), visibility: document.visibilityState }), ${FRAME_WAIT_FALLBACK_MS});
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      clearTimeout(timer);
-      resolve({ won: "frames", ms: Math.round(performance.now() - started), visibility: document.visibilityState });
-    }));
-  })`));
-  if (frameWait.won === "timer") {
-    console.log(`INFO ${text.split(" ")[0]} frame wait fell back to the ${FRAME_WAIT_FALLBACK_MS} ms timer after ${frameWait.ms} ms (visibility ${frameWait.visibility})`);
-  }
+  await step(cdp, "typeAndSend.frameWait", async () => {
+    const frameWait = await cdp.evaluate(`new Promise((resolve) => {
+      const started = performance.now();
+      const state = () => ({ visibility: document.visibilityState, hasFocus: document.hasFocus(), ms: Math.round(performance.now() - started) });
+      const timer = setTimeout(() => resolve({ won: "timer", ...state() }), ${FRAME_WAIT_FALLBACK_MS});
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        clearTimeout(timer);
+        resolve({ won: "frames", ...state() });
+      }));
+    })`);
+    if (frameWait.won === "timer" && frameWait.visibility === "visible") {
+      throw new Error(`two frames did not paint within ${FRAME_WAIT_FALLBACK_MS} ms in a visible window (${text.split(" ")[0]})`);
+    }
+    if (frameWait.won === "timer") {
+      console.log(`INFO ${text.split(" ")[0]} frame wait fell back to the ${FRAME_WAIT_FALLBACK_MS} ms timer after ${frameWait.ms} ms (visibility ${frameWait.visibility})`);
+    }
+  });
   try {
     await step(cdp, "typeAndSend.waitSendEnabled", () => waitFor(() => cdp.evaluate(`Boolean(document.querySelector(".composer-shell .send-btn:not(:disabled)"))`), "composer Send enabled", 15_000));
   } catch (error) {
