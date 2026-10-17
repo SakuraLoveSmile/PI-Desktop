@@ -21,6 +21,8 @@ use crate::workspace::{resolve_tool_path_with_external, simple_canonicalize, Too
 mod grep_rg;
 pub mod hashline;
 pub mod ignore_rules;
+#[cfg(unix)]
+mod residual;
 mod service_control;
 pub mod shell;
 
@@ -2788,7 +2790,14 @@ async fn tool_bash(
             }
             cancelled = wait_for_cancellation(&mut cancellation) => {
                 if cancelled {
-                    match service_control::stop_or_kill(&options, service_control::Runner { pid, ownership: &mut ownership, control: &mut control, wait_task: &mut wait_task }, service_control::Output { rx: &mut output_rx, closed: &mut output_closed, stdout: &mut stdout, stderr: &mut stderr, notifier: &mut notifier }).await {
+                    // Capture before the stop: once the runner exits, its
+                    // children are reparented and no longer found from it.
+                    #[cfg(unix)]
+                    let snapshot = residual::capture(pid).await;
+                    let stopped = service_control::stop_or_kill(&options, service_control::Runner { pid, ownership: &mut ownership, control: &mut control, wait_task: &mut wait_task }, service_control::Output { rx: &mut output_rx, closed: &mut output_closed, stdout: &mut stdout, stderr: &mut stderr, notifier: &mut notifier }).await;
+                    #[cfg(unix)]
+                    residual::schedule_report(snapshot);
+                    match stopped {
                         Ok(()) => break BashStop::Aborted,
                         Err(error) => break BashStop::LifecycleFailed(error),
                     }
