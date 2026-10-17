@@ -1,6 +1,7 @@
 //! Public RPC user paths against real local shells and an isolated database.
 use super::*;
 use crate::background_processes as jobs;
+use crate::tools::test_output::{after_output_start, mark_output};
 use tempfile::TempDir;
 
 struct Fixture {
@@ -92,7 +93,11 @@ impl Fixture {
 async fn background_user_path_output_completion_duplicate_and_restart() {
     let mut f = Fixture::new("auto");
     let start = f
-        .start("complete", "printf '你好'; printf 'warning' >&2", 5000)
+        .start(
+            "complete",
+            &mark_output("printf '你好'; printf 'warning' >&2"),
+            5000,
+        )
         .await;
     assert_eq!(start["ok"], true);
     assert_eq!(start["content"]["status"], "starting");
@@ -101,12 +106,12 @@ async fn background_user_path_output_completion_duplicate_and_restart() {
     let read = f.terminal(id).await;
     assert_eq!(read["process"]["status"], "completed");
     assert_eq!(read["process"]["exitCode"], 0);
-    assert_eq!(read["stdout"], "你好");
-    assert_eq!(read["stderr"], "warning");
+    assert_eq!(after_output_start(&read["stdout"]), "你好");
+    assert_eq!(after_output_start(&read["stderr"]), "warning");
     let duplicate = f.start("complete", "printf should-not-execute", 5000).await;
     assert_eq!(duplicate["content"]["backgroundProcessId"], id);
     assert_eq!(duplicate["content"]["status"], "completed");
-    assert_eq!(f.read(id).await["stdout"], "你好");
+    assert_eq!(after_output_start(&f.read(id).await["stdout"]), "你好");
     assert_eq!(f.state.lock().await.tool_budget.snapshot().active, 0);
     assert!(f.state.lock().await.active_bash_cancellations.is_empty());
     let list = f
@@ -117,7 +122,7 @@ async fn background_user_path_output_completion_duplicate_and_restart() {
     let st = f.state.lock().await;
     let reopened = AppState::open(&st.data_dir).unwrap();
     assert_eq!(
-        jobs::read(&reopened, &f.session, id).unwrap()["stdout"],
+        after_output_start(&jobs::read(&reopened, &f.session, id).unwrap()["stdout"]),
         "你好"
     );
 }
@@ -126,22 +131,30 @@ async fn background_user_path_output_completion_duplicate_and_restart() {
 async fn background_nonzero_timeout_and_bounded_output_spill() {
     let mut f = Fixture::new("auto");
     let failed = f
-        .start("fail", "printf before; printf error >&2; exit 7", 5000)
+        .start(
+            "fail",
+            &mark_output("printf before; printf error >&2; exit 7"),
+            5000,
+        )
         .await;
     let failed = f
         .terminal(failed["content"]["backgroundProcessId"].as_str().unwrap())
         .await;
     assert_eq!(failed["process"]["status"], "failed");
     assert_eq!(failed["process"]["exitCode"], 7);
-    assert_eq!(failed["stderr"], "error");
+    assert_eq!(after_output_start(&failed["stderr"]), "error");
     let timed = f
-        .start("timeout", "printf before-timeout; sleep 30", 1000)
+        .start(
+            "timeout",
+            &mark_output("printf before-timeout; sleep 30"),
+            1000,
+        )
         .await;
     let timed = f
         .terminal(timed["content"]["backgroundProcessId"].as_str().unwrap())
         .await;
     assert_eq!(timed["process"]["status"], "timed_out");
-    assert_eq!(timed["stdout"], "before-timeout");
+    assert_eq!(after_output_start(&timed["stdout"]), "before-timeout");
     let message = timed["errorMessage"].as_str().unwrap();
     assert!(message.contains("explicit 1 second"), "{message}");
     assert!(
