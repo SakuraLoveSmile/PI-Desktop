@@ -288,7 +288,8 @@ async function typeAndSend(cdp, text) {
 const runningBash = (cdp) => cdp.evaluate(`document.querySelector(".tool-row.status-running") !== null`);
 
 async function markerProcesses() {
-  const { stdout } = await execFileAsync("ps", ["-axww", "-o", "pid=,ppid=,pgid=,command="]);
+  // -A -ww is accepted by both macOS ps and the procps ps on the Linux nightly runner.
+  const { stdout } = await execFileAsync("ps", ["-A", "-ww", "-o", "pid=,ppid=,pgid=,command="]);
   return stdout
     .split("\n")
     .filter((line) => line.includes(`297.${marker}`))
@@ -476,11 +477,13 @@ async function run() {
     check("abort offer clicked", clicked === true);
     await waitFor(async () => !(await runningBash(cdp)), "Bash row to leave running", 20_000);
     const rowStoppedMs = Date.now() - clickedAt;
-    let remaining = [];
-    await waitFor(async () => {
+    // A failing ps probe must fail the run here, not leave an empty list that passes.
+    const exitDeadline = Date.now() + 20_000;
+    let remaining = await markerProcesses();
+    while (remaining.length && Date.now() < exitDeadline) {
+      await sleep(250);
       remaining = await markerProcesses();
-      return remaining.length === 0;
-    }, "command processes to exit", 20_000).catch(() => {});
+    }
     check(
       "no process from the stuck command remains",
       remaining.length === 0,
