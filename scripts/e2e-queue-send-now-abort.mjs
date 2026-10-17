@@ -72,6 +72,22 @@ function check(name, ok, detail = "") {
   if (!ok) throw new Error(`assertion failed: ${name}`);
 }
 
+// Runs one named step. A failure is rethrown with the step name and the window
+// state at that moment, so a stuck run says where it stopped. The state read has
+// its own short bound, so a stalled renderer cannot hold up the report.
+async function step(cdp, name, action) {
+  try {
+    return await action();
+  } catch (error) {
+    const state = await Promise.resolve()
+      .then(() => cdp.send("Runtime.evaluate", { expression: "({ visibility: document.visibilityState, hasFocus: document.hasFocus() })", returnByValue: true }, 2_000))
+      .then((result) => result.result?.value)
+      .catch(() => null);
+    const where = state ? `visibility=${state.visibility}, hasFocus=${state.hasFocus}` : "window state unavailable";
+    throw new Error(`step ${name} failed: ${error.message} (${where})`, { cause: error });
+  }
+}
+
 function createModelFixture(log) {
   const textOf = (message) =>
     typeof message?.content === "string" ? message.content : JSON.stringify(message?.content ?? "");
@@ -248,7 +264,7 @@ async function selectSession(cdp, sessionId) {
 
 async function typeAndSend(cdp, text) {
   // insertText needs a caret inside the contenteditable; focus alone is not enough.
-  const focused = await cdp.evaluate(`(() => {
+  const focused = await step(cdp, "typeAndSend.focus", () => cdp.evaluate(`(() => {
     const editor = document.querySelector(".composer-input");
     if (!(editor instanceof HTMLElement)) return false;
     editor.focus();
@@ -258,25 +274,25 @@ async function typeAndSend(cdp, text) {
     selection.removeAllRanges();
     selection.addRange(range);
     return true;
-  })()`);
+  })()`));
   if (!focused) throw new Error("composer editor missing");
-  await cdp.send("Input.insertText", { text });
+  await step(cdp, "typeAndSend.insertText", () => cdp.send("Input.insertText", { text }));
   // Two frames normally finish within milliseconds. A hidden or minimized
   // window paints no frames, so the timer ends the wait instead of the CDP bound.
   // The Send-enabled wait below still has to pass before the click.
-  const frameWait = await cdp.evaluate(`new Promise((resolve) => {
+  const frameWait = await step(cdp, "typeAndSend.frameWait", () => cdp.evaluate(`new Promise((resolve) => {
     const started = performance.now();
     const timer = setTimeout(() => resolve({ won: "timer", ms: Math.round(performance.now() - started), visibility: document.visibilityState }), ${FRAME_WAIT_FALLBACK_MS});
     requestAnimationFrame(() => requestAnimationFrame(() => {
       clearTimeout(timer);
       resolve({ won: "frames", ms: Math.round(performance.now() - started), visibility: document.visibilityState });
     }));
-  })`);
+  })`));
   if (frameWait.won === "timer") {
     console.log(`INFO ${text.split(" ")[0]} frame wait fell back to the ${FRAME_WAIT_FALLBACK_MS} ms timer after ${frameWait.ms} ms (visibility ${frameWait.visibility})`);
   }
   try {
-    await waitFor(() => cdp.evaluate(`Boolean(document.querySelector(".composer-shell .send-btn:not(:disabled)"))`), "composer Send enabled", 15_000);
+    await step(cdp, "typeAndSend.waitSendEnabled", () => waitFor(() => cdp.evaluate(`Boolean(document.querySelector(".composer-shell .send-btn:not(:disabled)"))`), "composer Send enabled", 15_000));
   } catch (error) {
     const composer = await cdp.evaluate(`(() => {
       const editor = document.querySelector(".composer-input");
@@ -406,7 +422,7 @@ async function run() {
       defaultMode: "agent",
       defaultPermissionMode: "auto",
     });
-    const created = await invoke(cdp, "sessionCreate", [{
+    const created = await step(cdp, "sessionCreate", () => invoke(cdp, "sessionCreate", [{
       title: "Send now abort E2E",
       mode: "agent",
       projectPath: workspace,
@@ -414,18 +430,18 @@ async function run() {
       modelId: "fixture",
       // "auto" lets the Bash call run without a permission card; the card path is not under test here.
       permissionMode: "auto",
-    }]);
+    }]));
     const sessionId = created?.session?.id;
     if (!sessionId) throw new Error(`sessionCreate returned no session: ${JSON.stringify(created)}`);
-    await invoke(cdp, "sessionConfigure", [sessionId, {
+    await step(cdp, "sessionConfigure", () => invoke(cdp, "sessionConfigure", [sessionId, {
       mode: "agent",
       providerId: provider.id,
       modelId: "fixture",
       thinkingLevel: "off",
-    }]);
+    }]));
     // The renderer reads settings and providers at mount, so reload after seeding (as plan-ui does).
-    await reloadRenderer(cdp);
-    await selectSession(cdp, sessionId);
+    await step(cdp, "reloadRenderer", () => reloadRenderer(cdp));
+    await step(cdp, "selectSession", () => selectSession(cdp, sessionId));
 
     await typeAndSend(cdp, `${SLOW_MARK} run a command that does not return on its own.`);
     // The row label is the display name, not the tool id, so the class is the signal; the only tool in this run is Bash.
