@@ -57,11 +57,12 @@ test("send-now offers an abort on the head promoted row once a top-level Bash ha
     const { ComposerStatus } = await server.ssrLoadModule("/src/features/chat/composer/ComposerStatus.tsx");
     const initial = { ...useAppStore.getInitialState() };
     // Server renders read zustand's initial state, so live fields are patched there (see todo-recovery.test.mjs).
-    const render = (queuedPrompts, live = {}) => {
+    const render = (queuedPrompts, live = {}, { approvalPending = false } = {}) => {
       Object.assign(useAppStore.getInitialState(), {
         activeSessionId: "session-a",
         runningSessions: { "session-a": true },
         messages: [bashRow()],
+        sessions: [],
         ...live,
       });
       return renderToStaticMarkup(createElement(ComposerStatus, {
@@ -72,7 +73,7 @@ test("send-now offers an abort on the head promoted row once a top-level Bash ha
         moveQueuedPrompt: async () => {},
         editQueuedPrompt: () => {},
         sendQueuedNow: async () => {},
-        approvalPending: false,
+        approvalPending,
         enhancementError: null,
         clearEnhancementError: () => {},
         droppedDirectories: [],
@@ -103,6 +104,7 @@ test("send-now offers an abort on the head promoted row once a top-level Bash ha
           ["non-Bash tool", { messages: [bashRow({ toolName: "Read" })] }],
           ["idle session", { runningSessions: {} }],
           ["another session is active", { activeSessionId: "session-b" }],
+          ["remote session", { sessions: [{ id: "session-a", source: "remote" }] }],
         ];
         for (const [name, live] of cases) {
           assert.equal(render(due, live).match(ABORT_BUTTON), null, name);
@@ -117,6 +119,11 @@ test("send-now offers an abort on the head promoted row once a top-level Bash ha
           waitingRow("pending:turn-d"),
         ]);
         assert.equal(markup.match(ABORT_BUTTON)?.length, 1);
+      });
+
+      await t.test("a pending approval hides the abort even when a Bash call is due", () => {
+        const markup = render([promotedRow("turn-a", Date.now() - 31_000)], {}, { approvalPending: true });
+        assert.equal(markup.match(ABORT_BUTTON), null);
       });
     } finally {
       Object.assign(useAppStore.getInitialState(), initial);
