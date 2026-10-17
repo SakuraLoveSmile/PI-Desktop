@@ -713,6 +713,11 @@ Known limits:
   only on top-level Bash rows.
 - Only the Bash call's process group is ended. Descendants outside that group,
   such as a Gradle daemon, are not ended and may keep running.
+- When a running Bash call is cancelled, the Host records the call's descendants
+  before the stop and, about a second after it, writes any still running to the
+  host log. This is a report only: those processes are never terminated, and the
+  abort result is unchanged. Only descendants still attached to the runner when
+  the stop begins are included.
 - In Goal or Team `suppressRunEnd` modes, `requestGracefulStop` hard-aborts the
   whole turn (existing behavior), and this channel follows it. That path has no
   end-to-end test yet.
