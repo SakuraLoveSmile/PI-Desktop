@@ -2243,6 +2243,36 @@ identify the platform validation still needed.
 - **Milestone**: M6+
 - **Status**: Draft; host-side reorder covered by `turn_queue` unit tests
 
+#### E2E-QUEUE-send-now-abort-offer-after-30s: Abort command appears on the head promoted row after 30 seconds
+
+- **Preconditions**: A provider fixture makes the model issue one foreground
+  Bash call running `sleep 600`; the turn holds one waiting queued row.
+- **Steps**: 1) Start the turn and wait until the Bash row shows running. 2)
+  Choose Send now on the waiting row. 3) Before 30 seconds, confirm the row has
+  no Abort command button. 4) At 30 seconds, confirm exactly one Abort command
+  button appears, on the head promoted row only. 5) Press it and confirm the
+  button is disabled until the response returns. 6) Watch the transcript: the
+  Bash row ends with an error, the turn ends at its batch boundary, and the
+  promoted row starts. 7) Repeat with a subagent Bash call, a remote session,
+  and a pending approval, and confirm no button appears. 8) Let the Bash call
+  finish on its own before pressing; the button must disappear and the queued
+  row must still start after the turn.
+- **Expected**: The button never appears before the 30-second delay, appears
+  only while a top-level Bash call runs in the active session, and never fires
+  without a press. A press aborts that one call; another top-level Bash call in
+  the same batch needs its own press. A call that already finished shows the
+  "already finished" notice, and a failed request shows the stop-failed notice.
+  The waiting rows keep their order, and the renderer sends no turn id.
+- **Specs linked**: `04-ux/08-component-spec.md` (§11), `03-runtime/01-ipc-protocol.md` (§5.6a)
+- **Acceptance**: C (chat)
+- **Milestone**: M6+
+- **Status**: Draft; the offer, its gating, and the store action are covered by
+  `apps/desktop/test/queue-send-now-tool-abort.test.mjs`; the Host-side abort
+  path by `packages/agent-runtime/src/runtime-tests/runtime-abort-tool.test.ts`
+  and `apps/desktop/test/agent-ipc-abort-tool.test.mjs`. Not run in Electron: no
+  automated suite drives a model-issued Bash call through the renderer, so this
+  stays a manual local-provider scenario.
+
 #### E2E-QUEUE-cancel-next-during-start: The next waiting message stays cancelable
 
 - **Preconditions**: An isolated desktop profile and a local provider that can

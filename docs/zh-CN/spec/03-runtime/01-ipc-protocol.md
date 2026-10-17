@@ -514,7 +514,7 @@ type AgentAbortToolResponse = {
 };
 ```
 
-目前还没有渲染器入口调用该渠道。之后的入口只应在排队项已优先（“立即发送”已请求优雅停止）且某个 Bash 调用仍在运行时调用它。
+渲染器只在排队队首（已优先的第一条）上提供该操作：“立即发送”把该行优先后，若某个顶层 Bash 调用已运行满 30 秒，该行才显示“中止命令”。30 秒计时在渲染器完成，Host 不计时。行本身从不自动中止，只有用户按下按钮时才调用。请求不带 `turnId`：`toolCallId` 已唯一标识该调用，主进程按当前活动回合核对。`found: false` 表示该调用已经结束；`found: true, requested: false` 表示无法请求优雅停止。远程会话不提供该操作，因为它的回合在另一台主机上运行。
 主进程要求 `toolCallId` 非空，并确认 `turnId`（若提供）与该会话当前的活动回合一致；
 不一致或没有活动回合时返回 `{ found: false, requested: false }`，不触达 runtime。
 主进程随后把请求转给 sidecar 的内部方法 `agent.abortTool`，由 runtime 按以下顺序处理：

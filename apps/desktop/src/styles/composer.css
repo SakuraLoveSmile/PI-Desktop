@@ -139,7 +139,8 @@
 }
 
 .composer-queued-prompt-action,
-.composer-queued-prompt-send-now {
+.composer-queued-prompt-send-now,
+.composer-queued-prompt-abort-tool {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -156,7 +157,8 @@
   height: 24px;
 }
 
-.composer-queued-prompt-send-now {
+.composer-queued-prompt-send-now,
+.composer-queued-prompt-abort-tool {
   min-height: 24px;
   padding: 0 8px;
   color: var(--ds-text-secondary);
@@ -167,12 +169,15 @@
 .composer-queued-prompt-action:hover,
 .composer-queued-prompt-action:focus-visible,
 .composer-queued-prompt-send-now:hover:not(:disabled),
-.composer-queued-prompt-send-now:focus-visible {
+.composer-queued-prompt-send-now:focus-visible,
+.composer-queued-prompt-abort-tool:hover:not(:disabled),
+.composer-queued-prompt-abort-tool:focus-visible {
   background: var(--ds-bg-hover);
   color: var(--ds-text-primary);
 }
 
-.composer-queued-prompt-send-now:disabled {
+.composer-queued-prompt-send-now:disabled,
+.composer-queued-prompt-abort-tool:disabled {
   cursor: wait;
   opacity: 0.65;
 }
