@@ -105,6 +105,13 @@
       "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
     },
     {
+      "id": "composer-queue-send-now-abort",
+      "family": "composer",
+      "script": "scripts/e2e-queue-send-now-abort.mjs",
+      "tier": "nightly",
+      "safety": "Isolated Electron profile and Host with a loopback model fixture; the scripted Bash command is marker-tagged, and the script signals only the Electron process group it spawned and, on failure, processes whose command line carries its marker."
+    },
+    {
       "id": "composer-thinking-layout",
       "family": "composer",
       "script": "scripts/e2e-composer-thinking-layout.mjs",
