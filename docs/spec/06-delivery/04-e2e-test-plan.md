@@ -2248,7 +2248,9 @@ identify the platform validation still needed.
 - **Preconditions**: A provider fixture makes the model issue one foreground
   Bash call running `echo start-<marker>; sleep 297.<marker>; echo end-<marker>`
   with `timeout: 300`. The marker is random, so the script can find only its
-  own processes. The turn holds one waiting queued row.
+  own processes. The turn holds one waiting queued row. The app window stays
+  visible for the whole run: a hidden or minimized window paints no frames, so
+  the run is invalid and fails with `invalid run: window hidden`, not a pass.
 - **Steps**: 1) Start the turn and wait until the Bash row shows running. 2)
   Choose Send now on the waiting row. 3) Before 30 seconds, confirm the row has
   no Abort command button. 4) At 30 seconds, confirm exactly one Abort command

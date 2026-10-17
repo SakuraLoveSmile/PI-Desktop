@@ -8292,7 +8292,8 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 #### E2E-QUEUE-send-now-abort-offer-after-30s：队首优先行 30 秒后才出现“中止命令”
 
 - **前提条件**：提供方可以让模型发出一个前台 Bash 调用 `echo start-<marker>; sleep 297.<marker>; echo end-<marker>`，
-  `timeout: 300`；`<marker>` 为随机数，使脚本只能找到自己的进程。队列中有一条等待行。
+  `timeout: 300`；`<marker>` 为随机数，使脚本只能找到自己的进程。队列中有一条等待行。应用窗口在整个运行中保持可见：
+  隐藏或最小化的窗口不绘制帧，运行因此无效，会以 `invalid run: window hidden` 失败，而不是通过。
 - **步骤**：
   1. 开始回合，等到 Bash 行显示为运行中。
   2. 对等待行点击“立即发送”。

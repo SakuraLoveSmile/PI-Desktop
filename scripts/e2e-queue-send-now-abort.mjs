@@ -72,9 +72,19 @@ function check(name, ok, detail = "") {
   if (!ok) throw new Error(`assertion failed: ${name}`);
 }
 
+// A hidden window paints no frames, so a run in one proves nothing about the composer.
+// Such a failure is built here and marked, and step() reports it as an invalid run.
+const HIDDEN_RUN = "invalid run: window hidden";
+function hiddenRunError(where, marker) {
+  const error = new Error(`window hidden ${where}; keep the window visible and rerun (${marker})`);
+  error.hiddenWindow = true;
+  return error;
+}
+
 // Runs one named step. A failure is rethrown with the step name and the window
-// state at that moment, so a stuck run says where it stopped. The state read has
-// its own short bound, so a stalled renderer cannot hold up the report.
+// state at that moment, so a stuck run says where it stopped. A failure in a hidden
+// window starts with HIDDEN_RUN, so it reads as an invalid run, not a product failure.
+// The state read has its own short bound, so a stalled renderer cannot hold up the report.
 async function step(cdp, name, action) {
   try {
     return await action();
@@ -84,7 +94,8 @@ async function step(cdp, name, action) {
       .then((result) => result.result?.value)
       .catch(() => null);
     const where = state ? `visibility=${state.visibility}, hasFocus=${state.hasFocus}` : "window state unavailable";
-    throw new Error(`step ${name} failed: ${error.message} (${where})`, { cause: error });
+    const hidden = error.hiddenWindow === true || state?.visibility === "hidden";
+    throw new Error(`${hidden ? `${HIDDEN_RUN}; ` : ""}step ${name} failed: ${error.message} (${where})`, { cause: error });
   }
 }
 
@@ -264,23 +275,27 @@ async function selectSession(cdp, sessionId) {
 
 async function typeAndSend(cdp, text) {
   // insertText needs a caret inside the contenteditable; focus alone is not enough.
-  const focused = await step(cdp, "typeAndSend.focus", () => cdp.evaluate(`(() => {
-    const editor = document.querySelector(".composer-input");
-    if (!(editor instanceof HTMLElement)) return false;
-    editor.focus();
-    const selection = window.getSelection();
-    const range = document.createRange();
-    range.selectNodeContents(editor);
-    selection.removeAllRanges();
-    selection.addRange(range);
-    return true;
-  })()`));
+  // A hidden window is refused before anything is typed into it.
+  const focused = await step(cdp, "typeAndSend.focus", async () => {
+    if ((await cdp.evaluate("document.visibilityState")) === "hidden") throw hiddenRunError("before typing", text.split(" ")[0]);
+    return cdp.evaluate(`(() => {
+      const editor = document.querySelector(".composer-input");
+      if (!(editor instanceof HTMLElement)) return false;
+      editor.focus();
+      const selection = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      return true;
+    })()`);
+  });
   if (!focused) throw new Error("composer editor missing");
   await step(cdp, "typeAndSend.insertText", () => cdp.send("Input.insertText", { text }));
   // Two frames normally finish within milliseconds. A hidden or minimized window
-  // paints no frames, so the timer may end the wait, but only for a hidden window.
-  // A visible window that misses its frames is a stall and fails with the step name.
-  // The Send-enabled wait below still has to pass before the click.
+  // paints no frames, so the timer ends the wait there and the run is invalid. A
+  // visible window that misses its frames is a stall. Either way the step fails with
+  // its name. The Send-enabled wait below still has to pass before the click.
   await step(cdp, "typeAndSend.frameWait", async () => {
     const frameWait = await cdp.evaluate(`new Promise((resolve) => {
       const started = performance.now();
@@ -295,7 +310,7 @@ async function typeAndSend(cdp, text) {
       throw new Error(`two frames did not paint within ${FRAME_WAIT_FALLBACK_MS} ms in a visible window (${text.split(" ")[0]})`);
     }
     if (frameWait.won === "timer") {
-      console.log(`INFO ${text.split(" ")[0]} frame wait fell back to the ${FRAME_WAIT_FALLBACK_MS} ms timer after ${frameWait.ms} ms (visibility ${frameWait.visibility})`);
+      throw hiddenRunError("at the frame wait", text.split(" ")[0]);
     }
   });
   try {
