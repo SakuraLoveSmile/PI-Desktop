@@ -237,7 +237,7 @@ IDs come from executable result/test calls and annotated dynamic suites. Documen
 | E2E-PROJECT-delete-removes-project-and-owned-sessions-unknown-path | [scripts/e2e-smoke.mjs:639](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-smoke.mjs#L639) |
 | E2E-PROJECT-SKILL-CREATE | [scripts/e2e-skill-market.mjs:274](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-skill-market.mjs#L274) |
 | E2E-PROJECT-SKILL-NO-OVERWRITE | [scripts/e2e-skill-market.mjs:281](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-skill-market.mjs#L281) |
-| E2E-QUEUE-send-now-abort-offer-after-30s | [scripts/e2e-queue-send-now-abort.mjs:550](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-queue-send-now-abort.mjs#L550) |
+| E2E-QUEUE-send-now-abort-offer-after-30s | [scripts/e2e-queue-send-now-abort.mjs:573](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-queue-send-now-abort.mjs#L573) |
 | E2E-RUNTIME-background-bash-timeout-is-visible | [scripts/e2e-background-bash-limit.mjs:171](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-background-bash-limit.mjs#L171) |
 | E2E-RUNTIME-edit-accepts-tag-with-legacy-arguments | [scripts/e2e-edit-legacy.mjs:15](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-edit-legacy.mjs#L15) |
 | E2E-runtime-module | [scripts/e2e-smoke.mjs:831](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-smoke.mjs#L831) |
