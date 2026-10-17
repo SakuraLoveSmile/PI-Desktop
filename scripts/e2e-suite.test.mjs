@@ -85,7 +85,8 @@ test("candidate identity fingerprints directory symlinks without following their
     assert.equal(afterEvidence.dirty, false, "generated evidence must leave a clean source checkout");
     assert.equal(afterEvidence.workspaceDiffSha256, beforeEvidence.workspaceDiffSha256,
       "generated reports and screenshots must not appear as candidate source changes");
-    const linked = join(repository, "target");
+    // Keep this name outside the copied ignore policy: git hides ignored links from candidate identity.
+    const linked = join(repository, "linked-dependency");
     await symlink(firstTarget, linked, process.platform === "win32" ? "junction" : "dir");
     const before = await candidateIdentity(repository);
     assert.equal(before.dirty, true);
