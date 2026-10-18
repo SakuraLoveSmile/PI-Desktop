@@ -13,7 +13,7 @@ import {
   listPendingToolRequests,
 } from "@pi-desktop/host-runtime";
 import { DeviceTokenAuthenticator, RacpServer, bindRacpWebSocket, type RacpHostOperations, type WsBinding } from "@pi-desktop/racp";
-import { APP_VERSION, type AgentEventEnvelope, type GoalProgressChangedEvent } from "@pi-desktop/shared";
+import { APP_VERSION, type AgentEventEnvelope, type GoalProgressChangedEvent, type GoalExecutionChangedEvent } from "@pi-desktop/shared";
 
 import type { PiHostConfig } from "./config.js";
 import { FileCredentialStore, loadOrCreateHostId } from "./credentials.js";
@@ -42,6 +42,13 @@ function isGoalProgressChangedEvent(value: unknown): value is GoalProgressChange
   return typeof event.sessionId === "string" && Boolean(event.sessionId.trim()) &&
     typeof event.executionId === "string" && Boolean(event.executionId.trim()) &&
     typeof event.revision === "number" && Number.isInteger(event.revision) && event.revision > 0;
+}
+
+function isGoalExecutionChangedEvent(value: unknown): value is GoalExecutionChangedEvent {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const event = value as Record<string, unknown>;
+  return typeof event.sessionId === "string" && Boolean(event.sessionId.trim()) &&
+    typeof event.executionId === "string" && Boolean(event.executionId.trim());
 }
 
 /**
@@ -155,8 +162,9 @@ export async function startPiHost(config: PiHostConfig, options: { log?: HostLog
     runtime.attachHost(host);
     state.hostProgressUnsubscribe?.();
     state.hostProgressUnsubscribe = host.onNotification((method, params) => {
-      if (state.host !== host || method !== "goalProgress.changed" || !isGoalProgressChangedEvent(params)) return;
-      agentHost.publishGoalProgressChanged(params);
+      if (state.host !== host) return;
+      if (method === "goalProgress.changed" && isGoalProgressChangedEvent(params)) agentHost.publishGoalProgressChanged(params);
+      if (method === "goalExecutions.changed" && isGoalExecutionChangedEvent(params)) agentHost.publishGoalExecutionChanged(params);
     });
     state.sidecar?.setHost(host);
     log("info", "host-core handshake ok", { generation: host.generation });

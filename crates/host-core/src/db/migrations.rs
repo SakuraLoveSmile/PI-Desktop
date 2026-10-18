@@ -19,6 +19,26 @@ impl Database {
             [],
         );
         let tx = self.conn.unchecked_transaction()?;
+        let active_goals: Vec<(String, String)> = {
+            let mut stmt=tx.prepare_cached("SELECT session_id,execution_id FROM plan_approvals WHERE execution_state IN ('queued','running') AND COALESCE(execution_kind,kind)='goal' AND execution_id IS NOT NULL")?;
+            let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
+            rows.collect::<rusqlite::Result<_>>()?
+        };
+        for (session, id) in active_goals {
+            crate::goal_holds::settle_in_transaction(
+                self,
+                &tx,
+                &session,
+                &id,
+                crate::goal_holds::GoalSettlement {
+                    ended: "errored",
+                    error_code: Some("HOST_RESTARTED"),
+                    stop_hint: None,
+                    barrier_failed: false,
+                    durable_seq: 0,
+                },
+            )?;
+        }
         let mut running_team_sessions: HashSet<String> = {
             let mut stmt = tx.prepare_cached(
                 "SELECT team_session_id FROM teams

@@ -686,6 +686,7 @@ export const es = {
     "artifactScratchUnavailable": "El directorio de sesión temporal no está disponible.",
   },
   "goal": {
+    blocked: en.goal.blocked,
     "progressLabel": "Progreso del objetivo",
     "progressListLabel": "Lista de tareas del objetivo",
     "progressInitializing": "Cargando progreso…",
@@ -2189,6 +2190,7 @@ sklm: {
       endedProcesses: "Finalizados {{count}}",
       clearEndedProcesses: "Limpiar procesos finalizados",
       goal: {
+        reportBlocked: en.panel.activity.goal.reportBlocked,
         reportPending: "Informe pendiente",
         reportUnavailable: "Informe no disponible",
         reportGenerating: "Generando informe",

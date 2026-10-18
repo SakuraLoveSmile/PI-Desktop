@@ -73,8 +73,10 @@ const HOST_PROXY_ALLOWED = new Set([
   "goalReports.submitDraft",
   "goalReports.invalidateDraft",
   "goalReports.markFailed",
-  // Progress write capabilities are issued only for the approved execution
-  // currently bound to this sidecar turn. Reads remain Main/RACP-only.
+  // Resume reads the existing progress snapshot before issuing a fresh token.
+  // Host validates session/execution ownership on reads and the current bound
+  // execution turn on write capabilities. Hold mutations remain Main-only.
+  "goalProgress.get",
   "goalProgress.issueToken",
   "goalProgress.update",
   "project.instructions.resolve",
@@ -525,6 +527,15 @@ export class AgentSidecar {
           );
         }
         const params = (msg.params?.params ?? {}) as Record<string, unknown>;
+        if (method === "goalProgress.get" &&
+          (typeof params.sessionId !== "string" || !params.sessionId.trim() ||
+            typeof params.executionId !== "string" || !params.executionId.trim())) {
+          // The Main read API allows omitting the session; sidecar reads must
+          // always invoke Host's session/execution ownership validation.
+          throw Object.assign(new Error("Goal progress read requires sessionId and executionId"), {
+            code: -32602, data: { errorCode: "INVALID_ARGUMENT" },
+          });
+        }
         if (method === "team.getOrdinaryInboxCapability" || method === "team.readOrdinaryInbox" || method === "team.ackOrdinaryInbox") {
           const handler = this.ordinaryTeamInboxHandler;
           const host = this.host;

@@ -19,6 +19,31 @@ const progress = (revision, statuses = ["completed", "pending"], executionId = "
 const report = (kind = "structured", executionId = "execution") => ({
   state: "ready", report: { sessionId: "session", executionId, integrity: { kind } },
 });
+test("durable blocked execution supersedes pending report state and refreshes after resume", async () => {
+  let hold = { sessionId: "session", executionId: "execution", state: "blocked", version: 1 };
+  let changed;
+  const reader = createGoalActivityReader("session", "execution", {
+    readProgress: async () => ({ progress: progress(1) }), readReport: async () => ({ state: "pending", report: null }),
+    readExecution: async () => ({ hold }), onProgress: () => () => {}, onReport: () => () => {},
+    onExecution: (listener) => { changed = listener; return () => {}; },
+  });
+  const off = reader.subscribe(() => {}); await reader.refresh();
+  assert.equal(reader.getState().reportState, "blocked"); assert.equal(reader.getState().reportKnown, true);
+  hold = { ...hold, state: "resumed", version: 2 }; changed({ sessionId: "session", executionId: "execution" });
+  await reader.refresh(); assert.equal(reader.getState().hold.state, "resumed");
+  assert.notEqual(reader.getState().reportState, "blocked"); off();
+});
+test("user-accepted host facts never present a fallback warning, historical fallback retains it", async () => {
+  for (const closure of [undefined, "user_accepted"]) {
+    const reader = createGoalActivityReader("session", "execution", {
+      readProgress: async () => ({ progress: null }),
+      readReport: async () => ({ state: "ready", report: { sessionId: "session", executionId: "execution", integrity: { kind: "fallback" }, closure } }),
+      onProgress: () => () => {}, onReport: () => () => {},
+    });
+    const off = reader.subscribe(() => {}); await reader.refresh();
+    assert.equal(reader.getState().reportState, closure ? "ready" : "fallback"); off();
+  }
+});
 async function settle() { await Promise.resolve(); await Promise.resolve(); }
 function fixture() {
   const progressReads = [];

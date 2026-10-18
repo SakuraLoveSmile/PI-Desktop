@@ -2795,15 +2795,21 @@ was met.
 The transcript card identifies the Goal and verdict and opens its report in the
 Work Panel. The transcript presents a Goal completion card only when the execution
 has reached `completed` and the report has settled
-as `ready` (or publication `failed` with Retry available). Interrupted execution,
+as `ready` (or publication `failed` with Retry available). A blocked hold instead
+renders the GoalBlockedCard described below. Other interrupted execution,
 including historical interrupted ready/failed reports, is excluded. In-flight drafts and pending
 executions are strictly suppressed from transcript card rendering and automatic Work Panel opening.
 Automatic opening waits for refreshed report metadata, matches its session/execution/report
 identity to the event, and rechecks the active session and listener lifetime after the read.
 A ready report presents the Goal snapshot, execution status,
 structured or fallback integrity, supported criteria and checks, evidence,
-changed files, limitations, and next steps. Fallback reports identify missing
-or incomplete evidence and do not present unknown checks as passed.
+changed files, limitations, and next steps. New automatic completion requires
+structured `met`; a non-`met` result is displayed only after explicit acceptance.
+`closure = user_accepted` shows User accepted closure (unverified), preserving
+the report verdict without presenting it as Agent-verified. Optional segments
+and blocks form a blocked/resumed timeline and preserve the first segment's
+start time. Historical fallback reports identify missing or incomplete evidence
+and do not present unknown checks as passed or offer reopening.
 
 The Work Panel distinguishes loading, pending persistence, ready, failed,
 unavailable, and disconnected reads. Failures use localized generic text and
@@ -2823,8 +2829,8 @@ callouts. Order is header/metrics, summary, steps, files, verification, gallery,
 and conclusion/limitations/next steps. Narrow tables scroll inside their frame.
 Dark report colors follow the reference; light mode uses existing theme tokens.
 
-Rendering continues to consume the durable v1 Host report, without executing
-supplied JSX or changing persistence. Model claims and Host observations remain
+Rendering consumes durable Host report schema v1/v2, without executing
+supplied JSX. Existing v1 report files are read without rewriting them. Model claims and Host observations remain
 separate; metric success styling requires linked passing Host observations.
 Missing evidence resolution is unknown, and contradictions, fallback integrity,
 interrupted status, unavailable images, and retry remain explicit.
@@ -2836,6 +2842,38 @@ interrupted status, unavailable images, and retry remain explicit.
 - The report tab exposes headings and evidence in reading order.
 - Retry uses the shared Button primitive, is disabled while the request is in
   flight, and keeps readable foreground contrast in both themes.
+
+### GoalBlockedCard and Composer resume intent
+
+An execution with `hold.state = blocked` uses the existing card, Button and
+semantic warning styles. It shows the Goal title, Goal blocked — needs attention,
+localized reasons (including unsettled member/task identities), the actual Goal
+checklist snapshot, and available Agent `limitations`/`nextSteps`. Missing
+progress is unavailable, not invented or auto-completed. The card provides
+Continue execution, Accept current result and finish, and Abandon Goal. Actions
+are scoped by session/execution and expected hold version; duplicate clicks are
+disabled while pending, errors remain visible, and late responses cannot act on
+a different selected session. Acceptance preserves non-`met` verdicts; abandon
+creates no completion report.
+
+While blocked, the Composer is editable and defaults to Send continues Goal X.
+A removable chip exposes that intent; dismissing it sends an ordinary message
+without closing the Goal. Continue uses the current Composer provider/model
+selection and may include visible text guidance and ordinary file references;
+it does not require a new `SubmitGoal` or approval. Image references and plugin
+attachments are not supported by this text/file-reference continuation path.
+An attempted send preserves the complete draft/attachments and shows a localized
+hint to dismiss the resume chip and send an ordinary message. It does not silently
+drop attachments, send partial guidance or automatically switch the user's intent. Session changes clear stale intent and version state.
+Approving a replacement Goal warns that it supersedes the blocked Goal; the old
+contract remains in read-only history. No automatic model calls run while held,
+and paused Team members cannot be dispatched until explicit continuation.
+
+The blocked card/chip use localized accessible names, ordinary keyboard Button
+activation and shared focus behavior. Long reasons and task labels wrap within
+the existing responsive card; the current transcript, Composer and report visual
+style stays unchanged. Remote v1 holds display the same facts read-only and do
+not expose local continuation/acceptance/abandon actions.
 
 ## 10B.4 GoalProgressBar and Active Goal Capsule
 
@@ -3317,6 +3355,7 @@ reasoning-level control.
 | Permission pending | textarea disabled (per [03-permission-ux.md](03-permission-ux.md) §7) | Send disabled; Stop remains active whenever the running empty-draft condition is met |
 | Plan / Goal / planning | textarea active while idle; contract badge and permission chip visible; mode chip pulses while the live turn projects `planning` | inspect, send, or submit a contract |
 | Plan / Goal / awaiting approval | approval surface shows the title, immutable artifact opener, revision controls, Goal conversion, and one-time Schedule action for the exact `.pi/<kind>/*.md` approval; the Composer remains visible and editable below it | approve, reject, request changes, schedule, or clear/send revision draft |
+| Goal / blocked | editable Composer and removable Send continues Goal X chip; held checklist/reasons visible | Continue with selected model, accept current result, abandon, or dismiss chip for an ordinary message |
 | Plan / queued or running | Agent badge remains selected; queue/running state is visible; draft and next-turn controls remain editable | Stop; Send queues the next prompt; no replay control |
 | Plan / Goal / planning after rejected, expired, or interrupted proposal | contract chip remains visible and editable | send a later prompt; submit a new contract; no execution action |
 | No workspace | textarea active, warning banner "No project — tools limited" | Send enabled |
@@ -4863,9 +4902,10 @@ restores the recorded history. Tool timeout uses warning/clock styling distinct
 from failed/error styling.
 
 Goal plan rows show the authoritative completed/total count, execution state and
-report state (pending, generating, ready, fallback, failed or unavailable).
+report state (pending, generating, blocked, ready, fallback, failed or unavailable).
 Overview and the Composer Goal capsule share one session/execution-scoped Host
-reader. Missing counts are unavailable, not fabricated zeroes; fallback reports
+reader. A blocked row shows Goal title · Goal blocked with semantic warning
+styling and opens its held state. Missing counts are unavailable, not fabricated zeroes; historical fallback reports
 stay explicitly degraded. The title opens the existing Goal artifact; the report
 badge opens that execution's report in its owning session. Late/cross-session
 reads and older progress revisions cannot overwrite current state. The reader
@@ -4902,7 +4942,9 @@ and disclosure arrow as the other groups, including hover/focus. The suggestion 
 opening an anchored suggestion dialog.
 The Overview starts with Needs attention when the owning session has pending
 permission/plan approvals, failed activities, timed-out processes or failed/
-fallback Goal reports. Each entry opens the relevant group and reveals its target,
+fallback Goal reports or blocked Goal holds. `task.failed` notifications carrying
+`error_code = GOAL_BLOCKED` say Goal blocked, needs attention; no task-completed
+notification is produced by a blocked settlement. Each entry opens the relevant group and reveals its target,
 including rows past the five-item preview and folded terminal process records.
 Generated activity entries scroll/focus their visible row; approval entries return
 to the latest transcript and focus the pending approval, without answering it.

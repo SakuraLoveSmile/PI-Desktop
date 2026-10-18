@@ -16,6 +16,8 @@ export function useGoalActivity(sessionId: string, executionId: string | undefin
         readReport: api.getGoalReport,
         onProgress: api.onGoalProgressChanged,
         onReport: api.onGoalReportChanged,
+        readExecution: api.goalExecutionGet,
+        onExecution: api.onGoalExecutionChanged,
         onHostRestart: (listener) => api.onHostStatus((event) => { if (event.ok && event.restarted) listener(); }),
         onFocus: (listener) => {
           window.addEventListener("focus", listener);
