@@ -37,7 +37,8 @@ export function SubagentActivityRow({ id, name, task, status, statusLabel, timin
     </span>}
   </>;
   const classes = `subagent-activity-row ${className} status-${status ?? "unknown"}`;
-  return onOpen ? <TooltipButton type="button" className={classes} tooltip={title} onClick={onOpen}
+  // The title reads as a sentence, so its tooltip wraps inside the viewport instead of running past it.
+  return onOpen ? <TooltipButton type="button" className={classes} tooltipClassName="ui-tooltip-help" tooltip={title} onClick={onOpen}
     data-delegation-id={id} data-activity-id={id} data-status={status}>{content}</TooltipButton>
-    : <Tooltip label={title} className={`${classes} session-activity-readonly`}>{content}</Tooltip>;
+    : <Tooltip label={title} tooltipClassName="ui-tooltip-help" className={`${classes} session-activity-readonly`}>{content}</Tooltip>;
 }
