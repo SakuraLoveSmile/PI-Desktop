@@ -1,5 +1,8 @@
-import { formatToolDuration } from "../../../lib/tool-display";
+import { compact, formatToolDuration } from "../../../lib/tool-display";
 import { delegationTimingBounds, type DelegationActivityItem, type SubagentTiming } from "../../../lib/subagent-topology";
+
+/** The row tooltip repeats only the opening of a delegation brief; the full brief stays in the subagent tab. */
+const ROW_TASK_EXCERPT_LIMIT = 120;
 
 /** Stable presentation identity; the avatar is decorative, never a status signal. */
 export function subagentAvatarVariant(id: string): number {
@@ -26,5 +29,7 @@ export function subagentElapsed(status: string | undefined, timing: SubagentTimi
 }
 
 export function subagentRowText(name: string, task: string | undefined, statusLabel: string | undefined, elapsed: string | undefined): string {
-  return [name, task, [statusLabel, elapsed].filter(Boolean).join(" ")].filter(Boolean).join(" · ");
+  // A multi-KB brief would otherwise become the whole tooltip and accessible name.
+  const excerpt = task ? compact(task, ROW_TASK_EXCERPT_LIMIT) : undefined;
+  return [name, excerpt, [statusLabel, elapsed].filter(Boolean).join(" ")].filter(Boolean).join(" · ");
 }

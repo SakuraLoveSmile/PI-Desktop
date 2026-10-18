@@ -94,3 +94,12 @@ test('inline subagent text keeps real names and task details with deterministic 
     assert.ok([0,1,2].includes(subagentAvatarVariant(id)));
   }
 });
+
+test('row text bounds a long multi-line delegation brief to one excerpt', () => {
+  const brief = `你是只读代码复核者。\n\n工作树：/tmp/worktree\n${'检查边界条件与错误处理。'.repeat(20)}`;
+  const label = subagentRowText('code-reviewer',brief,'Subagent Running','3m 12s');
+  assert.equal(label.includes('\n'),false,label);
+  assert.ok(label.startsWith('code-reviewer · 你是只读代码复核者。 工作树：/tmp/worktree 检查边界条件'),label);
+  assert.ok(label.endsWith('… · Subagent Running 3m 12s'),label);
+  assert.ok([...label].length <= 200,`row text is ${[...label].length} characters`);
+});
