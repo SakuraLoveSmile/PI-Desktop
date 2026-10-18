@@ -103,6 +103,8 @@ The code, retryability and 30-second admission deadline remain unchanged.
 | `AGENT_NOT_FOUND` | no | session missing |
 | `TURN_NOT_FOUND` | no | turn id invalid |
 | `TURN_ABORTED` | no | turn aborted by user/system |
+| `INTERACTION_POLICY_MISMATCH` | no | the turn's persisted interaction mode does not match its admitted runtime policy; reject admission before executing tools |
+| `INTERACTION_REQUIRED` | no | an unattended turn needs a user decision; persist the structured interaction request and stop the turn instead of opening an interactive waiter |
 | `AGENT_SIDECAR_CRASHED` | no | the Node agent sidecar process died mid-turn; the owning turn settles as aborted with this code instead of an unrelated plan-approval code (issue #1077) |
 | `AGENT_SIDECAR_OOM` | no | the sidecar died after its JavaScript heap hit the configured cap, diagnosed from the V8 fatal-error banner in its stderr tail; the same turn fails the same way until the input shrinks (issue #1077) |
 | `MODEL_NOT_CONFIGURED` | no | no usable model selected, or provider rejects the selected model as unknown |
