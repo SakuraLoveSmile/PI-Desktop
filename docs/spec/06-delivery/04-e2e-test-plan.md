@@ -2272,15 +2272,23 @@ identify the platform validation still needed.
 - **Milestone**: M6+
 - **Status**: Partly automated. `scripts/e2e-queue-send-now-abort.mjs`
   (`pnpm test:e2e:queue-send-now-abort`) runs in Electron with an isolated
-  profile, host and loopback model fixture. It checks steps 1–4 and 6: no offer
+  profile, host and loopback model fixture. It checks steps 1–6 and 8: no offer
   at 5 s or 25 s; one offer by 40 s; a press stops the Bash row; no process of
   the stuck command remains; the queued prompt is answered; the model gets no
   turn between the kill and the queued prompt; and the queued request carries
-  the aborted call's own `TOOL_ABORTED` result. Step 4 counts the offers in
-  Electron; the head-row rule is a unit-level case. Not run in Electron: step 5
-  (disabled while the press is in flight), step 7 (the unit cases in
-  `apps/desktop/test/queue-send-now-tool-abort.test.mjs` cover the subagent,
-  remote and approval gates) and step 8 (a call that finishes before the press).
+  the aborted call's own `TOOL_ABORTED` result. For step 5, a controlled gate
+  delays the real abort IPC at the preload boundary: the rendered button becomes
+  disabled, a second click issues no second request, and releasing the gate
+  forwards the original request once without synthesizing a response. A second
+  isolated run covers step 8: after the offer appears, a workspace control file
+  lets the real Bash command exit normally without a click; the offer disappears,
+  the queue advances, and the next request retains the successful tool result.
+  A screenshot of the actual abort offer is saved under
+  `.artifacts/queued-send-now-closeout/abort-offer.png`.
+  Step 4 counts the offers in Electron; the head-row rule is a component-level
+  case. Step 7 remains component-level coverage in
+  `apps/desktop/test/queue-send-now-tool-abort.test.mjs` for the subagent,
+  remote and approval gates; it is not claimed as Electron coverage.
   The Host-side abort path is covered by
   `packages/agent-runtime/src/runtime-tests/runtime-abort-tool.test.ts` and
   `apps/desktop/test/agent-ipc-abort-tool.test.mjs`.
