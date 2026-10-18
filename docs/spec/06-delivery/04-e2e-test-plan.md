@@ -18449,7 +18449,7 @@ authenticated turn and never revives the old execution token.
   its full contents in the original execution. Unread current notices and open
   tasks block completion independently. Consuming a notice neither completes
   tasks nor supplies successful participation. Reserved keys are rejected.
-- **Specs:** Host RPC silent completion mail; Expert Team ADR 2026-10-13.
+- **Specs:** Host RPC silent completion mail; Expert Team ADR plus-expert-team-collaboration (2026-10-13 amendments).
 - **Acceptance:** `node scripts/e2e-team-member-silence.mjs`; Rust tests cover
   reported/direct/terminal-task/abort exclusions, rollback, participation and
   source/event-proof deletion, plus transport and checkpoint failure recovery.
