@@ -1,4 +1,4 @@
-# External ask answering over local MCP
+# ADR: External ask answering over local MCP
 
 - Status: Accepted for implementation; implementation and acceptance pending
 - Date: 2026-10-14
