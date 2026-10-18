@@ -368,3 +368,12 @@ cookie profile 与 Host link 标记为不排期；终端流式操作、`tools/ad
 `tool/execute` 中继、host-core 持久化的队列、远程订阅者 30 分钟默认审批寿命和
 `applyCeilingToPairedDevices` 策略同属该修订。
 完整状态机、示例和验收条款见英文源规格。
+
+
+### Read-only Goal hold projection (2026-10-13)
+
+A completed remote turn does not prove a completed Goal. goalExecutions.changed
+refreshes the owning session; existing report/progress readers expose holds
+using interrupted/GOAL_BLOCKED. Remote v1 does not expose local resume/close/
+settle mutations. Completed-report Retry cannot accept or resume a hold.
+See the [English source](/spec/03-runtime/19-remote-agent-control-protocol).

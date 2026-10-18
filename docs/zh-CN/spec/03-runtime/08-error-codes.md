@@ -160,6 +160,10 @@ stdio 与 Tokio 的动态阻塞池隔离，因此后一种情况
 | `PLAN_EXECUTION_INTERRUPTED` | 不 | 已批准的 queued/running Plan 或 Goal 执行已停止且不重播 |
 | `GOAL_EXECUTION_NOT_TERMINAL` | 不 | Goal 尚未结算，不能生成最终报告 |
 | `GOAL_PROGRESS_NOT_RUNNING` | 不 | 执行或绑定回合已停止，不能写入进度 |
+| `GOAL_BLOCKED` | no | Goal acceptance is unverified or execution errored; a durable hold needs explicit Continue, Accept or Abandon, never automatic retry |
+| `GOAL_ABANDONED` | no | user abandoned a blocked Goal; execution remains interrupted and no completion report is published |
+| `GOAL_SUPERSEDED` | no | a newly approved Goal replaced the session's blocked Goal; the old execution is interrupted and cannot resume |
+| `GOAL_REPORT_NOT_VERIFIED` | no | automatic Goal completion/finalization lacks a valid structured met draft, completed existing progress or settled current Team work; publish no report |
 | `PLAN_REQUIRES_INTERACTIVE_SESSION` | 不 | unattended/scheduled Plan 或 Goal 运行无法请求批准 |
 | `PLAN_NOT_FOUND` | 不 | 没有审批记录与该提案 id 匹配 |
 | `PLAN_SESSION_NOT_FOUND` | 不 | Plan/Goal RPC 点名了主机没有的会话 |
@@ -572,3 +576,17 @@ transcript 保留稳定错误码、传输 errno 和原始 details，但使用本
 TEAM_SERVICE_UNAUTHORIZED 拒绝缺少当前认证 Agent Team/run/turn owner 的服务，包括研究、被替换/过期路由或超权限范围。TEAM_APPROVAL_REQUIRED 保持当前确认名单含义。TEAM_SERVICE_LIMIT_REACHED 表示 Host2/Team1/session1 活服务上限，与原 global/session/shell 准入不同。INVALID_PARAMS 拒绝非法 kind、前台 service 或 service timeout 覆盖。修正范围/参数或先停止 owned service，不绕权或忙重试。
 
 普通 inbox 来源伪造仍为 PERMISSION_DENIED，过期精确回合/proof/authority 保留 Team 拒绝码。明确 ACK transport loss 可留下仅摘要 pending IDs，authority 错误不允许 flush 正文。
+
+
+### Goal hold recovery errors
+
+GOAL_BLOCKED is a needs-attention execution state, not a generic transport retry.
+Continue must use the same execution and current hold version; retrying
+finalizeReport cannot resume or accept it. GOAL_ABANDONED and GOAL_SUPERSEDED are
+terminal user-directed outcomes without completed reports. GOAL_REPORT_NOT_VERIFIED
+requires corrected Goal evidence/report submission or explicit held-result
+acceptance; it never silently falls back to completion. Host boot recovery
+records agent_error:HOST_RESTARTED in queued/running effective Goal holds before
+the generic Plan interruption fence. HOST_RESTARTED is a hold reason suffix,
+not a new transport error replacing HOST_UNAVAILABLE. Already blocked holds
+remain unchanged and no Goal is automatically replayed.

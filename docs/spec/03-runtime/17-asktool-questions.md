@@ -78,6 +78,8 @@ otherwise it records a skip. `Skip` explicitly records a skip and advances.
 For ordinary questions there is no timer, countdown, or automatic expiration. The card remains pending
 until the user submits or the turn is stopped. If the turn is stopped while a
 card is open, the runtime resolves every remaining question as skipped.
+Later ordinary asktool calls in the same assistant tool batch also return
+skipped results without registering another waiter or opening a new card.
 
 When an ask arrives, the app shows an in-app toast with a stable localized
 prompt title and the first question; background sessions also follow the
@@ -102,6 +104,75 @@ question keeps the question text and uses an empty placeholder:
 ```text
 question text：
 ```
+
+## 5. External answering over local MCP (execution ask relay)
+
+Implementation status: specified, not yet implemented or validated. This
+additive contract covers ordinary interactive asks only. It does not expose
+permission approval or Team-managed questions and does not create a remote
+access surface. See [the decision](../../adr/external-ask-answering-over-mcp.md).
+
+- `AskToolRequest` adds optional `turnId` and `createdAt` fields, populated
+  when the runtime registers its waiter. Older requests remain valid.
+- `pi_asks_pending {sessionId}` is read-only and returns
+  `{sessionId, asks:[{requestId, toolCallId, turnId?, createdAt?, questions}]}`.
+  Exclude requests marked `teamManaged` or `teamPending`; `native-pi:` sessions
+  return no asks. The MCP projection must not inherit the Renderer helper's
+  eight-request cap. Status and details use the same filter.
+- `pi_agent_status` retains its `{status:{...}}` envelope; Main adds
+  `status.pendingInputs:{count,requestIds}`. Runtime `getStatus()` remains
+  unchanged. Only live waiters count; no durable unanswered history is invented
+  after sidecar restart. Size-limit errors are observable and never presented
+  as an empty pending list.
+- `pi_asks_resolve {sessionId,requestId,expectedToolCallId,answers,confirm:true}`
+  is dangerous. `answers` is an ordered `(null|string[])[]` with exactly one
+  entry per question. Each non-null entry contains nonempty strings; ordinary
+  single-select questions accept at most one value. Free text and a selected
+  label are mutually exclusive for single-select; multi-select can append free
+  text. The existing deterministic §4 serialization is preserved.
+- Validate confirmation and input shape before dispatch. Bind session,
+  request and expected tool-call identity to the same pending waiter; reject
+  cross-session/call identity with `ASKTOOL_IDENTITY_MISMATCH` and Team-owned
+  attempts with `ASKTOOL_TEAM_MANAGED`. Malformed arguments fail with
+  `ASKTOOL_INVALID_ARGUMENT`. Do not use the sole visible question as identity.
+- An accepted answer returns `{status:"answered",requestId}`. A request
+  already consumed by either surface returns `{status:"not_pending",requestId}`;
+  normalize both runtime `ASKTOOL_NOT_FOUND` and AgentHost `NOT_FOUND` only for
+  this request-resolution path. Other failures remain failures. A successful
+  non-pending result does not prove which answer won or that the turn completed.
+- The runtime consumes a waiter at most once; neither the bridge's reentrant
+  guard nor an external client's local lock guarantees exclusion against
+  Desktop answering. There is no new prompt, turn, session or approval after
+  an answer. A delayed request can still apply after its client's timeout;
+  pending snapshots are not delivery receipts.
+- Named and generic MCP ask resolution record `input.resolved.by` using a
+  trusted `MCP_CONTROL_PRINCIPAL` (`subjectId:"mcp-control"`, role controller,
+  input/respond capability). Renderer IPC retains DESKTOP_PRINCIPAL. The
+  client cannot choose, inject or elevate a principal. Controller bootstrap
+  must pass this source through the actual bridge resolution path.
+- A resolved ordinary ask disappears through the existing tool-end Renderer
+  event; reload reconstructs from pendingInteractive. An empty MCP list alone
+  is not evidence that the Renderer card was removed.
+
+The ordinary stop rule in §3 closes current ordinary waiters as skips and
+fences later ordinary asktool calls in the same assistant batch before waiter
+registration, preserving graceful stop's `completed` settlement. Abort independently
+settles `aborted`; Team and preserveRunningTools behavior remains unchanged.
+Sidecar restart discards in-memory waiters; external schedulers must retain
+their own question history and use durable turn evidence to classify expiry.
+
+The existing ordinary asktool tool-result details add `resolutionKind` with
+`answered`, `stopped`, or `aborted`. Ordinary answers, including Decline all,
+are answered; graceful-stop cancellation is stopped, and abort cancellation
+is aborted. This private waiter consumption marker is persisted alongside
+questions, answers and resolvedAt. It does not change model-facing content,
+introduce a history API, or persist an answering principal. `session.get` projects optional `message.turnId` from the persisted message
+index using the same session and message ID; the associated turn must belong
+to that session. Missing index identity stays missing, without guessing from
+the active turn or timestamps. An external
+scheduler can match session, turn and tool-call identity in a complete
+transcript to distinguish a real answer followed by immediate completion
+from cancellation. `input.resolved.by` remains event-only evidence.
 
 This format is deterministic, preserves question order, and makes multi-select
 answers distinguishable without exposing a renderer-only state object to the

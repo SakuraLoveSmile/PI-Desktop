@@ -695,6 +695,7 @@ export const tr = {
     artifactScratchUnavailable: "Geçici oturum dizini kullanılamıyor.",
   },
   goal: {
+    blocked: en.goal.blocked,
     progressLabel: "Hedef ilerlemesi",
     progressListLabel: "Hedef görev listesi",
     progressInitializing: "İlerleme yükleniyor…",
@@ -2194,6 +2195,7 @@ sklm: {
       endedProcesses: "Biten {{count}}",
       clearEndedProcesses: "Biten süreçleri temizle",
       goal: {
+        reportBlocked: en.panel.activity.goal.reportBlocked,
         reportPending: "Rapor bekleniyor",
         reportUnavailable: "Rapor kullanılamıyor",
         reportGenerating: "Rapor oluşturuluyor",

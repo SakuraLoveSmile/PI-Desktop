@@ -686,6 +686,7 @@ export const fr = {
     "artifactScratchUnavailable": "Le répertoire de session temporaire est indisponible.",
   },
   "goal": {
+    blocked: en.goal.blocked,
     "progressLabel": "Progression de l’objectif",
     "progressListLabel": "Liste des tâches de l’objectif",
     "progressInitializing": "Chargement de la progression…",
@@ -2188,6 +2189,7 @@ sklm: {
       endedProcesses: "Terminés {{count}}",
       clearEndedProcesses: "Effacer les processus terminés",
       goal: {
+        reportBlocked: en.panel.activity.goal.reportBlocked,
         reportPending: "Rapport en attente",
         reportUnavailable: "Rapport indisponible",
         reportGenerating: "Rapport en cours",

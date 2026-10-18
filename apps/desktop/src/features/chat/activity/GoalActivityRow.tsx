@@ -21,24 +21,24 @@ export function GoalActivityRow({ sessionId, proposal, visible, onOpenArtifact, 
   const open = useAppStore((state) => state.openWorkPanelTabForSession);
   const completed = goal.progress?.items.filter((item) => item.status === "completed").length ?? 0;
   const total = goal.progress?.items.length ?? 0;
-  const reportState = goal.reportError && goal.reportState !== "failed" ? "unavailable" : goal.reportState;
-  const reportKey = reportState === "fallback" ? "reportFallback" : reportState === "ready" ? "reportReady"
+  const reportState = goal.reportError && goal.reportState !== "failed" && goal.reportState !== "blocked" ? "unavailable" : goal.reportState;
+  const reportKey = reportState === "blocked" ? "reportBlocked" : reportState === "fallback" ? "reportFallback" : reportState === "ready" ? "reportReady"
     : reportState === "failed" ? "reportFailed" : reportState === "unavailable" ? "reportUnavailable"
     : reportState === "generating" ? "reportGenerating" : "reportPending";
   const reportLabel = reportState === "none" && proposal.executionState === "interrupted"
     ? t("panel.overview.status.interrupted") : t(`panel.activity.goal.${reportKey}`);
   const progressLabel = goal.error ? t("goal.progressFailed") : total > 0 ? `${completed}/${total}` : t("panel.activity.goal.progressUnavailable");
   const title = proposal.title.trim() || proposal.question.trim();
-  const canOpen = Boolean(proposal.executionId && (goal.reportState !== "none" || goal.reportError));
-  const reportBadge = <Badge className="session-activity-goal-report" tone={reportState === "fallback" || reportState === "unavailable" ? "warning" : reportState === "failed" ? "error" : reportState === "ready" ? "success" : "neutral"}>{reportLabel}</Badge>;
-  const status = proposal.executionState ?? proposal.status;
+  const canOpen = Boolean(reportState !== "blocked" && proposal.executionId && (goal.reportState !== "none" || goal.reportError));
+  const reportBadge = <Badge className="session-activity-goal-report" tone={reportState === "blocked" || reportState === "fallback" || reportState === "unavailable" ? "warning" : reportState === "failed" ? "error" : reportState === "ready" ? "success" : "neutral"}>{reportLabel}</Badge>;
+  const status = reportState === "blocked" ? "degraded" : proposal.executionState ?? proposal.status;
   return <div className="session-activity-goal-row" data-activity-id={proposal.id} data-goal-execution-id={proposal.executionId}>
     <div className="session-activity-goal-main">
       <span className="session-activity-icon" aria-hidden><IconListChecks size={15} /></span>
       {onOpenArtifact ? <TooltipButton type="button" className="session-activity-goal-title session-activity-goal-title-action"
         tooltip={title} onClick={onOpenArtifact}>{title}</TooltipButton>
         : <span className="session-activity-goal-title" title={title}>{title}</span>}
-      <ActivityStatus status={status} label={t(`panel.overview.status.${status}`)} compact />
+      <ActivityStatus status={status} label={reportState === "blocked" ? t("goal.blocked.title") : t(`panel.overview.status.${status}`)} compact />
     </div>
     <div className="session-activity-goal-meta">
       <span className="session-activity-goal-progress" role="status" aria-live="polite">{progressLabel}</span>

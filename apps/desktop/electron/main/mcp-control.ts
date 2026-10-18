@@ -4,6 +4,7 @@ import { isIP } from "node:net";
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { SESSION_COLLABORATION_OPERATIONS } from "./session-collaboration-control";
+import { invokeAskControl, type ExecutionAskControl } from "./execution-ask-control";
 
 /** A small JSON Schema subset used by MCP's tools/list response. */
 export type McpJsonSchema = {
@@ -455,6 +456,22 @@ const CORE_TOOL_SPECS = [
     (input) => [input.sessionId],
   ),
   coreTool(
+    "pi_asks_pending",
+    "List all ordinary live asktool questions for a session.",
+    objectSchema({ sessionId: stringSchema("Target session id.") }, ["sessionId"]),
+    "agent/askTool/pending",
+    input => [input],
+  ),
+  coreTool(
+    "pi_asks_resolve",
+    "Answer an ordinary live question with pinned request and tool-call identities. Set confirm=true.",
+    objectSchema({ sessionId: stringSchema(), requestId: stringSchema(), expectedToolCallId: stringSchema(),
+      answers: { type: "array", items: anySchema() }, confirm: booleanSchema("Required acknowledgement.") },
+    ["sessionId", "requestId", "expectedToolCallId", "answers", "confirm"]),
+    "agent/askTool/resolve",
+    input => { const { confirm: _confirm, ...resolution } = input; return [resolution]; },
+  ),
+  coreTool(
     "pi_agent_stop",
     "Request a graceful stop at the next Agent turn boundary.",
     objectSchema({ sessionId: stringSchema("Target session id.") }, ["sessionId"]),
@@ -832,6 +849,7 @@ export function createMcpControlController(options: {
   channels: Readonly<Record<string, string>>;
   invoke: IpcInvoke;
   invokeSessionCollaboration?: (input: McpControlInvokeInput) => Promise<unknown>;
+  askTools?: ExecutionAskControl;
   onOperationComplete?: (
     operation: McpControlOperation,
     result: unknown,
@@ -840,6 +858,7 @@ export function createMcpControlController(options: {
   ) => void | Promise<void>;
 }): McpControlController {
   const operations = [...createMcpControlOperations(options.channels),
+    ...(options.askTools ? [{ id: "agent/askTool/pending", channel: "internal:asktool-pending", description: "List ordinary live asktool questions.", risk: "read" as const, argumentShape: ["{sessionId}"] }] : []),
     ...(options.invokeSessionCollaboration ? SESSION_COLLABORATION_OPERATIONS : [])];
   const operationById = new Map(operations.map((operation) => [operation.id, operation]));
   return {
@@ -867,9 +886,16 @@ export function createMcpControlController(options: {
         });
       }
       const sanitized = args.map((value) => stripSecretMaterial(value)) as unknown[];
-      const result = operation.channel === "internal:session-collaboration"
+      let result = options.askTools && (operation.id === "agent/askTool/pending" || (operation.id === "agent/askTool/resolve" && input.source !== "plugin"))
+        ? await invokeAskControl(options.askTools, operation.id, sanitized)
+        : operation.channel === "internal:session-collaboration"
         ? await options.invokeSessionCollaboration!({ ...input, args: sanitized })
         : await options.invoke(operation.channel, sanitized);
+      if (operation.id === "agent/getStatus" && options.askTools) {
+        const asks = await options.askTools.pending(String(sanitized[0] ?? ""));
+        const envelope = result as { status?: Record<string, unknown> };
+        result = { ...envelope, status: { ...envelope.status, pendingInputs: { count: asks.length, requestIds: asks.map(ask => ask.requestId) } } };
+      }
       await options.onOperationComplete?.(operation, result, sanitized, input.source);
       return result;
     },
@@ -1289,6 +1315,7 @@ export class McpControlServer {
 
   private buildTools(): McpTool[] {
     const common = CORE_TOOL_SPECS.flatMap((entry) => {
+      if (entry.name === "pi_asks_resolve" && !this.operationById.has("agent/askTool/pending")) return [];
       const operation = this.operationById.get(entry.operationId);
       if (!operation) return [];
       return [{
@@ -1297,7 +1324,7 @@ export class McpControlServer {
         inputSchema: entry.inputSchema,
         execute: async (raw: unknown) => {
           const input = asObject(raw);
-          assertRequiredFields(entry.inputSchema, input, entry.name);
+          if (entry.name !== "pi_asks_pending" && entry.name !== "pi_asks_resolve") assertRequiredFields(entry.inputSchema, input, entry.name);
           if (operation.risk === "dangerous" && input.confirm !== true) {
             throw Object.assign(new Error(`confirm=true is required for ${operation.id}`), { code: "CONFIRMATION_REQUIRED" });
           }
@@ -1336,6 +1363,7 @@ export class McpControlServer {
           operation: operation.id,
           args,
           confirm: input.confirm === true,
+          source: "mcp",
         });
         return { operation: operation.id, result };
       },
@@ -1435,7 +1463,7 @@ export class McpControlServer {
   }
 
   private async invokeOperation(operation: McpControlOperation, args: readonly unknown[]): Promise<unknown> {
-    return this.controller.invoke({ operation: operation.id, args, confirm: true });
+    return this.controller.invoke({ operation: operation.id, args, confirm: true, source: "mcp" });
   }
 
   private sessionId(request: IncomingMessage): string | null {

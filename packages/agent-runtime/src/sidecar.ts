@@ -10,6 +10,7 @@ import { bindProjectContextHost } from "./project-context-host.js";
 import { visionFromModelConfig } from "./model-capabilities.js";
 import { hydrateAttachmentHistory } from "./attachment-history.js";
 import { classifyAgentError } from "./agent-errors.js";
+import { parseGoalResume } from "./goal-execution-context.js";
 import { readLocalRequestErrorDetails } from "./local-request-errors.js";
 import {
   DesktopAgentRuntime,
@@ -19,7 +20,7 @@ import {
   type RuntimeProviderConfig,
 } from "./runtime.js";
 import type { PluginSkillDef } from "./plugin-skills-prompt.js";
-import type { SessionMessageOrigin, TrustedExtensionSpec } from "@pi-desktop/shared";
+import type { ProjectMemoryAlias, SessionMessageOrigin, TrustedExtensionSpec } from "@pi-desktop/shared";
 import type { ProjectInstructions } from "./project-instructions.js";
 import type { CustomSystemPrompt } from "./custom-system-prompt.js";
 import {
@@ -133,6 +134,7 @@ type RuntimeParams = {
   customSystemPrompt?: CustomSystemPrompt;
   projectInstructions?: ProjectInstructions;
   projectMemory?: string;
+  projectMemoryAlias?: ProjectMemoryAlias;
   compactionSettings?: ContextCompactionSettings;
   attachmentsDir?: string;
   userMessageId?: string;
@@ -259,6 +261,7 @@ async function runtimeFor(
     projectInstructions: params.projectInstructions,
     customSystemPrompt: params.customSystemPrompt,
     projectMemory: params.projectMemory,
+    projectMemoryAlias: params.projectMemoryAlias,
     projectPath: params.projectPath,
     commandShell: params.commandShell,
   })
@@ -338,6 +341,7 @@ async function runtimeFor(
     customSystemPrompt: params.customSystemPrompt,
     projectInstructions: params.projectInstructions,
     projectMemory: params.projectMemory,
+    projectMemoryAlias: params.projectMemoryAlias,
     scratchDir:
       typeof params.scratchDir === "string" && params.scratchDir
         ? params.scratchDir
@@ -515,18 +519,22 @@ async function handle(method: string, params: any): Promise<unknown> {
       const sessionId = String(params.sessionId ?? "");
       const turnId = String(params.turnId ?? "").trim();
       const execution = params.execution as PlanExecution | undefined;
+      const resume = parseGoalResume(params.resume);
       if (!sessionId || !turnId || !execution) {
         throw Object.assign(new Error("approved plan execution parameters required"), {
           errorCode: "PLAN_EXECUTION_NOT_FOUND",
         });
+      }
+      if (resume && execution.kind !== "goal") {
+        throw Object.assign(new Error("Only an approved Goal can resume"), { errorCode: "INVALID_ARGUMENT" });
       }
       const runtime = await runtimeFor({
         ...params,
         sessionId,
         mode: "agent",
         turnId,
-      });
-      void runtime.executeApprovedPlan(execution, turnId).catch((err) => {
+      }, resume?.userMessage);
+      void runtime.executeApprovedPlan(execution, turnId, resume).catch((err) => {
         notify("agent.event", {
           sessionId,
           turnId,

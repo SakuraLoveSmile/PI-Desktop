@@ -20,7 +20,7 @@ export const ask: ToolCall = { type: "toolCall", name: "asktool", id: "ask", arg
 export const bash: ToolCall = { type: "toolCall", name: "Bash", id: "bash", arguments: { command: "printf fixture" } };
 
 export function fixture(batches: ToolCall[][], mode?: "interactive" | "unattended", runtimeMode: "agent" | "plan" = "plan",
-  response: { terminal?: "error" | "aborted"; terminalRound?: number; resultOnly?: boolean; observe?: (event: AgentEventEnvelope) => void;
+  response: { terminal?: "error" | "aborted"; terminalRound?: number; resultOnly?: boolean; autoAnswer?: boolean; observe?: (event: AgentEventEnvelope) => void;
     beforeFinish?: (round: number, signal?: AbortSignal) => Promise<void> } = {}, overrides: Partial<AgentRuntimeOptions> = {}) {
   const events: AgentEventEnvelope[] = [];
   const requests: Context[] = [];
@@ -40,7 +40,7 @@ export function fixture(batches: ToolCall[][], mode?: "interactive" | "unattende
       events.push(envelope);
       response.observe?.(envelope);
       // Keep the old implementation from hanging during the failing baseline.
-      if (envelope.event.type === "asktool_request") runtime.resolveAskTool({ requestId: envelope.event.request.requestId,
+      if (response.autoAnswer !== false && envelope.event.type === "asktool_request") runtime.resolveAskTool({ requestId: envelope.event.request.requestId,
         sessionId: "policy-fixture", answers: [["Zero"]] });
     },
     ...overrides,

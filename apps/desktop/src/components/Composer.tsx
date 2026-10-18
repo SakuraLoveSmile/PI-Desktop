@@ -65,6 +65,8 @@ import { useVoiceInput } from "../features/voice/useVoiceInput";
 import { ComposerToolbar } from "../features/chat/composer/ComposerToolbar";
 import { ComposerStatus } from "../features/chat/composer/ComposerStatus";
 import { GoalProgressBar } from "../features/chat/composer/GoalProgressBar";
+import { useBlockedGoalResume } from "../hooks/useBlockedGoalResume";
+import { BlockedGoalResumeChip } from "../features/chat/composer/BlockedGoalResumeChip";
 
 const EMPTY_QUEUED_PROMPTS: QueuedPrompt[] = [];
 
@@ -101,6 +103,7 @@ export function Composer({
   );
   const sessions = useAppStore((s) => s.sessions);
   const activeSessionId = useAppStore((s) => s.activeSessionId);
+  const blockedGoal = useBlockedGoalResume(activeSessionId);
   const activeSessionSummary = sessions.find(
     (session) => session.id === activeSessionId,
   );
@@ -457,6 +460,18 @@ export function Composer({
         thinkingLevel,
       });
     }
+    if (blockedGoal.shouldResume && blockedGoal.submit) {
+      if (!provider?.id || !modelId || !activeSessionId || blockedGoal.busy) return false;
+      try {
+        await blockedGoal.submit(content, snapshot, { providerId: provider.id, modelId });
+        onAccepted?.(activeSessionId);
+        return true;
+      } catch (error) {
+        showToast(t(error instanceof Error && error.message === "GOAL_RESUME_ATTACHMENTS_UNSUPPORTED"
+          ? "goal.blocked.attachmentsUnsupported" : "goal.blocked.actionFailed"), { variant: "error" });
+        return false;
+      }
+    }
     return sendPrompt(content, snapshot, targetSessionId, onAccepted, options);
   };
   const submitController = useComposerSubmit({
@@ -638,6 +653,8 @@ export function Composer({
           onDragLeave={onComposerDragLeave}
           onDrop={onComposerDrop}
         >
+          {blockedGoal.shouldResume && <BlockedGoalResumeChip title={blockedGoal.execution?.title || t("goal.untitled")}
+            onDismiss={blockedGoal.dismiss} />}
           {planCheckpoint &&
           (planCheckpoint.executionKind ?? planCheckpoint.kind) === "goal" &&
           activeSessionId ? (

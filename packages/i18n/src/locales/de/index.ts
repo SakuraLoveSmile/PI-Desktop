@@ -686,6 +686,7 @@ export const de = {
     "artifactScratchUnavailable": "Das temporäre Sitzungsverzeichnis ist nicht verfügbar.",
   },
   "goal": {
+    blocked: en.goal.blocked,
     "progressLabel": "Zielfortschritt",
     "progressListLabel": "Aufgabenliste des Ziels",
     "progressInitializing": "Fortschritt wird geladen…",
@@ -2191,6 +2192,7 @@ sklm: {
       endedProcesses: "Beendet {{count}}",
       clearEndedProcesses: "Beendete Prozesse ausblenden",
       goal: {
+        reportBlocked: en.panel.activity.goal.reportBlocked,
         reportPending: "Bericht ausstehend",
         reportUnavailable: "Bericht nicht verfügbar",
         reportGenerating: "Bericht wird erstellt",

@@ -2391,6 +2391,7 @@ The named tools cover the common Agent workflow:
 - `pi_agent_prompt`, `pi_agent_status`, `pi_turn_get`, `pi_agent_stop`,
   `pi_agent_abort`, `pi_agent_compact`
 - `pi_plans_pending`, `pi_plans_resolve`
+- `pi_asks_pending`, `pi_asks_resolve` (execution ask relay; implementation pending)
 - `pi_workspace_diff`, `pi_fs_list`, `pi_fs_read`
 
 `pi_turn_get` reads one durable turn's terminal state so an external scheduler
@@ -2436,6 +2437,37 @@ accepts an operation id and positional IPC arguments:
   "args": ["/path/to/project"]
 }
 ```
+
+The execution ask relay adds two typed operations without exposing Renderer
+state or a new Host RPC boundary. `pi_asks_pending {sessionId}` is read-only,
+returning `{sessionId,asks:[{requestId,toolCallId,turnId?,createdAt?,questions}]}`.
+Main adds `status.pendingInputs:{count,requestIds}` to the existing
+`pi_agent_status` result; runtime `getStatus()` is unchanged. Both projections
+exclude teamManaged/teamPending requests and return an empty list for native-pi
+sessions. They must not reuse a Renderer helper's eight-item cap. Oversized
+results follow the observable MCP limit contract and must not appear as an
+empty list or a complete silently shortened answer.
+
+`pi_asks_resolve {sessionId,requestId,expectedToolCallId,answers,confirm:true}`
+is dangerous and resolves only the matching ordinary live request. Answers are
+an ordered `(null|string[])[]`; the existing runtime validator and deterministic
+tool output remain authoritative. Results are
+`{status:"answered"|"not_pending",requestId}`. Normalize an already-consumed
+request's runtime ASKTOOL_NOT_FOUND or AgentHost NOT_FOUND to not_pending; other
+errors remain errors. Invalid shape, mismatched identity and Team ownership
+fail as ASKTOOL_INVALID_ARGUMENT, ASKTOOL_IDENTITY_MISMATCH and
+ASKTOOL_TEAM_MANAGED respectively. Validate session/request/tool identity at
+the actual waiter resolution boundary, not from the current selection.
+
+Named and generic agent/askTool/resolve paths use the server's trusted
+MCP_CONTROL_PRINCIPAL (mcp-control/controller, input/respond), wired through
+the Main bootstrap and bridge. Renderer IPC retains DESKTOP_PRINCIPAL; clients
+cannot supply a principal. Both tools appear in tools/list and
+pi_control_describe when implemented. They preserve existing authentication,
+permission, confirmation and request/result size limits. No new turn or prompt
+is created. A timeout is an unknown delivery outcome, and a pending read cannot
+prove an earlier write has failed. See spec 17 §5 and the external ask answering
+ADR. This paragraph specifies the target contract; implementation is pending.
 
 Only main-process channels registered in the reviewed catalog are available.
 The first-version catalog is the project/session/Agent/workspace flow plus
@@ -2782,3 +2814,10 @@ from a previous project/editor instance cannot update the current dialog.
 notification. Both are additive; the preload's existing whitelist guards apply.
 The payload, legacy fallback and ownership rules are defined in
 [Complete session activity projection](session-activity-projection.md).
+
+Execution ask relay durable evidence: `session.get` returns optional
+`UiMessage.turnId` projected from the persisted message index by session and
+message ID, with matching turn ownership. Missing index ownership remains
+absent. It must not be inferred from the active turn or timestamps. This
+additive projection lets consumers bind existing asktool result details to
+the exact completed turn; it introduces no mutation, table or history API.

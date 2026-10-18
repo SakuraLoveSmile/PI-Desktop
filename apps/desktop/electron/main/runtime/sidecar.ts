@@ -134,6 +134,7 @@ export function createSidecarRuntime({
   // crashed sidecar's tail is unknown: callers pass the classified code down.
   const releaseCrashedTurn = (sessionId: string, crashedTurnId: string, errorCode: string) =>
     finishTurn(sessionId, "aborted", errorCode, {
+      executionError: true,
       turnId: crashedTurnId,
     });
 
@@ -173,6 +174,7 @@ export function createSidecarRuntime({
     }
     inflightCheckpointer.settle(sessionId);
     await finishTurn(sessionId, "aborted", errorCode, {
+      executionError: true,
       recoverInflight: true,
       turnId: crashedTurnId,
     });
@@ -180,7 +182,8 @@ export function createSidecarRuntime({
       await finishApprovedExecution(
         executionId,
         "interrupted",
-        "PLAN_EXECUTION_INTERRUPTED",
+        errorCode,
+        { ended: "errored" },
       );
     }
   };
@@ -361,7 +364,8 @@ export function createSidecarRuntime({
       void finishApprovedExecution(
         executionId,
         "interrupted",
-        "PLAN_EXECUTION_INTERRUPTED",
+        crashErrorCode,
+        { ended: "errored" },
       );
     }
     logger.app("runtime", "error", "agent sidecar exited unexpectedly", {

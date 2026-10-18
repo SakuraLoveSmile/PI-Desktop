@@ -9825,7 +9825,7 @@ options retain pressed states and switching behavior.
 ### Team Goal 结算与完成原因
 
 - `E2E-GOAL-report-waits-for-settled-team`：获批 Team Goal 派遣专家；专家运行时提交报告被拒绝，诊断精确包含成员、派遣、任务且不持久化草稿；专家结束后的未消费证据继续阻挡，原始回合通过 `wait_for_updates` 消费完整结果后报告成功。
-- `E2E-TEAM-completion-error-keeps-host-reason`：真实宿主拒绝经运行时 guard 和三次具体原因提示，第四次拒绝的终态错误与宿主原因完全相同。
+- `E2E-TEAM-completion-blocked-keeps-host-reason`：真实宿主拒绝经运行时 guard 和三次具体原因提示，第四次拒绝的终态错误与宿主原因完全相同。
 
 自动执行 `scripts/e2e-goal-report.mjs`（隔离真实 Host RPC 和运行时工具／guard）及 `scripts/e2e-team-approved-goal.mjs`（隔离 Electron、回环假 provider）。不访问真实会话、profile 或模型。
 
@@ -10026,3 +10026,27 @@ nightly 的 `--recovery-only` 变体把仍在 waiting 的问题经进程重启�
 - **规格：** `04-ux/08-component-spec.md` §11。
 - **自动化：** `node scripts/e2e-transcript-render.mjs`。
 - **状态：** 对照确切的任务候选和基线版本记录结果。
+
+
+### E2E-GOAL-blocked-resume acceptance (2026-10-13)
+
+The [English source](/spec/06-delivery/04-e2e-test-plan) defines acceptance A–G:
+missing report hold without publication; incident-shaped unsettled Team pause;
+same-execution continuation with original contract/context/current model;
+explicit partial acceptance; abandon and replacement; restart and Agent/resume
+errors; Plan/Stop/history/ordinary-message/remote boundaries preserved.
+New automatic fallback completion expectations are retired. Exhausted approved
+Goal Team recovery now yields team_unsettled hold rather than terminal error.
+The isolated loopback-model suites must record tested candidate/base and actual
+results; this text does not claim they ran. The user accepted H: legacy
+interrupted-column/CHECK decoding remains compatible; an old Plus v7 binary
+refuses new v8 before mutation. Whole-database downgrade is unsupported.
+
+
+Final lifecycle and evidence scope: Native scenarios 001–010 use isolated Host/runtime fixtures; 010 launches a real AgentSidecar child/ParentHostProxy and checks authorized progress reads. Legacy 009 needs a known old binary and disposable DB, never production 67b8868e. UI-001 runs production components/Composer in sandboxed Electron with fake preload, nine groups at 1000px/420px. Separate lanes do not prove a full installed-app journey. Include crash-fence holds, owned-pause-only supersession cleanup and preserved unsupported attachment drafts in acceptance.
+
+### Plus 场景汇总
+
+| Plus 场景 | 用户路径 | 自动化入口 |
+| --- | --- | --- |
+| E2E-PLUS-worktree-memory-owner | 槽位启动 → 后续回合 → 更新/删除 → 映射失效 | project-context --worktree-memory；Rust 与启动/运行时测试 |

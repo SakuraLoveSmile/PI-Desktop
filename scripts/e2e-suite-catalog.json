@@ -21,6 +21,13 @@
       "safety": "Production Host, sidecar, headless lifecycle and authenticated MCP with an isolated profile and local malicious SSE provider; no production data or paid provider calls."
     },
     {
+      "id": "execution-ask-relay",
+      "family": "runtime-provider",
+      "script": "scripts/e2e-execution-ask-relay.mjs",
+      "tier": "nightly",
+      "safety": "Real isolated Electron bootstrap, Rust Host, release sidecar bundle, authenticated HTTP MCP and loopback model SSE; real Renderer ask answer/reload/stop/abort, no production data or paid provider calls."
+    },
+    {
       "id": "edit-legacy",
       "family": "runtime-provider",
       "script": "scripts/e2e-edit-legacy.mjs",
@@ -196,6 +203,36 @@
       "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
     },
     {
+      "id": "goal-blocked-resume",
+      "family": "goals-team",
+      "script": "scripts/e2e-goal-blocked-resume.mjs",
+      "tier": "nightly",
+      "safety": "Isolated real Host/Runtime/Pi transport with temporary HOME/data/workspace and loopback scripted model. No real provider or user Desktop.",
+      "scenarioIds": [
+        "E2E-GOAL-BLOCKED-001",
+        "E2E-GOAL-BLOCKED-002",
+        "E2E-GOAL-BLOCKED-003",
+        "E2E-GOAL-BLOCKED-004",
+        "E2E-GOAL-BLOCKED-005",
+        "E2E-GOAL-BLOCKED-006",
+        "E2E-GOAL-BLOCKED-007",
+        "E2E-GOAL-BLOCKED-008",
+        "E2E-GOAL-BLOCKED-009",
+        "E2E-GOAL-BLOCKED-010",
+        "E2E-GOAL-BLOCKED-011"
+      ]
+    },
+    {
+      "id": "goal-blocked-ui",
+      "family": "goals-team",
+      "script": "scripts/e2e-goal-blocked-ui.mjs",
+      "tier": "nightly",
+      "safety": "Isolated Chromium/Electron profile rendering production Goal components and hooks with fixture API. No real provider or user Desktop.",
+      "scenarioIds": [
+        "E2E-GOAL-BLOCKED-UI-001"
+      ]
+    },
+    {
       "id": "goal-report",
       "family": "goals-team",
       "script": "scripts/e2e-goal-report.mjs",
@@ -203,7 +240,7 @@
       "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked.",
       "scenarioIds": [
         "E2E-GOAL-report-waits-for-settled-team",
-        "E2E-TEAM-completion-error-keeps-host-reason"
+        "E2E-TEAM-completion-blocked-keeps-host-reason"
       ]
     },
     {

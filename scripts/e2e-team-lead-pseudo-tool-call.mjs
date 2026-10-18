@@ -151,6 +151,11 @@ try {
       hostFinalAuthorizations: 1, realToolCalls: toolEnds.length, turnId, result: "PASS" });
     await runtime.dispose();
     await host.call("session.endTurn", { turnId, status: "completed", createNotification: false });
+    // These are approved Plans; blocked Goal replay has a separate native suite.
+    await host.call("plans.finishExecution", { executionId: execution.id, status: "completed" });
+    const { history } = await host.call("plans.pending", { sessionId: lead.id });
+    assert.equal(history.find(proposal => proposal.executionId === execution.id).executionState, "completed");
+    assert.equal((await host.call("goalReports.list", { sessionId: lead.id })).reports.length, 0);
   }
 } finally {
   await Promise.allSettled(runtimes.map(runtime => runtime.dispose()));

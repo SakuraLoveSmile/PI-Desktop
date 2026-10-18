@@ -1,4 +1,6 @@
 import type {
+  GoalHold,
+  GoalExecutionChangedEvent,
   GitWorkspaceRequest, GitWorkspaceMutation, GitWorkspaceSnapshot, GitWorktree,
   SessionQuickNote,
   SessionActivityPage,
@@ -1174,6 +1176,12 @@ export const api = {
     }>(IPC.invoke.goalReportGet, params),
   listGoalReports: (params: { sessionId: string }) =>
     invoke<{ reports: GoalReportSummary[] }>(IPC.invoke.goalReportList, params),
+  goalExecutionGet: (params: { sessionId: string; executionId?: string }) =>
+    invoke<{ execution?: PlanExecution; hold?: GoalHold }>(IPC.invoke.goalExecutionGet, params),
+  goalResume: (params: { sessionId: string; executionId: string; expectedVersion: number; message?: string; modelOverride?: { providerId: string; modelId: string } }) =>
+    invoke<{ execution: PlanExecution; hold: GoalHold }>(IPC.invoke.goalResume, params),
+  goalClose: (params: { sessionId: string; executionId: string; expectedVersion: number; action: "accept" | "abandon" }) =>
+    invoke<{ execution: PlanExecution; hold: GoalHold; report?: GoalReportSummary }>(IPC.invoke.goalClose, params),
   retryGoalReport: (params: { sessionId: string; executionId: string }) =>
     invoke<{ report: GoalReportSummary }>(IPC.invoke.goalReportRetry, params),
   getGoalProgress: (params: { sessionId?: string; executionId: string }) =>
@@ -1753,6 +1761,10 @@ export const api = {
     return window.piDesktop.on(IPC.event.goalReportChanged, (payload) =>
       listener(payload),
     );
+  },
+  onGoalExecutionChanged: (listener: (event: GoalExecutionChangedEvent) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.goalExecutionChanged, (payload) => listener(payload as GoalExecutionChangedEvent));
   },
   getTodos: (sessionId: string) =>
     invoke<SessionTodoSnapshot>(IPC.invoke.todosGet, { sessionId }),

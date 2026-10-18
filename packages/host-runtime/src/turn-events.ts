@@ -39,7 +39,7 @@ export type TurnOwnership = {
     sessionId: string,
     status: "completed" | "aborted" | "error",
     errorCode: string | undefined,
-    options: { turnId: string; errorDetails?: unknown },
+    options: { turnId: string; errorDetails?: unknown; stopHint?: "team_unsettled" },
   ): Promise<void>;
 };
 
@@ -204,9 +204,13 @@ export class TurnEventPipeline {
       }
     }
 
-    const finish = (status: "completed" | "aborted" | "error", errorCode: string | undefined, errorDetails?: unknown) =>
+    const finish = (
+      status: "completed" | "aborted" | "error",
+      errorCode: string | undefined,
+      options: { errorDetails?: unknown; stopHint?: "team_unsettled" } = {},
+    ) =>
       this.options.ownership
-        .finishTurn(sessionId, status, errorCode, { turnId: envelope.turnId ?? "", ...(errorDetails !== undefined ? { errorDetails } : {}) })
+        .finishTurn(sessionId, status, errorCode, { turnId: envelope.turnId ?? "", ...options })
         .catch((error: unknown) => {
           this.options.log("warn", "turn finalization failed", { sessionId, error: String(error) });
         });
@@ -231,11 +235,12 @@ export class TurnEventPipeline {
           retriable: event.error.retriable,
         });
         if (this.options.ownership.isStaleTerminalEvent(envelope)) return;
-        void finish(event.error.code === "TURN_ABORTED" ? "aborted" : "error", event.error.code, event.error.details);
+        void finish(event.error.code === "TURN_ABORTED" ? "aborted" : "error", event.error.code,
+          event.error.details !== undefined ? { errorDetails: event.error.details } : {});
         return;
       case "agent_end":
         if (this.options.ownership.isStaleTerminalEvent(envelope)) return;
-        void finish("completed", undefined);
+        void finish("completed", undefined, event.stopHint ? { stopHint: event.stopHint } : {});
         return;
       case "turn_end":
         return;

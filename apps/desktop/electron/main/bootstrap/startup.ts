@@ -112,7 +112,7 @@ export type StartupDependencies = {
   ensureWindow: () => Promise<boolean>;
   bootHostStatus: (bootError: unknown) => unknown;
   flushPendingApplicationMenuCommands: () => void;
-  getSidecar?: () => unknown;
+  getSidecar?: () => { call<T = unknown>(method: string, params?: Record<string, unknown>): Promise<T> } | null;
   invokeSessionCollaboration?: (input: McpControlInvokeInput) => Promise<unknown>;
   onSessionQueueChange?: () => void;
   onAgentHostReady?: () => Promise<void>;
@@ -278,6 +278,11 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
       invoke: invokeIpc,
       channels: IPC.invoke,
       getHost,
+      resolveAskWaiter: resolution => {
+        const sidecar = deps.getSidecar?.();
+        if (!sidecar) throw new Error("sidecar unavailable");
+        return sidecar.call("asktool.resolve", resolution);
+      },
       isSessionBusy,
       onQueueChange: (event) => {
         sendToRenderer(IPC.event.agentQueueChanged, event);
@@ -289,6 +294,10 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
       invoke: invokeIpc,
       channels: IPC.invoke,
       invokeSessionCollaboration: deps.invokeSessionCollaboration,
+      askTools: {
+        pending: sessionId => state.agentHostBridge!.pendingOrdinaryAsks(sessionId),
+        resolve: resolution => state.agentHostBridge!.resolveOrdinaryAsk(resolution),
+      },
       onOperationComplete: async (operation, result, args, source) => {
         const event = mcpControlRendererEvent(operation, result, args, source);
         if (event) sendToRenderer(IPC.event.sessionsChanged, event);
