@@ -9,6 +9,10 @@
  * The model must get no turn between the kill and the queued prompt, and the
  * queued request must carry the aborted call's own result, so the next provider
  * request is a valid transcript.
+ * A gated real preload IPC checks the disabled state and prevents a second
+ * click while the first request is in flight. A second isolated run releases
+ * its real Bash through a control file: the unclicked offer disappears, and
+ * the queued request retains that call's normal success result.
  * The process check only observes (ps, by marker); the script kills nothing it
  * did not spawn itself.
  *
@@ -19,11 +23,11 @@
 import { execFile, spawn } from "node:child_process";
 import { randomInt } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer as createHttpServer } from "node:http";
 import { createServer as createNetServer } from "node:net";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import {
   assertDesktopBuild,
@@ -31,6 +35,7 @@ import {
   repositoryRoot,
   resolveElectronBinary,
 } from "./e2e/boot.mjs";
+import { installAbortIpcGate } from "./e2e/queue-send-now-ipc-gate.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = repositoryRoot();
@@ -99,7 +104,7 @@ async function step(cdp, name, action) {
   }
 }
 
-function createModelFixture(log) {
+function createModelFixture(log, command) {
   const textOf = (message) =>
     typeof message?.content === "string" ? message.content : JSON.stringify(message?.content ?? "");
   return async (req, res) => {
@@ -125,7 +130,7 @@ function createModelFixture(log) {
           throw new Error(`unexpected Bash schema: ${JSON.stringify(bash.function.parameters)}`);
         }
         log.bashCalls += 1;
-        call = { name: bash.function.name, args: { command: bashCommand, timeout: 300 } };
+        call = { name: bash.function.name, args: { command, timeout: 300 } };
       } else if (last.role === "user" && textOf(last).includes(QUEUED_MARK)) {
         log.queuedSeen = true;
         text = QUEUED_REPLY;
@@ -168,10 +173,12 @@ function connectCdp(url, onEvent) {
   const socket = new WebSocket(url);
   const pending = new Map();
   let nextId = 1;
+  const eventListeners = new Set();
   socket.addEventListener("message", (event) => {
     const message = JSON.parse(String(event.data));
     if (message.method) {
       onEvent(message);
+      for (const listener of eventListeners) listener(message);
       return;
     }
     const entry = pending.get(message.id);
@@ -209,6 +216,10 @@ function connectCdp(url, onEvent) {
   return {
     opened,
     send,
+    onEvent(listener) {
+      eventListeners.add(listener);
+      return () => eventListeners.delete(listener);
+    },
     async evaluate(expression) {
       const result = await send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
       if (result.exceptionDetails) {
@@ -339,12 +350,12 @@ async function typeAndSend(cdp, text) {
 
 const runningBash = (cdp) => cdp.evaluate(`document.querySelector(".tool-row.status-running") !== null`);
 
-async function markerProcesses() {
+async function markerProcesses(processMarker = `297.${marker}`) {
   // -A -ww is accepted by both macOS ps and the procps ps on the Linux nightly runner.
   const { stdout } = await execFileAsync("ps", ["-A", "-ww", "-o", "pid=,ppid=,pgid=,command="]);
   return stdout
     .split("\n")
-    .filter((line) => line.includes(`297.${marker}`))
+    .filter((line) => line.includes(processMarker))
     .map((line) => line.trim());
 }
 
@@ -391,15 +402,21 @@ async function waitForRenderer(cdpPort) {
   }, "renderer target", 60_000, 500);
 }
 
-async function run() {
+async function run({ finishNaturally = false } = {}) {
   const tempRoot = await mkdtemp(join(tmpdir(), "pi-send-now-abort-"));
   const dataDir = join(tempRoot, "data");
   const profileDir = join(tempRoot, "electron-profile");
   const workspace = join(tempRoot, "workspace");
+  const releaseFile = join(workspace, `release-${marker}`);
+  const processMarker = finishNaturally ? releaseFile : `297.${marker}`;
+  const shellQuote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
+  const command = finishNaturally
+    ? `echo start-${marker}; while [ ! -f ${shellQuote(releaseFile)} ]; do sleep 0.1; done; echo end-${marker}`
+    : bashCommand;
   await mkdir(dataDir, { recursive: true });
   await mkdir(workspace, { recursive: true });
   const modelLog = { requests: [], bashCalls: 0, queuedSeen: false, queuedHistory: undefined, errors: [] };
-  const modelServer = createHttpServer(createModelFixture(modelLog));
+  const modelServer = createHttpServer(createModelFixture(modelLog, command));
   await new Promise((resolve) => modelServer.listen(0, "127.0.0.1", resolve));
   const modelUrl = `http://127.0.0.1:${modelServer.address().port}/v1`;
   const cdpPort = await freePort();
@@ -408,6 +425,7 @@ async function run() {
   const rendererErrors = [];
   let cdp = null;
   let failed = false;
+  let ipcGate;
   try {
     const target = await waitForRenderer(cdpPort);
     cdp = connectCdp(target.webSocketDebuggerUrl, (message) => {
@@ -464,6 +482,7 @@ async function run() {
     // The renderer reads settings and providers at mount, so reload after seeding (as plan-ui does).
     await step(cdp, "reloadRenderer", () => reloadRenderer(cdp));
     await step(cdp, "selectSession", () => selectSession(cdp, sessionId));
+    if (!finishNaturally) ipcGate = await step(cdp, "installAbortIpcGate", () => installAbortIpcGate(cdp, waitFor));
 
     await typeAndSend(cdp, `${SLOW_MARK} run a command that does not return on its own.`);
     // The row label is the display name, not the tool id, so the class is the signal; the only tool in this run is Bash.
@@ -489,7 +508,7 @@ async function run() {
       console.log(`INFO approved the Bash call once through the permission card (button "${label}")`);
     }
     await waitFor(() => runningBash(cdp), "running Bash row", 60_000);
-    await waitFor(async () => (await markerProcesses()).length > 0, "command process to start", 30_000);
+    await waitFor(async () => (await markerProcesses(processMarker)).length > 0, "command process to start", 30_000);
     check("Bash call is running behind the stuck command", true, gate === "approval" ? "approved through the card" : "auto-approved");
 
     await typeAndSend(cdp, `${QUEUED_MARK} after the stuck command.`);
@@ -526,27 +545,60 @@ async function run() {
       `shown ${shownAt - sentAt} ms after Send now, ${offerCount} offer(s)`,
     );
 
-    const clickedAt = Date.now();
-    const clicked = await cdp.evaluate(`(() => {
-      const button = document.querySelector(".composer-queued-prompt-abort-tool");
-      if (!button) return false;
-      button.click();
-      return true;
-    })()`);
-    check("abort offer clicked", clicked === true);
+    let clickedAt = Date.now();
+    if (finishNaturally) {
+      // The command owns its normal exit. No abort request or artificial tool
+      // result is injected; the file is an explicit external synchronization point.
+      await writeFile(releaseFile, "release\n");
+    } else {
+      const screenshotPath = resolve(process.env.PI_QUEUE_ABORT_SCREENSHOT || join(root, ".artifacts", "queued-send-now-closeout", "abort-offer.png"));
+      await mkdir(dirname(screenshotPath), { recursive: true });
+      const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+      await writeFile(screenshotPath, Buffer.from(screenshot.data, "base64"));
+      console.log(`INFO abort offer screenshot: ${screenshotPath}`);
+      clickedAt = Date.now();
+      const clicked = await cdp.evaluate(`(() => {
+        const button = document.querySelector(".composer-queued-prompt-abort-tool");
+        if (!button) return false;
+        button.click();
+        return true;
+      })()`);
+      check("abort offer clicked", clicked === true);
+      await waitFor(() => cdp.evaluate(`(() => {
+        const button = document.querySelector(".composer-queued-prompt-abort-tool");
+        return button?.disabled && button.getAttribute("aria-disabled") === "true";
+      })()`), "abort offer disabled while real IPC is held");
+      await waitFor(async () => (await ipcGate.state()).calls === 1, "one held abort IPC");
+      const held = await ipcGate.state();
+      check("the held abort IPC has not reached main", held.forwarded === 0 && await runningBash(cdp));
+      check("abort IPC identifies the tool without a renderer turn id", held.requests[0]?.toolCallId === "bash-call-1" && !Object.hasOwn(held.requests[0], "turnId"));
+      await cdp.evaluate(`document.querySelector(".composer-queued-prompt-abort-tool").click()`);
+      const repeated = await ipcGate.state();
+      check("a second click while disabled sends no additional abort IPC", repeated.calls === 1 && repeated.forwarded === 0);
+      await ipcGate.release();
+    }
     await waitFor(async () => !(await runningBash(cdp)), "Bash row to leave running", 20_000);
+    if (finishNaturally) {
+      await waitFor(() => cdp.evaluate(`Boolean(document.querySelector(".tool-row.status-success")) && !document.querySelector(".composer-queued-prompt-abort-tool")`), "successful Bash result and abort offer removed");
+      check("the unclicked abort offer disappears when Bash finishes naturally", true);
+    } else {
+      const released = await ipcGate.state();
+      check("releasing the gate forwards exactly one real abort IPC", released.calls === 1 && released.forwarded === 1);
+      await ipcGate.restore();
+      ipcGate = undefined;
+    }
     const rowStoppedMs = Date.now() - clickedAt;
     // A failing ps probe must fail the run here, not leave an empty list that passes.
     const exitDeadline = Date.now() + 20_000;
-    let remaining = await markerProcesses();
+    let remaining = await markerProcesses(processMarker);
     while (remaining.length && Date.now() < exitDeadline) {
       await sleep(250);
-      remaining = await markerProcesses();
+      remaining = await markerProcesses(processMarker);
     }
     check(
-      "no process from the stuck command remains",
+      "no process from the command remains",
       remaining.length === 0,
-      remaining.length ? remaining.join(" | ") : `row stopped ${rowStoppedMs} ms after click`,
+      remaining.length ? remaining.join(" | ") : `row stopped ${rowStoppedMs} ms after ${finishNaturally ? "release" : "click"}`,
     );
 
     await waitFor(() => cdp.evaluate(`(() => {
@@ -560,32 +612,34 @@ async function run() {
       offer: document.querySelectorAll(".composer-queued-prompt-abort-tool").length,
     })`);
     check(
-      "queued prompt started after the abort and the queue is empty",
+      `queued prompt started after ${finishNaturally ? "natural completion" : "the abort"} and the queue is empty`,
       leftover.queued === 0 && leftover.offer === 0 && modelLog.queuedSeen,
-      `answered ${answeredMs} ms after click`,
+      `answered ${answeredMs} ms after ${finishNaturally ? "release" : "click"}`,
     );
     check("the model fixture received no request errors", modelLog.errors.length === 0, modelLog.errors[0]?.split("\n")[0] ?? "");
     // Only the slow prompt and the queued prompt may reach the model: a request
-    // ending in a tool result would mean a model turn ran after the kill.
+    // ending in a tool result would mean a model turn ran after the boundary.
     check(
-      "the model got no turn after the kill",
+      `the model got no turn after ${finishNaturally ? "natural completion" : "the kill"}`,
       JSON.stringify(modelLog.requests) === JSON.stringify(["user", "user"]),
       `requests end ${modelLog.requests.join(" > ")}`,
     );
     const history = modelLog.queuedHistory;
     check(
-      "the queued request carries the aborted Bash call",
+      "the queued request carries the Bash call",
       JSON.stringify(history?.calls) === JSON.stringify(["bash-call-1"]),
       `roles ${history?.roles.join(" > ") ?? "none"}`,
     );
     const abortResult = history?.results.length === 1 ? history.results[0] : undefined;
     check(
-      "the aborted Bash call has a real abort result",
-      abortResult?.toolCallId === "bash-call-1" && abortEvidence.test(abortResult.head),
+      finishNaturally ? "the naturally completed Bash call has its real success result" : "the aborted Bash call has a real abort result",
+      abortResult?.toolCallId === "bash-call-1" && (finishNaturally
+        ? abortResult.head.includes(`end-${marker}`) && !/TOOL_ABORTED/.test(abortResult.head)
+        : abortEvidence.test(abortResult.head)),
       `result ${JSON.stringify(abortResult?.head ?? "none")}`,
     );
     console.log(`INFO renderer errors observed: ${rendererErrors.length}`);
-    console.log("PASS E2E-QUEUE-send-now-abort-offer-after-30s");
+    console.log(`PASS ${finishNaturally ? "natural completion before pressing the abort offer (step 8)" : "abort offer disabled during real IPC (steps 1–6)"}`);
     return 0;
   } catch (error) {
     failed = true;
@@ -594,6 +648,7 @@ async function run() {
     console.error(output.join("").slice(-2000));
     return 1;
   } finally {
+    await ipcGate?.release().catch(() => {});
     cdp?.close();
     const exited = child.exitCode !== null || child.signalCode !== null
       ? Promise.resolve()
@@ -603,7 +658,7 @@ async function run() {
     } catch {}
     await Promise.race([exited, sleep(5_000)]);
     if (failed) {
-      for (const line of await markerProcesses().catch(() => [])) {
+      for (const line of await markerProcesses(processMarker).catch(() => [])) {
         const pid = Number(line.split(/\s+/)[0]);
         if (pid > 1) {
           try {
@@ -617,4 +672,7 @@ async function run() {
   }
 }
 
-process.exit(await run());
+const abortResult = await run();
+const result = abortResult || await run({ finishNaturally: true });
+if (result === 0) console.log("PASS E2E-QUEUE-send-now-abort-offer-after-30s");
+process.exit(result);

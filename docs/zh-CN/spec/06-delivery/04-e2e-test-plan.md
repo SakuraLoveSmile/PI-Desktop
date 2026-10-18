@@ -8310,11 +8310,15 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 - **验收**：C（对话与流）
 - **里程碑**：M6+
 - **状态**：部分自动化。`scripts/e2e-queue-send-now-abort.mjs`（`pnpm test:e2e:queue-send-now-abort`）在 Electron 中运行，
-  使用隔离的 profile、Host 与回环模型夹具。覆盖步骤 1–4 和 6：5 秒与 25 秒时没有按钮；40 秒内出现一个按钮；点击会停止
+  使用隔离的 profile、Host 与回环模型夹具。覆盖步骤 1–6 和 8：5 秒与 25 秒时没有按钮；40 秒内出现一个按钮；点击会停止
   Bash 行；卡住命令的进程全部退出；排队行得到回复；在中止与排队提示之间模型没有新回合；排队请求携带被中止调用自己的
-  `TOOL_ABORTED` 结果。步骤 4 在 Electron 中只统计按钮数量，“只在队首优先行上出现”由单元用例覆盖。未在 Electron 中覆盖：
-  步骤 5（请求进行中的禁用状态）、步骤 7（子代理、远程与审批的门控由 `queue-send-now-tool-abort.test.mjs` 的单元用例覆盖）
-  以及步骤 8（点击前调用已自行结束）。Host 侧中止路径仍由 `runtime-abort-tool.test.ts` 与
+  `TOOL_ABORTED` 结果。步骤 5 在 preload 边界可控地延迟真实中止 IPC，检查按钮禁用、再次点击不产生第二次请求，
+  释放后原请求只转发一次，不伪造响应。第二个隔离运行覆盖步骤 8：按钮出现后，通过工作区控制文件让真实 Bash
+  自行正常退出，不点击中止；检查按钮消失、队列推进，以及下一次请求保留成功的工具结果。
+  实际按钮截图保存在 `.artifacts/queued-send-now-closeout/abort-offer.png`。
+  步骤 4 在 Electron 中统计按钮数量，“只在队首优先行上出现”由组件用例覆盖。
+  步骤 7 的子代理、远程与审批门控仍由 `queue-send-now-tool-abort.test.mjs` 的组件用例覆盖，不作为 Electron 实测。
+  Host 侧中止路径仍由 `runtime-abort-tool.test.ts` 与
   `agent-ipc-abort-tool.test.mjs` 覆盖。
 
 #### E2E-QUEUE-edit-restores-draft-only-when-input-empty：编辑仅在输入框为空时回填草稿
