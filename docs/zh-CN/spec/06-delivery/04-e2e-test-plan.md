@@ -10012,3 +10012,9 @@ refuses new v8 before mutation. Whole-database downgrade is unsupported.
 
 
 Final lifecycle and evidence scope: Native scenarios 001–010 use isolated Host/runtime fixtures; 010 launches a real AgentSidecar child/ParentHostProxy and checks authorized progress reads. Legacy 009 needs a known old binary and disposable DB, never production 67b8868e. UI-001 runs production components/Composer in sandboxed Electron with fake preload, nine groups at 1000px/420px. Separate lanes do not prove a full installed-app journey. Include crash-fence holds, owned-pause-only supersession cleanup and preserved unsupported attachment drafts in acceptance.
+
+### Plus 场景汇总
+
+| Plus 场景 | 用户路径 | 自动化入口 |
+| --- | --- | --- |
+| E2E-PLUS-worktree-memory-owner | 槽位启动 → 后续回合 → 更新/删除 → 映射失效 | project-context --worktree-memory；Rust 与启动/运行时测试 |
