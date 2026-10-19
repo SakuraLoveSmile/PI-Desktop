@@ -612,7 +612,7 @@ export const zhCN = {
       noProjects: "没有匹配的项目",
       actionFailed: "操作失败：{{message}}",
       localMode: "本地",
-      worktreeMode: "Worktree",
+      worktreeMode: "工作树",
       back: "返回",
       worktreeName: "新工作树分支名称",
       worktreeHint: "从已提交的 HEAD 创建，未提交修改保留在原目录。",
