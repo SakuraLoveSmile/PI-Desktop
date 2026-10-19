@@ -459,6 +459,7 @@ export const es = {
       noGit: "Este directorio no es un repositorio de Git.",
       worktreeUnavailable: "Se requiere un HEAD confirmado.",
       noBranch: "Sin rama",
+      detachedHead: "HEAD separado · {{sha}}",
       branchName: "Nombre de la rama",
       createSwitch: "Crear y cambiar",
       branchSearch: "Buscar ramas",

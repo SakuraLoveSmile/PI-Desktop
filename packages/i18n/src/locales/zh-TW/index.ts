@@ -463,6 +463,7 @@ export const zhTW = {
       noGit: "此目錄不是 Git 儲存庫。",
       worktreeUnavailable: "需要先有一次提交。",
       noBranch: "無分支",
+      detachedHead: "分離 HEAD · {{sha}}",
       branchName: "分支名稱",
       createSwitch: "建立並切換",
       branchSearch: "搜尋分支",

@@ -459,6 +459,7 @@ export const fr = {
       noGit: "Ce répertoire n'est pas un dépôt Git.",
       worktreeUnavailable: "Un HEAD validé est requis.",
       noBranch: "Aucune branche",
+      detachedHead: "HEAD détaché · {{sha}}",
       branchName: "Nom de la branche",
       createSwitch: "Créer et basculer",
       branchSearch: "Rechercher des branches",

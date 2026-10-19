@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { IconBranch, IconCheck, IconChevronLeft, IconPlus, IconSearch } from "../../../components/icons";
 import { AnchoredMenu } from "../../../components/settings/AnchoredMenu";
 import { Button, Field, Input, Tooltip, TooltipButton } from "../../../components/ui";
-import { branchOccupiedElsewhere, canChangeBranch, composerFooterMenuKeyDown, visibleLocalBranches } from "./composer-git-menu";
+import { branchOccupiedElsewhere, canChangeBranch, composerFooterMenuKeyDown, detachedHeadShortSha, visibleLocalBranches } from "./composer-git-menu";
 
 export type ComposerBranchMenuProps = {
   git: GitWorkspaceSnapshot | null;
@@ -29,7 +29,8 @@ export function ComposerBranchMenu({ git, loading, busy, error, disabled, onRelo
   const blocked = disabled || busy || loading || pending;
   const canMutate = canChangeBranch(git, blocked);
   const branches = visibleLocalBranches(git, query);
-  const label = git?.branch || t("chat.workspaceMenu.noBranch");
+  const detachedSha = detachedHeadShortSha(git);
+  const label = git?.branch || (detachedSha ? t("chat.workspaceMenu.detachedHead", { sha: detachedSha }) : t("chat.workspaceMenu.noBranch"));
   const diagnostic = actionError || error;
 
   const run = async (action: () => Promise<void>) => {

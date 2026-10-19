@@ -471,6 +471,7 @@ export const tr = {
       noGit: "Bu dizin bir Git deposu değil.",
       worktreeUnavailable: "Commit edilmiş bir HEAD gerekiyor.",
       noBranch: "Dal yok",
+      detachedHead: "Ayrık HEAD · {{sha}}",
       branchName: "Dal adı",
       createSwitch: "Oluştur ve geç",
       branchSearch: "Dalları ara",

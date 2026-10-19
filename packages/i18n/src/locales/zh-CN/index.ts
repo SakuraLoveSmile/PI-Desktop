@@ -623,6 +623,7 @@ export const zhCN = {
       noGit: "此目录不是 Git 仓库。",
       worktreeUnavailable: "需要先有一次提交。",
       noBranch: "无分支",
+      detachedHead: "分离 HEAD · {{sha}}",
       branchName: "分支名称",
       createSwitch: "创建并切换",
       branchSearch: "搜索分支",

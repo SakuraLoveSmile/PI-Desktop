@@ -471,6 +471,7 @@ export const ko = {
       noGit: "이 디렉터리는 Git 저장소가 아닙니다.",
       worktreeUnavailable: "커밋된 HEAD가 필요합니다.",
       noBranch: "브랜치 없음",
+      detachedHead: "분리된 HEAD · {{sha}}",
       branchName: "브랜치 이름",
       createSwitch: "만들고 전환",
       branchSearch: "브랜치 검색",

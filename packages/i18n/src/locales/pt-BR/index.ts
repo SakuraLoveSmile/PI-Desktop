@@ -460,6 +460,7 @@ export const ptBR = {
       noGit: "Este diretório não é um repositório Git.",
       worktreeUnavailable: "É necessário um HEAD confirmado.",
       noBranch: "Nenhuma branch",
+      detachedHead: "HEAD desanexado · {{sha}}",
       branchName: "Nome da branch",
       createSwitch: "Criar e alternar",
       branchSearch: "Pesquisar branches",

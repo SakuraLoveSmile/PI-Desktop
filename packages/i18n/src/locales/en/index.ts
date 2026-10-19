@@ -634,6 +634,7 @@ export const en = {
       noGit: "This directory is not a Git repository.",
       worktreeUnavailable: "A committed HEAD is required.",
       noBranch: "No branch",
+      detachedHead: "Detached HEAD · {{sha}}",
       branchName: "Branch name",
       createSwitch: "Create and switch",
       branchSearch: "Search branches",

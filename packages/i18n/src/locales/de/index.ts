@@ -459,6 +459,7 @@ export const de = {
       noGit: "Dieses Verzeichnis ist kein Git-Repository.",
       worktreeUnavailable: "Ein Commit als HEAD ist erforderlich.",
       noBranch: "Kein Branch",
+      detachedHead: "Losgelöster HEAD · {{sha}}",
       branchName: "Branch-Name",
       createSwitch: "Erstellen und wechseln",
       branchSearch: "Branches durchsuchen",
