@@ -5123,7 +5123,7 @@ viewport restoration remain intact.
 
 ### Composer metadata and compact agent rows
 
-The composer footer shows the current session's project, local/remote host, and known local Git branch. Unavailable project/branch metadata is omitted; remote sessions never borrow a local branch. Model menus list all models without a search field. Generation speed, full-turn token totals, cache metrics and context details are available from the bottom-right context meter. Subagent entries use transparent gradient-avatar rows with name, task, localized status and measured elapsed time; clicking a row opens read-only details, with no panorama entry. Validate model keyboard selection, footer metadata, context details and agent navigation in the isolated composer/transcript fixtures, including narrow layouts.
+The composer footer shows the current session's project, local/remote host, and known local Git branch; the branch chip is omitted without a project path and in remote sessions, which never borrow a local branch. A detached HEAD is named by its short commit (`Detached HEAD · abc1234`), and `No branch` appears only when neither a branch nor a commit is known. Model menus list all models without a search field. Generation speed, full-turn token totals, cache metrics and context details are available from the bottom-right context meter. Subagent entries use transparent gradient-avatar rows with name, task, localized status and measured elapsed time; clicking a row opens read-only details, with no panorama entry. Validate model keyboard selection, footer metadata, context details and agent navigation in the isolated composer/transcript fixtures, including narrow layouts.
 
 ### Recorded outputs, delegate details and project Skill suggestions
 
