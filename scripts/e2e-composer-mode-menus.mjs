@@ -69,7 +69,7 @@ app.whenReady().then(async () => {
   try {
     await win.loadFile(path.join(__dirname, "index.html"));
     await waitFor('!!document.querySelector(".composer-profile-chip")');
-    await checkProfileLabel("智能体");
+    await checkProfileLabel("单智能体");
     await click(".composer-profile-chip");
     await checkMenu(".composer-profile-menu.is-open");
     await click('.composer-profile-menu.is-open [aria-checked="false"]');
