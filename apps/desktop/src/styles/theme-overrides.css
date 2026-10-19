@@ -258,6 +258,29 @@
   gap: 4px;
 }
 
+.composer-contract-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.composer-contract-exit {
+  width: 20px;
+  min-width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  padding: 0;
+  border-radius: var(--radius-full);
+  color: var(--ds-text-muted);
+}
+
+.composer-contract-exit:hover:not(:disabled) {
+  color: var(--ds-text-primary);
+  background: var(--ds-bg-hover);
+}
+
 .composer-mode-chip-label {
   min-width: 0;
   overflow: hidden;

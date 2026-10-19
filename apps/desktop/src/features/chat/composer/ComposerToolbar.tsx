@@ -33,6 +33,7 @@ export type ComposerToolbarProps = {
   displayMode?: Mode;
   executionProfile?: ExecutionProfile;
   planningLive: boolean;
+  planAwaitingApproval?: boolean;
   goalExecutionActive?: boolean;
   providerId?: string;
   modelId?: string;
@@ -75,6 +76,7 @@ export function ComposerToolbar({
   displayMode,
   executionProfile = "standard",
   planningLive,
+  planAwaitingApproval = false,
   goalExecutionActive = false,
   providerId,
   modelId,
@@ -117,6 +119,24 @@ export function ComposerToolbar({
     modelMenu.setOpen(false);
   };
 
+  // Shared by the + menu's mode switches and the Plan chip's close control.
+  const selectMode = async (nextMode: Mode) => {
+    try {
+      await configureActiveSession({
+        mode: nextMode,
+        providerId,
+        modelId,
+        thinkingLevel,
+        permissionMode: sessionPermissionMode,
+        executionProfile,
+      });
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error), {
+        variant: "error",
+      });
+    }
+  };
+
   return (
     <div className="composer-toolbar">
       {/* Left controls retain their plugin slot and mode-entry wiring. */}
@@ -146,22 +166,7 @@ export function ComposerToolbar({
               });
             }
           }}
-          onSelectMode={async (nextMode) => {
-            try {
-              await configureActiveSession({
-                mode: nextMode,
-                providerId,
-                modelId,
-                thinkingLevel,
-                permissionMode: sessionPermissionMode,
-                executionProfile,
-              });
-            } catch (error) {
-              showToast(error instanceof Error ? error.message : String(error), {
-                variant: "error",
-              });
-            }
-          }}
+          onSelectMode={selectMode}
           onPickAndAttach={pickAndAttach}
           onInsertReference={onInsertReference}
           onInsertCommand={onInsertCommand}
@@ -208,6 +213,7 @@ export function ComposerToolbar({
           mode={mode}
           displayMode={displayMode}
           planningLive={planningLive}
+          planAwaitingApproval={planAwaitingApproval}
           goalExecutionActive={goalExecutionActive}
           disabled={controlsBlocked}
           controlsBlocked={controlsBlocked}
@@ -215,6 +221,7 @@ export function ComposerToolbar({
             closeAllMenus();
             setPlusOpen(true);
           }}
+          onExitPlan={() => void selectMode("agent")}
         />
         <ComposerControlSlots side="left" />
       </div>

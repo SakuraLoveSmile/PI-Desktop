@@ -273,6 +273,7 @@ export const ptBR = {
     contractPlanDesc: "Elabora e revisa um plano estruturado antes da execução",
     contractGoalDesc: "Define o resultado pretendido e os critérios de aceitação",
     contractMode: "Modo de contrato",
+    exitPlanMode: "Sair do modo Plano",
     executionProfile: "Perfil de execução",
     tableActions: "Ações da tabela",
     copyTableMarkdown: "Copiar tabela como Markdown",

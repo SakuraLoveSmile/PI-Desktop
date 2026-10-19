@@ -441,6 +441,7 @@ export const en = {
     contractPlanDesc: "Drafts and reviews a structured plan before execution",
     contractGoalDesc: "Defines target outcome and acceptance criteria",
     contractMode: "Contract mode",
+    exitPlanMode: "Exit Plan mode",
     executionProfile: "Execution profile",
     tableActions: "Table actions",
     copyTableMarkdown: "Copy table as Markdown",

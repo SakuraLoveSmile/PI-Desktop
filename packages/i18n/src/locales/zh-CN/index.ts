@@ -436,6 +436,7 @@ export const zhCN = {
     contractPlanDesc: "执行前先制定步骤方案供审核",
     contractGoalDesc: "设定目标产出与验收标准后自主达成",
     contractMode: "方案模式",
+    exitPlanMode: "退出规划模式",
     executionProfile: "执行方式",
     tableActions: "表格操作",
     copyTableMarkdown: "复制表格为 Markdown",

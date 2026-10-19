@@ -3255,6 +3255,13 @@ reasoning-level control.
   second status row parked above the composer; a staged mode choice still
   updates the chip immediately and does not start that pulse until the
   in-flight turn actually projects `planning`.
+- While Plan is the committed mode, the Plan chip carries a close control
+  (`chat.exitPlanMode`) that returns to Agent through the same switch as the +
+  menu's Plan toggle. The control is disabled while a plan is being drafted or
+  awaits approval (the host refuses a mode change then with
+  `PLAN_CONFIGURATION_BLOCKED`) and while controls are blocked; the + menu's
+  Plan switch has no planning or approval guard. Exiting does not delete plan
+  history.
 - The adjacent execution-profile chip compactly fits its localized Agent and
   Expert Team labels (up to 130px, or 104px below a 480px composer) to
   maintain a dense toolbar with 4-8px internal gaps. Its icon is a single

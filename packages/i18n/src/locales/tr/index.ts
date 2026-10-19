@@ -283,6 +283,7 @@ export const tr = {
     contractPlanDesc: "Yürütmeden önce yapılandırılmış bir plan hazırlar ve inceler",
     contractGoalDesc: "Hedef çıktıyı ve kabul kriterlerini tanımlar",
     contractMode: "Sözleşme modu",
+    exitPlanMode: "Plan modundan çık",
     executionProfile: "Yürütme profili",
     tableActions: "Tablo işlemleri",
     copyTableMarkdown: "Tabloyu Markdown olarak kopyala",

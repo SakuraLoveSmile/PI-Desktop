@@ -283,6 +283,7 @@ export const ko = {
     contractPlanDesc: "실행 전 구조화된 계획을 작성하고 검토합니다",
     contractGoalDesc: "목표 결과와 수락 기준을 정의합니다",
     contractMode: "계약 모드",
+    exitPlanMode: "계획 모드 종료",
     executionProfile: "실행 프로필",
     tableActions: "표 작업",
     copyTableMarkdown: "표를 Markdown으로 복사",

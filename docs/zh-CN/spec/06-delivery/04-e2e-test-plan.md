@@ -861,12 +861,12 @@ task-candidate E2E 从请求工作树运行，但使用主工作区已经准备�
 - **步骤**： 1) 单击左侧输入的 Composer 模式芯片，进入 Plan。 2）
   发送通常需要 Write/Edit 的提示并观察行为。 3）
 单击同一 Composer 芯片返回 Agent。 4) 开始回合并尝试
-  在运行中或待处理的 Plan 批准可见时切换模式。
+  在运行中或待处理的 Plan 批准可见时切换模式。 5) 重新进入 Plan 后使用芯片的关闭控件：它像 + 菜单的 Plan 开关一样返回 Agent，并在计划起草或等待批准时保持禁用。
 - **预期**：Composer 芯片更新活动会话 `mode`（Plan 和
   Goal 硬否认 Write/Edit 和插件工具，而 Bash 遵循所选的
   权限模式； Agent 根据权限设置允许其正常工具）。的
   当存在轮流或活动待批准时芯片被禁用并重新启用
-  会话返回 idle/planning 后。不呈现顶栏模式控件。
+  会话返回 idle/planning 后。规划芯片旁的关闭控件在同样的状态下禁用。不呈现顶栏模式控件。
 - **链接规格**：`04-ux/08-component-spec.md`（§2，§11），
   `03-runtime/03-tools-and-permissions.md`（§10），
   `03-runtime/04-data-storage.md` (§8)

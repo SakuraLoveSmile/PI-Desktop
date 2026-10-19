@@ -274,6 +274,7 @@ export const fr = {
     "contractPlanDesc": "Rédige et examine un plan structuré avant l'exécution",
     "contractGoalDesc": "Définit le résultat cible et les critères d'acceptation",
     "contractMode": "Mode de contrat",
+    "exitPlanMode": "Quitter le mode Plan",
     "executionProfile": "Profil d'exécution",
     "tableActions": "Actions du tableau",
     "copyTableMarkdown": "Copier le tableau en Markdown",

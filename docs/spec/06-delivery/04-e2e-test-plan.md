@@ -2455,7 +2455,10 @@ workflow. They are not gates or promised outputs of the current Release run.
 - **Steps**: 1) Click the left-of-input Composer mode chip to enter Plan. 2)
   Send a prompt that would normally require Write/Edit and observe behavior. 3)
   Click the same Composer chip to return to Agent. 4) Begin a turn and try to
-  toggle mode mid-run or while a pending Plan approval is visible.
+  toggle mode mid-run or while a pending Plan approval is visible. 5) Re-enter
+  Plan, then use the chip's close control: it returns to Agent as the + menu's
+  Plan toggle does, and it stays disabled while the plan is being drafted or
+  awaits approval.
 - **Expected**: The Composer chip updates the active session `mode` (Plan and
   Goal hard-deny Write/Edit and plugin tools while Bash follows the selected
   permission mode; Agent allows its normal tools per permission settings). The

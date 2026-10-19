@@ -709,6 +709,7 @@ export function Composer({
             displayMode={displayMode}
             executionProfile={executionProfile}
             planningLive={planningLive}
+            planAwaitingApproval={planningState === "awaiting_approval"}
             goalExecutionActive={executionActive}
             providerId={provider?.id}
             modelId={modelId}

@@ -276,6 +276,7 @@ export const zhTW = {
     contractPlanDesc: "執行前先制定步驟方案供審核",
     contractGoalDesc: "設定目標產出與驗收標準後自主達成",
     contractMode: "方案模式",
+    exitPlanMode: "退出規劃模式",
     executionProfile: "執行方式",
     tableActions: "表格操作",
     copyTableMarkdown: "複製表格為 Markdown",
