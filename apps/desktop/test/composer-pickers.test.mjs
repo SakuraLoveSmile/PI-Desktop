@@ -54,7 +54,7 @@ test("ComposerExecutionProfilePicker renders two distinct options with notice", 
   assert.match(profilePickerSource, /role="menuitemradio"/);
   assert.match(profilePickerSource, /canSwitchToStandard/);
   assert.match(profilePickerSource, /IconUsers/);
-  assert.match(profilePickerSource, /IconBot/);
+  assert.match(profilePickerSource, /\bIconUser\b/);
 });
 
 test("ComposerContractPicker renders compact indicator for active mode", () => {

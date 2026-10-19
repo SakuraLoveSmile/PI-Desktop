@@ -425,7 +425,7 @@ export const zhCN = {
     scheduleState: { scheduled: "已定时", missed: "已错过", claimed: "已启动", cancelled: "已取消" },
     scheduleExecutionState: { queued: "排队中", running: "执行中", completed: "已完成", interrupted: "已中断" },
     planStatus: { approved: "已批准", changes_requested: "修订中", rejected: "已拒绝", expired: "已过期", interrupted: "已中断" },
-    profileAgent: "智能体",
+    profileAgent: "单智能体",
     profileAgentDesc: "单智能体标准执行",
     profileTeam: "专家团",
     profileTeamDesc: "多智能体自主协作团队，拥有共享任务看板",

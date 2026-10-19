@@ -4,9 +4,9 @@ import type { ExecutionProfile } from "@pi-desktop/shared";
 import { AnchoredMenu } from "../../../components/settings/AnchoredMenu";
 import { TooltipButton } from "../../../components/ui";
 import {
-  IconBot,
   IconCheck,
   IconChevronDown,
+  IconUser,
   IconUsers,
 } from "../../../components/icons";
 
@@ -67,7 +67,7 @@ export function ComposerExecutionProfilePicker({
           }}
         >
           <span className="composer-mode-chip-face" key={executionProfile}>
-            {isTeam ? <IconUsers size={14} /> : <IconBot size={14} />}
+            {isTeam ? <IconUsers size={14} /> : <IconUser size={14} />}
             <span className="composer-mode-chip-label text-sm">{label}</span>
           </span>
           <IconChevronDown size={12} />
@@ -87,7 +87,7 @@ export function ComposerExecutionProfilePicker({
           }
         }}
       >
-        <IconBot size={14} className="composer-item-icon" />
+        <IconUser size={14} className="composer-item-icon" />
         <div className="flex-1 text-left min-w-0">
           <div className="font-medium text-sm">{t("chat.profileAgent")}</div>
           <div className="text-xs text-muted truncate">

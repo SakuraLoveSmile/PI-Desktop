@@ -3257,7 +3257,9 @@ reasoning-level control.
   in-flight turn actually projects `planning`.
 - The adjacent execution-profile chip compactly fits its localized Agent and
   Expert Team labels (up to 130px, or 104px below a 480px composer) to
-  maintain a dense toolbar with 4-8px internal gaps.
+  maintain a dense toolbar with 4-8px internal gaps. Its icon is a single
+  person for Agent and the group icon for Expert Team, so it stays distinct
+  from the Bot model chip.
 - Permission and operating-mode controls retain their existing Add-menu and
   approval-card entry points. Repositioning the toolbar does not change
   permission defaults, mode gates or the separate execution-policy approval.
