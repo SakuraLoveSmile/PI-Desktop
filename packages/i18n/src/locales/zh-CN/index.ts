@@ -2496,6 +2496,7 @@ sklm: {
     overview: {
       specs: "规格",
       changedFiles: "改动文件",
+      viewAllChanges: "查看所有改动",
       attachments: "附件",
       skills: "技能",
       memory: "记忆",

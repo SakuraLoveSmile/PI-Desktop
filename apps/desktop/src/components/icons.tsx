@@ -56,6 +56,7 @@ import {
   Info,
   Keyboard,
   KeyRound,
+  Lightbulb,
   Link,
   ListChecks,
   LogOut,
@@ -256,6 +257,7 @@ export const IconTarget = icon(Target);
 export const IconBrowser = icon(AppWindow);
 export const IconHook = icon(Webhook);
 export const IconWorkflow = icon(Workflow);
+export const IconLightbulb = icon(Lightbulb);
 export const IconLink = icon(Link);
 export const IconPalette = icon(Palette);
 export const IconPerson = icon(Smile);

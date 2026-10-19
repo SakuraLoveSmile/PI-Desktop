@@ -290,3 +290,15 @@ Validate count-to-dialog, keyboard/hover actions, project review/save, Ignore/co
   manual lane, separate from restart recovery. Candidate build receipts bind
   source/base revisions and executable hashes; these entries make no release,
   live-provider, Windows or user-acceptance claim.
+
+- Overview chrome lines up: the Activity entry shares the 48px disclosure
+  rhythm, file, subagent, reference and checklist rows start their text in the
+  same column as Team task titles, and the subagent panorama link matches Team
+  progress. Subagent badges show the localized outcome such as Completed instead
+  of the raw status, and the badge and panorama node share one tone.
+
+- Normal-session Overview follows the reference layout: session checklist rows
+  are one-line state glyphs with completed rows receding, section headers are
+  muted with dashed dividers, changed files show language glyphs, exact `+N` /
+  `−N` counts and a link to the Review tab, and references use underline tabs.
+  Expert Team task rows and their solid dividers are unchanged.

@@ -2258,7 +2258,7 @@ sklm: {
       goalReport: "목표 보고서",
     },
     overview: {
-      specs: "사양", changedFiles: "변경된 파일", attachments: "첨부 파일", skills: "스킬", memory: "메모리", mcp: "MCP",
+      specs: "사양", changedFiles: "변경된 파일", viewAllChanges: "모든 변경 사항 보기", attachments: "첨부 파일", skills: "스킬", memory: "메모리", mcp: "MCP",
       noRecordedSkills: "현재 대화에 기록된 스킬이 없습니다", noRecordedMemory: "현재 대화에 기록된 메모리가 없습니다", noRecordedMcp: "현재 대화에 기록된 MCP 사용 내역이 없습니다",
       recordedChangesNote: "현재 불러온 대화에 성공적으로 기록된 변경 사항만 표시합니다. 전체 Git 변경 목록은 아닙니다.",
       noSession: "선택한 세션이 없습니다", untitled: "제목 없는 세션", project: "프로젝트", model: "모델", modeLabel: "모드", messages: "메시지", notAvailable: "없음", progress: "진행 상황", statusLabel: "현재 상태", noPlans: "이 세션에 계획 활동이 없습니다", artifacts: "산출물", noArtifacts: "이 세션에 산출물이 없습니다", references: "참조", noReferences: "명시적인 파일 참조가 없습니다", mode: { chat: "채팅", plan: "계획", goal: "목표" }, subagents: "Subagents", noSubagents: "No subagents delegated in this session", teamSection: "Expert Team", status: { idle: "대기", running: "실행 중", planning: "계획 중", awaiting_approval: "승인 대기", pending: "대기 중", approved: "승인됨", rejected: "거부됨", expired: "만료됨", interrupted: "중단됨", queued: "대기열", completed: "완료됨", failed: "실패" }

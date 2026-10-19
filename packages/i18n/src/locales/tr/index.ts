@@ -2248,7 +2248,7 @@ sklm: {
       goalReport: "Hedef Raporu",
     },
     overview: {
-      specs: "Özellikler", changedFiles: "Değiştirilen dosyalar", attachments: "Ekler", skills: "Beceriler", memory: "Bellek", mcp: "MCP",
+      specs: "Özellikler", changedFiles: "Değiştirilen dosyalar", viewAllChanges: "Tüm değişiklikleri görüntüle", attachments: "Ekler", skills: "Beceriler", memory: "Bellek", mcp: "MCP",
       noRecordedSkills: "Bu görüşmede kaydedilmiş beceri yok", noRecordedMemory: "Bu görüşmede kaydedilmiş bellek yok", noRecordedMcp: "Bu görüşmede kaydedilmiş MCP kullanımı yok",
       recordedChangesNote: "Yalnızca şu anda yüklenmiş görüşmede başarıyla kaydedilen değişiklikler gösterilir; bu, tüm Git değişikliklerinin listesi değildir.",
       noSession: "Oturum seçilmedi", untitled: "Adsız oturum", project: "Proje", model: "Model", modeLabel: "Mod", messages: "Mesajlar", notAvailable: "Kullanılamıyor", progress: "İlerleme", statusLabel: "Geçerli durum", noPlans: "Bu oturumda plan etkinliği yok", artifacts: "Yapaylar", noArtifacts: "Bu oturumda yapay yok", references: "Başvurular", noReferences: "Açık dosya başvurusu yok", mode: { chat: "Sohbet", plan: "Plan", goal: "Hedef" }, subagents: "Subagents", noSubagents: "No subagents delegated in this session", teamSection: "Expert Team", status: { idle: "Boşta", running: "Çalışıyor", planning: "Planlanıyor", awaiting_approval: "Onay bekleniyor", pending: "Beklemede", approved: "Onaylandı", rejected: "Reddedildi", expired: "Süresi doldu", interrupted: "Kesildi", queued: "Kuyrukta", completed: "Tamamlandı", failed: "Başarısız" }

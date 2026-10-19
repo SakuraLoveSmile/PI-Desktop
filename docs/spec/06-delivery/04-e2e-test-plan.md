@@ -17916,11 +17916,13 @@ The scheduled instruction editor keeps its original card and minimum height.
 
 `node scripts/e2e-todo-checklist.mjs` mounts the actual OverviewTab with real
 SQLite Host sessions and production API/store/checklist wiring. Verify empty
-state, default-expanded ordered tasks, disclosure collapse/reopen, live statuses,
-320px dark/light wrapping, cancelled count, stale revision rejection, session
-switch, backend restart and first-read recovery. The external model stream is
-deterministic and no real provider or user profile is accessed. Task rows scroll
-with Overview; the Composer has no Session checklist mounting or popup.
+state, default-expanded ordered tasks, disclosure collapse/reopen, live statuses
+(each row draws a state glyph and title; the status word is visually hidden text
+read from the DOM), 320px dark/light wrapping, cancelled count, stale revision
+rejection, session switch, backend restart and first-read recovery. The external
+model stream is deterministic and no real provider or user profile is accessed.
+Task rows scroll with Overview; the Composer has no Session checklist mounting or
+popup.
 
 ### Expert Team configuration and Overview reference alignment
 
@@ -17943,8 +17945,13 @@ with Overview; the Composer has no Session checklist mounting or popup.
   compare the actual candidate to the supplied reference.
   Overview layout also exercises long titles, project paths and model names at
   320/360/570px in both themes: metadata values retain positive visible width,
-  and header/resources/references introduce no horizontal overflow. Selected
-  reference options retain their existing pressed states and switching path.
+  and header/resources/references introduce no horizontal overflow. Titles clamp
+  to two lines with the full title in a tooltip; changed-file and attachment rows
+  stay on one line (file name, muted folder, a language glyph, and `+N`/`−N`
+  counts only when every recorded edit to that path has exact counts) with the full
+  path in the row tooltip. Reference tabs are underline tabs that keep their pressed
+  states and switching path. The changed-files heading links to the Review tab only
+  when that tab has entries.
 - node --test apps/desktop/test/settings-ipc-partial-write.test.mjs protects
   full committed Main network/menu/developer policy after partial writes and
   guarantees no side effects on rejected configuration. Host/runtime/component

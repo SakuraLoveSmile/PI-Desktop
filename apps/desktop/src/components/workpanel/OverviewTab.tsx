@@ -4,9 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { PlanProposal } from "@pi-desktop/shared";
 import { useAppStore } from "../../stores/app-store";
-import { IconChevronDown, IconBot, IconFileText, IconInfo, IconWorkflow } from "../icons";
-import { AgentPanorama, type PanoramaNode, type PanoramaNodeStatus } from "./AgentPanorama";
-import { fileWorkPanelTab, teamWorkPanelTab, overviewWorkPanelTab } from "../../lib/work-panel-tabs";
+import { IconArrowUpRight, IconChevronDown, IconChevronRight, IconBot, IconFileText, IconInfo, IconLightbulb, IconListChecks, IconPlug, IconWorkflow } from "../icons";
+import { AgentPanorama, type PanoramaNode } from "./AgentPanorama";
+import { fileWorkPanelTab, teamWorkPanelTab, overviewWorkPanelTab, toolWorkPanelTab } from "../../lib/work-panel-tabs";
 import { resolvePlanArtifactPath } from "../../lib/plan-artifact";
 import { useTeamSnapshot } from "../../hooks/useTeamSnapshot";
 import { usePendingTeamExecutionReview } from "../../hooks/useTeamExecutionReview";
@@ -17,7 +17,11 @@ import { TeamTaskProgress } from "./team/TeamTaskProgress";
 import { Button } from "../ui";
 import { isActivePlanExecution } from "../../lib/plan-mode-state";
 import { SessionTodoChecklist } from "./SessionTodoChecklist";
-import { recordedOverviewResources, type RecordedResource, type OverviewReferences } from "./overview-recorded-resources";
+import { overviewRowText, recordedOverviewResources, type RecordedResource, type OverviewReferences } from "./overview-recorded-resources";
+import { overviewSubagentBadgeClass, overviewSubagentLabelKey, overviewSubagentTone } from "./overview-subagent-status";
+import { overviewFileGlyph, overviewLineCounts } from "./overview-file-meta";
+import { activityChangedFiles } from "../../features/chat/activity/session-activity-resources";
+import { reviewChangesFromMessages } from "../../lib/workspace-review";
 
 type OverviewItem = {
   id: string;
@@ -96,6 +100,10 @@ function OverviewContent() {
   }, [proposals]);
 
   const resources = useMemo(() => recordedOverviewResources(messages), [messages]);
+  // Counts come only from recorded edits that all carry exact line counts; see activityChangedFiles.
+  const lineCounts = useMemo(() => new Map(activityChangedFiles(messages).map((file) => [file.path, file] as const)), [messages]);
+  // The review tab lists only edits with a review payload, so the link is offered only when it has something to show.
+  const reviewChangeCount = useMemo(() => reviewChangesFromMessages(messages).length, [messages]);
   const references = resources.references[referenceKind];
   const openItem = async (item: OverviewItem) => {
     if (!item.path) return;
@@ -150,13 +158,7 @@ function OverviewContent() {
       id: sub.delegationId,
       name: sub.agentName,
       task: sub.task || undefined,
-      status: (sub.status === "completed"
-        ? "completed"
-        : sub.status === "running"
-          ? "running"
-          : sub.status === "timed_out" || sub.status === "aborted" || sub.status === "stopped"
-            ? "paused"
-            : "failed") as PanoramaNodeStatus,
+      status: overviewSubagentTone(sub.status),
       avatarIcon: "bot",
     }));
 
@@ -190,6 +192,9 @@ function OverviewContent() {
 
   const providerName = providers.find((provider) => provider.id === session.providerId)?.name ?? session.providerId;
   const model = [providerName, session.modelId].filter(Boolean).join(" / ");
+  const title = session.title || t("panel.overview.untitled");
+  const projectPath = session.projectPath || t("panel.overview.notAvailable");
+  const modelLabel = model || t("panel.overview.notAvailable");
   const checkpoint = activeSessionId ? planCheckpoints[activeSessionId] : undefined;
   const displayedMode = checkpoint && checkpoint.sessionId === activeSessionId && isActivePlanExecution(checkpoint)
     ? checkpoint.executionKind ?? checkpoint.kind : session.mode;
@@ -222,17 +227,17 @@ function OverviewContent() {
   );
 
   return (
-    <div className="work-panel-overview" data-testid="overview-tab">
+    <div className={`work-panel-overview${isTeam ? "" : " work-panel-overview-plain"}`} data-testid="overview-tab">
       {metadataError && <p className="work-panel-overview-empty-copy" role="status">{t("team.staleData")}: {metadataError}</p>}
       <header className="work-panel-overview-header">
         <div className="work-panel-overview-icon" aria-hidden>
           <IconInfo size={18} />
         </div>
         <div className="work-panel-overview-heading">
-          <h2>{session.title || t("panel.overview.untitled")}</h2>
+          <h2 title={title}>{title}</h2>
           <dl className="work-panel-overview-meta">
-            <div><dt>{t("panel.overview.project")}</dt><dd>{session.projectPath || t("panel.overview.notAvailable")}</dd></div>
-            <div><dt>{t("panel.overview.model")}</dt><dd>{model || t("panel.overview.notAvailable")}</dd></div>
+            <div><dt>{t("panel.overview.project")}</dt><dd title={projectPath}>{projectPath}</dd></div>
+            <div><dt>{t("panel.overview.model")}</dt><dd title={modelLabel}>{modelLabel}</dd></div>
             <div><dt>{t("panel.overview.modeLabel")}</dt><dd>{mode}</dd></div>
             <div><dt>{t("panel.overview.messages")}</dt><dd>{session.messageCount}</dd></div>
           </dl>
@@ -240,8 +245,10 @@ function OverviewContent() {
       </header>
 
       <div className="work-panel-overview-scroll">
-        <Button variant="ghost" size="sm" onClick={() => openWorkPanelTabForSession(session.id, overviewWorkPanelTab("activity"))}>
-          {t("panel.activity.title")}
+        <Button variant="ghost" size="sm" className="work-panel-overview-activity"
+          onClick={() => openWorkPanelTabForSession(session.id, overviewWorkPanelTab("activity"))}>
+          <span>{t("panel.activity.title")}</span>
+          <IconChevronRight size={16} className="work-panel-overview-chevron" aria-hidden />
         </Button>
         <SessionTodoChecklist key={session.id} sessionId={session.id} />
         {isTeam && teamSessionId && (
@@ -280,7 +287,7 @@ function OverviewContent() {
                 title={t("team.viewPanorama")}
                 aria-label={t("team.viewPanorama")}
               >
-                <IconWorkflow size={13} aria-hidden />
+                <IconArrowUpRight size={16} aria-hidden />
                 <span>{t("team.viewPanorama")}</span>
               </button>
             )}
@@ -296,13 +303,13 @@ function OverviewContent() {
                   title={sub.task || sub.agentName}
                   onClick={() => openSubagentTab(sub.delegationId, sub.agentName)}
                 >
-                  <IconBot size={15} aria-hidden />
+                  <IconBot size={16} aria-hidden />
                   <span className="work-panel-overview-file-copy">
                     <span className="work-panel-overview-file-label">{sub.agentName}</span>
                     {sub.task && <span className="work-panel-overview-file-detail">{sub.task}</span>}
                   </span>
-                  <span className={`team-badge team-phase-${sub.status === "completed" ? "completed" : sub.status === "running" ? "running" : "failed"}`}>
-                    {sub.status}
+                  <span className={`team-badge ${overviewSubagentBadgeClass(overviewSubagentTone(sub.status))}`}>
+                    {t(overviewSubagentLabelKey(sub.status), { defaultValue: sub.status })}
                   </span>
                 </button>
               ))
@@ -338,18 +345,39 @@ function OverviewContent() {
               <div className="work-panel-overview-artifact-group" key={kind} data-artifact-kind={kind}>
                 <div className="work-panel-overview-group-heading">
                   <span>{t(`panel.overview.${kind}`)}</span><span>{items.length}</span>
+                  {kind === "changedFiles" && reviewChangeCount > 0 && (
+                    <button type="button" className="work-panel-overview-group-action"
+                      onClick={() => openWorkPanelTabForSession(session.id, toolWorkPanelTab("review"))}>
+                      <span>{t("panel.overview.viewAllChanges")}</span>
+                      <IconArrowUpRight size={14} aria-hidden />
+                    </button>
+                  )}
                 </div>
                 {kind === "changedFiles" && <p className="work-panel-overview-resource-note">{t("panel.overview.recordedChangesNote")}</p>}
-                {items.map((item: OverviewItem | RecordedResource) => (
-                  <Button variant="ghost" className="work-panel-overview-file" key={item.id}
-                    title={item.path ?? item.label} onClick={() => void openItem(item)} disabled={!item.path}>
-                    <IconFileText size={15} aria-hidden />
-                    <span className="work-panel-overview-file-copy">
-                      <span className="work-panel-overview-file-label">{item.label}</span>
-                      {"detail" in item && item.detail && <span className="work-panel-overview-file-detail">{item.detail}</span>}
-                    </span>
-                  </Button>
-                ))}
+                {items.map((item: OverviewItem | RecordedResource) => {
+                  const row = overviewRowText(item);
+                  const filePath = item.path ?? item.label;
+                  const glyph = kind === "specs" ? null : overviewFileGlyph(filePath);
+                  const counts = kind === "changedFiles" ? overviewLineCounts(lineCounts.get(filePath)) : null;
+                  return (
+                    <Button variant="ghost" className="work-panel-overview-file" key={item.id}
+                      title={item.path ?? item.label} onClick={() => void openItem(item)} disabled={!item.path}>
+                      {kind === "specs" ? <IconListChecks size={16} aria-hidden />
+                        : glyph ? <span className={`work-panel-overview-file-glyph is-${glyph.tone}`} aria-hidden>{glyph.text}</span>
+                          : <IconFileText size={16} aria-hidden />}
+                      <span className="work-panel-overview-file-copy work-panel-overview-file-copy-inline">
+                        <span className="work-panel-overview-file-label">{row.label}</span>
+                        {row.detail && <span className="work-panel-overview-file-detail">{row.detail}</span>}
+                      </span>
+                      {counts && (
+                        <span className="diff-counts work-panel-overview-file-counts">
+                          {counts.added > 0 && <span className="diff-count-add">{`+${counts.added}`}</span>}
+                          {counts.removed > 0 && <span className="diff-count-del">{`−${counts.removed}`}</span>}
+                        </span>
+                      )}
+                    </Button>
+                  );
+                })}
               </div>
             ) : null)}
             {artifactItems.length === 0 && resources.changedFiles.length === 0 && resources.attachments.length === 0 && (
@@ -374,7 +402,9 @@ function OverviewContent() {
             </div>
             <ul className="work-panel-overview-reference-list" aria-label={t(`panel.overview.${referenceKind}`)}>
               {references.map((reference) => <li className="work-panel-overview-recorded-reference" key={reference.id}>
-                <IconWorkflow size={15} aria-hidden /><span>{reference.label}</span>
+                {referenceKind === "memory" ? <IconLightbulb size={16} aria-hidden />
+                  : referenceKind === "mcp" ? <IconPlug size={16} aria-hidden /> : <IconWorkflow size={16} aria-hidden />}
+                <span>{reference.label}</span>
               </li>)}
             </ul>
             {references.length === 0 && <p className="work-panel-overview-empty-copy">

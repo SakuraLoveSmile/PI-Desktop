@@ -3038,18 +3038,46 @@ message was delivered based only on mailbox enqueue state.
 
 ### Overview chrome and task progress
 
-All session Overview disclosures use 48px headers with primary, medium-weight
-14px text, 16px left inset and solid subtle-border separators. Native disclosure
-markers are replaced by one decorative 16px right-hand chevron, rotating left
-when closed; reduced-motion preferences remove the transition. The subagent
-summary retains its existing panorama control between its label and chevron.
+All session Overview disclosures and the activity entry use 48px headers with a
+16px left inset. Native disclosure markers are replaced by one decorative 16px
+right-hand chevron, rotating left when closed; reduced-motion preferences remove
+the transition. In a normal (non-Expert-Team) session the headers and the activity
+entry use secondary, regular-weight 14px text and dashed `--ds-border-default`
+separators, which is the reference layout. The Expert Team overview keeps
+primary, medium-weight headers and solid subtle separators, because the Team
+progress geometry pins them. The session checklist header is secondary and regular
+in both modes. The subagent summary's panorama link uses the flat 13px text and
+16px arrow of the Team progress link and sits between its label and chevron.
 The metadata header remains above the scroll area without shrinking. Its icon
 and title share a compact row; project and model occupy full-width metadata
 rows, followed by mode and message count side by side. Long values truncate
-within their columns. References use compact rounded options with a raised
-selected surface, retaining the existing pressed-state semantics and labels.
+within their columns. References are underline tabs: the selected tab reads in primary with a 2px
+accent rule beneath it and the others stay secondary, retaining the pressed-state
+semantics and labels.
 Artifact text flexes within its row so long paths cannot displace trailing
 status badges. Disclosure headers expose an inset keyboard focus outline.
+
+The metadata title uses 16px semibold text, wraps to at most two lines and
+exposes the full title as a tooltip. The activity entry is a header-tier row
+with no tinted background; it follows the header tone and turns primary on hover. Item rows
+(changed-file, attachment, subagent, reference and checklist rows) put a 16px
+leading icon on the 16px inset and start the label 12px later, at 44px, the
+column Team task titles already use. Labels are 14px. Changed-file, attachment and plan-artifact rows stay on one
+line: the file name, then the folder or plan title in muted 12px text, truncated
+with an ellipsis. Changed-file rows lead with a language glyph for markup, style
+and script files (`<>`, `#`, `JS`, `TS`; markup takes the warning tone), plan
+artifacts lead with a list glyph, and other files keep the generic file icon. A
+changed-file row shows `+N` and `−N` in the Review tab's diff-count classes only
+when every recorded edit to that path carries exact line counts; a partial total is
+never shown, and a zero side is omitted, so an addition-only file shows `+N` alone.
+The changed-files heading links to the Review tab with `View all
+changes` when that tab has entries. File and subagent rows tint on hover, and the
+tint extends 6px past the inset without moving the icon. Group headings are 12px
+regular secondary text; empty copy and resource notes are 12px muted. Subagent badges show the same localized outcome label as the
+Activity rail. Running uses the accent tone, completed the success tone,
+stopped, aborted and timed-out use the neutral tone, and failed and denied use
+the error tone; the panorama node uses the same tone. Project and model values
+expose their full text as a tooltip when they truncate.
 
 Team sessions show one progress section (`进展` / `進展`) with a panorama link,
 arrow, divider and independent 24px disclosure control. The section publishes
@@ -3329,10 +3357,14 @@ reasoning-level control.
   Overview scroll area. The Composer footer has no session checklist trigger.
 - The header names the Session checklist and its completed/total count. A shared
   Button disclosure starts expanded and exposes `aria-expanded`. The ordered
-  inline list includes every task with full wrapped text and localized status;
+  inline list includes every task with its full wrapped title, and the localized
+  status is kept for assistive technology and the row tooltip;
   the existing Overview scroll makes long lists reachable without nested popups.
 - Cancelled tasks are excluded from the denominator; an all-cancelled list shows
-  cancellation instead of 0/0. Rows are read-only and retain distinct statuses.
+  cancellation instead of 0/0. Rows are read-only. Each row is one line: a state
+  glyph (check-circle and muted when completed, hollow circle when pending or in
+  progress, slash-circle when cancelled) and the title. In progress reads in
+  primary at medium weight.
 - Live snapshot updates preserve expansion and focus. A session switch starts
   its own expanded checklist; empty snapshots remove the section. Goal progress
   remains near the Composer and consumes a separate execution snapshot.

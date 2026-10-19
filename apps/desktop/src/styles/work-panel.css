@@ -123,13 +123,16 @@
 }
 
 .work-panel-overview-heading h2 {
+  display: -webkit-box;
   min-width: 0;
   margin: 0;
   overflow: hidden;
-  font-size: var(--text-md-plus);
+  font-size: var(--text-lg);
   font-weight: var(--font-weight-semibold);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: var(--leading-compact-plus);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .work-panel-overview-meta {
@@ -210,8 +213,7 @@
   padding: 0 0 16px;
 }
 
-.work-panel-overview .team-progress-title,
-.work-panel-overview .session-todo-checklist-header {
+.work-panel-overview .team-progress-title {
   color: var(--ds-text-primary);
   font-weight: var(--font-weight-medium);
 }
@@ -222,54 +224,126 @@
   border-radius: var(--radius-xs);
 }
 
-.work-panel-overview-artifact-group + .work-panel-overview-artifact-group { margin-top: 16px; }
+.work-panel-overview-artifact-group + .work-panel-overview-artifact-group { margin-top: 12px; }
 .work-panel-overview-group-heading {
   display: flex;
   align-items: center;
   gap: 8px;
   padding-block: 4px;
   color: var(--ds-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-normal);
+}
+/* Heading action, e.g. the changed-files link into the Review tab; it takes the heading's trailing edge. */
+.work-panel-overview-group-action {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  margin-inline-start: auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-3xs);
+  background: transparent;
+  color: var(--ds-text-secondary);
+  font: inherit;
   font-size: var(--text-md);
+  font-weight: var(--font-weight-normal);
+  cursor: pointer;
+}
+.work-panel-overview-group-action:hover {
+  color: var(--ds-text-primary);
 }
 .work-panel-overview-resource-note {
   margin: 2px 0 6px;
   color: var(--ds-text-muted);
   font-size: var(--text-sm);
 }
+/* Underline tabs: the selected tab reads in primary with an accent rule beneath it, the others stay secondary. */
 .work-panel-overview-reference-tabs {
   display: flex;
-  width: fit-content;
-  max-width: 100%;
-  gap: 4px;
-  margin-bottom: 12px;
-  padding: 3px;
-  border: 1px solid var(--ds-border-subtle);
-  border-radius: var(--radius-sm);
-  background: var(--ds-bg-sunken);
+  width: 100%;
+  gap: 16px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--ds-border-subtle);
 }
 .work-panel-overview-reference-tab.btn {
-  padding: 4px 12px;
-  min-height: 32px;
-  border-radius: var(--radius-xs);
+  min-height: 28px;
+  padding: 4px 0 5px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  margin-bottom: -1px;
+  background: transparent;
+  box-shadow: none;
   color: var(--ds-text-secondary);
   font-size: var(--text-base);
+  font-weight: var(--font-weight-normal);
+}
+.work-panel-overview-reference-tab.btn:hover {
+  background: transparent;
+  color: var(--ds-text-primary);
 }
 .work-panel-overview-reference-tab.btn[aria-pressed="true"] {
-  background: var(--ds-bg-dock-raised);
+  border-bottom-color: var(--ds-accent);
+  background: transparent;
   color: var(--ds-text-primary);
-  box-shadow: var(--ds-raised-shadow);
+  box-shadow: none;
+}
+/* Keyboard focus: an outline that the base rule's box-shadow reset cannot override, matching the activity entry. */
+.work-panel-overview-reference-tab.btn:focus-visible {
+  outline: 2px solid var(--ds-accent);
+  outline-offset: -2px;
+  box-shadow: none;
 }
 .work-panel-overview-reference-list { margin: 0; padding: 0; list-style: none; }
+/* Item tier without a hover target: 16px icon, 12px gap, 14px label, so text starts at 44px like the Team task rows. */
 .work-panel-overview-recorded-reference {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding-block: 6px;
-  color: var(--ds-text-secondary);
+  gap: 12px;
+  padding-block: 5px;
+  color: var(--ds-text-primary);
   font-size: var(--text-base);
   overflow-wrap: anywhere;
 }
 .work-panel-overview-file.btn { justify-content: flex-start; height: auto; }
+
+/* Header tier: the entry row shares the 48px rhythm, 14px medium title, 16px chevron and subtle divider of the disclosure headers. */
+.work-panel-overview-activity.btn {
+  display: flex;
+  width: 100%;
+  height: auto;
+  min-height: 48px;
+  justify-content: space-between;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--ds-border-subtle);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ds-text-primary);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-medium);
+}
+
+.work-panel-overview-activity.btn:hover,
+.work-panel-overview-activity.btn:active {
+  background: transparent;
+  color: var(--ds-text-primary);
+  transform: none;
+}
+
+.work-panel-overview-activity.btn:hover .work-panel-overview-chevron {
+  color: var(--ds-text-primary);
+}
+
+.work-panel-overview-activity.btn:focus-visible {
+  outline: 2px solid var(--ds-accent);
+  outline-offset: -2px;
+  border-radius: var(--radius-xs);
+}
 
 .session-todo-checklist-header {
   display: flex;
@@ -298,39 +372,47 @@
 .session-todo-checklist-list {
   display: grid;
   min-width: 0;
-  gap: 4px;
+  gap: 0;
   margin: 0;
   list-style: none;
 }
 
+/* One line per task: glyph, 12px gap, 14px title, so the text column starts at 44px like the Team rows. */
 .session-todo-checklist-row {
+  position: relative;
   display: flex;
   min-width: 0;
   align-items: flex-start;
-  gap: 8px;
-  padding: 7px 0;
+  gap: 12px;
+  padding: 5px 0;
   color: var(--ds-text-secondary);
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
 }
 
+/* Glyph sits on the first line of the title; completed rows recede, the one in progress reads in primary at medium weight. */
 .session-todo-checklist-symbol {
   display: grid;
   flex: 0 0 auto;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
+  margin-block-start: 2px;
+  color: var(--ds-text-muted);
   place-items: center;
 }
 
-.session-todo-checklist-row-completed .session-todo-checklist-symbol {
-  color: var(--ds-success);
+.session-todo-checklist-row-completed {
+  color: var(--ds-text-muted);
+}
+
+.session-todo-checklist-row-in_progress {
+  color: var(--ds-text-primary);
 }
 
 .session-todo-checklist-row-in_progress .session-todo-checklist-symbol {
-  color: var(--ds-accent);
+  color: var(--ds-text-primary);
 }
 
 .session-todo-checklist-row-in_progress .session-todo-checklist-content {
-  color: var(--ds-text-primary);
   font-weight: var(--font-weight-medium);
 }
 
@@ -345,9 +427,14 @@
   overflow-wrap: anywhere;
 }
 
+/* The status word stays in the DOM for assistive tech and text search, but is not drawn. */
 .session-todo-checklist-status {
-  color: var(--ds-text-muted);
-  font-size: var(--text-xs);
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .work-panel-overview-status,
@@ -357,13 +444,27 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  padding: 7px 0;
+  padding: 8px 0;
   font-size: var(--text-sm);
+}
+
+/* Plan rows are item rows, so their title reads at item size and only the status stays a meta line. */
+.work-panel-overview-row {
+  font-size: var(--text-base);
 }
 
 .work-panel-overview-status span,
 .work-panel-overview-row-detail {
   color: var(--ds-text-muted);
+}
+
+.work-panel-overview-row-detail {
+  font-size: var(--text-sm);
+}
+
+.work-panel-overview-status strong {
+  color: var(--ds-text-primary);
+  font-weight: var(--font-weight-medium);
 }
 
 .work-panel-overview-row-label {
@@ -373,14 +474,16 @@
   white-space: nowrap;
 }
 
-.work-panel-overview-file,
-.work-panel-overview-reference {
+/* Item tier with a hover target: 16px icon, 12px gap, so the label starts at 44px. The negative margin cancels the
+   6px padding, so the hover tint reaches past the text edge while the icon stays on the section edge. */
+.work-panel-overview-file {
   display: flex;
-  width: 100%;
+  width: calc(100% + 12px);
   min-width: 0;
   align-items: center;
-  gap: 9px;
-  padding: 8px 6px;
+  gap: 12px;
+  margin-inline: -6px;
+  padding: 5px 6px;
   border: 0;
   border-radius: var(--radius-sm);
   color: var(--ds-text-primary);
@@ -390,8 +493,7 @@
   text-align: left;
 }
 
-.work-panel-overview-file:hover,
-.work-panel-overview-reference:hover {
+.work-panel-overview-file:hover {
   background: var(--ds-bg-hover);
 }
 
@@ -419,41 +521,35 @@
   font-size: var(--text-xs);
 }
 
-.work-panel-overview-empty,
-.work-panel-overview-empty-copy {
-  color: var(--ds-text-muted);
+/* Recorded files read as one line: name, folder in muted text, then exact line counts from the Review tab's classes. */
+.work-panel-overview-file-copy-inline {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 8px;
+}
+.work-panel-overview-file-copy-inline .work-panel-overview-file-label {
+  flex: 0 1 auto;
+}
+.work-panel-overview-file-copy-inline .work-panel-overview-file-detail {
+  flex: 1 1 0;
+  min-width: 0;
   font-size: var(--text-sm);
 }
 
-.work-panel-overview-team-card {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px;
-  background: var(--ds-bg-sunken);
-  border: 1px solid var(--ds-border-subtle);
-  border-radius: var(--radius-md);
+/* Language glyph in place of the generic file icon. Only markup takes the warning tone; the palette has no per-language colour. */
+.work-panel-overview-file-glyph {
+  display: grid;
+  flex: 0 0 auto;
+  width: 16px;
+  place-items: center;
+  color: var(--ds-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--leading-none);
 }
-
-.work-panel-overview-team-action {
-  margin-top: 4px;
-}
-
-.work-panel-overview-action-btn {
-  padding: 4px 10px;
-  font-size: var(--text-xs);
-  font-weight: var(--font-medium);
-  border-radius: var(--radius-sm);
-  background: var(--ds-bg-hover);
-  color: var(--ds-text-primary);
-  border: 1px solid var(--ds-border-subtle);
-  cursor: pointer;
-  transition: all var(--motion-duration-fast) var(--motion-ease-out);
-}
-
-.work-panel-overview-action-btn:hover {
-  background: var(--ds-bg-elevated-primary);
-  border-color: var(--ds-border-hover);
+.work-panel-overview-file-glyph.is-markup {
+  color: var(--ds-warning);
 }
 
 .work-panel-overview-subagent-row {
@@ -467,24 +563,27 @@
   gap: 8px;
 }
 
+/* Same flat link as the Team progress header (13px text, 16px arrow, 24px target), so both panorama entries match. */
 .work-panel-overview-panorama-btn {
   display: inline-flex;
+  flex: none;
   align-items: center;
   gap: 4px;
-  padding: 2px 6px;
-  font-size: var(--text-xs);
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-3xs);
+  background: transparent;
   color: var(--ds-text-secondary);
-  background: var(--ds-bg-elevated);
-  border: 1px solid var(--ds-border-subtle);
-  border-radius: var(--radius-xs);
+  font-family: inherit;
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-normal);
   cursor: pointer;
-  transition: all var(--motion-duration-fast) var(--motion-ease-out);
 }
 
 .work-panel-overview-panorama-btn:hover {
-  background: var(--ds-bg-hover);
+  background: transparent;
   color: var(--ds-text-primary);
-  border-color: var(--ds-border-default);
 }
 
 .work-panel-overview-empty {
@@ -492,6 +591,8 @@
   justify-content: center;
   gap: 10px;
   padding: 32px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-sm);
   text-align: center;
 }
 
@@ -502,7 +603,27 @@
 .work-panel-overview-empty-copy {
   margin: 0;
   padding: 4px 0;
-  font-size: var(--text-md);
+  color: var(--ds-text-muted);
+  font-size: var(--text-sm);
+}
+
+/* Non-team Overview follows the reference chrome: muted headers, dashed dividers and the 30px item rhythm. Team sessions keep
+   the solid dividers that the Team progress geometry pins in the E2E suite. */
+.work-panel-overview-plain .work-panel-overview-section,
+.work-panel-overview-plain .work-panel-overview-activity.btn {
+  border-bottom: 1px dashed var(--ds-border-default);
+}
+.work-panel-overview-plain .work-panel-overview-section > summary,
+.work-panel-overview-plain .work-panel-overview-activity.btn {
+  color: var(--ds-text-secondary);
+  font-weight: var(--font-weight-normal);
+}
+.work-panel-overview-plain .work-panel-overview-activity.btn:hover {
+  color: var(--ds-text-primary);
+}
+.work-panel-overview-plain .work-panel-overview-status,
+.work-panel-overview-plain .work-panel-overview-row {
+  padding-block: 5px;
 }
 
 @media (prefers-reduced-motion: reduce) {

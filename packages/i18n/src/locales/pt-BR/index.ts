@@ -2194,7 +2194,7 @@ export const ptBR = {
       goalReport: "Relatório da meta",
     },
     overview: {
-      specs: "Especificações", changedFiles: "Arquivos alterados", attachments: "Anexos", skills: "Habilidades", memory: "Memória", mcp: "MCP",
+      specs: "Especificações", changedFiles: "Arquivos alterados", viewAllChanges: "Ver todas as alterações", attachments: "Anexos", skills: "Habilidades", memory: "Memória", mcp: "MCP",
       noRecordedSkills: "Nenhuma habilidade registrada nesta conversa", noRecordedMemory: "Nenhuma memória registrada nesta conversa", noRecordedMcp: "Nenhum uso de MCP registrado nesta conversa",
       recordedChangesNote: "São exibidas apenas as alterações registradas com sucesso na conversa carregada no momento; esta não é uma lista completa de alterações do Git.",
       noSession: "Nenhuma sessão selecionada", untitled: "Sessão sem título", project: "Projeto", model: "Modelo", modeLabel: "Modo", messages: "Mensagens", notAvailable: "Indisponível", progress: "Progresso", statusLabel: "Status atual", noPlans: "Nenhuma atividade de plano nesta sessão", artifacts: "Artefatos", noArtifacts: "Nenhum artefato nesta sessão", references: "Referências", noReferences: "Nenhuma referência de arquivo explícita", mode: { chat: "Chat", plan: "Plano", goal: "Meta" }, subagents: "Subagents", noSubagents: "No subagents delegated in this session", teamSection: "Expert Team", status: { idle: "Inativo", running: "Em execução", planning: "Planejando", awaiting_approval: "Aguardando aprovação", pending: "Pendente", approved: "Aprovado", rejected: "Rejeitado", expired: "Expirado", interrupted: "Interrompido", queued: "Na fila", completed: "Concluído", failed: "Falhou" }

@@ -2243,7 +2243,7 @@ sklm: {
       goalReport: "Informe de meta",
     },
     overview: {
-      specs: "Especificaciones", changedFiles: "Archivos modificados", attachments: "Adjuntos", skills: "Habilidades", memory: "Memoria", mcp: "MCP",
+      specs: "Especificaciones", changedFiles: "Archivos modificados", viewAllChanges: "Ver todos los cambios", attachments: "Adjuntos", skills: "Habilidades", memory: "Memoria", mcp: "MCP",
       noRecordedSkills: "No hay habilidades registradas en esta conversación", noRecordedMemory: "No hay memoria registrada en esta conversación", noRecordedMcp: "No hay uso de MCP registrado en esta conversación",
       recordedChangesNote: "Solo se muestran los cambios registrados correctamente en la conversación cargada actualmente; no es una lista completa de cambios de Git.",
       noSession: "No hay sesión seleccionada", untitled: "Sesión sin título", project: "Proyecto", model: "Modelo", modeLabel: "Modo", messages: "Mensajes", notAvailable: "No disponible", progress: "Progreso", statusLabel: "Estado actual", noPlans: "No hay actividad de planes en esta sesión", artifacts: "Artefactos", noArtifacts: "No hay artefactos en esta sesión", references: "Referencias", noReferences: "No hay referencias de archivos explícitas", mode: { chat: "Chat", plan: "Plan", goal: "Objetivo" }, subagents: "Subagents", noSubagents: "No subagents delegated in this session", teamSection: "Expert Team", status: { idle: "Inactivo", running: "En ejecución", planning: "Planificando", awaiting_approval: "Esperando aprobación", pending: "Pendiente", approved: "Aprobado", rejected: "Rechazado", expired: "Caducado", interrupted: "Interrumpido", queued: "En cola", completed: "Completado", failed: "Fallido" }

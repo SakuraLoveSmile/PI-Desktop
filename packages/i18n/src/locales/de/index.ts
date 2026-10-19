@@ -2245,7 +2245,7 @@ sklm: {
       goalReport: "Zielbericht",
     },
     overview: {
-      specs: "Spezifikationen", changedFiles: "Geänderte Dateien", attachments: "Anhänge", skills: "Skills", memory: "Erinnerungen", mcp: "MCP",
+      specs: "Spezifikationen", changedFiles: "Geänderte Dateien", viewAllChanges: "Alle Änderungen anzeigen", attachments: "Anhänge", skills: "Skills", memory: "Erinnerungen", mcp: "MCP",
       noRecordedSkills: "Keine Skills in dieser Sitzung aufgezeichnet", noRecordedMemory: "Keine Erinnerungen in dieser Sitzung aufgezeichnet", noRecordedMcp: "Keine MCP-Nutzung in dieser Sitzung aufgezeichnet",
       recordedChangesNote: "Angezeigt werden nur erfolgreich aufgezeichnete Änderungen der aktuell geladenen Sitzung; dies ist keine vollständige Git-Änderungsliste.",
       noSession: "Keine Sitzung ausgewählt", untitled: "Unbenannte Sitzung", project: "Projekt", model: "Modell", modeLabel: "Modus", messages: "Nachrichten", notAvailable: "Nicht verfügbar", progress: "Fortschritt", statusLabel: "Aktueller Status", noPlans: "Keine Planaktivität in dieser Sitzung", artifacts: "Artefakte", noArtifacts: "Keine Artefakte in dieser Sitzung", references: "Referenzen", noReferences: "Keine expliziten Dateireferenzen", mode: { chat: "Chat", plan: "Plan", goal: "Ziel" }, subagents: "Subagents", noSubagents: "No subagents delegated in this session", teamSection: "Expert Team", status: { idle: "Inaktiv", running: "Läuft", planning: "Planung", awaiting_approval: "Wartet auf Genehmigung", pending: "Ausstehend", approved: "Genehmigt", rejected: "Abgelehnt", expired: "Abgelaufen", interrupted: "Unterbrochen", queued: "Warteschlange", completed: "Abgeschlossen", failed: "Fehlgeschlagen" }

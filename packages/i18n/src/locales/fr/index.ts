@@ -2242,7 +2242,7 @@ sklm: {
       goalReport: "Rapport d’objectif",
     },
     overview: {
-      specs: "Spécifications", changedFiles: "Fichiers modifiés", attachments: "Pièces jointes", skills: "Compétences", memory: "Mémoire", mcp: "MCP",
+      specs: "Spécifications", changedFiles: "Fichiers modifiés", viewAllChanges: "Voir toutes les modifications", attachments: "Pièces jointes", skills: "Compétences", memory: "Mémoire", mcp: "MCP",
       noRecordedSkills: "Aucune compétence enregistrée dans cette conversation", noRecordedMemory: "Aucune mémoire enregistrée dans cette conversation", noRecordedMcp: "Aucune utilisation de MCP enregistrée dans cette conversation",
       recordedChangesNote: "Seules les modifications enregistrées avec succès dans la conversation actuellement chargée sont affichées ; ceci ne constitue pas une liste complète des changements Git.",
       noSession: "Aucune session sélectionnée", untitled: "Session sans titre", project: "Projet", model: "Modèle", modeLabel: "Mode", messages: "Messages", notAvailable: "Indisponible", progress: "Progression", statusLabel: "État actuel", noPlans: "Aucune activité de plan dans cette session", artifacts: "Artefacts", noArtifacts: "Aucun artefact dans cette session", references: "Références", noReferences: "Aucune référence de fichier explicite", mode: { chat: "Chat", plan: "Plan", goal: "Objectif" }, subagents: "Subagents", noSubagents: "No subagents delegated in this session", teamSection: "Expert Team", status: { idle: "Inactif", running: "En cours", planning: "Planification", awaiting_approval: "En attente d'approbation", pending: "En attente", approved: "Approuvé", rejected: "Rejeté", expired: "Expiré", interrupted: "Interrompu", queued: "En file", completed: "Terminé", failed: "Échec" }

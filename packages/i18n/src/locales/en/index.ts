@@ -2553,6 +2553,7 @@ sklm: {
     overview: {
       specs: "Specifications",
       changedFiles: "Changed files",
+      viewAllChanges: "View all changes",
       attachments: "Attachments",
       skills: "Skills",
       memory: "Memory",
