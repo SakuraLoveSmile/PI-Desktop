@@ -423,6 +423,8 @@ export const de = {
     "usageContextUnavailable": "Kontextnutzung ist noch nicht verfügbar",
     "compactContext": "Kontext komprimieren",
     "usageContextLabel": "Kontext",
+    "usageContextRemainingLabel": "Verbleibend",
+    "usageContextUsedLabel": "Verwendet",
     "usageContextLeft": "{{count}} Token übrig",
     "usageContextSpent": "{{count}} Token verwendet",
     "usageContextTokens": "{{used}} / {{window}} Token",

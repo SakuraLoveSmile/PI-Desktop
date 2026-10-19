@@ -2138,7 +2138,7 @@ MainChat 底部的输入区域，用于撰写和发送提示。支持多行输�
 - 左工具栏放 Add、执行 profile 和 Plan/Goal 控件；左侧插件槽位保留原位置与顺序。右侧插件槽位
   同样保留原位置与顺序，后接组合的模型 × 推理芯片、提示增强、Live 语音，以及单一停止/发送位。
   模型芯片仍是一个按钮，锚定菜单仍关联该按钮。发送与停止共用中性 32px 圆角方形尺寸。
-  上下文用量保留在既有页脚，并在量表旁显示 `chat.usageContextLabel`。模型芯片显示 Bot、模型名和以 `·` 分隔的规范推理等级；
+  上下文用量保留在既有页脚，其量表旁的标签标明方向：`chat.usageContextRemainingLabel`（剩余）或 `chat.usageContextUsedLabel`（已用），跟随用量显示设置；不可用占位保留 `chat.usageContextLabel`（上下文）。模型芯片显示 Bot、模型名和以 `·` 分隔的规范推理等级；
   `off` 省略等级。`low`、`high`、`xhigh`、`max` 不本地化。
   提示增强空闲显示 Sparkles，运行时用 `.tool-spinner` 和本地化 `Enhancing…`，保持单次草稿改写。
   内联文件/粘贴图片芯片不禁用增强，也不会从草稿中丢失。

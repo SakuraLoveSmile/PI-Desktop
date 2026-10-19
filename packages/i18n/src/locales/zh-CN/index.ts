@@ -587,6 +587,8 @@ export const zhCN = {
     usageContextUnavailable: "上下文用量尚不可用",
     compactContext: "压缩上下文",
     usageContextLabel: "上下文",
+    usageContextRemainingLabel: "剩余",
+    usageContextUsedLabel: "已用",
     usageContextLeft: "剩余 {{count}} tokens",
     usageContextSpent: "已用 {{count}} tokens",
     usageContextTokens: "{{used}} / {{window}} tokens",

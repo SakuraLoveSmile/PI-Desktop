@@ -9,6 +9,7 @@ import {
   contextUsageView,
   estimateResponseOutputTokens,
   estimateToolTokenUsage,
+  contextUsageLabelKey,
   resolveContextUsageDisplay,
   resolveContextWindow,
   toolTokenUsage,
@@ -16,6 +17,11 @@ import {
   settleStoppedAssistantMetrics,
   resolveComposerUsageFooterMetrics,
 } from "../src/lib/context-usage.ts";
+
+test("the footer label names the leading figure as remaining or used", () => {
+  assert.equal(contextUsageLabelKey(resolveContextUsageDisplay(undefined)), "chat.usageContextRemainingLabel");
+  assert.equal(contextUsageLabelKey(resolveContextUsageDisplay("used")), "chat.usageContextUsedLabel");
+});
 
 test("context usage exposes the remaining ring percentage", () => {
   const context = calculateContextUsage(

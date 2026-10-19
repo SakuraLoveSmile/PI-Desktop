@@ -427,6 +427,8 @@ export const zhTW = {
     usageContextUnavailable: "上下文用量尚不可用",
     compactContext: "壓縮上下文",
     usageContextLabel: "上下文",
+    usageContextRemainingLabel: "剩餘",
+    usageContextUsedLabel: "已用",
     usageContextLeft: "剩餘 {{count}} tokens",
     usageContextSpent: "已用 {{count}} tokens",
     usageContextTokens: "{{used}} / {{window}} tokens",

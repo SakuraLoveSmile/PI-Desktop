@@ -264,8 +264,8 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   browser. Workspace HTML preview, BrowserPreview, OAuth, and Feedback
   keep their existing destinations. Context
   usage display controls whether the composer toolbar context ring and its
-  popover lead with the remaining or the used capacity figure; the default
-  is remaining. The threshold controls when a text-only paste becomes a
+  popover lead with the remaining or the used capacity figure, and the footer
+  label names that figure; the default is remaining. The threshold controls when a text-only paste becomes a
   temporary session-scratch file; it defaults to 600 characters and accepts
   integer values from 1 through 1,000,000.
 - **Prompt enhancement** is a card controlling the Composer's Enhance prompt

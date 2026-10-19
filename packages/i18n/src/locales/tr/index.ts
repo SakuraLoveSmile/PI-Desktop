@@ -435,6 +435,8 @@ export const tr = {
     usageContextUnavailable: "Bağlam kullanımı henüz mevcut değil",
     compactContext: "Bağlamı sıkıştır",
     usageContextLabel: "Bağlam",
+    usageContextRemainingLabel: "Kalan",
+    usageContextUsedLabel: "Kullanılan",
     usageContextLeft: "{{count}} token kaldı",
     usageContextSpent: "{{count}} token kullanıldı",
     usageContextTokens: "{{used}} / {{window}} token",

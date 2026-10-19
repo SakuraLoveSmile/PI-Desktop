@@ -424,6 +424,8 @@ export const ptBR = {
     usageContextUnavailable: "O uso do contexto ainda não está disponível",
     compactContext: "Compactar contexto",
     usageContextLabel: "Contexto",
+    usageContextRemainingLabel: "Restante",
+    usageContextUsedLabel: "Usado",
     usageContextLeft: "{{count}} tokens restantes",
     usageContextSpent: "{{count}} tokens usados",
     usageContextTokens: "{{used}} / {{window}} tokens",

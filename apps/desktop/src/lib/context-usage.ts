@@ -147,6 +147,13 @@ export function resolveContextUsageDisplay(value: unknown): ContextUsageDisplay 
   return value === "used" ? "used" : "remaining";
 }
 
+/** Visible footer label for the leading figure, so its direction reads without the bar. */
+export function contextUsageLabelKey(
+  display: ContextUsageDisplay,
+): "chat.usageContextRemainingLabel" | "chat.usageContextUsedLabel" {
+  return display === "used" ? "chat.usageContextUsedLabel" : "chat.usageContextRemainingLabel";
+}
+
 export type ContextUsageView = {
   display: ContextUsageDisplay;
   /** Percentage the trigger, heading, and popover lead with. */

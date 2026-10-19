@@ -598,6 +598,8 @@ export const en = {
     usageContextUnavailable: "Context usage is not available yet",
     compactContext: "Compact context",
     usageContextLabel: "Context",
+    usageContextRemainingLabel: "Remaining",
+    usageContextUsedLabel: "Used",
     usageContextLeft: "{{count}} tokens left",
     usageContextSpent: "{{count}} tokens used",
     usageContextTokens: "{{used}} / {{window}} tokens",

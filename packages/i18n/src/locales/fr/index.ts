@@ -423,6 +423,8 @@ export const fr = {
     "usageContextUnavailable": "L’utilisation du contexte n’est pas encore disponible",
     "compactContext": "Compacter le contexte",
     "usageContextLabel": "Contexte",
+    "usageContextRemainingLabel": "Restant",
+    "usageContextUsedLabel": "Utilisé",
     "usageContextLeft": "{{count}} jetons restants",
     "usageContextSpent": "{{count}} jetons utilisés",
     "usageContextTokens": "{{used}} / {{window}} jetons",

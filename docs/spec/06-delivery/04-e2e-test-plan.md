@@ -14903,21 +14903,23 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   reported token usage. Settings → AI → Defaults is reachable.
 - **Steps**:
   1. Confirm the composer footer context track shows remaining capacity
-     (track nearly full, percentage ≈ remaining %, tooltip and aria-label
+     (track nearly full, percentage ≈ remaining %, footer label reads
+     Remaining (`chat.usageContextRemainingLabel`), tooltip and aria-label
      use remaining vocabulary).
   2. Open Settings → AI → Defaults and switch the Context usage display
      segmented control from Remaining to Used.
   3. Return to the chat and inspect the context meter: the track now
      fills by `usedRatio` (nearly empty at low occupancy), the percentage
-     shows ≈ used %, the popover heading shows used tokens + percentage,
-     and the tooltip/aria-label use used-capacity vocabulary.
+     shows ≈ used %, the footer label reads Used
+     (`chat.usageContextUsedLabel`), the popover heading shows used tokens +
+     percentage, and the tooltip/aria-label use used-capacity vocabulary.
   4. Confirm warning/critical track colors still follow remaining capacity:
      at remaining > 25 % the track stays neutral even when used % is high.
   5. Switch back to Remaining and confirm the original display returns.
 - **Expected**: The display mode flips the track fill, percentage, token
-  count, heading, tooltip, and aria-label consistently. Color thresholds
-  remain based on remaining capacity in both modes. The default for a
-  fresh profile is Remaining.
+  count, heading, footer label, tooltip, and aria-label consistently. Color
+  thresholds remain based on remaining capacity in both modes. The default for
+  a fresh profile is Remaining.
 - **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/08-component-spec.md`,
   ADR 0223, `08-meta/decisions-log.md` (D398)
 - **Acceptance**: C (conversation & stream), Quality (preference)
@@ -18145,7 +18147,7 @@ The composer footer shows the current session's project, local/remote host, and 
   button, with the existing anchored menu and plugin slot sides/order preserved.
   The Goal contract picker remains during planning and is hidden during Goal
   execution; Plan remains available. Send and Stop share a 32px rounded-square
-  footprint. The context meter visibly includes `chat.usageContextLabel`.
+  footprint. The context meter visibly names its figure with the direction label (`chat.usageContextRemainingLabel` by default, `chat.usageContextUsedLabel` when the display is Used).
   ScheduledEditor retains its existing picker placement and behavior. Narrow
   layouts keep controls within the Composer without overlap.
 - **Specs:** `04-ux/08-component-spec.md` §11.

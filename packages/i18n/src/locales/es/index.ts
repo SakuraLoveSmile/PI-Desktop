@@ -423,6 +423,8 @@ export const es = {
     "usageContextUnavailable": "El uso del contexto aún no está disponible",
     "compactContext": "Compactar contexto",
     "usageContextLabel": "Contexto",
+    "usageContextRemainingLabel": "Restante",
+    "usageContextUsedLabel": "Usado",
     "usageContextLeft": "Quedan {{count}} tokens",
     "usageContextSpent": "{{count}} tokens usados",
     "usageContextTokens": "{{used}} / {{window}} tokens",

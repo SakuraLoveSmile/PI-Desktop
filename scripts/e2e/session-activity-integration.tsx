@@ -256,7 +256,7 @@ export async function sessionActivityIntegrationProbe() {
     set({messages:usageMessages,retainedTranscripts:{'activity-a':usageMessages,'activity-b':second},settings:{...useAppStore.getState().settings!,contextUsageDisplay:'used'}});
     await until(()=>meter()?.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')==='11','context progress did not use real parent-message usage');
     check(Boolean(meter()?.textContent?.includes('11%')),'context percentage and progress bar agree');
-    check(meter()?.querySelector('.composer-usage-label')?.textContent === i18n.t('chat.usageContextLabel'), 'known context footer includes its visible label');
+    check(meter()?.querySelector('.composer-usage-label')?.textContent === i18n.t('chat.usageContextUsedLabel'), 'known context footer names its used figure');
     const track=meter()!.querySelector('.composer-usage-context-track')!.getBoundingClientRect();const fill=meter()!.querySelector('.composer-usage-context-fill')!.getBoundingClientRect();
     check(Math.abs(fill.width/track.width-28544/262144)<.01,'bar width uses reported tokens over configured context window');
     check(meter()!.getBoundingClientRect().right>=host.querySelector('.composer-shell')!.getBoundingClientRect().right-10,'context meter is right aligned below the input');
@@ -426,7 +426,7 @@ export async function sessionActivityIntegrationProbe() {
         const toolbarBoxes = [...host.querySelectorAll<HTMLElement>('.composer-toolbar button:not([disabled])')].map(control => control.getBoundingClientRect());
         check(toolbarBoxes.every((first, index) => toolbarBoxes.slice(index + 1).every(second => first.right <= second.left + 1 || second.right <= first.left + 1 || first.bottom <= second.top + 1 || second.bottom <= first.top + 1)), `${appearance} enlarged narrow toolbar controls never overlap with plugins`);
         check(host.scrollWidth <= host.clientWidth, `${appearance} enlarged narrow composer has no horizontal overflow`);
-        check(meter()?.querySelector('.composer-usage-label')?.textContent === i18n.t('chat.usageContextLabel'), `${appearance} enlarged context label remains visible`);
+        check(meter()?.querySelector('.composer-usage-label')?.textContent === i18n.t(useAppStore.getState().settings?.contextUsageDisplay === 'used' ? 'chat.usageContextUsedLabel' : 'chat.usageContextRemainingLabel'), `${appearance} enlarged context label remains visible`);
       }
     } finally {
       flushSync(() => narrowPluginDisposers.forEach(dispose => dispose()));

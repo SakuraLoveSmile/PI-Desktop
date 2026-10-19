@@ -435,6 +435,8 @@ export const ko = {
     usageContextUnavailable: "아직 컨텍스트 사용량을 확인할 수 없습니다",
     compactContext: "컨텍스트 압축",
     usageContextLabel: "컨텍스트",
+    usageContextRemainingLabel: "남음",
+    usageContextUsedLabel: "사용됨",
     usageContextLeft: "토큰 {{count}}개 남음",
     usageContextSpent: "토큰 {{count}}개 사용됨",
     usageContextTokens: "{{used}} / {{window}} 토큰",

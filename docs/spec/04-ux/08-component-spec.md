@@ -3222,7 +3222,7 @@ reasoning-level control.
 | input (two empty lines, grows through seven visible lines)        |
 | placeholder: welcome → command/file hint → keyboard hint          |
 | [+] [Agent/Expert Team ▾] [Plan/Goal] [plugin] [model · reasoning ▾] [enhance] [Live] [↑/⏹] |
-| context usage footer (Context label and meter, when available)                                  |
+| context usage footer (Remaining or Used label and meter, when available)                                  |
 +----------------------------------------------------------+
 ```
 
@@ -3267,8 +3267,10 @@ reasoning-level control.
   chip, prompt enhancement, Live voice and the single Stop/Send slot. The model
   chip remains one button and its anchored menu remains tied to that button.
   Send and Stop use the same neutral 32px rounded-square footprint. Context
-  usage stays in the existing footer with the visible `chat.usageContextLabel`
-  beside its meter. The chip shows Bot, the
+  usage stays in the existing footer beside its meter. Its visible label names
+  the leading figure's direction: `chat.usageContextRemainingLabel` (Remaining)
+  or `chat.usageContextUsedLabel` (Used), following the context usage display
+  setting. The unavailable placeholder keeps `chat.usageContextLabel` (Context). The chip shows Bot, the
   current model name, and the
   current canonical reasoning level value separated by `·`; `off` omits the
   level text. The canonical value is rendered as-is (`low`, `high`, `xhigh`,
