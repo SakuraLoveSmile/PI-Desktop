@@ -8,7 +8,7 @@ import { ComposerPlusMenu } from "../../apps/desktop/src/features/chat/composer/
 
 const labels: Record<string, string> = {
   "chat.executionProfile": "Execution profile",
-  "chat.profileAgent": "智能体",
+  "chat.profileAgent": "单智能体",
   "chat.profileAgentDesc": "Single agent",
   "chat.profileTeam": "专家团",
   "chat.profileTeamDesc": "Work with teammates",

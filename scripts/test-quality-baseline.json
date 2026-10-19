@@ -1228,7 +1228,7 @@
       ]
     },
     "apps/desktop/test/composer-pickers.test.mjs": {
-      "assertions": 34,
+      "assertions": 33,
       "cases": 5,
       "signatures": [
         "0e32fc23745f6b358c99",
@@ -1262,7 +1262,6 @@
         "e6ac7de8712f6a127537",
         "e8f40e7dd933d9ce7fb1",
         "ea61dcdb8d016b642e24",
-        "eb0ebf6bc3c681138948",
         "f1dd1b619f5c4025bcd4",
         "f631659d8b20dec3dd44"
       ]
