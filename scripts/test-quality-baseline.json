@@ -627,7 +627,7 @@
       ]
     },
     "apps/desktop/test/chat-error-message.test.mjs": {
-      "assertions": 32,
+      "assertions": 31,
       "cases": 4,
       "signatures": [
         "09b41f449fbdc8900ec4",
@@ -660,7 +660,6 @@
         "e6021b81473b62b80d03",
         "e8f4a229d66a589ea718",
         "f016aa74c01115baf815",
-        "f89ce3bc80257f762cdd",
         "fd6f5cedc4b96615bded"
       ]
     },
