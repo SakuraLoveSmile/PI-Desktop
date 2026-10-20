@@ -11,6 +11,10 @@ import { Host, resolveHostBinary } from "./e2e/host.mjs";
 import { AgentSidecar } from "../packages/host-runtime/dist/agent-sidecar.js";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
+if (process.argv.includes("--worktree-memory")) {
+  const { runWorktreeMemoryContext } = await import("./e2e/worktree-memory-context.mjs");
+  await runWorktreeMemoryContext(root);
+} else {
 const scratch = await mkdtemp(join(tmpdir(), "pi-project-context-"));
 const workspace = join(scratch, "workspace");
 const second = join(scratch, "other-project");
@@ -147,4 +151,5 @@ try {
   await sidecar?.dispose(); await host.stop();
   server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
   await rm(scratch, { recursive: true, force: true });
+}
 }

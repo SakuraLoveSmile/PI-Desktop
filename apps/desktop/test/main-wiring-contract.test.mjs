@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import ts from "typescript";
 
 // Wiring in the composition root and in the plugin services factory is not
 // covered by any behavioural test: those modules import Electron, so they cannot
@@ -92,9 +93,12 @@ function assertPassesRequiredKeys(interfaceSource, interfaceName, callSource, ca
   const keys = requiredKeys(interfaceBody(interfaceSource, interfaceName));
   assert.ok(keys.length > 3, `${interfaceName} should declare several members`);
   const argument = callArgument(callSource, callee);
-  const missing = keys.filter(
-    (key) => !new RegExp(`(^|\\n)\\s*${key}\\s*[,:]`, "m").test(argument),
-  );
+  // Read actual top-level object properties, including grouped shorthand
+  // wiring, without allowing a nested literal to satisfy an omitted dependency.
+  const sourceFile = ts.createSourceFile("wiring.ts", `const dependencies = {${argument}};`, ts.ScriptTarget.Latest, true);
+  const properties = sourceFile.statements[0].declarationList.declarations[0].initializer.properties;
+  const wired = new Set(properties.map(property => property.name?.getText(sourceFile)));
+  const missing = keys.filter(key => !wired.has(key));
   assert.deepEqual(
     missing,
     [],

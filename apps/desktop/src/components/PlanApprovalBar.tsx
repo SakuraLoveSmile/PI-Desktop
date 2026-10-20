@@ -26,6 +26,7 @@ import { Button, Input, Select, SettingsToggle, TooltipButton } from "./ui";
 import { PlanMarkdownActions } from "./PlanMarkdownActions";
 import { ApprovalSummary } from "./ApprovalSummary";
 import { AnchoredMenu } from "./settings/AnchoredMenu";
+import { useBlockedGoalResume } from "../hooks/useBlockedGoalResume";
 
 const APPROVAL_MODES: readonly GlobalPermissionMode[] = [
   "ask",
@@ -60,6 +61,7 @@ function copyKey(kind: ProposalKind, name: string): string {
 
 export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
   const { t } = useTranslation();
+  const heldGoal = useBlockedGoalResume(proposal.sessionId);
   const resolvePlan = useAppStore((state) => state.resolvePlan);
   const convertPlanToGoal = useAppStore((state) => state.convertPlanToGoal);
   const runMissedPlan = useAppStore((state) => state.runMissedPlan);
@@ -303,6 +305,8 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
         ) : null}
       </div>
       {blockedByDraft ? <p className="plan-approval-draft-warning">{t("chat.planDraftPending")}</p> : null}
+      {isPending && effectiveKind === "goal" && heldGoal.hold?.state === "blocked" &&
+        <p className="plan-approval-draft-warning" role="status">{t("goal.blocked.supersede", { title: heldGoal.execution?.title || t("goal.untitled") })}</p>}
       <div className="plan-approval-footer">
         <div className="plan-approval-details">
           {artifactPath ? (

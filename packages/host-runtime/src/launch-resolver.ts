@@ -12,6 +12,8 @@ import {
   type CommandShellCatalog,
   type ModelBinding,
   type Mode,
+  type ProjectGroupContextResult,
+  type ProjectMemoryAlias,
   type SessionThinkingLevel,
   type UserSkillRecord,
   type UserSubagentRecord,
@@ -27,6 +29,7 @@ import {
   resolveSubagentProviders,
   visionFromModelConfig,
   type RuntimeProviderConfig,
+  type ProjectInstructions,
   type UserSubagentDocument,
 } from "@pi-desktop/agent-runtime";
 
@@ -109,6 +112,52 @@ function launchError(message: string, errorCode: string): Error {
 
 function isHostUnavailable(error: unknown): boolean {
   return (error as { errorCode?: string } | null)?.errorCode === ErrorCodes.HOST_UNAVAILABLE;
+}
+
+/** Resolve only memory bodies through an alias; workspace roots remain slot-owned. */
+export async function resolveLaunchProjectContext(
+  host: Pick<HostRpc, "call">,
+  projectPath: string | undefined,
+  projectInstructions: ProjectInstructions | undefined,
+): Promise<{ projectInstructions?: ProjectInstructions; projectMemory?: string; projectMemoryAlias?: ProjectMemoryAlias }> {
+  if (!projectPath) return { projectInstructions };
+  let projectMemory: string | undefined;
+  let projectMemoryAlias: ProjectMemoryAlias | undefined;
+  const readLegacy = async () => {
+    const legacy = await host.call<{ memory?: { content?: string } }>("project.memory.get", { path: projectPath });
+    projectMemory = legacy.memory?.content?.trim() || undefined;
+  };
+  try {
+    const result = await host.call<ProjectGroupContextResult>("project.group.context", { path: projectPath });
+    projectMemoryAlias = result.memoryAlias;
+    const groupRoots = projectMemoryAlias ? [] : result.context?.roots ?? [];
+    const groupRootGuide = groupRoots.length > 1
+      ? [
+          `Primary root: ${groupRoots[0]?.path ?? projectPath}`,
+          ...groupRoots.slice(1).map(root => `Additional root: ${root.path}`),
+          "Use an absolute path when reading or editing an additional root.",
+        ].join("\n")
+      : "";
+    // Alias instructions live separately so a later failed/invalid owner read
+    // can clear them without discarding the slot's file instruction chain.
+    const groupInstructions = projectMemoryAlias ? undefined : result.context?.instructions?.trim();
+    if (groupRootGuide || groupInstructions) {
+      projectInstructions = { entries: [
+        ...(projectInstructions?.entries ?? []),
+        ...(groupRootGuide ? [{ source: "ChatGPT Project folders", content: groupRootGuide }] : []),
+        ...(groupInstructions ? [{ source: "ChatGPT Project instructions", content: groupInstructions }] : []),
+      ] };
+    }
+    projectMemory = (projectMemoryAlias?.memory ?? result.context?.memory)?.content?.trim() || undefined;
+    // A valid empty alias is authoritative, including when the slot has no group.
+    if (!projectMemoryAlias && !result.context) await readLegacy();
+  } catch {
+    projectMemoryAlias = undefined;
+    try { await readLegacy(); } catch {
+      // Project context is best effort; it must never prevent a session launch.
+    }
+  }
+  return { projectInstructions, projectMemory, projectMemoryAlias };
 }
 
 /**
@@ -260,49 +309,9 @@ export function createHeadlessLaunchResolver(options: HeadlessLaunchResolverOpti
     );
     const projectPath =
       typeof session.projectPath === "string" && session.projectPath.trim() ? session.projectPath.trim() : undefined;
-    let projectInstructions = await loadInstructionChain(projectPath);
-    let projectMemory: string | undefined;
-    if (projectPath) {
-      try {
-        const result = await host.call<{
-          context?: { roots?: Array<{ path?: string }>; instructions?: string; memory?: { content?: string } } | null;
-        }>("project.group.context", { path: projectPath });
-        const groupRoots = result.context?.roots ?? [];
-        const groupRootGuide =
-          groupRoots.length > 1
-            ? [
-                `Primary root: ${groupRoots[0]?.path ?? projectPath}`,
-                ...groupRoots.slice(1).map((root) => `Additional root: ${root.path}`),
-                "Use an absolute path when reading or editing an additional root.",
-              ].join("\n")
-            : "";
-        const groupInstructions = result.context?.instructions?.trim();
-        if (groupRootGuide || groupInstructions) {
-          projectInstructions = {
-            entries: [
-              ...(projectInstructions?.entries ?? []),
-              ...(groupRootGuide ? [{ source: "ChatGPT Project folders", content: groupRootGuide }] : []),
-              ...(groupInstructions ? [{ source: "ChatGPT Project instructions", content: groupInstructions }] : []),
-            ],
-          };
-        }
-        const groupMemory = result.context?.memory?.content?.trim();
-        if (groupMemory) projectMemory = groupMemory;
-        if (!result.context) {
-          const legacy = await host.call<{ memory?: { content?: string } }>("project.memory.get", { path: projectPath });
-          const content = legacy.memory?.content?.trim();
-          if (content) projectMemory = content;
-        }
-      } catch {
-        try {
-          const legacy = await host.call<{ memory?: { content?: string } }>("project.memory.get", { path: projectPath });
-          const content = legacy.memory?.content?.trim();
-          if (content) projectMemory = content;
-        } catch {
-          // Project memory is best effort; it must never prevent a session launch.
-        }
-      }
-    }
+    const { projectInstructions, projectMemory, projectMemoryAlias } = await resolveLaunchProjectContext(
+      host, projectPath, await loadInstructionChain(projectPath),
+    );
 
     const userSkills = (await activeUserSkills(projectPath)).filter((skill) => isActiveInProject(skill, projectPath ?? null));
     const pluginSkills = userSkills.map((skill) => ({ id: skill.id, name: skill.name, description: skill.description }));
@@ -386,6 +395,7 @@ export function createHeadlessLaunchResolver(options: HeadlessLaunchResolverOpti
         projectPath,
         projectInstructions,
         projectMemory,
+        projectMemoryAlias,
         provider: {
           id: provider.id,
           name: provider.name,

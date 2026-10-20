@@ -193,6 +193,7 @@ function persistAgentEvent(envelope: AgentEventEnvelope): UiMessage | undefined 
     if (isStaleTerminalEvent(envelope)) return;
     const turnFinalization = finishTurn(envelope.sessionId, "completed", undefined, {
       turnId: envelope.turnId ?? "",
+      ...(event.stopHint ? { stopHint: event.stopHint } : {}),
     });
     // The finalizer's promise can reject — its body attempts the durable end and
     // its release handler no longer swallows a throwing body — so the chain is
@@ -273,7 +274,7 @@ function persistAgentEvent(envelope: AgentEventEnvelope): UiMessage | undefined 
     // event can interpret it as successful completion. Historical/delegate
     // replies are persisted below but cannot alter a live execution.
     if (executionId && !envelope.parentToolCallId && (event.message.status === "aborted" || event.message.status === "error")) {
-      lockExecutionInterruption(envelope.sessionId, envelope.turnId, { errorCode: event.message.error?.code });
+      lockExecutionInterruption(envelope.sessionId, envelope.turnId, { errorCode: event.message.error?.code ?? (event.message.status === "error" ? "TURN_ERROR" : undefined), errored: event.message.status === "error" });
     }
     // Checkpoint the finished snapshot before the outbox append (D327).
     // Settling first dropped the last interval of text, and endTurn used to

@@ -27,6 +27,7 @@ function fixture({ flush = async () => undefined, pendingBySession = () => 0 } =
     async call(method, params) {
       calls.push({ method, params });
       if (method === "plans.finishExecution") return { ok: true };
+      if (method === "goalExecutions.settle") return { execution: { id: executionId }, hold: { state: "blocked" } };
       if (method === "goalReports.markFailed") return { report: { status: "failed" } };
       if (method === "goalReports.finalizeReport") return { report: { status: "ready" } };
       throw new Error(`Unexpected Host call: ${method}`);
@@ -67,6 +68,7 @@ function fixture({ flush = async () => undefined, pendingBySession = () => 0 } =
       size: pendingBySession,
     },
   });
+  runtime.registerResumedExecution({ id: executionId, sessionId, kind: "goal" });
   return { calls, executionId, finished, runtime, sessionId };
 }
 
@@ -75,33 +77,31 @@ test("a failed transcript flush settles the execution but leaves its report fail
   await f.runtime.finishApprovedExecution(f.executionId, "completed");
 
   assert.deepEqual(f.calls.map((call) => call.method), [
-    "plans.finishExecution",
-    "goalReports.markFailed",
+    "goalExecutions.settle",
   ]);
-  assert.deepEqual(f.calls[1].params, {
+  assert.deepEqual(f.calls[0].params, {
     sessionId: f.sessionId,
     executionId: f.executionId,
-    errorCode: "REPORT_PERSISTENCE_BARRIER_FAILED",
+    ended: "agent_stopped",
+    persistenceBarrierFailed: true,
   });
   assert.equal(f.finished.has(f.executionId), true);
 
   await f.runtime.finishApprovedExecution(f.executionId, "completed");
-  assert.equal(f.calls.filter((call) => call.method === "plans.finishExecution").length, 1);
+  assert.equal(f.calls.filter((call) => call.method === "goalExecutions.settle").length, 1);
 });
 
 test("only pending transcript rows in the report session block publication", async () => {
   const blocked = fixture({ pendingBySession: (sessionId) => sessionId === "session-1" ? 1 : 0 });
   await blocked.runtime.finishApprovedExecution(blocked.executionId, "completed");
   assert.deepEqual(blocked.calls.map((call) => call.method), [
-    "plans.finishExecution",
-    "goalReports.markFailed",
+    "goalExecutions.settle",
   ]);
 
   const unrelated = fixture({ pendingBySession: (sessionId) => sessionId === "session-1" ? 0 : 1 });
   await unrelated.runtime.finishApprovedExecution(unrelated.executionId, "completed");
   assert.deepEqual(unrelated.calls.map((call) => call.method), [
-    "plans.finishExecution",
-    "goalReports.finalizeReport",
+    "goalExecutions.settle",
   ]);
 });
 
@@ -160,7 +160,7 @@ async function lifecycleFixture(t, { kind = "goal", stopGate, abortGate, endTurn
       if (method === "session.beginTurn") return { turnId: nextTurnId };
       if (method === "session.endTurn") { endTurnEntered.resolve(); await endTurnGate?.promise; return { ok: true }; }
       if (method === "session.saveActiveRevision") return { saved: null };
-      if (method === "goalReports.finalizeReport") return { report: { status: "ready" } };
+      if (method === "goalExecutions.settle") return { execution: { ...execution, state: "interrupted" }, hold: { state: "blocked" } };
       if (["plans.bindExecutionTurn", "goalReports.bindExecutionTurn", "session.appendMessage", "session.saveInflight", "plans.finishExecution", "team.cancelLeadAsks"].includes(method)) return { ok: true };
       throw new Error(`Unexpected Host call: ${method}`);
     },
@@ -256,21 +256,21 @@ test("provider aborted message followed by agent_end interrupts the Goal executi
   assertInterruptedWithoutReport(f);
 });
 
-test("provider error message without a separate error event interrupts the Goal execution", async (t) => {
+test("provider error message without a separate error event blocks the Goal execution", async (t) => {
   const f = await lifecycleFixture(t);
   f.event({ ...abortedMessage, message: { ...abortedMessage.message, status: "error" } });
   f.event(agentEnd);
   await f.settle();
-  assertInterruptedWithoutReport(f);
+  assert.equal(f.calls.find(call => call.method === "goalExecutions.settle").params.ended, "errored");
 });
 
-test("an error event racing agent_end retains the interrupted execution decision", async (t) => {
+test("an error event racing agent_end retains the blocked execution decision", async (t) => {
   const f = await lifecycleFixture(t);
   f.event({ type: "error", error: { code: "PROVIDER_ERROR", message: "Provider failed", retriable: false } });
   f.event(agentEnd);
   await f.settle();
   assert.equal(f.calls.find((call) => call.method === "session.endTurn").params.status, "error");
-  assertInterruptedWithoutReport(f);
+  assert.equal(f.calls.find(call => call.method === "goalExecutions.settle").params.errorCode, "PROVIDER_ERROR");
 });
 
 test("a provider error message retains its diagnostic code through later terminal events", async (t) => {
@@ -280,8 +280,8 @@ test("a provider error message retains its diagnostic code through later termina
   f.event({ type: "error", error: { code: "PROVIDER_ERROR", message: "Provider failed", retriable: false } });
   f.event(agentEnd);
   await f.settle();
-  const finished = f.calls.find((call) => call.method === "plans.finishExecution");
-  assert.equal(finished.params.status, "interrupted");
+  const finished = f.calls.find((call) => call.method === "goalExecutions.settle");
+  assert.equal(finished.params.ended, "errored");
   assert.equal(finished.params.errorCode, "PROVIDER_ERROR");
   assert.equal(f.calls.some((call) => call.method === "goalReports.finalizeReport"), false);
 });
@@ -310,8 +310,8 @@ test("stale stop, abort and provider-aborted messages cannot interrupt a new Goa
   f.event(abortedMessage, "turn-2", { parentToolCallId: "delegate" });
   f.event(agentEnd, "turn-2");
   await f.settle();
-  assert.deepEqual(f.calls.filter((call) => call.method === "plans.finishExecution").map((call) => call.params.status), ["completed", "completed"]);
-  assert.equal(f.calls.filter((call) => call.method === "goalReports.finalizeReport").length, 2);
+  assert.equal(f.calls.filter((call) => call.method === "goalExecutions.settle").length, 2);
+  assert.equal(f.calls.filter((call) => call.method === "goalReports.finalizeReport").length, 0);
 });
 
 for (const operation of ["stop", "abort"]) {
@@ -343,9 +343,9 @@ test("normal completion publishes exactly one Goal report", async (t) => {
   await f.settle();
   f.event(agentEnd);
   await f.settle();
-  assert.deepEqual(f.calls.filter((call) => call.method === "plans.finishExecution").map((call) => call.params.status), ["completed"]);
-  assert.equal(f.calls.filter((call) => call.method === "goalReports.finalizeReport").length, 1);
-  assert.ok(f.calls.findIndex((call) => call.method === "session.appendMessage") < f.calls.findIndex((call) => call.method === "goalReports.finalizeReport"));
+  assert.equal(f.calls.filter((call) => call.method === "goalExecutions.settle").length, 1);
+  assert.equal(f.calls.filter((call) => call.method === "goalReports.finalizeReport").length, 0);
+  assert.ok(f.calls.findIndex((call) => call.method === "session.appendMessage") < f.calls.findIndex((call) => call.method === "goalExecutions.settle"));
 });
 
 test("a stop after natural completion has claimed the turn cannot rewrite its Goal result", async (t) => {
@@ -356,8 +356,8 @@ test("a stop after natural completion has claimed the turn cannot rewrite its Go
   await f.stop();
   endTurnGate.resolve();
   await f.settle();
-  assert.equal(f.calls.find((call) => call.method === "plans.finishExecution").params.status, "completed");
-  assert.equal(f.calls.filter((call) => call.method === "goalReports.finalizeReport").length, 1);
+  assert.equal(f.calls.find((call) => call.method === "goalExecutions.settle").params.ended, "agent_stopped");
+  assert.equal(f.calls.filter((call) => call.method === "goalReports.finalizeReport").length, 0);
 });
 
 test("ordinary conversations and Plan executions retain graceful-stop completion semantics", async (t) => {
@@ -371,3 +371,12 @@ test("ordinary conversations and Plan executions retain graceful-stop completion
     if (kind === "plan") assert.equal(f.calls.find((call) => call.method === "plans.finishExecution").params.status, "completed");
   }
 });
+
+ test("approved Goal turns suppress ordinary completion notifications and forward team stop hints", async (t) => {
+  const f = await lifecycleFixture(t);
+  f.event({ ...agentEnd, stopHint: "team_unsettled" });
+  await f.settle();
+  assert.equal(f.calls.find(call => call.method === "session.endTurn").params.createNotification, false);
+  assert.equal(f.calls.find(call => call.method === "session.beginTurn").params.createNotification, false);
+  assert.equal(f.calls.find(call => call.method === "goalExecutions.settle").params.stopHint, "team_unsettled");
+ });

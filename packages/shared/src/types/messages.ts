@@ -81,6 +81,8 @@ export type ToolTokenUsage = {
 
 export type UiMessage = {
   id: string;
+  /** Read-side projection from the owning session's durable message index, when known. */
+  turnId?: string;
   role: UiMessageRole;
   content: string;
   /** Internal model instructions/tool declarations; never a visible chat row. */

@@ -76,6 +76,7 @@ The scenarios are specified in
 | `e2e-plan.mjs` | `pnpm test:e2e:plan` | Plan state, checkpoint artifact, and approval transitions |
 | `e2e-plan-ui.mjs` | `pnpm test:e2e:plan-ui` | Plan approval through the rendered UI |
 | `e2e-electron-boot.mjs` | `pnpm test:e2e:boot` | Electron boot probe |
+| `e2e-queue-send-now-abort.mjs` | `pnpm test:e2e:queue-send-now-abort` | Isolated Electron journeys: the abort offer stays hidden for 30 s; a controlled real IPC delay checks disabled/repeated clicks before the command stops and the queue advances; a second command exits normally without a click and the queue still advances, preserving each tool result |
 | `e2e-provider-recovery.mjs` | `node scripts/e2e-provider-recovery.mjs` | Isolated desktop with a localhost fault-injection provider: socket failures, interrupted streams, Responses recovery, exhausted retries, Continue, and recovery across eleven real Read calls. Requires a built desktop/runtime and host binary (`PI_DESKTOP_HOST_BIN` when outside the checkout); retains screenshots and JSON under `.artifacts/issue-699/` |
 | `e2e-settings-scroll.mjs` | `pnpm test:e2e:settings-scroll` | Production Settings component navigation, search anchoring, focus-on-mount, and scroll behavior |
 | `e2e-transcript-render.mjs` | `pnpm test:e2e:transcript` | Production transcript render boundaries, runtime status geometry, and deterministic smooth-text cadence |

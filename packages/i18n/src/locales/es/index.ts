@@ -341,7 +341,10 @@ export const es = {
     "removeQueuedPrompt": "Eliminar mensaje en cola",
     "sendNow": "Enviar ahora",
     sendNowPending: "Esperando a que termine la tarea actual",
-    queuedPromptStopFailed: "No se pudo detener la tarea actual. Este mensaje sigue en cola y se puede cancelar.",
+    queuedPromptToolAbort: "Cancelar comando",
+    queuedPromptToolAbortHint: "Cancelar el comando en curso para que empiece el mensaje en cola",
+    queuedPromptToolAbortGone: "Ese comando ya ha terminado",
+    queuedPromptStopFailed:"No se pudo detener la tarea actual. Este mensaje sigue en cola y se puede cancelar.",
     queuedPromptAlreadyStarted: "Este mensaje ya se está ejecutando. Usa Detener para detener la tarea actual.",
     "moveQueuedPromptUp": "Subir",
     "moveQueuedPromptDown": "Bajar",
@@ -683,6 +686,7 @@ export const es = {
     "artifactScratchUnavailable": "El directorio de sesión temporal no está disponible.",
   },
   "goal": {
+    blocked: en.goal.blocked,
     "progressLabel": "Progreso del objetivo",
     "progressListLabel": "Lista de tareas del objetivo",
     "progressInitializing": "Cargando progreso…",
@@ -2186,6 +2190,7 @@ sklm: {
       endedProcesses: "Finalizados {{count}}",
       clearEndedProcesses: "Limpiar procesos finalizados",
       goal: {
+        reportBlocked: en.panel.activity.goal.reportBlocked,
         reportPending: "Informe pendiente",
         reportUnavailable: "Informe no disponible",
         reportGenerating: "Generando informe",

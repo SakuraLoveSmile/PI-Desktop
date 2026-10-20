@@ -1,3 +1,4 @@
+import { remapGoalSession } from "./goal-identities";
 /**
  * Event bridge: translate a paired host's RACP event stream into the local
  * renderer IPC events already consumed for a local session. The renderer
@@ -226,9 +227,12 @@ export function createRemoteEventBridge(options: RemoteEventBridgeOptions): Remo
         }
         if (isRecord(payload) && isRecord(payload.goalReport)) {
           emit(IPC.event.goalReportChanged, {
-            ...payload.goalReport,
+            ...remapGoalSession(payload.goalReport, remoteSessionId),
             sessionId: remoteSessionId,
           });
+        }
+        if (isRecord(payload) && isRecord(payload.goalExecution)) {
+          emit(IPC.event.goalExecutionChanged, { ...remapGoalSession(payload.goalExecution, remoteSessionId), sessionId: remoteSessionId });
         }
         if (isRecord(payload) && isRecord(payload.goalProgress)) {
           emit(IPC.event.goalProgressChanged, {

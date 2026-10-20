@@ -208,6 +208,13 @@ try {
   assert.equal((await host.call("team.authorizeLeadTool", { teamSessionId: lead.id, callerSessionId: lead.id, toolName: "SubmitGoalReport" })).authorized, true);
   const board = await host.call("team.getBoard", { teamSessionId: lead.id, callerSessionId: lead.id });
   assert.deepEqual(board.tasks.map(task => task.status).sort(), ["cancelled", "cancelled", "failed"]);
+  // This existing fixture is an approved Plan. Goal incident exhaustion is
+  // covered by E2E-GOAL-BLOCKED-003; the Plan completion contract stays intact.
+  await host.call("session.endTurn", { turnId: leadTurn, status: "completed", createNotification: false });
+  await host.call("plans.finishExecution", { executionId: execution.id, status: "completed" });
+  const history = await host.call("plans.pending", { sessionId: lead.id });
+  assert.equal(history.history.find(proposal => proposal.executionId === execution.id).executionState, "completed");
+  assert.equal((await host.call("goalReports.list", { sessionId: lead.id })).reports.length, 0);
   console.log(`PASS ${scenario}: text final rejected, Lead task_update closes undispatched tasks, unread silent notice rejected, wait_for_updates consumes, final/report authorized`);
   console.log(JSON.stringify(evidence));
 } finally {

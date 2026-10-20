@@ -276,3 +276,31 @@ test("an unknown kind stays quiet — the bridge never throws on unfamiliar even
   assert.equal(events.length, 0);
   assert.equal(warnings.length, 0);
 });
+
+
+test("session.changed forwards blocked Goal and its nested identities into the remote session", () => {
+  const { bridge, events } = collect();
+  bridge.handle(makeEnvelope({ kind: "session.changed", payload: { goalExecution: {
+    sessionId: HOST_SESSION_ID, executionId: "goal", execution: { id: "goal", sessionId: HOST_SESSION_ID, state: "interrupted" },
+    hold: { sessionId: HOST_SESSION_ID, state: "blocked", progress: { sessionId: HOST_SESSION_ID, executionId: "goal" } },
+  } } }));
+  assert.equal(events.length, 1);
+  assert.equal(events[0].channel, IPC.event.goalExecutionChanged);
+  assert.equal(events[0].payload.sessionId, REMOTE_SESSION_ID);
+  assert.equal(events[0].payload.execution.sessionId, REMOTE_SESSION_ID);
+  assert.equal(events[0].payload.hold.sessionId, REMOTE_SESSION_ID);
+  assert.equal(events[0].payload.hold.progress.sessionId, REMOTE_SESSION_ID);
+});
+
+test("session.changed remaps holds carried by the existing Goal report event", () => {
+  const { bridge, events } = collect();
+  bridge.handle(makeEnvelope({ kind: "session.changed", payload: { goalReport: {
+    sessionId: HOST_SESSION_ID, executionId: "goal", hold: {
+      sessionId: HOST_SESSION_ID, executionId: "goal", state: "blocked", progress: { sessionId: HOST_SESSION_ID },
+    },
+  } } }));
+  assert.equal(events[0].channel, IPC.event.goalReportChanged);
+  assert.equal(events[0].payload.sessionId, REMOTE_SESSION_ID);
+  assert.equal(events[0].payload.hold.sessionId, REMOTE_SESSION_ID);
+  assert.equal(events[0].payload.hold.progress.sessionId, REMOTE_SESSION_ID);
+});

@@ -12,6 +12,11 @@ export type QueuedPrompt = {
    * ordered until the Host delivers or cancels them.
    */
   priority?: number;
+  /**
+   * Renderer-only clock: when this row was promoted with Send now, or when this
+   * renderer first saw it promoted. The abort offer waits on it.
+   */
+  promotedAt?: number;
 };
 
 export type QueuedPromptDirection = "up" | "down";
@@ -87,6 +92,24 @@ export function promoteQueuedPrompt(
     { ...item, priority: highest + 1 },
     ...waiting,
   ]);
+}
+
+/** Stamp the promotion clock on a promoted row. promoteQueuedPrompt stays clock-free. */
+export function stampQueuedPromptPromotedAt(
+  queues: QueuedPrompts,
+  sessionId: string,
+  promptId: string,
+  promotedAt: number,
+): QueuedPrompts {
+  const queue = queues[sessionId];
+  if (!queue) return queues;
+  return withSessionQueue(
+    queues,
+    sessionId,
+    queue.map((item) =>
+      item.id === promptId && isPromotedQueuedPrompt(item) ? { ...item, promotedAt } : item,
+    ),
+  );
 }
 
 /**

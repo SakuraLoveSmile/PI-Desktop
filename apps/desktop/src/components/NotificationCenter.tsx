@@ -299,14 +299,15 @@ export function NotificationCenter({
             <ul className="notification-list">
               {visibleNotifications.map((notification) => {
                 const failed = notification.kind === "task.failed";
+                const blocked = failed && notification.errorCode === "GOAL_BLOCKED";
                 const sessionTitle = notification.sessionTitle || t("chat.untitledTask");
                 const title = t(
-                  failed
+                  blocked ? "goal.blocked.notificationTitle" : failed
                     ? "notifications.failedTitle"
                     : "notifications.completedTitle",
                   { sessionTitle },
                 );
-                const body = failed
+                const body = blocked ? t("goal.blocked.notificationBody") : failed
                   ? notification.errorCode
                     ? t("notifications.failedBodyWithCode", {
                         code: notification.errorCode,

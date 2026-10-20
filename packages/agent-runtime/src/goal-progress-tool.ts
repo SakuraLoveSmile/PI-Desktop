@@ -20,13 +20,16 @@ export type GoalProgressManagerOptions = {
   sessionId: string;
   executionId: string;
   writeToken: string;
+  initialSnapshot?: GoalProgressSnapshot | null;
   onUpdate: (items: GoalProgressItem[]) => Promise<GoalProgressSnapshot>;
 };
 
 export class GoalProgressManager {
   private lastSnapshot: GoalProgressSnapshot | null = null;
 
-  constructor(private readonly options: GoalProgressManagerOptions) {}
+  constructor(private readonly options: GoalProgressManagerOptions) {
+    this.lastSnapshot = options.initialSnapshot ?? null;
+  }
 
   get executionId(): string {
     return this.options.executionId;

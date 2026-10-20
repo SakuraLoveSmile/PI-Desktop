@@ -350,7 +350,10 @@ export const tr = {
     removeQueuedPrompt: "Kuyruktaki iletiyi kaldır",
     sendNow: "Şimdi gönder",
     sendNowPending: "Geçerli görevin bitmesi bekleniyor",
-    queuedPromptStopFailed: "Geçerli görev durdurulamadı. Bu mesaj hâlâ kuyrukta ve iptal edilebilir.",
+    queuedPromptToolAbort: "Komutu durdur",
+    queuedPromptToolAbortHint: "Çalışan komutu durdurup sıradaki mesajı başlat",
+    queuedPromptToolAbortGone: "Bu komut zaten tamamlandı",
+    queuedPromptStopFailed:"Geçerli görev durdurulamadı. Bu mesaj hâlâ kuyrukta ve iptal edilebilir.",
     queuedPromptAlreadyStarted: "Bu mesaj zaten çalıştırılıyor. Çalışan görevi durdurmak için Durdur düğmesini kullanın.",
     moveQueuedPromptUp: "Yukarı taşı",
     moveQueuedPromptDown: "Aşağı taşı",
@@ -692,6 +695,7 @@ export const tr = {
     artifactScratchUnavailable: "Geçici oturum dizini kullanılamıyor.",
   },
   goal: {
+    blocked: en.goal.blocked,
     progressLabel: "Hedef ilerlemesi",
     progressListLabel: "Hedef görev listesi",
     progressInitializing: "İlerleme yükleniyor…",
@@ -2191,6 +2195,7 @@ sklm: {
       endedProcesses: "Biten {{count}}",
       clearEndedProcesses: "Biten süreçleri temizle",
       goal: {
+        reportBlocked: en.panel.activity.goal.reportBlocked,
         reportPending: "Rapor bekleniyor",
         reportUnavailable: "Rapor kullanılamıyor",
         reportGenerating: "Rapor oluşturuluyor",

@@ -28,8 +28,10 @@ fn active_review(
             "TEAM_UNAUTHORIZED: only the Lead may read execution inbox"
         ));
     }
+    let first = crate::goal_holds::active_resume_scope(db, team)?;
+    let scope = first.as_deref().unwrap_or(expected);
     if sessions::running_turn_id(db, team)?.as_deref() != Some(expected)
-        || !super::authority::review_belongs_to_current_scope(db, team, expected)?
+        || !super::authority::review_belongs_to_current_scope(db, team, scope)?
     {
         return Ok(None);
     }
@@ -49,12 +51,23 @@ fn active_review(
     if !approved {
         return Ok(None);
     }
-    Ok(super::get_launch_review(db, team, None)?.filter(|review| {
-        review.lead_turn_id == expected
-            && review.launch_policy.as_deref().unwrap_or("user_confirmed") == "user_confirmed"
-            && review.strategy.as_deref().unwrap_or("delegate") == "delegate"
-            && !review.members.is_empty()
-    }))
+    let review_id = if first.is_some() {
+        super::get_execution_decision(db, team, scope)?
+            .and_then(|decision| decision.review_ids.and_then(|ids| ids.last().cloned()))
+    } else {
+        None
+    };
+    if first.is_some() && review_id.is_none() {
+        return Ok(None);
+    }
+    Ok(
+        super::get_launch_review(db, team, review_id.as_deref())?.filter(|review| {
+            review.lead_turn_id == scope
+                && review.launch_policy.as_deref().unwrap_or("user_confirmed") == "user_confirmed"
+                && review.strategy.as_deref().unwrap_or("delegate") == "delegate"
+                && !review.members.is_empty()
+        }),
+    )
 }
 
 pub fn state(
@@ -80,10 +93,11 @@ pub(super) fn enrol_task(db: &Database, team: &str, caller: &str, task: &str) ->
     let Some(turn) = sessions::running_turn_id(db, team)? else {
         return Ok(());
     };
-    if active_review(db, team, team, &turn)?.is_none() {
+    let Some(review) = active_review(db, team, team, &turn)? else {
         return Ok(());
-    }
-    let mut decision = super::get_execution_decision(db, team, &turn)?
+    };
+    let scope = review.lead_turn_id;
+    let mut decision = super::get_execution_decision(db, team, &scope)?
         .ok_or_else(|| anyhow!("TEAM_APPROVAL_REQUIRED: current execution decision missing"))?;
     if !decision.task_ids.iter().any(|id| id == task) {
         decision.task_ids.push(task.into());
@@ -91,7 +105,7 @@ pub(super) fn enrol_task(db: &Database, team: &str, caller: &str, task: &str) ->
             chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
         db.kv_set(
             super::TEAM_EXECUTION_DECISION_NS,
-            &format!("{team}:{turn}"),
+            &format!("{team}:{scope}"),
             &serde_json::to_value(decision)?,
         )?;
     }
@@ -105,7 +119,7 @@ pub fn read(db: &Database, team: &str, caller: &str, expected: &str) -> Result<V
         return Ok(vec![]);
     }
     super::authority::require_confirmed_strategy(db, team)?;
-    let decision = super::get_execution_decision(db, team, expected)?
+    let decision = super::get_execution_decision(db, team, &review.lead_turn_id)?
         .ok_or_else(|| anyhow!("TEAM_APPROVAL_REQUIRED: current execution decision missing"))?;
     let key = format!("{team}:{expected}");
     let mut consumed: Vec<String> = db
@@ -156,17 +170,13 @@ pub fn read(db: &Database, team: &str, caller: &str, expected: &str) -> Result<V
 
 /// An approved execution cannot complete while its tasks, experts or incoming
 /// results still belong to it. Participation alone only grants substantive tools.
-pub(super) fn require_settled(
+pub(crate) fn require_settled(
     db: &Database,
     decision: &super::TeamExecutionDecision,
 ) -> Result<()> {
     let tasks = super::list_team_tasks(db, &decision.team_session_id)?;
-    let open_tasks = tasks
+    let open_tasks = open_decision_tasks(db, decision)?
         .iter()
-        .filter(|task| {
-            decision.task_ids.contains(&task.task_id)
-                && matches!(task.status.as_str(), "pending" | "in_progress")
-        })
         .map(|task| {
             format!(
                 "{} ({})",
@@ -260,4 +270,18 @@ fn current_expert_result(
         }
     }
     Ok(false)
+}
+
+pub(crate) fn open_decision_tasks(
+    db: &Database,
+    decision: &super::TeamExecutionDecision,
+) -> Result<Vec<super::TeamTask>> {
+    Ok(super::list_team_tasks(db, &decision.team_session_id)?
+        .into_iter()
+        .filter(|task| {
+            !task.deleted
+                && decision.task_ids.contains(&task.task_id)
+                && matches!(task.status.as_str(), "pending" | "in_progress")
+        })
+        .collect())
 }

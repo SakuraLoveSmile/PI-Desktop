@@ -197,10 +197,10 @@ creates neither A2A tables nor unowned plugin-session rows. The schema version i
 internal persistence invariant, not an additional JSON-RPC field; the
 checkpoint architecture remains host-owned.
 
-The shared host-core storage chain is v19. Plus-only structures, including
+The shared host-core storage chain is v21. Plus-only structures, including
 approved execution provider/model bindings, durable revision intent fields, and
 the `plan_execution_schedules` table, are versioned by the separate Plus track
-recorded in `plus_schema_meta` (current v5; see the data-storage spec, section
+recorded in `plus_schema_meta` (current v9; see the data-storage spec, section
 7.1), so a Plus persistence increment does not move `user_version`. Protocol v11
 remains the wire version; persistence increments on either track do not add a
 JSON-RPC version field.
@@ -777,6 +777,78 @@ contract is being negotiated.
 - `plans.abort` — marks pending approval work interrupted; it never replays or
   changes an already-approved session back to its contract mode
 
+### Goal execution holds
+
+Host-core owns Goal settlement and all hold mutations. `PlanExecutionState`
+remains `queued | running | completed | interrupted`: blocked is represented by
+`interrupted` with `errorCode = GOAL_BLOCKED` and `hold.state = blocked`.
+Execution and report readers include the optional hold; session ownership is
+checked before reading or mutating it. Local Renderer actions use Main/preload,
+not direct persistence access.
+
+- `goalExecutions.get({ sessionId, executionId? })` returns `{ execution?, hold? }`.
+  Omitting the execution ID reads the latest blocked Goal in that session.
+- `goalExecutions.settle({ sessionId, executionId, ended, errorCode?, stopHint?,
+  persistenceBarrierFailed?, durableSeq? })` returns `{ execution, hold?, report? }`.
+  `ended` is `agent_stopped | errored`. This is an internal orchestrator operation;
+  explicit user Stop retains the existing interruption path. Only verified
+  structured `met` with completed existing progress and settled current Team
+  work permits automatic completion. All other endings, including Agent errors,
+  create a hold. Transcript-barrier failure retains report `markFailed` semantics
+  and must never publish stale ready evidence.
+- `goalExecutions.resume({ sessionId, executionId, expectedVersion, modelOverride? })`
+  returns `{ execution, hold, resume: { reasons, segment, priorTurnIds } }`. The optional override
+  is `{ providerId, modelId }`. The hold must be blocked with its expected CAS
+  version and the matching execution must be `interrupted/GOAL_BLOCKED`. The
+  session must be idle with no other queued/running execution. Resume clears
+  the error, changes execution to running, increments the segment/resume count,
+  audits model choice and resumes only the Team pause owned by this hold. Main
+  locks the session operation, begins a turn, binds it (invalidating the old
+  draft) and calls `agent.executeApprovedPlan` with resume metadata. `priorTurnIds`
+  lists this hold's previously bound segment turn IDs in execution order, before
+  the new turn is bound. It is additive/optional for older callers; current Host
+  producers always supply the array, including an empty scope. Runtime matches
+  these identities to Host-projected `UiMessage.turnId`; it never selects by
+  timestamps or includes intervening ordinary turns. Malformed supplied IDs are
+  rejected before runtime admission. Any admission or dispatch failure settles
+  back to a `resume_failed` hold.
+- `goalExecutions.close({ sessionId, executionId, expectedVersion, action })`
+  returns `{ execution, hold, report? }`; `action` is `accept | abandon`. Acceptance
+  is the only path to completed/non-`met`, records `closure = user_accepted`, and
+  uses a valid structured draft or bounded Host facts. Abandon records
+  `GOAL_ABANDONED` and publishes no report. Both are CAS-guarded blocked-only
+  transitions; stale concurrent responses cannot close or resume a newer hold.
+- `goalExecutions.changed` refreshes session/execution-scoped hold readers after
+  settlement, resume, acceptance, abandonment or supersession.
+
+`GoalHold` carries `executionId`, `sessionId`, `state` (blocked/resumed/accepted/
+abandoned/superseded), `reasons`, optional `firstTurnId`, `segments`, `blocks`,
+`resumeCount`, `pausedTeam`, CAS `version`, `createdAt` and `updatedAt`. Reader
+responses may include the available draft and progress snapshot. Reasons are
+`{ code, detail?, tasks? }`, with task entries `{ id, title, status, assigneeId? }`.
+Segments are `{ turnId, startedAt, endedAt? }`; blocks are `{ at, reasons }`.
+`goalExecutions.changed` carries `{ sessionId, executionId, execution?, hold? }`.
+Private progress write tokens never appear in these public payloads.
+
+Blocked settlement atomically updates the approval execution, invalidates its
+progress token, persists reasons/segment history, pauses associated Team work,
+writes `goal_execution_blocked` audit state and creates `task.failed` with
+`error_code = GOAL_BLOCKED`. It never creates `task.completed` or a report-ready
+event. Reasons distinguish `report_missing`, `report_invalid`, `verdict_partial`,
+`verdict_blocked`, `verdict_unknown`, `team_unsettled` (member/task diagnostics),
+`resume_failed` and `agent_error:<code>`. Model blockers continue to use
+`limitations`/`nextSteps`; no `blockers[]` report field is added.
+
+Approval of a replacement Goal atomically marks the old blocked hold superseded
+and its execution `interrupted/GOAL_SUPERSEDED`, releasing only that hold's
+owned Team pause in the same transaction so the new Goal may use its Team.
+An explicit independent user pause clears hold pause ownership; resume and
+supersede cannot clear that user pause. Historical reports are not mutated.
+Plan execution and legacy completed reports keep their existing paths. Host
+boot recovery settles queued/running effective Goals as blocked with a
+`agent_error:HOST_RESTARTED` reason before the generic
+Plan interruption fence. Previously blocked holds are not changed or replayed.
+
 ### Goal reports and real-time progress
 
 - `goalReports.get` / `goalReports.list` / `goalReports.submitDraft` / `goalReports.invalidateDraft` /
@@ -793,6 +865,13 @@ contract is being negotiated.
     Status overrides cannot promote an interrupted execution or overwrite a completed report as interrupted.
     Rejection precedes draft removal or metadata updates, including retries of historical ready reports.
     Interruption records execution status only; it does not publish a fallback completion report.
+    Automatic finalization requires a verified structured `met` draft; otherwise
+    `GOAL_REPORT_NOT_VERIFIED` is returned before writing report files. Bounded
+    Host-facts construction is reserved for explicit held-Goal acceptance and
+    historical completed-report Retry. `goalReports.get`/`list` include the
+    optional hold even when no ready report exists. Schema v2's optional
+    `closure`, `segments` and `blocks` distinguish user acceptance from Agent
+    verification and retain the original first-segment start time.
 - `goalProgress.get` — `{ executionId, sessionId? }` returns `{ progress: GoalProgressSnapshot | null }`.
 - `goalProgress.issueToken` — `{ executionId, sessionId, turnId }` generates and returns `{ writeToken }`
   bound to the running turn recorded in `goal_reports.turn_id` and the effective Goal execution
@@ -1224,6 +1303,7 @@ type PlanExecution = {
   executionProviderId?: string;
   executionModelId?: string;
   state: PlanExecutionState;
+  hold?: GoalHold; // Host-owned hold; see Goal execution holds above.
 };
 
 type PlansPendingResult = {
@@ -1323,8 +1403,10 @@ Goal). The absolute
 30-minute deadline records `expired` with `PLAN_APPROVAL_TIMEOUT`. Abort, host
 restart, sidecar restart, or persistence failure records `interrupted`. Before
 serving RPC after startup, the host transactionally interrupts prior pending
-approvals and queued/running execution states. Pending, queued, and running
-work is never replayed; queued/running interruption after approval leaves the
+approvals and queued/running Plan execution states. Queued/running effective
+Goals first settle as blocked with `agent_error:HOST_RESTARTED`; existing holds
+are unchanged. Pending, queued, and running work is never replayed;
+queued/running interruption after approval leaves the
 session in Agent. The process epoch is internal and is not a wire or database
 field.
 
@@ -1468,8 +1550,10 @@ Tool outcomes (`TOOL_DENIED`, `TOOL_TIMEOUT`, `PATH_OUTSIDE_WORKSPACE`,
    scoped;
    only one pending approval and one queued/running execution exists per
    session, and resolution is serialized by host-core
-7. Startup transactionally interrupts pending approvals and queued/running
-   execution states before RPC service. Late renderer responses fail closed;
+7. Before RPC service, startup transactionally settles queued/running effective
+   Goals as blocked with `agent_error:HOST_RESTARTED`, preserving existing holds,
+   then applies the unchanged Plan pending/execution interruption fence.
+   Late renderer responses fail closed;
    pending interruption keeps the session's contract mode and an
    already-approved queued/running interruption keeps Agent.
 8. A session fork is one host-owned snapshot operation. The source transcript
@@ -1863,7 +1947,7 @@ side effects, so a partial request cannot reset unrelated runtime policy.
 | `project.memory.editor.get` | `path` | `{editor: {owner, memory, autoRecordEnabled}}` |
 | `project.memory.editor.save` | `path, expectedOwner, expectedMemory, entries` | `{editor}` after owner/snapshot CAS |
 | `project.autoMemory.setEnabled` | `path, expectedOwner, enabled` | `{autoRecordEnabled}` |
-| `project.autoMemory.agentList` | trusted `sessionId, boundPath` | `{memory, autoRecordEnabled}` |
+| `project.autoMemory.agentList` | trusted `sessionId, boundPath` | `{memory, autoRecordEnabled, memoryAlias?}` |
 | `project.autoMemory.agentUpsert` | binding plus optional `id`, `title`, `content`, update's `expectedTitle, expectedContent` | current runtime memory state |
 | `project.autoMemory.agentDelete` | binding plus `id, expectedTitle, expectedContent` | current runtime memory state |
 | `project.history.search` | binding plus literal `query` (1–500 characters), optional `limit` (1–20, default 10) | `{hits, hasMore}` |
@@ -2183,3 +2267,28 @@ inbox settlement. This allowance is independent of the existing maximum-three
 confirmed-roster settlement nudges. Members and non-Team sessions are outside
 this rule. No tools are inferred or executed from textual pseudo calls, and
 normal final-answer/event/usage semantics remain unchanged.
+
+## Verified worktree memory aliases
+
+`project.group.context({path})` may additionally return
+`memoryAlias: {memory: ProjectMemory, instructions: string}`. Its existing
+`context` remains the requested slot's actual group context, including null;
+the alias never carries the owner's roots or changes group membership. Presence
+is authoritative even for empty memory/instructions. Ordinary responses omit
+the additive field. `project.memory.get` resolves the same verified owner as
+the fallback memory reader.
+
+`project.autoMemory.agentList` resolves the stored session project after the
+existing trusted binding check and returns the same optional alias. File/Git
+validation runs outside the Host mutex and SQLite transactions; the Host then
+rechecks the session binding before reading memory. Agent callers cannot
+substitute the real root as `boundPath`. Alias reads do not migrate or write
+`kv`; effective `autoRecordEnabled` is false. Plan/Goal writes retain
+`TOOL_DISABLED_IN_PLAN`. Other alias writes (legacy memory setter, snapshot
+editor save, setEnabled and agent mutations) are rejected rather than
+redirected. Group-id setters keep their existing explicit group semantics.
+
+A missing/invalid projection produces bounded diagnostics without memory bytes
+or credentials and preserves ordinary slot ownership semantics. A later
+missing alias or failed refresh revokes the previous alias instructions and
+notes, including when the prior response was nonempty.

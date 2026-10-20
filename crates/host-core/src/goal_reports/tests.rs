@@ -178,7 +178,7 @@ fn test_submit_draft_and_finalize_structured() {
     );
     assert_eq!(read.file_bytes, Some(on_disk.len() as u64));
     let report_val = read.report.clone().expect("ready report body");
-    assert_eq!(report_val["schemaVersion"], 1);
+    assert_eq!(report_val["schemaVersion"], 2);
     assert_eq!(report_val["verdict"], "met");
     assert_eq!(report_val["execution"]["status"], "completed");
     assert_eq!(report_val["execution"]["durableSeq"], 42);
@@ -198,41 +198,20 @@ fn test_submit_draft_and_finalize_structured() {
 }
 
 #[test]
-fn test_finalize_fallback_when_no_draft() {
+fn test_finalize_rejects_missing_draft_without_publication() {
     let (_dir, db) = create_test_db();
-    let session_id = "sess-fallback";
-    let execution_id = "exec-fallback-1";
-    seed_goal_execution(&db, session_id, execution_id);
+    seed_goal_execution(&db, "s", "e");
+    bind_execution_turn(&db, "e", "t").unwrap();
     db.conn()
-        .execute(
-            "UPDATE plan_approvals SET execution_state = 'completed' WHERE execution_id = ?1",
-            params![execution_id],
-        )
+        .execute("UPDATE plan_approvals SET execution_state='completed'", [])
         .unwrap();
-    bind_execution_turn(&db, execution_id, "turn-fb").unwrap();
-
-    let summary =
-        finalize_report(&db, execution_id, 10, Some("completed"), Some("USER_ABORT")).unwrap();
-    assert_eq!(summary.status, "ready");
-    assert_eq!(summary.verdict, "unknown");
-    assert_eq!(summary.integrity, "fallback");
-
-    // A fallback report is a SUCCESSFUL `ready` read. Its `integrity.kind` is
-    // the only signal that no completed structured report exists, so the state
-    // must stay `ready` while the integrity stays distinguishable.
-    let read = read_report(&db, session_id, execution_id).unwrap();
-    assert_eq!(read.state, REPORT_STATE_READY);
-    assert_eq!(read.integrity.as_deref(), Some("fallback"));
-    assert_ne!(read.integrity.as_deref(), Some("structured"));
-    assert_eq!(read.verdict.as_deref(), Some("unknown"));
-    let report_val = read.report.expect("fallback report body");
-    assert_eq!(report_val["schemaVersion"], 1);
-    assert_eq!(report_val["integrity"]["kind"], "fallback");
-    assert_eq!(report_val["execution"]["status"], "completed");
-    assert_eq!(report_val["execution"]["errorCode"], "USER_ABORT");
-    let summary = list_reports(&db, session_id).unwrap().remove(0);
-    assert_eq!(summary.status, "ready");
-    assert_eq!(summary.execution_status.as_deref(), Some("completed"));
+    let error = finalize_report(&db, "e", 0, None, None).unwrap_err();
+    assert!(error.to_string().starts_with("GOAL_REPORT_NOT_VERIFIED"));
+    assert!(!report_file_path(db.data_dir(), "s", "e").exists());
+    assert_eq!(
+        read_report(&db, "s", "e").unwrap().state,
+        REPORT_STATE_PENDING
+    );
 }
 
 #[test]
@@ -297,12 +276,6 @@ fn test_mark_failed_is_idempotent_and_retry_uses_host_facts() {
     let session_id = "sess-failed";
     let execution_id = "exec-failed-1";
     seed_goal_execution(&db, session_id, execution_id);
-    db.conn()
-        .execute(
-            "UPDATE plan_approvals SET execution_state = 'completed' WHERE execution_id = ?1",
-            params![execution_id],
-        )
-        .unwrap();
 
     submit_draft(
         &db,
@@ -310,6 +283,12 @@ fn test_mark_failed_is_idempotent_and_retry_uses_host_facts() {
         &json!({ "summary": "stale agent draft", "verdict": "met" }),
     )
     .unwrap();
+    db.conn()
+        .execute(
+            "UPDATE plan_approvals SET execution_state = 'completed' WHERE execution_id = ?1",
+            params![execution_id],
+        )
+        .unwrap();
     mark_failed(&db, session_id, execution_id, "REPORT_DRAFT_PERSIST_FAILED").unwrap();
     mark_failed(&db, session_id, execution_id, "REPORT_DRAFT_PERSIST_FAILED").unwrap();
     let status: String = db
@@ -337,6 +316,7 @@ fn test_mark_failed_is_idempotent_and_retry_uses_host_facts() {
     assert_eq!(report.verdict.as_deref(), Some("unknown"));
     let body = report.report.expect("retried fallback report body");
     assert_eq!(body["integrity"]["kind"], "fallback");
+    assert!(body.get("closure").is_none());
     assert_eq!(body["verdict"], "unknown");
 }
 
@@ -430,7 +410,7 @@ fn test_submit_draft_rejects_terminal_reports_without_mutation() {
 }
 
 #[test]
-fn test_invalidate_draft_triggers_fallback() {
+fn test_invalidate_draft_prevents_automatic_publication() {
     let (_dir, db) = create_test_db();
     let session_id = "sess-inv";
     let execution_id = "exec-inv-1";
@@ -473,10 +453,8 @@ fn test_invalidate_draft_triggers_fallback() {
             params![execution_id],
         )
         .unwrap();
-    let summary = finalize_report(&db, execution_id, 1, Some("completed"), None).unwrap();
-    assert_eq!(summary.status, "ready");
-    assert_eq!(summary.integrity, "fallback");
-    assert_eq!(summary.verdict, "unknown");
+    assert!(finalize_report(&db, execution_id, 1, Some("completed"), None).is_err());
+    assert!(!report_file_path(db.data_dir(), session_id, execution_id).exists());
 }
 
 fn structured_draft() -> Value {
@@ -496,13 +474,13 @@ fn structured_draft() -> Value {
 }
 
 fn ready_structured_file(db: &Database, session_id: &str, execution_id: &str) {
+    submit_draft(db, execution_id, &structured_draft()).unwrap();
     db.conn()
         .execute(
             "UPDATE plan_approvals SET execution_state = 'completed' WHERE execution_id = ?1",
             params![execution_id],
         )
         .unwrap();
-    submit_draft(db, execution_id, &structured_draft()).unwrap();
     finalize_report(db, execution_id, 7, Some("completed"), None).unwrap();
     let _ = session_id;
 }

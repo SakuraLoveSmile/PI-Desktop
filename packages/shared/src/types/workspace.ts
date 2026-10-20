@@ -1,4 +1,4 @@
-import type { ProjectMemory } from "./filesystem.js";
+import type { ProjectMemory, ProjectMemoryAlias } from "./filesystem.js";
 
 /** Shared public types grouped by the owning application domain. */
 export type AppNotificationKind = "task.completed" | "task.failed";
@@ -61,6 +61,12 @@ export type ProjectGroupContext = {
   roots: ProjectGroupRoot[];
   instructions: string;
   memory: ProjectMemory;
+};
+
+export type ProjectGroupContextResult = {
+  context: ProjectGroupContext | null;
+  /** Memory-only alias; never changes group membership or workspace roots. */
+  memoryAlias?: ProjectMemoryAlias;
 };
 
 /**

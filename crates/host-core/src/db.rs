@@ -22,6 +22,8 @@ mod migrations;
 mod model;
 mod plugin_providers_migration;
 mod plus_schema;
+#[cfg(test)]
+pub(crate) use plus_schema::PLUS_SCHEMA_VERSION;
 mod project_auto_memory;
 mod project_groups;
 mod project_memory_editor;

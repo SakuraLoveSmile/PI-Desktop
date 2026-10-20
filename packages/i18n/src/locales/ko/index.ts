@@ -350,7 +350,10 @@ export const ko = {
     removeQueuedPrompt: "대기 중인 메시지 제거",
     sendNow: "지금 보내기",
     sendNowPending: "현재 작업이 끝나기를 기다리는 중",
-    queuedPromptStopFailed: "현재 작업을 중지하지 못했습니다. 이 메시지는 아직 대기 중이며 취소할 수 있습니다.",
+    queuedPromptToolAbort: "명령 중단",
+    queuedPromptToolAbortHint: "실행 중인 명령을 중단해 대기 중인 메시지를 시작합니다",
+    queuedPromptToolAbortGone: "이 명령은 이미 끝났습니다",
+    queuedPromptStopFailed:"현재 작업을 중지하지 못했습니다. 이 메시지는 아직 대기 중이며 취소할 수 있습니다.",
     queuedPromptAlreadyStarted: "이 메시지는 이미 실행 중입니다. 중지 버튼을 사용하세요.",
     moveQueuedPromptUp: "위로",
     moveQueuedPromptDown: "아래로",
@@ -692,6 +695,7 @@ export const ko = {
     artifactScratchUnavailable: "임시 세션 디렉터리를 사용할 수 없습니다.",
   },
   goal: {
+    blocked: en.goal.blocked,
     progressLabel: "목표 진행 상황",
     progressListLabel: "목표 작업 목록",
     progressInitializing: "진행 상황 불러오는 중…",
@@ -2201,6 +2205,7 @@ sklm: {
       endedProcesses: "종료 {{count}}개",
       clearEndedProcesses: "종료된 프로세스 지우기",
       goal: {
+        reportBlocked: en.panel.activity.goal.reportBlocked,
         reportPending: "보고서 대기 중",
         reportUnavailable: "보고서를 사용할 수 없음",
         reportGenerating: "보고서 생성 중",

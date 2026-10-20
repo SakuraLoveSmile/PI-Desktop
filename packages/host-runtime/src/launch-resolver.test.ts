@@ -1,10 +1,13 @@
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { createHeadlessLaunchResolver, type HostProviderRecord } from "./launch-resolver.js";
 
 type Call = { method: string; params: Record<string, unknown> };
 
-function hostWith(providers: HostProviderRecord[], secrets: Record<string, string> = {}) {
+function hostWith(providers: HostProviderRecord[], secrets: Record<string, string> = {}, projectContext: unknown = { context: null }) {
   const calls: Call[] = [];
   return {
     calls,
@@ -30,7 +33,7 @@ function hostWith(providers: HostProviderRecord[], secrets: Record<string, strin
           case "agents.disabledBuiltins":
             return { disabled: [] } as T;
           case "project.group.context":
-            return { context: null } as T;
+            return projectContext as T;
           case "project.memory.get":
             return { memory: { content: "remember me" } } as T;
           default:
@@ -55,6 +58,56 @@ const provider: HostProviderRecord = {
 };
 
 describe("createHeadlessLaunchResolver", () => {
+  it.each([[false, false], [true, false], [false, true], [true, true]])(
+    "uses the authoritative memory alias without falling back to slot notes (empty=%s, grouped=%s)", async (empty, grouped) => {
+    const root = await mkdtemp(join(tmpdir(), "memory-alias-launch-"));
+    const slot = join(root, "slot-1");
+    const owner = join(root, "real-project");
+    await mkdir(slot);
+    await mkdir(owner);
+    await writeFile(join(slot, "AGENTS.md"), "Slot file instructions.");
+    await writeFile(join(owner, "AGENTS.md"), "Real root untracked instructions must stay private.");
+    try {
+      const memoryAlias = { memory: { content: empty ? "" : "Real project notes.", entries: [] },
+        instructions: empty ? "" : "Real group instructions." };
+      const { host, calls } = hostWith([provider], { p1: "sk-test" }, {
+        context: grouped ? { roots: [{ path: owner }, { path: join(owner, "additional") }],
+          instructions: "Stale slot group instructions.", memory: { content: "Stale slot group notes." } } : null, memoryAlias,
+      });
+      const resolver = createHeadlessLaunchResolver({ getHost: () => host, dataDir: root, log: () => undefined });
+      const launch = await resolver.resolve("slot-session", { projectPath: slot }, {});
+      expect(launch.projectPath).toBe(slot);
+      expect(launch.sidecarParams.projectPath).toBe(slot);
+      expect(launch.sidecarParams.projectMemory).toBe(empty ? undefined : "Real project notes.");
+      expect(launch.sidecarParams.projectMemoryAlias).toEqual(memoryAlias);
+      const instructions = JSON.stringify(launch.sidecarParams.projectInstructions);
+      expect(instructions).toContain("Slot file instructions.");
+      expect(instructions).not.toContain("Real root untracked instructions");
+      expect(instructions).not.toContain(owner);
+      expect(instructions).not.toContain("Primary root:");
+      expect(instructions).not.toContain("Additional root:");
+      expect(instructions).not.toContain("Stale slot group");
+      expect(calls.filter(call => call.method === "project.memory.get")).toEqual([]);
+      expect(calls.find(call => call.method === "project.group.context")?.params).toEqual({ path: slot });
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+
+  it("keeps ordinary group roots, memory and instructions when no alias exists", async () => {
+    const { host, calls } = hostWith([provider], { p1: "sk-test" }, { context: {
+      roots: [{ path: "/ordinary/project" }, { path: "/ordinary/additional" }],
+      instructions: "Ordinary group rules.", memory: { content: "Ordinary group notes." },
+    } });
+    const resolver = createHeadlessLaunchResolver({ getHost: () => host, dataDir: "/data", log: () => undefined });
+    const launch = await resolver.resolve("ordinary", { projectPath: "/ordinary/project" }, {});
+    expect(launch.sidecarParams.projectMemory).toBe("Ordinary group notes.");
+    expect(launch.sidecarParams.projectMemoryAlias).toBeUndefined();
+    const instructions = JSON.stringify(launch.sidecarParams.projectInstructions);
+    expect(instructions).toContain("Ordinary group rules.");
+    expect(instructions).toContain("Primary root: /ordinary/project");
+    expect(instructions).toContain("Additional root: /ordinary/additional");
+    expect(calls.some(call => call.method === "project.memory.get")).toBe(false);
+  });
+
   it("resolves the session's provider, its secret, the shell, skills and project memory", async () => {
     const { host, calls } = hostWith([provider], { p1: "sk-test" });
     const resolver = createHeadlessLaunchResolver({ getHost: () => host, dataDir: "/data", log: () => undefined });
