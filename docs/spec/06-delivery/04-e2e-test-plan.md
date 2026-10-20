@@ -6308,7 +6308,8 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
      card's head band, the Mermaid canvas, tool output, the composer placeholder
      and disabled send chip, the dialog scrim and permission backdrop, and the
      dock question card with its option row. Apply custom surface variables,
-     keyboard-focus both searches, then remove the custom theme.
+     keyboard-focus both searches and the composer input, mark the composer shell
+     as a file-drop target, then remove the custom theme.
 - **Expected**:
   - Work panel body reads as quiet `#fafafa` inset paper with a white header band.
   - Settings fields, browser URL, segment tracks, and shortcut keycaps use light inset fills; focused fields lift with a neutral ring.
@@ -6328,12 +6329,18 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
     existing shadows/focus rings. Prose ink mixes follow `--ds-text-primary`,
     and the `one-dark-pro` / `one-light` Shiki plate and its ink stay with the
     Shiki theme by design. This batch does not change plugin APIs.
+  - The composer shell paints its neutral focus ring and glow while its input has
+    focus, paints the accent drop outline while a file is dragged over it, and shows
+    no outline at idle. The critical context-usage meter paints its value and fill
+    with `--ds-danger`, which resolves to the error red in each palette.
 - **Specs linked**: `04-ux/07-ui-design-system.md`, `04-ux/08-component-spec.md`
 - **Acceptance**: D148
 - **Milestone**: M5
 - **Status detail**: `pnpm test:e2e:theme-surfaces` exercises these ordinary fills,
-  focus states, and built-in restoration with real Chromium, production CSS,
-  and deterministic DOM fixtures; plugin installation/lifecycle is not covered.
+  focus states, the composer focus, idle and file-drop cues, the critical usage
+  meter's `--ds-danger` paint, and built-in restoration with real Chromium,
+  production CSS, and deterministic DOM fixtures; plugin installation/lifecycle is
+  not covered.
   Branch runs do not replace post-integration E2E. Other surfaces in this
   scenario retain manual visual checks.
 

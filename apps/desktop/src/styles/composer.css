@@ -224,14 +224,17 @@
     transform var(--motion-duration-normal) var(--motion-ease-out);
 }
 
-/* The approved composer outline stays neutral in both themes. */
-.composer-shell:focus-within {
+/* The approved composer outline stays neutral in both themes. The state cues
+ * carry the themed root so they score (0,4,0): the per-theme shell rules score
+ * (0,3,0) and load later (globals.css imports composer-menus and theme-overrides
+ * after this file), so a bare state selector never paints. */
+:root[data-theme] .composer-shell:focus-within {
   border-color: var(--ds-border-default);
   box-shadow: 0 7px 24px color-mix(in oklab, var(--ds-text-primary) 9%, transparent);
 }
 
 /* Native file-system drops get a target cue without changing shell geometry. */
-.composer-shell.is-drop-target {
+:root[data-theme] .composer-shell.is-drop-target {
   outline: 2px solid color-mix(in oklab, var(--ds-accent) 72%, transparent);
   outline-offset: 3px;
 }

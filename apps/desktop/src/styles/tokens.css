@@ -142,6 +142,8 @@
   --ds-success: #40c977;
   --ds-warning: #ff8549;
   --ds-error: #ff6764;
+  /* Critical usage and danger text reuse the error red in each palette. */
+  --ds-danger: var(--ds-error);
   --ds-info: var(--gray-300);
   --ds-purple: #c27aff;
   --ds-goal: #2dd4bf;
@@ -281,6 +283,7 @@
   --ds-success: #00a240;
   --ds-warning: #e25507;
   --ds-error: #e02e2a;
+  --ds-danger: var(--ds-error);
   --ds-info: #5d5d5d;
   --ds-purple: #7c3aed;
   --ds-goal: #0d9488;
