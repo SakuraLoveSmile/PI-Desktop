@@ -1907,9 +1907,9 @@ Single message render — either user (plaintext) or assistant (markdown streami
   horizontal progress track beside the percentage, omitting the redundant
   `Context` label; the leading figure (track fill, percentage, token label,
   popover heading, tooltip, and
-  `aria-label`) follows `settings.contextUsageDisplay` — `"remaining"`
-  (default) or `"used"` — so the footer track fills by `remainingRatio` or
-  `usedRatio` accordingly. Other consumers of the existing ring variant retain
+  `aria-label`) follows `settings.contextUsageDisplay` — `"used"`
+  (default) or `"remaining"` — so the footer track fills by `usedRatio` or
+  `remainingRatio` accordingly. Other consumers of the existing ring variant retain
   their previous rendering. Low capacity changes the semantic color based
   on remaining capacity (remaining ≤ 25 % warning, ≤ 10 % critical)
   regardless of display mode, without making color the only signal.

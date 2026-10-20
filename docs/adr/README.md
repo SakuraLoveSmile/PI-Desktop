@@ -270,7 +270,7 @@ Each ADR includes:
 | message-quotes-and-side-chats | Message quotes and renderer-owned side chats | Superseded by 0268 |
 | response-annotations | Response annotations as prompt attachments | Superseded by 0268 |
 | floating-annotation-index | Floating annotation index and source locations | Superseded by 0268 |
-| 0223 | Context Usage Display Preference | Accepted (amends 0184) |
+| 0223 | Context Usage Display Preference | Accepted (amends 0184; default amended 2026-10-20) |
 | 0224 | Right panel tab strip and data-driven add menu | Accepted (issue #229) |
 | 0225 | Restore deferred tools from effective session context | Accepted (issue #225) |
 | 0226 | Reserve chat width for composer controls | Accepted |

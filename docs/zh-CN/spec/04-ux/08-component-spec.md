@@ -1305,8 +1305,8 @@ row 而不是在转录本中添加树镶边。
   本地化无障碍名称说明不可用，不伪造 0% 或 100%。检查器在输入区下方页脚右端，
   显示水平进度轨和百分比，去掉重复的 `Context` 文字；引导数值（填充、百分比、令牌
   标签、弹层标题、tooltip 与 `aria-label`）跟随
-  `settings.contextUsageDisplay`——`"remaining"`（默认）或 `"used"`——
-  因此页脚进度轨按 `remainingRatio` 或 `usedRatio` 填充；其他既有圆环使用者保持原样。低容量时根据剩余容量
+  `settings.contextUsageDisplay`——`"used"`（默认）或 `"remaining"`——
+  因此页脚进度轨按 `usedRatio` 或 `remainingRatio` 填充；其他既有圆环使用者保持原样。低容量时根据剩余容量
   改变语义颜色（剩余 ≤ 25 % 警告、≤ 10 % 临界），不随显示模式变化，
   不让颜色成为唯一信号。点击触发器（或使用键盘激活）会打开非模态摘要
   面板，标题跟随同一显示模式，并展示已用/窗口计数以及两个无卡片的本轮/

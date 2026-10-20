@@ -139,12 +139,13 @@ export function calculateContextUsage(
 }
 
 /**
- * Which figure the composer ring and its summary lead with (D398). Absent or
- * unrecognised values keep the remaining-capacity default, so a persisted
- * typo never blanks the trigger.
+ * Which figure the composer ring and its summary lead with (D398; default
+ * changed to used on 2026-10-20). Only an explicit `remaining` keeps the
+ * countdown. Absent or unrecognised values lead with used capacity, so a
+ * persisted typo never blanks the trigger.
  */
 export function resolveContextUsageDisplay(value: unknown): ContextUsageDisplay {
-  return value === "used" ? "used" : "remaining";
+  return value === "remaining" ? "remaining" : "used";
 }
 
 /** Visible footer label for the leading figure, so its direction reads without the bar. */
@@ -376,7 +377,7 @@ export function resolveComposerUsageFooterMetrics({
   responseDurationMs,
   responseOutputTokens,
   responseOutputEstimated = false,
-  contextUsageDisplay = "remaining",
+  contextUsageDisplay = "used",
 }: {
   usage: MessageUsage;
   turnUsage: MessageUsage;

@@ -6658,9 +6658,9 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   - Opening the context usage inspector after a checkpoint shows one line with
     the compaction count and the newest summary's token estimate; before any
     checkpoint that line is absent.
-  - The context usage indicator exposes the same localized remaining-context
-    summary on hover and keyboard focus, and its tooltip remains visible above
-    the home/docked composer without clipping.
+  - The context usage indicator exposes the same localized context summary
+    (used figure by default) on hover and keyboard focus, and its tooltip
+    remains visible above the home/docked composer without clipping.
   - At the hard boundary a durable checkpoint is created before the next model
     request. The complete visible transcript is unchanged, and the continued
     task stays below the model-aware safe budget.
@@ -10457,8 +10457,9 @@ This test plan spec is accepted when:
 - Complete an assistant turn that reports usage.
 - Expect a model badge under the answer and the compact Context inspector in
   the composer toolbar, left of the model picker. The trigger shows the
-  remaining-capacity ring and percentage; clicking it (or activating it from
-  the keyboard) shows remaining tokens plus percentage, used/window counts,
+  context ring and percentage in the configured figure (used capacity by
+  default; see E2E-250); clicking it (or activating it from the keyboard)
+  shows the matching tokens plus percentage, used/window counts,
   two unboxed turn/speed values, one inline exact provider-usage summary, and
   one aggregate tool-usage summary with types, calls, and approximate tokens.
   Per-tool rows, bars, badges, explanatory estimate copy, and inner section
@@ -14912,24 +14913,25 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Preconditions**: An Agent session has completed at least one turn that
   reported token usage. Settings → AI → Defaults is reachable.
 - **Steps**:
-  1. Confirm the composer footer context track shows remaining capacity
-     (track nearly full, percentage ≈ remaining %, footer label reads
-     Remaining (`chat.usageContextRemainingLabel`), tooltip and aria-label
-     use remaining vocabulary).
+  1. On a fresh profile, confirm the composer footer context track shows used
+     capacity by default (track nearly empty at low occupancy, percentage ≈
+     used %, footer label reads Used (`chat.usageContextUsedLabel`),
+     tooltip and aria-label use used vocabulary).
   2. Open Settings → AI → Defaults and switch the Context usage display
-     segmented control from Remaining to Used.
+     segmented control from Used to Remaining.
   3. Return to the chat and inspect the context meter: the track now
-     fills by `usedRatio` (nearly empty at low occupancy), the percentage
-     shows ≈ used %, the footer label reads Used
-     (`chat.usageContextUsedLabel`), the popover heading shows used tokens +
-     percentage, and the tooltip/aria-label use used-capacity vocabulary.
+     fills by `remainingRatio` (nearly full at low occupancy), the percentage
+     shows ≈ remaining %, the footer label reads Remaining
+     (`chat.usageContextRemainingLabel`), the popover heading shows remaining tokens +
+     percentage, and the tooltip/aria-label use remaining-capacity vocabulary.
   4. Confirm warning/critical track colors still follow remaining capacity:
      at remaining > 25 % the track stays neutral even when used % is high.
-  5. Switch back to Remaining and confirm the original display returns.
+  5. Switch back to Used and confirm the default display returns.
 - **Expected**: The display mode flips the track fill, percentage, token
-  count, heading, footer label, tooltip, and aria-label consistently. Color
-  thresholds remain based on remaining capacity in both modes. The default for
-  a fresh profile is Remaining.
+  count, heading, footer label, tooltip, and aria-label consistently. Color thresholds
+  remain based on remaining capacity in both modes. The default for a
+  fresh profile is Used; an explicit Remaining choice saved before the
+  default changed is kept.
 - **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/08-component-spec.md`,
   ADR 0223, `08-meta/decisions-log.md` (D398)
 - **Acceptance**: C (conversation & stream), Quality (preference)
