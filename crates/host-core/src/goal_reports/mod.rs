@@ -22,6 +22,9 @@ pub mod assets;
 pub mod evidence;
 mod progress;
 mod read;
+mod validation;
+
+use validation::validate_structured_draft;
 
 #[allow(unused_imports)]
 use read::sha256_hex;
@@ -37,7 +40,7 @@ mod tests;
 
 pub const SCHEMA: &str = include_str!("schema.sql");
 
-pub const GOAL_REPORT_SCHEMA_VERSION: i64 = 1;
+pub const GOAL_REPORT_SCHEMA_VERSION: i64 = 2;
 pub const MAX_REPORT_JSON_BYTES: usize = 256 * 1024; // 256 KiB
 pub const MAX_EVIDENCE_SUMMARY_BYTES: usize = 2 * 1024; // 2 KiB
 pub const MAX_METRICS: usize = 8;
@@ -62,8 +65,12 @@ pub struct GoalReportSummary {
     pub turn_id: Option<String>,
     pub status: String,
     pub execution_status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hold: Option<crate::goal_holds::GoalHold>,
     pub verdict: String,
     pub integrity: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub closure: Option<String>,
     pub summary: String,
     pub goal_title: String,
     pub file_path: String,
@@ -83,7 +90,9 @@ fn row_to_summary(row: &Row<'_>) -> rusqlite::Result<GoalReportSummary> {
         turn_id: row.get("turn_id")?,
         status: row.get("status")?,
         execution_status: row.get("execution_status")?,
+        hold: None,
         integrity: row.get("integrity")?,
+        closure: None,
         verdict: row.get("verdict")?,
         summary: row.get("summary")?,
         goal_title: row.get("goal_title").unwrap_or_default(),
@@ -165,6 +174,16 @@ pub fn bind_execution_turn(db: &Database, execution_id: &str, turn_id: &str) -> 
         return Ok(());
     }
 
+    let finalized: bool = db.conn().query_row(
+        "SELECT EXISTS(SELECT 1 FROM goal_reports WHERE execution_id=?1 AND status='ready')",
+        [execution_id],
+        |row| row.get(0),
+    )?;
+    if finalized {
+        return Err(anyhow!("CONFLICT: finalized goal reports are immutable"));
+    }
+    invalidate_draft(db, execution_id)?;
+    crate::goal_holds::bind_segment(db, execution_id, turn_id)?;
     let report_id = format!("rep-{}", Uuid::new_v4().simple());
     db.conn()
         .prepare_cached(
@@ -210,189 +229,6 @@ pub fn invalidate_draft(db: &Database, execution_id: &str) -> Result<()> {
     Ok(())
 }
 
-fn validate_string_field<'a>(
-    object: &'a serde_json::Map<String, Value>,
-    field: &str,
-    context: &str,
-) -> Result<&'a str> {
-    object
-        .get(field)
-        .and_then(Value::as_str)
-        .filter(|value| !value.trim().is_empty())
-        .ok_or_else(|| anyhow!("INVALID_ARGUMENT: {context}.{field} must be a non-empty string"))
-}
-
-fn validate_enum_field(
-    object: &serde_json::Map<String, Value>,
-    field: &str,
-    allowed: &[&str],
-    context: &str,
-) -> Result<()> {
-    let value = validate_string_field(object, field, context)?;
-    if allowed.contains(&value) {
-        Ok(())
-    } else {
-        Err(anyhow!(
-            "INVALID_ARGUMENT: {context}.{field} must be one of: {}",
-            allowed.join(", ")
-        ))
-    }
-}
-
-fn validate_array<'a>(draft: &'a Value, field: &str) -> Result<Option<&'a Vec<Value>>> {
-    let Some(value) = draft.get(field) else {
-        return Ok(None);
-    };
-    value
-        .as_array()
-        .map(Some)
-        .ok_or_else(|| anyhow!("INVALID_ARGUMENT: {field} must be an array"))
-}
-
-fn validate_structured_draft(draft: &Value) -> Result<()> {
-    let object = draft
-        .as_object()
-        .ok_or_else(|| anyhow!("INVALID_ARGUMENT: draft must be an object"))?;
-    let summary = validate_string_field(object, "summary", "draft")?;
-    if summary.len() > MAX_REPORT_JSON_BYTES {
-        return Err(anyhow!("REPORT_SIZE_EXCEEDED: summary too large"));
-    }
-    validate_enum_field(
-        object,
-        "verdict",
-        &["met", "partial", "blocked", "unknown"],
-        "draft",
-    )?;
-
-    for (field, limit) in [
-        ("metrics", MAX_METRICS),
-        ("criteria", MAX_CRITERIA),
-        ("steps", MAX_STEPS),
-        ("files", MAX_FILES),
-        ("checks", MAX_CHECKS),
-    ] {
-        if let Some(items) = validate_array(draft, field)? {
-            if items.len() > limit {
-                return Err(anyhow!("LIMIT_EXCEEDED: too many {field}"));
-            }
-        }
-    }
-
-    if let Some(items) = validate_array(draft, "metrics")? {
-        for (index, item) in items.iter().enumerate() {
-            let object = item
-                .as_object()
-                .ok_or_else(|| anyhow!("INVALID_ARGUMENT: metrics[{index}] must be an object"))?;
-            let context = format!("metrics[{index}]");
-            validate_string_field(object, "label", &context)?;
-            validate_string_field(object, "value", &context)?;
-        }
-    }
-    if let Some(items) = validate_array(draft, "criteria")? {
-        for (index, item) in items.iter().enumerate() {
-            let object = item
-                .as_object()
-                .ok_or_else(|| anyhow!("INVALID_ARGUMENT: criteria[{index}] must be an object"))?;
-            let context = format!("criteria[{index}]");
-            validate_string_field(object, "id", &context)?;
-            validate_string_field(object, "text", &context)?;
-            validate_enum_field(
-                object,
-                "verdict",
-                &["met", "unmet", "partial", "unknown"],
-                &context,
-            )?;
-        }
-    }
-    if let Some(items) = validate_array(draft, "steps")? {
-        for (index, item) in items.iter().enumerate() {
-            let object = item
-                .as_object()
-                .ok_or_else(|| anyhow!("INVALID_ARGUMENT: steps[{index}] must be an object"))?;
-            let context = format!("steps[{index}]");
-            validate_string_field(object, "id", &context)?;
-            validate_string_field(object, "title", &context)?;
-            validate_enum_field(
-                object,
-                "status",
-                &["completed", "failed", "skipped"],
-                &context,
-            )?;
-        }
-    }
-    if let Some(items) = validate_array(draft, "files")? {
-        for (index, item) in items.iter().enumerate() {
-            let object = item
-                .as_object()
-                .ok_or_else(|| anyhow!("INVALID_ARGUMENT: files[{index}] must be an object"))?;
-            let context = format!("files[{index}]");
-            validate_string_field(object, "path", &context)?;
-            validate_enum_field(
-                object,
-                "changeType",
-                &["created", "modified", "deleted", "referenced"],
-                &context,
-            )?;
-            validate_enum_field(
-                object,
-                "attribution",
-                &["direct", "subagent", "declared"],
-                &context,
-            )?;
-        }
-    }
-    if let Some(items) = validate_array(draft, "checks")? {
-        for (index, item) in items.iter().enumerate() {
-            let object = item
-                .as_object()
-                .ok_or_else(|| anyhow!("INVALID_ARGUMENT: checks[{index}] must be an object"))?;
-            let context = format!("checks[{index}]");
-            validate_string_field(object, "id", &context)?;
-            validate_string_field(object, "command", &context)?;
-            validate_enum_field(
-                object,
-                "result",
-                &["passed", "failed", "inconclusive"],
-                &context,
-            )?;
-        }
-    }
-    if let Some(items) = validate_array(draft, "evidences")? {
-        for (index, item) in items.iter().enumerate() {
-            let object = item
-                .as_object()
-                .ok_or_else(|| anyhow!("INVALID_ARGUMENT: evidences[{index}] must be an object"))?;
-            let context = format!("evidences[{index}]");
-            validate_string_field(object, "id", &context)?;
-            validate_enum_field(
-                object,
-                "kind",
-                &["tool_call", "tool_result", "message", "file", "subagent"],
-                &context,
-            )?;
-            validate_string_field(object, "refId", &context)?;
-            let evidence_summary = validate_string_field(object, "summary", &context)?;
-            if evidence_summary.len() > MAX_EVIDENCE_SUMMARY_BYTES {
-                return Err(anyhow!("LIMIT_EXCEEDED: evidence summary too large"));
-            }
-        }
-        if let Some(items) = validate_array(draft, "screenshots")? {
-            if items.len() > assets::MAX_SCREENSHOTS_PER_REPORT {
-                return Err(anyhow!("LIMIT_EXCEEDED: too many screenshots"));
-            }
-            for (index, item) in items.iter().enumerate() {
-                let object = item.as_object().ok_or_else(|| {
-                    anyhow!("INVALID_ARGUMENT: screenshots[{index}] must be an object")
-                })?;
-                let context = format!("screenshots[{index}]");
-                validate_string_field(object, "id", &context)?;
-                validate_string_field(object, "evidenceRef", &context)?;
-            }
-        }
-    }
-    Ok(())
-}
-
 pub fn submit_draft(db: &Database, execution_id: &str, draft: &Value) -> Result<()> {
     let raw = serde_json::to_string(draft)?;
     if raw.len() > MAX_REPORT_JSON_BYTES {
@@ -422,6 +258,9 @@ pub fn submit_draft(db: &Database, execution_id: &str, draft: &Value) -> Result<
         return Err(anyhow!("INVALID_ARGUMENT: execution is not a goal"));
     }
 
+    if facts.execution_state.as_deref() != Some("running") {
+        return Err(anyhow!("INVALID_ARGUMENT: goal execution is not running"));
+    }
     let progress = progress::load_matching_progress(db, execution_id, &facts)?;
     progress::validate_met_progress(draft, progress.as_ref())?;
 
@@ -607,6 +446,26 @@ pub fn finalize_report(
     status_override: Option<&str>,
     error_code_override: Option<&str>,
 ) -> Result<GoalReportSummary> {
+    finalize_with_closure(
+        db,
+        execution_id,
+        durable_seq_override,
+        status_override,
+        error_code_override,
+        "agent_verified",
+        false,
+    )
+}
+
+pub(crate) fn finalize_with_closure(
+    db: &Database,
+    execution_id: &str,
+    durable_seq_override: i64,
+    status_override: Option<&str>,
+    error_code_override: Option<&str>,
+    closure: &str,
+    allow_host_facts: bool,
+) -> Result<GoalReportSummary> {
     let facts = load_proposal_facts(db.conn(), execution_id)?;
     require_completed_execution(&facts, status_override)?;
 
@@ -621,7 +480,10 @@ pub fn finalize_report(
         })
         .optional()?;
 
-    if existing.as_ref().is_some_and(|row| row.3 == "failed") {
+    if existing
+        .as_ref()
+        .is_some_and(|row| matches!(row.3.as_str(), "failed" | "ready"))
+    {
         return list_reports(db, &facts.session_id)?
             .into_iter()
             .find(|report| report.execution_id == execution_id)
@@ -677,10 +539,21 @@ pub fn finalize_report(
         None
     };
 
+    if !allow_host_facts
+        && maybe_draft
+            .as_ref()
+            .and_then(|draft| draft.get("verdict"))
+            .and_then(Value::as_str)
+            != Some("met")
+    {
+        return Err(anyhow!(
+            "GOAL_REPORT_NOT_VERIFIED: a valid structured met report is required"
+        ));
+    }
     let execution_status = "completed";
     let error_code = error_code_override.or(facts.error_code.as_deref());
 
-    let (integrity_kind, verdict, summary, full_report) = match maybe_draft {
+    let (integrity_kind, verdict, summary, mut full_report) = match maybe_draft {
         Some(draft) => {
             let verdict = draft
                 .get("verdict")
@@ -818,8 +691,29 @@ pub fn finalize_report(
         }
     };
 
+    if !closure.is_empty() {
+        full_report["closure"] = json!(closure);
+    }
+    if let Some(hold) = crate::goal_holds::get_hold(db, &facts.session_id, execution_id)? {
+        if let Some(first) = hold.segments.first() {
+            full_report["execution"]["startedAt"] = json!(first.started_at);
+        }
+        full_report["segments"] = json!(hold.segments);
+        full_report["blocks"] = json!(hold.blocks);
+    }
     let target_file = report_file_path(db.data_dir(), &facts.session_id, execution_id);
     let payload = serde_json::to_vec_pretty(&full_report)?;
+    if target_file.is_file() {
+        mark_failed(
+            db,
+            &facts.session_id,
+            execution_id,
+            "REPORT_PERSISTENCE_BARRIER_FAILED",
+        )?;
+        return Err(anyhow!(
+            "REPORT_PERSISTENCE_FAILED: existing report files are immutable"
+        ));
+    }
 
     let write_res = write_atomic(&target_file, &payload);
     let (file_hash, file_size) = match write_res {
@@ -873,7 +767,14 @@ pub fn finalize_report(
             durable_seq,
             created_at,
             now
-        ])?;
+        ]).map_err(|error| {
+            let cleanup=fs::remove_file(&target_file);
+            let failure=mark_failed(db, &facts.session_id, execution_id, "REPORT_PERSISTENCE_BARRIER_FAILED");
+            match (cleanup,failure) {
+                (Ok(()),Ok(_)) => anyhow!("REPORT_PERSISTENCE_FAILED: {error}"),
+                (cleanup,failure) => anyhow!("REPORT_PERSISTENCE_FAILED: {error}; cleanup: {cleanup:?}; failure recording: {failure:?}"),
+            }
+        })?;
 
     // Draft is now superseded by the ready report snapshot
     if draft_path.exists() {
@@ -882,14 +783,16 @@ pub fn finalize_report(
 
     Ok(GoalReportSummary {
         report_id,
-        session_id: facts.session_id,
+        session_id: facts.session_id.clone(),
         execution_id: execution_id.to_string(),
         proposal_id: facts.request_id,
         turn_id,
         status: "ready".to_string(),
         execution_status: Some(execution_status.to_string()),
+        hold: crate::goal_holds::get_hold(db, &facts.session_id, execution_id)?,
         verdict,
         integrity: integrity_kind,
+        closure: (!closure.is_empty()).then(|| closure.into()),
         summary,
         goal_title: facts.title,
         file_path: rel_path,
@@ -899,4 +802,31 @@ pub fn finalize_report(
         created_at,
         updated_at: now,
     })
+}
+
+/// Reads a current draft without publishing or altering any report state.
+pub(crate) fn current_draft(db: &Database, execution_id: &str) -> Result<Option<Value>> {
+    let facts = load_proposal_facts(db.conn(), execution_id)?;
+    let status: Option<String> = db
+        .conn()
+        .query_row(
+            "SELECT status FROM goal_reports WHERE execution_id=?1",
+            [execution_id],
+            |row| row.get(0),
+        )
+        .optional()?;
+    if status.as_deref() != Some("draft") {
+        return Ok(None);
+    }
+    let draft: Value = serde_json::from_slice(&fs::read(draft_file_path(
+        db.data_dir(),
+        &facts.session_id,
+        execution_id,
+    ))?)?;
+    validate_structured_draft(&draft)?;
+    progress::validate_met_progress(
+        &draft,
+        progress::load_matching_progress(db, execution_id, &facts)?.as_ref(),
+    )?;
+    Ok(Some(draft))
 }

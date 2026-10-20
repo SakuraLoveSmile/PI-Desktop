@@ -245,6 +245,7 @@ export type AppState = {
   /** Return one waiting row to the composer as an editable draft. */
   editQueuedPrompt: (promptId: string) => void;
   sendQueuedNow: (promptId: string) => Promise<void>;
+  abortQueuedPromptTool: (sessionId: string, toolCallId: string) => Promise<void>;
   refreshQueuedPrompts: (sessionId: string) => Promise<void>;
   applyQueueChanged: (event: AgentQueueChangedEvent) => void;
   compactContext: () => Promise<void>;

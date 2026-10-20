@@ -8289,6 +8289,38 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 - **里程碑**：M6+
 - **状态**：草稿；Host 侧重排已由 `turn_queue` 单元测试覆盖
 
+#### E2E-QUEUE-send-now-abort-offer-after-30s：队首优先行 30 秒后才出现“中止命令”
+
+- **前提条件**：提供方可以让模型发出一个前台 Bash 调用 `echo start-<marker>; sleep 297.<marker>; echo end-<marker>`，
+  `timeout: 300`；`<marker>` 为随机数，使脚本只能找到自己的进程。队列中有一条等待行。应用窗口在整个运行中保持可见：
+  隐藏或最小化的窗口不绘制帧，运行因此无效，会以 `invalid run: window hidden` 失败，而不是通过。
+- **步骤**：
+  1. 开始回合，等到 Bash 行显示为运行中。
+  2. 对等待行点击“立即发送”。
+  3. 在 30 秒之前确认该行没有“中止命令”按钮。
+  4. 满 30 秒后确认只在队首优先行上出现一个“中止命令”按钮。
+  5. 点击它，并确认在响应返回前按钮处于禁用状态。
+  6. 观察转录：Bash 行以错误结束，回合在批次边界结束，优先行随即启动。
+  7. 分别在子代理 Bash、远程会话和待决审批的情形下重复，确认都不出现按钮。
+  8. 在点击前让 Bash 自行结束：按钮必须消失，且回合结束后排队行仍会启动。
+- **预期**：按钮不会在 30 秒前出现，只在当前会话有顶层 Bash 调用运行时出现，且绝不在未点击时
+  自动中止。点击只中止那一个调用；同一批次中的下一个顶层 Bash 需要再次点击。调用已结束时提示
+  “该命令已经结束”，请求失败时提示“未能停止”。等待行的顺序不变，渲染器不发送 turnId。
+- **链接规格**：`04-ux/08-component-spec.md`（§11）、`03-runtime/01-ipc-protocol.md`（§5.6a）
+- **验收**：C（对话与流）
+- **里程碑**：M6+
+- **状态**：部分自动化。`scripts/e2e-queue-send-now-abort.mjs`（`pnpm test:e2e:queue-send-now-abort`）在 Electron 中运行，
+  使用隔离的 profile、Host 与回环模型夹具。覆盖步骤 1–6 和 8：5 秒与 25 秒时没有按钮；40 秒内出现一个按钮；点击会停止
+  Bash 行；卡住命令的进程全部退出；排队行得到回复；在中止与排队提示之间模型没有新回合；排队请求携带被中止调用自己的
+  `TOOL_ABORTED` 结果。步骤 5 在 preload 边界可控地延迟真实中止 IPC，检查按钮禁用、再次点击不产生第二次请求，
+  释放后原请求只转发一次，不伪造响应。第二个隔离运行覆盖步骤 8：按钮出现后，通过工作区控制文件让真实 Bash
+  自行正常退出，不点击中止；检查按钮消失、队列推进，以及下一次请求保留成功的工具结果。
+  实际按钮截图保存在 `.artifacts/queued-send-now-closeout/abort-offer.png`。
+  步骤 4 在 Electron 中统计按钮数量，“只在队首优先行上出现”由组件用例覆盖。
+  步骤 7 的子代理、远程与审批门控仍由 `queue-send-now-tool-abort.test.mjs` 的组件用例覆盖，不作为 Electron 实测。
+  Host 侧中止路径仍由 `runtime-abort-tool.test.ts` 与
+  `agent-ipc-abort-tool.test.mjs` 覆盖。
+
 #### E2E-QUEUE-edit-restores-draft-only-when-input-empty：编辑仅在输入框为空时回填草稿
 
 - **前提条件**：会话正在运行，队列中有一条带文本与文件引用芯片的提示，输入框为空。
@@ -9793,7 +9825,7 @@ options retain pressed states and switching behavior.
 ### Team Goal 结算与完成原因
 
 - `E2E-GOAL-report-waits-for-settled-team`：获批 Team Goal 派遣专家；专家运行时提交报告被拒绝，诊断精确包含成员、派遣、任务且不持久化草稿；专家结束后的未消费证据继续阻挡，原始回合通过 `wait_for_updates` 消费完整结果后报告成功。
-- `E2E-TEAM-completion-error-keeps-host-reason`：真实宿主拒绝经运行时 guard 和三次具体原因提示，第四次拒绝的终态错误与宿主原因完全相同。
+- `E2E-TEAM-completion-blocked-keeps-host-reason`：真实宿主拒绝经运行时 guard 和三次具体原因提示，第四次拒绝的终态错误与宿主原因完全相同。
 
 自动执行 `scripts/e2e-goal-report.mjs`（隔离真实 Host RPC 和运行时工具／guard）及 `scripts/e2e-team-approved-goal.mjs`（隔离 Electron、回环假 provider）。不访问真实会话、profile 或模型。
 
@@ -9994,3 +10026,27 @@ nightly 的 `--recovery-only` 变体把仍在 waiting 的问题经进程重启�
 - **规格：** `04-ux/08-component-spec.md` §11。
 - **自动化：** `node scripts/e2e-transcript-render.mjs`。
 - **状态：** 对照确切的任务候选和基线版本记录结果。
+
+
+### E2E-GOAL-blocked-resume acceptance (2026-10-13)
+
+The [English source](/spec/06-delivery/04-e2e-test-plan) defines acceptance A–G:
+missing report hold without publication; incident-shaped unsettled Team pause;
+same-execution continuation with original contract/context/current model;
+explicit partial acceptance; abandon and replacement; restart and Agent/resume
+errors; Plan/Stop/history/ordinary-message/remote boundaries preserved.
+New automatic fallback completion expectations are retired. Exhausted approved
+Goal Team recovery now yields team_unsettled hold rather than terminal error.
+The isolated loopback-model suites must record tested candidate/base and actual
+results; this text does not claim they ran. The user accepted H: legacy
+interrupted-column/CHECK decoding remains compatible; an old Plus v7 binary
+refuses new v8 before mutation. Whole-database downgrade is unsupported.
+
+
+Final lifecycle and evidence scope: Native scenarios 001–010 use isolated Host/runtime fixtures; 010 launches a real AgentSidecar child/ParentHostProxy and checks authorized progress reads. Legacy 009 needs a known old binary and disposable DB, never production 67b8868e. UI-001 runs production components/Composer in sandboxed Electron with fake preload, nine groups at 1000px/420px. Separate lanes do not prove a full installed-app journey. Include crash-fence holds, owned-pause-only supersession cleanup and preserved unsupported attachment drafts in acceptance.
+
+### Plus 场景汇总
+
+| Plus 场景 | 用户路径 | 自动化入口 |
+| --- | --- | --- |
+| E2E-PLUS-worktree-memory-owner | 槽位启动 → 后续回合 → 更新/删除 → 映射失效 | project-context --worktree-memory；Rust 与启动/运行时测试 |

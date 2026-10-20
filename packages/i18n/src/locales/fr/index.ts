@@ -341,7 +341,10 @@ export const fr = {
     "removeQueuedPrompt": "Supprimer le message en file d'attente",
     "sendNow": "Envoyer maintenant",
     sendNowPending: "En attente de la fin de la tâche en cours",
-    queuedPromptStopFailed: "Impossible d’arrêter la tâche en cours. Ce message reste en attente et peut être annulé.",
+    queuedPromptToolAbort: "Interrompre la commande",
+    queuedPromptToolAbortHint: "Interrompre la commande en cours pour lancer le message en attente",
+    queuedPromptToolAbortGone: "Cette commande est déjà terminée",
+    queuedPromptStopFailed:"Impossible d’arrêter la tâche en cours. Ce message reste en attente et peut être annulé.",
     queuedPromptAlreadyStarted: "Ce message est déjà en cours d’exécution. Utilisez Arrêter pour arrêter la tâche.",
     "moveQueuedPromptUp": "Monter",
     "moveQueuedPromptDown": "Descendre",
@@ -683,6 +686,7 @@ export const fr = {
     "artifactScratchUnavailable": "Le répertoire de session temporaire est indisponible.",
   },
   "goal": {
+    blocked: en.goal.blocked,
     "progressLabel": "Progression de l’objectif",
     "progressListLabel": "Liste des tâches de l’objectif",
     "progressInitializing": "Chargement de la progression…",
@@ -2185,6 +2189,7 @@ sklm: {
       endedProcesses: "Terminés {{count}}",
       clearEndedProcesses: "Effacer les processus terminés",
       goal: {
+        reportBlocked: en.panel.activity.goal.reportBlocked,
         reportPending: "Rapport en attente",
         reportUnavailable: "Rapport indisponible",
         reportGenerating: "Rapport en cours",

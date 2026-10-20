@@ -2108,20 +2108,6 @@
         "c811692312fbf83b5c40"
       ]
     },
-    "apps/desktop/test/goal-report-ipc-registration.test.mjs": {
-      "assertions": 8,
-      "cases": 1,
-      "signatures": [
-        "226a4e3b83cb6d59ae56",
-        "44ab8d299dbe98da1742",
-        "8576932e53d2124fbc4d",
-        "8e5ce63caed2e1447996",
-        "960ef67d0880c83e8b17",
-        "aaee022d78c25e3ca96b",
-        "ccad007b7c9f3943ceff",
-        "df86d1883ea2a50f0d99"
-      ]
-    },
     "apps/desktop/test/home-empty-layout.test.mjs": {
       "assertions": 38,
       "cases": 6,

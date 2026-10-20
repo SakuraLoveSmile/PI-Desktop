@@ -140,6 +140,18 @@ export type AgentStopResponse = {
   requested: boolean;
 };
 
+/** Ends one running Bash call so a queued send-now can reach its boundary. */
+export type AgentAbortToolRequest = {
+  sessionId: string;
+  turnId?: string;
+  toolCallId: string;
+};
+
+export type AgentAbortToolResponse = {
+  found: boolean;
+  requested: boolean;
+};
+
 /** One entry of the Host-owned turn queue as the renderer mirrors it (D386). */
 export type QueuedTurnSummary = {
   id: string;
@@ -293,6 +305,8 @@ export type AskToolRequest = {
   requestId: string;
   sessionId: string;
   toolCallId: string;
+  turnId?: string;
+  createdAt?: string;
   questions: AskToolQuestion[];
   /** Host-owned Team-only deferred question; grants no execution authority. */
   teamManaged?: true;
@@ -314,6 +328,8 @@ export type PendingInteractiveRequests = {
 export type AskToolResolution = {
   requestId: string;
   sessionId: string;
+  /** Optional for existing Desktop callers; external controllers pin the live tool identity. */
+  expectedToolCallId?: string;
   answers: Array<string[] | null>;
 };
 
@@ -332,11 +348,11 @@ export function formatAskToolOutput(
 
 export type AgentEvent =
   | { type: "agent_start" }
-  | { type: "agent_end"; messageIds: string[] }
+  | { type: "agent_end"; messageIds: string[]; stopHint?: "team_unsettled" }
   | { type: "turn_start" }
   | { type: "usage"; usage: MessageUsage }
   | { type: "context_insights"; request?: ContextInsightsRequest; diagnosticEvent?: ContextInsightsEvent }
-  | { type: "turn_end"; subagentUsage?: MessageUsage }
+  | { type: "turn_end"; subagentUsage?: MessageUsage; stopHint?: "team_unsettled" }
   | { type: "message_start"; message: UiMessage }
   | {
       type: "message_update";

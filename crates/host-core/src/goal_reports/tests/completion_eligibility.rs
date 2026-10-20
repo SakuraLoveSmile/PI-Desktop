@@ -119,3 +119,23 @@ fn test_retry_rejects_uncompleted_execution_before_any_mutation() {
         }
     }
 }
+
+#[test]
+fn automatic_finalization_requires_verified_met_report() {
+    for verdict in [None, Some("partial"), Some("blocked"), Some("unknown")] {
+        let (_dir, db) = create_test_db();
+        seed_goal_execution(&db, "session", "execution");
+        bind_execution_turn(&db, "execution", "turn").unwrap();
+        if let Some(verdict) = verdict {
+            submit_draft(
+                &db,
+                "execution",
+                &json!({"summary":"Still incomplete", "verdict":verdict}),
+            )
+            .unwrap();
+        }
+        db.conn().execute("UPDATE plan_approvals SET execution_state='completed' WHERE execution_id='execution'", []).unwrap();
+        assert!(finalize_report(&db, "execution", 0, None, None).is_err());
+        assert!(!report_file_path(db.data_dir(), "session", "execution").exists());
+    }
+}

@@ -2206,6 +2206,7 @@ MainChat 底部的输入区域，用于撰写和发送提示。支持多行输�
 | 正在等待许可 | 文本区域已禁用（根据 [03-permission-ux.md](/zh-CN/spec/04-ux/03-permission-ux) §7） | 发送禁用；满足运行中且草稿为空时停止仍然可用 |
 | Plan / Goal / 规划 | 文本区域在空闲时处于活动状态；合同徽章和许可芯片可见；实时回合投影 `planning` 时模式芯片脉冲 | 检查、发送或提交合同 |
 | Plan / Goal / 等待批准 | 批准表面仅显示标题和工件开启器以获取确切的 `.pi/<kind>/*.md` 批准；草稿保留为只读，并且该会话的输入框控件仍然被阻止 | 批准或拒绝 |
+| Goal / blocked | editable Composer and removable Send continues Goal X chip; held checklist/reasons visible | Continue with selected model, accept current result, abandon, or dismiss chip for an ordinary message |
 | Plan / 已排队或正在运行 | Agent 徽章保持选中状态； queue/running状态可见；草稿和下一回合控件保持可编辑 | 草稿为空时停止；有内容时发送并排队下一条提示；无重播控制 |
 | Plan / Goal / 提案被拒绝、过期或中断后的计划 | 合约芯片仍然可见且可编辑 | 稍后发送提示；提交新合同；没有执行动作 |
 | 没有工作空间 | 文本区域处于活动状态，警告横幅“无项目 - 工具有限” | 发送已启用 |
@@ -2233,7 +2234,7 @@ MainChat 底部的输入区域，用于撰写和发送提示。支持多行输�
   一条 FIFO 条目；当前运行到达 `agent_end` 之后才会作为普通提示发送。草稿为空时，
   同一个提交槽位显示停止，因此清空草稿即可显示立即停止操作。切换会话不会影响其他
   会话的队列。
-- 排队行：内容，然后依次是上移、下移、立即发送、编辑、删除。上移/下移与该行相邻的
+- 排队行：内容，然后依次是上移、下移、立即发送、编辑、删除（队首已提升行在立即发送之后另有“中止命令”，见下文）。上移/下移与该行相邻的
   等待条目互换，并镜像 Host 持久的 `position`；在等待区块边界处是空操作，绝不会跨入
   优先区块。编辑会移除该行，并把捕获的草稿——文本加内联文件引用芯片——回填到输入框；
   应用重启后若内存草稿已不存在，则恢复 Host 保存的正文及图片/文件附件，不改写正文；
@@ -2242,6 +2243,7 @@ MainChat 底部的输入区域，用于撰写和发送提示。支持多行输�
   顶掉它。随后请求 `agent/stop`，当前回复/工具批次正常结束后释放优先区块，并先于
   所有等待条目启动。第一条优先行启动回合，其余作为相邻的用户消息加入同一回合，因此整块
   只被回复一次。会话空闲时立即启动。
+- 中止命令：仅队首的已提升行提供该操作，且需距其“立即发送”已满 30 秒，并且当前会话中正有顶层 Bash 调用在运行。子代理内的调用、远程会话以及待决的审批都不提供该操作。按钮以运行中调用的 `toolCallId` 调用 `agent/tool/abort`（见 IPC §5.6a），请求期间禁用，且绝不自动触发。`found: false` 表示该命令已经结束，`requested: false` 表示无法请求停止，请求失败时显示“未能停止”提示。Bash 调用结束后，回合在批次边界结束，已提升的行随即启动。同一批次中之后的顶层 Bash 调用会立即再次出现该按钮，因为等待时间已经满足。
 - 入队尚未完成的行在 Host 返回持久化 id 前保持锁定：上移/下移、立即发送、编辑和删除
   均禁用，五个操作的提示均说明正在保存，立即发送按钮同时显示本地化的“正在保存”。
   直接调用编辑/删除也不改变该行或草稿；
@@ -3425,3 +3427,22 @@ Local/Worktree 反映真实 Git checkout，不是 agent/chat/plan mode。新 Wor
 无快照不显示虚构的 0/0 或百分比；专家确认等待覆盖普通进度，读取失败仍可见。
 真实计数变化继续由唯一 live 区域播报，披露、报告就绪移除和会话隔离保持原行为。
 定时任务的指令卡不挂载目标条，保留原壳体外观。
+
+
+### GoalBlockedCard and Composer resume intent (2026-10-13)
+
+A blocked hold replaces the completion card with its title, warning state,
+localized reasons, actual Goal checklist and Agent limitations/nextSteps.
+Continue, accept current result and finish, or abandon are session/execution/
+version scoped; pending/stale actions cannot affect another session. The
+removable Composer chip defaults Send to continuing the same Goal with the
+current selected model. Dismissal sends an ordinary message; replacement
+approval warns about supersession. Remote v1 holds are read-only.
+Activity and task.failed/GOAL_BLOCKED notifications show needs attention;
+blocked settlement sends no completion notification. Schema-v2 user_accepted
+reports show unverified closure and optional block/segment timeline. Historical
+v1 fallback reports remain unchanged. The [English source](/spec/04-ux/08-component-spec)
+supersedes the old v1-only rendering description above.
+
+
+Final lifecycle and evidence scope: Continuation supports text and ordinary file references. Image/plugin attachments preserve the complete draft and show a localized hint to use ordinary send after dismissing the chip; they are not discarded or sent as partial guidance.

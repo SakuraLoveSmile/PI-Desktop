@@ -1,4 +1,6 @@
 import type {
+  GoalHold,
+  GoalExecutionChangedEvent,
   GitWorkspaceRequest, GitWorkspaceMutation, GitWorkspaceSnapshot, GitWorktree,
   SessionQuickNote,
   SessionActivityPage,
@@ -27,6 +29,8 @@ import type {
   SessionSummarizeTitleRequest,
   SessionSummarizeTitleResponse,
   AgentStopResponse,
+  AgentAbortToolRequest,
+  AgentAbortToolResponse,
   AgentQueueChangedEvent,
   AgentQueuePushRequest,
   QueuedTurnSummary,
@@ -1111,6 +1115,8 @@ export const api = {
     }),
   stop: (sessionId: string, turnId?: string) =>
     invoke<AgentStopResponse>(IPC.invoke.agentStop, { sessionId, ...(turnId ? { turnId } : {}) }),
+  abortTool: (req: AgentAbortToolRequest) =>
+    invoke<AgentAbortToolResponse>(IPC.invoke.agentAbortTool, req),
   queuePrompt: (req: AgentQueuePushRequest) =>
     invoke<QueuedTurnSummary>(IPC.invoke.agentQueuePush, req),
   listQueuedPrompts: (sessionId: string) =>
@@ -1170,6 +1176,12 @@ export const api = {
     }>(IPC.invoke.goalReportGet, params),
   listGoalReports: (params: { sessionId: string }) =>
     invoke<{ reports: GoalReportSummary[] }>(IPC.invoke.goalReportList, params),
+  goalExecutionGet: (params: { sessionId: string; executionId?: string }) =>
+    invoke<{ execution?: PlanExecution; hold?: GoalHold }>(IPC.invoke.goalExecutionGet, params),
+  goalResume: (params: { sessionId: string; executionId: string; expectedVersion: number; message?: string; modelOverride?: { providerId: string; modelId: string } }) =>
+    invoke<{ execution: PlanExecution; hold: GoalHold }>(IPC.invoke.goalResume, params),
+  goalClose: (params: { sessionId: string; executionId: string; expectedVersion: number; action: "accept" | "abandon" }) =>
+    invoke<{ execution: PlanExecution; hold: GoalHold; report?: GoalReportSummary }>(IPC.invoke.goalClose, params),
   retryGoalReport: (params: { sessionId: string; executionId: string }) =>
     invoke<{ report: GoalReportSummary }>(IPC.invoke.goalReportRetry, params),
   getGoalProgress: (params: { sessionId?: string; executionId: string }) =>
@@ -1749,6 +1761,10 @@ export const api = {
     return window.piDesktop.on(IPC.event.goalReportChanged, (payload) =>
       listener(payload),
     );
+  },
+  onGoalExecutionChanged: (listener: (event: GoalExecutionChangedEvent) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.goalExecutionChanged, (payload) => listener(payload as GoalExecutionChangedEvent));
   },
   getTodos: (sessionId: string) =>
     invoke<SessionTodoSnapshot>(IPC.invoke.todosGet, { sessionId }),

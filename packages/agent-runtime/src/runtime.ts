@@ -33,6 +33,8 @@ import {
   UPDATE_GOAL_PROGRESS_TOOL_NAME,
 } from "./goal-progress-tool.js";
 import { GoalReportRecovery } from "./goal-report-recovery.js";
+import { approvedGoalInstruction, parseGoalResume, type RuntimeGoalResume } from "./goal-execution-context.js";
+import { createGoalProgressCapability } from "./goal-progress-capability.js";
 import { randomUUID } from "node:crypto";
 import {
   settledDelegationMessage,
@@ -69,7 +71,6 @@ import {
 import {
   DEFAULT_COMMAND_TIMEOUT_MS,
   OAUTH_AUTH_KIND,
-  validateGoalProgressSnapshot,
   type TrustedExtensionCommand,
   type TrustedExtensionDiagnostic,
   type TrustedExtensionSpec,
@@ -103,6 +104,7 @@ import type {
   SessionMessageOrigin,
   PlanExecution,
   PlanProposal,
+  ProjectMemoryAlias,
   PlanningState,
   Risk,
   SubagentDefinition,
@@ -1004,6 +1006,8 @@ export type AgentRuntimeOptions = {
   projectInstructions?: ProjectInstructions;
   /** Durable project context loaded from host-owned project memory. */
   projectMemory?: string;
+  /** Memory-only alias; never changes the session workspace or instruction files. */
+  projectMemoryAlias?: ProjectMemoryAlias;
   /** Persisted transcript to seed the agent with (session isolation: each
    * session's agent carries only its own history). */
   history?: UiMessage[];
@@ -1073,6 +1077,7 @@ export type RuntimeMatchConfig = {
   customSystemPrompt?: CustomSystemPrompt;
   projectInstructions?: ProjectInstructions;
   projectMemory?: string;
+  projectMemoryAlias?: ProjectMemoryAlias;
   projectPath?: string;
   commandShell: CommandShellOption;
   subagents?: SubagentDefinition[];
@@ -1773,6 +1778,8 @@ export class DesktopAgentRuntime {
   private baseProjectInstructions?: ProjectInstructions;
   private projectInstructions?: ProjectInstructions;
   private projectMemory?: string;
+  private launchProjectMemoryAlias?: ProjectMemoryAlias;
+  private projectMemoryAlias?: ProjectMemoryAlias;
   private turnProjectMemory?: string;
   private autoMemoryEnabled = false;
   private projectMemoryRefreshAbort?: AbortController;
@@ -1856,6 +1863,7 @@ export class DesktopAgentRuntime {
   private readonly teamLeadExecution = new TeamLeadExecutionGuard();
   private readonly confirmedDeclarationView = new ConfirmedDeclarationModelView();
   private readonly goalReportRecovery = new GoalReportRecovery();
+  private goalStopHint?: "team_unsettled";
   private activeToolCalls = new Map<
     string,
     { toolName: string; args: unknown; startedAt: number }
@@ -1887,7 +1895,9 @@ export class DesktopAgentRuntime {
   private terminatingToolCalls = new Set<string>();
   /** A scoped normal yield, including batches with other non-terminating tools. */
   private pendingTeamInboxYield?: () => boolean;
+  private readonly entryTurnIds = new Map<string, string>();
   private fullEntries: MessageEntry[];
+  private executionContextPriorEntryIds?: ReadonlySet<string>;
   private executionContextStartIndex: number | null = null;
   private readonly systemJournal = new SystemTranscriptJournal();
   private composedSections: Record<string, string> = {};
@@ -1916,6 +1926,8 @@ export class DesktopAgentRuntime {
   private pendingModelCompaction = false;
   /** One-shot request to finish the current turn at the next boundary. */
   private gracefulStopRequested = false;
+  /** Running Bash calls by tool call id, so a queued send-now can end one. */
+  private readonly runningBashAborts = new Map<string, () => void>();
   private readonly teamBudgetStop = new TeamRunLimitStop();
   /** Codex's `claim_*` flags: one of each reminder per context window. */
   private contextReminderClaimed = false;
@@ -1975,7 +1987,9 @@ export class DesktopAgentRuntime {
     this.customSystemPrompt = opts.customSystemPrompt;
     this.baseProjectInstructions = opts.projectInstructions;
     this.projectInstructions = opts.projectInstructions;
-    this.projectMemory = opts.projectMemory?.trim() || undefined;
+    this.launchProjectMemoryAlias = opts.projectMemoryAlias;
+    this.projectMemoryAlias = opts.projectMemoryAlias;
+    this.projectMemory = (opts.projectMemoryAlias?.memory.content ?? opts.projectMemory)?.trim() || undefined;
     this.turnProjectMemory = this.projectPath ? this.projectMemory : undefined;
     this.compactionEnabled = compactionEnabled(opts.compactionSettings);
     this.compactionStrategy = resolveCompactionStrategy(opts.compactionStrategy);
@@ -2248,7 +2262,9 @@ export class DesktopAgentRuntime {
         }
         if (!this.gracefulStopRequested) return;
         if (message.stopReason === "error" || message.stopReason === "aborted") return;
-        this.gracefulStopRequested = false;
+        // Retain the stop through agent_end so approved Goal report recovery
+        // cannot restart the execution after this assistant/tool boundary.
+        if (!this.autonomousExecution || !this.goalReportDraftManager) this.gracefulStopRequested = false;
         return { action: "end" };
       },
     });
@@ -2382,8 +2398,17 @@ export class DesktopAgentRuntime {
       : this.agent.state.systemPrompt;
   }
 
+  private effectiveProjectInstructions(): ProjectInstructions | undefined {
+    const instructions = this.projectMemoryAlias?.instructions.trim();
+    if (!instructions) return this.projectInstructions;
+    return { entries: [
+      ...(this.projectInstructions?.entries ?? []),
+      { source: "ChatGPT Project instructions", content: instructions },
+    ] };
+  }
+
   private composeSystemPrompt(): string {
-    const projectPrompt = projectInstructionsPrompt(this.projectInstructions);
+    const projectPrompt = projectInstructionsPrompt(this.effectiveProjectInstructions());
     const memoryPrompt = projectMemoryPrompt(this.projectPath ? this.turnProjectMemory : this.projectMemory);
     const automaticPrompt = this.autoMemoryEnabled && this.mode === "agent" ? autoMemoryPrompt() : undefined;
     const optionalToolsPrompt = this.optionalToolsPrompt();
@@ -2433,10 +2458,12 @@ export class DesktopAgentRuntime {
     this.projectMemoryRefreshAbort = controller;
     let enabled = false;
     let content: string | undefined;
+    let memoryAlias: ProjectMemoryAlias | undefined;
     try {
       const state = await loadAutoMemory(this.host, this.sessionId, controller.signal);
       enabled = state.autoRecordEnabled;
-      content = state.memory.content;
+      memoryAlias = state.memoryAlias;
+      content = (memoryAlias?.memory ?? state.memory).content;
     } catch (error) {
       // Do not log memory bytes, host parameters, or capability tokens.
       if (!controller.signal.aborted) console.warn("project memory unavailable for this turn", {
@@ -2449,6 +2476,7 @@ export class DesktopAgentRuntime {
     this.autoMemoryEnabled = enabled;
     // Refresh failures must never reuse notes the user may have deleted.
     this.turnProjectMemory = content;
+    this.projectMemoryAlias = memoryAlias;
     this.rebuildToolCatalog();
     this.setAgentTools(this.activeTools());
     this.setAgentSystemPrompt(this.composeSystemPrompt());
@@ -2727,7 +2755,8 @@ export class DesktopAgentRuntime {
       // prompt recomposes from the fresh content.
       safeJson(this.customSystemPrompt ?? null) ===
         safeJson(config.customSystemPrompt ?? null) &&
-      (this.projectMemory ?? "") === (config.projectMemory?.trim() ?? "") &&
+      (this.projectMemory ?? "") === ((config.projectMemoryAlias?.memory.content ?? config.projectMemory)?.trim() ?? "") &&
+      safeJson(this.launchProjectMemoryAlias ?? null) === safeJson(config.projectMemoryAlias ?? null) &&
       (this.projectPath ?? "") === (config.projectPath?.trim() ?? "") &&
       // Only standard sessions compare Task inputs; Team reuse follows Host context.
       (!this.canDelegate() && this.executionProfile === "team" || (
@@ -3018,7 +3047,7 @@ export class DesktopAgentRuntime {
           | undefined
       )?.requiresReasoningContentOnAssistantMessages === true;
     const entries: MessageEntry[] = [];
-    const append = (id: string, message: AgentMessage): MessageEntry => {
+    const append = (id: string, message: AgentMessage, turnId?: string): MessageEntry => {
       const entry: MessageEntry = {
         type: "message",
         id,
@@ -3027,6 +3056,7 @@ export class DesktopAgentRuntime {
         timestamp: timestampMs(message.timestamp),
         message,
       };
+      if (turnId) this.entryTurnIds.set(id, turnId);
       entries.push(entry);
       return entry;
     };
@@ -3034,6 +3064,7 @@ export class DesktopAgentRuntime {
     // (the nearest one above), keeping each call adjacent to its result as
     // the provider APIs require.
     let toolCarrier: AssistantMessage | undefined;
+    let toolCarrierTurnId: string | undefined;
     for (const m of orderSystemRows(history)) {
       // Subagent rows belong to the transcript and to review, never to the
       // parent's model context (ADR 0062): the parent only ever saw the `Task`
@@ -3043,7 +3074,7 @@ export class DesktopAgentRuntime {
       const timestamp = Date.parse(m.createdAt) || Date.now();
       if (m.role === "system" && m.modelSystem) {
         toolCarrier = undefined;
-        append(m.id, this.systemJournal.restore(m));
+        append(m.id, this.systemJournal.restore(m), m.turnId);
       } else if (m.role === "user") {
         toolCarrier = undefined;
         const attachments = (m.attachments ?? []).map((attachment) =>
@@ -3062,7 +3093,7 @@ export class DesktopAgentRuntime {
         ) {
           continue;
         }
-        append(m.id, { role: "user", content, timestamp });
+        append(m.id, { role: "user", content, timestamp }, m.turnId);
       } else if (m.role === "assistant") {
         toolCarrier = undefined;
         // Failed provider responses belong in the transcript for diagnosis,
@@ -3102,10 +3133,13 @@ export class DesktopAgentRuntime {
           stopReason: "stop",
           timestamp,
         };
-        append(m.id, assistant);
+        append(m.id, assistant, m.turnId);
         toolCarrier = assistant;
+        toolCarrierTurnId = m.turnId;
       } else if (m.role === "tool") {
         if (!m.toolCallId || !m.toolName) continue;
+        // A carrier from a different durable turn cannot own this tool call.
+        if (toolCarrierTurnId !== m.turnId) toolCarrier = undefined;
         if (!toolCarrier) {
           // Tool row whose assistant row was lost (truncated branch):
           // synthesize a carrier so the call/result pair stays well-formed.
@@ -3119,7 +3153,8 @@ export class DesktopAgentRuntime {
             stopReason: "toolUse",
             timestamp,
           };
-          append(`${m.id}:carrier`, toolCarrier);
+          append(`${m.id}:carrier`, toolCarrier, m.turnId);
+          toolCarrierTurnId = m.turnId;
         }
         toolCarrier.content.push({
           type: "toolCall",
@@ -3128,7 +3163,7 @@ export class DesktopAgentRuntime {
           arguments: toJsonObject(m.toolArgs),
         });
         toolCarrier.stopReason = "toolUse";
-        append(m.id, toolResultFromUi(m, timestamp));
+        append(m.id, toolResultFromUi(m, timestamp), m.turnId);
       }
     }
     return entries.filter(
@@ -3165,7 +3200,7 @@ export class DesktopAgentRuntime {
   ): Entry[] {
     const entries: Entry[] = this.executionContextStartIndex === null
       ? [...this.fullEntries]
-      : entriesFromExecutionStart(this.fullEntries, this.executionContextStartIndex);
+      : entriesFromExecutionStart(this.fullEntries, this.executionContextStartIndex, this.executionContextPriorEntryIds);
     if (!checkpoint) return entries;
     if (isRecord(checkpoint.details) && checkpoint.details.systemMessageJson) {
       this.systemJournal.rememberCheckpoint(checkpoint.details.systemMessageJson);
@@ -3204,6 +3239,7 @@ export class DesktopAgentRuntime {
 
   private appendLiveEntry(id: string, message: AgentMessage): void {
     if (!id || this.fullEntries.some((entry) => entry.id === id)) return;
+    if (this.turnId) this.entryTurnIds.set(id, this.turnId);
     this.fullEntries.push({
       type: "message",
       id,
@@ -3475,8 +3511,10 @@ export class DesktopAgentRuntime {
           unsubscribeOutput?.();
           signal?.removeEventListener("abort", abort);
           this.activeToolProgressCleanups.delete(cleanup);
+          if (isBash) this.runningBashAborts.delete(toolCallId);
         };
         this.activeToolProgressCleanups.add(cleanup);
+        if (isBash) this.runningBashAborts.set(toolCallId, abort);
         if (signal?.aborted) {
           cleanup(false);
           throw Object.assign(new Error("tool execution aborted before it started"), {
@@ -3789,10 +3827,20 @@ export class DesktopAgentRuntime {
             isError: true,
           };
         }
+        if (this.gracefulStopRequested && !this.teamBudgetStop.requested &&
+            !(this.executionProfile === "team" && this.teamContext?.isLead && this.turnId)) {
+          const answers = questions.map(() => null);
+          return {
+            content: [{ type: "text", text: formatAskToolOutput(questions, answers) }],
+            details: { questions, answers, resolvedAt: new Date().toISOString(), resolutionKind: "stopped" },
+          };
+        }
         const request: AskToolRequest = {
           requestId: randomUUID(),
           sessionId: this.sessionId,
           toolCallId,
+          ...(this.turnId ? { turnId: this.turnId } : {}),
+          createdAt: new Date().toISOString(),
           questions,
         };
         const planning = this.mode === "plan" && this.teamContext?.isLead
@@ -3814,7 +3862,8 @@ export class DesktopAgentRuntime {
             return { content: [{ type: "text", text: "The question remains pending after 30 minutes. This turn is interrupted, not completed. Wait for the user's authenticated answer; resume or obtain new execution approval explicitly." }],
               details: { questions, requestId: request.requestId, pending: true }, terminate: true };
           }
-          return {content: [{type: "text", text: formatAskToolOutput(questions, answers)}], details: {questions, answers, resolvedAt: new Date().toISOString()}};
+          const resolutionKind = this.executionProfile === "team" && this.teamContext?.isLead ? undefined : this.askTools.resolutionKind(answers);
+          return {content: [{type: "text", text: formatAskToolOutput(questions, answers)}], details: {questions, answers, resolvedAt: new Date().toISOString(), ...(resolutionKind ? { resolutionKind } : {})}};
         } finally {
           if (questionContext) {
             for (let index=0;index<questions.length;index++) await this.host.call("team.closePlanningQuestion", {...questionContext, questionId: `${request.requestId}:${index}`});
@@ -4527,7 +4576,7 @@ export class DesktopAgentRuntime {
       const skillsPrompt = pluginSkillsPrompt(this.pluginSkills);
       if (skillsPrompt) blocks.push(skillsPrompt);
     }
-    const projectPrompt = projectInstructionsPrompt(this.projectInstructions);
+    const projectPrompt = projectInstructionsPrompt(this.effectiveProjectInstructions());
     if (projectPrompt) blocks.push(projectPrompt);
     return blocks;
   }
@@ -6478,6 +6527,7 @@ export class DesktopAgentRuntime {
     this.teamLeadExecution.reset();
     this.confirmedDeclarationView.clear();
     this.goalReportRecovery.reset();
+    this.goalStopHint = undefined;
     this.pendingProgressTurnRerun = false;
     this.progressTurnRerunAttempted = false;
     this.progressTurnRerunInProgress = false;
@@ -6701,7 +6751,7 @@ export class DesktopAgentRuntime {
 
   private prepareGoalReportRecovery(): boolean {
     if (
-      !this.autonomousExecution || !this.goalReportDraftManager ||
+      !this.autonomousExecution || !this.goalReportDraftManager || this.goalStopHint ||
       this.goalReportDraftManager.isDraftValid() || this.disposed ||
       this.runCancelled || this.gracefulStopRequested || this.turnHadError ||
       this.pendingSubmissionOutcome || this.pendingMutationTermination ||
@@ -6781,7 +6831,7 @@ export class DesktopAgentRuntime {
       host: this.host, team: this.teamContext!,
       refreshDeclaration: executionStart !== null
         ? review => this.confirmedDeclarationView.register(review, this.turnEpoch,
-          entriesFromExecutionStart(this.fullEntries, executionStart).map(entry => entry.message))
+          entriesFromExecutionStart(this.fullEntries, executionStart, this.executionContextPriorEntryIds).map(entry => entry.message))
         : undefined,
       state: () => ({ turnId: this.turnId, epoch: this.turnEpoch, mode: this.mode,
         inactive: this.disposed || this.runCancelled }),
@@ -8404,7 +8454,7 @@ export class DesktopAgentRuntime {
           ) {
             const completion = await this.teamLeadExecution.authorizeCompletion(this.host, this.teamContext,
               () => ({ turnId: this.turnId, epoch: this.turnEpoch, mode: this.mode,
-                inactive: this.disposed || this.runCancelled }), this.autonomousExecution, responseText);
+                inactive: this.disposed || this.runCancelled }), this.autonomousExecution, responseText, !!this.goalReportDraftManager);
             if (completion.kind === "superseded") break;
             if (completion.kind === "stale") aborted = true;
             if (completion.kind === "recover") {
@@ -8414,11 +8464,12 @@ export class DesktopAgentRuntime {
               this.streamStartedAt = undefined;
               break;
             }
+            if (completion.kind === "blocked") this.goalStopHint = "team_unsettled";
             if (completion.kind === "error") { teamCompletionFailed = true; classifiedError = completion.error; }
           }
           // Re-run an invisible answer once before surfacing a finished turn.
           const silence =
-            !teamCompletionFailed &&
+            !teamCompletionFailed && !this.goalStopHint &&
             !failed &&
             !aborted &&
             responseText.trim().length === 0 &&
@@ -8475,7 +8526,7 @@ export class DesktopAgentRuntime {
           // Autonomous plan/goal: clearly forward-looking text without a tool
           // call is probably progress, not a final answer. Nudge once (#43).
           const progressOnlyTurn =
-            !teamCompletionFailed &&
+            !teamCompletionFailed && !this.goalStopHint &&
             !failed &&
             !aborted &&
             !silentTurn &&
@@ -8760,6 +8811,7 @@ export class DesktopAgentRuntime {
         this.emit({
           type: "turn_end",
           ...(subagentUsage ? { subagentUsage } : {}),
+          ...(this.goalStopHint ? { stopHint: this.goalStopHint } : {}),
         });
         break;
       case "agent_end": {
@@ -8819,6 +8871,7 @@ export class DesktopAgentRuntime {
         )
           break;
         if (this.prepareGoalReportRecovery()) break;
+        this.gracefulStopRequested = false;
         this.acceptingSteering = false;
         this.retainPendingSteering();
         this.autonomousExecution = false;
@@ -8833,6 +8886,7 @@ export class DesktopAgentRuntime {
         this.emit({
           type: "agent_end",
           messageIds: [],
+          ...(this.goalStopHint ? { stopHint: this.goalStopHint } : {}),
         });
         break;
       }
@@ -8987,9 +9041,14 @@ export class DesktopAgentRuntime {
   async executeApprovedPlan(
     execution: PlanExecution,
     durableTurnId: string,
+    resume?: RuntimeGoalResume,
   ): Promise<{ turnId: string }> {
     if (this.disposed) throw new Error("runtime disposed");
     this.assertNotRunning();
+    resume = parseGoalResume(resume);
+    if (resume && execution.kind !== "goal") {
+      throw Object.assign(new Error("Only an approved Goal can resume"), { errorCode: "INVALID_ARGUMENT" });
+    }
     this.retainPendingSteering();
     if (execution.sessionId !== this.sessionId) {
       throw Object.assign(new Error("approved plan belongs to another session"), {
@@ -9045,7 +9104,24 @@ export class DesktopAgentRuntime {
     // contract and subsequent work, never planning turns from another model.
     // The system state is transcript rows too, so entriesFromExecutionStart
     // keeps it.
-    this.executionContextStartIndex = this.fullEntries.length;
+    this.executionContextPriorEntryIds = undefined;
+    if (resume?.priorTurnIds) {
+      const priorTurns = new Set(resume.priorTurnIds);
+      this.executionContextPriorEntryIds = new Set(this.fullEntries
+        .filter(entry => {
+          const owner = this.entryTurnIds.get(entry.id);
+          return owner !== undefined && priorTurns.has(owner);
+        }).map(entry => entry.id));
+      this.executionContextStartIndex = this.fullEntries.length;
+      // Session checkpoints have no execution ownership. Rebuild from the
+      // complete source rows, then compact this selected context if needed.
+      this.activeCompaction = undefined;
+    } else {
+      // Compatibility for older callers without durable segment identities.
+      const priorGoalStart = resume && execution.kind === "goal"
+        ? this.fullEntries.findIndex(entry => entry.id === `approved-goal:${execution.id}`) : -1;
+      this.executionContextStartIndex = priorGoalStart >= 0 ? priorGoalStart : this.fullEntries.length;
+    }
 
     const kind = execution.kind === "goal" ? "goal" : "plan";
     if (kind === "goal") {
@@ -9055,7 +9131,7 @@ export class DesktopAgentRuntime {
         getProgressSnapshot: () => this.goalProgressManager?.snapshot,
         onDraftSubmitted: async (draft) => {
           // No catch here: a swallowed failure would make the tool report
-          // success while the Host publishes a fallback report instead. The
+          // success while the Host cannot verify the report. The
           // error propagates into the SubmitGoalReport tool result so the
           // executing Agent can retry.
           await this.host.call("goalReports.submitDraft", {
@@ -9083,58 +9159,11 @@ export class DesktopAgentRuntime {
           );
         },
       });
-      let tokenRes: unknown;
-      let tokenRequestFailed = false;
-      try {
-        tokenRes = await this.host.call<unknown>("goalProgress.issueToken", {
-          sessionId: execution.sessionId,
-          executionId: execution.id,
-          turnId: durableTurnId,
-        });
-      } catch (error: unknown) {
-        ensureExecutionIsCurrent();
-        tokenRequestFailed = true;
-        this.logGoalProgressTokenFailure(execution.id, error);
-      }
-      ensureExecutionIsCurrent();
-      if (!tokenRequestFailed) {
-        const writeToken =
-          tokenRes !== null && typeof tokenRes === "object" && !Array.isArray(tokenRes)
-            ? (tokenRes as Record<string, unknown>).writeToken
-            : undefined;
-        if (typeof writeToken === "string" && writeToken.trim()) {
-          this.goalProgressManager = new GoalProgressManager({
-            sessionId: execution.sessionId,
-            executionId: execution.id,
-            writeToken,
-            onUpdate: async (items) => {
-              const res = await this.host.call<unknown>("goalProgress.update", {
-                sessionId: execution.sessionId,
-                executionId: execution.id,
-                writeToken,
-                items,
-              });
-              const snapshot =
-                res !== null && typeof res === "object" && !Array.isArray(res)
-                  ? (res as Record<string, unknown>).progress
-                  : undefined;
-              if (
-                !validateGoalProgressSnapshot(snapshot) ||
-                snapshot.sessionId !== execution.sessionId ||
-                snapshot.executionId !== execution.id
-              ) {
-                throw new Error("Host returned an invalid goal progress snapshot");
-              }
-              return snapshot;
-            },
-          });
-        } else {
-          this.logGoalProgressTokenFailure(
-            execution.id,
-            new Error("Host returned no valid write token"),
-          );
-        }
-      }
+      this.goalProgressManager = await createGoalProgressCapability({
+        host: this.host, execution, turnId: durableTurnId, resumed: !!resume,
+        assertCurrent: ensureExecutionIsCurrent,
+        tokenFailure: error => this.logGoalProgressTokenFailure(execution.id, error),
+      });
       ensureExecutionIsCurrent();
       this.rebuildToolCatalog();
       this.setAgentTools(this.activeTools());
@@ -9148,21 +9177,7 @@ export class DesktopAgentRuntime {
     }
     const instruction =
       kind === "goal"
-        ? [
-            "The user approved the goal contract below. Reach that goal now, autonomously.",
-            `Use the host-created goal artifact at the workspace-relative path: ${execution.artifact.relativePath}`,
-            `Approved goal title: ${execution.title}`,
-            `Approval question: ${execution.question}`,
-            "Treat the following Markdown as the exact approved contract. Do not renegotiate it, replace it with a new contract, or ask for approval again.",
-            "<approved-goal-markdown>",
-            execution.plan,
-            "</approved-goal-markdown>",
-            "Choose your own approach with the normal Agent tools. Then verify every acceptance criterion yourself, running the checks the contract names rather than assuming they pass.",
-            "Keep working while a criterion is still unmet and you have an untried approach. Stop early only if a boundary in the contract blocks you or a criterion cannot be verified; say which one and why.",
-            "Use UpdateGoalProgress to maintain the approved Goal checklist from the start and whenever a milestone starts, completes, or fails. TodoWrite is a separate working checklist and does not update Goal progress. Before SubmitGoalReport, reconcile every existing progress item with the observed outcome; use partial or blocked when work remains incomplete.",
-            "Finish with a report that walks the acceptance criteria one by one, each marked met or unmet with the evidence you observed.",
-            "Call SubmitGoalReport with your final structured report (summary, verdict, metrics, criteria checklist, steps, and verification evidence) once your verification is complete.",
-          ].join("\n")
+        ? approvedGoalInstruction(execution, resume, this.goalProgressManager?.snapshot)
         : [
             "Execute the approved implementation plan now.",
             `Use the host-created plan artifact at the workspace-relative path: ${execution.artifact.relativePath}`,
@@ -9174,7 +9189,14 @@ export class DesktopAgentRuntime {
             "</approved-plan-markdown>",
             "Implement the approved plan with the normal Agent tools, then report the result.",
           ].join("\n");
-    const internalId = `approved-${kind}:${execution.id}`;
+    if (resume?.userMessage?.trim()) {
+      // Main persists and echoes the supplement once; this is its model-facing row.
+      this.appendLiveEntry(`approved-goal-resume-user:${execution.id}:${resume.segment}`, {
+        role: "user", content: resume.userMessage, timestamp: Date.now(),
+      });
+    }
+    const internalId = resume && kind === "goal"
+      ? `approved-goal-resume:${execution.id}:${resume.segment}` : `approved-${kind}:${execution.id}`;
     const internalMessage: AgentMessage = {
       role: "user",
       content: instruction,
@@ -9226,6 +9248,7 @@ export class DesktopAgentRuntime {
       this.terminateParentTurn();
       return { turnId: this.turnId };
     }
+    if (this.goalStopHint) return { turnId: this.turnId };
     await this.resumeAfterDelegations();
     return { turnId: this.turnId };
   }
@@ -9548,6 +9571,20 @@ export class DesktopAgentRuntime {
     this.compactionAbort?.abort();
   }
 
+  /**
+   * Abort one running Bash call so a queued send-now can reach its boundary.
+   * The graceful stop goes first: killing the call alone lets the model read
+   * the error and carry on, possibly re-running the same command. The kill
+   * reuses the Bash call's own abort path, which asks the host to stop it.
+   */
+  abortRunningBash(toolCallId: string): { found: boolean; requested: boolean } {
+    const abort = this.runningBashAborts.get(toolCallId);
+    if (!abort) return { found: false, requested: false };
+    if (!this.requestGracefulStop().requested) return { found: true, requested: false };
+    abort();
+    return { found: true, requested: true };
+  }
+
   /** Ask pi-agent-core to stop after the current assistant/tool turn. */
   requestGracefulStop(preserveRunningTools = false): { requested: boolean } {
     if (preserveRunningTools) {
@@ -9565,6 +9602,7 @@ export class DesktopAgentRuntime {
     }
     this.acceptingSteering = false;
     this.gracefulStopRequested = true;
+    this.askTools.cancelAll("stopped", true);
     return { requested: true };
   }
 

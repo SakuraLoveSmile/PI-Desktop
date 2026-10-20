@@ -172,6 +172,22 @@ describe("AgentHost ingest", () => {
     expect(host.getTurn("rt_1").status).toBe("completed");
   });
 
+  it("publishes Goal hold changes without changing the v1 RACP vocabulary", () => {
+    const { host, received } = build();
+    host.publishGoalExecutionChanged({ sessionId: "s1", executionId: "execution-1" });
+    expect(received.at(-1)).toMatchObject({
+      scope: "session", sessionId: "s1", kind: "session.changed",
+      payload: { goalExecution: { sessionId: "s1", executionId: "execution-1" } },
+    });
+  });
+
+  it("ignores blank Goal execution notification identities", () => {
+    const { host, received } = build();
+    host.publishGoalExecutionChanged({ sessionId: "", executionId: "execution-1" });
+    host.publishGoalExecutionChanged({ sessionId: "s1", executionId: " " });
+    expect(received).toHaveLength(0);
+  });
+
   it("publishes Goal Progress changes on the durable session event stream", () => {
     const { host, received } = build();
     host.publishGoalProgressChanged({ sessionId: "s1", executionId: "execution-1", revision: 2 });

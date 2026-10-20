@@ -72,6 +72,23 @@ impl Database {
         })
     }
 
+    pub(crate) fn get_project_memory_editor_readonly(
+        &self,
+        path: &str,
+    ) -> Result<ProjectMemoryEditorState> {
+        let canonical =
+            canonical_project_path(path).ok_or_else(|| anyhow!("project path required"))?;
+        let owner = match self.project_group_for_path(&canonical)? {
+            Some(group) if !group.legacy => format!("group:{}", group.id),
+            _ => format!("path:{canonical}"),
+        };
+        Ok(ProjectMemoryEditorState {
+            owner,
+            memory: self.get_project_memory_readonly(path)?,
+            auto_record_enabled: self.get_auto_record_enabled_readonly(path)?,
+        })
+    }
+
     pub fn save_project_memory_editor(
         &self,
         path: &str,

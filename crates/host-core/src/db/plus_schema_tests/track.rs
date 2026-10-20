@@ -4,8 +4,8 @@
 use super::fixtures::{
     assert_all_plus_structures, assert_seed_rows_survive, assert_upstream_structures_through,
     backup_files, column_exists, create_baseline_database, create_legacy_fork_database,
-    expected_backups, meta, open_error, open_plus_backup, plan_row, plus_meta, seed_rows,
-    table_exists, user_version, LegacyShape,
+    create_p8_database, expected_backups, meta, open_error, open_plus_backup, plan_row, plus_meta,
+    seed_rows, table_exists, user_version, LegacyShape, P8Shape,
 };
 use crate::db::plus_schema::{
     run_steps, PlusMeta, FORK_SHARED_BASELINE, PLUS_COLUMNS, PLUS_SCHEMA_VERSION, PLUS_TABLES,
@@ -380,13 +380,14 @@ fn plus_v5_upgrade_adds_ordinary_inbox_with_a_recoverable_backup() {
 }
 
 #[test]
-fn p8_upgrades_p7_with_backup_defaults_and_constraints() {
+fn p9_upgrades_p7_with_backup_defaults_and_constraints() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("pi.sqlite");
     let db = Database::open(&path).unwrap();
     db.conn()
         .execute_batch(
-            "INSERT INTO sessions(id,title,created_at,updated_at) VALUES ('old','Keep me',1,1);
+            "DROP TABLE goal_execution_holds;
+        INSERT INTO sessions(id,title,created_at,updated_at) VALUES ('old','Keep me',1,1);
         ALTER TABLE sessions DROP COLUMN interaction_mode;
         ALTER TABLE turns DROP COLUMN error_details_json;
         UPDATE plus_schema_meta SET plus_version=7;",
@@ -395,7 +396,7 @@ fn p8_upgrades_p7_with_backup_defaults_and_constraints() {
     drop(db);
     let db = Database::open(&path).unwrap();
     assert_eq!(user_version(db.conn()), SCHEMA_VERSION);
-    assert_eq!(meta(db.conn()).unwrap().plus_version, 8);
+    assert_eq!(meta(db.conn()).unwrap().plus_version, PLUS_SCHEMA_VERSION);
     let saved: (String, String) = db
         .conn()
         .query_row(
@@ -413,12 +414,103 @@ fn p8_upgrades_p7_with_backup_defaults_and_constraints() {
         )
         .is_err());
     assert!(db.conn().execute("INSERT INTO turns(id,session_id,status,error_details_json,started_at) VALUES ('bad','old','error','broken',1)",[]).is_err());
+    assert!(table_exists(db.conn(), "goal_execution_holds"));
     assert_eq!(backup_files(dir.path()), vec!["pi.sqlite.plus-v7.bak"]);
     let backup = open_plus_backup(&path, "plus-v7", SCHEMA_VERSION);
     assert!(!column_exists(&backup, "sessions", "interaction_mode"));
     assert!(!column_exists(&backup, "turns", "error_details_json"));
+    assert!(!table_exists(&backup, "goal_execution_holds"));
     drop(backup);
     drop(db);
     let _ = Database::open(&path).unwrap();
     assert_eq!(backup_files(dir.path()), vec!["pi.sqlite.plus-v7.bak"]);
+}
+
+#[test]
+fn main_p8_upgrades_to_goal_holds_without_losing_interaction_or_terminal_details() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("pi.sqlite");
+    create_p8_database(&path, P8Shape::Main);
+    for _ in 0..2 {
+        let db = Database::open(&path).unwrap();
+        assert_eq!(meta(db.conn()).unwrap().plus_version, PLUS_SCHEMA_VERSION);
+        assert_eq!(user_version(db.conn()), SCHEMA_VERSION);
+        assert_all_plus_structures(db.conn());
+        assert_seed_rows_survive(db.conn(), Some(LegacyShape::V23));
+        let saved: (String, String, String) = db
+            .conn()
+            .query_row(
+                "SELECT s.interaction_mode,t.status,t.error_details_json
+             FROM sessions s JOIN turns t ON t.session_id=s.id WHERE t.id='saved-turn'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(
+            saved,
+            (
+                "unattended".into(),
+                "error".into(),
+                r#"{"code":"INTERACTION_REQUIRED"}"#.into()
+            )
+        );
+        assert_eq!(
+            db.conn()
+                .query_row("SELECT COUNT(*) FROM goal_execution_holds", [], |row| {
+                    row.get::<_, i64>(0)
+                })
+                .unwrap(),
+            0
+        );
+    }
+    assert_eq!(backup_files(dir.path()), vec!["pi.sqlite.plus-v8.bak"]);
+    let backup = open_plus_backup(&path, "plus-v8", SCHEMA_VERSION);
+    assert_eq!(meta(&backup).unwrap().plus_version, 8);
+    assert!(!table_exists(&backup, "goal_execution_holds"));
+    assert!(column_exists(&backup, "sessions", "interaction_mode"));
+    assert!(column_exists(&backup, "turns", "error_details_json"));
+}
+
+#[test]
+fn original_goal_p8_upgrades_without_replacing_holds_or_losing_rows() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("pi.sqlite");
+    create_p8_database(&path, P8Shape::GoalCandidate);
+    let hold = |conn: &Connection| -> String {
+        conn.query_row(
+            "SELECT json_array(execution_id,session_id,state,reasons_json,first_turn_id,
+                               segments_json,blocks_json,resume_count,paused_team,version,
+                               created_at,updated_at)
+             FROM goal_execution_holds WHERE execution_id='e2' AND session_id='s1'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap()
+    };
+    let original = Connection::open(&path).unwrap();
+    let saved_hold = hold(&original);
+    drop(original);
+    for _ in 0..2 {
+        let db = Database::open(&path).unwrap();
+        assert_eq!(meta(db.conn()).unwrap().plus_version, PLUS_SCHEMA_VERSION);
+        assert_eq!(user_version(db.conn()), SCHEMA_VERSION);
+        assert_all_plus_structures(db.conn());
+        assert_seed_rows_survive(db.conn(), Some(LegacyShape::V23));
+        assert_eq!(hold(db.conn()), saved_hold);
+        let saved: (String, String, Option<String>) = db
+            .conn()
+            .query_row(
+                "SELECT s.interaction_mode,t.status,t.error_details_json
+             FROM sessions s JOIN turns t ON t.session_id=s.id WHERE t.id='saved-turn'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(saved, ("interactive".into(), "error".into(), None));
+    }
+    assert_eq!(backup_files(dir.path()), vec!["pi.sqlite.plus-v8.bak"]);
+    let backup = open_plus_backup(&path, "plus-v8", SCHEMA_VERSION);
+    assert_eq!(hold(&backup), saved_hold);
+    assert!(!column_exists(&backup, "sessions", "interaction_mode"));
+    assert!(!column_exists(&backup, "turns", "error_details_json"));
 }

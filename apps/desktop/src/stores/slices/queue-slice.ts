@@ -16,6 +16,7 @@ import {
   queuedPromptForSession,
   removeQueuedPrompt,
   reorderQueuedPrompt,
+  stampQueuedPromptPromotedAt,
   type QueuedPrompt,
 } from "../../lib/queued-prompts";
 import type {
@@ -70,12 +71,15 @@ export function createQueueSlice({
   | "moveQueuedPrompt"
   | "editQueuedPrompt"
   | "sendQueuedNow"
+  | "abortQueuedPromptTool"
   | "refreshQueuedPrompts"
   | "applyQueueChanged"
   | "sendPrompt"
   | "steerPrompt"
 > {
   const queuedDrafts = new Map<string, ComposerDraftSnapshot>();
+  // Renderer-only promotion clock per Host row id, so Host refreshes keep it.
+  const promotedAts = new Map<string, number>();
   const pendingSubmissions = new Set<string>();
 
   function toQueuedPrompt(entry: QueuedTurnSummary): QueuedPrompt {
@@ -97,6 +101,7 @@ export function createQueueSlice({
       createdAt: Date.parse(entry.createdAt) || Date.now(),
       // The Host owns ordering and priority: entries arrive in delivery order.
       ...(entry.priority === undefined ? {} : { priority: entry.priority }),
+      ...(promotedAts.has(entry.id) ? { promotedAt: promotedAts.get(entry.id) } : {}),
     };
   }
 
@@ -104,6 +109,12 @@ export function createQueueSlice({
     sessionId: string,
     entries: QueuedTurnSummary[],
   ): void {
+    // A row promoted by another path starts its clock when this renderer first sees it.
+    for (const entry of entries) {
+      if (entry.priority !== undefined && !promotedAts.has(entry.id)) {
+        promotedAts.set(entry.id, Date.now());
+      }
+    }
     set((state) => {
       const current = state.queuedPrompts[sessionId] ?? [];
       const pending = current.filter(isPendingQueuedPrompt);
@@ -114,6 +125,7 @@ export function createQueueSlice({
           !entries.some((entry) => entry.id === item.id)
         ) {
           queuedDrafts.delete(item.id);
+          promotedAts.delete(item.id);
         }
       }
       const next = { ...state.queuedPrompts };
@@ -210,6 +222,7 @@ export function createQueueSlice({
           queuedPrompts: removeQueuedPrompt(state.queuedPrompts, sessionId, promptId),
         }));
         queuedDrafts.delete(promptId);
+        promotedAts.delete(promptId);
       } catch (error) {
         const conflict = error instanceof Error && "code" in error && error.code === "CONFLICT";
         get().showToast(conflict ? i18n.t("chat.queuedPromptAlreadyStarted") :
@@ -288,11 +301,14 @@ export function createQueueSlice({
       if (!item || isPendingQueuedPrompt(item) || isPromotedQueuedPrompt(item)) {
         return;
       }
+      const promotedAt = Date.now();
+      promotedAts.set(promptId, promotedAt);
       set((state) => ({
-        queuedPrompts: promoteQueuedPrompt(
-          state.queuedPrompts,
+        queuedPrompts: stampQueuedPromptPromotedAt(
+          promoteQueuedPrompt(state.queuedPrompts, sessionId, promptId),
           sessionId,
           promptId,
+          promotedAt,
         ),
       }));
       let prioritized = false;
@@ -319,6 +335,24 @@ export function createQueueSlice({
           prioritized && stillQueued ? `${i18n.t("chat.queuedPromptStopFailed")} ${detail}` : detail,
           { variant: "error" },
         );
+      }
+    },
+
+    /**
+     * Abort the running Bash call that holds the head promoted row. The Host
+     * ends the turn at its next boundary, and the promoted row starts then.
+     */
+    abortQueuedPromptTool: async (sessionId, toolCallId) => {
+      try {
+        const result = await api.abortTool({ sessionId, toolCallId });
+        if (!result.found) {
+          get().showToast(i18n.t("chat.queuedPromptToolAbortGone"), { variant: "info" });
+        } else if (!result.requested) {
+          get().showToast(i18n.t("chat.queuedPromptStopFailed"), { variant: "info" });
+        }
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        get().showToast(`${i18n.t("chat.queuedPromptStopFailed")} ${detail}`, { variant: "error" });
       }
     },
 

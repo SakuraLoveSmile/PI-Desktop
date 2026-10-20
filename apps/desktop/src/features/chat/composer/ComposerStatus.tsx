@@ -24,6 +24,7 @@ import {
   toggleQueueDisclosure,
 } from "./queue-disclosure-state";
 import { useAppStore } from "../../../stores/app-store";
+import { QueuedPromptToolAbortButton } from "./QueuedPromptToolAbortButton";
 
 export type ComposerStatusProps = {
   t: TFunction;
@@ -65,6 +66,8 @@ export function ComposerStatus({
     () => new Map(),
   );
   const queueCount = queuedPrompts.length;
+  // Promoted rows form the queue head, so this is the one that starts next.
+  const headPromotedId = queuedPrompts.find(isPromotedQueuedPrompt)?.id;
   const queueExpanded = queueDisclosureExpanded(queueDisclosure, queueScopeKey, queueCount);
 
   useEffect(() => {
@@ -198,6 +201,9 @@ export function ComposerStatus({
                         ? t("common.saving")
                         : t("chat.sendNow")}
                   </TooltipButton>
+                  {item.id === headPromotedId && !approvalPending ? (
+                    <QueuedPromptToolAbortButton t={t} prompt={item} />
+                  ) : null}
                   <TooltipButton
                     type="button"
                     className="composer-queued-prompt-action composer-queued-prompt-edit"

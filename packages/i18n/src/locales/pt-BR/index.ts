@@ -340,7 +340,10 @@ export const ptBR = {
     removeQueuedPrompt: "Remover prompt da fila",
     sendNow: "Enviar agora",
     sendNowPending: "Aguardando a tarefa atual terminar",
-    queuedPromptStopFailed: "Não foi possível parar a tarefa atual. Esta mensagem continua na fila e pode ser cancelada.",
+    queuedPromptToolAbort: "Cancelar comando",
+    queuedPromptToolAbortHint: "Cancelar o comando em execução para iniciar a mensagem da fila",
+    queuedPromptToolAbortGone: "Esse comando já foi concluído",
+    queuedPromptStopFailed:"Não foi possível parar a tarefa atual. Esta mensagem continua na fila e pode ser cancelada.",
     queuedPromptAlreadyStarted: "Esta mensagem já começou. Use Parar para interromper a tarefa em execução.",
     moveQueuedPromptUp: "Mover para cima",
     moveQueuedPromptDown: "Mover para baixo",
@@ -681,6 +684,7 @@ export const ptBR = {
     artifactScratchUnavailable: "O diretório temporário da sessão está indisponível.",
   },
   goal: {
+    blocked: en.goal.blocked,
     progressLabel: "Progresso da meta",
     progressListLabel: "Lista de tarefas da meta",
     progressInitializing: "Carregando progresso…",
@@ -2137,6 +2141,7 @@ export const ptBR = {
       endedProcesses: "Encerrados {{count}}",
       clearEndedProcesses: "Limpar processos encerrados",
       goal: {
+        reportBlocked: en.panel.activity.goal.reportBlocked,
         reportPending: "Relatório pendente",
         reportUnavailable: "Relatório indisponível",
         reportGenerating: "Gerando relatório",

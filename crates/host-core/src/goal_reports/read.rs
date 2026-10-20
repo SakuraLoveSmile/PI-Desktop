@@ -78,7 +78,7 @@ fn validate_report_snapshot(value: &Value) -> Result<(), String> {
         .get("schemaVersion")
         .and_then(Value::as_i64)
         .ok_or_else(|| "schema: schemaVersion missing".to_string())?;
-    if schema_version != GOAL_REPORT_SCHEMA_VERSION {
+    if !matches!(schema_version, 1 | GOAL_REPORT_SCHEMA_VERSION) {
         return Err(format!(
             "schema: unsupported schemaVersion {schema_version} (expected {GOAL_REPORT_SCHEMA_VERSION})"
         ));
@@ -124,6 +124,16 @@ fn validate_report_snapshot(value: &Value) -> Result<(), String> {
         Some("met") | Some("partial") | Some("blocked") | Some("unknown")
     ) {
         return Err("schema: verdict invalid".to_string());
+    }
+    if let Some(closure) = object.get("closure") {
+        if !matches!(closure.as_str(), Some("agent_verified" | "user_accepted")) {
+            return Err("schema: closure invalid".into());
+        }
+        if closure.as_str() == Some("agent_verified")
+            && (verdict != Some("met") || integrity_kind != Some("structured"))
+        {
+            return Err("schema: agent_verified requires structured met".into());
+        }
     }
     if !object.get("summary").is_some_and(Value::is_string) {
         return Err("schema: summary missing".to_string());
@@ -394,7 +404,21 @@ pub fn list_reports(db: &Database, session_id: &str) -> Result<Vec<GoalReportSum
     let rows = stmt.query_map(params![session_id], row_to_summary)?;
     let mut results = Vec::new();
     for row in rows {
-        results.push(row?);
+        let mut summary = row?;
+        summary.hold = crate::goal_holds::get_hold(db, session_id, &summary.execution_id)?;
+        summary.closure = if summary.execution_status.as_deref() == Some("completed") {
+            summary
+                .hold
+                .as_ref()
+                .and_then(|hold| match hold.state.as_str() {
+                    "accepted" => Some("user_accepted".into()),
+                    "resumed" => Some("agent_verified".into()),
+                    _ => None,
+                })
+        } else {
+            None
+        };
+        results.push(summary);
     }
     Ok(results)
 }
@@ -454,9 +478,17 @@ pub fn retry_report(
             )?
             .query_row(params![execution_id], row_to_summary)
             .optional()?;
-        if let Some(s) = summary {
-            return Ok(s);
+        if summary.is_some() {
+            return list_reports(db, session_id)?
+                .into_iter()
+                .find(|report| report.execution_id == execution_id)
+                .ok_or_else(|| anyhow!("REPORT_PERSISTENCE_FAILED: ready report summary missing"));
         }
+    }
+
+    let hold = crate::goal_holds::get_hold(db, session_id, execution_id)?;
+    if hold.as_ref().is_some_and(|hold| hold.state != "accepted") {
+        return Err(anyhow!("GOAL_REPORT_NOT_VERIFIED: failed verified-goal publication cannot be retried from unverified host facts"));
     }
 
     // A failed publication must never be retried from an agent draft. Remove
@@ -475,5 +507,13 @@ pub fn retry_report(
         )?;
     }
 
-    finalize_report(db, execution_id, durable_seq, None, None)
+    finalize_with_closure(
+        db,
+        execution_id,
+        durable_seq,
+        None,
+        None,
+        if hold.is_some() { "user_accepted" } else { "" },
+        true,
+    )
 }
