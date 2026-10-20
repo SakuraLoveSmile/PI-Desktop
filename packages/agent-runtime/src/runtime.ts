@@ -6594,15 +6594,9 @@ export class DesktopAgentRuntime {
     this.activeProviderRetryAttempt = retryAttempt;
     this.pendingProviderRetry = undefined;
 
-    const messages = [...this.agent.state.messages];
-    if (messages.at(-1)?.role !== "assistant") {
-      throw new Error("Cannot retry a provider stream without its failed assistant message");
-    }
-    // A failed stream can be represented by more than one trailing assistant
-    // message after a tool round. Remove the whole failed suffix before
-    // continuing; pi-agent-core rejects any assistant-terminated transcript.
-    while (messages.at(-1)?.role === "assistant") messages.pop();
-    this.setAgentMessages(messages);
+    // Compaction may already have removed the failed response. Preserve its
+    // retained summary and system updates while discarding any failed suffix.
+    this.setAgentMessages(removeTrailingAssistantMessages(this.agent.state.messages));
 
     this.providerRetryInProgress = true;
     this.requestStartedAt = Date.now();
