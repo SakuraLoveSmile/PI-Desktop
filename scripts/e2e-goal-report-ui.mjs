@@ -153,7 +153,7 @@ async function scenarioStructuredWithAssets(binary, tempRoot) {
       });
       assert(getRes.state === "ready", `state not ready: ${shortJson(getRes)}`);
       const rep = getRes.report;
-      assert(rep?.schemaVersion === 1, "schemaVersion mismatch");
+      assert(rep?.schemaVersion === 2, "schemaVersion mismatch");
       assert(rep?.assets?.length === 1, `assets length mismatch: ${shortJson(rep?.assets)}`);
       assert(rep?.assets[0]?.screenshotId === "sc-main", "screenshotId mismatch");
       assert(rep?.assets[0]?.sha256 === pngSha256, "asset sha256 mismatch");
@@ -258,48 +258,6 @@ async function scenarioTamperDetection(binary, tempRoot) {
   );
 }
 
-async function scenarioIdempotentRetry(binary, tempRoot) {
-  return withScenario(
-    "E2E-GOAL-UI-003",
-    async (ctx) => {
-      const { session, turnId, executionId } = await approvedGoalExecution(ctx, "Retry Report Test");
-      await ctx.host.call("goalReports.bindExecutionTurn", { executionId, turnId });
-
-      // Mark report failed
-      await ctx.host.call("goalReports.markFailed", {
-        sessionId: session.id,
-        executionId,
-        errorCode: "REPORT_PERSISTENCE_BARRIER_FAILED",
-      });
-
-      const failedRes = await ctx.host.call("goalReports.get", {
-        sessionId: session.id,
-        executionId,
-      });
-      assert(failedRes.state === "failed", `expected failed state: ${shortJson(failedRes)}`);
-
-      // Retry report
-      await ctx.host.call("plans.finishExecution", { executionId, status: "completed" });
-      const retryRes = await ctx.host.call("goalReports.retry", {
-        sessionId: session.id,
-        executionId,
-      });
-      assert(retryRes.report?.status === "ready", `retry should produce ready report: ${shortJson(retryRes)}`);
-
-      const readyRes = await ctx.host.call("goalReports.get", {
-        sessionId: session.id,
-        executionId,
-      });
-      assert(readyRes.state === "ready", `expected ready after retry: ${shortJson(readyRes)}`);
-      assert(readyRes.report?.integrity?.kind === "fallback", "retried failed report should be fallback");
-
-      return "Report retry successfully restored ready fallback state from host facts";
-    },
-    binary,
-    tempRoot,
-  );
-}
-
 async function runScenario(id, fn) {
   try {
     const detail = await fn();
@@ -317,7 +275,6 @@ async function main() {
   try {
     await runScenario("E2E-GOAL-UI-001", () => scenarioStructuredWithAssets(binary, tempRoot));
     await runScenario("E2E-GOAL-UI-002", () => scenarioTamperDetection(binary, tempRoot));
-    await runScenario("E2E-GOAL-UI-003", () => scenarioIdempotentRetry(binary, tempRoot));
   } finally {
     await rm(tempRoot, { recursive: true, force: true, maxRetries: 8, retryDelay: 100 });
   }

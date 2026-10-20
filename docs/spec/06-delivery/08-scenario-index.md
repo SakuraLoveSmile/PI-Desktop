@@ -220,7 +220,6 @@ IDs come from executable result/test calls and annotated dynamic suites. Documen
 | E2E-GOAL-report-waits-for-settled-team | [scripts/e2e-goal-report.mjs:74](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-goal-report.mjs#L74); [scripts/e2e-suite-catalog.json (goal-report)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
 | E2E-GOAL-UI-001 | [scripts/e2e-goal-report-ui.mjs:64](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-goal-report-ui.mjs#L64) |
 | E2E-GOAL-UI-002 | [scripts/e2e-goal-report-ui.mjs:225](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-goal-report-ui.mjs#L225) |
-| E2E-GOAL-UI-003 | [scripts/e2e-goal-report-ui.mjs:263](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-goal-report-ui.mjs#L263) |
 | E2E-harness-fatal | [scripts/e2e-plan.mjs:1049](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plan.mjs#L1049) |
 | E2E-harness-host | [scripts/e2e-plan.mjs:1011](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plan.mjs#L1011) |
 | E2E-LONG-CONVERSATION | [scripts/e2e-long-conversation.mjs:604](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-long-conversation.mjs#L604) |
