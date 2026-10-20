@@ -8,7 +8,8 @@
  * the user-visible paths: the new header action order, select → next →
  * submit, skip → submit, decline-all, and a custom answer.
  *
- * Scenario: E2E-ASKTOOL-compact-card-interaction.
+ * Scenarios: E2E-ASKTOOL-compact-card-interaction and
+ * E2E-ASKTOOL-draft-survives-session-switch.
  */
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
@@ -18,8 +19,14 @@ import { en } from "@pi-desktop/i18n";
 import { AskToolCard } from "../../apps/desktop/src/components/AskToolCard";
 import { api } from "../../apps/desktop/src/lib/api";
 import { useAppStore } from "../../apps/desktop/src/stores/app-store";
+import { headAsk } from "../../apps/desktop/src/lib/pending-asks";
 
 const SESSION_ID = "asktool-card";
+
+function ActiveAskCard() {
+  const request = useAppStore((state) => headAsk(state.pendingAsks, state.activeSessionId));
+  return request ? <AskToolCard key={request.requestId} request={request} /> : null;
+}
 
 declare global {
   var asktoolCardProbe: () => Promise<unknown>;
@@ -305,6 +312,42 @@ export async function asktoolCardProbe({ keepEvidence = false } = {}) {
     assert(host.textContent?.includes("Pending answer"), "Team pending badge is visible");
     assert(host.textContent?.includes("explicitly resume or approve execution again"), "pending question explains the new approval boundary");
     assert(!headerButtons().primary.disabled && options().length > 0, "deferred question remains answerable");
+
+    // Switch the actual store projection A → B → A, including a free-text draft
+    // on question two. Only the IPC response is stubbed; the component and
+    // renderer store own selection, draft updates and final settlement.
+    const first = askRequest("ask-session-a", QUESTIONS);
+    const second = { ...askRequest("ask-session-b", QUESTIONS), sessionId: "asktool-other" };
+    flushSync(() => {
+      useAppStore.setState({ activeSessionId: first.sessionId, pendingAsks: {
+        [first.sessionId]: [first], [second.sessionId]: [second],
+      } });
+      root.render(<I18nextProvider i18n={i18n}><ActiveAskCard /></I18nextProvider>);
+    });
+    flushSync(() => options()[1]!.click());
+    flushSync(() => headerButtons().primary.click());
+    flushSync(() => element<HTMLButtonElement>(".asktool-custom-option").click());
+    const draftInput = element<HTMLInputElement>(".asktool-custom-input");
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(draftInput, "keep rollback notes");
+    draftInput.dispatchEvent(new Event("input", { bubbles: true }));
+    await frame();
+    flushSync(() => useAppStore.setState({ activeSessionId: second.sessionId }));
+    assert(questionText().includes("Which upgrade path?"), "another request starts at question one");
+    assert(options().every((option) => option.getAttribute("aria-checked") === "false"), "another request does not inherit choices");
+    assert(!host.querySelector(".asktool-custom-input"), "another request does not inherit custom text");
+    flushSync(() => options()[0]!.click());
+    flushSync(() => useAppStore.setState({ activeSessionId: first.sessionId }));
+    assert(questionText().includes("Allow rollback?"), "session A resumes at the open question");
+    assert(element<HTMLInputElement>(".asktool-custom-input").value === "keep rollback notes", "session A preserves custom text");
+    flushSync(() => element<HTMLButtonElement>(".asktool-indicator").click());
+    assert(options()[1]!.getAttribute("aria-checked") === "true", "session A preserves its selected option");
+    flushSync(() => headerButtons().primary.click());
+    flushSync(() => headerButtons().primary.click());
+    await until(() => resolutions.length === 7, "restored draft submits");
+    assert(JSON.stringify(resolutions[6]!.answers) === JSON.stringify([["beta"], ["keep rollback notes"]]), "restored draft submits exact answers");
+    await until(() => !host.querySelector(".asktool-card"), "successful resolution removes the card");
+    flushSync(() => useAppStore.setState({ activeSessionId: second.sessionId }));
+    assert(options()[0]!.getAttribute("aria-checked") === "true", "resolving A preserves B's independent draft");
     if (keepEvidence) {
       document.documentElement.setAttribute("data-theme", "dark");
       host.style.width = "100%";
@@ -326,6 +369,7 @@ export async function asktoolCardProbe({ keepEvidence = false } = {}) {
     api.resolveAskTool = originalResolve;
     useAppStore.setState({
       pendingAsks: initial.pendingAsks,
+      askDrafts: initial.askDrafts,
       activeSessionId: initial.activeSessionId,
     });
   }

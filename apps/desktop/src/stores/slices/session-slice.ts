@@ -34,6 +34,7 @@ import {
   type SessionMeta,
 } from "../../lib/sidebar-preferences";
 import { api } from "../../lib/api";
+import { dropAskDraft } from "../../lib/pending-asks";
 import { createRefreshCoordinator } from "../../lib/refresh-coordinator";
 import {
   applyOptimisticSessionConfiguration,
@@ -325,15 +326,24 @@ export function createSessionSlice({
           sessionId,
           pendingPermissions,
         );
+        const keptAskIds = new Set(pendingAsks.map((ask) => ask.requestId));
+        let askDrafts = state.askDrafts;
+        for (const ask of state.pendingAsks[sessionId] ?? []) {
+          if (!keptAskIds.has(ask.requestId)) {
+            askDrafts = dropAskDraft(askDrafts, ask.requestId);
+          }
+        }
         if (
           nextPendingAsks === state.pendingAsks &&
-          nextPendingPermissions === state.pendingPermissions
+          nextPendingPermissions === state.pendingPermissions &&
+          askDrafts === state.askDrafts
         ) {
           return {};
         }
         return {
           pendingAsks: nextPendingAsks,
           pendingPermissions: nextPendingPermissions,
+          askDrafts,
         };
       });
     },
