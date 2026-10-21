@@ -37,10 +37,14 @@ async function run(host, expected, extra) {
     `https://${host}:${server.address().port}/v1`, expected], { env, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
   let output = "";
   for (const stream of [child.stdout, child.stderr]) stream.on("data", (data) => { output += data; });
-  const timeout = setTimeout(() => child.kill(), 30_000);
+  let forceKill;
+  const timeout = setTimeout(() => {
+    child.kill("SIGTERM");
+    forceKill = setTimeout(() => child.kill("SIGKILL"), 2_000);
+  }, 30_000);
   let code;
   try { code = await new Promise((resolve, reject) => { child.once("error", reject); child.once("close", resolve); }); }
-  finally { clearTimeout(timeout); }
+  finally { clearTimeout(timeout); clearTimeout(forceKill); }
   assert.equal(code, 0, output);
   assert.equal(handshakes - before, 1, "a certificate failure must not retry TLS");
   console.log(output.trim());
@@ -53,9 +57,17 @@ try {
     outfile: join(temp, "agent-runtime/sidecar.js"), bundle: true, platform: "node", format: "esm",
     define: { PI_BUNDLED_NODE: "true" },
     banner: { js: `import { createRequire as __piCreateRequire } from 'node:module'; const require = __piCreateRequire(import.meta.url);
-import __certificateProbeTls from 'node:tls';
-{ const tls = __certificateProbeTls; const defaults = new Set(tls.getCACertificates('default'));
-process.stdout.write(JSON.stringify({jsonrpc:'2.0',method:'test.trust',params:{systemCount:tls.getCACertificates('system').length,systemIncluded:tls.getCACertificates('system').every(c=>defaults.has(c)),extraIncluded:tls.getCACertificates('extra').every(c=>defaults.has(c))}})+'\\n'); }` },
+import __certificateProbeTls from 'node:tls';` },
+    // Measure the configured sidecar after its real startup merge, rather than
+    // the runtime defaults before the entry point executes. Compare certificate
+    // contents because setDefaultCACertificates can normalize PEM whitespace.
+    footer: { js: `{ const tls = __certificateProbeTls; const { X509Certificate: __ProbeCert } = require('node:crypto');
+const identity = c=>{ try { return new __ProbeCert(c).fingerprint256 } catch { return c } };
+const defaults = new Set(tls.getCACertificates('default').map(identity)); const now = Date.now();
+// An OS store is a cache and keeps expired entries; a merged expired anchor can
+// never verify anything, so only the usable roots are expected in the defaults.
+const usable = tls.getCACertificates('system').filter(c=>{ try { return new Date(new __ProbeCert(c).validTo).getTime() > now } catch { return true } });
+process.stdout.write(JSON.stringify({jsonrpc:'2.0',method:'test.trust',params:{systemCount:tls.getCACertificates('system').length,usableSystemCount:usable.length,systemIncluded:usable.every(c=>defaults.has(identity(c))),extraIncluded:tls.getCACertificates('extra').every(c=>defaults.has(identity(c)))}})+'\\n'); }` },
   });
   await build({ entryPoints: [join(root, "scripts/e2e/provider-certificate-sidecar.ts")],
     outfile: join(temp, "parent.mjs"), bundle: true, platform: "node", format: "esm",

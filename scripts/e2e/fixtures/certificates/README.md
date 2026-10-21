@@ -15,3 +15,9 @@ openssl req -x509 -newkey rsa:2048 -nodes -keyout localhost-key.pem \
 
 The E2E test supplies the certificate only through a child process's
 `NODE_EXTRA_CA_CERTS`. It never modifies the machine's certificate stores.
+
+`expired-system-ca.crt` is a public, self-signed CA-only fixture with subject
+`CN=Expired system CA test fixture`, valid from January 1, 2020 through
+January 1, 2021. Its private key is not stored. The CA merge unit test freezes
+time at October 22, 2026 and supplies this expired root alongside the valid
+localhost certificate at the TLS API boundary, independent of the host OS store.
