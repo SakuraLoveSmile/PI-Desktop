@@ -22,9 +22,6 @@ jobs:
         with:
           fetch-depth: 0
       - uses: pnpm/action-setup@v6
-      # Install from a clean store. Restoring the pnpm store left Electron's install
-      # script unrun, so the binary never appeared and the smoke tier stopped at
-      # "Electron binary missing" before any suite ran.
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -39,6 +36,10 @@ jobs:
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - name: Install clean-runner dependencies
         run: pnpm install --frozen-lockfile
+      - name: Fetch the Electron binary
+        # Electron's npm package fetches its binary on first use, not on install,
+        # and the suites look for it directly under node_modules/electron/dist.
+        run: node apps/desktop/node_modules/electron/install.js
       - name: Build the candidate Host
         run: cargo build -p host-core --locked
       - name: Build workspace and Desktop
