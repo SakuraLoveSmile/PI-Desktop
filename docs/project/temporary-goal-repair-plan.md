@@ -18,18 +18,18 @@ Excluded: implementing the calculator from the reported conversation, retrying t
 
 ### 2.1 Working directories
 
-- Primary coordination checkout: `/Users/developer/Documents/Code/Project/Fork Project/PI-Desktop`.
-- Repair worktree: `/Users/developer/Documents/Code/Project/Fork Project/PI-Desktop-worktrees/fix-temporary-goal`.
+- Primary coordination checkout: `<primary-checkout>`.
+- Repair worktree: `<worktrees>/fix-temporary-goal`.
 - Repair branch: `codex/fix-temporary-goal`.
 - Inspected repair HEAD and local `origin/main`: `35d69037422492db38ed0c816966122e61989b8c`. The remote was fetched in the earlier diagnostic turn, not again in this planning turn.
 - Primary HEAD: `1c355b5faf508ab3101ca52cc84efbdadffa8372`; the primary is dirty and behind its local remote-tracking ref. Do not develop there or update it as part of this repair.
-- Separate Canvas worktree: `/Users/developer/Documents/Code/Project/Fork Project/PI-Desktop-worktrees/feat-goal-completion-report`. Its source and branch are outside this repair's ownership. Do not copy its uncommitted implementation or alter its artifacts.
+- Separate Canvas worktree: `<worktrees>/feat-goal-completion-report`. Its source and branch are outside this repair's ownership. Do not copy its uncommitted implementation or alter its artifacts.
 
 All source paths below are relative to the repair worktree. The implementation lead must recheck status and current base after receiving implementation authorization. Continue this request's worktree; do not create a second competing implementation. Preserve the existing edits before any authorized base refresh. If a safe refresh is blocked by overlapping or unowned changes, report that blocker rather than stash, reset, or force a rebase.
 
 ### 2.2 Confirmed failure, from the earlier diagnostic turn
 
-Only the named conversation was read. Session `00000000-0000-4000-8000-000000000001` had no project binding, remained in Goal mode and had no `plan_approvals` rows. Two otherwise valid `SubmitGoal` results returned `PLAN_WORKSPACE_REQUIRED`, `isError: true`, and `terminate: true`. Their outer tool records said success, and their turns ended as completed. Approval and implementation never began.
+Only the named conversation was read. Session `<redacted-session-id>` had no project binding, remained in Goal mode and had no `plan_approvals` rows. Two otherwise valid `SubmitGoal` results returned `PLAN_WORKSPACE_REQUIRED`, `isError: true`, and `terminate: true`. Their outer tool records said success, and their turns ended as completed. Approval and implementation never began.
 
 There were earlier model argument mistakes (an asktool option shape and a missing SubmitGoal question), but the model corrected them before the repeated workspace rejection. They are not the root cause and do not justify loosening tool schemas.
 

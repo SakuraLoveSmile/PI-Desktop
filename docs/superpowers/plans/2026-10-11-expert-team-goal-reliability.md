@@ -520,6 +520,6 @@ Status: six local repair candidates are ready for user experience. The user expl
 | WP5 | `08d9ed3dcb296651f2f58841a9a08ce4ec265d70` | Implemented and candidate-verified; pending user experience. |
 | WP6 | `3cbf0a19ea838babb5c720b13c5c13c390bcd5be` | Implemented and candidate-verified; pending user experience. |
 
-WP7 remains P2 backlog; it is not counted as implemented. All seven implementation/investigation worktrees are clean. Main remains unchanged. Full commands, evidence, retained limitations and branch paths: historical external execution record: `/Users/developer/Documents/Code/Project/Fork Project/PI-Desktop-delivery/20261011-expert-team-goal-reliability/EXECUTION.md`.
+WP7 remains P2 backlog; it is not counted as implemented. All seven implementation/investigation worktrees are clean. Main remains unchanged. Full commands, evidence, retained limitations and branch paths: historical external execution record: `<delivery-artifacts>/20261011-expert-team-goal-reliability/EXECUTION.md`.
 
 Review corrections included complete sanitized rejection reasons, RPC-wrapped error recognition, trusted roster cancellation, failure notice delivery after checkpoint faults, background completion between waits, complete HEAD projections, sender-turn/scope fences and deletion-safe warning counters. WP6 mechanically extracted the existing send-message RPC arm to its domain owner to satisfy the architecture ratchet; it did not expand the limit allowlist. No new RPC or database migration was introduced.

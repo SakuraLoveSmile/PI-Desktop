@@ -27,8 +27,8 @@ Preserve official PI-Desktop, Plus profiles, Keychain entries, existing provider
 
 ## Verified baseline and evidence limits
 
-- Primary checkout: `/Users/developer/Documents/Code/Project/Fork Project/PI-Desktop`. It was clean on `main` before planning. `git fetch origin main` completed during this planning turn.
-- Plan worktree: `/Users/developer/.codex/worktrees/example-worktree/PI-Desktop`, branch `codex/macos-local-network-repair-plan`, surveyed base `aef7aad669bb12357d58d899516aeec5473e40e4` (`origin/main`). Only this document is written. Refresh the base before implementation and preserve any later changes.
+- Primary checkout: `<primary-checkout>`. It was clean on `main` before planning. `git fetch origin main` completed during this planning turn.
+- Plan worktree: `<worktrees>/macos-local-network-plan/PI-Desktop`, branch `codex/macos-local-network-repair-plan`, surveyed base `aef7aad669bb12357d58d899516aeec5473e40e4` (`origin/main`). Only this document is written. Refresh the base before implementation and preserve any later changes.
 - Earlier in this conversation, `/Applications/Pi-Desktop-Plus.app` and the built bundle under `apps/desktop/release/mac-arm64/` were inspected: version `0.15.6`, bundle ID `cn.sakura.pi-desktop`, Apple Development signing identity, valid `codesign --verify --deep --strict`, and `NSLocalNetworkUsageDescription` present. This qualifies signature integrity, not Developer ID distribution or notarization.
 - Installed official PI-Desktop `0.15.10` has ID `net.aiuo.pi-desktop`. Both installed main executables report arm64 UUID `4C4C44B6-5555-3144-A187-35A40BAD7A39`.
 - Apple TN3178 documents network-subsystem confusion when differently identified applications reuse a main executable UUID. TN3179 states that Local Network identity uses code signing and the main executable UUID. The collision is verified; causality for this incident is not yet proven. No post-fix packet, HTTP, native prompt, or settings evidence exists.
@@ -184,7 +184,7 @@ Completed in this turn: skill/full handoff reads, clean-workspace and fetched-ba
 
 ## Implementation execution record (2026-09-30, T1–T3)
 
-Worktree: `/Users/developer/Documents/Code/Project/Fork Project/PI-Desktop-worktrees/macos-local-network-repair-t1-t3`,
+Worktree: `<worktrees>/macos-local-network-repair-t1-t3`,
 branch `codex/macos-local-network-repair-t1-t3`, created from refreshed `origin/main`
 (`aef7aad669bb12357d58d899516aeec5473e40e4`). The primary checkout stayed on `main`.
 Environment: Node v22.23.2, pnpm 10.34.5. The fresh worktree had no `node_modules`, so
