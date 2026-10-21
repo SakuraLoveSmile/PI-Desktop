@@ -244,7 +244,11 @@ export function installFooterMenuFixture(t: TFunction) {
   }
   async function scene(probe: Probe, scene: FooterScene) {
     close();
-    set({ isRunning: false, runningSessions: {}, activeProjectPath: path, openProjectPaths: [path, "/isolated/docs"], openProjects: [{ path, name: "PI-Desktop", branch: "main" }, { path: "/isolated/docs", name: "Notes project", branch: "main" }] });
+    // Earlier probes leave a running Goal checkpoint, which keeps Composer active
+    // even after the agent run flags are cleared. Menu scenes require an idle strip.
+    set({ isRunning: false, runningSessions: {}, planCheckpoints: {}, activeProjectPath: path, openProjectPaths: [path, "/isolated/docs"], openProjects: [{ path, name: "PI-Desktop", branch: "main" }, { path: "/isolated/docs", name: "Notes project", branch: "main" }] });
+    probe.check(probe.host.querySelector('.composer-top-strip')?.getAttribute('data-expanded') === 'true'
+      && Boolean(probe.host.querySelector('.composer-footer-project button:not(:disabled)')), `${scene} starts with idle workspace controls`);
     const kind = scene === "project-menu" ? "project" : scene === "branch-menu" ? "footer-branch" : "footer-location";
     const index = scene === "project-menu" ? 0 : scene === "branch-menu" ? 2 : 1;
     const popup = await open(probe, index, kind);
