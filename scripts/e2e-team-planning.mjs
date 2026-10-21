@@ -482,7 +482,9 @@ export function createPlanningFixture(projectPath) {
       console.log("PASS Team Plan mailbox finalization: full structured results defer normally while authenticated extra report waits, FIFO consumes full multilingual report exactly once, final proposal preserves the user's queued follow-up");
       // Remove only the fixture user's own follow-up via the user-visible
       // queue action, after proving that automatic finalization preserved it.
-      await evaluate(`document.querySelector('.composer-queued-prompt-remove').click()`);
+      await evaluate(`document.querySelector('.composer-queued-prompt-more').click()`);
+      await waitFor(() => evaluate(`Boolean(document.querySelector('[data-context-menu-item="remove"]'))`), "queue row menu offers Remove");
+      await evaluate(`document.querySelector('[data-context-menu-item="remove"]').click()`);
       await waitFor(async () => (await invoke("agentQueueList", { sessionId: planLead.id })).entries.length === 0, "fixture user explicitly removes their preserved follow-up");
 
       actionExpertSessionId = (await invoke("teamGetRoster", { teamSessionId: planLead.id })).members.find(item => item.name === "research_one")?.memberSessionId;

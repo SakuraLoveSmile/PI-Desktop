@@ -122,10 +122,6 @@ test("running prompts use a removable per-session queue with priority actions", 
   assert.match(store, /event\.type === "agent_end"[\s\S]*refreshQueuedPrompts\(envelope\.sessionId\)/);
   assert.doesNotMatch(store, /drainQueuedPrompts/);
   assert.match(composer, /data-testid="queued-prompt"/);
-  assert.match(composer, /removeQueuedPrompt\(item\.id\)/);
-  assert.match(composer, /moveQueuedPrompt\(item\.id, "up"\)/);
-  assert.match(composer, /moveQueuedPrompt\(item\.id, "down"\)/);
-  assert.match(composer, /editQueuedPrompt\(item\.id\)/);
   assert.match(composer, /sendQueuedNow\(item\.id\)/);
   // Send now promotes a row into the priority block instead of jumping to the
   // head, so two promoted rows leave in the order they were clicked.
@@ -135,22 +131,8 @@ test("running prompts use a removable per-session queue with priority actions", 
   );
   assert.match(queuedPromptsLib, /Math\.max\(max, candidate\.priority\)/);
   // Promotion fixes ordering and editing; removal remains available until delivery.
+  // The lock rules are asserted as data in queue-row-actions.test.mjs.
   assert.match(composer, /data-priority=\{promoted \? "true" : "false"\}/);
-  assert.match(composer, /disabled=\{sendNowLocked\}/);
-  assert.match(
-    composer,
-    /\{promoted\s*\? t\("chat\.sendNowPending"\)\s*: pending\s*\? t\("common\.saving"\)\s*: t\("chat\.sendNow"\)\}/,
-  );
-  assert.equal(
-    (composer.match(/disabled=\{actionsLocked\}/g) ?? []).length,
-    6,
-    "three pending or promoted row actions lock move up/down and edit",
-  );
-  assert.equal(
-    (composer.match(/aria-disabled=\{actionsLocked\}/g) ?? []).length,
-    3,
-    "each locked action carries its own aria-disabled state",
-  );
   assert.doesNotMatch(composer, /sendNowRequested/);
   assert.doesNotMatch(queuedPromptsLib, /sendNowRequested/);
   assert.doesNotMatch(queuedPromptsLib, /clearQueuedPromptSendNow/);

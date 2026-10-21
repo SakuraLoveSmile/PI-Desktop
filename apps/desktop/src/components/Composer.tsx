@@ -58,6 +58,7 @@ import { useComposerSubmit } from "../features/chat/composer/hooks/useComposerSu
 import { ComposerImageAttachments } from "../features/chat/composer/ComposerImageAttachments";
 import { ComposerInput } from "../features/chat/composer/ComposerInput";
 import { useComposerModelMenu } from "../features/chat/composer/hooks/useComposerModelMenu";
+import { thinkingLevelLabel } from "../features/chat/composer/thinking-level-label";
 import { ComposerWorkspaceContext } from "../features/chat/composer/ComposerWorkspaceContext";
 import { ComposerUsageFooter } from "../features/chat/composer/ComposerUsageFooter";
 import { ContextUsagePlaceholder } from "../features/chat/composer/ContextUsagePlaceholder";
@@ -421,7 +422,7 @@ export function Composer({
     thinkingProvider,
     configuredThinkingLevel,
   );
-  const thinkingLabel = thinkingLevel;
+  const thinkingLabel = thinkingLevelLabel(thinkingLevel, t);
   const modelLabel = modelId
     ? composerModelDisplayName(provider, modelId)
     : t("chat.model");
@@ -643,6 +644,7 @@ export function Composer({
           dismissDroppedDirectories={dismissDroppedDirectories}
         />
         <ComposerImageAttachments controller={draft.imagePreview} onRemove={draft.removeImage} disabled={inputBlocked} />
+        <ComposerWorkspaceContext t={t} running={runActive} />
         <div
           ref={composerShellRef}
           className={`composer-shell${inputBlocked ? " is-gated" : ""}${
@@ -742,7 +744,6 @@ export function Composer({
           />
         </div>
         <div className="composer-bottom-footer">
-          <ComposerWorkspaceContext />
           {composerContextUsage ? (
             <ComposerUsageFooter {...composerContextUsage} />
           ) : <ContextUsagePlaceholder />}

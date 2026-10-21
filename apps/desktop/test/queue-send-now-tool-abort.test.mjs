@@ -86,13 +86,13 @@ test("send-now offers an abort on the head promoted row once a top-level Bash ha
       await t.test("offers the abort once the head row has waited 30 seconds behind a running Bash", () => {
         const markup = render([promotedRow("turn-a", Date.now() - 31_000)]);
         assert.equal(markup.match(ABORT_BUTTON)?.length, 1);
-        assert.equal(ROW_ACTIONS(markup).length, 6, "the abort is an extra action beside the five existing ones");
+        assert.equal(ROW_ACTIONS(markup).length, 2, "the abort sits beside the row's ⋯ trigger");
       });
 
       await t.test("stays hidden before the 30 second threshold", () => {
         const markup = render([promotedRow("turn-a", Date.now() - 29_000)]);
         assert.equal(markup.match(ABORT_BUTTON), null);
-        assert.equal(ROW_ACTIONS(markup).length, 5);
+        assert.equal(ROW_ACTIONS(markup).length, 1, "a promoted row keeps only its ⋯ trigger before the threshold");
       });
 
       await t.test("never targets a subagent Bash, a finished or non-Bash call, or an idle session", () => {

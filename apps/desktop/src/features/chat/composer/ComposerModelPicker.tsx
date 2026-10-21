@@ -88,12 +88,8 @@ export function ComposerModelPicker({
             <IconBot size={14} />
           </span>
           <span className="composer-model-thinking-model">{modelLabel}</span>
-          {thinkingLevel !== "off" ? (
-            <>
-              <span className="composer-model-thinking-dot" aria-hidden="true">·</span>
-              <span className="composer-model-thinking-level">{thinkingLabel}</span>
-            </>
-          ) : null}
+          <span className="composer-model-thinking-dot" aria-hidden="true">·</span>
+          <span className="composer-model-thinking-level">{thinkingLabel}</span>
           <IconChevronDown size={12} aria-hidden="true" className="composer-model-thinking-chevron" />
         </TooltipButton>
       )}

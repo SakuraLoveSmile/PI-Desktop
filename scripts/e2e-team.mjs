@@ -1384,9 +1384,9 @@ try {
   await waitFor(() => modelGates.queue.entered, "controlled Lead turn for queue actions");
   for (let index = 1; index <= 8; index += 1) {
     await submitComposerPrompt(sendCdp, evaluate, `Queue fixture prompt ${index}`);
-    await waitFor(() => evaluate(`document.querySelectorAll('[data-testid="queued-prompt"]').length === ${index} && !document.querySelector('[data-testid="queued-prompt"] .composer-queued-prompt-remove:disabled')`), `Host-confirmed queue row ${index}`);
+    await waitFor(() => evaluate(`document.querySelectorAll('[data-testid="queued-prompt"]').length === ${index} && !document.querySelector('[data-testid="queued-prompt"] .composer-queued-prompt-more:disabled')`), `Host-confirmed queue row ${index}`);
   }
-  await evaluate(`document.querySelector('.composer-queue-heading')?.click()`);
+  // Two or more rows fold by default, so the summary is already showing.
   await waitFor(() => evaluate(`document.querySelector('.composer-queue-heading')?.getAttribute('aria-expanded') === 'false'`), "queue folded with eight waiting prompts");
   await saveScreenshot(sendCdp, "team-queue-collapsed.png");
   await evaluate(`document.querySelector('[data-sidebar-session-row="${planLead.id}"] button.thread-item-main')?.click()`);
@@ -1395,19 +1395,51 @@ try {
   await waitFor(() => evaluate(`document.querySelector('.composer-queue-heading')?.getAttribute('aria-expanded') === 'false'`), "Lead queue keeps folded choice after session return");
   await evaluate(`document.querySelector('.composer-queue-heading')?.click()`);
   assert.ok(await evaluate(`document.querySelector('.composer-queue-body').clientHeight <= 168`), "eight-row queue body exceeds its height limit");
-  await evaluate(`document.querySelectorAll('.composer-queued-prompt-move-up')[7]?.click()`);
+  // Edit, move and remove live in each row's ⋯ menu: open it, then pick the item.
+  // The menu is anchored to its ⋯ button and must stay open while the transcript
+  // behind it scrolls, which a running turn's reflow does at any time.
+  const queueRowAction = async (index, action, { scrollBehind = false } = {}) => {
+    const available = `!!document.querySelector('[data-context-menu-item="${action}"]:not(:disabled)')`;
+    // A menu closes once its trigger leaves the queue list, so bring the row into view first.
+    await evaluate(`document.querySelectorAll('.composer-queued-prompt-more')[${index}]?.scrollIntoView({ block: 'nearest' })`);
+    await evaluate(`document.querySelectorAll('.composer-queued-prompt-more')[${index}]?.click()`);
+    await waitFor(() => evaluate(available), `queue row ${index} ${action} menu open`);
+    if (scrollBehind) {
+      await saveScreenshot(sendCdp, "team-queue-menu-open.png");
+      // Sampled in the same task as the scroll: a reflow can re-pin the transcript
+      // to the bottom within a frame, which would hide the move from a later read.
+      const moved = await evaluate(`(() => { const el = document.querySelector('.thread-scroll'); const before = el.scrollTop; el.scrollBy({ top: -24 }); return el.scrollTop < before; })()`);
+      assert.ok(moved, "the transcript behind the open queue menu did not scroll");
+      await delay(150);
+      assert.ok(await evaluate(available), `queue row ${index} ${action} menu closed when the transcript behind it scrolled`);
+      await saveScreenshot(sendCdp, "team-queue-menu-open-after-scroll.png");
+      await evaluate(`document.querySelector('.thread-scroll').scrollBy({ top: 24 })`);
+    }
+    const choose = `(() => { const item = document.querySelector('[data-context-menu-item="${action}"]:not(:disabled)'); if (!item) return false; item.click(); return true; })()`;
+    await waitFor(() => evaluate(choose), `queue row ${index} ${action} chosen`);
+  };
+  await queueRowAction(7, "moveUp", { scrollBehind: true });
   await waitFor(() => evaluate(`document.querySelectorAll('.composer-queued-prompt-text')[6]?.innerText === 'Queue fixture prompt 8'`), "queue Move Up");
-  await evaluate(`document.querySelectorAll('.composer-queued-prompt-move-down')[6]?.click()`);
+  await queueRowAction(6, "moveDown");
   await waitFor(() => evaluate(`document.querySelectorAll('.composer-queued-prompt-text')[7]?.innerText === 'Queue fixture prompt 8'`), "queue Move Down");
-  await evaluate(`document.querySelectorAll('.composer-queued-prompt-remove')[7]?.click()`);
+  await queueRowAction(7, "remove");
   await waitFor(() => evaluate(`document.querySelectorAll('[data-testid="queued-prompt"]').length === 7`), "queue Remove");
-  await evaluate(`document.querySelectorAll('.composer-queued-prompt-edit')[1]?.click()`);
+  await queueRowAction(1, "edit");
   await waitFor(() => evaluate(`document.querySelector('.composer-input')?.textContent === 'Queue fixture prompt 2' && document.querySelectorAll('[data-testid="queued-prompt"]').length === 6`), "queue Edit returns the draft");
   await submitComposerPrompt(sendCdp, evaluate, "Queue fixture prompt 2 edited");
-  await waitFor(() => evaluate(`document.querySelectorAll('[data-testid="queued-prompt"]').length === 7 && !document.querySelector('[data-testid="queued-prompt"] .composer-queued-prompt-remove:disabled')`), "edited queue prompt confirmed");
+  await waitFor(() => evaluate(`document.querySelectorAll('[data-testid="queued-prompt"]').length === 7 && !document.querySelector('[data-testid="queued-prompt"] .composer-queued-prompt-more:disabled')`), "edited queue prompt confirmed");
   await saveScreenshot(sendCdp, "team-queue-expanded.png");
+  // A row the list scrolls fully out of view takes its open menu with it, and closing
+  // must not pull the list back to that row.
+  await evaluate(`document.querySelector('.composer-queue-body').scrollTop = 0`);
+  await evaluate(`document.querySelectorAll('.composer-queued-prompt-more')[0]?.click()`);
+  await waitFor(() => evaluate(`!!document.querySelector('[data-context-menu-item="remove"]:not(:disabled)')`), "queue row 1 menu open at the top of the list");
+  await evaluate(`(() => { const body = document.querySelector('.composer-queue-body'); body.scrollTop = body.scrollHeight; })()`);
+  await waitFor(() => evaluate(`!document.querySelector('[data-context-menu-item]')`), "queue row 1 menu closes once its row leaves the list");
+  await delay(150);
+  assert.ok(await evaluate(`!document.querySelector('[data-context-menu-item]') && document.querySelector('.composer-queue-body').scrollTop > 0`), "closing the queue row menu pulled the list back to its row");
   for (let count = 7; count > 1; count -= 1) {
-    await evaluate(`document.querySelectorAll('.composer-queued-prompt-remove')[${count - 1}]?.click()`);
+    await queueRowAction(count - 1, "remove");
     await waitFor(() => evaluate(`document.querySelectorAll('[data-testid="queued-prompt"]').length === ${count - 1}`), "remove surplus queue fixture");
   }
   await evaluate(`document.querySelector('.composer-queued-prompt-send-now')?.click()`);

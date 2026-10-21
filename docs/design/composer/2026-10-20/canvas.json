@@ -1,0 +1,21 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-10-20T00:00:00Z"},
+  "title": "Composer layout redesign",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 960, "h": 260, "title": "Dark · idle"},
+    "Running.dc.html": {"x": 1040, "y": 0, "w": 960, "h": 260, "title": "Dark · running"},
+    "Light.dc.html": {"x": 2080, "y": 0, "w": 960, "h": 260, "title": "Light · idle"},
+    "Menu.dc.html": {"x": 0, "y": 300, "w": 960, "h": 360, "title": "Dark · menu open"},
+    "States.dc.html": {"x": 1040, "y": 300, "w": 960, "h": 300, "title": "Dark · click states"},
+    "Model.dc.html": {"x": 2080, "y": 300, "w": 960, "h": 440, "title": "Dark · model switch"},
+    "Context.dc.html": {"x": 0, "y": 780, "w": 960, "h": 520, "title": "Dark · context low"},
+    "InputStates.dc.html": {"x": 1040, "y": 780, "w": 960, "h": 540, "title": "Dark · input states"},
+    "Queue.dc.html": {"x": 2080, "y": 780, "w": 960, "h": 680, "title": "Dark · queued prompts"}
+  },
+  "order": ["Main.dc.html", "Running.dc.html", "Light.dc.html", "Menu.dc.html", "States.dc.html", "Model.dc.html", "Context.dc.html", "InputStates.dc.html", "Queue.dc.html"],
+  "notes": {},
+  "designSystems": []
+}

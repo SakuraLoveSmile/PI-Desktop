@@ -2162,7 +2162,7 @@ workflow. They are not gates or promised outputs of the current Release run.
   (`aria-label="Stop generating"`) and no Send button is present; type a draft
   and verify the same slot becomes Send (`aria-label="Send"`) with no Stop
   button present. Send two more prompts and inspect the queue above the
-  composer. 3) Remove the second queued row and switch to B. 4) Send a prompt
+  composer. 3) Remove the second queued row from its ⋯ menu and switch to B. 4) Send a prompt
   in B, then return to A before either run completes. 5) Choose Send now on A's
   remaining queued row, then choose Send now on a second row. 6) Observe A
   through the current tool/reply boundary and then the next turn. 7) Start
@@ -2171,8 +2171,8 @@ workflow. They are not gates or promised outputs of the current Release run.
   turn finish without Send now, and delay its host `session.endTurn` response
   until after `agent_end` is delivered. Release finalization and observe both
   follow-ups through their turn boundaries. Repeat with a provider error and an
-  immediate abort. 9) With waiting rows, use move up and move down and confirm
-  the persisted order follows. 10) Edit a waiting row while the composer holds
+  immediate abort. 9) With waiting rows, use each row's ⋯ menu to move up and down and confirm
+  the persisted order follows. 10) Edit a waiting row from its ⋯ menu while the composer holds
   text, then with an empty composer. 11) Delay Host queue admission. Attempt to
   edit/remove the pending row, release admission, then edit/remove the durable
   row. Repeat with a captured file-reference draft. 12) Withhold a local Host
@@ -2186,9 +2186,12 @@ workflow. They are not gates or promised outputs of the current Release run.
   promoted rows are delivered in the order they were promoted, before any
   waiting row, without `AGENT_BUSY`: the first starts the turn and the rest join
   it as adjacent user messages, so the model answers once for the whole block.
-  A promoted row locks move/edit and Send now, but permits removal; promotion is
+  A promoted row locks Move and Edit in its ⋯ menu and replaces Send now with
+  its wait, but permits Remove; promotion is
   one-way. Move up/down swaps only waiting rows, never crosses the promoted
-  block, and persists. Edit is refused with a visible message while the input
+  block, and persists. Two or more waiting rows fold behind a summary until
+  expanded, and Send now appears on hover or focus. Edit is refused with a visible
+  message while the input
   is non-empty, and otherwise removes the row and returns its text plus its
   file-reference chips to the composer. Immediate Stop aborts the current reply
   and preserves A's queued row;
@@ -2199,8 +2202,9 @@ workflow. They are not gates or promised outputs of the current Release run.
   click or session switch. Repeated terminal handling does not double-dispatch.
   Other sessions' queues remain unchanged, and quitting while finalization is
   pending preserves queued work without starting another turn. Pending-admission
-  rows disable all five actions, explain Saving in each tooltip, show Saving
-  on Send now, and remain visible without restoring a second draft. Once acknowledged, remove deletes the durable row and edit restores
+  rows disable the ⋯ trigger, whose label reads Saving, and every menu action;
+  the row shows Saving where Send now would be, and it remains visible without
+  restoring a second draft. Once acknowledged, remove deletes the durable row and edit restores
   exactly its captured draft; neither row reappears after refresh. A local Host
   admission timeout clears the pending row, reports the error, and restores
   the rejected composer draft; retry can queue normally.
@@ -2264,6 +2268,26 @@ workflow. They are not gates or promised outputs of the current Release run.
 - **Acceptance**: C (chat), F (persistence)
 - **Milestone**: M6+
 - **Status**: Draft; host-side reorder covered by `turn_queue` unit tests
+
+#### E2E-QUEUE-row-menu-survives-transcript-scroll: A row's ⋯ menu follows its trigger when the transcript scrolls
+
+- **Preconditions**: Provider configured; a turn is held while at least two prompts are queued, and the transcript is pinned to the bottom.
+- **Steps**: 1) Open a waiting row's ⋯ menu. 2) Scroll the transcript behind it by a few pixels, then let the held turn reflow its content. 3) Confirm the menu is still open beside its trigger, then choose Move up and confirm the order changes.
+- **Expected**: Scrolling or reflowing the transcript repositions the menu with its trigger instead of dismissing it. The menu closes after a choice, on an outside press, on Escape or Tab, or when its trigger leaves the viewport.
+- **Specs linked**: `04-ux/09-interaction-patterns.md` (shared anchored menus)
+- **Acceptance**: C (chat)
+- **Milestone**: M6+
+- **Automation**: `node scripts/e2e-team.mjs` (queue section, first queue action; the scroll check)
+
+#### E2E-QUEUE-row-menu-closes-when-row-leaves-list: A row's ⋯ menu closes when the queue list scrolls its row out of view
+
+- **Preconditions**: Provider configured; a turn is held while at least three prompts are queued, so the queue list (at most 168px tall) scrolls.
+- **Steps**: 1) Scroll the queue list to its top and open the first row's ⋯ menu. 2) Scroll the queue list to its bottom, so that row is fully out of view. 3) Confirm the menu closes, nothing is left floating over the composer, and the list keeps its scroll position.
+- **Expected**: A menu whose trigger is fully outside the queue list closes, and focus is not moved back to the hidden trigger. A trigger that is only partly visible keeps its menu open.
+- **Specs linked**: `04-ux/08-component-spec.md` (queued row)
+- **Acceptance**: C (chat)
+- **Milestone**: M6+
+- **Automation**: `node scripts/e2e-team.mjs` (queue section, after the expanded-queue screenshot; the list-scroll close check)
 
 #### E2E-QUEUE-send-now-abort-offer-after-30s: Abort command appears on the head promoted row after 30 seconds
 
@@ -4278,8 +4302,8 @@ workflow. They are not gates or promised outputs of the current Release run.
   follows immediately; arrow keys retain focus and update the selection.
   With reduced motion enabled, the target is shown without a transition.
 - **Expected**: The chip is in the right toolbar with a Bot icon, before the
-  standalone prompt-enhancement Sparkles action and Send/Abort; Off omits the
-  level text. The single anchored menu replaces its root
+  standalone prompt-enhancement Sparkles action and Send/Abort; Off shows the
+  localized Off label. The single anchored menu replaces its root
   with an in-place back row and submenu, never opens tabs or a second popover,
   and always reopens at the root. Model search filters sticky provider groups;
   reasoning levels come from `omit` then the selected model binding's enabled
@@ -6410,7 +6434,8 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
     level merely because the model supports reasoning.
   - Reopening the first session preserves the user's later explicit selection.
   - The non-reasoning session starts at `off`; its combined chip keeps the Bot
-    icon, omits level text, and its reasoning submenu exposes only Off. Missing
+    icon, shows the localized Off label, and its reasoning submenu exposes only
+    Off. Missing
     capability metadata also falls back to `off`.
 - **Specs linked**: `03-runtime/13-model-catalog-and-selection.md`,
   `04-ux/08-component-spec.md`, ADR 0018, D303
@@ -18142,7 +18167,7 @@ prove account/region eligibility or call a real model.
 
 ### Composer metadata and compact agent rows
 
-The composer footer shows the current session's project, local/remote host, and known local Git branch; the branch chip is omitted without a project path and in remote sessions, which never borrow a local branch. A detached HEAD is named by its short commit (`Detached HEAD · abc1234`), and `No branch` appears only when neither a branch nor a commit is known. Model menus list all models without a search field. Generation speed, full-turn token totals, cache metrics and context details are available from the bottom-right context meter. Subagent entries use transparent gradient-avatar rows with name, task, localized status and measured elapsed time; clicking a row opens read-only details, with no panorama entry. Validate model keyboard selection, footer metadata, context details and agent navigation in the isolated composer/transcript fixtures, including narrow layouts.
+The workspace strip above the input card shows the current session's project, local/remote host, and known local Git branch; during a run it folds to the branch. Unavailable project/branch metadata is omitted; remote sessions never borrow a local branch. A detached HEAD is named by its short commit (`Detached HEAD · abc1234`), and `No branch` appears only when neither a branch nor a commit is known. Model menus list all models without a search field. Generation speed, full-turn token totals, cache metrics and context details are available from the bottom-right context meter. Subagent entries use transparent gradient-avatar rows with name, task, localized status and measured elapsed time; clicking a row opens read-only details, with no panorama entry. Validate model keyboard selection, workspace metadata, context details and agent navigation in the isolated composer/transcript fixtures, including narrow layouts.
 
 ### E2E-COMPOSER-toolbar-footer
 

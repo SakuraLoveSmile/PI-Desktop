@@ -2,6 +2,12 @@
 
 Upstream v0.15.6 → v0.16.1 has been merged.
 
+- The workspace strip (project, location, branch) sits above the input card
+  and folds to the branch while a run is active. The reasoning chip shows Off
+  instead of hiding when reasoning is off. Queued follow-ups fold behind a
+  summary once two or more are waiting, and Edit, Move, and Remove moved into
+  each row's ⋯ menu; Send now appears on hover or focus.
+
 - External schedulers can select a durable unattended interaction policy.
   `asktool` is hidden from discovery and a forbidden call stops the complete
   response before any tool executes, returning durable structured questions.

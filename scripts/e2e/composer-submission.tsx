@@ -141,7 +141,10 @@ export async function verifyComposerSubmission(imagePath: string, i18n: i18n) {
           position: 1, createdAt: "2026-01-01T00:00:00Z",
         }],
       }));
-      host.querySelector<HTMLButtonElement>(".composer-queued-prompt-edit")!.click();
+      host.querySelector<HTMLButtonElement>(".composer-queued-prompt-more")!.click();
+      await painted();
+      // The ⋯ menu portals to document.body, so its items are not under the host.
+      document.querySelector<HTMLButtonElement>('[data-context-menu-item="edit"]')!.click();
       await painted();
       assert(editor().textContent === "Review @/scratch/notes.txt" && host.querySelectorAll(".composer-image-attachment").length === 1,
         "editing a restored queue entry must recover text and image attachments");

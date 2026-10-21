@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Composer queued prompts</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="--ground:#181818;--strip:#262628;--card:#212121f5;--line:rgba(255,255,255,0.05);--rule:rgba(255,255,255,0.08);--text:#ffffff;--secondary:rgba(255,255,255,0.7);--muted:rgba(255,255,255,0.52);--placeholder:rgba(255,255,255,0.42);--hover:rgba(255,255,255,0.06);--send-bg:rgba(255,255,255,0.18);--send-fg:rgba(24,24,24,0.7);--shadow:0 3px 7.5px #0000000a,0 0 20px #0000000d;--danger:#ff6764;width:960px;height:680px;box-sizing:border-box;position:relative;background:var(--ground);color:var(--text);font-family:'PingFang SC','Hiragino Sans GB','Noto Sans CJK SC',system-ui,sans-serif">
+  <div style="position:absolute;left:24px;top:16px;right:24px;font-size:12px;line-height:18px;color:var(--muted)">待发送消息 · 方案 1：默认收起为摘要条，展开后是扁平列表；待发送条仍在顶部条之上（已定）。<br>每行只留一个主动作（悬停或聚焦时显示）；编辑、上移、下移、移除收进「…」。</div>
+
+  <div style="position:absolute;left:24px;top:68px;width:432px;display:flex;flex-direction:column">
+    <div style="font-size:12px;line-height:16px;color:var(--secondary);margin-bottom:12px">收起（默认，2 条及以上）</div>
+    <div style="position:relative;margin:0 26px -12px;height:38px;box-sizing:border-box;display:flex;align-items:center;gap:8px;padding:0 6px 0 14px;border-radius:16px 16px 0 0;border-top:1px solid var(--rule);background:var(--strip);font-size:12.5px;line-height:18px;color:var(--secondary)">
+      <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 auto;color:var(--muted)"><path d="M4 6h10M4 12h6M4 18h10"/><path d="M17 12h3M18.5 10.5L20 12l-1.5 1.5"/></svg>
+      <span style="flex:1;min-width:0;display:flex;align-items:baseline;gap:8px;white-space:nowrap"><span style="flex:0 0 auto;color:var(--text)">待发送 3 条</span><span style="min-width:0;overflow:hidden;text-overflow:ellipsis">修复登录页按钮的对齐问题</span></span>
+      <span style="display:flex;justify-content:flex-end;flex:0 0 88px"><button type="button" style="display:inline-flex;align-items:center;flex:0 0 auto;height:24px;padding:0 8px;border:0;border-radius:12px;background:transparent;color:var(--secondary);font:inherit;font-size:12px;white-space:nowrap">中止命令</button></span>
+      <button type="button" aria-label="展开" style="display:inline-grid;place-items:center;flex:0 0 auto;width:24px;height:24px;padding:0;border:0;border-radius:12px;background:transparent;color:var(--muted)"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+    </div>
+    <div style="position:relative;margin:0 24px -14px;padding:10px 20px 24px;box-sizing:border-box;background:var(--strip);border-radius:16px 16px 0 0;display:flex;align-items:center;gap:16px;color:var(--muted);font-size:12px;line-height:18px;white-space:nowrap">
+      <span style="color:var(--text)">PI-Desktop</span><span>本地</span><span style="min-width:0;overflow:hidden;text-overflow:ellipsis">codex/review-result-format</span>
+    </div>
+    <div style="position:relative;padding:12px 16px 10px;box-sizing:border-box;border-radius:16px;border:1px solid var(--line);background:var(--card);box-shadow:var(--shadow)">
+      <div style="font-size:14px;line-height:20px;color:var(--placeholder)">发消息或创建任务，/ 调用指令，@ 文件或对话</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:12px">
+        <span style="display:grid;place-items:center;width:28px;height:28px;color:var(--muted)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
+        <span style="margin-left:auto;font-size:12px;color:var(--secondary)">Qwen3.8-Max</span>
+        <span style="display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:var(--send-bg);color:var(--send-fg)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5.5 11.5L12 5l6.5 6.5"/></svg></span>
+      </div>
+    </div>
+  </div>
+
+  <div style="position:absolute;left:504px;top:68px;width:432px;display:flex;flex-direction:column">
+    <div style="font-size:12px;line-height:16px;color:var(--secondary);margin-bottom:12px">单条（1 条，不折叠）</div>
+    <div style="position:relative;margin:0 26px -12px;height:38px;box-sizing:border-box;display:flex;align-items:center;gap:8px;padding:0 6px 0 14px;border-radius:16px 16px 0 0;border-top:1px solid var(--rule);background:var(--strip);font-size:12.5px;line-height:18px;color:var(--secondary)">
+      <span aria-hidden="true" style="position:absolute;left:0;top:12px;bottom:10px;width:2px;border-radius:0 2px 2px 0;background:var(--secondary)"></span>
+      <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 auto;color:var(--muted)"><path d="M4 6h10M4 12h6M4 18h10"/><path d="M17 12h3M18.5 10.5L20 12l-1.5 1.5"/></svg>
+      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)">修复登录页按钮的对齐问题</span>
+      <span style="flex:0 0 auto;color:var(--muted)">等待当前任务结束</span>
+      <span style="display:flex;justify-content:flex-end;flex:0 0 88px"><button type="button" style="display:inline-flex;align-items:center;flex:0 0 auto;height:24px;padding:0 8px;border:0;border-radius:12px;background:transparent;color:var(--secondary);font:inherit;font-size:12px;white-space:nowrap">中止命令</button></span>
+      <button type="button" aria-label="更多" style="display:inline-grid;place-items:center;flex:0 0 auto;width:24px;height:24px;padding:0;border:0;border-radius:12px;background:transparent;color:var(--muted)"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>
+    </div>
+    <div style="position:relative;margin:0 24px -14px;padding:10px 20px 24px;box-sizing:border-box;background:var(--strip);border-radius:16px 16px 0 0;display:flex;align-items:center;gap:16px;color:var(--muted);font-size:12px;line-height:18px;white-space:nowrap">
+      <span style="color:var(--text)">PI-Desktop</span><span>本地</span><span style="min-width:0;overflow:hidden;text-overflow:ellipsis">codex/review-result-format</span>
+    </div>
+    <div style="position:relative;padding:12px 16px 10px;box-sizing:border-box;border-radius:16px;border:1px solid var(--line);background:var(--card);box-shadow:var(--shadow)">
+      <div style="font-size:14px;line-height:20px;color:var(--placeholder)">发消息或创建任务，/ 调用指令，@ 文件或对话</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:12px">
+        <span style="display:grid;place-items:center;width:28px;height:28px;color:var(--muted)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
+        <span style="margin-left:auto;font-size:12px;color:var(--secondary)">Qwen3.8-Max</span>
+        <span style="display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:var(--send-bg);color:var(--send-fg)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5.5 11.5L12 5l6.5 6.5"/></svg></span>
+      </div>
+    </div>
+  </div>
+
+  <div style="position:absolute;left:24px;top:290px;width:432px;display:flex;flex-direction:column">
+    <div style="font-size:12px;line-height:16px;color:var(--secondary);margin-bottom:12px">展开为扁平列表（点摘要条右侧的箭头）</div>
+    <div style="position:relative;margin:0 26px -12px;padding-bottom:12px;border-radius:16px 16px 0 0;border-top:1px solid var(--rule);background:var(--strip)">
+      <div style="height:38px;box-sizing:border-box;display:flex;align-items:center;gap:8px;padding:0 6px 0 14px;font-size:12.5px;line-height:18px;color:var(--secondary)">
+        <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 auto;color:var(--muted)"><path d="M4 6h10M4 12h6M4 18h10"/><path d="M17 12h3M18.5 10.5L20 12l-1.5 1.5"/></svg>
+        <span style="flex:1;min-width:0;color:var(--text)">待发送 3 条</span>
+        <button type="button" aria-label="收起" style="display:inline-grid;place-items:center;flex:0 0 auto;width:24px;height:24px;padding:0;border:0;border-radius:12px;background:transparent;color:var(--muted)"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg></button>
+      </div>
+      <div style="position:relative;height:40px;box-sizing:border-box;display:flex;align-items:center;gap:8px;padding:0 6px 0 37px;border-top:1px solid var(--line);font-size:12.5px;line-height:18px;color:var(--secondary)">
+        <span aria-hidden="true" style="position:absolute;left:0;top:10px;bottom:10px;width:2px;border-radius:0 2px 2px 0;background:var(--secondary)"></span>
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)">修复登录页按钮的对齐问题</span>
+        <span style="flex:0 0 auto;color:var(--muted)">等待当前任务结束</span>
+        <span style="display:flex;justify-content:flex-end;flex:0 0 88px"><button type="button" style="display:inline-flex;align-items:center;flex:0 0 auto;height:24px;padding:0 8px;border:0;border-radius:12px;background:transparent;color:var(--secondary);font:inherit;font-size:12px;white-space:nowrap">中止命令</button></span>
+        <button type="button" aria-label="更多" style="display:inline-grid;place-items:center;flex:0 0 auto;width:24px;height:24px;padding:0;border:0;border-radius:12px;background:transparent;color:var(--muted)"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>
+      </div>
+      <div style="position:relative;height:40px;box-sizing:border-box;display:flex;align-items:center;gap:8px;padding:0 6px 0 37px;border-top:1px solid var(--line);background:var(--hover);font-size:12.5px;line-height:18px;color:var(--secondary)">
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)">补充 composer 的单元测试</span>
+        <span style="display:flex;justify-content:flex-end;flex:0 0 88px"><button type="button" style="display:inline-flex;align-items:center;gap:4px;flex:0 0 auto;height:24px;padding:0 8px;border:0;border-radius:12px;background:transparent;color:var(--secondary);font:inherit;font-size:12px;white-space:nowrap"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5V20"/></svg>立即发送</button></span>
+        <button type="button" aria-label="更多" style="display:inline-grid;place-items:center;flex:0 0 auto;width:24px;height:24px;padding:0;border:0;border-radius:12px;background:transparent;color:var(--muted)"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>
+      </div>
+      <div style="position:relative;height:40px;box-sizing:border-box;display:flex;align-items:center;gap:8px;padding:0 6px 0 37px;border-top:1px solid var(--line);font-size:12.5px;line-height:18px;color:var(--secondary)">
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)">更新快捷键说明文档</span>
+        <span style="flex:0 0 auto;color:var(--muted)">正在保存…</span>
+        <span style="flex:0 0 88px"></span>
+        <button type="button" disabled aria-label="更多" style="display:inline-grid;place-items:center;flex:0 0 auto;width:24px;height:24px;padding:0;border:0;border-radius:12px;background:transparent;color:var(--muted);opacity:0.4"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>
+      </div>
+    </div>
+    <div style="position:relative;margin:0 24px -14px;padding:10px 20px 24px;box-sizing:border-box;background:var(--strip);border-radius:16px 16px 0 0;display:flex;align-items:center;gap:16px;color:var(--muted);font-size:12px;line-height:18px;white-space:nowrap">
+      <span style="color:var(--text)">PI-Desktop</span><span>本地</span><span style="min-width:0;overflow:hidden;text-overflow:ellipsis">codex/review-result-format</span>
+    </div>
+    <div style="position:relative;padding:12px 16px 10px;box-sizing:border-box;border-radius:16px;border:1px solid var(--line);background:var(--card);box-shadow:var(--shadow)">
+      <div style="font-size:14px;line-height:20px;color:var(--placeholder)">发消息或创建任务，/ 调用指令，@ 文件或对话</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:12px">
+        <span style="display:grid;place-items:center;width:28px;height:28px;color:var(--muted)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
+        <span style="margin-left:auto;font-size:12px;color:var(--secondary)">Qwen3.8-Max</span>
+        <span style="display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:var(--send-bg);color:var(--send-fg)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5.5 11.5L12 5l6.5 6.5"/></svg></span>
+      </div>
+    </div>
+  </div>
+
+  <div style="position:absolute;left:504px;top:290px;width:432px;display:flex;flex-direction:column">
+    <div style="font-size:12px;line-height:16px;color:var(--secondary);margin-bottom:12px">行规则与「…」菜单</div>
+    <div style="display:flex;gap:16px;align-items:flex-start">
+      <div style="width:200px;box-sizing:border-box;padding:6px;border-radius:16px;border:1px solid var(--line);background:var(--card);box-shadow:0 16px 48px rgba(0,0,0,0.55)">
+        <div style="font-size:11px;line-height:16px;color:var(--muted);padding:4px 10px 6px">首条</div>
+        <div style="display:flex;align-items:center;height:30px;padding:0 10px;border-radius:10px;font-size:12.5px;color:var(--text);opacity:0.4">编辑</div>
+        <div style="display:flex;align-items:center;height:30px;padding:0 10px;border-radius:10px;font-size:12.5px;color:var(--text);opacity:0.4">上移</div>
+        <div style="display:flex;align-items:center;height:30px;padding:0 10px;border-radius:10px;font-size:12.5px;color:var(--text);opacity:0.4">下移</div>
+        <div style="display:flex;align-items:center;height:30px;padding:0 10px;border-radius:10px;font-size:12.5px;color:var(--danger)">移除</div>
+      </div>
+      <div style="width:200px;box-sizing:border-box;padding:6px;border-radius:16px;border:1px solid var(--line);background:var(--card);box-shadow:0 16px 48px rgba(0,0,0,0.55)">
+        <div style="font-size:11px;line-height:16px;color:var(--muted);padding:4px 10px 6px">其他行</div>
+        <div style="display:flex;align-items:center;height:30px;padding:0 10px;border-radius:10px;font-size:12.5px;color:var(--text)">编辑</div>
+        <div style="display:flex;align-items:center;height:30px;padding:0 10px;border-radius:10px;font-size:12.5px;color:var(--text)">上移</div>
+        <div style="display:flex;align-items:center;height:30px;padding:0 10px;border-radius:10px;font-size:12.5px;color:var(--text)">下移</div>
+        <div style="display:flex;align-items:center;height:30px;padding:0 10px;border-radius:10px;font-size:12.5px;color:var(--danger)">移除</div>
+      </div>
+    </div>
+    <div style="margin-top:16px;font-size:11px;line-height:16px;color:var(--muted)">
+      <div style="color:var(--secondary)">规则</div>
+      <div>首条：左侧竖线代替「下一条」标签；编辑、上移、下移锁定，仍可移除；「中止命令」仅在无待审批时显示。</div>
+      <div>其他行：「立即发送」悬停或聚焦时显示（左侧第二行为悬停态）；菜单四项可用。</div>
+      <div>保存中：灰色文字代替按钮；移除禁用。</div>
+      <div>1 条不折叠；2 条及以上默认收起，展开后为扁平列表。</div>
+    </div>
+  </div>
+
+  <div style="position:absolute;left:24px;right:24px;bottom:16px;font-size:11px;line-height:16px;color:var(--muted)">「立即发送」沿用现有动作：提升后等待当前任务结束再发送。已定保留此文案，未采用截图里的「引导」（语义可能不同）。<br>透明度：锁定项 0.4。保存中不再用 0.65 的禁用按钮，改为灰色文字；composer.css 179–205 需随实现调整。</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":680}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

@@ -435,7 +435,7 @@ visually distinct from list content.
 | Session completed | Green check mark from the latest unread task notification when the row is not selected |
 | Session failed | Red circled alert mark from the latest unread task notification when the row is not selected |
 | Hover row | Project headers and all conversation rows share one full-row `--ds-bg-hover` surface, radius and transition; selected conversation fill takes precedence |
-| Current workspace | Project header shows the workspace dot, never a persistent selection fill; topbar follows that workspace; composer exposes no workspace identity |
+| Current workspace | Project header shows the workspace dot, never a persistent selection fill; topbar follows that workspace; the workspace strip above the input card shows project, location, and branch (folded to the branch during a run), and the input card itself exposes no workspace identity |
 | Navigation selection | Only the selected conversation on the chat page uses `--ds-bg-active`, including pinned and standalone rows; folding its group never transfers selection to the header. No conversation or a non-chat page means no selected conversation row |
 | Keyboard focus | The focused control keeps its visible outline; the project title stays transparent and independent action buttons retain their own hover feedback |
 | Collapsed project | Header remains visible; unpinned child conversations are hidden; global pins remain visible |
@@ -3281,8 +3281,8 @@ reasoning-level control.
   or `chat.usageContextUsedLabel` (Used), following the context usage display
   setting. The unavailable placeholder keeps `chat.usageContextLabel` (Context). The chip shows Bot, the
   current model name, and the
-  current canonical reasoning level value separated by `·`; `off` omits the
-  level text. The canonical value is rendered as-is (`low`, `high`, `xhigh`,
+  current canonical reasoning level value separated by `·`; `off` shows the
+  localized Off label. The canonical value is rendered as-is (`low`, `high`, `xhigh`,
   or `max`) and is not localized. The
   prompt-enhancement action shows Sparkles while idle, uses the shared
   `.tool-spinner` and localized `Enhancing…` label while running, and remains
@@ -3358,9 +3358,12 @@ reasoning-level control.
   visible copy is a keyed opacity fade while the native `placeholder` value
   remains in the textarea for assistive technology.
 - Queue rows: while a session is running, each accepted prompt is held in a
-  renderer-owned FIFO list above the shell. Rows show the visible prompt (or
-  file-reference names), expose independent Remove and Send now actions, and
-  increase the dock height measured by `--composer-dock-height`.
+  Host-owned FIFO list above the shell; a row the Host has not yet admitted
+  exists only in the renderer. Rows show the visible prompt (or file-reference
+  names). Two or more rows fold behind a summary that carries the head's Abort
+  offer; a single row is always listed. Expanded waiting rows show Send now on
+  hover or focus, and every row keeps Edit, Move up, Move down, and Remove in its
+  ⋯ menu. The queue increases the dock height measured by `--composer-dock-height`.
 
 ### 11.3a Overview session checklist
 
@@ -3453,8 +3456,13 @@ reasoning-level control.
   different session's queue is not affected by switching sessions. Running with
   an empty draft changes this same submit slot to Stop. Clear the draft to
   expose the immediate-stop action.
-- Queued row: the text, then move up, move down, Send now, edit, and remove
-  (the head promoted row adds Abort command after Send now, see below).
+- Queued row: the text, then a status label while the row is saving or waiting
+  for the current task, or a Send now button on a waiting row (visible on hover
+  or focus). The head promoted row adds the Abort command (see below). A ⋯
+  trigger opens the row menu: Edit, Move up, Move down, a separator, then Remove
+  as the danger action. While the queue is folded, its summary carries the head's
+  Abort command. A row menu closes when the list scrolls its row fully out of view,
+  and focus is not moved back to the hidden trigger.
   Move up/down swaps the row with its adjacent waiting neighbour and mirrors the
   Host's durable `position`; at the waiting-block boundary it is a no-op and
   never crosses into the promoted block. Edit removes the row and returns its
@@ -3462,7 +3470,9 @@ reasoning-level control.
   after an app restart, when that in-memory draft is unavailable, restore the
   Host-stored content and image/file attachments without rewriting the content;
   while the input is non-empty (or holds attachments) the action is refused with
-  a toast and nothing changes. Remove drops the row immediately.
+  a toast and nothing changes. Remove keeps the row until the Host confirms the
+  cancellation; if delivery already started, the row stays and a message directs
+  the user to Stop.
 - Send now: promotes the row to the end of the session's priority block, so a
   second Send now leaves behind the first instead of replacing it at the head.
   It then requests `agent/stop`, and the promoted block is released after the
@@ -3479,17 +3489,18 @@ reasoning-level control.
   When the Bash call settles, the turn ends at its batch boundary and the
   promoted row starts. A later top-level Bash call in the same batch offers the
   button again at once, because the delay has already passed.
-- A pending queue row is locked until Host admission returns its durable id: move
-  up/down, Send now, edit, and remove are disabled. All five tooltips explain
-  that it is saving; Send now also displays the localized Saving label. Direct edit/remove actions leave the pending row and draft
-  unchanged; after admission, ordinary waiting-row actions become available.
-- A promoted row fixes order: move up/down and edit are disabled with
-  their tooltip and `aria-disabled` state intact, and the Send now button reads
-  as waiting for the current task (`chat.sendNowPending`). Remove remains
-  available until delivery and waits for Host acknowledgement. If delivery
-  already started, show a conflict message directing the user to Stop.
-  The row carries a distinct
-  promoted surface so it is not mistaken for another waiting row.
+- A pending queue row is locked until Host admission returns its durable id: its
+  ⋯ trigger is disabled, so edit, move up/down, and remove cannot be opened. The
+  row shows the localized Saving label in place of Send now, and the disabled
+  trigger's tooltip explains that it is saving. Direct edit/remove actions leave
+  the pending row and draft unchanged; after admission, ordinary waiting-row
+  actions become available.
+- A promoted row fixes order: the row shows the waiting label
+  (`chat.sendNowPending`) in place of Send now. Its ⋯ menu disables Edit and
+  move up/down, and keeps Remove available until delivery; Remove waits for Host
+  acknowledgement. If delivery already started, show a conflict message directing
+  the user to Stop. The row carries a distinct promoted surface so it is not
+  mistaken for another waiting row.
 - Stop: the single submit slot is shown only while a turn is running and the
   draft is empty. It stops the running turn and cancels pending permission.
   Before any
@@ -3676,8 +3687,9 @@ transcript and Overview history.
 - Editable text controls never enable browser spellcheck or autocorrect (D145)
 - Send button: `aria-label="Send message"`
 - Stop button: `aria-label="Stop generating"`
-- Queued prompt list: `aria-label="Queued messages"`; each row has an
-  accessible Remove button and a Send now button.
+- Queued prompt list: `aria-label="Queued messages"`; each row has an accessible
+  ⋯ trigger whose menu holds Edit, Move up, Move down, and Remove. Each waiting
+  row also has a Send now button.
 - Native file-system drag-over highlights the complete Composer shell with an
   outline that does not change layout; dropping a folder leaves its complete
   path visible in the editable draft, and dropping regular files exposes the
@@ -5123,7 +5135,7 @@ viewport restoration remain intact.
 
 ### Composer metadata and compact agent rows
 
-The composer footer shows the current session's project, local/remote host, and known local Git branch; the branch chip is omitted without a project path and in remote sessions, which never borrow a local branch. A detached HEAD is named by its short commit (`Detached HEAD · abc1234`), and `No branch` appears only when neither a branch nor a commit is known. Model menus list all models without a search field. Generation speed, full-turn token totals, cache metrics and context details are available from the bottom-right context meter. Subagent entries use transparent gradient-avatar rows with name, task, localized status and measured elapsed time; clicking a row opens read-only details, with no panorama entry. Validate model keyboard selection, footer metadata, context details and agent navigation in the isolated composer/transcript fixtures, including narrow layouts.
+The workspace strip above the input card shows the current session's project, local/remote host, and known local Git branch; during a run it folds to the branch. Unavailable project/branch metadata is omitted; remote sessions never borrow a local branch. A detached HEAD is named by its short commit (`Detached HEAD · abc1234`), and `No branch` appears only when neither a branch nor a commit is known. Model menus list all models without a search field. Generation speed, full-turn token totals, cache metrics and context details are available from the bottom-right context meter. Subagent entries use transparent gradient-avatar rows with name, task, localized status and measured elapsed time; clicking a row opens read-only details, with no panorama entry. Validate model keyboard selection, workspace metadata, context details and agent navigation in the isolated composer/transcript fixtures, including narrow layouts.
 
 ### Recorded outputs, delegate details and project Skill suggestions
 
@@ -5143,7 +5155,7 @@ Validate count-to-dialog, keyboard/hover actions, project review/save, Ignore/co
 
 ### Composer workspace menus (Plus)
 
-The composer footer exposes three anchored menus, retaining the existing neutral
+The workspace strip above the input card exposes three anchored menus, folded to the branch menu during a run, retaining the existing neutral
 color tokens and opaque popover surface. Project search matches names and paths;
 the current project is checked. Selecting another project or no workspace uses
 the existing `newSession` navigation workflow. It never rebinds a populated
