@@ -245,7 +245,7 @@ for (const kind of ["plan", "goal"]) test(`deadline wakeup binds the approved ${
 });
 
 const { createSessionCoordination } = await import("../electron/main/runtime/session-coordination.ts");
-for (const kind of ["plan", "goal"]) test(`failed ${kind} execution binding interrupts its owned turn without sidecar launch`, async () => {
+for (const kind of ["plan", "goal"]) test(`failed ${kind} execution binding settles its owned turn without sidecar launch`, async () => {
   const execution = { id: "execution", proposalId: "proposal", sessionId: "session", kind, state: "queued",
     plan: "# Plan", title: "Plan", question: "Proceed?", targetPermissionMode: "ask",
     artifact: { relativePath: "plan.md", sha256: "hash", sizeBytes: 6 } };
@@ -259,10 +259,12 @@ for (const kind of ["plan", "goal"]) test(`failed ${kind} execution binding inte
     if (method === (kind === "plan" ? "plans.bindExecutionTurn" : "goalReports.bindExecutionTurn")) {
       throw { errorCode: "PLAN_EXECUTION_STALE" };
     }
+    if (method === "goalExecutions.settle") return { hold: { state: "blocked" } };
     return { ok: true };
   } };
   const coordination = createSessionCoordination({ activeTurns: new Map(), getMainWindow: () => null, getViewingSessionId: () => null });
   let launched = false;
+  let blocked = false;
   const runtime = createPlanRuntime({
     runtimeState: { host, sidecar: { async call() { launched = true; return { accepted: true }; } } },
     planState: { approvedExecutionDrain: null }, coordination, logger: { app() {} }, isQuitting: () => false,
@@ -270,6 +272,7 @@ for (const kind of ["plan", "goal"]) test(`failed ${kind} execution binding inte
     startedApprovedExecutions: new Set(), finishedApprovedExecutions: new Set(), dispatchingApprovedExecutions: new Set(),
     claimedExecutionSessions: new Map(), approvedExecutionIdsBySession: new Map(), approvedExecutionTurns: new Map(),
     inFlightExecutionFinishes: new Set(), pendingExecutionFinishes: new Map(),
+    onGoalBlocked: async () => { blocked = true; },
     announceTurnEnded() {}, emitAgentEvent() {}, sendToRenderer() {}, acquireSessionOperation: coordination.acquireSessionOperation,
     resolveAgentRuntimeLaunch: async () => ({ providerId: "fake", modelId: "fake", sidecarParams: { sessionId: "session" } }),
   });
@@ -277,9 +280,17 @@ for (const kind of ["plan", "goal"]) test(`failed ${kind} execution binding inte
   assert.equal(launched, false);
   assert.equal(coordination.activeTurns.has("session"), false);
   assert.deepEqual(calls.find((call) => call.method === "session.endTurn")?.params,
-    { turnId: "execution-turn", status: "error", errorCode: "PLAN_EXECUTION_STALE", createNotification: true });
-  assert.deepEqual(calls.find((call) => call.method === "plans.finishExecution")?.params,
-    { executionId: "execution", status: "interrupted", errorCode: "PLAN_EXECUTION_STALE" });
+    { turnId: "execution-turn", status: "error", errorCode: "PLAN_EXECUTION_STALE", createNotification: kind !== "goal" });
+  if (kind === "goal") {
+    assert.deepEqual(calls.find(call => call.method === "goalExecutions.settle")?.params,
+      { sessionId: "session", executionId: "execution", ended: "errored", errorCode: "PLAN_EXECUTION_STALE" });
+    assert.equal(calls.some(call => call.method === "plans.finishExecution"), false);
+    assert.equal(blocked, true);
+  } else {
+    assert.deepEqual(calls.find(call => call.method === "plans.finishExecution")?.params,
+      { executionId: "execution", status: "interrupted", errorCode: "PLAN_EXECUTION_STALE" });
+    assert.equal(blocked, false);
+  }
 });
 
 const { createRuntimeLifecycle } = await import("../electron/main/runtime/lifecycle.ts");

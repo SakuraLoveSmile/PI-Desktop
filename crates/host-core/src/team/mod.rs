@@ -114,3 +114,8 @@ pub fn get_member_presentation(
         .map(serde_json::from_value)
         .transpose()?)
 }
+
+pub(crate) use lifecycle::require_unpaused;
+
+#[cfg(test)]
+mod goal_resume_tests;

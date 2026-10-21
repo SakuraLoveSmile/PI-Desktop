@@ -1,4 +1,4 @@
-import { IPC, ErrorCodes, compactionRecordId, findSkillMentions, isGlobalPermissionMode, isRpcTimeoutError, type AgentEventEnvelope, type AgentPromptRequest, type AgentSteerRequest, type UiMessage, type AgentQueuePushRequest, type AgentStopRequest, type AskToolResolution, type GlobalPermissionMode, type MessageUsage, type PendingInteractiveRequests, type PlanExecutionFinishStatus, type PlanResolutionResult, type PlanResolveRequest, type PromptEnhancementRequest, type SessionSummarizeTitleRequest, type VoiceOrigin, canonicalThinkingLevel, type ThinkingLevel } from "@pi-desktop/shared";
+import { IPC, ErrorCodes, compactionRecordId, findSkillMentions, isGlobalPermissionMode, isRpcTimeoutError, type AgentEventEnvelope, type AgentPromptRequest, type AgentSteerRequest, type UiMessage, type AgentAbortToolRequest, type AgentAbortToolResponse, type AgentQueuePushRequest, type AgentStopRequest, type AskToolResolution, type GlobalPermissionMode, type MessageUsage, type PendingInteractiveRequests, type PlanExecutionFinishStatus, type PlanResolutionResult, type PlanResolveRequest, type PromptEnhancementRequest, type SessionSummarizeTitleRequest, type VoiceOrigin, canonicalThinkingLevel, type ThinkingLevel } from "@pi-desktop/shared";
 import type { FinishTurn, LockExecutionInterruption } from "../runtime/plans";
 import { expandSlashInvocation, enhancePromptDraft, summarizeSessionTitle, visionFromModelConfig, type ComposerTemplate, type RuntimeProviderConfig } from "@pi-desktop/agent-runtime";
 import { OAUTH_AUTH_KIND, type VendorOAuth } from "../oauth";
@@ -844,6 +844,23 @@ export function registerAgentIpc({
     // here: agent_end must arrive after the current reply/tool batch completes
     // and finish it as a normal completed turn.
     return sidecar.call("agent.stop", { ...req, ...(activeTurnId ? { turnId: activeTurnId } : {}) });
+  });
+
+  // Ends one running Bash call so a queued send-now can reach its boundary. The
+  // runtime owns the stop-then-kill order; main only confirms that the turn the
+  // renderer saw is still the active one, so a stale click cannot reach a newer turn.
+  handle(IPC.invoke.agentAbortTool, async (req: AgentAbortToolRequest) => {
+    if (!sidecar) throw new Error("sidecar unavailable");
+    if (!req.toolCallId) throw new Error("toolCallId required");
+    const activeTurnId = activeTurns.get(req.sessionId);
+    if (!activeTurnId || (req.turnId && req.turnId !== activeTurnId)) {
+      return { found: false, requested: false };
+    }
+    return sidecar.call<AgentAbortToolResponse>("agent.abortTool", {
+      sessionId: req.sessionId,
+      turnId: activeTurnId,
+      toolCallId: req.toolCallId,
+    });
   });
 
   handle(IPC.invoke.agentGetStatus, async (sessionId: string) => {

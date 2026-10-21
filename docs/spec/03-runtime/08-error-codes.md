@@ -156,9 +156,13 @@ The code, retryability and 30-second admission deadline remain unchanged.
 | `PLAN_APPROVAL_STALE` | no | response does not match the live proposal/session/turn/tool-call/version |
 | `PLAN_APPROVAL_INTERRUPTED` | no | pending approval closed during abort, crash, or persistence failure |
 | `PLAN_ARTIFACT_WRITE_FAILED` | no | host could not write exact bytes to a new `.pi/<kind>/*.md` artifact |
-| `PLAN_EXECUTION_INTERRUPTED` | no | approved queued/running Plan or Goal execution stopped without replay |
+| `PLAN_EXECUTION_INTERRUPTED` | no | approved queued/running Plan stopped without replay; Goal user Stop remains interruption, while errored/crash Goals use durable holds |
 | `GOAL_EXECUTION_NOT_TERMINAL` | no | report publication/retry requested without persisted Goal completion, or a status override contradicts completion; interruption is not completion |
 | `GOAL_PROGRESS_NOT_RUNNING` | no | progress write attempted after its execution or bound turn stopped |
+| `GOAL_BLOCKED` | no | Goal acceptance is unverified or execution errored; a durable hold needs explicit Continue, Accept or Abandon, never automatic retry |
+| `GOAL_ABANDONED` | no | user abandoned a blocked Goal; execution remains interrupted and no completion report is published |
+| `GOAL_SUPERSEDED` | no | a newly approved Goal replaced the session's blocked Goal; the old execution is interrupted and cannot resume |
+| `GOAL_REPORT_NOT_VERIFIED` | no | automatic Goal completion/finalization lacks a valid structured met draft, completed existing progress or settled current Team work; publish no report |
 | `PLAN_REQUIRES_INTERACTIVE_SESSION` | no | unattended/scheduled Plan or Goal run cannot request approval |
 | `PLAN_NOT_FOUND` | no | no approval row matches the proposal id |
 | `PLAN_SESSION_NOT_FOUND` | no | the Plan/Goal RPC named a session the host does not have |
@@ -490,7 +494,9 @@ the turn must obtain a fresh effective ID/dialect. `PLAN_ARTIFACT_WRITE_FAILED`
 never creates an approval row. `PLAN_APPROVAL_TIMEOUT` applies only to the
 absolute pending deadline;
 `PLAN_EXECUTION_INTERRUPTED` identifies an already-approved queued/running
-execution interrupted by abort or host recovery. `PLAN_KIND_MISMATCH` is a
+Plan execution interrupted by abort or host recovery. Effective Goals use the
+hold settlement path for execution errors and Host restart; explicit user Stop
+still interrupts. `PLAN_KIND_MISMATCH` is a
 terminating tool error like `PLAN_NOT_ACTIVE`: the submit tool ran against the
 wrong contract, so no artifact is written and no approval row is created.
 
@@ -653,3 +659,17 @@ owned service before a fresh attempt; do not bypass permissions or busy-retry.
 Ordinary inbox provenance violations remain `PERMISSION_DENIED`; stale precise
 turn/proof/authority errors retain Team denial codes. A recognized ACK transport
 loss can leave summary-only pending IDs, but authority errors cannot flush a body.
+
+
+### Goal hold recovery errors
+
+GOAL_BLOCKED is a needs-attention execution state, not a generic transport retry.
+Continue must use the same execution and current hold version; retrying
+finalizeReport cannot resume or accept it. GOAL_ABANDONED and GOAL_SUPERSEDED are
+terminal user-directed outcomes without completed reports. GOAL_REPORT_NOT_VERIFIED
+requires corrected Goal evidence/report submission or explicit held-result
+acceptance; it never silently falls back to completion. Host boot recovery
+records agent_error:HOST_RESTARTED in queued/running effective Goal holds before
+the generic Plan interruption fence. HOST_RESTARTED is a hold reason suffix,
+not a new transport error replacing HOST_UNAVAILABLE. Already blocked holds
+remain unchanged and no Goal is automatically replayed.

@@ -888,15 +888,62 @@ invalidate it; the tool result warns the Agent to resubmit after such work.
 If successful Goal execution ends without a valid draft, the runtime requests
 one report-only continuation at most, preserving the same execution and single
 terminal lifecycle. Errors, cancellation, and interruption do not trigger it.
-If this continuation still leaves no valid report, normal Host fallback applies.
+If this continuation still leaves no valid report, the Host settles the Goal as
+blocked; it never synthesizes automatic fallback completion. The report-only
+allowance resets once per resumed segment, not once per model round. There is
+no automatic blocked-Goal retry loop.
 
-A fallback retains bounded steps from the same execution's last Goal progress
-snapshot. Completed and failed items keep those statuses; pending/in-progress
-items are shown as skipped with their exact snapshot status in the detail,
-without claiming they were completed. At least one completed item yields
-`partial`, failed-only work yields `blocked`, and no demonstrated completion or
-failure remains `unknown`. Fallback integrity stays visible and never implies
-that the Goal contract was met. No existing stored reports are rewritten.
+Automatic completion requires a valid structured draft with `verdict = met`,
+all items in an existing matching Goal progress snapshot completed, and no open
+current-decision Team task, queued dispatch, running member or unconsumed result.
+The absence of a progress snapshot remains compatible with existing callers.
+Terminal `failed`/`cancelled` Team tasks are disclosed in the report and do not
+independently block a valid `met` verdict. Normal endings with missing/invalid
+reports, `partial`/`blocked`/`unknown` verdicts, or unsettled Team work enter a
+Host-owned hold. Agent errors and dispatch failures also enter a hold; explicit
+user Stop/cancellation remains an interruption. At Host crash/restart, the boot
+fence first settles queued/running effective Goals into blocked holds with the
+`agent_error:HOST_RESTARTED` reason, before applying the generic
+Plan startup interruption fence. Existing blocked holds remain unchanged and
+neither path automatically replays work. Blocked settlement revokes the
+progress token, pauses associated Team work, retains readable progress/draft
+facts, emits a needs-attention notification and publishes no completion report.
+
+A hold is persisted as `interrupted/GOAL_BLOCKED` plus a Plus-owned record, not
+as a new `PlanExecutionState` value. Startup recovery must leave a blocked hold
+intact; it must never classify one as running or replay it automatically.
+
+The user may continue the same execution, accept the current result, or abandon
+it. Continue retains the original approved contract, permission mode and
+execution ID, starts a new turn/segment, invalidates the old draft and issues a
+new private progress token. It uses the Composer's selected provider/model and
+audits that change. User guidance appears once as a visible user message. The
+internal resume instruction contains reasons, the complete contract and the
+requirements to avoid renegotiation, resubmit `SubmitGoalReport`, and verify each
+criterion before claiming `met`. Host supplies `resume.priorTurnIds` from the
+hold's durable execution segments. Runtime retains those turns through the
+Host-projected `UiMessage.turnId`, plus the current segment and model system
+state. Planning, intervening ordinary turns and rows without an owning turn are
+excluded, including after a sidecar restart or model switch; message text and
+timestamps never establish ownership. Tool calls and results retain their owning
+turn together. Session compaction checkpoints have no execution ownership, so
+resume reconstructs the selected context from complete source rows and compacts
+it again if needed rather than replaying an unrelated summary. Older callers
+omitting `priorTurnIds` retain the existing in-memory anchor behavior. A resume
+startup failure returns to a blocked hold with `resume_failed`.
+
+Only explicit acceptance may complete a non-`met` Goal. The report records
+`closure = user_accepted`, preserving the draft verdict and limitations; missing
+valid drafts use bounded Host facts without claiming verification. Automatic
+completion records `closure = agent_verified`. Report schema v2 adds optional
+closure, execution segments and block history; v1 reports stay readable and
+existing completed/fallback reports are never rewritten or reopened. Abandon
+records `GOAL_ABANDONED` without a report. Approving a new Goal supersedes the
+same session's blocked Goal with `GOAL_SUPERSEDED`. Supersession atomically
+releases only the old hold-owned Team pause so the replacement Goal can use its
+Team; an independent user pause remains in force. A blocked scratch Goal keeps
+its workspace alive. Report Retry remains a completed-report persistence repair,
+not an alternative way to complete or resume a held execution.
 
 ## 5c. Thinking capability and stream contract
 
@@ -2009,8 +2056,12 @@ count. This is an authorization failure, not a draft-persistence failure.
 Member mail is consumed inside the original approved execution turn; its inbox
 authority remains active. A post-execution mailbox continuation does not acquire
 a Goal token or report tool. Confirmed rosters receive up to three reason-specific
-completion nudges; after those three continuations, the next rejection terminates
-with the Host reason and `stage: team_completion`. Unconfirmed-roster recovery
+completion nudges; after those three continuations, the next rejection on an
+approved Goal ends the segment normally with `stop_hint = team_unsettled` and
+lets Host settlement create a hold with member/task diagnostics. It does not
+turn the Goal into an ordinary `TEAM_APPROVAL_REQUIRED` interruption.
+Non-Goal execution retains the terminal Host reason and `stage: team_completion`.
+Unconfirmed-roster recovery
 remains limited to one nudge. Ordinary non-Goal final-answer authority is unchanged.
 
 A trusted cancelled/interrupted roster aborts approved execution even when it
@@ -2113,3 +2164,21 @@ compaction wiring and external fake provider/Host boundaries. Checkpoint/summary
 persist before the next request, preserving active task and authenticated caller.
 It found no product defect; thresholds and watchdog behavior remain unchanged.
 This is runtime coverage, not a real-model or Main/Rust incident replay.
+
+## Worktree slot memory context
+
+Desktop and headless launch use the same context composition helper. A verified
+Host `memoryAlias` supplies only the owner's memory and group instructions;
+`projectPath`, cwd, the slot's file-instruction chain (including its checked-out
+AGENTS files), and all tool roots stay bound to the slot. Real owner roots must
+not appear as Primary/Additional roots in the prompt. Untracked instructions
+from the real repository are not copied or loaded.
+
+Launch passes the alias separately from the base instruction chain. Every user
+turn refreshes memory and alias instructions through the session-bound Host
+agentList response. Empty values delete old context; absent aliases or failed
+reads clear only the previous alias layer, keeping the slot/global instruction
+chain. Cancellation, disposal and turn epochs reject late reads. Reusable
+runtimes compare the alias launch configuration. Alias reads never expose
+ProjectMemory writes even if recording is enabled for the real project;
+Plan/Goal remain read-only.

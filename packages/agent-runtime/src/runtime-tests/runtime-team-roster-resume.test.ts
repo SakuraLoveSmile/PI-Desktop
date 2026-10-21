@@ -132,7 +132,7 @@ describe("DesktopAgentRuntime weak-model roster resume", () => {
     } finally { f.releaseReviewRead(); await f.runtime.dispose(); }
   });
 
-  it("R6 unmatched declaration retains the existing three completion retries", async () => {
+  it("R6 unmatched Goal declaration retains three completion retries then blocks", async () => {
     const f = rosterResumeFixture({ declarationReviewId: "legacy-review" });
     const running = f.runtime.executeApprovedPlan(execution, "team-turn");
     try {
@@ -141,7 +141,10 @@ describe("DesktopAgentRuntime weak-model roster resume", () => {
       await running;
       expect(f.requests.slice(2)).toHaveLength(4);
       expect(f.requests.slice(2).every(request => declarationPayload(request)?.status === "pending")).toBe(true);
-      expect(f.events.some(event => event.type === "error" && event.error.code === "TEAM_APPROVAL_REQUIRED")).toBe(true);
+      expect(f.events.some(event => event.type === "error")).toBe(false);
+      expect(f.events.filter(event => event.type === "agent_end")).toEqual([
+        expect.objectContaining({ stopHint: "team_unsettled" }),
+      ]);
       expect(f.host.call.mock.calls.some(([method]) => method === "team.sendMessage")).toBe(false);
     } finally { await f.runtime.dispose(); }
   });

@@ -237,6 +237,9 @@ type AgentStopResponse = {
 `completed`；该请求不会中止提供商流、取消正在运行的工具，也不会开启第二个
 并发回合。空闲会话返回 `requested: false`。
 
+运行中的 Bash 调用不会因本请求结束。要结束它，使用 `pi-desktop/agent/tool/abort`（见 §5.6a）。
+它会先发出同一个优雅停止，因此排队消息可以在边界上启动。
+
 渲染器按会话持有可移除的、仅存于内存的排队提示词列表。它只在排队项的
 **立即发送** 操作时调用该渠道，并在终止事件之后通过常规的 `agent/prompt`
 流程释放该项。
@@ -495,6 +498,48 @@ renderer 的“立即发送”随后请求优雅停止，使该条目在下一�
 队列的投递契约由 ADR 0265 冻结。回合自身的结算对队列具有权威性：终态事件可能被丢弃
 （点名 Main 已不再拥有的回合的终态事件永远不会到达模块），也可能根本没发出，因此结算会在
 模块内关闭该回合并释放它持有的队列。
+
+### 5.6a 中止运行中的 Bash 调用（`pi-desktop/agent/tool/abort`）
+
+```ts
+type AgentAbortToolRequest = {
+ sessionId: string;
+ turnId?: string;
+ toolCallId: string;
+};
+
+type AgentAbortToolResponse = {
+ found: boolean;
+ requested: boolean;
+};
+```
+
+渲染器只在排队队首（已优先的第一条）上提供该操作：“立即发送”把该行优先后，若某个顶层 Bash 调用已运行满 30 秒，该行才显示“中止命令”。30 秒计时在渲染器完成，Host 不计时。行本身从不自动中止，只有用户按下按钮时才调用。请求不带 `turnId`：`toolCallId` 已唯一标识该调用，主进程按当前活动回合核对。`found: false` 表示该调用已经结束；`found: true, requested: false` 表示无法请求优雅停止。远程会话不提供该操作，因为它的回合在另一台主机上运行。
+主进程要求 `toolCallId` 非空，并确认 `turnId`（若提供）与该会话当前的活动回合一致；
+不一致或没有活动回合时返回 `{ found: false, requested: false }`，不触达 runtime。
+主进程随后把请求转给 sidecar 的内部方法 `agent.abortTool`，由 runtime 按以下顺序处理：
+
+- 只处理已登记的运行中 Bash 调用。未知、已结束或已中止的调用返回 `found: false`。
+- 先请求优雅停止（与 §5.2 是同一个一次性请求）。若它返回 `requested: false`，结果是
+  `found: true, requested: false`，不中止任何东西。
+- 只有停止请求成功后，才通过该 Bash 调用自己的中止路径调用 Host 的 `tools.abort`，由 Host
+  结束其进程组。
+
+结果以 `found` 为准。Host 对未知 id 也会返回 `aborted: true`（墓碑），不能用它判断是否真的中止了什么。
+
+被中止的调用以错误工具结果返回模型。同一批次中它之后的工具仍然照常执行：批次按顺序运行，
+只有 agent 级中止信号才会打断批次。批次结束后，优雅停止在边界上把回合终结为 `completed`，
+排队消息随后启动。批次中其它运行中的 Bash 调用各需一次中止。
+
+已知限制：
+
+- 子代理内部的 Bash 调用也会登记（它与父回合共用 `sessionId`）。但父回合的边界仍要等子代理结束，
+  因此中止它不会让排队消息立即启动。UI 应只为顶层 Bash 行提供入口。
+- 只结束该 Bash 的进程组。不在该进程组内的后代进程（例如 Gradle 守护进程）不会被结束，可能仍在运行。
+- 取消运行中的 Bash 调用时，Host 会在停止前记录该调用的后代进程，并在停止约一秒后把仍在运行的进程写入宿主日志。这只是报告：这些残留进程从不被结束，中止结果也不变。只记录停止开始时仍挂在该调用 runner 下的后代进程。
+- 在 Goal 或团队 `suppressRunEnd` 模式下，`requestGracefulStop` 会直接硬中止整个回合（既有语义），
+  本渠道沿用该行为。这一路径尚无端到端测试。
+- 远程会话的回合不在本机 `activeTurns` 中，因此返回 `found: false`。该渠道不在远程 backend 的处理列表中。
 
 ### 5.7 会话协作投影
 

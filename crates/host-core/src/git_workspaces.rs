@@ -9,7 +9,7 @@ use std::{
 };
 use tokio::process::Command;
 
-mod command;
+pub(crate) mod command;
 #[cfg(test)]
 use command::{bounded_read, OUTPUT_LIMIT};
 use command::{command, run, run_input, GitOutput};

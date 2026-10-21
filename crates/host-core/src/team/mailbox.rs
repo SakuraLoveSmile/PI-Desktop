@@ -171,6 +171,12 @@ pub fn send_team_message_with_dispatch(
 
     validate_team_participant(db, team_session_id, &target_session_id)?;
     if target_session_id != team_session_id {
+        let held: bool = db.conn().query_row("SELECT EXISTS(SELECT 1 FROM goal_execution_holds WHERE session_id=?1 AND state='blocked')",[team_session_id],|row|row.get(0))?;
+        if held {
+            return Err(anyhow!(
+                "TEAM_PAUSED: resume the owning goal before dispatching work"
+            ));
+        }
         super::review::require_approved_member(db, team_session_id, &target_session_id)?;
     }
     if caller_session_id != team_session_id {

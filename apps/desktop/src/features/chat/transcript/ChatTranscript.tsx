@@ -7,6 +7,7 @@ import { PermissionCard } from "../../../components/PermissionCard";
 import { Button, TooltipButton } from "../../../components/ui";
 import { TurnOutcomeCard } from "../../../components/TurnOutcomeCard";
 import { GoalReportCard } from "../../../components/GoalReportCard";
+import { BlockedGoalSessionCard } from "../goal/BlockedGoalSessionCard";
 import { PlanApprovalBar } from "../../../components/PlanApprovalBar";
 import { goalReportWorkPanelTab, teamWorkPanelTab } from "../../../lib/work-panel-tabs";
 import { shouldPresentGoalReportInTranscript } from "../../../lib/goal-report-presentation";
@@ -351,6 +352,7 @@ function TranscriptBody({
                   }}
                 />
               ))}
+              {sessionId && <BlockedGoalSessionCard sessionId={sessionId} />}
               <TurnOutcomeCard
                 messages={messages}
                 result={latestTurnResult}

@@ -59,7 +59,7 @@ const SUMMARY_KEYS: Record<ToolAction, string[]> = {
     "prompt",
   ],
 };
-function compact(value: string, limit = 220) {
+export function compact(value: string, limit = 220) {
   const singleLine = value.replace(/\s+/g, " ").trim();
   return singleLine.length > limit
     ? `${singleLine.slice(0, Math.max(0, limit - 1)).trimEnd()}…`
