@@ -41,7 +41,7 @@ and final delivery to the user remain in Chinese; this repository's root
   roster/board and a Team panel. They are different execution profiles. No
   renderer write API, SQLite access, migration, or new protocol is needed for
   the panorama. `TaskWait`/`TaskList` are lifecycle events, not new agents.
-- `/Users/sakurasep/Downloads/1` is a UTF-8 Qoder Canvas TSX report source.
+- `<reference-artifacts>/goal-report.tsx` is a UTF-8 Qoder Canvas TSX report source.
   It uses `H1`, metadata, four `Stat` summaries, phase/file/evidence `Table`s,
   screenshot `Grid`, a warning `Callout`, and a final conclusion with a `Tag`.
   Its four relative PNGs are references from that report, not screenshots of
@@ -348,7 +348,7 @@ for this plan and cannot be edited by these workers.
    panorama and label are projections of existing data. Review the task diff,
    preserve unrelated work, and follow root `AGENTS.md` for commit/PR gates.
 
-Use the structure of `/Users/sakurasep/Downloads/1` for the implementation
+Use the structure of `<reference-artifacts>/goal-report.tsx` for the implementation
 report: outcome title/source and tested revision, truthful four-metric summary,
 phase table, changed-file table, verification table with exact commands and
 pass/fail/skipped, native screenshots in a two-column grid when obtained,

@@ -14,8 +14,8 @@ Implementation requires a subsequent explicit user request; that request permits
 local implementation and applicable isolated validation, not remote publishing,
 paid models, production data changes, or operation of the user's running app.
 
-- Primary checkout: `/Users/sakurasep/Documents/Code/Project/Fork Project/PI-Desktop`.
-- Request worktree: `/Users/sakurasep/Documents/Code/Project/Fork Project/PI-Desktop-worktrees/plan-preview-archive-official-team`.
+- Primary checkout: `<primary-checkout>`.
+- Request worktree: `<worktrees>/plan-preview-archive-official-team`.
 - Request branch: `codex/plan-preview-archive-official-team`.
 - Current request HEAD, local main and remotely checked main:
   `aef7aad669bb12357d58d899516aeec5473e40e4`.

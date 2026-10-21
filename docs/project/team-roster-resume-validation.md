@@ -88,8 +88,8 @@ The request baseline contains fetched origin/main
 
 ## Real-model attempt: pre-roster acceptance remains unverified
 
-After the original minikv prompt was provided, one isolated production
-Electron/Main/Host/sidecar attempt ran with MINIKV-GOAL-TEST-2 on candidate
+After the original test prompt was provided, one isolated production
+Electron/Main/Host/sidecar attempt ran with an isolated Goal fixture on candidate
 3968c4160882. The real CPA gemini-3.8-flash-high Lead used high thinking. The
 candidate UI and Rust Host were built from this checkout; the installed App and
 primary database were untouched. One setup-only attempt selected the plugin
@@ -97,8 +97,8 @@ launcher instead of the main window and timed out without a prompt/model call;
 that selector was corrected before the single real Goal run.
 
 Goal negotiation and real UI Auto approval succeeded. Execution
-97067fe7-2375-41a9-b285-cfb7a07c818a / turn
-f4aa54bc-b33f-4113-b853-a42a952d2ccc started at 2026-10-11 22:05:47.554
+`<redacted-execution-id>` / turn
+`<redacted-turn-id>` started at 2026-10-11 22:05:47.554
 Asia/Taipei. After 240.223 seconds there was no new output/tool, no declaration,
 no roster, no task and no expert. The harness's 240-second pending-roster wait
 expired (total run 306 seconds); this was not a product/provider timeout. No
@@ -117,7 +117,8 @@ C1-C4/C7 had no implemented outputs or commands; C5 lacks package.json despite
 no node_modules; C6 has no expert participation to verify; C8 has no Lead final
 report. Only negotiation Bash git status; ls -la and node -v ran once each,
 followed by one successful SubmitGoal. Full external audit and snapshots are
-saved in /Users/sakurasep/Documents/Codex/2026-10-11/minikv-goal-test-2/report.md.
+saved in the private external record `<external-evidence>/goal-test/report.md`
+(path redacted; the record is not distributed with this repository).
 
 Scripted replay remains green, but real-model/multi-expert acceptance is
 incomplete. Diagnose approved-execution request-start/first-event/timeout

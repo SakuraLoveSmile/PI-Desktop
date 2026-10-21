@@ -7,7 +7,7 @@ Status: implementation complete; waiting for user experience confirmation. The h
 - Branch: `fix/team-stalled-turn-reproduction`.
 - User-authorized local base: `25602d52d510e98a3c8a6ac5d50fe42992c2d103`.
 - Remote baseline observed by the parent: `05dc95412028d7e5a9bcedbb03e2d01f795da21a`.
-- Worktree: `/Users/sakurasep/.codex/worktrees/team-stalled-turn-reproduction/PI-Desktop`.
+- Worktree: `<worktrees>/team-stalled-turn-reproduction/PI-Desktop`.
 - The test calls the production `DesktopAgentRuntime.prompt` entry point with `executionProfile=team`, `isLead=false`, and `workPurpose=execute`. The actual pi Agent loop, provider wrappers and runtime recovery wiring remain real. Only the provider event stream and Host RPC boundary are fakes.
 - No live session, real provider, user data directory or installed Desktop instance was accessed. Dependencies were reused by reference; candidate package output was rebuilt locally without installation.
 

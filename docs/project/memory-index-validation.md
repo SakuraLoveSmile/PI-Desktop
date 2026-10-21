@@ -10,7 +10,7 @@ commit, push, or merge was performed. The primary checkout remains clean.
 ## Candidate
 
 - Branch: `codex/memory-code-index`.
-- Worktree: `/Users/sakurasep/.codex/worktrees/memory-code-index/PI-Desktop`.
+- Worktree: `<worktrees>/memory-code-index/PI-Desktop`.
 - Base and latest fetched origin/main: `05dc95412028d7e5a9bcedbb03e2d01f795da21a`.
 - Candidate: that base plus the uncommitted task files.
 - Executable/task-file SHA-256 manifest fingerprint (excluding docs):

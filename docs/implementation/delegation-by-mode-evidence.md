@@ -65,7 +65,7 @@ Result: PASS for both suites (exit code 0). Team was run after rebuilding the
 renderer from the candidate's final shared changelog output.
 
 Environment: macOS, Node 22.23.2; request worktree
-`/Users/sakurasep/.codex/worktrees/delegation-by-mode/PI-Desktop`; primary
+`<worktrees>/delegation-by-mode/PI-Desktop`; primary
 checkout's existing external dependencies and Electron reused by links, with
 workspace package links resolving to the request worktree. Runtime, shared and
 Desktop outputs were built in the request worktree. The unchanged host-core

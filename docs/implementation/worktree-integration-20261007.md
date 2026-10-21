@@ -6,7 +6,7 @@ Primary and source worktrees were not modified. Recoverable file copies,
 staged/unstaged/combined binary patches, source metadata, verified SHA-256
 manifests and a verified Git bundle are stored at:
 
-`/Users/sakurasep/Documents/Code/Project/Fork Project/PI-Desktop-worktree-archives/20261007-integration`
+`<worktree-archives>/20261007-integration`
 
 | Input | Recoverable revision | Integration |
 | --- | --- | --- |

@@ -28,7 +28,7 @@ function report(): GoalReport {
     schemaVersion: 1, reportId: "reference-report", sessionId: "reference-session", executionId: "reference-execution", proposalId: "reference-proposal", turnId: "reference-turn",
     goal: { title: "基础用户管理系统", markdown: "# Approved Goal\nDeliver the user management system." },
     execution: { status: "completed", startedAt: 1000, completedAt: 121000, timingSource: "turn" }, integrity: { kind: "structured" }, verdict: "met",
-    deliveryContext: { sourceLabel: "FastAPI + SQLite + JWT", revisionLabel: "工作区 /Users/sakurasep/Documents/Code/Test/测试" },
+    deliveryContext: { sourceLabel: "FastAPI + SQLite + JWT", revisionLabel: "工作区 /workspace/example-project" },
     summary: "按已批准 Spec 从零构建的分层用户管理 REST API，覆盖全部需求并通过逐项符合性审计。\n\n系统提供用户核心数据模型（ID / 用户名 / 邮箱 / 密码哈希 / 状态 / 时间戳）、注册与登录（JWT）认证、用户增删改查、Pydantic 数据校验与统一错误处理。采用单向分层架构（api → services → models/db → core），密码用 Argon2id 哈希，JWT 显式算法白名单，响应模型白名单确保密码哈希绝不外泄。",
     metrics: [{ label: "单元测试", value: "159 通过", evidenceRefs: ["unit"] }, { label: "覆盖率", value: "93%", evidenceRefs: ["coverage"] }, { label: "Ruff Lint", value: "0 告警", evidenceRefs: ["lint"] }, { label: "API 端点", value: "10 个" }, { label: "浏览器 E2E", value: "11/11", evidenceRefs: ["browser"] }],
     steps: steps.map((title, index) => ({ id: String(index + 1), title, status: "completed", detail: ["确认 FastAPI + SQLite + REST API + JWT，绿地项目", "简洁可维护性 / 性能可扩展性 / 最小改动低风险，三名研究分析师并行探索环境并各自产出完整方案", "以清晰分层为骨架，吸收数据层性能实践与最小风险控制，剔除异步栈/Repository/Alembic 等过度设计", "分层 core / db / models / schemas / services / api，单向依赖"][index] ?? "已记录的研究、验证与修复步骤。" })),

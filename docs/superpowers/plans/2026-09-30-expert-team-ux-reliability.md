@@ -22,7 +22,7 @@ The original artwork is already available: [Lead](assets/expert-team-ux/lead.svg
 
 ## Baseline and current evidence
 
-- Request worktree: `/Users/sakurasep/.codex/worktrees/expert-team-ux-review/PI-Desktop`, branch `codex/expert-team-ux-review`, base `a395c6067`. Preserve all parallel worktree changes and do not treat the dirty integration tree as a validated commit.
+- Request worktree: `<worktrees>/expert-team-ux-review/PI-Desktop`, branch `codex/expert-team-ux-review`, base `a395c6067`. Preserve all parallel worktree changes and do not treat the dirty integration tree as a validated commit.
 - The earlier planning worktree and its baseline are historical provenance only. Do not edit or merge into that worktree, the primary checkout, or local `main` while implementing this request.
 - Existing [2026-09-30 panorama plan](2026-09-30-plan-card-goal-composer-panorama.md), especially T4, supplied the implemented shared panorama/compact standard-subagent foundation. Retain that work. This new request fixes its current lifecycle defects and extends Team-specific presentation; it does not renumber/reopen that plan's Plan card, Goal indicator, or Composer toolbar work. Its contradictory historical status paragraphs do not prove current native UI acceptance.
 - Earlier [Composer/Team/Plan-to-Goal plan](2026-09-29-composer-team-plan-goal-sidebar.md) describes related foundations. Current source wins over its old revision/worktree/status statements.
