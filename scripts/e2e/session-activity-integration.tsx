@@ -38,7 +38,7 @@ export async function sessionActivityIntegrationProbe() {
   api.onSessionActivityChanged=()=>()=>{};
   const calls:string[]=[];
   const configurations: { sessionId: string; config: Parameters<typeof api.configureSession>[1] }[] = [];
-  const footerFixture=installFooterMenuFixture();
+  const footerFixture=installFooterMenuFixture(i18n.t);
   const notes=new Map<string,SessionQuickNote>();
   const createdAt=new Date(Date.now()-17_000).toISOString();
   // Synthetic catalog metadata for layout only; never read a configured account.
@@ -235,7 +235,7 @@ export async function sessionActivityIntegrationProbe() {
     await useAppStore.getState().configureActiveSession({thinkingLevel:'high'});
     click(host.querySelector('.composer-plus > button'));
     await until(()=>Boolean(document.querySelector('.composer-plus-menu.is-open')),'Plan entry menu missing');
-    click(document.querySelector('.composer-plus-menu.is-open [role="switch"][aria-label="Plan"]'));
+    click([...document.querySelectorAll('.composer-plus-menu.is-open [role="switch"]')].find(control=>control.getAttribute('aria-label')===i18n.t('settings.modePlan')));
     await until(()=>selected().mode==='plan'&&Boolean(host.querySelector('.composer-contract-exit:not(:disabled)')),'Plan did not expose its close action');
     click(host.querySelector('.composer-plus > button'));
     await until(()=>!document.querySelector('.composer-plus-menu.is-open'),'Plan entry menu did not close');
