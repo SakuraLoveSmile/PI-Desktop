@@ -229,6 +229,7 @@ import {
   clampOutputToContext,
   effectiveModelContextWindow,
   estimateOutputCapInputTokens,
+  requestTranscript,
 } from "./output-cap.js";
 import {
   composeSubagentSystemPrompt,
@@ -2136,6 +2137,9 @@ export class DesktopAgentRuntime {
         // with pi's own run signal (Stop must keep working): the adapter refuses
         // to start an attempt on an aborted signal, and its backoff sleep rejects.
         const stallAbort = new AbortController();
+        // Both output clamps must see the instructions the adapter sends,
+        // rather than charging every superseded system snapshot again.
+        const requestContext = requestTranscript(m, context);
         const attemptOptions: SimpleStreamOptions = {
           ...hookedOptions,
           // Cap the output budget at the pi-desktop layer so the estimate
@@ -2143,7 +2147,7 @@ export class DesktopAgentRuntime {
           // max_tokens, but the low-level `stream` path used by
           // `thinkingLevel: "omit"` would otherwise send it untouched, and
           // both consume an estimate that under-counts CJK text (issue B).
-          maxTokens: clampOutputToContext(m, context, hookedOptions.maxTokens),
+          maxTokens: clampOutputToContext(m, requestContext, hookedOptions.maxTokens),
           signal: AbortSignal.any([
             ...(hookedOptions.signal ? [hookedOptions.signal] : []),
             stallAbort.signal,
@@ -2154,7 +2158,7 @@ export class DesktopAgentRuntime {
         const contextInsightsStep = ++this.contextInsightsStep;
         const retryStream = createProviderRetryStream(
           m,
-          context,
+          requestContext,
           attemptOptions,
           (retryOptions) => {
             this.teamBudgetStop.assertModelAdmission();
@@ -2170,8 +2174,8 @@ export class DesktopAgentRuntime {
             } };
             return accountModelStream(m, () =>
             this.thinkingLevel === "omit"
-              ? this.models.stream(omitThinkingModel(m), context, observedOptions)
-              : this.models.streamSimple(m, context, observedOptions), {
+              ? this.models.stream(omitThinkingModel(m), requestContext, observedOptions)
+              : this.models.streamSimple(m, requestContext, observedOptions), {
                 providerId: this.provider.id,
                 nativeCost: this.provider.modelConfig?.nativeCost,
                 onUsage: (usage) => this.emit({ type: "usage", usage }, usageTurnId),

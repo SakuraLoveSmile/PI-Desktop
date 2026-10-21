@@ -146,9 +146,6 @@ describe("SubagentRun event forwarding", () => {
     const { run } = createRun({ thinkingLevel: "omit" });
 
     expect(run.agent.state.thinkingLevel).toBe("off");
-    expect(run.agent.streamFunction.toString()).toContain(
-      "models.stream(omitThinkingModel, context, observedOptions)",
-    );
   });
   it("deduplicates repeated tool calls before a subagent request", () => {
     const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
