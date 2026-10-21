@@ -22,10 +22,12 @@ jobs:
         with:
           fetch-depth: 0
       - uses: pnpm/action-setup@v6
+      # Install from a clean store. Restoring the pnpm store left Electron's install
+      # script unrun, so the binary never appeared and the smoke tier stopped at
+      # "Electron binary missing" before any suite ran.
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-          cache: pnpm
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Provision Electron display and native libraries
