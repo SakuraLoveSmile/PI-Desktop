@@ -106,18 +106,17 @@ test("Goal planning retains its mode entry and execution removes only that indic
 });
 
 test("context footer names the bar's direction by default, and the unavailable state keeps its label", async (t) => {
-  // SSR renders the store's initial state, so the "used" direction is covered by contextUsageLabelKey's unit test.
   const ssr = await composer(t);
   const { ContextUsageInspector } = await ssr.load("/src/components/ContextUsageInspector.tsx");
   const { ContextUsagePlaceholder } = await ssr.load("/src/features/chat/composer/ContextUsagePlaceholder.tsx");
   const usage = { inputTokens: 1_000, outputTokens: 200, totalTokens: 1_200 };
-  const remaining = ssr.render(createElement(ContextUsageInspector, { usage, turnUsage: usage, contextWindow: 200_000, tools: [], variant: "footer" }));
+  const used = ssr.render(createElement(ContextUsageInspector, { usage, turnUsage: usage, contextWindow: 200_000, tools: [], variant: "footer" }));
   const unknown = ssr.render(createElement(ContextUsagePlaceholder));
-  assert.match(remaining, /<span class="composer-usage-label">Remaining<\/span>/);
+  assert.match(used, /<span class="composer-usage-label">Used<\/span>/);
   assert.match(unknown, /<span class="composer-usage-label">Context<\/span>/);
-  for (const html of [remaining, unknown]) {
+  for (const html of [used, unknown]) {
     assert.match(html, /composer-usage-context-track/);
   }
-  assert.match(remaining, /aria-haspopup="dialog"/);
+  assert.match(used, /aria-haspopup="dialog"/);
   assert.match(unknown, /disabled=""/);
 });

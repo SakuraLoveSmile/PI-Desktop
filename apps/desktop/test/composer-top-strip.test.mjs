@@ -53,7 +53,10 @@ test("ComposerWorkspaceContext lists project and branch while idle and folds to 
     const running = ssr.render(createElement(ComposerWorkspaceContext, { t, running: true }));
     assert.match(running, /class="composer-top-strip" data-expanded="false"/);
     assert.doesNotMatch(running, /Project A/, "the project name folds away during a run");
-    assert.match(running, /class="composer-top-strip-toggle"[^>]*aria-expanded="false"[^>]*aria-label="chat.topStripExpand"/);
+    const toggle = running.match(/<button\b[^>]*class="composer-top-strip-toggle"[^>]*>/)?.[0];
+    assert.ok(toggle, "the running strip offers a disclosure button");
+    assert.match(toggle, /aria-expanded="false"/);
+    assert.match(toggle, /aria-label="chat.topStripExpand"/);
   } finally {
     Object.assign(useAppStore.getInitialState(), initial);
   }

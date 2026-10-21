@@ -18184,7 +18184,7 @@ The workspace strip above the input card shows the current session's project, lo
   button, with the existing anchored menu and plugin slot sides/order preserved.
   The Goal contract picker remains during planning and is hidden during Goal
   execution; Plan remains available. Send and Stop share a 32px rounded-square
-  footprint. The context meter visibly names its figure with the direction label (`chat.usageContextRemainingLabel` by default, `chat.usageContextUsedLabel` when the display is Used).
+  footprint. The context meter visibly names its figure with the direction label (`chat.usageContextUsedLabel` by default, `chat.usageContextRemainingLabel` when the display is Remaining).
   ScheduledEditor retains its existing picker placement and behavior. Narrow
   layouts keep controls within the Composer without overlap.
 - **Specs:** `04-ux/08-component-spec.md` §11.

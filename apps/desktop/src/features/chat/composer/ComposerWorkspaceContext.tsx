@@ -1,6 +1,7 @@
 import type { TFunction } from "i18next";
 import { useState } from "react";
 import { IconChevronDown, IconChevronUp } from "../../../components/icons";
+import { TooltipButton } from "../../../components/ui";
 import { normalizeProjectPath } from "../../../lib/sidebar-session-groups";
 import { useAppStore } from "../../../stores/app-store";
 import { ComposerBranchMenu } from "./ComposerBranchMenu";
@@ -46,14 +47,14 @@ function ComposerWorkspaceControls({ t, running, path, name, sessionId, remote, 
       {expanded ? <ComposerLocationMenu {...common} remote={remote} /> : null}
       {path && !remote && <ComposerBranchMenu {...common} />}
     </div>
-    {running ? <button
+    {running ? <TooltipButton
       type="button"
       className="composer-top-strip-toggle"
       aria-expanded={expanded}
-      aria-label={expanded ? t("chat.topStripCollapse") : t("chat.topStripExpand")}
+      tooltip={expanded ? t("chat.topStripCollapse") : t("chat.topStripExpand")}
       onClick={() => setStored(toggleTopStrip(strip))}
     >
       {expanded ? <IconChevronUp size={14} aria-hidden /> : <IconChevronDown size={14} aria-hidden />}
-    </button> : null}
+    </TooltipButton> : null}
   </div>;
 }

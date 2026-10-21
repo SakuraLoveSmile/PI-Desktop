@@ -37,6 +37,7 @@ export async function sessionActivityIntegrationProbe() {
   api.getSessionActivity=async()=>{throw new Error('SESSION_ACTIVITY_UNSUPPORTED');};
   api.onSessionActivityChanged=()=>()=>{};
   const calls:string[]=[];
+  const configurations: { sessionId: string; config: Parameters<typeof api.configureSession>[1] }[] = [];
   const footerFixture=installFooterMenuFixture();
   const notes=new Map<string,SessionQuickNote>();
   const createdAt=new Date(Date.now()-17_000).toISOString();
@@ -45,7 +46,7 @@ export async function sessionActivityIntegrationProbe() {
   const provider:ProviderPublic={id:'preview-provider',name:'预览模型（示例）',vendorKey:'custom',type:'custom',protocol:'openai',enabled:true,authKind:'none',hasSecret:false,models:models.map(model=>({id:model.modelId,alias:model.displayName,contextWindow:model.contextWindow??200000,maxTokens:8192,thinkingLevels:model.supportedThinkingLevels??['off'],defaultThinkingLevel:'off'})),defaultModelId:'qwen3.8-max',supportsReasoning:true,supportedThinkingLevels:['off','low','high','max'],createdAt,updatedAt:createdAt};
   api.listProviderModels=async()=>({models,source:'cache'});
   api.listSessions=async()=>({sessions:useAppStore.getState().sessions});
-  api.configureSession=async(id,config)=>{calls.push(`configure:${id}`);const current=useAppStore.getState().sessions.find(item=>item.id===id);if(!current)throw new Error('Unknown preview session');return {session:{...current,...config}};};
+  api.configureSession=async(id,config)=>{calls.push(`configure:${id}`);configurations.push({sessionId:id,config:{...config}});const current=useAppStore.getState().sessions.find(item=>item.id===id);if(!current)throw new Error('Unknown preview session');return {session:{...current,...config}};};
   api.getTeamRoster=async teamSessionId=>({teamSessionId,revision:0,paused:false,members:[]});
   api.teamPause=async teamSessionId=>({team:{teamSessionId,paused:true}});
   api.getTeamSnapshot=async teamSessionId=>({teamSessionId,revision:0,paused:false,members:[],tasks:[],readiness:[],scopeOverlaps:[],leadPhase:'idle',queuedMessageCount:0,review:null,decision:null});
@@ -81,6 +82,18 @@ export async function sessionActivityIntegrationProbe() {
     check(Boolean(rail()?.textContent?.includes('state-review')),'recorded delegation appears in rail');
     check(getComputedStyle(rail()!.querySelector('.session-activity-row')!).display==='flex'&&Boolean(rail()?.querySelector('.session-activity-agent-glyph'))&&!rail()?.querySelector('.subagent-activity-avatar'),'actual lazy activity stylesheet is loaded');
     check(host.querySelector('.chat-session-main')!.getBoundingClientRect().right<=rail()!.getBoundingClientRect().left,'rail does not cover transcript');
+    const strip=()=>host.querySelector<HTMLElement>('.composer-top-strip');
+    const workspaceContext=()=>strip()?.querySelector('.composer-workspace-context');
+    const stripToggle=()=>strip()?.querySelector<HTMLButtonElement>('.composer-top-strip-toggle');
+    await until(()=>Boolean(workspaceContext()?.textContent?.includes('main')),'workspace branch did not load');
+    check(strip()?.dataset.expanded==='false'&&workspaceContext()?.querySelectorAll('.composer-footer-trigger').length===1&&!workspaceContext()?.textContent?.includes('PI-Desktop')&&!workspaceContext()?.textContent?.includes('本地'),'running workspace strip defaults to the branch alone');
+    check(stripToggle()?.getAttribute('aria-expanded')==='false'&&stripToggle()?.getAttribute('aria-label')===i18n.t('chat.topStripExpand'),'folded strip exposes its accessible expansion action');
+    click(stripToggle());
+    check(strip()?.dataset.expanded==='true'&&workspaceContext()?.textContent?.includes('PI-Desktop')&&workspaceContext()?.textContent?.includes('本地')&&workspaceContext()?.textContent?.includes('main'),'running strip expands to actual project host and branch');
+    check(stripToggle()?.getAttribute('aria-expanded')==='true'&&stripToggle()?.getAttribute('aria-label')===i18n.t('chat.topStripCollapse'),'expanded strip exposes its accessible collapse action');
+    click(stripToggle());
+    check(strip()?.dataset.expanded==='false'&&workspaceContext()?.querySelectorAll('.composer-footer-trigger').length===1,'running strip collapses back to the branch');
+    click(stripToggle());
     const visiblePane=host.querySelector('.session-pane[data-visible="true"]')!;
     const taskCard=visiblePane.querySelector('.subagent-tasks-card')!;const taskRow=taskCard?.querySelector('.subagent-tasks-row');
     check(!taskCard.querySelector('.subagent-tasks-action-btn')&&!taskCard.textContent?.includes('查看全景'),'subagent rows have no panorama entry');
@@ -98,6 +111,7 @@ export async function sessionActivityIntegrationProbe() {
     click([...rail()!.querySelectorAll('button')].find(button=>button.querySelector('.session-activity-group-title')?.textContent==='子智能体'));
     set({activeSessionId:'activity-b',retainedSessionIds:['activity-b','activity-a'],messages:second,isRunning:false});await until(()=>rail()?.getAttribute('data-session-id')==='activity-b','Session B did not display');
     check(!rail()?.textContent?.includes('state-review'),'A tasks do not leak into B');
+    check(strip()?.dataset.expanded==='true'&&!stripToggle(),'idle switched session shows workspace controls without a disclosure');
     check(!host.querySelector('.composer-workspace-context')?.textContent?.includes('main'),'pathless session does not borrow another project branch');
     const localSessions = useAppStore.getState().sessions;
     set({sessions:localSessions.map(item=>item.id==='activity-b'?{...item,source:'remote',projectPath:'/isolated/music',projectName:'Remote project'}:item)});
@@ -105,6 +119,7 @@ export async function sessionActivityIntegrationProbe() {
     set({sessions:localSessions});
 
     set({activeSessionId:'activity-a',retainedSessionIds:['activity-a','activity-b'],messages,isRunning:true});await until(()=>rail()?.getAttribute('data-session-id')==='activity-a','Retained A did not return');
+    check(strip()?.dataset.expanded==='false'&&!workspaceContext()?.textContent?.includes('PI-Desktop'),'session switch resets another session manual strip expansion');
     await until(()=>rail()?.querySelector('[data-activity-group="processes"] .session-activity-group-count')?.textContent==='1','Returning process snapshot did not load');
     check(rail()?.querySelector('[data-activity-group="processes"] .session-activity-disclosure')?.getAttribute('aria-expanded')==='false','unchanged running process preserves manual collapse after hide/show');
     const heading=[...rail()!.querySelectorAll('button')].find(button=>button.querySelector('.session-activity-group-title')?.textContent==='子智能体')!;check(heading.getAttribute('aria-expanded')==='false','session switch preserves group disclosure');click(heading);
@@ -207,6 +222,7 @@ export async function sessionActivityIntegrationProbe() {
     }
     check(Boolean(right.querySelector('.composer-enhance-btn')&&right.querySelector('.send-btn')),'enhancement and send use right toolbar');
     set({runningSessions:{},isRunning:false});
+    check(strip()?.dataset.expanded==='true'&&!stripToggle()&&workspaceContext()?.textContent?.includes('PI-Desktop')&&workspaceContext()?.textContent?.includes('本地'),'idle workspace restores project and host automatically');
     const profile=()=>host.querySelector('.composer-profile-chip');
     click(profile());await until(()=>Boolean(document.querySelector('.composer-profile-menu.is-open')),'Profile menu missing');
     await Promise.all(document.querySelector('.composer-profile-menu')!.getAnimations().map(animation=>animation.finished));
@@ -216,6 +232,21 @@ export async function sessionActivityIntegrationProbe() {
     click(profileRows[1]);await until(()=>profile()?.getAttribute('data-profile')==='team','Team profile did not switch');
     const selected=()=>useAppStore.getState().sessions.find(item=>item.id==='activity-a')!;
     check(selected().mode==='agent'&&selected().permissionMode==='auto'&&selected().modelId==='qwen3.8-max','profile switch preserves mode permission and model');
+    await useAppStore.getState().configureActiveSession({thinkingLevel:'high'});
+    click(host.querySelector('.composer-plus > button'));
+    await until(()=>Boolean(document.querySelector('.composer-plus-menu.is-open')),'Plan entry menu missing');
+    click(document.querySelector('.composer-plus-menu.is-open [role="switch"][aria-label="Plan"]'));
+    await until(()=>selected().mode==='plan'&&Boolean(host.querySelector('.composer-contract-exit:not(:disabled)')),'Plan did not expose its close action');
+    click(host.querySelector('.composer-plus > button'));
+    await until(()=>!document.querySelector('.composer-plus-menu.is-open'),'Plan entry menu did not close');
+    const configurationCount=configurations.length;
+    click(host.querySelector('.composer-contract-exit'));
+    await until(()=>selected().mode==='agent'&&!host.querySelector('.composer-contract-chip'),'Plan close did not restore Agent mode');
+    const exitConfiguration=configurations.at(-1);
+    check(configurations.length===configurationCount+1&&exitConfiguration?.sessionId==='activity-a'&&exitConfiguration.config.mode==='agent','Plan close forwards Agent to the owning session Host configuration');
+    check(exitConfiguration?.config.executionProfile==='team'&&exitConfiguration.config.providerId===provider.id&&exitConfiguration.config.modelId==='qwen3.8-max'&&exitConfiguration.config.thinkingLevel==='high'&&exitConfiguration.config.permissionMode==='auto','Plan close preserves profile provider model reasoning and permissions at the Host boundary');
+    check(selected().executionProfile==='team'&&selected().providerId===provider.id&&selected().modelId==='qwen3.8-max'&&selected().thinkingLevel==='high'&&selected().permissionMode==='auto'&&profile()?.getAttribute('data-profile')==='team','Plan close preserves the visible Team profile and committed session configuration');
+    await useAppStore.getState().configureActiveSession({thinkingLevel:'off'});
     click(profile());click(document.querySelector('.composer-profile-menu [role="menuitemradio"]'));await until(()=>profile()?.getAttribute('data-profile')==='standard','Standard profile did not switch');
     click(host.querySelector('.composer-model-thinking-chip'));await until(()=>document.querySelectorAll('.composer-model-option').length===2,'Direct model list did not load');
     check(!document.querySelector('.composer-model-tab'),'model list has no default or custom tabs');
@@ -248,22 +279,24 @@ export async function sessionActivityIntegrationProbe() {
     // Keep the mixed completed regression above separate from the running demo.
     const previewMessages=messages.filter(message=>message.id!=='activity-wait').map(message=>message.id==='activity-task'?{...message,toolStatus:'running' as const}:message.id==='activity-child-answer'?{...message,status:'streaming' as const}:message);
     set({messages:previewMessages,retainedTranscripts:{'activity-a':previewMessages,'activity-b':second},runningSessions:{'activity-a':true},isRunning:true});
+    check(strip()?.dataset.expanded==='false'&&workspaceContext()?.querySelectorAll('.composer-footer-trigger').length===1,'new run resets idle workspace strip to the branch');
     const meter=()=>host.querySelector<HTMLButtonElement>('.composer-usage-context-btn');
     check(Boolean(host.querySelector('.composer-usage-context[data-unavailable="true"]')&&meter()?.disabled&&meter()?.textContent?.includes('—')),'missing usage displays unknown rather than a fabricated percentage');
     check(meter()?.querySelector('.composer-usage-label')?.textContent === i18n.t('chat.usageContextLabel'), 'unknown context footer includes its visible label');
     const outputMessages=['0001-deadline-based-timer.md','0002-clock-choice-and-sleep.md','flutter-doctor.txt','0005-tray-manager-pin.md'].map((name,index)=>msg(`output-${index}`,'tool','Written',{toolName:'Write',toolStatus:'success',toolArgs:{path:`/isolated/music/docs/${name}`}}));
     const usageMessages=previewMessages.map(message=>message.id==='activity-text'?{...message,providerId:provider.id,modelId:'qwen3.8-max',usage:{inputTokens:27520,outputTokens:1024,totalTokens:28544},responseDurationMs:32000}:message.id==='activity-child-answer'?{...message,usage:{inputTokens:900000,outputTokens:1000}}:message);
-    set({messages:usageMessages,retainedTranscripts:{'activity-a':usageMessages,'activity-b':second},settings:{...useAppStore.getState().settings!,contextUsageDisplay:'used'}});
+    set({messages:usageMessages,retainedTranscripts:{'activity-a':usageMessages,'activity-b':second},settings:{...useAppStore.getState().settings!,contextUsageDisplay:undefined}});
     await until(()=>meter()?.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')==='11','context progress did not use real parent-message usage');
     check(Boolean(meter()?.textContent?.includes('11%')),'context percentage and progress bar agree');
-    check(meter()?.querySelector('.composer-usage-label')?.textContent === i18n.t('chat.usageContextUsedLabel'), 'known context footer names its used figure');
+    check(meter()?.querySelector('.composer-usage-label')?.textContent === i18n.t('chat.usageContextUsedLabel'), 'context footer defaults to Used without an explicit preference');
     const track=meter()!.querySelector('.composer-usage-context-track')!.getBoundingClientRect();const fill=meter()!.querySelector('.composer-usage-context-fill')!.getBoundingClientRect();
     check(Math.abs(fill.width/track.width-28544/262144)<.01,'bar width uses reported tokens over configured context window');
-    check(meter()!.getBoundingClientRect().right>=host.querySelector('.composer-shell')!.getBoundingClientRect().right-10,'context meter is right aligned below the input');
+    const meterBounds=meter()!.getBoundingClientRect();const composerBounds=host.querySelector('.composer-shell')!.getBoundingClientRect();
+    check(Math.abs(meterBounds.left+meterBounds.width/2-composerBounds.left-composerBounds.width/2)<=1&&meterBounds.top>=composerBounds.bottom,'context meter is centered below the input');
     click(meter());await until(()=>Boolean(document.querySelector('.context-inspector-popover.is-open')),'context details did not open');
     const contextPanel=document.querySelector<HTMLElement>('.context-inspector-popover')!;
     check(!host.querySelector('.composer-usage-speed,.composer-usage-total,.composer-usage-cache'),'metrics live only inside the context popup');
-    check(Boolean(host.querySelector('.composer-workspace-context')?.textContent?.includes('PI-Desktop'))&&Boolean(host.querySelector('.composer-workspace-context')?.textContent?.includes('本地'))&&Boolean(host.querySelector('.composer-workspace-context')?.textContent?.includes('main')),'footer shows actual project host and branch metadata');
+    check(strip()?.dataset.expanded==='false'&&workspaceContext()?.textContent?.includes('main')&&!workspaceContext()?.textContent?.includes('PI-Desktop')&&!workspaceContext()?.textContent?.includes('本地'),'context popup leaves the running workspace strip folded to its branch');
     check(Boolean(contextPanel.textContent?.includes('生成速度'))&&Boolean(contextPanel.textContent?.includes('本轮合计')),'context popup retains speed and turn statistics');
     check(Boolean(contextPanel.querySelector('[role="progressbar"][aria-valuenow="11"]')),'context panel displays total occupancy');
     const panelTrack=contextPanel.querySelector('.context-inspector-occupancy-track')!.getBoundingClientRect();const panelFill=contextPanel.querySelector('.context-inspector-occupancy-fill')!.getBoundingClientRect();
@@ -273,6 +306,7 @@ export async function sessionActivityIntegrationProbe() {
     flushSync(()=>window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true})));await until(()=>!document.querySelector('.context-inspector-popover'),'Escape closes context details');
     check(document.activeElement===meter(),'context Escape returns focus to the meter');
     set({settings:{...useAppStore.getState().settings!,contextUsageDisplay:'remaining'}});await until(()=>meter()?.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')==='89','remaining display preference was not preserved');
+    check(meter()?.querySelector('.composer-usage-label')?.textContent===i18n.t('chat.usageContextRemainingLabel')&&meter()?.textContent?.includes('89%'),'explicit Remaining preference preserves its label and percentage');
     set({settings:{...useAppStore.getState().settings!,contextUsageDisplay:'used'},runningSessions:{},isRunning:false});click(meter());await until(()=>Boolean(document.querySelector<HTMLButtonElement>('.context-inspector-compact-action:not(:disabled)')),'idle local conversation cannot reach compaction');
     click(document.querySelector('.context-inspector-compact-action'));await until(()=>calls.includes('compact:activity-a'),'context button did not use existing compaction workflow');
     check(useAppStore.getState().runningSessions['activity-a']===true&&!document.querySelector('.context-inspector-popover'),'compaction starts only captured session and closes the popup');

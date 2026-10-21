@@ -19,6 +19,7 @@ const labels: Record<string, string> = {
   "chat.contractGoalDesc": "Complete a goal",
   "settings.modePlan": "Plan",
   "settings.modeGoal": "Goal",
+  "chat.exitPlanMode": "Exit Plan mode",
 };
 const t = ((key: string) => labels[key] ?? key) as TFunction;
 
@@ -45,6 +46,7 @@ function PickerFixture() {
         <ComposerContractPicker
           t={t} mode={mode} planningLive={false}
           onClick={() => { setProfileOpen(false); setPlusOpen(true); }}
+          onExitPlan={() => setMode("agent")}
         />
       </div></div>
     </div></div>
