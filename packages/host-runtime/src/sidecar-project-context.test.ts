@@ -37,6 +37,22 @@ function fixture(handler?: (method: string, params: unknown) => Promise<unknown>
 }
 
 describe("project context reverse RPC binding", () => {
+  it("refreshes an alias through the original slot binding without adopting owner paths", async () => {
+    let alias = { memory: { content: "Owner notes.", entries: [] }, instructions: "Owner rules." };
+    const { launch, probe, calls } = fixture(async () => ({ memory: alias.memory, autoRecordEnabled: false, memoryAlias: alias }));
+    const slot = "/pool/repository/slot-1";
+    await launch("bound", slot);
+    expect(await probe("project.autoMemory.agentList", { sessionId: "bound", boundPath: "/real/owner" }))
+      .toMatchObject({ memoryAlias: alias });
+    alias = { memory: { content: "", entries: [] }, instructions: "" };
+    expect(await probe("project.autoMemory.agentList", { sessionId: "bound", boundPath: "/real/owner" }))
+      .toMatchObject({ memoryAlias: alias });
+    expect(calls).toEqual([
+      { method: "project.autoMemory.agentList", params: { sessionId: "bound", boundPath: slot } },
+      { method: "project.autoMemory.agentList", params: { sessionId: "bound", boundPath: slot } },
+    ]);
+  });
+
   it("uses only the launch-bound path and entry preconditions", async () => {
     const { launch, probe, calls } = fixture();
     await launch("bound", "/trusted/root");

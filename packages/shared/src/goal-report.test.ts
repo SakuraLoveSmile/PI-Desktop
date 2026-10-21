@@ -102,6 +102,36 @@ describe("Goal Completion Report v1 Contract & Validation", () => {
     evidences: sampleValidDraft.evidences!,
   };
 
+  it("preserves historical version 1 without upgrading the snapshot", () => {
+    const result = validateGoalReport({ ...sampleValidReport, schemaVersion: 1 });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.schemaVersion).toBe(1);
+  });
+
+  it("retains user acceptance and the blocked/resumed timeline in v2", () => {
+    const result = validateGoalReport({
+      ...sampleValidReport, schemaVersion: 2, verdict: "partial",
+      closure: "user_accepted",
+      segments: [{ turnId: "turn-first", startedAt: 1000, endedAt: 2000 },
+        { turnId: "turn-resume", startedAt: 3000, endedAt: 5000 }],
+      blocks: [{ at: 2000, reasons: [{ code: "verdict_partial" }] }],
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toMatchObject({ closure: "user_accepted", verdict: "partial" });
+      expect(result.value).toHaveProperty("segments", [
+        { turnId: "turn-first", startedAt: 1000, endedAt: 2000 },
+        { turnId: "turn-resume", startedAt: 3000, endedAt: 5000 },
+      ]);
+      expect(result.value).toHaveProperty("blocks", [{ at: 2000, reasons: [{ code: "verdict_partial" }] }]);
+    }
+  });
+
+  it("rejects invalid closure and forged Host closure in model drafts", () => {
+    expect(validateGoalReport({ ...sampleValidReport, closure: "automatic_fallback" }).ok).toBe(false);
+    expect(validateGoalReportDraft({ ...sampleValidDraft, closure: "user_accepted" }).ok).toBe(false);
+  });
+
   it("validates a healthy structured draft", () => {
     const res = validateGoalReportDraft(sampleValidDraft);
     expect(res.ok).toBe(true);

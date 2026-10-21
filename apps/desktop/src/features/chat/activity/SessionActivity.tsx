@@ -71,7 +71,7 @@ export function SessionActivity({ sessionId, messages, visible, rangeLimited }: 
       id: proposal.id, label: proposal.title.trim() || proposal.question.trim() || proposal.kind,
       status: proposal.executionState ?? proposal.status,
       attentionStatus: reportStates[`${sessionId}:${proposal.executionId}`] === "failed" ? "failed"
-        : reportStates[`${sessionId}:${proposal.executionId}`] === "fallback" ? "degraded" : undefined,
+        : ["fallback", "blocked"].includes(reportStates[`${sessionId}:${proposal.executionId}`] ?? "") ? "degraded" : undefined,
       statusLabel: t(`panel.overview.status.${proposal.executionState ?? proposal.status}`),
       ...((proposal.executionKind ?? proposal.kind) === "goal" && proposal.executionId ? {
         content: <GoalActivityRow sessionId={sessionId} proposal={proposal} visible={visible && supported} onOpenArtifact={onOpen} onReportStateChange={onReportStateChange} />,
@@ -146,10 +146,11 @@ export function SessionActivity({ sessionId, messages, visible, rangeLimited }: 
   if (pending?.status === "pending") attentionItems.push({ id: `approval:${pending.id}`, label: t("panel.activity.attentionPlanApproval", { title: pending.title }), group: "plans", itemId: pending.id, onOpen: () => revealApproval(".plan-approval-bar") });
   for (const proposal of plans) {
     const state = reportStates[`${sessionId}:${proposal.executionId}`];
-    if (proposal.executionId && (state === "failed" || state === "fallback")) attentionItems.push({
-      id: `report:${proposal.executionId}`, label: t(state === "failed" ? "panel.activity.attentionReportFailed" : "panel.activity.attentionReportFallback", { title: proposal.title }),
+    if (proposal.executionId && (state === "failed" || state === "fallback" || state === "blocked")) attentionItems.push({
+      id: `report:${proposal.executionId}`, label: t(state === "blocked" ? "goal.blocked.activityTitle" : state === "failed" ? "panel.activity.attentionReportFailed" : "panel.activity.attentionReportFallback", { title: proposal.title }),
       group: "plans", itemId: proposal.id,
-      onOpen: () => { if (proposal.executionId) open(sessionId, goalReportWorkPanelTab(proposal.executionId, proposal.title)); },
+      onOpen: () => { if (state === "blocked") revealApproval('[data-testid="goal-blocked-card"]');
+        else if (proposal.executionId) open(sessionId, goalReportWorkPanelTab(proposal.executionId, proposal.title)); },
     });
   }
   return <SessionActivityRail sessionId={sessionId} visible={visible} plans={planRows} agents={agents} teamMembers={teamMembers} attentionItems={attentionItems}

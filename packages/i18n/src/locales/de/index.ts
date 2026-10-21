@@ -341,7 +341,10 @@ export const de = {
     "removeQueuedPrompt": "Nachricht in der Warteschlange entfernen",
     "sendNow": "Jetzt senden",
     sendNowPending: "Warten auf das Ende der aktuellen Aufgabe",
-    queuedPromptStopFailed: "Die aktuelle Aufgabe konnte nicht gestoppt werden. Diese Nachricht wartet noch und kann abgebrochen werden.",
+    queuedPromptToolAbort: "Befehl abbrechen",
+    queuedPromptToolAbortHint: "Den laufenden Befehl abbrechen, damit die wartende Nachricht startet",
+    queuedPromptToolAbortGone: "Dieser Befehl ist bereits beendet",
+    queuedPromptStopFailed:"Die aktuelle Aufgabe konnte nicht gestoppt werden. Diese Nachricht wartet noch und kann abgebrochen werden.",
     queuedPromptAlreadyStarted: "Diese Nachricht wird bereits ausgeführt. Verwenden Sie Stopp, um die laufende Aufgabe zu stoppen.",
     "moveQueuedPromptUp": "Nach oben",
     "moveQueuedPromptDown": "Nach unten",
@@ -683,6 +686,7 @@ export const de = {
     "artifactScratchUnavailable": "Das temporäre Sitzungsverzeichnis ist nicht verfügbar.",
   },
   "goal": {
+    blocked: en.goal.blocked,
     "progressLabel": "Zielfortschritt",
     "progressListLabel": "Aufgabenliste des Ziels",
     "progressInitializing": "Fortschritt wird geladen…",
@@ -2188,6 +2192,7 @@ sklm: {
       endedProcesses: "Beendet {{count}}",
       clearEndedProcesses: "Beendete Prozesse ausblenden",
       goal: {
+        reportBlocked: en.panel.activity.goal.reportBlocked,
         reportPending: "Bericht ausstehend",
         reportUnavailable: "Bericht nicht verfügbar",
         reportGenerating: "Bericht wird erstellt",

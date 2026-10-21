@@ -125,6 +125,7 @@ fn strip_all_plus_structures(conn: &Connection) {
     drop_tables(
         conn,
         &[
+            "goal_execution_holds",
             "team_ordinary_inbox",
             "background_service_ownership",
             "background_processes",
@@ -377,4 +378,53 @@ pub(super) fn assert_seed_rows_survive(conn: &Connection, shape: Option<LegacySh
         .unwrap();
     assert_eq!(profile, if keeps_team { "team" } else { "standard" });
     assert_eq!(teams, i64::from(keeps_team));
+}
+
+/// Both independent candidates used P8 before integration. Main's released
+/// P8 owns the interaction columns; the Goal candidate had only durable holds.
+#[derive(Clone, Copy, Debug)]
+pub(super) enum P8Shape {
+    Main,
+    GoalCandidate,
+}
+
+pub(super) fn create_p8_database(path: &Path, shape: P8Shape) {
+    let db = Database::open(path).unwrap();
+    seed_rows(db.conn());
+    db.conn()
+        .execute_batch(
+            "INSERT INTO turns(id,session_id,status,error_details_json,started_at)
+             VALUES ('saved-turn','s1','error','{\"code\":\"INTERACTION_REQUIRED\"}',3);
+             UPDATE sessions SET interaction_mode='unattended' WHERE id='s1';",
+        )
+        .unwrap();
+    match shape {
+        P8Shape::Main => {
+            db.conn()
+                .execute_batch("DROP TABLE IF EXISTS goal_execution_holds;")
+                .unwrap();
+        }
+        P8Shape::GoalCandidate => {
+            db.conn().execute_batch(crate::goal_holds::SCHEMA).unwrap();
+            db.conn()
+                .execute_batch(
+                    "INSERT INTO goal_execution_holds (
+                       execution_id,session_id,state,reasons_json,first_turn_id,
+                       segments_json,blocks_json,resume_count,paused_team,version,created_at,updated_at
+                     ) VALUES ('e2','s1','blocked','[{\"code\":\"needs_user\"}]','saved-turn',
+                               '[{\"turnId\":\"saved-turn\"}]','[]',2,1,4,3,4);",
+                )
+                .unwrap();
+            drop_columns(
+                db.conn(),
+                &[
+                    ("sessions", "interaction_mode"),
+                    ("turns", "error_details_json"),
+                ],
+            );
+        }
+    }
+    db.conn()
+        .execute("UPDATE plus_schema_meta SET plus_version=8", [])
+        .unwrap();
 }

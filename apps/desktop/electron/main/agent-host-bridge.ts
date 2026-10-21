@@ -59,6 +59,8 @@ export type AgentHostBridgeOptions = {
   invoke: IpcInvoke;
   channels: typeof IPC.invoke;
   getHost: () => HostLike | null;
+  /** Trusted direct ordinary waiter route; avoids Desktop/Team fallback during answer races. */
+  resolveAskWaiter?: (resolution: AskToolResolution) => Promise<unknown>;
   /** Runtime-side busy state the event stream cannot see (active turn map,
    * manual compaction). */
   isSessionBusy?: (sessionId: string) => boolean;
@@ -73,6 +75,9 @@ export const DESKTOP_PRINCIPAL: Principal = {
   roles: ["owner"],
   pairedDevice: true,
 };
+
+/** Trusted Electron-main external controller; never supplied by IPC/MCP clients. */
+export const MCP_CONTROL_PRINCIPAL: Principal = { subject: "mcp-control", roles: ["controller"] };
 
 /**
  * Electron Main's adapter around the headless Agent Host module (rollout R1,
@@ -345,6 +350,45 @@ export function createAgentHostBridge(options: AgentHostBridgeOptions) {
 
   return {
     agentHost,
+    async pendingOrdinaryAsks(sessionId: string): Promise<AskToolRequest[]> {
+      if (sessionId.startsWith("native-pi:")) return [];
+      await agentHost.refreshPendingInputs(sessionId);
+      return agentHost.pendingInputRequests(sessionId).map(entry => entry.original)
+        .filter(request => !request.teamManaged && !request.teamPending);
+    },
+    async resolveOrdinaryAsk(resolution: AskToolResolution): Promise<{ status: "answered" | "not_pending"; requestId: string }> {
+      if (resolution.sessionId.startsWith("native-pi:")) return { status: "not_pending", requestId: resolution.requestId };
+      await agentHost.refreshPendingInputs(resolution.sessionId);
+      const pendingSession = agentHost.pendingInputSession(resolution.requestId);
+      if (pendingSession && pendingSession !== resolution.sessionId) {
+        throw Object.assign(new Error("asktool session mismatch"), { errorCode: "ASKTOOL_IDENTITY_MISMATCH" });
+      }
+      const entry = agentHost.pendingInputRequests(resolution.sessionId).find(candidate => candidate.original.requestId === resolution.requestId);
+      if (entry?.original.teamManaged || entry?.original.teamPending) {
+        throw Object.assign(new Error("Team-managed questions cannot be answered over MCP"), { errorCode: "ASKTOOL_TEAM_MANAGED" });
+      }
+      if (entry && entry.original.toolCallId !== resolution.expectedToolCallId) {
+        throw Object.assign(new Error("asktool tool call mismatch"), { errorCode: "ASKTOOL_IDENTITY_MISMATCH" });
+      }
+      if (entry && (resolution.answers.length !== entry.original.questions.length || resolution.answers.some((answer, index) => answer !== null && !entry.original.questions[index].multiSelect && answer.length > 1))) {
+        throw Object.assign(new Error("asktool answers do not match the question shape"), { errorCode: "ASKTOOL_INVALID_ARGUMENT" });
+      }
+      if (!entry) return { status: "not_pending", requestId: resolution.requestId };
+      try {
+        const settled = await this.resolveAskByRequestId(resolution, MCP_CONTROL_PRINCIPAL);
+        if (!settled) {
+          if (!options.resolveAskWaiter) return { status: "not_pending", requestId: resolution.requestId };
+          await options.resolveAskWaiter(resolution);
+          agentHost.closePendingInput(resolution.sessionId, resolution.requestId, MCP_CONTROL_PRINCIPAL);
+        }
+        return { status: "answered", requestId: resolution.requestId };
+      } catch (error) {
+        const failure = error as { errorCode?: string; code?: string; data?: { errorCode?: string } };
+        const code = failure.data?.errorCode ?? failure.errorCode ?? failure.code;
+        if (code === "ASKTOOL_NOT_FOUND" || code === "NOT_FOUND") return { status: "not_pending", requestId: resolution.requestId };
+        throw error;
+      }
+    },
     observeWorkTarget(sessionId: string): string | null {
       return agentHost.observeWorkTarget(sessionId).activeTurnId;
     },
@@ -400,7 +444,7 @@ export function createAgentHostBridge(options: AgentHostBridgeOptions) {
      * `pendingInteractiveRequests` read (for example after switching windows
      * back to the session) no longer resurrects the already answered card.
      */
-    async resolveAskByRequestId(resolution: AskToolResolution): Promise<{ ok: boolean } | null> {
+    async resolveAskByRequestId(resolution: AskToolResolution, principal: Principal = DESKTOP_PRINCIPAL): Promise<{ ok: boolean } | null> {
       const sessionId = String(resolution?.sessionId ?? "").trim();
       const requestId = String(resolution?.requestId ?? "").trim();
       if (!sessionId || !requestId) return null;
@@ -410,7 +454,7 @@ export function createAgentHostBridge(options: AgentHostBridgeOptions) {
         .find((candidate) => candidate.original.requestId === requestId);
       resolvingInputs.add(key);
       try {
-        if (options.getHost()) {
+        if (options.getHost() && principal === DESKTOP_PRINCIPAL) {
           try {
             const result = await requireHost().call<{ ask: { status: string; answers?: Array<string[] | null> }; entry?: HostQueueEntry | null }>("team.resolveLeadAsk", { ...resolution, sessionId, requestId });
             if (result.entry) {
@@ -425,11 +469,11 @@ export function createAgentHostBridge(options: AgentHostBridgeOptions) {
           }
         }
         if (!entry) return null;
-        await forIpc(() => agentHost.respondInput(DESKTOP_PRINCIPAL, {
+        await forIpc(() => agentHost.respondInput(principal, {
           inputId: entry.input.id,
           answers: resolution.answers,
           context: { requestId },
-        }));
+        }, resolution.expectedToolCallId));
       } finally {
         resolvingInputs.delete(key);
       }

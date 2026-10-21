@@ -20,6 +20,7 @@ Each ADR includes:
 
 | ID | Title | Status |
 |---|---|---|
+| goal-blocked-state | [Goal blocked state and same-execution continuation](goal-blocked-state.md) | Accepted for implementation |
 | team-lead-pending-questions-and-replacements | [Durable Lead questions and bounded replacement](team-lead-pending-questions-and-replacements.md) | Accepted for implementation |
 | team-run-limits | [Host-owned Team wall-clock limits](team-run-limits.md) | Accepted for implementation |
 | team-task-dispatch-age | [Explicit task dispatch and queue age](team-task-dispatch-age.md) | Accepted for implementation |
@@ -376,5 +377,7 @@ Each ADR includes:
 | retained-browser-pages-per-tab | [Retain a host-owned browser page per resource tab](retained-browser-pages-per-tab.md) | Accepted |
 | 0318 | [Publish native Linux arm64 artifacts](0318-linux-arm64-release-lane.md) | Accepted (D638) |
 | unattended-interaction-policy | [Host-owned unattended interaction policy](unattended-interaction-policy.md) | Accepted for implementation |
+| external-ask-answering-over-mcp | [External ask answering over local MCP](external-ask-answering-over-mcp.md) | Accepted for implementation; implementation and acceptance pending |
+| worktree-memory-owner | [Resolve verified worktree memory without aliasing workspace access](worktree-memory-owner.md) | Accepted for the implementation candidate |
 
 - [Explicit Team task dispatch and queued-message age](team-task-dispatch-age.md)

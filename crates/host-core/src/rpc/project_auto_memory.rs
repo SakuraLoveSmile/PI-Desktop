@@ -11,6 +11,91 @@ fn memory_rpc_error(error: anyhow::Error) -> JsonRpcError {
     }
 }
 
+fn alias_read_only() -> JsonRpcError {
+    rpc_err(
+        1008,
+        "slot memory aliases are read-only",
+        "MEMORY_ALIAS_READ_ONLY",
+    )
+}
+
+fn session_project(
+    st: &AppState,
+    params: &Value,
+    writing: bool,
+) -> Result<(String, String), JsonRpcError> {
+    let session_id = params
+        .get("sessionId")
+        .and_then(Value::as_str)
+        .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+    let detail = sessions::get_session(&st.db, session_id)
+        .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+        .ok_or_else(|| rpc_err(1007, "session not found", "SESSION_NOT_FOUND"))?;
+    if writing {
+        crate::team::planning::validate_tool(&st.db, session_id, "ProjectMemory")
+            .map_err(team_rpc_err)?;
+        crate::team::expert_config::validate_tool(&st.db, session_id, "ProjectMemory")
+            .map_err(team_rpc_err)?;
+        if matches!(detail.summary.mode.as_str(), "plan" | "goal") {
+            return Err(rpc_err(
+                1008,
+                "memory writes unavailable in plan mode",
+                "TOOL_DISABLED_IN_PLAN",
+            ));
+        }
+    }
+    let path = detail
+        .summary
+        .project_path
+        .ok_or_else(|| rpc_err(1002, "session has no project", "INVALID_PARAMS"))?;
+    let bound_path = params
+        .get("boundPath")
+        .and_then(Value::as_str)
+        .ok_or_else(|| rpc_err(1002, "session binding required", "INVALID_PARAMS"))?;
+    if crate::db::canonical_project_path(bound_path) != crate::db::canonical_project_path(&path) {
+        return Err(rpc_err(
+            1008,
+            "session project changed",
+            "SESSION_PROJECT_CHANGED",
+        ));
+    }
+    Ok((path, detail.summary.mode))
+}
+
+fn memory_alias(db: &crate::db::Database, owner: &str) -> Result<Value, JsonRpcError> {
+    let memory = db
+        .get_project_memory_readonly(owner)
+        .map_err(memory_rpc_error)?;
+    let instructions = match db.project_group_for_path(owner).map_err(memory_rpc_error)? {
+        Some(group) if !group.legacy => db
+            .get_project_group_instructions(&group.id)
+            .map_err(memory_rpc_error)?,
+        _ => String::new(),
+    };
+    Ok(json!({ "memory": memory, "instructions": instructions }))
+}
+
+pub(super) async fn context(
+    state: Arc<Mutex<AppState>>,
+    params: Value,
+) -> Result<Value, JsonRpcError> {
+    let path = params
+        .get("path")
+        .and_then(Value::as_str)
+        .ok_or_else(|| rpc_err(1002, "path required", "INVALID_PARAMS"))?;
+    let owner = crate::project_memory_owner::resolve(path).await;
+    let st = state.lock().await;
+    let context = st
+        .db
+        .project_group_context_for_path(&owner.requested_path)
+        .map_err(memory_rpc_error)?;
+    let mut result = json!({ "context": context });
+    if owner.is_alias {
+        result["memoryAlias"] = memory_alias(&st.db, &owner.owner_path)?;
+    }
+    Ok(result)
+}
+
 /// Legacy clients do not carry an editor snapshot. Preserve their original
 /// behavior until the user opts into concurrent agent writes, then require
 /// the snapshot editor so a stale whole-list save cannot discard those writes.
@@ -41,14 +126,58 @@ pub(super) async fn handle(
     params: Value,
 ) -> Result<Value, JsonRpcError> {
     match method {
+        "project.memory.get" | "project.memory.set" => {
+            let path = params
+                .get("path")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "path required", "INVALID_PARAMS"))?;
+            let owner = crate::project_memory_owner::resolve(path).await;
+            if owner.is_alias && method == "project.memory.set" {
+                return Err(alias_read_only());
+            }
+            let st = state.lock().await;
+            let memory = if method == "project.memory.get" {
+                if owner.is_alias {
+                    st.db.get_project_memory_readonly(&owner.owner_path)
+                } else {
+                    st.db.get_project_memory(path)
+                }
+            } else {
+                ensure_legacy_write_allowed(&st.db, path)?;
+                if let Some(entries) = params.get("entries") {
+                    st.db.set_project_memory_entries(path, entries)
+                } else {
+                    let content = params
+                        .get("content")
+                        .and_then(Value::as_str)
+                        .ok_or_else(|| rpc_err(1002, "content required", "INVALID_PARAMS"))?;
+                    st.db.set_project_memory(path, content)
+                }
+            }
+            .map_err(memory_rpc_error)?;
+            Ok(json!({ "memory": memory }))
+        }
         "project.memory.editor.get" | "project.memory.editor.save" => {
             let path = params
                 .get("path")
                 .and_then(Value::as_str)
                 .ok_or_else(|| rpc_err(1002, "path required", "INVALID_PARAMS"))?;
+            let owner = crate::project_memory_owner::resolve(path).await;
+            if owner.is_alias && method == "project.memory.editor.save" {
+                return Err(alias_read_only());
+            }
             let st = state.lock().await;
             let editor = if method == "project.memory.editor.get" {
-                st.db.get_project_memory_editor(path)
+                if owner.is_alias {
+                    st.db
+                        .get_project_memory_editor_readonly(&owner.owner_path)
+                        .map(|mut editor| {
+                            editor.auto_record_enabled = false;
+                            editor
+                        })
+                } else {
+                    st.db.get_project_memory_editor(path)
+                }
             } else {
                 let owner = params
                     .get("expectedOwner")
@@ -71,55 +200,37 @@ pub(super) async fn handle(
         | "project.autoMemory.agentUpsert"
         | "project.autoMemory.agentDelete" => {
             let is_agent = method.starts_with("project.autoMemory.agent");
-            let st = state.lock().await;
-            let path = if is_agent {
-                let session_id = params
-                    .get("sessionId")
-                    .and_then(Value::as_str)
-                    .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
-                let detail = sessions::get_session(&st.db, session_id)
-                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
-                    .ok_or_else(|| rpc_err(1007, "session not found", "SESSION_NOT_FOUND"))?;
-                if method != "project.autoMemory.agentList" {
-                    crate::team::planning::validate_tool(&st.db, session_id, "ProjectMemory")
-                        .map_err(team_rpc_err)?;
-                    crate::team::expert_config::validate_tool(&st.db, session_id, "ProjectMemory")
-                        .map_err(team_rpc_err)?;
-                }
-                if method != "project.autoMemory.agentList"
-                    && (detail.summary.mode == "plan" || detail.summary.mode == "goal")
-                {
-                    return Err(rpc_err(
-                        1008,
-                        "memory writes unavailable in plan mode",
-                        "TOOL_DISABLED_IN_PLAN",
-                    ));
-                }
-                detail
-                    .summary
-                    .project_path
-                    .ok_or_else(|| rpc_err(1002, "session has no project", "INVALID_PARAMS"))?
+            let writing = method != "project.autoMemory.agentList";
+            // Session binding and mode are trusted before resolving an alias.
+            // Git I/O holds neither AppState nor a SQLite transaction.
+            let binding = if is_agent {
+                let st = state.lock().await;
+                Some(session_project(&st, &params, writing)?)
+            } else {
+                None
+            };
+            let path = if let Some((path, _)) = &binding {
+                path.clone()
             } else {
                 params
                     .get("path")
                     .and_then(Value::as_str)
                     .ok_or_else(|| rpc_err(1002, "path required", "INVALID_PARAMS"))?
-                    .to_string()
+                    .to_owned()
             };
-            if is_agent {
-                let bound_path = params
-                    .get("boundPath")
-                    .and_then(Value::as_str)
-                    .ok_or_else(|| rpc_err(1002, "session binding required", "INVALID_PARAMS"))?;
-                if crate::db::canonical_project_path(bound_path)
-                    != crate::db::canonical_project_path(&path)
-                {
+            let owner = crate::project_memory_owner::resolve(&path).await;
+            let st = state.lock().await;
+            if let Some(expected) = binding {
+                if session_project(&st, &params, writing)? != expected {
                     return Err(rpc_err(
                         1008,
                         "session project changed",
                         "SESSION_PROJECT_CHANGED",
                     ));
                 }
+            }
+            if owner.is_alias && writing {
+                return Err(alias_read_only());
             }
             for field in ["id", "title", "content", "expectedTitle", "expectedContent"] {
                 if params.get(field).is_some_and(|value| !value.is_string()) {
@@ -208,6 +319,13 @@ pub(super) async fn handle(
                         params.get("expectedContent").and_then(Value::as_str),
                     )
                 }
+                _ if owner.is_alias => st
+                    .db
+                    .get_project_memory_editor_readonly(&owner.owner_path)
+                    .map(|mut editor| {
+                        editor.auto_record_enabled = false;
+                        editor
+                    }),
                 _ => st.db.get_project_memory_editor(&path),
             }
             .map_err(memory_rpc_error)?;
@@ -223,7 +341,12 @@ pub(super) async fn handle(
                     }])
                 };
             }
-            Ok(json!({ "memory": memory, "autoRecordEnabled": state.auto_record_enabled }))
+            let mut result =
+                json!({ "memory": memory, "autoRecordEnabled": state.auto_record_enabled });
+            if owner.is_alias {
+                result["memoryAlias"] = memory_alias(&st.db, &owner.owner_path)?;
+            }
+            Ok(result)
         }
         _ => Err(rpc_err(
             1002,
@@ -687,3 +810,6 @@ mod tests {
         assert_eq!(persisted.memory.entries.unwrap()[1].content, "Use pnpm");
     }
 }
+
+#[cfg(test)]
+mod project_memory_alias_tests;

@@ -2,7 +2,7 @@ import type { MessageEntry } from "./pi-runtime-types.js";
 
 /**
  * The transcript an approved Plan or Goal execution is built from: everything
- * from `start` on, plus the model's system state from before it.
+ * from `start` on, explicitly owned prior segment rows, and the model's system state.
  *
  * Execution must not see the planning turns, but the runtime prompt and the
  * tool declarations are `system` rows of that same transcript. Cutting them
@@ -14,8 +14,9 @@ import type { MessageEntry } from "./pi-runtime-types.js";
 export function entriesFromExecutionStart(
   entries: readonly MessageEntry[],
   start: number,
+  priorEntryIds?: ReadonlySet<string>,
 ): MessageEntry[] {
   return entries.filter(
-    (entry, index) => index >= start || entry.message.role === "system",
+    (entry, index) => index >= start || entry.message.role === "system" || priorEntryIds?.has(entry.id) === true,
   );
 }

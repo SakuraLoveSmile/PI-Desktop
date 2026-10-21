@@ -296,6 +296,10 @@ finalized as `completed`; the request does not abort the provider stream,
 cancel running tools, or open a second concurrent turn. An idle session returns
 `requested: false`.
 
+A running Bash call is not ended by this request. To end one, use
+`pi-desktop/agent/tool/abort` (see 5.6a). It requests the same graceful stop
+first, so the queued prompt can start at the boundary.
+
 The renderer owns the removable, in-memory queued-prompt list per session. It
 calls this channel only for a queued item's **Send now** action and releases
 that item through the ordinary `agent/prompt` flow after the terminal event.
@@ -653,6 +657,72 @@ authoritative for the queue: the terminal event can be dropped (a terminal event
 naming a turn Main no longer owns never reaches the module) or never emitted, so
 the settlement closes the turn inside the module and releases the queue the turn
 was holding.
+
+### 5.6a Abort a running Bash call (`pi-desktop/agent/tool/abort`)
+
+```ts
+type AgentAbortToolRequest = {
+ sessionId: string;
+ turnId?: string;
+ toolCallId: string;
+};
+
+type AgentAbortToolResponse = {
+ found: boolean;
+ requested: boolean;
+};
+```
+
+The renderer calls this channel only from the head promoted queue row, and only
+after a top-level Bash call has run for 30 seconds since "Send now" promoted the
+row. The delay is renderer-side; the Host does not time it. The row never
+aborts on its own: the user presses the offer. The request carries no `turnId`,
+because `toolCallId` already identifies one call and main matches the active
+turn itself. `found: false` means the call already settled; `found: true,
+requested: false` means no graceful stop could be requested. Remote sessions
+never offer it, because their turns run on another host.
+Main requires a non-empty `toolCallId` and checks that `turnId`, when given,
+matches the session's active turn. A mismatch or an idle session returns
+`{ found: false, requested: false }` without reaching the runtime. Main then
+forwards the request to the sidecar method `agent.abortTool`, and the runtime
+handles it in this order:
+
+- Only registered running Bash calls are considered. An unknown, settled, or
+  already aborted call returns `found: false`.
+- The graceful stop is requested first, using the same one-shot request as 5.2.
+  If that returns `requested: false`, the result is `found: true,
+  requested: false` and nothing is aborted.
+- Only after a successful stop request does the Bash call's own abort path ask
+  the Host to `tools.abort`, which ends its process group.
+
+Use `found` as the result. For an unknown id the Host also returns
+`aborted: true` (a tombstone), so that field does not show whether anything was
+aborted.
+
+The aborted call returns an error tool result to the model. Tools after it in
+the same batch still run: a batch runs in order, and only the agent-level abort
+signal interrupts it. When the batch ends, the graceful stop ends the turn at
+the boundary as `completed`, and the queued prompt starts next. Each other
+running Bash call in that batch needs its own abort.
+
+Known limits:
+
+- A Bash call inside a subagent is also registered, because it shares the
+  parent's `sessionId`. The parent boundary still waits for the subagent, so
+  aborting it does not start the queued prompt. The UI should offer the action
+  only on top-level Bash rows.
+- Only the Bash call's process group is ended. Descendants outside that group,
+  such as a Gradle daemon, are not ended and may keep running.
+- When a running Bash call is cancelled, the Host records the call's descendants
+  before the stop and, about a second after it, writes any still running to the
+  host log. This is a report only: those processes are never terminated, and the
+  abort result is unchanged. Only descendants still attached to the runner when
+  the stop begins are included.
+- In Goal or Team `suppressRunEnd` modes, `requestGracefulStop` hard-aborts the
+  whole turn (existing behavior), and this channel follows it. That path has no
+  end-to-end test yet.
+- A remote session's turn is not in this machine's `activeTurns`, so it returns
+  `found: false`. The channel is not in the remote backend's handled list.
 
 ### 5.7 Session collaboration projection
 
@@ -2321,6 +2391,7 @@ The named tools cover the common Agent workflow:
 - `pi_agent_prompt`, `pi_agent_status`, `pi_turn_get`, `pi_agent_stop`,
   `pi_agent_abort`, `pi_agent_compact`
 - `pi_plans_pending`, `pi_plans_resolve`
+- `pi_asks_pending`, `pi_asks_resolve` (execution ask relay; implementation pending)
 - `pi_workspace_diff`, `pi_fs_list`, `pi_fs_read`
 
 `pi_turn_get` reads one durable turn's terminal state so an external scheduler
@@ -2366,6 +2437,37 @@ accepts an operation id and positional IPC arguments:
   "args": ["/path/to/project"]
 }
 ```
+
+The execution ask relay adds two typed operations without exposing Renderer
+state or a new Host RPC boundary. `pi_asks_pending {sessionId}` is read-only,
+returning `{sessionId,asks:[{requestId,toolCallId,turnId?,createdAt?,questions}]}`.
+Main adds `status.pendingInputs:{count,requestIds}` to the existing
+`pi_agent_status` result; runtime `getStatus()` is unchanged. Both projections
+exclude teamManaged/teamPending requests and return an empty list for native-pi
+sessions. They must not reuse a Renderer helper's eight-item cap. Oversized
+results follow the observable MCP limit contract and must not appear as an
+empty list or a complete silently shortened answer.
+
+`pi_asks_resolve {sessionId,requestId,expectedToolCallId,answers,confirm:true}`
+is dangerous and resolves only the matching ordinary live request. Answers are
+an ordered `(null|string[])[]`; the existing runtime validator and deterministic
+tool output remain authoritative. Results are
+`{status:"answered"|"not_pending",requestId}`. Normalize an already-consumed
+request's runtime ASKTOOL_NOT_FOUND or AgentHost NOT_FOUND to not_pending; other
+errors remain errors. Invalid shape, mismatched identity and Team ownership
+fail as ASKTOOL_INVALID_ARGUMENT, ASKTOOL_IDENTITY_MISMATCH and
+ASKTOOL_TEAM_MANAGED respectively. Validate session/request/tool identity at
+the actual waiter resolution boundary, not from the current selection.
+
+Named and generic agent/askTool/resolve paths use the server's trusted
+MCP_CONTROL_PRINCIPAL (mcp-control/controller, input/respond), wired through
+the Main bootstrap and bridge. Renderer IPC retains DESKTOP_PRINCIPAL; clients
+cannot supply a principal. Both tools appear in tools/list and
+pi_control_describe when implemented. They preserve existing authentication,
+permission, confirmation and request/result size limits. No new turn or prompt
+is created. A timeout is an unknown delivery outcome, and a pending read cannot
+prove an earlier write has failed. See spec 17 §5 and the external ask answering
+ADR. This paragraph specifies the target contract; implementation is pending.
 
 Only main-process channels registered in the reviewed catalog are available.
 The first-version catalog is the project/session/Agent/workspace flow plus
@@ -2712,3 +2814,10 @@ from a previous project/editor instance cannot update the current dialog.
 notification. Both are additive; the preload's existing whitelist guards apply.
 The payload, legacy fallback and ownership rules are defined in
 [Complete session activity projection](session-activity-projection.md).
+
+Execution ask relay durable evidence: `session.get` returns optional
+`UiMessage.turnId` projected from the persisted message index by session and
+message ID, with matching turn ownership. Missing index ownership remains
+absent. It must not be inferred from the active turn or timestamps. This
+additive projection lets consumers bind existing asktool result details to
+the exact completed turn; it introduces no mutation, table or history API.

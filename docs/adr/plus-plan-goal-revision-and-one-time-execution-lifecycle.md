@@ -56,13 +56,16 @@ An interrupted execution records its terminal state without producing a result o
 fallback report. Report Retry cannot bypass this completion gate. Runtime stop
 intent is frozen before asynchronous cancellation can race with a generic end
 event; ordinary graceful-stop turn semantics remain distinct from Goal completion.
-Historical report artifacts are retained and no persisted-format migration is required.
+Historical report artifacts are retained. ADR goal-blocked-state amends Goal
+settlement with Plus P9 holds, explicit continuation and user acceptance; an
+ordinary successful turn is no longer sufficient for automatic Goal completion.
 
 ## Consequences
 
 - Every actionable request is scoped by proposal/session/turn/tool-call/version.
-- A changed model affects the next revision only; it cannot mutate an approved
-  execution snapshot.
+- A changed model affects the next revision only; explicit continuation of a
+  held Goal may bind the current model without changing its approved contract
+  or permissions (ADR goal-blocked-state).
 - Execution bindings, revision intent, and schedules are stored by Plus schema
   step P3, which is additive. An existing database that is behind on the Plus
   track gets a readable backup before the step runs

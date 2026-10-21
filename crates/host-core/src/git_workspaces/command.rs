@@ -12,17 +12,17 @@ use tokio::{
 pub(super) const OUTPUT_LIMIT: u64 = 1024 * 1024;
 
 #[derive(Debug)]
-pub(super) struct GitOutput {
+pub(crate) struct GitOutput {
     pub(super) status: ExitStatus,
     pub(super) stdout: Vec<u8>,
     pub(super) stderr: Vec<u8>,
 }
 impl GitOutput {
-    pub(super) fn text(&self) -> Result<String> {
+    pub(crate) fn text(&self) -> Result<String> {
         String::from_utf8(self.stdout.clone())
             .map_err(|_| internal("Git returned non-UTF-8 metadata"))
     }
-    pub(super) fn checked(self) -> Result<Self> {
+    pub(crate) fn checked(self) -> Result<Self> {
         if self.status.success() {
             Ok(self)
         } else {
@@ -48,7 +48,7 @@ pub(super) async fn bounded_read(reader: impl AsyncRead + Unpin) -> std::io::Res
     Ok(bytes)
 }
 
-pub(super) fn command(project: &Path, overrides: &[String], args: &[&str]) -> Command {
+pub(crate) fn command(project: &Path, overrides: &[String], args: &[&str]) -> Command {
     let mut command = Command::new("git");
     // Do not inherit a caller's alternate Git directory, config injection,
     // tracing sink, credential helper or pager settings.
@@ -181,7 +181,7 @@ impl Drop for ProcessTree {
     }
 }
 
-pub(super) async fn run(command: Command, timeout: Duration) -> Result<GitOutput> {
+pub(crate) async fn run(command: Command, timeout: Duration) -> Result<GitOutput> {
     run_input(command, timeout, None).await
 }
 pub(super) async fn run_input(

@@ -6,17 +6,27 @@ type MemoryHost = {
   call<T = unknown>(method: string, params?: unknown): Promise<T>;
 };
 
-function memoryState(value: unknown): ProjectMemoryRuntimeState {
+function validateMemory(value: unknown): void {
   if (!value || typeof value !== "object") throw new Error("Invalid project memory response");
-  const state = value as Record<string, unknown>;
-  if (typeof state.autoRecordEnabled !== "boolean" || !state.memory || typeof state.memory !== "object") {
-    throw new Error("Invalid project memory response");
-  }
-  const memory = state.memory as Record<string, unknown>;
+  const memory = value as Record<string, unknown>;
   if (typeof memory.content !== "string" || (memory.entries !== undefined &&
     (!Array.isArray(memory.entries) || memory.entries.some(entry => !entry || typeof entry !== "object" ||
       typeof entry.id !== "string" || typeof entry.title !== "string" || typeof entry.content !== "string")))) {
     throw new Error("Invalid project memory response");
+  }
+}
+
+function memoryState(value: unknown): ProjectMemoryRuntimeState {
+  if (!value || typeof value !== "object") throw new Error("Invalid project memory response");
+  const state = value as Record<string, unknown>;
+  if (typeof state.autoRecordEnabled !== "boolean") throw new Error("Invalid project memory response");
+  validateMemory(state.memory);
+  if (state.memoryAlias !== undefined) {
+    if (!state.memoryAlias || typeof state.memoryAlias !== "object" ||
+      typeof (state.memoryAlias as Record<string, unknown>).instructions !== "string") {
+      throw new Error("Invalid project memory response");
+    }
+    validateMemory((state.memoryAlias as Record<string, unknown>).memory);
   }
   return value as ProjectMemoryRuntimeState;
 }

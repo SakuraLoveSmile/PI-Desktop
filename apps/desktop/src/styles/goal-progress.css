@@ -205,3 +205,17 @@
   color: var(--ds-text-secondary);
   text-decoration: line-through;
 }
+.goal-resume-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 8px;
+  font-size: var(--text-xs);
+}
+
+.goal-resume-chip .badge {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
