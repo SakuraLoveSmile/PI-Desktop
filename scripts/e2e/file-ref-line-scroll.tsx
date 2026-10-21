@@ -8,9 +8,22 @@ import { FilesTab } from "../../apps/desktop/src/components/workpanel/FilesTab";
 import { LinkifiedText } from "../../apps/desktop/src/features/chat/transcript/shared";
 import { useAppStore } from "../../apps/desktop/src/stores/app-store";
 import { splitChatText } from "../../apps/desktop/src/lib/chat-links";
+import { Markdown } from "../../apps/desktop/src/components/Markdown";
 
 const targetPath = "src/scroll-target.txt";
 const targetLine = 65;
+const references = [
+  { token: `${targetPath}:${targetLine}:4`, line: targetLine, column: 4 },
+  { token: `${targetPath}:45-48`, line: 45 },
+  { token: `${targetPath}#L75-L80`, line: 75 },
+];
+const transcript = references.map(({ token }) => `Review ${token}.`).join(" ");
+const markdownReferences = [
+  { token: `${targetPath}:55-60`, line: 55, path: targetPath, source: `${targetPath}:55-60`, selector: ".fixture-markdown-bare a" },
+  { token: `${targetPath}#L35-L40`, line: 35, path: targetPath, source: `[source](${targetPath}#L35-L40)`, selector: ".fixture-markdown-explicit a" },
+  { token: `${targetPath}:25:3`, line: 25, column: 3, path: targetPath, source: `\`${targetPath}:25:3\``, selector: ".fixture-markdown-linked-code .chat-code-link" },
+  { token: "src/scroll target.txt:85-89", line: 85, path: "src/scroll target.txt", source: "`src/scroll target.txt:85-89`", selector: ".fixture-markdown-code .chat-code-link" },
+];
 const content = Array.from({ length: 90 }, (_, index) => `line ${index + 1}`).join("\n");
 const resolveRefs: string[] = [];
 const readPaths: string[] = [];
@@ -25,13 +38,14 @@ window.piDesktop = {
     if (channel === IPC.invoke.fsResolveRef) {
       const ref = String(input?.ref ?? "");
       resolveRefs.push(ref);
+      const relativePath = ref.replace(/^\/workspace\//, "");
       return {
         ok: true,
         data: {
           match: {
             root: "workspace",
-            relativePath: targetPath,
-            absolutePath: `/workspace/${targetPath}`,
+            relativePath,
+            absolutePath: `/workspace/${relativePath}`,
             matchedBy: "exact-relative",
             projectRoot: { path: "/workspace", name: "Fixture", primary: true },
           },
@@ -86,7 +100,12 @@ void i18n
       root.render(
         <I18nextProvider i18n={i18n}>
           <div className="fixture-chat">
-            <LinkifiedText text={`Review ${targetPath}:${targetLine}:4.`} />
+            <LinkifiedText text={transcript} />
+            {markdownReferences.map((reference) => (
+              <div key={reference.selector} className={reference.selector.split(" ")[0].slice(1)}>
+                <Markdown source={reference.source} />
+              </div>
+            ))}
           </div>
           <FilesTab />
         </I18nextProvider>,
@@ -103,34 +122,49 @@ void i18n
       };
 
       if (!(await until(
-        () => Boolean(document.querySelector<HTMLButtonElement>(".chat-file-chip")),
+        () => document.querySelectorAll(".chat-file-chip").length === references.length,
         "verified transcript chip",
       ))) throw new Error("The verified file reference chip did not render");
-      document.querySelector<HTMLButtonElement>(".chat-file-chip")!.click();
-      if (!(await until(
-        () => Boolean(document.querySelector(".file-viewer-path")) && readPaths.length > 0,
-        "host viewer file load",
-      ))) throw new Error(`Host file viewer did not load: ${JSON.stringify({ resolveRefs, readPaths, request: useAppStore.getState().workPanelFileRequest })}`);
-      await until(() => scrollCalls.length > 0, "host viewer line scroll");
+      const cases = [];
+      const clicks = [
+        ...references.map((reference, index) => ({ ...reference, path: targetPath, selector: `.chat-file-chip:nth-of-type(${index + 1})`, element: document.querySelectorAll<HTMLButtonElement>(".chat-file-chip")[index] })),
+        ...markdownReferences.map((reference) => ({ ...reference, element: document.querySelector<HTMLElement>(reference.selector) })),
+      ];
+      for (const reference of clicks) {
+        const previousScrollCalls = scrollCalls.length;
+        if (!reference.element) throw new Error(`Missing reference: ${reference.selector}`);
+        reference.element.click();
+        if (!(await until(
+          () => Boolean(document.querySelector(".file-viewer-path")) && readPaths.length > 0,
+          "host viewer file load",
+        ))) throw new Error(`Host file viewer did not load: ${JSON.stringify({ resolveRefs, readPaths, request: useAppStore.getState().workPanelFileRequest })}`);
+        if (!(await until(() => scrollCalls.length > previousScrollCalls, "host viewer line scroll"))) {
+          throw new Error(`No scroll for ${reference.token}`);
+        }
 
-      const viewer = document.querySelector<HTMLElement>(".file-viewer-body");
-      const line = viewer?.querySelector<HTMLElement>(`[data-line="${targetLine}"]`);
-      if (!viewer || !line) throw new Error("The requested source line was not rendered");
-      const viewerRect = viewer.getBoundingClientRect();
-      const lineRect = line.getBoundingClientRect();
-      const request = useAppStore.getState().workPanelFileRequest;
+        const viewer = document.querySelector<HTMLElement>(".file-viewer-body");
+        const line = viewer?.querySelector<HTMLElement>(`[data-line="${reference.line}"]`);
+        if (!viewer || !line) throw new Error("The requested source line was not rendered");
+        const viewerRect = viewer.getBoundingClientRect();
+        const lineRect = line.getBoundingClientRect();
+        const request = useAppStore.getState().workPanelFileRequest;
+        cases.push({
+          token: reference.token,
+          request,
+          scrollCall: scrollCalls.at(-1) ?? null,
+          scrollTop: viewer.scrollTop,
+          targetLineVisible: lineRect.top >= viewerRect.top && lineRect.bottom <= viewerRect.bottom,
+        });
+      }
       return {
         fileManagerAvailable: useAppStore.getState().pluginViews.some(
           (view) => view.pluginId === "pi.file-manager" && view.viewId === "manager",
         ),
         selectedPath: document.querySelector(".file-viewer-path")?.textContent,
-        segments: splitChatText(`Review ${targetPath}:${targetLine}:4.`, "/workspace"),
+        segments: splitChatText(transcript, "/workspace"),
         resolveRefs,
         readPaths,
-        request,
-        scrollCall: scrollCalls.at(-1) ?? null,
-        scrollTop: viewer.scrollTop,
-        targetLineVisible: lineRect.top >= viewerRect.top && lineRect.bottom <= viewerRect.bottom,
+        cases,
       };
     };
   })
@@ -153,10 +187,13 @@ declare global {
       segments: unknown[];
       resolveRefs: string[];
       readPaths: string[];
-      request: { path: string; line?: number; column?: number } | null;
-      scrollCall: { line: string | undefined; block?: string } | undefined;
-      scrollTop: number;
-      targetLineVisible: boolean;
+      cases: Array<{
+        token: string;
+        request: { path: string; line?: number; column?: number } | null;
+        scrollCall: { line: string | undefined; block?: string } | null;
+        scrollTop: number;
+        targetLineVisible: boolean;
+      }>;
     }>;
   }
 }

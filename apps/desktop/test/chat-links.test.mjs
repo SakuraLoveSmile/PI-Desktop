@@ -766,3 +766,61 @@ test("resolvePreviewTarget carries line/col on file chips (#681)", () => {
     column: 7,
   });
 });
+
+test("positioned references support ranges and GitHub anchors without changing paths", () => {
+  for (const suffix of [":42-44", "#L42", "#L42-L44", "#l42-44"]) {
+    for (const path of ["src/main.rs", "docs/Makefile", "/工程/my project/报告.md", "C:\\demo project\\readme.md"]) {
+      assert.equal(parseFileRef(`${path}${suffix}`), path);
+      assert.deepEqual(parseFileRefPosition(`${path}${suffix}`), { line: 42 });
+      assert.deepEqual(resolvePreviewTarget(`${path}${suffix}`, ROOT), {
+        kind: "file", path, line: 42,
+      });
+    }
+  }
+  assert.deepEqual(resolvePreviewTarget('@"docs/my file.md#L42-L44"', ROOT), {
+    kind: "file", path: "docs/my file.md", line: 42,
+  });
+});
+
+test("invalid positions never become a different valid line or column", () => {
+  for (const suffix of [":0", ":42:0", ":42-41", "#L0", "#L42-L0", "#L42-L41", ":42-44:7", ":9007199254740993", "#L42-L9007199254740993"]) {
+    const source = `src/main.rs${suffix}`;
+    assert.equal(parseFileRefPosition(source), null, source);
+    for (const segment of splitChatText(source, ROOT)) {
+      if (segment.kind === "target" && segment.target.kind === "file") {
+        assert.equal(segment.target.line, undefined, source);
+        assert.equal(segment.target.column, undefined, source);
+      }
+    }
+  }
+});
+
+test("transcript scanning preserves complete positioned tokens and surrounding text", () => {
+  for (const token of ["src/main.rs:42-44", "src/main.rs#L42", "src/main.rs#L42-L44", "docs/Makefile#L42", "/工程/my project/报告.md#L42-L44", "C:\\demo project\\readme.md:42-44", '@"docs/my file.md#L42-L44"']) {
+    const source = `Review ${token}，然后继续。`;
+    const segments = splitChatText(source, ROOT);
+    const target = segments.find((segment) => segment.kind === "target");
+    assert.equal(target?.text, token, source);
+    assert.equal(target?.target.line, 42, source);
+    assert.equal(segments.map((segment) => segment.text).join(""), source);
+  }
+  assert.equal(resolvePreviewTarget("../outside.ts#L42", ROOT), null);
+  assert.equal(resolvePreviewTarget("~/private.ts:42-44", ROOT), null);
+});
+
+test("markdown links retain positioned targets and literal source labels", () => {
+  for (const [source, href] of [
+    ["src/main.rs:42:7", "src/main.rs:42:7"],
+    ["src/main.rs:42-44", "src/main.rs:42"],
+    ["src/main.rs#L42-L44", "src/main.rs:42"],
+    ["C:\\demo project\\readme.md#L42", "C%3A%5Cdemo%20project%5Creadme.md:42"],
+  ]) {
+    for (const type of ["text", "inlineCode"]) {
+      const tree = { type: "root", children: [{ type, value: source }] };
+      linkifyMdastTree(tree, ROOT);
+      assert.equal(tree.children[0].type, "link", source);
+      assert.equal(tree.children[0].url, href, source);
+      assert.deepEqual(tree.children[0].children, [{ type, value: source }]);
+    }
+  }
+});

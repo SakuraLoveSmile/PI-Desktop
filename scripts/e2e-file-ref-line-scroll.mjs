@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Follow a real transcript path:line chip into the production host file viewer. */
+/** Follow real transcript line/column/range chips into the production host file viewer. */
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
@@ -85,13 +85,18 @@ app.whenReady().then(async () => {
   console.log(line);
   assert.equal(code, 0, output.slice(-4000));
   assert.equal(result.fileManagerAvailable, true, "fixture must use the normal project-file setup");
-  assert.deepEqual(result.resolveRefs, ["src/scroll-target.txt", "src/scroll-target.txt"]);
-  assert.deepEqual(result.readPaths, ["src/scroll-target.txt"]);
-  assert.equal(result.selectedPath, "src/scroll-target.txt");
-  assert.deepEqual(result.request, { path: "src/scroll-target.txt", seq: 1, line: 65, column: 4 });
-  assert.deepEqual(result.scrollCall, { line: "65", block: "center" });
-  assert.ok(result.scrollTop > 0, "host file viewer did not scroll away from the top");
-  assert.equal(result.targetLineVisible, true, "requested line is outside the visible viewer area");
+  const expectedPaths = new Set(["src/scroll-target.txt", "src/scroll target.txt"]);
+  assert.deepEqual(new Set(result.resolveRefs), expectedPaths, "resolution must retain complete undecorated paths");
+  assert.deepEqual(new Set(result.readPaths), expectedPaths, "viewer must read exactly the referenced files");
+  assert.equal(result.selectedPath, "src/scroll target.txt");
+  assert.equal(result.cases.length, 7);
+  for (const [index, expected] of [{ line: 65, column: 4 }, { line: 45 }, { line: 75 }, { line: 55 }, { line: 35 }, { line: 25, column: 3 }, { line: 85 }].entries()) {
+    const actual = result.cases[index];
+    assert.deepEqual(actual.request, { path: index === 6 ? "src/scroll target.txt" : "src/scroll-target.txt", seq: index + 1, ...expected }, actual.token);
+    assert.deepEqual(actual.scrollCall, { line: String(expected.line), block: "center" }, actual.token);
+    assert.ok(actual.scrollTop > 0, `host file viewer did not scroll away from the top: ${actual.token}`);
+    assert.equal(actual.targetLineVisible, true, `requested line is outside the visible viewer area: ${actual.token}`);
+  }
 } finally {
   await rm(temp, { recursive: true, force: true });
 }
