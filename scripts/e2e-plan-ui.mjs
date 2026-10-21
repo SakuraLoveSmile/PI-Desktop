@@ -1736,24 +1736,49 @@ async function runAcceptance(state) {
   assert(overviewText.includes("Plan UI second"), `Overview omitted the current Plan: ${shortText(overviewText)}`);
   assert(overviewText.includes("Plan UI fixture"), "Overview omitted the configured provider name");
   await captureScreenshot(state, "e2e-plan-overview");
-  const compactHit = await state.cdp.evaluate(`(() => {
-    const button = document.querySelector('.thinking-display-control button:last-of-type');
-    if (!button) return { visible: false };
-    const box = button.getBoundingClientRect();
-    const x = box.left + box.width / 2;
-    const y = box.top + box.height / 2;
-    const hit = document.elementFromPoint(x, y);
-    return { visible: x >= 0 && x < innerWidth && y >= 0 && y < innerHeight &&
-      Boolean(hit?.closest('.thinking-display-control')), box: { x, y, width: box.width, height: box.height },
-      hit: hit?.className ?? null };
-  })()`);
-  assert(compactHit.visible, `Compact control is obscured: ${jsonText(compactHit)}`);
-  await clickSelector(state, '.thinking-display-control button:last-of-type', "Compact display");
-  await waitFor(async () => (await getSettings(state)).thinkingDisplayMode === "compact", "persisted Compact display", state);
+  // The Compact/Detailed control moved from the conversation to Settings > AI.
+  // The legacy class names no longer exist, so the labelled radiogroup is the
+  // real conversation-absence check.
+  const thinkingModeGroup = '.settings-segment[role="radiogroup"][aria-label="思考过程展示模式"]';
+  assert(
+    await state.cdp.evaluate(`!document.querySelector(".thinking-display-control") &&
+      !document.querySelector(".transcript-display-toolbar") &&
+      !document.querySelector(${JSON.stringify(thinkingModeGroup)})`),
+    "thinking display control is present in the conversation",
+  );
+  await clickSelector(state, '[data-nav="settings"]', "Settings navigation");
+  // The Settings route is lazy-loaded behind a Suspense fallback: wait for its nav.
+  await waitFor(
+    () => state.cdp.evaluate(`(() => {
+      const tab = [...document.querySelectorAll(".settings-nav-item")]
+        .find((node) => node.querySelector(".settings-nav-label")?.textContent?.trim() === "AI");
+      if (!tab) return false;
+      tab.click();
+      return true;
+    })()`),
+    "Settings AI tab",
+    state,
+  );
+  await waitFor(
+    () => state.cdp.evaluate(`Boolean(document.querySelector(${JSON.stringify(thinkingModeGroup)}))`),
+    "Settings thinking display control",
+    state,
+  );
+  const setThinkingMode = async (optionLabel, mode) => {
+    const clicked = await state.cdp.evaluate(`(() => {
+      const option = [...document.querySelectorAll(${JSON.stringify(`${thinkingModeGroup} [role="radio"]`)})]
+        .find((node) => node.textContent?.trim() === ${JSON.stringify(optionLabel)});
+      if (!option) return false;
+      option.click();
+      return true;
+    })()`);
+    assert(clicked, `Settings thinking display option is missing: ${optionLabel}`);
+    await waitFor(async () => (await getSettings(state)).thinkingDisplayMode === mode, `persisted ${mode} display`, state);
+  };
+  await setThinkingMode("精简", "compact");
   await captureScreenshot(state, "e2e-plan-compact");
-  await clickSelector(state, '.thinking-display-control button:first-of-type', "Detailed display");
-  await waitFor(async () => (await getSettings(state)).thinkingDisplayMode === "detailed", "restored Detailed display", state);
-  record("E2E-PLAN-WORKFLOW-UI", true, "details stay closed until click, Markdown preview and Overview open, Compact setting persists");
+  await setThinkingMode("详细", "detailed");
+  record("E2E-PLAN-WORKFLOW-UI", true, "details stay closed until click, Markdown preview and Overview open, Compact setting persists in Settings, no thinking control in the conversation");
 
   record(
     "E2E-106-renderer",
@@ -1843,7 +1868,11 @@ async function runAcceptance(state) {
     return result.history?.find((item) =>
       item.id === sourcePlan.proposalId && (item.executionState === "completed" || item.executionState === "interrupted"));
   }, "converted Goal execution to finish", state, 45_000);
-  assert(finishedGoal.executionState === "completed", `converted Goal execution ended ${finishedGoal.executionState}`);
+  // The fixture turn submits no met Goal report, so the host blocks it instead of completing it.
+  assert(
+    finishedGoal.executionState === "interrupted" && finishedGoal.errorCode === "GOAL_BLOCKED",
+    `converted Goal without a met report must block, got ${finishedGoal.executionState}/${finishedGoal.errorCode}`,
+  );
   await waitFor(async () => {
     const result = await getPreloadResult(state, "agentGetStatus", [goalSession.id]);
     return result?.status?.isRunning === false;
@@ -1851,7 +1880,7 @@ async function runAcceptance(state) {
   record(
     "E2E-PLAN-GOAL-CONVERSION",
     true,
-    `plan=${sourcePlan.proposalId} executionKind=${approvedGoal.executionKind} executionState=${finishedGoal.executionState}`,
+    `plan=${sourcePlan.proposalId} executionKind=${approvedGoal.executionKind} executionState=${finishedGoal.executionState} errorCode=${finishedGoal.errorCode}`,
   );
   await captureScreenshot(state, "e2e-plan-goal-conversion");
 
