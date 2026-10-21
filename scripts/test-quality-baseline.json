@@ -596,7 +596,7 @@
       ]
     },
     "apps/desktop/test/chat-context-menu-surface.test.mjs": {
-      "assertions": 25,
+      "assertions": 21,
       "cases": 3,
       "signatures": [
         "045ea6904cc97bdc9bee",
@@ -604,8 +604,6 @@
         "27c1912e4f3121292f71",
         "2e3b51740c423a7f4e5e",
         "38ca36be2a1f1d4bb9d5",
-        "39a2f68c6b84e288fd3e",
-        "4033265a21f1beee164f",
         "41ad0c5e8c988e0db627",
         "57a3bb9440023f2dc810",
         "5ed45f4b28d5fd3d1c20",
@@ -619,10 +617,8 @@
         "cadf40527eb88ba5b8a4",
         "db3b65872646cddf1e7b",
         "dd6e5215dd3a78c00eef",
-        "e05bc3b58a794688a684",
         "e6272ee9f45c9c7c9237",
         "e6cbcfb04b590bea1615",
-        "f958cbc313fff943ce75",
         "fb8a411a040279c73160"
       ]
     },

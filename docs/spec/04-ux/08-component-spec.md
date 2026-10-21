@@ -2005,8 +2005,9 @@ message its checkpoint covers.
   narrows with the pane instead of crossing that edge.
 - Timestamps: `aria-label` with full time string, visual shows relative time
 - Right-click menus are `role="menu"` with `role="menuitem"` rows, arrow /
-  Home / End navigation, Escape / Tab / outside-press / scroll-behind
-  dismissal, and an accessible name (`chat.messageMenu` or
+  Home / End navigation, Escape / Tab / outside-press / reader-scroll
+  dismissal (a scroll the app makes behind the menu does not dismiss it), and
+  an accessible name (`chat.messageMenu` or
   `chat.conversationMenu`). Focus returns to whatever the right-click
   interrupted. While editing a user message, Copy uses the selected draft text
   (or the whole draft if the caret is collapsed), and Select message text selects

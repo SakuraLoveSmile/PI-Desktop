@@ -433,9 +433,13 @@ may be retained while exactly one workspace supplies the visible shell context.
   background, markdown links) are the same family: they portal to
   `document.body` as a viewport-fixed layer, measure before reveal so
   they never flash at the origin, clamp inside the viewport instead of
-  flipping, and close on outside press, Escape, Tab, window blur, or a
-  scroll of anything behind them. An empty item list never opens a
-  surface.
+  flipping, and close on outside press, Escape, Tab, window blur, or reader
+  scroll input (wheel, touch movement, or a scroll key outside a text field)
+  of anything behind them. A scroll the app or the layout makes, such as the
+  transcript re-pinning while a turn streams, leaves them open. The transcript's
+  message menu also closes when a turn starts or its pane leaves the screen,
+  because its Edit, Delete and revision items were gated when it opened. An
+  empty item list never opens a surface.
 
 ### 1.6 Local profile footer
 

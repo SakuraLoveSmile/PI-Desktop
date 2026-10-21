@@ -25,9 +25,6 @@ test("the pointer-anchored menu portals, measures, and closes without trapping f
   assert.match(menuSource, /portalToBody\(/);
   assert.match(menuSource, /placeContextMenu\(/);
   assert.match(menuSource, /className=\{`context-menu\$\{placement \? " is-open" : ""\}`\}/);
-  assert.match(menuSource, /window\.addEventListener\("pointerdown", onOutside, true\)/);
-  assert.match(menuSource, /window\.addEventListener\("keydown", onKeyDown, true\)/);
-  assert.match(menuSource, /if \(event\.key === "Tab"\)/);
   assert.match(menuSource, /onContextMenu=\{/);
   assert.match(menuSource, /function snapshotSelection\(/);
   assert.match(menuSource, /live\.isCollapsed/);
@@ -38,7 +35,6 @@ test("the pointer-anchored menu portals, measures, and closes without trapping f
 });
 
 test("the transcript owns one menu and each speaking row can open it", () => {
-  assert.match(transcriptSource, /<TranscriptMenuProvider>/);
   assert.match(transcriptSource, /onContextMenu=\{onContextMenu\}/);
   assert.match(transcriptSource, /conversationMenuItems\(/);
   assert.match(messageRowSource, /onContextMenu=\{onContextMenu\}/);

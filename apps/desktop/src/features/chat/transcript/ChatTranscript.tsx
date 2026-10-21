@@ -76,7 +76,10 @@ export const ChatTranscript = memo(function ChatTranscript(
   props: ChatTranscriptProps,
 ) {
   return (
-    <TranscriptMenuProvider>
+    <TranscriptMenuProvider
+      running={props.isRunning && !props.readingWindow}
+      visible={props.paneVisible ?? true}
+    >
       <TranscriptBody {...props} />
     </TranscriptMenuProvider>
   );

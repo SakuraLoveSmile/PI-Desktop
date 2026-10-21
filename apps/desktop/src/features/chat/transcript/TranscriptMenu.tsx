@@ -17,6 +17,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
@@ -44,8 +45,27 @@ export function useTranscriptMenu(): OpenTranscriptMenu {
   return useContext(TranscriptMenuContext);
 }
 
-export function TranscriptMenuProvider({ children }: { children: ReactNode }) {
+export function TranscriptMenuProvider({
+  children,
+  running,
+  visible,
+}: {
+  children: ReactNode;
+  /** A turn is streaming. Edit, Delete and the revision steps were gated on it. */
+  running: boolean;
+  /** The pane holding this transcript is on screen. */
+  visible: boolean;
+}) {
   const { contextMenu, openContextMenu, closeContextMenu } = useContextMenu();
+  /*
+    Items are built when a menu opens, so Edit, Delete and the revision steps
+    keep the gate they were opened with. A scroll used to close a menu that went
+    stale this way. Scrolling no longer does, so any change to either input
+    closes the menu here.
+  */
+  useEffect(() => {
+    closeContextMenu();
+  }, [closeContextMenu, running, visible]);
   return (
     <TranscriptMenuContext.Provider value={openContextMenu}>
       {children}
