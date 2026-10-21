@@ -169,8 +169,8 @@ IDs come from executable result/test calls and annotated dynamic suites. 文档�
 | E2E-0PLUGIN-I18N | [scripts/e2e-smoke.mjs:389](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-smoke.mjs#L389) |
 | E2E-105 | [scripts/e2e-plan.mjs:241](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plan.mjs#L241) |
 | E2E-106 | [scripts/e2e-plan.mjs:306](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plan.mjs#L306) |
-| E2E-106-live-agent | [scripts/e2e-plan-ui.mjs:1916](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plan-ui.mjs#L1916) |
-| E2E-106-renderer | [scripts/e2e-plan-ui.mjs:1759](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plan-ui.mjs#L1759) |
+| E2E-106-live-agent | [scripts/e2e-plan-ui.mjs:1945](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plan-ui.mjs#L1945) |
+| E2E-106-renderer | [scripts/e2e-plan-ui.mjs:1784](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plan-ui.mjs#L1784) |
 | E2E-107 | [scripts/e2e-plan.mjs:493](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plan.mjs#L493) |
 | E2E-108 | [scripts/e2e-plan.mjs:523](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plan.mjs#L523) |
 | E2E-109 | [scripts/e2e-plan.mjs:577](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plan.mjs#L577) |
@@ -185,7 +185,7 @@ IDs come from executable result/test calls and annotated dynamic suites. 文档�
 | E2E-116 | [scripts/e2e-plan.mjs:946](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plan.mjs#L946) |
 | E2E-117-en | [scripts/e2e-plan-ui.mjs:1618](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plan-ui.mjs#L1618) |
 | E2E-117-responsive | [scripts/e2e-plan-ui.mjs:1628](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plan-ui.mjs#L1628) |
-| E2E-117-zh-CN | [scripts/e2e-plan-ui.mjs:1764](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plan-ui.mjs#L1764) |
+| E2E-117-zh-CN | [scripts/e2e-plan-ui.mjs:1789](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plan-ui.mjs#L1789) |
 | E2E-166 | [scripts/e2e-subagent-models.mjs:351](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-subagent-models.mjs#L351) |
 | E2E-ACTIVITY-APP-EXIT | [scripts/e2e-session-activity.mjs:286](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-session-activity.mjs#L286) |
 | E2E-ACTIVITY-CRASH | [scripts/e2e-session-activity.mjs:301](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-session-activity.mjs#L301) |
@@ -232,10 +232,10 @@ IDs come from executable result/test calls and annotated dynamic suites. 文档�
 | E2E-MCP-MARKET-SEMANTICS | [scripts/e2e-mcp-market.mjs:249](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-mcp-market.mjs#L249) |
 | E2E-MCP-SESSION-CHUNK | [scripts/e2e-mcp-session-chunk.mjs:87](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-mcp-session-chunk.mjs#L87) |
 | E2E-PLAN-005 | [scripts/e2e-plan.mjs:376](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plan.mjs#L376) |
-| E2E-PLAN-GOAL-CONVERSION | [scripts/e2e-plan-ui.mjs:1852](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plan-ui.mjs#L1852) |
-| E2E-PLAN-ONE-TIME-SCHEDULE | [scripts/e2e-plan-ui.mjs:1816](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plan-ui.mjs#L1816) |
-| E2E-PLAN-REVISION | [scripts/e2e-plan-ui.mjs:1907](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plan-ui.mjs#L1907) |
-| E2E-PLAN-WORKFLOW-UI | [scripts/e2e-plan-ui.mjs:1756](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plan-ui.mjs#L1756) |
+| E2E-PLAN-GOAL-CONVERSION | [scripts/e2e-plan-ui.mjs:1881](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plan-ui.mjs#L1881) |
+| E2E-PLAN-ONE-TIME-SCHEDULE | [scripts/e2e-plan-ui.mjs:1841](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plan-ui.mjs#L1841) |
+| E2E-PLAN-REVISION | [scripts/e2e-plan-ui.mjs:1936](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plan-ui.mjs#L1936) |
+| E2E-PLAN-WORKFLOW-UI | [scripts/e2e-plan-ui.mjs:1781](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plan-ui.mjs#L1781) |
 | E2E-PLAN-WORKSPACE | [scripts/e2e-plan.mjs:198](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plan.mjs#L198) |
 | E2E-PLUGIN-import-extension-installs-dependencies | [scripts/e2e-plugin-import-deps.mjs:173](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plugin-import-deps.mjs#L173) |
 | E2E-PLUGIN-import-extension-recovers-missing-npm | [scripts/e2e-plugin-import-deps.mjs:262](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plugin-import-deps.mjs#L262) |
