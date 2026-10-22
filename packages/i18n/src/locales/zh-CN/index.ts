@@ -901,6 +901,8 @@ export const zhCN = {
     progressListLabel: "目标任务清单",
     progressInitializing: "加载进度…",
     progressFailed: "进度读取失败",
+    progressDescription: "目标说明",
+    progressNotReported: "尚未提供逐项目标进度。",
     planning: "正在明确目标",
     approvalRegion: "目标审批",
     readyAnnouncement: "目标契约已就绪，已在工作面板中打开。",

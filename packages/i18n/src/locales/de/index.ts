@@ -700,6 +700,8 @@ export const de = {
     "progressListLabel": "Aufgabenliste des Ziels",
     "progressInitializing": "Fortschritt wird geladen…",
     "progressFailed": "Fortschritt nicht verfügbar",
+    progressDescription: "Zielbeschreibung",
+    progressNotReported: "Noch kein Fortschritt für die einzelnen Zielaufgaben gemeldet.",
     "planning": "Ziel definieren",
     "approvalRegion": "Zielgenehmigung",
     "readyAnnouncement": "Zielvertrag bereit. Es ist im Arbeitsfenster geöffnet.",

@@ -909,6 +909,8 @@ export const en = {
     progressListLabel: "Goal task list",
     progressInitializing: "Loading progress…",
     progressFailed: "Progress unavailable",
+    progressDescription: "Goal description",
+    progressNotReported: "No goal item progress reported yet.",
     planning: "Defining goal",
     approvalRegion: "Goal approval",
     readyAnnouncement: "Goal contract ready. It is open in the Work Panel.",

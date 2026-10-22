@@ -700,6 +700,8 @@ export const fr = {
     "progressListLabel": "Liste des tâches de l’objectif",
     "progressInitializing": "Chargement de la progression…",
     "progressFailed": "Progression indisponible",
+    progressDescription: "Description de l’objectif",
+    progressNotReported: "Aucune progression des tâches de l’objectif n’a encore été signalée.",
     "planning": "Définition de l'objectif",
     "approvalRegion": "Approbation de l'objectif",
     "readyAnnouncement": "Contrat d'objectif prêt. Il est ouvert dans le panneau de travail.",

@@ -5107,6 +5107,15 @@ Disclosure, terminal report removal and session isolation retain their current
 behavior. Scheduled instruction cards do not mount this Goal disclosure and
 keep their existing shell appearance.
 
+Expanded Goal progress leads with the execution's recorded item checklist.
+Each row shows the full wrapping item label and an explicit localized status
+(pending, in progress, completed or failed); color alone is not the status.
+The original Goal description remains available in a secondary, initially
+collapsed disclosure after the checklist. Loading, unavailable and unreported
+progress have explicit empty states and never substitute the description for
+completion evidence. A completed item count does not change the authoritative
+execution phase or imply that the final result has been accepted.
+
 ### Expert Team settings and reference-aligned Overview (2026-10-08)
 
 Settings exposes an Expert Team destination under Agent configuration. The page

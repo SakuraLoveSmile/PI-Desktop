@@ -16882,6 +16882,13 @@ renderer's durable transcript reads. No real model or provider is contacted.
   produce no transcript result card or automatic Work Panel opening; interrupted progress
   disappears without waiting. Completed report navigation and persistence remain intact.
 - **Progress:** Approved Goal progress accepts pending/in-progress/completed/failed items.
+  Expanding the composer Goal row shows those items first, with full wrapping
+  labels and explicit localized status text. The original Goal description is
+  initially collapsed after the checklist and can be opened independently.
+  Loading, unreadable or unreported progress remains explicit instead of
+  displaying the goal description as if it were completion evidence. Live
+  updates refresh item statuses; an all-completed checklist retains a running
+  execution badge until the authoritative execution actually finishes.
   Unauthorized turns and stale revisions are rejected. A new execution ignores old report
   and progress responses; terminal settlement revokes writes, retains readable progress,
   and session deletion removes it. Failed Team operations do not change dispatch cards;

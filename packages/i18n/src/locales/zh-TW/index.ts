@@ -741,6 +741,8 @@ export const zhTW = {
     progressListLabel: "目標任務清單",
     progressInitializing: "載入進度…",
     progressFailed: "進度讀取失敗",
+    progressDescription: "目標說明",
+    progressNotReported: "尚未提供逐項目標進度。",
     planning: "正在明確目標",
     approvalRegion: "目標審批",
     readyAnnouncement: "目標契約已就緒，已在工作面板中開啟。",

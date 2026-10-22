@@ -698,6 +698,8 @@ export const ptBR = {
     progressListLabel: "Lista de tarefas da meta",
     progressInitializing: "Carregando progresso…",
     progressFailed: "Progresso indisponível",
+    progressDescription: "Descrição da meta",
+    progressNotReported: "O progresso dos itens da meta ainda não foi informado.",
     planning: "Definindo objetivo",
     approvalRegion: "Aprovação do objetivo",
     readyAnnouncement: "Contrato do objetivo pronto. Está aberto no Painel de Trabalho.",

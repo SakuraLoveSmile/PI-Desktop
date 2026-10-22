@@ -709,6 +709,8 @@ export const ko = {
     progressListLabel: "목표 작업 목록",
     progressInitializing: "진행 상황 불러오는 중…",
     progressFailed: "진행 상황을 사용할 수 없음",
+    progressDescription: "목표 설명",
+    progressNotReported: "아직 개별 목표 항목의 진행 상황이 보고되지 않았습니다.",
     planning: "목표 정의 중",
     approvalRegion: "목표 승인",
     readyAnnouncement: "목표 계약이 준비되었습니다. 작업 패널에서 열려 있습니다.",

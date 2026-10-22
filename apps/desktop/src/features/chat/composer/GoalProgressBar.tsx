@@ -2,7 +2,7 @@ import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { PlanProposal } from "@pi-desktop/shared";
 import { useGoalActivity } from "../../../hooks/useGoalActivity";
-import { Button } from "../../../components/ui";
+import { Badge, Button } from "../../../components/ui";
 import { IconChevronDown, IconChevronRight } from "../../../components/icons";
 import { usePendingTeamExecutionReview } from "../../../hooks/useTeamExecutionReview";
 import { useAppStore } from "../../../stores/app-store";
@@ -158,13 +158,10 @@ export function GoalProgressBar({ sessionId, proposal }: GoalProgressBarProps) {
 
         {expanded ? (
           <div id={listId} className="goal-progress-expanded-content">
-            <div className="goal-progress-body-text">
-              {proposal.markdown || proposal.plan}
-            </div>
-            {items.length > 0 ? (
+            {capsuleState.kind === "progress" ? (
               <div className="goal-progress-items-container" role="list" aria-label={t("goal.progressListLabel")}>
                 {items.map((item) => (
-                  <div className="goal-progress-item-entry" role="listitem" key={item.id}>
+                  <div className="goal-progress-item-entry" role="listitem" data-status={item.status} key={item.id}>
                     <span
                       className="goal-progress-item-dot"
                       data-status={item.status}
@@ -177,9 +174,25 @@ export function GoalProgressBar({ sessionId, proposal }: GoalProgressBarProps) {
                     >
                       {item.label}
                     </span>
+                    <Badge
+                      className="goal-progress-item-status"
+                      tone={item.status === "completed" ? "success" : item.status === "failed" ? "error" : "neutral"}
+                    >
+                      {t(`goal.blocked.progress.${item.status}`)}
+                    </Badge>
                   </div>
                 ))}
               </div>
+            ) : (
+              <p className="goal-progress-empty-state">
+                {capsuleState.kind === "indeterminate" ? t("goal.progressNotReported") : capsuleState.message}
+              </p>
+            )}
+            {proposal.markdown || proposal.plan ? (
+              <details className="goal-progress-description">
+                <summary>{t("goal.progressDescription")}</summary>
+                <div className="goal-progress-body-text">{proposal.markdown || proposal.plan}</div>
+              </details>
             ) : null}
           </div>
         ) : null}

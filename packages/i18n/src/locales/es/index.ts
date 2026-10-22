@@ -700,6 +700,8 @@ export const es = {
     "progressListLabel": "Lista de tareas del objetivo",
     "progressInitializing": "Cargando progreso…",
     "progressFailed": "Progreso no disponible",
+    progressDescription: "Descripción del objetivo",
+    progressNotReported: "Aún no se ha informado del progreso de las tareas del objetivo.",
     "planning": "Definición de meta",
     "approvalRegion": "Aprobación de meta",
     "readyAnnouncement": "Contrato de meta listo. Está abierto en el Panel de Trabajo.",

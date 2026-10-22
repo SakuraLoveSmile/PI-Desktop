@@ -709,6 +709,8 @@ export const tr = {
     progressListLabel: "Hedef görev listesi",
     progressInitializing: "İlerleme yükleniyor…",
     progressFailed: "İlerleme bilgisi kullanılamıyor",
+    progressDescription: "Hedef açıklaması",
+    progressNotReported: "Hedef maddeleri için henüz ilerleme bildirilmedi.",
     planning: "Hedef tanımlanıyor",
     approvalRegion: "Hedef onayı",
     readyAnnouncement: "Hedef sözleşmesi hazır. Çalışma panelinde açık.",

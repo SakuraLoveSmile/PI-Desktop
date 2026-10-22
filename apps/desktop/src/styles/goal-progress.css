@@ -139,9 +139,9 @@
   .goal-progress-bar-title { flex-basis: 100%; }
 }
 
-/* Expanded content: max 144px internal scrolling */
+/* Keep a short checklist and its description disclosure visible together. */
 .goal-progress-expanded-content {
-  max-height: 144px;
+  max-height: 180px;
   overflow-y: auto;
   border-top: 1px solid var(--ds-border-subtle);
   padding: 10px 12px;
@@ -151,7 +151,7 @@
 }
 
 .goal-progress-body-text {
-  margin-bottom: 8px;
+  margin-top: 8px;
   white-space: pre-wrap;
   word-break: break-word;
   line-height: var(--leading-normal);
@@ -162,12 +162,11 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-top: 8px;
 }
 
 .goal-progress-item-entry {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   font-size: var(--text-xs);
   min-width: 0;
@@ -178,6 +177,7 @@
   height: 8px;
   border-radius: var(--radius-round);
   flex-shrink: 0;
+  margin-top: 5px;
 }
 
 .goal-progress-item-dot[data-status="completed"] {
@@ -193,17 +193,43 @@
   background: var(--ds-border-strong);
 }
 
+.goal-progress-item-dot[data-status="failed"] {
+  background: var(--ds-error);
+}
+
 .goal-progress-item-label {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  line-height: var(--leading-normal);
   flex: 1;
 }
 
-.goal-progress-item-label[data-status="completed"] {
+.goal-progress-item-status {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.goal-progress-item-entry[data-status="in_progress"] .goal-progress-item-status {
+  color: var(--ds-goal);
+  background: var(--ds-goal-soft);
+}
+
+.goal-progress-empty-state {
+  margin: 0;
+}
+
+.goal-progress-description {
+  margin-top: 8px;
+}
+
+.goal-progress-description > summary {
+  cursor: pointer;
   color: var(--ds-text-secondary);
-  text-decoration: line-through;
+}
+
+.goal-progress-description > summary:focus-visible {
+  outline: 2px solid var(--ds-focus);
+  outline-offset: 2px;
 }
 .goal-resume-chip {
   display: flex;
