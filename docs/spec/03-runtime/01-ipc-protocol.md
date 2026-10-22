@@ -1966,8 +1966,12 @@ Renderer IPC kept for the Plan-safe preview facade and URL fallback:
   other folders, which are then searched in the group's own order (ADR 0263),
   so a shorthand resolves in a sibling folder as readily as in the primary one,
   and the match names the folder that answered. Inside one root an exact path
-  beats a shorthand; among shorthands the longest matching tail wins, then the
-  shallowest path. Relative and indexed candidates must resolve to regular files
+  beats a shorthand; a shorthand must match exactly one file by its complete
+  supplied path suffix. Resolution never shortens that suffix to a basename or
+  chooses by depth. Ambiguity returns `match: null` immediately rather than
+  falling through to another root. Supported `:line`, `:line:column`,
+  `:start-end`, `#Lstart` and `#Lstart-Lend` suffixes are removed before path
+  lookup; renderer positioning uses the start line. Relative and indexed candidates must resolve to regular files
   whose real paths remain inside their answering root; an exact path through an
   escaping or dangling link cannot fall back to a same-name indexed file. The
   files-panel ignore set applies. A reference that matches

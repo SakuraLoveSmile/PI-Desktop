@@ -86,11 +86,17 @@ applies on narrow screens; the card does not rely on page-level scrolling.
 
 ## Request transitions
 
-The question index, draft answers, and submission state belong to the displayed
-request. Switching chats or advancing the pending queue mounts a fresh card at
-question one with empty answers and enabled actions. State from the previous
-request must not leak into the destination request. Unsubmitted card drafts are
-local to the mounted card and are reset when it is replaced.
+The question index and draft answers belong to the request ID in renderer
+memory. Switching chats and returning restores the open question, choices,
+custom text and skipped answers. A different request starts at question one
+with empty answers; answers never leak between requests. Drafts survive only
+for the current renderer lifetime and introduce no persisted format.
+
+Successful submission or decline clears that request's draft; submission
+failure retains it for correction or retry. Tool/turn termination removes
+ordinary drafts, while Host-deferred Team questions retain their drafts with
+their cards. Authoritative pending-interaction reconciliation drops drafts for
+requests that have ended, and session/project removal clears their drafts.
 
 ## Team Lead pending badge
 

@@ -376,6 +376,13 @@
   column without widening the card, and long question content keeps choices
   visible. Selecting and submitting still returns the original option label.
 
+- Draft lifecycle regression: answer the first question, enter custom text in
+  the next, switch A → B → A, and recover the same question and answers.
+  Keep B and a new request empty, then submit A with its exact original values.
+  Store tests cover failed submission, tool/turn termination, Host reconciliation
+  racing a new request, session removal and retained Host-deferred Team drafts.
+  Drafts are renderer-memory state and do not survive reload.
+
 ### E2E-INTERACTION-unattended-hard-boundary
 
 - **Preconditions:** A candidate build receipt, isolated Host data/profile and
@@ -16307,10 +16314,16 @@ the latest destination. These assertions measure work counts, not device FPS.
   runtime compacts against the published safety ceiling, and no request is sent
   with `input + output` beyond that ceiling. Small ASCII requests retain the
   configured budget when it fits.
+- Folded-transcript regression: restore a long session with repeated large
+  system snapshots and continue it through a loopback Responses gateway. Repeat
+  for a delegate after its usage anchor. The actual wire request retains the
+  configured 8192-token output budget and only the current leading system
+  snapshot. A model declaring mid-conversation support keeps its updates.
 - **Specs linked:** `03-runtime/02-agent-runtime.md`,
   `03-runtime/13-model-catalog-and-selection.md`
 - **Acceptance:** F (runtime provider requests), C (chat and stream)
-- **Status:** Unit-covered; deterministic provider fixture pending
+- **Status:** Unit coverage plus `output-cap-request.test.ts` loopback
+  parent/delegate wire coverage. Record actual candidate runs separately.
 
 ### E2E-PROVIDER-certificate-trust-and-terminal-errors
 
@@ -16321,7 +16334,10 @@ the latest destination. These assertions measure work counts, not device FPS.
   desktop sidecar and submit a chat prompt against an untrusted localhost
   certificate. Relaunch with its CA in `NODE_EXTRA_CA_CERTS`, then request the
   same certificate through a hostname absent from its SAN.
-- **Expected:** The child's default CA set includes system roots and extra CAs.
+- **Expected:** After startup the child's default CA set includes non-expired
+  system roots and inherited extra CAs. Deterministic unit fixtures prove that
+  expired OS entries are excluded while bundled and extra roots retain their
+  existing semantics.
   The first request fails once with a non-retriable certificate error and no
   retry status; the trusted request returns text; the hostname mismatch still
   fails once. TLS and hostname verification remain enabled.
@@ -17504,23 +17520,41 @@ current CAS revision. Legacy descriptions and reviews without presentation are r
   through successful recovery. Terminal failure and Stop retain their existing
   closure behavior. Covered by the parameterized runtime overflow user-path test.
 
+- Retry/compaction regression: recovery may start after compaction has already
+  removed the failed assistant. Parent and delegate continue the retained
+  summary, with and without a trailing system update, through the real Agent
+  loop. Each loop closes once; delegate lifecycle stays out of the parent
+  session lifecycle. `runtime-compacted-retry.test.ts` supplies the controlled
+  failure-state regression, with existing stream-retry user paths covering the
+  transient failure and recovered assistant bubble.
 
-#### E2E-262: Transcript path:line opens and scrolls the host file viewer
+- Empty-row persistence regression: drive real event persistence and restart
+  its outbox. Empty completed, failed and aborted assistants add no transcript
+  row; thinking, errors, steering reservations and Goal/Team tool lineage
+  remain durable. Empty failed replies still lock their matching approved
+  execution before terminal settlement. Covered by
+  `empty-assistant-persistence.test.mjs` and existing finalization suites.
+
+
+#### E2E-262: Positioned transcript references open and scroll the host file viewer
 
 - **Preconditions:** Isolated Electron/Chromium, an active workspace and session,
   the bundled file-manager view available, and deterministic filesystem IPC
   fixtures.
-- **Steps:** Render a real transcript `path:line:column` reference followed by
-  sentence punctuation; click its verified file chip and wait for the host file
-  viewer to load.
+- **Steps:** Click real user chips using `path:line:column`, `path:start-end`
+  and `path#Lstart-Lend`, including sentence punctuation. Repeat through
+  assistant bare references, explicit Markdown links, inline code and a path
+  containing spaces. Wait for each host file view to load.
 - **Expected:** Despite the bundled file-manager view being available, the
   positioned reference opens in the host's read-only file tab. The file request
-  retains its line and column, and the viewer scrolls the requested line into
+  retains its starting line and optional column, and the viewer scrolls that line into
   the visible center area. The path and file contents remain the same as the
-  reference target.
+  reference target. Every click opens once, including linkified inline code.
+  Host resolver tests retain exact-path priority and reject ambiguous complete
+  suffixes without guessing a shorter name or falling through to another root.
 - **Specs:** `04-ux/08` §11.8; ADR 0262.
 - **Status:** `node scripts/e2e-file-ref-line-scroll.mjs` mounts production
-  `LinkifiedText` and `FilesTab` in isolated Electron with filesystem IPC
+  `LinkifiedText`, `Markdown` and `FilesTab` in isolated Electron with filesystem IPC
   fixtures; no real project files or provider are used.
 
 ### Imported-extension GUI executable discovery regression (#1173)

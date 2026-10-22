@@ -1345,6 +1345,15 @@ Project drag/drop follows these patterns:
   outside the project has no relative path to copy and says so. The OS default
   application is no longer what this click does, though that action stays
   reachable from the file view's own context menu.
+- Positioned local references accept `:line`, `:line:column`, `:start-end`,
+  `#Lstart` and `#Lstart-Lend` (case-insensitive `L`). Ranges jump to the start
+  line without adding a selection. Positions are positive safe integers and
+  range ends cannot precede their start. User chips, assistant inline code and
+  Markdown links retain the same target and position; one click opens once.
+  A positioned project file uses the host's read-only `file:` tab even when
+  the bundled file view is available. Main resolves exact paths first, then
+  only a unique complete suffix; ambiguous names open nothing and never fall
+  through to another root. No shorter suffix or depth heuristic guesses a file.
 - In the host `file:` tab, a conversation MP4 that cannot be previewed because
   it is binary or exceeds the text preview limit offers **Open with default
   application**. This applies to named `.mp4` files and extensionless

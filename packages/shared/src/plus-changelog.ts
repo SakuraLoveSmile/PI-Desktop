@@ -17,6 +17,9 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
+        "Keep long-session output budgets and retries correct after instruction updates and compaction; omit genuinely empty replies from saved history.",
+        "Preserve AskTool drafts across chats and open positioned file links precisely, rejecting ambiguous file names.",
+        "Exclude expired system trust anchors while retaining certificate and hostname verification.",
         "Keep unmet Goals blocked with preserved progress; continue the same contract, accept the current result explicitly, or abandon it.",
         "Show queued expert-report metadata during Lead turns, protect active members with reasoned interruption, retire stale task dispatches and warn about shared-tree Git commands without blocking them.",
         "Keep Team Lead questions answerable after a thirty-minute pause, and replace a failed approved expert once while retaining its permissions and history.",
@@ -44,6 +47,9 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
+        "修复长会话指令更新、压缩后的输出额度与重试，历史记录不再保存无内容的空回复。",
+        "切换会话保留提问草稿；文件链接准确跳转到指定行，同名歧义不再猜测打开。",
+        "合并系统信任证书时排除已过期项，并保留证书与主机名校验。",
         "未达成的目标会保留进度并进入受阻；可沿用同一契约继续执行、明确接受现状或放弃。",
         "Lead 回合可见待处理专家报告摘要；中断活跃成员需要明确理由，未开始的过期任务派发会撤销，共享树 Git 操作仅警告、不拦截。",
         "团队 Lead 问题等待 30 分钟后释放回合但保留可回答卡片；失败的已批准专家可替换一次，继承原权限并保留历史。",
@@ -71,6 +77,9 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
+        "修正長工作階段指令更新、壓縮後的輸出額度與重試，歷史記錄不再儲存無內容的空回覆。",
+        "切換工作階段保留提問草稿；檔案連結準確跳至指定行，同名歧義不再猜測開啟。",
+        "合併系統信任憑證時排除已過期項，並保留憑證與主機名稱驗證。",
         "未達成的目標會保留進度並進入受阻；可沿用同一契約繼續執行、明確接受現況或放棄。",
         "Lead 回合可見待處理專家報告摘要；中斷活躍成員需要明確理由，未開始的過期任務派發會撤銷，共用樹 Git 操作僅警告、不攔截。",
         "團隊 Lead 問題等待 30 分鐘後釋放回合但保留可回答卡片；失敗的已核准專家可替換一次，繼承原權限並保留歷史。",
@@ -98,6 +107,9 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
+        "Uzun oturumlarda yönerge güncellemeleri ve sıkıştırma sonrası çıktı bütçesi ve yeniden denemeler düzeltildi; boş yanıtlar geçmişe kaydedilmez.",
+        "Sohbetler arasında soru taslaklarını koruyun ve dosya bağlantılarında belirtilen satıra gidin; belirsiz dosya adları açılmaz.",
+        "Süresi dolmuş sistem kök sertifikalarını dışlayın; sertifika ve ana makine doğrulaması korunur.",
         "Tamamlanmayan hedefler ilerlemeyi koruyarak engellenir; aynı sözleşmeyle devam edin, mevcut sonucu açıkça kabul edin veya vazgeçin.",
         "Lider turlarında bekleyen uzman raporlarını gösterir; etkin üyeleri gerekçeli kesintilerle korur, eski görev gönderimlerini iptal eder ve ortak Git işlemlerinde engellemeden uyarır.",
         "Ekip lideri soruları otuz dakika sonra turu serbest bırakır ve yanıtlanabilir kalır; başarısız onaylı uzman, izinleri ve geçmişi korunarak bir kez değiştirilebilir.",
@@ -125,6 +137,9 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
+        "Ausgabebudgets und Wiederholungen bleiben nach Anweisungsänderungen und Komprimierung korrekt; leere Antworten werden nicht gespeichert.",
+        "Frageentwürfe bleiben beim Chatwechsel erhalten; Dateilinks öffnen die angegebene Zeile und mehrdeutige Namen bleiben ungeöffnet.",
+        "Abgelaufene Systemzertifikate werden ausgeschlossen; Zertifikats- und Hostnamenprüfung bleiben aktiv.",
         "Nicht erreichte Ziele bleiben mit ihrem Fortschritt blockiert; denselben Auftrag fortsetzen, den aktuellen Stand ausdrücklich akzeptieren oder aufgeben.",
         "Zeigt ausstehende Expertenberichte im Lead-Durchlauf, schützt aktive Mitglieder mit begründeten Unterbrechungen, verwirft veraltete Aufgaben und warnt bei gemeinsamem Git ohne Blockierung.",
         "Team-Lead-Fragen bleiben nach dreißig Minuten beantwortbar; ein fehlgeschlagener genehmigter Experte kann einmal mit bestehenden Rechten und Verlauf ersetzt werden.",
@@ -152,6 +167,9 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
+        "Corrige el presupuesto de salida y los reintentos tras actualizar instrucciones o compactar sesiones largas; omite respuestas vacías del historial.",
+        "Conserva borradores de preguntas al cambiar de chat y abre enlaces en la línea indicada; los nombres ambiguos no se abren.",
+        "Excluye certificados del sistema caducados y mantiene la verificación de certificados y nombres de host.",
         "Los objetivos no alcanzados quedan bloqueados conservando su progreso; continúe el mismo contrato, acepte explícitamente el resultado actual o abandone.",
         "Muestra informes pendientes al Lead, protege miembros activos con interrupciones justificadas, retira tareas obsoletas y advierte sobre Git compartido sin bloquear.",
         "Las preguntas del Lead liberan el turno tras treinta minutos y siguen disponibles; un experto aprobado que falle puede sustituirse una vez conservando permisos e historial.",
@@ -179,6 +197,9 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
+        "Corrige le budget de sortie et les reprises après modification des instructions ou compactage ; les réponses vides ne sont plus enregistrées.",
+        "Conserve les brouillons de questions entre les discussions et ouvre les fichiers à la ligne indiquée, sans choisir un nom ambigu.",
+        "Exclut les certificats système expirés tout en conservant la vérification des certificats et des noms d’hôte.",
         "Les objectifs non atteints restent bloqués avec leur progression ; poursuivez le même contrat, acceptez explicitement le résultat actuel ou abandonnez.",
         "Affiche les rapports en attente au Lead, protège les membres actifs par une interruption motivée, retire les tâches périmées et avertit pour Git partagé sans bloquer.",
         "Les questions du Lead libèrent le tour après trente minutes et restent accessibles ; un expert approuvé en échec peut être remplacé une fois en conservant droits et historique.",
@@ -206,6 +227,9 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
+        "긴 세션의 지침 갱신과 압축 후 출력 한도 및 재시도를 수정하고 내용 없는 응답은 기록에 저장하지 않습니다.",
+        "채팅을 전환해도 질문 초안을 유지하며 파일 링크의 지정 줄로 이동합니다. 모호한 파일 이름은 열지 않습니다.",
+        "만료된 시스템 신뢰 인증서를 제외하고 인증서와 호스트 이름 검증을 유지합니다.",
         "달성하지 못한 목표는 진행 상황을 보존하고 차단됩니다. 같은 계약으로 계속하거나, 현재 결과를 명시적으로 수락하거나, 포기할 수 있습니다.",
         "Lead 실행 중 대기 중인 전문가 보고서 요약을 표시하고, 활성 구성원 중단에는 이유를 요구합니다. 오래된 작업 전달을 취소하고 공유 Git 명령은 차단 없이 경고합니다.",
         "팀 Lead 질문은 30분 후 실행을 해제해도 답변할 수 있습니다. 실패한 승인 전문가는 기존 권한과 기록을 유지하며 한 번 교체할 수 있습니다.",
@@ -233,6 +257,9 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
+        "Corrige limites de saída e novas tentativas após atualizar instruções ou compactar sessões longas; respostas vazias não são salvas no histórico.",
+        "Preserva rascunhos de perguntas ao trocar de conversa e abre arquivos na linha indicada; nomes ambíguos não são abertos.",
+        "Exclui certificados de sistema expirados, mantendo a verificação de certificados e nomes de host.",
         "Metas não alcançadas ficam bloqueadas com o progresso preservado; continue o mesmo contrato, aceite explicitamente o resultado atual ou abandone.",
         "Mostra relatórios pendentes ao Lead, protege membros ativos com interrupção justificada, retira tarefas obsoletas e alerta sobre Git compartilhado sem bloquear.",
         "Perguntas do Lead liberam o turno após trinta minutos e continuam disponíveis; um especialista aprovado que falhar pode ser substituído uma vez, preservando permissões e histórico.",
