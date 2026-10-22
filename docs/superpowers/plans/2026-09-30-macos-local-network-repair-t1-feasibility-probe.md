@@ -6,7 +6,7 @@
 > reproduced anywhere in this document.
 >
 > Date: 2026-09-30. Worktree:
-> `/Users/developer/Documents/Code/Project/Fork Project/PI-Desktop-worktrees/macos-local-network-repair-t1-t3`
+> `<worktrees>/macos-local-network-repair-t1-t3`
 > (branch `codex/macos-local-network-repair-t1-t3`, base `aef7aad66`).
 > Host: macOS 27.0 (build 26A428), arm64. Node v22.23.2.
 > Companion deliverable: `scripts/macos-executable-identity.mjs` (read-only

@@ -2,7 +2,7 @@
 
 > Implementation authorized on 2026-09-26. T1/T2/T4/T8/T9: **实现中**;
 > T3/T5/T6/T7: **待体验**.
-> Worktree: `/Users/developer/.codex/worktrees/example-worktree/PI-Desktop`.
+> Worktree: `<worktrees>/plus-brand-identity/PI-Desktop`.
 > Branch: `codex/plus-brand-identity`; base: `35d69037422492db38ed0c816966122e61989b8c`.
 
 ## Goal and approved scope
@@ -482,7 +482,7 @@ subagents are integrated by their assigned file owner.
 `pnpm --filter @pi-desktop/desktop typecheck`, `pnpm lint`,
 `pnpm -r --if-present test`, `pnpm docs:check`, and `git diff --check`.
 The default shell resolves pnpm 8.15.4 on this host, below the repository's
-`pnpm@10.34.5` requirement. Prepend `/Users/developer/Library/pnpm` to
+`pnpm@10.34.5` requirement. Prepend `$HOME/Library/pnpm` to
 `PATH` for these commands; do not install a second dependency tree. For
 changed UI behavior, use isolated Electron checks against E2E-050 (combined
 menu), E2E-209 (Import), and E2E-REMOTE-HOST-settings-compact-inventory,
@@ -533,7 +533,7 @@ remain separate from task-candidate evidence.
 ## Closeout execution evidence, 2026-09-26
 
 All T5–T7 fixes were implemented in a separate baseline worktree at
-`/Users/developer/.codex/worktrees/example-worktree/PI-Desktop`, branch
+`<worktrees>/plus-baseline-closeout/PI-Desktop`, branch
 `codex/plus-baseline-closeout`, based on the fetched
 `origin/main=35d69037422492db38ed0c816966122e61989b8c`. The primary checkout
 and the existing uncommitted `codex/plus-brand-identity` worktree were not
