@@ -1271,6 +1271,8 @@ const TOOL_PARAM_ALIASES: Record<string, Record<string, string>> = {
   Grep: { query: "pattern" },
 };
 const TOOL_OUTPUT_UPDATE_THROTTLE_MS = 100;
+/** Bounded wait for partial output after a host-side tool kill. */
+const TOOL_ABORT_GRACE_MS = 10_000;
 const MAX_TOOL_PROGRESS_CHARS = 64 * 1024;
 const TOOL_PROGRESS_TRUNCATION_MARKER =
   "\n\n[tool output progress truncated]\n\n";
@@ -1940,6 +1942,12 @@ export class DesktopAgentRuntime {
   private contextReminderClaimed = false;
   private contextFallbackReminderClaimed = false;
   private activeToolProgressCleanups = new Set<(flush: boolean) => void>();
+  /**
+   * Abort handlers for the tool calls currently awaiting `tools.execute`.
+   * `abort()` drives these directly: a tool must be released even when the
+   * signal it was handed never fires, or the stop RPC stays pending forever.
+   */
+  private activeToolAborts = new Set<() => void>();
   private hostCloseUnsubscribe?: () => void;
   private turnSubagentUsage?: MessageUsage;
   private goalReportDraftManager?: GoalReportDraftManager;
@@ -3495,21 +3503,51 @@ export class DesktopAgentRuntime {
               scheduleProgress();
             })
           : undefined;
+        // #1767: host-core only honours `tools.abort` for `Bash` and
+        // `GenerateImages` — it kills the process and answers the in-flight
+        // execute with `TOOL_ABORTED`. Every other tool keeps running to
+        // completion whatever the runtime sends, so awaiting it blocked the
+        // turn long after the user pressed Stop. Those tools therefore abandon
+        // the wait locally the instant the signal fires; the orphaned host call
+        // settles on its own and its result is discarded.
+        const hostAbortsTool = isBash || toolName === "GenerateImages";
+        const abortedMarker = Symbol("tool-aborted");
+        let resolveAborted: (marker: typeof abortedMarker) => void = () => undefined;
+        const aborted = new Promise<typeof abortedMarker>((resolve) => {
+          resolveAborted = resolve;
+        });
+        let abortGraceTimer: ReturnType<typeof setTimeout> | undefined;
+        let stopped = false;
         const abort = () => {
-          if ((!isBash && toolName !== "GenerateImages") || abortRequested || settled) return;
+          if (abortRequested || settled) return;
           abortRequested = true;
-          abortPromise = this.host
-            .call("tools.abort", {
-              sessionId: this.sessionId,
-              toolCallId,
-            })
-            .then(
-              () => undefined,
-              (error) => {
-                abortError = error;
-              },
-            );
+          if (hostAbortsTool) {
+            abortPromise = this.host
+              .call("tools.abort", {
+                sessionId: this.sessionId,
+                toolCallId,
+              })
+              .then(
+                () => undefined,
+                (error) => {
+                  abortError = error;
+                },
+              );
+          }
+          // Release progress/output resources before arming the grace window:
+          // cleanup is idempotent and must not race the timer it would clear.
           cleanup(true);
+          if (hostAbortsTool) {
+            // Bounded window for the partial output the host collected before
+            // the kill; past it the turn ends regardless.
+            abortGraceTimer = setTimeout(
+              () => resolveAborted(abortedMarker),
+              TOOL_ABORT_GRACE_MS,
+            );
+          } else {
+            // Nothing host-side can interrupt this tool, so stop waiting now.
+            resolveAborted(abortedMarker);
+          }
         };
 
         cleanup = (flush: boolean) => {
@@ -3521,6 +3559,7 @@ export class DesktopAgentRuntime {
           unsubscribeOutput?.();
           signal?.removeEventListener("abort", abort);
           this.activeToolProgressCleanups.delete(cleanup);
+          this.activeToolAborts.delete(abort);
           if (isBash) this.runningBashAborts.delete(toolCallId);
         };
         this.activeToolProgressCleanups.add(cleanup);
@@ -3534,6 +3573,7 @@ export class DesktopAgentRuntime {
         if (signal) {
           signal.addEventListener("abort", abort, { once: true });
         }
+        this.activeToolAborts.add(abort);
 
         let result: {
           ok: boolean;
@@ -3545,7 +3585,7 @@ export class DesktopAgentRuntime {
         let executionError: unknown;
         let executionFailed = false;
         try {
-          result = await this.host.call<{
+          const execution = this.host.call<{
               ok: boolean;
               content: unknown;
               isError?: boolean;
@@ -3588,16 +3628,34 @@ export class DesktopAgentRuntime {
                 ? { permissionScope: this.delegatePermissionScopes.get(toolCallId) }
                 : {}),
             });
-          captureBackgroundReceipt?.(result, signal);
+          // #1767: stop has to end the turn even when the tool never yields.
+          // Losing the race does not cancel the host call — it only stops this
+          // turn from waiting on it.
+          const raced = await Promise.race([execution, aborted]);
+          if (raced === abortedMarker) {
+            stopped = true;
+          } else {
+            result = raced;
+            captureBackgroundReceipt?.(result, signal);
+          }
         } catch (error) {
           executionFailed = true;
           executionError = error;
         } finally {
           this.delegatePermissionScopes.delete(toolCallId);
           cleanup(true);
+          // cleanup is a no-op once the abort path has run, so the grace timer
+          // it armed is released here instead.
+          if (abortGraceTimer) clearTimeout(abortGraceTimer);
         }
         if (abortPromise) await abortPromise;
         if (abortError) throw abortError;
+        if (stopped) {
+          throw Object.assign(
+            new Error(`tool execution aborted while ${toolName} was running`),
+            { errorCode: "TOOL_ABORTED" },
+          );
+        }
         if (executionFailed) throw executionError;
         if (!result) throw new Error("tool execution returned no result");
         const recordParams = isRecord(params) ? params : undefined;
@@ -9604,6 +9662,14 @@ export class DesktopAgentRuntime {
     this.providerRetryAbort?.abort();
     if (this.compactionInProgress) this.compactionAborted = true;
     this.compactionAbort?.abort();
+    // `agent.abort()` normally fires the signal each in-flight tool was handed,
+    // and the tool executor reacts to that. When the signal does not reach a
+    // tool, the executor keeps awaiting `tools.execute`, the turn never
+    // settles, and this method never returns. The renderer awaits this RPC
+    // before it clears the "processing" state, so one unyielding tool pinned
+    // the whole session until it finished on its own (#1767). Drive the tools
+    // from here as well, so a stop always releases them.
+    for (const abortTool of [...this.activeToolAborts]) abortTool();
   }
 
   /**
