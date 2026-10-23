@@ -106,6 +106,17 @@ app.whenReady().then(async () => {
         ${state}.sessions.find(session => session.id === 'main-task').projectPath === '/fixture/music/main' &&
         ${state}.sessions.find(session => session.id === 'branch-task').projectPath === '/fixture/worktrees/music/review' &&
         ${state}.sessions.find(session => session.id === 'slot-task').projectPath === '/fixture/pool/music/slot-3'`);
+      await window.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' });
+      await window.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape' });
+      await evaluate(`document.activeElement.blur(); window.settingsMemoryFixture.branch('refreshed-slot-branch');
+        window.fixtureProjectActivations = window.settingsMemoryFixture.requests.filter(request => request.channel.endsWith('/project/set')).length;
+        document.querySelector('${task('slot-task')}').focus()`);
+      await until(`document.querySelector('.sidebar-session-hover-card')?.textContent.includes('refreshed-slot-branch')`);
+      await check('session hover refreshes the active checkout branch without activating a project or adding a native button tooltip', `
+        ${state}.workspace.branch === 'refreshed-slot-branch' &&
+        window.settingsMemoryFixture.requests.filter(request => request.channel.endsWith('/project/set')).length === window.fixtureProjectActivations &&
+        document.querySelector('${task('slot-task')}').title === '' &&
+        document.querySelector('${task('slot-task')} .thread-item-context').title === '/fixture/pool/music/slot-3'`);
       await click(`${music} .sidebar-session-group-add`);
       await until(`${state}.activeSessionId?.startsWith('created-')`);
       await check('new task from the shared Sidebar row stays in the active slot', `
@@ -116,11 +127,28 @@ app.whenReady().then(async () => {
       await check('shared row edit and delete actions identify the current checkout', `
         document.querySelector('[data-action="edit-project"]').title === '/fixture/pool/music/slot-3' &&
         document.querySelector('[data-action="delete-project"]').title === '/fixture/pool/music/slot-3'`);
+      await click('[data-action="open-project-folder"]');
+      await check('shared project folder action opens the actual active checkout', `
+        window.settingsMemoryFixture.requests.filter(request => request.channel.endsWith('/project/open-folder')).at(-1).input === '/fixture/pool/music/slot-3'`);
+      await click(`${music} .project-more`);
       await click('[data-action="edit-project"]');
       await until(`!!document.querySelector('.project-create-folder-copy[title="/fixture/pool/music/slot-3"]')`);
       await check('editing the shared Sidebar row keeps the actual single-root group', `
         document.querySelectorAll('.project-create-folder-copy').length === 1`);
       await click('.project-create-dialog-close');
+      await evaluate(`window.settingsMemoryFixture.running(['branch-task', 'slot-task'])`);
+      await click(`${music} .project-more`);
+      await click('[data-action="delete-project"]');
+      await check('the first shared Sidebar delete click only arms the current row', `
+        !document.querySelector('.project-delete-dialog') &&
+        !window.settingsMemoryFixture.requests.some(request => request.channel.endsWith('/project/remove'))`);
+      await click('[data-action="delete-project"]');
+      await until(`!!document.querySelector('.project-delete-dialog')`);
+      await check('Sidebar delete confirmation counts only the target checkout and its live task', `
+        document.querySelector('#project-delete-dialog-sessions').textContent.startsWith('2 saved sessions') &&
+        document.querySelector('#project-delete-dialog-running').textContent.startsWith('1 session in this project')`);
+      await click('.project-delete-dialog .project-instructions-dialog-close');
+      await evaluate(`window.settingsMemoryFixture.running([])`);
       await click(`${music} .project-more`);
       await click('[data-action="toggle-project-archive"]');
       await until(`${state}.workspace.path === '/fixture/other/checkout' && !document.querySelector('${music}')`);
@@ -141,7 +169,25 @@ app.whenReady().then(async () => {
       await click('.projects-menu [data-action="edit-project"]');
       await until(`!!document.querySelector('.project-create-folder-copy[title="/fixture/other/checkout"]')`);
       await check('archive edit keeps foreign same-name project roots separate', `document.querySelectorAll('.project-create-folder-copy').length === 1`);
-      await click('.project-create-dialog-close');
+      await type('#project-edit-name', 'Other checkout renamed');
+      await click('.project-edit-dialog button[type="submit"]');
+      await until(`!document.querySelector('.project-edit-dialog')`);
+      await check('archive edit submits the actual project group and preserves its sole checkout root', `(() => {
+        const input = window.settingsMemoryFixture.requests.filter(request => request.channel.endsWith('/project-group/update')).at(-1).input;
+        return input.groupId === 'other' && input.name === 'Other checkout renamed' &&
+          JSON.stringify(input.folders) === JSON.stringify(['/fixture/other/checkout']);
+      })()`);
+      await evaluate(`window.settingsMemoryFixture.running(['main-task', 'other-task'])`);
+      await click('.projects-icon-btn[aria-haspopup="menu"]');
+      await click('.projects-menu [data-action="delete-project"]');
+      await check('the first archive delete click only arms the current row', `!document.querySelector('.project-delete-dialog')`);
+      await click('.projects-menu [data-action="delete-project"]');
+      await until(`!!document.querySelector('.project-delete-dialog')`);
+      await check('archive delete confirmation excludes running sessions in another shared project', `
+        document.querySelector('#project-delete-dialog-sessions').textContent.startsWith('2 saved sessions') &&
+        document.querySelector('#project-delete-dialog-running').textContent.startsWith('1 session in this project')`);
+      await click('.project-delete-dialog .project-instructions-dialog-close');
+      await evaluate(`window.settingsMemoryFixture.running([])`);
       if (rendererErrors.length) throw new Error(`Renderer errors: ${rendererErrors.join('\n')}`);
       console.log('Workspace Memory E2E passed');
       app.exit(0);

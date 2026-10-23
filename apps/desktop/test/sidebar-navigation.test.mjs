@@ -242,7 +242,6 @@ test("sidebar action icons stay quiet until their toolbar or row is hovered", ()
 
 test("project rows expose folder actions and full-path hover", () => {
   assert.match(sidebarSource, /data-action="open-project-folder"/);
-  assert.match(sidebarSource, /api\.openProjectFolder\(entry\.path\)/);
   assert.doesNotMatch(sidebarSource, /data-action="edit-project-instructions"/);
   assert.doesNotMatch(sidebarSource, /<ProjectInstructionsDialog/);
   assert.doesNotMatch(sidebarSource, /data-action="open-session-folder"/);
@@ -261,10 +260,6 @@ test("sidebar row menus omit project reassignment and switching actions", () => 
   assert.doesNotMatch(sidebarSource, /data-action="move-session-to-project"/);
   assert.doesNotMatch(sidebarSource, /t\("nav\.moveToProject"/);
   assert.doesNotMatch(sidebarSource, /t\("project\.switch"/);
-  assert.match(
-    sidebarSource,
-    /if \(!entry\.active && !\(await selectProject\(entry\.path\)\)\) return;/,
-  );
 });
 
 test("session rows use the hover card instead of a native title tooltip", () => {
@@ -274,7 +269,6 @@ test("session rows use the hover card instead of a native title tooltip", () => 
 
   assert.match(sessionMain, /showSessionHoverCard\(/);
   assert.doesNotMatch(sessionMain, /title=\{taskTitle\(session\.title\)\}/);
-  assert.doesNotMatch(sessionMain, /\btitle=\{/);
   assert.match(hoverSource, /className="sidebar-session-hover-card"/);
   assert.match(hoverSource, /className="sidebar-session-hover-card-title"/);
   assert.match(sessionMain, /onFocusCapture=/);

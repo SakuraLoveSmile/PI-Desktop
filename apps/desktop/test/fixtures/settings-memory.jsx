@@ -65,6 +65,14 @@ window.piDesktop = {
       const ok = data => ({ ok: true, data });
       if (channel === IPC.invoke.updatesGetState) return ok(null);
       if (channel === IPC.invoke.projectGet) return ok({ workspace: clone(currentWorkspace) });
+      if (channel === IPC.invoke.projectGroupUpdate) {
+        const project = groups.find(candidate => candidate.id === input.groupId);
+        if (!project) return failure('NOT_FOUND', 'Fixture project does not exist');
+        project.name = input.name;
+        project.roots = input.folders.map((path, position) => ({ path, name: path.split('/').at(-1), position }));
+        if (project.memoryProject) project.memoryProject.name = input.name;
+        return ok({ group: clone(project) });
+      }
       if (channel === IPC.invoke.projectSet) {
         if (![...checkoutPaths, otherPath].includes(input)) return failure('NOT_FOUND', 'Fixture checkout does not exist');
         currentWorkspace = { path: input, name: 'Music', branch: input === checkoutPaths[2] ? 'detached' : 'main' };
@@ -79,6 +87,9 @@ window.piDesktop = {
           createdAt: session.createdAt,
         }] : [], messageStart: 0, hasMoreBefore: false } : null });
       }
+      if (channel === IPC.invoke.sessionCollaboration) return ok({ sessionId: input.sessionId,
+        title: savedSessions.find(session => session.id === input.sessionId)?.title ?? '',
+        status: 'idle', observedAt: '2026-10-23T00:00:00.000Z', recentExchanges: [] });
       if (channel === IPC.invoke.sessionCreate) {
         const session = { ...workspaceSessions[2], ...clone(input), id: `created-${++createdSessions}`, messageCount: 0,
           memoryProjectId: input.projectPath === otherPath ? 'other-memory' : 'music-memory' };
@@ -164,6 +175,8 @@ window.settingsMemoryFixture = {
   migration: (path, required) => { projects.get(path).migrationRequired = required; },
   async locale(value) { await i18n.changeLanguage(value); },
   theme(value) { document.documentElement.dataset.theme = value; },
+  branch(value) { currentWorkspace.branch = value; },
+  running(ids) { useAppStore.setState({ runningSessions: Object.fromEntries(ids.map(id => [id, true])) }); },
   workspace() {
     const state = useAppStore.getState();
     return clone({ workspace: state.workspace, activeSessionId: state.activeSessionId,
