@@ -75,12 +75,12 @@ export type AppSettings = {
    */
   promptEnhancementUserTemplate?: string;
   /**
-   * Model the one-shot enhancement runs on. Absent means "follow the Composer's
-   * current model". When the pinned pair is unusable, main falls back to the
-   * Composer model and logs a warning (ADR 0121).
+   * Model the one-shot enhancement runs on. Absent or null means "follow the
+   * Composer's current model". When the pinned pair is unusable, main falls back
+   * to the Composer model and logs a warning (ADR 0121).
    */
-  promptEnhancementProviderId?: string;
-  promptEnhancementModelId?: string;
+  promptEnhancementProviderId?: string | null;
+  promptEnhancementModelId?: string | null;
   /**
    * Reasoning effort for the one-shot enhancement. Absent means `off`: the
    * enhancement never inherits the session's level, because a rewrite rarely
