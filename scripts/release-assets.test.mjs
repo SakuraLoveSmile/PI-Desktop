@@ -56,10 +56,10 @@ async function fixture(t, version = "0.15.8", channel = "latest") {
   ]) {
     const group = `dist-linux-${arch}`;
     const image = await add(group, `Pi-Desktop-Plus-${version}-linux-${imageArch}.AppImage`);
-    await add(group, `pi-desktop-plus_${version}_${debArch}.deb`);
-    await add(group, `pi-desktop-plus-${version}-${rpmArch}.rpm`);
+    const deb = await add(group, `pi-desktop-plus_${version}_${debArch}.deb`);
+    const rpm = await add(group, `pi-desktop-plus-${version}-${rpmArch}.rpm`);
     await add(group, `Pi-Desktop-Plus-${version}-linux-${arch}.asar`);
-    await feed(group, `${channel}-linux${arch === "x64" ? "" : "-arm64"}.yml`, [image]);
+    await feed(group, `${channel}-linux${arch === "x64" ? "" : "-arm64"}.yml`, [image, deb, rpm]);
     const host = await add(`pi-host-linux-${arch}`, `pi-host-${version}-linux-${arch}.tar.gz`);
     const bytes = await readFile(join(input, `pi-host-linux-${arch}`, host));
     await add(`pi-host-linux-${arch}`, `${host}.sha256`, `${digest("sha256", bytes)}  ${host}\n`);
@@ -130,8 +130,8 @@ test("ordinary YAML feeds are safely read without depending on npm packages", as
   const f = await fixture(t);
   const path = join(f.input, "dist-linux-x64", "latest-linux.yml");
   const feed = JSON.parse(await readFile(path, "utf8"));
-  const file = feed.files[0];
-  await writeFile(path, `version: ${feed.version}\nfiles:\n  - url: ${file.url}\n    sha512: ${file.sha512}\n    size: ${file.size}\npath: ${feed.path}\nsha512: ${feed.sha512}\nreleaseDate: '${feed.releaseDate}'\n`);
+  const entries = feed.files.map(file => `  - url: ${file.url}\n    sha512: ${file.sha512}\n    size: ${file.size}\n`).join("");
+  await writeFile(path, `version: ${feed.version}\nfiles:\n${entries}path: ${feed.path}\nsha512: ${feed.sha512}\nreleaseDate: '${feed.releaseDate}'\n`);
   await aggregateReleaseAssets(f.options);
   assert((await readdir(f.output)).includes("latest-linux.yml"));
 });
@@ -147,6 +147,8 @@ for (const [label, mutate, expected] of [
   ["stale feed version", f => f.changeFeed("dist-mac-arm64", "latest-mac-arm64.yml", feed => { feed.version = "0.15.7"; }), /version/],
   ["bad feed hash", f => f.changeFeed("dist-windows-x64", "latest.yml", feed => { feed.files[0].sha512 = "incorrect"; }), /SHA512/],
   ["bad feed size", f => f.changeFeed("dist-linux-arm64", "latest-linux-arm64.yml", feed => { feed.files[0].size++; }), /size/],
+  ["missing Linux installer update entry", f => f.changeFeed("dist-linux-x64", "latest-linux.yml", feed => { feed.files.pop(); }), /Incomplete updater files/],
+  ["bad Linux DEB update hash", f => f.changeFeed("dist-linux-arm64", "latest-linux-arm64.yml", feed => { feed.files[1].sha512 = "incorrect"; }), /SHA512/],
   ["bad legacy feed hash", f => f.changeFeed("dist-mac-x64", "latest-mac-x64.yml", feed => { feed.sha512 = "incorrect"; }), /SHA512/],
   ["feed traversal", f => f.changeFeed("dist-linux-x64", "latest-linux.yml", feed => { feed.files[0].url = "../private.AppImage"; }), /Unsafe artifact reference/],
   ["external feed URL", f => f.changeFeed("dist-linux-x64", "latest-linux.yml", feed => { feed.files[0].url = "https://example.invalid/app.AppImage"; }), /Unsafe artifact reference/],

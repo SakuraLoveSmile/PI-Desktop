@@ -189,8 +189,10 @@ async function verifyAndMergeFeeds(staging, options, inventory) {
     [`Pi-Desktop-Plus-Setup-${version}.exe`], inventory);
   for (const arch of LINUX_ARCHES) {
     const name = `${channel}-linux${arch === "x64" ? "" : "-arm64"}.yml`;
+    const installers = requiredLayout(version, channel).get(`dist-linux-${arch}`)
+      .filter(file => [".AppImage", ".deb", ".rpm"].some(extension => file.endsWith(extension)));
     verifyFeed(await parseFeed(join(staging, name)), name, version,
-      [`Pi-Desktop-Plus-${version}-linux-${arch === "x64" ? "x86_64" : "arm64"}.AppImage`], inventory);
+      installers, inventory);
   }
   const files = macFeeds.flatMap(feed => feed.files);
   const zip = files.find(file => file.url.endsWith(".zip"));
