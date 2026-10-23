@@ -259,6 +259,7 @@ import { projectMemoryPrompt } from "./project-memory-prompt.js";
 import { autoMemoryPrompt, createAutoMemoryTool, loadAutoMemory } from "./project-auto-memory.js";
 import { createProjectHistoryTool } from "./project-history.js";
 import { buildCodeSearchTool } from "./code-search.js";
+import { ADVISOR_TOOL_NAME, completeAdvisor, createAdvisorTool } from "./advisor-tool.js";
 import {
   pluginSkillsPrompt,
   pluginSkillsPromptSections,
@@ -997,6 +998,8 @@ export type AgentRuntimeOptions = {
   thinkingLevel: SessionThinkingLevel;
   /** Persisted opt-in for retrying transient provider failures until success. */
   infiniteProviderRetry?: boolean;
+  /** Model that answers the Advisor tool; absent keeps the tool out of this session. */
+  advisorProvider?: RuntimeProviderConfig;
   systemPrompt?: string;
   /** pi-compatible SYSTEM.md / APPEND_SYSTEM.md resolved for the session (issue #542). */
   customSystemPrompt?: CustomSystemPrompt;
@@ -1080,6 +1083,7 @@ export type RuntimeMatchConfig = {
   projectMemoryAlias?: ProjectMemoryAlias;
   projectPath?: string;
   commandShell: CommandShellOption;
+  advisorProvider?: RuntimeProviderConfig;
   subagents?: SubagentDefinition[];
   subagentProviders?: Record<string, RuntimeProviderConfig>;
   /** Resolved keys explicitly opted into Task.model selection; pins alone grant no override. */
@@ -1836,6 +1840,8 @@ export class DesktopAgentRuntime {
   private providerRateLimitRetryAttempt = 0;
   /** Opt-in mode removes only the retry-count ceiling; abort and backoff stay intact. */
   private infiniteProviderRetry = false;
+  /** Advisor model for the Advisor tool; undefined keeps the tool out of this session. */
+  private readonly advisorProvider: RuntimeProviderConfig | undefined;
   private activeProviderRetryAttempt = 0;
   private providerRetryInProgress = false;
   private suppressProviderRetryRunEnd = false;
@@ -1959,6 +1965,7 @@ export class DesktopAgentRuntime {
     this.provider = opts.provider;
     this.thinkingLevel = clampThinkingLevel(opts.provider, opts.thinkingLevel);
     this.infiniteProviderRetry = opts.infiniteProviderRetry === true;
+    this.advisorProvider = opts.advisorProvider;
     this.host = opts.host;
     this.ordinaryTeamInbox = new OrdinaryTeamInbox(this.host);
     this.backgroundProcessUpdates = new BackgroundProcessUpdates(this.host, this.sessionId, () => this.disposed || this.runCancelled ? undefined : this.turnEpoch);
@@ -2208,11 +2215,7 @@ export class DesktopAgentRuntime {
             sessionId: this.sessionId, turnId: this.turnId, message,
           });
         });
-        const modelView = this.confirmedDeclarationView.project(messages, {
-          teamSessionId: this.sessionId, turnId: this.turnId, epoch: this.turnEpoch,
-          active: this.autonomousExecution && this.mode === "agent" && !this.disposed &&
-            !this.runCancelled && !this.gracefulStopRequested && !this.teamBudgetStop.requested,
-        });
+        const modelView = this.projectModelView(messages);
         return alignRetainedReasoningIdentity(
           convertToLlm(this.dropDuplicateToolCalls(modelView)), this.reasoningReplayIdentity(),
         );
@@ -2749,6 +2752,7 @@ export class DesktopAgentRuntime {
         clampThinkingLevel(config.provider, config.thinkingLevel) &&
       current === next &&
       safeJson(this.commandShell) === safeJson(config.commandShell) &&
+      safeJson(this.advisorProvider ?? null) === safeJson(config.advisorProvider ?? null) &&
       safeJson(this.baseProjectInstructions ?? null) ===
         safeJson(config.projectInstructions ?? null) &&
       // Editing SYSTEM.md / APPEND_SYSTEM.md retires the runtime so the next
@@ -4026,6 +4030,8 @@ export class DesktopAgentRuntime {
     const goalProgressTools = this.goalProgressManager
       ? [this.goalProgressManager.buildTool()]
       : [];
+    // The Advisor is a main-session tool; Team sessions keep their own tool sets.
+    const advisorTools = !isTeam && this.advisorProvider ? [this.buildAdvisorTool(this.advisorProvider)] : [];
     const memoryEpoch = this.turnEpoch;
     const projectTools = this.projectPath ? [
       createProjectHistoryTool(this.host, this.sessionId),
@@ -4064,6 +4070,7 @@ export class DesktopAgentRuntime {
       ...extensionTools,
       ...goalReportTools,
       ...goalProgressTools,
+      ...advisorTools,
     ];
   }
 
@@ -4203,6 +4210,7 @@ export class DesktopAgentRuntime {
   private isCoreTool(name: string): boolean {
     return (
       name === CONTEXT_COMPACTION_TOOL_NAME ||
+      name === ADVISOR_TOOL_NAME ||
       name === "ProjectHistory" || name === "CodeSearch" ||
       retainModeToolDeclaration(name) ||
       MODE_TRANSITION_TOOL_NAMES.has(name) ||
@@ -6288,6 +6296,31 @@ export class DesktopAgentRuntime {
   private applyProjectInstructions(resolved: ProjectInstructions | undefined): void {
     this.projectInstructions = resolved;
     this.setAgentSystemPrompt(this.composeSystemPrompt());
+  }
+
+  /** Confirmed-declaration view of `messages`, before provider conversion. */
+  private projectModelView(messages: AgentMessage[]): AgentMessage[] {
+    return this.confirmedDeclarationView.project(messages, {
+      teamSessionId: this.sessionId, turnId: this.turnId, epoch: this.turnEpoch,
+      active: this.autonomousExecution && this.mode === "agent" && !this.disposed &&
+        !this.runCancelled && !this.gracefulStopRequested && !this.teamBudgetStop.requested,
+    });
+  }
+
+  /**
+   * The Advisor reads the conversation the next request would carry, so its
+   * advice covers what the executor sees, including a checkpoint summary.
+   */
+  private buildAdvisorTool(provider: RuntimeProviderConfig): AgentTool {
+    return createAdvisorTool({
+      model: buildProviderModel(provider),
+      conversation: () => this.dropDuplicateToolCalls(this.projectModelView(this.agent.state.messages)),
+      advise: (request) => completeAdvisor(provider, request, {
+        sessionId: this.sessionId,
+        onUsage: (usage) => this.emit({ type: "usage", usage }, this.turnId),
+      }),
+      turnKey: () => this.turnEpoch,
+    });
   }
 
   /**
