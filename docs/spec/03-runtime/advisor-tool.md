@@ -100,9 +100,15 @@ it before acting.
 
 - The scenarios `E2E-ADVISOR-off-until-a-model-is-picked`,
   `E2E-ADVISOR-clear-row-returns-to-off`, and
-  `E2E-ADVISOR-stale-pin-keeps-the-session-running` are documented as Draft in
-  the [E2E test plan](../06-delivery/04-e2e-test-plan.md). They are not
-  implemented or run yet.
+  `E2E-ADVISOR-stale-pin-keeps-the-session-running` are automated in
+  `scripts/e2e-advisor.mjs` (`pnpm test:e2e:advisor`, nightly tier), as the
+  [E2E test plan](../06-delivery/04-e2e-test-plan.md) records. The run is
+  full-app Electron on a loopback fixture: the session provider and the advisor
+  pin are two endpoints on one server. It asserts that a session's requests
+  declare `Read` but never `Advisor` when no model is picked or the picked one
+  is unavailable, that no chat request reaches the advisor endpoint in any
+  scenario, that clearing the pin stores explicit `null`s that survive a
+  restart, and that the app log records `advisor model unavailable`.
 - Unit and integration coverage: `advisor-tool.test.ts`,
   `advisor-provider.test.ts`, and `fixed-tool-runtime.test.ts` in
   `packages/agent-runtime`; the configuration match in

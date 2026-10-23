@@ -495,6 +495,13 @@
       "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
     },
     {
+      "id": "advisor",
+      "family": "runtime-provider",
+      "script": "scripts/e2e-advisor.mjs",
+      "tier": "nightly",
+      "safety": "Fixture-only: one loopback server backs both provider endpoints, data and profile dirs are isolated under .artifacts, and no real provider or model is called."
+    },
+    {
       "id": "remote-host",
       "family": "sessions",
       "script": "scripts/e2e-remote-host.mjs",

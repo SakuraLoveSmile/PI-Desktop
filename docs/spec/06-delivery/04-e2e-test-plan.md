@@ -3127,7 +3127,7 @@ identify the platform validation still needed.
 - **Specs linked**: `03-runtime/advisor-tool.md`, `04-ux/06-settings-ia.md`
 - **Acceptance**: A (core shell)
 - **Milestone**: M4
-- **Status**: Draft
+- **Status**: Automated (`scripts/e2e-advisor.mjs`)
 
 #### E2E-ADVISOR-clear-row-returns-to-off
 
@@ -3137,17 +3137,17 @@ identify the platform validation still needed.
 - **Specs linked**: `03-runtime/advisor-tool.md`, `04-ux/06-settings-ia.md`
 - **Acceptance**: A (core shell)
 - **Milestone**: M4
-- **Status**: Draft
+- **Status**: Automated (`scripts/e2e-advisor.mjs`)
 
 #### E2E-ADVISOR-stale-pin-keeps-the-session-running
 
 - **Preconditions**: Advisor model picked from a provider, which is then disabled.
 - **Steps**: 1) Open Settings → AI and read the Advisor model row. 2) Start a main session and send one message.
-- **Expected**: The row keeps the pinned provider and model with an `Unavailable` note. The session answers normally with no `Advisor` tool row, and the host log records `advisor model unavailable`.
+- **Expected**: The row keeps the pinned provider and model with an `Unavailable` note. The session answers normally with no `Advisor` tool row, and the app log (`logs/app/session.log` under the data directory) records `advisor model unavailable`.
 - **Specs linked**: `03-runtime/advisor-tool.md`, `04-ux/06-settings-ia.md`
 - **Acceptance**: A (core shell)
 - **Milestone**: M4
-- **Status**: Draft
+- **Status**: Automated (`scripts/e2e-advisor.mjs`)
 
 #### E2E-SETTINGS-ai-tab-pickers-use-in-app-menus
 
