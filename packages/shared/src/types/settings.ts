@@ -91,11 +91,13 @@ export type AppSettings = {
   promptEnhancementThinkingLevel?: ThinkingLevel;
   /**
    * Model the Advisor tool consults (docs/spec/03-runtime/04-advisor-tool.md).
-   * Absent means the tool is off. When the pinned pair is unusable, a main
-   * session runs without the tool and logs why instead of failing to start.
+   * Absent or null means the tool is off; clearing writes null because
+   * settings.set merges, so a deleted key would keep the old pin. When the
+   * pinned pair is unusable, a main session runs without the tool and logs why
+   * instead of failing to start.
    */
-  advisorProviderId?: string;
-  advisorModelId?: string;
+  advisorProviderId?: string | null;
+  advisorModelId?: string | null;
   defaultPermissionMode?: GlobalPermissionMode;
   theme: ThemePreference;
   /** UI language; `auto` (and absent) follows the OS locale. */

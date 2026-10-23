@@ -60,6 +60,7 @@ import {
 import { AgentInstructionsSection, UpdatesRow } from "./agent-sections";
 import { ImportSection } from "./import-page";
 import { PromptEnhancementCard } from "./prompt-enhancement-card";
+import { AdvisorCard } from "./advisor-card";
 import { CloseBehaviorSection, DeveloperSection } from "./developer-sections";
 import { PluginScenicThemesDestination } from "../../components/settings/PluginScenicThemesDestination";
 import { ConfigSyncPage } from "../../components/settings/ConfigSyncPage";
@@ -620,6 +621,11 @@ export function SettingsPage() {
               </SettingsCard>
 
               <PromptEnhancementCard
+                settings={settings}
+                saveSettings={saveSettings}
+              />
+
+              <AdvisorCard
                 settings={settings}
                 saveSettings={saveSettings}
               />

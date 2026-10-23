@@ -1129,6 +1129,17 @@ mod tests {
             .starts_with("CONFIG_SYNC_DEPENDENCY: advisorProviderId"));
     }
 
+    #[test]
+    fn application_references_cleared_advisor_pin_as_no_dependency() {
+        let data_dir = tempfile::tempdir().expect("data directory");
+        let state = AppState::open(data_dir.path()).expect("state");
+        validate_application_references(
+            &state,
+            &json!({ "advisorProviderId": Value::Null, "advisorModelId": Value::Null }),
+        )
+        .expect("a cleared pin names no provider to resolve");
+    }
+
     fn pending_approvals(value: &Value) -> Vec<(String, String, String)> {
         value
             .get("pendingApprovals")

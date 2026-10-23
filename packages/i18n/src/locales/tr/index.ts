@@ -1785,6 +1785,11 @@ sklm: {
     promptEnhancementThinkingOff: "Kapalı (akıl yürütme yok)",
     promptEnhancementModelFollow: "Geçerli modeli izle",
     promptEnhancementModelUnavailable: "Kullanılamıyor — iyileştirme geçerli modele düşer",
+    advisorTitle: "Danışman",
+    advisorDesc: "Ana ajanın çalışırken ikinci bir modelden tavsiye almasını sağlar. Yalnızca ana oturumlarda. Şimdiye kadarki konuşma seçtiğiniz sağlayıcıya gönderilir.",
+    advisorModel: "Danışman modeli",
+    advisorModelOff: "Kapalı",
+    advisorModelUnavailable: "Kullanılamıyor. Başka bir model seçene kadar oturumlar danışmansız çalışır.",
     promptEnhancementUserTemplate: "Kullanıcı şablonu",
     promptEnhancementUserTemplateDesc:
       "Taslağı sarar. Taslak değişkenini içermelidir; ekleme düğmesini kullanın.",

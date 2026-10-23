@@ -1824,6 +1824,11 @@ sklm: {
     promptEnhancementThinkingOff: "關閉思考",
     promptEnhancementModelFollow: "跟隨目前模型",
     promptEnhancementModelUnavailable: "無法使用 — 增強時會回退到目前模型",
+    advisorTitle: "顧問",
+    advisorDesc: "讓主代理在工作時向第二個模型請教，僅用於主工作階段。截至目前的對話會傳送給你選擇的服務商。",
+    advisorModel: "顧問模型",
+    advisorModelOff: "關閉",
+    advisorModelUnavailable: "無法使用，重新選擇模型之前，工作階段會在沒有顧問的情況下執行。",
     promptEnhancementUserTemplate: "使用者範本",
     promptEnhancementUserTemplateDesc:
       "用於包裹草稿。必須包含草稿變數，請用插入按鈕寫入。",

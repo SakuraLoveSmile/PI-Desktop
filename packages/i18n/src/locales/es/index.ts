@@ -1780,6 +1780,11 @@ sklm: {
     "promptEnhancementModelFollow": "Seguir el modelo actual",
     "promptEnhancementModelUnavailable":
       "No disponible: la mejora usará el modelo actual",
+    "advisorTitle": "Asesor",
+    "advisorDesc": "Permite que el agente principal pida consejo a un segundo modelo mientras trabaja. Solo en sesiones principales. La conversación hasta ahora se envía al proveedor que elijas.",
+    "advisorModel": "Modelo asesor",
+    "advisorModelOff": "Desactivado",
+    "advisorModelUnavailable": "No disponible. Las sesiones se ejecutan sin asesor hasta que elijas otro modelo.",
     "promptEnhancementUserTemplate": "Plantilla de usuario",
     "promptEnhancementUserTemplateDesc":
       "Envuelve el borrador. Debe incluir la variable del borrador; use el botón de inserción.",

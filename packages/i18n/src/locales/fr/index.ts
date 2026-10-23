@@ -1779,6 +1779,11 @@ sklm: {
     "promptEnhancementModelFollow": "Suivre le modèle actuel",
     "promptEnhancementModelUnavailable":
       "Indisponible — l'amélioration utilisera le modèle actuel",
+    "advisorTitle": "Conseiller",
+    "advisorDesc": "Permet à l'agent principal de demander l'avis d'un second modèle pendant son travail. Sessions principales uniquement. La conversation en cours est envoyée au fournisseur choisi.",
+    "advisorModel": "Modèle conseiller",
+    "advisorModelOff": "Désactivé",
+    "advisorModelUnavailable": "Indisponible. Les sessions fonctionnent sans conseiller tant que vous ne choisissez pas un autre modèle.",
     "promptEnhancementUserTemplate": "Modèle utilisateur",
     "promptEnhancementUserTemplateDesc":
       "Encadre le brouillon. Doit contenir la variable de brouillon ; utilisez le bouton d'insertion.",
