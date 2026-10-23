@@ -49,18 +49,19 @@ Create the worktree from current remote `main`:
 
 ```bash
 git fetch origin main
+mkdir -p "/Users/sakurasep/Documents/Code/Project/Project Worktree/PI-Desktop"
 git worktree add \
   -b <type>/<short-description> \
-  <worktree-path> \
+  "/Users/sakurasep/Documents/Code/Project/Project Worktree/PI-Desktop/<short-description>" \
   origin/main
-cd <worktree-path>
+cd "/Users/sakurasep/Documents/Code/Project/Project Worktree/PI-Desktop/<short-description>"
 ```
 
-All new worktrees, including subagent and temporary validation/integration
-worktrees, go under `/Users/sakurasep/Documents/Code/Project/Project Worktree/PI-Desktop/<short-description>/`.
-Inspect `git status --short --branch` and `git worktree list` before creating
-one. If the tool cannot select that location, use `git worktree add` with the
-quoted absolute path.
+Every new worktree, including subagent and temporary validation or integration
+worktrees, must use this central location. Do not use sibling, in-repository,
+or tool-default directories. Inspect the working state, `git worktree list`,
+and task ownership before creation. If a tool cannot select the location, use
+`git worktree add` with a quoted absolute path.
 
 Branch names: `feat/...`, `fix/...`, `docs/...`, `refactor/...`, `chore/...`.
 
@@ -119,9 +120,13 @@ and safely synchronizes local `main`.
 - Archive dirty/untracked work and needed ignored packages, screenshots and
   configuration recoverably before removal; do not discard unsaved data or
   force-delete an unmerged branch.
+- Verify no running task, service, or needed path reference still uses the
+  checkout; retain it and report the exact blocker if it remains in use.
 - Remove/archive request-owned worktrees, prune stale registrations, and remove
   empty parent directories only when they contain no other data beyond name
   markers. Prefer the managed archive operation for managed worktrees.
+  Run removal from outside the checkout and preserve the shared worktree root,
+  other tasks, and recovery archives.
 - Delete verified merged task/obsolete integration branches.
   Do not keep backup snapshots as normal local branches. Preserve backup
   commits through archive refs outside `refs/heads/` or verified backup files

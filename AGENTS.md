@@ -206,16 +206,13 @@ Every development request uses:
 The primary checkout and local `main` are coordination surfaces, not
 development workspaces.
 
-Create every new worktree, including subagent and temporary integration or
-validation worktrees, under:
-
-```text
-/Users/sakurasep/Documents/Code/Project/Project Worktree/PI-Desktop/<short-description>/
-```
-
-Before creating one, inspect `git status --short --branch` and `git worktree
-list` and confirm task ownership. If the worktree tool cannot select this
-location, use `git worktree add` with the quoted absolute path.
+Create every new worktree, including subagent and temporary validation or
+integration worktrees, under
+`/Users/sakurasep/Documents/Code/Project/Project Worktree/PI-Desktop/<short-description>/`.
+Do not use sibling, in-repository, or tool-default directories. Inspect
+`git status --short --branch`, `git worktree list`, and task ownership first.
+If a tool cannot select this location, use `git worktree add` with a quoted
+absolute path instead.
 
 ### Never
 
@@ -236,12 +233,13 @@ location, use `git worktree add` with the quoted absolute path.
 ```bash
 git fetch origin main
 
+mkdir -p "/Users/sakurasep/Documents/Code/Project/Project Worktree/PI-Desktop"
 git worktree add \
   -b <type>/<short-description> \
-  <worktree-path> \
+  "/Users/sakurasep/Documents/Code/Project/Project Worktree/PI-Desktop/<short-description>" \
   origin/main
 
-cd <worktree-path>
+cd "/Users/sakurasep/Documents/Code/Project/Project Worktree/PI-Desktop/<short-description>"
 ```
 
 All implementation, targeted validation, conflict resolution, and
@@ -362,11 +360,15 @@ push, remote-branch deletion, or removal of another task's resources.
 2. Before removal, preserve any remaining dirty/untracked work and needed
    ignored artifacts (packages, screenshots, local configuration) in a
    verified, recoverable archive. Do not discard unsaved data or force-delete
-   an unmerged branch to make cleanup pass.
+   an unmerged branch to make cleanup pass. Verify no running task, service,
+   or needed path reference still uses the checkout; if it remains in use,
+   retain it and report the exact blocker.
 3. Remove or archive all worktrees owned by this request, prune stale Git
    registrations, and remove their empty container directories only after
    verifying they contain no other files beyond worktree-name markers. Use
    the managed archive operation for managed worktrees when available.
+   Run removal from outside the checkout and preserve the shared worktree
+   root, other tasks, and recovery archives.
 4. Delete the verified merged task branch and obsolete integration branches.
    Do not keep backup snapshots as normal local branches. Store recovery
    snapshots in archive refs (outside `refs/heads/`) or verified backup files,

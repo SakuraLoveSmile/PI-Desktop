@@ -68,6 +68,10 @@ Before editing any file for a new request:
   worktree is clean.
 - [ ] A dedicated `<type>/<short-description>` request branch and worktree are
   created from that updated `main` commit.
+- [ ] The worktree is under
+  `/Users/sakurasep/Documents/Code/Project/Project Worktree/PI-Desktop/<short-description>/`,
+  including subagent and temporary validation or integration worktrees.
+  Working state, registered worktrees, and task ownership were checked first.
 - [ ] The request worktree reuses the primary checkout's host toolchains,
   compatible dependency tree, package stores, caches, and ignored local
   configuration where safe; no separate environment is installed for E2E.
@@ -204,8 +208,11 @@ merge happened remotely via PR/MR or locally in the primary checkout:
   when remote delivery was requested.
 - [ ] Before direct removal, the request worktree is clean; otherwise a
   verified recoverable archive preserves all remaining request contents.
+- [ ] No running task, service, or needed path reference still uses the
+  checkout; a retained checkout is reported by exact path and blocker.
 - [ ] `git worktree remove <worktree-path>` succeeded without forcing, or the
-  managed archive operation completed and the old checkout is absent.
+  managed archive operation completed and the old checkout is absent. Removal
+  ran outside the checkout and preserved the shared worktree root and archives.
 - [ ] `git branch -d <type>/<short-description>` succeeded (no `-D` fallback on
   an unmerged branch).
 - [ ] `git worktree prune` leaves `git worktree list` free of stale entries for

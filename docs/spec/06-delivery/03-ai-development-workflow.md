@@ -52,6 +52,12 @@ The rules below govern every change to the PI-Desktop codebase and documentation
   `docs/request-branch-workflow`.
 - Use one dedicated worktree per request. Do not implement a new request in the
   primary checkout or reuse another request's worktree.
+- All new worktrees, including subagent and temporary validation or integration
+  worktrees, belong under
+  `/Users/sakurasep/Documents/Code/Project/Project Worktree/PI-Desktop/<short-description>/`.
+  Inspect working state, `git worktree list`, and task ownership first. Use a
+  quoted absolute path with `git worktree add` when tooling cannot select this
+  location; do not use sibling, in-repository, or tool-default directories.
 - Reuse the primary checkout's development environment where safe: installed
   toolchains, package-manager stores, build caches, and ignored local
   environment configuration remain the canonical environment. Reference or
@@ -93,8 +99,11 @@ The rules below govern every change to the PI-Desktop codebase and documentation
   checks, automatically clean this request's worktrees and merged branches in
   the same task; no separate cleanup approval is needed for its own resources.
   Preserve dirty/untracked contents and needed ignored artifacts in verified
-  recovery archives first. Prune registrations and retire empty parent/name
-  marker containers, obsolete integration branches and visible snapshot branches.
+  recovery archives first. Verify no running task, service, or needed path
+  reference still uses the checkout; retain it and report the exact blocker
+  when it remains in use. Remove from outside the checkout, preserve the shared
+  worktree root, and prune registrations and retire empty parent/name marker
+  containers, obsolete integration branches and visible snapshot branches.
   Backup commits belong in archive refs outside `refs/heads/` or verified files.
   Check Git worktrees, local branches and physical paths, and report any blocker
   by its exact path/ref. Preserve the primary checkout, active/unmerged work,
