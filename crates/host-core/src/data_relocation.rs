@@ -2,12 +2,17 @@
 //! The source remains untouched. No schema migration, recovery, or sweep runs.
 
 use anyhow::{bail, Context, Result};
-use rusqlite::{params, Connection, OpenFlags};
+use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::fs::{self, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Component, Path, PathBuf};
 
+#[cfg(test)]
+mod git_memory_tests;
+#[cfg(test)]
+mod project_memory_tests;
 #[cfg(test)]
 mod tests;
 
@@ -50,6 +55,41 @@ impl Roots {
         };
         *value = Value::String(next);
         true
+    }
+
+    fn memory_source(&self, owner: &str) -> Option<String> {
+        owner
+            .strip_prefix("path:")
+            .and_then(|path| self.remap(path))
+            .map(|path| format!("path:{path}"))
+    }
+
+    fn memory_space(&self, value: &mut Value) -> bool {
+        let Some(object) = value.as_object_mut() else {
+            return false;
+        };
+        let mut changed = false;
+        for key in ["primaryPath", "gitCommonDir"] {
+            if let Some(path) = object.get_mut(key) {
+                changed |= self.string(path);
+            }
+        }
+        if let Some(Value::Array(paths)) = object.get_mut("paths") {
+            for path in paths {
+                changed |= self.string(path);
+            }
+        }
+        if let Some(Value::Array(sources)) = object.get_mut("importedSources") {
+            for source in sources {
+                if let Some(next) = source.as_str().and_then(|owner| self.memory_source(owner)) {
+                    *source = Value::String(next);
+                    changed = true;
+                }
+            }
+        }
+        // Path projection grants no Git authority. Verified-copy identity
+        // rebinding is handled separately inside the database transaction.
+        changed
     }
 
     fn structured(&self, value: &mut Value) -> bool {
@@ -320,6 +360,150 @@ fn column_exists(connection: &Connection, table: &str, column: &str) -> Result<b
     Ok(false)
 }
 
+/// The cold migration caller verified the entire copy before invoking us. This
+/// is the only point where copied filesystem evidence may retain a memory UUID;
+/// ordinary checkout discovery must continue requiring its own physical identity.
+fn rebind_copied_memory_repository(
+    connection: &Connection,
+    roots: &Roots,
+    space_id: &str,
+    value: &mut Value,
+) -> Result<bool> {
+    let Some(identity) = value.get("repositoryIdentity").and_then(Value::as_str) else {
+        return Ok(false);
+    };
+    let identity = identity.to_owned();
+    let mut known: Vec<_> = value
+        .get("verifiedRepositoryIdentities")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(str::to_owned)
+        .collect();
+    if !identity.starts_with("explicit-group:") {
+        known.push(identity.clone());
+    }
+    if known.is_empty() {
+        return Ok(false);
+    }
+    let mut directories: Vec<PathBuf> = value
+        .get("gitCommonDir")
+        .and_then(Value::as_str)
+        .filter(|path| !path.is_empty())
+        .map(PathBuf::from)
+        .into_iter()
+        .collect();
+    if let Some(paths) = value.get("paths").and_then(Value::as_array) {
+        directories.extend(
+            paths
+                .iter()
+                .filter_map(Value::as_str)
+                .map(|path| Path::new(path).join(".git")),
+        );
+    }
+    directories.sort();
+    directories.dedup();
+    let mut replacements = Vec::new();
+    for directory in directories {
+        let Some(moved) = directory.to_str().and_then(|path| roots.remap(path)) else {
+            continue;
+        };
+        match fs::symlink_metadata(&directory) {
+            Ok(metadata) if metadata.file_type().is_symlink() => continue,
+            Ok(metadata)
+                if metadata.is_file()
+                    && directory.file_name().is_some_and(|name| name == ".git") =>
+            {
+                bail!("profile relocation cannot preserve linked Git worktrees; keep the original profile and move or repair the worktrees first");
+            }
+            Ok(metadata) if metadata.is_dir() => {}
+            Ok(_) => bail!("copied Git memory metadata is not a directory"),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(error) => return Err(error.into()),
+        }
+        let original = directory.canonicalize()?;
+        let relative = original
+            .strip_prefix(&roots.canonical_source)
+            .context("copied Git memory directory escapes the source profile")?;
+        let Some(old_identity) =
+            crate::project_memory_owner::directory_identity(&original, &fs::metadata(&original)?)
+        else {
+            bail!("source Git memory identity is unavailable");
+        };
+        // A historical space may describe a repository since replaced at this
+        // path. Its copy must never become authority for that old collection.
+        if !known.contains(&old_identity) {
+            continue;
+        }
+        let worktrees = original.join("worktrees");
+        if regular_directory(&worktrees)? && fs::read_dir(worktrees)?.next().transpose()?.is_some()
+        {
+            bail!("profile relocation cannot preserve linked Git worktrees; keep the original profile and move or repair the worktrees first");
+        }
+        let moved = Path::new(&moved);
+        if !regular_directory(moved)? {
+            bail!("copied Git memory directory is missing");
+        }
+        let moved_canonical = moved.canonicalize()?;
+        if moved_canonical != roots.destination.canonicalize()?.join(relative) {
+            bail!("copied Git memory directory does not match the verified profile copy");
+        }
+        let Some(new_identity) = crate::project_memory_owner::directory_identity(
+            &moved_canonical,
+            &fs::metadata(&moved_canonical)?,
+        ) else {
+            bail!("copied Git memory identity is unavailable");
+        };
+        if old_identity != new_identity {
+            replacements.push((old_identity, new_identity));
+        }
+    }
+    let mut changed = false;
+    if let Some((_, next)) = replacements.iter().find(|(old, _)| old == &identity) {
+        let old_key = hex::encode(Sha256::digest(identity.as_bytes()));
+        let next_key = hex::encode(Sha256::digest(next.as_bytes()));
+        let indexed: Option<String> = connection
+            .query_row(
+                "SELECT value_json FROM kv WHERE ns='projectMemoryRepositories/v1' AND key=?1",
+                [&old_key],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if indexed
+            .as_deref()
+            .map(serde_json::from_str::<Value>)
+            .transpose()?
+            != Some(Value::String(space_id.to_owned()))
+        {
+            bail!("copied Git memory repository index does not match its space");
+        }
+        // UPDATE retains the timestamp, rejects collisions, and removes the old
+        // physical index so the retained backup cannot automatically rejoin.
+        connection.execute(
+            "UPDATE kv SET key=?1 WHERE ns='projectMemoryRepositories/v1' AND key=?2",
+            params![next_key, old_key],
+        )?;
+        value["repositoryIdentity"] = Value::String(next.clone());
+        changed = true;
+    }
+    if let Some(evidence) = value
+        .get_mut("verifiedRepositoryIdentities")
+        .and_then(Value::as_array_mut)
+    {
+        for identity in evidence {
+            if let Some((_, next)) = replacements
+                .iter()
+                .find(|(old, _)| identity.as_str() == Some(old))
+            {
+                *identity = Value::String(next.clone());
+                changed = true;
+            }
+        }
+    }
+    Ok(changed)
+}
+
 fn relocate_database(roots: &Roots) -> Result<()> {
     let path = roots.destination.join("pi.sqlite");
     if !regular_file(&path)? {
@@ -367,7 +551,7 @@ fn relocate_database(roots: &Roots) -> Result<()> {
     }
     if column_exists(&transaction, "kv", "value_json")? {
         let rows = {
-            let mut statement = transaction.prepare("SELECT ns, key, value_json FROM kv WHERE ns IN ('app','ui','projectGroups','projectMemory','projectInstructions','projectAutoMemory')")?;
+            let mut statement = transaction.prepare("SELECT ns, key, value_json FROM kv WHERE ns IN ('app','ui','projectGroups','projectMemory','projectInstructions','projectAutoMemory','projectMemorySpaces/v1','projectMemoryCheckouts/v1','projectMemoryRevokedCheckouts/v1','projectMemoryImportedSources/v1')")?;
             let rows = statement
                 .query_map([], |row| {
                     Ok((
@@ -380,14 +564,19 @@ fn relocate_database(roots: &Roots) -> Result<()> {
             rows
         };
         for (namespace, key, text) in rows {
-            let next_key = if matches!(namespace.as_str(), "projectMemory" | "projectInstructions")
-            {
+            let next_key = if matches!(
+                namespace.as_str(),
+                "projectMemory"
+                    | "projectInstructions"
+                    | "projectMemoryCheckouts/v1"
+                    | "projectMemoryRevokedCheckouts/v1"
+            ) {
                 roots.remap(&key).unwrap_or_else(|| key.clone())
-            } else if namespace == "projectAutoMemory" {
-                key.strip_prefix("path:")
-                    .and_then(|path| roots.remap(path))
-                    .map(|path| format!("path:{path}"))
-                    .unwrap_or_else(|| key.clone())
+            } else if matches!(
+                namespace.as_str(),
+                "projectAutoMemory" | "projectMemoryImportedSources/v1"
+            ) {
+                roots.memory_source(&key).unwrap_or_else(|| key.clone())
             } else {
                 key.clone()
             };
@@ -397,6 +586,10 @@ fn relocate_database(roots: &Roots) -> Result<()> {
                 roots.string(&mut value)
             } else if matches!(namespace.as_str(), "app" | "ui" | "projectGroups") {
                 roots.structured(&mut value)
+            } else if namespace == "projectMemorySpaces/v1" {
+                let rebound =
+                    rebind_copied_memory_repository(&transaction, roots, &key, &mut value)?;
+                roots.memory_space(&mut value) | rebound
             } else {
                 false
             };

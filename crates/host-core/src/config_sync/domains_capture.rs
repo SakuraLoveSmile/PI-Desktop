@@ -362,68 +362,6 @@ pub(crate) fn capture_projects(
     Ok(result)
 }
 
-pub(crate) fn capture_memory(
-    st: &mut AppState,
-    identities: &ProjectIdentityOverrides,
-) -> Result<Vec<PortableEntity>> {
-    let mut result = Vec::new();
-    for project in st.db.list_projects()? {
-        let memory = st.db.get_project_memory(&project.path)?;
-        if memory.content.trim().is_empty() && memory.entries.is_none() {
-            continue;
-        }
-        let project_name = project.name.clone();
-        let (project_id, group_id, root_position) = project_scope(st, &project.path, identities)?;
-        let mut payload = json!({
-            "projectLogicalId": project_id.clone(),
-            "memory": memory,
-        });
-        if let Some(object) = payload.as_object_mut() {
-            if let Some(group_id) = group_id {
-                object.insert("projectGroupLogicalId".into(), Value::String(group_id));
-            }
-            if let Some(position) = root_position {
-                object.insert("projectRootPosition".into(), json!(position));
-            }
-        }
-        result.push(entity(
-            DOMAIN_MEMORY,
-            format!("memory:{project_id}"),
-            project_name,
-            payload,
-            false,
-            true,
-            true,
-            Vec::new(),
-        ));
-    }
-    for group in st.db.list_project_groups()? {
-        if group.legacy {
-            continue;
-        }
-        let memory = st.db.get_project_group_memory(&group.id)?;
-        if memory.content.trim().is_empty() && memory.entries.is_none() {
-            continue;
-        }
-        let logical_id = project_group_logical_id(st, &group)?;
-        result.push(entity(
-            DOMAIN_MEMORY,
-            format!("memory:{logical_id}"),
-            group.name.clone(),
-            json!({
-                "projectGroupLogicalId": logical_id,
-                "projectGroupName": group.name,
-                "memory": memory,
-            }),
-            false,
-            true,
-            true,
-            Vec::new(),
-        ));
-    }
-    Ok(result)
-}
-
 pub(crate) fn capture_instructions(
     st: &mut AppState,
     identities: &ProjectIdentityOverrides,

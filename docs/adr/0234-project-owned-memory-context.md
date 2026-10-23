@@ -1,6 +1,6 @@
 # ADR 0234: Keep project memory host-owned and path-scoped
 
-- Status: Accepted
+- Status: Accepted (amended 2026-10-23)
 - Date: 2026-09-12
 - Deciders: PI-Desktop maintainers
 
@@ -58,3 +58,18 @@ its unified collection and opt-in design. Workspace cache design references
 PR #697 by muzimu217 (`ceb8908dac02794f2d071e720ea74ce26a60a014`); this version
 adds a separate literal CodeSearch tool and does not take over Grep's results
 or claim the upstream feature was merged.
+
+## Worktree amendment: stable memory spaces
+
+[Stable project memory spaces](worktree-project-memory-spaces.md) amend the
+original path-scoped ownership decision. Verified checkouts use a Host-generated
+UUID and `memory:<uuid>` owner, with one shared collection and opt-in preference.
+Explicit multi-root groups remain stable logical boundaries, including Git and
+non-Git roots; different explicit groups are not automatically combined.
+
+Old path/group source collections remain intact and readable for recovery.
+Imports preserve differing notes and source attribution without truncation. A
+combined value over 32 KiB leaves the sources unchanged, pauses recording and
+exposes a manual snapshot-CAS recovery editor. An empty shared collection does
+not resurrect old source notes. Generic worktree sharing changes memory only;
+tool roots and instruction chains remain bound to the actual checkout.

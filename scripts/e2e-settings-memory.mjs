@@ -13,7 +13,7 @@ const { build } = createRequire(new URL('../packages/agent-runtime/package.json'
 const temporary = await mkdtemp(join(tmpdir(), 'pi-settings-memory-'));
 try {
   await build({ entryPoints: [join(root, 'apps/desktop/test/fixtures/settings-memory.jsx')], outfile: join(temporary, 'fixture.js'),
-    bundle: true, format: 'esm', platform: 'browser', jsx: 'automatic',
+    bundle: true, format: 'esm', platform: 'browser', jsx: 'automatic', loader: { '.png': 'dataurl' },
     alias: { '@pi-desktop/i18n': join(root, 'packages/i18n/src'),
       '@pi-desktop/shared': join(root, 'packages/shared/src') },
     define: { 'import.meta.env.DEV': 'false', 'process.env.NODE_ENV': '"development"' },
@@ -56,19 +56,24 @@ try {
   try {
     if (process.argv.includes('--serve')) {
       console.log(`SETTINGS_MEMORY_FIXTURE_URL http://127.0.0.1:${server.address().port}`);
+      console.log(`WORKSPACE_MEMORY_FIXTURE_URL http://127.0.0.1:${server.address().port}/?mode=workspace`);
       await new Promise(resolvePromise => {
         process.once('SIGINT', resolvePromise);
         process.once('SIGTERM', resolvePromise);
       });
     } else {
-    const environment = { ...process.env, PI_SETTINGS_MEMORY_FIXTURE_URL: `http://127.0.0.1:${server.address().port}` };
-    delete environment.ELECTRON_RUN_AS_NODE;
-    const child = spawn(resolveElectronBinary(root).electronBinary,
-      [`--user-data-dir=${join(temporary, 'profile')}`, join(root, 'apps/desktop/test/fixtures/settings-memory-runner.cjs')],
-      { env: environment, windowsHide: true, stdio: 'inherit' });
-    process.exitCode = await new Promise((resolvePromise, reject) => {
-      child.once('exit', (code) => resolvePromise(code ?? 1)); child.once('error', reject);
-    });
+      for (const mode of process.argv.includes('--workspace') ? ['workspace'] : ['settings', 'workspace']) {
+        const environment = { ...process.env, PI_SETTINGS_MEMORY_FIXTURE_URL:
+          `http://127.0.0.1:${server.address().port}/${mode === 'workspace' ? '?mode=workspace' : ''}` };
+        delete environment.ELECTRON_RUN_AS_NODE;
+        const child = spawn(resolveElectronBinary(root).electronBinary,
+          [`--user-data-dir=${join(temporary, `profile-${mode}`)}`, join(root, 'apps/desktop/test/fixtures/settings-memory-runner.cjs')],
+          { env: environment, windowsHide: true, stdio: 'inherit' });
+        process.exitCode = await new Promise((resolvePromise, reject) => {
+          child.once('exit', (code) => resolvePromise(code ?? 1)); child.once('error', reject);
+        });
+        if (process.exitCode !== 0) break;
+      }
     }
   } finally {
     server.closeAllConnections();

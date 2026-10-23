@@ -54,6 +54,17 @@ project; project-group roots derive identities from the group identity and
 ordered root position. A device mapping overlays the received logical ID onto
 its local folder, so different absolute paths do not create duplicate
 entities.
+
+Optional project-memory sync keeps the existing portable schema. A shared
+worktree memory collection is captured once per local memory space, using the
+existing portable project/group scope and any current folder mapping. Capture
+reads the shared content rather than preserved legacy source collections.
+Import and deletion tombstones route through an already associated mapped
+folder to that local shared collection; unassociated projects retain the legacy
+adapter behavior. Memory-space UUIDs, repository identities, checkout and session
+bindings, and the automatic-recording opt-in remain device-local. Sync neither
+exports them nor infers cross-device repository associations from them.
+
 Incoming project-scoped executable content stays staged until a local folder
 mapping and approval exist. No local path is written into the encrypted
 portable entity payload. Plugin data that has no supported adapter is reported

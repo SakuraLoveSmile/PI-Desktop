@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Policy-Sync: 2026-10-10.1
+Policy-Sync: 2026-10-22.1
 
 Instructions for Claude Code CLI and Claude Cowork on PI-Desktop.
 
@@ -56,7 +56,11 @@ git worktree add \
 cd <worktree-path>
 ```
 
-Suggested worktree path: `../PI-Desktop-worktrees/<short-description>`.
+All new worktrees, including subagent and temporary validation/integration
+worktrees, go under `/Users/sakurasep/Documents/Code/Project/Project Worktree/PI-Desktop/<short-description>/`.
+Inspect `git status --short --branch` and `git worktree list` before creating
+one. If the tool cannot select that location, use `git worktree add` with the
+quoted absolute path.
 
 Branch names: `feat/...`, `fix/...`, `docs/...`, `refactor/...`, `chore/...`.
 
@@ -67,7 +71,7 @@ Branch names: `feat/...`, `fix/...`, `docs/...`, `refactor/...`, `chore/...`.
 2. implement in the worktree
 3. targeted static/unit/integration checks
 4. review the full diff
-5. commit
+5. commit only when the user explicitly requests it
 6. fetch + rebase/refresh against latest origin/main (private branch)
 7. resolve conflicts in the worktree
 8. task-candidate E2E in the same worktree

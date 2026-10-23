@@ -5,6 +5,7 @@ export const esEntries: ChangelogEntry[] = [
     "version": "0.16.1",
     "date": "2026-10-04",
     "highlights": [
+      "La memoria del proyecto y sus conversaciones se comparten entre worktrees de Git verificados; el acceso a archivos sigue limitado al checkout real y los slots reutilizados permanecen aislados.",
       "Elige una ubicación personalizada de datos en Ajustes, sigue una migración en frío verificada y limpia solo las cachés que se pueden reconstruir.",
       "Las tareas programadas pueden ejecutarse por intervalos: cada 5 minutos hasta 24 horas, contados desde que la tarea se activó.",
       "La página de tareas programadas empareja la lista de tareas con la tarea seleccionada: su último resultado, la próxima ejecución, la instrucción y el historial de ejecuciones.",

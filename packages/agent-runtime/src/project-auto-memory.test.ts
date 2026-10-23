@@ -9,7 +9,7 @@ import { DesktopAgentRuntime, type AgentRuntimeOptions } from "./runtime.js";
 const runtimes: DesktopAgentRuntime[] = [];
 afterEach(async () => { await Promise.all(runtimes.splice(0).map(runtime => runtime.dispose())); });
 
-function fixture(options: { mode?: Mode; projectPath?: string; host?: RuntimeHost; memoryAlias?: ProjectMemoryAlias } = {}) {
+function fixture(options: { mode?: Mode; projectPath?: string; sessionId?: string; host?: RuntimeHost; memoryAlias?: ProjectMemoryAlias } = {}) {
   let enabled = true;
   let failReads = false;
   let entries: ProjectMemoryEntry[] = [{ id: "style", title: "Style", content: "Prefer concise replies." }];
@@ -37,7 +37,7 @@ function fixture(options: { mode?: Mode; projectPath?: string; host?: RuntimeHos
   });
   const host: RuntimeHost = options.host ?? { call: <T>(method: string, params?: unknown) => call(method, params as Record<string, unknown>) as Promise<T> };
   const runtimeOptions: AgentRuntimeOptions = {
-    host, sessionId: "real-session", mode: options.mode ?? "agent", projectPath: options.projectPath ?? "/fixture/project",
+    host, sessionId: options.sessionId ?? "real-session", mode: options.mode ?? "agent", projectPath: options.projectPath ?? "/fixture/project",
     projectMemory: "Stale launch note.", thinkingLevel: "off",
     projectInstructions: { entries: [{ source: "AGENTS.md", content: "Slot file instructions." }] },
     projectMemoryAlias: options.memoryAlias,
@@ -71,6 +71,51 @@ function fixture(options: { mode?: Mode; projectPath?: string; host?: RuntimeHos
 }
 
 describe("automatic project memory user path", () => {
+  it("writes a sourced decision from one checkout and recalls it in another without moving either workspace", async () => {
+    let enabled = true;
+    let entries: ProjectMemoryEntry[] = [];
+    const memory = () => ({ content: entries.map(entry => `${entry.title}\n${entry.content}`).join("\n\n"), entries: [...entries] });
+    const state = (): ProjectMemoryRuntimeState => ({ memory: memory(), autoRecordEnabled: enabled,
+      memoryAlias: { memory: memory(), instructions: "Shared project rules." } });
+    const call = vi.fn(async (method: string, params?: Record<string, unknown>) => {
+      if (method === "project.autoMemory.agentList") return state();
+      if (method === "project.autoMemory.agentUpsert") {
+        if (!enabled) throw new Error("recording disabled");
+        entries.push({ id: "decision", title: String(params?.title), content: String(params?.content) });
+        return state();
+      }
+      return {};
+    });
+    const host: RuntimeHost = { call: <T>(method: string, params?: unknown) => call(method, params as Record<string, unknown>) as Promise<T> };
+    const first = fixture({ host, sessionId: "checkout-session", projectPath: "/fixture/worktrees/feature", memoryAlias: state().memoryAlias });
+    const source = "Use pnpm. Verified in package.json at merged commit abc123; source session checkout-session.";
+    first.responses.push([{ type: "toolCall", id: "decision", name: "ProjectMemory", arguments: { action: "upsert", title: "Package manager", content: source } }]);
+    await first.runtime.prompt("Save the verified package manager decision with its source.");
+    expect(call).toHaveBeenCalledWith("project.autoMemory.agentUpsert", expect.objectContaining({ sessionId: "checkout-session", content: source }));
+    expect(first.requests[0].prompt).toContain("verified technical conclusions");
+    expect(first.requests[0].prompt).toContain("unmerged experiments");
+    expect(first.requests[0].prompt).toContain("source session and commit");
+    expect(first.requests[0].prompt).toContain("Slot file instructions.");
+    const retained = first.probe.agent.state.tools.find(tool => tool.name === "ProjectMemory")!;
+
+    const second = fixture({ host, mode: "plan", sessionId: "review-session", projectPath: "/fixture/pool/repo/slot-3", memoryAlias: state().memoryAlias });
+    await second.runtime.prompt("Recall the package manager decision.");
+    expect(second.requests[0].prompt).toContain(source);
+    expect(second.requests[0].prompt).toContain("Shared project rules.");
+    expect(second.requests[0].prompt).not.toContain("# Updating project memory");
+    expect(second.probe.agent.state.tools.some(tool => tool.name === "ProjectMemory")).toBe(false);
+    expect(first.runtimeOptions.projectPath).toBe("/fixture/worktrees/feature");
+    expect(second.runtimeOptions.projectPath).toBe("/fixture/pool/repo/slot-3");
+    expect(call).toHaveBeenCalledWith("project.autoMemory.agentList", { sessionId: "review-session" });
+
+    enabled = false;
+    await first.runtime.prompt("Read the decision after recording was disabled.");
+    expect(first.requests.at(-1)?.prompt).toContain(source);
+    expect(first.requests.at(-1)?.tools).not.toContain("ProjectMemory");
+    await expect(retained.execute("revoked", { action: "upsert", content: "Late note" })).rejects.toThrow("no longer active");
+    expect(call.mock.calls.filter(([method]) => method === "project.autoMemory.agentUpsert")).toHaveLength(1);
+  });
+
   it("retires a runtime when its launch alias instructions change", () => {
     const memoryAlias = { memory: { content: "Owner notes.", entries: [] }, instructions: "Original owner rules." };
     const f = fixture({ memoryAlias });
@@ -251,6 +296,18 @@ describe("automatic project memory user path", () => {
 });
 
 describe("project memory tool boundary", () => {
+  it.each([false, true])("returns authoritative alias entries, including an empty shared collection (%s)", async empty => {
+    const old = { id: "slot", title: "Old slot", content: "An unrelated slot note." };
+    const shared = { id: "shared", title: "Project decision", content: "Verified project convention." };
+    const call = vi.fn(async () => ({
+      memory: { content: old.content, entries: [old] }, autoRecordEnabled: true,
+      memoryAlias: { memory: { content: empty ? "" : shared.content, entries: empty ? [] : [shared] }, instructions: "" },
+    }));
+    const tool = createAutoMemoryTool({ call: <T>() => call() as Promise<T> }, "checkout-session");
+    const result = await tool.execute("shared-read", { action: "list" });
+    expect(result.content).toEqual([{ type: "text", text: JSON.stringify(empty ? [] : [shared]) }]);
+  });
+
   it("captures session id and requires entry snapshots for updates and deletes", async () => {
     const call = vi.fn(async (_method: string, _params?: unknown) => ({ memory: { content: "", entries: [] }, autoRecordEnabled: true }));
     const tool = createAutoMemoryTool({ call: <T>(method: string, params?: unknown) => call(method, params) as Promise<T> }, "real-session");

@@ -10,12 +10,12 @@ function newCard(): EditorCard {
 }
 
 export function useProjectMemoryEditor(
-  project: { path: string; groupId?: string; legacy?: boolean },
+  project: { path: string; groupId?: string; legacy?: boolean; memoryOwner?: string },
   onSaved: () => void,
   onError: (error: unknown) => void,
 ) {
   const projectPath = project.path;
-  const scope = JSON.stringify([project.path, project.groupId, project.legacy]);
+  const scope = JSON.stringify([project.path, project.groupId, project.legacy, project.memoryOwner]);
   const [failure, setFailure] = useState<MemoryEditorFailure | null>(null);
   const callbacks = useRef({ onSaved, onError });
   callbacks.current = { onSaved, onError };
@@ -32,7 +32,8 @@ export function useProjectMemoryEditor(
   currentScope.current = scope;
 
   const checkOwner = (result: ProjectMemoryEditor) => {
-    if (project.groupId && !project.legacy && result.owner !== `group:${project.groupId}`) {
+    const expected = project.memoryOwner ?? (project.groupId && !project.legacy ? `group:${project.groupId}` : undefined);
+    if (expected && result.owner !== expected) {
       throw Object.assign(new Error("Project memory owner changed; refresh the project list"), {
         code: "PROJECT_CHANGED",
       });

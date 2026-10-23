@@ -5,6 +5,7 @@ export const trEntries: ChangelogEntry[] = [
     "version": "0.16.1",
     "date": "2026-10-04",
     "highlights": [
+      "Doğrulanmış Git worktree alanları proje belleğini ve ilgili sohbetleri paylaşır; dosya erişimi gerçek checkout ile sınırlı kalır ve yeniden kullanılan yuvalar yalıtılır.",
       "Ayarlar'dan özel bir veri konumu seçin, doğrulanmış soğuk taşımayı izleyin ve yalnızca yeniden oluşturulabilir önbellekleri temizleyin.",
       "Zamanlanmış görevler aralık temposunda çalışabilir: görev kurulduktan sonra 5 dakikadan 24 saate kadar.",
       "Zamanlanmış sayfası görev listesini seçili görevle birlikte sunar: son sonucu, sonraki çalışmayı, talimatı ve çalışma geçmişini.",
