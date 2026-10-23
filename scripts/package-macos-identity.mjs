@@ -32,6 +32,9 @@ import { existsSync, readdirSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { shouldUseSecureTimestamp } from "./macos-signing-policy.mjs";
+import { requireCloudPackageBuild } from "./require-cloud-build.mjs";
+
+requireCloudPackageBuild();
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const desktopRoot = join(repoRoot, "apps", "desktop");
@@ -156,14 +159,8 @@ const electronDist = resolveElectronDist();
 const flags = [`-c.electronDist=${electronDist}`, `-c.afterPack=${gate}`];
 
 /*
-  Local macOS builds sign without a secure timestamp by default. Asking for one
-  makes codesign request a token from Apple's timestamp authority for every signed
-  file, and on this host that token is reproducibly lost partway through a build —
-  measured as one failure in every ~24 requests, with the failing file differing
-  per run — which aborts packaging with "A timestamp was expected but was not
-  found". A secure timestamp is required for notarization, so the release lane
-  keeps it; set PI_MAC_SECURE_TIMESTAMP=1 to request one here as well when a
-  locally built DMG has to be notarized.
+  Unsigned cloud candidates do not request secure timestamps. Signed release
+  jobs explicitly enable notarization and secure timestamps before packaging.
 */
 const secureTimestampRequested =
   shouldUseSecureTimestamp(forwarded, process.env);
@@ -176,7 +173,7 @@ if (secureTimestampRequested) {
 } else {
   flags.push("-c.mac.timestamp=none");
   console.error(
-    "[package-macos] signing without a secure timestamp: this is a local artifact, not a " +
+    "[package-macos] signing without a secure timestamp: this is a candidate artifact, not a " +
       "notarization candidate",
   );
 }

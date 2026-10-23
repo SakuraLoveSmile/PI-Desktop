@@ -58,7 +58,7 @@ The rules below govern every change to the PI-Desktop codebase and documentation
   link those resources into the request worktree when required; do not copy
   environment state into tracked files. Generate other worktree-local state only
   when isolation or version compatibility requires it.
-- Task-candidate E2E runs from the request worktree but must reuse the host
+- Local task-candidate E2E runs from the request worktree but must reuse the host
   dependency/runtime environment already provisioned in the primary checkout.
   Do not run `pnpm install`, `npm install`, or create a second environment
   solely for E2E. Keep temporary profiles, data directories, sockets, ports,
@@ -76,8 +76,9 @@ The rules below govern every change to the PI-Desktop codebase and documentation
   `origin/main`.
 - When a push or other remote delivery is authorized, the fixed delivery order
   in `AGENTS.md` applies: refresh against latest `origin/main`, run
-  task-candidate E2E in the worktree, push the request branch, open a PR/MR
-  targeting `main`, pass the required remote checks (including the PR-base
+  local task-candidate E2E or select the exact-SHA hosted lane, push the request
+  branch, open a PR/MR targeting `main`, pass the selected hosted candidate
+  gates and the required remote checks (including the PR-base
   gate) and reviews, and merge using a permitted strategy. Then fetch and
   safely synchronize local `main` with the landed change. Do not infer
   permission to push directly to `main`, force-push, or discard unrelated
@@ -216,11 +217,11 @@ an unambiguous pull request number for this repository.
 - Removing this subsection lifts the restriction. It is not a permanent
   narrowing of the contribution scope.
 
-### R7 — Code-bearing changes require relevant E2E after main integration
+### R7 — Code-bearing changes require relevant candidate E2E before merge
 
 > **Every code-bearing change must pass relevant E2E on a candidate that
-> already contains the latest `origin/main`, before its request branch is
-> pushed or a PR/MR is opened.**
+> already contains the latest `origin/main`, before merge or commit-only
+> completion. Hosted validation may follow an authorized branch push/PR.**
 
 This rule applies to changes that modify executable or runtime-affecting
 content, including `apps/`, `packages/`, `crates/`, runtime scripts, build or
@@ -229,7 +230,10 @@ Documentation-only changes are exempt when they do not alter executable
 behavior.
 
 E2E execution is mandatory for code-bearing changes. Task-candidate E2E runs
-in the request worktree after incorporating `origin/main`. Do not merge the
+from the request worktree or its exact SHA on GitHub-hosted Actions after
+incorporating `origin/main`. When the hosted lane is selected, an authorized
+branch push and PR may precede that gate; successful hosted results are required
+before merge. Record source SHA, base revision, run URL and all job conclusions. Do not merge the
 task into local `main` to satisfy this gate. An E2E run on a branch that is
 behind `origin/main` does not satisfy R7. Select suites using the
 regression-surface guidance in `04-e2e-test-plan.md`; build, typecheck,
@@ -244,8 +248,9 @@ reason, alternative validation, and remaining risk as `NOT RUN`. The branch
 push and PR/MR may still proceed with that record so the change can be
 validated in a capable environment, but the gate is not satisfied and delivery
 remains incomplete until the suite passes against a candidate that contains
-latest `origin/main`. A failed required suite blocks the push, the PR/MR, and
-declaring the change delivered until the failure is classified and fixed.
+latest `origin/main`. A failed required suite blocks merge and declaring the change delivered until
+the failure is classified and fixed. A hosted check may be retriggered only on
+the intended candidate; dispatching it is not passing evidence.
 
 After the PR/MR merges into remote `main`, rerun the affected suites when the
 landed executable content differs from the commit the gate ran on (landing
@@ -287,8 +292,8 @@ Every change follows this sequence. Steps may be iterated if the implementation 
 8. Commit with conventional message
 9. Update BOARD if milestone-related
 10. Refresh against latest `origin/main` (`pnpm check:pr-base`) and run
-    task-candidate E2E in the worktree (R7); when remote delivery is authorized,
-    push branch + open PR/MR to main only after that gate
+    local candidate E2E or select hosted exact-SHA validation (R7); when remote
+    delivery is authorized, push branch + open PR/MR, then pass hosted gates
 11. Merge the PR/MR into remote `main` through the remote gates when remote
     delivery is authorized, synchronize local `main`, verify, and clean up
 12. If launch was requested: build and start from integrated main
@@ -306,10 +311,10 @@ Every change follows this sequence. Steps may be iterated if the implementation 
 | **4. Implement** | Write code, config, or assets. | Changed files. |
 | **5. Spec-sync** | Update specs per the impact list. Add ADR if architectural. Update `decisions-log.md` if an implementation default changes. | Updated docs/spec/\* and/or docs/adr/\*. |
 | **6. E2E doc** | When R3 applies, add or update scenario entries in `04-e2e-test-plan.md` and link to acceptance criteria IDs (A–H). Otherwise, confirm no scenario update is needed. | Updated e2e test plan, or confirmed not applicable. |
-| **7. Validate** | Use change risk and regression scope to select the smallest useful local checks. The relevant E2E gate for a code-bearing change runs in the request worktree after `origin/main` is incorporated (`pnpm check:pr-base`) and before any branch push or PR/MR; a suite that cannot run is recorded as `NOT RUN` and keeps delivery incomplete. | Targeted check and E2E results, or an explicit environment limitation. |
+| **7. Validate** | Use change risk and regression scope to select the smallest useful local checks. The relevant E2E gate for a code-bearing change runs in the request worktree after `origin/main` is incorporated (`pnpm check:pr-base`) before merge or commit-only completion; the hosted lane may follow an authorized push/PR. A suite that cannot run is recorded as `NOT RUN` and keeps delivery incomplete. | Targeted check and E2E results, or an explicit environment limitation. |
 | **8. Commit** | Git commit with conventional message (see §4). | One or more commits. |
 | **9. BOARD** | If the change completes a milestone deliverable, update `docs/project/BOARD.md`. | Updated board. |
-| **10. Refresh + gate** | Refresh against latest `origin/main`, confirm it is an ancestor of HEAD (`pnpm check:pr-base`), then run task-candidate E2E in the worktree. When remote publishing is authorized, push the request branch and open a PR/MR targeting `main` only after that gate. | Verified candidate with the E2E gate result, or a recorded `NOT RUN` limitation; reviewable remote change or a local-only delivery route. |
+| **10. Refresh + gate** | Refresh against latest `origin/main`, confirm it is an ancestor of HEAD (`pnpm check:pr-base`), then run local task-candidate E2E or select exact-SHA hosted validation. When remote publishing is authorized, push the request branch and open a PR/MR targeting `main`; pass the selected hosted gates before merge. | Verified candidate with the E2E gate result, or a recorded `NOT RUN` limitation; reviewable remote change or a local-only delivery route. |
 | **11. Remote merge + cleanup** | For authorized remote delivery, merge the PR/MR into remote `main` through the required gates (including the PR-base check) and synchronize local `main`; rerun the affected suites when the landed executable content differs from the commit the gate ran on. Verify the expected commits and remove the merged worktree and branch. | Requested integration complete, or an explicit blocker / narrower user-requested handoff. |
 | **12. Launch** | When requested, build and start from the integrated `main` checkout and its development environment. | Running app includes the delivered change. |
 
@@ -328,11 +333,11 @@ Every change follows this sequence. Steps may be iterated if the implementation 
 - E2E scenario documentation and E2E execution are separate concerns. R3 still
   requires scenario updates for user-visible or protocol-visible behavior.
 - Every code-bearing change must run at least one relevant E2E suite on a
-  candidate that contains latest `origin/main` before its branch is pushed or
-  a PR/MR is opened, and must run the union of suites required by the affected
+  candidate that contains latest `origin/main` before merge or commit-only
+  completion, and must run the union of suites required by the affected
   regression surfaces. The available commands are defined by the root
   `package.json` and the selection matrix in `04-e2e-test-plan.md`.
-- Task-candidate E2E may use the request worktree's source, but it must use the
+- Local task-candidate E2E uses the request worktree's source and the
   host dependency/runtime environment described in R4. Do not reinstall the
   repository environment for each run; only missing or incompatible host
   dependencies justify installation or rebuild, and that reason must be
@@ -346,11 +351,25 @@ Every change follows this sequence. Steps may be iterated if the implementation 
   PR/MR may proceed with that record, but the gate is not satisfied and
   delivery remains incomplete until the suite passes against a candidate that
   contains latest `origin/main`.
-- Required E2E jobs that the hosting platform starts before a remote merge do
-  not replace the task-candidate gate. Observe and report their result; after
+- Exact-SHA hosted E2E may satisfy the task-candidate gate when it runs the
+  required suites against the recorded current-main candidate. PR integration
+  jobs remain required separately. Observe and report their result; after
   the remote merge, rerun the affected suites when the landed executable
   content differs from the commit the gate ran on. Otherwise the recorded
   result stands.
+
+### Cloud packaging and release policy
+
+Installer and release packages are built only on GitHub-hosted Actions runners,
+including unpacked `pack --dir` output. Local `pnpm dev` and ordinary development
+compilation remain supported. Do not bypass installer guards or revive the
+retired `scripts/release-macos.sh` lane. A manual `release.yml` candidate yields
+verified Actions artifacts only; a formal version tag must identify a clean,
+already merged main commit, require macOS signing/notarization, and pass shared
+CI and complete asset verification before draft/upload/remote verification and
+publication. Existing published releases are immutable. See the
+[release runbook](06-release-runbook.md) for preparation, tagging, channels,
+secrets, failure recovery and evidence.
 
 ### Marketplace/update diagnosis gate
 
@@ -394,7 +413,7 @@ Which change types require which doc updates.
 | UX change | Related `04-ux/` spec | — | — | New UI scenario | — |
 | Spec-only update | The spec itself | — | — | — | — |
 | Chore (deps, tooling) | — | — | If tooling decision | — | — |
-| **App version release / stable tag** | `06-delivery/06-release-runbook.md` (mandatory version-surface gate before tag: shipped-locale `packages/shared/src/changelog.ts`, its test list, all workspace/Cargo/`APP_VERSION` versions, and the release line in `README.md` + `README.zh-CN.md`) | — | If release policy changes | Confirm E2E-067B still accurate | If milestone ship |
+| **App version release / stable tag** | `06-delivery/06-release-runbook.md` (mandatory version-surface gate before tag: shipped-locale `packages/shared/src/plus-changelog.ts`, the merged catalog/test list, all workspace/Cargo/`APP_VERSION` versions, and the release line in `README.md` + `README.zh-CN.md`) | — | If release policy changes | Confirm E2E-067B still accurate | If milestone ship |
 
 ---
 
@@ -471,8 +490,9 @@ The repository uses a mandatory request-branch and worktree workflow:
 - **Delivery follows R4's authorization boundary and its fixed order.**
   Commit-only delivery stops at the request-branch commit in the worktree.
   Authorized push/remote delivery first refreshes against latest `origin/main`
-  (`pnpm check:pr-base`), runs task-candidate E2E in the worktree (R7), then
-  pushes the request branch and opens the PR/MR, merges it into remote `main`
+  (`pnpm check:pr-base`), runs local candidate E2E or selects the exact-SHA hosted
+  lane (R7), then pushes the request branch and opens the PR/MR. After the
+  selected hosted gates pass, it merges into remote `main`
   through the PR/MR gates (including the PR-base check), and synchronizes
   local `main`. Explicit branch-only or draft-only requests retain their
   narrower scope. Do not open or update a PR that is behind `origin/main`.
@@ -508,10 +528,11 @@ needed; synchronize and clean up from the clean primary checkout after merge):
 git fetch origin main
 git rebase origin/main   # private branch; do not force-push a shared branch
 pnpm check:pr-base
-# run the required task-candidate E2E suites for this change (R7)
+# run local candidate E2E, or select exact-SHA hosted validation (R7)
 git push -u origin <type>/<short-description>
 gh pr create --base main --head <type>/<short-description>
 gh pr checks --watch
+# selected hosted candidate gates must also pass at the recorded SHA
 gh pr merge --merge
 git fetch origin main
 # from a clean primary checkout
@@ -558,7 +579,7 @@ explicit branch-only or draft-only delivery scope:
 4. E2E scenarios are documented (or confirmed not needed per §3).
 5. Necessary targeted local validation passes; for a code-bearing change the
    relevant E2E gate has run on a candidate that contains latest `origin/main`
-   before the branch push, the PR/MR, or a commit-only completion, or the
+   before merge or commit-only completion, locally or on hosted Actions, or the
    environment limitation is recorded as `NOT RUN` and delivery remains
    incomplete until that suite passes; automatically triggered remote gates
    also pass, including the PR-base ancestry check.
@@ -587,7 +608,8 @@ explicit branch-only or draft-only delivery scope:
 When the change is a **stable app version release** (version bump + tag),
 Definition of Done also requires, **before** the tag, that every
 version-bearing surface describes the new version: the shipped-locale in-app
-changelog entries in `packages/shared/src/changelog.ts` (English and every
+Plus changelog entries in `packages/shared/src/plus-changelog.ts`, merged by
+`changelog.ts` (English and every
 shipped product locale, with aligned highlight counts) with its `changelog.test.ts` list, every app
 `package.json` (root, `apps/*`, and `docs/package.json`; `packages/*` keep the
 upstream-synced version, ADR plus-version-line), the Cargo workspace version and
@@ -625,9 +647,9 @@ D164, and D260. GitHub release notes are not a substitute.
 | Merging a linked pull request that only has a sound direction, leaves the original failure mode, or is larger than the smallest coherent fix without a stated reason | Violates R6; direction is not enough |
 | Merging a linked pull request that introduces a harm blocker | Violates R6 |
 | Force-pushing a contributor's branch to land a linked pull request | Violates R6; landing fixes go on top of the author's commits |
-| Tagging a stable app release without updating `packages/shared/src/changelog.ts` for every shipped locale | Violates D164 / D345 / release runbook; in-app What's new is empty for that locale and version |
-| Tagging a stable app release while `README.md` / `README.zh-CN.md` still state an older release line, or bypassing `scripts/check-release-docs.mjs` with `--skip-docs-check` | Violates D260 / release runbook; published documentation advertises a version the release no longer matches |
-| Pushing a request branch or opening a PR/MR before the required E2E has run against a candidate that contains latest `origin/main`, or declaring a code-bearing change delivered without that result (except a recorded `NOT RUN` limitation) | Violates R7's fixed order; review would start on an unvalidated commit |
+| Tagging a stable app release without updating `packages/shared/src/plus-changelog.ts` for every shipped locale | Violates D164 / D345 / release runbook; in-app What's new is empty for that locale and version |
+| Tagging a stable app release while `README.md` / `README.zh-CN.md` still state an older release line, or bypassing the final cloud documentation gate | Violates D260 / release runbook; published documentation advertises a version the release no longer matches |
+| Merging or declaring a code-bearing change delivered before the required E2E passes against a candidate containing latest `origin/main` | Violates R7; an authorized push/PR for hosted validation does not waive the gate |
 
 ---
 
@@ -648,13 +670,13 @@ This workflow spec itself is accepted when:
       rejected.
 - [ ] Remote publishing requires authorization and uses PR/MR gates before
       remote `main` integration and local synchronization.
-- [ ] Refreshing against latest `origin/main` and the relevant E2E gate precede
-      the request branch push and the pull request. Do not merge the task into
-      local `main` to create that candidate.
+- [ ] Refreshing against latest `origin/main` precedes PR creation/update;
+      the relevant local or exact-SHA hosted E2E gate precedes merge. Do not
+      merge the task into local `main` to create that candidate.
 - [ ] Worktree removal and branch deletion are required immediately after the
       request branch is merged into `main`.
 - [ ] Relevant E2E execution is mandatory for code-bearing changes on a
-      candidate that contains latest `origin/main` before the PR/MR is opened,
+      candidate that contains latest `origin/main` before merge or completion,
       without a separate test request; E2E documentation remains mandatory
       under R3.
 - [ ] Local validation is risk-based; unnecessary checks may be skipped without

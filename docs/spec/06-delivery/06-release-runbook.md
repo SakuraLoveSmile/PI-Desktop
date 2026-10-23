@@ -14,22 +14,24 @@
 
 ## 1. Build lanes
 
-| Lane | Command | Signing | Use |
-|---|---|---|---|
-| Dev | `pnpm dev` | none | daily development |
-| Local package | `pnpm --filter @pi-desktop/desktop pack` | unsigned without a configured certificate | packaging smoke (`--dir` output) |
-| Local DMG | `pnpm --filter @pi-desktop/desktop dist` | unsigned without a configured certificate | local install test |
-| Release | `scripts/release-macos.sh` | Developer ID + mandatory notarization | distributable artifact |
+Installer and release packages are built only on GitHub-hosted Actions runners.
+Local development compilation remains supported; installer commands (including
+unpacked `pack --dir`) and their wrappers require `GITHUB_ACTIONS=true` and
+`RUNNER_ENVIRONMENT=github-hosted`. Self-hosted runners are not a packaging lane.
+Do not set these values locally to bypass the guard.
 
-The static electron-builder config does not embed a certificate identity, so
-contributors without certificates can still package locally. The release lane
-requires an injected Developer ID identity (local) or `CSC_LINK` certificate
-(CI), and fails before publication if signing or notarization verification does
-not pass.
+| Lane | Entry point | Signing | Result |
+|---|---|---|---|
+| Development | `pnpm dev`, `pnpm build:js`, Cargo development commands | none required | local development output |
+| Cloud candidate | Manual `release.yml` dispatch | unsigned by default; optional macOS signing | verified Actions bundle only |
+| Formal release | Push `v<version>` after its preparation PR merges | macOS Developer ID + mandatory notarization | verified, immutable GitHub Release |
+
+`scripts/release-macos.sh` is retired and exits with cloud-workflow guidance.
+There is no local installer or publication fallback when cloud validation fails.
 
 ### 1.1 macOS packages use an independently identified Electron
 
-Every macOS lane above except `pnpm dev` packages an independently assembled
+Every cloud macOS packaging lane uses an independently assembled
 Electron distribution instead of the stock one.
 `scripts/package-macos-identity.mjs` runs `scripts/assemble-electron-dist.mjs`,
 which compiles `apps/desktop/build/electron-main-stub.c` against the pinned
@@ -70,19 +72,12 @@ Electron readiness, preventing the stock host identity from owning native
 notifications or taskbar groups. The Windows package additionally pins the
 `Pi-Desktop-Plus` executable and Start menu shortcut names. The launcher sets
 `PI_DESKTOP_DEV=1` so runtime packaging checks keep update delivery disabled
-
-Signing policy for these lanes: they sign **without a secure timestamp**
-(`-c.mac.timestamp=none`). Requesting one makes `codesign` ask Apple's timestamp
-authority for a token per signed file, and on this project's development host that
-token is reproducibly lost partway through a build — measured as one failure in
-every ~24 requests, with the failing file differing per run — which aborts
-packaging with `A timestamp was expected but was not found`. A secure timestamp is
-required for notarization, so the release lane keeps it; set
-`PI_MAC_SECURE_TIMESTAMP=1` to request one from a local lane as well when a DMG
-built here has to be notarized.
 and preserve developer workspace defaults despite the branded executable name.
 The first `pnpm dev` on Electron 43+ downloads the Electron binary on demand
-(the package no longer installs it during `pnpm install`).
+(the package no longer installs it during `pnpm install`). Clean cloud runners
+explicitly fetch that pinned Electron binary before building or running E2E.
+Unsigned cloud candidates do not request a secure timestamp; signed candidates
+and formal releases require the secure timestamp used for notarization.
 Packaged lanes use `build/icon.icns` through electron-builder on macOS and
 `build/icon.ico` for the Windows executable and native window icon. The
 renderer imports the same PNG through `BrandLogo`. The PNG is canonical;
@@ -93,17 +88,14 @@ when macOS `iconutil` is available, without overwriting the canonical source.
 
 ## 2. Prerequisites (release lane)
 
-1. Apple Developer account with a **Developer ID Application** certificate in
-   the login keychain, owned by the fork release operator. The certificate
-   common name and signing TeamIdentifier must match the configured values.
-2. Environment variables for the local signed lane:
-   - `MAC_SIGNING_IDENTITY` — certificate common name, including its team suffix;
-     electron-builder rejects a name that keeps the
-     `Developer ID Application:` prefix, so the script strips it
-   - `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` — required for
-     notarization (`APPLE_TEAM_ID` must match the signing certificate team)
-3. Rust toolchain and pnpm workspace installed. The Rust toolchain must run on
-   the native macOS runner: arm64 for Apple Silicon or x86_64 for Intel.
+1. Repository Actions access and permission to dispatch a candidate. Formal
+   publication additionally requires authorization to push the version tag.
+2. Configure all six macOS signing secrets in §4.6 for a formal release or a
+   signed candidate. The certificate and signing TeamIdentifier must belong to
+   the fork operator and match the configured identity.
+3. GitHub-hosted native runners with the pinned Node/pnpm, Rust, Electron and
+   lockfile dependencies. No prebuilt local output is a release input. The
+   workflow checks runner architecture and compiles the native host on it.
 
 ## 3. What the build ships
 
@@ -156,170 +148,140 @@ Surfaces in scope:
 
 | Surface | Requirement |
 |---|---|
-| `apps/desktop/resources/models.dev/api.json` | Refreshed from https://models.dev/api.json before tagging; the release workflow packages this snapshot unchanged |
-| `packages/shared/src/changelog-en.ts` | Newest-first English entries (source of truth, ADR 0009) |
-| `packages/shared/src/changelog-zh-CN.ts`, `changelog-zh-TW.ts`, `changelog-tr.ts`, `changelog-de.ts`, `changelog-es.ts`, `changelog-fr.ts`, `changelog-ko.ts`, `changelog-pt-BR.ts` | Same version set and highlight counts as English; a newly shipped locale is also registered in `packages/shared/src/changelog.ts` |
-| `packages/shared/src/changelog.test.ts` | Version added at the top of the newest-first list |
-| `package.json`, `apps/*/package.json`, `docs/package.json` | Same version (`docs` is a third workspace root, not under `apps`/`packages`) |
-| `packages/*/package.json` | Not bumped by a release: each keeps the version of the upstream tree last synced from, and the preflight only requires them to agree with each other (ADR plus-version-line) |
-| `Cargo.toml` `[workspace.package]`, `Cargo.lock` `host-core` | Same version |
-| `packages/shared/src/protocol.ts` `APP_VERSION` | Same version |
-| `README.md`, `README.zh-CN.md` | Status section states the current `<major>.<minor>.x` release line; toolchain, command, and roadmap claims still true |
+| `packages/shared/src/plus-changelog.ts` | Newest-first Plus stable-version notes in English and every shipped locale; preserve upstream catalogs |
+| `packages/shared/src/changelog.ts` and `changelog-*.ts` | Merged catalog remains aligned across locales; register newly shipped locales here |
+| `packages/shared/src/changelog.test.ts` | New stable version first in the expected version list |
+| `package.json`, `apps/*/package.json`, `docs/package.json` | Same app version |
+| `packages/*/package.json` | Keep the upstream version line; package versions must agree with each other (ADR plus-version-line) |
+| `Cargo.toml` workspace version, `Cargo.lock` host-core version, `packages/shared/src/protocol.ts` `APP_VERSION` | Same app version |
+| `README.md`, `README.zh-CN.md` | Current `<major>.<minor>.x` release line and accurate product/development claims |
+| `apps/desktop/electron/main/settings-operation-metadata.json` | Metadata validated by the release-documentation gate |
 
-Blocking steps:
+Blocking preparation:
 
-1. Refresh `apps/desktop/resources/models.dev/api.json` **before** tagging.
-   `scripts/release.mjs` does this by default for every bump, including
-   prereleases. A no-op refresh (already current) still counts: the snapshot
-   in the tagged tree is what artifacts ship. Do not treat a minified
-   one-line JSON diff as absent.
-2. Edit `packages/shared/src/changelog-en.ts` **before**
-   `node scripts/release.mjs <version>` / `git tag`:
-   - Add a **newest-first** entry under `en` and every shipped product locale
-     (`zh-CN` / `zh-TW` in `changelog-zh-CN.ts` / `changelog-zh-TW.ts`; the
-     remaining catalogs are the sibling `packages/shared/src/changelog-*.ts` files).
-   - Same `version` string (semver **without** a leading `v`, matching
-     `apps/desktop` / `APP_VERSION` for a stable cut).
-   - Optional ISO `date` (`YYYY-MM-DD`).
-   - Matching highlight counts; English is the source of truth (ADR 0009).
-   - Each bullet is one short user-facing idea (not raw PR titles).
-3. Do **not** catalog the prerelease identifier (`x.y.z-rc.*`,
-   `x.y.z-beta.*`) as its own in-app changelog version. When the prerelease
-   is a preview of the next stable line, add that **stable** version's
-   entries (`x.y.z`) so testers can read "what's new" without a network
-   fetch. Omit the catalog only when product explicitly ships no notes for
-   this cut.
-4. Sync the newest-first version list in
-   `packages/shared/src/changelog.test.ts` (add the new stable version at the
-   top), then run `pnpm --filter @pi-desktop/shared test` and confirm catalog
-   alignment (version sets + highlight counts) still passes.
-5. Update `README.md` and `README.zh-CN.md` when the release line changes
-   (`0.10.x` → `0.11.x`) and whenever the release ships user-visible behavior
-   the Highlights, Download, Getting started, Status, or Development sections
-   now describe incorrectly. Both locales stay structurally in sync; English is
-   the source of truth and the zh-CN file links the `docs/zh-CN/` mirrors.
-6. Run the preflight and fix every reported surface:
-   `pnpm check:release-docs [version]` (`node scripts/check-release-docs.mjs`).
-   For a prerelease, run it against the **stable** version being previewed
-   (`pnpm check:release-docs x.y.z`) so changelog/README alignment is
-   checked even though `scripts/release.mjs` skips that preflight for
-   `x.y.z-beta.*` / `x.y.z-rc.*`. The preflight compiles the TypeScript
-   changelog in a temporary directory, so it does not require a prior
-   workspace build. `scripts/release.mjs` still refreshes models.dev for
-   prereleases; `--skip-docs-check` exists only for a deliberate
-   non-release bump.
-7. Commit the documentation updates so the tagged commit contains notes and
-   accurate version claims for that version (alone or adjacent to the bump).
-8. GitHub Release bodies may still use `generate_release_notes: true` for the
-   web page; they remain web-only and are **not** the in-app notes source.
+1. Add short user-facing Plus notes for the stable version in
+   `plus-changelog.ts`, with the same versions and highlight counts in every
+   shipped locale. `changelog.ts` merges these entries with upstream history;
+   do not overwrite upstream catalogs to record a Plus release.
+2. For a preview such as `x.y.z-rc.1`, catalog the stable `x.y.z` being previewed,
+   not the prerelease identifier. Update `changelog.test.ts` and both READMEs.
+3. Run `node scripts/release.mjs <version>` on the dedicated request branch to
+   prepare the version files. This command does not commit, build installers,
+   push, or refresh models.dev. Review resource updates explicitly; the tagged
+   tree's checked-in models.dev snapshot is packaged unchanged.
+4. Pass `node scripts/check-release-docs.mjs <stable-version>` and the shared
+   changelog tests on the prepared source. The documentation checker compiles
+   the TypeScript catalog into a temporary directory. When preparation checks
+   must run in cloud, `--skip-docs-check` is preparation-only; the reused cloud
+   CI gate still validates release documentation and must pass before merge.
+   This option cannot be used with `--tag`.
+5. Commit the preparation on the request branch, open its PR and merge into
+   `main` after the required cloud checks. GitHub-generated web release notes
+   never replace the in-app catalog.
 
-Pre-tag checklist:
+### 4.2 Cloud candidate build
 
-- [ ] `apps/desktop/resources/models.dev/api.json` is refreshed or confirmed
-      current in the tagged tree
-- [ ] `packages/shared/src/changelog-en.ts` and every shipped locale catalog
-      carry entries for the stable version being shipped or previewed
-- [ ] `packages/shared/src/changelog-de.ts` and the other locale catalogs
-      match the English version set and highlight counts
-- [ ] Highlight counts match across locales
-- [ ] Shared changelog tests pass
-- [ ] `README.md` and `README.zh-CN.md` state the current release line and
-      contain no claims the release invalidates
-- [ ] `node scripts/check-release-docs.mjs` passes on the release commit
-      (use the stable version when tagging a prerelease preview)
-- [ ] `release.mjs` / tag runs only after the documentation commit is on the
-      release branch
-
-### 4.2 Build / package
+For a candidate of current `main`:
 
 ```bash
-export MAC_SIGNING_IDENTITY="Your Developer ID Name (YOURTEAMID)"
-export APPLE_ID=...
-export APPLE_APP_SPECIFIC_PASSWORD=...
-export APPLE_TEAM_ID=...
-scripts/release-macos.sh
+gh workflow run release.yml --ref main -f sign_macos=false
 ```
 
-Artifacts land in `apps/desktop/release/` (DMG + ZIP + blockmaps).
+A request branch may be selected with `--ref <request-branch>` before merge.
+The preflight pins the resolved full 40-character source SHA; every subsequent
+job checks out that same commit. Keep the run URL, source/base SHAs, every job
+conclusion and the final artifact identity with the validation record. A queued
+or dispatched run does not prove a successful build.
 
-`scripts/release-macos.sh` defaults to the host architecture and accepts
-`MAC_ARCH=arm64` or `MAC_ARCH=x64` only when that architecture matches the
-host. This keeps the native Rust host sidecar and Electron package aligned.
+Manual dispatch defaults to `sign_macos=false`. Set it to `true` only with the
+six signing secrets configured. Both variants run the same shared CI barriers,
+platform builds and asset aggregation. They produce
+`release-bundle-<version>-<source-sha>` in Actions only: no GitHub Release is
+created and no public updater feed is published. Unsigned artifacts are debug
+candidates and do not establish Gatekeeper/notarization qualification.
 
-### 4.3 GitHub tag and manual workflow
+### 4.3 Formal tag and publication
 
-The GitHub Release workflow starts all native platform runners without a
-separate validation-job barrier. Each runner validates that the pushed tag
-matches `apps/desktop/package.json` immediately after checkout, before package
-inputs are prepared.
+After the version-preparation PR has merged, check out the exact merged commit
+in a clean worktree, then:
 
-On every platform, the release preparation step starts the locked Rust host
-build in parallel with pnpm installation and native dependency rebuilding. It
-then builds only the workspace dependencies selected by
-`@pi-desktop/desktop^...`, failing if that dependency selection is unexpectedly
-empty. The platform `dist:*` command remains responsible for bundling the agent
-runtime, verifying the host build, building the Desktop application once, and
-invoking electron-builder. This avoids a redundant Desktop build without
-changing the package scripts or release artifacts.
+```bash
+node scripts/release.mjs <version> --tag
+git push origin v<version>
+```
 
-**Default macOS release policy:** GitHub tag releases Developer ID-sign,
-notarize, staple, and Gatekeeper-verify macOS DMG/ZIP before upload (D450 /
-ADR 0289). Missing signing or notarization secrets fail the job. A
-`workflow_dispatch` run may set `sign_macos: false` only to produce unsigned
-debug artifacts; that path must not be used for a GitHub Release tag. Local
-`scripts/release-macos.sh` remains the explicit signed local lane; `pnpm dist:mac`
-stays unsigned without a configured certificate (D078).
+Tag mode validates documentation, refreshes `origin/main`, verifies that the
+clean checked-out commit already belongs to it, and requires the tag to be
+absent locally and remotely. It creates an annotated tag only; it never bumps
+files or commits. Network verification failures block tagging. Never replace an
+existing tag or bypass this check with a manual tag on an unmerged branch.
+Pushing the tag starts `.github/workflows/release.yml`.
+
+The formal preflight rejects tag/app/Cargo/protocol version mismatches, a tag
+that resolves to another commit, or a source not contained in freshly fetched
+`origin/main`. Stable SemVer uses the `latest` channel. Named prereleases such
+as `alpha`, `beta` and `rc` use their own updater channel and are published with
+`prerelease=true` and `make_latest=false`; malformed or unsafe channels fail.
+Formal tags always require all six signing secrets and fail early if any are
+missing. An unsigned manual candidate cannot be promoted into a formal release.
+
+The workflow executes these barriers in order:
+
+1. **Metadata:** pin source SHA, version, channel, release kind and signing
+   policy. Fetch `main` without changing the candidate checkout.
+2. **Shared verification:** reuse `ci.yml` at that source for JS build,
+   typecheck, lint, architecture/test-quality gates, tests, runtime-test
+   typecheck, Rust fmt/clippy/tests, isolated smoke and release-script behavior
+   tests. The full release-documentation gate runs after dependency install.
+3. **Native builds:** build Desktop for macOS arm64/Intel x64, Windows x64,
+   Linux x64/arm64, plus the Linux x64/arm64 pi-host bundles. Fetch the pinned
+   Electron binary on clean runners. Packaging uses `--publish never`; only
+   the final publication job may write a Release.
+4. **Aggregate:** require all seven expected artifact groups; reject missing,
+   unexpected, duplicate or unsafe paths. Check updater versions, actual
+   SHA512/size, and pi-host SHA256 sidecars. Merge both macOS feeds, then emit
+   `release-manifest.json` and `SHA256SUMS` for the complete verified bundle.
+   The manifest records source repository/SHA, run URL/id/attempt, version,
+   channel, kind, signing policy and every asset's name/size/SHA256.
+5. **Publish (formal tags only):** `scripts/publish-release.mjs` revalidates
+   the bundle and remote tag/main identity, creates a draft, uploads every
+   asset, verifies remote SHA256 digests and sizes, then publishes. A published
+   release is immutable: existing assets are never overwritten. A failed draft
+   remains for inspection; a retry must match its exact source and manifest
+   identity and may reuse only identical uploaded assets. A mismatched draft
+   blocks publication. Do not delete or replace it automatically.
 
 The macOS matrix uses `macos-15` for arm64 and `macos-15-intel` for Intel x64.
-Each job verifies `uname -m`, passes the matching `--arm64` or `--x64` flag to
-electron-builder, and builds `pi-desktop-host-core` on that same native
-runner. Tag builds and `sign_macos: true` (the dispatch default) receive
-`CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and
-`APPLE_TEAM_ID` only from GitHub Actions secrets, pin the certificate through
-`CSC_NAME=${MAC_SIGNING_IDENTITY}` (bare common name — electron-builder rejects
-the `Developer ID Application:` prefix), force code signing and
-`notarytool` notarization of `Pi-Desktop-Plus.app`. The DMG is then submitted to the
-same service on its own (`scripts/notarize-and-staple-macos-release-dmg.sh`),
-and only an `Accepted` status allows the ticket to be stapled. Verification
-then checks the identity, code-signing integrity (including
-`pi-desktop-host-core`), Gatekeeper `Notarized Developer ID`, and both stapled
-tickets before any artifact upload. The per-architecture `latest-mac.yml` files
-are renamed before upload; the publish job merges them into one feed after
-downloading both artifacts.
+Each verifies `uname -m` and builds the Rust host on the same native runner.
+Signed lanes pin `CSC_NAME` to the configured certificate common name, force
+signing and notarization of the app, separately notarize/staple the DMG, then
+verify code integrity, configured identity, Gatekeeper and both stapled tickets
+before upload (§4.6–§5). No signing or notarization check is optional for tags.
 
-The shared electron-builder configuration applies the architecture-labelled
-pattern at the macOS platform level for ZIPs and overrides it at the DMG target
-level. Both public architectures are therefore explicit: the arm64 lane
-publishes `Pi-Desktop-Plus-<version>-arm64.dmg` and
-`Pi-Desktop-Plus-<version>-arm64-mac.zip`, while the Intel x64 lane publishes
-`Pi-Desktop-Plus-<version>-x64.dmg` and `Pi-Desktop-Plus-<version>-x64-mac.zip`. This
-applies to both unsigned and signed macOS lanes, including local release builds,
-and ensures each generated updater feed references its architecture-labelled
-asset names and matching checksums. Before upload, each macOS runner requires
-exactly one architecture-labelled DMG and ZIP (including blockmaps) and rejects
-any unlabelled or wrong-architecture macOS artifact.
 
-The DMG uses a branded 720×440 background with a two-icon drag-to-Applications
-gesture. The app and Applications link are the only items in the window.
+Every builder invocation receives the explicit `-c.publish.channel=<channel>`
+from preflight, including prereleases; feed names are not inferred from the
+version string alone. After signed DMG notarization/stapling changes its bytes,
+`scripts/refresh-macos-release-metadata.mjs` regenerates the external DMG blockmap
+and refreshes that channel's macOS feed SHA512/size before verification/upload.
+It uses electron-builder's installed blockmap implementation with an explicit
+external output, and verifies that generating the map leaves the signed DMG
+bytes unchanged. Aggregation then checks the final stapled artifact's hashes.
 
-The macOS ZIP contains `Pi-Desktop-Plus.app` at its root. Neither the DMG nor ZIP
-ships an opening-help note or executable first-launch helper, including local
-and unsigned debug builds. Tagged artifacts remain signed and notarized; the
-unsigned lane is for debugging and does not imply Gatekeeper qualification.
+Both macOS architectures have explicit DMG/ZIP names (§6), including blockmaps;
+each lane rejects unlabelled or wrong-architecture artifacts. The DMG retains
+its branded 720×440 drag-to-Applications window with only the app and Applications
+link. The ZIP contains `Pi-Desktop-Plus.app` at its root. Neither ships an
+opening-help note or executable first-launch helper.
 
-DMG, ZIP, NSIS, AppImage, deb, rpm, blockmap, and updater feed outputs are already
-compressed or compression-insensitive. The workflow therefore uploads their
-temporary Actions artifacts with compression level zero before the publish job
-assembles the GitHub Release. The Linux runners also copy their unpacked
-`resources/app.asar` (`linux-unpacked` on x64, `linux-arm64-unpacked` on arm64)
-to the versioned `Pi-Desktop-Plus-<version>-linux-<arch>.asar` asset before upload.
-This preserves the exact archive used by the Linux installers for downstream
-repackaging with a system Electron.
-
-The Linux updater feeds carry the architecture they were built for:
-`latest-linux.yml` for x64 and `latest-linux-arm64.yml` for arm64. Those are the
-channel files `electron-updater` requests on the matching architecture, so a
-lane fails before upload if its own feed is missing.
+The Linux builds retain the glibc 2.35 floor (§7), versioned system-Electron ASAR
+assets copied from each installer, and architecture-specific feeds:
+`<channel>-linux.yml` for x64 and `<channel>-linux-arm64.yml` for arm64. The two
+macOS feeds are merged into `<channel>-mac.yml`; Windows NSIS uses
+`<channel>.yml`. Temporary compressed installer/feed artifacts use Actions
+compression level zero before aggregation. Platform output and pi-host inventory
+are checked by `scripts/release-assets.mjs` rather than inferred from successful
+individual build jobs.
 
 ### 4.4 Documentation site deployment
 
@@ -330,7 +292,7 @@ initiated manually in Vercel when required.
 
 ### 4.5 CNB mirror trigger
 
-After `softprops/action-gh-release` publishes or updates a GitHub Release,
+After an upstream GitHub Release is published or updated,
 `.github/workflows/mirror-to-cnb.yml` starts the CNB pipeline at
 `aixk/Pi-Desktop`. GitHub Release remains the canonical artifact source; CNB
 is a copy of the same tag for users who pull from
@@ -342,7 +304,7 @@ The job:
 - fires on `release` `published` / `edited`, and on `workflow_dispatch` with
   an explicit tag such as `v0.14.6`
 - sends event `api_trigger_mirror` and `MIRROR_TAGS` set to that tag
-- uses repository secret `CNB_MIRROR_TOKEN` (already configured) and fails
+- uses repository secret `CNB_MIRROR_TOKEN` and fails
   closed if the secret is empty
 - builds the JSON body with `jq` so a missing tag cannot produce an empty
   `MIRROR_TAGS` value on a manual run
@@ -464,7 +426,7 @@ A DMG that was never submitted has no ticket, so stapling it fails with
 `Could not find base64 encoded ticket ... Error 65`. Stapler retries are only
 allowed after Apple returns `Accepted`.
 
-Run after every signed release build:
+The GitHub-hosted verification steps run after every signed release build:
 
 ```bash
 for APP in apps/desktop/release/mac-*/Pi-Desktop-Plus.app; do
@@ -611,10 +573,9 @@ Manual smoke on a clean profile (`PI_DESKTOP_DATA_DIR=$(mktemp -d)`):
 
 ## 6. Native-runner release packages
 
-The repository exposes native-runner commands for every release target. Each
-packaging command first runs `build:host-release`, then bundles the agent
-runtime and Electron app. D126/D285/D603 tag workflows publish these outputs and
-their electron-updater manifests. Run a target command on that target OS:
+These commands are implementation references for GitHub-hosted Actions only,
+not local packaging instructions. Each builds the release host, bundles the agent
+runtime and Electron app, and packages on its target native runner:
 
 ```text
 macOS Apple Silicon: pnpm --filter @pi-desktop/desktop run dist:mac -- --arm64
@@ -629,10 +590,9 @@ gets the correct updater distribution marker.
 
 The macOS packages include `bin/pi-desktop-host-core` built for their runner
 architecture; the Linux packages do the same on their native x64 and arm64
-runners; Windows includes `bin/pi-desktop-host-core.exe`. Signing, rollback,
-and installer upgrade
-qualification remain release hardening work; publication is active under
-D126/D285/D603.
+runners; Windows includes `bin/pi-desktop-host-core.exe`. macOS signing and
+notarization are mandatory for formal tags. Rollback and installer upgrade
+qualification remain separate release hardening work.
 
 Native-runner output matrix:
 
@@ -692,6 +652,7 @@ Shell smoke on each native runner:
   `@picovoice/pvrecorder-node` classifies Linux arm64 by `/proc/cpuinfo` CPU
   part. Speech-to-text (`transcribe-cpp` ships a `linux-arm64-cpu-vulkan`
   bundle) and every other feature work on any arm64 Linux device.
-- Rollback, staged rollout, and prerelease channel policy remain open release
-  work. Existing unsigned macOS installs may need one manual signed DMG before
-  in-app updates succeed.
+- Rollback and staged rollout remain open release work. Prereleases have
+  separate named feeds and never become GitHub latest. Existing unsigned macOS
+  installs may need one manual signed DMG installation before in-app updates
+  succeed; obtain that installer from the cloud release.

@@ -24,7 +24,7 @@
 
 <br />
 
-**[本地构建](#开发者)** ·
+**[本地开发](#开发者)** ·
 [上游文档](https://pi-docs.aiuo.net/) ·
 [插件开发](docs/plugin-development.md) ·
 [界面预览](docs/guide/screenshots.md) ·
@@ -568,7 +568,7 @@ Agent / Plan / Goal
 
 <div align="center">
 
-### [本地构建 Pi-Desktop-Plus →](#开发者)
+### [本地开发 Pi-Desktop-Plus →](#开发者)
 
 **macOS · Windows · Linux**
 
@@ -680,6 +680,19 @@ pnpm test
 
 </details>
 
+### 云端安装包构建与发布
+
+保留 `pnpm dev` 和常规源码编译，用于本地开发。安装包和 Release 包（包括
+`pack --dir` 解包产物）仅在 GitHub 托管的 Actions runner 中构建。
+
+```bash
+gh workflow run release.yml --ref main -f sign_macos=false
+```
+
+该命令只生成经过验证的 Actions 候选工件，不发布 GitHub Release 或更新源。
+正式发布先通过 PR 合并版本准备，再对干净的 main 合并提交打标签，经过云端检查、
+macOS 签名和公证后发布。操作步骤见[发布手册](docs/spec/06-delivery/06-release-runbook.md)。
+
 ### 文档
 
 [Documentation](https://pi-docs.aiuo.net/) ·
@@ -760,7 +773,7 @@ Pi-Desktop-Plus 使用 **GNU Lesser General Public License v3.0**。
 
 <br />
 
-**[本地构建](#开发者)** ·
+**[本地开发](#开发者)** ·
 [Documentation](https://pi-docs.aiuo.net/) ·
 [Build a Plugin](docs/plugin-development.md)
 

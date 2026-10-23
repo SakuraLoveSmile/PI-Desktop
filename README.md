@@ -24,7 +24,7 @@ Local-first · Model-agnostic · Plugin-powered · macOS / Windows / Linux
 
 <br />
 
-**[Build locally](#for-developers)** ·
+**[Develop locally](#for-developers)** ·
 [Upstream documentation](https://pi-docs.aiuo.net/) ·
 [Build a Plugin](docs/plugin-development.md) ·
 [Screenshots](docs/guide/screenshots.md) ·
@@ -565,7 +565,7 @@ Agent / Plan / Goal
 
 <div align="center">
 
-### [Build Pi-Desktop-Plus locally →](#for-developers)
+### [Develop Pi-Desktop-Plus locally →](#for-developers)
 
 **macOS · Windows · Linux**
 
@@ -677,6 +677,21 @@ pnpm test
 
 </details>
 
+### Cloud installer builds and releases
+
+Local development with `pnpm dev` and ordinary source compilation remains
+supported. Installers and release packages, including unpacked `pack --dir`
+output, are built only on GitHub-hosted Actions runners.
+
+```bash
+gh workflow run release.yml --ref main -f sign_macos=false
+```
+
+This creates a verified candidate bundle in Actions artifacts without publishing
+a GitHub Release or updater feed. Formal releases use a version-preparation PR,
+a tag on its clean merged main commit, and mandatory cloud verification and macOS
+signing/notarization. See the [Release Runbook](docs/spec/06-delivery/06-release-runbook.md).
+
 ### Documentation
 
 [Documentation](https://pi-docs.aiuo.net/) ·
@@ -757,7 +772,7 @@ See [LICENSE](LICENSE) for details.
 
 <br />
 
-**[Build locally](#for-developers)** ·
+**[Develop locally](#for-developers)** ·
 [Documentation](https://pi-docs.aiuo.net/) ·
 [Build a Plugin](docs/plugin-development.md)
 

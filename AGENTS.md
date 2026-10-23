@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Policy-Sync: 2026-10-10.1
+Policy-Sync: 2026-10-24.1
 
 Mandatory rules for AI coding agents working in PI-Desktop.
 
@@ -206,6 +206,17 @@ Every development request uses:
 The primary checkout and local `main` are coordination surfaces, not
 development workspaces.
 
+Create every new worktree, including subagent and temporary integration or
+validation worktrees, under:
+
+```text
+/Users/sakurasep/Documents/Code/Project/Project Worktree/PI-Desktop/<short-description>/
+```
+
+Before creating one, inspect `git status --short --branch` and `git worktree
+list` and confirm task ownership. If the worktree tool cannot select this
+location, use `git worktree add` with the quoted absolute path.
+
 ### Never
 
 * develop directly on `main`
@@ -234,11 +245,12 @@ cd <worktree-path>
 ```
 
 All implementation, targeted validation, conflict resolution, and
-task-candidate E2E happen inside the task's dedicated worktree.
+task-candidate E2E use the task's dedicated worktree or its exact SHA on
+GitHub-hosted Actions.
 
 ### E2E environment reuse
 
-Task-candidate E2E runs from the dedicated request worktree but reuses the
+Local task-candidate E2E runs from the dedicated request worktree but reuses the
 host development environment already provisioned in the primary checkout.
 Reuse the host Node/pnpm toolchain, compatible `node_modules`, Electron,
 Rust/Cargo targets, package-manager stores, build caches, and ignored local
@@ -250,6 +262,28 @@ runtime environment solely to execute E2E. Keep only mutable test state
 isolated to the request worktree or its scratch directory. Install or rebuild
 dependencies only when the host environment is missing or incompatible, and
 record that reason. Clean CI and release runners may install from lockfiles.
+
+### Cloud installer and release builds
+
+Installer and release packages are built only on GitHub-hosted Actions runners.
+This includes unpacked `pack --dir` output. Local `pnpm dev`, JavaScript builds,
+Rust development builds, and targeted checks remain available. Installer
+commands and their direct wrappers reject local and self-hosted execution;
+`scripts/release-macos.sh` is retired. Do not bypass the guard or fall back to a
+local package when a cloud gate fails.
+
+Use `.github/workflows/release.yml` for a manual candidate or a formal version
+tag, following `docs/spec/06-delivery/06-release-runbook.md`. Manual candidates
+produce verified Actions artifacts only. Only a signed, verified tag already
+contained in remote `main` can publish a GitHub Release.
+
+Task-candidate validation may run on GitHub-hosted Actions at the exact request
+SHA after incorporating latest `origin/main`. With this lane selected, an
+authorized branch push and PR may precede the hosted gate; its successful result
+is required before merge. Record the tested SHA, base revision, run URL and job
+conclusions. A pending, failed, or missing cloud result is not passing evidence.
+Local candidate E2E continues to use the shared host environment described in this file;
+clean hosted runners install from lockfiles.
 
 ### Before candidate validation
 
@@ -295,10 +329,10 @@ behind `origin/main`.
 5. commit the task
 6. refresh the task branch against latest origin/main (`pnpm check:pr-base`)
 7. resolve conflicts inside the task worktree
-8. run required task-candidate E2E in the task worktree
-9. push the request branch
+8. run local task-candidate E2E, or select hosted validation of the exact SHA
+9. push the request branch when authorized
 10. open/update the PR/MR
-11. validate the PR integration candidate
+11. pass hosted task-candidate gates when selected, then PR integration gates
 12. merge into remote main through repository gates
 13. synchronize local main
 14. remove the worktree and merged local branch
@@ -934,7 +968,9 @@ git fetch origin main
 git rebase origin/main
 ```
 
-then E2E from the same task worktree.
+then E2E from the same task worktree, or from its exact SHA on GitHub-hosted
+Actions. The hosted lane may follow an authorized push/PR and must pass before
+merge. Record the run URL and job conclusions alongside the fields below.
 
 Record:
 
@@ -978,7 +1014,7 @@ command.
 
 ### Commit rules
 
-* Commit only when the user asks.
+* Commit completed logical changes on the task branch.
 * Stage files by explicit path, then re-run `git status` to confirm
   what is staged.
 * Message format: subject + blank line + body. Single-line commits are
