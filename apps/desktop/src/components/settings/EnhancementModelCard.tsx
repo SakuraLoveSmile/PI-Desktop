@@ -34,6 +34,7 @@ import {
   subagentModelOrphanPin,
   subagentModelSelectValue,
 } from "./subagent-models";
+import { enhancementPinPatch } from "../../features/settings/enhancement-pin";
 
 export function EnhancementModelCard() {
   const { t } = useTranslation();
@@ -135,8 +136,7 @@ export function EnhancementModelCard() {
       : null;
     const stored = settings.promptEnhancementThinkingLevel ?? "off";
     await save({
-      promptEnhancementProviderId: providerId,
-      promptEnhancementModelId: modelId,
+      ...enhancementPinPatch(providerId, modelId),
       promptEnhancementThinkingLevel: nextProvider
         ? canonicalThinkingLevel(thinkingLevelForProvider(nextProvider, stored))
         : stored,

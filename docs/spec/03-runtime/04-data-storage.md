@@ -371,7 +371,9 @@ template applies), `promptEnhancementUserTemplate`,
 `promptEnhancementProviderId`, `promptEnhancementModelId`, and
 `promptEnhancementThinkingLevel` (ADR 0121). An absent or blank user template means the
 built-in default applies, so clearing the field stores no key rather than an
-empty string. A non-blank user template must contain the draft variable and stay
+empty string. Following the Composer's model stores `null` for both pin ids, not an empty
+string, because an empty provider id names no provider. A non-blank user template
+must contain the draft variable and stay
 within `PROMPT_ENHANCEMENT_TEMPLATE_MAX_LENGTH`; host-core rejects a write that
 breaks either rule and drops any stored `promptEnhancementSystemPrompt`, which is
 no longer read. No schema version bump is required.

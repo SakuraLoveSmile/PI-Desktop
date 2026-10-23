@@ -1140,6 +1140,30 @@ mod tests {
         .expect("a cleared pin names no provider to resolve");
     }
 
+    #[test]
+    fn application_references_treat_an_empty_enhancement_provider_as_follow_composer() {
+        let data_dir = tempfile::tempdir().expect("data directory");
+        let state = AppState::open(data_dir.path()).expect("state");
+        // The runtime reads an empty or blank id as "follow the Composer", so a
+        // bundle that carries one must still import. A non-empty id must still
+        // name a provider that exists.
+        for blank in ["", "   "] {
+            validate_application_references(
+                &state,
+                &json!({ "promptEnhancementProviderId": blank }),
+            )
+            .expect("a blank enhancement provider is not a dependency");
+        }
+        let error = validate_application_references(
+            &state,
+            &json!({ "promptEnhancementProviderId": "provider-from-remote" }),
+        )
+        .expect_err("missing enhancement provider should be staged");
+        assert!(error
+            .to_string()
+            .starts_with("CONFIG_SYNC_DEPENDENCY: promptEnhancementProviderId"));
+    }
+
     fn pending_approvals(value: &Value) -> Vec<(String, String, String)> {
         value
             .get("pendingApprovals")

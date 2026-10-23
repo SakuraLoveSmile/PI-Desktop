@@ -85,6 +85,12 @@ pub(crate) fn validate_application_references(st: &AppState, payload: &Value) ->
         let Some(provider_id) = payload.get(provider_key).and_then(Value::as_str) else {
             continue;
         };
+        // An empty or blank enhancement pin means "follow the Composer": the
+        // runtime reads it trimmed, so it names no provider. The default stays
+        // strict, because scheduled tasks take a blank default as the provider id.
+        if provider_key == "promptEnhancementProviderId" && provider_id.trim().is_empty() {
+            continue;
+        }
         if providers::get_provider(&st.db, &st.secrets, provider_id)?.is_none() {
             bail!(
                 "CONFIG_SYNC_DEPENDENCY: {provider_key} references missing provider {provider_id}"
