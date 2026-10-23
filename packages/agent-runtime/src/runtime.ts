@@ -4181,7 +4181,8 @@ export class DesktopAgentRuntime {
     const kind = proposalKindForMode(this.mode);
     if (!kind) return true;
     // Contract modes are read-only: inspection tools, plan-safe plugin
-    // actions (ADR 0211), and the one submit tool that belongs to this kind.
+    // actions (ADR 0211), the Advisor consult (ADR 0319: it writes nothing
+    // and never reaches Host), and the one submit tool that belongs to this kind.
     if (this.isPlanSafePluginTool(name)) return true;
     return new Set([
       "Read",
@@ -4193,6 +4194,7 @@ export class DesktopAgentRuntime {
       "ProjectHistory",
       "CodeSearch",
       CONTEXT_COMPACTION_TOOL_NAME,
+      ADVISOR_TOOL_NAME,
       SUBMIT_TOOL_NAMES[kind],
     ]).has(name);
   }
