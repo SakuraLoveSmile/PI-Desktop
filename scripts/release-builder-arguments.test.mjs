@@ -25,6 +25,8 @@ test("Windows packaging forwards explicit update channel and architecture to eve
     assert(args.includes("--x64"));
     assert(args.includes("-c.publish.channel=beta"));
     assert(!args.includes("--"), "a separator must not hide flags from electron-builder");
+    assert(args.every(arg => !arg.startsWith("-c.electronDist=") && !arg.startsWith("-c.afterPack=")),
+      "Windows retains its stock Electron distribution");
     assert.deepEqual(args.slice(4, 6), ["--publish", "never"]);
   }
 });
@@ -55,4 +57,6 @@ test("Linux packaging forwards explicit update channel and architecture past the
   });
   const calls = readFileSync(log, "utf8").trim().split("\n").map(line => JSON.parse(line));
   assert.deepEqual(calls, [["exec", "electron-builder", "--linux", "--publish", "never", "--arm64", "-c.publish.channel=beta"]]);
+  assert(calls[0].every(arg => !arg.startsWith("-c.electronDist=") && !arg.startsWith("-c.afterPack=")),
+    "Linux retains its stock Electron distribution");
 });

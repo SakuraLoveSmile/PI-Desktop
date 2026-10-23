@@ -25,7 +25,6 @@ const [
   stylesSource,
   pkgSource,
   buildReleaseSource,
-  releaseWorkflowSource,
   enSource,
   zhSource,
   changelogSource,
@@ -45,7 +44,6 @@ const [
   loadStyles(),
   read("../package.json"),
   read("../../../scripts/build-desktop-release.mjs"),
-  read("../../../.github/workflows/release.yml"),
   read("../../../packages/i18n/src/locales/en/index.ts"),
   read("../../../packages/i18n/src/locales/zh-CN/index.ts"),
   read("../../../packages/shared/src/changelog.ts"),
@@ -316,12 +314,9 @@ test("packaging publishes an electron-updater feed for GitHub Releases", () => {
     /shell:\s*process\.platform === "win32"/,
     "Windows must launch the pnpm.cmd shim through a shell",
   );
-  // The upload step must carry every updater feed, and the release publishes
-  // all platforms unfiltered (D126/D285).
-  assert.match(releaseWorkflowSource, /release\/\*\.zip/);
-  assert.match(releaseWorkflowSource, /release\/\*\.rpm/);
-  assert.match(releaseWorkflowSource, /release\/latest\*\.yml/);
-  assert.match(releaseWorkflowSource, /files: dist\/\*/);
+  // All-platform feed delivery and stable/prerelease publication now run through
+  // release-assets.test.mjs and publish-release.test.mjs using real file bundles
+  // and a GitHub transport fixture, rather than a latest-only workflow glob.
 });
 
 test("shared shipped-locale changelog is the in-app notes source of truth", () => {

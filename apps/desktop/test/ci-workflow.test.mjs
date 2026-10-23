@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
@@ -29,6 +30,15 @@ const [
   read("../../../scripts/release-macos.sh"),
   read("../../../scripts/export-linux-asar.mjs"),
 ]);
+
+// Parse executable workflow configuration; release domain behavior is exercised
+// in scripts/release-preflight, release-assets and publish-release tests.
+const desktopRequire = createRequire(new URL("../package.json", import.meta.url));
+const builderRequire = createRequire(desktopRequire.resolve("electron-builder/package.json"));
+const { load } = builderRequire("js-yaml");
+const releaseWorkflow = load(releaseWorkflowSource);
+const ciWorkflow = load(ciWorkflowSource);
+const releaseStep = (name) => releaseWorkflow.jobs.build.steps.find(step => step.name === name);
 
 test("CI skips documentation-only pushes and pull requests", () => {
   assert.equal(
@@ -61,17 +71,13 @@ test("CI does not typecheck workspace dependencies twice", () => {
   assert.doesNotMatch(ciWorkflowSource, /run: pnpm typecheck/);
 });
 
-test("release runners validate tags without a separate job barrier", () => {
-  assert.doesNotMatch(releaseWorkflowSource, /^  validate:/m);
-  assert.doesNotMatch(releaseWorkflowSource, /^    needs: validate$/m);
-  assert.match(
-    releaseWorkflowSource,
-    /TAG_VERSION="\$\{GITHUB_REF_NAME#v\}"/,
-  );
-  assert.match(
-    releaseWorkflowSource,
-    /Tag v\$TAG_VERSION does not match apps\/desktop\/package\.json version \$APP_VERSION/,
-  );
+test("release validates one pinned candidate before starting verification", () => {
+  const { metadata, verify, build, "pi-host-bundle": host } = releaseWorkflow.jobs;
+  assert.equal(metadata.steps.find(step => step.id === "preflight").run, "node scripts/release-preflight.mjs");
+  assert.equal(verify.needs, "metadata");
+  for (const job of [build, host]) assert.deepEqual(job.needs, ["metadata", "verify"]);
+  // Exact tag/version, source identity, main ancestry and signing refusal are
+  // tested with real isolated Git repositories in release-preflight.test.mjs.
 });
 
 test("release preparation overlaps independent work and avoids duplicate builds", () => {
@@ -92,23 +98,17 @@ test("release preparation overlaps independent work and avoids duplicate builds"
 });
 
 test("release builds are gated on the CI checks and least-privilege permissions", () => {
-  assert.match(releaseWorkflowSource, /^permissions:\n  contents: read$/m);
-  assert.match(releaseWorkflowSource, /^  verify:/m);
-  assert.match(releaseWorkflowSource, /^  build:\n[\s\S]*?^    needs: verify$/m);
-  const verifyJob = releaseWorkflowSource.match(/^  verify:\n[\s\S]*?(?=^  build:)/m)?.[0];
-  assert.ok(verifyJob, "release verify job is missing");
-  for (const step of [
-    /run: pnpm build:js/,
-    /run: pnpm --filter @pi-desktop\/desktop typecheck/,
-    /run: pnpm lint/,
-    /run: pnpm -r --if-present test/,
-    /run: cargo test -p host-core --locked/,
-  ]) {
-    assert.match(verifyJob, step);
+  assert.deepEqual(releaseWorkflow.permissions, { contents: "read" });
+  assert.equal(releaseWorkflow.jobs.verify.uses, "./.github/workflows/ci.yml");
+  assert.deepEqual(releaseWorkflow.jobs.build.needs, ["metadata", "verify"]);
+  assert.deepEqual(releaseWorkflow.jobs.publish.needs, ["metadata", "aggregate"]);
+  assert.deepEqual(releaseWorkflow.jobs.publish.permissions, { contents: "write" });
+  const runs = ciWorkflow.jobs.js.steps.map(step => step.run);
+  for (const command of ["pnpm build:js", "pnpm --filter @pi-desktop/desktop typecheck", "pnpm lint", "pnpm -r --if-present test"]) {
+    assert(runs.includes(command), `shared CI must run ${command}`);
   }
-  const publishJob = releaseWorkflowSource.match(/^  publish:\n[\s\S]*$/m)?.[0];
-  assert.ok(publishJob, "release publish job is missing");
-  assert.match(publishJob, /^    permissions:\n      contents: write$/m);
+  assert(ciWorkflow.jobs.rust.steps.some(step => step.run === "cargo test -p host-core --locked"));
+  assert.equal(ciWorkflow.jobs["e2e-smoke"].uses, "./.github/workflows/e2e-run.yml");
 });
 
 test("release artifacts bypass redundant Actions compression", () => {
@@ -164,34 +164,16 @@ test("release workflow publishes the Linux ASAR beside installers", () => {
 });
 
 test("the release matrix ships native Linux x64 and arm64 lanes", () => {
-  assert.match(
-    releaseWorkflowSource,
-    /name: Linux arm64[\s\S]*?os: ubuntu-22\.04-arm[\s\S]*?arch: arm64[\s\S]*?runner_arch: aarch64[\s\S]*?artifact: linux-arm64[\s\S]*?platform: linux[\s\S]*?dist: dist:linux/,
-    "the arm64 lane runs on a native arm64 runner",
-  );
-  // A runner that is not the architecture it packages would pair one
-  // architecture's Electron app with the other's Rust sidecar.
-  assert.match(
-    releaseWorkflowSource,
-    /name: Verify native runner architecture[\s\S]*?if: matrix\.runner_arch/,
-  );
-  // electron-builder already names each Linux lane's feed after its own
-  // architecture (`latest-linux.yml` on x64, `latest-linux-arm64.yml` on
-  // arm64) — the names electron-updater requests — so the lanes cannot
-  // overwrite each other's feed during the publish merge, and the lane
-  // verifies the name it will publish instead of renaming it.
-  assert.match(
-    releaseWorkflowSource,
-    /name: Verify the Linux update feed[\s\S]*?feed="apps\/desktop\/release\/\$\{\{ matrix\.feed \}\}"/,
-  );
-  assert.match(releaseWorkflowSource, /feed: latest-linux\.yml/);
-  assert.match(releaseWorkflowSource, /feed: latest-linux-arm64\.yml/);
-  // The pi-host bundles the SSH bootstrap installs track the desktop's Linux
-  // lanes one for one.
-  assert.match(
-    releaseWorkflowSource,
-    /pi-host-bundle:[\s\S]*?- arch: x64[\s\S]*?os: ubuntu-22\.04[\s\S]*?- arch: arm64[\s\S]*?os: ubuntu-22\.04-arm/,
-  );
+  const lanes = releaseWorkflow.jobs.build.strategy.matrix.include.filter(row => row.platform === "linux");
+  assert.deepEqual(lanes.map(({ arch, os, runner_arch, artifact, feed }) => ({ arch, os, runner_arch, artifact, feed })), [
+    { arch: "x64", os: "ubuntu-22.04", runner_arch: "x86_64", artifact: "linux-x64", feed: "linux.yml" },
+    { arch: "arm64", os: "ubuntu-22.04-arm", runner_arch: "aarch64", artifact: "linux-arm64", feed: "linux-arm64.yml" },
+  ]);
+  assert.equal(releaseStep("Verify native runner architecture").if, "matrix.runner_arch");
+  assert.deepEqual(releaseWorkflow.jobs["pi-host-bundle"].strategy.matrix.include,
+    lanes.map(({ arch, os, runner_arch }) => ({ arch, os, runner_arch })));
+  // Architecture-specific feed names, missing lanes and checksum integrity are
+  // exercised by the complete input fixture in release-assets.test.mjs.
 });
 
 test("the Linux package config lets the workflow choose the architecture", () => {
@@ -222,60 +204,29 @@ test("the Linux package config lets the workflow choose the architecture", () =>
 });
 
 test("release matrix packages both native macOS architectures", () => {
-  assert.match(
-    releaseWorkflowSource,
-    /name: macOS arm64[\s\S]*?os: macos-15[\s\S]*?arch: arm64[\s\S]*?runner_arch: arm64/,
-  );
-  assert.match(
-    releaseWorkflowSource,
-    /name: macOS Intel x64[\s\S]*?os: macos-15-intel[\s\S]*?arch: x64[\s\S]*?runner_arch: x86_64/,
-  );
-  assert.match(
-    releaseWorkflowSource,
-    /name: Package installers \(\$\{\{ matrix\.dist \}\}\)[\s\S]*?if: matrix\.platform != 'macos'[\s\S]*?run: pnpm --filter @pi-desktop\/desktop run \$\{\{ matrix\.dist \}\} -- --\$\{\{ matrix\.arch \}\}/,
-  );
-  assert.equal(
-    JSON.parse(desktopPackageSource).build.mac.artifactName,
-    "Pi-Desktop-Plus-${version}-${arch}-mac.${ext}",
-    "macOS ZIP names include the target architecture",
-  );
-  assert.equal(
-    JSON.parse(desktopPackageSource).build.dmg.artifactName,
-    "Pi-Desktop-Plus-${version}-${arch}.${ext}",
-    "macOS DMG names include the target architecture",
-  );
-  assert.match(
-    releaseWorkflowSource,
-    /Package unsigned macOS installer[\s\S]*?pnpm --filter @pi-desktop\/desktop run dist:mac -- --\$\{\{ matrix\.arch \}\}/,
-    "unsigned macOS builds use the shared artifact naming config",
-  );
-  assert.doesNotMatch(
-    releaseWorkflowSource,
-    /-c\.(?:dmg|zip)\.artifactName/,
-    "release workflow does not pass unsupported target overrides",
-  );
-  assert.match(
-    releaseWorkflowSource,
-    /name: Verify macOS artifact names[\s\S]*?Expected exactly one[\s\S]*?Unexpected unlabelled or wrong-architecture macOS artifact/,
-    "macOS publication rejects ambiguous artifact names",
-  );
-  assert.match(
-    releaseWorkflowSource,
-    /latest-mac-\$\{\{ matrix\.arch \}\}\.yml/,
-  );
-  assert.match(releaseWorkflowSource, /Merge macOS updater metadata[\s\S]*?ruby/);
+  const lanes = releaseWorkflow.jobs.build.strategy.matrix.include.filter(row => row.platform === "macos");
+  assert.deepEqual(lanes.map(({ arch, os, runner_arch }) => ({ arch, os, runner_arch })), [
+    { arch: "arm64", os: "macos-15", runner_arch: "arm64" },
+    { arch: "x64", os: "macos-15-intel", runner_arch: "x86_64" },
+  ]);
+  const config = JSON.parse(desktopPackageSource).build;
+  assert.equal(config.mac.artifactName, "Pi-Desktop-Plus-${version}-${arch}-mac.${ext}");
+  assert.equal(config.dmg.artifactName, "Pi-Desktop-Plus-${version}-${arch}.${ext}");
+  assert.equal(releaseStep("Package installers (${{ matrix.dist }})").if, "matrix.platform != 'macos'");
+  assert.equal(releaseStep("Disambiguate macOS update metadata").run,
+    'mv "apps/desktop/release/${RELEASE_CHANNEL}-mac.yml" "apps/desktop/release/${RELEASE_CHANNEL}-mac-${{ matrix.arch }}.yml"');
+  // release-assets.test.mjs rejects wrong/missing architecture artifacts and
+  // merges both macOS feeds only after checking every final file hash and size.
 });
 
 test("macOS release signing is required on tag pushes", () => {
-  assert.match(
-    releaseWorkflowSource,
-    /workflow_dispatch:\s+inputs:\s+sign_macos:[\s\S]*?default:\s*true[\s\S]*?type:\s*boolean/,
-  );
-  assert.ok(
-    releaseWorkflowSource.includes(
-      "MACOS_SIGN_RELEASE: ${{ github.event_name != 'workflow_dispatch' || inputs.sign_macos == true }}",
-    ),
-  );
+  assert.equal(releaseWorkflow.on.workflow_dispatch.inputs.sign_macos.default, false);
+  assert.equal(releaseWorkflow.on.workflow_dispatch.inputs.sign_macos.type, "boolean");
+  assert.equal(releaseWorkflow.jobs.build.env.MACOS_SIGN_RELEASE, "${{ needs.metadata.outputs.signed_macos }}");
+  assert(releaseStep("Package signed and notarized macOS installer").run.includes("-c.mac.forceCodeSigning=true"),
+    "the cloud signing command must require a valid signing identity");
+  // release-preflight.test.mjs proves that tags require signing even when the
+  // manual input is false, and that unsigned candidates require no secrets.
 
   const unsignedBlock = releaseWorkflowSource.match(
     /- name: Package unsigned macOS installer[\s\S]*?(?=\n      - name:)/,
@@ -366,62 +317,9 @@ test("macOS release signing is required on tag pushes", () => {
   assert.doesNotMatch(releaseWorkflowSource, /scripts\/staple-macos-release-dmg\.sh/);
 });
 
-test("the signed local macOS lane selects the native runner architecture", () => {
-  assert.match(releaseMacScriptSource, /DEFAULT_MAC_ARCH/);
-  assert.match(releaseMacScriptSource, /MAC_ARCH="\$\{MAC_ARCH:-\$DEFAULT_MAC_ARCH\}"/);
-  assert.match(releaseMacScriptSource, /must match the host/);
-  assert.match(releaseMacScriptSource, /electron-builder --mac "--\$\{MAC_ARCH\}"/);
-  assert.match(releaseMacScriptSource, /MAC_SIGNING_IDENTITY.*required/);
-  assert.doesNotMatch(releaseMacScriptSource, /XingYu Liu|DUV63RKYTW/);
-  assert.match(
-    releaseMacScriptSource,
-    /MAC_SIGNING_IDENTITY="\$\{MAC_SIGNING_IDENTITY#Developer ID Application: \}"/,
-    "the local lane strips the prefix electron-builder rejects",
-  );
-  assert.doesNotMatch(
-    releaseMacScriptSource,
-    /-c\.(?:dmg|zip)\.artifactName/,
-    "the signed local macOS lane uses the shared artifact naming config",
-  );
-  // The local lane documents itself as Developer ID + mandatory
-  // notarization, so it must pass both flags and must not publish.
-  assert.match(releaseMacScriptSource, /-c\.mac\.notarize=true/);
-  assert.match(releaseMacScriptSource, /-c\.mac\.forceCodeSigning=true/);
-  assert.match(releaseMacScriptSource, /--publish never/);
-  assert.doesNotMatch(
-    releaseMacScriptSource,
-    /DEBUG="\$\{DEBUG:-[^}]*electron-builder/,
-    "the local lane must not enable builder-util's executing debug line",
-  );
-  assert.match(
-    releaseMacScriptSource,
-    /node scripts\/macos-signing-watchdog\.mjs --label "release-macos-\$\{MAC_ARCH\}" --/,
-    "the local signed macOS lane runs under the signing watchdog",
-  );
-  assert.match(
-    releaseMacScriptSource,
-    /node scripts\/macos-bundle-inventory\.mjs apps\/desktop\/release/,
-  );
-  // The DMG is submitted, stapled, and validated once, and the release is
-  // verified exactly once.
-  assert.match(
-    releaseMacScriptSource,
-    /scripts\/notarize-and-staple-macos-release-dmg\.sh apps\/desktop\/release/,
-  );
-  assert.equal(
-    (releaseMacScriptSource.match(/scripts\/verify-macos-release\.sh/g) ?? []).length,
-    1,
-    "the local signed macOS lane verifies the release exactly once",
-  );
-  assert.doesNotMatch(releaseMacScriptSource, /scripts\/staple-macos-release-dmg\.sh/);
-});
+// The standalone local lane was retired. macos-release-lane.test.mjs now proves
+// it rejects execution before any build/sign/notarization tool is invoked.
 
-/**
- * The regression that broke the local signed lane: a rewrite replaced the
- * electron-builder flags with two commands but kept the line continuation, so
- * one command became a positional argument while the other still pointed at a
- * deleted script. Every script path either lane references must exist.
- */
 test("both macOS lanes only reference scripts that exist", async () => {
   const referenced = new Set();
   for (const source of [releaseMacScriptSource, releaseWorkflowSource]) {
