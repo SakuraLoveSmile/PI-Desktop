@@ -2251,6 +2251,12 @@ fn fork_session_snapshot(
         if inserted == 0 {
             return Err(anyhow!("session not found: {source_id}"));
         }
+        // A fork copies the transcript's logical project, even if its old
+        // checkout directory now belongs to another repository. Keep this in
+        // the savepoint shared by ordinary and Team research forks.
+        if let Some(space_id) = db.project_memory_space_session(source_id)? {
+            db.bind_project_memory_space_session(&id, &space_id)?;
+        }
         for (seq, record) in records.iter().enumerate() {
             insert_index_row(conn, &id, seq as i64, None, record, texts[seq].as_deref())?;
         }

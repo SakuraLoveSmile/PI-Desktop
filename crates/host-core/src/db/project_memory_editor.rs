@@ -20,6 +20,12 @@ pub struct ProjectMemoryEditorState {
     pub owner: String,
     pub memory: ProjectMemoryRecord,
     pub auto_record_enabled: bool,
+    #[serde(skip_serializing_if = "is_false")]
+    pub migration_required: bool,
+}
+
+fn is_false(value: &bool) -> bool {
+    !value
 }
 
 pub(crate) fn memory_entries(memory: &ProjectMemoryRecord) -> Vec<ProjectMemoryEntryRecord> {
@@ -45,6 +51,19 @@ pub(crate) fn memory_entries(memory: &ProjectMemoryRecord) -> Vec<ProjectMemoryE
 
 impl Database {
     fn editor_owner(&self, path: &str) -> Result<(String, Option<String>, String)> {
+        if let Some(space) = self.project_memory_space_for_path(path)? {
+            let canonical =
+                canonical_project_path(path).ok_or_else(|| anyhow!("project path required"))?;
+            return Ok((
+                format!("memory:{}", space.id),
+                Some(format!("memory:{}", space.id)),
+                canonical,
+            ));
+        }
+        self.legacy_editor_owner(path)
+    }
+
+    fn legacy_editor_owner(&self, path: &str) -> Result<(String, Option<String>, String)> {
         let canonical =
             canonical_project_path(path).ok_or_else(|| anyhow!("project path required"))?;
         let group = self
@@ -61,7 +80,11 @@ impl Database {
         let (owner, group_id, canonical) = self.editor_owner(path)?;
         let auto_record_enabled = self.get_auto_record_enabled(&canonical)?;
         let memory = if let Some(id) = group_id {
-            self.get_project_group_memory(&id)?
+            if let Some(space) = id.strip_prefix("memory:") {
+                self.get_memory_space_content(space)?
+            } else {
+                self.get_project_group_memory(&id)?
+            }
         } else {
             self.get_project_memory(&canonical)?
         };
@@ -69,6 +92,7 @@ impl Database {
             owner,
             memory,
             auto_record_enabled,
+            migration_required: false,
         })
     }
 
@@ -86,7 +110,54 @@ impl Database {
             owner,
             memory: self.get_project_memory_readonly(path)?,
             auto_record_enabled: self.get_auto_record_enabled_readonly(path)?,
+            migration_required: false,
         })
+    }
+
+    pub(crate) fn get_legacy_project_memory_editor(
+        &self,
+        path: &str,
+    ) -> Result<ProjectMemoryEditorState> {
+        let (owner, group_id, canonical) = self.legacy_editor_owner(path)?;
+        let memory = match group_id {
+            Some(id) => self.get_project_group_memory(&id)?,
+            None => self.get_project_memory(&canonical)?,
+        };
+        Ok(ProjectMemoryEditorState {
+            owner,
+            memory,
+            auto_record_enabled: false,
+            migration_required: true,
+        })
+    }
+
+    pub(crate) fn save_legacy_project_memory_editor(
+        &self,
+        path: &str,
+        expected_owner: &str,
+        expected_memory: &Value,
+        entries: &Value,
+    ) -> Result<ProjectMemoryEditorState> {
+        let transaction = self.conn.unchecked_transaction()?;
+        let current = self.get_legacy_project_memory_editor(path)?;
+        if current.owner != expected_owner {
+            return Err(ProjectMemoryConflict::Owner.into());
+        }
+        if serde_json::to_value(&current.memory)? != *expected_memory {
+            return Err(ProjectMemoryConflict::Snapshot.into());
+        }
+        let (_, group_id, canonical) = self.legacy_editor_owner(path)?;
+        match group_id {
+            Some(id) => {
+                self.set_project_group_memory(&id, entries)?;
+            }
+            None => {
+                self.set_project_memory_entries(&canonical, entries)?;
+            }
+        }
+        let result = self.get_legacy_project_memory_editor(path)?;
+        transaction.commit()?;
+        Ok(result)
     }
 
     pub fn save_project_memory_editor(
@@ -130,7 +201,11 @@ impl Database {
         }
         let (_, group_id, canonical) = self.editor_owner(path)?;
         if let Some(id) = group_id {
-            self.set_project_group_memory(&id, entries)?;
+            if let Some(space) = id.strip_prefix("memory:") {
+                self.set_memory_space_content(space, entries)?;
+            } else {
+                self.set_project_group_memory(&id, entries)?;
+            }
         } else {
             self.set_project_memory_entries(&canonical, entries)?;
         }
@@ -205,7 +280,11 @@ impl Database {
         let (_, group_id, canonical) = self.editor_owner(path)?;
         let entries = serde_json::to_value(&entries)?;
         if let Some(id) = group_id {
-            self.set_project_group_memory(&id, &entries)?;
+            if let Some(space) = id.strip_prefix("memory:") {
+                self.set_memory_space_content(space, &entries)?;
+            } else {
+                self.set_project_group_memory(&id, &entries)?;
+            }
         } else {
             self.set_project_memory_entries(&canonical, &entries)?;
         }

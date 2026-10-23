@@ -58,6 +58,8 @@ export type SessionSummary = {
   /** Number of messages in the current canonical transcript. */
   messageCount: number;
   projectPath?: string;
+  /** Host-owned recall identity; a reused checkout path cannot rebind old chats. */
+  memoryProjectId?: string;
   /**
    * Durable display name for this session's workspace (`projects.name`),
    * persisted by the Host when the session was created. Optional: older hosts

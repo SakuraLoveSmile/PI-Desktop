@@ -12,25 +12,32 @@ fn all_kv(db: &crate::db::Database) -> Vec<(String, String, String, i64)> {
 }
 
 #[tokio::test]
-async fn project_memory_alias_rpc_reads_group_and_legacy_without_writes_or_roots() {
+async fn project_memory_alias_retains_instructions_and_uses_shared_opt_in_without_roots() {
     use crate::project_memory_owner::{tests::Fixture, TEST_PROJECTION};
     let f = Fixture::new();
-    let owner = f.repository.to_str().unwrap().to_string();
-    let slot = f.slot.to_str().unwrap().to_string();
+    let owner = f.repository.to_str().unwrap().to_owned();
+    let slot = f.slot.to_str().unwrap().to_owned();
     let mut app = AppState::open(&f.dir.path().join("profile")).unwrap();
     app.handshook = true;
     app.db.ensure_project(&owner, false).unwrap();
     app.db.ensure_project(&slot, false).unwrap();
     app.db
-        .set_project_memory(&slot, "stale slot memory")
+        .set_project_memory(&slot, "Older worktree finding")
         .unwrap();
     app.db
-        .set_project_memory(&owner, "owner legacy memory")
+        .set_project_memory(&owner, "Owner legacy memory")
         .unwrap();
-    app.db.kv_set("projectAutoMemory",&format!("path:{owner}"), &json!({"enabled":true,"entries":[{"id":"preview","title":"Preview","content":"unmigrated note"}]})).unwrap();
-    let mut session_ids = Vec::new();
-    for mode in ["agent", "plan", "goal"] {
-        session_ids.push(
+    let group = app
+        .db
+        .create_project_group("Owner", std::slice::from_ref(&owner))
+        .unwrap();
+    app.db
+        .set_project_group_instructions(&group.id, "Real shared instructions")
+        .unwrap();
+    app.db.set_auto_memory_enabled(&owner, true).unwrap();
+    let session_ids: Vec<_> = ["agent", "plan", "goal"]
+        .into_iter()
+        .map(|mode| {
             sessions::create_session_with_options(
                 &app.db,
                 sessions::SessionCreateOptions {
@@ -40,84 +47,49 @@ async fn project_memory_alias_rpc_reads_group_and_legacy_without_writes_or_roots
                 },
             )
             .unwrap()
-            .id,
-        );
-    }
-    let before = all_kv(&app.db);
+            .id
+        })
+        .collect();
     let state = Arc::new(Mutex::new(app));
     let (tx, _) = mpsc::unbounded_channel();
-    TEST_PROJECTION.scope(f.projection.clone(),async {
-            let context=handle_request(state.clone(),"project.group.context",json!({"path":slot}),tx.clone()).await.unwrap();
-            assert!(context["context"].is_null());
-            assert!(context["memoryAlias"]["memory"]["content"].as_str().unwrap().contains("owner legacy memory"));
-            assert!(context["memoryAlias"]["memory"]["content"].as_str().unwrap().contains("unmigrated note"));
-            assert!(context["memoryAlias"].get("roots").is_none());
-            let editor = handle_request(state.clone(), "project.memory.editor.get", json!({"path":slot}), tx.clone()).await.unwrap();
-            assert_eq!(editor["editor"]["memory"], context["memoryAlias"]["memory"]);
-            assert_eq!(editor["editor"]["autoRecordEnabled"], false);
-            for (index,id) in session_ids.iter().enumerate() {
-                let read=handle_request(state.clone(),"project.autoMemory.agentList",json!({"sessionId":id,"boundPath":slot}),tx.clone()).await.unwrap();
-                assert_eq!(read["memoryAlias"],context["memoryAlias"]);
-                assert_eq!(read["autoRecordEnabled"],false);
-                for method in ["project.autoMemory.agentUpsert", "project.autoMemory.agentDelete"] {
-                    let denied=handle_request(state.clone(),method,json!({"sessionId":id,"boundPath":slot,"content":"not allowed","id":"preview","expectedTitle":"Preview","expectedContent":"unmigrated note"}),tx.clone()).await.unwrap_err();
-                    assert_eq!(denied.data.unwrap()["errorCode"], if index==0 {"MEMORY_ALIAS_READ_ONLY"} else {"TOOL_DISABLED_IN_PLAN"});
-                }
-            }
-            let forged=handle_request(state.clone(),"project.autoMemory.agentList",json!({"sessionId":session_ids[0],"boundPath":owner}),tx.clone()).await.unwrap_err();
-            assert_eq!(forged.data.unwrap()["errorCode"],"SESSION_PROJECT_CHANGED");
-            for method in ["project.memory.set","project.memory.editor.save","project.autoMemory.setEnabled"] {
-                let denied=handle_request(state.clone(),method,json!({"path":slot,"content":"overwrite","entries":[],"expectedOwner":"anything","expectedMemory":{},"enabled":true}),tx.clone()).await.unwrap_err();
-                assert_eq!(denied.data.unwrap()["errorCode"],"MEMORY_ALIAS_READ_ONLY");
-            }
-            let memory=handle_request(state.clone(),"project.memory.get",json!({"path":slot}),tx.clone()).await.unwrap();
-            assert_eq!(memory["memory"],context["memoryAlias"]["memory"]);
-        }).await;
-    assert_eq!(all_kv(&state.lock().await.db), before);
-    let group = {
-        let st = state.lock().await;
-        st.db
-            .create_project_group("Owner", std::slice::from_ref(&owner))
+    TEST_PROJECTION.scope(f.projection.clone(), async {
+        let context = handle_request(state.clone(), "project.group.context", json!({"path":slot}), tx.clone()).await.unwrap();
+        assert!(context["context"].is_null());
+        let alias = &context["memoryAlias"];
+        assert!(alias["memory"]["content"].as_str().unwrap().contains("Owner legacy memory"));
+        assert!(alias["memory"]["content"].as_str().unwrap().contains("Older worktree finding"));
+        assert_eq!(alias["instructions"], "Real shared instructions");
+        assert!(alias.get("roots").is_none());
+        let editor = handle_request(state.clone(), "project.memory.editor.get", json!({"path":slot}), tx.clone()).await.unwrap();
+        assert!(editor["editor"]["owner"].as_str().unwrap().starts_with("memory:"));
+        assert_eq!(editor["editor"]["autoRecordEnabled"], true);
+        for id in &session_ids {
+            let read = handle_request(state.clone(), "project.autoMemory.agentList", json!({"sessionId":id,"boundPath":slot}), tx.clone()).await.unwrap();
+            assert_eq!(&read["memoryAlias"], alias);
+            assert_eq!(read["autoRecordEnabled"], true);
+        }
+        let before = all_kv(&state.lock().await.db);
+        handle_request(state.clone(), "project.autoMemory.agentList", json!({"sessionId":session_ids[0],"boundPath":slot}), tx.clone()).await.unwrap();
+        assert_eq!(all_kv(&state.lock().await.db), before, "ordinary refresh does not rewrite migration or binding timestamps");
+        let added = handle_request(state.clone(), "project.autoMemory.agentUpsert", json!({"sessionId":session_ids[0],"boundPath":slot,"title":"Stable","content":"Verified durable convention"}), tx.clone()).await.unwrap();
+        assert!(added["memory"]["content"].as_str().unwrap().contains("Verified durable convention"));
+        for id in &session_ids[1..] {
+            let denied = handle_request(state.clone(), "project.autoMemory.agentUpsert", json!({"sessionId":id,"boundPath":slot,"content":"Not allowed"}), tx.clone()).await.unwrap_err();
+            assert_eq!(denied.data.unwrap()["errorCode"], "TOOL_DISABLED_IN_PLAN");
+        }
+        let forged = handle_request(state.clone(), "project.autoMemory.agentList", json!({"sessionId":session_ids[0],"boundPath":owner}), tx).await.unwrap_err();
+        assert_eq!(forged.data.unwrap()["errorCode"], "SESSION_PROJECT_CHANGED");
+    }).await;
+    assert_eq!(
+        state
+            .lock()
+            .await
+            .db
+            .get_project_memory(&slot)
             .unwrap()
-    };
-    {
-        let st = state.lock().await;
-        st.db
-            .set_project_group_instructions(&group.id, "real shared instructions")
-            .unwrap();
-        st.db
-            .set_project_group_memory(&group.id, &json!([]))
-            .unwrap();
-    }
-    let before = all_kv(&state.lock().await.db);
-    TEST_PROJECTION
-        .scope(f.projection.clone(), async {
-            let read = handle_request(
-                state.clone(),
-                "project.group.context",
-                json!({"path":slot}),
-                tx.clone(),
-            )
-            .await
-            .unwrap();
-            assert!(read["context"].is_null());
-            assert_eq!(
-                read["memoryAlias"]["instructions"],
-                "real shared instructions"
-            );
-            assert_eq!(read["memoryAlias"]["memory"]["content"], "");
-            let per_turn = handle_request(
-                state.clone(),
-                "project.autoMemory.agentList",
-                json!({"sessionId":session_ids[1],"boundPath":slot}),
-                tx.clone(),
-            )
-            .await
-            .unwrap();
-            assert_eq!(per_turn["memoryAlias"], read["memoryAlias"]);
-        })
-        .await;
-    assert_eq!(all_kv(&state.lock().await.db), before);
+            .content,
+        "Older worktree finding"
+    );
 }
 
 #[tokio::test]
@@ -187,7 +159,7 @@ async fn project_memory_alias_rechecks_binding_after_unlocked_git_validation() {
 }
 
 #[tokio::test]
-async fn project_memory_alias_next_read_updates_deletes_and_invalidates_without_cache() {
+async fn project_memory_alias_refreshes_shared_edits_and_revokes_only_invalid_instructions() {
     use crate::project_memory_owner::{tests::Fixture, TEST_PROJECTION};
     let mut f = Fixture::new();
     let owner = f.repository.to_str().unwrap().to_owned();
@@ -204,45 +176,20 @@ async fn project_memory_alias_next_read_updates_deletes_and_invalidates_without_
         },
     )
     .unwrap();
-    app.db.set_project_memory(&owner, "version one").unwrap();
-    app.db.set_project_memory(&slot, "slot fallback").unwrap();
     let state = Arc::new(Mutex::new(app));
     let (tx, _) = mpsc::unbounded_channel();
-    TEST_PROJECTION
-        .scope(f.projection.clone(), async {
-            for content in ["version one", "version two", ""] {
-                {
-                    let st = state.lock().await;
-                    if content.is_empty() {
-                        st.db.delete_project_memory(&owner).unwrap();
-                    } else {
-                        st.db.set_project_memory(&owner, content).unwrap();
-                    }
-                }
-                let before = all_kv(&state.lock().await.db);
-                let read = handle_request(
-                    state.clone(),
-                    "project.autoMemory.agentList",
-                    json!({"sessionId":session.id,"boundPath":slot}),
-                    tx.clone(),
-                )
-                .await
-                .unwrap();
-                assert_eq!(read["memoryAlias"]["memory"]["content"], content);
-                assert_eq!(all_kv(&state.lock().await.db), before);
-            }
-            f.data["schema_version"] = json!(2);
-            f.save();
-            let read = handle_request(
-                state.clone(),
-                "project.autoMemory.agentList",
-                json!({"sessionId":session.id,"boundPath":slot}),
-                tx.clone(),
-            )
-            .await
-            .unwrap();
-            assert!(read.get("memoryAlias").is_none());
-            assert_eq!(read["memory"]["content"], "slot fallback");
-        })
-        .await;
+    TEST_PROJECTION.scope(f.projection.clone(), async {
+        for content in ["version one", "version two", ""] {
+            let editor = handle_request(state.clone(), "project.memory.editor.get", json!({"path":owner}), tx.clone()).await.unwrap();
+            let entries = if content.is_empty() { json!([]) } else { json!([{"id":"current","title":"","content":content}]) };
+            handle_request(state.clone(), "project.memory.editor.save", json!({"path":owner, "expectedOwner":editor["editor"]["owner"], "expectedMemory":editor["editor"]["memory"], "entries":entries}), tx.clone()).await.unwrap();
+            let read = handle_request(state.clone(), "project.autoMemory.agentList", json!({"sessionId":session.id,"boundPath":slot}), tx.clone()).await.unwrap();
+            assert_eq!(read["memoryAlias"]["memory"]["content"], content);
+        }
+        f.data["schema_version"] = json!(2);
+        f.save();
+        let read = handle_request(state.clone(), "project.autoMemory.agentList", json!({"sessionId":session.id,"boundPath":slot}), tx).await.unwrap();
+        assert!(read.get("memoryAlias").is_none(), "unverified owner instructions are revoked");
+        assert_eq!(read["memory"]["content"], "", "Git-verified shared memory is independent of the legacy projection");
+    }).await;
 }

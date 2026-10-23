@@ -281,7 +281,7 @@ Each ADR includes:
 | 0231 | Ideographic comma opens the composer slash menu | Accepted (amends D123 / D139 / ADR 0024; issue #65) |
 | 0232 | Keep macOS DMG opening guidance text-only | Superseded for macOS distribution by 0309 |
 | 0233 | Renderer-owned multi-folder project creation | Accepted (amends ADR 0011 / ADR 0016) |
-| 0234 | Keep project memory host-owned and path-scoped | Accepted |
+| 0234 | Keep project memory host-owned and path-scoped | Accepted (amended by worktree-project-memory-spaces) |
 | 0235 | Preserve domain facades and enforce architecture budgets | Accepted |
 | 0236 | Restore archived projects when session import adds a bound session | Accepted |
 | 0237 | Keep Session Orchestration in an Official Plugin | Accepted |
@@ -296,7 +296,7 @@ Each ADR includes:
 | 0246 | Opt-in subagent inheritance of the parent tool catalog | Accepted (amends 0062; issue #215 / PR #319) |
 | 0247 | Git clone accepts only syntactically public hosts | Accepted (amends home git clone; D416) |
 | 0248 | [Package theme assets and contributed window backgrounds](0248-plugin-theme-assets-and-window-background.md) | Accepted (issue #335) |
-| 0249 | ChatGPT-style logical project groups | Accepted (amends ADR 0233 / ADR 0234 / ADR 0016) |
+| 0249 | ChatGPT-style logical project groups | Accepted (amends ADR 0233 / ADR 0234 / ADR 0016; amended by worktree-project-memory-spaces) |
 | 0261 | [Plugin Appearance Extensions](0261-plugin-appearance-extensions.md) | Accepted for implementation |
 | 0251 | [Deleting a project removes its owned sessions](0251-project-delete-with-owned-sessions.md) | Accepted |
 | global-sidebar-pins | [Show pinned conversations in a global sidebar section](global-sidebar-pins.md) | Accepted (amends ADR 0016; issue #306) |
@@ -379,6 +379,7 @@ Each ADR includes:
 | 0319 | [Offer the Advisor tool in Plan and Goal modes](0319-advisor-tool-contract-modes.md) | Accepted (D642) |
 | unattended-interaction-policy | [Host-owned unattended interaction policy](unattended-interaction-policy.md) | Accepted for implementation |
 | external-ask-answering-over-mcp | [External ask answering over local MCP](external-ask-answering-over-mcp.md) | Accepted for implementation; implementation and acceptance pending |
-| worktree-memory-owner | [Resolve verified worktree memory without aliasing workspace access](worktree-memory-owner.md) | Accepted for the implementation candidate |
+| worktree-memory-owner | [Resolve verified worktree memory without aliasing workspace access](worktree-memory-owner.md) | Accepted; amended by worktree-project-memory-spaces |
+| worktree-project-memory-spaces | [Share durable project memory across verified worktrees](worktree-project-memory-spaces.md) | Accepted for the implementation candidate; user acceptance pending |
 
 - [Explicit Team task dispatch and queued-message age](team-task-dispatch-age.md)

@@ -16,15 +16,15 @@ The rules below govern every change to the PI-Desktop codebase and documentation
 
 - Every code, config, or UX change that alters observable behavior must update the relevant `docs/spec/` document before or alongside the change.
 - Architectural boundary changes (process model, IPC contract, storage ownership, security boundary) also require an ADR — see `docs/adr/README.md`.
-- Pure refactor that preserves behavior and API contracts does not require spec updates, but must still be committed (R2).
+- Pure refactor that preserves behavior and API contracts does not require spec updates. Commit only when the user explicitly asks (R2).
 
-### R2 — Commit-per-change
+### R2 — Explicit Commit Authorization
 
-> **Every completed logical change must be git committed.**
+> **Create commits only when the user explicitly asks for a commit.**
 
-- No large uncommitted piles of work. Each logical unit of work — a feature, a fix, a spec update, a chore — gets its own commit.
-- Uncommitted work at session end is a violation of this rule.
-- If a change is incomplete, either commit it as a draft with a `WIP:` prefix or roll it back.
+- Keep the requested change reviewable in its dedicated branch and worktree.
+- An incomplete or uncommitted change may remain in that worktree; do not make a
+  WIP commit or roll back user-authorized work to satisfy this rule.
 
 ### R3 — E2E coverage doc
 
@@ -65,9 +65,9 @@ The rules below govern every change to the PI-Desktop codebase and documentation
   logs, and artifacts isolated; install or rebuild only when host dependencies
   are missing or incompatible, and record the reason.
 - Development commits and direct pushes on `main` are forbidden.
-- A commit request does not itself authorize remote publishing. If remote
-  delivery has not been authorized, stop after the request-branch commit in the
-  worktree. Do not merge the task into local `main` to create an E2E candidate.
+- A commit request does not itself authorize remote publishing. Do not commit
+  without the explicit request, or merge the task into local `main` to create an
+  E2E candidate.
 - Before opening or updating a PR/MR, fetch `origin/main` and make it an
   ancestor of the request head (`git merge-base --is-ancestor origin/main HEAD`,
   or `pnpm check:pr-base`). Refresh in the task worktree (`git rebase
@@ -469,7 +469,8 @@ The repository uses a mandatory request-branch and worktree workflow:
   when sharing would be unsafe or incompatible, but that state stays ignored
   and must not leak into commits.
 - **Delivery follows R4's authorization boundary and its fixed order.**
-  Commit-only delivery stops at the request-branch commit in the worktree.
+  A requested commit stays on the request branch unless remote delivery was
+  separately authorized.
   Authorized push/remote delivery first refreshes against latest `origin/main`
   (`pnpm check:pr-base`), runs task-candidate E2E in the worktree (R7), then
   pushes the request branch and opens the PR/MR, merges it into remote `main`

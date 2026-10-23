@@ -37,6 +37,23 @@ function fixture(handler?: (method: string, params: unknown) => Promise<unknown>
 }
 
 describe("project context reverse RPC binding", () => {
+  it("writes shared memory through the checkout binding without accepting a model-supplied owner", async () => {
+    const entry = { id: "shared-note", title: "Package manager", content: "Use pnpm. Source: verified commit abc123." };
+    const alias = { memory: { content: entry.content, entries: [entry] }, instructions: "Shared rules." };
+    const { launch, probe, calls } = fixture(async () => ({ memory: alias.memory, autoRecordEnabled: true, memoryAlias: alias }));
+    const checkout = "/worktrees/music/fix-lyrics";
+    await launch("bound", checkout);
+    expect(await probe("project.autoMemory.agentList", { sessionId: "bound", boundPath: "/owner/music" }))
+      .toMatchObject({ memoryAlias: alias, autoRecordEnabled: true });
+    expect(await probe("project.autoMemory.agentUpsert", {
+      sessionId: "bound", boundPath: "/owner/music", memorySpaceId: "spoofed", title: entry.title, content: entry.content,
+    })).toMatchObject({ memoryAlias: alias });
+    expect(calls).toEqual([
+      { method: "project.autoMemory.agentList", params: { sessionId: "bound", boundPath: checkout } },
+      { method: "project.autoMemory.agentUpsert", params: { sessionId: "bound", boundPath: checkout, title: entry.title, content: entry.content } },
+    ]);
+  });
+
   it("refreshes an alias through the original slot binding without adopting owner paths", async () => {
     let alias = { memory: { content: "Owner notes.", entries: [] }, instructions: "Owner rules." };
     const { launch, probe, calls } = fixture(async () => ({ memory: alias.memory, autoRecordEnabled: false, memoryAlias: alias }));

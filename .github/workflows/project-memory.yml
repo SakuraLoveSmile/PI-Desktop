@@ -1,0 +1,76 @@
+name: Project memory regression
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/project-memory.yml'
+      - 'crates/host-core/src/db/project_memory*'
+      - 'crates/host-core/src/db/project_memory_spaces/**'
+      - 'crates/host-core/src/rpc/project_memory*'
+      - 'crates/host-core/src/rpc/project_history.rs'
+      - 'crates/host-core/src/project_memory_owner*'
+      - 'packages/agent-runtime/src/project-memory*'
+      - 'packages/agent-runtime/src/project-auto-memory*'
+      - 'packages/host-runtime/src/launch-resolver*'
+      - 'apps/desktop/src/**/memory-projects.ts'
+      - 'apps/desktop/src/**/ProjectMemory*'
+      - 'apps/desktop/src/**/useProjectMemory*'
+      - 'apps/desktop/test/app-store-sidebar.test.mjs'
+      - 'apps/desktop/test/project-delete.test.mjs'
+      - 'apps/desktop/test/project-edit.test.mjs'
+      - 'apps/desktop/test/sidebar-navigation.test.mjs'
+      - 'apps/desktop/test/fixtures/settings-memory*'
+      - 'scripts/e2e/worktree-memory-context.mjs'
+      - 'scripts/e2e-project-context.mjs'
+      - 'scripts/e2e-settings-memory.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: project-memory-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  memory:
+    name: Shared project memory / history / checkout isolation
+    runs-on: macos-15
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install clean-runner dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Fetch Electron
+        run: node apps/desktop/node_modules/electron/install.js
+      - name: Build the candidate
+        run: |
+          cargo build -p host-core --locked
+          pnpm build:js
+      - name: Verify real Host and Sidecar project context
+        env:
+          PI_DESKTOP_HOST_BIN: ${{ github.workspace }}/target/debug/pi-desktop-host-core
+          PI_CONTEXT_EVIDENCE_DIR: ${{ github.workspace }}/.artifacts/project-memory/protocol
+        run: |
+          mkdir -p .artifacts/project-memory
+          git rev-parse HEAD > .artifacts/project-memory/candidate.txt
+          node scripts/e2e-project-context.mjs --worktree-memory 2>&1 | tee .artifacts/project-memory/protocol.log
+      - name: Verify project grouping and memory editor
+        run: |
+          node scripts/e2e-settings-memory.mjs 2>&1 | tee .artifacts/project-memory/settings.log
+          node scripts/e2e-project-auto-memory.mjs 2>&1 | tee .artifacts/project-memory/editor.log
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: project-memory-evidence
+          path: .artifacts/project-memory/
+          if-no-files-found: warn

@@ -157,6 +157,9 @@ impl Database {
     }
 
     pub fn get_auto_record_enabled(&self, path: &str) -> Result<bool> {
+        if let Some(space) = self.project_memory_space_for_path(path)? {
+            return self.get_memory_space_auto_record_enabled(&space.id);
+        }
         self.migrate_legacy_auto_entries(path)?;
         Ok(self
             .legacy_auto_memory(&self.auto_memory_key(path)?)?
@@ -164,6 +167,9 @@ impl Database {
     }
 
     pub fn set_auto_memory_enabled(&self, path: &str, enabled: bool) -> Result<bool> {
+        if let Some(space) = self.project_memory_space_for_path(path)? {
+            return self.set_memory_space_auto_record_enabled(&space.id, enabled);
+        }
         self.migrate_legacy_auto_entries(path)?;
         self.kv_set(
             NAMESPACE,

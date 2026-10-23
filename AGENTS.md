@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Policy-Sync: 2026-10-10.1
+Policy-Sync: 2026-10-22.1
 
 Mandatory rules for AI coding agents working in PI-Desktop.
 
@@ -206,6 +206,17 @@ Every development request uses:
 The primary checkout and local `main` are coordination surfaces, not
 development workspaces.
 
+Create every new worktree, including subagent and temporary integration or
+validation worktrees, under:
+
+```text
+/Users/sakurasep/Documents/Code/Project/Project Worktree/PI-Desktop/<short-description>/
+```
+
+Before creating one, inspect `git status --short --branch` and `git worktree
+list` and confirm task ownership. If the worktree tool cannot select this
+location, use `git worktree add` with the quoted absolute path.
+
 ### Never
 
 * develop directly on `main`
@@ -292,7 +303,7 @@ behind `origin/main`.
 2. implement in the request worktree
 3. run targeted static/unit/integration checks
 4. review the task diff
-5. commit the task
+5. commit the task only when the user explicitly requested a commit
 6. refresh the task branch against latest origin/main (`pnpm check:pr-base`)
 7. resolve conflicts inside the task worktree
 8. run required task-candidate E2E in the task worktree

@@ -16,7 +16,8 @@ import { TooltipButton, cx } from "./ui";
 /** Default number of most-recent sessions shown per project group before the rest fold. */
 const MAX_VISIBLE_SESSIONS = 10;
 import { portalToBody } from "../lib/portal-visibility";
-import { appendSessionToOpenProject } from "../lib/session-projects";
+import { buildSidebarMemoryProjects, type SidebarMemoryProject } from "../lib/memory-projects";
+import { useProjectMemoryGroups } from "./useProjectMemoryGroups";
 import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
 import { SessionHoverCard } from "../features/sessions/SessionHoverCard";
@@ -101,17 +102,7 @@ import {
   IconX,
 } from "./icons";
 
-type ProjectEntry = {
-  path: string;
-  key: string;
-  name: string;
-  sessions: SessionSummary[];
-  open: boolean;
-  active: boolean;
-  meta: ProjectMeta;
-  /** Best-effort git branch from the project workspace, if known. */
-  branch?: string;
-};
+type ProjectEntry = SidebarMemoryProject;
 
 const VIEWPORT_PADDING = 8;
 
@@ -490,29 +481,6 @@ export function Sidebar({
   const activeProjectPath = normalizeProjectPath(activeProjectPathState ?? workspace?.path);
   const selectedSessionId = selectingSessionId ?? activeSessionId;
 
-  useEffect(() => {
-    const selected = sessions.find((session) => session.id === selectedSessionId);
-    if (selected?.team?.role !== "member") {
-      lastRevealedTeamChildRef.current = selectedSessionId ?? null;
-      return;
-    }
-    if (lastRevealedTeamChildRef.current === selected.id) return;
-    lastRevealedTeamChildRef.current = selected.id;
-    const leadId = selected.team.teamSessionId;
-    const lead = sessions.find((session) => session.id === leadId && session.team?.role === "lead");
-    if (lead && useAppStore.getState().sessionMeta[leadId]?.teamExpanded !== true) {
-      setTeamExpanded(leadId, true);
-    }
-    const projectPath = normalizeProjectPath(selected.projectPath);
-    if (lead && projectPath) {
-      setExpandedProjectSessions((current) => ({ ...current, [projectPath]: true }));
-    }
-    const frame = window.requestAnimationFrame(() => {
-      document.querySelector<HTMLElement>(`[data-sidebar-session-row="${CSS.escape(selected.id)}"]`)
-        ?.scrollIntoView({ block: "nearest" });
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [selectedSessionId, sessions, setTeamExpanded]);
   const openProjectPaths = useMemo(
     () =>
       openProjectPathsState
@@ -749,45 +717,12 @@ export function Sidebar({
     [pinnedSessions],
   );
 
+  const { groups: memoryGroups, refresh: refreshMemoryGroups } = useProjectMemoryGroups(
+    JSON.stringify([openProjectPaths, workspace?.path, selectedSessionId, sessions.map((session) => session.id)]),
+  );
   const projectEntries = useMemo(() => {
-    const byPath = new Map<string, ProjectEntry>();
-    const add = (rawPath: string, name?: string, branch?: string, open = false) => {
-      const normalized = normalizeProjectPath(rawPath);
-      if (!normalized) return;
-      const existing = byPath.get(normalized);
-      if (existing) {
-        existing.open ||= open;
-        if (name && existing.name === projectName(existing.path)) existing.name = name;
-        if (branch && !existing.branch) existing.branch = branch;
-        return;
-      }
-      const meta = projectMetaFor(rawPath, projectMeta);
-      byPath.set(normalized, {
-        path: rawPath,
-        key: normalized,
-        name: projectName(rawPath, meta.name ?? name),
-        sessions: [],
-        open,
-        active: normalized === activeProjectPath,
-        meta,
-        branch,
-      });
-    };
-    for (const path of openProjectPaths) {
-      const record = openProjects.find(
-        (project) => normalizeProjectPath(project.path) === path,
-      );
-      add(path, record?.name, record?.branch, true);
-    }
-    if (workspace?.path) add(workspace.path, workspace.name, workspace.branch, true);
-    for (const session of filtered) {
-      const sessionPath = normalizeProjectPath(session.projectPath);
-      if (!sessionPath) continue;
-      // A closed project remains discoverable in Projects, but its historical
-      // sessions must not recreate a sidebar tab that the user just closed.
-      if (!appendSessionToOpenProject(byPath, sessionPath, session)) continue;
-    }
-    const result = [...byPath.values()].filter(
+    const result = buildSidebarMemoryProjects({ groups: memoryGroups, openPaths: openProjectPaths,
+      workspaces: openProjects, workspace, sessions: filtered, projectMeta, activePath: activeProjectPath }).filter(
       (entry) => showArchived || !entry.meta.archived,
     );
     for (const entry of result) entry.sessions.sort(compareSessions);
@@ -838,18 +773,39 @@ export function Sidebar({
     displayProjectSort,
     sessionMeta,
     compareSessions,
+    memoryGroups,
   ]);
 
-  // Look up project entries by normalized path so session rows can fetch the
-  // workspace name (and any other project metadata) for the hover card.
-  const projectEntriesByPath = useMemo(() => {
-    const map = new Map<string, ProjectEntry>();
-    for (const entry of projectEntries) map.set(entry.key, entry);
-    return map;
-  }, [projectEntries]);
+  const projectEntriesBySession = useMemo(() => new Map(projectEntries.flatMap((entry) =>
+    entry.sessions.map((session) => [session.id, entry] as const))), [projectEntries]);
 
   projectEntriesRef.current = projectEntries;
 
+  useEffect(() => {
+    const selected = sessions.find((session) => session.id === selectedSessionId);
+    if (selected?.team?.role !== "member") {
+      lastRevealedTeamChildRef.current = selectedSessionId ?? null;
+      return;
+    }
+    const entry = projectEntriesBySession.get(selected.id);
+    const revealKey = `${selected.id}:${entry?.key ?? ""}`;
+    if (lastRevealedTeamChildRef.current === revealKey) return;
+    lastRevealedTeamChildRef.current = revealKey;
+    const leadId = selected.team.teamSessionId;
+    const lead = sessions.find((session) => session.id === leadId && session.team?.role === "lead");
+    if (lead && useAppStore.getState().sessionMeta[leadId]?.teamExpanded !== true) {
+      setTeamExpanded(leadId, true);
+    }
+    const projectPath = entry?.key ?? normalizeProjectPath(selected.projectPath);
+    if (lead && projectPath) {
+      setExpandedProjectSessions((current) => ({ ...current, [projectPath]: true }));
+    }
+    const frame = window.requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>(`[data-sidebar-session-row="${CSS.escape(selected.id)}"]`)
+        ?.scrollIntoView({ block: "nearest" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [selectedSessionId, sessions, setTeamExpanded, projectEntriesBySession]);
   const finishProjectReorderPress = useCallback((opts?: { keepClickSuppressed?: boolean }) => {
     const state = projectReorderRef.current;
     if (state) {
@@ -1020,8 +976,7 @@ export function Sidebar({
     temporary: boolean,
   ) => {
     const projectPath = session.projectPath ?? "";
-    const normalizedProjectPath = normalizeProjectPath(projectPath);
-    const entry = projectEntriesByPath.get(normalizedProjectPath ?? "");
+    const entry = projectEntriesBySession.get(session.id);
     revealSessionHoverCard({
       session: { ...session, title: taskTitle(session.title) },
       target,
@@ -1029,7 +984,7 @@ export function Sidebar({
       space: temporary ? t("nav.hoverCardTemporarySpace") : entry?.name ?? projectName(projectPath),
       branch: entry?.branch,
     });
-  }, [projectEntriesByPath, revealSessionHoverCard, t, taskTitle]);
+  }, [projectEntriesBySession, revealSessionHoverCard, t, taskTitle]);
 
   const temporarySessions = useMemo(
     () => filtered
@@ -1368,8 +1323,7 @@ export function Sidebar({
     const next =
       !archived && wasActive
         ? session.projectPath
-          ? projectEntries
-              .find((entry) => entry.key === normalizeProjectPath(session.projectPath))
+          ? projectEntriesBySession.get(session.id)
               ?.sessions.find(
                 (item) =>
                   item.id !== session.id &&
@@ -1414,9 +1368,7 @@ export function Sidebar({
     closeMenus();
     const wasActive = activeSessionId === session.id;
     const sameScope = session.projectPath
-      ? projectEntries.find(
-          (entry) => entry.key === normalizeProjectPath(session.projectPath),
-        )?.sessions ?? []
+      ? projectEntriesBySession.get(session.id)?.sessions ?? []
       : temporarySessions;
     const next = wasActive
       ? sameScope.find(
@@ -1534,12 +1486,15 @@ export function Sidebar({
     }
     setArmedDelete(null);
     closeMenus(false);
-    if (entry.sessions.some((session) => runningSessions[session.id] === true)) {
-      setDeleteProjectFor(entry);
+    const targetSessions = sessions.filter((session) =>
+      entry.roots?.some((root) => normalizeProjectPath(session.projectPath) === normalizeProjectPath(root.path)) ??
+      normalizeProjectPath(session.projectPath) === normalizeProjectPath(entry.actionPath));
+    if (targetSessions.some((session) => runningSessions[session.id] === true)) {
+      setDeleteProjectFor({ ...entry, path: entry.actionPath, sessions: targetSessions });
       return;
     }
     try {
-      await deleteProjectAction(entry.path);
+      await deleteProjectAction(entry.actionPath);
       showToast(t("project.deleted", { name: entry.name }), { variant: "success" });
     } catch (error) {
       // The host refuses a project whose task started after this render.
@@ -1554,7 +1509,7 @@ export function Sidebar({
   const openProjectFolder = async (entry: ProjectEntry) => {
     closeMenus(false);
     try {
-      await api.openProjectFolder(entry.path);
+      await api.openProjectFolder(entry.actionPath);
     } catch (error) {
       reportError(error);
     }
@@ -1562,6 +1517,7 @@ export function Sidebar({
 
   const editProjectEntry = (entry: ProjectEntry, name: string) => {
     renameProject(entry.path, name);
+    refreshMemoryGroups();
   };
 
   const forkSession = async (session: SessionSummary) => {
@@ -1631,7 +1587,7 @@ export function Sidebar({
       // prevents an archived, invisible project from remaining active.
       if (wasActive) {
         if (next) {
-          if (!(await selectProject(next.path))) return;
+          if (!(await selectProject(next.actionPath))) return;
         } else {
           await clearProject();
         }
@@ -1645,7 +1601,9 @@ export function Sidebar({
   const closeProject = async (entry: ProjectEntry) => {
     closeMenus();
     try {
-      await closeProjectAction(entry.path);
+      const members = openProjectPaths.filter((path) =>
+        entry.paths.some((candidate) => normalizeProjectPath(candidate) === path));
+      for (const path of members.length ? members : [entry.path]) await closeProjectAction(path);
     } catch (error) {
       reportError(error);
     }
@@ -1794,7 +1752,7 @@ export function Sidebar({
     if (!dragged) return;
     event.preventDefault();
     event.stopPropagation();
-    void moveSessionToProject(dragged.id, entry.path, entry.name);
+    void moveSessionToProject(dragged.id, entry.actionPath, entry.name);
   };
 
   // Native folder drops on the projects list add or switch to that project.
@@ -1843,7 +1801,7 @@ export function Sidebar({
     const normalizedProjectPath = normalizeProjectPath(session.projectPath);
     const temporary = options?.temporary ?? !normalizedProjectPath;
     const owningProject = options?.global && normalizedProjectPath
-      ? projectEntriesByPath.get(normalizedProjectPath)?.name
+      ? projectEntriesBySession.get(session.id)?.name
         ?? projectName(normalizedProjectPath, projectMetaFor(normalizedProjectPath, projectMeta).name)
       : t("nav.hoverCardTemporarySpace");
     const active = page === "chat" && selectedSessionId === session.id;
@@ -1929,6 +1887,12 @@ export function Sidebar({
           aria-describedby={sessionHoverCard?.session.id === session.id ? `session-hover-${session.id}` : undefined}
         >
           <span className="thread-item-title">{taskTitle(rowTitle)}</span>
+          {!options?.global && options?.projectPath && normalizedProjectPath &&
+              normalizedProjectPath !== normalizeProjectPath(options.projectPath) ? (
+            <span className="thread-item-context" title={session.projectPath ?? undefined}>
+              {projectName(normalizedProjectPath)}
+            </span>
+          ) : null}
           {sessionPinned(session, meta) ? (
             <IconPin size={11} className="thread-item-pin" aria-hidden />
           ) : null}
@@ -2122,7 +2086,7 @@ export function Sidebar({
             const target = event.target as HTMLElement | null;
             if (target?.closest("button, [data-action]")) return;
             void (async () => {
-              if (!entry.active && !(await selectProject(entry.path))) return;
+              if (!entry.active && !(await selectProject(entry.actionPath))) return;
               setCollapsed(entry.path, !collapsedProject);
             })();
           }}
@@ -2166,7 +2130,7 @@ export function Sidebar({
                 return;
               }
               void (async () => {
-                if (!entry.active && !(await selectProject(entry.path))) return;
+                if (!entry.active && !(await selectProject(entry.actionPath))) return;
                 setCollapsed(entry.path, !collapsedProject);
               })();
             }}
@@ -2219,7 +2183,7 @@ export function Sidebar({
             className="sidebar-session-group-add"
             tooltip={entry.active ? t("project.newTask") : t("project.openAndNewTask", { defaultValue: "Open project and create task" })}
             ariaLabel={entry.active ? t("project.newTask") : t("project.openAndNewTask", { defaultValue: "Open project and create task" })}
-            onClick={() => void createProjectSession(entry.path)}
+            onClick={() => void createProjectSession(entry.actionPath)}
           >
             <IconNewSession size={13} />
           </TooltipButton>
@@ -2485,9 +2449,10 @@ export function Sidebar({
               type="button"
               role="menuitem"
               data-action="edit-project"
+              title={entry.actionPath}
               onClick={() => {
                 closeMenus(false);
-                setEditProjectFor(entry);
+                setEditProjectFor({ ...entry, path: entry.actionPath });
               }}
             >
               <IconPencil size={14} />
@@ -2522,6 +2487,7 @@ export function Sidebar({
               role="menuitem"
               className={cx("danger", armedDelete === projectDeleteKey(entry) && "is-armed")}
               data-action="delete-project"
+              title={entry.actionPath}
               data-armed={armedDelete === projectDeleteKey(entry) ? "true" : undefined}
               onClick={() => void requestDeleteProject(entry)}
             >

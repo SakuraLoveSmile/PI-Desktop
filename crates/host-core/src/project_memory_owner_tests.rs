@@ -262,3 +262,73 @@ async fn project_memory_owner_rejects_detached_registry_with_attached_actual_hea
     );
     std::fs::write(f.slot.join(".git"), original).unwrap();
 }
+
+#[tokio::test]
+async fn project_memory_preparation_verifies_branches_subprojects_and_independent_repositories() {
+    let f = Fixture::new();
+    let branch = f.dir.path().join("ordinary-branch");
+    git(
+        &f.repository,
+        &[
+            "worktree",
+            "add",
+            "-q",
+            "-b",
+            "ordinary",
+            branch.to_str().unwrap(),
+        ],
+    );
+    let main = prepare(f.repository.to_str().unwrap()).await.unwrap();
+    let detached = prepare(f.slot.to_str().unwrap()).await.unwrap();
+    let attached = prepare(branch.to_str().unwrap()).await.unwrap();
+    assert_eq!(main.repository_identity, detached.repository_identity);
+    assert_eq!(main.repository_identity, attached.repository_identity);
+    assert_eq!(attached.primary_path, f.repository.to_str().unwrap());
+    let subproject = branch.join("subproject");
+    std::fs::create_dir(&subproject).unwrap();
+    assert!(prepare(subproject.to_str().unwrap()).await.is_none());
+    let other = Fixture::new();
+    assert_ne!(
+        main.repository_identity,
+        prepare(other.repository.to_str().unwrap())
+            .await
+            .unwrap()
+            .repository_identity
+    );
+    let original = std::fs::read(f.slot.join(".git")).unwrap();
+    std::fs::copy(branch.join(".git"), f.slot.join(".git")).unwrap();
+    assert!(
+        prepare(f.slot.to_str().unwrap()).await.is_none(),
+        "copied administrative pointers cannot impersonate another checkout"
+    );
+    std::fs::write(f.slot.join(".git"), original).unwrap();
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn project_memory_repository_identity_survives_a_primary_checkout_move() {
+    let f = Fixture::new();
+    git(
+        &f.repository,
+        &["worktree", "remove", f.slot.to_str().unwrap()],
+    );
+    let before = prepare(f.repository.to_str().unwrap()).await.unwrap();
+    let moved = f.dir.path().join("renamed-repository");
+    std::fs::rename(&f.repository, &moved).unwrap();
+    let after = prepare(moved.to_str().unwrap()).await.unwrap();
+    assert_eq!(before.repository_identity, after.repository_identity);
+    assert_ne!(before.git_common_dir, after.git_common_dir);
+}
+
+#[test]
+fn project_memory_owner_missing_birthtime_never_guesses_repository_identity() {
+    let dir = tempfile::tempdir().unwrap();
+    let metadata = std::fs::metadata(dir.path()).unwrap();
+    assert!(directory_identity_with_created(dir.path(), &metadata, None).is_none());
+    assert!(directory_identity_with_created(
+        dir.path(),
+        &metadata,
+        Some(std::time::UNIX_EPOCH + Duration::from_secs(42))
+    )
+    .is_some());
+}

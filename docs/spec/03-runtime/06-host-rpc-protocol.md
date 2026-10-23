@@ -253,15 +253,19 @@ type ToolBudgetHealth = {
   attached session has a running turn, before changing group membership, so a
   live turn never loses the transcript it is writing and a rejected delete
   leaves the project group unchanged.
-- `project.memory.get({ path })` — returns the durable memory for the canonical
-  project path, or an empty record when no memory has been saved
+- `project.memory.get({ path })` — returns the durable memory resolved for that
+  checkout's stable memory owner, with legacy path/group fallback when applicable;
+  an authoritative empty shared collection never resurrects old source notes
 - `project.memory.set({ path, entries })` — normalizes and stores visual memory
   entries, derives readable `content`, and validates the 32 KiB limit. The
   derived value is injected into that project's next runtime context as
   user-provided context. `{ path, content }` remains supported for legacy
   callers and returns a memory record without structured entries.
-- `project.groups.list` — returns one host-owned logical group per named
-  project. Existing path-only records are compatibility `legacy` groups.
+- `project.groups.list` — returns the actual Host-owned group records, with
+  additive `memoryProject: {id, name, primaryPath, paths}` when shared ownership
+  is verified. UI display may fold equal memory IDs; roots/group IDs are unchanged
+  and metadata paths never grant file access. Existing path-only records are
+  compatibility `legacy` groups.
 - `project.group.create({ name, folders })` — validates the display name and
   local directories, stores the ordered roots, and returns the new group
   without changing the active workspace. A non-legacy root cannot belong to a
@@ -274,7 +278,10 @@ type ToolBudgetHealth = {
   suppressed historical paths rather than reappearing as standalone legacy
   groups.
 - `project.group.memory.get/set({ groupId, entries })` — reads or normalizes
-  shared group memory using the existing 32 KiB entry limit.
+  the group's resolved memory collection using the existing 32 KiB rendered
+  limit and legacy-write protections. Explicit multi-root groups keep one
+  logical memory across Git and non-Git roots; distinct explicit groups are
+  not automatically merged.
 - `project.group.instructions.get/set({ groupId, content })` — reads or stores
   shared group instructions using a bounded host-owned value.
 - `project.group.context({ path })` — resolves the group containing a primary or
@@ -1944,7 +1951,7 @@ side effects, so a partial request cannot reset unrelated runtime policy.
 
 | Method | Parameters | Result |
 | --- | --- | --- |
-| `project.memory.editor.get` | `path` | `{editor: {owner, memory, autoRecordEnabled}}` |
+| `project.memory.editor.get` | `path` | `{editor: {owner, memory, autoRecordEnabled, migrationRequired?}}` |
 | `project.memory.editor.save` | `path, expectedOwner, expectedMemory, entries` | `{editor}` after owner/snapshot CAS |
 | `project.autoMemory.setEnabled` | `path, expectedOwner, enabled` | `{autoRecordEnabled}` |
 | `project.autoMemory.agentList` | trusted `sessionId, boundPath` | `{memory, autoRecordEnabled, memoryAlias?}` |
@@ -1960,8 +1967,9 @@ rewrites the path from trusted session launch state and forwards only approved
 fields. Agent memory writes require opt-in and Agent execution mode; Plan/Goal
 are read-only, including code-cache clear. Invalid input and CAS/owner conflicts
 are observable errors; no partial memory save is published. History search is
-scoped before pagination. Context reads enforce the same current group membership
-and exclude deleted sources. Code index scanning runs outside the async worker
+scoped before pagination. Context reads enforce the same bound memory identity
+(or legacy group scope), include associated worktree sources and exclude deleted
+or unrelated sources. Code index scanning runs outside the async worker
 and binding is rechecked after the blocking operation.
 ## Session activity RPCs
 
@@ -2268,27 +2276,57 @@ confirmed-roster settlement nudges. Members and non-Team sessions are outside
 this rule. No tools are inferred or executed from textual pseudo calls, and
 normal final-answer/event/usage semantics remain unchanged.
 
-## Verified worktree memory aliases
+## Verified worktree memory spaces and aliases
 
-`project.group.context({path})` may additionally return
-`memoryAlias: {memory: ProjectMemory, instructions: string}`. Its existing
-`context` remains the requested slot's actual group context, including null;
-the alias never carries the owner's roots or changes group membership. Presence
-is authoritative even for empty memory/instructions. Ordinary responses omit
-the additive field. `project.memory.get` resolves the same verified owner as
-the fallback memory reader.
+`project.group.context({path})` may return
+`memoryAlias: {memory: ProjectMemory, instructions: string}` alongside the actual
+checkout's existing `context`, including null. Generic registered worktrees
+replace only the memory in their actual context or the fallback memory read;
+their ordinary group instructions and roots are unchanged. KaneoPilot's validated schema-1 slot
+alias retains its earlier owner-group instruction compatibility. Neither
+projection carries owner roots. Presence is authoritative for empty content.
 
-`project.autoMemory.agentList` resolves the stored session project after the
-existing trusted binding check and returns the same optional alias. File/Git
-validation runs outside the Host mutex and SQLite transactions; the Host then
-rechecks the session binding before reading memory. Agent callers cannot
-substitute the real root as `boundPath`. Alias reads do not migrate or write
-`kv`; effective `autoRecordEnabled` is false. Plan/Goal writes retain
-`TOOL_DISABLED_IN_PLAN`. Other alias writes (legacy memory setter, snapshot
-editor save, setEnabled and agent mutations) are rejected rather than
-redirected. Group-id setters keep their existing explicit group semantics.
+Host validates Git evidence outside its mutex/SQLite transactions, then registers
+or resolves a generated stable memory UUID. `memory:<uuid>` is the shared owner
+used by editor Save and setEnabled. Initial registration/import may write
+versioned `kv` associations; steady-state reads do not rewrite them. Old path and
+group collections are retained. Explicit multi-root groups preserve their own
+stable logical boundary across selected Git/non-Git roots; automatic worktree
+association does not combine distinct explicit groups.
 
-A missing/invalid projection produces bounded diagnostics without memory bytes
-or credentials and preserves ordinary slot ownership semantics. A later
-missing alias or failed refresh revokes the previous alias instructions and
-notes, including when the prior response was nonempty.
+Automatic Git sharing requires reliable common-directory birth/creation metadata
+and filesystem identity. Missing metadata preserves the original scope; non-Unix
+moves are not inferred, and no `.git` marker is created. Explicit user groups
+can still share selected roots without that automatic evidence. Root edits keep
+the group's existing logical-memory semantics, unlike automatic slot reuse.
+
+`project.memory.editor.get/save` operate on the resolved collection. Save compares
+both `expectedOwner` and the complete `expectedMemory` snapshot. Source imports
+are atomic, preserve differing notes with attribution and never truncate to the
+32 KiB rendered limit. If the aggregate is too large, the legacy editor returns
+`migrationRequired: true`, effective recording false and the original source
+snapshot. Manual CAS editing remains available; shorten/export sources, save and
+reload to retry. Runtime writes surface `PROJECT_MEMORY_MIGRATION_REQUIRED`;
+failed association publishes no partial collection. Empty shared content never
+falls back to an old preserved source.
+
+`project.autoMemory.agentList` and mutations validate trusted `sessionId` and
+actual `boundPath`, recheck the session after repository probing and enforce its
+persisted memory identity. Model callers cannot substitute the owner's root.
+Stable shared slots allow Agent mutations only after opt-in and entry CAS.
+Plan/Goal retain `TOOL_DISABLED_IN_PLAN`. Legacy slot alias fallback without a
+stable space keeps recording false and rejects mutations with
+`MEMORY_ALIAS_READ_ONLY`. Missing/replaced checkout identity returns
+`PROJECT_CHANGED` instead of silently reading or writing its former owner.
+
+`session.list` adds optional `memoryProjectId` from Host session associations,
+without changing the persisted session record shape. Existing conversations keep
+the captured space across checkout removal or path reuse; only an explicit
+session move replaces that binding. `project.history.search/context` resolve the
+caller's stable space and retain historical source membership across worktrees,
+including removed slots. A reused path's new repository gets its own scope and
+cannot acquire old source sessions. File/Git/CodeSearch containment still follows
+the actual checkout and explicit tool group.
+
+A failed refresh revokes prior alias notes/instructions. Invalid external slot
+projections yield bounded diagnostics without memory bytes or credentials.

@@ -2,12 +2,56 @@ use super::*;
 
 fn memory_rpc_error(error: anyhow::Error) -> JsonRpcError {
     use crate::db::ProjectMemoryConflict;
+    if error.is::<crate::db::ProjectMemoryMigrationRequired>() {
+        return rpc_err(1008, error.to_string(), "PROJECT_MEMORY_MIGRATION_REQUIRED");
+    }
     match error.downcast_ref::<ProjectMemoryConflict>() {
         Some(ProjectMemoryConflict::Owner) => rpc_err(1008, error.to_string(), "PROJECT_CHANGED"),
         Some(ProjectMemoryConflict::Snapshot | ProjectMemoryConflict::Entry) => {
             rpc_err(1008, error.to_string(), "CONFLICT")
         }
         None => rpc_err(1002, error.to_string(), "INVALID_PARAMS"),
+    }
+}
+
+/// Fresh Git evidence or explicit group membership attaches memory only. A
+/// failed aggregate migration keeps the old editor usable for recovery.
+fn prepare_memory_space(
+    db: &crate::db::Database,
+    path: &str,
+    prepared: Option<&crate::project_memory_owner::PreparedMemoryProject>,
+) -> Result<(bool, bool), JsonRpcError> {
+    match prepared {
+        Some(prepared) => match db.ensure_project_memory_space(prepared) {
+            Ok(_) => Ok((true, false)),
+            Err(error) if error.is::<crate::db::ProjectMemoryMigrationRequired>() => {
+                Ok((false, true))
+            }
+            Err(error) => Err(memory_rpc_error(error)),
+        },
+        None => {
+            match db.ensure_explicit_group_memory_space(path) {
+                Ok(Some(_)) => return Ok((true, false)),
+                Ok(None) => {}
+                Err(error) if error.is::<crate::db::ProjectMemoryMigrationRequired>() => {
+                    return Ok((false, true))
+                }
+                Err(error) => return Err(memory_rpc_error(error)),
+            }
+            db.clear_project_memory_space_path(path)
+                .map_err(memory_rpc_error)?;
+            if db
+                .project_memory_space_path_revoked(path)
+                .map_err(memory_rpc_error)?
+            {
+                return Err(rpc_err(
+                    1008,
+                    "checkout identity unavailable; original project memory remains preserved",
+                    "PROJECT_CHANGED",
+                ));
+            }
+            Ok((false, false))
+        }
     }
 }
 
@@ -83,15 +127,41 @@ pub(super) async fn context(
         .get("path")
         .and_then(Value::as_str)
         .ok_or_else(|| rpc_err(1002, "path required", "INVALID_PARAMS"))?;
+    let prepared = crate::project_memory_owner::prepare(path).await;
     let owner = crate::project_memory_owner::resolve(path).await;
     let st = state.lock().await;
-    let context = st
+    let (shared, migration_required) = prepare_memory_space(&st.db, path, prepared.as_ref())?;
+    if migration_required {
+        return Err(memory_rpc_error(
+            crate::db::ProjectMemoryMigrationRequired.into(),
+        ));
+    }
+    let mut context = st
         .db
         .project_group_context_for_path(&owner.requested_path)
         .map_err(memory_rpc_error)?;
+    if shared {
+        if let Some(context) = context.as_mut() {
+            context.memory = st
+                .db
+                .get_project_memory_editor(path)
+                .map_err(memory_rpc_error)?
+                .memory;
+        }
+    }
     let mut result = json!({ "context": context });
     if owner.is_alias {
-        result["memoryAlias"] = memory_alias(&st.db, &owner.owner_path)?;
+        let mut alias = memory_alias(&st.db, &owner.owner_path)?;
+        if shared {
+            alias["memory"] = serde_json::to_value(
+                st.db
+                    .get_project_memory_editor(path)
+                    .map_err(memory_rpc_error)?
+                    .memory,
+            )
+            .map_err(|error| rpc_err(1000, error.to_string(), "INTERNAL"))?;
+        }
+        result["memoryAlias"] = alias;
     }
     Ok(result)
 }
@@ -103,10 +173,14 @@ pub(super) fn ensure_legacy_write_allowed(
     db: &crate::db::Database,
     path: &str,
 ) -> Result<(), JsonRpcError> {
-    if db
+    if (db
         .project_group_for_path(path)
         .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?
         .is_some()
+        || db
+            .project_memory_space_for_path(path)
+            .map_err(memory_rpc_error)?
+            .is_some())
         && db
             .get_auto_record_enabled(path)
             .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?
@@ -131,20 +205,45 @@ pub(super) async fn handle(
                 .get("path")
                 .and_then(Value::as_str)
                 .ok_or_else(|| rpc_err(1002, "path required", "INVALID_PARAMS"))?;
+            let prepared = crate::project_memory_owner::prepare(path).await;
             let owner = crate::project_memory_owner::resolve(path).await;
-            if owner.is_alias && method == "project.memory.set" {
+            let st = state.lock().await;
+            let (shared, migration_required) =
+                prepare_memory_space(&st.db, path, prepared.as_ref())?;
+            if !shared && owner.is_alias && !migration_required && method == "project.memory.set" {
                 return Err(alias_read_only());
             }
-            let st = state.lock().await;
             let memory = if method == "project.memory.get" {
-                if owner.is_alias {
+                if migration_required {
+                    st.db
+                        .get_legacy_project_memory_editor(path)
+                        .map(|editor| editor.memory)
+                } else if shared {
+                    st.db
+                        .get_project_memory_editor(path)
+                        .map(|editor| editor.memory)
+                } else if owner.is_alias {
                     st.db.get_project_memory_readonly(&owner.owner_path)
                 } else {
                     st.db.get_project_memory(path)
                 }
             } else {
-                ensure_legacy_write_allowed(&st.db, path)?;
-                if let Some(entries) = params.get("entries") {
+                if migration_required {
+                    if st.db.get_auto_record_enabled_readonly(path).map_err(memory_rpc_error)? {
+                        return Err(rpc_err(1008, "automatic recording is enabled; use the project memory snapshot editor", "CONFLICT"));
+                    }
+                } else {
+                    ensure_legacy_write_allowed(&st.db, path)?;
+                }
+                if shared {
+                    let project = st.db.project_memory_space_for_path(path).map_err(memory_rpc_error)?.ok_or_else(|| rpc_err(1008, "project memory identity changed", "PROJECT_CHANGED"))?;
+                    if let Some(entries) = params.get("entries") {
+                        st.db.set_memory_space_content(&project.id, entries)
+                    } else {
+                        let content = params.get("content").and_then(Value::as_str).ok_or_else(|| rpc_err(1002, "content required", "INVALID_PARAMS"))?;
+                        st.db.set_memory_space_legacy_content(&project.id, content)
+                    }
+                } else if let Some(entries) = params.get("entries") {
                     st.db.set_project_memory_entries(path, entries)
                 } else {
                     let content = params
@@ -155,20 +254,29 @@ pub(super) async fn handle(
                 }
             }
             .map_err(memory_rpc_error)?;
-            Ok(json!({ "memory": memory }))
+            Ok(json!({ "memory": memory, "migrationRequired": migration_required }))
         }
         "project.memory.editor.get" | "project.memory.editor.save" => {
             let path = params
                 .get("path")
                 .and_then(Value::as_str)
                 .ok_or_else(|| rpc_err(1002, "path required", "INVALID_PARAMS"))?;
+            let prepared = crate::project_memory_owner::prepare(path).await;
             let owner = crate::project_memory_owner::resolve(path).await;
-            if owner.is_alias && method == "project.memory.editor.save" {
+            let st = state.lock().await;
+            let (shared, migration_required) =
+                prepare_memory_space(&st.db, path, prepared.as_ref())?;
+            if !shared
+                && !migration_required
+                && owner.is_alias
+                && method == "project.memory.editor.save"
+            {
                 return Err(alias_read_only());
             }
-            let st = state.lock().await;
             let editor = if method == "project.memory.editor.get" {
-                if owner.is_alias {
+                if migration_required {
+                    st.db.get_legacy_project_memory_editor(path)
+                } else if !shared && owner.is_alias {
                     st.db
                         .get_project_memory_editor_readonly(&owner.owner_path)
                         .map(|mut editor| {
@@ -189,8 +297,13 @@ pub(super) async fn handle(
                 let entries = params
                     .get("entries")
                     .ok_or_else(|| rpc_err(1002, "entries required", "INVALID_PARAMS"))?;
-                st.db
-                    .save_project_memory_editor(path, owner, memory, entries)
+                if migration_required {
+                    st.db
+                        .save_legacy_project_memory_editor(path, owner, memory, entries)
+                } else {
+                    st.db
+                        .save_project_memory_editor(path, owner, memory, entries)
+                }
             }
             .map_err(memory_rpc_error)?;
             Ok(json!({ "editor": editor }))
@@ -218,6 +331,7 @@ pub(super) async fn handle(
                     .ok_or_else(|| rpc_err(1002, "path required", "INVALID_PARAMS"))?
                     .to_owned()
             };
+            let prepared = crate::project_memory_owner::prepare(&path).await;
             let owner = crate::project_memory_owner::resolve(&path).await;
             let st = state.lock().await;
             if let Some(expected) = binding {
@@ -229,8 +343,30 @@ pub(super) async fn handle(
                     ));
                 }
             }
-            if owner.is_alias && writing {
+            let (shared, migration_required) =
+                prepare_memory_space(&st.db, &path, prepared.as_ref())?;
+            if migration_required {
+                return Err(memory_rpc_error(
+                    crate::db::ProjectMemoryMigrationRequired.into(),
+                ));
+            }
+            if !shared && owner.is_alias && writing {
                 return Err(alias_read_only());
+            }
+            if shared && is_agent {
+                if let Some(project) = st
+                    .db
+                    .project_memory_space_for_path(&path)
+                    .map_err(memory_rpc_error)?
+                {
+                    let session_id = params
+                        .get("sessionId")
+                        .and_then(Value::as_str)
+                        .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+                    st.db
+                        .bind_project_memory_space_session(session_id, &project.id)
+                        .map_err(memory_rpc_error)?;
+                }
             }
             for field in ["id", "title", "content", "expectedTitle", "expectedContent"] {
                 if params.get(field).is_some_and(|value| !value.is_string()) {
@@ -319,7 +455,7 @@ pub(super) async fn handle(
                         params.get("expectedContent").and_then(Value::as_str),
                     )
                 }
-                _ if owner.is_alias => st
+                _ if !shared && owner.is_alias => st
                     .db
                     .get_project_memory_editor_readonly(&owner.owner_path)
                     .map(|mut editor| {
@@ -344,7 +480,11 @@ pub(super) async fn handle(
             let mut result =
                 json!({ "memory": memory, "autoRecordEnabled": state.auto_record_enabled });
             if owner.is_alias {
-                result["memoryAlias"] = memory_alias(&st.db, &owner.owner_path)?;
+                let mut alias = memory_alias(&st.db, &owner.owner_path)?;
+                if shared {
+                    alias["memory"] = result["memory"].clone();
+                }
+                result["memoryAlias"] = alias;
             }
             Ok(result)
         }
@@ -813,3 +953,8 @@ mod tests {
 
 #[cfg(test)]
 mod project_memory_alias_tests;
+#[cfg(test)]
+mod project_memory_worktree_tests;
+
+#[cfg(test)]
+mod project_memory_group_lifecycle_tests;

@@ -108,10 +108,15 @@ export function ProjectDetailPanel({
                   type="button"
                   className="projects-detail-task"
                   onClick={() => onOpenSession(session.id)}
-                  title={title}
+                  title={session.projectPath ? `${title}\n${session.projectPath}` : title}
                 >
                   <IconChat size={13} className="projects-detail-task-icon" />
                   <span className="projects-detail-task-title">{title}</span>
+                  {project.memoryProject && session.projectPath && session.projectPath !== project.path ? (
+                    <span className="projects-detail-task-updated" title={session.projectPath}>
+                      {session.projectPath.split(/[\\/]/).filter(Boolean).at(-1)}
+                    </span>
+                  ) : null}
                   <span className="projects-detail-task-updated">
                     {formatUpdated(
                       sessionTimestamp(session.updatedAt),

@@ -5,6 +5,7 @@ export const frEntries: ChangelogEntry[] = [
     "version": "0.16.1",
     "date": "2026-10-04",
     "highlights": [
+      "La mémoire du projet et ses conversations restent partagées entre les worktrees Git vérifiés ; l’accès aux fichiers reste limité au checkout réel et les emplacements réutilisés restent isolés.",
       "Choisissez un emplacement de données personnalisé dans les paramètres, suivez une migration à froid vérifiée et ne nettoyez que les caches régénérables.",
       "Les tâches planifiées peuvent s’exécuter par intervalle : de 5 minutes à 24 heures, compté à partir du moment où la tâche a été activée.",
       "La page des tâches planifiées associe la liste des tâches à la tâche sélectionnée : dernier résultat, prochaine exécution, instruction et historique des exécutions.",

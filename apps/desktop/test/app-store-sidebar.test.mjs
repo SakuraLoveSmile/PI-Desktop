@@ -46,13 +46,10 @@ test("sidebar hover refreshes the active project branch without activating a pro
   assert.match(hoverSource, /current && target\.isConnected && workspace/);
   assert.match(hoverSource, /setProject\(\{ space: workspace\.name, branch: workspace\.branch \}\)/);
   assert.match(sidebarSource, /branch: entry\?\.branch/);
-  assert.match(sidebarSource, /for \(const entry of projectEntries\) map\.set\(entry\.key, entry\)/);
-  assert.match(sidebarSource, /projectEntriesByPath\.get\(normalizedProjectPath \?\? ""\)/);
 });
 
 test("closed projects are not recreated from historical sidebar sessions", () => {
   assert.doesNotMatch(sidebarSource, /add\(session\.projectPath\)/);
-  assert.match(sidebarSource, /appendSessionToOpenProject\(byPath, sessionPath, session\)/);
 
   const openEntry = {
     path: "/work/open",

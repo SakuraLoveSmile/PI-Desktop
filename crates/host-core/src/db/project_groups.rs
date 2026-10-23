@@ -163,6 +163,15 @@ impl Database {
     }
 
     pub fn create_project_group(&self, name: &str, paths: &[String]) -> Result<ProjectGroupRecord> {
+        self.create_project_group_with_memory_evidence(name, paths, None)
+    }
+
+    pub(crate) fn create_project_group_with_memory_evidence(
+        &self,
+        name: &str,
+        paths: &[String],
+        prepared: Option<&crate::project_memory_owner::PreparedMemoryProject>,
+    ) -> Result<ProjectGroupRecord> {
         let name = name.trim();
         if name.is_empty() {
             return Err(anyhow!("project group name must not be blank"));
@@ -204,9 +213,6 @@ impl Database {
                 position: position as i64,
             })
             .collect::<Vec<_>>();
-        for path in &canonical_paths {
-            self.ensure_project(path, false)?;
-        }
         let group = ProjectGroupRecord {
             id: Uuid::new_v4().to_string(),
             name: name.to_string(),
@@ -220,7 +226,11 @@ impl Database {
             detached_paths: Vec::new(),
         };
         let transaction = self.conn.unchecked_transaction()?;
+        for path in &canonical_paths {
+            self.ensure_project(path, false)?;
+        }
         self.merge_auto_memory_into_group(&canonical_paths, &group.id)?;
+        self.transition_project_group_memory(&group, prepared)?;
         self.kv_set(GROUP_NAMESPACE, &group.id, &serde_json::to_value(&group)?)?;
         self.merge_path_memories_into_group(&canonical_paths, &group.id)?;
         self.migrate_legacy_auto_entries(&canonical_paths[0])?;
@@ -233,6 +243,16 @@ impl Database {
         id: &str,
         name: &str,
         paths: &[String],
+    ) -> Result<ProjectGroupRecord> {
+        self.update_project_group_with_memory_evidence(id, name, paths, None)
+    }
+
+    pub(crate) fn update_project_group_with_memory_evidence(
+        &self,
+        id: &str,
+        name: &str,
+        paths: &[String],
+        prepared: Option<&crate::project_memory_owner::PreparedMemoryProject>,
     ) -> Result<ProjectGroupRecord> {
         let name = name.trim();
         if name.is_empty() || name.chars().count() > MAX_PROJECT_GROUP_NAME_CHARS {
@@ -286,10 +306,6 @@ impl Database {
                 removed_without_sessions.push(*path);
             }
         }
-        for path in &ordered {
-            self.ensure_project(path, false)?;
-        }
-
         if current.legacy && ordered.len() == 1 {
             self.conn
                 .prepare_cached("UPDATE projects SET name = ?1 WHERE path = ?2")?
@@ -334,6 +350,9 @@ impl Database {
             detached_paths,
         };
         let transaction = self.conn.unchecked_transaction()?;
+        for path in &ordered {
+            self.ensure_project(path, false)?;
+        }
         self.merge_auto_memory_into_group(&ordered, &group.id)?;
         if current.legacy {
             // A legacy project may already have path-scoped memory. Merge the
@@ -377,6 +396,7 @@ impl Database {
                 )?;
             }
         }
+        self.transition_project_group_memory(&group, prepared)?;
         self.kv_set(GROUP_NAMESPACE, &group.id, &serde_json::to_value(&group)?)?;
         self.migrate_legacy_auto_entries(&ordered[0])?;
         transaction.commit()?;
