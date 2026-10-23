@@ -21,6 +21,9 @@ test("the Advisor row reads Off until a model is pinned, and names a stale pin",
   const off = render({});
   assert.match(off, /Advisor/);
   assert.match(off, /model-default-empty">Off</);
+  // The row is the shared ModelPinMenu, so it renders the same anchor and trigger.
+  assert.match(off, /model-default-anchor/);
+  assert.match(off, /model-default-trigger/);
   assert.doesNotMatch(off, /Unavailable\./);
 
   const cleared = render({ advisorProviderId: null, advisorModelId: null });
