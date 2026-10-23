@@ -148,6 +148,8 @@ approval is bound to the entity digest. A changed command, endpoint, script,
 instruction, or credential destination therefore invalidates the old approval.
 Missing provider references are retained as dependency approvals instead of
 being written as unusable defaults; unrelated entities can continue applying.
+A blank prompt-enhancement provider id means follow the Composer, so it is not a
+provider reference and imports without a dependency approval.
 The host never activates staged executable content merely because a UI flag is
 set. Newly imported automation definitions are also disabled until this
 device explicitly takes execution ownership; an existing local task keeps its

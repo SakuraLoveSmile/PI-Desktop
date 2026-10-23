@@ -61,7 +61,7 @@ endpoint 已观测到的状态视为对象不存在，其他非成功响应仍�
 
 本地加密基线是最后一次确认的共同 revision。每个 vault 内的捕获、远端读取、三方合并、不可变对象上传、head 发布和本地应用会串行执行。严格模式使用 CAS head 发布；兼容模式发布每设备指针并合并发现的 tips。标量设置按声明的实体单元合并；provider 记录、MCP 记录、skill package 和 automation 定义不会作为任意 JSON 数组合并。tombstone 表示明确删除；未选择的类别不表示删除。
 
-相同编辑会收敛，不相交编辑可以继续。同一单元编辑以及 delete-versus-edit 会将两个候选都保留为冲突。导入的 MCP、skills、subagents、plugins 和 automations 需要本地激活审批；审批绑定实体 digest。因此命令、endpoint、脚本、指令或凭据目的地改变后，旧审批会失效。缺失的 provider 引用会作为依赖审批保留，而不会被写成不可用的默认值；无关实体仍可继续应用。
+相同编辑会收敛，不相交编辑可以继续。同一单元编辑以及 delete-versus-edit 会将两个候选都保留为冲突。导入的 MCP、skills、subagents、plugins 和 automations 需要本地激活审批；审批绑定实体 digest。因此命令、endpoint、脚本、指令或凭据目的地改变后，旧审批会失效。缺失的 provider 引用会作为依赖审批保留，而不会被写成不可用的默认值；无关实体仍可继续应用。空白的提示词增强 provider ID 表示跟随输入框当前模型，因此它不是 provider 引用，导入时不会产生依赖审批。
 Host 绝不会仅因为 UI flag 被设置就激活暂存的可执行内容。新导入的 automation 定义同样会被禁用，直到本设备明确取得执行所有权；已有本地任务继续使用其设备本地启用状态。
 
 导入路径会在应用每个实体前重新检查捕获到的本地 generation。捕获之后发生的修改会保留，并在下一轮重新协调。持久化的加密 pending bundle 会记录捕获的本地 manifest 和 `applying` 标记；重启恢复会完成已审批步骤，或在认为配置已收敛前保留 bundle 供重试。现有的本地 MCP 直接创建行为不变。

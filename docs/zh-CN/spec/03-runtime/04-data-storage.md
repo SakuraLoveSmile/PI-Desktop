@@ -1268,7 +1268,7 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
 `promptEnhancementCustomTemplate`（决定已存模板是否生效的开关）、
 `promptEnhancementUserTemplate`、`promptEnhancementProviderId`、
 `promptEnhancementModelId` 与 `promptEnhancementThinkingLevel`（ADR 0121）。用户模板缺失或为空表示使用内置默认值，
-因此清空字段不会写入空字符串而是不写该键。非空的用户模板必须包含草稿变量，且
+因此清空字段不会写入空字符串而是不写该键。跟随输入框当前模型时，两个指定字段都存为 `null`，而不是空字符串，因为空的 provider ID 不指向任何提供商。非空的用户模板必须包含草稿变量，且
 不得超过 `PROMPT_ENHANCEMENT_TEMPLATE_MAX_LENGTH`；host-core 会拒绝违反任一规则的
 写入，并丢弃已不再读取的 `promptEnhancementSystemPrompt`。无需提升 schema 版本。
 - Plan 和 Goal 工件永远不会根据转录内容重建。开
