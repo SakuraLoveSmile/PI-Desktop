@@ -37,6 +37,9 @@ jobs:
     name: Shared project memory / history / checkout isolation
     runs-on: macos-15
     timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -60,11 +63,11 @@ jobs:
         run: |
           mkdir -p .artifacts/project-memory
           git rev-parse HEAD > .artifacts/project-memory/candidate.txt
-          node scripts/e2e-project-context.mjs --worktree-memory | tee .artifacts/project-memory/protocol.log
+          node scripts/e2e-project-context.mjs --worktree-memory 2>&1 | tee .artifacts/project-memory/protocol.log
       - name: Verify project grouping and memory editor
         run: |
-          node scripts/e2e-settings-memory.mjs | tee .artifacts/project-memory/settings.log
-          node scripts/e2e-project-auto-memory.mjs | tee .artifacts/project-memory/editor.log
+          node scripts/e2e-settings-memory.mjs 2>&1 | tee .artifacts/project-memory/settings.log
+          node scripts/e2e-project-auto-memory.mjs 2>&1 | tee .artifacts/project-memory/editor.log
       - uses: actions/upload-artifact@v7
         if: always()
         with:

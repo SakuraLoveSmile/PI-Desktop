@@ -129,7 +129,7 @@ app.whenReady().then(async () => {
         document.querySelector('[data-action="delete-project"]').title === '/fixture/pool/music/slot-3'`);
       await click('[data-action="open-project-folder"]');
       await check('shared project folder action opens the actual active checkout', `
-        window.settingsMemoryFixture.requests.filter(request => request.channel.endsWith('/project/open-folder')).at(-1).input === '/fixture/pool/music/slot-3'`);
+        window.settingsMemoryFixture.requests.filter(request => request.channel.endsWith('/project/openFolder')).at(-1).input === '/fixture/pool/music/slot-3'`);
       await click(`${music} .project-more`);
       await click('[data-action="edit-project"]');
       await until(`!!document.querySelector('.project-create-folder-copy[title="/fixture/pool/music/slot-3"]')`);
