@@ -427,19 +427,8 @@ export function subagentProviderLookupError(
   return `no provider matches "${providerId}"`;
 }
 
-/**
- * Resolve every distinct model pin into a provider binding the sidecar can
- * use, keyed by `subagentModelKey`.
- *
- * A pin that cannot be resolved is deliberately left out of the map instead of
- * falling back to the session provider: a definition that asks for a cheap
- * model must not silently start spending the expensive one. The runtime turns
- * the missing entry into a tool error naming the pin.
- */
-export async function resolveSubagentProviders(input: {
-  definitions: readonly SubagentDefinition[];
-  providers: readonly SubagentProviderSource[];
-  getSecret: (providerId: string) => Promise<string | undefined>;
+/** Host lookups that turn a provider row and a model id into a binding. */
+export type ProviderModelLookups = {
   /** Per-model binding for a vendor-account row, resolved by Electron main. */
   resolveVendorBinding?: (
     provider: SubagentProviderSource,
@@ -450,6 +439,21 @@ export async function resolveSubagentProviders(input: {
     provider: SubagentProviderSource,
     modelId: string,
   ) => Promise<{ modelConfig: ModelConfig; capabilities: ThinkingCapabilitySet } | undefined>;
+};
+
+/**
+ * Resolve every distinct model pin into a provider binding the sidecar can
+ * use, keyed by `subagentModelKey`.
+ *
+ * A pin that cannot be resolved is deliberately left out of the map instead of
+ * falling back to the session provider: a definition that asks for a cheap
+ * model must not silently start spending the expensive one. The runtime turns
+ * the missing entry into a tool error naming the pin.
+ */
+export async function resolveSubagentProviders(input: ProviderModelLookups & {
+  definitions: readonly SubagentDefinition[];
+  providers: readonly SubagentProviderSource[];
+  getSecret: (providerId: string) => Promise<string | undefined>;
 }): Promise<{
   providers: Record<string, RuntimeProviderConfig>;
   diagnostics: string[];
@@ -487,55 +491,77 @@ export async function resolveSubagentProviders(input: {
         secrets.set(provider.id, undefined);
       }
     }
-    const apiKey = secrets.get(provider.id) ?? "";
-    if (!apiKey && !isVendorAccount && provider.authKind !== "none") {
-      diagnostics.push(`${name}: provider "${provider.name}" has no API key`);
+    const bound = await bindProviderModel({
+      provider,
+      modelId: pin.modelId,
+      apiKey: secrets.get(provider.id) ?? "",
+      resolveVendorBinding: input.resolveVendorBinding,
+      resolveModel: input.resolveModel,
+    });
+    if (typeof bound === "string") {
+      diagnostics.push(`${name}: ${bound}`);
       continue;
     }
-    // A vendor account resolves the pinned model against the signed-in
-    // catalog: one account can span wire APIs, and a gateway's model list
-    // does not exist in the builtin one at all.
-    let binding: VendorModelBinding | undefined;
-    if (isVendorAccount) {
-      try {
-        binding = await input.resolveVendorBinding?.(provider, pin.modelId);
-      } catch {
-        binding = undefined;
-      }
-      if (!binding) {
-        diagnostics.push(
-          `${name}: vendor account "${provider.name}" does not offer "${pin.modelId}"`,
-        );
-        continue;
-      }
-    }
-    const resolvedModel = !isVendorAccount
-      ? await input.resolveModel?.(provider, pin.modelId)
-      : undefined;
-    const modelConfig =
-      binding?.modelConfig ??
-      resolvedModel?.modelConfig ??
-      genericModelConfig(pin.modelId, binding?.baseUrl ?? provider.baseUrl ?? "");
-    const capabilities = binding ??
-      resolvedModel?.capabilities ??
-      capabilitiesFromModelConfig(modelConfig);
-    const apiStyle = binding?.apiStyle ?? provider.apiStyle;
-    resolved[key] = {
-      id: provider.id,
-      name: provider.name,
-      ...(provider.vendorKey ? { vendorKey: provider.vendorKey } : {}),
-      ...(provider.headers ? { headers: { ...provider.headers } } : {}),
-      ...(binding?.baseUrl ?? provider.baseUrl
-        ? { baseUrl: binding?.baseUrl ?? provider.baseUrl }
-        : {}),
-      modelId: pin.modelId,
-      apiKey,
-      ...(provider.authKind ? { authKind: provider.authKind } : {}),
-      ...(apiStyle ? { apiStyle } : {}),
-      supportsReasoning: capabilities.supportsReasoning,
-      supportedThinkingLevels: [...capabilities.supportedThinkingLevels],
-      ...(modelConfig ? { modelConfig } : {}),
-    };
+    resolved[key] = bound;
   }
   return { providers: resolved, diagnostics };
+}
+
+/**
+ * Bind one provider row to one model the way a sidecar runs it. Returns why the
+ * pair cannot run instead of a binding, so each caller words its own diagnostic.
+ *
+ * A vendor account resolves the model against the signed-in catalog: one
+ * account can span wire APIs, and a gateway's model list does not exist in the
+ * builtin one at all.
+ */
+export async function bindProviderModel(input: ProviderModelLookups & {
+  provider: SubagentProviderSource;
+  modelId: string;
+  /** Empty for a vendor account, whose credential is requested per request. */
+  apiKey: string;
+}): Promise<RuntimeProviderConfig | string> {
+  const { provider, modelId, apiKey } = input;
+  const isVendorAccount = provider.authKind === OAUTH_AUTH_KIND;
+  if (!apiKey && !isVendorAccount && provider.authKind !== "none") {
+    return `provider "${provider.name}" has no API key`;
+  }
+  let binding: VendorModelBinding | undefined;
+  if (isVendorAccount) {
+    try {
+      binding = await input.resolveVendorBinding?.(provider, modelId);
+    } catch {
+      binding = undefined;
+    }
+    if (!binding) {
+      return `vendor account "${provider.name}" does not offer "${modelId}"`;
+    }
+  }
+  const resolvedModel = !isVendorAccount
+    ? await input.resolveModel?.(provider, modelId)
+    : undefined;
+  const modelConfig =
+    binding?.modelConfig ??
+    resolvedModel?.modelConfig ??
+    genericModelConfig(modelId, binding?.baseUrl ?? provider.baseUrl ?? "");
+  const capabilities = binding ??
+    resolvedModel?.capabilities ??
+    capabilitiesFromModelConfig(modelConfig);
+  const apiStyle = binding?.apiStyle ?? provider.apiStyle;
+  return {
+    id: provider.id,
+    name: provider.name,
+    ...(provider.vendorKey ? { vendorKey: provider.vendorKey } : {}),
+    ...(provider.headers ? { headers: { ...provider.headers } } : {}),
+    ...(binding?.baseUrl ?? provider.baseUrl
+      ? { baseUrl: binding?.baseUrl ?? provider.baseUrl }
+      : {}),
+    modelId,
+    apiKey,
+    ...(provider.authKind ? { authKind: provider.authKind } : {}),
+    ...(apiStyle ? { apiStyle } : {}),
+    supportsReasoning: capabilities.supportsReasoning,
+    supportedThinkingLevels: [...capabilities.supportedThinkingLevels],
+    ...(modelConfig ? { modelConfig } : {}),
+  };
 }

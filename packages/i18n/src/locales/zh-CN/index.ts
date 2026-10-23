@@ -1988,6 +1988,11 @@ sklm: {
     promptEnhancementThinkingOff: "关闭思考",
     promptEnhancementModelFollow: "跟随当前模型",
     promptEnhancementModelUnavailable: "不可用 — 增强时会回退到当前模型",
+    advisorTitle: "顾问",
+    advisorDesc: "让主代理在工作时向第二个模型请教，仅用于主会话。截至目前的对话会发送给你选择的服务商。",
+    advisorModel: "顾问模型",
+    advisorModelOff: "关闭",
+    advisorModelUnavailable: "不可用，重新选择模型之前，会话将在没有顾问的情况下运行。",
     promptEnhancementUserTemplate: "用户模板",
     promptEnhancementUserTemplateDesc:
       "用于包裹草稿。必须包含草稿变量，请用插入按钮写入。",

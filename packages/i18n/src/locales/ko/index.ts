@@ -1795,6 +1795,11 @@ sklm: {
     promptEnhancementThinkingOff: "끄기(추론 없음)",
     promptEnhancementModelFollow: "현재 모델 따르기",
     promptEnhancementModelUnavailable: "사용할 수 없음 — 향상 시 현재 모델로 대체됩니다",
+    advisorTitle: "어드바이저",
+    advisorDesc: "주 에이전트가 작업 중에 두 번째 모델에 조언을 구할 수 있습니다. 주 세션에서만 사용됩니다. 지금까지의 대화가 선택한 제공자에게 전송됩니다.",
+    advisorModel: "어드바이저 모델",
+    advisorModelOff: "끔",
+    advisorModelUnavailable: "사용할 수 없음. 다른 모델을 고를 때까지 어드바이저 없이 세션이 실행됩니다.",
     promptEnhancementUserTemplate: "사용자 템플릿",
     promptEnhancementUserTemplateDesc:
       "초안을 감쌉니다. 초안 변수를 반드시 포함해야 하며, 삽입 버튼으로 넣으세요.",

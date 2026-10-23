@@ -284,6 +284,14 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   model actually supports (the row is disabled when it supports none), defaults
   to Off, and has no follow-the-session entry. Settings search indexes the card,
   its switch, the template row, the default-model row, and the reasoning row.
+- **Advisor model** is an Advisor card below Prompt enhancement in the AI tab
+  ([advisor tool](../03-runtime/advisor-tool.md)). Its one row, `Advisor model`,
+  uses the same anchored, searchable menu as the default-model row, over the
+  models the Composer offers. The menu's first row, `Off`, clears the pin, and
+  the tool stays off until a model is picked. A pinned model the menu cannot
+  list stays in the row with an `Unavailable` note, and sessions then run
+  without the tool. The card description says the conversation goes to the
+  chosen provider. Settings search indexes the card and the row.
 - **Thinking display mode** is provided only in General / Defaults as a
   segmented control with Detailed (default) and
   Compact. Detailed uses one whole-process disclosure, starts the process

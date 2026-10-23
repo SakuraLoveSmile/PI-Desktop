@@ -1116,6 +1116,31 @@ mod tests {
     }
 
     #[test]
+    fn application_references_missing_advisor_provider_as_a_deferred_dependency() {
+        let data_dir = tempfile::tempdir().expect("data directory");
+        let state = AppState::open(data_dir.path()).expect("state");
+        let error = validate_application_references(
+            &state,
+            &json!({ "advisorProviderId": "provider-from-remote" }),
+        )
+        .expect_err("missing provider should be staged");
+        assert!(error
+            .to_string()
+            .starts_with("CONFIG_SYNC_DEPENDENCY: advisorProviderId"));
+    }
+
+    #[test]
+    fn application_references_cleared_advisor_pin_as_no_dependency() {
+        let data_dir = tempfile::tempdir().expect("data directory");
+        let state = AppState::open(data_dir.path()).expect("state");
+        validate_application_references(
+            &state,
+            &json!({ "advisorProviderId": Value::Null, "advisorModelId": Value::Null }),
+        )
+        .expect("a cleared pin names no provider to resolve");
+    }
+
+    #[test]
     fn application_references_treat_an_empty_enhancement_provider_as_follow_composer() {
         let data_dir = tempfile::tempdir().expect("data directory");
         let state = AppState::open(data_dir.path()).expect("state");

@@ -4,7 +4,7 @@
 
 
 > 应用的决定：D003、D004、D006、D013、D015、D093、D114、D115、D181、D186、D636、
-> D189、D190、D195（ADR 0057）、D315、D384（ADR 0211）、ADR 0087
+> D189、D190、D195（ADR 0057）、D315、D384（ADR 0211）、ADR 0087、D642（ADR 0319）
 
 ## 0. 冻结政策总结
 
@@ -12,8 +12,9 @@
 |---|---|
 | 默认模式 | Agent |
 | Agent 工具 | 读取 / Glob / Grep / 写入 / 编辑 / Bash + 已注册的插件工具 |
-| Plan 工具 | 读取 / Glob / Grep / BrowserPreview / Bash / SubmitPlan + 声明 plan-safe 动作的插件工具 |
-| Goal 工具 | 读取 / Glob / Grep / BrowserPreview / Bash / SubmitGoal + 声明 plan-safe 动作的插件工具 |
+| Advisor 工具 | 仅限已固定 Advisor 模型的主会话，在 Agent、Plan 和 Goal 模式中可用（ADR 0319）：一个无参数工具，把到目前为止的对话发送给该模型，并返回其建议（[advisor-tool.md](advisor-tool.md)） |
+| Plan 工具 | 读取 / Glob / Grep / BrowserPreview / Bash / SubmitPlan / Advisor（已固定时，ADR 0319）+ 声明 plan-safe 动作的插件工具 |
+| Goal 工具 | 读取 / Glob / Grep / BrowserPreview / Bash / SubmitGoal / Advisor（已固定时，ADR 0319）+ 声明 plan-safe 动作的插件工具 |
 | Plan 和 Goal 硬拒绝 | 写入 / 编辑 / 没有 `planSafeActions` 的插件工具 / 未知工具 / 另一类的提交工具 |
 | 插件 `planSafeActions` | 非空的 `action` 字符串数组；运行时在 Plan/Goal 中隐藏没有该列表的插件工具，host 放行已列出的工具，plugin-runtime 拒绝列表外的任何动作（ADR 0211） |
 | 本地权限确认 | 无自动截止时间；必须明确决定或取消 |
@@ -481,6 +482,7 @@ MVP 可以通过写入 SQLite 或日志文件来启动。
 | Goal | 允许 | 允许 | 否认 | Plan/`ask`：确认； `auto`：允许 | 仅 plan-safe 动作 |
 
 ### 注释
+- Advisor（已固定时）在 Plan 和 Goal 中作为只读咨询运行，永不到达 Host，因此没有矩阵行，也没有权限弹窗（ADR 0319）。
 - 权限 UI 之前，Plan 和 Goal 硬拒绝 Write/Edit 以及没有 `planSafeActions` 的插件工具；直接主机
   调用不能绕过矩阵。声明了非空列表的插件工具会被放行；运行器仍会拒绝列表外的任何动作（ADR 0211）。
 - Agent 模式使用权限卡或选定的自动策略

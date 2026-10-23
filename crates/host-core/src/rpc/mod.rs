@@ -8718,6 +8718,44 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn settings_set_clears_the_advisor_pin_with_explicit_nulls() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let state = Arc::new(Mutex::new(app_state));
+        let tx = mpsc::unbounded_channel().0;
+
+        handle_request(
+            state.clone(),
+            "settings.set",
+            json!({ "advisorProviderId": "provider-a", "advisorModelId": "model-a" }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        let pinned = handle_request(state.clone(), "settings.get", json!({}), tx.clone())
+            .await
+            .unwrap();
+        assert_eq!(pinned["advisorProviderId"], json!("provider-a"));
+
+        // settings.set merges, so clearing writes explicit nulls. An omitted key
+        // would keep the old pin, and an empty string would name no provider.
+        handle_request(
+            state.clone(),
+            "settings.set",
+            json!({ "advisorProviderId": null, "advisorModelId": null }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        let cleared = handle_request(state, "settings.get", json!({}), tx)
+            .await
+            .unwrap();
+        assert_eq!(cleared["advisorProviderId"], Value::Null);
+        assert_eq!(cleared["advisorModelId"], Value::Null);
+    }
+
+    #[tokio::test]
     async fn settings_set_round_trips_live_voice_without_changing_dictation_settings() {
         let data_dir = tempfile::tempdir().unwrap();
         let mut app_state = AppState::open(data_dir.path()).unwrap();

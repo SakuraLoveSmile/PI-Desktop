@@ -130,6 +130,8 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.promptEnhancementModel",
       "settings.promptEnhancementModelFollow",
       "settings.promptEnhancementThinking",
+      "settings.advisorTitle",
+      "settings.advisorModel",
       "settings.largePasteThreshold",
     ],
   },

@@ -217,9 +217,6 @@ test("the enhancement model and reasoning are rows on the Prompt enhancement car
   assert.doesNotMatch(card, /SettingsCard/);
   assert.match(card, /t\("settings\.promptEnhancementModel"\)/);
 
-  // Same control as the default-model row: one anchored menu, one search field.
-  assert.match(card, /AnchoredMenu/);
-  assert.match(card, /model-default-anchor/);
   assert.match(card, /promptEnhancementProviderId/);
   assert.match(card, /promptEnhancementModelId/);
   assert.match(card, /promptEnhancementModelFollow/);

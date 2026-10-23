@@ -2027,6 +2027,11 @@ sklm: {
     promptEnhancementModelFollow: "Follow the current model",
     promptEnhancementModelUnavailable:
       "Unavailable — enhance will fall back to the current model",
+    advisorTitle: "Advisor",
+    advisorDesc: "Lets the main agent ask a second model for advice while it works. Main sessions only. The conversation so far is sent to the provider you pick.",
+    advisorModel: "Advisor model",
+    advisorModelOff: "Off",
+    advisorModelUnavailable: "Unavailable. Sessions run without the Advisor until you pick another model.",
     promptEnhancementUserTemplate: "User template",
     promptEnhancementUserTemplateDesc:
       "Wraps the draft. It must include the draft variable; use the insert button to place it.",

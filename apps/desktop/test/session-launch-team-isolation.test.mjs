@@ -246,3 +246,39 @@ for (const empty of [false, true]) {
     assert.equal(f.hostCalls.some(({ method }) => method === "project.memory.get"), false);
   });
 }
+
+test("Advisor pin binds the pinned API-key model and never reaches team roles", async (t) => {
+  const f = fixture(t);
+  const pin = { advisorProviderId: "delegate-provider", advisorModelId: "private" };
+  const params = (await f.launch("standard", {}, pin)).sidecarParams;
+  assert.equal(params.advisorProvider.id, "delegate-provider");
+  assert.equal(params.advisorProvider.modelId, "private");
+  assert.equal(params.advisorProvider.apiKey, "fixture-secret");
+  const team = (await f.launch("team", {}, pin)).sidecarParams;
+  assert.equal(team.advisorProvider, undefined);
+  assert.equal(f.warnings.some(([, , message]) => message === "advisor model unavailable"), false);
+});
+
+test("Advisor OAuth pin is bound to this session so main answers its auth request", async (t) => {
+  const f = fixture(t);
+  const params = (await f.launch("standard", {}, { advisorProviderId: "delegate-vendor", advisorModelId: "available" })).sidecarParams;
+  assert.equal(params.advisorProvider.authKind, OAUTH_AUTH_KIND);
+  assert.equal(params.advisorProvider.apiKey, "");
+  assert.ok(f.authBindings.at(-1).bindings.some((binding) => binding.providerId === "delegate-vendor"));
+});
+
+test("Advisor pin the provider no longer offers is skipped and logged without failing the launch", async (t) => {
+  const f = fixture(t);
+  const params = (await f.launch("standard", {}, { advisorProviderId: "delegate-provider", advisorModelId: "retired" })).sidecarParams;
+  assert.equal(params.advisorProvider, undefined);
+  assert.ok(f.warnings.some(([, level, message, details]) =>
+    level === "warn" && message === "advisor model unavailable"
+      && details.data.reason === 'provider "Delegate" does not offer "retired"'));
+});
+
+test("Advisor stays off without a pin", async (t) => {
+  const f = fixture(t);
+  const params = (await f.launch("standard")).sidecarParams;
+  assert.equal(params.advisorProvider, undefined);
+  assert.equal(f.warnings.some(([, , message]) => message === "advisor model unavailable"), false);
+});

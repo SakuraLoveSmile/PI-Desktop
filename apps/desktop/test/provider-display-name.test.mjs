@@ -103,7 +103,7 @@ test("the default picker's query reaches an account by its label", () => {
 test("the Settings model pickers name providers through the shared helper", async () => {
   for (const rel of [
     "../src/components/settings/ModelConfigPage.tsx",
-    "../src/components/settings/EnhancementModelCard.tsx",
+    "../src/components/settings/ModelPinMenu.tsx",
   ]) {
     const source = await read(rel);
     assert.match(source, /providerDisplayName\(provider\)/, rel);

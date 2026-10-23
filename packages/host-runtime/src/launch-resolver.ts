@@ -26,6 +26,7 @@ import {
   loadSubagentDefinitions,
   modelConfigWithBinding,
   optionalProviderHeaders,
+  resolveAdvisorProvider,
   resolveSubagentProviders,
   visionFromModelConfig,
   type RuntimeProviderConfig,
@@ -376,6 +377,21 @@ export function createHeadlessLaunchResolver(options: HeadlessLaunchResolverOpti
       log("warn", "subagent definitions have problems", { sessionId, diagnostics: subagentDiagnostics });
     }
 
+    const advisor = await resolveAdvisorProvider({
+      settings,
+      providers: providers.providers,
+      getSecret,
+      resolveModel: async (row, modelId) => {
+        const record = providers.providers.find((candidate) => candidate.id === row.id);
+        if (!record) return undefined;
+        const resolved = effectiveModelConfig(record, modelId, record.baseUrl);
+        return { modelConfig: resolved.modelConfig, capabilities: resolved.capabilities };
+      },
+    });
+    if (advisor.status === "unavailable") {
+      log("warn", "advisor model unavailable", { sessionId, reason: advisor.reason });
+    }
+    const advisorProvider = advisor.status === "ready" ? advisor.provider : undefined;
     const sessionMode = typeof session.mode === "string" ? session.mode : undefined;
     const defaultMode = typeof settings.defaultMode === "string" ? settings.defaultMode : undefined;
     return {
@@ -389,6 +405,7 @@ export function createHeadlessLaunchResolver(options: HeadlessLaunchResolverOpti
         ...(overrides.turnId ? { turnId: overrides.turnId } : {}),
         thinkingLevel,
         infiniteProviderRetry: settings.infiniteProviderRetry === true,
+        ...(advisorProvider ? { advisorProvider } : {}),
         commandShell,
         scratchDir: join(dataDir, "scratch", sessionId),
         attachmentsDir: join(dataDir, "attachments"),

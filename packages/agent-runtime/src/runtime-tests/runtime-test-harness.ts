@@ -141,6 +141,7 @@ export function createRuntime(
     subagents: SubagentDefinition[];
     subagentProviders: Record<string, RuntimeProviderConfig>;
     subagentModelKeys: string[];
+    advisorProvider: RuntimeProviderConfig;
     subagentMaxDepth: number;
     subagentMaxConcurrency: number;
     pluginSkills: import("../plugin-skills-prompt.js").PluginSkillDef[];
@@ -169,6 +170,7 @@ export function createRuntime(
     executionProfile: overrides.executionProfile,
     teamContext: overrides.teamContext,
     provider: overrides.provider ?? provider,
+    advisorProvider: overrides.advisorProvider,
     commandShell: overrides.commandShell ?? commandShell,
     thinkingLevel: overrides.thinkingLevel ?? "medium",
     history: overrides.history,
@@ -233,6 +235,7 @@ export function runtimeMatches(
     subagents: (runtime as any).subagents,
     subagentProviders: (runtime as any).subagentProviders,
     subagentModelKeys: [...(runtime as any).subagentModelKeys],
+    advisorProvider: (runtime as any).advisorProvider,
     ...overrides,
   });
 }

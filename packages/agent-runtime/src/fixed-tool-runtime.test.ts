@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEEPSEEK_MODELS } from "@earendil-works/pi-ai/providers/deepseek.models";
 import { systemTranscriptCheckpoint } from "./system-transcript.js";
 import { readSystemMessage } from "./system-transcript-journal.js";
-import type { UiMessage } from "@pi-desktop/shared";
+import type { Mode, UiMessage } from "@pi-desktop/shared";
 import { modelConfigFromPi } from "./model-capabilities.js";
 import { DesktopAgentRuntime, type PluginToolDef, type RuntimeProviderConfig } from "./runtime.js";
 
@@ -42,12 +42,12 @@ async function wireFixture(calls: Call[]) {
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   } };
 }
-function runtimeFixture(history: UiMessage[] = [], tools = pluginTools, provider = flashProvider(), denied = false) {
+function runtimeFixture(history: UiMessage[] = [], tools = pluginTools, provider = flashProvider(), denied = false, advisorProvider?: RuntimeProviderConfig, mode: Mode = "agent") {
   const rows = structuredClone(history);
   const executed: string[] = [];
   const errors: unknown[] = [];
   const runtime = new DesktopAgentRuntime({
-    sessionId: "fixed-tools", mode: "agent", provider, thinkingLevel: "off", history: rows, pluginTools: tools,
+    sessionId: "fixed-tools", mode, provider, thinkingLevel: "off", history: rows, pluginTools: tools, advisorProvider,
     commandShell: { id: "bash", label: "Bash", dialect: "posix", available: true, isDefault: true },
     host: { call: async <T>(method: string, params?: unknown): Promise<T> => {
       if (method === "session.appendMessage") rows.push((params as { message: UiMessage }).message);
@@ -211,6 +211,48 @@ describe("fixed Flash declarations through runtime and HTTP/SSE", () => {
         const previous = wire.requests[index - 1].messages;
         expect(wire.requests[index].messages.slice(0, previous.length)).toEqual(previous);
       }
+    } finally { await f.runtime.dispose(); await wire.close(); }
+  });
+
+  it("offers Advisor as a fixed declaration and answers it through the advisor model", async () => {
+    const wire = await wireFixture([{ name: "Advisor" }]);
+    const f = runtimeFixture([], pluginTools, flashProvider(), false, flashProvider());
+    try {
+      await f.prompt();
+      expect(f.errors).toEqual([]);
+      expect(wire.requests[0].tools.map((tool) => tool.function.name)).toContain("Advisor");
+      // executor request, advisor completion, executor follow-up
+      expect(wire.requests).toHaveLength(3);
+      expect(JSON.stringify(wire.requests[1].messages)).toContain("<transcript>");
+      expect(wire.requests[1].tools ?? []).toEqual([]);
+      // Advisor runs inside the runtime; it never reaches Host tool execution.
+      expect(f.executed).toEqual([]);
+      expect(JSON.stringify(f.rows.find((row) => row.toolName === "Advisor")?.toolResult)).toContain("Advisor guidance");
+    } finally { await f.runtime.dispose(); await wire.close(); }
+  });
+
+  it.each(["plan", "goal"] as const)("offers and answers Advisor in %s mode", async (mode) => {
+    const wire = await wireFixture([{ name: "Advisor" }]);
+    const f = runtimeFixture([], pluginTools, flashProvider(), false, flashProvider(), mode);
+    try {
+      await f.prompt();
+      expect(f.errors).toEqual([]);
+      expect(wire.requests[0].tools.map((tool) => tool.function.name)).toContain("Advisor");
+      expect(wire.requests).toHaveLength(3);
+      expect(JSON.stringify(wire.requests[1].messages)).toContain("<transcript>");
+      // Contract modes stay read-only: the consult runs in the runtime, not Host.
+      expect(f.executed).toEqual([]);
+      expect(JSON.stringify(f.rows.find((row) => row.toolName === "Advisor")?.toolResult)).toContain("Advisor guidance");
+    } finally { await f.runtime.dispose(); await wire.close(); }
+  });
+
+  it("does not offer Advisor without an advisor model", async () => {
+    const wire = await wireFixture([]);
+    const f = runtimeFixture();
+    try {
+      await f.prompt();
+      expect(f.errors).toEqual([]);
+      expect(wire.requests[0].tools.map((tool) => tool.function.name)).not.toContain("Advisor");
     } finally { await f.runtime.dispose(); await wire.close(); }
   });
 });

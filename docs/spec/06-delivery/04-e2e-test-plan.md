@@ -3119,6 +3119,36 @@ identify the platform validation still needed.
 - **Milestone**: M5
 - **Status**: Documented; native Windows validation pending
 
+#### E2E-ADVISOR-off-until-a-model-is-picked
+
+- **Preconditions**: App running with at least one enabled provider that offers a usable model; no advisor model has been picked.
+- **Steps**: 1) Open Settings → AI and find the Advisor card below Prompt enhancement. 2) Read the Advisor model row and the card description. 3) Start a main session, send one message that needs no advice, and check the tool rows.
+- **Expected**: The row reads `Off`. The card description says the conversation goes to the provider the user picks. The session shows no `Advisor` tool row.
+- **Specs linked**: `03-runtime/advisor-tool.md`, `04-ux/06-settings-ia.md`
+- **Acceptance**: A (core shell)
+- **Milestone**: M4
+- **Status**: Automated (`scripts/e2e-advisor.mjs`)
+
+#### E2E-ADVISOR-clear-row-returns-to-off
+
+- **Preconditions**: App running with an advisor model picked from an enabled provider.
+- **Steps**: 1) Open the Advisor model menu. 2) Choose `Off`. 3) Quit and reopen the app, then reopen Settings → AI.
+- **Expected**: The row reads `Off` at once and after restart. The stored settings keep `null` for both advisor ids, not an empty provider id.
+- **Specs linked**: `03-runtime/advisor-tool.md`, `04-ux/06-settings-ia.md`
+- **Acceptance**: A (core shell)
+- **Milestone**: M4
+- **Status**: Automated (`scripts/e2e-advisor.mjs`)
+
+#### E2E-ADVISOR-stale-pin-keeps-the-session-running
+
+- **Preconditions**: Advisor model picked from a provider, which is then disabled.
+- **Steps**: 1) Open Settings → AI and read the Advisor model row. 2) Start a main session and send one message.
+- **Expected**: The row keeps the pinned provider and model with an `Unavailable` note. The session answers normally with no `Advisor` tool row, and the app log (`logs/app/session.log` under the data directory) records `advisor model unavailable`.
+- **Specs linked**: `03-runtime/advisor-tool.md`, `04-ux/06-settings-ia.md`
+- **Acceptance**: A (core shell)
+- **Milestone**: M4
+- **Status**: Automated (`scripts/e2e-advisor.mjs`)
+
 #### E2E-SETTINGS-ai-tab-pickers-use-in-app-menus
 
 - **Preconditions**: App running with a host that reports at least one configured command shell and at least one catalog shell that is unavailable on this platform.

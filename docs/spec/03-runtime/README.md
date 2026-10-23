@@ -31,3 +31,5 @@
 
 - [Ordinary Agent Team wait-boundary inbox](team-ordinary-inbox.md)
 - [Explicit Host-managed Team services](team-managed-services.md)
+
+- [Advisor tool](advisor-tool.md) — a second model consulted for guidance during main sessions.

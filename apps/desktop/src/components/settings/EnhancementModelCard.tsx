@@ -6,10 +6,10 @@
  * switch. They are rows rather than a second card so the template, model, and
  * reasoning for the same action share one heading.
  *
- * The picker reuses the default-model anchored menu so Settings offers one kind
- * of model picker, and the reasoning row reuses the shared settings menu select.
+ * The picker is the shared ModelPinMenu, so Settings offers one kind of model
+ * picker, and the reasoning row reuses the shared settings menu select.
  */
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
   THINKING_LEVELS,
@@ -23,11 +23,8 @@ import {
 } from "../../features/chat/composer/model";
 import { useAppStore } from "../../stores/app-store";
 import { api } from "../../lib/api";
-import { providerDisplayName, providerSearchText } from "../../lib/provider-display";
-import { sameComposerModelId } from "../../lib/composer-models";
-import { Button, Input, cx } from "../ui";
-import { IconCheck, IconChevronDown, IconSearch } from "../icons";
-import { AnchoredMenu } from "./AnchoredMenu";
+import { providerDisplayName } from "../../lib/provider-display";
+import { ModelPinMenu } from "./ModelPinMenu";
 import { SettingsMenuSelect } from "./SettingsMenuSelect";
 import { SettingsRow } from "../../features/settings/primitives";
 import { defaultModelOptions } from "./default-model";
@@ -45,8 +42,6 @@ export function EnhancementModelCard() {
   const providerModels = useAppStore((state) => state.providerModels);
   const settings = useAppStore((state) => state.settings);
   const showToast = useAppStore((state) => state.showToast);
-  const [picking, setPicking] = useState(false);
-  const [query, setQuery] = useState("");
 
   const choices = useMemo(() => subagentModelChoices(providers), [providers]);
   const groups = useMemo(() => groupSubagentModelChoices(choices), [choices]);
@@ -66,13 +61,6 @@ export function EnhancementModelCard() {
     () => defaultModelOptions(providers.filter((provider) => provider.enabled)),
     [providers],
   );
-  const visible = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return options;
-    return options.filter(({ provider, modelId }) =>
-      `${providerSearchText(provider)} ${modelId}`.toLowerCase().includes(needle),
-    );
-  }, [options, query]);
 
   const pinnedProviderId = settings?.promptEnhancementProviderId ?? "";
   const pinnedModelId = settings?.promptEnhancementModelId ?? "";
@@ -153,7 +141,6 @@ export function EnhancementModelCard() {
         ? canonicalThinkingLevel(thinkingLevelForProvider(nextProvider, stored))
         : stored,
     });
-    setPicking(false);
   };
 
   return (
@@ -188,107 +175,15 @@ export function EnhancementModelCard() {
             )
           }
         >
-          <AnchoredMenu
-            className="model-default-anchor"
-            open={picking}
-            onClose={() => setPicking(false)}
-            menuClassName="model-default-menu"
+          <ModelPinMenu
             label={t("settings.promptEnhancementModel")}
-            align="end"
-            trigger={(ref) => (
-              <Button
-                ref={ref}
-                className="settings-text-action model-default-trigger"
-                variant="ghost"
-                disabled={groups.length === 0 && !orphanPin}
-                onClick={() => {
-                  setQuery("");
-                  setPicking((current) => !current);
-                }}
-                aria-haspopup="listbox"
-                aria-expanded={picking}
-              >
-                {t("settings.changeDefaultModel")}
-                <IconChevronDown
-                  className="model-default-trigger-chevron"
-                  size={13}
-                  aria-hidden
-                />
-              </Button>
-            )}
-          >
-            <div className="model-default-search">
-              <IconSearch size={14} aria-hidden />
-              <Input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={t("settings.defaultModelSearch")}
-                aria-label={t("settings.defaultModelSearch")}
-                autoFocus
-              />
-            </div>
-            <div className="model-default-results" role="presentation">
-              {visible.length === 0 ? (
-                <div className="model-default-no-results">{t("settings.noModelMatches")}</div>
-              ) : null}
-              <ul className="model-default-list">
-                <li>
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={!settings.promptEnhancementProviderId}
-                    aria-label={t("settings.promptEnhancementModelFollow")}
-                    className={cx(
-                      "model-default-option",
-                      !settings.promptEnhancementProviderId && "is-current",
-                    )}
-                    onClick={() => void pickModel("", "")}
-                  >
-                    <span className="model-default-option-check" aria-hidden>
-                      {!settings.promptEnhancementProviderId ? <IconCheck size={12} /> : null}
-                    </span>
-                    <span className="model-default-option-model">
-                      {t("settings.promptEnhancementModelFollow")}
-                    </span>
-                  </button>
-                </li>
-                {visible.map(({ provider, modelId }, index) => {
-                  const isCurrent =
-                    settings.promptEnhancementProviderId === provider.id &&
-                    sameComposerModelId(settings.promptEnhancementModelId ?? "", modelId);
-                  const previous = visible[index - 1];
-                  const startsGroup = !previous || previous.provider.id !== provider.id;
-                  return (
-                    <li key={`${provider.id}:${modelId}`}>
-                      {startsGroup ? (
-                        <div
-                          className={cx(
-                            "model-default-provider-group",
-                            index > 0 && "has-divider",
-                          )}
-                        >
-                          {providerDisplayName(provider)}
-                        </div>
-                      ) : null}
-                      <button
-                        type="button"
-                        role="option"
-                        aria-selected={isCurrent}
-                        aria-label={`${providerDisplayName(provider)} · ${modelId}`}
-                        className={cx("model-default-option", isCurrent && "is-current")}
-                        onClick={() => void pickModel(provider.id, modelId)}
-                      >
-                        <span className="model-default-option-check" aria-hidden>
-                          {isCurrent ? <IconCheck size={12} /> : null}
-                        </span>
-                        <span className="model-default-option-model font-mono">{modelId}</span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          </AnchoredMenu>
+            options={options}
+            pinnedProviderId={pinnedProviderId}
+            pinnedModelId={pinnedModelId}
+            clearLabel={t("settings.promptEnhancementModelFollow")}
+            disabled={groups.length === 0 && !orphanPin}
+            onPick={pickModel}
+          />
         </SettingsRow>
 
         <SettingsRow

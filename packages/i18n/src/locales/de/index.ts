@@ -1782,6 +1782,11 @@ sklm: {
     "promptEnhancementModelFollow": "Aktuellem Modell folgen",
     "promptEnhancementModelUnavailable":
       "Nicht verfügbar — die Verbesserung fällt auf das aktuelle Modell zurück",
+    "advisorTitle": "Berater",
+    "advisorDesc": "Lässt den Hauptagenten während der Arbeit ein zweites Modell um Rat fragen. Nur in Hauptsitzungen. Der bisherige Gesprächsverlauf wird an den gewählten Anbieter gesendet.",
+    "advisorModel": "Beratermodell",
+    "advisorModelOff": "Aus",
+    "advisorModelUnavailable": "Nicht verfügbar. Sitzungen laufen ohne Berater, bis du ein anderes Modell wählst.",
     "promptEnhancementUserTemplate": "Benutzer-Vorlage",
     "promptEnhancementUserTemplateDesc":
       "Umschließt den Entwurf. Muss die Entwurfsvariable enthalten; fügen Sie sie über die Schaltfläche ein.",
