@@ -38,7 +38,7 @@ import {
   groupArchiveRows,
   neighborPath,
   nextArchiveOpenPath,
-  sessionMatchesIndexProject,
+  sessionMatchesProjectRoots,
   type ProjectIndexItem,
   type SessionIndexRecord,
   type SortMode,
@@ -110,6 +110,7 @@ export function ProjectsPage() {
     path: string;
     groupId?: string;
     legacy?: boolean;
+    memoryOwner?: string;
   } | null>(null);
 
   useEffect(() => {
@@ -215,10 +216,11 @@ export function ProjectsPage() {
   };
 
   const openProjectSession = async (path: string, sessionId: string) => {
-    if (!(await activate(path))) return;
+    const sourcePath = sessions.find((session) => session.id === sessionId)?.projectPath ?? path;
+    if (!(await activate(sourcePath))) return;
     if (
       normalizeProjectPath(useAppStore.getState().workspace?.path) !==
-      normalizeProjectPath(path)
+      normalizeProjectPath(sourcePath)
     ) {
       return;
     }
@@ -241,7 +243,7 @@ export function ProjectsPage() {
    * with a live turn keeps the dialog that names those sessions and stops them
    * before the delete.
    */
-  const requestDeleteProject = async (project: ProjectIndexItem, totalSessions: number) => {
+  const requestDeleteProject = async (project: ProjectIndexItem) => {
     const key = projectDeleteKey(project.path);
     if (armedDelete !== key) {
       setArmedDelete(key);
@@ -249,21 +251,20 @@ export function ProjectsPage() {
     }
     setArmedDelete(null);
     setMenuFor(null);
-    const liveSessions = sessions.filter(
-      (session) =>
-        sessionMatchesIndexProject(session, project) && runningSessions[session.id] === true,
-    );
+    const targetSessions = sessions.filter((session) =>
+      sessionMatchesProjectRoots(session, project.roots.map((root) => root.path)));
+    const liveSessions = targetSessions.filter((session) => runningSessions[session.id] === true);
     if (liveSessions.length > 0) {
       setDeleteFor({
         name: project.name,
-        path: project.path,
-        sessionCount: totalSessions,
+        path: project.actionPath ?? project.path,
+        sessionCount: targetSessions.length,
         roots: project.roots,
       });
       return;
     }
     try {
-      await deleteProjectAction(project.path);
+      await deleteProjectAction(project.actionPath ?? project.path);
       setRecents(loadRecentProjects());
       showToast(t("project.deleted", { name: project.name }), { variant: "success" });
     } catch (error) {
@@ -506,7 +507,7 @@ export function ProjectsPage() {
                   onOpenSession={(sessionId) =>
                     void openProjectSession(project.path, sessionId)
                   }
-                  onNewTask={() => void startTask(project.path)}
+                  onNewTask={() => void startTask(project.actionPath ?? project.path)}
                   onRenameSession={setRenameFor}
                   onShowMore={() =>
                     setVisibleSessionCounts((prev) => ({
@@ -526,7 +527,7 @@ export function ProjectsPage() {
                         <Button
                           size="sm"
                           variant="primary"
-                          onClick={() => void activate(project.path)}
+                          onClick={() => void activate(project.actionPath ?? project.path)}
                         >
                           {t("project.open")}
                         </Button>
@@ -561,7 +562,7 @@ export function ProjectsPage() {
                           role="menuitem"
                           onClick={() => {
                             setMenuFor(null);
-                            void startTask(project.path);
+                            void startTask(project.actionPath ?? project.path);
                           }}
                         >
                           <IconChat size={14} />
@@ -574,7 +575,7 @@ export function ProjectsPage() {
                             setMenuFor(null);
                             setInstructionsFor({
                               name: project.name,
-                              path: project.path,
+                              path: project.actionPath ?? project.path,
                               groupId: project.groupId,
                               legacy: project.legacy,
                             });
@@ -590,9 +591,10 @@ export function ProjectsPage() {
                             setMenuFor(null);
                             setMemoryFor({
                               name: project.name,
-                              path: project.path,
+                              path: project.actionPath ?? project.path,
                               groupId: project.groupId,
                               legacy: project.legacy,
+                              memoryOwner: project.memoryProject ? `memory:${project.memoryProject.id}` : undefined,
                             });
                           }}
                         >
@@ -603,10 +605,11 @@ export function ProjectsPage() {
                           type="button"
                           role="menuitem"
                           data-action="edit-project"
+                          title={project.actionPath ?? project.path}
                           onClick={() => {
                             setMenuFor(null);
                             setEditProjectFor({
-                              path: project.path,
+                              path: project.actionPath ?? project.path,
                               name: project.name,
                               groupId: project.groupId,
                               roots: project.roots,
@@ -649,10 +652,11 @@ export function ProjectsPage() {
                             armedDelete === projectDeleteKey(project.path) && "is-armed",
                           )}
                           data-action="delete-project"
+                          title={project.actionPath ?? project.path}
                           data-armed={
                             armedDelete === projectDeleteKey(project.path) ? "true" : undefined
                           }
-                          onClick={() => void requestDeleteProject(project, totalSessions)}
+                          onClick={() => void requestDeleteProject(project)}
                         >
                           <IconTrash size={14} />
                           {armedDelete === projectDeleteKey(project.path)
@@ -743,7 +747,7 @@ export function ProjectsPage() {
           runningSessionIds={sessions
             .filter(
               (session) =>
-                sessionMatchesIndexProject(session, deleteFor) &&
+                sessionMatchesProjectRoots(session, deleteFor.roots.map((root) => root.path)) &&
                 runningSessions[session.id] === true,
             )
             .map((session) => session.id)}

@@ -40,7 +40,16 @@ fn scope(db: &Database, params: &Value) -> Result<Vec<String>, JsonRpcError> {
 }
 
 fn query(db: &Database, method: &str, params: &Value) -> Result<Value, JsonRpcError> {
-    let roots = scope(db, params)?;
+    let legacy_roots = scope(db, params)?;
+    let memory_project = db
+        .project_memory_space_session(field(params, "sessionId")?)
+        .map_err(|error| rpc_err(1000, error.to_string(), "INTERNAL"))?;
+    let roots = if let Some(id) = &memory_project {
+        db.project_memory_space_paths(id)
+            .map_err(|error| rpc_err(1000, error.to_string(), "INTERNAL"))?
+    } else {
+        legacy_roots
+    };
     let search_query = match params.get("query") {
         None => "",
         Some(Value::String(s)) => s.trim(),
@@ -65,8 +74,14 @@ fn query(db: &Database, method: &str, params: &Value) -> Result<Value, JsonRpcEr
                 .ok_or_else(|| rpc_err(1002, "limit must be 1–20", "INVALID_PARAMS"))?
                 as usize,
         };
-        let mut page = crate::session_search::search_scoped(db, search_query, 0, Some(&roots))
-            .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+        let mut page = crate::session_search::search_with_memory_scope(
+            db,
+            search_query,
+            0,
+            Some(&roots),
+            memory_project.as_deref(),
+        )
+        .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
         let has_more = page.next_offset.is_some() || page.hits.len() > limit;
         page.hits.truncate(limit);
         let hits: Vec<Value> = page
@@ -83,6 +98,20 @@ fn query(db: &Database, method: &str, params: &Value) -> Result<Value, JsonRpcEr
         return Ok(json!({"hits": hits, "hasMore": has_more}));
     }
     let target_id = field(params, "targetSessionId")?;
+    if let Some(id) = &memory_project {
+        if db
+            .project_memory_space_session(target_id)
+            .map_err(|error| rpc_err(1000, error.to_string(), "INTERNAL"))?
+            .as_ref()
+            != Some(id)
+        {
+            return Err(rpc_err(
+                1007,
+                "history source not found in this project",
+                "NOT_FOUND",
+            ));
+        }
+    }
     let target = sessions::get_session(db, target_id)
         .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
         .filter(|s| {
@@ -144,7 +173,36 @@ pub(super) async fn handle(
     method: &str,
     params: Value,
 ) -> Result<Value, JsonRpcError> {
+    // Authenticate the caller before doing unlocked Git discovery.
+    let (session_id, path) = {
+        let st = state.lock().await;
+        scope(&st.db, &params)?;
+        let session_id = field(&params, "sessionId")?.to_owned();
+        let path = field(&params, "boundPath")?.to_owned();
+        (session_id, path)
+    };
+    let prepared = crate::project_memory_owner::prepare(&path).await;
     let st = state.lock().await;
+    scope(&st.db, &params)?;
+    match project_memory_projects::register(&st.db, Some(&path), prepared.as_ref()) {
+        Ok(Some(project)) => {
+            st.db
+                .bind_project_memory_space_session(&session_id, &project.id)
+                .map_err(|_| rpc_err(1008, "session project changed", "PROJECT_CHANGED"))?;
+        }
+        Ok(None) => {
+            if Path::new(&path).exists()
+                && st
+                    .db
+                    .project_memory_space_session(&session_id)
+                    .map_err(|error| rpc_err(1000, error.to_string(), "INTERNAL"))?
+                    .is_some()
+            {
+                return Err(rpc_err(1008, "session project changed", "PROJECT_CHANGED"));
+            }
+        }
+        Err(error) => return Err(error),
+    }
     query(&st.db, method, &params)
 }
 
@@ -345,3 +403,7 @@ mod tests {
         assert_eq!(failure.data.unwrap()["errorCode"], "TEAM_UNAUTHORIZED");
     }
 }
+
+#[cfg(test)]
+#[path = "project_worktree_history_tests.rs"]
+mod project_worktree_history_tests;

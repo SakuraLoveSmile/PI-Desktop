@@ -10,6 +10,7 @@ mod plan_schedule_rpc;
 mod project_auto_memory;
 mod project_code_search;
 mod project_history;
+mod project_memory_projects;
 #[cfg(test)]
 #[path = "../team/run_limits_pending_tests.rs"]
 mod run_limits_pending_tests;
@@ -2044,14 +2045,7 @@ async fn handle_request_inner(
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "projects": projects }))
         }
-        "project.groups.list" => {
-            let st = state.lock().await;
-            let groups = st
-                .db
-                .list_project_groups()
-                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
-            Ok(json!({ "groups": groups }))
-        }
+        "project.groups.list" => project_memory_projects::list(state).await,
         "project.group.create" => {
             let name = params
                 .get("name")
@@ -2065,10 +2059,14 @@ async fn handle_request_inner(
                 .filter_map(Value::as_str)
                 .map(str::to_string)
                 .collect::<Vec<_>>();
+            let memory_project = match folders.first() {
+                Some(path) => crate::project_memory_owner::prepare(path).await,
+                None => None,
+            };
             let st = state.lock().await;
             let group = st
                 .db
-                .create_project_group(name, &folders)
+                .create_project_group_with_memory_evidence(name, &folders, memory_project.as_ref())
                 .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
             Ok(json!({ "group": group }))
         }
@@ -2089,10 +2087,40 @@ async fn handle_request_inner(
                 .filter_map(Value::as_str)
                 .map(str::to_string)
                 .collect::<Vec<_>>();
+            let primary = {
+                let st = state.lock().await;
+                st.db
+                    .list_project_groups()
+                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                    .into_iter()
+                    .find(|group| group.id == group_id)
+                    .ok_or_else(|| rpc_err(1002, "project group not found", "INVALID_PARAMS"))?
+                    .primary_path
+            };
+            let memory_project = crate::project_memory_owner::prepare(&primary).await;
             let st = state.lock().await;
+            if st
+                .db
+                .list_project_groups()
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                .into_iter()
+                .find(|group| group.id == group_id)
+                .is_none_or(|group| group.primary_path != primary)
+            {
+                return Err(rpc_err(
+                    1008,
+                    "project changed; reload before updating folders",
+                    "PROJECT_CHANGED",
+                ));
+            }
             let group = st
                 .db
-                .update_project_group(group_id, name, &folders)
+                .update_project_group_with_memory_evidence(
+                    group_id,
+                    name,
+                    &folders,
+                    memory_project.as_ref(),
+                )
                 .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
             Ok(json!({ "group": group }))
         }
@@ -2113,40 +2141,10 @@ async fn handle_request_inner(
             Ok(json!({ "group": group }))
         }
         "project.group.memory.get" => {
-            let id = params
-                .get("groupId")
-                .and_then(Value::as_str)
-                .ok_or_else(|| rpc_err(1002, "groupId required", "INVALID_PARAMS"))?;
-            let st = state.lock().await;
-            let memory = st
-                .db
-                .get_project_group_memory(id)
-                .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
-            Ok(json!({ "memory": memory }))
+            project_memory_projects::group_memory(state, params, false).await
         }
         "project.group.memory.set" => {
-            let id = params
-                .get("groupId")
-                .and_then(Value::as_str)
-                .ok_or_else(|| rpc_err(1002, "groupId required", "INVALID_PARAMS"))?;
-            let entries = params
-                .get("entries")
-                .ok_or_else(|| rpc_err(1002, "entries required", "INVALID_PARAMS"))?;
-            let st = state.lock().await;
-            if let Some(group) = st
-                .db
-                .list_project_groups()
-                .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?
-                .into_iter()
-                .find(|group| group.id == id)
-            {
-                project_auto_memory::ensure_legacy_write_allowed(&st.db, &group.primary_path)?;
-            }
-            let memory = st
-                .db
-                .set_project_group_memory(id, entries)
-                .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
-            Ok(json!({ "memory": memory }))
+            project_memory_projects::group_memory(state, params, true).await
         }
         "project.group.instructions.get" => {
             let id = params
@@ -2707,12 +2705,20 @@ async fn handle_request_inner(
             let st = state.lock().await;
             let sessions = sessions::list_sessions(&st.db)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            let sessions = sessions
+                .iter()
+                .map(|session| project_memory_projects::session_value(&st.db, session))
+                .collect::<Result<Vec<_>, _>>()?;
             Ok(json!({ "sessions": sessions }))
         }
         "session.create" => {
             let interaction_mode = interaction_mode_param(&params)?;
             let thinking_level = thinking_level_param(&params)?;
             let permission_parent = permission_parent_param(&params)?;
+            let memory_project = match params.get("projectPath").and_then(Value::as_str) {
+                Some(path) => crate::project_memory_owner::prepare(path).await,
+                None => None,
+            };
             let st = state.lock().await;
             let inherited_interaction_mode: Option<String> = match permission_parent.as_deref() {
                 Some(parent_id) => st
@@ -2798,13 +2804,31 @@ async fn handle_request_inner(
                 interaction_mode,
                 execution_profile,
             };
+            let memory_project = match project_memory_projects::register(
+                &st.db,
+                options.project_path.as_deref(),
+                memory_project.as_ref(),
+            ) {
+                Ok(project) => project,
+                Err(_) => {
+                    tracing::warn!(
+                        "session created without shared memory; project memory needs review"
+                    );
+                    None
+                }
+            };
             let session = if create_team_record {
                 sessions::create_team_lead_session_with_options(&st.db, options)
             } else {
                 sessions::create_session_with_options(&st.db, options)
             }
             .map_err(session_naming_rpc_err)?;
-            Ok(json!({ "session": session }))
+            if let Some(project) = memory_project {
+                st.db
+                    .bind_project_memory_space_session(&session.id, &project.id)
+                    .map_err(|error| rpc_err(1000, error.to_string(), "INTERNAL"))?;
+            }
+            Ok(json!({ "session": project_memory_projects::session_value(&st.db, &session)? }))
         }
         "session.fork" => {
             let session_id = params
@@ -2826,7 +2850,9 @@ async fn handle_request_inner(
                         return Err(rpc_err(1008, "session is running", "CONFLICT"));
                     }
                 };
-            Ok(json!({ "session": session }))
+            Ok(
+                json!({ "session": project_memory_projects::session_detail_value(&st.db, &session)? }),
+            )
         }
         "session.moveProject" => {
             let session_id = params
@@ -2841,6 +2867,7 @@ async fn handle_request_inner(
                 .map(str::trim)
                 .filter(|value| !value.is_empty())
                 .ok_or_else(|| rpc_err(1002, "projectPath required", "INVALID_PARAMS"))?;
+            let memory_project = crate::project_memory_owner::prepare(project_path).await;
             let st = state.lock().await;
             if background_processes_rpc::has_services(&st, session_id, false)? {
                 if sessions::session_has_running_turn(&st.db, session_id).map_err(plan_rpc_err)? {
@@ -2885,6 +2912,11 @@ async fn handle_request_inner(
                     "SESSION_HAS_BACKGROUND_PROCESSES",
                 ));
             }
+            let memory_project = project_memory_projects::register(
+                &st.db,
+                Some(project_path),
+                memory_project.as_ref(),
+            )?;
             let session = match sessions::move_session_project(&st.db, session_id, project_path)
                 .map_err(plan_rpc_err)?
             {
@@ -2896,7 +2928,13 @@ async fn handle_request_inner(
                     return Err(rpc_err(1008, "session is running", "CONFLICT"));
                 }
             };
-            Ok(json!({ "session": session }))
+            st.db
+                .replace_project_memory_space_session(
+                    session_id,
+                    memory_project.as_ref().map(|project| project.id.as_str()),
+                )
+                .map_err(|error| rpc_err(1000, error.to_string(), "INTERNAL"))?;
+            Ok(json!({ "session": project_memory_projects::session_value(&st.db, &session)? }))
         }
         "session.get" => {
             let id = params
@@ -2947,6 +2985,10 @@ async fn handle_request_inner(
                 },
             )
             .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            let session = session
+                .as_ref()
+                .map(|session| project_memory_projects::session_detail_value(&st.db, session))
+                .transpose()?;
             Ok(json!({ "session": session }))
         }
         "contextInsights.get" => {

@@ -1,6 +1,6 @@
 # ADR 0249: ChatGPT-Style Logical Project Groups
 
-- Status: Accepted
+- Status: Accepted (amended 2026-10-23)
 - Date: 2026-09-13
 - Deciders: PI-Desktop maintainers
 - Amends: ADR 0233, ADR 0234, ADR 0016
@@ -72,3 +72,27 @@ policy.
 - **Add a new relational schema immediately:** rejected because the existing
   host `kv` extension boundary can durably store this configuration without
   changing the schema version.
+
+## Worktree amendment: memory identity is separate from file access
+
+[Stable project memory spaces](worktree-project-memory-spaces.md) add a
+memory-only identity above verified worktree paths. An explicit multi-root group
+continues to share one logical memory across every selected root, including
+mixed Git and non-Git directories. Separate explicit groups remain independent;
+repository affinity does not override the user's grouping choice.
+
+Ordinary registered Git worktrees may share memory and history without becoming
+additional tool roots or inheriting owner-group instructions. Host group records
+remain intact; the UI folds their verified `memoryProject.id` into one display
+row while edit/delete operations retain a real checkout/group target. Sessions
+retain their actual project path and bind to a stable memory ID, preventing a
+reused slot from acquiring another repository's historical sessions. This amends
+the assumption that group membership or a path alone completely determines
+memory/history scope; it does not change the file-access boundary in decision 5.
+
+Explicit root edits/replacements retain the group's existing stable logical
+memory semantics. Automatic Git association requires reliable filesystem
+identity/creation evidence and otherwise preserves the original scope; that
+restriction does not disable the user's explicit group sharing and never writes
+a `.git` marker. A reused automatic slot is a different case and receives a new
+repository memory UUID.

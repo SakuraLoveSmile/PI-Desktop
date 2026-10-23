@@ -11,6 +11,7 @@ import {
   projectBucket,
   projectMatchesQuery,
   sessionMatchesIndexProject,
+  sessionMatchesProjectRoots,
   sessionMatchesQuery,
   sessionTimestamp,
   shortenPath,
@@ -157,4 +158,61 @@ test("one row click opens that row's card and closes the open one", () => {
   // missing: the click re-selected the row and the card stayed up.
   assert.equal(nextArchiveOpenPath("/a", "/a"), null);
   assert.equal(nextArchiveOpenPath(null, "/a"), "/a");
+});
+
+test("verified worktrees share one project row while sessions keep their actual paths", () => {
+  const memoryProject = { id: "music-memory", name: "Music", primaryPath: "/repos/music",
+    paths: ["/repos/music", "/worktrees/music/review", "/pool/music/slot-3"] };
+  const durableProjects = memoryProject.paths.map((path, index) => ({
+    id: `group-${index}`, name: index ? "slot-3" : "Music", primaryPath: path,
+    roots: [{ path, name: "checkout", position: 0 }], lastOpenedAt: index,
+    pinned: false, memoryProject,
+  }));
+  const items = buildProjectIndex({ durableProjects, recents: [], sessionProjects: [
+    { path: "/worktrees/music/review", name: "Music", updatedAt: 5 },
+  ], workspace: { path: "/pool/music/slot-3", name: "slot-3", branch: "review" }, projectMeta: {} });
+  assert.equal(items.length, 1);
+  assert.equal(items[0].name, "Music");
+  assert.equal(items[0].path, "/repos/music");
+  assert.deepEqual(items[0].roots, durableProjects[0].roots);
+  const sessions = memoryProject.paths.map((projectPath, index) => ({ id: `session-${index}`,
+    title: `Task ${index}`, projectPath, createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-02T00:00:00.000Z" }));
+  assert.deepEqual(displayedProjectSessions(sessions, items[0], "").related.map(session => session.projectPath),
+    memoryProject.paths);
+  assert.equal(sessionMatchesIndexProject({ projectPath: "/repos/other" }, items[0]), false);
+});
+
+test("matching names do not combine unrelated project rows", () => {
+  const durableProjects = ["/repos/music", "/repos/other-music"].map((path, index) => ({
+    id: `group-${index}`, name: "Music", primaryPath: path,
+    roots: [{ path, name: "Music", position: 0 }], lastOpenedAt: 1, pinned: false,
+    memoryProject: { id: `memory-${index}`, name: "Music", primaryPath: path, paths: [path] },
+  }));
+  const items = buildProjectIndex({ durableProjects, recents: [], sessionProjects: [], projectMeta: {} });
+  assert.equal(items.length, 2);
+});
+
+test("reused checkout paths do not move historical tasks into another memory project", () => {
+  const slot = "/pool/slot-3";
+  const durableProjects = [
+    { id: "old-group", name: "Old", primaryPath: "/repos/old", roots: [{ path: "/repos/old", name: "Old", position: 0 }],
+      lastOpenedAt: 1, pinned: false, memoryProject: { id: "old", name: "Old", primaryPath: "/repos/old", paths: ["/repos/old", slot] } },
+    { id: "new-group", name: "New", primaryPath: slot, roots: [{ path: slot, name: "New", position: 0 }],
+      lastOpenedAt: 2, pinned: false, memoryProject: { id: "new", name: "New", primaryPath: "/repos/new", paths: ["/repos/new", slot] } },
+  ];
+  const items = buildProjectIndex({ durableProjects, recents: [], sessionProjects: [], projectMeta: {} });
+  const oldProject = items.find((item) => item.memoryProject.id === "old");
+  const newProject = items.find((item) => item.memoryProject.id === "new");
+  const oldTask = { projectPath: slot, memoryProjectId: "old" };
+  const newTask = { projectPath: slot, memoryProjectId: "new" };
+  assert.equal(sessionMatchesIndexProject(oldTask, oldProject), true);
+  assert.equal(sessionMatchesIndexProject(oldTask, newProject), false);
+  assert.equal(sessionMatchesIndexProject(newTask, oldProject), false);
+  assert.equal(sessionMatchesIndexProject(newTask, newProject), true);
+  assert.equal(sessionMatchesIndexProject({ projectPath: slot }, oldProject), false);
+  assert.equal(sessionMatchesIndexProject({ projectPath: slot }, newProject), true);
+  assert.equal(sessionMatchesIndexProject(oldTask, { path: slot, roots: newProject.roots }), false);
+  assert.equal(sessionMatchesProjectRoots(oldTask, oldProject.roots.map((root) => root.path)), false);
+  assert.equal(sessionMatchesProjectRoots(oldTask, newProject.roots.map((root) => root.path)), true);
 });

@@ -35,8 +35,10 @@ schema v7, v8, v11, and v14:
 
 Project groups use the existing `kv` extension boundary rather than a new
 relational schema. The host stores one JSON record per group in the
-`projectGroups` namespace, shared memory in `projectGroupMemory`, and shared
-instructions in `projectGroupInstructions`. The record contains the stable group
+`projectGroups` namespace and shared instructions in `projectGroupInstructions`.
+`projectGroupMemory` remains the legacy group-memory source; verified spaces use
+the versioned memory content/association records described below. The group
+record contains the stable group
 id, display name, ordered canonical roots, primary root, timestamps, and optional
 `detachedPaths`. Removed roots without sessions stay in `detachedPaths` so an old
 path project record is not recreated as a standalone legacy group. A removed root
@@ -456,10 +458,12 @@ CREATE TABLE projects (
 - The *current* visible workspace is `kv(app, currentProjectId)` — no singleton
   table, no partial-unique flag. Retained tabs do not add more current-project
   fields.
-- Project memory is host-owned in `kv(ns='projectMemory', key=<canonical path>)`
-  rather than renderer preferences. It is independent for every project path,
-  capped at 32 KiB, and is loaded by Electron main when a project session
-  starts. Visual entries are normalized and rendered to plain `content` for
+- Project memory is Host-owned, not a renderer preference. Legacy values in
+  `kv(ns='projectMemory', key=<canonical path>)` and `projectGroupMemory` remain
+  compatibility/recovery sources. Verified worktrees use a stable UUID memory
+  space rather than an independent collection per checkout. Its rendered context
+  is capped at 32 KiB and loaded by Electron main when a project session starts.
+  Visual entries are normalized and rendered to plain `content` for
   the runtime; legacy plain-text values remain readable and are shown as one
   untitled entry when opened in the editor. The runtime labels it as
   user-provided context so it cannot become a replacement for safety, tool, or
@@ -2050,10 +2054,14 @@ Task remain separate optional transcript/event fields.
 
 ## Plus automatic memory and code index storage
 
-Automatic memory uses existing project/group memory collections and their
-32-KiB derived-context limit. The opt-in flag lives in Host `kv` namespace
-`projectAutoMemory`, keyed by `path:<canonical-path>` or `group:<id>`; it does not
-advance the shared schema. User and agent entries share the existing collection.
+Automatic memory uses the Host-owned collection selected by the current memory
+owner and the existing 32-KiB derived-context limit. Verified memory spaces own
+their shared recording flag; legacy `projectAutoMemory` flags keyed by
+`path:<canonical-path>` or `group:<id>` remain upgrade sources. Explicit multi-root
+groups retain their stable logical sharing boundary across Git and non-Git
+roots; separate explicit groups are not combined by repository affinity. This
+does not advance the shared relational schema. User and agent entries share one
+collection; recording defaults off and Plan/Goal writes remain prohibited.
 Agent updates/deletions compare the entry's last title/content; editor Save
 compares the owner and complete loaded memory snapshot before atomic replacement.
 Conflicts preserve persisted notes and the user's unsaved editor draft. Legacy
@@ -2141,14 +2149,15 @@ New service launches persist `stopMode` in the existing KV namespace
 ownership rows. Historical rows without that record keep `stopMode` absent;
 reopen never infers their stop mechanism from the current operating system.
 
-## Read-only memory ownership for KaneoPilot worktree slots
+## KaneoPilot worktree slot compatibility
 
 The Host may resolve a detached planning/review slot to a memory owner using
 `~/Library/Application Support/KaneoPilot/worktree-slots.json`. KaneoPilot's
 SQLite remains authoritative for slots; this file is its derived, read-only
 projection, never a new Plus state store. Plus neither repairs the projection
-nor changes its own project groups, session paths or memory records while
-reading aliases. No schema migration is introduced.
+nor uses the projection to change tool groups or session project paths. Stable
+memory associations may be persisted separately as described below; no shared
+relational schema migration is introduced.
 
 Schema 1 contains `updated_at`, `worktrees_root` and `slots`; each slot contains
 `slot_id`, `path`, `repository`, `git_common_dir`, `repo_key` and `state`. The
@@ -2161,9 +2170,79 @@ worktree and the SHA256-derived 16-character repo key. No arbitrary mapping
 path is accepted from RPC/model arguments. Slot state is diagnostic, not a
 permission grant. Disk-stale, forged or cross-repository entries never alias.
 
-Memory reads resolve the existing owner group or legacy collection without
-legacy migration or any `kv` write. Effective automatic recording is false for
-an alias; the real owner's stored flag is untouched. Editors and write APIs
-cannot write through an alias. Normal paths preserve their existing behavior.
-The common project-group resolver and tool workspace containment do not alias.
-See [memory-owner decision](../../adr/worktree-memory-owner.md).
+The slot projection remains read-only external evidence and keeps its existing
+owner-group instruction compatibility. When fresh Git validation registers a
+stable memory space, editor/Agent operations use its shared owner; Agent writes
+still require opt-in and Agent mode. Only legacy alias fallback without a shared
+space keeps effective recording false and rejects writes. The common tool
+group resolver and workspace containment do not alias. See the
+[memory-owner decision](../../adr/worktree-memory-owner.md) and its
+[stable-space amendment](../../adr/worktree-project-memory-spaces.md).
+
+## Stable project memory spaces
+
+Rust stores versioned records in the existing `kv` extension boundary:
+`projectMemorySpaces/v1`, `projectMemoryRepositories/v1`,
+`projectMemoryCheckouts/v1`, `projectMemorySessions/v1`,
+`projectMemorySpaceContent/v1`, `projectMemoryRevokedCheckouts/v1` and
+`projectMemoryImportedSources/v1`. A generated UUID identifies the space and
+`memory:<uuid>` is its editor/CAS owner. Repository evidence includes the
+validated Git common directory and its filesystem identity; a matching path,
+branch name or repository basename does not establish ownership. Automatic Git
+association requires reliable common-directory birth/creation metadata plus
+filesystem identity. Missing creation metadata retains the original scope; a
+moved non-Unix repository is not guessed to retain its identity. No `.git` marker
+is written. These are capability rules, not evidence of a Linux validation run.
+Explicit multi-root groups supply a deliberate logical boundary independent of Git
+membership. All their selected roots share that boundary, and distinct explicit
+groups are not automatically merged. Updating or replacing an explicit group's
+selected roots retains that group's existing logical-memory semantics; it is not
+an automatic repository association. Explicit groups remain available when Git
+identity evidence is unavailable.
+
+Promoting an already-associated primary checkout into a multi-root group keeps
+its UUID, current collection, recording preference and historical session
+bindings. An independent group created from a branch/slot receives a new UUID,
+copies the current collection and transfers only the selected roots' sessions.
+Fresh repository evidence must match the source association before either
+transition; a replaced directory cannot donate its previous repository's data.
+An explicit group keeps its UUID if later reduced to one root.
+Adding a root from a different existing memory space fails atomically rather
+than replacing that space's content/history associations. A first promotion of
+an associated checkout without fresh evidence also fails, including through
+internal/config-sync APIs. Existing explicit-group updates retain their UUID.
+
+A first association/import is transactional and may persist these records.
+Repeated steady-state reads avoid rewriting unchanged records. Old
+`projectMemory`, `projectGroupMemory` and recording-source values retain their
+original bytes/timestamps. Import deduplicates identical notes, retains differing
+notes with source attribution and records source ownership so a reused slot
+cannot import its previous repository's source collection. Empty shared content
+is authoritative and does not fall back to preserved notes.
+
+If combined rendered content exceeds 32 KiB, association rolls back rather than
+truncating notes or publishing a partial merge. The legacy source editor exposes
+`migrationRequired: true`, disables recording and allows manual owner/snapshot
+CAS saves. Export or shorten sources, save and reload to retry. Runtime/agent
+operations report migration-required errors until recovery succeeds.
+
+Sessions capture the stable memory-space ID on creation or first association;
+forks inherit it in the snapshot transaction. Explicit session moves and the
+deliberate project-group transition above can replace a binding; ordinary reads
+cannot. Checkout removal retains shared
+content and historical session membership. Fresh validation can associate the
+same slot path with another repository without moving old sessions. A stale
+bound session is refused on identity change. History retrieval uses the stable
+session association, while code search and file access retain actual checkout
+roots. Host list projections add `memoryProject` and `memoryProjectId` without
+rewriting the persisted session shape or changing tool-group membership.
+
+For Git projects inside the managed profile, the verified cold-copy offline
+relocation may replace the stored physical repository identity while preserving
+the UUID. The source directory must still match the stored identity and the new
+directory must be the verified internal copy. The same transaction replaces its
+repository index and removes the old backup's index; source bytes are unchanged.
+This exception is unavailable during normal resolution or for independent
+clones. Internal repositories with registered linked-worktree pointers refuse
+this relocation before pointer publication, retaining the original active
+profile and reporting the error without rewriting Git configuration.

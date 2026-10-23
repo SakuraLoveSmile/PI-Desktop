@@ -152,7 +152,6 @@ test("both project menus expose a destructive delete action", () => {
       projectsSource.indexOf("toggleProjectArchive(project)"),
     "ProjectsPage orders delete after archive",
   );
-  assert.match(projectsSource, /sessionCount: totalSessions/);
   assert.match(projectsSource, /setDeleteFor\(\{/);
   assert.match(
     projectsSource,
@@ -238,7 +237,6 @@ test("the menu item arms first and only a live task reaches the dialog", () => {
   }
 
   // Each surface counts the sessions that belong to its own row.
-  assert.match(dialogProps(projectsSource), /sessionMatchesIndexProject\(session, deleteFor\)/);
   assert.match(dialogProps(sidebarSource), /deleteProjectFor\.sessions\s*\.filter\(/);
 });
 

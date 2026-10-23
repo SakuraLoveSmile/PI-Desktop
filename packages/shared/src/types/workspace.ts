@@ -41,6 +41,14 @@ export type ProjectGroupRoot = {
   position: number;
 };
 
+/** Host-verified memory identity. These paths never grant filesystem access. */
+export type MemoryProject = {
+  id: string;
+  name: string;
+  primaryPath: string;
+  paths: string[];
+};
+
 export type ProjectGroupRecord = {
   id: string;
   name: string;
@@ -54,6 +62,8 @@ export type ProjectGroupRecord = {
   legacy?: boolean;
   /** Previously removed roots remain suppressed from legacy projections. */
   detachedPaths?: string[];
+  /** Presentation and recall scope, independent of this group's tool roots. */
+  memoryProject?: MemoryProject;
 };
 
 export type ProjectGroupContext = {

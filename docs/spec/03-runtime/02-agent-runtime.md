@@ -2029,11 +2029,13 @@ it off revokes writes while retaining read context. No extraction model or
 embedding provider is called. Requests capture a trusted session binding in the
 runtime's Host closure and the parent sidecar proxy verifies it before forwarding.
 
-ProjectHistory searches literal phrases in the current logical project's saved
-Desktop sessions. Search returns at most 20 sessions, two matching excerpts per
-session and stable session/message IDs. Read validates that the source remains
-in the same group and returns at most five user/assistant messages, each capped
-at 2,000 characters. Deleted chats are excluded; native Pi history is not mixed
+ProjectHistory searches literal phrases in the current stable memory project's
+saved Desktop sessions, including its other worktrees. Explicit multi-root groups
+retain their logical boundary. Search returns at most 20 sessions, two matching
+excerpts per session and stable session/message IDs. Read validates that the
+source retains the same bound memory identity (or the legacy group scope when no
+stable identity exists) and returns at most five user/assistant messages, each
+capped at 2,000 characters. Deleted chats are excluded; native Pi history is not mixed
 in without a Host-owned project identity.
 
 CodeSearch performs case-insensitive literal search in the session's root (not
@@ -2165,20 +2167,43 @@ persist before the next request, preserving active task and authenticated caller
 It found no product defect; thresholds and watchdog behavior remain unchanged.
 This is runtime coverage, not a real-model or Main/Rust incident replay.
 
-## Worktree slot memory context
+## Worktree project memory context
 
-Desktop and headless launch use the same context composition helper. A verified
-Host `memoryAlias` supplies only the owner's memory and group instructions;
-`projectPath`, cwd, the slot's file-instruction chain (including its checked-out
-AGENTS files), and all tool roots stay bound to the slot. Real owner roots must
-not appear as Primary/Additional roots in the prompt. Untracked instructions
-from the real repository are not copied or loaded.
+Desktop and headless launch use the same context composition helper. Host
+validates registered Git checkouts and resolves a stable UUID memory owner.
+Generic worktrees replace only memory: `projectPath`, cwd, actual tool roots and
+the checked-out/global instruction chain stay with the session checkout. Sharing
+memory never adds owner roots or owner-group instructions. Explicit multi-root
+groups preserve their selected-root logical boundary, including Git and non-Git
+folders; separate explicit groups are not automatically merged.
+Automatic sharing requires reliable Git common-directory birth/creation metadata
+and filesystem identity. Unsupported metadata retains the original scope;
+non-Unix moves are not guessed and no `.git` marker is written. Explicit groups
+can still share their roots and retain their existing memory when roots change.
 
-Launch passes the alias separately from the base instruction chain. Every user
-turn refreshes memory and alias instructions through the session-bound Host
-agentList response. Empty values delete old context; absent aliases or failed
-reads clear only the previous alias layer, keeping the slot/global instruction
-chain. Cancellation, disposal and turn epochs reject late reads. Reusable
-runtimes compare the alias launch configuration. Alias reads never expose
-ProjectMemory writes even if recording is enabled for the real project;
-Plan/Goal remain read-only.
+KaneoPilot's existing verified schema-1 slot alias retains its owner-group
+instruction projection for compatibility. It still does not copy untracked owner
+AGENTS files or expose owner roots as Primary/Additional roots. Launch passes
+`memoryAlias` separately from the base instruction chain. Generic memory-only
+projection does not add an alias instruction layer.
+
+Every user turn and approved-plan execution refreshes Host memory and effective
+recording state. Empty values clear old context, and absent aliases or failed
+reads revoke the old alias layer while preserving base checkout/global
+instructions. Cancellation, disposal and turn epochs discard late responses.
+Technical memory remains labelled user-provided context; verify another commit's
+or environment's facts against the current checkout before relying on them.
+
+After stable registration, an explicitly opted-in Agent may update the same
+collection from any associated worktree. Plan/Goal remain read-only; disabling
+recording revokes write guidance/tools on the next turn without deleting notes.
+Legacy alias fallback without stable registration stays read-only. Oversized
+legacy imports pause recording and report the manual migration recovery path;
+they never silently truncate context or fall back to stale notes.
+
+Runtime Host closures retain the session's actual `boundPath`. Host compares
+its stable session memory binding after fresh repository validation; a slot
+reused by another repository cannot rebind the old conversation implicitly.
+ProjectHistory may read related worktree history with source IDs/paths, including
+removed worktrees. Read and CodeSearch continue using the actual checkout, and
+unrelated projects stay outside memory/history scope.

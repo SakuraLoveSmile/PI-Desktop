@@ -18702,31 +18702,54 @@ push or PR authorization.
 ### E2E-PLUS-worktree-memory-owner
 
 - **Preconditions:** Current-main request candidate; rebuilt Rust Host and Node
-  sidecar; isolated HOME/data/profile, real temporary Git repository and two
-  detached slots; localhost deterministic provider only.
-- **Steps:** Store real project/group memory and instructions, register slots
-  through the fixed schema-1 projection, and launch Plan/Goal slot sessions.
-  Capture provider requests on the first and subsequent turns. Update/delete
-  memory and instructions; invalidate the mapping and repeat. Exercise a
-  multi-root owner and a second slot. Check forged binding and write refusals.
-- **Expected:** Both launch and later turns see the real memory/instructions
-  without real root lists or real untracked AGENTS; cwd/tool roots remain slot.
-  Empty/deleted/invalid alias context does not revive old notes. Plan/Goal and
-  all alias writes are refused. Real Host reads leave all kv rows unchanged.
-  Ordinary group context and sessions retain their existing behavior.
-- **Specs:** Runtime worktree context; Host verified aliases; storage memory
-  ownership; [ADR](../../adr/worktree-memory-owner.md).
-- **Automation:** `node scripts/e2e-project-context.mjs --worktree-memory`;
-  resolver/RPC Rust tests and launch/runtime behavior suites; existing isolated
-  Electron memory editor fixture remains the UI regression.
-- **Acceptance:** Candidate executable provenance, prompt captures, isolation
-  and actual checks are recorded separately from installation/paid-model tests.
+  sidecar; isolated HOME/data/profile; a real Git primary checkout, branch
+  worktree, one schema-1 registered detached slot and one generic detached slot;
+  a distinct same-named repository; localhost
+  deterministic provider only. No real account or paid endpoint is used.
+- **Steps:** Seed old path/group/branch/slot collections before first ownership
+  resolution, including conflicting notes. Resolve one stable owner without
+  rewriting source bytes/timestamps or tool-group roots. Drive ten scripted
+  user turns: recording off; opted-in Agent remember; Plan recall; Goal recall;
+  update; empty/delete; restore; revoke recording; cross-worktree history;
+  actual-checkout Read/CodeSearch. Keep the Agent runtime identity stable across
+  its turns so freshness depends on per-turn refresh. Exercise editor CAS and
+  opt-in/mode refusals. Remove a slot, reuse its path for the other repository,
+  then restart Host and recheck memory/history attribution.
+- **Expected:** Verified worktrees share `memory:<uuid>` and one collection;
+  differing imported notes retain attribution and preserved source records stay
+  unchanged. First association may persist derived records; steady-state reads
+  and refused writes do not rewrite `kv`. Empty shared notes never resurrect old
+  sources. Agent writes require opt-in; Plan/Goal remain read-only. Generic
+  projection changes memory only; the existing slot instruction projection
+  remains compatible. Actual cwd, roots, instruction files and code search stay
+  in the checkout without owner roots/untracked owner AGENTS disclosure. Removed
+  slots retain memory/history; path reuse never imports another repository's
+  source notes or moves its historical sessions. Restart preserves identities.
+- **Additional focused coverage:** Rust tests cover oversized-import rollback,
+  manual legacy editor CAS recovery, explicit multi-root Git/non-Git sharing and
+  separation of distinct explicit groups, single-to-multiple-root identity
+  preservation, atomic refusal to absorb another existing memory space, and
+  verified profile-copy identity relocation. UI tests cover ID-based row folding,
+  source-checkout session selection, real-checkout action scope and the
+  migration-required editor. Run those checks separately; the ten-turn protocol
+  harness alone does not establish UI or all multi-root acceptance.
+- **Specs:** Runtime worktree context; Host verified memory spaces; storage
+  memory ownership; [ADR](../../adr/worktree-project-memory-spaces.md), amending
+  the [slot alias decision](../../adr/worktree-memory-owner.md).
+- **Automation:** `node scripts/e2e-project-context.mjs --worktree-memory`
+  invokes `scripts/e2e/worktree-memory-context.mjs`; resolver/RPC Rust tests and
+  launch/runtime behavior suites; `node scripts/e2e-settings-memory.mjs` covers
+  the isolated production editor with fixture IPC.
+- **Acceptance:** Record tested candidate/base revisions, executable provenance,
+  ten-turn prompt/tool captures and actual results. Distinguish protocol evidence,
+  fixture UI, installed-build behavior and paid/real-model validation.
 - **Milestone:** Plus.
-- **Status:** Implementation candidate; do not infer a run from this definition.
+- **Status:** Implementation candidate; this definition is not a passing run or
+  user acceptance record.
 
 | Plus scenario | User path | Automated entry |
 | --- | --- | --- |
-| E2E-PLUS-worktree-memory-owner | Slot launch → subsequent turn → update/delete → mapping invalidation | project-context --worktree-memory; Rust + launch/runtime tests |
+| E2E-PLUS-worktree-memory-owner | Associate/import → ten turns → slot removal/reuse → restart | project-context --worktree-memory; Rust + launch/runtime + editor tests |
 ### E2E-RUNTIME-execution-ask-relay
 
 - **Preconditions:** Dedicated task worktree, current recorded main base,

@@ -72,12 +72,13 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   level.
   When search filters the directory, empty clusters and their headings disappear.
 - **Memory / 记忆** is a regular Workspace destination available in every build
-  and independent of developer mode. Its page lists Host-provided project groups
-  in a Settings card, using each group as the memory-sharing unit. Each row opens
-  the existing Project memory editor for that group; an empty list links to
-  Project archive, and a failed list read exposes retry. The page does not add a
-  second editor or change storage/API behavior. Project archive keeps its existing
-  Project memory action, and both entry points open the same editor.
+  and independent of developer mode. Its Settings card folds Host project rows
+  by verified `memoryProject.id`, so a project's registered worktrees expose one
+  memory entry. Explicit multi-root groups retain their own logical boundary,
+  including mixed Git/non-Git roots; unrelated groups and matching names do not
+  merge. Each row opens the existing editor for that shared owner. An empty list
+  links to Project archive, and a failed list read exposes retry. Project archive
+  keeps its Project memory action; both entry points use the same collection.
 - **Voice** is a regular Preferences destination between AI and Shortcuts,
   present in every build with no Experimental badge and no developer-mode
   requirement. Its rail row, page, search hits, and idle Composer entry are
@@ -1001,14 +1002,26 @@ unchanged. Subagents retains its existing list and editor sheet.
 
 ## Plus project memory recording
 
-Settings > Memory lists project groups and opens the same Project memory editor
-already available from Project archive. The group is the sharing unit: projects
-in a group share its saved notes and automatic-recording preference, while other
-groups stay independent. The editor's shared recording switch follows its
+Settings > Memory opens the same Project memory editor available from Project
+archive. A stable Host memory ID is the sharing unit for verified worktrees;
+explicit multi-root projects keep their user-selected logical boundary across
+Git and non-Git roots. Separate explicit groups remain independent. Worktrees
+in one memory space share saved notes and the recording preference. The editor's shared recording switch follows its
 description, defaults off and persists immediately; note edits continue using
 the existing single Save action. Turning recording off retains saved notes for
 chat context. Existing card layout, add/edit/remove actions and compact/narrow
 scrolling behavior remain. Conflicts retain drafts and offer an explicit reload;
 if the project changes group ownership, editing is disabled until the current
-project identity is refreshed. No separate memory storage, editor, source lists
-or automatic background extraction are introduced.
+project identity is refreshed. If preserved legacy sources exceed the combined
+32 KiB limit, the editor explains recovery, disables recording and keeps manual
+CAS edits available. Shorten/export sources, save and reload to retry; notes are
+never silently truncated. No second editor, source-list UI or automatic
+background extraction is introduced.
+
+Sidebar and Project archive also fold verified memory IDs into one display row.
+Task selection preserves each session's actual checkout, and related task rows
+show the source checkout. Edit/delete/new-task actions target the actual
+representative checkout; edit/delete tooltips identify that path. Underlying
+group roots remain intact and shared display does not imply bulk deletion of
+other worktrees. A slot reused by another repository shows its current project;
+old tasks stay attached to their captured memory ID, not to the recycled path.

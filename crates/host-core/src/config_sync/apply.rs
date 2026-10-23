@@ -1,5 +1,9 @@
 use super::*;
 
+#[cfg(test)]
+#[path = "memory_sync_tests.rs"]
+mod memory_sync_tests;
+
 fn mapped_project_paths(config: &StoredConfig, payload: &Value) -> Result<Option<Vec<String>>> {
     let logical_ids = [
         payload.get("projectGroupLogicalId"),
@@ -313,6 +317,17 @@ fn apply_entity(
             .and_then(Value::as_str);
         let is_group_memory =
             group_logical_id.is_some() && entity.payload.get("projectRootPosition").is_none();
+        let path = mapped_project_path(config, &entity.payload)?.ok_or_else(|| {
+            anyhow!("CONFIG_SYNC_MAPPING_REQUIRED: project memory needs a local folder")
+        })?;
+        if domains::apply_shared_memory(
+            &st.db,
+            &path,
+            entity.payload.get("memory"),
+            entity.deleted,
+        )? {
+            return Ok(());
+        }
         if is_group_memory {
             let group = st.db.stored_project_group_for_path(&paths[0])?;
             let group_id = if let Some(group) = group {
@@ -351,9 +366,6 @@ fn apply_entity(
             }
             return Ok(());
         }
-        let Some(path) = mapped_project_path(config, &entity.payload)? else {
-            bail!("CONFIG_SYNC_MAPPING_REQUIRED: project memory needs a local folder");
-        };
         if entity.deleted {
             st.db.delete_project_memory(&path)?;
         } else if let Some(memory) = entity.payload.get("memory") {

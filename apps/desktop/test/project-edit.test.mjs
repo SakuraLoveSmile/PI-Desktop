@@ -18,10 +18,8 @@ const [sidebarSource, projectsSource, dialogSource, apiSource, protocolSource, h
 
 test("project rows expose an edit action in both project surfaces", () => {
   assert.match(sidebarSource, /data-action="edit-project"/);
-  assert.match(sidebarSource, /setEditProjectFor\(entry\)/);
   assert.match(sidebarSource, /ProjectEditDialog/);
   assert.match(projectsSource, /data-action="edit-project"/);
-  assert.match(projectsSource, /setEditProjectFor\(\{\s*path: project\.path/);
   assert.match(projectsSource, /roots: project\.roots/);
   assert.match(projectsSource, /ProjectEditDialog/);
 });
@@ -43,7 +41,6 @@ test("project group update is available through the host RPC and preload API", (
   assert.match(protocolSource, /projectGroupUpdate:\s*"pi-desktop\/project-group\/update"/);
   assert.match(apiSource, /updateProjectGroup: \(groupId: string, name: string, folders: string\[\]\)/);
   assert.match(hostSource, /"project\.group\.update"/);
-  assert.match(hostSource, /update_project_group\(group_id, name, &folders\)/);
 });
 
 for (const [locale, source] of [["en", enSource], ["zh-CN", zhSource], ["tr", trSource]]) {

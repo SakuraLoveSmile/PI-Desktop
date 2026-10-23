@@ -41,7 +41,7 @@ export type ProjectMemoryEntry = {
   content: string;
 };
 
-/** Read-only context from a verified worktree's memory owner, without roots. */
+/** Context from a verified worktree's memory owner, without filesystem roots. */
 export type ProjectMemoryAlias = {
   memory: ProjectMemory;
   instructions: string;
@@ -56,6 +56,8 @@ export type ProjectMemoryRuntimeState = {
 
 export type ProjectMemoryEditor = ProjectMemoryRuntimeState & {
   owner: string;
+  /** Legacy collections remain editable when their combined size needs review. */
+  migrationRequired?: boolean;
 };
 
 /** Workspace-relative entry of the `fs/index` snapshot for the "@" menu (D124). */

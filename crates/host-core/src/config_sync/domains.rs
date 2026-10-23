@@ -12,11 +12,14 @@ use uuid::Uuid;
 
 #[path = "domains_capture.rs"]
 mod capture_impl;
+#[path = "domains_memory.rs"]
+mod memory_impl;
 pub(crate) use capture_impl::{
     capture, global_instruction_path_for_sync, remove_instruction_file, write_instruction_file,
 };
 #[cfg(test)]
-pub(crate) use capture_impl::{capture_instructions, capture_memory, capture_projects};
+pub(crate) use capture_impl::{capture_instructions, capture_projects};
+pub(crate) use memory_impl::{apply_shared_memory, capture_memory};
 
 pub const DOMAIN_APPLICATION: &str = "application";
 pub const DOMAIN_PROVIDERS: &str = "providers";

@@ -66,6 +66,17 @@ pub fn search_scoped(
     offset: i64,
     roots: Option<&[String]>,
 ) -> Result<SearchPage> {
+    search_with_memory_scope(db, query, offset, roots, None)
+}
+
+/// A durable session association, rather than a directory name, bounds recall.
+pub(crate) fn search_with_memory_scope(
+    db: &Database,
+    query: &str,
+    offset: i64,
+    roots: Option<&[String]>,
+    memory_project: Option<&str>,
+) -> Result<SearchPage> {
     let query = query.trim();
     if query.is_empty() {
         return Ok(SearchPage {
@@ -108,6 +119,11 @@ pub fn search_scoped(
          LEFT JOIN matched ON matched.session_id = s.id
          WHERE s.deleted_at IS NULL AND (matched.count > 0 OR metadata_match)
            AND (?4 IS NULL OR p.path IN (SELECT value FROM json_each(?4)))
+           AND (?5 IS NULL OR EXISTS (
+             SELECT 1 FROM kv memory_binding
+             WHERE memory_binding.ns = 'projectMemorySessions/v1'
+               AND memory_binding.key = s.id
+               AND json_extract(memory_binding.value_json, '$') = ?5))
          ORDER BY s.updated_at DESC, s.id ASC LIMIT 31 OFFSET ?3"
     );
     let mut hits = db
@@ -118,7 +134,8 @@ pub fn search_scoped(
                 query,
                 quoted,
                 offset,
-                roots.map(serde_json::to_string).transpose()?
+                roots.map(serde_json::to_string).transpose()?,
+                memory_project
             ],
             |row| {
                 Ok(SessionMatch {

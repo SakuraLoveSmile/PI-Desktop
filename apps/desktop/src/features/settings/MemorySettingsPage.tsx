@@ -6,6 +6,7 @@ import { useAppStore } from "../../stores/app-store";
 import { ProjectMemoryDialog } from "../../components/ProjectMemoryDialog";
 import { Button } from "../../components/ui";
 import { SettingsCard, SettingsRow } from "./primitives";
+import { collapseMemoryProjectGroups } from "../../lib/memory-projects";
 
 export function MemorySettingsPage() {
   const { t } = useTranslation();
@@ -21,7 +22,7 @@ export function MemorySettingsPage() {
     setFailed(false);
     setGroups(null);
     void api.listProjectGroups().then(({ groups: result }) => {
-      if (!cancelled) setGroups(result);
+      if (!cancelled) setGroups(collapseMemoryProjectGroups(result));
     }).catch(() => {
       if (!cancelled) setFailed(true);
     });
@@ -50,13 +51,15 @@ export function MemorySettingsPage() {
           </SettingsRow>
         ) : groups.map((group) => (
           <SettingsRow
-            key={group.id}
-            title={group.name}
-            detail={<span className="memory-settings-path" title={group.primaryPath}>{group.primaryPath}</span>}
+            key={group.memoryProject?.id ?? group.id}
+            title={group.memoryProject?.name ?? group.name}
+            detail={<span className="memory-settings-path" title={group.memoryProject?.primaryPath ?? group.primaryPath}>
+              {group.memoryProject?.primaryPath ?? group.primaryPath}
+            </span>}
           >
             <Button
               variant="secondary"
-              aria-label={`${t("project.editMemory")} · ${group.name}`}
+              aria-label={`${t("project.editMemory")} · ${group.memoryProject?.name ?? group.name}`}
               onClick={() => setSelected(group)}
             >
               {t("project.editMemory")}
@@ -67,10 +70,11 @@ export function MemorySettingsPage() {
       {selected ? (
         <ProjectMemoryDialog
           project={{
-            name: selected.name,
+            name: selected.memoryProject?.name ?? selected.name,
             path: selected.primaryPath,
             groupId: selected.id,
             legacy: selected.legacy,
+            memoryOwner: selected.memoryProject ? `memory:${selected.memoryProject.id}` : undefined,
           }}
           onClose={() => setSelected(null)}
           onSaved={() => showToast(t("project.memorySaved"), { variant: "success" })}

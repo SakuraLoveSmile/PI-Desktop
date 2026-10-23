@@ -13,7 +13,7 @@ export function ProjectMemoryDialog({
   onSaved,
   onError,
 }: {
-  project: { name: string; path: string; groupId?: string; legacy?: boolean };
+  project: { name: string; path: string; groupId?: string; legacy?: boolean; memoryOwner?: string };
   onClose: () => void;
   onSaved: () => void;
   onError: (error: unknown) => void;
@@ -67,12 +67,15 @@ export function ProjectMemoryDialog({
           </TooltipButton>
         </div>
         <p className="project-memory-dialog-description">{t("project.memoryDescription")}</p>
+        {editor?.migrationRequired ? (
+          <p className="project-memory-dialog-error" role="status">{t("project.memoryMigrationRequired")}</p>
+        ) : null}
         <div className="project-auto-memory-toggle">
           <span>{t("project.autoMemoryToggle")}</span>
           <SettingsToggle
             label={t("project.autoMemoryToggle")}
             checked={autoRecordEnabled}
-            disabled={editor === null || saving}
+            disabled={editor === null || saving || editor.migrationRequired === true}
             busy={saving}
             onChange={() => void setEnabled(!autoRecordEnabled)}
           />

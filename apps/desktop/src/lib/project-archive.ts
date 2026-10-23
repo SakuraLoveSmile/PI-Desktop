@@ -1,6 +1,7 @@
 import type { ProjectMeta } from "./sidebar-preferences.ts";
 import { normalizeProjectPath } from "./sidebar-preferences.ts";
 import { projectColor, type RecentProject } from "./recent-projects.ts";
+import { collapseMemoryProjectGroups, memoryProjectForPath, memoryProjectPaths, type MemoryProject } from "./memory-projects.ts";
 
 export const INITIAL_VISIBLE_SESSION_COUNT = 8;
 
@@ -31,6 +32,10 @@ export type ProjectIndexItem = RecentProject & {
   roots: ProjectRoot[];
   legacy: boolean;
   archived?: boolean;
+  /** Display/history membership, independent of the group's filesystem roots. */
+  sessionPaths?: string[];
+  memoryProject?: MemoryProject;
+  actionPath?: string;
 };
 
 export type DurableProjectGroup = {
@@ -41,12 +46,14 @@ export type DurableProjectGroup = {
   lastOpenedAt: number;
   pinned: boolean;
   legacy?: boolean;
+  memoryProject?: MemoryProject;
 };
 
 export type SessionIndexRecord = {
   id: string;
   title: string;
   projectPath?: string | null;
+  memoryProjectId?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -109,13 +116,23 @@ export function sessionMatchesQuery(
 }
 
 export function sessionMatchesIndexProject(
+  session: Pick<SessionIndexRecord, "projectPath" | "memoryProjectId">,
+  project: Pick<ProjectIndexItem, "roots" | "path" | "sessionPaths" | "memoryProject">,
+) {
+  if (session.memoryProjectId) {
+    return project.memoryProject?.id === session.memoryProjectId;
+  }
+  return sessionMatchesProjectRoots(session, project.sessionPaths ?? project.roots.map((root) => root.path));
+}
+
+/** Destructive project actions keep their existing checkout-root scope. */
+export function sessionMatchesProjectRoots(
   session: Pick<SessionIndexRecord, "projectPath">,
-  project: Pick<ProjectIndexItem, "roots" | "path">,
+  paths: readonly string[],
 ) {
   const sessionPath = normalizeProjectPath(session.projectPath);
   return Boolean(
-    sessionPath &&
-      project.roots.some((root) => normalizeProjectPath(root.path) === sessionPath),
+    sessionPath && paths.some((path) => normalizeProjectPath(path) === sessionPath),
   );
 }
 
@@ -149,18 +166,19 @@ export const PROJECT_STATUS_LABEL_KEYS: Record<ProjectStatus, string> = {
 };
 
 export function projectStatus(args: {
-  project: Pick<ProjectIndexItem, "path" | "archived">;
+  project: Pick<ProjectIndexItem, "path" | "archived" | "sessionPaths">;
   workspacePath?: string | null;
   openProjectPaths: readonly string[];
 }): ProjectStatus | null {
   const { project, workspacePath, openProjectPaths } = args;
   if (project.archived === true) return "archived";
-  if (normalizeProjectPath(workspacePath) === normalizeProjectPath(project.path)) {
+  const paths = project.sessionPaths ?? [project.path];
+  if (paths.some((path) => normalizeProjectPath(workspacePath) === normalizeProjectPath(path))) {
     return "active";
   }
   if (
     openProjectPaths.some(
-      (path) => normalizeProjectPath(path) === normalizeProjectPath(project.path),
+      (path) => paths.some((candidate) => normalizeProjectPath(path) === normalizeProjectPath(candidate)),
     )
   ) {
     return "open";
@@ -248,7 +266,7 @@ export function filterArchiveItems(
 
 export function relatedProjectSessions(
   sessions: readonly SessionIndexRecord[],
-  project: Pick<ProjectIndexItem, "roots" | "path">,
+  project: Pick<ProjectIndexItem, "roots" | "path" | "sessionPaths" | "memoryProject">,
 ) {
   return sessions
     .filter((session) => sessionMatchesIndexProject(session, project))
@@ -301,30 +319,37 @@ export function buildProjectIndex(args: {
   projectMeta: Record<string, ProjectMeta>;
 }): ProjectIndexItem[] {
   const { durableProjects, recents, sessionProjects, workspace, projectMeta } = args;
+  const displayGroups = collapseMemoryProjectGroups(durableProjects);
   const byPath = new Map<string, ProjectIndexItem>();
   const addGroup = (group: DurableProjectGroup, openedAt = group.lastOpenedAt) => {
-    const key = normalizeProjectPath(group.primaryPath);
+    const path = group.memoryProject?.primaryPath ?? group.primaryPath;
+    const key = normalizeProjectPath(path);
     if (!key) return;
     const existing = byPath.get(key);
     byPath.set(key, {
-      path: group.primaryPath,
-      name: group.name,
+      path,
+      actionPath: group.primaryPath,
+      name: group.memoryProject?.name ?? group.name,
       openedAt: Math.max(existing?.openedAt ?? 0, openedAt),
       pinned: group.pinned,
       color: existing?.color ?? projectColor(group.primaryPath),
       groupId: group.id,
       roots: group.roots,
       legacy: group.legacy === true,
+      sessionPaths: memoryProjectPaths(group).filter((candidate) => {
+        const owner = memoryProjectForPath(durableProjects, candidate)?.memoryProject;
+        return !owner || owner.id === group.memoryProject?.id;
+      }),
+      memoryProject: group.memoryProject,
     });
   };
   const groupForPath = (path: string) => {
-    const key = normalizeProjectPath(path);
-    return durableProjects.find((group) =>
-      group.roots.some((root) => normalizeProjectPath(root.path) === key),
-    );
+    const source = memoryProjectForPath(durableProjects, path);
+    return source?.memoryProject
+      ? displayGroups.find((group) => group.memoryProject?.id === source.memoryProject?.id) : source;
   };
 
-  for (const group of durableProjects) addGroup(group);
+  for (const group of displayGroups) addGroup(group);
 
   for (const project of recents) {
     const group = groupForPath(project.path);

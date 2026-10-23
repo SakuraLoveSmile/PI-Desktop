@@ -1,4 +1,4 @@
-//! Read-only KaneoPilot memory aliases; never a workspace/root resolver.
+//! Verified memory ownership; never a workspace or filesystem-access resolver.
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::{
@@ -11,6 +11,126 @@ use tokio::io::AsyncReadExt;
 const MAX_BYTES: u64 = 1024 * 1024;
 const MAX_SLOTS: usize = 4096;
 const TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Git evidence is prepared outside Host/database locks and consumed only by
+/// memory ownership. It must never be used to extend a workspace's tool roots.
+#[derive(Debug, Clone)]
+pub(crate) struct PreparedMemoryProject {
+    pub requested_path: String,
+    pub primary_path: String,
+    pub git_common_dir: String,
+    pub repository_identity: String,
+    pub paths: Vec<String>,
+}
+
+pub(crate) fn directory_identity(path: &Path, metadata: &std::fs::Metadata) -> Option<String> {
+    directory_identity_with_created(path, metadata, metadata.created().ok())
+}
+
+fn directory_identity_with_created(
+    _path: &Path,
+    metadata: &std::fs::Metadata,
+    created: Option<std::time::SystemTime>,
+) -> Option<String> {
+    // dev/ino alone can be reused after deletion. Unsupported birthtime must
+    // fail closed instead of disclosing the previous repository's memory.
+    let created = created?
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?
+        .as_nanos();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        Some(format!(
+            "unix:{}:{}:{created}",
+            metadata.dev(),
+            metadata.ino()
+        ))
+    }
+    #[cfg(not(unix))]
+    {
+        // Platforms without a portable file id keep the canonical location as
+        // part of the evidence. Moving one requires an explicit re-association.
+        Some(format!("directory:{}:{created}", _path.to_str()?))
+    }
+}
+
+async fn registered_repository(path: &str) -> Result<Option<PreparedMemoryProject>, &'static str> {
+    let requested = system_path(Path::new(path))?;
+    if canonical(&requested).await? != requested
+        || git_path(&requested, "--show-toplevel").await? != requested
+    {
+        return Ok(None);
+    }
+    let common = git_path(&requested, "--git-common-dir").await?;
+    let git_dir = git_path(&requested, "--absolute-git-dir").await?;
+    if git_dir != common {
+        let back_pointer = tokio::fs::read_to_string(git_dir.join("gitdir"))
+            .await
+            .map_err(|_| "worktree back-pointer unavailable")?;
+        if canonical(Path::new(back_pointer.trim_end_matches(['\r', '\n']))).await?
+            != canonical(&requested.join(".git")).await?
+        {
+            return Err("worktree back-pointer mismatch");
+        }
+    }
+    let metadata = tokio::fs::metadata(&common)
+        .await
+        .map_err(|_| "Git identity unavailable")?;
+    let identity = directory_identity(&common, &metadata).ok_or("Git identity unavailable")?;
+    let list = git(&requested, &["worktree", "list", "--porcelain", "-z"]).await?;
+    let mut paths = Vec::new();
+    for record in list.split("\0\0").filter(|record| !record.is_empty()) {
+        let Some(raw) = record
+            .split('\0')
+            .next()
+            .and_then(|field| field.strip_prefix("worktree "))
+        else {
+            continue;
+        };
+        let root = system_path(Path::new(raw))?;
+        // Prunable/deleted entries are historical evidence only, never fresh
+        // authority to read a replacement repository at the same location.
+        if !root.is_dir() {
+            continue;
+        }
+        if canonical(&root).await? == root
+            && git_path(&root, "--show-toplevel").await? == root
+            && git_path(&root, "--git-common-dir").await? == common
+        {
+            paths.push(root.to_str().ok_or("non UTF-8 checkout")?.to_owned());
+        }
+    }
+    let requested_path = requested.to_str().ok_or("non UTF-8 checkout")?.to_owned();
+    if !paths.contains(&requested_path) {
+        return Err("checkout not registered");
+    }
+    let primary_path = paths.first().cloned().ok_or("missing primary checkout")?;
+    Ok(Some(PreparedMemoryProject {
+        requested_path,
+        primary_path,
+        git_common_dir: common.to_str().ok_or("non UTF-8 Git directory")?.to_owned(),
+        repository_identity: identity,
+        paths,
+    }))
+}
+
+pub(crate) async fn prepare(path: &str) -> Option<PreparedMemoryProject> {
+    match tokio::time::timeout(TIMEOUT, registered_repository(path)).await {
+        Ok(Ok(prepared)) => prepared,
+        Ok(Err(reason)) => {
+            tracing::debug!(
+                reason,
+                "shared project memory unavailable; retaining project scope"
+            );
+            None
+        }
+        Err(_) => {
+            tracing::warn!("shared project memory validation timed out; retaining project scope");
+            None
+        }
+    }
+}
 
 #[derive(Debug)]
 pub(crate) struct MemoryOwner {
