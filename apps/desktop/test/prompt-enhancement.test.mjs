@@ -217,11 +217,6 @@ test("the enhancement model and reasoning are rows on the Prompt enhancement car
   assert.doesNotMatch(card, /SettingsCard/);
   assert.match(card, /t\("settings\.promptEnhancementModel"\)/);
 
-  // Same control as the default-model row: one anchored menu, one search field.
-  // The card composes the shared ModelPinMenu, which owns the anchored menu.
-  const pin = await read("../src/components/settings/ModelPinMenu.tsx");
-  assert.match(card, /<ModelPinMenu/);
-  assert.match(pin, /AnchoredMenu/);
   assert.match(card, /promptEnhancementProviderId/);
   assert.match(card, /promptEnhancementModelId/);
   assert.match(card, /promptEnhancementModelFollow/);

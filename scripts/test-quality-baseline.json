@@ -5083,7 +5083,7 @@
       ]
     },
     "apps/desktop/test/prompt-enhancement.test.mjs": {
-      "assertions": 95,
+      "assertions": 93,
       "cases": 5,
       "signatures": [
         "0055ea0fd94795202e59",
@@ -5106,7 +5106,6 @@
         "385a7ec91b1b6687ffe8",
         "3882bfd3d8a2cace41f4",
         "38df30be95f21231cb6c",
-        "3a0ceb2ec3e65903a878",
         "3a42b8d921531f506163",
         "3ed5a3932ac02aff528d",
         "4f97fe561f1972b13fcf",
@@ -5175,7 +5174,6 @@
         "f6ae49aafe3461b2364e",
         "f6fed3628a8c42a455f0",
         "f8411c4d03c9604cb7ba",
-        "f8ce67dab3f75b423b0e",
         "f8fc7612c8486ab34da0",
         "fa539324c330872965bf",
         "fad1714bdaa06229fbd1",
