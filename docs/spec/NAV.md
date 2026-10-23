@@ -52,6 +52,7 @@
 - [21-image-generation.md](03-runtime/21-image-generation.md)
 - [22-config-sync.md](03-runtime/22-config-sync.md)
 - [svg-attachment-input.md](03-runtime/svg-attachment-input.md)
+- [advisor-tool.md](03-runtime/advisor-tool.md)
 
 ## 4. UX
 - [README.md](04-ux/README.md)

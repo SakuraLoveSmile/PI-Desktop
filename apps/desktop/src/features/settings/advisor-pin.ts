@@ -1,5 +1,5 @@
 /**
- * Pin state for the Advisor model row (docs/spec/03-runtime/04-advisor-tool.md).
+ * Pin state for the Advisor model row (docs/spec/03-runtime/advisor-tool.md).
  *
  * A pin is "off" when either key is empty, "listed" when the picker offers the
  * pinned model, and "unlisted" when it does not. An unlisted pin is kept: launch

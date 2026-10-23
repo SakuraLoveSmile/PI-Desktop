@@ -90,7 +90,7 @@ export type AppSettings = {
    */
   promptEnhancementThinkingLevel?: ThinkingLevel;
   /**
-   * Model the Advisor tool consults (docs/spec/03-runtime/04-advisor-tool.md).
+   * Model the Advisor tool consults (docs/spec/03-runtime/advisor-tool.md).
    * Absent or null means the tool is off; clearing writes null because
    * settings.set merges, so a deleted key would keep the old pin. When the
    * pinned pair is unusable, a main session runs without the tool and logs why

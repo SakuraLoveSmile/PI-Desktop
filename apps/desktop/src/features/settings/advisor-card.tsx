@@ -1,5 +1,5 @@
 /**
- * Advisor model settings (docs/spec/03-runtime/04-advisor-tool.md).
+ * Advisor model settings (docs/spec/03-runtime/advisor-tool.md).
  *
  * One row picks the model the Advisor tool consults. The tool is off until a
  * model is picked, so a session never sends its conversation to a second

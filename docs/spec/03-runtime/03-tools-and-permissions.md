@@ -9,6 +9,7 @@
 |---|---|
 | Default mode | Agent |
 | Agent tools | Read / Glob / Grep / Write / Edit / Bash + registered plugin tools |
+| Advisor tool | Main sessions with a pinned Advisor model only: one no-parameter tool that sends the conversation so far to that model and returns its advice ([advisor-tool.md](advisor-tool.md)) |
 | Plan tools | Read / Glob / Grep / BrowserPreview / Bash / SubmitPlan + plugin tools that declare plan-safe actions |
 | Goal tools | Read / Glob / Grep / BrowserPreview / Bash / SubmitGoal + plugin tools that declare plan-safe actions |
 | Plan and Goal hard deny | Write / Edit / plugin tools without `planSafeActions` / unknown tools / the other kind's submit tool |
