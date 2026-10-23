@@ -1115,6 +1115,20 @@ mod tests {
             .starts_with("CONFIG_SYNC_DEPENDENCY: defaultProviderId"));
     }
 
+    #[test]
+    fn application_references_missing_advisor_provider_as_a_deferred_dependency() {
+        let data_dir = tempfile::tempdir().expect("data directory");
+        let state = AppState::open(data_dir.path()).expect("state");
+        let error = validate_application_references(
+            &state,
+            &json!({ "advisorProviderId": "provider-from-remote" }),
+        )
+        .expect_err("missing provider should be staged");
+        assert!(error
+            .to_string()
+            .starts_with("CONFIG_SYNC_DEPENDENCY: advisorProviderId"));
+    }
+
     fn pending_approvals(value: &Value) -> Vec<(String, String, String)> {
         value
             .get("pendingApprovals")

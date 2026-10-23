@@ -126,6 +126,8 @@ type RuntimeParams = {
   subagentProviders?: Record<string, RuntimeProviderConfig>;
   /** Opted-in override keys, separate from definition-only pinned bindings. */
   subagentModelKeys?: string[];
+  /** Provider binding for the Advisor tool; absent when the Advisor is off. */
+  advisorProvider?: RuntimeProviderConfig;
   scratchDir?: string;
   /** Session-bound workspace root supplied by Electron main. */
   projectPath?: string;
@@ -256,6 +258,9 @@ async function runtimeFor(
     subagents,
     subagentProviders,
     subagentModelKeys,
+    ...(params.advisorProvider
+      ? { advisorProvider: withVendorAuth(sessionId, params.advisorProvider) }
+      : {}),
     subagentMaxDepth: params.subagentMaxDepth,
     subagentMaxConcurrency: params.subagentMaxConcurrency,
     projectInstructions: params.projectInstructions,
@@ -335,6 +340,9 @@ async function runtimeFor(
     subagents,
     subagentProviders,
     subagentModelKeys,
+    ...(params.advisorProvider
+      ? { advisorProvider: withVendorAuth(sessionId, params.advisorProvider) }
+      : {}),
     subagentMaxDepth: params.subagentMaxDepth,
     subagentMaxConcurrency: params.subagentMaxConcurrency,
     projectPath: params.projectPath,

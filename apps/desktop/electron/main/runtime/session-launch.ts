@@ -27,8 +27,10 @@ import {
   loadSubagentDefinitions,
   modelConfigWithBinding,
   optionalProviderHeaders,
+  resolveAdvisorProvider,
   resolveSubagentProviders,
   visionFromModelConfig,
+  type ProviderModelLookups,
   type UserSubagentDocument,
 } from "@pi-desktop/agent-runtime";
 import { resolveLaunchProjectContext } from "@pi-desktop/host-runtime";
@@ -434,6 +436,36 @@ export function createSessionLaunchRuntime({
       });
     }
 
+    // Host lookups shared by the subagent pins and the Advisor pin: credentials,
+    // vendor-account bindings and models.dev metadata all live on this side.
+    const getSecret = async (id: string) =>
+      (await runtimeState.host!.call<{ value?: string }>("providers.getSecret", { id })).value;
+    const providerModelLookups: ProviderModelLookups = {
+      resolveVendorBinding: (pinned, pinnedModelId) =>
+        vendorOAuth.bindingFor(pinned.id, pinnedModelId),
+      resolveModel: async (pinned, pinnedModelId) => {
+        const catalogModelConfig = catalogModelConfigFor(modelsDevCatalog, {
+          providerId: pinned.id,
+          vendorKey: pinned.vendorKey,
+          baseUrl: pinned.baseUrl,
+          apiStyle: pinned.apiStyle,
+          modelId: pinnedModelId,
+        });
+        const configuredProvider = providers.providers.find(
+          (candidate) => candidate.id === pinned.id,
+        );
+        return configuredProvider
+          ? effectiveSubagentModelConfig(
+              configuredProvider,
+              pinnedModelId,
+              catalogModelConfig,
+            )
+          : {
+              modelConfig: catalogModelConfig,
+              capabilities: capabilitiesFromModelConfig(catalogModelConfig),
+            };
+      },
+    };
     let subagentCatalog: Awaited<ReturnType<typeof loadSubagentDefinitions>> = {
       definitions: [], builtins: [], diagnostics: [],
     };
@@ -455,32 +487,8 @@ export function createSessionLaunchRuntime({
       subagentBindings = await resolveSubagentProviders({
         definitions: subagentCatalog.definitions,
         providers: providers.providers,
-        getSecret: async (id: string) =>
-          (await runtimeState.host!.call<{ value?: string }>("providers.getSecret", { id })).value,
-        resolveVendorBinding: (pinned, pinnedModelId) =>
-          vendorOAuth.bindingFor(pinned.id, pinnedModelId),
-        resolveModel: async (pinned, pinnedModelId) => {
-          const catalogModelConfig = catalogModelConfigFor(modelsDevCatalog, {
-            providerId: pinned.id,
-            vendorKey: pinned.vendorKey,
-            baseUrl: pinned.baseUrl,
-            apiStyle: pinned.apiStyle,
-            modelId: pinnedModelId,
-          });
-          const configuredProvider = providers.providers.find(
-            (candidate) => candidate.id === pinned.id,
-          );
-          return configuredProvider
-            ? effectiveSubagentModelConfig(
-                configuredProvider,
-                pinnedModelId,
-                catalogModelConfig,
-              )
-            : {
-                modelConfig: catalogModelConfig,
-                capabilities: capabilitiesFromModelConfig(catalogModelConfig),
-              };
-        },
+        getSecret,
+        ...providerModelLookups,
       });
       // Delegation model catalog: every model binding flagged
       // `availableForSubagents` is pre-resolved so the system prompt can list
@@ -573,16 +581,34 @@ export function createSessionLaunchRuntime({
         });
       }
     }
+    // The Advisor is a main-session tool: team roles never get it. A pin that
+    // cannot run is logged and skipped rather than failing the launch.
+    const advisor = executionProfile === "team"
+      ? undefined
+      : await resolveAdvisorProvider({
+          settings,
+          providers: providers.providers,
+          getSecret,
+          ...providerModelLookups,
+        });
+    if (advisor?.status === "unavailable") {
+      logger.app("session", "warn", "advisor model unavailable", {
+        sessionId,
+        data: { reason: advisor.reason },
+      });
+    }
+    const advisorProvider = advisor?.status === "ready" ? advisor.provider : undefined;
     // Bind the vendor-account rows this turn is allowed to sign requests with:
-    // the session's own provider plus any row a pinned subagent resolved to. The
-    // sidecar may then ask main for request auth, but only for a row named here,
-    // and the set is rewritten on every launch.
+    // the session's own provider, any row a pinned subagent resolved to, and the
+    // Advisor's row. The sidecar may then ask main for request auth, but only for
+    // a row named here, and the set is rewritten on every launch.
 
     runtimeState.sidecar?.setVendorAuthBindings(
       sessionId,
       [
         provider.id,
         ...Object.values(subagentBindings.providers).map((binding) => binding.id),
+        ...(advisorProvider ? [advisorProvider.id] : []),
       ]
         .map((id) => providers.providers.find((row) => row.id === id))
         .flatMap((row) =>
@@ -609,6 +635,7 @@ export function createSessionLaunchRuntime({
         infiniteProviderRetry: settings.infiniteProviderRetry === true,
         subagentMaxDepth: subagentLimits.maxDepth,
         subagentMaxConcurrency: subagentLimits.maxConcurrency,
+        ...(advisorProvider ? { advisorProvider } : {}),
         commandShell,
         scratchDir: join(dataDir, "scratch", sessionId),
         attachmentsDir: join(dataDir, "attachments"),

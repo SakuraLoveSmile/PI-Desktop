@@ -12,6 +12,15 @@ describe("DesktopAgentRuntime configuration matching", () => {
     await runtime.dispose();
   });
 
+  it("reuses a runtime only while its Advisor binding is unchanged", async () => {
+    const advisorProvider = { ...provider, id: "advisor-fixture", modelId: "advisor-model" };
+    const runtime = createRuntime({ advisorProvider });
+    expect(runtimeMatches(runtime)).toBe(true);
+    expect(runtimeMatches(runtime, { advisorProvider: undefined })).toBe(false);
+    expect(runtimeMatches(runtime, { advisorProvider: { ...advisorProvider, modelId: "another-model" } })).toBe(false);
+    await runtime.dispose();
+  });
+
   it("accepts no-auth providers and reuses only an exact pi configuration", async () => {
     const runtime = createRuntime();
 

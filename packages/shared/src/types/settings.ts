@@ -89,6 +89,13 @@ export type AppSettings = {
    * stored level is always one the model can run.
    */
   promptEnhancementThinkingLevel?: ThinkingLevel;
+  /**
+   * Model the Advisor tool consults (docs/spec/03-runtime/04-advisor-tool.md).
+   * Absent means the tool is off. When the pinned pair is unusable, a main
+   * session runs without the tool and logs why instead of failing to start.
+   */
+  advisorProviderId?: string;
+  advisorModelId?: string;
   defaultPermissionMode?: GlobalPermissionMode;
   theme: ThemePreference;
   /** UI language; `auto` (and absent) follows the OS locale. */

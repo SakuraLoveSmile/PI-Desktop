@@ -52,6 +52,8 @@ pub(crate) const PORTABLE_APPLICATION_FIELDS: &[&str] = &[
     "promptEnhancementProviderId",
     "promptEnhancementModelId",
     "promptEnhancementThinkingLevel",
+    "advisorProviderId",
+    "advisorModelId",
     "imageGeneration",
     "imageGenerationModels",
     "speech",

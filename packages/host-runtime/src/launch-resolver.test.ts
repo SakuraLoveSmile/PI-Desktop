@@ -181,6 +181,34 @@ describe("createHeadlessLaunchResolver", () => {
     expect(launch.sidecarParams.infiniteProviderRetry).toBe(true);
   });
 
+  it("binds the Advisor pin to a configured model and logs a pin the provider no longer offers", async () => {
+    const { host } = hostWith([provider], { p1: "sk-test" });
+    const logged: unknown[][] = [];
+    const resolver = createHeadlessLaunchResolver({ getHost: () => host, dataDir: "/data", log: (...args: unknown[]) => logged.push(args) });
+    const off = await resolver.resolve("s1", { providerId: "p1", modelId: "gpt-a" }, {});
+    expect(off.sidecarParams.advisorProvider).toBeUndefined();
+
+    const bound = await resolver.resolve(
+      "s1",
+      { providerId: "p1", modelId: "gpt-a" },
+      { advisorProviderId: "p1", advisorModelId: "gpt-a" },
+    );
+    expect(bound.sidecarParams.advisorProvider).toMatchObject({ id: "p1", modelId: "gpt-a", apiKey: "sk-test" });
+
+    const stale = await resolver.resolve(
+      "s1",
+      { providerId: "p1", modelId: "gpt-a" },
+      { advisorProviderId: "p1", advisorModelId: "gpt-gone" },
+    );
+    expect(stale.sidecarParams.advisorProvider).toBeUndefined();
+    expect(stale.sidecarParams.provider.apiKey).toBe("sk-test");
+    expect(logged).toContainEqual([
+      "warn",
+      "advisor model unavailable",
+      { sessionId: "s1", reason: 'provider "OpenAI" does not offer "gpt-gone"' },
+    ]);
+  });
+
   it("falls back to the default provider and refuses a provider without a secret", async () => {
     const { host } = hostWith([provider, { ...provider, id: "p2", name: "Other", hasSecret: false }], { p1: "sk" });
     const resolver = createHeadlessLaunchResolver({ getHost: () => host, dataDir: "/data", log: () => undefined });
