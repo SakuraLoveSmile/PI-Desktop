@@ -1,7 +1,7 @@
 # 03. Tools and Permissions
 
 > Decisions applied: D003, D004, D006, D013, D015, D093, D114, D115, D181, D186, D636,
-> D189, D190, D195 (ADR 0057), D315, D384 (ADR 0211), ADR 0087
+> D189, D190, D195 (ADR 0057), D315, D384 (ADR 0211), ADR 0087, D642 (ADR 0319)
 
 ## 0. Frozen policy summary
 
@@ -9,9 +9,9 @@
 |---|---|
 | Default mode | Agent |
 | Agent tools | Read / Glob / Grep / Write / Edit / Bash + registered plugin tools |
-| Advisor tool | Main sessions with a pinned Advisor model only: one no-parameter tool that sends the conversation so far to that model and returns its advice ([advisor-tool.md](advisor-tool.md)) |
-| Plan tools | Read / Glob / Grep / BrowserPreview / Bash / SubmitPlan + plugin tools that declare plan-safe actions |
-| Goal tools | Read / Glob / Grep / BrowserPreview / Bash / SubmitGoal + plugin tools that declare plan-safe actions |
+| Advisor tool | Main sessions with a pinned Advisor model only, in Agent, Plan and Goal modes (ADR 0319): one no-parameter tool that sends the conversation so far to that model and returns its advice ([advisor-tool.md](advisor-tool.md)) |
+| Plan tools | Read / Glob / Grep / BrowserPreview / Bash / SubmitPlan / Advisor (when pinned, ADR 0319) + plugin tools that declare plan-safe actions |
+| Goal tools | Read / Glob / Grep / BrowserPreview / Bash / SubmitGoal / Advisor (when pinned, ADR 0319) + plugin tools that declare plan-safe actions |
 | Plan and Goal hard deny | Write / Edit / plugin tools without `planSafeActions` / unknown tools / the other kind's submit tool |
 | Plugin `planSafeActions` | Non-empty array of `action` strings; runtime hides plugin tools without one in Plan/Goal, host admits listed tools, plugin-runtime rejects any action outside the list (ADR 0211) |
 | Local permission approval | No automatic deadline; explicit decision or cancellation required |
@@ -523,6 +523,7 @@ for the current key-log policy.
 | Goal | allow | allow | deny | `ask`/`accept-edits`: confirm; `auto`: allow | plan-safe actions only |
 
 ### Notes
+- Advisor (when pinned) runs in Plan and Goal as a read-only consult that never reaches Host, so it has no matrix row and no permission prompt (ADR 0319).
 - Plan and Goal hard-deny Write/Edit and plugin tools without `planSafeActions` before permission UI; a direct host
   call cannot bypass the matrix. Plugin tools that declare a non-empty list are admitted; the runner still rejects any action outside that list (ADR 0211).
 - Agent mode uses permission cards or the selected automatic policy for

@@ -184,7 +184,8 @@
      `new_context`; every compaction adds a transcript row and one warning.
      No user-facing settings**
 44. Plan tools and policy: **Read / Glob / Grep / BrowserPreview / Bash plus
-    `EnterPlanMode` and `SubmitPlan`; Write/Edit/plugin and
+    `EnterPlanMode`, `SubmitPlan`, and `Advisor` when a main session has a
+    pinned advisor model (ADR 0319); Write/Edit/plugin and
     unknown tools are denied. Bash follows `ask`, `accept-edits`, or `auto`, so
     Plan is planning intent, not a strict read-only security profile.**
 45. Plan checkpoint: **`SubmitPlan(title, markdown, question)` causes host-core

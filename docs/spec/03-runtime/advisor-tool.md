@@ -9,8 +9,13 @@ it before acting.
 
 ## Scope
 
-- Main sessions only. Team roles and subagent runs never receive the tool, and
-  Electron launch does not resolve the pin for team profiles.
+- Main sessions only, in Agent, Plan and Goal modes (ADR 0319). Team roles and
+  subagent runs never receive the tool, and Electron launch does not resolve
+  the pin for team profiles.
+- In Plan and Goal the consult stays read-only: it writes nothing, and the
+  advisor model gets no tools. The call runs inside the runtime and never
+  reaches Host, so no permission rule classifies it and no approval prompt
+  appears in any permission mode. The pin in Settings is the consent.
 - Off until the user picks a model. There is no built-in advisor.
 
 ## Settings
