@@ -905,7 +905,11 @@ identify the platform validation still needed.
   Developer ID signatures or notarization, using explicit `-arm64` and `-x64`
   filename markers for their native architecture; macOS staple and Gatekeeper
   checks are explicitly skipped. Windows/Linux artifacts and the merged updater
-  feed still publish normally. This exception does not satisfy E2E-196c.
+  feed are validated in the Actions candidate bundle only. No GitHub Release
+  or public updater feed is published. This exception does not satisfy E2E-196c.
+  All jobs use the same pinned source SHA; record run URL, source/base SHAs, job
+  conclusions and final bundle identity. Local/self-hosted packaging (including
+  `pack --dir`) is rejected; development compilation remains supported.
 - **Specs linked**: `06-delivery/06-release-runbook.md`
 - **Acceptance**: Quality (debug packaging)
 - **Milestone**: M6+
@@ -935,12 +939,13 @@ identify the platform validation still needed.
 
 - **Preconditions**: A `vX.Y.Z` tag matching `apps/desktop/package.json` is
   pushed, or the Release workflow is dispatched with `sign_macos: true`
-  (default); GitHub Actions has `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`,
-  `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID` secrets; both native macOS
+  (manual dispatch defaults to false); the tag already belongs to remote main.
+  GitHub Actions has `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`,
+  `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` and `MAC_SIGNING_IDENTITY` secrets; both native macOS
   runners are available.
 - **Steps**: 1) Run the tag workflow. 2) For each macOS architecture, inspect
   the unpacked app with `codesign -dv --verbose=4` and confirm authority
-  `Developer ID Application: XingYu Liu (DUV63RKYTW)`. 3) Run
+  matching the configured fork certificate and TeamIdentifier. 3) Run
   `codesign --verify --deep --strict --verbose=2`,
   `spctl --assess --type execute --verbose=4`, and `xcrun stapler validate`
   against the app, including `Contents/Resources/bin/pi-desktop-host-core`.
@@ -954,7 +959,11 @@ identify the platform validation still needed.
   no ticket and fails `stapler staple` with error 65, so a tag build must never
   reach that state. The app opens normally; no `xattr` quarantine-removal
   command or Security & Privacy override is required. Missing secrets, a
-  rejected submission, or an exhausted staple retry fail the job.
+  rejected submission, or an exhausted staple retry fail the job. Formal tags
+  publish only after shared CI, complete platform/feed/hash aggregation, draft
+  uploads and remote digest/size verification. Published assets are immutable;
+  failed drafts remain for inspection and only an identical bundle can resume.
+  Signed manual candidates still produce Actions artifacts only.
 - **Specs linked**: `06-delivery/06-release-runbook.md`,
   `05-security/01-security.md`, ADR 0289
 - **Acceptance**: Quality, Security
@@ -5504,8 +5513,9 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 #### E2E-067C: Release version-surface preflight blocks a misaligned tag (D260)
 
-- **Preconditions**: A clean worktree at the current stable version. No release
-  tag has been created for the candidate version.
+- **Preconditions**: An isolated clean fixture repository with prepared version
+  surfaces, a controlled origin/main and no candidate tag. No live Release or
+  production repository is used by behavioral tests.
 - **Steps**: 1) Run `node scripts/check-release-docs.mjs` on the aligned tree.
   2) Regress one surface at a time — remove the newest changelog entry from
   `en`, then from `zh-CN`, then change a highlight count so the locales differ,
@@ -5513,25 +5523,30 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   manifest to a version the other `packages/*` manifests do not have, then
   leave the READMEs stating the previous `<major>.<minor>.x` release line — and
   rerun the preflight after each. 3) Run
-  `node scripts/release.mjs <next-version> --tag` with one surface still
+  `node scripts/release.mjs <version> --tag` with one surface still
   regressed. 4) Restore every surface, rerun the preflight, and repeat the
   release command.
 - **Expected**: The aligned tree reports alignment and exits 0; `packages/*`
   manifests that keep the upstream-synced version while the app surfaces carry
   the release version are aligned, and `release.mjs` leaves them unchanged.
   Each regression is reported by name with the offending file and expected
-  version, and exits non-zero. With a regressed surface, `release.mjs` bumps
-  files but creates neither the release commit nor the tag, and says the
-  documentation check failed. After restoration the preflight passes and the
-  release command proceeds to commit and tag. `--skip-docs-check` bypasses only
-  the check and is documented as non-release use.
+  version, and exits non-zero. Tag mode never changes files or commits; a
+  regressed surface prevents the tag. After restoration, an exact clean commit
+  already in freshly fetched origin/main may be annotated only if the tag is
+  absent locally and remotely. Network verification errors block tagging.
+  Preparation without `--tag` changes version files only; it must be committed
+  and merged through a PR before tagging. `--skip-docs-check` is preparation-only
+  and cannot bypass tag/cloud release gates.
 - **Specs linked**: `06-delivery/06-release-runbook.md` §4.1,
   `06-delivery/05-change-checklist.md`, `06-delivery/03-ai-development-workflow.md`,
   `08-meta/decisions-log.md` (D164, D260)
 - **Acceptance**: Quality (release process)
 - **Milestone**: M5
-- **Status**: Script-covered (`scripts/check-release-docs.mjs`); manual release
-  rehearsal Draft
+- **Status**: Script behavior covered by `release-git.test.mjs`,
+  `release-preflight.test.mjs`, `release-assets.test.mjs`,
+  `publish-release.test.mjs` and `require-cloud-build.test.mjs`, using isolated
+  repositories/files and a fake GitHub API. Actual cloud candidate, publication
+  and clean-machine install/upgrade evidence remain separate delivery records.
 
 #### E2E-068: Fork a conversation into an independent session
 

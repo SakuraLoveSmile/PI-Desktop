@@ -14,46 +14,64 @@
 
 ## 1. 构建通道
 
-| 通道 | 命令 | 签名 | 用途 |
+安装包和 Release 包仅在 GitHub 托管的 Actions runner 中构建。
+保留本地开发编译；安装包命令（包括 `pack --dir` 解包产物）及其包装器要求
+`GITHUB_ACTIONS=true` 和 `RUNNER_ENVIRONMENT=github-hosted`。
+自托管 runner 不属于打包通道，不得在本地设置这些值绕过检查。
+
+| 通道 | 入口 | 签名 | 结果 |
 |---|---|---|---|
-| 开发 | `pnpm dev` | 无 | 日常开发 |
-| 本地打包 | `pnpm --filter @pi-desktop/desktop pack` | 未配置证书时未签名 | 打包冒烟测试（`--dir` 输出） |
-| 本地 DMG | `pnpm --filter @pi-desktop/desktop dist` | 未配置证书时未签名 | 本地安装测试 |
-| 发布 | `scripts/release-macos.sh` | Developer ID + 强制公证 | 可分发产物 |
+| 开发 | `pnpm dev`、`pnpm build:js`、Cargo 开发命令 | 不要求 | 本地开发产物 |
+| 云端候选 | 手动触发 `release.yml` | 默认未签名，可选 macOS 签名 | 仅验证后的 Actions 工件 |
+| 正式发布 | 版本准备 PR 合并后推送 `v<version>` | macOS Developer ID 和强制公证 | 验证后不可变的 GitHub Release |
 
-静态 electron-builder 配置不嵌入证书身份，因此没有证书的贡献者仍可在本地打包。
-发布通道需要注入 Developer ID 身份（本地）或 `CSC_LINK` 证书（CI）；签名或公证验证
-失败时，发布会在上传前失败。
+`scripts/release-macos.sh` 已退役，只输出云端操作提示并退出。
+云端验证失败时，不存在本地安装包或发布兜底通道。
 
-在 macOS 上，`pnpm dev` 创建并重用带有指纹的品牌 Electron 主机
-捆绑在 `.cache/electron-dev/` 下。它的包名称、可执行文件、标识符、
-和 ICNS 资源是仅用于开发的 Pi-Desktop-Plus 值，因此 AppKit 显示
-应用程序菜单中的 Pi-Desktop-Plus 并使用本机中的规范图标
-关于面板。运行时还将 `build/icon_1024.png` 应用于 Dock。库存
-`node_modules` 下的文件永远不会被修改。 Windows/Linux 不断发展
-正常的 electro-vite 可执行文件。尽管如此，Windows Main 还是注册了
-之前 NSIS 包使用的相同 `cn.sakura.pi-desktop` AppUserModelID
-Electron 准备就绪，防止库存主机身份拥有本机
-通知或任务栏组。 Windows 封装另外引脚
-`Pi-Desktop-Plus` 可执行文件和“开始”菜单快捷方式名称。启动器设置
-`PI_DESKTOP_DEV=1` 因此运行时打包检查会禁用更新传送
-并保留开发人员工作区默认值，尽管有品牌可执行文件名称。
-Electron 43+ 上的首次 `pnpm dev` 会按需下载 Electron 二进制文件
-（该包不再在 `pnpm install` 期间安装它）。
-打包通道在 macOS 上通过 electron-builder 使用 `build/icon.icns`，并在
-Windows 可执行文件和原生窗口图标中使用 `build/icon.ico`。渲染器通过
-`BrandLogo` 导入相同的 PNG。PNG 是规范来源；`scripts/make-icon.py` 派生
-多尺寸 Windows ICO、512px Windows/Linux 包 PNG，以及 iconset/ICNS（当 macOS
-`iconutil` 可用时），无需覆盖规范来源。
+### 1.1 macOS 包使用独立身份的 Electron
+
+所有云端 macOS 打包通道都使用独立组装的 Electron。
+`scripts/package-macos-identity.mjs` 调用 `scripts/assemble-electron-dist.mjs`，
+使用固定版本的官方框架编译 `apps/desktop/build/electron-main-stub.c`，
+再把链接后的主程序换入该发行版的副本。随后带着
+`-c.electronDist=<that copy>` 和
+`-c.afterPack=scripts/macos-identity-gate.mjs` 调用 electron-builder。
+若主程序的 `LC_UUID` 与官方 Electron 或 `PI_IDENTITY_REFERENCE` 相同、
+应用标识或本地网络权限说明不正确、或缺少 host sidecar，门禁会使构建失败。
+不能静默回退到官方发行版。
+
+原因：electron-builder 只重命名 Electron 预编译主程序，而不重新链接。
+Chromium 的 LLD 根据链接内容生成 `LC_UUID`，因此同一 Electron 版本的 fork
+可能共享 UUID。macOS 将本地网络权限归属与代码签名和该 UUID 关联；共享 UUID
+曾导致本应用没有权限弹窗、没有系统设置条目且局域网请求被丢弃
+（ADR plus-independent-application-identity）。
+
+macOS 打包因此需要可用的 `clang`。组装器离线使用固定依赖提供的
+`node_modules/electron/dist`，不下载源码；必须先构建 Rust sidecar
+（`pnpm run build:host-release`）。Windows/Linux 包装器保持原有参数转发。
+
+macOS 的 `pnpm dev` 创建并复用 `.cache/electron-dev/` 下带指纹的品牌 Electron
+宿主。包名、可执行文件、标识符和 ICNS 是仅用于开发的 Pi-Desktop-Plus 值。
+应用菜单和原生关于面板使用产品身份；Dock 使用 `build/icon_1024.png`。
+不会修改 `node_modules` 中的官方文件。Windows/Linux 开发继续使用普通
+electron-vite 可执行文件。Windows Main 在 Electron 就绪前注册与 NSIS 相同的
+`cn.sakura.pi-desktop` AppUserModelID；Windows 包固定产品可执行文件和快捷方式名。
+启动器设置 `PI_DESKTOP_DEV=1`，禁用开发环境更新交付并保留开发工作区默认值。
+Electron 43+ 首次 `pnpm dev` 按需下载 Electron 二进制，`pnpm install` 不再下载。
+干净的云端 runner 在构建或 E2E 前显式获取该固定版本二进制。
+未签名云端候选不请求安全时间戳；签名候选和正式发布必须使用公证所需时间戳。
+打包使用 macOS `build/icon.icns` 和 Windows `build/icon.ico`；渲染器的
+`BrandLogo` 使用相同规范 PNG。`scripts/make-icon.py` 从
+`build/icon_1024.png` 生成多尺寸 ICO、512px Windows/Linux PNG、透明单色
+`build/tray-icon-mac.png` 模板，以及可用时通过 `iconutil` 生成 iconset/ICNS。
 
 ## 2. 先决条件（发布通道）
 
-1. Apple 开发者帐户，登录钥匙串中具有 **Developer ID Application** 证书。证书属于本 fork 的发布者，其名称与 TeamIdentifier 必须与显式配置一致。
-2. 本地签名通道的环境变量：
-   - `MAC_SIGNING_IDENTITY` — 包含团队后缀的证书通用名；electron-builder 拒绝保留 `Developer ID Application:` 前缀的名称，脚本会自动去掉该前缀
-   - `APPLE_ID`、`APPLE_APP_SPECIFIC_PASSWORD`、`APPLE_TEAM_ID` — 公证所必需（`APPLE_TEAM_ID` 必须匹配签名证书的团队）
-3. 安装 Rust 工具链和 pnpm 工作区。Rust 必须在 macOS 本机运行器上运行：
-   Apple Silicon 使用 arm64，Intel 使用 x86_64。
+1. 具有仓库 Actions 访问和候选构建触发权限；正式发布还需要版本标签推送授权。
+2. 正式发布或签名候选配置 §4.6 的六个签名 Secret；证书和 TeamIdentifier
+   属于本 fork 发布者，并与配置身份一致。
+3. GitHub 托管的原生 runner，使用固定 Node/pnpm、Rust、Electron 和锁文件依赖。
+   不使用本地产物作为发布输入。工作流检查架构并在相同 runner 上编译原生 host。
 
 ## 3. 构建内容
 
@@ -95,146 +113,119 @@ Windows 可执行文件和原生窗口图标中使用 `build/icon.ico`。渲染�
 
 | 位置 | 要求 |
 |---|---|
-| `apps/desktop/resources/models.dev/api.json` | 打标签前从 https://models.dev/api.json 刷新；发布工作流按该快照原样打包 |
-| `packages/shared/src/changelog-en.ts` | 英文条目按最新优先排列（事实来源，ADR 0009） |
-| `packages/shared/src/changelog-zh-CN.ts`、`changelog-zh-TW.ts`、`changelog-tr.ts`、`changelog-de.ts`、`changelog-es.ts`、`changelog-fr.ts`、`changelog-ko.ts`、`changelog-pt-BR.ts` | 版本集合与亮点条数与英文一致；新增的已发货语言还需在 `packages/shared/src/changelog.ts` 注册 |
-| `packages/shared/src/changelog.test.ts` | 该版本加入最新优先清单的首位 |
-| `package.json`、`apps/*/package.json`、`docs/package.json` | 版本号一致（`docs` 是第三个工作区根，不在 `apps`/`packages` 之下） |
-| `packages/*/package.json` | 发布时不提升：各自保持最近一次同步的上游树的版本，预检只要求它们彼此一致（ADR plus-version-line） |
-| `Cargo.toml` 的 `[workspace.package]`、`Cargo.lock` 的 `host-core` | 版本号一致 |
-| `packages/shared/src/protocol.ts` 的 `APP_VERSION` | 版本号一致 |
-| `README.md`、`README.zh-CN.md` | 状态章节声明当前 `<major>.<minor>.x` 版本线；工具链、命令与路线图描述仍然成立 |
+| `packages/shared/src/plus-changelog.ts` | Plus 稳定版本说明按最新优先排列，英文和所有已发货语言一致；保留上游目录 |
+| `packages/shared/src/changelog.ts` 和 `changelog-*.ts` | 合并目录跨语言保持一致；新增语言在此注册 |
+| `packages/shared/src/changelog.test.ts` | 预期版本列表首项为新稳定版本 |
+| `package.json`、`apps/*/package.json`、`docs/package.json` | 应用版本一致 |
+| `packages/*/package.json` | 保留上游版本线；各包版本彼此一致（ADR plus-version-line） |
+| Cargo 工作区版本、Cargo.lock host-core、protocol.ts APP_VERSION | 与应用版本一致 |
+| `README.md`、`README.zh-CN.md` | 当前 `<major>.<minor>.x` 版本线，以及准确的产品与开发说明 |
+| `apps/desktop/electron/main/settings-operation-metadata.json` | 通过发布文档门禁验证的元数据 |
 
-阻塞步骤：
+阻塞性的准备步骤：
 
-1. 打标签**之前**刷新 `apps/desktop/resources/models.dev/api.json`。
-   `scripts/release.mjs` 默认对每次升版本都会刷新，包括预发布。无变化的刷新
-   （已经是最新）仍然算通过：被打标签的树里的快照才是产物会带上的内容。
-   不要把单行压缩 JSON 的 diff 当成“文件不存在”。
-2. 在 `node scripts/release.mjs <version>` / `git tag` **之前**编辑
-   `packages/shared/src/changelog-en.ts`：
-   - 在 `en` 和每个已发货产品语言下各添加**最新优先**的条目（`zh-CN` / `zh-TW`
-     位于 `changelog-zh-CN.ts` / `changelog-zh-TW.ts`；其余语言目录是同级的
-     `packages/shared/src/changelog-*.ts` 文件）。
-   - 稳定版使用相同的 `version` 字符串（semver，**不带**前导 `v`，与
-     `apps/desktop` / `APP_VERSION` 一致）。
-   - 可选的 ISO `date`（`YYYY-MM-DD`）。
-   - 亮点条数一致；英文是唯一事实来源（ADR 0009）。
-   - 每条只表达一个面向用户的要点（不是原始 PR 标题）。
-3. **不要**把预发布标识（`x.y.z-rc.*`、`x.y.z-beta.*`）本身写进应用内更新日志。
-   当该预发布是下一稳定版的预览时，应添加那个**稳定版本**（`x.y.z`）的条目，
-   让测试者无需联网就能看到“新增内容”。仅当产品明确不为这次构建提供说明时
-   才省略目录。
-4. 同步 `packages/shared/src/changelog.test.ts` 中的最新优先版本清单
-   （把新的稳定版本加到首位），然后运行
-   `pnpm --filter @pi-desktop/shared test`，确认目录对齐（版本集合与亮点
-   条数）仍然通过。
-5. 版本线发生变化（`0.10.x` → `0.11.x`）时更新 `README.md` 与
-   `README.zh-CN.md`；当本次发布交付了用户可见行为，使亮点、下载、快速上手、
-   状态或参与开发章节的描述不再准确时同样要更新。两个语言版本保持结构一致，
-   英文是事实来源，中文版链接 `docs/zh-CN/` 镜像。
-6. 运行预检并修复所有报告的位置：
-   `pnpm check:release-docs [version]`（即 `node scripts/check-release-docs.mjs`）。
-   对预发布，请对正在预览的**稳定版本**运行
-   （`pnpm check:release-docs x.y.z`），这样即使 `scripts/release.mjs` 对
-   `x.y.z-beta.*` / `x.y.z-rc.*` 跳过该预检，更新日志和 README 仍会对齐。
-   预检会在临时目录编译 TypeScript 更新日志，因此不要求先构建整个工作区。
-   `scripts/release.mjs` 仍会为预发布刷新 models.dev；`--skip-docs-check`
-   仅用于明确的非发布性升版本。
-7. 提交文档更新，使被打标签的提交同时包含该版本的说明与准确的版本描述
-   （单独提交或与升版本提交相邻）。
-8. GitHub Release 正文仍可对网页使用 `generate_release_notes: true`；它们
-   仅限网页，**不是**应用内说明的来源。
+1. 在 `plus-changelog.ts` 中增加稳定版本的简短用户说明；所有已发货语言具有
+   相同版本和亮点条数。`changelog.ts` 合并 Plus 与上游历史，不覆盖上游目录记录 Plus 发布。
+2. `x.y.z-rc.1` 等预览版本记录对应稳定版本 `x.y.z`，不单列预发布标识。
+   同步 `changelog.test.ts` 和两份 README。
+3. 在独立请求分支运行 `node scripts/release.mjs <version>` 准备版本文件。
+   该命令不提交、不构建安装包、不推送，也不刷新 models.dev。资源更新需显式审查；
+   工作流原样打包标签树中的 models.dev 快照。
+4. 在准备后的源码上通过 `node scripts/check-release-docs.mjs <stable-version>`
+   和 shared 更新日志测试。检查器会在临时目录编译 TypeScript 更新日志。
+   若准备检查必须在云端运行，可仅在准备阶段使用 `--skip-docs-check`；
+   复用的云端 CI 文档门禁仍须在合并前通过，`--tag` 不接受此选项。
+5. 在请求分支提交准备，经过 PR 和云端门禁合并到 `main`。
+   GitHub 网页自动生成说明不能替代应用内更新日志。
 
-打标签前清单：
+### 4.2 云端候选构建
 
-- [ ] `apps/desktop/resources/models.dev/api.json` 已刷新，或已确认打标签的树中为最新
-- [ ] `packages/shared/src/changelog-en.ts` 及每个已发货语言目录含有正在发布或
-      预览的稳定版本条目
-- [ ] `packages/shared/src/changelog-de.ts` 及其他语言目录与英文版本集合、
-      亮点条数一致
-- [ ] 各语言的亮点条数一致
-- [ ] 共享更新日志测试通过
-- [ ] `README.md` 与 `README.zh-CN.md` 声明当前版本线，且没有被本次发布
-      推翻的描述
-- [ ] `node scripts/check-release-docs.mjs` 在发布提交上通过
-      （预览预发布时传入稳定版本）
-- [ ] `release.mjs` / 打标签仅在文档提交进入发布分支后执行
-
-### 4.2 构建/打包
+构建当前 `main` 候选：
 
 ```bash
-export MAC_SIGNING_IDENTITY="Your Developer ID Name (YOURTEAMID)"
-export APPLE_ID=...
-export APPLE_APP_SPECIFIC_PASSWORD=...
-export APPLE_TEAM_ID=...
-scripts/release-macos.sh
+gh workflow run release.yml --ref main -f sign_macos=false
 ```
 
-工件落在 `apps/desktop/release/`（DMG + ZIP + 块图）中。
+合并前也可使用 `--ref <request-branch>`。预检固定完整的 40 位提交 SHA，
+后续所有 job 检出相同提交。验证记录保留 run URL、source/base SHA、各 job
+结论与最终工件标识。已排队或已触发不代表构建成功。
 
-`scripts/release-macos.sh` 默认使用主机架构，也接受 `MAC_ARCH=arm64` 或
-`MAC_ARCH=x64`，但该值必须与主机匹配，以保持 Rust 本机主机和 Electron
-软件包的架构一致。
+手动构建默认 `sign_macos=false`；只有配置六个签名 Secret 后才设置 true。
+两种候选都经过共享 CI、平台构建和聚合，只生成 Actions 中的
+`release-bundle-<version>-<source-sha>`，不创建 GitHub Release，不发布公共更新源。
+未签名工件仅用于调试，不能证明通过 Gatekeeper 或公证。
 
-### 4.3 GitHub 标签和手动工作流程
+### 4.3 正式标签和发布
 
-GitHub Release 工作流程启动所有本机平台运行程序，无需
-单独的验证作业障碍。每个运行器都会验证推送的标签
-结账后、打包前立即匹配 `apps/desktop/package.json`
-输入已准备好。
+版本准备 PR 合并后，在干净工作树检出准确的合并提交，然后执行：
 
-在每个平台上，发布准备步骤都会启动锁定的 Rust 主机
-与 pnpm 安装和本机依赖项重建并行构建。它
-然后仅构建由选择的工作区依赖项
-`@pi-desktop/desktop^...`，如果该依赖项选择意外则失败
-空的。平台 `dist:*` 命令仍然负责捆绑代理
-运行时，验证主机构建，构建一次桌面应用程序，以及
-调用电子构建器。这避免了多余的桌面构建，而无需
-更改包脚本或发布工件。
+```bash
+node scripts/release.mjs <version> --tag
+git push origin v<version>
+```
 
-**macOS 默认发布策略：** GitHub tag 发布会在上传前对 macOS DMG/ZIP 做 Developer ID 签名、公证、装订和 Gatekeeper 校验（D450 / ADR 0289）。缺少签名或公证密钥则作业失败。`workflow_dispatch` 仅可把 `sign_macos: false` 用于未签名调试产物，不得用于 GitHub Release 标签。本地 `scripts/release-macos.sh` 仍是明确的本地签名通道；未配置证书时 `pnpm dist:mac` 保持未签名（D078）。
+标签模式验证文档，刷新 `origin/main`，确认干净的当前提交已包含于远端 main，
+并确认标签在本地和远端均不存在。只创建附注标签，不修改版本文件或提交。
+网络验证失败会阻止打标签，不得替换已有标签或手动给未合并分支打发布标签。
+推送标签后启动 `.github/workflows/release.yml`。
 
-macOS 矩阵使用 arm64 的 `macos-15` 和 Intel x64 的
-`macos-15-intel`。每个作业验证 `uname -m`，向 electron-builder 传入匹配
-的 `--arm64` 或 `--x64`，并在同一本机运行器上构建
-`pi-desktop-host-core`。每个架构的 `latest-mac.yml` 会在上传前重命名，
-发布作业下载两个工件后再合并为一个更新源。
+正式预检拒绝标签与应用/Cargo/协议版本不一致、标签指向其他提交或源码不属于
+新获取的 `origin/main`。稳定 SemVer 使用 `latest`；`alpha`、`beta`、`rc`
+等预发布使用独立更新渠道，并设置 `prerelease=true`、`make_latest=false`。
+非法版本或不安全渠道会失败。正式标签始终要求六个签名 Secret，缺失即尽早失败。
+不能将未签名候选提升为正式 Release。
 
-共享的 electron-builder 配置在 macOS 平台级别为 ZIP 应用带架构后缀的命名模板，
-并在 DMG 目标级别覆盖该模板。两个公开架构都会明确可见：arm64 通道发布
-`Pi-Desktop-Plus-<version>-arm64.dmg` 和 `Pi-Desktop-Plus-<version>-arm64-mac.zip`，
-Intel x64 通道发布 `Pi-Desktop-Plus-<version>-x64.dmg` 和
-`Pi-Desktop-Plus-<version>-x64-mac.zip`。这同时适用于未签名、已签名和本地 macOS
-通道，并确保每个按架构生成的更新源都会引用带架构后缀的工件名及其匹配校验和。
-上传前，每个 macOS 运行器必须恰好生成一个带架构后缀的 DMG 和 ZIP（包括
-blockmap），任何无后缀或架构错误的 macOS 工件都会使发布失败。
+门禁顺序：
 
-DMG 使用带品牌视觉的 720×440 背景，只展示拖入 Applications 的双图标安装手势。
-窗口里只有应用和 Applications 链接。
+1. **元数据：** 固定 source SHA、版本、渠道、发布类型和签名策略；
+   获取 main 时不改变候选检出。
+2. **共享验证：** 在相同源码复用 `ci.yml`：JS 构建、类型、lint、架构、测试质量、
+   单元测试、运行时测试类型、Rust fmt/clippy/test、隔离 smoke 和发布脚本行为测试。
+   安装依赖后运行完整发布文档门禁。
+3. **原生构建：** macOS arm64/Intel x64、Windows x64、Linux x64/arm64 Desktop，
+   以及 Linux x64/arm64 pi-host。干净 runner 显式获取固定 Electron。
+   打包使用 `--publish never`，只有最终发布 job 可写 Release。
+4. **聚合：** 要求七组预期工件，拒绝缺失、意外、重复或不安全路径；
+   验证更新源版本、实际 SHA512/大小和 pi-host SHA256 sidecar。
+   合并两份 macOS 更新源，生成 `release-manifest.json` 与 `SHA256SUMS`。
+   manifest 记录源仓库/SHA、run URL/id/attempt、版本、渠道、类型、签名策略和
+   每个资产的名称/大小/SHA256。
+5. **正式发布：** `scripts/publish-release.mjs` 重新验证工件和远端 tag/main 身份，
+   创建草稿、上传全部资产、验证远端 SHA256 与大小后才公开。
+   已公开 Release 不可变，不覆盖资产。失败草稿保留供检查；重试须匹配准确的
+   source/manifest 身份，只复用相同资产，身份不符则阻塞，不自动删除或替换草稿。
 
-macOS ZIP 在安装包根目录包含 `Pi-Desktop-Plus.app`。DMG 和 ZIP 都不附带打开说明或首次
-启动命令助手，本地与未签名调试构建也一样。标签发布工件仍会签名并公证；未签名通道
-仅用于调试，不代表已通过 Gatekeeper 验证。
+macOS arm64 使用 `macos-15`，Intel x64 使用 `macos-15-intel`；检查 `uname -m`，
+在同一原生 runner 构建 Rust host。签名通道将 `CSC_NAME` 固定为配置证书通用名，
+强制应用签名和公证，独立对 DMG 公证/装订，上传前验证代码、身份、Gatekeeper
+和两份票据（§4.6–§5）。正式标签不能跳过这些检查。
 
-标签构建和 `sign_macos: true`（手动运行的默认值）仅从 GitHub Actions 密钥接收 `CSC_LINK`、`CSC_KEY_PASSWORD`、`APPLE_ID`、`APPLE_APP_SPECIFIC_PASSWORD` 和 `APPLE_TEAM_ID`，通过 `CSC_NAME=${MAC_SIGNING_IDENTITY}`（裸通用名——electron-builder 拒绝 `Developer ID Application:` 前缀）固定证书，强制代码签名与 `notarytool` 公证 `Pi-Desktop-Plus.app`。随后 DMG 会由 `scripts/notarize-and-staple-macos-release-dmg.sh` 单独提交到同一个服务，只有返回 `Accepted` 才允许装订票据。之后验证身份、代码签名完整性（含 `pi-desktop-host-core`）、Gatekeeper `Notarized Developer ID` 以及两份已装订票据，再进行任何工件上传。
 
-DMG、ZIP、NSIS、AppImage、deb、rpm、块图和更新程序提要输出已
-压缩或压缩不敏感。因此，工作流程会上传它们的
-发布作业之前压缩级别为零的临时操作工件
-组装 GitHub 版本。Linux 运行器还会在上传前
-把各自解压出的 `resources/app.asar`（x64 为 `linux-unpacked`，arm64 为
-`linux-arm64-unpacked`）复制为带版本的
-`Pi-Desktop-Plus-<version>-linux-<arch>.asar` 资产。这保留了 Linux 安装器用于
-以系统 Electron 下游重新打包时使用的那份确切归档。
+每次 builder 调用都显式接收预检给出的 `-c.publish.channel=<channel>`，
+包括预发布；不单凭版本字符串推断更新源名称。签名 DMG 经公证和装订改变字节后，
+`scripts/refresh-macos-release-metadata.mjs` 在验证和上传前重新生成外置 DMG
+blockmap，并刷新该渠道 macOS 更新源中的 SHA512 和大小。
+它使用已安装的 electron-builder blockmap 实现并显式指定外置输出，
+同时验证生成 blockmap 不改变已签名 DMG 字节。聚合随后检查最终装订产物的哈希。
 
-Linux 更新源带上它们所构建的架构：x64 为 `latest-linux.yml`，arm64 为
-`latest-linux-arm64.yml`。这正是 `electron-updater` 在对应架构上请求的通道文件，
-因此某条通道若缺少自己的更新源，会在上传前就失败。
+两种 macOS 架构均使用明确命名的 DMG/ZIP 和 blockmap（§6），拒绝无架构或架构错误资产。
+DMG 保持品牌 720×440 拖入 Applications 布局，仅显示应用和 Applications 链接。
+ZIP 根目录包含 `Pi-Desktop-Plus.app`，两者都不附首次启动说明或可执行辅助脚本。
 
-### 4.4 CNB 镜像触发
+Linux 保持 glibc 2.35 下限（§7），从安装包复制版本化的系统 Electron ASAR，
+并分别生成 `<channel>-linux.yml`（x64）、`<channel>-linux-arm64.yml`（arm64）。
+macOS 合并为 `<channel>-mac.yml`，Windows NSIS 使用 `<channel>.yml`。
+已压缩的临时安装包和更新源采用 Actions 压缩级别零。
+`scripts/release-assets.mjs` 验证平台与 pi-host 完整库存，不能仅凭各构建 job 成功推断完整性。
 
-`softprops/action-gh-release` 发布或更新 GitHub Release 之后，
+### 4.4 文档站部署
+
+发布工作流不部署文档站。`docs/vercel.json` 已关闭 Vercel Git Deployments，
+文档源码变化不会自动更新生产站，需要时在 Vercel 手动发起部署。
+
+### 4.5 CNB 镜像触发
+
+上游 GitHub Release 发布或更新后，
 `.github/workflows/mirror-to-cnb.yml` 会启动 `aixk/Pi-Desktop` 上的 CNB
 流水线。GitHub Release 仍是权威产物源；CNB 只是同一标签的副本，供从
 https://cnb.cool/aixk/Pi-Desktop 拉取的用户使用。
@@ -245,13 +236,13 @@ https://cnb.cool/aixk/Pi-Desktop 拉取的用户使用。
 - 在 `release` 的 `published` / `edited` 时触发，也可通过
   `workflow_dispatch` 传入明确标签（例如 `v0.14.6`）
 - 发送事件 `api_trigger_mirror`，并把 `MIRROR_TAGS` 设为该标签
-- 使用仓库密钥 `CNB_MIRROR_TOKEN`（已配置）；密钥为空时失败退出
+- 使用仓库密钥 `CNB_MIRROR_TOKEN`；密钥为空时失败退出
 - 用 `jq` 构造 JSON，避免手动运行时标签缺失导致空的 `MIRROR_TAGS`
 
 若 CNB 流水线幂等，对同一标签重跑是安全的。它不会重新构建桌面产物，
 也不会改写 electron-updater 更新源。
 
-### 4.5 GitHub Actions 中的 macOS 签名密钥
+### 4.6 GitHub Actions 中的 macOS 签名密钥
 
 在 GitHub → 仓库 `SakuraLoveSmile/PI-Desktop` → Settings → Secrets and variables →
 Actions 中创建下列密钥。不要把 p12、密码、Apple ID 或应用专用密码提交进仓库。
@@ -263,7 +254,7 @@ Actions 中创建下列密钥。不要把 p12、密码、Apple ID 或应用专�
 | `CSC_KEY_PASSWORD` | 导出该 `.p12` 时设置的密码 |
 | `APPLE_ID` | 属于团队 `${APPLE_TEAM_ID}` 的 Apple ID 邮箱 |
 | `APPLE_APP_SPECIFIC_PASSWORD` | 来自 https://appleid.apple.com → Sign-In and Security → App-Specific Passwords 的应用专用密码 |
-| `APPLE_TEAM_ID` | `${APPLE_TEAM_ID}` |
+| `APPLE_TEAM_ID` | 本 fork 发布者的 Apple Developer 团队 ID，与签名证书一致 |
 | `MAC_SIGNING_IDENTITY` | 本 fork 的 Developer ID Application 证书通用名，包含团队后缀 |
 
 在本地把 p12 编成 base64（不要把输出贴到聊天或仓库）：
@@ -275,7 +266,7 @@ base64 -i developer-id-application.p12 | pbcopy
 Linux 使用 `base64 -w0 developer-id-application.p12`。绝不能进入 git 的文件：
 `*.p12`、`*.cer`、`*.p8`、`*.mobileprovision`。
 
-### 4.6 macOS 签名可观测性与超时
+### 4.7 macOS 签名可观测性与超时
 
 `electron-builder` 在开始签名前只打印一行 —— `signing
 file=release/mac-arm64/Pi-Desktop-Plus.app platform=darwin type=distribution
@@ -344,7 +335,7 @@ override 作用于它。它的 `signApplication()` 对每个文件 `await` 一�
 
 从未提交过的 DMG 没有票据，因此装订会失败并报 `Could not find base64 encoded ticket ... Error 65`。只有在 Apple 返回 `Accepted` 之后才允许重试装订。
 
-每次已签名发布后运行：
+GitHub 托管 runner 每次完成签名构建后执行以下验证：
 
 ```bash
 for APP in apps/desktop/release/mac-*/Pi-Desktop-Plus.app; do
@@ -354,6 +345,7 @@ for APP in apps/desktop/release/mac-*/Pi-Desktop-Plus.app; do
   xcrun stapler validate "$APP"
 done
 xcrun stapler validate apps/desktop/release/*.dmg
+```
 
 当提交未被接受时，Release 工作流会自动打印 Apple 公证日志；手动查看方式：
 
@@ -362,7 +354,6 @@ xcrun notarytool log <submission-id> \
   --apple-id "$APPLE_ID" \
   --password "$APPLE_APP_SPECIFIC_PASSWORD" \
   --team-id "$APPLE_TEAM_ID"
-```
 ```
 
 ### 5.1 安装包体积门禁
@@ -482,10 +473,9 @@ project/Temporary 使用消息加会话图标创建控件。
 
 ## 6. 本机运行器发布包
 
-该存储库为每个发布目标公开本机运行器构建命令。
-每个打包命令首先运行 `build:host-release`，然后捆绑代理
-运行时和 Electron 应用程序。D126/D285/D603 标签工作流程发布这些输出及其
-电子更新程序清单。在该目标操作系统上运行目标命令：
+以下命令仅是 GitHub 托管 Actions 的实现参考，不是本地打包步骤。
+各命令先构建 release host，打包 agent runtime 和 Electron 应用，
+再在对应操作系统的原生 runner 中打包：
 
 ```text
 macOS Apple Silicon: pnpm --filter @pi-desktop/desktop run dist:mac -- --arm64
@@ -499,8 +489,8 @@ Windows 的 `dist:win` 命令会运行 `scripts/build-desktop-release.mjs`，分
 
 macOS 软件包包括按本机架构构建的 `bin/pi-desktop-host-core`；
 Linux 软件包在其本机 x64 与 arm64 运行器上做同样的事；Windows
-软件包包括 `bin/pi-desktop-host-core.exe`。签名、回滚和安装程序升级资质仍保持发布
-硬化工作；发布本身已在 D126/D285/D603 下启用。
+软件包包括 `bin/pi-desktop-host-core.exe`。正式标签强制 macOS 签名和公证；
+回滚和安装程序升级资格仍属于独立的发布加固工作。
 
 Native-runner 输出矩阵：
 
@@ -553,4 +543,5 @@ electron Pi-Desktop-Plus-<version>-linux-<arch>.asar
   `@picovoice/pvrecorder-node` 按 `/proc/cpuinfo` 的 CPU part 判定 Linux
   arm64。语音转写（`transcribe-cpp` 随附 `linux-arm64-cpu-vulkan` 包）以及
   其余所有功能在任何 arm64 Linux 设备上都可用。
-- 回滚、分阶段部署和预发布渠道政策仍是开放的发布工作。现有未签名 macOS 安装可能需要先手动安装一次已签名 DMG，之后应用内更新才能成功。
+- 回滚和分阶段部署仍是开放工作。预发布具有独立命名更新源且不会成为 GitHub latest。
+  现有未签名 macOS 安装可能需先手动安装一次云端发布的已签名 DMG，才能应用内更新。

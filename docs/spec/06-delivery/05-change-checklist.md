@@ -68,14 +68,18 @@ Before editing any file for a new request:
   worktree is clean.
 - [ ] A dedicated `<type>/<short-description>` request branch and worktree are
   created from that updated `main` commit.
+- [ ] The worktree is under
+  `/Users/sakurasep/Documents/Code/Project/Project Worktree/PI-Desktop/<short-description>/`,
+  including subagent and temporary validation or integration worktrees.
+  Working state, registered worktrees, and task ownership were checked first.
 - [ ] The request worktree reuses the primary checkout's host toolchains,
   compatible dependency tree, package stores, caches, and ignored local
   configuration where safe; no separate environment is installed for E2E.
 - [ ] Only mutable, incompatible, or concurrency-sensitive environment state
   stays worktree-local and ignored.
 - [ ] The current branch is not `main` before implementation begins.
-- [ ] Delivery scope is recorded: create a commit only when the user asks;
-  a push request includes PR-based remote `main` integration after
+- [ ] Delivery scope is recorded: a commit request stays on the request
+  branch; a push request includes PR-based remote `main` integration after
   `pnpm check:pr-base`. Explicit branch-only or draft-only limits are honored.
 
 ---
@@ -131,11 +135,11 @@ After implementation (or alongside it):
 - [ ] The smallest necessary targeted local checks passed, or local validation
   was assessed as unnecessary with no separate approval or waiver required.
 - [ ] Relevant E2E suites were selected and passed on a candidate that contains
-  latest `origin/main` before the request branch was pushed and a PR/MR was
-  opened, or before a commit-only delivery was declared complete; required
+  latest `origin/main` before merge or commit-only completion. For exact-SHA
+  hosted validation, an authorized push/PR may precede the gate; required
   validation needs no separate user request. Documentation-only changes retain
   their existing exemption.
-- [ ] Task-candidate E2E used the host development environment already
+- [ ] Local task-candidate E2E used the host development environment already
   provisioned in the primary checkout; no `pnpm install`/`npm install` or
   second dependency/runtime environment was created solely for E2E. Any
   missing/incompatible-host exception is recorded with its reason.
@@ -144,7 +148,8 @@ After implementation (or alongside it):
   is recorded with its reason, alternative validation, and remaining risk;
   delivery remains incomplete until that gate passes.
 - [ ] Hosting-platform E2E jobs that start before the remote merge were observed
-  and reported but do not replace the local `main` gate; a post-merge rerun
+  and reported; exact-SHA hosted candidate jobs can satisfy the candidate gate,
+  while PR integration gates remain separate. A post-merge rerun
   happened when the landed executable content differs from the commit the gate
   ran on. Dispatch or rerun follows the hosting platform's or repository
   workflow's requirements.
@@ -170,8 +175,8 @@ explicit branch-only or draft-only requests retain their narrower scope:
 - [ ] Before a PR/MR is opened or updated, `origin/main` is an ancestor of the
   request head (`pnpm check:pr-base`). A PR behind `origin/main` is not opened.
 - [ ] For a code-bearing change: the relevant E2E gate ran against a candidate
-  that contains latest `origin/main` before the branch push and PR/MR creation,
-  or before a commit-only delivery was declared complete, or its `NOT RUN`
+  that contains latest `origin/main` before merge or commit-only completion,
+  locally or on GitHub-hosted Actions at the exact recorded SHA, or its `NOT RUN`
   limitation is recorded with reason, alternative validation, and remaining risk.
 - [ ] Commit-only delivery did not publish remotely without separate
   authorization.
@@ -203,8 +208,11 @@ merge happened remotely via PR/MR or locally in the primary checkout:
   when remote delivery was requested.
 - [ ] Before direct removal, the request worktree is clean; otherwise a
   verified recoverable archive preserves all remaining request contents.
+- [ ] No running task, service, or needed path reference still uses the
+  checkout; a retained checkout is reported by exact path and blocker.
 - [ ] `git worktree remove <worktree-path>` succeeded without forcing, or the
-  managed archive operation completed and the old checkout is absent.
+  managed archive operation completed and the old checkout is absent. Removal
+  ran outside the checkout and preserved the shared worktree root and archives.
 - [ ] `git branch -d <type>/<short-description>` succeeded (no `-D` fallback on
   an unmerged branch).
 - [ ] `git worktree prune` leaves `git worktree list` free of stale entries for
@@ -231,7 +239,7 @@ merge happened remotely via PR/MR or locally in the primary checkout:
 Required for every stable app version bump / tag (D164). Skip only for
 documentation-only work or non-release chores.
 
-- [ ] `packages/shared/src/changelog.ts` has a newest-first entry for the
+- [ ] `packages/shared/src/plus-changelog.ts` has a newest-first Plus entry for the
       release version under `en` and every shipped product locale (no leading
       `v`).
 - [ ] Highlight counts match across locales; English is the source of truth.
@@ -246,7 +254,21 @@ documentation-only work or non-release chores.
 - [ ] `node scripts/check-release-docs.mjs` passes (version surfaces,
       shipped-locale catalog, README release line).
 - [ ] Documentation commit is on the release branch **before**
-      `node scripts/release.mjs <version> --tag` / `git tag v<version>`.
+      `node scripts/release.mjs <version> --tag`.
+- [ ] Installer builds, including unpacked `pack --dir`, ran only on
+      GitHub-hosted Actions; no local packaging fallback was used.
+- [ ] The preparation PR merged into `main` after cloud checks; tag mode used
+      its exact clean merged commit, verified fresh remote ancestry and absence
+      of an existing tag, and did not bump files or commit.
+- [ ] The tag workflow pinned one full source SHA and passed shared CI,
+      native architecture/signing/notarization and complete asset/feed checks.
+- [ ] `release-manifest.json`, `SHA256SUMS`, source/base SHAs, run URL and all
+      job conclusions were retained as evidence. Candidate dispatch produced
+      Actions artifacts only; publication was not inferred from dispatch.
+- [ ] Formal publication used draft → upload → remote digest/size verification
+      → publish; no published asset was overwritten. Failed drafts were retained
+      and any retry matched their exact source/manifest identity.
+- [ ] Prerelease feeds use their named channel and do not become GitHub latest.
 - [ ] GitHub auto-generated release body is treated as web-only, not the
       in-app source ([06-release-runbook.md §4.1](06-release-runbook.md#41-mandatory-release-version-surface-gate-d164--d260)).
 
@@ -263,8 +285,8 @@ user's delivery scope:
 | 2 | Code/doc implements the planned change | Step 4 of [development loop](03-ai-development-workflow.md#2-development-loop) |
 | 3 | All impacted specs updated | [R1 — Spec-sync](03-ai-development-workflow.md#r1--spec-first--spec-sync) |
 | 4 | E2E scenarios documented (or confirmed not needed) | [R3 — E2E coverage doc](03-ai-development-workflow.md#r3--e2e-coverage-doc) |
-| 5 | Targeted local checks follow the existing risk standard; for a code-bearing change the relevant E2E gate passed on a candidate that contains latest `origin/main` (`pnpm check:pr-base`) before the branch push, the PR/MR, or a commit-only completion (or its `NOT RUN` limitation is recorded); after the remote merge the affected suites were rerun when the landed executable content changed; required tests need no separate user request | Steps 7, 10, and 11 of development loop |
-| 6 | A commit is created only when the user explicitly requested it; requested commits follow the conventional format | [R2 — Explicit Commit Authorization](03-ai-development-workflow.md#r2--explicit-commit-authorization) |
+| 5 | Targeted local checks follow the existing risk standard; for a code-bearing change the relevant E2E gate passed on a candidate that contains latest `origin/main` (`pnpm check:pr-base`) before merge or commit-only completion (authorized push/PR may precede exact-SHA hosted validation) (or its `NOT RUN` limitation is recorded); after the remote merge the affected suites were rerun when the landed executable content changed; required tests need no separate user request | Steps 7, 10, and 11 of development loop |
+| 6 | Change committed with conventional message | [R2 — Commit-per-change](03-ai-development-workflow.md#r2--commit-per-change) |
 | 7 | BOARD updated if milestone deliverable completed | Step 9 of development loop |
 | 8 | No secrets or local data in commit | [§4.4 Never commit](03-ai-development-workflow.md#44-never-commit) |
 | 9 | Requested local/remote `main` integration completed under R4; expected commits verified and merged worktree/branch removed; any requested launch uses integrated `main` | [R4 — Request branch + worktree + merge gate](03-ai-development-workflow.md#r4--request-branch--worktree--merge-gate) |

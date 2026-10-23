@@ -17,13 +17,11 @@ import { shouldUseSecureTimestamp } from "../../../scripts/macos-signing-policy.
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-const [wrapper, assembler, gate, releaseLane, releaseBuilder, releaseWorkflow, packageSource] = await Promise.all([
+const [wrapper, assembler, gate, releaseBuilder, packageSource] = await Promise.all([
   read("../../../scripts/package-macos-identity.mjs"),
   read("../../../scripts/assemble-electron-dist.mjs"),
   read("../../../scripts/macos-identity-gate.mjs"),
-  read("../../../scripts/release-macos.sh"),
   read("../../../scripts/build-desktop-release.mjs"),
-  read("../../../.github/workflows/release.yml"),
   read("../package.json"),
 ]);
 const pkg = JSON.parse(packageSource);
@@ -39,13 +37,8 @@ test("every macOS lane packages through the identity-aware entry point", () => {
   assert.match(releaseBuilder, /package-macos-identity\.mjs/);
 });
 
-test("Windows and Linux lanes keep the stock distribution", () => {
-  assert.match(pkg.scripts["dist:win"], /build-desktop-release\.mjs win/);
-  assert.match(pkg.scripts["dist:linux"], /electron-builder --linux/);
-  for (const name of ["dist:win", "dist:linux"]) {
-    assert.doesNotMatch(pkg.scripts[name], /package-macos-identity/, name);
-  }
-});
+// Stock Windows/Linux distribution and forwarded channel/architecture are
+// exercised at the builder process boundary in release-builder-arguments.test.mjs.
 
 test("the wrapper always supplies the distribution, the gate and a post-check", () => {
   assert.match(wrapper, /-c\.electronDist=\$\{electronDist\}/);
@@ -58,51 +51,20 @@ test("the wrapper always supplies the distribution, the gate and a post-check", 
   assert.match(wrapper, /verified \$\{packaged\.length\} packaged bundle/);
 });
 
-test("local lanes sign without a secure timestamp and the release lane keeps it", () => {
-  assert.match(wrapper, /-c\.mac\.timestamp=none/);
-  assert.match(wrapper, /PI_MAC_SECURE_TIMESTAMP/);
-  assert.match(wrapper, /shouldUseSecureTimestamp\(forwarded, process\.env\)/);
-  assert.doesNotMatch(releaseLane, /timestamp=none/);
+test("notarization requests retain secure timestamps independently of unrelated builder flags", () => {
+  for (const args of [
+    ["-c.publish.channel=beta", "-c.mac.forceCodeSigning=true", "-c.mac.notarize=true"],
+    ["--config.mac.notarize", "true", "--arm64"],
+  ]) assert.equal(shouldUseSecureTimestamp(args, {}), true);
+  assert.equal(shouldUseSecureTimestamp([], {}), false);
+  assert.equal(shouldUseSecureTimestamp([], { PI_MAC_SECURE_TIMESTAMP: "1" }), true);
+  assert.equal(shouldUseSecureTimestamp(["-c.mac.notarize=false"], {}), false);
 });
 
-test("the signed CI invocation keeps a secure timestamp for notarization", () => {
-  const signedBlock = releaseWorkflow.match(
-    /- name: Package signed and notarized macOS installer[\s\S]*?(?=\n      - name:)/,
-  )?.[0];
-  assert.ok(signedBlock, "signed macOS package step is missing");
-  const invocation = signedBlock.match(
-    /run dist:mac -- --\$\{\{ matrix\.arch \}\} \\\n\s+(-c\.mac\.forceCodeSigning=true) \\\n\s+(-c\.mac\.notarize=true)/,
-  );
-  assert.ok(invocation, "signed CI dist:mac invocation is missing");
-  assert.equal(
-    shouldUseSecureTimestamp(invocation.slice(1), {}),
-    true,
-    "CI notarization arguments must retain secure timestamps",
-  );
-  assert.equal(shouldUseSecureTimestamp([], {}), false, "local lane defaults to no timestamp");
-  assert.equal(
-    shouldUseSecureTimestamp([], { PI_MAC_SECURE_TIMESTAMP: "1" }),
-    true,
-    "explicit local override requests a secure timestamp",
-  );
-  assert.equal(
-    shouldUseSecureTimestamp(["-c.mac.notarize=false"], {}),
-    false,
-    "notarize=false keeps the local no-timestamp policy",
-  );
-  assert.match(
-    signedBlock,
-    /run dist:mac -- --\$\{\{ matrix\.arch \}\} \\\n\s+-c\.mac\.forceCodeSigning=true \\\n\s+-c\.mac\.notarize=true/,
-  );
-});
-
-test("the signed release lane packages the independent distribution and the gate", () => {
-  assert.match(releaseLane, /-c\.electronDist="\$\{PI_ELECTRON_DIST\}"/);
-  assert.match(releaseLane, /-c\.afterPack="\$\(pwd\)\/scripts\/macos-identity-gate\.mjs"/);
-  assert.match(releaseLane, /assemble-electron-dist\.mjs/);
-  assert.match(releaseLane, /-c\.mac\.forceCodeSigning=true/);
-  assert.match(releaseLane, /-c\.mac\.notarize=true/);
-});
+// The retired release-macos.sh path is exercised by macos-release-lane.test.mjs;
+// the live identity wrapper/gate remain covered below and by executable identity
+// fixtures, while signing and DMG phase ordering are covered by the dedicated
+// macos-release-verification.test.mjs and macos-signing-watchdog.test.mjs suites.
 
 test("the assembler preserves bundle-relative symlinks and refuses a shared UUID", () => {
   assert.match(assembler, /run\("ditto", \[officialDist, out\]\)/);

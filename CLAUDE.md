@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Policy-Sync: 2026-10-22.1
+Policy-Sync: 2026-10-24.1
 
 Instructions for Claude Code CLI and Claude Cowork on PI-Desktop.
 
@@ -49,18 +49,19 @@ Create the worktree from current remote `main`:
 
 ```bash
 git fetch origin main
+mkdir -p "/Users/sakurasep/Documents/Code/Project/Project Worktree/PI-Desktop"
 git worktree add \
   -b <type>/<short-description> \
-  <worktree-path> \
+  "/Users/sakurasep/Documents/Code/Project/Project Worktree/PI-Desktop/<short-description>" \
   origin/main
-cd <worktree-path>
+cd "/Users/sakurasep/Documents/Code/Project/Project Worktree/PI-Desktop/<short-description>"
 ```
 
-All new worktrees, including subagent and temporary validation/integration
-worktrees, go under `/Users/sakurasep/Documents/Code/Project/Project Worktree/PI-Desktop/<short-description>/`.
-Inspect `git status --short --branch` and `git worktree list` before creating
-one. If the tool cannot select that location, use `git worktree add` with the
-quoted absolute path.
+Every new worktree, including subagent and temporary validation or integration
+worktrees, must use this central location. Do not use sibling, in-repository,
+or tool-default directories. Inspect the working state, `git worktree list`,
+and task ownership before creation. If a tool cannot select the location, use
+`git worktree add` with a quoted absolute path.
 
 Branch names: `feat/...`, `fix/...`, `docs/...`, `refactor/...`, `chore/...`.
 
@@ -71,13 +72,13 @@ Branch names: `feat/...`, `fix/...`, `docs/...`, `refactor/...`, `chore/...`.
 2. implement in the worktree
 3. targeted static/unit/integration checks
 4. review the full diff
-5. commit only when the user explicitly requests it
+5. commit
 6. fetch + rebase/refresh against latest origin/main (private branch)
 7. resolve conflicts in the worktree
-8. task-candidate E2E in the same worktree
-9. push branch
+8. local task-candidate E2E, or select hosted validation of the exact SHA
+9. push branch when authorized
 10. open/update PR
-11. PR integration validation
+11. pass selected hosted candidate gates, then PR integration validation
 12. merge into remote main through repository gates
 13. synchronize local main
 14. remove your worktree and merged local branch
@@ -85,6 +86,28 @@ Branch names: `feat/...`, `fix/...`, `docs/...`, `refactor/...`, `chore/...`.
 
 Do **not** insert `merge task → local main` between refresh and task-candidate E2E. The task branch itself is the local integration candidate after incorporating latest `origin/main`. Do not open or update a PR that is behind `origin/main`. Run `pnpm check:pr-base` before opening or updating a PR.
 
+
+### Cloud installer and release builds
+
+Installer and release packages are built only on GitHub-hosted Actions runners.
+This includes unpacked `pack --dir` output. Local `pnpm dev`, JavaScript builds,
+Rust development builds, and targeted checks remain available. Installer
+commands and their direct wrappers reject local and self-hosted execution;
+`scripts/release-macos.sh` is retired. Do not bypass the guard or fall back to a
+local package when a cloud gate fails.
+
+Use `.github/workflows/release.yml` for a manual candidate or a formal version
+tag, following `docs/spec/06-delivery/06-release-runbook.md`. Manual candidates
+produce verified Actions artifacts only. Only a signed, verified tag already
+contained in remote `main` can publish a GitHub Release.
+
+Task-candidate validation may run on GitHub-hosted Actions at the exact request
+SHA after incorporating latest `origin/main`. With this lane selected, an
+authorized branch push and PR may precede the hosted gate; its successful result
+is required before merge. Record the tested SHA, base revision, run URL and job
+conclusions. A pending, failed, or missing cloud result is not passing evidence.
+Local candidate E2E continues to use the shared host environment described in this file;
+clean hosted runners install from lockfiles.
 
 ### Verified merge and cleanup
 
@@ -97,9 +120,13 @@ and safely synchronizes local `main`.
 - Archive dirty/untracked work and needed ignored packages, screenshots and
   configuration recoverably before removal; do not discard unsaved data or
   force-delete an unmerged branch.
+- Verify no running task, service, or needed path reference still uses the
+  checkout; retain it and report the exact blocker if it remains in use.
 - Remove/archive request-owned worktrees, prune stale registrations, and remove
   empty parent directories only when they contain no other data beyond name
   markers. Prefer the managed archive operation for managed worktrees.
+  Run removal from outside the checkout and preserve the shared worktree root,
+  other tasks, and recovery archives.
 - Delete verified merged task/obsolete integration branches.
   Do not keep backup snapshots as normal local branches. Preserve backup
   commits through archive refs outside `refs/heads/` or verified backup files
@@ -127,7 +154,7 @@ If a required suite cannot run, report `NOT RUN` with reason, alternative valida
 
 ### E2E environment reuse
 
-Task-candidate E2E uses the host development environment already provisioned
+Local task-candidate E2E uses the host development environment already provisioned
 in the primary checkout. Reuse its Node/pnpm toolchain, compatible
 `node_modules`, Electron, Rust/Cargo targets, stores, caches, and ignored
 configuration by reference or link when needed.

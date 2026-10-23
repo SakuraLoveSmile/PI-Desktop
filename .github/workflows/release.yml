@@ -1,26 +1,8 @@
-# Release pipeline
-#
-# Trigger: push a tag `vX.Y.Z` (must match apps/desktop/package.json version).
-# The easiest way to cut a release:
-#
-#   node scripts/release.mjs 0.2.0 --tag   # bump versions + commit + create tag v0.2.0
-#   git push origin <branch> v0.2.0        # push → this workflow builds & publishes
-#
-# Builds installers for every platform defined in the electron-builder config
-# (macOS dmg/zip arm64 and x64, Windows NSIS and portable ZIP x64, Linux
-# AppImage/deb/rpm x64 and arm64), each
-# with its native pi-desktop-host-core Rust sidecar. The Linux app.asar is also
-# exported as a system-Electron repackaging asset, and all outputs — with their
-# electron-updater latest*.yml feeds — are published to the GitHub Release
-# (D126/D285/D364/D603). macOS tag artifacts are Developer ID-signed, notarized, and
-# stapled before upload (D450 / ADR 0289).
-#
-# It also builds the headless `pi-host` bundle for both Linux architectures the
-# desktop publishes and publishes each as
-# pi-host-<version>-linux-<arch>.tar.gz plus a .sha256 sidecar. The desktop's
-# SSH bootstrap downloads that asset at the desktop's version and verifies the
-# published checksum before installing on the remote machine (rollout
-# 06-delivery/07-remote-control-rollout.md §6 acceptance 4; D375 / ADR 0284).
+# Cloud-only installer pipeline. Manual dispatch produces candidate artifacts.
+# Formal tags must already be merged into main and match every app version
+# surface. Both paths share CI gates and a fixed source SHA. Only signed,
+# notarized, fully verified tag bundles can become a published GitHub Release.
+# Version preparation and tagging are documented in the release runbook.
 
 name: Release
 
@@ -30,9 +12,9 @@ on:
   workflow_dispatch:
     inputs:
       sign_macos:
-        description: 'Sign and notarize macOS artifacts (default true; set false only for unsigned debug artifacts)'
+        description: 'Sign and notarize candidate macOS artifacts; formal tags always require signing'
         required: false
-        default: true
+        default: false
         type: boolean
 
 # Least privilege by default; only the publish job needs to write the release.
@@ -44,50 +26,57 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  verify:
-    # Same gate as ci.yml. A tag push does not trigger ci.yml, so without this
-    # job a broken tree could be built and published untested.
-    name: Verify (build / typecheck / lint / test)
+  metadata:
+    name: Validate source, version and signing requirements
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 5
+    outputs:
+      source_sha: ${{ steps.preflight.outputs.source_sha }}
+      base_sha: ${{ steps.preflight.outputs.base_sha }}
+      version: ${{ steps.preflight.outputs.version }}
+      document_version: ${{ steps.preflight.outputs.document_version }}
+      channel: ${{ steps.preflight.outputs.channel }}
+      prerelease: ${{ steps.preflight.outputs.prerelease }}
+      signed_macos: ${{ steps.preflight.outputs.signed_macos }}
+      kind: ${{ steps.preflight.outputs.kind }}
+      tag: ${{ steps.preflight.outputs.tag }}
     steps:
       - uses: actions/checkout@v7
-
-      - uses: pnpm/action-setup@v6
-
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-          cache: pnpm
+      - name: Refresh main without changing the candidate
+        run: git fetch origin main
+      - name: Pin the release candidate
+        id: preflight
+        env:
+          SIGN_MACOS: ${{ inputs.sign_macos || false }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          MAC_SIGNING_IDENTITY: ${{ secrets.MAC_SIGNING_IDENTITY }}
+        run: node scripts/release-preflight.mjs
 
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build workspace packages
-        run: pnpm build:js
-
-      - name: Typecheck Desktop
-        run: pnpm --filter @pi-desktop/desktop typecheck
-
-      - name: Lint
-        run: pnpm lint
-
-      - name: Unit tests
-        run: pnpm -r --if-present test
-
-      - name: Rust host-core test
-        run: cargo test -p host-core --locked
+  verify:
+    name: Verify candidate
+    needs: metadata
+    uses: ./.github/workflows/ci.yml
+    with:
+      source_sha: ${{ needs.metadata.outputs.source_sha }}
+      base_sha: ${{ needs.metadata.outputs.base_sha }}
+      release_document_version: ${{ needs.metadata.outputs.document_version }}
 
   build:
     name: Build ${{ matrix.name }}
-    needs: verify
+    needs: [metadata, verify]
     env:
-      # Tag pushes always sign. workflow_dispatch signs unless explicitly disabled.
-      MACOS_SIGN_RELEASE: ${{ github.event_name != 'workflow_dispatch' || inputs.sign_macos == true }}
+      MACOS_SIGN_RELEASE: ${{ needs.metadata.outputs.signed_macos }}
+      RELEASE_CHANNEL: ${{ needs.metadata.outputs.channel }}
     strategy:
       fail-fast: false
       matrix:
@@ -121,7 +110,7 @@ jobs:
             runner_arch: x86_64
             artifact: linux-x64
             platform: linux
-            feed: latest-linux.yml
+            feed: linux.yml
             dist: dist:linux
           - name: Linux arm64
             # GitHub's native arm64 runner packages the Electron app and the
@@ -133,7 +122,7 @@ jobs:
             runner_arch: aarch64
             artifact: linux-arm64
             platform: linux
-            feed: latest-linux-arm64.yml
+            feed: linux-arm64.yml
             dist: dist:linux
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
@@ -142,6 +131,8 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.metadata.outputs.source_sha }}
 
       - name: Verify native runner architecture
         # A mislabelled or emulated runner would wrap one architecture's
@@ -155,17 +146,6 @@ jobs:
           expected_arch="${{ matrix.runner_arch }}"
           if [ "$actual_arch" != "$expected_arch" ]; then
             echo "::error::Expected $expected_arch runner, got $actual_arch."
-            exit 1
-          fi
-
-      - name: Compare tag with apps/desktop/package.json
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
-          APP_VERSION="$(node -p "require('./apps/desktop/package.json').version")"
-          if [ "$TAG_VERSION" != "$APP_VERSION" ]; then
-            echo "::error::Tag v$TAG_VERSION does not match apps/desktop/package.json version $APP_VERSION."
-            echo "Run 'node scripts/release.mjs $TAG_VERSION --tag' to bump versions before tagging."
             exit 1
           fi
 
@@ -202,6 +182,7 @@ jobs:
           trap 'kill "$host_build_pid" 2>/dev/null || true' EXIT
 
           pnpm install --frozen-lockfile
+          node apps/desktop/node_modules/electron/install.js
           pnpm --filter '@pi-desktop/desktop^...' --fail-if-no-match build
 
           wait "$host_build_pid"
@@ -210,10 +191,10 @@ jobs:
       - name: Package installers (${{ matrix.dist }})
         if: matrix.platform != 'macos'
         # The dist scripts pass --publish never themselves: electron-builder
-        # must not self-publish on tag builds (no token; softprops owns it).
+        # must not self-publish on tag builds (only the final publish job can).
         # The explicit architecture keeps the package and native Rust sidecar
         # aligned with the runner selected by this matrix entry.
-        run: pnpm --filter @pi-desktop/desktop run ${{ matrix.dist }} -- --${{ matrix.arch }}
+        run: pnpm --filter @pi-desktop/desktop run ${{ matrix.dist }} -- --${{ matrix.arch }} -c.publish.channel="$RELEASE_CHANNEL"
 
       - name: Package unsigned macOS installer
         if: matrix.platform == 'macos' && env.MACOS_SIGN_RELEASE != 'true'
@@ -224,7 +205,7 @@ jobs:
           set -euo pipefail
           # Artifact names are defined in apps/desktop/package.json: the mac
           # pattern labels ZIPs, and the dmg target pattern labels DMGs.
-          pnpm --filter @pi-desktop/desktop run dist:mac -- --${{ matrix.arch }}
+          pnpm --filter @pi-desktop/desktop run dist:mac -- --${{ matrix.arch }} -c.publish.channel="$RELEASE_CHANNEL"
 
       - name: Diagnose macOS signing environment
         # Records the runner baseline (system, codesign, identities, keychain,
@@ -304,6 +285,7 @@ jobs:
           node scripts/macos-signing-watchdog.mjs \
             --label "dist:mac-${{ matrix.arch }}" \
             -- pnpm --filter @pi-desktop/desktop run dist:mac -- --${{ matrix.arch }} \
+              -c.publish.channel="$RELEASE_CHANNEL" \
               -c.mac.forceCodeSigning=true \
               -c.mac.notarize=true
 
@@ -334,6 +316,10 @@ jobs:
             --label "notarize-dmg-${{ matrix.arch }}" \
             -- scripts/notarize-and-staple-macos-release-dmg.sh apps/desktop/release
 
+      - name: Refresh updater metadata after stapling the DMG
+        if: matrix.platform == 'macos' && env.MACOS_SIGN_RELEASE == 'true'
+        run: node scripts/refresh-macos-release-metadata.mjs apps/desktop/release "$RELEASE_CHANNEL"
+
       - name: Verify signed and notarized macOS installer
         if: matrix.platform == 'macos' && env.MACOS_SIGN_RELEASE == 'true'
         env:
@@ -358,7 +344,7 @@ jobs:
         if: matrix.platform == 'linux'
         run: |
           set -euo pipefail
-          feed="apps/desktop/release/${{ matrix.feed }}"
+          feed="apps/desktop/release/${RELEASE_CHANNEL}-${{ matrix.feed }}"
           if [[ ! -f "$feed" ]]; then
             echo "::error::Expected the Linux updater feed at $feed"
             ls apps/desktop/release || true
@@ -391,7 +377,7 @@ jobs:
 
       - name: Disambiguate macOS update metadata
         if: matrix.platform == 'macos'
-        run: mv apps/desktop/release/latest-mac.yml apps/desktop/release/latest-mac-${{ matrix.arch }}.yml
+        run: mv "apps/desktop/release/${RELEASE_CHANNEL}-mac.yml" "apps/desktop/release/${RELEASE_CHANNEL}-mac-${{ matrix.arch }}.yml"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
@@ -408,11 +394,11 @@ jobs:
             apps/desktop/release/*.rpm
             apps/desktop/release/*.asar
             apps/desktop/release/*.blockmap
-            apps/desktop/release/latest*.yml
+            apps/desktop/release/${{ needs.metadata.outputs.channel }}*.yml
 
   pi-host-bundle:
     name: Bundle pi-host (Linux ${{ matrix.arch }})
-    needs: verify
+    needs: [metadata, verify]
     strategy:
       fail-fast: false
       matrix:
@@ -435,16 +421,8 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v7
-
-      - name: Compare tag with apps/desktop/package.json
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
-          APP_VERSION="$(node -p "require('./apps/desktop/package.json').version")"
-          if [ "$TAG_VERSION" != "$APP_VERSION" ]; then
-            echo "::error::Tag v$TAG_VERSION does not match apps/desktop/package.json version $APP_VERSION."
-            exit 1
-          fi
+        with:
+          ref: ${{ needs.metadata.outputs.source_sha }}
 
       - name: Verify native runner architecture
         if: matrix.runner_arch
@@ -516,64 +494,66 @@ jobs:
             apps/pi-host/dist-bundle/pi-host-*-linux-${{ matrix.arch }}.tar.gz
             apps/pi-host/dist-bundle/pi-host-*-linux-${{ matrix.arch }}.tar.gz.sha256
 
-  publish:
-    name: Publish GitHub Release
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build, pi-host-bundle]
+  aggregate:
+    name: Verify complete installer bundle
+    needs: [metadata, build, pi-host-bundle]
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.metadata.outputs.source_sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: dist-*
+          path: artifacts
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: pi-host-linux-*
+          path: artifacts
+      - name: Verify all platforms, feeds and checksums
+        env:
+          RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
+          SOURCE_SHA: ${{ needs.metadata.outputs.source_sha }}
+          RELEASE_CHANNEL: ${{ needs.metadata.outputs.channel }}
+          BUILD_KIND: ${{ needs.metadata.outputs.kind }}
+          MACOS_SIGN_RELEASE: ${{ needs.metadata.outputs.signed_macos }}
+        run: |
+          node scripts/release-assets.mjs --input artifacts --output dist \
+            --version "$RELEASE_VERSION" --source "$SOURCE_SHA" \
+            --repository "$GITHUB_REPOSITORY" --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT" --channel "$RELEASE_CHANNEL" \
+            --kind "$BUILD_KIND" --signed-macos "$MACOS_SIGN_RELEASE"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-bundle-${{ needs.metadata.outputs.version }}-${{ needs.metadata.outputs.source_sha }}
+          path: dist/*
+          if-no-files-found: error
+          compression-level: 0
+
+  publish:
+    name: Publish verified GitHub Release
+    if: needs.metadata.outputs.kind == 'release'
+    needs: [metadata, aggregate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.metadata.outputs.source_sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
       - uses: actions/download-artifact@v8
         with:
+          name: release-bundle-${{ needs.metadata.outputs.version }}-${{ needs.metadata.outputs.source_sha }}
           path: dist
-          merge-multiple: true
-
-      - name: List artifacts
-        run: ls -la dist/
-
-      - name: Merge macOS updater metadata
-        working-directory: dist
-        run: |
-          set -euo pipefail
-          ruby <<'RUBY'
-          require "yaml"
-
-          paths = Dir["latest-mac-*.yml"].sort
-          expected_paths = ["latest-mac-arm64.yml", "latest-mac-x64.yml"]
-          abort "Expected both macOS updater feeds" unless paths == expected_paths
-
-          feeds = paths.map do |path|
-            YAML.safe_load(File.read(path), permitted_classes: [], aliases: false)
-          end
-          versions = feeds.map { |feed| feed.fetch("version") }.uniq
-          abort "macOS updater feeds disagree on version" unless versions.length == 1
-
-          files = feeds.flat_map { |feed| feed.fetch("files") }
-            .uniq { |file| file.fetch("url") }
-          zip = files.find { |file| file.fetch("url").end_with?(".zip") }
-          abort "macOS updater feeds contain no ZIP" if zip.nil?
-
-          merged = feeds.first.merge(
-            "version" => versions.first,
-            "files" => files,
-            "path" => zip.fetch("url"),
-            "sha512" => zip.fetch("sha512"),
-          )
-          File.write("latest-mac.yml", merged.to_yaml)
-          RUBY
-          rm latest-mac-arm64.yml latest-mac-x64.yml
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3
-        with:
-          # D126/D285/D364/D603: all desktop platforms and both native macOS
-          # architectures ship from tag builds — installers, the Windows
-          # portable ZIP, the Linux ASAR, blockmaps, and the latest*.yml
-          # feeds that drive electron-updater on each platform (in-app for
-          # Windows NSIS and Linux AppImage; macOS and Windows ZIP remain
-          # manual-delivery by product policy).
-          files: dist/*
-          generate_release_notes: true
-          prerelease: ${{ contains(github.ref_name, '-') }}
+      - name: Create draft, verify remote assets, then publish
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/publish-release.mjs --directory dist

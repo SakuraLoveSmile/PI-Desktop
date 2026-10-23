@@ -1,52 +1,54 @@
 #!/usr/bin/env node
 /**
- * Bump the app version everywhere and (optionally) create the release tag.
- * `packages/*` manifests keep the upstream-synced version (ADR plus-version-line).
+ * Prepare version files for a release PR, or tag an already merged version.
  *
- * Usage:
- *   node scripts/release.mjs <version>          # bump files only
- *   node scripts/release.mjs <version> --tag    # bump + commit (only bumped files) + tag v<version>
+ * node scripts/release.mjs <version>       # prepare files; commit and merge by PR
+ * node scripts/release.mjs <version> --tag # annotate exact HEAD already in main
  *
- * --tag still creates the tag when the bump was already committed (nothing to
- * change), and refuses when v<version> exists locally or on origin.
- *
- * BEFORE running this for a stable release, update every version-bearing
- * document (D164 + D260, docs/spec/06-delivery/06-release-runbook.md section 4.1):
- *   - the pinned Pi packages supply the model catalog
- *     and committed with the release tag
- *   - packages/shared/src/plus-changelog.ts (one Plus entry for <version> in every
- *     shipped locale, matching highlight counts) and its newest-first list in
- *     changelog.test.ts
- *   - the release line stated in README.md and README.zh-CN.md
- * GitHub auto-generated release bodies are web-only and are not a substitute.
- *
- * This script runs `scripts/check-release-docs.mjs <version>` after bumping and
- * refuses to tag while any surface disagrees. Prereleases skip that preflight
- * (changelog catalogs the next stable version, not `x.y.z-beta.*`); still run
- * `node scripts/check-release-docs.mjs x.y.z` against the stable version being
- * previewed. Use --skip-docs-check only for a deliberate non-release bump.
- *
- * Pushing the tag triggers .github/workflows/release.yml, which builds the
- * macOS / Windows / Linux installers and publishes them to a GitHub Release:
- *
- *   git push origin <branch> v<version>
+ * Installers are built only by .github/workflows/release.yml. This command never
+ * builds, publishes, or pushes. --tag never bumps or commits files, and remote
+ * verification failures block tagging. --skip-docs-check is preparation-only.
  */
 import { readdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { parseReleaseVersion } from "./release-preflight.mjs";
+import { createReleaseTag } from "./release-git.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const version = process.argv[2];
 const doTag = process.argv.includes("--tag");
 const skipDocsCheck = process.argv.includes("--skip-docs-check");
-const isPrerelease = version?.includes("-") ?? false;
-
-if (!version || !/^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$/.test(version)) {
-  console.error(
-    "Usage: node scripts/release.mjs <version> [--tag] [--skip-docs-check]   e.g. 0.11.0 or 0.11.0-beta.1",
-  );
+let parsed;
+try {
+  parsed = parseReleaseVersion(version);
+  if (process.argv.slice(3).some((arg) => !["--tag", "--skip-docs-check"].includes(arg))) {
+    throw new Error("Unknown release option.");
+  }
+  if (doTag && skipDocsCheck) throw new Error("--skip-docs-check is preparation-only and cannot be used with --tag.");
+} catch (error) {
+  console.error(error.message);
+  console.error("Usage: node scripts/release.mjs <version> [--tag | --skip-docs-check]");
   process.exit(1);
+}
+
+function checkDocumentation() {
+  execFileSync(process.execPath, [path.join(root, "scripts/check-release-docs.mjs"), parsed.stableVersion], {
+    cwd: root, stdio: "inherit",
+  });
+}
+
+if (doTag) {
+  try {
+    checkDocumentation();
+    const { tag, source } = createReleaseTag(root, version);
+    console.log(`Tagged main commit ${source} as ${tag}. Start the cloud release with:\n  git push origin ${tag}`);
+  } catch (error) {
+    console.error(error.message);
+    process.exitCode = 1;
+  }
+  process.exit(process.exitCode ?? 0);
 }
 
 const changed = [];
@@ -90,83 +92,22 @@ if (changed.length === 0) {
   console.log(`Bumped to ${version}:\n  ${changed.join("\n  ")}`);
 }
 
-// Version surfaces, the shipped-locale changelog, and the README release line must
-// agree before a tag exists (D260). Bumping files is reversible; a tag is not.
-if (!skipDocsCheck && !isPrerelease) {
+// Preparation is reversible. The same stable-document gate also validates
+// prerelease version surfaces through check-release-docs' preview support.
+if (!skipDocsCheck) {
   try {
-    execFileSync(process.execPath, [path.join(root, "scripts/check-release-docs.mjs"), version], {
-      cwd: root,
-      stdio: "inherit",
-    });
+    checkDocumentation();
   } catch {
-    console.error("\nRelease documentation check failed; not committing or tagging.");
+    console.error("\nRelease documentation check failed. Complete the version preparation before opening its PR.");
     process.exit(1);
   }
-} else if (isPrerelease && !skipDocsCheck) {
-  console.log("Skipping stable release-document preflight for prerelease version.");
 }
 
-const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
-const tag = `v${version}`;
-const branch = git("rev-parse", "--abbrev-ref", "HEAD");
-
-/**
- * Where `tag` already exists: "locally", "on origin", or null. A local-only
- * check misses a tag that was pushed from another clone, so origin is queried
- * too when it is configured; a network failure only downgrades to a warning.
- */
-function findExistingTag() {
-  if (git("tag", "--list", tag)) return "locally";
-  let hasOrigin = false;
-  try {
-    git("remote", "get-url", "origin");
-    hasOrigin = true;
-  } catch {
-    // No remote named origin: nothing further to check.
-  }
-  if (!hasOrigin) return null;
-  try {
-    const remoteTags = execFileSync("git", ["ls-remote", "--tags", "origin", `refs/tags/${tag}`], {
-      cwd: root,
-      encoding: "utf8",
-      timeout: 20_000,
-      stdio: ["ignore", "pipe", "pipe"],
-    }).trim();
-    if (remoteTags) return "on origin";
-  } catch (error) {
-    const reason = (error.stderr || error.message || "").toString().trim().split("\n")[0];
-    console.warn(
-      `Warning: could not query origin for ${tag} (${reason || "unknown error"}); ` +
-        "only local tags were checked.",
-    );
-  }
-  return null;
-}
-
-if (doTag) {
-  const existing = findExistingTag();
-  if (existing) {
-    console.error(`Tag ${tag} already exists ${existing}.`);
-    process.exit(1);
-  }
-  if (changed.length > 0) {
-    // Pathspec commit: only the bumped files, so unrelated staged work stays untouched.
-    git("commit", "-m", `chore(release): ${tag}`, "--", ...changed);
-  } else {
-    // The bump was applied earlier; still tag, but only if HEAD carries it,
-    // since release.yml compares the tag with apps/desktop/package.json at HEAD.
-    const headVersion = JSON.parse(git("show", "HEAD:apps/desktop/package.json")).version;
-    if (headVersion !== version) {
-      console.error(
-        `HEAD has apps/desktop/package.json at ${headVersion}, not ${version}; ` +
-          "commit the bump before tagging.",
-      );
-      process.exit(1);
-    }
-    console.log(`Nothing to commit; tagging current HEAD as ${tag}.`);
-  }
-  git("tag", tag);
-  console.log(`\nTagged ${tag}. Publish with:\n  git push origin ${branch} ${tag}`);
-} else if (changed.length > 0) {
-  console.log(`\nNext steps:\n  git commit -m "chore(release): ${tag}" -- ${changed.join(" ")}\n  git tag ${tag}\n  git push origin ${branch} ${tag}`);
-}
+console.log(`
+Next steps:
+  1. Commit the version files and release notes on a request branch.
+  2. Merge that PR into main after its cloud checks pass.
+  3. Check out the exact merged commit in a clean worktree.
+  4. Run node scripts/release.mjs ${version} --tag
+  5. Push only v${version}; GitHub Actions builds, verifies and publishes it.
+See docs/spec/06-delivery/06-release-runbook.md.`);

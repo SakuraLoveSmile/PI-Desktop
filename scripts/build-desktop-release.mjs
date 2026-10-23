@@ -2,9 +2,13 @@ import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { requireCloudPackageBuild } from "./require-cloud-build.mjs";
+
+requireCloudPackageBuild();
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
-const forwardedArgs = process.argv.slice(2);
+// pnpm run forwards a separator which would stop builder parsing channel/arch.
+const forwardedArgs = process.argv.slice(2).filter(arg => arg !== "--");
 
 const hostTarget =
   process.platform === "win32"
