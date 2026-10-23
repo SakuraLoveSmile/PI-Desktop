@@ -394,7 +394,7 @@ jobs:
             apps/desktop/release/*.rpm
             apps/desktop/release/*.asar
             apps/desktop/release/*.blockmap
-            apps/desktop/release/*.yml
+            apps/desktop/release/${{ needs.metadata.outputs.channel }}*.yml
 
   pi-host-bundle:
     name: Bundle pi-host (Linux ${{ matrix.arch }})
