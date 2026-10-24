@@ -34,20 +34,33 @@ function github(options = {}) {
   let assets = [];
   let failed = false;
   let uploadCount = 0;
-  let releaseReads = 0;
   const api = async (method, endpoint, request = {}) => {
     calls.push({ method, endpoint, ...request });
     if (method === "GET" && endpoint.includes("/git/ref/tags/")) return { object: { type: "tag", sha: "b".repeat(40) } };
     if (method === "GET" && endpoint.includes("/git/tags/")) return { object: { type: "commit", sha: options.tagSha ?? sourceSha } };
     if (method === "GET" && endpoint.includes("/compare/")) return { status: options.mainStatus ?? "ahead" };
     if (method === "GET" && endpoint.includes("/releases/tags/")) {
-      releaseReads++;
+      // GitHub's tag lookup returns published releases only, including to
+      // authenticated callers that can list drafts or fetch one by ID.
+      if (release && !release.draft) return release;
+      throw Object.assign(new Error("not found"), { status: 404 });
+    }
+    if (method === "GET" && endpoint.startsWith(`/repos/${repository}/releases?`)) {
       if (options.releaseReadError) throw Object.assign(new Error("fixture authentication failure"), { status: options.releaseReadError });
-      if (options.changeDraft && releaseReads > 1 && release) return { ...release, ...options.changeDraft };
+      if (options.invalidReleaseList) return {};
+      const page = Number(new URL("https://example.invalid" + endpoint).searchParams.get("page"));
+      const entries = [...(options.otherReleases ?? []), ...(release ? [release] : []),
+        ...(options.duplicateTag && release ? [{ ...release, id: 43 }] : [])];
+      return entries.slice((page - 1) * 100, page * 100);
+    }
+    if (method === "GET" && endpoint.endsWith("/releases/42")) {
+      if (options.draftReadError) throw Object.assign(new Error("fixture draft read failure"), { status: options.draftReadError });
+      if (options.changeDraft && release) return { ...release, ...options.changeDraft };
       if (release) return release;
       throw Object.assign(new Error("not found"), { status: 404 });
     }
     if (method === "POST" && endpoint.endsWith("/releases")) {
+      assert(!release, "an existing release must be resumed, not replaced");
       release = { id: 42, html_url: "https://example.invalid/release", ...request.json };
       return release;
     }
@@ -90,6 +103,8 @@ test("stable release is a draft until every uploaded digest is verified", async 
   assert.equal(publish.method, "PATCH");
   assert.deepEqual(publish.json, { draft: false, prerelease: false, make_latest: "true" });
   assert.equal(remote.assets.length, 3);
+  assert(remote.calls.some(call => call.method === "GET" && call.endpoint.endsWith("/releases/42")));
+  assert(!remote.calls.some(call => call.endpoint.includes("/releases/tags/")));
 });
 
 test("unsigned releases are refused without opt-in before contacting GitHub", async t => {
@@ -156,7 +171,8 @@ test("prerelease publication does not become the stable latest release", async t
 
 test("published releases and unrelated drafts are immutable", async t => {
   const input = await fixture(t);
-  for (const release of [{ id: 42, draft: false }, { id: 42, draft: true, body: "unrelated draft" }]) {
+  for (const release of [{ id: 42, tag_name: "v1.2.3", draft: false },
+    { id: 42, tag_name: "v1.2.3", draft: true, body: "unrelated draft" }]) {
     const remote = github({ release });
     await assert.rejects(publishRelease(input, remote), /already published|does not match/);
     assert(remote.calls.every(call => call.method === "GET"));
@@ -173,6 +189,61 @@ test("interrupted upload retains its draft and an exact retry uploads only missi
   assert.equal(remote.release.draft, false);
   assert.equal(remote.assets.length, 3);
   assert.equal(remote.calls.filter(call => call.method === "POST" && call.endpoint.endsWith("/releases")).length, 1);
+});
+
+test("draft discovery paginates past unrelated releases and resumes the same draft", async t => {
+  const input = await fixture(t);
+  const otherReleases = Array.from({ length: 100 }, (_, index) => ({ id: index + 100, tag_name: `v0.0.${index}`, draft: false }));
+  const remote = github({ failUploadOnce: true, otherReleases });
+  await assert.rejects(publishRelease(input, remote), /upload interrupted/);
+  await publishRelease(input, remote);
+  assert.equal(remote.release.draft, false);
+  assert.equal(remote.assets.length, 3);
+  assert(remote.calls.some(call => call.endpoint === `/repos/${repository}/releases?per_page=100&page=2`));
+  assert.equal(remote.calls.filter(call => call.method === "POST" && call.endpoint.endsWith("/releases")).length, 1);
+});
+
+test("duplicate matching tags across release pages prevent all writes", async t => {
+  const input = await fixture(t);
+  const release = { id: 42, tag_name: "v1.2.3", draft: true };
+  const otherReleases = Array.from({ length: 99 }, (_, index) => ({ id: index + 100, tag_name: `v0.0.${index}`, draft: false }));
+  const remote = github({ release, otherReleases, duplicateTag: true });
+  await assert.rejects(publishRelease(input, remote), /Multiple releases match/);
+  assert(remote.calls.every(call => call.method === "GET"));
+});
+
+test("invalid release listings fail without creating a draft", async t => {
+  const input = await fixture(t);
+  const remote = github({ invalidReleaseList: true });
+  await assert.rejects(publishRelease(input, remote), /release list/);
+  assert(remote.calls.every(call => call.method === "GET"));
+});
+
+test("an incomplete paginated search cannot create a replacement release", async t => {
+  const input = await fixture(t);
+  const otherReleases = Array.from({ length: 1000 }, (_, index) => ({ id: index + 100, tag_name: `v0.0.${index}`, draft: false }));
+  const remote = github({ otherReleases });
+  await assert.rejects(publishRelease(input, remote), /cannot identify a unique release/);
+  assert(remote.calls.every(call => call.method === "GET"));
+});
+
+test("failed final draft lookups retain all assets and resume without reuploading", async t => {
+  const input = await fixture(t);
+  for (const draftReadError of [403, 404]) {
+    const options = { draftReadError };
+    const remote = github(options);
+    await assert.rejects(publishRelease(input, remote), /draft read failure/);
+    assert.equal(remote.release.draft, true);
+    assert.equal(remote.assets.length, 3);
+    assert(!remote.calls.some(call => call.method === "PATCH"));
+    const assetWrites = remote.calls.filter(call => call.method === "POST" && call.endpoint.includes("/assets?"));
+    delete options.draftReadError;
+    await publishRelease(input, remote);
+    assert.equal(remote.release.id, 42);
+    assert.equal(remote.release.draft, false);
+    assert.equal(remote.calls.filter(call => call.method === "POST" && call.endpoint.includes("/assets?")).length, assetWrites.length);
+    assert.equal(remote.calls.filter(call => call.method === "POST" && call.endpoint.endsWith("/releases")).length, 1);
+  }
 });
 
 test("remote digest mismatch leaves the release private", async t => {

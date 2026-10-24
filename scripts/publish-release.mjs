@@ -132,6 +132,23 @@ async function remoteAssets(api, repository, releaseId) {
   throw new Error("Unexpectedly large release asset list");
 }
 
+async function releaseForTag(api, repository, tag) {
+  // The tag endpoint hides drafts. The authenticated list includes drafts,
+  // allowing an interrupted upload to resume without creating a replacement.
+  let matching;
+  for (let page = 1; page <= 10; page++) {
+    const releases = await api("GET", `/repos/${repository}/releases?per_page=100&page=${page}`);
+    if (!Array.isArray(releases)) throw new Error("GitHub did not return a release list");
+    for (const release of releases) {
+      if (release?.tag_name !== tag) continue;
+      if (matching) throw new Error(`Multiple releases match ${tag}; retained for inspection`);
+      matching = release;
+    }
+    if (releases.length < 100) return matching;
+  }
+  throw new Error("Unexpectedly large release list; cannot identify a unique release");
+}
+
 export async function publishRelease({ directory, repository, sourceSha, ref, allowUnsignedMacos = false }, { api }) {
   if (typeof allowUnsignedMacos !== "boolean") throw new Error("Invalid allowUnsignedMacos value");
   const { manifest, parsed, files } = await verifiedBundle(directory, allowUnsignedMacos);
@@ -144,9 +161,7 @@ export async function publishRelease({ directory, repository, sourceSha, ref, al
   const manifestHash = files.find(file => file.name === "release-manifest.json").sha256;
   const marker = `<!-- pi-release source=${source} manifest=${manifestHash} -->`;
   const disclosure = manifest.signedMacos ? "" : unsignedDisclosure;
-  let release;
-  try { release = await api("GET", `/repos/${repository}/releases/tags/${encodeURIComponent(tag)}`); }
-  catch (error) { if (error.status !== 404) throw error; }
+  let release = await releaseForTag(api, repository, tag);
   const draftIdentity = { tag, source, prerelease: parsed.prerelease, marker, disclosure };
   if (release) requireMatchingDraft(release, draftIdentity);
   if (!release) {
@@ -179,7 +194,7 @@ export async function publishRelease({ directory, repository, sourceSha, ref, al
   }
   // Recheck mutable refs immediately before opening the draft to users.
   await requireRemoteSource(api, repository, tag, source);
-  const currentDraft = await api("GET", `/repos/${repository}/releases/tags/${encodeURIComponent(tag)}`);
+  const currentDraft = await api("GET", `/repos/${repository}/releases/${release.id}`);
   requireMatchingDraft(currentDraft, { ...draftIdentity, id: release.id });
   const published = await api("PATCH", `/repos/${repository}/releases/${release.id}`, {
     json: { draft: false, prerelease: parsed.prerelease, make_latest: parsed.prerelease ? "false" : "true" },

@@ -1,0 +1,75 @@
+name: Recover Release publication
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_run_id:
+        description: 'Original tag Release run whose six verification gates passed and only publication failed'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  metadata:
+    name: Verify original Release run and bundle
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      artifact_id: ${{ steps.verify.outputs.artifact_id }}
+      run_id: ${{ steps.verify.outputs.run_id }}
+      tag: ${{ steps.verify.outputs.tag }}
+      allow_unsigned_macos: ${{ steps.verify.outputs.allow_unsigned_macos }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Validate recovery identity and every original gate
+        id: verify
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_RUN_ID: ${{ inputs.release_run_id }}
+          ALLOW_UNSIGNED_MACOS_RELEASE: ${{ vars.ALLOW_UNSIGNED_MACOS_RELEASE || 'false' }}
+        run: node scripts/recover-release-publication.mjs --run-id "$RELEASE_RUN_ID"
+
+  publish:
+    name: Resume verified draft publication
+    needs: metadata
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      actions: read
+    concurrency:
+      group: release-refs/tags/${{ needs.metadata.outputs.tag }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Download the original verified bundle by immutable artifact ID
+        uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ needs.metadata.outputs.artifact_id }}
+          run-id: ${{ needs.metadata.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: dist
+          merge-multiple: true
+      - name: Recheck provenance, checksums and existing draft before publication
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_RUN_ID: ${{ needs.metadata.outputs.run_id }}
+          RELEASE_ARTIFACT_ID: ${{ needs.metadata.outputs.artifact_id }}
+          ALLOW_UNSIGNED_MACOS_RELEASE: ${{ needs.metadata.outputs.allow_unsigned_macos }}
+        run: >-
+          node scripts/recover-release-publication.mjs --run-id "$RELEASE_RUN_ID"
+          --artifact-id "$RELEASE_ARTIFACT_ID" --directory dist
