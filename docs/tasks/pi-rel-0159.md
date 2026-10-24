@@ -393,7 +393,43 @@ families; its seven failures remain retained and block landing.
   The source of the pre-exit delay remains unknown; accompanying Crashpad
   frequency warnings do not establish it.
 
-Remaining: final Linux fixture closeout, exact-SHA hosted task-candidate and
+### Final four-failure closeout
+
+Nightly `40087933878` tested clean `ac58edae6ee49c604181b945c4ad1b2ab185e473`
+against `d424021c5b70771982072bf6ce813c5894395e3c`: 127/131 suites passed,
+all ten families retained the same candidate, and regular CI, Docs, PR-base
+and project-memory checks passed. Shell passed all seven suites, including
+197/197 layout checks and the bounded real crash/recovery path. Four failures
+remained in Team overflow, pending recovery, question startup and image selection.
+
+- Question startup now has a confirmed Linux cause: a bare Electron script
+  reports version `0.0`, correctly rejected by production storage. The fixture
+  launches an app directory containing the candidate's real package metadata
+  and asserts Electron loaded that version before importing production Main.
+  A real 2,040-artifact overlay build and all six Desktop/Host/sidecar/MCP
+  journeys passed at `faa8cca44` with the recorded fixture diff. No storage
+  validation or startup timeout changed.
+- Both Goal approval paths share the selected-session, enabled-trigger and
+  measured-menu helper. Recovery keeps trusted native clicks and its original
+  deadline; approved execution keeps its existing input path. Complete local
+  recovery, success and cancellation journeys passed. Local baseline also
+  passed, so the Linux failure is not claimed as locally reproduced.
+- Image selection now observes viewport/scroll painting before measuring its
+  native hit target. The complete isolated image generation, download, viewer,
+  selection continuity, narrow window and editing flow passed locally. The
+  original five-second selection deadline and all scenarios remain; baseline
+  passed locally and final Linux confirmation is still required.
+- Fresh Team evidence identifies the actual progress-row panorama link as
+  non-shrinking. The shipped French label reproduces the defect at 320px/150%:
+  the disclosure extends 85px beyond the row after the unchanged English and
+  Chinese matrices pass. Only that link now shrinks and truncates its text;
+  the full accessible name/tooltip, arrow and 24px disclosure remain. Full
+  bilingual layout matrices and all four French theme/surface combinations
+  passed, including native collapse/reopen and panorama navigation. Eleven
+  presentation tests passed. The lead inspected both the red screenshot and
+  repaired dark/light screenshots; an independent review found no blocker.
+
+Remaining: final combined-candidate verification, exact-SHA hosted task-candidate and
 PR-integration gates, formal release workflow, publication integrity and cleanup.
 These remain required. Detailed local logs/reports are in
 the integration tree's `.artifacts/pi-rel-0159-integrated/`. Final remote run and
