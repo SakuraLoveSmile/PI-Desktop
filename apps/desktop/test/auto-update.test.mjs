@@ -189,8 +189,6 @@ test("renderer exposes the updates API, banner and settings row", () => {
   assert.match(settingsSource, /<UpdatesRow[\s\S]*currentVersion=\{version\?\.version\}/);
   assert.match(settingsSource, /settings=\{settings\}/);
   assert.match(settingsSource, /saveSettings=\{saveSettings\}/);
-  assert.match(settingsSource, /update-settings-notes/);
-  assert.match(settingsSource, /updates\.whatsNew/);
   assert.match(settingsSource, /updates\.releaseNotes/);
   assert.match(settingsSource, /const ReleaseNotesDialog = lazy\(\(\) =>/);
   assert.match(settingsSource, /<Suspense[\s\S]*?<ReleaseNotesDialog/);

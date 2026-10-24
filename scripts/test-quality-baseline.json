@@ -364,7 +364,7 @@
       ]
     },
     "apps/desktop/test/auto-update.test.mjs": {
-      "assertions": 105,
+      "assertions": 103,
       "cases": 8,
       "signatures": [
         "00327b1fb77503d5f6ee",
@@ -383,7 +383,6 @@
         "22828725de2609e83701",
         "24638686cb823cd0e1f0",
         "2594ddb8b9e7a0a6b329",
-        "264f8245f29de299bb0a",
         "306546b706a962e7c4a7",
         "34a2c9d0767cc5832b34",
         "3536aad27bdbec0b15fd",
@@ -441,7 +440,6 @@
         "a957e6445ccdb8242a4f",
         "aa9c6fb43894cdf9321e",
         "ad183990da0ea83e060f",
-        "ade110cc6cca0e3ae49f",
         "af697ec7902e7a706417",
         "b62fd46ebf769f3c3400",
         "b8d5d161916e88bb947b",
@@ -1682,8 +1680,8 @@
       ]
     },
     "apps/desktop/test/default-model-picker.test.mjs": {
-      "assertions": 40,
-      "cases": 5,
+      "assertions": 32,
+      "cases": 4,
       "signatures": [
         "093583faee731433f2c8",
         "0dd58761cbd9229710e2",
@@ -1693,20 +1691,14 @@
         "1e04c35cfeb60b262abf",
         "2446214b9ac03f1dc24b",
         "25b9836db0257648e376",
-        "278cad6f5df367f5f817",
-        "28854a23f73e77c6dc39",
         "2ecc54c81481e02a016e",
         "322efcf59800282e838b",
-        "323f1a2dccfde0074732",
-        "35df4f7b31bc731eec2f",
         "4bb754a0d99d00f00a7d",
         "75f7ead43379ab1a51d3",
         "778d3f2f5d2bac4fd7a7",
         "793f13e8c7f63fe4a232",
         "80f949bdb46bbb916a51",
         "84e6405db7ffcca81382",
-        "856343f35e3d3ea36286",
-        "8d383a604015091545da",
         "8f97ead7316a8ff347d2",
         "940a764183cba1399200",
         "9545a44c2b8b1dfc2912",
@@ -1714,13 +1706,11 @@
         "9c4650e73c8e4da8029b",
         "b119c5531c03df471938",
         "b81c1a761be9eea772c5",
-        "b9350a1dad0c596cba4c",
         "d90a52f0404343883f1a",
         "daa4adaf0b27594a1e4f",
         "dbad8ce52518f656e23c",
         "e8188580521ebd16cc63",
         "edfd0bec86159b715f73",
-        "f18ffbbb219de366c732",
         "f875882a525ac79c87a6",
         "fc8f521087e6894b18b6",
         "fdfcdf9009cdb99c0609",
@@ -2440,8 +2430,8 @@
       ]
     },
     "apps/desktop/test/mcp-control-endpoint.test.mjs": {
-      "assertions": 54,
-      "cases": 9,
+      "assertions": 51,
+      "cases": 8,
       "signatures": [
         "137b5e2f3a58f8d3bc92",
         "13b095761fa8c001b604",
@@ -2452,7 +2442,6 @@
         "21736822b9c816cd1224",
         "2303f72430b67bd01f0f",
         "2b61841ac7388a2cf382",
-        "2eed0e94288a9c6ca6fe",
         "312f660ec3b5d0b143db",
         "331aa000d02362dc0dcb",
         "36b4a31b00fb253a52f8",
@@ -2481,7 +2470,6 @@
         "a948d587f07aaa208f5c",
         "b0156c9378e087efca25",
         "bc89e2473bd8e4b86fa3",
-        "c4df3659c7edcea8b331",
         "c8adb1144e1f97583df7",
         "c8d3c7bd9b04ee25fe32",
         "c8e066ec0fd7588a4413",
@@ -2494,7 +2482,6 @@
         "e92789bf205c149d6468",
         "eab5c0be921249d9f167",
         "ecae19dc0abb9c8c6bf9",
-        "f2a0573e08715635fe65",
         "f4acbd2d0264763dfa37",
         "fde4d58cc6a74ebaae7e"
       ]
@@ -4218,12 +4205,10 @@
       ]
     },
     "apps/desktop/test/plugin-settings-renderer-surface.test.mjs": {
-      "assertions": 21,
+      "assertions": 18,
       "cases": 3,
       "signatures": [
         "0b473d1fbd3a97b2210e",
-        "3109e81c68e69f2f6664",
-        "320a83b51fb066d08b76",
         "469f6c4cf1239f657f40",
         "476fb9a39d3ee6e0d7a1",
         "5a20abde079b6bdd73a2",
@@ -4240,7 +4225,6 @@
         "d9c372217b12c6f1e824",
         "df0b7573a164dc17334f",
         "ee3b982789a43df86dc7",
-        "f57229b5068fad7ec626",
         "fba687723b13c28c2698"
       ]
     },
@@ -4384,8 +4368,8 @@
       ]
     },
     "apps/desktop/test/plugin-themes.test.mjs": {
-      "assertions": 95,
-      "cases": 19,
+      "assertions": 94,
+      "cases": 18,
       "signatures": [
         "05c232e1a9067af50cc7",
         "05d35390018ec80c0056",
@@ -4446,7 +4430,6 @@
         "9eea7a775c892fe81a35",
         "a0835c466c87c00af263",
         "a4c9cb546eabc6309186",
-        "a5aa44d06a6c8ae95a7f",
         "a6245f1c324171942b01",
         "aa91c90a328954273df5",
         "adc1819bff7fcaf160f6",
@@ -8647,7 +8630,7 @@
       ]
     },
     "apps/desktop/test/transcript-style.test.mjs": {
-      "assertions": 246,
+      "assertions": 245,
       "cases": 29,
       "signatures": [
         "006820df89eb4a05f04a",
@@ -8714,7 +8697,6 @@
         "51743b87aa1cb5efd012",
         "51967270ab06985c6b92",
         "548ff294606d7148c97e",
-        "54b5a423888f33041da7",
         "54c9f82e8496b57feed8",
         "54e16fe1b7fcdbc109ae",
         "5602425e1fa719527c5d",
@@ -9195,25 +9177,21 @@
       ]
     },
     "apps/desktop/test/window-toggle-shortcut.test.mjs": {
-      "assertions": 29,
-      "cases": 5,
+      "assertions": 24,
+      "cases": 4,
       "signatures": [
         "19cb1f2fd54408567e42",
-        "246b9f30decf17c1751e",
         "4229224d74bcc2d82ccd",
         "52a9f52cf99295d8368e",
         "599c5e6ac38b064a3f97",
         "5f48f0ca7180361c70bb",
-        "617d20bc8254ac570005",
         "7a97784921b364cec393",
         "881f7582c68c11affc03",
         "8b1a62fe549b2b0c6371",
         "a0e3aa476b64bcaf5584",
         "a50cfcc28a87ce0e4fe4",
         "af124a5e5ad16b299c91",
-        "b0452229a9fd229b5dff",
         "ba9b1a0fa48049ab760c",
-        "bb28f3358942cbae4a85",
         "cf63f3c5bcfbe9ddedd7",
         "d044597e58aa03b0d535",
         "d1f78be9d6ae5731550c",
@@ -9223,7 +9201,6 @@
         "eb664670f187efd60c56",
         "ed13885f24af8b8ca6fa",
         "f0f15964c16d57211ed0",
-        "f1702b9f6ffa079c1bcc",
         "f60b4f617ea456073035",
         "facc664d7885a0c85652",
         "fbc875f3b8f59d25f3d2"

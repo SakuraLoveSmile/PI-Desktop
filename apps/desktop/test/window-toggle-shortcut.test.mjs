@@ -20,7 +20,6 @@ import {
   readAppSource,
   readMainModule,
   readMainSource,
-  readSettingsSource,
   readStoreSource,
 } from "./helpers/source-contracts.mjs";
 
@@ -56,11 +55,6 @@ const windowControlsSource = await readFile(
 );
 const appSource = await readAppSource();
 const storeSource = await readStoreSource();
-const settingsSource = await readSettingsSource();
-const sectionSource = await readFile(
-  new URL("../src/components/settings/KeyboardShortcutsSection.tsx", import.meta.url),
-  "utf8",
-);
 
 function toggleActionFor({ visible, minimized, focused }) {
   return windowToggleAction({
@@ -177,14 +171,7 @@ test("stored legacy overrides are folded where each process reads them", () => {
   assert.deepEqual(migrateKeybindingOverrides({}), undefined);
 });
 
-test("settings lists one toggle row and formats it from the shared catalog", () => {
-  assert.match(sectionSource, /KEYBOARD_SHORTCUTS\.filter\(\(shortcut\) => shortcut\.group === group\)/);
-  assert.match(sectionSource, /resolveKeybinding\(shortcut, settings\.keybindings, platform\)/);
-  assert.doesNotMatch(sectionSource, /closeWindow|summonWindow/);
-  assert.match(settingsSource, /<KeyboardShortcutsSection/);
-  assert.doesNotMatch(settingsSource, /closeWindow|summonWindow/);
-});
-
+// test-shortcut-settings.mjs checks the merged row and catalog display on all platforms.
 test("every locale labels the merged row in both surfaces", () => {
   for (const [id, catalog] of Object.entries(catalogs)) {
     const flat = flattenCatalog(catalog);

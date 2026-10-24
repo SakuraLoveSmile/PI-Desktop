@@ -103,6 +103,18 @@ globalThis.agentCapabilitiesProbe = async () => {
       assert(fixture.calls.filter(call => call.channel === IPC.invoke.mcpUpsert).length === 2, "Refresh retry must not repeat the write");
       await type(node.querySelector<HTMLInputElement>('input.agent-capability-search')!, "no-matches");
       assert(node.textContent?.includes(i18n.t("settings.capabilityNoMatches")) && node.querySelector('.agent-mcp-scope'), "MCP search cannot hide machine state");
+      for (const filter of ["Global", "Project", "All"]) {
+        await click([...node.querySelectorAll<HTMLButtonElement>('.agent-capability-segment button')].find(button => button.textContent?.startsWith(i18n.t(`settings.capabilityFilter${filter}`))));
+        assert(node.querySelectorAll('.agent-mcp-scope').length === 1 &&
+          !node.querySelector('.agent-capability-panel')?.contains(node.querySelector('.agent-mcp-scope')),
+          "The single machine endpoint remains independent of filtered server inventory");
+        const endpointToggle = node.querySelector<HTMLButtonElement>('.agent-mcp-scope [role="switch"]');
+        assert(endpointToggle && !endpointToggle.disabled, "Search and level filters cannot disable the host-owned endpoint switch");
+      }
+      await click(node.querySelector<HTMLButtonElement>('.agent-mcp-scope [role="switch"]')!);
+      assert(fixture.calls.at(-1)?.channel === IPC.invoke.mcpControlSet &&
+        node.querySelector('.agent-mcp-scope [role="switch"]')?.getAttribute("aria-checked") === "true",
+        "The endpoint stays operable through its own channel while the inventory has no search matches");
       checks.push("MCP edit, failed-save draft, save versus refresh failure, read-only retry, search and independent endpoint");
       await mount(<div />);
       fixture = createCapabilitiesFixture(new URLSearchParams("capabilities=empty"));

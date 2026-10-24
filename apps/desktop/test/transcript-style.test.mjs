@@ -595,12 +595,8 @@ test("thread scroll reserves stable gutters before overflow appears", () => {
 });
 
 test("thinking display mode is configured in Settings, not the transcript toolbar", async () => {
-  const settingsPage = await readFile(
-    new URL("../src/features/settings/SettingsPage.tsx", import.meta.url),
-    "utf8",
-  );
   assert.doesNotMatch(transcriptSource, /ThinkingDisplayControl|transcript-display-toolbar/);
-  assert.match(settingsPage, /<ThinkingDisplayModeRow\s+settings=\{settings\}\s+saveSettings=\{saveSettings\}\s*\/>/);
+  // The positive Settings user path is exercised by e2e-settings-scroll.mjs.
 });
 
 test("conversation minimap stays centered below titlebar at high density", () => {

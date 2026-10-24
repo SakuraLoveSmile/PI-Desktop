@@ -18,6 +18,7 @@ import { createExtensionsFixture } from "./settings-extensions-fixture";
 
 const destinations = ["A", "B"].map((id) => ({
   ref: `fixture:${id}`, pluginId: "fixture", label: `Themes ${id}`, keywords: [],
+  icon: id === "A" ? "bell" : "future-icon",
   description: "Fixture theme collection", themes: Array.from({ length: 12 }, (_, index) => ({
     themeId: `plugin:fixture:${id}${index}`, label: `Theme ${index}`, description: "Preview",
     previewUrl: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E", blur: 6,
@@ -183,6 +184,10 @@ async function pressSettingsKey(key, options = {}) {
   await settle();
 }
 async function exerciseSearchNavigation() {
+  assert(navButton("Themes A").querySelector("svg")?.classList.contains("lucide-bell"),
+    "Plugin navigation must render the declared host icon");
+  assert(navButton("Themes B").querySelector("svg")?.classList.contains("lucide-palette"),
+    "Unknown plugin icons must retain the host fallback icon");
   await select("Shortcuts");
   await setSettingsSearch("Enter to send");
   const match = navButton("Enter to send");
@@ -220,6 +225,12 @@ async function exerciseSearchNavigation() {
   assert(!document.querySelector(".settings-nav").textContent.includes(i18n.t("settings.noResults")),
     "Plugin matches must not coexist with a no-results message");
   await select("Themes A");
+  const extension = document.querySelector(".plugin-scenic-themes-destination");
+  const blurSlider = extension?.querySelector('input[type="range"]');
+  assert(extension && !extension.querySelector("iframe") && extension.querySelector('button[aria-pressed]') &&
+    blurSlider?.labels?.[0]?.textContent === i18n.t("settings.pluginScenic.backdropBlur") &&
+    [...extension.querySelectorAll("button")].some(button => button.textContent.trim() === i18n.t("settings.pluginScenic.apply")),
+    "Scenic destinations must expose host-rendered theme controls and an explicit Apply action");
   const clear = document.querySelector(`button[aria-label="${i18n.t("settings.clearSearch")}"]`);
   assert(clear instanceof HTMLButtonElement, "An active search must offer a named clear action");
   flushSync(() => clear.click());
@@ -231,6 +242,9 @@ async function exerciseSearchNavigation() {
   assert(current.length === 1 && current[0] === navButton("Themes A"),
     "Only the currently open plugin may identify itself as the current page");
   await select("AI");
+  assert(!document.querySelector(".plugin-scenic-themes-destination") &&
+    document.querySelector('[role="radiogroup"][aria-label="' + i18n.t("settings.thinkingDisplayMode") + '"]'),
+    "Core navigation must replace the plugin destination with the selected Settings page");
   assert(document.querySelectorAll('.settings-nav-item[aria-current="page"]').length === 1 &&
     navButton("AI").getAttribute("aria-current") === "page", "Returning to a built-in page must update the unique current item");
 
@@ -287,6 +301,20 @@ async function exerciseUpdatePreference() {
   const trigger = () => document.querySelector('button[aria-label="Update behavior"]');
   assert(trigger() instanceof HTMLButtonElement, "Update behavior selector must render");
   assert(trigger().textContent?.includes("Automatic"), "Installed package defaults to Automatic");
+  const notes = [...document.querySelectorAll(".update-settings-actions button")]
+    .find(button => button.textContent.trim() === i18n.t("updates.releaseNotes"));
+  assert(notes instanceof HTMLButtonElement, "Info must expose release notes as a named action");
+  notes.focus();
+  flushSync(() => notes.click());
+  const notesDeadline = performance.now() + 4000;
+  while (!document.querySelector('[role="dialog"] [data-release-version]') && performance.now() < notesDeadline) await settle();
+  const notesDialog = document.querySelector('[role="dialog"][aria-modal="true"]');
+  assert(notesDialog?.querySelector('[data-release-version]') && notesDialog.textContent.includes(i18n.t("updates.releaseNotes")),
+    "Release notes must load the bundled catalog in an accessible dialog");
+  window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+  await settle();
+  assert(!document.querySelector('[role="dialog"]') && document.activeElement === notes,
+    "Escape must close release notes and restore the Info action's focus");
   assert(
     [...document.querySelectorAll(".update-settings-actions button")]
       .some((button) => button.textContent?.includes("Check for updates")),
@@ -323,7 +351,28 @@ async function exerciseUpdatePreference() {
   assert(trigger().textContent?.includes("Manual"), "Manual preference must survive leaving and reopening Info");
   await choosePreference("Automatic", "automatic");
   assert(trigger().textContent?.includes("Automatic"), "Automatic must be selectable again");
-  return { updatePreference: settings.updatePreference, updateMode: updateState.mode };
+  return { updatePreference: settings.updatePreference, updateMode: updateState.mode, releaseNotes: true };
+}
+
+async function exerciseThinkingDisplay() {
+  await select("AI");
+  const group = () => document.querySelector('[role="radiogroup"][aria-label="' + i18n.t("settings.thinkingDisplayMode") + '"]');
+  const choose = async (label, value) => {
+    const option = [...(group()?.querySelectorAll('[role="radio"]') ?? [])].find(button => button.textContent.trim() === i18n.t(label));
+    assert(option instanceof HTMLButtonElement, "Thinking display option is available in Settings");
+    flushSync(() => option.click());
+    await settle();
+    assert(settings.thinkingDisplayMode === value && useAppStore.getState().settings?.thinkingDisplayMode === value &&
+      option.getAttribute("aria-checked") === "true", "Thinking display choice must persist and become visibly selected");
+  };
+  await choose("settings.thinkingDisplayCompact", "compact");
+  await select("General");
+  await select("AI");
+  assert([...group().querySelectorAll('[role="radio"]')].some(option =>
+    option.textContent.trim() === i18n.t("settings.thinkingDisplayCompact") && option.getAttribute("aria-checked") === "true"),
+    "Thinking display must survive leaving and reopening its Settings page");
+  await choose("settings.thinkingDisplayDetailed", "detailed");
+  return { thinkingDisplay: true };
 }
 
 async function exerciseBrazilianPortuguese() {
@@ -369,6 +418,7 @@ window.settingsScrollProbe = async () => {
   );
   const checks = [];
   checks.push(await exerciseSearchNavigation());
+  checks.push(await exerciseThinkingDisplay());
   await checkCloudSyncVisibility();
   for (const theme of ["light", "dark"]) {
     document.documentElement.dataset.theme = theme;

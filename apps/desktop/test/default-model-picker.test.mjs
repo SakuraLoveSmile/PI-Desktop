@@ -77,22 +77,7 @@ test("picking a default opens a bounded floating menu, not an inline list", asyn
   assert.match(menu[1], /z-index: 60;/);
 });
 
-test("the default picker portals out of the clipped settings panel", async () => {
-  const menuSource = await read("../src/components/settings/AnchoredMenu.tsx");
-  const source = await read("../src/components/settings/ModelConfigPage.tsx");
-
-  assert.match(menuSource, /createPortal\(/);
-  assert.match(menuSource, /document\.body/);
-  // Escape and an outside press close it; a scrolled-away trigger closes it too.
-  assert.match(menuSource, /event\.key !== "Escape"/);
-  assert.match(menuSource, /addEventListener\("mousedown", onPointer\)/);
-  assert.match(menuSource, /addEventListener\("scroll", onViewportChange, true\)/);
-
-  assert.match(source, /<AnchoredMenu/);
-  assert.match(source, /aria-haspopup="listbox"/);
-  assert.match(source, /role="option"/);
-});
-
+// Portal, dismissal and focus behavior run in e2e-settings-models-usability.mjs.
 test("the default picker keeps keyboard focus contained", async () => {
   const menuSource = await read("../src/components/settings/AnchoredMenu.tsx");
 

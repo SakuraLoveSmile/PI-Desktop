@@ -128,11 +128,7 @@ test("scenic background is a host root layer, not an app-shell pseudo-element", 
   );
 });
 
-test("core Settings navigation dismisses an active plugin destination", () => {
-  const source = readFileSync(join(desktopRoot, "src/features/settings/SettingsPage.tsx"), "utf8");
-  assert.match(source, /setActiveExtension\(null\);\s*setSettingsTab\(item\.id\);/s);
-});
-
+// e2e-settings-scroll.mjs verifies plugin-to-core navigation through Settings.
 test("host window-control band inherits the active theme palette without plugin geometry", () => {
   const chromeCss = readFileSync(join(desktopRoot, "src/styles/chrome.css"), "utf8");
   const scenicSettingsCss = readFileSync(join(desktopRoot, "src/styles/settings.css"), "utf8");

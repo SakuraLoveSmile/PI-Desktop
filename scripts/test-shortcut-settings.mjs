@@ -20,6 +20,7 @@ import { createRoot } from "react-dom/client";
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import { catalogs, flattenCatalog } from "@pi-desktop/i18n";
+import { KEYBOARD_SHORTCUTS, resolveKeybinding, keybindingDisplayParts } from "@pi-desktop/shared";
 import { KeyboardShortcutsSection } from "./src/components/settings/KeyboardShortcutsSection";
 window.IS_REACT_ACT_ENVIRONMENT = true;
 await i18n.use(initReactI18next).init({ lng: "en", keySeparator: false,
@@ -61,6 +62,15 @@ window.runTests = async () => {
         saveSettings={async patch => setSettings(s => ({ ...s, ...patch }))} />;
     }
     await act(async () => root.render(<Harness key={platform} />));
+    const toggleLabel = i18n.t("settings.shortcutAction.toggleWindow");
+    const toggleRows = [...document.querySelectorAll(".shortcut-row")].filter(row =>
+      row.querySelector(".settings-row-title")?.textContent === toggleLabel);
+    check(toggleRows.length === 1 && document.querySelectorAll(".shortcut-row").length === KEYBOARD_SHORTCUTS.length,
+      platform + ": Settings renders one merged window toggle and exactly the live catalog actions");
+    const toggle = KEYBOARD_SHORTCUTS.find(shortcut => shortcut.id === "toggleWindow");
+    const expectedBinding = keybindingDisplayParts(resolveKeybinding(toggle, {}, platform), platform).join("+");
+    check(toggleRows[0].querySelector(".shortcut-keybinding")?.getAttribute("aria-label") === expectedBinding,
+      platform + ": window toggle displays the shared catalog binding using the platform formatter");
     await click(label("Disable", "newTask"));
     check(saved.newTask === null, "Disable must persist Unbound");
     await bind("openSearch", platform, "n");
