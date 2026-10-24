@@ -99,6 +99,8 @@ globalThis.mcpControlSettingsProbe = async () => {
   };
   const scope = () => document.querySelector<HTMLElement>(".agent-mcp-scope");
   const toggle = () => scope()?.querySelector<HTMLButtonElement>('button[role="switch"]');
+  const readyToggle = (enabled: boolean) => toggle()?.getAttribute("aria-checked") === String(enabled)
+    && toggle()?.disabled === false && toggle()?.getAttribute("aria-busy") !== "true";
   const retry = () => [...(scope()?.querySelectorAll<HTMLButtonElement>("button") ?? [])]
     .find((button) => button.textContent?.includes("Retry"));
   const click = (element: HTMLElement | null | undefined, label: string) => {
@@ -111,13 +113,14 @@ globalThis.mcpControlSettingsProbe = async () => {
     render();
     await waitFor(() => scope()?.textContent?.includes("State unavailable") === true, "initial read error");
     render();
-    await waitFor(() => toggle()?.getAttribute("aria-checked") === "false", "read recovery");
+    await waitFor(() => readyToggle(false), "read recovery");
 
     // The switch stays off while the host is still deciding, then follows its reply.
     let resolveEnable!: (value: McpControlStatus) => void;
     fixture.nextSet = () => new Promise((resolve) => { resolveEnable = resolve; });
     click(toggle(), "enable");
-    await waitFor(() => toggle()?.getAttribute("aria-busy") === "true", "enable pending");
+    await waitFor(() => typeof resolveEnable === "function" && fixture.setCalls.at(-1) === true
+      && toggle()?.getAttribute("aria-busy") === "true", "enable pending host request");
     assert(toggle()?.getAttribute("aria-checked") === "false", "toggle flipped before host response");
     resolveEnable(fixture.state = status({ enabled: true, running: true }));
     await waitFor(() => toggle()?.getAttribute("aria-checked") === "true", "enabled response");
@@ -125,7 +128,7 @@ globalThis.mcpControlSettingsProbe = async () => {
     // A refused start is rendered as failed and exposes a retry action.
     fixture.state = status();
     render();
-    await waitFor(() => toggle()?.getAttribute("aria-checked") === "false", "reset before failed start");
+    await waitFor(() => readyToggle(false), "reset before failed start");
     fixture.nextSet = async () => {
       fixture.state = status({ enabled: true, running: false, error: "port 37123 is already in use" });
       return structuredClone(fixture.state);
