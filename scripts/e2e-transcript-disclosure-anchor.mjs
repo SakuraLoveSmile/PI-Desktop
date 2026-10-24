@@ -47,12 +47,13 @@ try {
   });
   await writeFile(
     join(temp, "index.html"),
-    '<!doctype html><meta charset="utf-8"><title>Transcript disclosure anchor regression</title><script src="renderer.js"></script>',
+    '<!doctype html><meta charset="utf-8"><title>Transcript disclosure anchor regression</title><body><div id="fixture-staging">Transcript disclosure geometry fixture</div><script src="renderer.js"></script>',
   );
   await writeFile(
     join(temp, "main.cjs"),
     `
 const { app, BrowserWindow } = require("electron");
+const { once } = require("node:events");
 const path = require("node:path");
 app.setPath("userData", path.join(__dirname, "profile"));
 app.whenReady().then(async () => {
@@ -71,11 +72,16 @@ app.whenReady().then(async () => {
   });
   window.webContents.on("console-message", (event) => console.error(event.message));
   try {
+    // loadFile completes navigation; ready-to-show observes the first real
+    // nonempty paint. The staging node makes that handshake independent of
+    // the probe, which removes it before mounting the measured components.
+    const firstPaint = once(window, "ready-to-show");
     await window.loadFile(path.join(__dirname, "index.html"));
+    await firstPaint;
     await window.webContents.executeJavaScript("window.addEventListener('error', event => console.error(event.error?.stack ?? event.message)); window.addEventListener('unhandledrejection', event => console.error(event.reason?.stack ?? String(event.reason)));");
     window.showInactive();
     const surface = await window.webContents.executeJavaScript("({ visibility: document.visibilityState, width: innerWidth, height: innerHeight })");
-    console.error("TRANSCRIPT_DISCLOSURE_STAGE " + JSON.stringify({ visible: window.isVisible(), minimized: window.isMinimized(), ...surface }));
+    console.error("TRANSCRIPT_DISCLOSURE_STAGE " + JSON.stringify({ firstPaint: true, visible: window.isVisible(), minimized: window.isMinimized(), ...surface }));
     if (!window.isVisible() || window.isMinimized() || surface.visibility !== "visible" || surface.width !== 800 || surface.height !== 640) {
       throw new Error("Disclosure fixture requires a visible 800x640 content viewport");
     }

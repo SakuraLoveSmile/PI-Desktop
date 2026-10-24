@@ -70,15 +70,16 @@ function geometry(scroller: HTMLElement, title: HTMLElement): Geometry {
 }
 
 /** Observe settled layout without waiting for the expected anchor position. */
-async function settle(scroller: HTMLElement, title: HTMLElement) {
-  await new Promise<void>((resolve, reject) => {
+async function settle(scroller: HTMLElement, title: HTMLElement, phase: string) {
+  const startedAt = performance.now();
+  return new Promise<{ phase: string; sampledFrames: number; stableFrames: number; elapsedMs: number }>((resolve, reject) => {
     let previous = "";
     let stableFrames = 0;
     let sampledFrames = 0;
     let frame = 0;
     const timeout = window.setTimeout(() => {
       cancelAnimationFrame(frame);
-      reject(new Error(`Disclosure geometry did not settle: ${JSON.stringify({ sampledFrames, visibility: document.visibilityState, width: innerWidth, height: innerHeight, previous })}`));
+      reject(new Error(`Disclosure geometry did not settle: ${JSON.stringify({ phase, sampledFrames, visibility: document.visibilityState, width: innerWidth, height: innerHeight, previous })}`));
     }, 2000);
     const sample = () => {
       sampledFrames += 1;
@@ -87,7 +88,7 @@ async function settle(scroller: HTMLElement, title: HTMLElement) {
       previous = current;
       if (stableFrames >= 3) {
         clearTimeout(timeout);
-        resolve();
+        resolve({ phase, sampledFrames, stableFrames, elapsedMs: performance.now() - startedAt });
       } else {
         frame = requestAnimationFrame(sample);
       }
@@ -178,11 +179,15 @@ globalThis.transcriptDisclosureProbe = async () => {
     resources: { en: { translation: en } },
     interpolation: { escapeValue: false },
   });
+  const staging = document.getElementById("fixture-staging");
+  assert(staging, "the first-paint staging node did not render");
+  staging.remove();
   const host = document.createElement("div");
   host.style.width = "700px";
   document.body.append(host);
   const renderErrors: unknown[] = [];
   const roots: Array<{ unmount: () => void }> = [];
+  const frames: Awaited<ReturnType<typeof settle>>[] = [];
 
   const mount = (node: Parameters<typeof I18nextProvider>[0]["children"]) => {
     const container = document.createElement("div");
@@ -217,7 +222,7 @@ globalThis.transcriptDisclosureProbe = async () => {
     assert(scroller, "the transcript scroller did not render");
     assert(title, "the tool title did not render");
 
-    await settle(scroller, title);
+    frames.push(await settle(scroller, title, "transcript.initial"));
     const before = geometry(scroller, title);
     assert(
       Math.abs(before.distanceFromBottom) < 1,
@@ -230,7 +235,7 @@ globalThis.transcriptDisclosureProbe = async () => {
 
     // A plain click on the title, exactly as a reader expands a tool row.
     title.click();
-    await settle(scroller, title);
+    frames.push(await settle(scroller, title, "transcript.expanded"));
     const expanded = geometry(scroller, title);
     assert(
       expanded.scrollHeight > before.scrollHeight + 100,
@@ -246,7 +251,7 @@ globalThis.transcriptDisclosureProbe = async () => {
     );
 
     title.click();
-    await settle(scroller, title);
+    frames.push(await settle(scroller, title, "transcript.collapsed"));
     const collapsed = geometry(scroller, title);
     assert(
       Math.abs(collapsed.titleTop - before.titleTop) < 2,
@@ -266,14 +271,14 @@ globalThis.transcriptDisclosureProbe = async () => {
     );
     assert(dockScroller, "the dock scroller did not render");
     assert(dockTitle, "the dock tool title did not render");
-    await settle(dockScroller, dockTitle);
+    frames.push(await settle(dockScroller, dockTitle, "dock.initial"));
     const dockBefore = geometry(dockScroller, dockTitle);
     assert(
       Math.abs(dockBefore.distanceFromBottom) < 1,
       `the dock did not start pinned to the bottom: ${JSON.stringify(dockBefore)}`,
     );
     dockTitle.click();
-    await settle(dockScroller, dockTitle);
+    frames.push(await settle(dockScroller, dockTitle, "dock.expanded"));
     const dockExpanded = geometry(dockScroller, dockTitle);
     assert(
       dockExpanded.scrollHeight > dockBefore.scrollHeight + 100,
@@ -313,14 +318,14 @@ globalThis.transcriptDisclosureProbe = async () => {
     const processScroller = processContainer.querySelector<HTMLElement>(".thread-scroll");
     const processTitle = processContainer.querySelector<HTMLElement>(".turn-process > button");
     assert(processScroller && processTitle, "process fixture did not render");
-    await settle(processScroller, processTitle);
+    frames.push(await settle(processScroller, processTitle, "process.active"));
     const processBefore = geometry(processScroller, processTitle);
     assert(
       processTitle.getAttribute("aria-expanded") === "true",
       "an active detailed process should start open",
     );
     renderProcess(false);
-    await settle(processScroller, processTitle);
+    frames.push(await settle(processScroller, processTitle, "process.completed"));
     const processCollapsed = geometry(processScroller, processTitle);
     assert(
       processTitle.getAttribute("aria-expanded") === "false",
@@ -331,7 +336,7 @@ globalThis.transcriptDisclosureProbe = async () => {
       "completed process content remained visible",
     );
     processTitle.click();
-    await settle(processScroller, processTitle);
+    frames.push(await settle(processScroller, processTitle, "process.expanded"));
     const processExpanded = geometry(processScroller, processTitle);
     assert(
       processTitle.getAttribute("aria-expanded") === "true",
@@ -349,7 +354,7 @@ globalThis.transcriptDisclosureProbe = async () => {
     );
     renderProcess(true);
     renderProcess(false);
-    await settle(processScroller, processTitle);
+    frames.push(await settle(processScroller, processTitle, "process.recompleted"));
     assert(
       processTitle.getAttribute("aria-expanded") === "true",
       "a user-expanded process should stay open after completion",
@@ -357,6 +362,7 @@ globalThis.transcriptDisclosureProbe = async () => {
     assert(renderErrors.length === 0, `React render errors: ${renderErrors.map(String).join("; ")}`);
     return {
       ok: true,
+      frames,
       process: { before: processBefore, collapsed: processCollapsed, expanded: processExpanded },
       transcript: { before, expanded, collapsed },
       dock: { before: dockBefore, expanded: dockExpanded },

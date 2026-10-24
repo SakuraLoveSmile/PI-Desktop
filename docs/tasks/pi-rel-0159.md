@@ -429,7 +429,22 @@ remained in Team overflow, pending recovery, question startup and image selectio
   presentation tests passed. The lead inspected both the red screenshot and
   repaired dark/light screenshots; an independent review found no blocker.
 
-Remaining: final combined-candidate verification, exact-SHA hosted task-candidate and
+The final combined native Team flow passed again on clean `2c6cac30e`, with a
+fresh source-bound overlay receipt. Its hosted CI, Docs, PR-base and
+project-memory checks passed. Nightly `40090499119` exposed another intermittent
+disclosure fixture failure: zero animation-frame samples in a settling round,
+despite a visible 800x640 viewport. That script is identical to the passing
+`ac58edae6` version; the old log does not identify the failing round. Electron
+43's documented `ready-to-show` event observes initial rendering, whereas
+`loadFile` completion alone does not. The fixture now awaits that event,
+registered before navigation, with real visible staging content removed before
+mounting the measured components. Nine named local phases each observed four
+real frames and three stable comparisons; all original geometry assertions and
+two-second/sixty-second budgets remain. Independent review found no blocker.
+This establishes the missing readiness precondition, not the old Linux
+compositor failure's precise internal cause; exact-SHA hosted proof is required.
+
+Remaining: final exact-SHA hosted task-candidate and
 PR-integration gates, formal release workflow, publication integrity and cleanup.
 These remain required. Detailed local logs/reports are in
 the integration tree's `.artifacts/pi-rel-0159-integrated/`. Final remote run and
