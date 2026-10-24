@@ -161,7 +161,7 @@ jobs:
           set -euo pipefail
           # Artifact names are defined in apps/desktop/package.json: the mac
           # pattern labels ZIPs, and the dmg target pattern labels DMGs.
-          pnpm --filter @pi-desktop/desktop run dist:mac -- --${{ matrix.arch }} -c.publish.channel="$RELEASE_CHANNEL"
+          pnpm --filter @pi-desktop/desktop run dist:mac -- --${{ matrix.arch }} -c.publish.channel="$RELEASE_CHANNEL" -c.mac.identity=-
 
       - name: Diagnose macOS signing environment
         # Records the runner baseline (system, codesign, identities, keychain,
@@ -282,6 +282,10 @@ jobs:
           MAC_SIGNING_IDENTITY: ${{ secrets.MAC_SIGNING_IDENTITY }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: scripts/verify-macos-release.sh apps/desktop/release
+
+      - name: Verify macOS app and archive signature integrity
+        if: matrix.platform == 'macos'
+        run: scripts/verify-macos-release.sh --integrity-only apps/desktop/release
 
       - name: Verify macOS artifact names
         if: matrix.platform == 'macos'
