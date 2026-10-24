@@ -203,10 +203,39 @@ before `setImmediate` was scheduled (30.9 ms in the failure). The same unchanged
 plugin test passed in isolation. Its correction uses a controlled clock to check
 the live page at 19 ms, settle at exactly 20 ms and release the listener, keeping
 the original timeout contract. All thirteen plugin-invoker cases passed after
-this test-only correction; no plugin runtime behavior changed. The Settings
-assertions require behavioral coverage before retirement. Initial nightly run
+this test-only correction; no plugin runtime behavior changed. `6716600d0`
+replaces the seven Settings structural assumptions with mounted user journeys:
+release-note open/close/focus, model portal dismissal and focus, independently
+reachable MCP control, plugin navigation and native controls, thinking-mode
+save/reopen, and the single window shortcut on all three platform catalogs.
+The seven focused suites passed 79 cases; four enhanced renderer suites passed.
+Independent review verified that the source-assertion baseline only decreases
+to 8,139, without new signatures, changed trusted revision or larger budgets.
+Initial nightly run
 `40077642507` was superseded and canceled for the revised test candidate; it is
 not passing validation evidence.
+
+The full workspace command at clean `6716600d06d00140e25e4b5004661ed786ed49cf`
+completed once in 119 seconds: 8,207 tests, 8,206 passed, one existing skipped
+case, zero failures. HEAD, index and workspace fingerprints were unchanged.
+All ten package suites passed, including 4,213 Desktop and 1,868 agent-runtime
+cases. The report and full output are `workspace-tests-6716600d.report.txt` and
+`workspace-tests-6716600d.log` under the combined evidence directory.
+
+Initial hosted CI `40077612446` exposed only the seven retired Settings source
+assertions; Rust and isolated smoke passed. Docs `40077612406` and PR-base
+`40077612382` passed. Project-memory `40077612389` passed real Host/Sidecar
+isolation but failed the renderer runner's fixed-coordinate hit test after
+removing a card and saving. Local `settings-memory` passed on clean `6716600d0`;
+that does not supersede the hosted failure. `4d7670eba` corrects a demonstrated
+fixture race: after dialog reflow, the runner kept checking the old coordinates.
+It now remeasures after an animation frame and requires a stable, currently
+hit-tested center before native pointer press/release. A deterministic 40px
+movement at that same removal/save/disable path fails with the old helper and
+passes with the fix; both full memory modes pass. No product code, hit-test
+requirement or timeout budget changed. The original CI log did not retain the
+post-failure rectangle, so its exact movement is not asserted retrospectively.
+Final exact-SHA hosted validation remains required before merge.
 
 Initial checks: source paths/HEAD/index/dirty state and registered worktrees
 inspected; origin main/tags fetched; original source snapshots verified. Remote
