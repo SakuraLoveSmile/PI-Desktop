@@ -3,9 +3,48 @@ import { execFileSync } from "node:child_process";
 import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { delimiter, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+
+test("the unsigned cloud lane selects a complete ad-hoc signing pass", { skip: process.platform === "win32" }, async t => {
+  const desktopManifest = new URL("../apps/desktop/package.json", import.meta.url);
+  const desktop = createRequire(desktopManifest);
+  const builder = createRequire(desktop.resolve("electron-builder/package.json"));
+  const workflow = builder("js-yaml").load(readFileSync(new URL("../.github/workflows/release.yml", import.meta.url), "utf8"));
+  const step = workflow.jobs.build.steps.find(step => step.name === "Package unsigned macOS installer");
+  const scratch = mkdtempSync(join(tmpdir(), "pi-unsigned-builder-"));
+  t.after(() => rmSync(scratch, { recursive: true, force: true }));
+  const log = join(scratch, "signing.json");
+  const pnpm = join(scratch, "pnpm");
+  writeFileSync(pnpm, `#!${process.execPath}
+const { createRequire } = require('node:module');
+const { writeFileSync } = require('node:fs');
+const desktop = createRequire(${JSON.stringify(fileURLToPath(desktopManifest))});
+const builder = createRequire(desktop.resolve('electron-builder/package.json'));
+const { getConfig } = builder('app-builder-lib/out/util/config/config.js');
+const { MacTargetHelper } = builder('app-builder-lib/out/mac/MacTargetHelper.js');
+(async () => {
+  const flag = process.argv.find(arg => arg.startsWith('-c.mac.identity='));
+  const config = await getConfig(${JSON.stringify(dirname(fileURLToPath(desktopManifest)))}, null,
+    flag ? { mac: { identity: flag.slice('-c.mac.identity='.length) } } : {});
+  const helper = new MacTargetHelper({ forceCodeSigning: false });
+  const identity = await helper.findSigningIdentity(false, false, config.mac.identity, undefined, config.mac);
+  writeFileSync(process.env.PI_SIGNING_LOG, JSON.stringify({ identity: identity?.name ?? null, mac: config.mac }));
+})().catch(error => { console.error(error); process.exitCode = 1; });
+`);
+  chmodSync(pnpm, 0o755);
+  execFileSync("bash", ["-c", step.run.replaceAll("${{ matrix.arch }}", "arm64")], {
+    env: { ...process.env, ...step.env, PATH: `${scratch}${delimiter}${process.env.PATH}`,
+      RELEASE_CHANNEL: "latest", PI_SIGNING_LOG: log },
+    timeout: 15_000,
+  });
+  const result = JSON.parse(readFileSync(log, "utf8"));
+  assert.equal(result.identity, "-", "the final app must be sealed instead of retaining its linker signature");
+  assert.equal(result.mac.hardenedRuntime, true);
+  assert.equal(result.mac.entitlements, "build/entitlements.mac.plist");
+  assert.equal(result.mac.entitlementsInherit, "build/entitlements.mac.plist");
+});
 
 test("Windows packaging forwards explicit update channel and architecture to every format", { skip: process.platform === "win32" }, t => {
   const scratch = mkdtempSync(join(tmpdir(), "pi-builder-args-"));

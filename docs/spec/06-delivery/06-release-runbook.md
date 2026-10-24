@@ -81,9 +81,13 @@ and preserve developer workspace defaults despite the branded executable name.
 The first `pnpm dev` on Electron 43+ downloads the Electron binary on demand
 (the package no longer installs it during `pnpm install`). Clean cloud runners
 explicitly fetch that pinned Electron binary before building or running E2E.
-Unsigned cloud lanes do not request a secure timestamp. Every signed lane,
-including signed candidates and formal releases, requires the secure timestamp
-used for notarization.
+Unsigned cloud lanes explicitly select `mac.identity=-` for a complete ad-hoc
+signing pass, including the resource seal. Disabling certificate discovery alone
+skips final signing and leaves the independently linked executable with an
+incomplete linker signature. Ad-hoc signatures do not provide Developer ID or
+notarization qualification. Unsigned cloud lanes do not request a secure
+timestamp. Every signed lane, including signed candidates and formal releases,
+requires the secure timestamp used for notarization.
 Packaged lanes use `build/icon.icns` through electron-builder on macOS and
 `build/icon.ico` for the Windows executable and native window icon. The
 renderer imports the same PNG through `BrandLogo`. The PNG is canonical;
@@ -259,7 +263,9 @@ The workflow executes these barriers in order:
    tests. The full release-documentation gate runs after dependency install.
 3. **Native build:** build Desktop for macOS arm64 on `macos-15`. Fetch the
    pinned Electron binary on the clean runner. Packaging uses `--publish never`;
-   only the final publication job may write a Release.
+   only the final publication job may write a Release. Both signing lanes must
+   pass strict signature/resource integrity checks on the loose app and the
+   actual ZIP/DMG apps before uploading artifacts.
 4. **Aggregate:** require exactly `dist-mac-arm64` with its DMG and ZIP, both
    blockmaps, and `<channel>-mac-arm64.yml`; reject missing, unexpected,
    duplicate or unsafe paths. Check updater version, actual SHA512/size, then
@@ -469,9 +475,19 @@ above.
 
 ## 5. Verification gates
 
-Unsigned debug artifacts (`workflow_dispatch` with `sign_macos: false`) are
-not Gatekeeper-qualified. Tag releases must pass the signature, notarization,
-and staple checks below or the workflow fails.
+Every macOS lane, including unsigned candidates and opted-in personal-use
+releases, must pass `scripts/verify-macos-release.sh --integrity-only
+apps/desktop/release` before upload. It requires exactly one loose app, ZIP and
+DMG, checks that each app has a resource seal, runs `codesign --verify --deep
+--strict` on each app and `codesign --verify --strict` on each bundled Host.
+It extracts the ZIP into a temporary directory and mounts the DMG read-only,
+detaching it on success or failure. A detach failure fails the gate and retains
+the scratch directory for diagnosis. No installed application or security
+setting is modified.
+
+Unsigned artifacts are not Gatekeeper-qualified. The default signed lane must
+also pass the Developer ID/team, notarization and staple checks below; the
+integrity-only mode does not replace those checks.
 
 Two separate notarization submissions exist, because Apple notarizes one
 artifact per submission and electron-builder only covers the app:

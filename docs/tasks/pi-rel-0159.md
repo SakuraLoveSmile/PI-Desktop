@@ -2,6 +2,69 @@
 
 Status: 实现中. Project: `fork-pi-desktop`. Created: 2026-10-24, Asia/Taipei.
 
+## Reopened: macOS bundle seal (2026-10-25)
+
+The three workstreams landed through PR #66 and version `0.15.9` was published
+from `3389c46f4aae393d1639c11c868f0f1645143b89` (Release run
+`40104984525`). The seven cloud jobs and asset/hash/container checks passed;
+the original task worktrees and ten local branches were archived and removed.
+Those historical receipts remain under the recovery directory below. They did
+not prove final bundle signature integrity.
+
+The user's installed `0.15.9` and the official ZIP share the same executable
+and Info.plist bytes. The bundle has no `Contents/_CodeSignature/CodeResources`;
+`codesign --verify --deep --strict` fails with "code has no resources but
+signature indicates they must be present". The executable retains the
+`electron-main-linked` linker ad-hoc signature (`Info.plist=not bound`,
+`Sealed Resources=none`). This is a packaging defect, not a download checksum
+failure. No installed file, quarantine attribute or system security setting was
+changed during diagnosis.
+
+Follow-up branch: `fix/20261025-pi-rel-0159-macos-bundle-seal`, based on the
+published source above. Worktree:
+`/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop/20261025-fix-pi-rel-0159-macos-bundle-seal`.
+The lead exclusively owns workflow, verification script, tests and this record;
+the independent analyst confirmed the root cause read-only. Existing primary
+checkout policy edits remain excluded. Host dependency links are reused.
+
+Scope: explicitly select electron-builder's ad-hoc identity in the unsigned
+cloud lane and block every macOS upload unless the loose app and actual ZIP/DMG
+apps have complete resource seals and valid strict app/Host signatures. Preserve
+hardened runtime, entitlements, independent UUIDs, cloud-only packaging and the
+full Developer ID/team/notarization/stapler gate. No runtime/data behavior changes.
+
+Acceptance: the real workflow command selects identity `-` (red baseline saved
+with actual `null`); all signature/asset failures stop the gate and mounted DMGs
+are detached; native codesign detects resource tampering; exact-SHA GitHub-hosted
+packaging verifies the actual ZIP and DMG. Local fixtures do not qualify the
+cloud packages or Gatekeeper. Evidence lives in
+`.artifacts/pi-rel-0159-macos-bundle-seal/` until archived.
+
+Local follow-up verification: 41 targeted packaging/verification tests passed,
+including the native codesign tamper test; the release/publication/cloud-guard
+command passed all 86 tests (the sets overlap). The new gate rejects the
+original installed/official-asset tuple before extraction because its seal is
+missing. Bash syntax, diff whitespace, policy synchronization, source-regex
+budget, scenario index, Biome, style tokens, documentation locale/content checks
+and release-document version alignment passed. The primary four-document diff
+still has SHA256 `65f2a631ce8ddc825240a86d46a497ec6b75618abc769035ad3fc45eb9e58c78`.
+
+The local pnpm wrappers tried automatic dependency verification and stopped on
+the shared node_modules symlink before running their checks; the underlying
+existing Node/Biome checks were then run directly, without installing another
+environment. Runtime builds, full runtime E2E and Rust checks were NOT RUN
+locally because this follow-up changes only release tooling and tests. The
+cloud candidate still must pass its shared CI and actual package gates. The
+independent read-only review found no blocking defect and explicitly retained
+the distinction between ad-hoc integrity and Finder/Gatekeeper qualification.
+
+Remaining: exact-SHA hosted candidate and actual package verification, then
+resolve the replacement release version. The external recovery directory's
+`current-status.json` and follow-up receipts extend this record with immutable
+source/run/artifact identities. Published `v0.15.9` and its assets remain
+immutable; no replacement version has been authorized yet. Installing or
+rewriting the user's real application/profile remains outside scope.
+
 ## Goal and authorization
 
 Finish the retained upstream fixes, Goal verification evidence, and Settings
