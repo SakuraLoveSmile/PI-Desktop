@@ -196,6 +196,18 @@ highlighted the exact context-usage row; the populated Skills screen retained
 its scope filters, list controls and collapsed optional discovery. This is
 fixture UI evidence, not real account or installed-app validation.
 
+Full workspace verification at `8031d6a6a` passed types and lint but stopped on
+eight Desktop tests: seven legacy source-shape assertions after the Settings
+split, and one unchanged plugin teardown test whose real 20 ms timer elapsed
+before `setImmediate` was scheduled (30.9 ms in the failure). The same unchanged
+plugin test passed in isolation. Its correction uses a controlled clock to check
+the live page at 19 ms, settle at exactly 20 ms and release the listener, keeping
+the original timeout contract. All thirteen plugin-invoker cases passed after
+this test-only correction; no plugin runtime behavior changed. The Settings
+assertions require behavioral coverage before retirement. Initial nightly run
+`40077642507` was superseded and canceled for the revised test candidate; it is
+not passing validation evidence.
+
 Initial checks: source paths/HEAD/index/dirty state and registered worktrees
 inspected; origin main/tags fetched; original source snapshots verified. Remote
 0.15.9 tag and Release were absent. No classic protection or ruleset is enabled,
