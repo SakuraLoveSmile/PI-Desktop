@@ -196,9 +196,9 @@ IDs come from executable result/test calls and annotated dynamic suites. Documen
 | E2E-ACTIVITY-EOF | [scripts/e2e-session-activity.mjs:269](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-session-activity.mjs#L269) |
 | E2E-ACTIVITY-NOTES | [scripts/e2e-session-activity.mjs:224](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-session-activity.mjs#L224) |
 | E2E-ACTIVITY-PROCESSES | [scripts/e2e-session-activity.mjs:258](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-session-activity.mjs#L258) |
-| E2E-ADVISOR-clear-row-returns-to-off | [scripts/e2e-advisor.mjs:591](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-advisor.mjs#L591) |
-| E2E-ADVISOR-off-until-a-model-is-picked | [scripts/e2e-advisor.mjs:590](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-advisor.mjs#L590) |
-| E2E-ADVISOR-stale-pin-keeps-the-session-running | [scripts/e2e-advisor.mjs:592](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-advisor.mjs#L592) |
+| E2E-ADVISOR-clear-row-returns-to-off | [scripts/e2e-advisor.mjs:615](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-advisor.mjs#L615) |
+| E2E-ADVISOR-off-until-a-model-is-picked | [scripts/e2e-advisor.mjs:614](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-advisor.mjs#L614) |
+| E2E-ADVISOR-stale-pin-keeps-the-session-running | [scripts/e2e-advisor.mjs:616](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-advisor.mjs#L616) |
 | E2E-CI-approval | [scripts/e2e-suite-catalog.json (approval)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
 | E2E-CI-restart | [scripts/e2e-suite-catalog.json (restart)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
 | E2E-COMPOSER-compact-running-input | [scripts/e2e-suite-catalog.json (transcript-render)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |

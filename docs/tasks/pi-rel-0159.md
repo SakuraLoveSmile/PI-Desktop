@@ -58,7 +58,9 @@ Initial worker branches use the matching `chore/20261024-pi-rel-0159-release-0-1
 stem plus their suffix. The Goal and provider closeout reuse the existing
 `-goal` and `-stop` trees on `fix/20261024-pi-rel-0159-goals-team-fixtures`
 and `fix/20261024-pi-rel-0159-provider-fixtures`; initial heads remain preserved
-in archive refs. The lead serially integrates worker commits. Workers
+in archive refs. The Settings tree is reused on
+`fix/20261024-pi-rel-0159-shell-fixtures` for the isolated crash-observation
+closeout; its previous Settings branch remains preserved. The lead serially integrates worker commits. Workers
 do not push, open PRs, publish, or modify original source worktrees. Existing
 host dependency trees and caches are reused; no local dependency installation
 or installer packaging is planned. Mutable fixtures, logs, artifacts and any
@@ -334,9 +336,66 @@ inspected; origin main/tags fetched; original source snapshots verified. Remote
 0.15.9 tag and Release were absent. No classic protection or ruleset is enabled,
 so repository gates must be observed explicitly.
 
-Remaining: final post-fix JS checks and Settings interactions, exact-SHA hosted
-task-candidate and PR-integration gates, formal release workflow, publication
-integrity and cleanup. These remain required. Detailed local logs/reports are in
+### Exact-candidate Linux follow-up
+
+Clean `2eb1c05f71c1957bca17547289cadffc5d893b2f` passed the full local JS
+build, Desktop/runtime-test types, lint, policy, release documentation, catalog
+and decreasing-only quality checks (8,123 current signatures). Full workspace
+tests passed once: 8,238 tests, 8,237 passed, one existing skipped case, zero
+failures; source and index remained unchanged. Its CI `40084445067`, Docs
+`40084445050`, PR-base `40084445096` and project-memory `40084445063` all
+passed. Nightly `40084446133` completed with 124/131 suites passing across ten
+families; its seven failures remain retained and block landing.
+
+- Disclosure geometry had no completed first frame sample on Linux. The
+  fixture now establishes a real, inactive visible 800x640 content viewport
+  and records surface/sample diagnostics. Its complete local probe passed;
+  original real rAF, three stable frames, two-second budget and displacement
+  assertions remain. This does not establish the precise OSR internal cause.
+- Provider ordering likewise timed out without a result from its hidden
+  animation-dependent fixture. A fixed visible 1000x760 content viewport fits
+  both local and Xvfb work areas, with native visibility checks and stage
+  diagnostics. Original and final full local probes passed, preserving drag,
+  rollback, stale refresh, defaults, restart and 200-card performance coverage.
+- Advisor's old trigger was actually below the viewport (y=1378-1424 with an
+  800px viewport). The fixture now scrolls to and hit-tests the enabled trigger
+  and owned visible menu before CDP pointer clicks, and matches the exact
+  scenario provider when saving. All three full cases and four app starts
+  passed locally; product menu behavior is unchanged.
+- Execution-question relay exited during initial Desktop startup, before any
+  of its six journeys. The old job omitted the only child-output evidence.
+  Startup errors now retain bounded exit/output diagnostics and the default
+  evidence directory is inside the existing uploaded artifact scope. A real
+  complete overlay build produced a clean 2,040-artifact receipt at
+  `40f2cc630b62c60f2ea9c82ec96a4b0bdf4058c9`, then all six real Desktop/Host/
+  sidecar/MCP journeys passed. The Linux startup cause is still unproven;
+  diagnostics and another actual hosted execution are required.
+- The Team overflow failure is a genuine observed 314px/326px surface mismatch,
+  but a proposed header explanation was not reproduced by either local font
+  experiment. Both experiments passed the original complete layout matrix.
+  No speculative product CSS change is retained. Failure-only descendant
+  geometry diagnostics will preserve the actual offending element on Linux.
+  Approved Goal controls now belong to the selected visible session and wait
+  for the measured Auto menu after scrolling. Both complete success/cancellation
+  journeys passed locally without changing permissions, assertions or timeouts.
+- The shell crash log records about 290 seconds between injection and actual
+  process exit, followed by a timeout only 156ms after `renderer.process.gone`.
+  An unbounded renderer CDP command crossed the old polling deadline. The
+  closeout separates bounded crash injection from the original 90-second
+  recovery deadline measured from the actual exit event, retains the suite's
+  overall limit, and preserves same-window/new-document/sidebar recovery.
+  Native checks passed 197/197 and six external-WebSocket protocol/deadline
+  checks passed. Final code preserves the original 420-second script and
+  480-second runner limits; injection is additionally bounded at 300 seconds.
+  The final post-native changes only tighten the initially proposed 470-second
+  limit back to 420 and disambiguate a diagnostic field. Actual local injection
+  took 349ms and exit-to-recovery took 883ms, with the same target and new loader.
+  The source of the pre-exit delay remains unknown; accompanying Crashpad
+  frequency warnings do not establish it.
+
+Remaining: final Linux fixture closeout, exact-SHA hosted task-candidate and
+PR-integration gates, formal release workflow, publication integrity and cleanup.
+These remain required. Detailed local logs/reports are in
 the integration tree's `.artifacts/pi-rel-0159-integrated/`. Final remote run and
 publication receipts will be preserved under the task's recovery directory;
 they extend this record without modifying the immutable tagged source.
@@ -347,6 +406,7 @@ Goals/Team, runtime/provider, sessions, transcript/composer, shell and voice.
 Device-specific native Windows behavior and signing/notarization must not be
 claimed from Linux fixtures or unsigned cloud artifacts.
 
-Next: finish T1-T3, integrate serially, review and validate the combined candidate,
-then complete the already-authorized PR/main/tag/release path and cleanup. Record
+Next: finish the remaining fixture verification, integrate serially, review and
+validate the combined candidate, then complete the already-authorized
+PR/main/tag/release path and cleanup. Record
 actual commands, tested SHAs, run URLs/job conclusions and residual limits here.
