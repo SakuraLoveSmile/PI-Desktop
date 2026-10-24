@@ -468,6 +468,38 @@ Original-scale offender JSON and screenshots now survive fixture cleanup under
 the existing hosted artifact directory. Final combined-source/Linux validation
 is still required.
 
+Nightly `40093157087` completed all ten families on clean `43422f2cbb` against
+`d424021c5`: 130/131 suites passed, with unchanged-candidate fingerprints in
+every report. Team's eight French layout probes and shell's 197 layout checks
+passed; regular CI, Docs, PR ancestry and project-memory gates also passed.
+Only pending recovery failed after its process-restart/persistence assertions:
+the fixture did not observe the card after renderer reload. This does not
+establish durable data loss. `Page.reload` acknowledges before navigation, so
+the old readiness check could accept the previous document's control surface.
+The closeout now requires a changed `performance.timeOrigin`, the same app URL,
+a complete non-booting shell and the selected target's visible pane or active
+sidebar row before proceeding. Empty sessions legitimately use the welcome
+composer, without a transcript pane. Reload receipts retain both document
+identities; failure snapshots preserve navigation and durable ask status before
+any attempted recovery. There is no second selection or input refresh to hide
+a failure. The original 15-second readiness and card deadlines remain.
+
+The complete isolated native recovery passed, including renderer reload, a
+second process restart, old authority rejection, one authenticated late-answer
+turn while fresh roster approval remains required. The independent budget flow exposed
+another existing fixture readiness gap: the exact old committed script also
+failed to launch after its single native confirmation. The helper checked an
+`is-entering` class that the component never sets while its real flex-basis
+animation moves the control. The original confirmation predicate now waits for
+that panel's own animation to finish and for two real painted samples with a
+stable hit target. It still sends one trusted click and retains the original
+15-second readiness/45-second roster deadlines. The full native budget journey
+then passed: soft notice, safe completion across hard pause, held report,
+restart, retained pause while disabling policy, explicit Resume and exactly-once
+admission. No product persistence, launch authorization, timeout or acceptance
+assertion was relaxed. Independent review found no material issue; final hosted
+confirmation is still required.
+
 Remaining: final exact-SHA hosted task-candidate and
 PR-integration gates, formal release workflow, publication integrity and cleanup.
 These remain required. Detailed local logs/reports are in

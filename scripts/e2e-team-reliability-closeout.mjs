@@ -106,10 +106,32 @@ async function selectSession(id) {
     await window.__PI_DESKTOP__.selectSession(id);
   }, id);
   await native.renderer.until(
-    () => Boolean(document.querySelector(".composer-input")),
-    null,
-    "selected session composer",
+    (id) => Boolean(
+      // Empty sessions use the welcome composer before a transcript pane exists.
+      (document.querySelector(`.session-pane[data-session-pane="${CSS.escape(id)}"][data-visible="true"]`) ||
+        document.querySelector(`[data-sidebar-session-row="${CSS.escape(id)}"].active`)) &&
+      document.querySelector(".composer-input"),
+    ),
+    id,
+    "selected target session and composer",
   );
+}
+async function reloadSession(id, label) {
+  const previous = await native.renderer.run(() => ({ timeOrigin: performance.timeOrigin, url: location.href }));
+  await native.cdp.call("Page.reload");
+  // Page.reload acknowledges the request before navigation completes. An old
+  // document's installed control surface must not satisfy the readiness check.
+  const current = await until(() => native.renderer.run((previous) => {
+    if (
+      performance.timeOrigin === previous.timeOrigin || location.href !== previous.url ||
+      document.readyState !== "complete" || !window.__PI_DESKTOP__ || !window.piDesktop ||
+      !document.querySelector(".app-shell") ||
+      document.querySelector(".app-shell.app-shell-boot, .app-shell.is-booting, .startup-splash")
+    ) return false;
+    return { timeOrigin: performance.timeOrigin, url: location.href };
+  }, previous), `${label} new document ready`, 15000);
+  await selectSession(id);
+  check(`${label} selected in a new renderer document`, { sessionId: id, previous, current });
 }
 async function submit(content) {
   await native.renderer.click('.composer-input[contenteditable="true"]');
@@ -367,13 +389,7 @@ try {
         permissionMode: "auto",
       })
     ).session;
-    await native.cdp.call("Page.reload");
-    await native.renderer.until(
-      () => Boolean(window.__PI_DESKTOP__ && !document.querySelector(".startup-splash")),
-      null,
-      "created Goal loaded",
-    );
-    await selectSession(goal.id);
+    await reloadSession(goal.id, "created Goal");
     await submit("CLOSEOUT_PENDING_GOAL: ask a bounded recovery question.");
     await approveGoalAuto({
       sessionId: goal.id,
@@ -475,9 +491,7 @@ try {
     const reports = (await ipc("goalReportList", { sessionId: goal.id })).reports;
     assert.equal(reports[0].executionStatus, "interrupted");
     assert.equal(reports[0].status, "pending");
-    await native.cdp.call("Page.reload");
-    await native.renderer.until(() => Boolean(window.__PI_DESKTOP__), null, "reload ready");
-    await selectSession(goal.id);
+    await reloadSession(goal.id, "pending Goal reload");
     await native.renderer.until(
       () => Boolean(document.querySelector(".asktool-card .badge")),
       null,
@@ -577,6 +591,30 @@ try {
 } catch (error) {
   failure = error;
   console.error(error.stack);
+  try {
+    const renderer = await native.renderer.run(() => ({
+      timeOrigin: performance.timeOrigin,
+      url: location.href,
+      readyState: document.readyState,
+      controlInstalled: Boolean(window.__PI_DESKTOP__),
+      shell: document.querySelector(".app-shell")?.className,
+      splash: Boolean(document.querySelector(".startup-splash")),
+      visiblePanes: [...document.querySelectorAll('.session-pane[data-visible="true"]')]
+        .map(node => node.getAttribute("data-session-pane")),
+      activeRows: [...document.querySelectorAll("[data-sidebar-session-row].active")]
+        .map(node => node.getAttribute("data-sidebar-session-row")),
+      askCards: [...document.querySelectorAll(".asktool-card")].map(node => node.innerText),
+    }));
+    // Capture the unmodified renderer before reading durable state; do not
+    // refresh inputs or reselect a session to make a failed recovery pass.
+    writeFileSync(join(runRoot, "failure-navigation.json"), JSON.stringify({
+      renderer,
+      durableAsks: readDb("SELECT key, json_extract(value_json,'$.status') AS status FROM kv WHERE ns='team-lead-ask-v1'"),
+    }, null, 2));
+    await screenshot("failure-navigation");
+  } catch (diagnosticError) {
+    console.error(`Failure navigation diagnostics: ${diagnosticError.stack}`);
+  }
 } finally {
   try {
     await stop();
@@ -631,13 +669,7 @@ async function budgetJourney() {
     { id: lead.id, providerId: provider.id },
   );
   assert.equal(configured.ok, true, JSON.stringify(configured));
-  await native.cdp.call("Page.reload");
-  await native.renderer.until(
-    () => Boolean(window.__PI_DESKTOP__ && !document.querySelector(".startup-splash")),
-    null,
-    "budget session loaded",
-  );
-  await selectSession(lead.id);
+  await reloadSession(lead.id, "budget session");
   await native.renderer.run(() => {
     window.__closeoutEvents = [];
     window.piDesktop.on(window.piDesktop.channels.event.agentMessage, (event) =>
@@ -656,11 +688,27 @@ async function budgetJourney() {
   check("WP8 native settings persist through real Host CAS", { policy: settings.expertTeam.runLimits });
   await selectSession(lead.id);
   await openTeamPanel();
-  await native.renderer.until(
-    () => Boolean(document.querySelector('[data-testid="team-launch-review-confirm-btn"]:not(:disabled)')),
+  const launchControl = await native.renderer.until(
+    async () => {
+      const button = document.querySelector('[data-testid="team-launch-review-confirm-btn"]:not(:disabled)');
+      const panel = button?.closest(".work-panel");
+      if (!button || !panel || panel.getAnimations().some(animation => animation.pending || animation.playState === "running")) return false;
+      button.scrollIntoView({ block: "nearest" });
+      // The panel animates its flex-basis without an `is-entering` class.
+      // Observe painted geometry after scroll before the single trusted click.
+      await new Promise(requestAnimationFrame);
+      const before = button.getBoundingClientRect();
+      await new Promise(requestAnimationFrame);
+      const after = button.getBoundingClientRect();
+      if (["x", "y", "width", "height"].some(key => Math.abs(before[key] - after[key]) > 0.5)) return false;
+      const x = after.x + after.width / 2, y = after.y + after.height / 2;
+      if (!button.contains(document.elementFromPoint(x, y))) return false;
+      return { x, y, width: after.width, height: after.height };
+    },
     null,
     "budget roster confirm",
   );
+  check("WP8 launch control is painted and stable before native confirmation", { launchControl });
   await native.renderer.click('[data-testid="team-launch-review-confirm-btn"]');
   const expert = await until(async () => {
     const members = (await ipc("teamGetRoster", { teamSessionId: lead.id })).members;
