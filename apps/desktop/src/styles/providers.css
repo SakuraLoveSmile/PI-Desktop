@@ -931,8 +931,13 @@
 }
 
 .project-memory-dialog {
+  display: flex;
+  flex-direction: column;
   width: min(100%, 760px);
+  max-height: calc(100dvh - 48px);
 }
+.project-memory-dialog-body { display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow-y: auto; }
+.project-memory-dialog > .dialog-actions, .project-memory-dialog > .project-instructions-dialog-head { flex: 0 0 auto; }
 
 .project-auto-memory-toggle {
   display: flex;
@@ -978,11 +983,11 @@
 
 .project-memory-dialog-list {
   display: flex;
-  max-height: min(46vh, 420px);
+  max-height: none;
   min-height: 120px;
   flex-direction: column;
-  gap: 10px;
-  overflow-y: auto;
+  gap: 6px;
+  overflow: visible;
   padding: 2px;
 }
 
@@ -1358,3 +1363,7 @@
 .provider-endpoint-guidance > span {
   flex: 1 1 260px;
 }
+
+.oauth-dialog { display: flex; flex-direction: column; max-height: calc(100dvh - 48px); }
+.oauth-body { min-height: 0; overflow-y: auto; display: grid; gap: 16px; }
+.oauth-dialog > .dialog-actions, .oauth-dialog > h2 { flex: 0 0 auto; }

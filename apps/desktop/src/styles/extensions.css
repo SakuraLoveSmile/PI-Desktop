@@ -1561,3 +1561,11 @@
     transition: none;
   }
 }
+
+.ext-sheet-head, .ext-sheet-actions { flex: 0 0 auto; }
+@media (max-width: 720px) {
+  .ext-sheet-overlay { padding: 16px; }
+  .ext-sheet { max-height: calc(100dvh - 32px); }
+  .ext-sheet-head, .ext-sheet-body, .ext-sheet-actions { padding-left: 16px; padding-right: 16px; }
+  .ext-sheet-actions { flex-wrap: wrap; }
+}

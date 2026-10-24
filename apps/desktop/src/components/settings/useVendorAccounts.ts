@@ -79,6 +79,7 @@ export function useVendorAccounts() {
   const [login, setLogin] = useState<ActiveLogin | null>(null);
   const [busyAccountId, setBusyAccountId] = useState<string | null>(null);
   const [savingAccount, setSavingAccount] = useState(false);
+  const [accountSaveError, setAccountSaveError] = useState("");
 
   const loadVendors = useCallback(async () => {
     try {
@@ -208,6 +209,8 @@ export function useVendorAccounts() {
   ): Promise<boolean> => {
     if (!form.name.trim() || !form.modelId.trim()) return false;
     setSavingAccount(true);
+    setAccountSaveError("");
+    let accountPersisted = false;
     try {
       await api.updateProvider({
         id: provider.id,
@@ -216,17 +219,26 @@ export function useVendorAccounts() {
         models: form.models,
         headers: form.headers,
       });
+      accountPersisted = true;
       if (settings?.defaultProviderId === provider.id) {
         await api.setSettings({
           ...settings,
           defaultModelId: form.modelId.trim(),
         });
       }
-      await Promise.all([loadVendors(), refreshProviders()]);
+      try {
+        await Promise.all([loadVendors(), refreshProviders()]);
+      } catch (error) {
+        showToast(t("settings.modelSavedRefreshFailed", { error: error instanceof Error ? error.message : String(error) }), { variant: "error" });
+        return true;
+      }
       showToast(t("settings.vendorAccountUpdated"), { variant: "success" });
       return true;
     } catch (error) {
-      showToast(error instanceof Error ? error.message : String(error), {
+      const detail = error instanceof Error ? error.message : String(error);
+      const message = accountPersisted ? t("settings.modelSavedFollowupFailed", { error: detail }) : detail;
+      setAccountSaveError(message);
+      showToast(message, {
         variant: "error",
       });
       return false;
@@ -241,6 +253,8 @@ export function useVendorAccounts() {
     login,
     busyAccountId,
     savingAccount,
+    accountSaveError,
+    clearAccountSaveError: () => setAccountSaveError(""),
     startLogin,
     finishLogin,
     closeLogin,

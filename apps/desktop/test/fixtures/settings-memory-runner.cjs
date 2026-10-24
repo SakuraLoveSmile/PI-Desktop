@@ -201,7 +201,12 @@ app.whenReady().then(async () => {
     })()`);
     await type('.settings-search', 'memory');
     await tagNav();
-    await check('rail search finds Memory', `document.querySelectorAll('.settings-nav-item').length === 1 && document.querySelector('.settings-nav-label').textContent === 'Memory'`);
+    await check('rail search finds Memory and its settings without unrelated destinations', `(() => {
+      const results = [...document.querySelectorAll('.settings-nav-item')];
+      return results.some(result => result.querySelector('.settings-nav-label')?.textContent === 'Memory') &&
+        results.every(result => result.querySelector('.settings-nav-label')?.textContent === 'Memory' ||
+          result.querySelector('.settings-search-result-context')?.textContent === 'Memory');
+    })()`);
     await click(nav('Memory'));
     await until(`window.settingsMemoryFixture.tab() === 'memory' && document.querySelectorAll('.settings-content button[aria-label^="Project memory ·"]').length === 3`);
     await check('host project groups and legacy folders are listed once, including paths', `
@@ -292,8 +297,8 @@ app.whenReady().then(async () => {
     await click(nav('Instructions'));
     await evaluate('window.settingsMemoryFixture.empty(true)');
     await click(nav('Memory'));
-    await until(`document.querySelector('.settings-content .settings-row button')?.textContent === 'Projects'`);
-    await click('.settings-content .settings-row button');
+    await until(`document.querySelector('.settings-content .settings-empty-action button')?.textContent === 'Projects'`);
+    await click('.settings-content .settings-empty-action button');
     await until(`window.settingsMemoryFixture.tab() === 'projects' && !!document.querySelector('.projects-toolbar')`);
     await check('empty Memory leads to the existing Projects archive', `document.querySelector('.settings-nav-item.active .settings-nav-label').textContent === 'Projects'`);
     if (rendererErrors.length) throw new Error(`Renderer errors: ${rendererErrors.join('\n')}`);

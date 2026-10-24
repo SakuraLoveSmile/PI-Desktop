@@ -4,7 +4,7 @@ import type { ProjectGroupRecord } from "@pi-desktop/shared";
 import { ErrorCodes } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
 import { api } from "../lib/api";
-import { Button, TooltipButton, SegmentedControl, cx } from "../components/ui";
+import { Button, Input, TooltipButton, SegmentedControl, cx } from "../components/ui";
 import {
   IconArchive,
   IconArchiveRestore,
@@ -45,6 +45,7 @@ import {
 } from "../lib/project-archive";
 import { ProjectArchiveIndex, projectRowId } from "../features/projects/ProjectArchiveIndex";
 import { ProjectDetailPanel } from "../features/projects/ProjectDetailPanel";
+import { SettingsEmptyState, SettingsWorkbenchHeader } from "../features/settings/primitives";
 
 export function ProjectsPage() {
   const { t, i18n } = useTranslation();
@@ -74,6 +75,8 @@ export function ProjectsPage() {
   // The host listing is the slow half of the index; until it settles an empty
   // index means "not loaded yet" rather than "no projects".
   const [loadingProjects, setLoadingProjects] = useState(true);
+  const [projectsFailed, setProjectsFailed] = useState(false);
+  const [projectListRevision, setProjectListRevision] = useState(0);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortMode>("recent");
   // The row whose card is open. Closed until the user asks for one.
@@ -115,13 +118,16 @@ export function ProjectsPage() {
 
   useEffect(() => {
     let canceled = false;
+    setLoadingProjects(true);
+    setProjectsFailed(false);
     void api
       .listProjectGroups()
       .then(({ groups }) => {
         if (!canceled) setDurableProjects(groups);
       })
       .catch(() => {
-        // Session-derived entries below keep the index useful if host listing fails.
+        // Keep prior host data and session-derived entries while offering recovery.
+        if (!canceled) setProjectsFailed(true);
       })
       .finally(() => {
         if (!canceled) setLoadingProjects(false);
@@ -129,7 +135,7 @@ export function ProjectsPage() {
     return () => {
       canceled = true;
     };
-  }, [sessions]);
+  }, [sessions, projectListRevision]);
 
   const items = useMemo(
     () =>
@@ -385,101 +391,90 @@ export function ProjectsPage() {
 
   return (
     <div className="settings-stack">
-      <div className="projects-toolbar">
-        <SegmentedControl
-          value={sort}
-          onChange={(mode) => setSort(mode)}
-          options={[
-            { value: "recent", label: t("project.sortRecent") },
-            { value: "name", label: t("project.sortName") },
-          ]}
-          label={t("project.sortBy")}
-          role="group"
-          className="projects-sort"
-          itemClassName="projects-sort-btn"
-        />
-        <div className="projects-search-wrap">
-          <IconSearch size={14} aria-hidden="true" />
-          <input
-            ref={searchRef}
-            className="projects-search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape" && query) {
-                e.preventDefault();
-                setQuery("");
-              }
-            }}
-            placeholder={t("project.searchPlaceholder")}
-            aria-label={t("project.searchPlaceholder")}
-            spellCheck={false}
-            autoCorrect="off"
-            autoCapitalize="off"
+      <SettingsWorkbenchHeader actions={
+        <Button variant="primary" onClick={addProject}>
+          <IconPlus size={14} />
+          {t("project.add")}
+        </Button>
+      }>
+        <div className="projects-toolbar">
+          <SegmentedControl
+            value={sort}
+            onChange={(mode) => setSort(mode)}
+            options={[
+              { value: "recent", label: t("project.sortRecent") },
+              { value: "name", label: t("project.sortName") },
+            ]}
+            label={t("project.sortBy")}
+            role="group"
+            className="projects-sort"
+            itemClassName="projects-sort-btn"
           />
-          {searching ? (
-            <TooltipButton
-              type="button"
-              className="projects-search-clear"
-              tooltip={t("project.clearSearch")}
-              ariaLabel={t("project.clearSearch")}
-              onClick={() => {
-                setQuery("");
-                searchRef.current?.focus();
+          <div className="projects-search-wrap">
+            <IconSearch size={14} aria-hidden="true" />
+            <Input
+              ref={searchRef}
+              className="projects-search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape" && query) {
+                  e.preventDefault();
+                  setQuery("");
+                }
               }}
-            >
-              <IconX size={12} />
-            </TooltipButton>
+              placeholder={t("project.searchPlaceholder")}
+              aria-label={t("project.searchPlaceholder")}
+              spellCheck={false}
+              autoCorrect="off"
+              autoCapitalize="off"
+            />
+            {searching ? (
+              <TooltipButton
+                type="button"
+                className="projects-search-clear"
+                tooltip={t("project.clearSearch")}
+                ariaLabel={t("project.clearSearch")}
+                onClick={() => {
+                  setQuery("");
+                  searchRef.current?.focus();
+                }}
+              >
+                <IconX size={12} />
+              </TooltipButton>
+            ) : null}
+          </div>
+          {searching ? (
+            <span className="projects-result-count" aria-live="polite">
+              {t("project.resultCount", {
+                count: filtered.length,
+                total: items.length,
+              })}
+            </span>
           ) : null}
         </div>
-        {searching ? (
-          <span className="projects-result-count" aria-live="polite">
-            {t("project.resultCount", {
-              count: filtered.length,
-              total: items.length,
-            })}
-          </span>
-        ) : null}
-        <div className="projects-toolbar-actions">
-          <Button variant="primary" onClick={addProject}>
-            <IconPlus size={14} />
-            {t("project.add")}
-          </Button>
+      </SettingsWorkbenchHeader>
+      {projectsFailed ? (
+        <div className="projects-load-error" role="alert">
+          <SettingsEmptyState
+            message={t("project.loadFailed")}
+            hint={items.length > 0 ? t("project.loadFailedRetained") : undefined}
+            action={<Button variant="secondary" onClick={() => setProjectListRevision((value) => value + 1)}>{t("errors.action.retry")}</Button>}
+          />
         </div>
-      </div>
+      ) : null}
 
       {groups.length === 0 ? (
-        <div className="settings-panel projects-empty">
-          <span className="projects-empty-icon" aria-hidden>
-            {items.length === 0 && loadingProjects ? (
-              <span className="route-pending-indicator" />
-            ) : (
-              <IconArchive size={18} />
-            )}
-          </span>
-          <div className="projects-empty-title">
-            {items.length === 0 && loadingProjects
+        projectsFailed && items.length === 0 ? null :
+        <div className="projects-empty">
+          <SettingsEmptyState
+            icon={items.length === 0 && loadingProjects ? <span className="route-pending-indicator" /> : <IconArchive size={18} />}
+            message={items.length === 0 && loadingProjects
               ? t("common.loading")
-              : items.length === 0
-                ? t("project.noProjects")
-                : t("project.noSearchResults")}
-          </div>
-          {/* A pending host listing must not silence the hint for the one
-              case that still has rows to talk about: a query that matched
-              nothing. */}
-          {items.length === 0 ? null : (
-            <div className="projects-empty-body">{t("project.noSearchResultsBody")}</div>
-          )}
-          {items.length === 0 && loadingProjects ? null : items.length === 0 ? (
-            <Button variant="primary" onClick={addProject}>
-              <IconPlus size={14} />
-              {t("project.add")}
-            </Button>
-          ) : (
-            <Button variant="secondary" onClick={() => setQuery("")}>
-              {t("project.clearSearch")}
-            </Button>
-          )}
+              : items.length === 0 ? t("project.noProjects") : t("project.noSearchResults")}
+            hint={items.length > 0 ? t("project.noSearchResultsBody") : undefined}
+            action={items.length > 0 ? <Button variant="secondary" onClick={() => setQuery("")}>{t("project.clearSearch")}</Button> : undefined}
+          />
         </div>
       ) : (
         <div className="projects-workbench" tabIndex={0} onKeyDown={onIndexKeyDown}>

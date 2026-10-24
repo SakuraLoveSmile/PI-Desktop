@@ -9,7 +9,7 @@
  * The picker is the shared ModelPinMenu, so Settings offers one kind of model
  * picker, and the reasoning row reuses the shared settings menu select.
  */
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   THINKING_LEVELS,
@@ -41,7 +41,9 @@ export function EnhancementModelCard() {
   const providers = useAppStore((state) => state.providers);
   const providerModels = useAppStore((state) => state.providerModels);
   const settings = useAppStore((state) => state.settings);
-  const showToast = useAppStore((state) => state.showToast);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
 
   const choices = useMemo(() => subagentModelChoices(providers), [providers]);
   const groups = useMemo(() => groupSubagentModelChoices(choices), [choices]);
@@ -113,14 +115,19 @@ export function EnhancementModelCard() {
   if (!settings) return null;
 
   const save = async (patch: Partial<AppSettings>) => {
-    const next = { ...settings, ...patch };
+    setSaving(true);
+    setSaveError(null);
+    setSaved(false);
     try {
-      await api.setSettings(next);
-      useAppStore.setState({ settings: next });
+      await api.setSettings(patch);
+      useAppStore.setState((state) => ({ settings: { ...(state.settings ?? settings), ...patch } }));
+      setSaved(true);
+      return true;
     } catch (error) {
-      showToast(error instanceof Error ? error.message : String(error), {
-        variant: "error",
-      });
+      setSaveError(error instanceof Error ? error.message : String(error));
+      return false;
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -135,7 +142,7 @@ export function EnhancementModelCard() {
         )
       : null;
     const stored = settings.promptEnhancementThinkingLevel ?? "off";
-    await save({
+    return save({
       ...enhancementPinPatch(providerId, modelId),
       promptEnhancementThinkingLevel: nextProvider
         ? canonicalThinkingLevel(thinkingLevelForProvider(nextProvider, stored))
@@ -182,6 +189,7 @@ export function EnhancementModelCard() {
             pinnedModelId={pinnedModelId}
             clearLabel={t("settings.promptEnhancementModelFollow")}
             disabled={groups.length === 0 && !orphanPin}
+            busy={saving}
             onPick={pickModel}
           />
         </SettingsRow>
@@ -193,7 +201,7 @@ export function EnhancementModelCard() {
           <SettingsMenuSelect
             label={t("settings.promptEnhancementThinking")}
             value={reasoning}
-            disabled={noReasoning}
+            disabled={saving || noReasoning}
             options={levelOptions.map((level) => ({
               id: level,
               label: level === "off" ? t("settings.promptEnhancementThinkingOff") : level,
@@ -211,6 +219,8 @@ export function EnhancementModelCard() {
             }
           />
         </SettingsRow>
+        {saveError ? <div className="settings-inline-error" role="alert">{saveError}</div> : null}
+        {saving || saved ? <div className="settings-inline-status" role="status">{t(saving ? "common.saving" : "settings.preferenceSaved")}</div> : null}
     </>
   );
 }

@@ -1,13 +1,6 @@
 /**
- * Probe outcomes as toasts.
- *
- * The line that used to sit under the key is gone: a settled probe — connected,
- * completed from the catalog, or refused — is the result of asking the
- * endpoint, so it is announced once and then gets out of the way instead of
- * holding a row of the dialog open for as long as the answer stands. Nothing
- * transient is announced: asking, waiting for a key, and the cache-first paint
- * say nothing about the service yet, and a toast for each of them would turn
- * typing into a stream of notices.
+ * Announce each settled probe once. Idle, in-flight and cache-only answers do
+ * not toast; persistent discovery failures are also shown by the model pane.
  */
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";

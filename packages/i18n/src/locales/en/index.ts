@@ -940,6 +940,54 @@ export const en = {
     dismiss: "Dismiss",
   },
   settings: {
+    "capabilitySaveFailed": "Could not save. Your draft is preserved. {{message}}",
+
+    "categories": "Settings categories",
+    "executionDefaults": "Execution",
+    "conversationDisplay": "Conversation and display",
+    "activeSessionOverrideState": "Uses a session override",
+    "activeSessionInheritState": "Inherits the default permission",
+    "applicationSupport": "Application and support",
+    "technicalDetails": "Technical details",
+    "protocolVersion": "Protocol {{version}}",
+    "hostVersion": "Host {{version}}",
+    "softwareUpdates": "Software updates",
+    "saveState": {
+      "saving": "Saving…",
+      "saved": "Settings saved",
+      "failed": "Could not save. Your previous settings are unchanged.",
+      "refreshFailed": "Settings saved, but the current view could not refresh."
+    },
+    "shortcutSearch": "Search actions or keys",
+    "shortcutFilter": "Shortcut filter",
+    "shortcutFilterAll": "All",
+    "shortcutFilterModified": "Modified",
+    "shortcutCount": "{{count}} shortcuts",
+    "shortcutNoMatches": "No shortcuts match these filters.",
+    "shortcutClearFilters": "Clear filters",
+    "shortcutRecordingCancel": "Press Escape to cancel recording.",
+    "preferenceSaved": "Saved",
+    "promptEnhancementDefaultTemplateActive": "Using the built-in template",
+    "closeBehaviorLoadError": "Could not load the close behavior. Retry to change it.",
+    "modelsWorkbenchHint": "Choose default models, manage AI services and accounts, and maintain the model catalog.",
+    "configureServices": "Configure services",
+    "modelSavedRefreshFailed": "Saved, but the service list could not refresh: {{error}}",
+    "modelSavedFollowupFailed": "The service was saved, but its default model could not be updated: {{error}}",
+    "instructionsLoadFailed": "Could not load instructions: {{message}}",
+    "instructionsSaveFailed": "Could not save instructions: {{message}}",
+    "instructionsUnsaved": "Unsaved changes",
+    "instructionsSaved": "Instructions saved",
+    "mcpIntro": "Manage the servers available to your agents, globally or for a project.",
+    "subagentsIntro": "Manage agent definitions, then adjust their runtime limits below.",
+    "importSessionsScanDesc": "Find local conversations from other tools. Review and select conversations before importing.",
+    "pluginScenic": {
+      "backdropBlur": "Backdrop blur",
+      "appliesTo": "Applies to {{theme}}",
+      "applying": "Applying…",
+      "apply": "Apply",
+      "saved": "Backdrop blur saved."
+    },
+
     storage: {
       unavailableHint: "The storage directory is currently unavailable. Reconnect the drive before starting; the app will not create empty data or switch to another directory.",
       browserSource: "Browser data source",
@@ -985,6 +1033,10 @@ export const en = {
       operationError: "Could not start the storage operation. {{error}}",
     },
     expertTeam: {
+      "projectOverrides": "Project overrides",
+      "selectProject": "Select project override",
+      "removedProject": "Removed project",
+
       runLimits: {
         title: "Team run limits", enabled: "Enable wall-clock limits", soft: "Wrap-up after (hours)", hard: "Pause after (hours)",
         description: "Defaults: wrap up after 6 hours, pause after 10 hours. Pauses and restarts keep the current run clock. A new admitted user task starts a new run. At the hard limit, the current tool batch finishes safely; background processes are left running. Extend or disable the limit, then resume the paused run.",
@@ -1163,6 +1215,9 @@ sklm: {
       voice: "Voice",
     },
     memory: {
+      "search": "Search project names or paths",
+      "resultCount": "{{count}} of {{total}} projects",
+
       title: "Memory",
       description:
         "Manage saved memories and automatic recording by project. Projects in the same group share memory; other projects stay separate.",
@@ -1311,6 +1366,10 @@ sklm: {
     skillBatchImported: "Imported {{count}} skill folders",
     skillBatchFailed: "Failed to import {{count}} folders. First: {{first}}",
     skillsEmpty: "No skills in this folder",
+    skillsIntro: "Save reusable workflows for your agents.",
+    skillsGlobalEmptyHint: "Create a skill or import one from a file or folder.",
+    skillsProjectEmptyHint: "Add a project in Projects to manage its skills here.",
+    skillsManageProjects: "Manage projects",
     subagentsEmpty: "No subagents of your own yet",
     subagentRuntimeLimits: "Delegation limits",
     subagentRuntimeLimitsDesc: "Single agents and team experts can delegate independent tasks within these limits. Changes apply to the next task run.",
@@ -1350,6 +1409,8 @@ sklm: {
       turnedOff: "Local control endpoint is off",
     },
     mcpMarket: {
+      "remotePartial": "Some registry sources are unavailable ({{names}})",
+
       browse: "Market",
       back: "My servers",
       title: "MCP Market",
@@ -1427,6 +1488,8 @@ sklm: {
     import: "Import",
     projectArchive: "Project archive",
     remoteHosts: {
+      "retry": "Retry",
+
       title: "Remote hosts",
       listError: "Failed to load hosts",
       loading: "Loading…",
@@ -1470,6 +1533,8 @@ sklm: {
       experimental: "Experimental",
     },
     configSync: {
+      "retry": "Retry",
+
       title: "Cloud sync",
       experimental: "Experimental",
       connectionTitle: "WebDAV cloud sync",
@@ -1690,6 +1755,7 @@ sklm: {
     marketCustomUrlPlaceholder: "https://example.com/catalog.json",
     search: "Search settings",
     searchPlaceholder: "Search settings…",
+    searchResults: "Search results ({{count}})",
     noResults: "No matching settings",
     enterToSend: "Enter to send",
     enterToSendDesc: "Off: press ⌘/Ctrl+Enter to send.",
@@ -2054,6 +2120,9 @@ sklm: {
     promptEnhancementSaveError: "Couldn't save the prompt-enhancement settings.",
   },
   project: {
+    "loadFailed": "Could not load the project list",
+    "loadFailedRetained": "Available projects are shown below. Retry to load the complete list.",
+
     open: "Open project",
     openFolder: "Open folder",
     none: "No project",
@@ -2669,6 +2738,9 @@ sklm: {
     loadDev: "Load local plugin",
     loadDevDone: "Local plugin loaded",
     piSkillsTitle: "Skills from pi CLI",
+    piSkillsSummary: "Reuse skill packages already installed with pi CLI.",
+    piSkillsDiscoveryFailed: "Could not read local packages. Try refreshing.",
+    piSkillsDiscoveryPartial: "Some locations could not be read. Available packages can still be used.",
     piSkillsHint: "Installed npm packages are discovered read-only. Import only packages you trust; manage imported packages in Plugins.",
     piSkillsConfirm: "Import and enable this pi package?",
     piSkillsExecutable: "This package includes executable extensions. Importing enables trusted code in the agent runtime and may install dependencies.",

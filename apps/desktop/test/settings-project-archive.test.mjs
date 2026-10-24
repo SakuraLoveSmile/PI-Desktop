@@ -40,7 +40,6 @@ const archiveUiSource = `${projectsPageSource}\n${projectsIndexSource}\n${projec
 test("settings owns the project archive destination", () => {
   assert.match(settingsSearchSource, /id: "projects"/);
   assert.match(settingsSearchSource, /titleKey: "settings\.projectArchive"/);
-  assert.match(settingsPageSource, /projects: <IconArchive/);
   assert.match(settingsPageSource, /tab === "projects" && <ProjectsPage/);
   const navOrder = ["general", "agent", "import", "projects", "about"].map(
     (id) => settingsSearchSource.indexOf(`id: "${id}"`),

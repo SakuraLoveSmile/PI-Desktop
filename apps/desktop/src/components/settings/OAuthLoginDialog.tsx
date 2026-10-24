@@ -157,7 +157,8 @@ export function OAuthLoginDialog({
           {vendor.loginLabel || t("settings.vendorSignInTo", { vendor: vendor.name })}
         </h3>
 
-        {error ? <div className="oauth-error">{error}</div> : null}
+        <div className="oauth-body">
+        {error ? <div className="oauth-error" role="alert">{error}</div> : null}
 
         <div className="oauth-status">{status}</div>
 
@@ -272,6 +273,7 @@ export function OAuthLoginDialog({
           </div>
         ) : null}
 
+        </div>
         <div className="provider-dialog-actions">
           <Button variant="ghost" disabled={closing} onClick={() => void cancel()}>
             {t("settings.cancel")}

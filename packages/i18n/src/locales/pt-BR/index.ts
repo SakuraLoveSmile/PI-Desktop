@@ -729,6 +729,54 @@ export const ptBR = {
     dismiss: "Dispensar"
   },
   settings: {
+    "capabilitySaveFailed": "Não foi possível salvar. Seu rascunho foi preservado. {{message}}",
+
+    "categories": "Categorias de configurações",
+    "executionDefaults": "Execução",
+    "conversationDisplay": "Conversa e exibição",
+    "activeSessionOverrideState": "Usa uma permissão específica da sessão",
+    "activeSessionInheritState": "Herda a permissão padrão",
+    "applicationSupport": "Aplicativo e suporte",
+    "technicalDetails": "Detalhes técnicos",
+    "protocolVersion": "Protocolo {{version}}",
+    "hostVersion": "Host {{version}}",
+    "softwareUpdates": "Atualizações de software",
+    "saveState": {
+      "saving": "Salvando…",
+      "saved": "Configurações salvas",
+      "failed": "Não foi possível salvar. Suas configurações anteriores foram mantidas.",
+      "refreshFailed": "As configurações foram salvas, mas não foi possível atualizar a visualização atual."
+    },
+    "shortcutSearch": "Buscar ações ou teclas",
+    "shortcutFilter": "Filtro de atalhos",
+    "shortcutFilterAll": "Todos",
+    "shortcutFilterModified": "Modificados",
+    "shortcutCount": "{{count}} atalhos",
+    "shortcutNoMatches": "Nenhum atalho corresponde a estes filtros.",
+    "shortcutClearFilters": "Limpar filtros",
+    "shortcutRecordingCancel": "Pressione Escape para cancelar a gravação.",
+    "preferenceSaved": "Salvo",
+    "promptEnhancementDefaultTemplateActive": "Usando o modelo de prompt integrado",
+    "closeBehaviorLoadError": "Não foi possível carregar o comportamento ao fechar. Tente novamente para alterá-lo.",
+    "modelsWorkbenchHint": "Escolha os modelos padrão, gerencie serviços e contas de IA e mantenha o catálogo de modelos.",
+    "configureServices": "Configurar serviços",
+    "modelSavedRefreshFailed": "Salvo, mas não foi possível atualizar a lista de serviços: {{error}}",
+    "modelSavedFollowupFailed": "O serviço foi salvo, mas não foi possível atualizar seu modelo padrão: {{error}}",
+    "instructionsLoadFailed": "Não foi possível carregar as instruções: {{message}}",
+    "instructionsSaveFailed": "Não foi possível salvar as instruções: {{message}}",
+    "instructionsUnsaved": "Alterações não salvas",
+    "instructionsSaved": "Instruções salvas",
+    "mcpIntro": "Gerencie os servidores disponíveis para seus agentes, globalmente ou em um projeto.",
+    "subagentsIntro": "Gerencie as definições de agentes e ajuste seus limites de execução abaixo.",
+    "importSessionsScanDesc": "Encontre conversas locais de outras ferramentas. Revise e selecione as conversas antes de importar.",
+    "pluginScenic": {
+      "backdropBlur": "Desfoque do fundo",
+      "appliesTo": "Aplica-se a {{theme}}",
+      "applying": "Aplicando…",
+      "apply": "Aplicar",
+      "saved": "Desfoque do fundo salvo."
+    },
+
     storage: {
       unavailableHint: "O diretório de armazenamento está indisponível no momento. Reconecte a unidade antes de iniciar; o aplicativo não criará dados vazios nem mudará para outro diretório.",
       browserSource: "Origem dos dados do navegador",
@@ -774,6 +822,10 @@ export const ptBR = {
       operationError: "Não foi possível iniciar a operação de armazenamento. {{error}}",
     },
     expertTeam: {
+      "projectOverrides": "Substituições do projeto",
+      "selectProject": "Selecionar substituição do projeto",
+      "removedProject": "Projeto removido",
+
       runLimits: en.settings.expertTeam.runLimits,
       title: "Equipe de especialistas",
       description: "Configure modelo, nível de raciocínio, subconjunto de ferramentas e instruções adicionais para os seis especialistas integrados. As alterações afetam somente especialistas iniciados depois. O modelo do Composer também vale para o Líder e especialistas sem modelo fixado. Restrições opcionais de ferramentas apenas reduzem a disponibilidade; nunca concedem permissões.",
@@ -914,6 +966,9 @@ export const ptBR = {
       voice: "Voz"
     },
     memory: {
+      "search": "Buscar nomes ou caminhos de projetos",
+      "resultCount": "{{count}} de {{total}} projetos",
+
       title: "Memória",
       description:
         "Gerencie as memórias salvas e o registro automático por projeto. Projetos do mesmo grupo compartilham memórias; os demais permanecem separados.",
@@ -1058,6 +1113,10 @@ export const ptBR = {
     skillBatchImported: "{{count}} pastas de skills importadas",
     skillBatchFailed: "Falha ao importar {{count}} pastas. Primeiro erro: {{first}}",
     skillsEmpty: "Nenhuma habilidade nesta pasta",
+    skillsIntro: "Salve fluxos de trabalho reutilizáveis para seus agentes.",
+    skillsGlobalEmptyHint: "Crie uma habilidade ou importe de um arquivo ou pasta.",
+    skillsProjectEmptyHint: "Adicione um projeto em Projetos para gerenciar suas habilidades aqui.",
+    skillsManageProjects: "Gerenciar projetos",
     subagentsEmpty: "Nenhum subagente próprio ainda",
     subagentRuntimeLimits: "Limites de delegação",
     subagentRuntimeLimitsDesc: "Agentes individuais e especialistas da equipe podem delegar tarefas independentes dentro destes limites. As alterações valem a partir da próxima execução.",
@@ -1095,6 +1154,8 @@ export const ptBR = {
       turnedOff: "O endpoint de controle local está desativado",
     },
     mcpMarket: {
+      "remotePartial": "Algumas fontes de registro estão indisponíveis ({{names}})",
+
       browse: "Mercado",
       back: "Meus servidores",
       title: "Mercado MCP",
@@ -1170,6 +1231,8 @@ export const ptBR = {
     import: "Importar",
     projectArchive: "Arquivo de projeto",
     remoteHosts: {
+      "retry": "Tentar novamente",
+
       title: "Hosts remotos",
       listError: "Falha ao carregar hosts",
       loading: "Carregando…",
@@ -1213,6 +1276,8 @@ export const ptBR = {
       experimental: "Experimental"
     },
     configSync: {
+      "retry": "Tentar novamente",
+
       title: "Sincronização na nuvem",
       experimental: "Experimental",
       connectionTitle: "Sincronização na nuvem via WebDAV",
@@ -1414,6 +1479,7 @@ export const ptBR = {
     marketCustomUrlPlaceholder: "https://example.com/catalog.json",
     search: "Configuração de pesquisa",
     searchPlaceholder: "Configuração de pesquisa…",
+    searchResults: "Resultados da busca ({{count}})",
     noResults: "Nenhum resultado encontrado",
     enterToSend: "Enter para enviar",
     enterToSendDesc: "Desativado: pressione ⌘/Ctrl+Enter para enviar.",
@@ -1762,6 +1828,9 @@ export const ptBR = {
     promptEnhancementSaveError: "Não foi possível salvar as configurações de aprimoramento de prompt."
   },
   project: {
+    "loadFailed": "Não foi possível carregar a lista de projetos",
+    "loadFailedRetained": "Os projetos disponíveis são exibidos abaixo. Tente novamente para carregar a lista completa.",
+
     open: "Abrir projeto",
     openFolder: "Abrir pasta",
     none: "Sem projeto",
@@ -2280,6 +2349,9 @@ export const ptBR = {
     loadDev: "Carregar plugin local",
     loadDevDone: "Plugin local carregado",
     piSkillsTitle: "Habilidades do pi CLI",
+    piSkillsSummary: "Reutilize pacotes de habilidades já instalados com pi CLI.",
+    piSkillsDiscoveryFailed: "Não foi possível ler os pacotes locais. Tente atualizar.",
+    piSkillsDiscoveryPartial: "Não foi possível ler alguns locais. Os pacotes disponíveis continuam utilizáveis.",
     piSkillsHint: "Os pacotes npm instalados são detectados sem alterações. Importe apenas pacotes confiáveis e gerencie os pacotes importados em Plugins.",
     piSkillsConfirm: "Importar e ativar este pacote pi?",
     piSkillsExecutable: "Este pacote inclui extensões executáveis. A importação ativa código confiável no ambiente de execução do agente e pode instalar dependências.",

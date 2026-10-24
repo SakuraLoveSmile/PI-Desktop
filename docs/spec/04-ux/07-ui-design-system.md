@@ -1307,6 +1307,16 @@ instead of the native `Select` (`<select>`) component. Native `Select`
 is reserved for non-Settings contexts where OS-level rendering is acceptable.
 
 
+### 11.13 Settings management layout
+
+`SettingsWorkbenchHeader` from `features/settings/primitives.tsx` accepts optional
+`description`, `actions` and filter/search `children`. It groups management actions
+above filtering and leaves the destination heading to SettingsPage. Use one
+primary creation action. `SettingsEmptyState` accepts `message`, optional `hint`,
+`icon` and `action`; its compact status layout replaces large empty-page heroes.
+Settings stacks own a single 24px section gap; SettingsCard contributes no outer
+margin. Editors scroll their body while keeping title and actions reachable.
+
 ## 12. State patterns
 
 ### 12.1 Interactive states

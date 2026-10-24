@@ -1051,6 +1051,34 @@
       "scenarioIds": [
         "E2E-TEAM-lead-pseudo-tool-call-retried-once"
       ]
+    },
+    {
+      "id": "agent-capabilities",
+      "family": "settings-storage",
+      "script": "scripts/e2e-agent-capabilities.mjs",
+      "tier": "nightly",
+      "safety": "Production renderer components with explicit in-memory preload fixtures and an isolated Electron profile; unknown IPC fails. No real accounts, provider calls, user data or marketplace writes."
+    },
+    {
+      "id": "settings-extensions",
+      "family": "settings-storage",
+      "script": "scripts/e2e-settings-extensions.mjs",
+      "tier": "nightly",
+      "safety": "Production renderer components with explicit in-memory preload fixtures and an isolated Electron profile; unknown IPC fails. No real accounts, provider calls, user data or marketplace writes."
+    },
+    {
+      "id": "settings-models-usability",
+      "family": "settings-storage",
+      "script": "scripts/e2e-settings-models-usability.mjs",
+      "tier": "nightly",
+      "safety": "Production renderer components with explicit in-memory preload fixtures and an isolated Electron profile; unknown IPC fails. No real accounts, provider calls, user data or marketplace writes."
+    },
+    {
+      "id": "settings-workspace",
+      "family": "settings-storage",
+      "script": "scripts/e2e-settings-workspace.mjs",
+      "tier": "nightly",
+      "safety": "Production renderer components with explicit in-memory preload fixtures and an isolated Electron profile; unknown IPC fails. No real accounts, provider calls, user data or marketplace writes."
     }
   ]
 }

@@ -932,6 +932,54 @@ export const zhCN = {
     dismiss: "关闭",
   },
   settings: {
+    "capabilitySaveFailed": "保存失败，已保留草稿。{{message}}",
+
+    "categories": "设置分类",
+    "executionDefaults": "执行方式",
+    "conversationDisplay": "对话与显示",
+    "activeSessionOverrideState": "使用当前会话的权限设置",
+    "activeSessionInheritState": "继承默认权限",
+    "applicationSupport": "应用与支持",
+    "technicalDetails": "技术详情",
+    "protocolVersion": "协议 {{version}}",
+    "hostVersion": "Host {{version}}",
+    "softwareUpdates": "软件更新",
+    "saveState": {
+      "saving": "正在保存…",
+      "saved": "设置已保存",
+      "failed": "保存失败，仍使用之前的设置。",
+      "refreshFailed": "设置已保存，但当前界面刷新失败。"
+    },
+    "shortcutSearch": "搜索动作或按键",
+    "shortcutFilter": "快捷键筛选",
+    "shortcutFilterAll": "全部",
+    "shortcutFilterModified": "已修改",
+    "shortcutCount": "{{count}} 个快捷键",
+    "shortcutNoMatches": "没有符合筛选条件的快捷键。",
+    "shortcutClearFilters": "清除筛选",
+    "shortcutRecordingCancel": "按 Escape 取消录制。",
+    "preferenceSaved": "已保存",
+    "promptEnhancementDefaultTemplateActive": "使用内置提示词模板",
+    "closeBehaviorLoadError": "无法读取关闭窗口的行为，请重试后修改。",
+    "instructionsLoadFailed": "无法读取指令：{{message}}",
+    "instructionsSaveFailed": "无法保存指令：{{message}}",
+    "instructionsUnsaved": "有未保存的修改",
+    "instructionsSaved": "指令已保存",
+    "mcpIntro": "管理智能体可用的全局和项目服务器。",
+    "subagentsIntro": "管理子智能体定义，并在列表下方调整运行限制。",
+    "pluginScenic": {
+      "backdropBlur": "背景模糊",
+      "appliesTo": "应用于 {{theme}}",
+      "applying": "应用中…",
+      "apply": "应用",
+      "saved": "背景模糊已保存。"
+    },
+    "modelsWorkbenchHint": "选择默认模型，管理 AI 服务和账户，并维护模型目录。",
+    "configureServices": "配置服务",
+    "modelSavedRefreshFailed": "已保存，但服务列表刷新失败：{{error}}",
+    "modelSavedFollowupFailed": "服务已保存，但默认模型更新失败：{{error}}",
+    "importSessionsScanDesc": "查找其他工具的本地对话，导入前可查看并选择需要的对话。",
+
     storage: {
       unavailableHint: "保存目录暂时不可用。请重新连接磁盘后启动；应用不会创建空白数据或切换到其他目录。",
       browserSource: "浏览器数据来源",
@@ -977,6 +1025,10 @@ export const zhCN = {
       operationError: "无法启动存储操作。{{error}}",
     },
     expertTeam: {
+      "projectOverrides": "项目覆盖",
+      "selectProject": "选择项目覆盖",
+      "removedProject": "已移除项目",
+
       runLimits: {
         title: "团队运行上限", enabled: "启用墙钟上限", soft: "提醒收尾时间（小时）", hard: "暂停时间（小时）",
         description: "默认 6 小时提醒收尾、10 小时暂停。暂停和重启保留当前运行时钟；实际获准开始的新用户任务开启新周期。硬上限等待当前工具批次安全结束，不主动停止后台进程。超限后先延长或关闭限制，再恢复暂停的运行。",
@@ -1149,6 +1201,9 @@ sklm: {
       voice: "语音",
     },
     memory: {
+      "search": "搜索项目名称或路径",
+      "resultCount": "{{count}} / {{total}} 个项目",
+
       title: "记忆",
       description:
         "按项目管理已保存的记忆与自动记录。项目组内共享记忆，其他项目互不影响。",
@@ -1157,6 +1212,8 @@ sklm: {
       loadFailed: "项目列表加载失败，请重试。",
     },
     configSync: {
+      "retry": "重试",
+
       title: "云同步",
       experimental: "实验性",
       connectionTitle: "WebDAV 云同步",
@@ -1443,6 +1500,10 @@ sklm: {
     skillBatchImported: "已导入 {{count}} 个技能文件夹",
     skillBatchFailed: "{{count}} 个文件夹导入失败。首个错误：{{first}}",
     skillsEmpty: "此目录中没有技能",
+    skillsIntro: "保存常用工作方法，供智能体按需使用。",
+    skillsGlobalEmptyHint: "新建技能，或从文件、文件夹导入。",
+    skillsProjectEmptyHint: "先在项目设置中添加项目，再管理项目专用技能。",
+    skillsManageProjects: "管理项目",
     subagentsEmpty: "还没有你自己的子智能体",
     subagentRuntimeLimits: "任务委派限制",
     subagentRuntimeLimitsDesc: "单智能体和专家团成员都可以在限制内拆分并委派独立任务。修改从下一次任务运行起生效。",
@@ -1480,6 +1541,8 @@ sklm: {
       turnedOff: "本机控制接口已关闭",
     },
     mcpMarket: {
+      "remotePartial": "部分注册源暂不可用（{{names}}）",
+
       browse: "市场",
       back: "我的服务",
       title: "MCP 市场",
@@ -1556,6 +1619,8 @@ sklm: {
     import: "导入",
     projectArchive: "项目归档",
     remoteHosts: {
+      "retry": "重试",
+
       title: "远程主机",
       listError: "加载失败",
       loading: "加载中…",
@@ -1657,6 +1722,7 @@ sklm: {
     marketCustomUrlPlaceholder: "https://example.com/catalog.json",
     search: "搜索设置",
     searchPlaceholder: "搜索设置…",
+    searchResults: "搜索结果（{{count}}）",
     noResults: "没有匹配的设置项",
     enterToSend: "回车发送",
     enterToSendDesc: "关闭后按 ⌘/Ctrl+Enter 发送。",
@@ -2015,6 +2081,9 @@ sklm: {
     promptEnhancementSaveError: "无法保存提示词增强设置。",
   },
   project: {
+    "loadFailed": "无法读取项目列表",
+    "loadFailedRetained": "下方保留了当前可用的项目，重试以读取完整列表。",
+
     open: "打开项目",
     openFolder: "打开文件夹",
     none: "无项目",
@@ -2612,6 +2681,9 @@ sklm: {
     loadDev: "加载本地插件",
     loadDevDone: "本地插件已加载",
     piSkillsTitle: "pi CLI 技能",
+    piSkillsSummary: "复用已通过 pi CLI 安装的本地技能包。",
+    piSkillsDiscoveryFailed: "无法读取本地技能包，请尝试刷新。",
+    piSkillsDiscoveryPartial: "部分位置无法读取，已发现的技能包仍可使用。",
     piSkillsHint: "只读发现已安装的 npm 包。请仅导入可信来源；导入后在插件页管理。",
     piSkillsConfirm: "导入并启用这个 pi 包？",
     piSkillsExecutable: "此包包含可执行扩展。导入会在 Agent 中启用可信代码，并可能安装依赖。",

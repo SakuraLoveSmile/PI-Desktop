@@ -243,6 +243,7 @@ export function McpEditorSheet({
   setDraft,
   editing,
   saving,
+  saveError,
   status,
   testing,
   projects,
@@ -258,6 +259,7 @@ export function McpEditorSheet({
   /** The record being edited, or null when creating: the id is immutable once saved. */
   editing: McpServerRecord | null;
   saving: boolean;
+  saveError?: string | null;
   status?: McpServerStatus;
   testing: boolean;
   projects: readonly ProjectRecord[];
@@ -569,6 +571,7 @@ export function McpEditorSheet({
         </div>
 
         {errorKey && !pristine ? <p className="ext-sheet-error">{t(errorKey)}</p> : null}
+        {saveError ? <p className="ext-sheet-error" role="alert">{saveError}</p> : null}
         <div className="ext-sheet-actions">
           {editing ? (
             <Button variant="ghost" disabled={testing} onClick={onTest}>

@@ -37,14 +37,11 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  /*
-    Wide enough for two model panes side by side, and a fixed height so the
-    dialog never grows with the number of models: the panes scroll, not the page.
-  */
+  /* Two model columns on wide windows; only the dialog body scrolls. */
   width: min(1040px, calc(100vw - 48px));
   max-width: 100%;
   min-width: 0;
-  height: min(720px, calc(100vh - 64px));
+  max-height: min(760px, calc(100dvh - 48px));
   padding: 16px;
 }
 
@@ -56,10 +53,7 @@
   flex: none;
 }
 
-/*
-  The dialog's actions sit in the header rather than a footer bar. Cancel is
-  first so the corner-most control is Save's neighbour, not Save itself.
-*/
+/* Advanced and connection actions stay beside the title; saving uses the footer. */
 .provider-setup-head-actions {
   display: flex;
   align-items: center;
@@ -83,8 +77,7 @@
   gap: 12px;
   min-height: 0;
   /*
-    Kept scrollable for very short windows, but in the normal case the two
-    panes below own the scrolling and this container does not move.
+    Model lists grow naturally inside this scrollable body.
     overflow-y: auto computes overflow-x to auto, which would clip the 2px
     field focus ring and let a wide min-content row scroll sideways. The
     2px padding keeps the ring inside the padding box.
@@ -559,7 +552,7 @@
 
 /* Pick on the left, review on the right; both stretch to the same height. */
 .provider-setup-panes {
-  flex: 1;
+  flex: 0 0 auto;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
@@ -1279,7 +1272,7 @@
   width: min(1040px, calc(100vw - 48px));
   max-width: 100%;
   min-width: 0;
-  height: min(720px, calc(100vh - 64px));
+  max-height: min(760px, calc(100dvh - 48px));
   padding: 16px;
 }
 
@@ -1780,10 +1773,7 @@
     max-height: min(760px, calc(100vh - 64px));
   }
 
-  .provider-models-list,
-  .provider-chosen-list {
-    max-height: min(240px, 30vh);
-  }
+
 }
 
 @media (max-width: 720px) {
@@ -1800,7 +1790,7 @@
   }
 
   .provider-setup-head-actions {
-    width: 100%;
+    max-width: 100%;
     justify-content: flex-end;
   }
 
@@ -1867,3 +1857,23 @@
 @media (prefers-reduced-motion: reduce) {
   .model-provider-row { transition: none; }
 }
+
+/* Editing actions stay reachable while connection and model fields scroll. */
+.provider-setup-actions { display: flex; flex-wrap: wrap; flex: 0 0 auto; justify-content: flex-end; gap: 8px; padding: 8px 0 0; }
+.provider-setup-head { flex: 0 0 auto; }
+.provider-connection-feedback, .provider-setup-error, .provider-models-error { margin: 0; font-size: var(--text-sm); overflow-wrap: anywhere; }
+.provider-setup-error, .provider-models-error, .provider-connection-feedback.is-error { color: var(--ds-danger); }
+.provider-models-error { padding: 10px 12px; }
+@media (max-width: 720px) {
+  .provider-setup-panes { grid-template-columns: minmax(0, 1fr); }
+  .provider-setup-field-row, .provider-setup-custom-identity-row, .provider-setup-custom-auth-row { grid-template-columns: minmax(0, 1fr); }
+
+  .provider-setup-head { flex-wrap: wrap; gap: 12px; }
+  .provider-setup-head-actions { flex-wrap: wrap; }
+}
+
+.provider-setup-actions > .provider-setup-error, .vendor-account-actions > .provider-setup-error { flex-basis: 100%; }
+
+.provider-models-list, .provider-chosen-list { flex: 0 0 auto; max-height: none; overflow: visible; }
+.vendor-account-head, .vendor-account-actions { flex: 0 0 auto; flex-wrap: wrap; }
+.model-config-page { gap: 24px; }

@@ -26,7 +26,7 @@ import {
   IconListChecks,
   IconX,
 } from "../icons";
-import { Input, TooltipButton, cx } from "../ui";
+import { Button, Input, TooltipButton, cx } from "../ui";
 import { LatestWinsGate } from "../../lib/latest-wins";
 import {
   classifySkillMarketFailure,
@@ -154,6 +154,7 @@ export function SkillMarketPanel({
   const { t } = useTranslation();
   const showToast = useAppStore((state) => state.showToast);
   const [search, setSearch] = useState("");
+  const [retry, setRetry] = useState(0);
   const [category, setCategory] = useState<"all" | SkillCatalogCategory>("all");
   const [page, setPage] = useState(1);
   const [jump, setJump] = useState("");
@@ -254,7 +255,7 @@ export function SkillMarketPanel({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [search, sources]);
+  }, [search, sources, retry]);
 
   const sourceName = (id?: string) =>
     id
@@ -662,6 +663,9 @@ export function SkillMarketPanel({
         </div>
       </div>
 
+      {remote.status === "error" ? (
+        <Button size="sm" variant="secondary" onClick={() => setRetry((value) => value + 1)}>{t("errors.action.retry")}</Button>
+      ) : null}
       {remote.status === "loading" ? (
         <p className="sklm-status" role="status">
           {t("settings.sklm.remoteLoading")}

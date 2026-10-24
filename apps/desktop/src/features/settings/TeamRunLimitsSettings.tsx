@@ -3,9 +3,9 @@ import { useTranslation } from "react-i18next";
 import { DEFAULT_TEAM_RUN_LIMITS, validateTeamRunLimits } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
 import { useAppStore } from "../../stores/app-store";
-import { Button, Field, Input, SettingsToggle } from "../../components/ui";
-import { CapabilityGroupHeader, CapabilityPanel } from "../../components/settings/AgentCapabilityLayout";
+import { Button, Input, SettingsToggle } from "../../components/ui";
 import { ExpertTeamSettingsConflict, persistTeamRunLimits } from "./expert-team-settings";
+import { SettingsCard, SettingsRow } from "./primitives";
 
 const HOUR = 60 * 60 * 1000;
 export function TeamRunLimitsSettings() {
@@ -36,20 +36,21 @@ export function TeamRunLimitsSettings() {
       if (current.current) setError(t(cause instanceof ExpertTeamSettingsConflict ? "settings.expertTeam.conflict" : "settings.expertTeam.saveFailed"));
     } finally { if (current.current) setBusy(false); }
   };
-  return <CapabilityPanel loading={false} loadingLabel={t("common.loading")}>
-    <CapabilityGroupHeader label={t("settings.expertTeam.runLimits.title")} count={2} />
-    <div className="expert-team-role-editor">
-      <Field label={t("settings.expertTeam.runLimits.enabled")}><SettingsToggle checked={enabled} onChange={() => setEnabled(!enabled)} disabled={busy} label={t("settings.expertTeam.runLimits.enabled")} /></Field>
-      <p>{t("settings.expertTeam.runLimits.description")}</p>
-      <Field label={t("settings.expertTeam.runLimits.soft")}>
+  return <SettingsCard
+    title={t("settings.expertTeam.runLimits.title")}
+    description={t("settings.expertTeam.runLimits.description")}
+  >
+      <SettingsRow title={t("settings.expertTeam.runLimits.enabled")}>
+        <SettingsToggle checked={enabled} onChange={() => setEnabled(!enabled)} disabled={busy} label={t("settings.expertTeam.runLimits.enabled")} />
+      </SettingsRow>
+      <SettingsRow title={t("settings.expertTeam.runLimits.soft")}>
         <Input type="number" value={soft} min="0" step="any" disabled={busy} aria-label={t("settings.expertTeam.runLimits.soft")} onChange={(event) => setSoft(event.target.value)} />
-      </Field>
-      <Field label={t("settings.expertTeam.runLimits.hard")}>
+      </SettingsRow>
+      <SettingsRow title={t("settings.expertTeam.runLimits.hard")}>
         <Input type="number" value={hard} min="0" step="any" disabled={busy} aria-label={t("settings.expertTeam.runLimits.hard")} onChange={(event) => setHard(event.target.value)} />
-      </Field>
-      {!valid && <p role="alert">{t("settings.expertTeam.runLimits.invalid")}</p>}
-      {error && <p role="alert">{error}</p>}
+      </SettingsRow>
+      {!valid && <p className="settings-inline-error" role="alert">{t("settings.expertTeam.runLimits.invalid")}</p>}
+      {error && <p className="settings-inline-error" role="alert">{error}</p>}
       <div className="expert-team-editor-actions"><Button disabled={busy || !valid} onClick={() => void save()}>{t(busy ? "settings.expertTeam.saving" : "settings.expertTeam.save")}</Button></div>
-    </div>
-  </CapabilityPanel>;
+  </SettingsCard>;
 }

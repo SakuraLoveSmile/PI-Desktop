@@ -36,6 +36,7 @@ export function ExpertTeamSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [scope, setScope] = useState(EXPERT_TEAM_USER_SCOPE);
+  const [lastProjectScope, setLastProjectScope] = useState("");
   const [editing, setEditing] = useState<ExpertTeamPresetId | null>(null);
   const [saving, setSaving] = useState(false);
   const [reload, setReload] = useState(0);
@@ -59,6 +60,7 @@ export function ExpertTeamSettingsPage() {
 
   const changeScope = (next: string) => {
     setScope(next);
+    if (next) setLastProjectScope(next);
     setEditing(null);
     setScopeError(null);
   };
@@ -87,24 +89,32 @@ export function ExpertTeamSettingsPage() {
       <AgentCapabilityPage toolbar={
         <div className="agent-capability-toolbar expert-team-toolbar">
           <SegmentedControl
-            value={scope}
-            onChange={changeScope}
+            value={scope ? "project" : "user"}
+            onChange={(mode) => changeScope(mode === "user" ? EXPERT_TEAM_USER_SCOPE
+              : [lastProjectScope, activeProjectPath, projects[0]?.path, missingProjects[0]].find((path) => path && (projects.some((project) => project.path === path) || missingProjects.includes(path))) ?? EXPERT_TEAM_USER_SCOPE)}
             label={t("settings.expertTeam.projectScope")}
             role="tablist"
             className="expert-team-scope-tabs agent-capability-segment"
             itemClassName="agent-capability-segment-btn"
             disabled={saving}
             options={[
-              { value: EXPERT_TEAM_USER_SCOPE, id: "expert-team-scope-user", label: t("settings.expertTeam.userScope"), controls: "expert-team-roles" },
-              ...projects.map((project, index) => ({ value: project.path, id: `expert-team-scope-project-${index}`,
-                label: <span title={project.path}>{project.name}{project.path === activeProjectPath
-                  ? <span className="expert-team-current-project"> · {t("settings.expertTeam.currentProject")}</span> : null}</span>,
-                controls: "expert-team-roles" })),
-              ...missingProjects.map((path, index) => ({ value: path, id: `expert-team-scope-missing-${index}`, label: <span title={path}>
-                {path.split(/[/\\]/).at(-1)} <span aria-hidden>⚠</span>
-              </span>, controls: "expert-team-roles" })),
+              { value: "user", id: "expert-team-scope-user", label: t("settings.expertTeam.userScope"), controls: "expert-team-roles" },
+              { value: "project", id: "expert-team-scope-project", label: t("settings.expertTeam.projectOverrides"), controls: "expert-team-roles" },
             ]}
           />
+          {scope ? <SettingsMenuSelect
+            label={t("settings.expertTeam.selectProject")}
+            value={scope}
+            disabled={saving || loading}
+            className="expert-team-project-picker"
+            options={[
+              ...projects.map((project) => ({ id: project.path,
+                label: `${project.name}${project.path === activeProjectPath ? ` · ${t("settings.expertTeam.currentProject")}` : ""}` })),
+              ...missingProjects.map((path) => ({ id: path,
+                label: `${path.split(/[/\\]/).at(-1)} · ${t("settings.expertTeam.removedProject")}` })),
+            ]}
+            onChange={changeScope}
+          /> : null}
           <HelpIcon label={t("settings.expertTeam.description")} />
         </div>
       }>
@@ -118,7 +128,6 @@ export function ExpertTeamSettingsPage() {
           <Button size="sm" variant="secondary" disabled={saving} onClick={() => void removeUnavailableScope()}>{t("settings.expertTeam.removeProjectOverrides")}</Button>
         </div> : null}
         {scopeError ? <p className="expert-team-error" role="alert">{scopeError}</p> : null}
-        {!scope && <TeamRunLimitsSettings />}
         <div id="expert-team-roles" role="tabpanel" aria-label={t("settings.expertTeam.builtinTitle")}>
           <CapabilityPanel loading={false} loadingLabel={t("common.loading")}>
             <CapabilityGroupHeader
@@ -137,9 +146,9 @@ export function ExpertTeamSettingsPage() {
                   glyph={<IconBot size={16} />}
                   name={name}
                   description={t(`settings.expertTeam.roles.${role}.description`)}
-                  badges={Object.keys(effective).length ? <span className="agent-capability-badge">
+                  badges={<span className="agent-capability-badge">
                     {t(saved ? "settings.expertTeam.pinned" : "settings.expertTeam.inherited")}
-                  </span> : undefined}
+                  </span>}
                   meta={effective.modelId ? <code>{effective.modelId}</code> : undefined}
                   actions={<TooltipButton
                     className="settings-icon-button"
@@ -159,6 +168,7 @@ export function ExpertTeamSettingsPage() {
             })}
           </CapabilityPanel>
         </div>
+        {!scope && <TeamRunLimitsSettings />}
       </AgentCapabilityPage>
     </div>
   );

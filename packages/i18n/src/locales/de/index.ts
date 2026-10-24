@@ -731,6 +731,54 @@ export const de = {
     "dismiss": "Verwerfen"
   },
   "settings": {
+    "capabilitySaveFailed": "Speichern fehlgeschlagen. Ihr Entwurf bleibt erhalten. {{message}}",
+
+    "categories": "Einstellungskategorien",
+    "executionDefaults": "Ausführung",
+    "conversationDisplay": "Unterhaltung und Anzeige",
+    "activeSessionOverrideState": "Verwendet eine sitzungsspezifische Berechtigung",
+    "activeSessionInheritState": "Übernimmt die Standardberechtigung",
+    "applicationSupport": "Anwendung und Support",
+    "technicalDetails": "Technische Details",
+    "protocolVersion": "Protokoll {{version}}",
+    "hostVersion": "Host {{version}}",
+    "softwareUpdates": "Softwareupdates",
+    "saveState": {
+      "saving": "Wird gespeichert…",
+      "saved": "Einstellungen gespeichert",
+      "failed": "Speichern fehlgeschlagen. Die bisherigen Einstellungen bleiben unverändert.",
+      "refreshFailed": "Einstellungen gespeichert, aber die aktuelle Ansicht konnte nicht aktualisiert werden."
+    },
+    "shortcutSearch": "Aktionen oder Tasten suchen",
+    "shortcutFilter": "Tastenkombinationen filtern",
+    "shortcutFilterAll": "Alle",
+    "shortcutFilterModified": "Geändert",
+    "shortcutCount": "{{count}} Tastenkombinationen",
+    "shortcutNoMatches": "Keine Tastenkombinationen entsprechen diesen Filtern.",
+    "shortcutClearFilters": "Filter zurücksetzen",
+    "shortcutRecordingCancel": "Escape drücken, um die Aufzeichnung abzubrechen.",
+    "preferenceSaved": "Gespeichert",
+    "promptEnhancementDefaultTemplateActive": "Integrierte Vorlage wird verwendet",
+    "closeBehaviorLoadError": "Das Verhalten beim Schließen konnte nicht geladen werden. Zum Ändern erneut versuchen.",
+    "modelsWorkbenchHint": "Standardmodelle auswählen, KI-Dienste und Konten verwalten und den Modellkatalog pflegen.",
+    "configureServices": "Dienste konfigurieren",
+    "modelSavedRefreshFailed": "Gespeichert, aber die Dienstliste konnte nicht aktualisiert werden: {{error}}",
+    "modelSavedFollowupFailed": "Der Dienst wurde gespeichert, aber sein Standardmodell konnte nicht aktualisiert werden: {{error}}",
+    "instructionsLoadFailed": "Anweisungen konnten nicht geladen werden: {{message}}",
+    "instructionsSaveFailed": "Anweisungen konnten nicht gespeichert werden: {{message}}",
+    "instructionsUnsaved": "Ungespeicherte Änderungen",
+    "instructionsSaved": "Anweisungen gespeichert",
+    "mcpIntro": "Die für Ihre Agenten verfügbaren Server global oder für ein Projekt verwalten.",
+    "subagentsIntro": "Agentendefinitionen verwalten und darunter ihre Laufzeitgrenzen anpassen.",
+    "importSessionsScanDesc": "Lokale Unterhaltungen aus anderen Tools suchen. Unterhaltungen vor dem Import prüfen und auswählen.",
+    "pluginScenic": {
+      "backdropBlur": "Hintergrundunschärfe",
+      "appliesTo": "Gilt für {{theme}}",
+      "applying": "Wird angewendet…",
+      "apply": "Anwenden",
+      "saved": "Hintergrundunschärfe gespeichert."
+    },
+
     storage: {
       unavailableHint: "Das Speicherverzeichnis ist derzeit nicht verfügbar. Verbinden Sie das Laufwerk vor dem Start erneut. Die App erstellt keine leeren Daten und wechselt nicht in ein anderes Verzeichnis.",
       browserSource: "Quelle der Browserdaten",
@@ -776,6 +824,10 @@ export const de = {
       operationError: "Der Speichervorgang konnte nicht gestartet werden. {{error}}",
     },
     expertTeam: {
+      "projectOverrides": "Projektüberschreibungen",
+      "selectProject": "Projektüberschreibung auswählen",
+      "removedProject": "Entferntes Projekt",
+
       runLimits: en.settings.expertTeam.runLimits,
       title: "Expertenteam",
       description: "Konfigurieren Sie Modell, Denkstufe, Werkzeugauswahl und zusätzliche Anweisungen für die sechs integrierten Experten. Änderungen gelten nur für neu gestartete Experten. Das Composer-Modell gilt auch für den Lead und Experten ohne festgelegtes Modell. Optionale Werkzeugeinschränkungen begrenzen nur die Verfügbarkeit und erteilen keine Berechtigungen.",
@@ -932,6 +984,9 @@ sklm: {
       "voice": "Sprache"
     },
     "memory": {
+      "search": "Projektnamen oder Pfade suchen",
+      "resultCount": "{{count}} von {{total}} Projekten",
+
       "title": "Erinnerungen",
       "description": "Gespeicherte Erinnerungen und automatische Aufzeichnung nach Projekt verwalten. Projekte derselben Gruppe teilen Erinnerungen; andere Projekte bleiben getrennt.",
       "projectsTitle": "Projekterinnerungen",
@@ -939,6 +994,8 @@ sklm: {
       "loadFailed": "Die Projektliste konnte nicht geladen werden. Bitte versuchen Sie es erneut."
     },
     "configSync": {
+      "retry": "Erneut versuchen",
+
       title: "Cloud sync",
       experimental: "Experimentell",
       connectionTitle: "WebDAV cloud sync",
@@ -1238,6 +1295,10 @@ sklm: {
     "skillBatchImported": "{{count}} Skill-Ordner importiert",
     "skillBatchFailed": "{{count}} Ordner konnten nicht importiert werden. Erster Fehler: {{first}}",
     "skillsEmpty": "Keine Fähigkeiten in diesem Ordner",
+    skillsIntro: "Speichere wiederverwendbare Abläufe für deine Agenten.",
+    skillsGlobalEmptyHint: "Erstelle einen Skill oder importiere eine Datei oder einen Ordner.",
+    skillsProjectEmptyHint: "Füge unter Projekte ein Projekt hinzu, um seine Skills hier zu verwalten.",
+    skillsManageProjects: "Projekte verwalten",
     "subagentsEmpty": "Noch keine eigenen Subagenten",
     subagentRuntimeLimits: "Delegationsgrenzen",
     subagentRuntimeLimitsDesc: "Einzelne Agenten und Teamexperten können innerhalb dieser Grenzen unabhängige Aufgaben delegieren. Änderungen gelten ab dem nächsten Aufgabenlauf.",
@@ -1255,6 +1316,8 @@ sklm: {
     "mcpSaved": "Gespeichert {{name}}",
     "mcpDuplicate": "Ein MCP-Server mit dieser ID oder diesem Namen ist auf dieser Ebene bereits vorhanden.",
     "mcpMarket": {
+      "remotePartial": "Einige Registrierungsquellen sind nicht verfügbar ({{names}})",
+
       browse: "Market",
       back: "Meine Server",
       title: "MCP-Markt",
@@ -1352,6 +1415,8 @@ sklm: {
     "import": "Importieren",
     "projectArchive": "Projektarchiv",
     "remoteHosts": {
+      "retry": "Erneut versuchen",
+
       "title": "Remote-Hosts",
       "listError": "Hosts konnten nicht geladen werden",
       "loading": "Wird geladen…",
@@ -1451,6 +1516,7 @@ sklm: {
     "marketCustomUrlPlaceholder": "https://example.com/catalog.json",
     "search": "Sucheinstellungen",
     "searchPlaceholder": "Sucheinstellungen…",
+    searchResults: "Suchergebnisse ({{count}})",
     "noResults": "Keine passenden Einstellungen",
     "enterToSend": "Zum Senden eingeben",
     "enterToSendDesc": "Aus: Zum Senden ⌘/Strg+Eingabe drücken.",
@@ -1809,6 +1875,9 @@ sklm: {
     "promptEnhancementSaveError": "Die Prompt-Verbesserungseinstellungen konnten nicht gespeichert werden.",
   },
   "project": {
+    "loadFailed": "Die Projektliste konnte nicht geladen werden",
+    "loadFailedRetained": "Verfügbare Projekte werden unten angezeigt. Erneut versuchen, um die vollständige Liste zu laden.",
+
     "open": "Projekt öffnen",
     "openFolder": "Ordner öffnen",
     "none": "Kein Projekt",
@@ -2331,6 +2400,9 @@ sklm: {
     "loadDev": "Lokales Plugin laden",
     "loadDevDone": "Lokales Plugin geladen",
     piSkillsTitle: "Skills aus pi CLI",
+    piSkillsSummary: "Bereits mit pi CLI installierte Skill-Pakete wiederverwenden.",
+    piSkillsDiscoveryFailed: "Lokale Pakete konnten nicht gelesen werden. Bitte aktualisiere die Liste.",
+    piSkillsDiscoveryPartial: "Einige Speicherorte konnten nicht gelesen werden. Verfügbare Pakete bleiben nutzbar.",
     piSkillsHint: "Installierte npm-Pakete werden nur gelesen. Importieren Sie nur vertrauenswürdige Pakete; verwalten Sie sie anschließend unter Plugins.",
     piSkillsConfirm: "Dieses pi-Paket importieren und aktivieren?",
     piSkillsExecutable: "Dieses Paket enthält ausführbare Erweiterungen. Der Import aktiviert vertrauenswürdigen Code im Agenten und installiert möglicherweise Abhängigkeiten.",

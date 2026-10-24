@@ -772,6 +772,54 @@ export const zhTW = {
     dismiss: "關閉",
   },
   settings: {
+    "capabilitySaveFailed": "儲存失敗，已保留草稿。{{message}}",
+
+    "categories": "設定分類",
+    "executionDefaults": "執行方式",
+    "conversationDisplay": "對話與顯示",
+    "activeSessionOverrideState": "使用目前工作階段的權限設定",
+    "activeSessionInheritState": "沿用預設權限",
+    "applicationSupport": "應用程式與支援",
+    "technicalDetails": "技術詳細資訊",
+    "protocolVersion": "通訊協定 {{version}}",
+    "hostVersion": "Host {{version}}",
+    "softwareUpdates": "軟體更新",
+    "saveState": {
+      "saving": "正在儲存…",
+      "saved": "設定已儲存",
+      "failed": "無法儲存，仍使用先前的設定。",
+      "refreshFailed": "設定已儲存，但目前畫面無法重新整理。"
+    },
+    "shortcutSearch": "搜尋動作或按鍵",
+    "shortcutFilter": "快捷鍵篩選",
+    "shortcutFilterAll": "全部",
+    "shortcutFilterModified": "已修改",
+    "shortcutCount": "{{count}} 個快捷鍵",
+    "shortcutNoMatches": "沒有符合篩選條件的快捷鍵。",
+    "shortcutClearFilters": "清除篩選",
+    "shortcutRecordingCancel": "按 Escape 取消錄製。",
+    "preferenceSaved": "已儲存",
+    "promptEnhancementDefaultTemplateActive": "使用內建提示詞範本",
+    "closeBehaviorLoadError": "無法讀取關閉視窗的行為，請重試後再修改。",
+    "modelsWorkbenchHint": "選擇預設模型、管理 AI 服務與帳戶，並維護模型目錄。",
+    "configureServices": "設定服務",
+    "modelSavedRefreshFailed": "已儲存，但服務清單無法重新整理：{{error}}",
+    "modelSavedFollowupFailed": "服務已儲存，但無法更新預設模型：{{error}}",
+    "instructionsLoadFailed": "無法讀取指令：{{message}}",
+    "instructionsSaveFailed": "無法儲存指令：{{message}}",
+    "instructionsUnsaved": "有尚未儲存的變更",
+    "instructionsSaved": "指令已儲存",
+    "mcpIntro": "管理智慧體可用的全域與專案伺服器。",
+    "subagentsIntro": "管理子智慧體定義，並在清單下方調整執行限制。",
+    "importSessionsScanDesc": "尋找其他工具的本機對話，匯入前可檢視並選擇需要的對話。",
+    "pluginScenic": {
+      "backdropBlur": "背景模糊",
+      "appliesTo": "套用至 {{theme}}",
+      "applying": "正在套用…",
+      "apply": "套用",
+      "saved": "背景模糊已儲存。"
+    },
+
     storage: {
       unavailableHint: "儲存目錄暫時無法使用。請重新連接磁碟後啟動；應用程式不會建立空白資料或切換到其他目錄。",
       browserSource: "瀏覽器資料來源",
@@ -817,6 +865,10 @@ export const zhTW = {
       operationError: "無法啟動儲存操作。{{error}}",
     },
     expertTeam: {
+      "projectOverrides": "專案覆寫",
+      "selectProject": "選擇專案覆寫",
+      "removedProject": "已移除的專案",
+
       runLimits: en.settings.expertTeam.runLimits,
       title: "專家團",
       loadFailed: "無法載入專家設定",
@@ -985,6 +1037,9 @@ sklm: {
       voice: "語音",
     },
     memory: {
+      "search": "搜尋專案名稱或路徑",
+      "resultCount": "{{count}} / {{total}} 個專案",
+
       title: "記憶",
       description:
         "依專案管理已儲存的記憶與自動記錄。同一專案群組會共用記憶，其他專案互不影響。",
@@ -993,6 +1048,8 @@ sklm: {
       loadFailed: "無法載入專案清單，請重試。",
     },
     configSync: {
+      "retry": "重試",
+
       title: "雲端同步",
       experimental: "實驗性",
       connectionTitle: "WebDAV 雲端同步",
@@ -1279,6 +1336,10 @@ sklm: {
     skillBatchImported: "已匯入 {{count}} 個技能資料夾",
     skillBatchFailed: "{{count}} 個資料夾匯入失敗。首個錯誤：{{first}}",
     skillsEmpty: "此目錄中沒有技能",
+    skillsIntro: "儲存常用工作方法，供智慧體按需使用。",
+    skillsGlobalEmptyHint: "新增技能，或從檔案、資料夾匯入。",
+    skillsProjectEmptyHint: "先在專案設定中新增專案，再管理專案專用技能。",
+    skillsManageProjects: "管理專案",
     subagentsEmpty: "還沒有你自己的子智慧體",
     subagentRuntimeLimits: "任務委派限制",
     subagentRuntimeLimitsDesc: "單智慧體和專家團成員都可以在限制內拆分並委派獨立任務。修改從下一次任務執行起生效。",
@@ -1316,6 +1377,8 @@ sklm: {
       turnedOff: "本機控制介面已關閉",
     },
     mcpMarket: {
+      "remotePartial": "部分登錄來源暫時無法使用（{{names}}）",
+
       browse: "市場",
       back: "我的服務",
       title: "MCP 市場",
@@ -1392,6 +1455,8 @@ sklm: {
     import: "匯入",
     projectArchive: "專案歸檔",
     remoteHosts: {
+      "retry": "重試",
+
       title: "遠端主機",
       listError: "載入失敗",
       loading: "載入中…",
@@ -1493,6 +1558,7 @@ sklm: {
     marketCustomUrlPlaceholder: "https://example.com/catalog.json",
     search: "搜尋設定",
     searchPlaceholder: "搜尋設定…",
+    searchResults: "搜尋結果（{{count}}）",
     noResults: "沒有匹配的設定項",
     enterToSend: "回車傳送",
     enterToSendDesc: "關閉後按 ⌘/Ctrl+Enter 傳送。",
@@ -1851,6 +1917,9 @@ sklm: {
     promptEnhancementSaveError: "無法儲存提示詞增強設定。",
   },
   project: {
+    "loadFailed": "無法讀取專案清單",
+    "loadFailedRetained": "下方保留了目前可用的專案，請重試以讀取完整清單。",
+
     open: "開啟專案",
     openFolder: "開啟資料夾",
     none: "無專案",
@@ -2401,6 +2470,9 @@ sklm: {
     loadDev: "載入本地外掛",
     loadDevDone: "本地外掛已載入",
     piSkillsTitle: "pi CLI 技能",
+    piSkillsSummary: "重用已透過 pi CLI 安裝的本機技能套件。",
+    piSkillsDiscoveryFailed: "無法讀取本機技能套件，請嘗試重新整理。",
+    piSkillsDiscoveryPartial: "部分位置無法讀取，已找到的技能套件仍可使用。",
     piSkillsHint: "唯讀探索已安裝的 npm 套件。請僅匯入可信來源；匯入後在外掛頁管理。",
     piSkillsConfirm: "匯入並啟用此 pi 套件？",
     piSkillsExecutable: "此套件包含可執行擴充功能。匯入會在 Agent 中啟用可信程式碼，並可能安裝相依套件。",

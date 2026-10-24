@@ -29,7 +29,7 @@ import {
   IconTerminal,
   IconX,
 } from "../icons";
-import { Field, Input, TooltipButton, cx } from "../ui";
+import { Button, Field, Input, TooltipButton, cx } from "../ui";
 
 const CATEGORIES: readonly McpCatalogCategory[] = [
   "devtools",
@@ -108,6 +108,7 @@ export function McpMarketPanel({
   const { t } = useTranslation();
   const showToast = useAppStore((state) => state.showToast);
   const [search, setSearch] = useState("");
+  const [retry, setRetry] = useState(0);
   const [category, setCategory] = useState<"all" | McpCatalogCategory>("all");
   const [page, setPage] = useState(1);
   const [jump, setJump] = useState("");
@@ -180,7 +181,7 @@ export function McpMarketPanel({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [search, sources]);
+  }, [search, sources, retry]);
   const loadMore = async () => {
     if (remote.loadingMore) return;
     const generation = requestGeneration.current;
@@ -584,6 +585,9 @@ export function McpMarketPanel({
         ))}
       </div>
 
+      {remote.status === "error" ? (
+        <Button size="sm" variant="secondary" onClick={() => setRetry((value) => value + 1)}>{t("errors.action.retry")}</Button>
+      ) : null}
       {remote.status === "loading" ? (
         <p className="mcpm-status" role="status">
           {t("settings.mcpMarket.remoteLoading")}
@@ -596,6 +600,9 @@ export function McpMarketPanel({
         </p>
       ) : null}
 
+      {remote.status === "ready" && remote.failed.length > 0 ? (
+        <p className="mcpm-status" role="status">{t("settings.mcpMarket.remotePartial", { names: remote.failed.map((id) => sourceName(id) ?? id).join(", ") })}</p>
+      ) : null}
       <div className="mcpm-list" role="list">
         {paged.length === 0 ? (
           <p className="mcpm-empty">{t("settings.mcpMarket.empty")}</p>

@@ -151,6 +151,7 @@ export function SkillEditorSheet({
   setDraft,
   editing,
   saving,
+  saveError,
   level,
   projectName,
   onClose,
@@ -161,6 +162,7 @@ export function SkillEditorSheet({
   setDraft: (next: SkillDraft) => void;
   editing: UserSkillRecord | null;
   saving: boolean;
+  saveError?: string | null;
   level: AgentCapabilityLevel;
   projectName?: string;
   onClose: () => void;
@@ -301,6 +303,7 @@ export function SkillEditorSheet({
 </div>
 
         {errorKey && !pristine ? <p className="ext-sheet-error">{t(errorKey)}</p> : null}
+        {saveError ? <p className="ext-sheet-error" role="alert">{saveError}</p> : null}
         <div className="ext-sheet-actions">
           {editing && onReveal ? (
             <Button variant="ghost" onClick={onReveal}>

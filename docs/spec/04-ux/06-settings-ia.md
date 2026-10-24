@@ -16,7 +16,7 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   shows a compact loading/failure state with a retry action instead of an empty
   section.
 
-- Left settings rail only, **275px**, using the same `sidebar-surface` material
+- Above 720 CSS pixels, the persistent settings rail is **275px**, using the same `sidebar-surface` material
   as the main sidebar: native vibrancy with shared tint/sheen on macOS, opaque
   `--ds-bg-sidebar` on Windows/Linux, and shared optional background imagery.
   macOS settings-wrapper ancestry is transparent; the content pane and its
@@ -25,11 +25,28 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   translate. That entrance is opacity-only. Settings dialogs and sheets portal
   to a viewport-fixed `#pi-desktop-overlays` host on the document element and
   cover the full window, including the rail.
+- At 720 CSS pixels and below, a Settings categories button opens the same
+  directory in a modal overlay. Search receives focus, the background stays
+  inert, and selecting a destination closes the directory and locates the
+  requested row. Closing returns focus to the categories button. Escape first
+  clears a nonempty search; a subsequent Escape closes the directory without
+  reaching app-wide shortcuts. IME confirmation never navigates. Resizing back
+  to the desktop rail closes the overlay. Content uses 16px narrow gutters.
 - Returning to the app restores the prior sidebar collapsed/expanded state
   without a sidebar entrance animation or a width ramp. Real toggle and
   automatic collapse/restore transitions on the visible shell still animate;
   initial presentation and route restoration do not.
-- Top of rail: traffic-light clearance and the pill **Search settings…**
+- Top of rail: traffic-light clearance and the pill **Search settings…**.
+  Entering Settings focuses this field. A query shows matching settings by
+  their visible row/card title, with the owning category underneath, and a
+  localized result count. Selecting a result opens its category and scrolls to
+  and highlights that setting. Option labels and help copy resolve to their
+  owning row; dynamic lists and dialog-only fields fall back to the category.
+  Repeated keyword matches produce one result per destination/target.
+  The query stays available while inspecting results. Clear search or Escape
+  restores the full directory and focuses the field. Arrow keys move between
+  the field and results; Enter opens the first result from the field or the
+  focused result. IME composition must not trigger navigation or clearing.
 - The **Back to app** (`返回应用`) action is pinned to the foot of the rail, not
   the top: it keeps its chevron + label form as a 32px control, and it shares
   the horizontal band of the main shell's sidebar footer icon row (settings /
@@ -45,32 +62,39 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   Interactive controls remain explicitly non-draggable
 - A compact navigation directory with short, parallel labels and icons, in this
   exact order:
-  1. **General / 常规** — Lucide `SlidersHorizontal` (appearance)
-  2. **AI** — Lucide `Sparkles` (permissions, defaults, command shell)
-  3. **Shortcuts / 快捷键** — Lucide `Keyboard` (keyboard shortcuts)
-  4. **Instructions / 指令** — Lucide `FileText` (global and project instruction files)
-  5. **Models / 模型** — Lucide `Bot` (providers and default model)
-  6. **Skills / 技能** — Lucide `BookOpen` (reusable agent instructions)
-  7. **MCP** — Lucide `Server` (agent connections)
-  8. **Subagents / 子智能体** — Lucide `Bot` (built-in and personal parallel agents)
-  9. **Import / 导入** — Lucide `Download` (bring sessions and model configuration in from other tools)
-  10. **Projects / 项目** — Lucide `Archive` (durable project index)
-  11. **Memory / 记忆** — Lucide `BookOpen` (saved project memory and automatic recording)
-  12. **Cloud sync / 云同步** — Lucide `CloudDownload` (encrypted portable configuration backup and bidirectional sync; developer mode only)
-  13. **Remote Hosts / 远程主机** — Lucide `Globe` (SSH bootstrap and pairing inventory; developer mode only)
-  14. **Info / 信息** — Lucide `Info` (versions, logs, updates, developer)
+  1. **General / 常规** — appearance, runtime, network and storage
+  2. **AI** — permissions, execution and conversation defaults
+  3. **Live voice / 实时语音** — adapters and accounts
+  4. **Shortcuts / 快捷键** — keyboard bindings
+  5. **Instructions / 指令** — instruction files
+  6. **Models / 模型** — services, accounts and default models
+  7. **Skills / 技能** — reusable agent instructions
+  8. **MCP** — agent connections
+  9. **Subagents / 子智能体** — built-in and personal agents
+  10. **Expert team / 专家团** — role inheritance and project overrides
+  11. **Import / 导入** — conversations and configuration from other tools
+  12. **Projects / 项目** — durable project index
+  13. **Memory / 记忆** — saved notes and recording
+  14. **Cloud sync / 云同步** — encrypted configuration sync (development only)
+  15. **Remote hosts / 远程主机** — SSH and pairing (development only)
+  16. **Info / 信息** — application, support, updates and developer settings
   Icons are decorative (`aria-hidden` via the SVG default) and stay monochrome
   with the rail label; do not reuse refresh/rotate glyphs here.
 - The directory remains a flat searchable list in the same exact order. For
   scanability, the destinations are shown in four titled visual clusters:
-  `Preferences` / `偏好` (General, AI, Shortcuts), `Agent` / `智能体`
-  (Instructions, Models, Skills, MCP, Subagents), `Workspace` / `工作区`
+  `Preferences` / `偏好` (General, AI, Live voice, Shortcuts), `Agent` / `智能体`
+  (Instructions, Models, Skills, MCP, Subagents, Expert team), `Workspace` / `工作区`
   (Import, Projects, Memory), and `System` / `系统` (Cloud sync, Remote Hosts, Info;
   Cloud sync and Remote Hosts are developer-only). Headings are
   muted, non-interactive labels and use whitespace for separation; no divider
   lines are rendered. These are visual landmarks only, not a second navigation
   level.
   When search filters the directory, empty clusters and their headings disappear.
+  Built-in and extension results share the same count and empty state. A plugin
+  match must never appear alongside “No matching settings”. The current
+  destination has one visual selection and `aria-current="page"`; opening a
+  plugin removes the retained built-in category's selection. Search results
+  wrap long labels and keep their category context inside the rail.
 - **Memory / 记忆** is a regular Workspace destination available in every build
   and independent of developer mode. Its Settings card folds Host project rows
   by verified `memoryProject.id`, so a project's registered worktrees expose one
@@ -590,6 +614,16 @@ system while preserving their different data ownership:
   the primary action's tooltip names that destination so the choice is never
   implicit. Choosing Project without a selected project reports that instead
   of failing silently.
+- Skills places its short description and Market / New actions above the shared
+  filter/search toolbar. The project picker appears only when projects exist.
+  Global and project groups retain their paths, counts, and file/folder import
+  actions; empty groups use compact inline guidance rather than large blank
+  cards. At narrow widths, skill names wrap and row actions move below the
+  skill copy, remaining visible without hover. No-project guidance links to Projects; Project creation is disabled
+  until a project is available. All / Global creation still targets Global.
+  pi CLI discovery follows the skill list as an optional collapsed source;
+  expanding it starts discovery. A failed scan shows a readable summary and
+  expandable diagnostics, without also claiming the scan found no packages.
 - The MCP page carries one extra machine-local strip inside its single panel,
   above the Global group: a title with a **Local** badge (plus a *Controlled by
   a launch argument* badge when the launch environment overrides the saved
@@ -877,8 +911,8 @@ system while preserving their different data ownership:
    Subagents / 子智能体, Import / 导入, Projects / 项目, Cloud sync / 云同步,
    Remote Hosts / 远程主机, and Info / 信息 in that order. Cloud sync / 云同步
    and Remote Hosts / 远程主机 appear only while developer mode is on. Voice
-   appears between AI and Shortcuts only in development builds with developer
-   mode on. The rows are grouped under Preferences / 偏好,
+   appears between AI and Shortcuts in every build, independent of developer
+   mode. The rows are grouped under Preferences / 偏好,
    Agent / 智能体, Workspace / 工作区, and System / 系统. There is no
    Usage / 用量 destination.
 3. Appearance is part of General and has no standalone rail destination
@@ -1025,3 +1059,55 @@ representative checkout; edit/delete tooltips identify that path. Underlying
 group roots remain intact and shared display does not imply bulk deletion of
 other worktrees. A slot reused by another repository shows its current project;
 old tasks stay attached to their captured memory ID, not to the recycled path.
+
+## Settings workbench usability
+
+All sixteen built-in destinations, their editors and markets, and the host-owned
+plugin destination shell retain the existing fonts, colors, radii and primitives.
+Management pages place one primary creation action above search/scope filters,
+then their collection, then secondary configuration. Major sections have 24px
+gaps and collection rows retain 6px gaps; card margins must not add another gap.
+Empty/loading/failure states are compact. Long names and paths never force the
+page wider than its viewport. Editors keep a fixed header and reachable action
+area; only their body scrolls. Model panes stack on narrow windows and grow
+inside that body instead of clipping content or adding fixed-height list scrolls.
+
+- General orders appearance, power/close behavior, network and storage. Paths,
+  cache sizes, mode-dependent proxy fields and maintenance confirmations remain.
+- AI keeps permissions first, then execution defaults, conversation/display and
+  prompt enhancement. Session inheritance and built-in/custom prompt state are
+  visible. Voice retains three adapters, compact unconfigured account selectors,
+  adjacent readiness/errors and call-time editing locks. Failed field saves
+  preserve drafts.
+- Shortcuts search localized action names and key labels, with All/Modified
+  filters, counts and clear/no-match guidance. Conflicts stay beside the affected
+  action; recording explains Escape cancellation.
+- Instructions cannot be edited until loaded. Loading failures offer retry;
+  failed saves retain the draft, and saved/unsaved status remains visible.
+- Models use one creation entry, default-model guidance, the combined service /
+  account list, and catalog maintenance. Connection, discovery and save errors
+  appear in their relevant editor area. OAuth manual-open and cancellation
+  retain their existing lifecycle.
+- Skills and MCP share the management shell and no-project action. MCP's local
+  control endpoint is independent of server counts and filtering. Subagent
+  definitions precede runtime limits. Expert Team uses User default / Project
+  overrides plus a project picker, including removed-project overrides. Role
+  editing preserves field inheritance, reset and concurrent-update protection.
+- Import retains four mounted source panels: switching neither scans nor drops
+  selections. The initial source explanation is visible before scanning.
+- Projects distinguish empty, no matches and failed reads. Failed reads retain
+  known and session-derived projects and offer retry. Memory searches project
+  names/paths locally and shows counts; recording remains immediate while note
+  edits remain explicitly saved with ownership/conflict protection.
+- Unconfigured sync starts with connection setup. Configured sync orders status
+  and actions, progress, approvals, categories, connection and maintenance.
+  Remote hosts expose list retry and retain separate SSH/pair drafts. Plugin
+  backdrop controls are localized and ignore responses owned by a retired theme.
+- Info groups application/support, software updates and developer settings.
+  Technical versions use a disclosure; release notes open on request.
+
+Saving a setting and refreshing its view are separate outcomes. A successful
+write followed by a failed read is reported as saved with refresh unavailable;
+retry only reads. Stale reads, retries and writes from retired page/project
+lifetimes cannot replace current feedback or collections. These renderer changes
+introduce no global Save All, new persistence format, IPC contract or defaults.

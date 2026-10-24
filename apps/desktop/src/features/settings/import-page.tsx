@@ -345,18 +345,20 @@ function ImportIdle({
   scanning: boolean;
 }) {
   const { t } = useTranslation();
-  const help = [description, note].filter(Boolean).join(" · ");
   return (
     <div className="settings-panel import-panel">
       <div className="import-idle">
         <span className="import-idle-glyph" aria-hidden>
           <IconDownload size={20} />
         </span>
+        <div className="import-idle-copy">
+          {description ? <p className="import-idle-description">{description}</p> : null}
+          {note ? <p className="import-idle-note">{note}</p> : null}
+        </div>
         <div className="import-idle-actions">
           <Button variant="secondary" disabled={scanning} onClick={onScan}>
             {scanning ? t("settings.importScanning") : t("settings.importScan")}
           </Button>
-          {help ? <HelpIcon label={help} /> : null}
         </div>
       </div>
     </div>
@@ -497,6 +499,7 @@ export function SessionImportPanel() {
     <div className="import-workbench">
       {candidates === null ? (
         <ImportIdle
+          description={t("settings.importSessionsScanDesc")}
           note={importLabels.sources && [
             importLabels.sources["claude-code"],
             importLabels.sources.opencode,

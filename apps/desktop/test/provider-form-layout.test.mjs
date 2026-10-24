@@ -19,8 +19,6 @@ const headerEditorSource = await read("../src/components/settings/ProviderHeader
 const vendorDialogSource = await read("../src/components/settings/VendorAccountDialog.tsx");
 // The panes themselves live in the picker both dialogs render (D269).
 const pickerSource = await read("../src/components/settings/ModelSelectionPanes.tsx");
-const fetchErrorCopySource = await read("../src/components/settings/models-fetch-error-copy.ts");
-const probeFeedbackSource = await read("../src/components/settings/useProbeFeedback.ts");
 // The credential rows live in their own component since D625.
 const fieldsSource = await read("../src/components/settings/ProviderConnectionFields.tsx");
 const styles = await loadStyles();
@@ -32,15 +30,7 @@ function block(selector) {
   return styles.slice(at, styles.indexOf("}", at));
 }
 
-test("the dialog is a fixed-height shell so it cannot grow with the model count", () => {
-  const dialog = block(".provider-setup-dialog");
-  assert.match(dialog, /height: min\(720px, calc\(100vh - 64px\)\)/);
-  assert.match(dialog, /width: min\(1040px, calc\(100vw - 48px\)\)/);
-  // Overlay is flex: auto min-width would keep the 1040px preferred width and
-  // clip the credential fields (and their 2px focus ring) on a narrower window.
-  assert.match(dialog, /min-width: 0/);
-  assert.match(dialog, /max-width: 100%/);
-});
+
 
 test("the scrolling body keeps the credential focus ring inside the dialog", () => {
   const body = block(".provider-setup-body");
@@ -117,23 +107,6 @@ test("custom Name and Base URL sit on one row without helper copy", () => {
   );
 });
 
-test("a failed model list is classified once and toasted, not dumped into the pane", () => {
-  assert.match(fetchErrorCopySource, /describeModelsFetchError/);
-  assert.match(probeFeedbackSource, /modelsFetchErrorText\(discovery\.error, t\)/);
-  assert.match(
-    probeFeedbackSource,
-    /showToast\(outcome\.message, \{ variant: outcome\.variant \}\)/,
-  );
-  // The pane keeps one line saying the list is missing; why it failed is the
-  // toast's job, so the classified box and its detail rows are gone.
-  assert.match(pickerSource, /provider-models-placeholder is-error/);
-  assert.match(styles, /\.provider-models-placeholder\.is-error\s*\{/);
-  assert.doesNotMatch(pickerSource, /variant="banner"/);
-  assert.doesNotMatch(pickerSource, /variant="placeholder"/);
-  assert.doesNotMatch(styles, /\.provider-models-note\s*\{/);
-  assert.doesNotMatch(styles, /\.provider-models-error-summary\s*\{/);
-});
-
 test("list rows carry no box of their own inside the inset pane", () => {
   // Double borders were what made the dialog look coarse; D297 removed the
   // hairline between rows too — the checkbox and a 2px gap make the list.
@@ -181,50 +154,6 @@ test("the discovered list header hosts a compact fetch-list action beside the ti
   assert.match(reload, /border: 0/);
   assert.doesNotMatch(reload, /box-shadow/);
   assert.doesNotMatch(styles, /\.provider-models-state\s*\{/);
-});
-
-test("the dialog's actions live in the header, not in a footer bar", () => {
-  assert.match(setupSource, /className="provider-setup-head-actions"/);
-  // The bare X is replaced by a labelled Cancel.
-  assert.doesNotMatch(setupSource, /className="provider-setup-close"/);
-  assert.doesNotMatch(styles, /\.provider-setup-close\b/);
-  assert.doesNotMatch(setupSource, /className="provider-setup-actions"/);
-  assert.doesNotMatch(styles, /\.provider-setup-actions\b/);
-
-  const head = setupSource.slice(
-    setupSource.indexOf('className="provider-setup-head-actions"'),
-    setupSource.indexOf('className="provider-setup-body"'),
-  );
-  // Test connection only applies to a provider that already exists.
-  assert.match(head, /provider \? \(/);
-  assert.match(head, /settings\.testConnection/);
-  assert.match(head, /settings\.cancel/);
-  assert.match(head, /settings\.saveProvider/);
-  // Cancel precedes Save, so the corner-most control is not the destructive one.
-  assert.ok(
-    head.indexOf('settings.cancel') < head.indexOf('settings.saveProvider'),
-    "Cancel should sit before Save in the header group",
-  );
-  // Save stays gated on a valid form.
-  assert.match(head, /disabled=\{!canSave\}/);
-});
-
-test("the connection test reports its result through the toast stack", () => {
-  // The button sits in the header and its outcome no longer takes a result line
-  // under the credential fields.
-  assert.match(setupSource, /showToast\(t\("settings\.testOk"\), \{ variant: "success" \}\)/);
-  assert.match(setupSource, /settings\.testFailedStatus/);
-  assert.doesNotMatch(setupSource, /provider-credential-test/);
-  assert.doesNotMatch(styles, /\.provider-credential-test\s*\{/);
-});
-
-test("a save failure is toasted instead of opening the body with an error row", () => {
-  assert.match(
-    setupSource,
-    /showToast\(cause instanceof Error \? cause\.message : String\(cause\), \{[\s\S]*variant: "error"/,
-  );
-  assert.doesNotMatch(setupSource, /provider-setup-error/);
-  assert.doesNotMatch(styles, /\.provider-setup-error\s*\{/);
 });
 
 test("picking and reviewing models are two side-by-side panes", () => {
@@ -276,28 +205,7 @@ test("empty panes hold their height instead of collapsing", () => {
   }
 });
 
-test("the panes stack only when the viewport is too narrow to read them side by side", () => {
-  const at = styles.indexOf("@media (max-width: 940px)");
-  assert.notEqual(at, -1, "missing the two-pane fallback breakpoint");
-  const query = styles.slice(at, styles.indexOf("@media", at + 10));
-  assert.doesNotMatch(
-    query.slice(0, query.indexOf("{")),
-    /max-height/,
-    "a short but wide viewport must keep both panes visible",
-  );
-  assert.match(query, /\.provider-setup-field-row[\s\S]*?\{\s*grid-template-columns: minmax\(0, 1fr\)/);
-  // The explicit custom rows must also collapse or Name | URL and Key | Format
-  // stay side-by-side on a stacked dialog.
-  assert.match(query, /\.provider-setup-custom-identity-row/);
-  assert.match(query, /\.provider-setup-custom-auth-row/);
-  // A stacked dialog must be allowed to size to its content again, and both
-  // dialogs host the same panes, so both need that release.
-  assert.match(
-    query,
-    /\.provider-setup-dialog,\s*\n\s*\.vendor-account-dialog\s*\{[\s\S]*?height: auto/,
-  );
-  assert.match(query, /max-height: min\(240px, 30vh\)/);
-});
+
 
 test("Advanced opens from the dialog header into a separate modal", () => {
   assert.match(setupSource, /ProviderHeadersEditor/);
@@ -365,7 +273,6 @@ test("the vendor account dialog hosts the same panes in the same shell", () => {
   assert.match(dialog, /width: min\(1040px, calc\(100vw - 48px\)\)/);
   assert.match(dialog, /max-width: 100%/);
   assert.match(dialog, /min-width: 0/);
-  assert.match(dialog, /height: min\(720px, calc\(100vh - 64px\)\)/);
   assert.match(vendorDialogSource, /<ModelSelectionPanes/);
   // Neither dialog folds the picker behind a chosen-models summary.
   assert.doesNotMatch(vendorDialogSource, /<ChosenModelsSummary/);

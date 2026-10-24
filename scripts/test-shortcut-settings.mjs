@@ -36,6 +36,14 @@ const button = (name) => {
   return found;
 };
 const click = async (name) => { await act(async () => button(name).click()); };
+const search = async (value) => {
+  const element = document.querySelector('input[aria-label="' + i18n.t("settings.shortcutSearch") + '"]');
+  check(element, "Search is available");
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(element, value);
+    element.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+};
 const bind = async (id, platform, key) => {
   await click(label("Change", id));
   await act(async () => button(label("Change", id)).dispatchEvent(new KeyboardEvent("keydown", {
@@ -77,9 +85,57 @@ window.runTests = async () => {
     await click(i18n.t("settings.shortcutResetAll"));
     check(Object.keys(saved).length === 0 && !document.querySelector('[role="alert"]'),
       "Global reset must clear overrides and errors together");
+    await search(i18n.t("settings.shortcutAction.newTask"));
+    check(document.querySelectorAll(".shortcut-row").length === 1,
+      "Action search finds the corresponding shortcut");
+    await search("Mod+N");
+    check(document.querySelectorAll(".shortcut-row").length === 1 &&
+      document.querySelector(".shortcut-row").textContent.includes(i18n.t("settings.shortcutAction.newTask")),
+      "Binding search accepts the canonical shortcut on every platform");
+    await search("");
+    await click(label("Disable", "newTask"));
+    await click(i18n.t("settings.shortcutFilterModified"));
+    check(document.querySelectorAll(".shortcut-row").length === 1 &&
+      saved.newTask === null, "Modified filter includes explicitly disabled shortcuts");
+    await click(label("Reset", "newTask"));
+    check(document.querySelectorAll(".shortcut-row").length === 0 &&
+      document.body.textContent.includes(i18n.t("settings.shortcutNoMatches")),
+      "Reset removes the override and updates the modified empty state");
+    await click(i18n.t("settings.shortcutClearFilters"));
+    await click(label("Change", "newTask"));
+    check(document.body.textContent.includes(i18n.t("settings.shortcutRecordingCancel")),
+      "Recording exposes its cancellation method");
+    await act(async () => button(label("Change", "newTask")).dispatchEvent(new KeyboardEvent("keydown", {
+      key: "Enter", isComposing: true, bubbles: true, cancelable: true,
+    })));
+    check(button(label("Change", "newTask")).getAttribute("aria-pressed") === "true" &&
+      !document.querySelector('[role="alert"]'), "IME confirmation does not record a shortcut");
+    await act(async () => button(label("Change", "newTask")).dispatchEvent(new KeyboardEvent("keydown", {
+      key: "Escape", bubbles: true, cancelable: true,
+    })));
+    check(button(label("Change", "newTask")).getAttribute("aria-pressed") === "false" &&
+      Object.keys(saved).length === 0, "Escape cancels without changing bindings");
   }
+  let rejectReset = true;
+  let remaining;
+  function FailureHarness() {
+    const [settings, setSettings] = useState({ keybindings: { newTask: null } });
+    remaining = settings.keybindings;
+    return <KeyboardShortcutsSection settings={settings} platform="darwin" saveSettings={async patch => {
+      if (rejectReset) throw new Error("Reset rejected");
+      setSettings(s => ({ ...s, ...patch }));
+    }} />;
+  }
+  await act(async () => root.render(<FailureHarness />));
+  await click(i18n.t("settings.shortcutResetAll"));
+  check(remaining.newTask === null && document.querySelector('[role="alert"]')?.textContent === "Reset rejected",
+    "Failed global reset keeps settings and exposes a retryable error");
+  rejectReset = false;
+  await click(i18n.t("settings.shortcutResetAll"));
+  check(Object.keys(remaining).length === 0 && !document.querySelector('[role="alert"]'),
+    "Retry clears overrides and the failed-reset state");
   await act(async () => root.unmount());
-  return "PASS: shortcut disable, reassign, conflicting reset, recovery and global reset on three platforms";
+  return "PASS: shortcut search, key search, modified filter, recording/IME, conflict-safe reset, failure/retry on three platforms";
 };`,
     },
     outfile: join(temp, "fixture.js"), bundle: true, format: "esm", platform: "browser", jsx: "automatic",

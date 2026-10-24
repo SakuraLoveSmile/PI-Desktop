@@ -50,6 +50,7 @@ export function RemoteHostsPage() {
   const { t } = useTranslation();
   const showToast = useAppStore((state) => state.showToast);
   const [hosts, setHosts] = useState<RemoteHostSummary[] | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<PairForm>(EMPTY_FORM);
   const [pairing, setPairing] = useState(false);
@@ -59,6 +60,8 @@ export function RemoteHostsPage() {
   const [addMode, setAddMode] = useState<AddMode>("ssh");
 
   const refresh = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
       const result = await api.listRemoteHosts();
       setHosts(result.hosts);
@@ -66,6 +69,8 @@ export function RemoteHostsPage() {
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : String(caught);
       setError(message);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -180,26 +185,32 @@ export function RemoteHostsPage() {
 
   return (
     <div className="settings-stack">
-      <div
-        className="settings-remote-host-list"
-        role="list"
-        aria-busy={hosts === null || removing !== null}
-      >
-        {error ? (
-          <div className="settings-remote-host-empty" role="alert">
+      {error ? (
+        <div className="settings-remote-host-empty settings-remote-host-error" role="alert">
+          <div>
             {t("settings.remoteHosts.listError")}
             <span className="settings-remote-host-empty-detail">{error}</span>
           </div>
-        ) : hosts === null ? (
+          <Button variant="secondary" onClick={() => void refresh()} disabled={loading}>
+            {t("settings.remoteHosts.retry")}
+          </Button>
+        </div>
+      ) : null}
+      <div
+        className="settings-remote-host-list"
+        role="list"
+        aria-busy={loading || removing !== null}
+      >
+        {loading && hosts === null ? (
           <div className="settings-remote-host-empty" role="status">
             {t("settings.remoteHosts.loading")}
           </div>
-        ) : hosts.length === 0 ? (
+        ) : hosts?.length === 0 ? (
           <div className="settings-remote-host-empty" role="status">
             {t("settings.remoteHosts.empty")}
           </div>
         ) : (
-          hosts.map((host) => (
+          hosts?.map((host) => (
             <article key={host.hostKey} className="settings-remote-host-card" role="listitem">
               <span
                 className={cx(

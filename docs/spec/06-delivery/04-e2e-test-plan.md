@@ -16621,7 +16621,7 @@ the latest destination. These assertions measure work counts, not device FPS.
 
 - **Preconditions:** Isolated npm package directory and plugin import storage;
   a package declaring `pi.skills`, optionally executable extensions. No provider.
-- **Steps:** Open Skills, discover the candidate, cancel import, confirm import,
+- **Steps:** Open Skills, expand pi CLI discovery, discover the candidate, cancel import, confirm import,
   read the registered skill body and resources, reload, and attempt a duplicate.
   Change metadata during confirmation; retry discovery after an error; discover
   with more than 256 hoisted dependencies and an unreadable scope. Simulate a
@@ -16635,7 +16635,8 @@ the latest destination. These assertions measure work counts, not device FPS.
   The header dismiss control closes the discovery panel to a secondary reveal button;
   closing ignores late discovery responses and initiates no imports; reveal triggers
   fresh discovery; busy imports disable dismiss and refresh; remount restores the
-  default expanded state.
+  default collapsed state, with no discovery until explicitly expanded. Discovery
+  failures show a readable summary and expandable details, not an empty result.
 - **Specs:** 07-plugins/16-trusted-extensions; ADR pi-npm-skill-discovery.
 - **Acceptance:** Plugin skill discovery and explicit trust boundary.
 - **Milestone:** Post-MVP compatibility.
@@ -16663,6 +16664,19 @@ the latest destination. These assertions measure work counts, not device FPS.
 
 ### E2E-SETTINGS-destination-scroll-reset
 
+- On entry, the search field has focus. Search for “Large paste”: the result
+  names the actual setting with AI as its category. Enter opens AI and makes
+  that row visible; selecting it again preserves valid anchor navigation.
+- ArrowDown/ArrowUp move focus from the field to results and back; Enter on a
+  result activates it. IME Enter/arrow/Escape events do not navigate or clear.
+  Clear search and Escape restore the directory and focus the search field.
+- Search for a plugin-only keyword: its result appears without a conflicting
+  no-results message. A missing query shows one no-results status and no empty
+  group headings. Clear it, open a plugin, and verify one selected/current
+  destination; return to a built-in category and verify the selection follows.
+- At narrow/default/wide widths in light/dark themes, inspect long result labels,
+  category context, visible keyboard focus, clear control, and pinned return
+  action. Navigation and content must remain independently scrollable.
 - Open Settings → AI and scroll midway down. Select Shortcuts: its title and
   first settings appear at the top. Scroll and return to AI: it starts at top.
 - Re-select the active destination and update settings without navigating:
@@ -16677,8 +16691,9 @@ the latest destination. These assertions measure work counts, not device FPS.
 - Run in light and dark themes.
 - Automated coverage: `pnpm test:e2e:settings-scroll` mounts the production
   SettingsPage, store, translations, and built CSS in isolated Electron. Only
-  preload data is stubbed; search navigation uses SearchDialog's public store
-  entry points. It also checks the Cloud sync developer-mode gate, Experimental
+  preload data is stubbed; rail search uses rendered controls and global search
+  deep links use SearchDialog's public store entry points. It also checks the
+  Cloud sync developer-mode gate, Experimental
   badges, and fallback to General. This covers renderer interaction, not host
   persistence or the full global-search dialog.
 
@@ -18880,3 +18895,58 @@ push or PR authorization.
 - **Status:** NOT RUN; implementation pending. Record candidate/base/source and
   artifact hashes, fixture safety, actual results and remaining UI/paid-model
   limitations. Synthetic provider behavior is not paid-model evidence.
+
+
+### E2E-SETTINGS-skills-workbench
+
+- Open Skills with no projects or skills. Creation and Market remain easy to
+  reach, empty scope groups are compact, and pi CLI discovery starts collapsed
+  without making a discovery request. Search shows no matches and clearing it
+  restores the scope groups. Project filtering disables New until a project is
+  available; the no-project action opens Projects.
+- With fixture projects and global/project skills, search, filter, create at
+  both target levels, edit a skill, toggle it, and cancel file/folder import.
+  Scope-specific import actions retain their targets and canceled imports leave
+  the list intact. Switching projects updates the project skill collection.
+- **Automation:** `node scripts/e2e-settings-scroll.mjs` mounts production
+  SettingsPage with strict, in-memory preload fixtures. No real skill files,
+  native pickers, marketplace, or model service are accessed. Discovery error,
+  cancellation, focus, and busy paths also run in
+  `node scripts/e2e-pi-skill-discovery-ui.mjs`.
+- **Visual acceptance:** Inspect Skills in light/dark themes at desktop and
+  narrow widths, with empty and populated data; actions remain reachable and
+  paths wrap or truncate without horizontal page overflow. A 560px regression
+  probe verifies readable skill names, visible controls, and working edit/toggle
+  actions using rendered geometry and pointer hit testing.
+
+
+### E2E-SETTINGS-all-page-workbench
+
+- Open every built-in category and a plugin theme destination in Chinese/light
+  and English/dark. At 560, 720, 800, 1120 and 1440 CSS pixels, and 200% zoom,
+  verify readable content, no horizontal page overflow, compact empties and
+  reachable primary actions. At <=720px use the category overlay: search, IME,
+  Escape clear then close, selected-row positioning and trigger focus return.
+  Escape must not run the shell's voice-cancel shortcut.
+- Edit preferences and retry a failed save. A successful write followed by a
+  failed refresh says saved; retry only reads. Release an old deferred refresh
+  after a newer failed save and verify it cannot overwrite the newer state.
+- In each management page complete a normal edit path; exercise read/empty/error
+  states, failed saves retaining drafts, and applicable project/source switches.
+  Keep memory recording immediate, content explicitly saved, Expert Team CAS
+  and inheritance intact, OAuth cancellation real at the mocked boundary, and
+  sync approvals digest-bound. Theme Apply and capability reload responses from
+  retired selections/lifetimes must not affect the current page.
+- **Automation:** `node scripts/e2e-settings-scroll.mjs` mounts the production
+  shell, CSS, store and translations with explicit in-memory preload handlers;
+  checks all destinations and model-editor geometry across the matrix. Dedicated
+  user paths run in `scripts/test-settings-preferences.mjs`,
+  `scripts/test-shortcut-settings.mjs`, `scripts/e2e-settings-models-usability.mjs`,
+  `scripts/e2e-agent-capabilities.mjs`, `scripts/e2e-settings-workspace.mjs` and
+  `scripts/e2e-settings-extensions.mjs`. Existing Storage, Project editor, Memory,
+  Expert Team and team-limit fixtures retain their boundary checks. Unknown IPC
+  fails rather than returning a generic success.
+- **Evidence boundary:** These fixtures use isolated profiles and in-memory
+  records; no real credentials, provider calls, user data or marketplace writes.
+  Browser inspection uses the same production components in a local preview.
+  This is renderer acceptance evidence, not live Host/service or release proof.

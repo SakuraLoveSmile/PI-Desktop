@@ -49,6 +49,7 @@ import {
   IconTrash,
 } from "../icons";
 import { TooltipButton, cx } from "../ui";
+import { SettingsWorkbenchHeader } from "../../features/settings/primitives";
 
 const GLOBAL_MCP_PATH = "~/.agents/servers";
 
@@ -80,6 +81,7 @@ const EMPTY_MCP_COLLECTION: McpCollection = { global: [], project: [], statuses:
 export function AgentMcpPage() {
   const { t } = useTranslation();
   const showToast = useAppStore((state) => state.showToast);
+  const setSettingsTab = useAppStore((state) => state.setSettingsTab);
   const { selectedProjectPath, setSelectedProjectPath, options } = useAgentProjects();
   const fetchServers = useCallback(async (): Promise<McpCollection> => {
     const [global, project] = await Promise.all([
@@ -106,6 +108,7 @@ export function AgentMcpPage() {
     loading,
     refreshing,
     reload: load,
+    captureOwner,
   } = useHostCollection(fetchServers, EMPTY_MCP_COLLECTION, (error) =>
     showToast(error instanceof Error ? error.message : String(error), { variant: "error" }),
   );
@@ -181,6 +184,18 @@ export function AgentMcpPage() {
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [editor, setEditor] = useState<McpEditorState | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [refreshFailed, setRefreshFailed] = useState(false);
+  useEffect(() => {
+    setSaveError(null);
+    setRefreshFailed(false);
+    setSaving(false);
+  }, [captureOwner]);
+  const retryRefresh = async () => {
+    const ownsOperation = captureOwner();
+    const result = await load({ reportError: false });
+    if (ownsOperation() && result !== "stale") setRefreshFailed(result === "failed");
+  };
   const [testingId, setTestingId] = useState<string | null>(null);
   const [authorizingId, setAuthorizingId] = useState<string | null>(null);
   const pendingOAuthRef = useRef<{ unsubscribe: () => void } | null>(null);
@@ -215,6 +230,7 @@ export function AgentMcpPage() {
   const targetLevel: AgentCapabilityLevel = filter === "project" ? "project" : "global";
 
   const openCreate = () => {
+    setSaveError(null);
     if (targetLevel === "project" && !selectedProjectPath) {
       showToast(t("settings.selectProjectFirst"), { variant: "error" });
       return;
@@ -233,12 +249,14 @@ export function AgentMcpPage() {
   };
 
   const openEdit = (server: McpServerRecord, level: AgentCapabilityLevel) => {
+    setSaveError(null);
     setMenuFor(null);
     setEditor({ draft: draftFromRecord(server), editing: server, level });
   };
 
   const save = async () => {
-    if (!editor) return;
+    if (!editor || saving) return;
+    const ownsOperation = captureOwner();
     const projectPath = editor.level === "project" ? selectedProjectPath ?? undefined : undefined;
     const candidateId = editor.draft.id.trim();
     const candidateLabel = editor.draft.label.trim().toLocaleLowerCase();
@@ -253,10 +271,14 @@ export function AgentMcpPage() {
       return;
     }
     setSaving(true);
+    setSaveError(null);
     try {
       await api.upsertMcpServer(draftToInput(editor.draft, { level: editor.level, projectPath }));
-      await load();
-      showToast(
+      if (!ownsOperation()) return;
+      const refreshed = await load({ reportError: false });
+      if (!ownsOperation()) return;
+      if (refreshed !== "stale") setRefreshFailed(refreshed === "failed");
+      if (refreshed === "loaded") showToast(
         t(editor.editing ? "settings.mcpSaved" : "settings.mcpAdded", {
           name: editor.draft.label || editor.draft.id,
         }),
@@ -264,9 +286,9 @@ export function AgentMcpPage() {
       );
       setEditor(null);
     } catch (error) {
-      showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
+      if (ownsOperation()) setSaveError(t("settings.capabilitySaveFailed", { message: error instanceof Error ? error.message : String(error) }));
     } finally {
-      setSaving(false);
+      if (ownsOperation()) setSaving(false);
     }
   };
 
@@ -655,7 +677,7 @@ export function AgentMcpPage() {
 
   /**
    * The one block on this page that is not an installed server: the desktop's own
-   * loopback control endpoint (ADR 0203). It sits above the level groups because
+   * loopback control endpoint (ADR 0203). It follows the level groups because
    * it belongs to this machine rather than to `~/.agents/servers` or a project,
    * so it never follows the level filter, the search, or the project picker, and
    * it carries no level or transport badge, no row menu, and no OAuth action.
@@ -796,6 +818,7 @@ export function AgentMcpPage() {
           ? t("settings.capabilityCreateInProject")
           : t("settings.capabilityCreateInGlobal")
       }
+      disabled={targetLevel === "project" && !selectedProjectPath}
       onClick={openCreate}
     >
       <IconPlus size={14} />
@@ -831,36 +854,38 @@ export function AgentMcpPage() {
   return (
     <AgentCapabilityPage
       toolbar={
-        <CapabilityToolbar
-          filter={filter}
-          onFilterChange={setFilter}
-          counts={counts}
-          search={search}
-          onSearchChange={setSearch}
-          searchPlaceholder={t("extensions.mcp.searchPlaceholder")}
-          projectPicker={
-            <AgentProjectPicker
-              value={selectedProjectPath}
-              options={options}
-              label={t("settings.selectProject")}
-              onChange={setSelectedProjectPath}
-            />
-          }
-          actions={
-            <>
-              {addButton}
-              {marketButton}
-            </>
-          }
-        />
+        <SettingsWorkbenchHeader
+          description={t("settings.mcpIntro")}
+          actions={<>{marketButton}{addButton}</>}
+        >
+          <CapabilityToolbar
+            filter={filter}
+            onFilterChange={setFilter}
+            counts={counts}
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder={t("extensions.mcp.searchPlaceholder")}
+            projectPicker={options.length > 0 ? (
+              <AgentProjectPicker
+                value={selectedProjectPath}
+                options={options}
+                label={t("settings.selectProject")}
+                onChange={setSelectedProjectPath}
+              />
+            ) : undefined}
+          />
+        </SettingsWorkbenchHeader>
       }
     >
+      {refreshFailed ? <div className="settings-save-feedback is-refreshFailed" role="status">
+        <span>{t("settings.saveState.refreshFailed")}</span>
+        <CapabilityButton onClick={() => void retryRefresh()}>{t("errors.action.retry")}</CapabilityButton>
+      </div> : null}
       <CapabilityPanel
         loading={loading}
         refreshing={refreshing}
         loadingLabel={t("settings.loadingCapabilities")}
       >
-        {renderControlEndpoint()}
         {counts.all === 0 && search.trim() ? (
           <CapabilityEmpty
             message={t("settings.capabilityNoMatches")}
@@ -879,7 +904,6 @@ export function AgentMcpPage() {
                   <CapabilityEmpty
                     message={t("settings.mcpEmpty")}
                     icon={<IconServer size={18} />}
-                    action={addButton}
                   />
                 ) : (
                   visible.global.map((server) => renderRow(server, "global"))
@@ -890,11 +914,15 @@ export function AgentMcpPage() {
               <>
                 <CapabilityGroupHeader
                   label={t("settings.projectLevel")}
-                  path={projectMcpPath(selectedProjectPath)}
+                  path={selectedProjectPath ? projectMcpPath(selectedProjectPath) : undefined}
                   count={visible.project.length}
                 />
                 {!selectedProjectPath ? (
-                  <CapabilityEmpty message={t("settings.selectProjectFirst")} />
+                  <CapabilityEmpty
+                    message={t("settings.selectProjectFirst")}
+                    hint={t("settings.skillsProjectEmptyHint")}
+                    action={<CapabilityButton onClick={() => setSettingsTab("projects")}>{t("settings.skillsManageProjects")}</CapabilityButton>}
+                  />
                 ) : visible.project.length === 0 ? (
                   <CapabilityEmpty
                     message={t("settings.mcpEmpty")}
@@ -908,6 +936,7 @@ export function AgentMcpPage() {
           </>
         )}
       </CapabilityPanel>
+      {renderControlEndpoint()}
 
       {editor ? (
         <McpEditorSheet
@@ -915,6 +944,7 @@ export function AgentMcpPage() {
           setDraft={(draft) => setEditor((current) => (current ? { ...current, draft } : current))}
           editing={editor.editing}
           saving={saving}
+          saveError={saveError}
           status={editor.editing ? statusFor(statuses, editor.editing) : undefined}
           testing={testingId === editor.editing?.id}
           projects={[]}

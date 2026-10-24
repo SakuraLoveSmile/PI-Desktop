@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   GLOBAL_SCOPE,
@@ -46,6 +46,7 @@ import { PiSkillDiscoveryPanel } from "./PiSkillDiscoveryPanel";
 import { SkillMarketPanel } from "./SkillMarketPanel";
 
 import { TooltipButton } from "../ui";
+import { SettingsWorkbenchHeader } from "../../features/settings/primitives";
 const GLOBAL_SKILLS_PATH = "~/.agents/skills";
 
 function projectSkillsPath(projectPath: string | null): string {
@@ -68,6 +69,7 @@ const EMPTY_SKILL_COLLECTION: SkillCollection = { global: [], project: [] };
 export function AgentSkillsPage() {
   const { t } = useTranslation();
   const showToast = useAppStore((state) => state.showToast);
+  const setSettingsTab = useAppStore((state) => state.setSettingsTab);
   const { selectedProjectPath, setSelectedProjectPath, options } = useAgentProjects();
   const fetchSkills = useCallback(async (): Promise<SkillCollection> => {
     const [global, project] = await Promise.all([
@@ -87,6 +89,7 @@ export function AgentSkillsPage() {
     loading,
     refreshing,
     reload: load,
+    captureOwner,
   } = useHostCollection(fetchSkills, EMPTY_SKILL_COLLECTION, (error) =>
     showToast(error instanceof Error ? error.message : String(error), { variant: "error" }),
   );
@@ -97,6 +100,18 @@ export function AgentSkillsPage() {
   const [editor, setEditor] = useState<SkillEditorState | null>(null);
   const [view, setView] = useState<"skills" | "market">("skills");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [refreshFailed, setRefreshFailed] = useState(false);
+  useEffect(() => {
+    setSaveError(null);
+    setRefreshFailed(false);
+    setSaving(false);
+  }, [captureOwner]);
+  const retryRefresh = async () => {
+    const ownsOperation = captureOwner();
+    const result = await load({ reportError: false });
+    if (ownsOperation() && result !== "stale") setRefreshFailed(result === "failed");
+  };
   const { armed, setArmed } = useArmedDelete();
 
   const rowKey = (level: AgentCapabilityLevel, id: string) => `${level}:${id}`;
@@ -147,6 +162,7 @@ export function AgentSkillsPage() {
   const targetLevel: AgentCapabilityLevel = filter === "project" ? "project" : "global";
 
   const openCreate = () => {
+    setSaveError(null);
     if (targetLevel === "project" && !selectedProjectPath) {
       showToast(t("settings.selectProjectFirst"), { variant: "error" });
       return;
@@ -165,6 +181,7 @@ export function AgentSkillsPage() {
   };
 
   const openEdit = async (skill: UserSkillRecord, level: AgentCapabilityLevel) => {
+    setSaveError(null);
     const key = rowKey(level, skill.id);
     setBusyId(key);
     try {
@@ -182,7 +199,8 @@ export function AgentSkillsPage() {
   };
 
   const save = async () => {
-    if (!editor) return;
+    if (!editor || saving) return;
+    const ownsOperation = captureOwner();
     const { draft, editing, level } = editor;
     const projectPath = level === "project" ? selectedProjectPath ?? undefined : undefined;
     const payload = {
@@ -195,19 +213,23 @@ export function AgentSkillsPage() {
       ...(projectPath ? { projectPath } : {}),
     };
     setSaving(true);
+    setSaveError(null);
     try {
       if (editing) await api.updateUserSkill(editing.id, payload);
       else await api.createUserSkill(payload);
-      await load();
-      showToast(
+      if (!ownsOperation()) return;
+      const refreshed = await load({ reportError: false });
+      if (!ownsOperation()) return;
+      if (refreshed !== "stale") setRefreshFailed(refreshed === "failed");
+      if (refreshed === "loaded") showToast(
         t(editing ? "settings.skillSaved" : "settings.skillCreated", { name: payload.name }),
         { variant: "success" },
       );
       setEditor(null);
     } catch (error) {
-      showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
+      if (ownsOperation()) setSaveError(t("settings.capabilitySaveFailed", { message: error instanceof Error ? error.message : String(error) }));
     } finally {
-      setSaving(false);
+      if (ownsOperation()) setSaving(false);
     }
   };
 
@@ -524,35 +546,46 @@ export function AgentSkillsPage() {
 
   return (
     <AgentCapabilityPage
+      className="skills-settings"
       toolbar={
-        <CapabilityToolbar
-          filter={filter}
-          onFilterChange={setFilter}
-          counts={counts}
-          search={search}
-          onSearchChange={setSearch}
-          searchPlaceholder={t("extensions.skills.searchPlaceholder")}
-          projectPicker={
-            <AgentProjectPicker
-              value={selectedProjectPath}
-              options={options}
-              label={t("settings.selectProject")}
-              onChange={setSelectedProjectPath}
-            />
-          }
-          actions={
-            <>
-              <CapabilityButton variant="primary" title={newSkillTitle} onClick={openCreate}>
+        <SettingsWorkbenchHeader
+          description={t("settings.skillsIntro")}
+          actions={<>
+              {marketButton}
+              <CapabilityButton
+                variant="primary"
+                title={newSkillTitle}
+                disabled={targetLevel === "project" && !selectedProjectPath}
+                onClick={openCreate}
+              >
                 <IconPlus size={14} />
                 {t("settings.newSkill")}
               </CapabilityButton>
-              {marketButton}
-            </>
-          }
-        />
+          </>}
+        >
+          <CapabilityToolbar
+            filter={filter}
+            onFilterChange={setFilter}
+            counts={counts}
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder={t("extensions.skills.searchPlaceholder")}
+            projectPicker={options.length > 0 ? (
+              <AgentProjectPicker
+                value={selectedProjectPath}
+                options={options}
+                label={t("settings.selectProject")}
+                onChange={setSelectedProjectPath}
+              />
+            ) : undefined}
+          />
+        </SettingsWorkbenchHeader>
       }
     >
-      <PiSkillDiscoveryPanel />
+      {refreshFailed ? <div className="settings-save-feedback is-refreshFailed" role="status">
+        <span>{t("settings.saveState.refreshFailed")}</span>
+        <CapabilityButton onClick={() => void retryRefresh()}>{t("errors.action.retry")}</CapabilityButton>
+      </div> : null}
       <CapabilityPanel
         loading={loading}
         refreshing={refreshing}
@@ -576,13 +609,8 @@ export function AgentSkillsPage() {
                 {visible.global.length === 0 ? (
                   <CapabilityEmpty
                     message={t("settings.skillsEmpty")}
+                    hint={t("settings.skillsGlobalEmptyHint")}
                     icon={<IconBookOpen size={18} />}
-                    action={
-                      <CapabilityButton variant="primary" onClick={openCreate}>
-                        <IconPlus size={14} />
-                        {t("extensions.skills.add")}
-                      </CapabilityButton>
-                    }
                   />
                 ) : (
                   visible.global.map((skill) => renderRow(skill, "global"))
@@ -593,12 +621,20 @@ export function AgentSkillsPage() {
               <>
                 <CapabilityGroupHeader
                   label={t("settings.projectLevel")}
-                  path={projectSkillsPath(selectedProjectPath)}
+                  path={selectedProjectPath ? projectSkillsPath(selectedProjectPath) : undefined}
                   count={visible.project.length}
                   action={selectedProjectPath ? importButton("project") : undefined}
                 />
                 {!selectedProjectPath ? (
-                  <CapabilityEmpty message={t("settings.selectProjectFirst")} />
+                  <CapabilityEmpty
+                    message={t("settings.selectProjectFirst")}
+                    hint={t("settings.skillsProjectEmptyHint")}
+                    action={
+                      <CapabilityButton onClick={() => setSettingsTab("projects")}>
+                        {t("settings.skillsManageProjects")}
+                      </CapabilityButton>
+                    }
+                  />
                 ) : visible.project.length === 0 ? (
                   <CapabilityEmpty
                     message={t("settings.skillsEmpty")}
@@ -612,6 +648,7 @@ export function AgentSkillsPage() {
           </>
         )}
       </CapabilityPanel>
+      <PiSkillDiscoveryPanel />
 
       {editor ? (
         <SkillEditorSheet
@@ -619,6 +656,7 @@ export function AgentSkillsPage() {
           setDraft={(draft) => setEditor((current) => (current ? { ...current, draft } : current))}
           editing={editor.editing}
           saving={saving}
+          saveError={saveError}
           level={editor.level}
           projectName={projectName}
           onClose={() => {

@@ -26,14 +26,16 @@ export function SubagentFallbackModels({ primary, values, choices, onChange }: {
     <Field label={t("extensions.subagents.fallbackModels")} hint={t("extensions.subagents.fallbackModelsHint")}>
       <ol className="space-y-2">
         {values.map((pin, index) => (
-          <li key={`${index}:${pin}`} className="flex items-center gap-2">
+          <li key={`${index}:${pin}`} className="subagent-fallback-row">
             <span className="min-w-0 flex-1 break-all text-sm">{index + 1}. {pin}</span>
+            <div className="subagent-fallback-actions">
             <Button size="sm" variant="secondary" disabled={index === 0} onClick={() => move(index, -1)}
               aria-label={t("extensions.subagents.fallbackMoveUp", { model: pin })}>↑</Button>
             <Button size="sm" variant="secondary" disabled={index === values.length - 1} onClick={() => move(index, 1)}
               aria-label={t("extensions.subagents.fallbackMoveDown", { model: pin })}>↓</Button>
             <Button size="sm" variant="secondary" onClick={() => onChange(values.filter((_, position) => position !== index))}
               aria-label={t("extensions.subagents.fallbackRemove", { model: pin })}>×</Button>
+            </div>
           </li>
         ))}
       </ol>

@@ -556,6 +556,7 @@ export function SubagentEditorSheet({
   setDraft,
   editing,
   saving,
+  saveError,
   initialPresetId,
   onClose,
   onSave,
@@ -565,6 +566,7 @@ export function SubagentEditorSheet({
   setDraft: (next: SubagentDraft) => void;
   editing: UserSubagentRecord | null;
   saving: boolean;
+  saveError?: string | null;
   /** Template chip to select on create, e.g. after Copy as mine. */
   initialPresetId?: string;
   onClose: () => void;
@@ -791,6 +793,7 @@ export function SubagentEditorSheet({
             {t(errorKey)}
           </p>
         ) : null}
+        {saveError ? <p className="ext-sheet-error" role="alert">{saveError}</p> : null}
         <div className="ext-sheet-actions">
           {editing && onReveal ? (
             <Button variant="ghost" onClick={onReveal}>

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { PluginScenicThemesDestinationMeta } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
 import { useAppStore } from "../../stores/app-store";
@@ -16,6 +17,7 @@ const clampBlur = (value: number) => Math.max(0, Math.min(20, Math.round(value))
  * already validated card metadata and declared backdrop assets.
  */
 export function PluginScenicThemesDestination({ destination, selectTheme }: Props) {
+  const { t } = useTranslation();
   const selectedTheme = useAppStore((state) => state.settings?.theme);
   const showToast = useAppStore((state) => state.showToast);
   const selectedCard = useMemo(
@@ -25,12 +27,22 @@ export function PluginScenicThemesDestination({ destination, selectTheme }: Prop
   const [confirmedBlur, setConfirmedBlur] = useState(selectedCard?.blur ?? 6);
   const [draftBlur, setDraftBlur] = useState(selectedCard?.blur ?? 6);
   const [saving, setSaving] = useState(false);
+  const ownerRef = useRef({ pluginId: destination.pluginId, card: selectedCard });
+  if (ownerRef.current.pluginId !== destination.pluginId || ownerRef.current.card !== selectedCard) {
+    ownerRef.current = { pluginId: destination.pluginId, card: selectedCard };
+  }
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   useEffect(() => {
     const blur = selectedCard?.blur ?? selectedCard?.blurDefault ?? 6;
     setConfirmedBlur(blur);
     setDraftBlur(blur);
-  }, [selectedCard]);
+    setSaving(false);
+  }, [destination.pluginId, selectedCard]);
 
   if (!selectedCard) return null;
 
@@ -44,15 +56,19 @@ export function PluginScenicThemesDestination({ destination, selectTheme }: Prop
 
   const apply = async () => {
     if (saving || draftBlur === confirmedBlur) return;
+    const owner = ownerRef.current;
+    const blur = draftBlur;
     setSaving(true);
     try {
-      await api.setPluginScenicThemeBlur(destination.pluginId, selectedCard.themeId, draftBlur);
-      setConfirmedBlur(draftBlur);
+      await api.setPluginScenicThemeBlur(destination.pluginId, selectedCard.themeId, blur);
+      if (!mountedRef.current || ownerRef.current !== owner) return;
+      setConfirmedBlur(blur);
+      showToast(t("settings.pluginScenic.saved"), { variant: "success" });
     } catch (error) {
-      setDraftBlur(confirmedBlur);
+      if (!mountedRef.current || ownerRef.current !== owner) return;
       showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
     } finally {
-      setSaving(false);
+      if (mountedRef.current && ownerRef.current === owner) setSaving(false);
     }
   };
 
@@ -84,12 +100,12 @@ export function PluginScenicThemesDestination({ destination, selectTheme }: Prop
       <div className="plugin-scenic-blur-control">
         <div className="plugin-scenic-blur-copy">
           <span className="plugin-scenic-blur-label">
-            Backdrop blur
-            <HelpIcon label={`Applies to ${selectedCard.label}`} />
+            {t("settings.pluginScenic.backdropBlur")}
+            <HelpIcon label={t("settings.pluginScenic.appliesTo", { theme: selectedCard.label })} />
           </span>
         </div>
         <div className="plugin-scenic-blur-actions">
-          <label className="sr-only" htmlFor="plugin-scenic-backdrop-blur">Backdrop blur</label>
+          <label className="sr-only" htmlFor="plugin-scenic-backdrop-blur">{t("settings.pluginScenic.backdropBlur")}</label>
           <input
             id="plugin-scenic-backdrop-blur"
             type="range"
@@ -101,7 +117,7 @@ export function PluginScenicThemesDestination({ destination, selectTheme }: Prop
           />
           <output htmlFor="plugin-scenic-backdrop-blur">{draftBlur}px</output>
           <Button variant="primary" disabled={saving || draftBlur === confirmedBlur} onClick={() => void apply()}>
-            {saving ? "Applying…" : "Apply"}
+            {saving ? t("settings.pluginScenic.applying") : t("settings.pluginScenic.apply")}
           </Button>
         </div>
       </div>

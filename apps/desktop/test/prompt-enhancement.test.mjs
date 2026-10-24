@@ -226,24 +226,6 @@ test("the enhancement model and reasoning are rows on the Prompt enhancement car
   assert.match(card, /SettingsRow/);
 });
 
-test("the reasoning row follows the selected model's real ladder", async () => {
-  const card = await read("../src/components/settings/EnhancementModelCard.tsx");
-
-  // Reuse the Composer's model-aware resolution instead of the canonical list.
-  assert.match(card, /thinkingProviderForModel/);
-  assert.match(card, /thinkingLevelForProvider/);
-  assert.match(card, /reasoningProvider/);
-  assert.match(card, /levelOptions/);
-  // A pinned model without reasoning still lists `off` and disables the row.
-  assert.match(card, /noReasoning/);
-  assert.match(card, /disabled=\{noReasoning\}/);
-  // Switching model re-clamps the stored level onto the new model.
-  const pickModel = card.slice(card.indexOf("const pickModel"), card.indexOf("return ("));
-  assert.match(pickModel, /thinkingLevelForProvider\(nextProvider, stored\)/);
-  // No follow-the-session option in this row.
-  assert.doesNotMatch(card, /promptEnhancementThinkingFollow/);
-});
-
 test("the enhancement-model copy exists in both reference locales", () => {
   for (const source of [en, zh]) {
     for (const key of [

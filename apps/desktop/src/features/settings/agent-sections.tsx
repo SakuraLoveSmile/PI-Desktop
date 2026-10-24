@@ -1,10 +1,10 @@
-import { lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { AgentInstructionFile, AppSettings, UpdatePreference } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
 import { useAppStore } from "../../stores/app-store";
 import { useUpdateState } from "../../hooks/use-update-state";
-import { Button } from "../../components/ui";
+import { Button, Textarea } from "../../components/ui";
 import { IconFileText } from "../../components/icons";
 import { SettingsMenuSelect } from "../../components/settings/SettingsMenuSelect";
 import { persistUpdatePreference } from "./update-preference";
@@ -21,26 +21,52 @@ export function AgentInstructionsSection() {
   const [global, setGlobal] = useState<AgentInstructionFile | null>(null);
   const [globalDraft, setGlobalDraft] = useState("");
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<{ operation: "load" | "save"; message: string } | null>(null);
+  const [saved, setSaved] = useState(false);
+  const request = useRef(0);
+  const mounted = useRef(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    void api.getAgentInstructions().then((result) => {
-      if (cancelled) return;
+  const load = useCallback(async () => {
+    const generation = ++request.current;
+    setLoading(true);
+    setError(null);
+    setSaved(false);
+    try {
+      const result = await api.getAgentInstructions();
+      if (!mounted.current || generation !== request.current) return;
       setGlobal(result.global);
       setGlobalDraft(result.global.content);
-    }).catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
+    } catch (cause) {
+      if (mounted.current && generation === request.current) {
+        setError({ operation: "load", message: cause instanceof Error ? cause.message : String(cause) });
+      }
+    } finally {
+      if (mounted.current && generation === request.current) setLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+    mounted.current = true;
+    void load();
+    return () => { mounted.current = false; request.current += 1; };
+  }, [load]);
+
   const save = async () => {
+    if (!global || loading || saving) return;
+    const submitted = globalDraft;
     setSaving(true);
+    setError(null);
+    setSaved(false);
     try {
-      const result = await api.saveAgentInstructions("global", globalDraft);
+      const result = await api.saveAgentInstructions("global", submitted);
+      if (!mounted.current) return;
       setGlobal(result.file);
+      setSaved(true);
+    } catch (cause) {
+      if (mounted.current) setError({ operation: "save", message: cause instanceof Error ? cause.message : String(cause) });
     } finally {
-      setSaving(false);
+      if (mounted.current) setSaving(false);
     }
   };
 
@@ -52,20 +78,26 @@ export function AgentInstructionsSection() {
         description={t("settings.instructionsGlobalDesc")}
       >
         <div className="settings-form-grid">
-          <div className="settings-row-copy">
-            <div className="settings-instruction-path">{global?.path ?? ""}</div>
-          </div>
-          <textarea
+          <Textarea
             className="field-textarea settings-instruction-editor"
             value={globalDraft}
-            onChange={(event) => setGlobalDraft(event.target.value)}
+            onChange={(event) => { setGlobalDraft(event.target.value); setSaved(false); }}
+            disabled={loading || global === null || saving}
+            aria-busy={loading || saving}
             aria-label={t("settings.instructionsGlobal")}
             spellCheck={false}
             autoCorrect="off"
             autoCapitalize="off"
           />
+          {global?.path ? <code className="settings-instruction-path">{global.path}</code> : null}
         </div>
+        {loading ? <p role="status">{t("common.loading")}</p> : null}
+        {error ? <div className="settings-inline-error" role="alert">
+          <span>{t(error.operation === "load" ? "settings.instructionsLoadFailed" : "settings.instructionsSaveFailed", { message: error.message })}</span>
+          {!global ? <Button size="sm" variant="secondary" onClick={() => void load()}>{t("errors.action.retry")}</Button> : null}
+        </div> : null}
         <div className="settings-panel-actions">
+          <span className="settings-save-status" role="status">{globalDirty ? t("settings.instructionsUnsaved") : saved ? t("settings.instructionsSaved") : ""}</span>
           <Button
             variant="primary"
             disabled={!globalDirty || saving}
@@ -187,13 +219,6 @@ export function UpdatesRow({
     }
   }
 
-  const notes = update?.releaseNotes?.trim() || null;
-  const showNotes =
-    notes &&
-    (update?.status === "available" ||
-      update?.status === "downloading" ||
-      update?.status === "downloaded");
-
   return (
     <>
       <SettingsRow
@@ -248,12 +273,7 @@ export function UpdatesRow({
           {statusText ? (
             <div className="text-right text-xs-plus text-text-muted">{statusText}</div>
           ) : null}
-          {showNotes ? (
-            <div className="update-settings-notes">
-              <div className="update-settings-notes-label">{t("updates.whatsNew")}</div>
-              <pre className="update-settings-notes-body">{notes}</pre>
-            </div>
-          ) : null}
+
         </div>
         {releaseNotesOpen ? (
           <Suspense

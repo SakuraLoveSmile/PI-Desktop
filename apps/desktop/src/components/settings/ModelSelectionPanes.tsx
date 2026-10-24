@@ -46,6 +46,7 @@ import {
 } from "./model-custom-lookup";
 import type { ProviderModelsState } from "./useProviderModels";
 import { useModelReorder } from "./useModelReorder";
+import { modelsFetchErrorText } from "./models-fetch-error-copy";
 
 /** One row of the model list: what the service returned, plus its binding. */
 export type ModelRow = {
@@ -425,8 +426,8 @@ export function ModelSelectionPanes({
     if (!discovered?.info) void enrichCustomModel(binding);
   };
 
-  // A failed probe leaves an empty pane: the pane says the list is missing and
-  // the toast says why, so the list no longer hosts a classified error box.
+  // Keep a failed probe visible beside the list, including when cached rows
+  // remain available. Retrying must not discard the configured models.
   const emptyFetchError = discovery.status === "error" && rows.length === 0;
 
   const modelListBody =
@@ -568,6 +569,7 @@ export function ModelSelectionPanes({
           </div>
         </div>
 
+        {discovery.error ? <div className="provider-models-error" role="alert">{modelsFetchErrorText(discovery.error, t)}</div> : null}
         {modelListBody}
       </div>
 
