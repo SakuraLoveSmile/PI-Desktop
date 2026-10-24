@@ -268,6 +268,56 @@ globalThis.composerPasteProbe = async () => {
     assert(controller.fileReferences.length === 1 && controller.fileReferences[0].path === references[1].path,
       "changing workspace must preserve scratch references");
 
+    // Each conversation owns its workspace metadata as well as its references.
+    // Seed both through real mounted editors, then reuse one mounted composer.
+    flushSync(() => root.render(null));
+    render("paste-b", "/project-b");
+    const projectBText = "B \uE020 and \uE021";
+    const projectBReferences = [
+      createFileReference("src/b.ts", "b.ts", "paste-b", { token: "\uE020" }),
+      createFileReference("/scratch/paste-b/b.txt", "b.txt", "paste-b", { token: "\uE021" }),
+    ];
+    flushSync(() => controller.applyEditorDraft(projectBText, projectBReferences, projectBText.length));
+    await new Promise(requestAnimationFrame);
+    flushSync(() => root.render(null));
+    render("paste-a", "/project-a");
+    const projectAText = "A \uE022 and \uE023";
+    const projectAReferences = [
+      createFileReference("src/a.ts", "a.ts", "paste-a", { token: "\uE022" }),
+      createFileReference("/scratch/paste-a/a.txt", "a.txt", "paste-a", { token: "\uE023" }),
+    ];
+    flushSync(() => controller.applyEditorDraft(projectAText, projectAReferences, projectAText.length));
+    await new Promise(requestAnimationFrame);
+    render("paste-b", "/project-b");
+    await new Promise(requestAnimationFrame);
+    assert(readEditorValue(controller.ref.current!) === projectBText &&
+      controller.fileReferences.length === 2 &&
+      controller.ref.current!.textContent!.includes("b.ts") &&
+      readComposerDraft("paste-a")?.workspacePath === "/project-a",
+    "cross-project session switch lost the destination draft or relabeled its source: " + JSON.stringify({
+      text: readEditorValue(controller.ref.current!),
+      referencePaths: controller.fileReferences.map((reference) => reference.path),
+      sourceWorkspace: readComposerDraft("paste-a")?.workspacePath,
+    }));
+    render("paste-a", "/project-a");
+    await new Promise(requestAnimationFrame);
+    assert(readEditorValue(controller.ref.current!) === projectAText &&
+      controller.fileReferences.length === 2 && controller.ref.current!.textContent!.includes("a.ts") &&
+      readComposerDraft("paste-b")?.workspacePath === "/project-b",
+    "cross-project round-trip did not restore each conversation's own draft");
+    render("paste-a", "/project-c");
+    await new Promise(requestAnimationFrame);
+    assert(readEditorValue(controller.ref.current!) === "A  and \uE023" &&
+      controller.fileReferences.length === 1 && controller.fileReferences[0].path === projectAReferences[1].path,
+    "a mounted workspace change must remove relative references while preserving scratch references");
+    render("paste-b", "/project-c");
+    await new Promise(requestAnimationFrame);
+    assert(readEditorValue(controller.ref.current!) === "B  and \uE021" &&
+      controller.fileReferences.length === 1 && controller.fileReferences[0].path === projectBReferences[1].path,
+    "restoring a session into another workspace must validate its own saved workspace");
+    flushSync(() => root.render(null));
+    resetComposerDraftCache();
+
     // Keep the source attachment snapshot when a paste finishes in another session.
     await reset("keep \uE010 ", 7, 7);
     const originalReference = createFileReference("/scratch/paste-a/original.txt", "original.txt", "paste-a", { token: "\uE010", kind: "file" });

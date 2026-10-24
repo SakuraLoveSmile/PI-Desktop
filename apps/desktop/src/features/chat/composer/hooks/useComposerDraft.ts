@@ -151,9 +151,7 @@ export function useComposerDraft({
   const ref = useRef<HTMLDivElement>(null);
   const placeholderContextRef = useRef(`${variant}:${activeSessionId ?? HOME_DRAFT_KEY}`);
   const draftKeyRef = useRef(draftKey);
-  const workspacePathRef = useRef(workspacePath);
-  workspacePathRef.current = workspacePath;
-  const previousWorkspacePathRef = useRef(initialDraft?.workspacePath ?? workspacePath);
+  const workspacePathRef = useRef(initialDraft?.workspacePath ?? workspacePath);
 
   // Keep one guidance copy stable until the user changes page or session.
   useEffect(() => {
@@ -392,6 +390,7 @@ export function useComposerDraft({
       if (previousKey === HOME_DRAFT_KEY) flushScheduledHomeDraftAdopt(draftKey);
       draftKeyRef.current = draftKey;
       const nextDraft = readComposerDraft(draftKey);
+      workspacePathRef.current = nextDraft?.workspacePath ?? workspacePath;
       const nextReferences = nextDraft?.fileReferences.map((fileReference) =>
         createFileReferenceFromSnapshot(fileReference, referenceSessionId),
       ) ?? [];
@@ -399,6 +398,8 @@ export function useComposerDraft({
       // A rapid switch must not serialize the previous render's attachments.
       valueRef.current = nextDraft?.text ?? "";
       fileReferencesRef.current = nextReferences;
+      editorValueRef.current = null;
+      pendingEditorCaretRef.current = nextDraft?.text.length ?? 0;
       setValue(nextDraft?.text ?? "");
       setFileReferences(nextReferences);
       setCursor(nextDraft?.text.length ?? 0);
@@ -406,7 +407,7 @@ export function useComposerDraft({
     }
     // Current drafts are serialized lazily on switch, unmount, blur, or a
     // snapshot request; plain typing does not serialize on every keystroke.
-  }, [draftKey, referenceSessionId]);
+  }, [draftKey, referenceSessionId, workspacePath]);
 
   useEffect(() => {
     if (draftKey !== draftKeyRef.current) return;
@@ -414,7 +415,7 @@ export function useComposerDraft({
       draftKey,
       valueRef.current,
       fileReferencesRef.current,
-      workspacePath,
+      workspacePathRef.current,
     );
   }, [draftKey, fileReferences, referenceSessionId, workspacePath]);
 
@@ -462,11 +463,11 @@ export function useComposerDraft({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- callbacks close over refs
   }, []);
 
-  useEffect(() => {
-    // A remount restores this workspace's draft; only a real workspace change
-    // invalidates its relative file references.
-    if (previousWorkspacePathRef.current === workspacePath) return;
-    previousWorkspacePathRef.current = workspacePath;
+  useLayoutEffect(() => {
+    // Validate the loaded owner's workspace, including when only its session
+    // changes. The departing owner's path must never invalidate incoming refs.
+    if (workspacePathRef.current === workspacePath) return;
+    workspacePathRef.current = workspacePath;
     const current = fileReferencesRef.current;
     // Plugin marks carry their text, not a workspace path.
     const survives = (fileReference: ComposerFileReference) =>
@@ -483,8 +484,9 @@ export function useComposerDraft({
     );
     if (droppedTokens.size > 0) {
       const element = ref.current;
-      const source = element ? readEditorValue(element) : valueRef.current;
-      const caret = element ? editorSelectionRange(element).start : source.length;
+      const source = valueRef.current;
+      const caret = pendingEditorCaretRef.current ??
+        (element ? editorSelectionRange(element).start : source.length);
       let nextValue = "";
       let nextCaret = caret;
       let index = 0;
@@ -498,11 +500,14 @@ export function useComposerDraft({
       }
       const nextIndex = Math.max(0, Math.min(nextCaret, nextValue.length));
       pendingEditorCaretRef.current = nextIndex;
+      valueRef.current = nextValue;
+      editorValueRef.current = null;
       setValue(nextValue);
       setCursor(nextIndex);
     }
+    fileReferencesRef.current = kept;
     setFileReferences(kept);
-  }, [workspacePath]);
+  }, [draftKey, workspacePath]);
 
   useEffect(() => {
     if (!composerPrefill || composerPrefill.sessionId !== activeSessionId) return;
