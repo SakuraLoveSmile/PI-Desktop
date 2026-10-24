@@ -47,9 +47,13 @@ app.whenReady().then(async () => {
   const host = new Host(${JSON.stringify(binary)}, path.join(__dirname, "data"));
   let window;
   let failure;
+  const startedAt = Date.now();
+  const stage = (name, detail = {}) => console.error("PROVIDER_ORDER_STAGE " + JSON.stringify({
+    name, elapsedMs: Date.now() - startedAt, ...detail,
+  }));
   try {
     await host.start();
-    console.error("PROVIDER_ORDER_STAGE host-ready");
+    stage("host-ready");
     const fixtures = [];
     for (const name of ["A", "B", "C"]) {
       const { provider } = await host.call("providers.create", {
@@ -103,25 +107,38 @@ app.whenReady().then(async () => {
       sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false,
     } });
     window.webContents.on("console-message", (event) => console.error(event.message));
+    for (const name of ["did-start-loading", "dom-ready", "did-finish-load", "did-stop-loading"]) {
+      window.webContents.on(name, () => stage(name));
+    }
+    window.webContents.on("did-fail-load", (_event, code, description, _url, isMainFrame) => {
+      if (isMainFrame) stage("did-fail-load", { code, description });
+    });
+    window.webContents.on("render-process-gone", (_event, detail) => stage("render-process-gone", detail));
+    window.on("unresponsive", () => stage("unresponsive"));
     await window.loadFile(path.join(__dirname, "index.html"));
-    console.error("PROVIDER_ORDER_STAGE loaded");
+    stage("loaded");
     // Drag previews and the probe's waits require real display frames. Show
     // the fixture without taking keyboard focus, including under Linux/Xvfb.
     window.showInactive();
     const surface = await window.webContents.executeJavaScript("({ visibility: document.visibilityState, width: innerWidth, height: innerHeight })");
-    console.error("PROVIDER_ORDER_STAGE " + JSON.stringify({ visible: window.isVisible(), minimized: window.isMinimized(), ...surface }));
+    stage("surface", { visible: window.isVisible(), minimized: window.isMinimized(), ...surface });
     if (!window.isVisible() || window.isMinimized() || surface.visibility !== "visible" || surface.width !== 1000 || surface.height !== 760) {
       throw new Error("Provider order fixture requires a visible 1000x760 content viewport");
     }
     await window.webContents.executeJavaScript("new Promise(resolve => requestAnimationFrame(() => resolve()))");
-    console.error("PROVIDER_ORDER_STAGE first-frame");
+    stage("first-frame");
     const interactions = await window.webContents.executeJavaScript("globalThis.providerOrderProbe()");
-    console.error("PROVIDER_ORDER_STAGE interactions-complete");
+    stage("interactions-complete");
     const performance = await window.webContents.executeJavaScript("globalThis.cardReorderPerformance()");
-    console.error("PROVIDER_ORDER_STAGE performance-complete");
-    await host.restart();
+    stage("performance-complete", { performance });
+    stage("host-stop-start", { pid: host.child?.pid, pendingMethods: [...host.pending.values()].map(entry => entry.method) });
+    await host.stop();
+    stage("host-stopped");
+    await host.start();
+    stage("host-restarted", { pid: host.child?.pid });
+    stage("renderer-reload-start");
     await window.loadFile(path.join(__dirname, "index.html"));
-    console.error("PROVIDER_ORDER_STAGE restarted");
+    stage("restarted");
     const restart = await window.webContents.executeJavaScript("globalThis.providerOrderProbe(true)");
     console.log("PROVIDER_ORDER_PROBE " + JSON.stringify({ ...interactions, restart: restart.ok, performance, surface }));
   } catch (error) {
@@ -140,12 +157,17 @@ app.whenReady().then(async () => {
   let output = "";
   for (const stream of [child.stdout, child.stderr]) stream.on("data", (data) => { output += data; });
   const timer = setTimeout(() => child.kill("SIGKILL"), 60_000);
-  let code;
+  let code, signal;
   try {
-    code = await new Promise((resolve, reject) => { child.once("error", reject); child.once("close", resolve); });
+    ({ code, signal } = await new Promise((resolve, reject) => {
+      child.once("error", reject);
+      child.once("close", (code, signal) => resolve({ code, signal }));
+    }));
   } finally { clearTimeout(timer); }
+  const stages = output.split(/\r?\n/).filter(line => line.startsWith("PROVIDER_ORDER_STAGE "));
+  for (const stage of stages) console.log(stage);
   const line = output.split(/\r?\n/).find((line) => line.startsWith("PROVIDER_ORDER_PROBE "));
-  assert(line, `no result (exit=${code}): ${output.slice(-4000)}`);
+  assert(line, `no result (exit=${code}, signal=${signal}): ${output.slice(-4000)}`);
   console.log(line);
   assert.equal(code, 0, output.slice(-6000));
   assert.equal(JSON.parse(line.slice("PROVIDER_ORDER_PROBE ".length)).ok, true);

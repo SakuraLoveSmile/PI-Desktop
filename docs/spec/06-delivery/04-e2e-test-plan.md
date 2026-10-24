@@ -4,6 +4,13 @@
 > Status: Accepted (protocol/Electron automation is active; scene-family nightly fixtures and PR smokes are active)
 > Cross-references: [acceptance-criteria](02-acceptance-criteria.md) · [milestones](01-mvp-milestones.md) · [ai-development-workflow](03-ai-development-workflow.md) · [change-checklist](05-change-checklist.md)
 
+The full automatic fixture catalog runs through `e2e-nightly.yml`. For focused
+diagnosis, dispatch the existing isolated runner with
+`gh workflow run e2e-run.yml -R SakuraLoveSmile/PI-Desktop --ref <request-branch> -f family=<catalog-family>`.
+This manual entry uses the nightly tier for one family and retains its exact
+candidate/base and artifact report. A focused diagnostic run does not replace
+the complete nightly candidate validation or PR integration gates.
+
 ---
 
 ## 1. Goals

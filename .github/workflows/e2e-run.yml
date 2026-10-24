@@ -12,6 +12,12 @@ on:
       source_sha:
         type: string
         default: ''
+  workflow_dispatch:
+    inputs:
+      family:
+        description: 'One catalog family for diagnosis; full nightly validation remains required'
+        type: string
+        required: true
 
 permissions:
   contents: read
@@ -55,7 +61,7 @@ jobs:
         run: node scripts/generate-scenario-index.mjs --check
       - name: Run isolated fixture suites
         env:
-          E2E_TIER: ${{ inputs.tier }}
+          E2E_TIER: ${{ inputs.tier || 'nightly' }}
           E2E_FAMILY: ${{ inputs.family }}
           PI_DESKTOP_HOST_BIN: ${{ github.workspace }}/target/debug/pi-desktop-host-core
         run: |
@@ -64,5 +70,5 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: e2e-${{ inputs.tier }}-${{ inputs.family || 'smoke' }}
+          name: e2e-${{ inputs.tier || 'nightly' }}-${{ inputs.family || 'smoke' }}
           path: .artifacts/e2e/

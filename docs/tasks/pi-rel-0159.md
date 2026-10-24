@@ -500,6 +500,21 @@ admission. No product persistence, launch authorization, timeout or acceptance
 assertion was relaxed. Independent review found no material issue; final hosted
 confirmation is still required.
 
+Clean `2c22219ea` has a fresh 2,040-artifact source-bound overlay receipt and a
+complete native recovery pass. Its ordinary CI, Docs, ancestry and shared-memory
+checks passed. Nightly `40096564091` confirmed all 36 Goal/Team suites, including
+pending recovery and the full budget lifecycle, but Provider ordering produced
+no result before its existing 60-second watchdog. Its recorded first frame,
+interactions and 200-card performance probe all completed; the missing stage is
+between Host restart and renderer reload. The exact same local baseline passed,
+so a local reproduction or a persistence defect is not claimed. Split timed
+Host stop/start and renderer navigation diagnostics now identify that boundary
+and retain Electron load/process events and the actual exit signal. No probe,
+performance assertion or deadline changed. The existing isolated runner gains
+a manual one-family nightly diagnostic entry; the complete nightly dispatcher
+and final full-catalog requirement remain unchanged. Focused Linux diagnosis
+and another complete final-candidate result are required before landing.
+
 Remaining: final exact-SHA hosted task-candidate and
 PR-integration gates, formal release workflow, publication integrity and cleanup.
 These remain required. Detailed local logs/reports are in
