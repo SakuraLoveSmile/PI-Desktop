@@ -8,6 +8,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { readlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import { resolveElectronBinary } from "./e2e/boot.mjs";
 import { Host, resolveHostBinary } from "./e2e/host.mjs";
@@ -15,6 +16,8 @@ import { Host, resolveHostBinary } from "./e2e/host.mjs";
 if (process.platform === "win32") {
   throw new Error("Team UI E2E requires macOS/Linux HOME isolation and controlled Host signals; no Windows profile was accessed.");
 }
+
+const teamEvidenceDir = fileURLToPath(new URL("../.artifacts/e2e/team/", import.meta.url));
 
 const tempRoot = await mkdtemp(join(tmpdir(), "pi-desktop-team-e2e-"));
 const dataDir = join(tempRoot, "data");
@@ -729,9 +732,10 @@ async function refreshWhileDragging(sendCdp, evaluate) {
   return after;
 }
 
-async function saveScreenshot(sendCdp, name) {
+async function saveScreenshot(sendCdp, name, directory = tempRoot) {
   const screenshot = await sendCdp("Page.captureScreenshot", { format: "png" });
-  const path = join(tempRoot, name);
+  await mkdir(directory, { recursive: true });
+  const path = join(directory, name);
   await writeFile(path, Buffer.from(screenshot.data, "base64"));
   return path;
 }
@@ -873,6 +877,21 @@ async function resizePanel(sendCdp, evaluate, width) {
   await waitFor(() => evaluate(`Math.abs(document.querySelector('[data-testid="work-panel"]').getBoundingClientRect().width-${width}) < 2`), `panel resized to ${width}px`);
 }
 
+const TEAM_SURFACE_METRICS = `(() => {
+  const root=document.documentElement;
+  const surface=document.querySelector('.team-panel, .work-panel-overview, .team-work-tab');
+  const bounds=surface.getBoundingClientRect(), surfaceStyle=getComputedStyle(surface);
+  const right=bounds.left+surface.clientWidth-parseFloat(surfaceStyle.paddingRight);
+  const overflowing=surface.scrollWidth > surface.clientWidth ? Array.from(surface.querySelectorAll('*')).map(node => {
+    const rect=node.getBoundingClientRect(), style=getComputedStyle(node);
+    return { tag:node.tagName, className:node.getAttribute('class'), parentClassName:node.parentElement?.className, text:node.textContent?.slice(0,100), right:rect.right, top:rect.top, bottom:rect.bottom,
+      width:rect.width, clientWidth:node.clientWidth, scrollWidth:node.scrollWidth,
+      display:style.display, minWidth:style.minWidth, flexShrink:style.flexShrink, flexWrap:style.flexWrap, gridTemplateColumns:style.gridTemplateColumns,
+      fontFamily:style.fontFamily,fontSize:style.fontSize,whiteSpace:style.whiteSpace,overflowX:style.overflowX };
+  }).filter(node => node.right > right+0.5).sort((a,b) => b.right-a.right).slice(0,20) : [];
+  return { page: [root.clientWidth, root.scrollWidth], surface: [surface.clientWidth, surface.scrollWidth], contentRight:right, overflowing };
+})()`;
+
 async function verifyTeamLayoutMatrix(sendCdp, evaluate, locale) {
   await sendCdp("Emulation.setDeviceMetricsOverride", { width: 1600, height: 1000, deviceScaleFactor: 1, mobile: false });
   let primaryError;
@@ -911,20 +930,7 @@ async function verifyTeamLayoutMatrix(sendCdp, evaluate, locale) {
           matrixPosition = { locale, surface, width, scale, theme, stage: "measure" };
           await evaluate(`document.documentElement.style.setProperty('--font-scale', '${scale}'); document.documentElement.setAttribute('data-theme', '${theme}'); true`);
           await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
-          const metrics = await evaluate(`(() => {
-            const root=document.documentElement;
-            const surface=document.querySelector('.team-panel, .work-panel-overview, .team-work-tab');
-            const bounds=surface.getBoundingClientRect(), surfaceStyle=getComputedStyle(surface);
-            const right=bounds.left+surface.clientWidth-parseFloat(surfaceStyle.paddingRight);
-            const overflowing=surface.scrollWidth > surface.clientWidth ? Array.from(surface.querySelectorAll('*')).map(node => {
-              const rect=node.getBoundingClientRect(), style=getComputedStyle(node);
-              return { tag:node.tagName, className:node.getAttribute('class'), text:node.textContent?.slice(0,100), right:rect.right,
-                width:rect.width, clientWidth:node.clientWidth, scrollWidth:node.scrollWidth,
-                display:style.display, minWidth:style.minWidth, flexShrink:style.flexShrink, flexWrap:style.flexWrap,
-                fontFamily:style.fontFamily,fontSize:style.fontSize,whiteSpace:style.whiteSpace,overflowX:style.overflowX };
-            }).filter(node => node.right > right+0.5).sort((a,b) => b.right-a.right).slice(0,20) : [];
-            return { page: [root.clientWidth, root.scrollWidth], surface: [surface.clientWidth, surface.scrollWidth], contentRight:right, overflowing };
-          })()`);
+          const metrics = await evaluate(TEAM_SURFACE_METRICS);
           assert.ok(metrics.page[1] <= metrics.page[0] && metrics.surface[1] <= metrics.surface[0], `${locale}/${surface}/${width}/${scale}/${theme} overflows: ${JSON.stringify(metrics)}`);
           if (scale === 1.5 && width === 320) await saveScreenshot(sendCdp, `team-${surface}-${locale}-${theme}-320-150.png`);
         }
@@ -933,7 +939,7 @@ async function verifyTeamLayoutMatrix(sendCdp, evaluate, locale) {
   } catch (error) {
     primaryError = error;
     console.error("TEAM_LAYOUT_PRIMARY_FAILURE", JSON.stringify({ ...matrixPosition, error: String(error), state: await diagnostics() }));
-    await saveScreenshot(sendCdp, `team-layout-primary-${locale}.png`);
+    await saveScreenshot(sendCdp, `team-layout-primary-${locale}.png`, teamEvidenceDir);
     throw error;
   } finally {
     try {
@@ -952,8 +958,9 @@ async function verifyTeamLayoutMatrix(sendCdp, evaluate, locale) {
 
 async function verifyLongTeamProgress(sendCdp, evaluate, invoke, leadId) {
   // Use a shipped, longer translation through the real language-setting path.
-  // This reproduces constrained text metrics without substituting a font or
-  // changing the existing bilingual matrix, panel widths or overflow standard.
+  // Keep the default-font cases and original bilingual matrix unchanged. An
+  // additional Verdana stack reproduces the measured 333px-label/5px header
+  // overflow on macOS; its sans-serif fallback also runs when Verdana is absent.
   await invoke("settingsSet", { language: "fr" });
   await sendCdp("Page.reload");
   await waitFor(() => evaluate(`document.documentElement.lang === 'fr' &&
@@ -962,7 +969,11 @@ async function verifyLongTeamProgress(sendCdp, evaluate, invoke, leadId) {
   await evaluate(`document.querySelector('[data-sidebar-session-row="${leadId}"] button.thread-item-main')?.click()`);
   await waitFor(() => evaluate(`!!document.querySelector('[data-session-pane="${leadId}"][data-visible="true"]')`), "Lead reopened in French");
   await sendCdp("Emulation.setDeviceMetricsOverride", { width: 1600, height: 1000, deviceScaleFactor: 1, mobile: false });
+  const originalFont = await evaluate(`document.documentElement.style.getPropertyValue('--font-sans')`);
+  let position = { locale: "fr", surface: "setup" };
   const clickProgressControl = async (selector) => {
+    await evaluate(`document.querySelector(${JSON.stringify(selector)}).scrollIntoView({block:'center'}); true`);
+    await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
     const point = await evaluate(`(() => {
       const control=document.querySelector(${JSON.stringify(selector)});
       const rect=control.getBoundingClientRect(), x=rect.left+rect.width/2, y=rect.top+rect.height/2;
@@ -974,12 +985,15 @@ async function verifyLongTeamProgress(sendCdp, evaluate, invoke, leadId) {
     await sendCdp("Input.dispatchMouseEvent", {type:"mouseReleased",...point,button:"left",buttons:0,clickCount:1});
   };
   try {
-    for (const surface of ["overview", "aggregate"]) {
+    for (const font of ["verdana", "default"]) for (const surface of ["overview", "aggregate"]) {
+      await evaluate(`document.documentElement.style.setProperty('--font-sans', ${JSON.stringify(font === "default" ? originalFont : 'Verdana, sans-serif')}); true`);
+      position = { locale: "fr", font, surface, stage: "navigation" };
       await openTeamPanel(sendCdp, evaluate);
       if (surface === "overview") await activateOverviewTab(sendCdp, evaluate);
       await waitFor(() => evaluate(`document.querySelector('.team-progress-title')?.textContent === 'Progression des tâches'`), "real French Team progress");
       await resizePanel(sendCdp, evaluate, 320);
       for (const theme of ["dark", "light"]) {
+        position = { locale: "fr", font, surface, theme, width: 320, scale: 1.5, stage: "measure" };
         await evaluate(`document.documentElement.style.setProperty('--font-scale', '1.5'); document.documentElement.setAttribute('data-theme', '${theme}'); true`);
         await evaluate(`document.querySelector('.team-progress-header').scrollIntoView({block:'center'}); true`);
         await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
@@ -990,16 +1004,23 @@ async function verifyLongTeamProgress(sendCdp, evaluate, invoke, leadId) {
           const label=link.querySelector('span');
           const toggle=progress.querySelector('.team-progress-toggle');
           const rect=node => node.getBoundingClientRect().toJSON();
-          return { page:[document.documentElement.clientWidth,document.documentElement.scrollWidth],
-            surface:[surface.clientWidth,surface.scrollWidth], progress:rect(progress), toggle:rect(toggle), arrow:rect(link.querySelector('svg')),
+          const header=surface.querySelector('.team-panel-header');
+          const measure=node => ({...rect(node),text:node.textContent,clientWidth:node.clientWidth,scrollWidth:node.scrollWidth,
+            minWidth:getComputedStyle(node).minWidth,flex:getComputedStyle(node).flex});
+          return { ...(${TEAM_SURFACE_METRICS}), progress:rect(progress), toggle:rect(toggle), arrow:rect(link.querySelector('svg')),
             link:{...rect(link),label:label.textContent,ariaLabel:link.getAttribute('aria-label'),
               font:getComputedStyle(link).font,fontFamily:getComputedStyle(link).fontFamily,
               textWidth:label.scrollWidth,labelWidth:label.clientWidth},
+            header:header ? {...rect(header),title:measure(header.querySelector('.team-panel-title')),
+              label:measure(header.querySelector('.team-panel-title > span:not(.team-status-badge)')),
+              badge:measure(header.querySelector('.team-status-badge')),
+              icon:rect(header.querySelector('.team-panel-title > svg')),
+              actions:Array.from(header.querySelectorAll('.team-panel-actions .icon-btn')).map(measure)} : null,
             children:Array.from(progress.children).map(node => ({className:node.className,...rect(node),
               flex:getComputedStyle(node).flex,minWidth:getComputedStyle(node).minWidth})) };
         })()`);
-        console.log("TEAM_LONG_PROGRESS_BOUNDS", JSON.stringify({ surface, theme, metrics }));
-        assert.ok(metrics.page[1] <= metrics.page[0] && metrics.surface[1] <= metrics.surface[0], `fr/${surface}/320/1.5/${theme} progress overflows: ${JSON.stringify(metrics)}`);
+        console.log("TEAM_LONG_PROGRESS_BOUNDS", JSON.stringify({ font, surface, theme, metrics }));
+        assert.ok(metrics.page[1] <= metrics.page[0] && metrics.surface[1] <= metrics.surface[0], `fr/${font}/${surface}/320/1.5/${theme} progress overflows: ${JSON.stringify(metrics)}`);
         assert.equal(metrics.toggle.width, 24, "long progress labels preserve the 24px disclosure width");
         assert.equal(metrics.toggle.height, 24, "long progress labels preserve the 24px disclosure height");
         assert.equal(metrics.arrow.width, 24, "the 16px panorama arrow retains its 150% scaled width");
@@ -1007,20 +1028,63 @@ async function verifyLongTeamProgress(sendCdp, evaluate, invoke, leadId) {
         assert.ok(metrics.toggle.right <= metrics.progress.right && metrics.toggle.left >= metrics.progress.left, "the complete disclosure stays inside its progress row");
         assert.ok(metrics.link.labelWidth > 0 && metrics.link.textWidth > metrics.link.labelWidth, "the real long label truncates within its available space");
         assert.equal(metrics.link.ariaLabel, metrics.link.label, "the full panorama label remains accessible");
-        await saveScreenshot(sendCdp, `team-long-progress-${surface}-${theme}.png`);
+        if (metrics.header) {
+          assert.equal(metrics.header.actions.length, 2, "both Team header actions remain available");
+          for (const action of metrics.header.actions) {
+            assert.equal(action.width, 28, "Team header actions preserve their 28px width");
+            assert.equal(action.height, 28, "Team header actions preserve their 28px height");
+            assert.ok(action.right <= metrics.header.right, "Team header actions stay within the header");
+          }
+          assert.equal(metrics.header.icon.width, 27, "the Team icon retains its 150% scaled size");
+          assert.ok(metrics.header.badge.scrollWidth <= metrics.header.badge.clientWidth, "the complete Team status badge stays visible");
+          assert.ok(metrics.header.label.clientWidth > 0 && metrics.header.label.scrollWidth > metrics.header.label.clientWidth, "the Team title truncates within its allocation");
+        }
+        await saveScreenshot(sendCdp, `team-long-progress-${surface}-${theme}${font === "default" ? "" : "-verdana"}.png`, teamEvidenceDir);
+        if (metrics.header) {
+          await evaluate(`document.querySelector('.team-panel-header').scrollIntoView({block:'center'}); true`);
+          await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
+          await saveScreenshot(sendCdp, `team-header-${font}-${theme}.png`, teamEvidenceDir);
+        }
         await clickProgressControl('.team-progress-toggle');
         await waitFor(() => evaluate(`document.querySelector('.team-progress-body')?.hidden === true`), "long-label progress collapse");
         await clickProgressControl('.team-progress-toggle');
         await waitFor(() => evaluate(`document.querySelector('.team-progress-body')?.hidden === false`), "long-label progress reopen");
       }
+      if (surface === "aggregate") {
+        const lastRefresh = await evaluate(`document.querySelector('.team-panel').dataset.lastSuccessAt`);
+        await clickProgressControl('.team-panel-actions .icon-btn:last-child');
+        await waitFor(() => evaluate(`document.querySelector('.team-panel')?.dataset.lastSuccessAt !== ${JSON.stringify(lastRefresh)}`), "native Team header refresh completes");
+        await clickProgressControl('.team-panel-actions .icon-btn:first-child');
+        await waitFor(() => evaluate(`!!document.querySelector('[data-panorama-canvas]')`), "native Team header panorama opens");
+        await openTeamPanel(sendCdp, evaluate);
+      }
       await clickProgressControl('.team-progress-panorama');
       await waitFor(() => evaluate(`!!document.querySelector('[data-panorama-canvas]')`), "long-label panorama link remains clickable");
     }
+  } catch (error) {
+    // Preserve the failing font scale before finally restores it. The upload
+    // path is outside the temporary profile, which retains normal cleanup.
+    const evidence = { ...position, error: String(error), metrics: await evaluate(TEAM_SURFACE_METRICS) };
+    console.error("TEAM_LONG_PROGRESS_FAILURE", JSON.stringify(evidence));
+    await mkdir(teamEvidenceDir, { recursive: true });
+    await writeFile(join(teamEvidenceDir, "team-long-progress-failure.json"), JSON.stringify(evidence, null, 2));
+    await saveScreenshot(sendCdp, "team-long-progress-primary.png", teamEvidenceDir);
+    if (evidence.metrics.overflowing.length) {
+      await evaluate(`(() => {
+        const surface=document.querySelector('.team-panel, .work-panel-overview');
+        const right=(${TEAM_SURFACE_METRICS}).contentRight;
+        Array.from(surface.querySelectorAll('*')).find(node => node.getBoundingClientRect().right > right+0.5)
+          ?.scrollIntoView({block:'center',inline:'nearest'});
+      })()`);
+      await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
+      await saveScreenshot(sendCdp, "team-long-progress-offender.png", teamEvidenceDir);
+    }
+    throw error;
   } finally {
-    await evaluate(`document.documentElement.style.removeProperty('--font-scale'); document.documentElement.setAttribute('data-theme', 'dark'); true`);
+    await evaluate(`document.documentElement.style.removeProperty('--font-scale'); document.documentElement.style.setProperty('--font-sans', ${JSON.stringify(originalFont)}); document.documentElement.setAttribute('data-theme', 'dark'); true`);
     await sendCdp("Emulation.clearDeviceMetricsOverride");
   }
-  console.log("PASS French long progress labels: Overview/aggregate, 320px, 150%, dark/light, full disclosure, native collapse/reopen and panorama link");
+  console.log("PASS French long progress labels: Overview/aggregate, 320px, 150%, dark/light, default/Verdana, intact header actions, native collapse/reopen, refresh and panorama links");
 }
 
 try {

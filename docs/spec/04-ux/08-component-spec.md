@@ -2987,6 +2987,9 @@ and diagnostic state, plus live non-deleted tasks with owner, status,
 dependencies, readiness, and advisory overlapping write scopes. Roster and board
 snapshots must describe the same Team revision. Refresh results from a prior
 Team or older request cannot replace a newer snapshot.
+At narrow widths and larger text scales, the aggregate header truncates its
+title label before displacing the status badge or either 28px action button.
+The Team icon retains its configured scale and both actions remain clickable.
 
 For local Desktop sessions, one revisioned Host snapshot also carries the
 queued Team-mail count and the current launch review/execution decision so a

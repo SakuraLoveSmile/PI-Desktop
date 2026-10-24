@@ -24,11 +24,22 @@
 
 .team-panel-title {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: 8px;
   font-size: var(--text-base);
   font-weight: var(--font-semibold);
   color: var(--ds-text-primary);
+}
+
+.team-panel-title > svg,
+.team-panel-title > .team-status-badge { flex: none; }
+
+.team-panel-title > span:not(.team-status-badge) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .team-panel-actions {

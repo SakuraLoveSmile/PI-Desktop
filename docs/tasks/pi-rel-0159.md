@@ -444,6 +444,30 @@ two-second/sixty-second budgets remain. Independent review found no blocker.
 This establishes the missing readiness precondition, not the old Linux
 compositor failure's precise internal cause; exact-SHA hosted proof is required.
 
+Linux `4b37e75bb` confirmed that readiness path: transcript passed 8/8 and all
+nine disclosure phases recorded four real samples and three stable comparisons.
+Its regular CI, Docs, PR-base and project-memory gates passed. The intermediate
+nightly was canceled after this targeted evidence, before all families finished;
+it is not a 131-suite acceptance result. The superseded `2c6cac30e` run likewise
+retains eight completed families (121/123 suites passing) and two failures;
+its unfinished shell/voice families are NOT RUN to completion.
+
+That Linux Team run also exposed a separate French aggregate-header overflow
+after the progress controls already fit: surface `314/319`. A real installed
+Verdana font reproduces the same boundary locally (333px label versus Linux's
+334px). The title's automatic minimum width pushes the two 28px header actions
+five pixels beyond the panel. The persistent regression failed on old CSS before
+the minimal fix: allow only the title text to shrink/ellipsis, retaining its
+configured icon, complete status badge, buttons, spacing and font size. The full
+native journey, original 120 bilingual combinations and eight default/Verdana
+French combinations passed after an actual overlay build; the surface is now
+`314/314`, with native refresh and both panorama entries verified. Eleven
+presentation tests and applicable static gates passed. Independent review found
+no blocker, and the lead inspected repaired dark/light header screenshots.
+Original-scale offender JSON and screenshots now survive fixture cleanup under
+the existing hosted artifact directory. Final combined-source/Linux validation
+is still required.
+
 Remaining: final exact-SHA hosted task-candidate and
 PR-integration gates, formal release workflow, publication integrity and cleanup.
 These remain required. Detailed local logs/reports are in
