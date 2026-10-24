@@ -4,6 +4,7 @@ import { IPC } from "@pi-desktop/shared";
 import { AgentMcpPage } from "../../apps/desktop/src/components/settings/AgentMcpPage";
 import { useAppStore } from "../../apps/desktop/src/stores/app-store";
 import { createCapabilitiesFixture } from "./settings-capabilities-fixture.js";
+import { SettingsPage } from "../../apps/desktop/src/features/settings/SettingsPage";
 
 const assert = (value: unknown, label: string) => { if (!value) throw new Error(label); };
 const deferred = <T,>() => {
@@ -130,6 +131,103 @@ export async function exerciseHostCollectionRaces({ mount, node, i18n }: {
       }
     }
     checks.push("pending save cannot revive old fetcher or feedback after project switch or unmount");
+
+    const scopeFailures: string[] = [];
+    for (const tab of ["mcp", "skills"] as const) {
+      await mount(<div />);
+      const projects = fixture.projects;
+      const writes: Array<{ projectPath?: string }> = [];
+      const pendingSave = deferred<void>();
+      let holdWrite = true;
+      let saveStarted = false;
+      let failWrite = false;
+      let holdSkillRead = false;
+      let skillReadStarted = false;
+      const pendingSkillRead = deferred<void>();
+      const listChannel = tab === "mcp" ? IPC.invoke.mcpList : IPC.invoke.skillList;
+      const writeChannel = tab === "mcp" ? IPC.invoke.mcpUpsert : IPC.invoke.skillUpdate;
+      const record = (projectPath: string) => ({
+        id: "same-id", name: "Original skill", label: "Original MCP", description: "Scope fixture",
+        enabled: true, level: "project", projectPath, scope: { mode: "projects", projects: [projectPath] },
+        path: `${projectPath}/.agents/${tab}/same-id`, source: "created", sizeBytes: 32,
+        transport: "stdio", command: "node", args: [], createdAt: "2026-10-24", updatedAt: "2026-10-24",
+      });
+      window.piDesktop = {
+        channels: IPC, platform: "darwin", on: () => () => {},
+        async invoke<T>(channel: string, ...args: unknown[]) {
+          const input = args[0] as { level?: string; projectPath?: string } | undefined;
+          let data: unknown;
+          if (channel === IPC.invoke.projectList) data = { projects };
+          else if (channel === IPC.invoke.pluginScenicThemesDestinations) data = [];
+          else if (channel === IPC.invoke.mcpControlGet) data = { enabled: false, running: false, source: "preference", connectionFile: "/fixture/control.json", error: null };
+          else if (channel === listChannel) {
+            const rows = input?.level === "project" && input.projectPath ? [record(input.projectPath)] : [];
+            data = tab === "mcp" ? { servers: rows, statuses: [] } : { skills: rows };
+          } else if (channel === IPC.invoke.skillRead && input?.projectPath) {
+            if (holdSkillRead) { holdSkillRead = false; skillReadStarted = true; await pendingSkillRead.promise; }
+            data = { skill: record(input.projectPath), body: "# Original skill\n\nFixture body." };
+          } else if (channel === writeChannel) {
+            writes.push({ projectPath: input?.projectPath });
+            if (failWrite) { failWrite = false; throw new Error("Scope fixture save failed"); }
+            if (holdWrite) { holdWrite = false; saveStarted = true; await pendingSave.promise; }
+            data = {};
+          } else throw new Error(`Unexpected scope fixture IPC ${channel}`);
+          return { ok: true, data: data as T };
+        },
+      };
+      useAppStore.setState({ settingsTab: tab, workspace: { path: projects[0].path, name: projects[0].name }, toasts: [] });
+      await mount(<SettingsPage />);
+      await until(() => node.querySelectorAll('.agent-capability-row').length === 1, `${tab}: project A inventory loaded through Settings`);
+      await click(node.querySelector<HTMLButtonElement>('.agent-capability-row button.settings-icon-button'));
+      await until(() => Boolean(document.querySelector('[role="dialog"]')), `${tab}: project A editor opens`);
+      const field = document.querySelector<HTMLInputElement>('[role="dialog"] input')!;
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field, "Project A draft");
+        field.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      await click(labelButton(document.querySelector('[role="dialog"]')!, i18n.t("common.save")));
+      await until(() => saveStarted, `${tab}: project A save waits`);
+      await act(async () => useAppStore.setState({ workspace: { path: projects[1].path, name: projects[1].name } }));
+      await act(async () => pendingSave.resolve());
+      // Do not open B's row: that used to replace the leaked editor and conceal
+      // the bug. Attempt the existing sheet action exactly as a user could.
+      const leakedEditor = document.querySelector('[role="dialog"]');
+      if (leakedEditor) await click(labelButton(leakedEditor, i18n.t("common.save")));
+      if (writes.some(write => write.projectPath === projects[1].path)) scopeFailures.push(`${tab}: project A draft was written to project B`);
+      if (leakedEditor) scopeFailures.push(`${tab}: project A editor survived the scope change`);
+      assert(writes[0]?.projectPath === projects[0].path, `${tab}: the original save stays bound to project A`);
+
+      // The current scope must still retain its draft and offer a retry after
+      // a genuine persistence failure; retiring A must not weaken that path.
+      await click(node.querySelector<HTMLButtonElement>('.agent-capability-row button.settings-icon-button'));
+      await until(() => Boolean(document.querySelector('[role="dialog"]')), `${tab}: project B opens a fresh editor`);
+      const retryField = document.querySelector<HTMLInputElement>('[role="dialog"] input')!;
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(retryField, "Project B retry draft");
+        retryField.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      failWrite = true;
+      await click(labelButton(document.querySelector('[role="dialog"]')!, i18n.t("common.save")));
+      assert(document.querySelector('[role="dialog"] [role="alert"]'), `${tab}: current save failure stays visible beside the draft`);
+      assert(document.querySelector<HTMLInputElement>('[role="dialog"] input')?.value === "Project B retry draft", `${tab}: current save failure retains the draft`);
+      await click(labelButton(document.querySelector('[role="dialog"]')!, i18n.t("common.save")));
+      await until(() => !document.querySelector('[role="dialog"]'), `${tab}: current save retry succeeds`);
+
+      if (tab === "skills") {
+        await act(async () => useAppStore.setState({ workspace: { path: projects[0].path, name: projects[0].name } }));
+        holdSkillRead = true;
+        await click(node.querySelector<HTMLButtonElement>('.agent-capability-row button.settings-icon-button'));
+        await until(() => skillReadStarted, "Skills project A editor read waits");
+        await act(async () => useAppStore.setState({ workspace: { path: projects[1].path, name: projects[1].name } }));
+        await act(async () => pendingSkillRead.resolve());
+        assert(!document.querySelector('[role="dialog"]'), "Skills retired project A read cannot open its editor in B");
+        assert(!node.querySelector<HTMLButtonElement>('.agent-capability-row button.settings-icon-button')?.disabled, "Skills retired read cannot leave B's matching row busy");
+      }
+      await mount(<div />);
+    }
+    assert(scopeFailures.length === 0, scopeFailures.join("; "));
+    checks.push("Settings MCP and Skills close pending project A editors on workspace B without writing A drafts into B");
+    checks.push("Settings current-scope MCP and Skills failed-save drafts retry successfully; retired Skills reads cannot reopen A or lock B");
     return checks;
   } finally { await mount(<div />); window.piDesktop = previous; }
 }

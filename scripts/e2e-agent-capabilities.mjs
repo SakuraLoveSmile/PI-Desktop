@@ -3,9 +3,9 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { repositoryRoot, resolveElectronBinary } from './e2e/boot.mjs';
 const root = repositoryRoot();
 const { build } = createRequire(join(root, 'packages/agent-runtime/package.json'))('esbuild');
@@ -14,6 +14,15 @@ try {
   await build({ entryPoints: [join(root, 'scripts/e2e/agent-capabilities.tsx')], outfile: join(temp, 'renderer.js'), bundle: true,
     platform: 'browser', format: 'esm', jsx: 'automatic', loader: { '.css': 'empty' },
     define: { 'process.env.NODE_ENV': '"development"', 'import.meta.env.DEV': 'false' },
+    plugins: [{ name: 'fixture-url-assets', setup(builder) {
+      builder.onResolve({ filter: /\?url$/ }, ({ path, resolveDir }) => ({
+        path: resolve(resolveDir, path.slice(0, -4)), namespace: 'fixture-url',
+      }));
+      builder.onLoad({ filter: /.*/, namespace: 'fixture-url' }, async ({ path }) => ({
+        contents: `export default ${JSON.stringify(`data:text/javascript;base64,${(await readFile(path)).toString('base64')}`)}`,
+        loader: 'js',
+      }));
+    } }],
     alias: { '@pi-desktop/shared': join(root, 'packages/shared/src/index.ts'),
       '@pi-desktop/shared/changelog-loader': join(root, 'packages/shared/src/changelog-loader.ts'),
       '@pi-desktop/i18n': join(root, 'packages/i18n/src/index.ts'),

@@ -68,6 +68,7 @@ type McpEditorState = {
   draft: McpDraft;
   editing: McpServerRecord | null;
   level: AgentCapabilityLevel;
+  projectPath: string | null;
 };
 
 type McpCollection = {
@@ -187,6 +188,7 @@ export function AgentMcpPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [refreshFailed, setRefreshFailed] = useState(false);
   useEffect(() => {
+    setEditor(null);
     setSaveError(null);
     setRefreshFailed(false);
     setSaving(false);
@@ -245,19 +247,20 @@ export function AgentMcpPage() {
       },
       editing: null,
       level: targetLevel,
+      projectPath: selectedProjectPath,
     });
   };
 
   const openEdit = (server: McpServerRecord, level: AgentCapabilityLevel) => {
     setSaveError(null);
     setMenuFor(null);
-    setEditor({ draft: draftFromRecord(server), editing: server, level });
+    setEditor({ draft: draftFromRecord(server), editing: server, level, projectPath: selectedProjectPath });
   };
 
   const save = async () => {
-    if (!editor || saving) return;
+    if (!editor || saving || editor.projectPath !== selectedProjectPath) return;
     const ownsOperation = captureOwner();
-    const projectPath = editor.level === "project" ? selectedProjectPath ?? undefined : undefined;
+    const projectPath = editor.level === "project" ? editor.projectPath ?? undefined : undefined;
     const candidateId = editor.draft.id.trim();
     const candidateLabel = editor.draft.label.trim().toLocaleLowerCase();
     const sameLevel = (editor.level === "global" ? globalServers : projectServers).some(

@@ -57,6 +57,7 @@ type SkillEditorState = {
   draft: SkillDraft;
   editing: UserSkillRecord | null;
   level: AgentCapabilityLevel;
+  projectPath: string | null;
 };
 
 type SkillCollection = {
@@ -103,6 +104,8 @@ export function AgentSkillsPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [refreshFailed, setRefreshFailed] = useState(false);
   useEffect(() => {
+    setEditor(null);
+    setBusyId(null);
     setSaveError(null);
     setRefreshFailed(false);
     setSaving(false);
@@ -177,32 +180,36 @@ export function AgentSkillsPage() {
       },
       editing: null,
       level: targetLevel,
+      projectPath: selectedProjectPath,
     });
   };
 
   const openEdit = async (skill: UserSkillRecord, level: AgentCapabilityLevel) => {
+    const ownsOperation = captureOwner();
     setSaveError(null);
     const key = rowKey(level, skill.id);
     setBusyId(key);
     try {
       const result = await api.readUserSkill(skill.id, levelQuery(level));
+      if (!ownsOperation()) return;
       setEditor({
         draft: draftFromSkill(result.skill ?? skill, result.body ?? ""),
         editing: result.skill ?? skill,
         level,
+        projectPath: selectedProjectPath,
       });
     } catch (error) {
-      showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
+      if (ownsOperation()) showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
     } finally {
-      setBusyId(null);
+      if (ownsOperation()) setBusyId(null);
     }
   };
 
   const save = async () => {
-    if (!editor || saving) return;
+    if (!editor || saving || editor.projectPath !== selectedProjectPath) return;
     const ownsOperation = captureOwner();
     const { draft, editing, level } = editor;
-    const projectPath = level === "project" ? selectedProjectPath ?? undefined : undefined;
+    const projectPath = level === "project" ? editor.projectPath ?? undefined : undefined;
     const payload = {
       name: draft.name.trim(),
       description: draft.description.trim(),
