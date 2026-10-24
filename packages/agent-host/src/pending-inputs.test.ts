@@ -1,15 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AskToolRequest } from "@pi-desktop/shared";
 import { AgentHost } from "./agent-host.js";
-import { MemoryQueueStore, type Principal, type QueuedTurnRecord } from "./ports.js";
+import { MemoryQueueStore, type Principal, type QueuedTurnRecord, type RuntimePort } from "./ports.js";
 
 const owner: Principal = { subject: "desktop", roles: ["owner"], pairedDevice: true };
 const request: AskToolRequest = { requestId: "ask", sessionId: "lead", toolCallId: "call", questions: [{ question: "Resume?", options: ["Review"] }], teamPending: { deferredAt: new Date(0).toISOString(), requiresNewApproval: true } };
 
-function fixture(readDurableInputs?: ConstructorParameters<typeof AgentHost>[0]["readDurableInputs"], isBusy = () => false) {
+function fixture(readDurableInputs?: ConstructorParameters<typeof AgentHost>[0]["readDurableInputs"], isBusy = () => false, steer?: RuntimePort["steer"]) {
   const prompts: unknown[]=[];
   const host=new AgentHost({ readDurableInputs,
-    runtime: { prompt: async input => { prompts.push(input); return { turnId:"new-user-turn" }; }, stop:async()=>({ requested:true }),abort:async()=>{},respondInput:async()=>{},isBusy },
+    runtime: { prompt: async input => { prompts.push(input); return { turnId:"new-user-turn" }; }, stop:async()=>({ requested:true }),abort:async()=>{},respondInput:async()=>{},isBusy, ...(steer ? { steer } : {}) },
     sessions: { get:async id=>({ id,title:"Lead",mode:"agent",permissionMode:"ask",planningState:"inactive",createdAt:new Date(0).toISOString(),updatedAt:new Date(0).toISOString() }), history:async()=>({ items:[],hasMore:false }) },
     approvals: { resolveTool:async()=>{},resolveContract:async()=>{},listPendingTools:async()=>[] },
     queueStore:new MemoryQueueStore(),
@@ -131,6 +131,30 @@ describe("durable Team inputs",()=>{
       context: { requestId: "other" } });
     expect(prompts).toEqual([]);
     expect(host.queue.find("asktool-answer:ask")).toBeDefined();
+    expect(host.queue.isHeld("lead")).toBe(true);
+  });
+
+  it("does not steer promoted ordinary work or expert mail into the live answer across a Team hold", async () => {
+    const steer = vi.fn(async () => ({ accepted: true }));
+    const { host, prompts } = fixture(undefined, () => false, steer);
+    await holdQueuedWork(host);
+    for (const record of host.queue.list("lead")) await host.prioritizeTurn(owner, record.id);
+    const promoted = host.queue.list("lead");
+    expect(promoted.every(record => record.priority !== undefined)).toBe(true);
+    await host.admitPersistedAnswer(owner, answerRecord());
+    await vi.waitFor(() => expect(prompts).toHaveLength(1));
+    await host.startTurn(owner, { sessionId: "lead", admission: "queue", input: { text: "Other work" },
+      context: { requestId: "other" } });
+    expect(steer).not.toHaveBeenCalled();
+    expect(host.queue.list("lead").slice(0, 2)).toEqual(promoted);
+    expect(host.queue.isHeld("lead")).toBe(true);
+    host.ingest({ sessionId: "lead", turnId: "new-user-turn", ts: Date.now(),
+      event: { type: "agent_end", messageIds: [] } });
+    await host.startTurn(owner, { sessionId: "lead", admission: "queue", input: { text: "Still held" },
+      context: { requestId: "still-held" } });
+    expect(prompts).toHaveLength(1);
+    expect(steer).not.toHaveBeenCalled();
+    expect(host.queue.list("lead").slice(0, 2)).toEqual(promoted);
     expect(host.queue.isHeld("lead")).toBe(true);
   });
 

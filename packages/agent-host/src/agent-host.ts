@@ -1176,7 +1176,9 @@ export class AgentHost {
           // The rest of the promoted block joins this turn as user input, so the
           // messages stay adjacent instead of waiting for their own turns
           // (ADR 0265). A runtime without steering keeps the previous behavior.
-          void this.deliverPromotedBlock(state, started.turnId);
+          // The Team-pause exception authorizes only this fresh answer;
+          // promoted work remains held along with the rest of the Team.
+          if (!liveAnswer) void this.deliverPromotedBlock(state, started.turnId);
           return;
         } catch (error) {
           turn.status = "failed";
