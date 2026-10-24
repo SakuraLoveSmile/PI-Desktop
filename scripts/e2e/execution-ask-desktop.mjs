@@ -29,7 +29,12 @@ import(${JSON.stringify(pathToFileURL(join(root, "apps/desktop/out/main/index.js
     env: { ...env, PI_DESKTOP_DATA_DIR: dataDir, PI_DESKTOP_HOST_BIN: binary,
       PI_DESKTOP_MCP_CONTROL: "1", PI_DESKTOP_MCP_PORT: "0", PI_DESKTOP_START_MAXIMIZED: "0" },
   });
-  for (const stream of [child.stdout, child.stderr]) stream.on("data", chunk => log(String(chunk)));
+  let outputTail = "";
+  for (const stream of [child.stdout, child.stderr]) stream.on("data", chunk => {
+    const text = String(chunk);
+    outputTail = (outputTail + text).slice(-8000);
+    log(text);
+  });
   let ws;
   const stop = async () => {
     ws?.close();
@@ -42,7 +47,7 @@ import(${JSON.stringify(pathToFileURL(join(root, "apps/desktop/out/main/index.js
   try {
     let target;
     await waitFor(async () => {
-      if (child.exitCode !== null) throw new Error(`Desktop fixture exited ${child.exitCode}`);
+      if (child.exitCode !== null || child.signalCode !== null) throw new Error(`Desktop fixture exited (code=${child.exitCode}, signal=${child.signalCode})`);
       try { target = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()).find(row => row.type === "page" && row.url.endsWith("/out/renderer/index.html")); return !!target; }
       catch { return false; }
     }, 30000, "real Desktop renderer");
@@ -71,5 +76,8 @@ import(${JSON.stringify(pathToFileURL(join(root, "apps/desktop/out/main/index.js
     await waitFor(async () => { try { connection = JSON.parse(await readFile(connectionFile, "utf8")); return connection.active; } catch { return false; } }, 30000, "bootstrap MCP callback wiring");
     assert.equal(new URL(connection.url).hostname, "127.0.0.1");
     return { child, send, evaluate, invoke, stop, connection, connectionFile };
-  } catch (error) { await stop(); throw error; }
+  } catch (error) {
+    await stop();
+    throw new Error(`${String(error)}\nDesktop startup output (tail):\n${outputTail || "(none)"}`, { cause: error });
+  }
 }
