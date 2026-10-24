@@ -77,6 +77,15 @@ const cardScript = (title) => `(() => {
   return heading?.closest("section.settings-card-block") ?? null;
 })()`;
 const ADVISOR_CARD = cardScript(ADVISOR_TITLE);
+const ADVISOR_MENU = '.model-default-menu.is-open[role="listbox"][aria-label="Advisor model"]';
+const READ_MENU = `(() => {
+  const trigger = ${ADVISOR_CARD}?.querySelector(".model-default-trigger");
+  return {
+    viewport: { width: innerWidth, height: innerHeight },
+    trigger: trigger ? { disabled: trigger.disabled, expanded: trigger.getAttribute("aria-expanded"), rect: trigger.getBoundingClientRect().toJSON() } : null,
+    menus: [...document.querySelectorAll(".model-default-menu")].map((menu) => ({ label: menu.getAttribute("aria-label"), visible: getComputedStyle(menu).visibility === "visible", options: [...menu.querySelectorAll('[role="option"]')].map((option) => option.getAttribute("aria-label")) })),
+  };
+})()`;
 const READ_ROW = `(() => {
   const card = ${ADVISOR_CARD};
   if (!card) return null;
@@ -84,17 +93,20 @@ const READ_ROW = `(() => {
   const help = card.querySelector(".ui-help-icon")?.getAttribute("aria-label") ?? "";
   return { detail: (detail?.textContent ?? "").replace(/\\s+/g, " ").trim(), help };
 })()`;
-const OPEN_MENU = `(() => {
+const ADVISOR_TRIGGER_POINT = `(() => {
   const trigger = ${ADVISOR_CARD}?.querySelector(".model-default-trigger");
-  if (!trigger) return false;
-  trigger.click();
-  return true;
+  if (!trigger || trigger.disabled) return null;
+  trigger.scrollIntoView({ block: "center", behavior: "instant" });
+  const rect = trigger.getBoundingClientRect(), x = rect.x + rect.width / 2, y = rect.y + rect.height / 2;
+  return trigger.contains(document.elementFromPoint(x, y)) ? { x, y, expanded: trigger.getAttribute("aria-expanded") === "true" } : null;
 })()`;
-const pickOption = (label) => `(() => {
-  const option = [...document.querySelectorAll('.model-default-menu button[role="option"]')].find((node) => node.getAttribute("aria-label") === ${JSON.stringify(label)});
-  if (!option) return false;
-  option.click();
-  return true;
+const optionPoint = (label) => `(() => {
+  const menu = document.querySelector(${JSON.stringify(ADVISOR_MENU)});
+  const option = [...(menu?.querySelectorAll('button[role="option"]') ?? [])].find((node) => node.getAttribute("aria-label") === ${JSON.stringify(label)});
+  if (!option || option.disabled) return null;
+  option.scrollIntoView({ block: "nearest", behavior: "instant" });
+  const rect = option.getBoundingClientRect(), x = rect.x + rect.width / 2, y = rect.y + rect.height / 2;
+  return option.contains(document.elementFromPoint(x, y)) ? { x, y } : null;
 })()`;
 const TRANSCRIPT_HAS_ADVISOR_ROW = `[...document.querySelectorAll("body *")].some((node) => node.children.length === 0 && node.textContent.trim() === ${JSON.stringify(ADVISOR_TOOL)})`;
 
@@ -291,9 +303,10 @@ class DesktopApp {
     await this.screenshot("failure").catch(() => {});
     const text = await this.evaluate("document.body.innerText").catch(() => "");
     const events = await this.evaluate("window.__advisorEvents").catch(() => null);
+    const menu = await this.evaluate(READ_MENU).catch(() => null);
     await writeFile(
       join(this.dir, "failure.json"),
-      JSON.stringify({ error: String(error?.message ?? error), text: text.slice(-3000), events }, null, 2),
+      JSON.stringify({ error: String(error?.message ?? error), text: text.slice(-3000), menu, events }, null, 2),
     ).catch(() => {});
   }
 
@@ -381,21 +394,32 @@ function waitForRow(app, label, matches) {
   }, label);
 }
 
-async function pinAdvisor(app) {
-  await app.waitFor(() => app.evaluate(OPEN_MENU), "Advisor model menu opens");
-  await app.waitFor(
-    () => app.evaluate(pickOption(`${ADVISOR_NAME} · ${ADVISOR_MODEL}`)),
-    "advisor model option",
-  );
+async function clickPoint(app, { x, y }) {
+  await app.send("Input.dispatchMouseEvent", { type: "mousePressed", x, y, button: "left", clickCount: 1 });
+  await app.send("Input.dispatchMouseEvent", { type: "mouseReleased", x, y, button: "left", clickCount: 1 });
+}
+
+async function pickAdvisorOption(app, label) {
+  console.log("ADVISOR_MENU_STATE", app.label, JSON.stringify(await app.evaluate(READ_MENU)));
+  // AnchoredMenu closes anchors outside the viewport. Exercise a hit-tested
+  // pointer path rather than clicking an unmeasured, hidden option in the DOM.
+  const trigger = await app.waitFor(() => app.evaluate(ADVISOR_TRIGGER_POINT), "visible enabled Advisor model trigger");
+  if (!trigger.expanded) await clickPoint(app, trigger);
+  await app.waitFor(() => app.evaluate(`Boolean(document.querySelector(${JSON.stringify(ADVISOR_MENU)}))`), "Advisor model menu opens");
+  const option = await app.waitFor(() => app.evaluate(optionPoint(label)), "advisor model option");
+  await clickPoint(app, option);
+}
+
+async function pinAdvisor(app, advisorId) {
+  await pickAdvisorOption(app, `${ADVISOR_NAME} · ${ADVISOR_MODEL}`);
   await app.waitFor(async () => {
     const settings = await app.ipc("settingsGet");
-    return Boolean(settings.advisorProviderId) && settings.advisorModelId === ADVISOR_MODEL;
+    return settings.advisorProviderId === advisorId && settings.advisorModelId === ADVISOR_MODEL;
   }, "advisor pin saved");
 }
 
 async function clearAdvisor(app) {
-  await app.waitFor(() => app.evaluate(OPEN_MENU), "Advisor model menu opens");
-  await app.waitFor(() => app.evaluate(pickOption(OFF)), "Off option");
+  await pickAdvisorOption(app, OFF);
 }
 
 async function runMainSession(app, main, title) {
@@ -505,7 +529,7 @@ async function scenarioClear() {
   const advisor = await withApp("clear-first", dataDir, async (app) => {
     const providers = await setUpProviders(app);
     await openAdvisorSettings(app);
-    await pinAdvisor(app);
+    await pinAdvisor(app, providers.advisor.id);
     await waitForRow(
       app,
       "pinned row names the advisor model",
@@ -544,7 +568,7 @@ async function scenarioStale() {
   return withApp("stale", join(artifacts, "stale", "data"), async (app) => {
     const { main, advisor } = await setUpProviders(app);
     await openAdvisorSettings(app);
-    await pinAdvisor(app);
+    await pinAdvisor(app, advisor.id);
     await app.ipc("providersUpdate", { id: advisor.id, enabled: false });
     await app.evaluate("window.__PI_DESKTOP__.refreshProviders()");
     await waitForRow(
