@@ -435,7 +435,7 @@ visually distinct from list content.
 | Session completed | Green check mark from the latest unread task notification when the row is not selected |
 | Session failed | Red circled alert mark from the latest unread task notification when the row is not selected |
 | Hover row | Project headers and all conversation rows share one full-row `--ds-bg-hover` surface, radius and transition; selected conversation fill takes precedence |
-| Current workspace | Project header shows the workspace dot, never a persistent selection fill; topbar follows that workspace; composer exposes no workspace identity |
+| Current workspace | Project header shows the workspace dot, never a persistent selection fill; topbar follows that workspace; the workspace strip above the input card shows project, location, and branch (folded to the branch during a run), and the input card itself exposes no workspace identity |
 | Navigation selection | Only the selected conversation on the chat page uses `--ds-bg-active`, including pinned and standalone rows; folding its group never transfers selection to the header. No conversation or a non-chat page means no selected conversation row |
 | Keyboard focus | The focused control keeps its visible outline; the project title stays transparent and independent action buttons retain their own hover feedback |
 | Collapsed project | Header remains visible; unpinned child conversations are hidden; global pins remain visible |
@@ -1907,9 +1907,9 @@ Single message render — either user (plaintext) or assistant (markdown streami
   horizontal progress track beside the percentage, omitting the redundant
   `Context` label; the leading figure (track fill, percentage, token label,
   popover heading, tooltip, and
-  `aria-label`) follows `settings.contextUsageDisplay` — `"remaining"`
-  (default) or `"used"` — so the footer track fills by `remainingRatio` or
-  `usedRatio` accordingly. Other consumers of the existing ring variant retain
+  `aria-label`) follows `settings.contextUsageDisplay` — `"used"`
+  (default) or `"remaining"` — so the footer track fills by `usedRatio` or
+  `remainingRatio` accordingly. Other consumers of the existing ring variant retain
   their previous rendering. Low capacity changes the semantic color based
   on remaining capacity (remaining ≤ 25 % warning, ≤ 10 % critical)
   regardless of display mode, without making color the only signal.
@@ -2005,8 +2005,9 @@ message its checkpoint covers.
   narrows with the pane instead of crossing that edge.
 - Timestamps: `aria-label` with full time string, visual shows relative time
 - Right-click menus are `role="menu"` with `role="menuitem"` rows, arrow /
-  Home / End navigation, Escape / Tab / outside-press / scroll-behind
-  dismissal, and an accessible name (`chat.messageMenu` or
+  Home / End navigation, Escape / Tab / outside-press / reader-scroll
+  dismissal (a scroll the app makes behind the menu does not dismiss it), and
+  an accessible name (`chat.messageMenu` or
   `chat.conversationMenu`). Focus returns to whatever the right-click
   interrupted. While editing a user message, Copy uses the selected draft text
   (or the whole draft if the caret is collapsed), and Select message text selects
@@ -2986,6 +2987,9 @@ and diagnostic state, plus live non-deleted tasks with owner, status,
 dependencies, readiness, and advisory overlapping write scopes. Roster and board
 snapshots must describe the same Team revision. Refresh results from a prior
 Team or older request cannot replace a newer snapshot.
+At narrow widths and larger text scales, the aggregate header truncates its
+title label before displacing the status badge or either 28px action button.
+The Team icon retains its configured scale and both actions remain clickable.
 
 For local Desktop sessions, one revisioned Host snapshot also carries the
 queued Team-mail count and the current launch review/execution decision so a
@@ -3038,18 +3042,50 @@ message was delivered based only on mailbox enqueue state.
 
 ### Overview chrome and task progress
 
-All session Overview disclosures use 48px headers with primary, medium-weight
-14px text, 16px left inset and solid subtle-border separators. Native disclosure
-markers are replaced by one decorative 16px right-hand chevron, rotating left
-when closed; reduced-motion preferences remove the transition. The subagent
-summary retains its existing panorama control between its label and chevron.
+All session Overview disclosures and the activity entry use 48px headers with a
+16px left inset. Native disclosure markers are replaced by one decorative 16px
+right-hand chevron, rotating left when closed; reduced-motion preferences remove
+the transition. In a normal (non-Expert-Team) session the headers and the activity
+entry use secondary, regular-weight 14px text and dashed `--ds-border-default`
+separators, which is the reference layout. The Expert Team overview keeps
+primary, medium-weight headers and solid subtle separators, because the Team
+progress geometry pins them. The session checklist header is secondary and regular
+in both modes. The subagent summary's panorama link uses the flat 13px text and
+16px arrow of the Team progress link and sits between its label and chevron.
+In Team progress, a long panorama label truncates within its flex allocation at
+narrow widths and larger font scales. Its full tooltip and accessible name, the
+16px arrow (scaled with text), and the fixed 24px disclosure remain available;
+the link must not push the disclosure outside the progress row.
 The metadata header remains above the scroll area without shrinking. Its icon
 and title share a compact row; project and model occupy full-width metadata
 rows, followed by mode and message count side by side. Long values truncate
-within their columns. References use compact rounded options with a raised
-selected surface, retaining the existing pressed-state semantics and labels.
+within their columns. References are underline tabs: the selected tab reads in primary with a 2px
+accent rule beneath it and the others stay secondary, retaining the pressed-state
+semantics and labels.
 Artifact text flexes within its row so long paths cannot displace trailing
 status badges. Disclosure headers expose an inset keyboard focus outline.
+
+The metadata title uses 16px semibold text, wraps to at most two lines and
+exposes the full title as a tooltip. The activity entry is a header-tier row
+with no tinted background; it follows the header tone and turns primary on hover. Item rows
+(changed-file, attachment, subagent, reference and checklist rows) put a 16px
+leading icon on the 16px inset and start the label 12px later, at 44px, the
+column Team task titles already use. Labels are 14px. Changed-file, attachment and plan-artifact rows stay on one
+line: the file name, then the folder or plan title in muted 12px text, truncated
+with an ellipsis. Changed-file rows lead with a language glyph for markup, style
+and script files (`<>`, `#`, `JS`, `TS`; markup takes the warning tone), plan
+artifacts lead with a list glyph, and other files keep the generic file icon. A
+changed-file row shows `+N` and `−N` in the Review tab's diff-count classes only
+when every recorded edit to that path carries exact line counts; a partial total is
+never shown, and a zero side is omitted, so an addition-only file shows `+N` alone.
+The changed-files heading links to the Review tab with `View all
+changes` when that tab has entries. File and subagent rows tint on hover, and the
+tint extends 6px past the inset without moving the icon. Group headings are 12px
+regular secondary text; empty copy and resource notes are 12px muted. Subagent badges show the same localized outcome label as the
+Activity rail. Running uses the accent tone, completed the success tone,
+stopped, aborted and timed-out use the neutral tone, and failed and denied use
+the error tone; the panorama node uses the same tone. Project and model values
+expose their full text as a tooltip when they truncate.
 
 Team sessions show one progress section (`进展` / `進展`) with a panorama link,
 arrow, divider and independent 24px disclosure control. The section publishes
@@ -3194,7 +3230,7 @@ reasoning-level control.
 | input (two empty lines, grows through seven visible lines)        |
 | placeholder: welcome → command/file hint → keyboard hint          |
 | [+] [Agent/Expert Team ▾] [Plan/Goal] [plugin] [model · reasoning ▾] [enhance] [Live] [↑/⏹] |
-| context usage footer (Context label and meter, when available)                                  |
+| context usage footer (Remaining or Used label and meter, when available)                                  |
 +----------------------------------------------------------+
 ```
 
@@ -3227,9 +3263,18 @@ reasoning-level control.
   second status row parked above the composer; a staged mode choice still
   updates the chip immediately and does not start that pulse until the
   in-flight turn actually projects `planning`.
+- While Plan is the committed mode, the Plan chip carries a close control
+  (`chat.exitPlanMode`) that returns to Agent through the same switch as the +
+  menu's Plan toggle. The control is disabled while a plan is being drafted or
+  awaits approval (the host refuses a mode change then with
+  `PLAN_CONFIGURATION_BLOCKED`) and while controls are blocked; the + menu's
+  Plan switch has no planning or approval guard. Exiting does not delete plan
+  history.
 - The adjacent execution-profile chip compactly fits its localized Agent and
   Expert Team labels (up to 130px, or 104px below a 480px composer) to
-  maintain a dense toolbar with 4-8px internal gaps.
+  maintain a dense toolbar with 4-8px internal gaps. Its icon is a single
+  person for Agent and the group icon for Expert Team, so it stays distinct
+  from the Bot model chip.
 - Permission and operating-mode controls retain their existing Add-menu and
   approval-card entry points. Repositioning the toolbar does not change
   permission defaults, mode gates or the separate execution-policy approval.
@@ -3239,11 +3284,13 @@ reasoning-level control.
   chip, prompt enhancement, Live voice and the single Stop/Send slot. The model
   chip remains one button and its anchored menu remains tied to that button.
   Send and Stop use the same neutral 32px rounded-square footprint. Context
-  usage stays in the existing footer with the visible `chat.usageContextLabel`
-  beside its meter. The chip shows Bot, the
+  usage stays in the existing footer beside its meter. Its visible label names
+  the leading figure's direction: `chat.usageContextRemainingLabel` (Remaining)
+  or `chat.usageContextUsedLabel` (Used), following the context usage display
+  setting. The unavailable placeholder keeps `chat.usageContextLabel` (Context). The chip shows Bot, the
   current model name, and the
-  current canonical reasoning level value separated by `·`; `off` omits the
-  level text. The canonical value is rendered as-is (`low`, `high`, `xhigh`,
+  current canonical reasoning level value separated by `·`; `off` shows the
+  localized Off label. The canonical value is rendered as-is (`low`, `high`, `xhigh`,
   or `max`) and is not localized. The
   prompt-enhancement action shows Sparkles while idle, uses the shared
   `.tool-spinner` and localized `Enhancing…` label while running, and remains
@@ -3259,7 +3306,9 @@ reasoning-level control.
   context inspector hides its percentage at the floor and the enhancement
   loading state becomes icon-only, preserving the action hit targets without
   clipping or overlapping toolbar content. Home and thread-docked composers
-  use the same responsive rules.
+  use the same responsive rules. With plugin composer controls mounted below
+  720px, the model trigger uses that same 32px icon-only variant early, retaining
+  its complete accessible name and menu while reserving room for plugin actions.
 - The combined chip opens the complete model list directly above itself, without search,
   provider-labelled rows, the current model's reasoning slider and a Model
   configurations action. There is no Default/Custom tab or intermediate root
@@ -3319,9 +3368,12 @@ reasoning-level control.
   visible copy is a keyed opacity fade while the native `placeholder` value
   remains in the textarea for assistive technology.
 - Queue rows: while a session is running, each accepted prompt is held in a
-  renderer-owned FIFO list above the shell. Rows show the visible prompt (or
-  file-reference names), expose independent Remove and Send now actions, and
-  increase the dock height measured by `--composer-dock-height`.
+  Host-owned FIFO list above the shell; a row the Host has not yet admitted
+  exists only in the renderer. Rows show the visible prompt (or file-reference
+  names). Two or more rows fold behind a summary that carries the head's Abort
+  offer; a single row is always listed. Expanded waiting rows show Send now on
+  hover or focus, and every row keeps Edit, Move up, Move down, and Remove in its
+  ⋯ menu. The queue increases the dock height measured by `--composer-dock-height`.
 
 ### 11.3a Overview session checklist
 
@@ -3329,10 +3381,14 @@ reasoning-level control.
   Overview scroll area. The Composer footer has no session checklist trigger.
 - The header names the Session checklist and its completed/total count. A shared
   Button disclosure starts expanded and exposes `aria-expanded`. The ordered
-  inline list includes every task with full wrapped text and localized status;
+  inline list includes every task with its full wrapped title, and the localized
+  status is kept for assistive technology and the row tooltip;
   the existing Overview scroll makes long lists reachable without nested popups.
 - Cancelled tasks are excluded from the denominator; an all-cancelled list shows
-  cancellation instead of 0/0. Rows are read-only and retain distinct statuses.
+  cancellation instead of 0/0. Rows are read-only. Each row is one line: a state
+  glyph (check-circle and muted when completed, hollow circle when pending or in
+  progress, slash-circle when cancelled) and the title. In progress reads in
+  primary at medium weight.
 - Live snapshot updates preserve expansion and focus. A session switch starts
   its own expanded checklist; empty snapshots remove the section. Goal progress
   remains near the Composer and consumes a separate execution snapshot.
@@ -3410,8 +3466,13 @@ reasoning-level control.
   different session's queue is not affected by switching sessions. Running with
   an empty draft changes this same submit slot to Stop. Clear the draft to
   expose the immediate-stop action.
-- Queued row: the text, then move up, move down, Send now, edit, and remove
-  (the head promoted row adds Abort command after Send now, see below).
+- Queued row: the text, then a status label while the row is saving or waiting
+  for the current task, or a Send now button on a waiting row (visible on hover
+  or focus). The head promoted row adds the Abort command (see below). A ⋯
+  trigger opens the row menu: Edit, Move up, Move down, a separator, then Remove
+  as the danger action. While the queue is folded, its summary carries the head's
+  Abort command. A row menu closes when the list scrolls its row fully out of view,
+  and focus is not moved back to the hidden trigger.
   Move up/down swaps the row with its adjacent waiting neighbour and mirrors the
   Host's durable `position`; at the waiting-block boundary it is a no-op and
   never crosses into the promoted block. Edit removes the row and returns its
@@ -3419,7 +3480,9 @@ reasoning-level control.
   after an app restart, when that in-memory draft is unavailable, restore the
   Host-stored content and image/file attachments without rewriting the content;
   while the input is non-empty (or holds attachments) the action is refused with
-  a toast and nothing changes. Remove drops the row immediately.
+  a toast and nothing changes. Remove keeps the row until the Host confirms the
+  cancellation; if delivery already started, the row stays and a message directs
+  the user to Stop.
 - Send now: promotes the row to the end of the session's priority block, so a
   second Send now leaves behind the first instead of replacing it at the head.
   It then requests `agent/stop`, and the promoted block is released after the
@@ -3436,17 +3499,18 @@ reasoning-level control.
   When the Bash call settles, the turn ends at its batch boundary and the
   promoted row starts. A later top-level Bash call in the same batch offers the
   button again at once, because the delay has already passed.
-- A pending queue row is locked until Host admission returns its durable id: move
-  up/down, Send now, edit, and remove are disabled. All five tooltips explain
-  that it is saving; Send now also displays the localized Saving label. Direct edit/remove actions leave the pending row and draft
-  unchanged; after admission, ordinary waiting-row actions become available.
-- A promoted row fixes order: move up/down and edit are disabled with
-  their tooltip and `aria-disabled` state intact, and the Send now button reads
-  as waiting for the current task (`chat.sendNowPending`). Remove remains
-  available until delivery and waits for Host acknowledgement. If delivery
-  already started, show a conflict message directing the user to Stop.
-  The row carries a distinct
-  promoted surface so it is not mistaken for another waiting row.
+- A pending queue row is locked until Host admission returns its durable id: its
+  ⋯ trigger is disabled, so edit, move up/down, and remove cannot be opened. The
+  row shows the localized Saving label in place of Send now, and the disabled
+  trigger's tooltip explains that it is saving. Direct edit/remove actions leave
+  the pending row and draft unchanged; after admission, ordinary waiting-row
+  actions become available.
+- A promoted row fixes order: the row shows the waiting label
+  (`chat.sendNowPending`) in place of Send now. Its ⋯ menu disables Edit and
+  move up/down, and keeps Remove available until delivery; Remove waits for Host
+  acknowledgement. If delivery already started, show a conflict message directing
+  the user to Stop. The row carries a distinct promoted surface so it is not
+  mistaken for another waiting row.
 - Stop: the single submit slot is shown only while a turn is running and the
   draft is empty. It stops the running turn and cancels pending permission.
   Before any
@@ -3633,8 +3697,9 @@ transcript and Overview history.
 - Editable text controls never enable browser spellcheck or autocorrect (D145)
 - Send button: `aria-label="Send message"`
 - Stop button: `aria-label="Stop generating"`
-- Queued prompt list: `aria-label="Queued messages"`; each row has an
-  accessible Remove button and a Send now button.
+- Queued prompt list: `aria-label="Queued messages"`; each row has an accessible
+  ⋯ trigger whose menu holds Edit, Move up, Move down, and Remove. Each waiting
+  row also has a Send now button.
 - Native file-system drag-over highlights the complete Composer shell with an
   outline that does not change layout; dropping a folder leaves its complete
   path visible in the editable draft, and dropping regular files exposes the
@@ -5051,6 +5116,15 @@ Disclosure, terminal report removal and session isolation retain their current
 behavior. Scheduled instruction cards do not mount this Goal disclosure and
 keep their existing shell appearance.
 
+Expanded Goal progress leads with the execution's recorded item checklist.
+Each row shows the full wrapping item label and an explicit localized status
+(pending, in progress, completed or failed); color alone is not the status.
+The original Goal description remains available in a secondary, initially
+collapsed disclosure after the checklist. Loading, unavailable and unreported
+progress have explicit empty states and never substitute the description for
+completion evidence. A completed item count does not change the authoritative
+execution phase or imply that the final result has been accepted.
+
 ### Expert Team settings and reference-aligned Overview (2026-10-08)
 
 Settings exposes an Expert Team destination under Agent configuration. The page
@@ -5080,7 +5154,7 @@ viewport restoration remain intact.
 
 ### Composer metadata and compact agent rows
 
-The composer footer shows the current session's project, local/remote host, and known local Git branch. Unavailable project/branch metadata is omitted; remote sessions never borrow a local branch. Model menus list all models without a search field. Generation speed, full-turn token totals, cache metrics and context details are available from the bottom-right context meter. Subagent entries use transparent gradient-avatar rows with name, task, localized status and measured elapsed time; clicking a row opens read-only details, with no panorama entry. Validate model keyboard selection, footer metadata, context details and agent navigation in the isolated composer/transcript fixtures, including narrow layouts.
+The workspace strip above the input card shows the current session's project, local/remote host, and known local Git branch; during a run it folds to the branch. Unavailable project/branch metadata is omitted; remote sessions never borrow a local branch. A detached HEAD is named by its short commit (`Detached HEAD · abc1234`), and `No branch` appears only when neither a branch nor a commit is known. Model menus list all models without a search field. Generation speed, full-turn token totals, cache metrics and context details are available from the bottom-right context meter. Subagent entries use transparent gradient-avatar rows with name, task, localized status and measured elapsed time; clicking a row opens read-only details, with no panorama entry. Validate model keyboard selection, workspace metadata, context details and agent navigation in the isolated composer/transcript fixtures, including narrow layouts.
 
 ### Recorded outputs, delegate details and project Skill suggestions
 
@@ -5100,7 +5174,7 @@ Validate count-to-dialog, keyboard/hover actions, project review/save, Ignore/co
 
 ### Composer workspace menus (Plus)
 
-The composer footer exposes three anchored menus, retaining the existing neutral
+The workspace strip above the input card exposes three anchored menus, folded to the branch menu during a run, retaining the existing neutral
 color tokens and opaque popover surface. Project search matches names and paths;
 the current project is checked. Selecting another project or no workspace uses
 the existing `newSession` navigation workflow. It never rebinds a populated

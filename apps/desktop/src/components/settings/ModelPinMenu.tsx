@@ -24,6 +24,7 @@ export function ModelPinMenu({
   pinnedModelId,
   clearLabel,
   disabled,
+  busy = false,
   onPick,
 }: {
   label: string;
@@ -32,7 +33,8 @@ export function ModelPinMenu({
   pinnedModelId: string;
   clearLabel: string;
   disabled: boolean;
-  onPick: (providerId: string, modelId: string) => Promise<void>;
+  busy?: boolean;
+  onPick: (providerId: string, modelId: string) => Promise<boolean | void>;
 }) {
   const { t } = useTranslation();
   const [picking, setPicking] = useState(false);
@@ -47,8 +49,8 @@ export function ModelPinMenu({
   }, [options, query]);
 
   const pick = async (providerId: string, modelId: string) => {
-    await onPick(providerId, modelId);
-    setPicking(false);
+    const saved = await onPick(providerId, modelId);
+    if (saved !== false) setPicking(false);
   };
 
   return (
@@ -64,7 +66,7 @@ export function ModelPinMenu({
           ref={ref}
           className="settings-text-action model-default-trigger"
           variant="ghost"
-          disabled={disabled}
+          disabled={disabled || busy}
           onClick={() => {
             setQuery("");
             setPicking((current) => !current);
@@ -101,6 +103,7 @@ export function ModelPinMenu({
               type="button"
               role="option"
               aria-selected={!pinnedProviderId}
+              disabled={busy}
               aria-label={clearLabel}
               className={cx("model-default-option", !pinnedProviderId && "is-current")}
               onClick={() => void pick("", "")}
@@ -132,6 +135,7 @@ export function ModelPinMenu({
                   type="button"
                   role="option"
                   aria-selected={isCurrent}
+                  disabled={busy}
                   aria-label={`${providerDisplayName(provider)} · ${modelId}`}
                   className={cx("model-default-option", isCurrent && "is-current")}
                   onClick={() => void pick(provider.id, modelId)}

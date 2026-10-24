@@ -47,31 +47,46 @@ try {
   });
   await writeFile(
     join(temp, "index.html"),
-    '<!doctype html><meta charset="utf-8"><title>Transcript disclosure anchor regression</title><script src="renderer.js"></script>',
+    '<!doctype html><meta charset="utf-8"><title>Transcript disclosure anchor regression</title><body><div id="fixture-staging">Transcript disclosure geometry fixture</div><script src="renderer.js"></script>',
   );
   await writeFile(
     join(temp, "main.cjs"),
     `
 const { app, BrowserWindow } = require("electron");
+const { once } = require("node:events");
 const path = require("node:path");
 app.setPath("userData", path.join(__dirname, "profile"));
 app.whenReady().then(async () => {
   const window = new BrowserWindow({
     show: false,
+    width: 800,
+    height: 640,
+    useContentSize: true,
     webPreferences: {
       sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
-      // A hidden window still has to deliver ResizeObserver callbacks and
-      // animation frames, because that is what the product scroll logic uses.
+      // Sample geometry from real display frames without taking keyboard focus.
       backgroundThrottling: false,
     },
   });
   window.webContents.on("console-message", (event) => console.error(event.message));
   try {
+    // loadFile completes navigation; ready-to-show observes the first real
+    // nonempty paint. The staging node makes that handshake independent of
+    // the probe, which removes it before mounting the measured components.
+    const firstPaint = once(window, "ready-to-show");
     await window.loadFile(path.join(__dirname, "index.html"));
+    await firstPaint;
+    await window.webContents.executeJavaScript("window.addEventListener('error', event => console.error(event.error?.stack ?? event.message)); window.addEventListener('unhandledrejection', event => console.error(event.reason?.stack ?? String(event.reason)));");
+    window.showInactive();
+    const surface = await window.webContents.executeJavaScript("({ visibility: document.visibilityState, width: innerWidth, height: innerHeight })");
+    console.error("TRANSCRIPT_DISCLOSURE_STAGE " + JSON.stringify({ firstPaint: true, visible: window.isVisible(), minimized: window.isMinimized(), ...surface }));
+    if (!window.isVisible() || window.isMinimized() || surface.visibility !== "visible" || surface.width !== 800 || surface.height !== 640) {
+      throw new Error("Disclosure fixture requires a visible 800x640 content viewport");
+    }
     const result = await window.webContents.executeJavaScript("globalThis.transcriptDisclosureProbe()");
-    console.log("TRANSCRIPT_DISCLOSURE_PROBE " + JSON.stringify(result));
+    console.log("TRANSCRIPT_DISCLOSURE_PROBE " + JSON.stringify({ ...result, surface }));
     app.quit();
   } catch (error) {
     console.error("TRANSCRIPT_DISCLOSURE_PROBE " + JSON.stringify({ ok: false, error: String(error) }));

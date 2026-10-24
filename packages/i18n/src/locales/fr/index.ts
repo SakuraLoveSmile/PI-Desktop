@@ -274,6 +274,7 @@ export const fr = {
     "contractPlanDesc": "Rédige et examine un plan structuré avant l'exécution",
     "contractGoalDesc": "Définit le résultat cible et les critères d'acceptation",
     "contractMode": "Mode de contrat",
+    "exitPlanMode": "Quitter le mode Plan",
     "executionProfile": "Profil d'exécution",
     "tableActions": "Actions du tableau",
     "copyTableMarkdown": "Copier le tableau en Markdown",
@@ -337,6 +338,11 @@ export const fr = {
     },
     "queuedPrompts": "Messages en file d'attente",
     "queueNext": "Ensuite : {{message}}",
+    "queueCount": "{{count}} en file d'attente",
+    "queueMoreActions": "Plus d'actions",
+    "topStripExpand": "Afficher les détails de l'espace de travail",
+    "topStripCollapse": "Masquer les détails de l'espace de travail",
+    "thinkingOff": "Désactivé",
     "queuedPromptEmpty": "Message en file d'attente",
     "removeQueuedPrompt": "Supprimer le message en file d'attente",
     "sendNow": "Envoyer maintenant",
@@ -423,6 +429,8 @@ export const fr = {
     "usageContextUnavailable": "L’utilisation du contexte n’est pas encore disponible",
     "compactContext": "Compacter le contexte",
     "usageContextLabel": "Contexte",
+    "usageContextRemainingLabel": "Restant",
+    "usageContextUsedLabel": "Utilisé",
     "usageContextLeft": "{{count}} jetons restants",
     "usageContextSpent": "{{count}} jetons utilisés",
     "usageContextTokens": "{{used}} / {{window}} jetons",
@@ -459,6 +467,7 @@ export const fr = {
       noGit: "Ce répertoire n'est pas un dépôt Git.",
       worktreeUnavailable: "Un HEAD validé est requis.",
       noBranch: "Aucune branche",
+      detachedHead: "HEAD détaché · {{sha}}",
       branchName: "Nom de la branche",
       createSwitch: "Créer et basculer",
       branchSearch: "Rechercher des branches",
@@ -691,6 +700,8 @@ export const fr = {
     "progressListLabel": "Liste des tâches de l’objectif",
     "progressInitializing": "Chargement de la progression…",
     "progressFailed": "Progression indisponible",
+    progressDescription: "Description de l’objectif",
+    progressNotReported: "Aucune progression des tâches de l’objectif n’a encore été signalée.",
     "planning": "Définition de l'objectif",
     "approvalRegion": "Approbation de l'objectif",
     "readyAnnouncement": "Contrat d'objectif prêt. Il est ouvert dans le panneau de travail.",
@@ -720,6 +731,54 @@ export const fr = {
     "dismiss": "Ignorer"
   },
   "settings": {
+    "capabilitySaveFailed": "Impossible d’enregistrer. Votre brouillon est conservé. {{message}}",
+
+    "categories": "Catégories des paramètres",
+    "executionDefaults": "Exécution",
+    "conversationDisplay": "Conversation et affichage",
+    "activeSessionOverrideState": "Utilise une autorisation propre à la session",
+    "activeSessionInheritState": "Hérite de l’autorisation par défaut",
+    "applicationSupport": "Application et assistance",
+    "technicalDetails": "Détails techniques",
+    "protocolVersion": "Protocole {{version}}",
+    "hostVersion": "Hôte {{version}}",
+    "softwareUpdates": "Mises à jour logicielles",
+    "saveState": {
+      "saving": "Enregistrement…",
+      "saved": "Paramètres enregistrés",
+      "failed": "Impossible d’enregistrer. Vos paramètres précédents sont inchangés.",
+      "refreshFailed": "Paramètres enregistrés, mais la vue actuelle n’a pas pu être actualisée."
+    },
+    "shortcutSearch": "Rechercher une action ou une touche",
+    "shortcutFilter": "Filtre des raccourcis",
+    "shortcutFilterAll": "Tous",
+    "shortcutFilterModified": "Modifiés",
+    "shortcutCount": "{{count}} raccourcis",
+    "shortcutNoMatches": "Aucun raccourci ne correspond à ces filtres.",
+    "shortcutClearFilters": "Effacer les filtres",
+    "shortcutRecordingCancel": "Appuyez sur Échap pour annuler l’enregistrement.",
+    "preferenceSaved": "Enregistré",
+    "promptEnhancementDefaultTemplateActive": "Utilise le modèle intégré",
+    "closeBehaviorLoadError": "Impossible de charger le comportement à la fermeture. Réessayez pour le modifier.",
+    "modelsWorkbenchHint": "Choisissez les modèles par défaut, gérez les services et comptes IA, et maintenez le catalogue de modèles.",
+    "configureServices": "Configurer les services",
+    "modelSavedRefreshFailed": "Enregistrement effectué, mais la liste des services n’a pas pu être actualisée : {{error}}",
+    "modelSavedFollowupFailed": "Le service a été enregistré, mais son modèle par défaut n’a pas pu être mis à jour : {{error}}",
+    "instructionsLoadFailed": "Impossible de charger les instructions : {{message}}",
+    "instructionsSaveFailed": "Impossible d’enregistrer les instructions : {{message}}",
+    "instructionsUnsaved": "Modifications non enregistrées",
+    "instructionsSaved": "Instructions enregistrées",
+    "mcpIntro": "Gérez les serveurs accessibles à vos agents, globalement ou pour un projet.",
+    "subagentsIntro": "Gérez les définitions des agents, puis ajustez leurs limites d’exécution ci-dessous.",
+    "importSessionsScanDesc": "Recherchez les conversations locales d’autres outils. Vérifiez et sélectionnez les conversations avant de les importer.",
+    "pluginScenic": {
+      "backdropBlur": "Flou d’arrière-plan",
+      "appliesTo": "S’applique à {{theme}}",
+      "applying": "Application…",
+      "apply": "Appliquer",
+      "saved": "Flou d’arrière-plan enregistré."
+    },
+
     storage: {
       unavailableHint: "Le dossier de stockage est actuellement indisponible. Reconnectez le disque avant de démarrer ; l’application ne créera pas de données vides et ne changera pas de dossier.",
       browserSource: "Source des données du navigateur",
@@ -765,6 +824,10 @@ export const fr = {
       operationError: "Impossible de lancer l’opération de stockage. {{error}}",
     },
     expertTeam: {
+      "projectOverrides": "Personnalisations par projet",
+      "selectProject": "Sélectionner une personnalisation de projet",
+      "removedProject": "Projet supprimé",
+
       runLimits: en.settings.expertTeam.runLimits,
       title: "Équipe d’experts",
       description: "Configurez le modèle, le niveau de raisonnement, le sous-ensemble d’outils et les instructions supplémentaires des six experts intégrés. Les changements ne concernent que les experts lancés par la suite. Le modèle de Composer s’applique aussi au responsable et aux experts sans modèle épinglé. Les restrictions facultatives d’outils réduisent uniquement leur disponibilité et n’accordent jamais de permissions.",
@@ -918,6 +981,9 @@ sklm: {
       "voice": "Voix"
     },
     "memory": {
+      "search": "Rechercher un nom ou un chemin de projet",
+      "resultCount": "{{count}} projets sur {{total}}",
+
       "title": "Mémoire",
       "description": "Gérez les souvenirs enregistrés et l'enregistrement automatique par projet. Les projets d'un même groupe partagent leur mémoire ; les autres restent séparés.",
       "projectsTitle": "Mémoire du projet",
@@ -925,6 +991,8 @@ sklm: {
       "loadFailed": "Impossible de charger la liste des projets. Réessayez."
     },
     "configSync": {
+      "retry": "Réessayer",
+
       title: "Cloud sync",
       experimental: "Expérimental",
       connectionTitle: "WebDAV cloud sync",
@@ -1224,6 +1292,10 @@ sklm: {
     "skillBatchImported": "{{count}} dossiers de compétences importés",
     "skillBatchFailed": "Échec de l'import de {{count}} dossiers. Premier échec : {{first}}",
     "skillsEmpty": "Aucune compétence dans ce dossier",
+    skillsIntro: "Enregistrez des méthodes de travail réutilisables pour vos agents.",
+    skillsGlobalEmptyHint: "Créez une compétence ou importez un fichier ou un dossier.",
+    skillsProjectEmptyHint: "Ajoutez un projet dans Projets pour gérer ses compétences ici.",
+    skillsManageProjects: "Gérer les projets",
     "subagentsEmpty": "Aucun sous-agent pour l'instant",
     subagentRuntimeLimits: "Limites de délégation",
     subagentRuntimeLimitsDesc: "Les agents individuels et les experts de l’équipe peuvent déléguer des tâches indépendantes dans ces limites. Les modifications s’appliquent à la prochaine exécution.",
@@ -1241,6 +1313,8 @@ sklm: {
     "mcpSaved": "Enregistré {{name}}",
     "mcpDuplicate": "Un serveur MCP avec cet ID ou ce nom existe déjà à ce niveau.",
     "mcpMarket": {
+      "remotePartial": "Certaines sources du registre sont indisponibles ({{names}})",
+
       browse: "Marché",
       back: "Mes serveurs",
       title: "Marché MCP",
@@ -1338,6 +1412,8 @@ sklm: {
     "import": "Importation",
     "projectArchive": "Archive du projet",
     "remoteHosts": {
+      "retry": "Réessayer",
+
       "title": "Hôtes distants",
       "listError": "Impossible de charger les hôtes",
       "loading": "Chargement…",
@@ -1437,6 +1513,7 @@ sklm: {
     "marketCustomUrlPlaceholder": "https://example.com/catalog.json",
     "search": "Paramètres de recherche",
     "searchPlaceholder": "Paramètres de recherche…",
+    searchResults: "Résultats de recherche ({{count}})",
     "noResults": "Aucun paramètre correspondant",
     "enterToSend": "Entrez pour envoyer",
     "enterToSendDesc": "Désactivé : appuyez sur ⌘/Ctrl+Entrée pour envoyer.",
@@ -1795,6 +1872,9 @@ sklm: {
     "promptEnhancementSaveError": "Impossible d'enregistrer les paramètres d'amélioration du prompt.",
   },
   "project": {
+    "loadFailed": "Impossible de charger la liste des projets",
+    "loadFailedRetained": "Les projets disponibles sont affichés ci-dessous. Réessayez pour charger la liste complète.",
+
     "open": "Ouvrir le projet",
     "openFolder": "Ouvrir le dossier",
     "none": "Aucun projet",
@@ -2242,7 +2322,7 @@ sklm: {
       goalReport: "Rapport d’objectif",
     },
     overview: {
-      specs: "Spécifications", changedFiles: "Fichiers modifiés", attachments: "Pièces jointes", skills: "Compétences", memory: "Mémoire", mcp: "MCP",
+      specs: "Spécifications", changedFiles: "Fichiers modifiés", viewAllChanges: "Voir toutes les modifications", attachments: "Pièces jointes", skills: "Compétences", memory: "Mémoire", mcp: "MCP",
       noRecordedSkills: "Aucune compétence enregistrée dans cette conversation", noRecordedMemory: "Aucune mémoire enregistrée dans cette conversation", noRecordedMcp: "Aucune utilisation de MCP enregistrée dans cette conversation",
       recordedChangesNote: "Seules les modifications enregistrées avec succès dans la conversation actuellement chargée sont affichées ; ceci ne constitue pas une liste complète des changements Git.",
       noSession: "Aucune session sélectionnée", untitled: "Session sans titre", project: "Projet", model: "Modèle", modeLabel: "Mode", messages: "Messages", notAvailable: "Indisponible", progress: "Progression", statusLabel: "État actuel", noPlans: "Aucune activité de plan dans cette session", artifacts: "Artefacts", noArtifacts: "Aucun artefact dans cette session", references: "Références", noReferences: "Aucune référence de fichier explicite", mode: { chat: "Chat", plan: "Plan", goal: "Objectif" }, subagents: "Subagents", noSubagents: "No subagents delegated in this session", teamSection: "Expert Team", status: { idle: "Inactif", running: "En cours", planning: "Planification", awaiting_approval: "En attente d'approbation", pending: "En attente", approved: "Approuvé", rejected: "Rejeté", expired: "Expiré", interrupted: "Interrompu", queued: "En file", completed: "Terminé", failed: "Échec" }
@@ -2317,6 +2397,9 @@ sklm: {
     "loadDev": "Charger le plugin local",
     "loadDevDone": "Plugin local chargé",
     piSkillsTitle: "Skills de pi CLI",
+    piSkillsSummary: "Réutilisez les compétences déjà installées avec pi CLI.",
+    piSkillsDiscoveryFailed: "Impossible de lire les paquets locaux. Essayez de rafraîchir.",
+    piSkillsDiscoveryPartial: "Certains emplacements sont illisibles. Les paquets disponibles restent utilisables.",
     piSkillsHint: "Les paquets npm installés sont détectés en lecture seule. Importez uniquement des paquets fiables, puis gérez-les dans Plugins.",
     piSkillsConfirm: "Importer et activer ce paquet pi ?",
     piSkillsExecutable: "Ce paquet contient des extensions exécutables. Son import active du code de confiance dans l’agent et peut installer des dépendances.",

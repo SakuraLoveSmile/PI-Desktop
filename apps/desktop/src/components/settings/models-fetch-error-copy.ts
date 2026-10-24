@@ -1,12 +1,4 @@
-/**
- * Toast copy for a failed model-list probe (`model-fetch-error.ts`).
- *
- * A probe failure is an event, not a state: the picker reports it once through
- * the app toast stack instead of keeping a classified box inside the dialog,
- * where it would push the panes down for as long as the failure lasts. Every
- * surface that probes the endpoint goes through here, so the same failure says
- * the same thing everywhere.
- */
+/** Classified copy shared by inline model-list feedback and probe toasts. */
 import type { TFunction } from "i18next";
 import { describeModelsFetchError } from "./model-fetch-error";
 

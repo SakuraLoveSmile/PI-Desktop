@@ -274,6 +274,7 @@ export const es = {
     "contractPlanDesc": "Redacta y revisa un plan estructurado antes de la ejecución",
     "contractGoalDesc": "Define el resultado objetivo y los criterios de aceptación",
     "contractMode": "Modo de contrato",
+    "exitPlanMode": "Salir del modo Plan",
     "executionProfile": "Perfil de ejecución",
     "tableActions": "Acciones de tabla",
     "copyTableMarkdown": "Copiar tabla como Markdown",
@@ -337,6 +338,11 @@ export const es = {
     },
     "queuedPrompts": "Mensajes en cola",
     "queueNext": "Siguiente: {{message}}",
+    "queueCount": "{{count}} en cola",
+    "queueMoreActions": "Más acciones",
+    "topStripExpand": "Mostrar detalles del espacio de trabajo",
+    "topStripCollapse": "Ocultar detalles del espacio de trabajo",
+    "thinkingOff": "Desactivado",
     "queuedPromptEmpty": "Mensaje en cola",
     "removeQueuedPrompt": "Eliminar mensaje en cola",
     "sendNow": "Enviar ahora",
@@ -423,6 +429,8 @@ export const es = {
     "usageContextUnavailable": "El uso del contexto aún no está disponible",
     "compactContext": "Compactar contexto",
     "usageContextLabel": "Contexto",
+    "usageContextRemainingLabel": "Restante",
+    "usageContextUsedLabel": "Usado",
     "usageContextLeft": "Quedan {{count}} tokens",
     "usageContextSpent": "{{count}} tokens usados",
     "usageContextTokens": "{{used}} / {{window}} tokens",
@@ -459,6 +467,7 @@ export const es = {
       noGit: "Este directorio no es un repositorio de Git.",
       worktreeUnavailable: "Se requiere un HEAD confirmado.",
       noBranch: "Sin rama",
+      detachedHead: "HEAD separado · {{sha}}",
       branchName: "Nombre de la rama",
       createSwitch: "Crear y cambiar",
       branchSearch: "Buscar ramas",
@@ -691,6 +700,8 @@ export const es = {
     "progressListLabel": "Lista de tareas del objetivo",
     "progressInitializing": "Cargando progreso…",
     "progressFailed": "Progreso no disponible",
+    progressDescription: "Descripción del objetivo",
+    progressNotReported: "Aún no se ha informado del progreso de las tareas del objetivo.",
     "planning": "Definición de meta",
     "approvalRegion": "Aprobación de meta",
     "readyAnnouncement": "Contrato de meta listo. Está abierto en el Panel de Trabajo.",
@@ -720,6 +731,54 @@ export const es = {
     "dismiss": "Descartar"
   },
   "settings": {
+    "capabilitySaveFailed": "No se pudo guardar. Se conserva el borrador. {{message}}",
+
+    "categories": "Categorías de ajustes",
+    "executionDefaults": "Ejecución",
+    "conversationDisplay": "Conversación y visualización",
+    "activeSessionOverrideState": "Usa un permiso específico de la sesión",
+    "activeSessionInheritState": "Hereda el permiso predeterminado",
+    "applicationSupport": "Aplicación y soporte",
+    "technicalDetails": "Detalles técnicos",
+    "protocolVersion": "Protocolo {{version}}",
+    "hostVersion": "Host {{version}}",
+    "softwareUpdates": "Actualizaciones de software",
+    "saveState": {
+      "saving": "Guardando…",
+      "saved": "Ajustes guardados",
+      "failed": "No se pudieron guardar. Tus ajustes anteriores no han cambiado.",
+      "refreshFailed": "Ajustes guardados, pero no se pudo actualizar la vista actual."
+    },
+    "shortcutSearch": "Buscar acciones o teclas",
+    "shortcutFilter": "Filtro de atajos",
+    "shortcutFilterAll": "Todos",
+    "shortcutFilterModified": "Modificados",
+    "shortcutCount": "{{count}} atajos",
+    "shortcutNoMatches": "Ningún atajo coincide con estos filtros.",
+    "shortcutClearFilters": "Borrar filtros",
+    "shortcutRecordingCancel": "Pulsa Escape para cancelar la grabación.",
+    "preferenceSaved": "Guardado",
+    "promptEnhancementDefaultTemplateActive": "Se usa la plantilla integrada",
+    "closeBehaviorLoadError": "No se pudo cargar el comportamiento al cerrar. Reintenta para cambiarlo.",
+    "modelsWorkbenchHint": "Elige los modelos predeterminados, administra los servicios y las cuentas de IA y mantén el catálogo de modelos.",
+    "configureServices": "Configurar servicios",
+    "modelSavedRefreshFailed": "Guardado, pero no se pudo actualizar la lista de servicios: {{error}}",
+    "modelSavedFollowupFailed": "El servicio se guardó, pero no se pudo actualizar su modelo predeterminado: {{error}}",
+    "instructionsLoadFailed": "No se pudieron cargar las instrucciones: {{message}}",
+    "instructionsSaveFailed": "No se pudieron guardar las instrucciones: {{message}}",
+    "instructionsUnsaved": "Cambios sin guardar",
+    "instructionsSaved": "Instrucciones guardadas",
+    "mcpIntro": "Administra los servidores disponibles para tus agentes, de forma global o para un proyecto.",
+    "subagentsIntro": "Administra las definiciones de los agentes y ajusta sus límites de ejecución a continuación.",
+    "importSessionsScanDesc": "Busca conversaciones locales de otras herramientas. Revisa y selecciona las conversaciones antes de importarlas.",
+    "pluginScenic": {
+      "backdropBlur": "Desenfoque del fondo",
+      "appliesTo": "Se aplica a {{theme}}",
+      "applying": "Aplicando…",
+      "apply": "Aplicar",
+      "saved": "Desenfoque del fondo guardado."
+    },
+
     storage: {
       unavailableHint: "El directorio de almacenamiento no está disponible. Vuelve a conectar la unidad antes de iniciar; la aplicación no creará datos vacíos ni cambiará a otro directorio.",
       browserSource: "Origen de los datos del navegador",
@@ -765,6 +824,10 @@ export const es = {
       operationError: "No se pudo iniciar la operación de almacenamiento. {{error}}",
     },
     expertTeam: {
+      "projectOverrides": "Ajustes específicos del proyecto",
+      "selectProject": "Seleccionar ajustes de proyecto",
+      "removedProject": "Proyecto eliminado",
+
       runLimits: en.settings.expertTeam.runLimits,
       title: "Equipo de expertos",
       description: "Configura el modelo, el nivel de razonamiento, el subconjunto de herramientas y las instrucciones adicionales de los seis expertos integrados. Los cambios solo afectan a los expertos que se inicien después. El modelo de Composer también se aplica al líder y a los expertos sin modelo fijado. Las restricciones opcionales de herramientas solo reducen la disponibilidad; nunca conceden permisos.",
@@ -919,6 +982,9 @@ sklm: {
       "voice": "Voz"
     },
     "memory": {
+      "search": "Buscar nombres o rutas de proyectos",
+      "resultCount": "{{count}} de {{total}} proyectos",
+
       "title": "Memoria",
       "description": "Administra los recuerdos guardados y el registro automático por proyecto. Los proyectos del mismo grupo comparten memoria; los demás permanecen separados.",
       "projectsTitle": "Memoria del proyecto",
@@ -926,6 +992,8 @@ sklm: {
       "loadFailed": "No se pudo cargar la lista de proyectos. Inténtalo de nuevo."
     },
     "configSync": {
+      "retry": "Reintentar",
+
       title: "Cloud sync",
       experimental: "Experimental",
       connectionTitle: "WebDAV cloud sync",
@@ -1225,6 +1293,10 @@ sklm: {
     "skillBatchImported": "Se importaron {{count}} carpetas de habilidades",
     "skillBatchFailed": "No se pudieron importar {{count}} carpetas. Primer error: {{first}}",
     "skillsEmpty": "No hay habilidades en esta carpeta",
+    skillsIntro: "Guarda flujos de trabajo reutilizables para tus agentes.",
+    skillsGlobalEmptyHint: "Crea una habilidad o impórtala desde un archivo o carpeta.",
+    skillsProjectEmptyHint: "Añade un proyecto en Proyectos para gestionar sus habilidades aquí.",
+    skillsManageProjects: "Gestionar proyectos",
     "subagentsEmpty": "Aún no hay subagentes propios",
     subagentRuntimeLimits: "Límites de delegación",
     subagentRuntimeLimitsDesc: "Los agentes individuales y los expertos del equipo pueden delegar tareas independientes dentro de estos límites. Los cambios se aplican a la siguiente ejecución.",
@@ -1242,6 +1314,8 @@ sklm: {
     "mcpSaved": "Guardado {{name}}",
     "mcpDuplicate": "Ya existe un servidor MCP con este ID o nombre en este nivel.",
     "mcpMarket": {
+      "remotePartial": "Algunas fuentes del registro no están disponibles ({{names}})",
+
       browse: "Mercado",
       back: "Mis servidores",
       title: "Mercado MCP",
@@ -1339,6 +1413,8 @@ sklm: {
     "import": "Importar",
     "projectArchive": "Archivo de proyecto",
     "remoteHosts": {
+      "retry": "Reintentar",
+
       "title": "Hosts remotos",
       "listError": "No se pudieron cargar los hosts",
       "loading": "Cargando…",
@@ -1438,6 +1514,7 @@ sklm: {
     "marketCustomUrlPlaceholder": "https://example.com/catalog.json",
     "search": "Configuración de búsqueda",
     "searchPlaceholder": "Configuración de búsqueda…",
+    searchResults: "Resultados de búsqueda ({{count}})",
     "noResults": "No hay configuraciones coincidentes",
     "enterToSend": "Ingresar para enviar",
     "enterToSendDesc": "Desactivado: presione ⌘/Ctrl+Entrar para enviar.",
@@ -1796,6 +1873,9 @@ sklm: {
     "promptEnhancementSaveError": "No se pudo guardar la configuración de mejora de prompts.",
   },
   "project": {
+    "loadFailed": "No se pudo cargar la lista de proyectos",
+    "loadFailedRetained": "Los proyectos disponibles se muestran a continuación. Reintenta para cargar la lista completa.",
+
     "open": "Abrir proyecto",
     "openFolder": "Abrir carpeta",
     "none": "Sin proyecto",
@@ -2243,7 +2323,7 @@ sklm: {
       goalReport: "Informe de meta",
     },
     overview: {
-      specs: "Especificaciones", changedFiles: "Archivos modificados", attachments: "Adjuntos", skills: "Habilidades", memory: "Memoria", mcp: "MCP",
+      specs: "Especificaciones", changedFiles: "Archivos modificados", viewAllChanges: "Ver todos los cambios", attachments: "Adjuntos", skills: "Habilidades", memory: "Memoria", mcp: "MCP",
       noRecordedSkills: "No hay habilidades registradas en esta conversación", noRecordedMemory: "No hay memoria registrada en esta conversación", noRecordedMcp: "No hay uso de MCP registrado en esta conversación",
       recordedChangesNote: "Solo se muestran los cambios registrados correctamente en la conversación cargada actualmente; no es una lista completa de cambios de Git.",
       noSession: "No hay sesión seleccionada", untitled: "Sesión sin título", project: "Proyecto", model: "Modelo", modeLabel: "Modo", messages: "Mensajes", notAvailable: "No disponible", progress: "Progreso", statusLabel: "Estado actual", noPlans: "No hay actividad de planes en esta sesión", artifacts: "Artefactos", noArtifacts: "No hay artefactos en esta sesión", references: "Referencias", noReferences: "No hay referencias de archivos explícitas", mode: { chat: "Chat", plan: "Plan", goal: "Objetivo" }, subagents: "Subagents", noSubagents: "No subagents delegated in this session", teamSection: "Expert Team", status: { idle: "Inactivo", running: "En ejecución", planning: "Planificando", awaiting_approval: "Esperando aprobación", pending: "Pendiente", approved: "Aprobado", rejected: "Rechazado", expired: "Caducado", interrupted: "Interrumpido", queued: "En cola", completed: "Completado", failed: "Fallido" }
@@ -2318,6 +2398,9 @@ sklm: {
     "loadDev": "Cargar complemento local",
     "loadDevDone": "Complemento local cargado",
     piSkillsTitle: "Skills de pi CLI",
+    piSkillsSummary: "Reutiliza paquetes de habilidades instalados con pi CLI.",
+    piSkillsDiscoveryFailed: "No se pudieron leer los paquetes locales. Prueba a actualizar.",
+    piSkillsDiscoveryPartial: "No se pudieron leer algunas ubicaciones. Los paquetes disponibles siguen siendo utilizables.",
     piSkillsHint: "Los paquetes npm instalados se detectan en modo de solo lectura. Importe únicamente paquetes de confianza y gestiónelos en Plugins.",
     piSkillsConfirm: "¿Importar y activar este paquete pi?",
     piSkillsExecutable: "Este paquete incluye extensiones ejecutables. La importación habilita código de confianza en el agente y puede instalar dependencias.",

@@ -29,6 +29,23 @@ function fixture(deferredStatus = "pending", fail?: string) {
 
 describe("Host-bound Lead ask wait", () => {
   afterEach(() => vi.useRealTimers());
+  it("keeps local lifecycle metadata while projecting the strict Host request contract", async () => {
+    const localRequest = { ...request, turnId: "turn", createdAt: "2026-10-24T00:00:00.000Z" };
+    const host = { call: vi.fn(async (method: string, params?: Record<string, unknown>) => {
+      if (method === "team.registerLeadAsk") {
+        expect(params).toEqual({ sessionId: "lead", callerSessionId: "lead", turnId: "turn", request });
+        return { ask: { status: "waiting", request }, deadlineMs: Date.now() + 1800000 };
+      }
+      return { ok: true };
+    }) };
+    const wait = vi.fn(async () => [["Wait"]]);
+    await expect(waitForLeadAsk({ host: host as RuntimeHost, request: localRequest,
+      turnId: "turn", wait, pending: vi.fn() })).resolves.toEqual([["Wait"]]);
+    expect(wait).toHaveBeenCalledWith({ ...localRequest, teamManaged: true }, expect.any(AbortSignal));
+    expect(host.call).toHaveBeenCalledWith("team.ackLeadAsk", {
+      sessionId: "lead", callerSessionId: "lead", turnId: "turn", requestId: "ask",
+    });
+  });
   it("defers once at 30 minutes and releases every timer", async () => {
     const f=fixture();await flush();
     await vi.advanceTimersByTimeAsync(1799999);expect(f.pending).not.toHaveBeenCalled();

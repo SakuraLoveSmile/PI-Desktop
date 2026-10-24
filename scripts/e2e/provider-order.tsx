@@ -59,8 +59,10 @@ globalThis.providerOrderProbe = async (restart = false) => {
     flushSync(() => source.dispatchEvent(new PointerEvent("pointerdown", { pointerId: 1, button: 0, clientX: x, clientY: y, bubbles: true })));
     flushSync(() => window.dispatchEvent(new PointerEvent("pointermove", { pointerId: 1, clientX: x + 12, clientY, bubbles: true, cancelable: true })));
     await painted();
-    assert(source.style.transform.includes("translate("), "the whole card must follow the pointer");
-    assert(target.style.transform.includes("translateY"), "surrounding cards must make room before dropping");
+    const geometry = () => JSON.stringify({ from, to, after, initial, rect, source: source.style.transform,
+      target: target.style.transform, order: names(), visibility: document.visibilityState });
+    assert(source.style.transform.includes("translate("), `the whole card must follow the pointer: ${geometry()}`);
+    assert(target.style.transform.includes("translateY"), `surrounding cards must make room before dropping: ${geometry()}`);
     assert(names() === useAppStore.getState().providers.map((item) => item.name).join(","), "drag preview must not persist before release");
     flushSync(() => window.dispatchEvent(new PointerEvent(drop ? "pointerup" : "pointercancel", { pointerId: 1, clientX: x + 12, clientY, bubbles: true })));
     await painted();

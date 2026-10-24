@@ -42,6 +42,11 @@ Local-first · Model-agnostic · Plugin-powered · macOS / Windows / Linux
 
 > **Current release line: 0.15.x (Early Preview).**
 
+Version 0.15.9 improves Settings navigation and save recovery, Goal verification,
+the Composer and Overview, and runtime cancellation. Goal verification upgrades
+local profiles to Plus schema P10 behind a migration backup; older builds require
+restoring the pre-upgrade profile before downgrading.
+
 ---
 
 ## Why Pi-Desktop-Plus?
@@ -576,11 +581,10 @@ Agent / Plan / Goal
 | Platform | Architecture  | Package                                 |
 | -------- | ------------- | --------------------------------------- |
 | macOS    | Apple Silicon | `.dmg` / `.zip`                         |
-| macOS    | Intel         | `.dmg` / `.zip`                         |
-| Windows  | x64           | Installer / `.zip`                      |
-| Linux    | x64 / ARM64   | `.AppImage` / `.deb` / `.rpm` / `.asar` |
-
-macOS releases are signed with a Developer ID certificate and notarized by Apple.
+The current fork release workflow publishes macOS Apple Silicon packages only.
+Personal-use releases explicitly allow unsigned, non-notarized builds and require
+manual download, installation and updates. Other source-supported platforms do
+not currently have published assets from this workflow.
 
 <details>
 <summary><strong>Linux Compatibility</strong></summary>
@@ -689,8 +693,9 @@ gh workflow run release.yml --ref main -f sign_macos=false
 
 This creates a verified candidate bundle in Actions artifacts without publishing
 a GitHub Release or updater feed. Formal releases use a version-preparation PR,
-a tag on its clean merged main commit, and mandatory cloud verification and macOS
-signing/notarization. See the [Release Runbook](docs/spec/06-delivery/06-release-runbook.md).
+a tag on its clean merged main commit, and mandatory cloud verification. macOS
+signing/notarization is required unless the repository explicitly enables the
+personal-use unsigned lane. See the [Release Runbook](docs/spec/06-delivery/06-release-runbook.md).
 
 ### Documentation
 

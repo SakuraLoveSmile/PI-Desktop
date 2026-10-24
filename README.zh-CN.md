@@ -109,6 +109,9 @@ Subagent 与 Worker Session 可以承担独立任务并行工作。
 
 > **当前发布线：0.15.x（Early Preview）。**
 
+0.15.9 改进设置导航与保存恢复、目标验证、输入区、概要和运行取消。
+目标验证会先备份，再将本地档案升级为 Plus P10；降级到旧版前需要恢复升级前档案。
+
 ---
 
 ## 插件不是附加功能，而是工作台的一部分
@@ -579,11 +582,8 @@ Agent / Plan / Goal
 | Platform | Architecture  | Package                                 |
 | -------- | ------------- | --------------------------------------- |
 | macOS    | Apple Silicon | `.dmg` / `.zip`                         |
-| macOS    | Intel         | `.dmg` / `.zip`                         |
-| Windows  | x64           | 安装程序 / `.zip`                       |
-| Linux    | x64 / ARM64   | `.AppImage` / `.deb` / `.rpm` / `.asar` |
-
-macOS Release 使用 Developer ID 签名并经过 Apple Notarization。
+当前分支的发布流程仅提供 macOS Apple Silicon 安装包。个人使用的发布明确允许
+未签名、未经公证的构建，需手动下载、安装和更新；其他源码支持的平台暂无此流程发布的工件。
 
 <details>
 <summary><strong>Linux Compatibility</strong></summary>
@@ -690,8 +690,9 @@ gh workflow run release.yml --ref main -f sign_macos=false
 ```
 
 该命令只生成经过验证的 Actions 候选工件，不发布 GitHub Release 或更新源。
-正式发布先通过 PR 合并版本准备，再对干净的 main 合并提交打标签，经过云端检查、
-macOS 签名和公证后发布。操作步骤见[发布手册](docs/spec/06-delivery/06-release-runbook.md)。
+正式发布先通过 PR 合并版本准备，再对干净的 main 合并提交打标签并通过云端检查。
+macOS 默认要求签名和公证；仓库明确启用个人使用的未签名发布时除外。
+操作步骤见[发布手册](docs/spec/06-delivery/06-release-runbook.md)。
 
 ### 文档
 

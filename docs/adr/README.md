@@ -20,6 +20,7 @@ Each ADR includes:
 
 | ID | Title | Status |
 |---|---|---|
+| goal-required-verification-commands | [Approval-bound Goal verification commands](goal-required-verification-commands.md) | Accepted for implementation |
 | goal-blocked-state | [Goal blocked state and same-execution continuation](goal-blocked-state.md) | Accepted for implementation |
 | team-lead-pending-questions-and-replacements | [Durable Lead questions and bounded replacement](team-lead-pending-questions-and-replacements.md) | Accepted for implementation |
 | team-run-limits | [Host-owned Team wall-clock limits](team-run-limits.md) | Accepted for implementation |
@@ -270,7 +271,7 @@ Each ADR includes:
 | message-quotes-and-side-chats | Message quotes and renderer-owned side chats | Superseded by 0268 |
 | response-annotations | Response annotations as prompt attachments | Superseded by 0268 |
 | floating-annotation-index | Floating annotation index and source locations | Superseded by 0268 |
-| 0223 | Context Usage Display Preference | Accepted (amends 0184) |
+| 0223 | Context Usage Display Preference | Accepted (amends 0184; default amended 2026-10-20) |
 | 0224 | Right panel tab strip and data-driven add menu | Accepted (issue #229) |
 | 0225 | Restore deferred tools from effective session context | Accepted (issue #225) |
 | 0226 | Reserve chat width for composer controls | Accepted |

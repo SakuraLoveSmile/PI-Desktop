@@ -229,6 +229,7 @@ import {
   clampOutputToContext,
   effectiveModelContextWindow,
   estimateOutputCapInputTokens,
+  requestTranscript,
 } from "./output-cap.js";
 import {
   composeSubagentSystemPrompt,
@@ -1270,6 +1271,8 @@ const TOOL_PARAM_ALIASES: Record<string, Record<string, string>> = {
   Grep: { query: "pattern" },
 };
 const TOOL_OUTPUT_UPDATE_THROTTLE_MS = 100;
+/** Bounded wait for partial output after a host-side tool kill. */
+const TOOL_ABORT_GRACE_MS = 10_000;
 const MAX_TOOL_PROGRESS_CHARS = 64 * 1024;
 const TOOL_PROGRESS_TRUNCATION_MARKER =
   "\n\n[tool output progress truncated]\n\n";
@@ -1939,6 +1942,12 @@ export class DesktopAgentRuntime {
   private contextReminderClaimed = false;
   private contextFallbackReminderClaimed = false;
   private activeToolProgressCleanups = new Set<(flush: boolean) => void>();
+  /**
+   * Abort handlers for the tool calls currently awaiting `tools.execute`.
+   * `abort()` drives these directly: a tool must be released even when the
+   * signal it was handed never fires, or the stop RPC stays pending forever.
+   */
+  private activeToolAborts = new Set<() => void>();
   private hostCloseUnsubscribe?: () => void;
   private turnSubagentUsage?: MessageUsage;
   private goalReportDraftManager?: GoalReportDraftManager;
@@ -2023,6 +2032,8 @@ export class DesktopAgentRuntime {
       // Visibility rules.
       "Before each tool batch, briefly state its purpose. Keep the user informed during long work. The final response must state the outcome, verification, and remaining blockers. Never claim actions or checks you did not perform.",
       USER_VISIBLE_PROGRESS_GUIDANCE,
+      // File-reference formatting.
+      "File references: when citing a real local file, use a Markdown link with a short label and the exact absolute path as its target, e.g. [file.ts](/workspace/src/file.ts:42). Add only a starting line (:line or :line:column) when useful; do not use ranges or GitHub #L anchors. Wrap destinations containing spaces in angle brackets. Do not wrap links in backticks or use file://, vscode://, or https:// for local files. Link only to existing files in the accessible workspace; mention unavailable or other-repository files as code text.",
       // Delegation steering (ADR 0089).
       ...(this.canDelegate() && this.subagents.length
         ? [
@@ -2136,6 +2147,9 @@ export class DesktopAgentRuntime {
         // with pi's own run signal (Stop must keep working): the adapter refuses
         // to start an attempt on an aborted signal, and its backoff sleep rejects.
         const stallAbort = new AbortController();
+        // Both output clamps must see the instructions the adapter sends,
+        // rather than charging every superseded system snapshot again.
+        const requestContext = requestTranscript(m, context);
         const attemptOptions: SimpleStreamOptions = {
           ...hookedOptions,
           // Cap the output budget at the pi-desktop layer so the estimate
@@ -2143,7 +2157,7 @@ export class DesktopAgentRuntime {
           // max_tokens, but the low-level `stream` path used by
           // `thinkingLevel: "omit"` would otherwise send it untouched, and
           // both consume an estimate that under-counts CJK text (issue B).
-          maxTokens: clampOutputToContext(m, context, hookedOptions.maxTokens),
+          maxTokens: clampOutputToContext(m, requestContext, hookedOptions.maxTokens),
           signal: AbortSignal.any([
             ...(hookedOptions.signal ? [hookedOptions.signal] : []),
             stallAbort.signal,
@@ -2154,7 +2168,7 @@ export class DesktopAgentRuntime {
         const contextInsightsStep = ++this.contextInsightsStep;
         const retryStream = createProviderRetryStream(
           m,
-          context,
+          requestContext,
           attemptOptions,
           (retryOptions) => {
             this.teamBudgetStop.assertModelAdmission();
@@ -2170,8 +2184,8 @@ export class DesktopAgentRuntime {
             } };
             return accountModelStream(m, () =>
             this.thinkingLevel === "omit"
-              ? this.models.stream(omitThinkingModel(m), context, observedOptions)
-              : this.models.streamSimple(m, context, observedOptions), {
+              ? this.models.stream(omitThinkingModel(m), requestContext, observedOptions)
+              : this.models.streamSimple(m, requestContext, observedOptions), {
                 providerId: this.provider.id,
                 nativeCost: this.provider.modelConfig?.nativeCost,
                 onUsage: (usage) => this.emit({ type: "usage", usage }, usageTurnId),
@@ -3489,21 +3503,62 @@ export class DesktopAgentRuntime {
               scheduleProgress();
             })
           : undefined;
+        // #1767: host-core only honours `tools.abort` for `Bash` and
+        // `GenerateImages` — it kills the process and answers the in-flight
+        // execute with `TOOL_ABORTED`. Every other tool keeps running to
+        // completion whatever the runtime sends, so awaiting it blocked the
+        // turn long after the user pressed Stop. Those tools therefore abandon
+        // the wait locally the instant the signal fires; the orphaned host call
+        // settles on its own and its result is discarded.
+        const hostAbortsTool = isBash || toolName === "GenerateImages";
+        const abortedMarker = Symbol("tool-aborted");
+        let resolveAborted: (marker: typeof abortedMarker) => void = () => undefined;
+        const aborted = new Promise<typeof abortedMarker>((resolve) => {
+          resolveAborted = resolve;
+        });
+        let abortGraceTimer: ReturnType<typeof setTimeout> | undefined;
+        let abortDeadlineExpired = false;
+        let stopped = false;
         const abort = () => {
-          if ((!isBash && toolName !== "GenerateImages") || abortRequested || settled) return;
+          if (abortRequested || settled) return;
           abortRequested = true;
-          abortPromise = this.host
-            .call("tools.abort", {
-              sessionId: this.sessionId,
-              toolCallId,
-            })
-            .then(
-              () => undefined,
-              (error) => {
-                abortError = error;
-              },
-            );
+          if (hostAbortsTool) {
+            const abortTurnId = this.turnId;
+            abortPromise = this.host
+              .call("tools.abort", {
+                sessionId: this.sessionId,
+                toolCallId,
+              })
+              .then(
+                () => undefined,
+                (error) => {
+                  if (abortDeadlineExpired) {
+                    process.stderr.write(
+                      `[agent-runtime] tool abort acknowledgement failed after deadline (session=${this.sessionId} turn=${abortTurnId} toolCall=${toolCallId}) code=${classifyAgentError(error).code}\n`,
+                    );
+                  } else {
+                    abortError = error;
+                  }
+                },
+              );
+          }
+          // Release progress/output resources before arming the grace window:
+          // cleanup is idempotent and must not race the timer it would clear.
           cleanup(true);
+          if (hostAbortsTool) {
+            // Bounded window for the partial output the host collected before
+            // the kill and its acknowledgement; past it the turn ends regardless.
+            abortGraceTimer = setTimeout(
+              () => {
+                abortDeadlineExpired = true;
+                resolveAborted(abortedMarker);
+              },
+              TOOL_ABORT_GRACE_MS,
+            );
+          } else {
+            // Nothing host-side can interrupt this tool, so stop waiting now.
+            resolveAborted(abortedMarker);
+          }
         };
 
         cleanup = (flush: boolean) => {
@@ -3515,6 +3570,7 @@ export class DesktopAgentRuntime {
           unsubscribeOutput?.();
           signal?.removeEventListener("abort", abort);
           this.activeToolProgressCleanups.delete(cleanup);
+          this.activeToolAborts.delete(abort);
           if (isBash) this.runningBashAborts.delete(toolCallId);
         };
         this.activeToolProgressCleanups.add(cleanup);
@@ -3528,6 +3584,7 @@ export class DesktopAgentRuntime {
         if (signal) {
           signal.addEventListener("abort", abort, { once: true });
         }
+        this.activeToolAborts.add(abort);
 
         let result: {
           ok: boolean;
@@ -3539,7 +3596,7 @@ export class DesktopAgentRuntime {
         let executionError: unknown;
         let executionFailed = false;
         try {
-          result = await this.host.call<{
+          const execution = this.host.call<{
               ok: boolean;
               content: unknown;
               isError?: boolean;
@@ -3582,16 +3639,36 @@ export class DesktopAgentRuntime {
                 ? { permissionScope: this.delegatePermissionScopes.get(toolCallId) }
                 : {}),
             });
-          captureBackgroundReceipt?.(result, signal);
+          // #1767: stop has to end the turn even when the tool never yields.
+          // Losing the race does not cancel the host call — it only stops this
+          // turn from waiting on it.
+          const raced = await Promise.race([execution, aborted]);
+          if (raced === abortedMarker) {
+            stopped = true;
+          } else {
+            result = raced;
+            captureBackgroundReceipt?.(result, signal);
+          }
         } catch (error) {
           executionFailed = true;
           executionError = error;
         } finally {
+          // The abort RPC shares the original grace window, including when
+          // execute has already returned partial output or an error.
+          if (abortPromise) await Promise.race([abortPromise, aborted]);
           this.delegatePermissionScopes.delete(toolCallId);
           cleanup(true);
+          // cleanup is a no-op once the abort path has run, so the grace timer
+          // it armed is released here instead.
+          if (abortGraceTimer) clearTimeout(abortGraceTimer);
         }
-        if (abortPromise) await abortPromise;
         if (abortError) throw abortError;
+        if (stopped) {
+          throw Object.assign(
+            new Error(`tool execution aborted while ${toolName} was running`),
+            { errorCode: "TOOL_ABORTED" },
+          );
+        }
         if (executionFailed) throw executionError;
         if (!result) throw new Error("tool execution returned no result");
         const recordParams = isRecord(params) ? params : undefined;
@@ -3760,6 +3837,10 @@ export class DesktopAgentRuntime {
           text = JSON.stringify(rawContent, null, 2);
         }
         if (!result.ok) this.failedHostToolCalls.add(toolCallId);
+        if (isBash && this.goalReportDraftManager) {
+          text += `\n\nGoal report evidence reference: ${JSON.stringify({ kind: "tool_result", refId: toolCallId })}. ` +
+            "Use this actual tool call ID in evidences[].refId, and reference that evidence's id in checks[].evidenceRefs. commandShellId is the shell selector, not an evidence ID.";
+        }
         return {
           content: [{ type: "text", text }, ...imageBlocks],
           details,
@@ -6594,15 +6675,9 @@ export class DesktopAgentRuntime {
     this.activeProviderRetryAttempt = retryAttempt;
     this.pendingProviderRetry = undefined;
 
-    const messages = [...this.agent.state.messages];
-    if (messages.at(-1)?.role !== "assistant") {
-      throw new Error("Cannot retry a provider stream without its failed assistant message");
-    }
-    // A failed stream can be represented by more than one trailing assistant
-    // message after a tool round. Remove the whole failed suffix before
-    // continuing; pi-agent-core rejects any assistant-terminated transcript.
-    while (messages.at(-1)?.role === "assistant") messages.pop();
-    this.setAgentMessages(messages);
+    // Compaction may already have removed the failed response. Preserve its
+    // retained summary and system updates while discarding any failed suffix.
+    this.setAgentMessages(removeTrailingAssistantMessages(this.agent.state.messages));
 
     this.providerRetryInProgress = true;
     this.requestStartedAt = Date.now();
@@ -9170,6 +9245,7 @@ export class DesktopAgentRuntime {
           // error propagates into the SubmitGoalReport tool result so the
           // executing Agent can retry.
           await this.host.call("goalReports.submitDraft", {
+            sessionId: execution.sessionId,
             executionId: execution.id,
             draft,
           });
@@ -9604,6 +9680,14 @@ export class DesktopAgentRuntime {
     this.providerRetryAbort?.abort();
     if (this.compactionInProgress) this.compactionAborted = true;
     this.compactionAbort?.abort();
+    // `agent.abort()` normally fires the signal each in-flight tool was handed,
+    // and the tool executor reacts to that. When the signal does not reach a
+    // tool, the executor keeps awaiting `tools.execute`, the turn never
+    // settles, and this method never returns. The renderer awaits this RPC
+    // before it clears the "processing" state, so one unyielding tool pinned
+    // the whole session until it finished on its own (#1767). Drive the tools
+    // from here as well, so a stop always releases them.
+    for (const abortTool of [...this.activeToolAborts]) abortTool();
   }
 
   /**

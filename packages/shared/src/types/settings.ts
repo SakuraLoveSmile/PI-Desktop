@@ -161,7 +161,7 @@ export type AppSettings = {
   linkOpenTarget?: LinkOpenTarget;
   /**
    * Which context figure the composer ring and its summary lead with (D398).
-   * `remaining` (default, absent) counts down from 100%; `used` counts up.
+   * `used` (default, absent) counts up; `remaining` counts down from 100%.
    * Color thresholds always follow remaining capacity, so the warning state
    * does not change meaning with this preference.
    */

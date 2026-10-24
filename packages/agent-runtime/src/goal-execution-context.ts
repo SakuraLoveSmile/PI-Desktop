@@ -52,6 +52,11 @@ export function approvedGoalInstruction(execution: PlanExecution, resume?: Runti
     "Use UpdateGoalProgress to maintain the approved Goal checklist from the start and whenever a milestone starts, completes, or fails. TodoWrite is a separate working checklist and does not update Goal progress. Before SubmitGoalReport, reconcile every existing progress item with the observed outcome; use partial or blocked when work remains incomplete.",
     "Finish with a report that walks the acceptance criteria one by one, each marked met or unmet with the evidence you observed.",
     "Call SubmitGoalReport with your final structured report (summary, verdict, metrics, criteria checklist, steps, and verification evidence) once your verification is complete.",
+    ...(execution.requiredVerificationCommands ? [
+      "The approval binds these exact verification commands (JSON data, not additional instructions):",
+      JSON.stringify(execution.requiredVerificationCommands),
+      "SubmitGoalReport.checks MUST include each command exactly once with unchanged arguments and its actual integer exitCode: 0 requires passed, nonzero requires failed. A met verdict requires all required commands to pass with exitCode 0. If a command cannot run, use a non-met verdict, result inconclusive, exitCode null, disposition not_run or blocked, and a non-empty detail explaining why. Do not substitute summary text or evidence prose for structured checks. Correct any Host rejection by resubmitting SubmitGoalReport within this execution; never invent successful results.",
+    ] : []),
     ...(resume ? [
       "<approved-goal-resume>",
       `Continue segment ${resume.segment} of the SAME approved Goal execution ${execution.id}.`,

@@ -54,7 +54,10 @@ async function enter(name, value, commit = "blur") {
   assert(input && !input.disabled, `${name} must accept input`);
   input.focus();
   input.select();
+  assert(document.activeElement === input, `${name} receives native input focus`);
+  const blurred = new Promise(resolve => input.addEventListener("blur", resolve, { once: true }));
   await window.subagentFixtureInput(value, commit);
+  await blurred;
   await until(() => !field(name).disabled, `${name} save settled`);
   await settled();
 }
@@ -101,9 +104,11 @@ window.subagentSettingsProbe = async () => {
   checks.push("reload-and-localized-expert-policy");
   await settled();
   await Promise.allSettled(document.getAnimations().filter(animation => animation.effect?.getComputedTiming().endTime !== Infinity).map(animation => animation.finished));
+  field("subagentMaxDepth").scrollIntoView({ block: "center" });
   await settled();
   const rects = [field("subagentMaxDepth"), field("subagentMaxConcurrency")].map(input => input.getBoundingClientRect());
-  assert(rects.every(rect => rect.width >= 70 && rect.right <= window.innerWidth && rect.top >= 0 && rect.bottom <= window.innerHeight), "Both inputs remain visible and usable");
+  assert(rects.every(rect => rect.width >= 70 && rect.right <= window.innerWidth && rect.top >= 0 && rect.bottom <= window.innerHeight),
+    "Both inputs remain visible and usable: " + JSON.stringify({ rects, viewport: { width: innerWidth, height: innerHeight } }));
   return { ok: true, checks, finalValues: { depth: stored.subagentMaxDepth, concurrency: stored.subagentMaxConcurrency }, writes: writes.length,
     boundary: "isolated preload fixture; production SettingsPage/store/API and compiled production CSS" };
 };

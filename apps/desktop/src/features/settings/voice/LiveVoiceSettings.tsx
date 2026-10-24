@@ -29,8 +29,8 @@ export function LiveVoiceSettings({
   const [providersLoadFailed, setProvidersLoadFailed] = useState(false);
   const [providersRequest, setProvidersRequest] = useState(0);
   const setSettingsTab = useAppStore((state) => state.setSettingsTab);
-  const showToast = useAppStore((state) => state.showToast);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<{ adapter?: Adapter; message: string } | null>(null);
   const [drafts, setDrafts] = useState<Record<string, { modelId?: string; voice?: string }>>({});
   const bindingByAdapter = useMemo(() => {
     const result = new Map<Adapter, LiveBinding>();
@@ -59,22 +59,25 @@ export function LiveVoiceSettings({
     return Boolean(provider.baseUrl);
   });
 
-  const save = async (next: LiveVoiceSettings) => {
+  const save = async (next: LiveVoiceSettings, adapter?: Adapter): Promise<boolean> => {
     setSaving(true);
+    setSaveError(null);
     try {
       await saveSettings({ liveVoice: next });
       await controller.refreshStatus();
+      return true;
     } catch {
-      showToast(t("liveVoice.saveFailed"), { variant: "error" });
+      setSaveError({ adapter, message: t("liveVoice.saveFailed") });
+      return false;
     } finally {
       setSaving(false);
     }
   };
 
-  const updateBinding = (adapter: Adapter, patch: Record<string, string>): Promise<void> => {
+  const updateBinding = (adapter: Adapter, patch: Record<string, string>): Promise<boolean> => {
     const current = bindingByAdapter.get(adapter);
     const providerId = patch.providerId ?? current?.providerId;
-    if (!providerId) return Promise.resolve();
+    if (!providerId) return Promise.resolve(false);
     const id = current?.id ?? `live-${adapter}-${crypto.randomUUID()}`;
     const currentModel = current && "modelId" in current ? current.modelId : undefined;
     const nextBinding: LiveBinding = adapter === "codex-live"
@@ -92,7 +95,20 @@ export function LiveVoiceSettings({
     const bindings = current
       ? live.bindings.map((binding) => binding.id === current.id ? nextBinding : binding)
       : [...live.bindings, nextBinding];
-    return save({ ...live, bindings, selectedBindingId: patch.providerId ? id : live.selectedBindingId ?? id });
+    return save({ ...live, bindings, selectedBindingId: patch.providerId ? id : live.selectedBindingId ?? id }, adapter);
+  };
+
+  const commitDraft = async (adapter: Adapter, id: string, field: "modelId" | "voice", value: string) => {
+    const normalized = value.trim();
+    if (normalized && !await updateBinding(adapter, { [field]: normalized })) return;
+    setDrafts((all) => {
+      // A late save must not discard a newer edit or the other field's draft.
+      if (all[id]?.[field] !== value) return all;
+      const next = { ...all, [id]: { ...all[id] } };
+      delete next[id]![field];
+      if (Object.keys(next[id]!).length === 0) delete next[id];
+      return next;
+    });
   };
 
   const removeBinding = (adapter: Adapter) => {
@@ -100,7 +116,7 @@ export function LiveVoiceSettings({
     if (!current) return;
     const bindings = live.bindings.filter((binding) => binding.id !== current.id);
     const selectedBindingId = live.selectedBindingId === current.id ? bindings[0]?.id : live.selectedBindingId;
-    void save({ enabled: live.enabled, bindings, ...(selectedBindingId ? { selectedBindingId } : {}) });
+    void save({ enabled: live.enabled, bindings, ...(selectedBindingId ? { selectedBindingId } : {}) }, adapter);
   };
 
   const selected = liveSnapshot.call;
@@ -111,14 +127,15 @@ export function LiveVoiceSettings({
     const current = bindingByAdapter.get(adapter);
     const choices = providerChoices(adapter);
     const readiness = current && liveSnapshot.status?.bindings.find((item) => item.bindingId === current.id);
+    const unavailable = current && !providersLoading && !providersLoadFailed && !choices.some((provider) => provider.id === current.providerId);
     const locked = adapterLocked(adapter);
     const title = t(`liveVoice.adapters.${adapter}.title`);
     return (
       <SettingsCard key={adapter} title={title} description={t(`liveVoice.adapters.${adapter}.description`)}>
-        {current && readiness ? (
+        {current && (readiness || unavailable) ? (
           <SettingsRow title={t("liveVoice.bindingStatus")}>
-            <Badge tone={readiness.selectable ? "success" : "warning"}>
-              {readiness.selectable ? t("liveVoice.ready") : t(`liveVoice.readiness.${readiness.reason ?? "missing-provider"}`)}
+            <Badge tone={!unavailable && readiness?.selectable ? "success" : "warning"}>
+              {unavailable ? t("liveVoice.providerUnavailable") : readiness?.selectable ? t("liveVoice.ready") : t(`liveVoice.readiness.${readiness?.reason ?? "missing-provider"}`)}
             </Badge>
           </SettingsRow>
         ) : null}
@@ -146,7 +163,7 @@ export function LiveVoiceSettings({
               checked={live.selectedBindingId === current.id}
               label={t("liveVoice.useForNextCall")}
               disabled={saving || locked}
-              onChange={() => void save({ ...live, selectedBindingId: current.id })}
+              onChange={() => void save({ ...live, selectedBindingId: current.id }, adapter)}
             />
           </SettingsRow>
         ) : null}
@@ -161,11 +178,7 @@ export function LiveVoiceSettings({
                 const modelId = event.currentTarget.value;
                 setDrafts((all) => ({ ...all, [current.id]: { ...all[current.id], modelId } }));
               }}
-              onBlur={(event) => {
-                const modelId = event.currentTarget.value.trim();
-                if (modelId) void updateBinding(adapter, { modelId }).finally(() => setDrafts((all) => { const next = { ...all }; delete next[current.id]; return next; }));
-                else setDrafts((all) => { const next = { ...all }; delete next[current.id]; return next; });
-              }}
+              onBlur={(event) => void commitDraft(adapter, current.id, "modelId", event.currentTarget.value)}
             />
           </SettingsRow>
         ) : null}
@@ -180,11 +193,7 @@ export function LiveVoiceSettings({
                 const voice = event.currentTarget.value;
                 setDrafts((all) => ({ ...all, [current.id]: { ...all[current.id], voice } }));
               }}
-              onBlur={(event) => {
-                const voice = event.currentTarget.value.trim();
-                if (voice) void updateBinding(adapter, { voice }).finally(() => setDrafts((all) => { const next = { ...all }; delete next[current.id]; return next; }));
-                else setDrafts((all) => { const next = { ...all }; delete next[current.id]; return next; });
-              }}
+              onBlur={(event) => void commitDraft(adapter, current.id, "voice", event.currentTarget.value)}
             />
           </SettingsRow>
         ) : null}
@@ -198,11 +207,12 @@ export function LiveVoiceSettings({
                 { id: "realtime-ga", label: t("liveVoice.profiles.realtime-ga") },
                 { id: "realtime-compat-v1", label: t("liveVoice.profiles.realtime-compat-v1") },
               ]}
-              onChange={(wireProfile) => updateBinding(adapter, { wireProfile })}
+              onChange={(wireProfile) => { void updateBinding(adapter, { wireProfile }); }}
             />
           </SettingsRow>
         ) : null}
         {locked ? <SettingsRow title={t("liveVoice.bindingLocked")}>{t("liveVoice.bindingLockedDetail")}</SettingsRow> : null}
+        {saveError?.adapter === adapter ? <div className="live-voice-error" role="alert">{saveError.message}</div> : null}
       </SettingsCard>
     );
   };
@@ -234,6 +244,7 @@ export function LiveVoiceSettings({
           />
         </SettingsRow>
         {providersLoading ? <div className="live-voice-hint" role="status">{t("common.loading")}</div> : null}
+        {saveError && !saveError.adapter ? <div className="live-voice-error" role="alert">{saveError.message}</div> : null}
         {providersLoadFailed ? (
           <div className="live-voice-error" role="alert">
             {t("liveVoice.providersLoadFailed")}

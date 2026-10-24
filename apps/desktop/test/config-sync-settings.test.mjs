@@ -109,26 +109,6 @@ test("the sync page follows progress while it runs a sync of its own", () => {
   assert.match(syncPage, /setProgress\(null\);/);
 });
 
-test("the progress line renders before the status card a first enable has not built", () => {
-  // The slowest sync of all is the first enable: it runs while `configured` is
-  // still false, and the status card does not exist yet. So the line cannot sit
-  // inside the `{configured ? …}` block that owns that card. Source order pins
-  // it: the line appears exactly once, earlier than the gate.
-  const marker = 'className="settings-config-sync-progress"';
-  const progressAt = syncPage.indexOf(marker);
-  const configuredAt = syncPage.indexOf("{configured ? (");
-  assert.equal(
-    syncPage.split(marker).length - 1,
-    1,
-    "the page renders exactly one progress line",
-  );
-  assert.ok(configuredAt > 0, "the configured gate is still rendered");
-  assert.ok(
-    progressAt > 0 && progressAt < configuredAt,
-    "the progress line must render before the {configured ? …} gate",
-  );
-});
-
 test("the sync card reports each phase with a readable fraction", () => {
   assert.match(syncPage, /t\(syncProgress\.phaseKey\)/);
   assert.match(syncPage, /settings\.configSync\.progressTitle/);

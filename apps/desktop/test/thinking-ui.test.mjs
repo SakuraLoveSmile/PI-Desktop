@@ -91,7 +91,7 @@ test("composer exposes the runtime thinking level order and provider filtering",
 });
 
 test("thinking levels use their canonical English values without i18n", () => {
-  assert.match(composerSource, /const thinkingLabel = thinkingLevel;/);
+  // The chip's off label is mapped in thinking-level-label.ts, which has its own test.
   // The slider's ticks print the canonical level values themselves.
   assert.match(composerSource, /onClick=\{\(\) => select\(stop\)\}>\{candidate\}<\/button>/);
   assert.doesNotMatch(composerSource, /THINKING_LEVEL_(LABELS|I18N_KEYS)/);

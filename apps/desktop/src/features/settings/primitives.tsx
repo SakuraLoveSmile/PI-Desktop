@@ -97,6 +97,53 @@ export function SettingsCard({
   );
 }
 
+/** Shared management-page actions, followed by the page's search and filters. */
+export function SettingsWorkbenchHeader({
+  description,
+  actions,
+  children,
+}: {
+  description?: string;
+  actions?: ReactNode;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="settings-workbench-header">
+      {description || actions ? (
+        <div className="settings-workbench-overview">
+          {description ? <p>{description}</p> : null}
+          {actions ? <div className="settings-workbench-actions">{actions}</div> : null}
+        </div>
+      ) : null}
+      {children}
+    </div>
+  );
+}
+
+/** Compact guidance keeps an empty management page readable and actionable. */
+export function SettingsEmptyState({
+  message,
+  hint,
+  icon,
+  action,
+}: {
+  message: string;
+  hint?: string;
+  icon?: ReactNode;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="settings-empty-state" role="status">
+      {icon ? <span className="settings-empty-icon" aria-hidden="true">{icon}</span> : null}
+      <div className="settings-empty-copy">
+        <span>{message}</span>
+        {hint ? <p>{hint}</p> : null}
+      </div>
+      {action ? <div className="settings-empty-action">{action}</div> : null}
+    </div>
+  );
+}
+
 export function CommandShellRow({
   settings,
   saveSettings,

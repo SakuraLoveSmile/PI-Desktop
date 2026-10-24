@@ -29,13 +29,19 @@ sidecar reproduces Node's documented additive semantics itself.
 The desktop launcher passes `--use-system-ca` before the sidecar entry point
 on Windows and Linux. On macOS the launcher omits the flag; instead the
 sidecar merges its bundled roots, the inherited `NODE_EXTRA_CA_CERTS` set,
-and the system-store certificates into the default CA set at startup
+and non-expired system-store certificates into the default CA set at startup
 (`tls.setDefaultCACertificates`, agent-runtime `system-ca`). Either way the
-effective trust set is the same: bundled roots, system roots, and an inherited
+effective trust set is the same: bundled roots, usable system roots, and an inherited
 extra-CA file, deduplicated by content. Certificate chain, expiration and
 hostname validation remain enabled. The app neither installs roots nor exports
 a certificate bundle. The operating system's existing trust policy is the
 authority for local roots.
+
+The startup merge filters only OS entries whose `validTo` is at or before
+startup time. OS stores retain expired anchors; merging one can stop OpenSSL
+at that anchor instead of a valid longer chain (issue #1393). Bundled and
+inherited extra roots retain their existing semantics. Unparseable entries
+remain subject to runtime validation and a rejected merge remains observable.
 
 This applies to the desktop sidecar's default Node TLS clients, including the
 direct, HTTP proxy and SOCKS provider transports. It is a process-level default,
@@ -68,6 +74,6 @@ No IPC fields, database format, credentials, or proxy settings change.
 
 `scripts/e2e-provider-certificates.mjs` exercises the real desktop launcher,
 bundled sidecar, pi-ai and a loopback HTTPS provider. It checks inclusion of
-system roots without modifying OS stores, then rejection of an untrusted root,
+non-expired system roots after startup without modifying OS stores, then rejection of an untrusted root,
 success with an inherited extra CA, and rejection of a mismatched hostname.
 Native macOS/Linux and the reporter's security product require separate checks.

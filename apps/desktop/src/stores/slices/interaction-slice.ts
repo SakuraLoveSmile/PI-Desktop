@@ -6,8 +6,10 @@ import type {
 } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
 import {
+  dropAskDraft as removeAskDraft,
   headAsk,
   removeAsk,
+  setAskDraft as applyAskDraft,
 } from "../../lib/pending-asks";
 import {
   headPermission,
@@ -44,6 +46,8 @@ export function createInteractionSlice({
   | "navForward"
   | "resolvePermission"
   | "resolveAsk"
+  | "setAskDraft"
+  | "dropAskDraft"
   | "resolvePlan"
   | "revisePlan"
   | "convertPlanToGoal"
@@ -236,7 +240,16 @@ export function createInteractionSlice({
       await api.resolveAskTool(resolution);
       set((state) => ({
         pendingAsks: removeAsk(state.pendingAsks, sessionId, resolution.requestId),
+        askDrafts: removeAskDraft(state.askDrafts, resolution.requestId),
       }));
+    },
+
+    setAskDraft: (requestId, draft) => {
+      set((state) => ({ askDrafts: applyAskDraft(state.askDrafts, requestId, draft) }));
+    },
+
+    dropAskDraft: (requestId) => {
+      set((state) => ({ askDrafts: removeAskDraft(state.askDrafts, requestId) }));
     },
 
     resolvePlan: async (resolution: PlanResolveRequest) => {

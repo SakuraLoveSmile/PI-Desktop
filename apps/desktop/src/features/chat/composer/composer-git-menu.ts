@@ -21,6 +21,12 @@ export function canCreateWorktree(git: GitWorkspaceSnapshot | null, blocked: boo
   return Boolean(git?.head && !blocked);
 }
 
+/** Short commit that names a detached HEAD; null while HEAD is on a branch or has no commit yet. */
+export function detachedHeadShortSha(git: GitWorkspaceSnapshot | null): string | null {
+  if (!git || git.branch || !git.head) return null;
+  return git.head.slice(0, 7);
+}
+
 export function managedWorktrees(git: GitWorkspaceSnapshot | null) {
   return git?.worktrees.filter((worktree) => worktree.managed && !worktree.isMain) ?? [];
 }

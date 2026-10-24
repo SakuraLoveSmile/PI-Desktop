@@ -1,5 +1,24 @@
 import { expect, it } from "vitest";
-import { parseGoalResume } from "./goal-execution-context.js";
+import type { PlanExecution } from "@pi-desktop/shared";
+import { approvedGoalInstruction, parseGoalResume } from "./goal-execution-context.js";
+
+it("delivers the frozen verification requirements to initial and resumed execution without replacing the approved Markdown", () => {
+  const execution: PlanExecution = {
+    id: "exec", proposalId: "proposal", sessionId: "session", kind: "goal", state: "running",
+    title: "Goal", question: "Proceed?", plan: "# Exact approved contract",
+    artifact: { relativePath: ".pi/goal/contract.md", sha256: "hash", sizeBytes: 25 }, targetPermissionMode: "auto",
+    requiredVerificationCommands: ["cargo test --locked", "pnpm test -- --run"],
+  };
+  for (const resume of [undefined, { segment: 2, reasons: [{ code: "report_invalid" as const }] }]) {
+    const instruction = approvedGoalInstruction(execution, resume);
+    expect(instruction).toContain(execution.plan);
+    expect(instruction).toContain(JSON.stringify(execution.requiredVerificationCommands));
+    expect(instruction).toContain("exitCode null");
+    expect(instruction).toContain("within this execution");
+  }
+  const { requiredVerificationCommands: _requirements, ...legacy } = execution;
+  expect(approvedGoalInstruction(legacy)).not.toContain("The approval binds these exact verification commands");
+});
 
 it("validates resume reasons, segment identity and user supplement at admission", () => {
   expect(parseGoalResume(undefined)).toBeUndefined();

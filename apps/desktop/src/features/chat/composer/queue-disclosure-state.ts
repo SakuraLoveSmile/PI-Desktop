@@ -1,20 +1,16 @@
 export type QueueDisclosureChoices = ReadonlyMap<string, boolean>;
 
+/**
+ * A queue of two or more rows folds by default; one row is always listed. Only
+ * an explicit toggle is stored, so the default follows the live count instead
+ * of freezing whatever count the queue had when it was first seen.
+ */
 export function queueDisclosureExpanded(
   choices: QueueDisclosureChoices,
   scopeKey: string,
   count: number,
 ): boolean {
-  return choices.get(scopeKey) ?? count <= 3;
-}
-
-export function initializeQueueDisclosure(
-  choices: QueueDisclosureChoices,
-  scopeKey: string,
-  count: number,
-): QueueDisclosureChoices {
-  if (count === 0 || choices.has(scopeKey)) return choices;
-  return new Map(choices).set(scopeKey, count <= 3);
+  return choices.get(scopeKey) ?? count <= 1;
 }
 
 export function toggleQueueDisclosure(

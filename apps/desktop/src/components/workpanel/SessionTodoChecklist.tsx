@@ -4,18 +4,7 @@ import type { SessionTodo, TodoStatus } from "@pi-desktop/shared";
 import { useSessionTodosRecovery } from "../../features/chat/todos/useSessionTodosRecovery";
 import { useAppStore } from "../../stores/app-store";
 import { Button } from "../ui";
-import { IconCheck, IconChevronDown } from "../icons";
-
-function statusSymbol(status: TodoStatus): string {
-  switch (status) {
-    case "in_progress":
-      return "◐";
-    case "cancelled":
-      return "⊘";
-    default:
-      return "○";
-  }
-}
+import { IconChevronDown, IconCircle, IconCircleCheck, IconCircleSlash } from "../icons";
 
 export function SessionTodoChecklist({ sessionId }: { sessionId: string }) {
   const { t } = useTranslation();
@@ -80,14 +69,26 @@ function TodoRow({ todo }: { todo: SessionTodo }) {
   const { t } = useTranslation();
   const label = t(`chat.todo.status.${todo.status}`);
   return (
-    <li className={`session-todo-checklist-row session-todo-checklist-row-${todo.status}`}>
+    <li className={`session-todo-checklist-row session-todo-checklist-row-${todo.status}`} title={label}>
       <span className="session-todo-checklist-symbol" aria-hidden>
-        {todo.status === "completed" ? <IconCheck size={13} /> : statusSymbol(todo.status)}
+        <TodoSymbol status={todo.status} />
       </span>
       <span className="session-todo-checklist-copy">
         <span className="session-todo-checklist-content">{todo.content}</span>
+        {/* Visually hidden: the status stays in the DOM for assistive tech; the row shows the glyph and the title. */}
         <span className="session-todo-checklist-status">{label}</span>
       </span>
     </li>
   );
+}
+
+function TodoSymbol({ status }: { status: TodoStatus }) {
+  switch (status) {
+    case "completed":
+      return <IconCircleCheck size={16} />;
+    case "cancelled":
+      return <IconCircleSlash size={16} />;
+    default:
+      return <IconCircle size={16} />;
+  }
 }

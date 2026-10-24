@@ -47,7 +47,7 @@ second, independent version track in the same database file.
    baseline DDL (`SCHEMA_LATEST`, `PLAN_APPROVALS_SCHEMA`).
 2. **Plus track.** Plus structures are created by an ordered list of additive,
    idempotent steps in `crates/host-core/src/db/plus_schema.rs`, versioned by
-   `PLUS_SCHEMA_VERSION` (currently 8). P1 to P4 are the former fork v20 to
+   `PLUS_SCHEMA_VERSION` (currently 10). P1 to P4 are the former fork v20 to
    v23 changes with their effect unchanged; Team DDL lives in
    `team/schema.sql`. A new Plus change appends a step and bumps the constant.
    An applied step is not edited.
@@ -58,6 +58,9 @@ second, independent version track in the same database file.
    defines the exact recovery and explicit unsupported-service behavior.
    P8 adds the durable unattended interaction policy and structured terminal
    details, as defined in [the interaction policy ADR](unattended-interaction-policy.md).
+   P9 adds durable Goal execution holds. P10 adds the nullable approval-bound
+   verification-command list, as defined in
+   [required Goal verification](goal-required-verification-commands.md).
 3. **State.** `plus_schema_meta` holds one row: `plus_version`, and
    `upstream_version`, the `user_version` the last Plus-aware open left
    behind. The Plus track creates the table itself, so the shared DDL stays

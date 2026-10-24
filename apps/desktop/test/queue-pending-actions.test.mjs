@@ -55,14 +55,15 @@ test("pending queue actions stay locked until admission succeeds", async (t) => 
           ...slice, approvalPending: false, enhancementError: null, droppedDirectories: [],
         })).match(/<button\b[^>]*>/g) ?? []).filter((button) => !button.includes("composer-queue-heading"));
         const pendingButtons = renderButtons();
-        assert.equal(pendingButtons.length, 5);
-        assert.ok(pendingButtons.every((button) => / disabled=""/.test(button)), "all pending row actions must be disabled");
-        assert.ok(pendingButtons.every((button) => /aria-label="[^"]*common.saving/.test(button)), "every pending action must explain that admission is still saving");
+        assert.equal(pendingButtons.length, 1, "a pending row offers only its menu trigger");
+        assert.ok(pendingButtons.every((button) => / disabled=""/.test(button)), "the pending row's menu trigger must be disabled");
+        assert.ok(pendingButtons.every((button) => /aria-label="[^"]*common.saving/.test(button)), "the menu trigger must explain that admission is still saving");
         const pendingMarkup = renderToStaticMarkup(createElement(ComposerStatus, {
           t: (key) => key, queueScopeKey: "session-a", queuedPrompts: [pending], ...slice,
           approvalPending: false, enhancementError: null, droppedDirectories: [],
         }));
-        assert.match(pendingMarkup, /class="composer-queued-prompt-send-now"[^>]*>common.saving<\/button>/);
+        assert.match(pendingMarkup, /class="composer-queued-prompt-status">common.saving<\/span>/);
+        assert.doesNotMatch(pendingMarkup, /composer-queued-prompt-send-now/, "a pending row shows no Send now control");
         slice[action](pending.id);
         assert.deepEqual(state.queuedPrompts["session-a"], [pending], "pending row must not appear deleted");
         assert.equal(state.composerPrefill, undefined, "pending edit must not restore a second draft");

@@ -117,6 +117,8 @@ pub struct PlanProposal {
     pub schedule_state: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub execution_kind: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub required_verification_commands: Option<Vec<String>>,
     pub revision_intent: Option<PlanRevisionIntent>,
 }
 
@@ -175,6 +177,8 @@ pub struct PlanExecution {
     pub kind: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub execution_kind: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub required_verification_commands: Option<Vec<String>>,
     pub plan: String,
     pub title: String,
     pub question: String,
@@ -229,6 +233,7 @@ pub struct PlanResolveParams<'a> {
 
 #[derive(Debug, Default)]
 pub struct PlanResolveOptions<'a> {
+    pub required_verification_commands: Option<&'a Value>,
     pub execution_provider_id: Option<&'a str>,
     pub execution_model_id: Option<&'a str>,
     pub scheduled_for: Option<&'a str>,

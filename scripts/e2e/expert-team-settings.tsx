@@ -28,7 +28,7 @@ async function until(condition: () => boolean, label: string) {
   while (!condition() && performance.now() < deadline) {
     await act(async () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
   }
-  assert(condition(), `Expected UI state: ${label}`);
+  assert(condition(), `Expected UI state: ${label}; tab=${useAppStore.getState().settingsTab}; surface=${document.querySelector(".settings-content")?.textContent?.slice(0, 700)}`);
 }
 function findButton(parent: ParentNode, label: string): HTMLButtonElement {
   const found = [...parent.querySelectorAll<HTMLButtonElement>("button")].find((button) => button.textContent?.trim() === label);
@@ -140,7 +140,7 @@ globalThis.expertTeamSettingsProbe = async (options = {}) => {
     useAppStore.setState({ settings: structuredClone(stored), settingsTab: "expertTeam", providers: [provider],
       providerModels: {}, activeProjectPath: "/fixture/StarTool", version: null });
     await act(async () => { root.render(createElement(I18nextProvider, { i18n }, createElement(SettingsPage, { key: ++revision }))); });
-    await until(() => document.querySelector('[role="tab"] span[title="/fixture/StarTool"]') !== null, "Host project scopes");
+    await until(() => document.querySelector('#expert-team-scope-project') !== null && !document.querySelector('.expert-team-settings [role="status"]'), "Host project scopes");
   };
   const roleCard = (role: ExpertTeamPresetId) => {
     const card = document.querySelector<HTMLElement>(`[data-testid="expert-team-role-${role}"]`);
@@ -150,12 +150,17 @@ globalThis.expertTeamSettingsProbe = async (options = {}) => {
   const edit = async (role: ExpertTeamPresetId) => click(findButton(roleCard(role), t("settings.expertTeam.edit")));
   const roleAction = async (role: ExpertTeamPresetId, key: string) => click(findButton(roleCard(role), t(`settings.expertTeam.${key}`)));
   const scope = async (name: string) => {
-    const tabs = document.querySelector('[role="tablist"]');
-    if (!tabs) throw new Error("Missing scopes");
-    const button = [...tabs.querySelectorAll<HTMLButtonElement>("button")].find((item) => item.textContent?.trim().startsWith(name));
-    if (!button) throw new Error(`Missing scope ${name}`);
-    await click(button);
+    const user = name === t("settings.expertTeam.userScope");
+    await click(document.querySelector<HTMLButtonElement>(user ? "#expert-team-scope-user" : "#expert-team-scope-project")!);
+    if (user) return;
+    const trigger = document.querySelector<HTMLButtonElement>(`.expert-team-project-picker button`);
+    if (!trigger) throw new Error("Missing project picker");
+    await click(trigger);
+    const choice = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find((item) => item.textContent?.trim().startsWith(name));
+    if (!choice) throw new Error(`Missing project scope ${name}`);
+    await click(choice);
   };
+
   const inheritCheckbox = async (role: ExpertTeamPresetId, key: string) => {
     const labels = [...roleCard(role).querySelectorAll("label.ui-checkbox")];
     const checkbox = labels.find((label) => label.textContent === t(`settings.expertTeam.${key}`))?.querySelector<HTMLInputElement>("input");
@@ -263,6 +268,7 @@ globalThis.expertTeamSettingsProbe = async (options = {}) => {
     checks.push("edit configured model, supported thinking, tools, instructions; save and reopen");
 
     await scope("StarTool");
+    assert(document.querySelectorAll('.expert-team-scope-tabs [role="tab"]').length === 2, "Project count cannot grow the scope tab strip");
     await edit("researcher");
     assert(roleCard("researcher").textContent?.includes("Fixture Service · fixture-model"), "Project scope must show inherited model");
     await inheritCheckbox("researcher", "instructionsInherit");

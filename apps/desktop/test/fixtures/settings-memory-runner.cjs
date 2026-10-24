@@ -26,7 +26,7 @@ app.whenReady().then(async () => {
       const element = document.querySelector(${JSON.stringify(selector)});
       return element && getComputedStyle(element).visibility === 'visible' && element.getBoundingClientRect().width > 0;
     })()`);
-    const point = await evaluate(`(() => {
+    const measure = () => evaluate(`(() => {
       const element = document.querySelector(${JSON.stringify(selector)});
       if (!element) throw new Error('Missing element: ' + ${JSON.stringify(selector)});
       element.scrollIntoView({ block: 'center', behavior: 'instant' });
@@ -35,10 +35,21 @@ app.whenReady().then(async () => {
       if (element.disabled) throw new Error('Disabled element: ' + ${JSON.stringify(selector)});
       return { x, y };
     })()`);
-    await window.webContents.debugger.sendCommand('Input.dispatchMouseEvent', {
-      type: 'mouseMoved', ...point, button: 'none', buttons: 0, pointerType: 'mouse',
-    });
-    await until(`document.querySelector(${JSON.stringify(selector)})?.contains(document.elementFromPoint(${point.x}, ${point.y}))`);
+    let point = await measure();
+    const deadline = Date.now() + 8000;
+    for (;;) {
+      await window.webContents.debugger.sendCommand('Input.dispatchMouseEvent', {
+        type: 'mouseMoved', ...point, button: 'none', buttons: 0, pointerType: 'mouse',
+      });
+      // Scrolling, dialog reflow and hover can move the target after measuring.
+      // Require a stable, currently hit-tested point before native press/release.
+      await evaluate('new Promise(requestAnimationFrame)');
+      const current = await measure();
+      const hit = await evaluate(`document.querySelector(${JSON.stringify(selector)})?.contains(document.elementFromPoint(${point.x}, ${point.y}))`);
+      if (hit && current.x === point.x && current.y === point.y) break;
+      if (Date.now() > deadline) throw new Error(`Native click target did not settle: ${selector} at (${current.x}, ${current.y}), hit=${hit}`);
+      point = current;
+    }
     const previous = await evaluate('window.__fixtureClicks');
     for (const type of ['mousePressed', 'mouseReleased']) {
       await window.webContents.debugger.sendCommand('Input.dispatchMouseEvent', {
@@ -201,7 +212,12 @@ app.whenReady().then(async () => {
     })()`);
     await type('.settings-search', 'memory');
     await tagNav();
-    await check('rail search finds Memory', `document.querySelectorAll('.settings-nav-item').length === 1 && document.querySelector('.settings-nav-label').textContent === 'Memory'`);
+    await check('rail search finds Memory and its settings without unrelated destinations', `(() => {
+      const results = [...document.querySelectorAll('.settings-nav-item')];
+      return results.some(result => result.querySelector('.settings-nav-label')?.textContent === 'Memory') &&
+        results.every(result => result.querySelector('.settings-nav-label')?.textContent === 'Memory' ||
+          result.querySelector('.settings-search-result-context')?.textContent === 'Memory');
+    })()`);
     await click(nav('Memory'));
     await until(`window.settingsMemoryFixture.tab() === 'memory' && document.querySelectorAll('.settings-content button[aria-label^="Project memory ·"]').length === 3`);
     await check('host project groups and legacy folders are listed once, including paths', `
@@ -256,8 +272,24 @@ app.whenReady().then(async () => {
     await click('.project-memory-card:nth-child(2) .project-memory-remove');
     await click(save);
     await until(`window.settingsMemoryFixture.state('/fixture/a').memory.entries.length === 1 && document.querySelector('${save}').disabled`);
+    // Model a dialog reflow between measurement and native pointer movement.
+    // The hit-testing helper must follow the target, never click its old point.
+    await evaluate(`(() => {
+      const dialog = document.querySelector('.project-memory-dialog');
+      dialog.addEventListener('mousemove', () => {
+        const before = document.querySelector('${toggle}').getBoundingClientRect();
+        dialog.style.translate = '0 40px';
+        const after = document.querySelector('${toggle}').getBoundingClientRect();
+        window.__fixtureMovedMemoryTarget = { from: before.y, to: after.y };
+      }, { once: true });
+    })()`);
     await click(toggle);
     await until(`window.settingsMemoryFixture.state('/fixture/a').enabled === false`);
+    await check('native hit testing follows the memory switch after dialog reflow', `
+      window.__fixtureMovedMemoryTarget.to - window.__fixtureMovedMemoryTarget.from === 40 &&
+      document.querySelector('${toggle}').getAttribute('aria-checked') === 'false'`);
+    console.log('MEMORY_CLICK_REFLOW', JSON.stringify(await evaluate('window.__fixtureMovedMemoryTarget')));
+    await evaluate(`document.querySelector('.project-memory-dialog').style.translate = ''`);
     await check('disable preserves existing memory and persists removals', `window.settingsMemoryFixture.state('/fixture/a').memory.entries[0].content === 'Edited A context' && !document.querySelector('.project-memory-card textarea').disabled`);
     await click(close);
     await open('Project B');
@@ -292,8 +324,8 @@ app.whenReady().then(async () => {
     await click(nav('Instructions'));
     await evaluate('window.settingsMemoryFixture.empty(true)');
     await click(nav('Memory'));
-    await until(`document.querySelector('.settings-content .settings-row button')?.textContent === 'Projects'`);
-    await click('.settings-content .settings-row button');
+    await until(`document.querySelector('.settings-content .settings-empty-action button')?.textContent === 'Projects'`);
+    await click('.settings-content .settings-empty-action button');
     await until(`window.settingsMemoryFixture.tab() === 'projects' && !!document.querySelector('.projects-toolbar')`);
     await check('empty Memory leads to the existing Projects archive', `document.querySelector('.settings-nav-item.active .settings-nav-label').textContent === 'Projects'`);
     if (rendererErrors.length) throw new Error(`Renderer errors: ${rendererErrors.join('\n')}`);

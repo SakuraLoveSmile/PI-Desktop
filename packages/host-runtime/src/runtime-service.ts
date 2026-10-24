@@ -17,6 +17,7 @@ import type { LaunchResolver } from "./launch-resolver.js";
 import { resolveSessionMessageInput } from "./session-message-input.js";
 import { TurnEventPipeline } from "./turn-events.js";
 import type { PersistenceBarrier } from "./turn-persistence.js";
+import type { GoalReportPersistenceBarrier } from "./agent-sidecar.js";
 
 /** host-core as the turn lifecycle drives it. `HostProcess` satisfies it. */
 export type RuntimeHostLink = {
@@ -34,6 +35,7 @@ export type RuntimeSidecarLink = {
   setProjectInstructionRoot(sessionId: string, projectPath?: string): void;
   clearProjectInstructionRoot(sessionId: string): void;
   clearVendorAuthBindings(sessionId: string): void;
+  setGoalReportPersistenceBarrier?(handler: GoalReportPersistenceBarrier): void;
 };
 
 /**
@@ -207,6 +209,18 @@ export class RuntimeService implements RuntimePort {
 
   /** Observe a (re)started sidecar: its agent events feed the lifecycle. */
   attachSidecar(sidecar: RuntimeSidecarLink): void {
+    sidecar.setGoalReportPersistenceBarrier?.(async ({ sessionId }) => {
+      const host = this.options.getHost();
+      const turnId = this.activeTurns.get(sessionId);
+      if (this.disposed || this.options.getSidecar() !== sidecar || !host || !turnId) {
+        throw typedError("Goal report has no current persistence owner. Retry SubmitGoalReport in the current execution.", ErrorCodes.INVALID_ARGUMENT);
+      }
+      const barrier = await this.flushPersistence(sessionId);
+      if (this.disposed || this.options.getSidecar() !== sidecar || this.options.getHost() !== host ||
+          this.activeTurns.get(sessionId) !== turnId || barrier.pending > 0 || barrier.failed.length > 0) {
+        throw typedError("Goal report tool results are not durably recorded for the current turn. Correct persistence before retrying SubmitGoalReport.", ErrorCodes.INVALID_ARGUMENT);
+      }
+    });
     const offEvents = sidecar.onNotification((method, params) => {
       if (this.options.getSidecar() !== sidecar) return;
       if (method !== "agent.event") return;

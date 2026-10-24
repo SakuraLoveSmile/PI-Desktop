@@ -1,4 +1,4 @@
-# 04. Data Storage (Shared schema v21, Plus track v8)
+# 04. Data Storage (Shared schema v21, Plus track v10)
 
 ## 0. Ownership decision
 
@@ -1730,7 +1730,7 @@ and moves only when upstream migrations are merged (ADR
 plus-schema-version-track). Plus-only structures run on a second track in the
 same database, so merging upstream never renumbers or collides with Plus data.
 Plus steps are ordered, additive, and idempotent. They live in
-`crates/host-core/src/db/plus_schema.rs`, and the current track version is 9:
+`crates/host-core/src/db/plus_schema.rs`, and the current track version is 10:
 
 | Step | Adds |
 |---|---|
@@ -1743,6 +1743,7 @@ Plus steps are ordered, additive, and idempotent. They live in
 | P7 | `background_service_ownership`, including `owner_project_path`, and its session-deletion guard |
 | P8 | Durable unattended interaction policy and structured terminal error details |
 | P9 | `goal_execution_holds`, the durable blocked/resume/explicit-close lifecycle |
+| P10 | nullable `plan_approvals.required_verification_commands_json`, binding external Goal verification requirements to approval/execution |
 
 P1 to P4 are the Plus-only changes earlier fork builds shipped as
 `user_version` 20 to 23. Every step probes before it changes anything, so a
@@ -1763,7 +1764,7 @@ edited.
 - **Legacy fork database.** A database with Plus structures, no
   `plus_schema_meta`, and `user_version` 20 to 23 was written by an earlier fork
   build. After a verified `pi.sqlite.legacy-v<N>.bak`, one transaction applies
-  every Plus step, writes the meta (track 9, current shared chain), and sets
+  every Plus step, writes the meta (track 10, current shared chain), and sets
   `user_version` to 19. A failure rolls the transaction back and leaves the
   legacy database as it was.
 - **Older fork build.** An older fork build that opens a reconciled database
@@ -1783,8 +1784,13 @@ edited.
   as P8; the integrated build uses P9 to avoid that collision. P7/P8 upgrades
   take a verified `pi.sqlite.plus-v<from>.bak`, replay the idempotent Plus steps,
   and preserve sessions, interaction policy, terminal details and existing holds.
-  Versions above P9 fail closed before maintenance or mutation. Older Plus
-  binaries refuse a P9 database; whole-database downgrade is unsupported.
+  P10 adds the nullable verification-command column idempotently behind a
+  verified `pi.sqlite.plus-v9.bak` for P9 upgrades. Existing proposals retain
+  NULL and their previous report behavior; no Markdown/artifact bytes or report
+  history are rewritten. Host owns migration and validates the list before
+  storing JSON during approval. Versions above P10 fail closed before
+  maintenance or mutation. Older Plus binaries refuse a P10 database;
+  whole-database downgrade is unsupported.
 - **Historical inbox recovery.** Host validates the journal against the
   canonical collaboration ledger and the exact authenticated transcript input.
   Prepared records recover through the existing file-first append path. Index

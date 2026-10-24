@@ -6,34 +6,30 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createServer } from "vite";
 
 import {
-  initializeQueueDisclosure,
   queueDisclosureExpanded,
   resetEmptyQueueDisclosure,
   toggleQueueDisclosure,
 } from "../src/features/chat/composer/queue-disclosure-state.ts";
 
-test("queue disclosure defaults to expanded through three rows and collapsed from four", () => {
+test("queue disclosure folds two or more rows by default and always lists a single row", () => {
   assert.equal(queueDisclosureExpanded(new Map(), "session-a", 1), true);
-  assert.equal(queueDisclosureExpanded(new Map(), "session-a", 3), true);
+  assert.equal(queueDisclosureExpanded(new Map(), "session-a", 2), false);
   assert.equal(queueDisclosureExpanded(new Map(), "session-a", 4), false);
 });
 
-test("queue disclosure keeps each scope choice across count changes and resets only an emptied scope", () => {
-  let choices = initializeQueueDisclosure(new Map(), "session-a", 4);
-  choices = toggleQueueDisclosure(choices, "session-a", 4);
-  choices = initializeQueueDisclosure(choices, "session-a", 2);
-  choices = initializeQueueDisclosure(choices, "session-b", 1);
-  assert.equal(queueDisclosureExpanded(choices, "session-a", 2), true);
-  assert.equal(queueDisclosureExpanded(choices, "session-b", 1), true);
+test("queue disclosure keeps only explicit choices per scope and resets an emptied scope", () => {
+  let choices = toggleQueueDisclosure(new Map(), "session-a", 4);
+  assert.equal(queueDisclosureExpanded(choices, "session-a", 2), true, "a manual expansion survives count changes");
 
   choices = toggleQueueDisclosure(choices, "session-b", 1);
+  assert.equal(queueDisclosureExpanded(choices, "session-b", 1), false);
   choices = resetEmptyQueueDisclosure(choices, "session-b");
   assert.equal(choices.has("session-b"), false);
+  assert.equal(queueDisclosureExpanded(choices, "session-b", 2), false, "an emptied scope folds again once it refills");
   assert.equal(queueDisclosureExpanded(choices, "session-a", 2), true);
-  assert.equal(queueDisclosureExpanded(choices, "session-b", 4), false);
 });
 
-test("ComposerStatus renders the disclosure with the original five queue actions", async () => {
+test("ComposerStatus folds two or more queued rows behind one summary and lists a single row plainly", async () => {
   const server = await createServer({
     root: fileURLToPath(new URL("..", import.meta.url)),
     configFile: false,
@@ -70,17 +66,19 @@ test("ComposerStatus renders the disclosure with the original five queue actions
       dismissDroppedDirectories() {},
     }));
 
-    const expandedMarkup = render(rows.slice(0, 3));
-    assert.match(expandedMarkup, /aria-expanded="true"/);
-    assert.match(expandedMarkup, /aria-controls="composer-queue-[^"]+"/);
-    assert.match(expandedMarkup, /Next: Queued task 1/);
-    assert.equal((expandedMarkup.match(/data-testid="queued-prompt"/g) ?? []).length, 3);
+    const single = render(rows.slice(0, 1));
+    assert.doesNotMatch(single, /composer-queue-heading/, "one row has no summary to fold");
+    assert.doesNotMatch(single, /class="composer-queue-body" hidden=""/);
+    assert.equal((single.match(/data-testid="queued-prompt"/g) ?? []).length, 1);
 
-    const collapsedMarkup = render(rows);
-    assert.match(collapsedMarkup, /aria-expanded="false"/);
-    assert.match(collapsedMarkup, /class="composer-queue-body" hidden=""/);
-    assert.equal((collapsedMarkup.match(/data-testid="queued-prompt"/g) ?? []).length, 4);
-    assert.equal((collapsedMarkup.match(/class="composer-queued-prompt-(?:action|send-now)/g) ?? []).length, 20);
+    const folded = render(rows);
+    assert.match(folded, /class="[^"]*composer-queue-heading[^"]*"[^>]*aria-expanded="false"/);
+    assert.match(folded, /aria-controls="composer-queue-[^"]+"/);
+    assert.match(folded, /Next: Queued task 1/);
+    assert.match(folded, /class="composer-queue-body" hidden=""/);
+    assert.equal((folded.match(/data-testid="queued-prompt"/g) ?? []).length, 4);
+    assert.equal((folded.match(/composer-queued-prompt-more/g) ?? []).length, 4, "every row keeps its ⋯ trigger");
+    assert.equal((folded.match(/class="composer-queued-prompt-send-now"/g) ?? []).length, 4);
   } finally {
     await server.close();
   }

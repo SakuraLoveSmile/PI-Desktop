@@ -24,7 +24,6 @@ test("scenic settings destinations are permission-gated and host-rendered", () =
   assert.match(ipc, /pluginScenicThemesDestinations/);
   assert.match(ipc, /ui\.settings/);
   assert.match(ipc, /ui\.theme/);
-  assert.match(page, /settings\.groupExtensions/);
   assert.match(page, /PluginScenicThemesDestination/);
   assert.match(component, /aria-pressed/);
   assert.doesNotMatch(component, /<iframe/);

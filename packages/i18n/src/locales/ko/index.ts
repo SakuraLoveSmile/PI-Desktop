@@ -283,6 +283,7 @@ export const ko = {
     contractPlanDesc: "실행 전 구조화된 계획을 작성하고 검토합니다",
     contractGoalDesc: "목표 결과와 수락 기준을 정의합니다",
     contractMode: "계약 모드",
+    exitPlanMode: "계획 모드 종료",
     executionProfile: "실행 프로필",
     tableActions: "표 작업",
     copyTableMarkdown: "표를 Markdown으로 복사",
@@ -346,6 +347,11 @@ export const ko = {
     },
     queuedPrompts: "대기 중인 메시지",
     queueNext: "다음: {{message}}",
+    queueCount: "대기 {{count}}개",
+    queueMoreActions: "추가 작업",
+    topStripExpand: "작업 공간 세부 정보 표시",
+    topStripCollapse: "작업 공간 세부 정보 숨기기",
+    thinkingOff: "끔",
     queuedPromptEmpty: "대기 중인 메시지",
     removeQueuedPrompt: "대기 중인 메시지 제거",
     sendNow: "지금 보내기",
@@ -435,6 +441,8 @@ export const ko = {
     usageContextUnavailable: "아직 컨텍스트 사용량을 확인할 수 없습니다",
     compactContext: "컨텍스트 압축",
     usageContextLabel: "컨텍스트",
+    usageContextRemainingLabel: "남음",
+    usageContextUsedLabel: "사용됨",
     usageContextLeft: "토큰 {{count}}개 남음",
     usageContextSpent: "토큰 {{count}}개 사용됨",
     usageContextTokens: "{{used}} / {{window}} 토큰",
@@ -471,6 +479,7 @@ export const ko = {
       noGit: "이 디렉터리는 Git 저장소가 아닙니다.",
       worktreeUnavailable: "커밋된 HEAD가 필요합니다.",
       noBranch: "브랜치 없음",
+      detachedHead: "분리된 HEAD · {{sha}}",
       branchName: "브랜치 이름",
       createSwitch: "만들고 전환",
       branchSearch: "브랜치 검색",
@@ -700,6 +709,8 @@ export const ko = {
     progressListLabel: "목표 작업 목록",
     progressInitializing: "진행 상황 불러오는 중…",
     progressFailed: "진행 상황을 사용할 수 없음",
+    progressDescription: "목표 설명",
+    progressNotReported: "아직 개별 목표 항목의 진행 상황이 보고되지 않았습니다.",
     planning: "목표 정의 중",
     approvalRegion: "목표 승인",
     readyAnnouncement: "목표 계약이 준비되었습니다. 작업 패널에서 열려 있습니다.",
@@ -729,6 +740,54 @@ export const ko = {
     dismiss: "닫기",
   },
   settings: {
+    "capabilitySaveFailed": "저장하지 못했습니다. 초안은 유지됩니다. {{message}}",
+
+    "categories": "설정 분류",
+    "executionDefaults": "실행",
+    "conversationDisplay": "대화 및 표시",
+    "activeSessionOverrideState": "현재 세션의 권한 설정 사용",
+    "activeSessionInheritState": "기본 권한 상속",
+    "applicationSupport": "앱 및 지원",
+    "technicalDetails": "기술 세부 정보",
+    "protocolVersion": "프로토콜 {{version}}",
+    "hostVersion": "호스트 {{version}}",
+    "softwareUpdates": "소프트웨어 업데이트",
+    "saveState": {
+      "saving": "저장 중…",
+      "saved": "설정이 저장되었습니다",
+      "failed": "저장하지 못했습니다. 이전 설정이 유지됩니다.",
+      "refreshFailed": "설정은 저장되었지만 현재 화면을 새로 고치지 못했습니다."
+    },
+    "shortcutSearch": "동작 또는 키 검색",
+    "shortcutFilter": "단축키 필터",
+    "shortcutFilterAll": "전체",
+    "shortcutFilterModified": "변경됨",
+    "shortcutCount": "단축키 {{count}}개",
+    "shortcutNoMatches": "필터와 일치하는 단축키가 없습니다.",
+    "shortcutClearFilters": "필터 지우기",
+    "shortcutRecordingCancel": "Escape를 눌러 기록을 취소하세요.",
+    "preferenceSaved": "저장됨",
+    "promptEnhancementDefaultTemplateActive": "기본 제공 템플릿 사용 중",
+    "closeBehaviorLoadError": "창 닫기 동작을 불러오지 못했습니다. 다시 시도한 후 변경하세요.",
+    "modelsWorkbenchHint": "기본 모델을 선택하고 AI 서비스 및 계정을 관리하며 모델 카탈로그를 관리하세요.",
+    "configureServices": "서비스 설정",
+    "modelSavedRefreshFailed": "저장되었지만 서비스 목록을 새로 고치지 못했습니다: {{error}}",
+    "modelSavedFollowupFailed": "서비스는 저장되었지만 기본 모델을 업데이트하지 못했습니다: {{error}}",
+    "instructionsLoadFailed": "지침을 불러오지 못했습니다: {{message}}",
+    "instructionsSaveFailed": "지침을 저장하지 못했습니다: {{message}}",
+    "instructionsUnsaved": "저장하지 않은 변경 사항",
+    "instructionsSaved": "지침이 저장되었습니다",
+    "mcpIntro": "에이전트가 사용할 전역 서버 또는 프로젝트 서버를 관리하세요.",
+    "subagentsIntro": "에이전트 정의를 관리하고 아래에서 실행 제한을 조정하세요.",
+    "importSessionsScanDesc": "다른 도구의 로컬 대화를 찾습니다. 가져오기 전에 대화를 검토하고 선택하세요.",
+    "pluginScenic": {
+      "backdropBlur": "배경 흐림",
+      "appliesTo": "{{theme}}에 적용",
+      "applying": "적용 중…",
+      "apply": "적용",
+      "saved": "배경 흐림이 저장되었습니다."
+    },
+
     storage: {
       unavailableHint: "저장 폴더를 현재 사용할 수 없습니다. 드라이브를 다시 연결한 후 시작하세요. 앱은 빈 데이터를 생성하거나 다른 폴더로 전환하지 않습니다.",
       browserSource: "브라우저 데이터 원본",
@@ -774,6 +833,10 @@ export const ko = {
       operationError: "저장 작업을 시작할 수 없습니다. {{error}}",
     },
     expertTeam: {
+      "projectOverrides": "프로젝트 재정의",
+      "selectProject": "재정의할 프로젝트 선택",
+      "removedProject": "제거된 프로젝트",
+
       runLimits: en.settings.expertTeam.runLimits,
       title: "전문가 팀",
       description: "내장 전문가 6명의 모델, 사고 수준, 도구 하위 집합, 추가 지침을 설정합니다. 변경 사항은 이후에 시작되는 전문가에게만 적용됩니다. Composer 모델은 Lead와 모델을 고정하지 않은 전문가에도 적용됩니다. 선택적 도구 제한은 사용 가능한 범위만 좁히며 권한을 부여하지 않습니다.",
@@ -926,6 +989,9 @@ sklm: {
       voice: "음성",
     },
     memory: {
+      "search": "프로젝트 이름 또는 경로 검색",
+      "resultCount": "전체 {{total}}개 중 {{count}}개 프로젝트",
+
       title: "메모리",
       description:
         "프로젝트별로 저장된 메모리와 자동 기록을 관리합니다. 같은 그룹의 프로젝트는 메모리를 공유하고, 다른 프로젝트에는 영향을 주지 않습니다.",
@@ -934,6 +1000,8 @@ sklm: {
       loadFailed: "프로젝트 목록을 불러오지 못했습니다. 다시 시도하세요.",
     },
     configSync: {
+      "retry": "다시 시도",
+
       title: "Cloud sync",
       experimental: "실험적",
       connectionTitle: "WebDAV cloud sync",
@@ -1233,6 +1301,10 @@ sklm: {
     skillBatchImported: "스킬 폴더 {{count}}개를 가져왔습니다",
     skillBatchFailed: "폴더 {{count}}개를 가져오지 못했습니다. 첫 번째 오류: {{first}}",
     skillsEmpty: "이 폴더에 스킬 없음",
+    skillsIntro: "에이전트가 재사용할 작업 방식을 저장하세요.",
+    skillsGlobalEmptyHint: "스킬을 만들거나 파일 또는 폴더에서 가져오세요.",
+    skillsProjectEmptyHint: "프로젝트 설정에서 프로젝트를 추가하면 전용 스킬을 관리할 수 있습니다.",
+    skillsManageProjects: "프로젝트 관리",
     subagentsEmpty: "내 서브에이전트가 아직 없음",
     subagentRuntimeLimits: "작업 위임 제한",
     subagentRuntimeLimitsDesc: "단일 에이전트와 팀 전문가 모두 이 제한 내에서 독립적인 작업을 위임할 수 있습니다. 변경 사항은 다음 작업 실행부터 적용됩니다.",
@@ -1270,6 +1342,8 @@ sklm: {
       turnedOff: "로컬 제어 엔드포인트가 꺼졌습니다",
     },
     mcpMarket: {
+      "remotePartial": "일부 레지스트리 소스를 사용할 수 없습니다({{names}})",
+
       browse: "마켓",
       back: "내 서버",
       title: "MCP 마켓",
@@ -1347,6 +1421,8 @@ sklm: {
     import: "가져오기",
     projectArchive: "프로젝트 보관함",
     remoteHosts: {
+      "retry": "다시 시도",
+
       title: "원격 호스트",
       listError: "호스트를 불러오지 못했습니다",
       loading: "로드 중…",
@@ -1448,6 +1524,7 @@ sklm: {
     marketCustomUrlPlaceholder: "https://example.com/catalog.json",
     search: "설정 검색",
     searchPlaceholder: "설정 검색…",
+    searchResults: "검색 결과 ({{count}})",
     noResults: "일치하는 설정 없음",
     enterToSend: "Enter로 보내기",
     enterToSendDesc: "끔: ⌘/Ctrl+Enter를 눌러 보내세요.",
@@ -1811,6 +1888,9 @@ sklm: {
     promptEnhancementSaveError: "프롬프트 향상 설정을 저장하지 못했습니다.",
   },
   project: {
+    "loadFailed": "프로젝트 목록을 불러오지 못했습니다",
+    "loadFailedRetained": "아래에 사용 가능한 프로젝트가 표시됩니다. 전체 목록을 불러오려면 다시 시도하세요.",
+
     open: "프로젝트 열기",
     openFolder: "폴더 열기",
     none: "프로젝트 없음",
@@ -2258,7 +2338,7 @@ sklm: {
       goalReport: "목표 보고서",
     },
     overview: {
-      specs: "사양", changedFiles: "변경된 파일", attachments: "첨부 파일", skills: "스킬", memory: "메모리", mcp: "MCP",
+      specs: "사양", changedFiles: "변경된 파일", viewAllChanges: "모든 변경 사항 보기", attachments: "첨부 파일", skills: "스킬", memory: "메모리", mcp: "MCP",
       noRecordedSkills: "현재 대화에 기록된 스킬이 없습니다", noRecordedMemory: "현재 대화에 기록된 메모리가 없습니다", noRecordedMcp: "현재 대화에 기록된 MCP 사용 내역이 없습니다",
       recordedChangesNote: "현재 불러온 대화에 성공적으로 기록된 변경 사항만 표시합니다. 전체 Git 변경 목록은 아닙니다.",
       noSession: "선택한 세션이 없습니다", untitled: "제목 없는 세션", project: "프로젝트", model: "모델", modeLabel: "모드", messages: "메시지", notAvailable: "없음", progress: "진행 상황", statusLabel: "현재 상태", noPlans: "이 세션에 계획 활동이 없습니다", artifacts: "산출물", noArtifacts: "이 세션에 산출물이 없습니다", references: "참조", noReferences: "명시적인 파일 참조가 없습니다", mode: { chat: "채팅", plan: "계획", goal: "목표" }, subagents: "Subagents", noSubagents: "No subagents delegated in this session", teamSection: "Expert Team", status: { idle: "대기", running: "실행 중", planning: "계획 중", awaiting_approval: "승인 대기", pending: "대기 중", approved: "승인됨", rejected: "거부됨", expired: "만료됨", interrupted: "중단됨", queued: "대기열", completed: "완료됨", failed: "실패" }
@@ -2333,6 +2413,9 @@ sklm: {
     loadDev: "로컬 플러그인 불러오기",
     loadDevDone: "로컬 플러그인 불러옴",
     piSkillsTitle: "pi CLI 스킬",
+    piSkillsSummary: "pi CLI로 이미 설치한 로컬 스킬 패키지를 재사용하세요.",
+    piSkillsDiscoveryFailed: "로컬 패키지를 읽을 수 없습니다. 새로고침해 주세요.",
+    piSkillsDiscoveryPartial: "일부 위치를 읽을 수 없습니다. 발견된 패키지는 사용할 수 있습니다.",
     piSkillsHint: "설치된 npm 패키지를 읽기 전용으로 검색합니다. 신뢰하는 패키지만 가져오세요. 가져온 패키지는 플러그인에서 관리합니다.",
     piSkillsConfirm: "이 pi 패키지를 가져와 활성화할까요?",
     piSkillsExecutable: "이 패키지에는 실행 가능한 확장이 포함되어 있습니다. 가져오면 에이전트에서 신뢰된 코드가 활성화되며 종속성이 설치될 수 있습니다.",

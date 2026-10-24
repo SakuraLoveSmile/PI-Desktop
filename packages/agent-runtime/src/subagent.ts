@@ -61,6 +61,7 @@ import { clampThinkingLevel } from "./thinking-level.js";
 import { subagentModelBinding, type SubagentProviderRetryState } from "./subagent-model-binding.js";
 import { contextBudgetFor } from "./context-budget.js";
 import { convertToLlm } from "./pi-runtime-messages.js";
+import { removeTrailingAssistantMessages } from "./system-transcript.js";
 import {
   delegateRetentionMode,
   delegateSummaryModels,
@@ -655,14 +656,8 @@ export class SubagentRun {
     const retryError = this.pendingProviderRetry;
     if (!retryError) return;
     this.pendingProviderRetry = undefined;
-    const messages = [...this.agent.state.messages];
-    if (messages.at(-1)?.role !== "assistant") {
-      throw new Error("Cannot retry a subagent provider stream without its failed assistant message");
-    }
-    // A failed provider stream can leave more than one assistant row after a
-    // tool round. Remove the entire failed suffix before continuing.
-    while (messages.at(-1)?.role === "assistant") messages.pop();
-    this.agent.state.messages = messages;
+    // Compaction may have consumed the failed response before recovery runs.
+    this.agent.state.messages = removeTrailingAssistantMessages(this.agent.state.messages);
     this.providerRetryInProgress = true;
     try {
       const delayMs =

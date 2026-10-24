@@ -81,16 +81,7 @@ test("one search field covers the page and every row carries its level", () => {
   assert.match(styles, /\.agent-capability-badge\.is-level\s*\{/);
 });
 
-test("skills keep the MCP-shaped toolbar and scope import actions in group headers", () => {
-  const toolbar = skills.slice(skills.indexOf("<CapabilityToolbar"), skills.indexOf("<CapabilityPanel"));
-  assert.match(toolbar, /actions=\{[\s\S]*?CapabilityButton variant="primary"/);
-  assert.match(toolbar, /settings\.newSkill/);
-  assert.doesNotMatch(toolbar, /extensions\.skills\.add/);
-  assert.doesNotMatch(toolbar, /importSkill|IconDownload|settings\.importSkill/);
-  assert.match(skills, /action=\{importButton\("global"\)\}/);
-  assert.match(skills, /action=\{selectedProjectPath \? importButton\("project"\) : undefined\}/);
-  assert.match(layout, /action\?: ReactNode/);
-});
+// Skills toolbar and scope imports are covered by the rendered Settings fixture.
 
 test("capability lists flow at natural height with skeleton loading", () => {
   assert.doesNotMatch(styles, /\.agent-capability-list\s*\{[^}]*?height:\s*\d+px/);
@@ -146,10 +137,8 @@ test("the empty state dresses its own glyph, not the icon in its CTA button", ()
   assert.match(styles, /\.agent-capability-empty-icon\s*\{/);
   assert.doesNotMatch(styles, /\.agent-capability-empty svg\s*\{/);
   assert.doesNotMatch(styles, /\.agent-capability-empty > svg\s*\{/);
-  // The pages that pass a CTA into the empty state are the ones that regressed.
-  for (const page of [mcp, subagents]) {
-    assert.match(page, /action=\{addButton\}|action=\{[a-zA-Z]*[Bb]utton\}/);
-  }
+  // Primary entry uniqueness and no-project actions are covered by the rendered
+  // agent-capabilities fixture; empty states no longer repeat the Add action.
 });
 
 test("toolbar buttons carry their own compact geometry", () => {

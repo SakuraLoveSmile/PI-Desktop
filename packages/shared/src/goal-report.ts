@@ -473,7 +473,7 @@ export function validateGoalReportDraft(
     const validResults: GoalReportCheckResult[] = ["passed", "failed", "inconclusive"];
     for (let i = 0; i < input.checks.length; i++) {
       const item = input.checks[i];
-      if (!isRecord(item) || typeof item.id !== "string" || typeof item.command !== "string") {
+      if (!isRecord(item) || typeof item.id !== "string" || typeof item.command !== "string" || !item.command.trim()) {
         return { ok: false, error: `checks[${i}] must have id and command strings` };
       }
       const result = typeof item.result === "string" && validResults.includes(item.result as GoalReportCheckResult)
@@ -492,7 +492,7 @@ export function validateGoalReportDraft(
       }
       checks.push({
         id: item.id.trim(),
-        command: item.command.trim(),
+        command: item.command,
         result,
         exitCode: typeof item.exitCode === "number" ? item.exitCode : null,
         ...(detail ? { detail } : {}),

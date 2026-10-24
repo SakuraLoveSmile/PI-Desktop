@@ -12,7 +12,8 @@ pub(crate) const PROPOSAL_COLUMNS: &str = "request_id, session_id, turn_id, tool
     (SELECT scheduled_for FROM plan_execution_schedules WHERE proposal_id = plan_approvals.request_id),
     (SELECT timezone FROM plan_execution_schedules WHERE proposal_id = plan_approvals.request_id),
     (SELECT state FROM plan_execution_schedules WHERE proposal_id = plan_approvals.request_id),
-    revision_intent_json, revision_state, revision_turn_id, revision_error_code, execution_kind";
+    revision_intent_json, revision_state, revision_turn_id, revision_error_code, execution_kind,
+    required_verification_commands_json";
 
 pub(crate) fn proposal_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PlanProposal> {
     let artifact_path: Option<String> = row.get(16)?;
@@ -91,6 +92,17 @@ pub(crate) fn proposal_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Pla
         schedule_timezone: row.get(29)?,
         schedule_state: row.get(30)?,
         execution_kind: row.get(35)?,
+        required_verification_commands: row
+            .get::<_, Option<String>>(36)?
+            .map(|raw| serde_json::from_str(&raw))
+            .transpose()
+            .map_err(|error| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    36,
+                    rusqlite::types::Type::Text,
+                    Box::new(error),
+                )
+            })?,
         revision_intent,
     })
 }

@@ -1,4 +1,5 @@
 import { flushSync } from "react-dom";
+import type { TFunction } from "i18next";
 import type { GitWorkspaceMutation, GitWorkspaceSnapshot, SessionSummary } from "@pi-desktop/shared";
 import { api } from "../../../apps/desktop/src/lib/api";
 import { useAppStore } from "../../../apps/desktop/src/stores/app-store";
@@ -12,7 +13,8 @@ type Probe = {
 };
 
 /** Replace only Host-facing calls. Menu/controller/store navigation remain real. */
-export function installFooterMenuFixture() {
+export function installFooterMenuFixture(t: TFunction) {
+  const worktreeLabel = t("chat.workspaceMenu.worktreeMode");
   const original = {
     getWorkspaceGit: api.getWorkspaceGit,
     switchWorkspaceBranch: api.switchWorkspaceBranch,
@@ -149,7 +151,7 @@ export function installFooterMenuFixture() {
       check(trigger(host, 2)?.textContent?.includes("feature/created"), "failed checkout preserves current branch");
       close(); failSwitch = false;
 
-      popup = await open(probe, 1, "footer-location"); click(find(popup, "Worktree"));
+      popup = await open(probe, 1, "footer-location"); click(find(popup, worktreeLabel));
       check(!popup.textContent?.includes("occupied") && Boolean(find(popup, "review")), "worktree picker lists only app-managed checkouts");
       click(find(popup, "review"));
       await until(() => useAppStore.getState().sessions.find(item => item.id === useAppStore.getState().activeSessionId)?.projectPath === managedPath, "Managed worktree did not create scoped session");
@@ -160,10 +162,10 @@ export function installFooterMenuFixture() {
       await until(() => useAppStore.getState().sessions.find(item => item.id === useAppStore.getState().activeSessionId)?.projectPath === path, "Local mode did not return to main directory");
       check(useAppStore.getState().sessions.some(item => item.projectPath === managedPath), "local mode leaves worktree session intact");
       markCurrentUsed();
-      popup = await open(probe, 1, "footer-location"); click(find(popup, "Worktree")); click(find(popup, "新建工作树"));
+      popup = await open(probe, 1, "footer-location"); click(find(popup, worktreeLabel)); click(find(popup, "新建工作树"));
       input(popup.querySelector("input"), "menu-created"); click(find(popup, "创建工作树"));
       await until(() => useAppStore.getState().sessions.find(item => item.id === useAppStore.getState().activeSessionId)?.projectPath === "/isolated/managed/menu-created", "Created worktree did not navigate to its actual directory");
-      await until(() => trigger(host, 1)?.textContent?.includes("Worktree") === true, "Worktree mode did not derive from new checkout snapshot");
+      await until(() => trigger(host, 1)?.textContent?.includes(worktreeLabel) === true, "Worktree mode did not derive from new checkout snapshot");
       check(calls.some(item => item.startsWith("session:/isolated/managed/menu-created")), "created worktree opens a real store-created session");
 
       restoreOwner();
@@ -172,7 +174,7 @@ export function installFooterMenuFixture() {
         openProjectPaths: [nestedProject], openProjects: [{ path: nestedProject, name: "Frontend", branch: "main" }],
         sessions: state.sessions.map(item => item.id === "activity-a" ? { ...item, projectPath: nestedProject } : item),
       }));
-      popup = await open(probe, 1, "footer-location"); click(find(popup, "Worktree")); click(find(popup, "nested-review"));
+      popup = await open(probe, 1, "footer-location"); click(find(popup, worktreeLabel)); click(find(popup, "nested-review"));
       await until(() => useAppStore.getState().sessions.find(item => item.id === useAppStore.getState().activeSessionId)?.projectPath === nestedManaged + nestedRelative, "Nested project worktree selection lost its relative directory");
       check(calls.includes(`session:${nestedManaged}${nestedRelative}`), "managed worktree preserves nested project execution directory");
       markCurrentUsed();
@@ -180,7 +182,7 @@ export function installFooterMenuFixture() {
       await until(() => useAppStore.getState().sessions.find(item => item.id === useAppStore.getState().activeSessionId)?.projectPath === nestedProject, "Nested worktree local mode did not return to nested main directory");
       check(useAppStore.getState().sessions.some(item => item.projectPath === nestedManaged + nestedRelative), "nested local mode retains the managed worktree conversation");
       markCurrentUsed();
-      popup = await open(probe, 1, "footer-location"); click(find(popup, "Worktree")); click(find(popup, "新建工作树"));
+      popup = await open(probe, 1, "footer-location"); click(find(popup, worktreeLabel)); click(find(popup, "新建工作树"));
       input(popup.querySelector("input"), "nested-created"); click(find(popup, "创建工作树"));
       await until(() => useAppStore.getState().sessions.find(item => item.id === useAppStore.getState().activeSessionId)?.projectPath === "/isolated/managed/nested-created" + nestedRelative, "Nested project worktree creation lost its relative directory");
       check(calls.includes(`session:/isolated/managed/nested-created${nestedRelative}`), "new worktree preserves nested project execution directory");
@@ -213,7 +215,7 @@ export function installFooterMenuFixture() {
       set(state => ({ sessions: state.sessions.map(item => item.id === "activity-a" ? { ...item, source: "remote" } : item) }));
       check(trigger(host, 0)?.disabled && !trigger(host, 2), "remote-owned session disables local project actions and hides local branch");
       restoreOwner(); deferWorktree = true;
-      popup = await open(probe, 1, "footer-location"); click(find(popup, "Worktree")); click(find(popup, "新建工作树"));
+      popup = await open(probe, 1, "footer-location"); click(find(popup, worktreeLabel)); click(find(popup, "新建工作树"));
       input(popup.querySelector("input"), "late-result"); click(find(popup, "创建工作树"));
       await until(() => Boolean(deferredWorktree), "Deferred worktree request did not begin");
       close(); popup = await open(probe, 0, "project"); click(find(popup, "Notes project"));
@@ -242,12 +244,16 @@ export function installFooterMenuFixture() {
   }
   async function scene(probe: Probe, scene: FooterScene) {
     close();
-    set({ isRunning: false, runningSessions: {}, activeProjectPath: path, openProjectPaths: [path, "/isolated/docs"], openProjects: [{ path, name: "PI-Desktop", branch: "main" }, { path: "/isolated/docs", name: "Notes project", branch: "main" }] });
+    // Earlier probes leave a running Goal checkpoint, which keeps Composer active
+    // even after the agent run flags are cleared. Menu scenes require an idle strip.
+    set({ isRunning: false, runningSessions: {}, planCheckpoints: {}, activeProjectPath: path, openProjectPaths: [path, "/isolated/docs"], openProjects: [{ path, name: "PI-Desktop", branch: "main" }, { path: "/isolated/docs", name: "Notes project", branch: "main" }] });
+    probe.check(probe.host.querySelector('.composer-top-strip')?.getAttribute('data-expanded') === 'true'
+      && Boolean(probe.host.querySelector('.composer-footer-project button:not(:disabled)')), `${scene} starts with idle workspace controls`);
     const kind = scene === "project-menu" ? "project" : scene === "branch-menu" ? "footer-branch" : "footer-location";
     const index = scene === "project-menu" ? 0 : scene === "branch-menu" ? 2 : 1;
     const popup = await open(probe, index, kind);
     if (scene === "worktree-create") {
-      probe.click(find(popup, "Worktree")); probe.click(find(popup, "新建工作树"));
+      probe.click(find(popup, worktreeLabel)); probe.click(find(popup, "新建工作树"));
       input(popup.querySelector("input"), "feature/composer-refinement");
     }
     await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));

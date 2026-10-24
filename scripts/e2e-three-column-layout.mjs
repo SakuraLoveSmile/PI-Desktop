@@ -39,6 +39,12 @@ const electronBin =
 const cdpPort = Number(process.env.PI_DESKTOP_LAYOUT_CDP_PORT || 9336);
 const MAIN_PANE_MIN_WIDTH = 450;
 const MAIN_PANE_REOPEN_TARGET_WIDTH = 460;
+const CDP_COMMAND_TIMEOUT_MS = 10_000;
+// Retain the existing 420s hard stop inside the suite runner's 480s limit,
+// including when Chromium crash injection stalls.
+const SUITE_TIMEOUT_MS = 420_000;
+const CRASH_INJECTION_TIMEOUT_MS = 300_000;
+const CRASH_RECOVERY_TIMEOUT_MS = 90_000;
 
 function resolveHostBinary() {
   const candidates = [
@@ -172,15 +178,22 @@ async function seedSidebarProjects(hostBinary, dataDir, tempDirs) {
   }
 }
 
-class CdpClient {
+export class CdpClient {
   constructor(ws) {
     this.ws = ws;
     this.closed = false;
     this.seq = 0;
     this.pending = new Map();
     this.console = [];
+    this.timeline = [];
+    this.traceStartedAt = null;
+    this.onTrace = null;
     ws.onmessage = (event) => {
       const message = JSON.parse(event.data);
+      if (message.method?.startsWith("Inspector.") ||
+        ["Page.frameNavigated", "Page.frameDetached", "Page.lifecycleEvent"].includes(message.method)) {
+        this.record({ event: message.method, params: message.params });
+      }
       if (
         message.method === "Runtime.consoleAPICalled" ||
         message.method === "Runtime.exceptionThrown"
@@ -194,41 +207,76 @@ class CdpClient {
       const entry = this.pending.get(message.id);
       if (!entry) return;
       this.pending.delete(message.id);
-      if (message.error) entry.reject(new Error(JSON.stringify(message.error)));
-      else entry.resolve(message.result);
+      entry.finish(message.error ? new Error(JSON.stringify(message.error)) : null, message.result);
     };
     ws.onclose = () => {
       this.closed = true;
+      this.record({ event: "websocket.closed" });
       for (const entry of this.pending.values()) {
-        entry.reject(new Error("CDP websocket closed"));
+        entry.finish(new Error("CDP websocket closed"));
       }
       this.pending.clear();
     };
   }
 
-  static connect(url) {
+  record(entry) {
+    const event = { at: new Date().toISOString(), ...entry };
+    this.timeline.push(event);
+    if (this.timeline.length > 80) this.timeline.shift();
+    if (this.traceStartedAt !== null) this.onTrace?.(event);
+  }
+
+  static connect(url, timeoutMs = CDP_COMMAND_TIMEOUT_MS) {
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(url);
-      ws.onerror = () => reject(new Error(`CDP websocket failed: ${url}`));
-      ws.onopen = () => resolve(new CdpClient(ws));
+      const timer = setTimeout(() => {
+        ws.close();
+        reject(new Error(`CDP websocket connection timed out after ${timeoutMs}ms: ${url}`));
+      }, timeoutMs);
+      ws.onerror = () => {
+        clearTimeout(timer);
+        reject(new Error(`CDP websocket failed: ${url}`));
+      };
+      ws.onopen = () => {
+        clearTimeout(timer);
+        resolve(new CdpClient(ws));
+      };
     });
   }
 
-  send(method, params = {}) {
+  send(method, params = {}, timeoutMs = CDP_COMMAND_TIMEOUT_MS) {
     if (this.closed) return Promise.reject(new Error("CDP websocket closed"));
     const id = ++this.seq;
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
-      this.ws.send(JSON.stringify({ id, method, params }));
+      const startedAt = Date.now();
+      this.record({ command: method, id, status: "sent", timeoutMs });
+      const finish = (error, result) => {
+        clearTimeout(timer);
+        this.record({ command: method, id, status: error ? "error" : "resolved",
+          commandElapsedMs: Date.now() - startedAt, error: error?.message });
+        if (error) reject(error);
+        else resolve(result);
+      };
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        finish(new Error(`CDP ${method} timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+      this.pending.set(id, { finish });
+      try {
+        this.ws.send(JSON.stringify({ id, method, params }));
+      } catch (error) {
+        this.pending.delete(id);
+        finish(error);
+      }
     });
   }
 
-  async evaluate(expression) {
+  async evaluate(expression, timeoutMs = CDP_COMMAND_TIMEOUT_MS) {
     const result = await this.send("Runtime.evaluate", {
       expression,
       awaitPromise: true,
       returnByValue: true,
-    });
+    }, timeoutMs);
     if (result.exceptionDetails) {
       throw new Error(
         result.exceptionDetails.exception?.description ??
@@ -246,17 +294,28 @@ async function listTargets(port) {
   return response.json();
 }
 
-async function waitFor(predicate, label, timeoutMs = 60_000) {
+export async function waitFor(predicate, label, timeoutMs = 60_000) {
   const deadline = Date.now() + timeoutMs;
   let lastError = null;
   while (Date.now() < deadline) {
+    let timer;
     try {
-      const value = await predicate();
+      // A hung predicate must not suspend the deadline itself. CDP commands
+      // also expire independently, so no pending request survives indefinitely.
+      const value = await Promise.race([
+        predicate(),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error(`predicate deadline: ${label}`)),
+            Math.max(1, deadline - Date.now()));
+        }),
+      ]);
       if (value) return value;
     } catch (error) {
       lastError = error;
+    } finally {
+      clearTimeout(timer);
     }
-    await delay(150);
+    await delay(Math.max(0, Math.min(150, deadline - Date.now())));
   }
   throw new Error(
     `timeout waiting for ${label}${lastError ? `: ${lastError.message}` : ""}`,
@@ -296,6 +355,8 @@ function check(ok, label, detail = "") {
 }
 
 async function main() {
+  const suiteStartedAt = Date.now();
+  const suiteDeadline = suiteStartedAt + SUITE_TIMEOUT_MS;
   if (!existsSync(join(appDir, "out/main/index.js"))) {
     console.error("desktop app not built. Run: pnpm --filter @pi-desktop/desktop build");
     process.exit(1);
@@ -357,11 +418,12 @@ async function main() {
   };
 
   const timeout = setTimeout(() => {
-    console.error("FAIL three-column layout — timeout after 420s");
+    console.error(`FAIL three-column layout — timeout after ${SUITE_TIMEOUT_MS / 1000}s`);
+    console.error("--- CDP timeline ---", JSON.stringify(activeCdp?.timeline));
     console.error(output.slice(-2_000));
     cleanup();
     process.exit(1);
-  }, 420_000);
+  }, Math.max(1, suiteDeadline - Date.now()));
 
   try {
     const target = await waitFor(async () => {
@@ -378,6 +440,8 @@ async function main() {
     const cdp = await CdpClient.connect(target.webSocketDebuggerUrl);
     activeCdp = cdp;
     await cdp.send("Runtime.enable");
+    await cdp.send("Page.enable");
+    await cdp.send("Inspector.enable");
     await cdp.send("Emulation.setFocusEmulationEnabled", { enabled: true });
 
     const measure = () => cdp.evaluate(MEASURE);
@@ -623,12 +687,17 @@ async function main() {
       stack.style.transition = "none";
       stack.style.width = "450px";
       const modelLabelStyles = getComputedStyle(modelLabel);
+      const leftBox = left.getBoundingClientRect();
+      const rightBox = right.getBoundingClientRect();
       const result = {
         width: Math.round(bar.getBoundingClientRect().width),
         clipped: bar.scrollWidth > bar.clientWidth + 1,
-        sameRow:
-          Math.round(left.getBoundingClientRect().top) ===
-          Math.round(right.getBoundingClientRect().top),
+        sameRow: Math.abs((leftBox.top + leftBox.height / 2) -
+          (rightBox.top + rightBox.height / 2)) < 1,
+        groupGeometry: {
+          left: { top: leftBox.top, height: leftBox.height },
+          right: { top: rightBox.top, height: rightBox.height },
+        },
         modelLabelHidden: modelLabelStyles.display === "none",
         modelChipWidth: Math.round(modelChip.getBoundingClientRect().width),
       };
@@ -732,6 +801,7 @@ async function main() {
         const controls = document.querySelector(".window-controls");
         const sidebar = document.querySelector(".sidebar");
         const platform = document.documentElement.dataset.platform;
+        const usesNativeControls = platform === "win32" || platform === "linux";
         const inset = parseFloat(getComputedStyle(row).paddingLeft);
         const actionRight = Math.max(...actions.map(el => el.getBoundingClientRect().right));
         return {
@@ -741,8 +811,8 @@ async function main() {
           leftClear: actions.length > 0 && headerBox.left >= actionRight + 8,
           insetClear: actions[0].getBoundingClientRect().left >= (sidebar?.getBoundingClientRect().right ?? 0) + inset,
           rightClear: headerBox.right <= window.innerWidth -
-            (platform === "win32" || platform === "linux" ? 120 : 0) &&
-            (!controls || headerBox.right <= controls.getBoundingClientRect().left),
+            (usesNativeControls ? 120 : 0) &&
+            (!usesNativeControls || !controls || headerBox.right <= controls.getBoundingClientRect().left),
           tabClear: !firstTab || firstTab.getBoundingClientRect().left >= actionRight + 8,
           rowRegion: getComputedStyle(row).webkitAppRegion,
           spacerRegion: getComputedStyle(spacer).webkitAppRegion,
@@ -1752,62 +1822,117 @@ async function main() {
     });
 
     const crashSentinel = `renderer-crash-${Date.now()}`;
+    const beforeCrashFrame = (await cdp.send("Page.getFrameTree")).frameTree.frame;
     await cdp.evaluate(
       `window.__PI_E2E_RENDERER_CRASH_SENTINEL = ${JSON.stringify(crashSentinel)}`,
     );
-    void cdp.send("Page.crash").catch(() => undefined);
+    // Observe navigation without evaluating the replacement renderer's initial
+    // empty document. Electron's sandbox preload belongs to the committed app
+    // document; evaluating before that commit can create a different context.
+    await cdp.send("Runtime.disable");
+    const crashStartedAt = Date.now();
+    const traceCrash = (entry) => console.log("CRASH-LIFECYCLE", JSON.stringify({
+      elapsedMs: Date.now() - crashStartedAt,
+      suiteElapsedMs: Date.now() - suiteStartedAt,
+      ...entry,
+    }));
+    cdp.traceStartedAt = crashStartedAt;
+    cdp.onTrace = traceCrash;
+    // Page.crash can spend minutes in Chromium's crash-reporting path before
+    // Electron receives render-process-gone. That is injection latency, not app
+    // recovery. Bound it independently, retaining the original 90s recovery bar
+    // and the unchanged outer 480s budget. The stages share the suite deadline;
+    // do not pre-spend 90s when recovery may finish in a few seconds.
+    const injectionBudgetMs = Math.min(CRASH_INJECTION_TIMEOUT_MS,
+      suiteDeadline - crashStartedAt);
+    if (injectionBudgetMs <= 0) throw new Error("no suite budget left for renderer crash injection");
+    traceCrash({ phase: "injection.start", targetId: target.id, frame: beforeCrashFrame,
+      injectionBudgetMs, recoveryBudgetMs: CRASH_RECOVERY_TIMEOUT_MS,
+      suiteBudgetMs: SUITE_TIMEOUT_MS });
+    if (process.platform === "linux") {
+      for (const path of ["/proc/self/limits", "/proc/sys/kernel/core_pattern"]) {
+        traceCrash({ diagnostic: path, value: await readFile(path, "utf8")
+          .catch((error) => `unavailable: ${error.message}`) });
+      }
+    }
+    const diagnosticsPath = join(dataDir, "logs", "app", "diagnostics.log");
+    const readRecoveryLog = async () => {
+      const diagnostics = await readFile(diagnosticsPath, "utf8").catch((error) => {
+        if (error.code === "ENOENT") return "";
+        throw error;
+      });
+      return diagnostics.split("\n").filter(Boolean).map((line) => {
+        try { return JSON.parse(line); } catch { return null; }
+      }).find((entry) => entry?.event === "renderer.process.gone" &&
+        Date.parse(entry.ts) >= crashStartedAt && entry.data?.reloaded === true);
+    };
+    // Page.crash is not required to reply after destroying its own renderer.
+    // Record its timeout/error explicitly; the independent process-gone event
+    // below, never a command error or a fresh navigation, proves actual exit.
+    void cdp.send("Page.crash").then(
+      () => traceCrash({ phase: "injection.command-complete" }),
+      (error) => traceCrash({ phase: "injection.command-ended", error: error.message }),
+    );
+    const rendererRecoveryLog = await waitFor(readRecoveryLog,
+      "Page.crash injection to produce renderer.process.gone", injectionBudgetMs);
+    const processGoneAt = Date.parse(rendererRecoveryLog.ts);
+    const recoveryDeadline = Math.min(processGoneAt + CRASH_RECOVERY_TIMEOUT_MS, suiteDeadline);
+    traceCrash({ phase: "renderer.process.gone", injectionElapsedMs: processGoneAt - crashStartedAt,
+      observedAfterMs: Date.now() - processGoneAt, entry: rendererRecoveryLog });
     let recoveryCdp = cdp;
+    let recoveryFrame = null;
+    let recoveryRuntimeEnabled = false;
+    const remainingRecoveryMs = () => {
+      const remaining = recoveryDeadline - Date.now();
+      if (remaining <= 0) throw new Error("renderer recovery exceeded 90s after actual process exit");
+      return Math.min(5_000, remaining);
+    };
     const recoveryState = await waitFor(async () => {
       if (recoveryCdp.closed) {
-        const page = (await listTargets(cdpPort).catch(() => [])).find(
+        const page = (await listTargets(cdpPort)).find(
           (candidate) => candidate.type === "page" && candidate.id === target.id,
         );
         if (!page?.webSocketDebuggerUrl) return false;
-        const connected = await CdpClient.connect(page.webSocketDebuggerUrl).catch(
-          () => null,
-        );
-        if (!connected) return false;
-        recoveryCdp = connected;
+        recoveryCdp = await CdpClient.connect(page.webSocketDebuggerUrl, remainingRecoveryMs());
+        recoveryCdp.traceStartedAt = crashStartedAt;
+        recoveryCdp.onTrace = traceCrash;
         activeCdp = recoveryCdp;
-        await recoveryCdp.send("Runtime.enable").catch(() => undefined);
+        await recoveryCdp.send("Page.enable", {}, remainingRecoveryMs());
+        await recoveryCdp.send("Inspector.enable", {}, remainingRecoveryMs());
+        recoveryRuntimeEnabled = false;
       }
-      const state = await recoveryCdp
-        .evaluate(`({
-          sentinel: window.__PI_E2E_RENDERER_CRASH_SENTINEL,
-          chatSurface: Boolean(document.querySelector('.chat-surface')),
-          splash: Boolean(document.querySelector('.startup-splash')),
-        })`)
-        .catch(() => null);
+      // This renderer-owned command is only safe after actual exit, and still
+      // has its own deadline if the replacement renderer has not started yet.
+      recoveryFrame = (await recoveryCdp.send("Page.getFrameTree", {}, remainingRecoveryMs()))
+        ?.frameTree?.frame;
+      if (!recoveryFrame || recoveryFrame.loaderId === beforeCrashFrame.loaderId ||
+        !recoveryFrame.url.includes("out/renderer/index.html")) return false;
+      if (!recoveryRuntimeEnabled) {
+        await recoveryCdp.send("Runtime.enable", {}, remainingRecoveryMs());
+        recoveryRuntimeEnabled = true;
+      }
+      const state = await recoveryCdp.evaluate(`({
+        sentinel: window.__PI_E2E_RENDERER_CRASH_SENTINEL,
+        href: location.href,
+        readyState: document.readyState,
+        chatSurface: Boolean(document.querySelector('.chat-surface')),
+        splash: Boolean(document.querySelector('.startup-splash')),
+      })`, remainingRecoveryMs());
       return state?.chatSurface && !state.splash && state.sentinel !== crashSentinel
         ? state
         : false;
-    }, "the renderer automatically reloads after a crash", 90_000);
-    const recoveredTarget = (await listTargets(cdpPort).catch(() => [])).find(
+    }, "the renderer automatically reloads after a crash", Math.max(0, recoveryDeadline - Date.now()));
+    const recoveredTarget = (await listTargets(cdpPort)).find(
       (candidate) => candidate.type === "page" && candidate.id === target.id,
     );
+    traceCrash({ phase: "renderer.recovered", recoveryElapsedMs: Date.now() - processGoneAt,
+      targetId: recoveredTarget?.id, frame: recoveryFrame, state: recoveryState });
+    recoveryCdp.traceStartedAt = null;
     check(
       recoveryState.chatSurface && recoveredTarget?.id === target.id,
       "the existing app window restores the chat after a renderer crash",
-      JSON.stringify({ recoveryState, targetId: recoveredTarget?.id }),
+      JSON.stringify({ recoveryState, targetId: recoveredTarget?.id, frame: recoveryFrame }),
     );
-    const diagnostics = await readFile(
-      join(dataDir, "logs", "app", "diagnostics.log"),
-      "utf8",
-    ).catch(() => "");
-    const rendererRecoveryLog = diagnostics
-      .split("\n")
-      .filter(Boolean)
-      .map((line) => {
-        try {
-          return JSON.parse(line);
-        } catch {
-          return null;
-        }
-      })
-      .find(
-        (entry) =>
-          entry?.event === "renderer.process.gone" && entry.data?.reloaded === true,
-      );
     check(
       Boolean(rendererRecoveryLog?.data?.reason),
       "renderer crash recovery records the exit reason and reload decision",
@@ -1833,11 +1958,17 @@ async function main() {
     process.exit(0);
   } catch (error) {
     console.error(`FAIL three-column layout — ${error.message}`);
+    console.error("--- CDP timeline ---", JSON.stringify(activeCdp?.timeline));
     try {
       if (activeCdp) {
+        console.error("--- renderer frame tree ---", JSON.stringify(
+          await activeCdp.send("Page.getFrameTree").catch(() => null),
+        ));
         console.error("--- renderer console tail ---");
         for (const line of activeCdp.console.slice(-12)) console.error(line);
         const dump = await activeCdp.evaluate(`({
+          href: location.href,
+          readyState: document.readyState,
           body: (document.body?.innerText || "").slice(0, 300),
           shell: !!document.querySelector(".app-shell"),
           splash: !!document.querySelector(".startup-splash"),
@@ -1854,7 +1985,9 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}

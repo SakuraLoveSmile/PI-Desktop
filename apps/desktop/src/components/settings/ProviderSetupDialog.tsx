@@ -101,6 +101,8 @@ export function ProviderSetupDialog({
   const [models, setModels] = useState<ModelBinding[]>(initialDraft?.models ?? provider?.models ?? []);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [connectionResult, setConnectionResult] = useState<{ message: string; ok: boolean } | null>(null);
   const showToast = useAppStore((state) => state.showToast);
   const [baseUrlTouched, setBaseUrlTouched] = useState(false);
   // A format the user picked by hand outranks every inference about this row.
@@ -157,8 +159,8 @@ export function ProviderSetupDialog({
     },
     provider,
   );
-  // The probe's own answer is reported once as a toast instead of a status row
-  // under the key, which held a line of the dialog open for as long as it stood.
+  // Announce the settled probe once; the model pane also retains failures so
+  // users can retry after a toast has disappeared.
   useProbeFeedback(discovery, named);
   const recommended = useRecommendedModelSelection({
     // A copy keeps the models it was copied with.
@@ -251,14 +253,11 @@ export function ProviderSetupDialog({
     if (normalized !== baseUrl) setBaseUrl(normalized);
   };
 
-  /*
-    The outcome of a manual connection test is an event: it is reported through
-    the app toast stack instead of a result line under the credential fields,
-    which used to push the two panes down every time it changed.
-  */
+  // Retain the saved connection's result beside its fields as well as the toast.
   const testConnection = async () => {
     if (!provider) return;
     setTesting(true);
+    setConnectionResult(null);
     try {
       const result = (await api.testProvider(provider.id)) as {
         ok?: boolean;
@@ -266,17 +265,16 @@ export function ProviderSetupDialog({
         status?: number;
       };
       if (result?.ok) {
+        setConnectionResult({ message: t("settings.testOk"), ok: true });
         showToast(t("settings.testOk"), { variant: "success" });
         return;
       }
-      showToast(
-        result?.message ||
-          (result?.status
-            ? t("settings.testFailedStatus", { status: result.status })
-            : t("settings.testFailed")),
-        { variant: "error" },
-      );
+      const message = result?.message ||
+        (result?.status ? t("settings.testFailedStatus", { status: result.status }) : t("settings.testFailed"));
+      setConnectionResult({ message, ok: false });
+      showToast(message, { variant: "error" });
     } catch (cause) {
+      setConnectionResult({ message: cause instanceof Error ? cause.message : String(cause), ok: false });
       showToast(cause instanceof Error ? cause.message : String(cause), {
         variant: "error",
       });
@@ -311,6 +309,7 @@ export function ProviderSetupDialog({
       ? remainingImageModels
       : undefined;
     setSaving(true);
+    setSaveError("");
     try {
       if (provider) {
         const result = await api.updateProvider({
@@ -344,6 +343,7 @@ export function ProviderSetupDialog({
         await onSaved(result.provider, persisted, imageModelIdsToSave);
       }
     } catch (cause) {
+      setSaveError(cause instanceof Error ? cause.message : String(cause));
       showToast(cause instanceof Error ? cause.message : String(cause), {
         variant: "error",
       });
@@ -400,22 +400,10 @@ export function ProviderSetupDialog({
               {testing ? t("settings.testing") : t("settings.testConnection")}
             </Button>
           ) : null}
-          <Button variant="ghost" size="sm" disabled={saving} onClick={onClose}>
-            {t("settings.cancel")}
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            disabled={!canSave}
-            onClick={() => void save()}
-          >
-            {saving ? t("settings.saving") : t("settings.saveProvider")}
-          </Button>
         </div>
       </div>
 
       <div className="provider-setup-body">
-
         <ProviderEndpointGuidance
           baseUrl={resolvedBaseUrl}
           apiStyle={resolvedApiStyle}
@@ -463,6 +451,11 @@ export function ProviderSetupDialog({
             requiresApiStyleChoice={requiresApiStyleChoice}
           />
 
+          {connectionResult ? (
+            <div className="provider-connection-feedback" role={connectionResult.ok ? "status" : "alert"}>
+              {connectionResult.message}
+            </div>
+          ) : null}
         </div>
 
         <ModelSelectionPanes
@@ -481,6 +474,15 @@ export function ProviderSetupDialog({
           }}
           autoPicked={recommended.autoPicked}
         />
+      </div>
+      <div className="provider-setup-actions">
+        {saveError ? <div className="provider-setup-error" role="alert">{saveError}</div> : null}
+        <Button variant="ghost" size="sm" disabled={saving} onClick={onClose}>
+          {t("settings.cancel")}
+        </Button>
+        <Button variant="primary" size="sm" disabled={!canSave} onClick={() => void save()}>
+          {saving ? t("settings.saving") : t("settings.saveProvider")}
+        </Button>
       </div>
     </>
   );

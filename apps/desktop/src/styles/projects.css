@@ -873,3 +873,6 @@
 .project-delete-dialog-confirm:hover:not(:disabled) {
   background: color-mix(in oklab, var(--ds-error) 85%, black);
 }
+
+.projects-empty:has(.settings-empty-state) { display: block; padding: 0; min-height: 0; text-align: left; }
+.projects-empty:has(.settings-empty-state) .btn { margin: 0; }

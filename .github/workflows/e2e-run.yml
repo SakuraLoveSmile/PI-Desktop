@@ -12,6 +12,12 @@ on:
       source_sha:
         type: string
         default: ''
+  workflow_dispatch:
+    inputs:
+      family:
+        description: 'One catalog family for diagnosis; full nightly validation remains required'
+        type: string
+        required: true
 
 permissions:
   contents: read
@@ -44,17 +50,18 @@ jobs:
         # Electron's npm package fetches its binary on first use, not on install,
         # and the suites look for it directly under node_modules/electron/dist.
         run: node apps/desktop/node_modules/electron/install.js
-      - name: Build the candidate Host
-        run: cargo build -p host-core --locked
-      - name: Build workspace and Desktop
-        run: pnpm build:js
+      - name: Build and attest the candidate Host, workspace and Desktop
+        run: |
+          node scripts/e2e/build-candidate.mjs
+          mkdir -p .artifacts/e2e
+          cp .review-evidence/build-candidate.json .artifacts/e2e/build-candidate.json
       - name: Bundle the candidate sidecar
         run: pnpm --filter @pi-desktop/agent-runtime bundle
       - name: Verify suite and generated scenario catalog
         run: node scripts/generate-scenario-index.mjs --check
       - name: Run isolated fixture suites
         env:
-          E2E_TIER: ${{ inputs.tier }}
+          E2E_TIER: ${{ inputs.tier || 'nightly' }}
           E2E_FAMILY: ${{ inputs.family }}
           PI_DESKTOP_HOST_BIN: ${{ github.workspace }}/target/debug/pi-desktop-host-core
         run: |
@@ -63,5 +70,5 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: e2e-${{ inputs.tier }}-${{ inputs.family || 'smoke' }}
+          name: e2e-${{ inputs.tier || 'nightly' }}-${{ inputs.family || 'smoke' }}
           path: .artifacts/e2e/

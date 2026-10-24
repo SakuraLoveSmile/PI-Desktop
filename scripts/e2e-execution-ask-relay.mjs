@@ -20,7 +20,7 @@ import { executionAskProvider } from "./e2e/execution-ask-provider.mjs";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const argv = process.argv.slice(2);
 const option = name => { const at = argv.indexOf(name); return at >= 0 ? argv[at + 1] : null; };
-const evidenceDir = resolve(option("--evidence-dir") ?? join(root, ".review-evidence", `execution-ask-relay-${Date.now()}`));
+const evidenceDir = resolve(option("--evidence-dir") ?? join(root, ".artifacts", "e2e", `execution-ask-relay-${Date.now()}`));
 const kaneoRoot = option("--kaneopilot-root") ? resolve(option("--kaneopilot-root")) : null;
 const serve = argv.includes("--serve-fixture");
 await mkdir(evidenceDir, { recursive: true });

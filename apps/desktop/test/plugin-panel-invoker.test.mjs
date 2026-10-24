@@ -111,7 +111,8 @@ test(
 test(
   "a page that refuses to close cannot hold up a shutdown",
   { timeout: 5_000 },
-  async () => {
+  async (context) => {
+    context.mock.timers.enable({ apis: ["setTimeout"] });
     const page = fakePage();
     // The page never goes away, so only the budget can end the wait: if the
     // implementation waited for the event, this test would hit its own timeout.
@@ -119,10 +120,17 @@ test(
     const pending = pageGoneWithin(page, 20).then(() => {
       settled = true;
     });
-    await new Promise((resolve) => setImmediate(resolve));
+    // A busy event loop may exceed the budget before setImmediate runs.
+    // Check both sides of the deadline without depending on host scheduling.
+    await Promise.resolve();
     assert.equal(settled, false, "the wait is not over while the page lives");
+    context.mock.timers.tick(19);
+    await Promise.resolve();
+    assert.equal(settled, false, "the page retains its full close budget");
+    context.mock.timers.tick(1);
     await pending;
     assert.equal(page.destroyed, false);
+    assert.equal(page.listeners.size, 0, "the timeout releases its listener");
     assert.ok(PLUGIN_PAGE_CLOSE_SETTLE_MS > 0);
   },
 );

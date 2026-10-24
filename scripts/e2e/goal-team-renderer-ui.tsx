@@ -89,8 +89,19 @@ globalThis.goalTeamRendererUiProbe = async () => {
       reportReads.set(id, deferred());
     }
     api.getGoalProgress = async ({ executionId }) => {
+      if (executionId === "empty-execution") return { progress: null };
+      if (executionId === "unavailable-execution") throw new Error("Fixture progress unavailable");
       if (executionId === "screenshot-execution") {
-        return { progress: progress("screenshot-execution", 1, "Screenshot step", "completed", "screenshot-session") };
+        return { progress: {
+          ...progress("screenshot-execution", 1, "Screenshot step", "completed", "screenshot-session"),
+          items: [
+            { id: "filter", label: "过滤 LRC、图片和文本等非音频文件", status: "completed" },
+            { id: "audio", label: "保留音频文件与目录浏览行为", status: "completed" },
+            { id: "queue", label: "核验播放队列中的文件类型", status: "in_progress" },
+            { id: "regression", label: "完成相关回归验证", status: "pending" },
+            { id: "build", label: "构建桌面应用", status: "failed" },
+          ],
+        } };
       }
       const initial = initialProgress.get(executionId);
       if (initial && !initialProgressUsed.has(executionId)) {
@@ -173,6 +184,8 @@ globalThis.goalTeamRendererUiProbe = async () => {
       ));
     await act(async () => { root.render(renderAll(oldProposal)); });
     await act(async () => container.querySelector<HTMLButtonElement>(".goal-progress-toggle-btn")?.click());
+    assert(container.querySelector(".goal-progress-empty-state")?.textContent === i18n.t("goal.progressInitializing"),
+      "expanded Goal progress must show loading rather than substitute the original goal description");
     await act(async () => initialProgress.get("execution-old")?.resolve({ progress: progress("execution-old", 1, "Old work", "completed") }));
     await until(() => container.textContent?.includes("Old work") === true, "initial goal progress");
     const oldProgressHandlers = [...(progressListeners.get("current") ?? [])];
@@ -190,13 +203,43 @@ globalThis.goalTeamRendererUiProbe = async () => {
       staleReportHandlers.forEach((listener) => listener({ sessionId: "goal-session", reportId: "report-old", executionId: "execution-old", proposalId: "proposal-old", status: "ready" }));
     });
     assert(Boolean(container.querySelector('[data-testid="goal-progress-bar"]')), "old report readiness must not hide the new running goal");
-    await act(async () => initialProgress.get("execution-new")?.resolve({ progress: progress("execution-new", 1, "Current work", "pending") }));
+    const currentChecklist: GoalProgressSnapshot = {
+      ...progress("execution-new", 1, "Current work", "pending"),
+      items: [
+        { id: "filter", label: "Filter non-audio WebDAV entries", status: "completed" },
+        { id: "verify", label: "Verify that opening a WebDAV directory excludes LRC, image, playlist and text files from the audio playback queue while retaining all supported audio files", status: "in_progress" },
+        { id: "current", label: "Current work", status: "pending" },
+        { id: "build", label: "Build the desktop application", status: "failed" },
+      ],
+    };
+    await act(async () => initialProgress.get("execution-new")?.resolve({ progress: currentChecklist }));
     await until(() => container.textContent?.includes("Current work") === true, "new goal progress");
     const disclosure = container.querySelector<HTMLButtonElement>(".goal-progress-bar-header")!;
     assert(disclosure.textContent?.includes("Goal progress"), "Goal progress must name its scope");
     assert(disclosure.contains(container.querySelector(".goal-progress-capsule")), "Goal count must share the title disclosure instead of floating separately");
     assert(disclosure.getAttribute("aria-expanded") === "true", "Goal disclosure exposes expanded state");
     assert(container.querySelector('[role="list"][aria-label="Goal task list"]'), "expanded Goal tasks have distinct list semantics");
+    const expandedContent = container.querySelector(".goal-progress-expanded-content")!;
+    assert(expandedContent.firstElementChild?.getAttribute("role") === "list",
+      "specific Goal completion items must precede the original goal description");
+    const completionRows = [...expandedContent.querySelectorAll('[role="listitem"]')];
+    assert(completionRows.length === currentChecklist.items.length, "every recorded Goal item must be visible in the checklist");
+    for (const [index, item] of currentChecklist.items.entries()) {
+      assert(completionRows[index].textContent?.includes(item.label), "Goal labels must retain their recorded order and full text");
+      assert(completionRows[index].querySelector(".goal-progress-item-status")?.textContent === i18n.t(`goal.blocked.progress.${item.status}`),
+        `Goal item ${item.id} must expose its completion status as text`);
+    }
+    const description = expandedContent.querySelector<HTMLDetailsElement>(".goal-progress-description")!;
+    assert(description && !description.open, "the original Goal description must be secondary and initially collapsed");
+    await act(async () => description.querySelector("summary")!.click());
+    assert(description.open && description.textContent?.includes(newProposal.markdown!), "the original goal description remains available on demand");
+    await act(async () => description.querySelector("summary")!.click());
+    container.style.width = "320px";
+    const longLabel = completionRows[1].querySelector<HTMLElement>(".goal-progress-item-label")!;
+    assert(longLabel.getBoundingClientRect().height > Number.parseFloat(getComputedStyle(longLabel).lineHeight),
+      "long Goal labels must wrap instead of truncating the actual completion criterion");
+    assert(expandedContent.scrollWidth <= expandedContent.clientWidth, "Goal completion rows must not introduce horizontal scrolling");
+    container.style.width = "";
     await act(async () => disclosure.click());
     assert(!container.querySelector(".goal-progress-items-container"), "clicking the progress row closes the task list");
     await act(async () => disclosure.click());
@@ -209,6 +252,10 @@ globalThis.goalTeamRendererUiProbe = async () => {
     await until(() => laterProgress.length === 2, "two overlapping progress reads");
     await act(async () => laterProgress[1].resolve({ progress: progress("execution-new", 3, "Newest work", "completed") }));
     await until(() => container.textContent?.includes("Newest work") === true, "newest progress revision");
+    assert(container.querySelector(".goal-progress-item-status")?.textContent === i18n.t("goal.blocked.progress.completed"),
+      "live Goal updates must update each item's status text");
+    assert(container.querySelector(".goal-progress-badge")?.textContent === i18n.t("chat.scheduleExecutionState.running"),
+      "a complete checklist must not claim that the still-running execution has finished");
     await act(async () => laterProgress[0].resolve({ progress: progress("execution-new", 2, "Stale work", "pending") }));
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     assert(container.textContent?.includes("Newest work"), "late lower-revision response must not replace newer progress");
@@ -241,6 +288,21 @@ globalThis.goalTeamRendererUiProbe = async () => {
 
     await act(async () => { root.render(renderAll({ ...newProposal, executionState: "interrupted" })); });
     assert(!container.querySelector('[data-testid="goal-progress-bar"]'), "interrupted execution ends progress without waiting for any report");
+
+    for (const [executionId, expected] of [
+      ["empty-execution", "goal.progressNotReported"],
+      ["unavailable-execution", "goal.progressFailed"],
+    ]) {
+      await act(async () => root.render(renderAll({ ...newProposal, executionId }, executionId)));
+      await until(() => container.querySelector(".goal-progress-badge")?.textContent !== i18n.t("goal.progressInitializing"), "settled progress read");
+      await act(async () => container.querySelector<HTMLButtonElement>(".goal-progress-toggle-btn")!.click());
+      assert(container.querySelector(".goal-progress-empty-state")?.textContent === i18n.t(expected),
+        "missing and unreadable Goal progress must have explicit states");
+      assert(!container.querySelector(".goal-progress-items-container, .goal-progress-capsule-text"),
+        "missing progress must not invent goal items or a completed count");
+      assert(!container.querySelector<HTMLDetailsElement>(".goal-progress-description")?.open,
+        "missing progress must not substitute the original description for completion evidence");
+    }
 
     await until(() => container.querySelector(".team-dispatch-card")?.getAttribute("data-state") === "in_progress", "live dispatch card status");
     const dispatchCard = container.querySelector<HTMLElement>(".team-dispatch-card");
@@ -407,9 +469,9 @@ globalThis.goalTeamRendererUiProbe = async () => {
     assert(!container.querySelector(".team-dispatch-joining, .team-timeline-runtime"), "settled timeline has no live row");
     const screenshotProposal = { ...newProposal, executionId: "screenshot-execution" } as PlanProposal;
     await act(async () => { root.render(createElement(Fragment, null, renderAll(screenshotProposal, "screenshot-session", true), renderTimeline())); });
-    await until(() => container.querySelector(".goal-progress-capsule-text")?.textContent?.trim() === "1/1", "ready progress for screenshot");
+    await until(() => container.querySelector(".goal-progress-capsule-text")?.textContent?.trim() === "2/5", "ready progress for screenshot");
     await act(async () => container.querySelector<HTMLButtonElement>(".goal-progress-toggle-btn")?.click());
-    await until(() => container.textContent?.includes("Screenshot step") === true, "expanded goal for screenshot");
+    await until(() => container.textContent?.includes("过滤 LRC") === true, "expanded goal for screenshot");
     assert(Boolean(container.querySelector(".goal-progress-expanded-content")), "expanded step list must be visible in the screenshot");
     assert(container.querySelector(".goal-progress-toggle-btn")?.getAttribute("aria-label")?.endsWith("Show less"), "expanded goal toggle must use the English catalog key");
     assert(Boolean(container.querySelector('[data-testid="goal-progress-bar"]')), "running goal progress should remain visible for the evidence capture");
@@ -419,7 +481,7 @@ globalThis.goalTeamRendererUiProbe = async () => {
     ] });
     await act(async () => { root.render(createElement(I18nextProvider, { i18n },
       createElement("div", { className: "composer-stack", style: { maxWidth: 760, margin: "24px auto", padding: 16 } },
-        createElement(GoalProgressBar, { sessionId: "screenshot-session", proposal: { ...screenshotProposal, sessionId: "screenshot-session", title: "Current Goal with its own execution tasks" } }),
+        createElement(GoalProgressBar, { sessionId: "screenshot-session", proposal: { ...screenshotProposal, sessionId: "screenshot-session", title: "WebDAV 音频过滤（界面验证示例）" } }),
         createElement("div", { className: "composer-shell", style: { minHeight: 100, padding: 16 } }, "Composer"),
         createElement("aside", { className: "work-panel-overview" }, createElement(SessionTodoChecklist, { sessionId: "screenshot-session" })),
       ))); });
@@ -438,6 +500,10 @@ globalThis.goalTeamRendererUiProbe = async () => {
       assert(container.querySelector(".goal-progress-bar")!.scrollWidth <= width, "compact Goal progress must fit narrow width");
     }
     await act(async () => i18n.changeLanguage("zh-CN"));
+    const progressPanel = container.querySelector<HTMLElement>(".goal-progress-expanded-content")!;
+    const descriptionSummary = progressPanel.querySelector(".goal-progress-description > summary")!;
+    assert(descriptionSummary.getBoundingClientRect().bottom <= progressPanel.getBoundingClientRect().bottom,
+      "a short five-item Goal checklist must leave the original description disclosure fully visible");
     preserveForScreenshot = true;
     globalThis.goalTeamRendererUiCleanup = () => { root.unmount(); container.remove(); };
   } finally {
@@ -455,5 +521,5 @@ globalThis.goalTeamRendererUiProbe = async () => {
     api.onTeamChanged = originalTeamChanged;
     useAppStore.setState({ openWorkPanelTabForSession: originalStoreMethod });
   }
-  return { ok: true, cardHeight, reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches, scenarios: ["goal execution and session switch", "cross-session event isolation", "stale report event", "out-of-order progress revisions", "ready report completion", "interruption without a result card or stuck progress", "completed report navigation", "single task navigation", "distinct Goal/session counts and disclosures", "320px light/dark progress layout", "expert joining feedback", "Team chronological transcript", "Compact and ordinary turn preservation", "card search/navigation", "live tail and section approval"] };
+  return { ok: true, cardHeight, reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches, scenarios: ["goal execution and session switch", "concrete Goal item statuses and secondary description", "loading, unreported and unavailable Goal progress", "wrapping Goal labels without horizontal scrolling", "complete checklist keeps running execution phase", "cross-session event isolation", "stale report event", "out-of-order progress revisions", "ready report completion", "interruption without a result card or stuck progress", "completed report navigation", "single task navigation", "distinct Goal/session counts and disclosures", "320px light/dark progress layout", "expert joining feedback", "Team chronological transcript", "Compact and ordinary turn preservation", "card search/navigation", "live tail and section approval"] };
 };

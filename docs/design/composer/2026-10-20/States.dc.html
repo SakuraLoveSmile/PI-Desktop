@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Composer dark click states</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="--ground:#181818;--text:#ffffff;--icon:rgba(255,255,255,0.78);--secondary:rgba(255,255,255,0.7);--muted:rgba(255,255,255,0.52);--hover:rgba(255,255,255,0.06);--stop-bg:rgba(255,255,255,0.16);--stop-hover:rgba(255,255,255,0.22);--send-bg:rgba(255,255,255,0.18);--send-fg:rgba(24,24,24,0.7);--ring:rgba(255,255,255,0.2);--accent:#ffffff;width:960px;height:300px;box-sizing:border-box;background:var(--ground);position:relative;font-family:'PingFang SC','Hiragino Sans GB','Noto Sans CJK SC',system-ui,sans-serif">
+  <div style="position:absolute;left:24px;top:20px;font-size:12px;line-height:18px;color:var(--muted)">点击后的既有状态，取自现有样式与文案；展开态见 Menu 画板（提议）</div>
+  <div style="position:absolute;left:24px;right:24px;top:56px;bottom:20px;display:grid;grid-template-columns:96px repeat(3,1fr);grid-template-rows:repeat(4,1fr);align-items:center">
+    <div style="font-size:12px;color:var(--muted)">发送</div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><span style="width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:var(--send-bg);color:var(--send-fg)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5.5 11.5L12 5l6.5 6.5"/></svg></span><span style="font-size:11px;line-height:16px;color:var(--muted)">空稿 · 禁用</span></div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><span style="width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:#ffffff;color:#181818"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5.5 11.5L12 5l6.5 6.5"/></svg></span><span style="font-size:11px;line-height:16px;color:var(--muted)">有内容 · 可发送</span></div>
+    <div style="font-size:12px;color:var(--muted)">停止</div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><span style="width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:var(--stop-bg);color:#ffffff"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg></span><span style="font-size:11px;line-height:16px;color:var(--muted)">运行中 · 默认</span></div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><span style="width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:var(--stop-hover);color:#ffffff"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg></span><span style="font-size:11px;line-height:16px;color:var(--muted)">悬停 · 22%</span></div>
+    <div style="font-size:12px;color:var(--muted)">增强</div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><span style="width:28px;height:28px;border-radius:999px;display:grid;place-items:center;color:var(--icon)"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8 2.2L16 18l2.2-.8z"/></svg></span><span style="font-size:11px;line-height:16px;color:var(--muted)">默认</span></div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><span style="height:28px;padding:0 10px;border-radius:999px;display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--secondary);background:var(--hover);white-space:nowrap"><span aria-hidden="true" style="width:12px;height:12px;border-radius:50%;border:2px solid var(--ring);border-top-color:var(--text);box-sizing:border-box;display:inline-block"></span>增强中…</span><span style="font-size:11px;line-height:16px;color:var(--muted)">加载中</span></div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><span style="width:28px;height:28px;border-radius:999px;display:grid;place-items:center;color:var(--icon)" aria-label="撤回增强"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></span><span style="font-size:11px;line-height:16px;color:var(--muted)">完成后 · 撤回增强</span></div>
+    <div style="font-size:12px;color:var(--muted)">模型芯片</div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><span style="height:28px;padding:0 8px;border-radius:999px;display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--secondary);white-space:nowrap"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent)"><rect x="4" y="8" width="16" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01"/></svg><span>Qwen3.8-Max</span><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span><span style="font-size:11px;line-height:16px;color:var(--muted)">默认</span></div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><span style="height:28px;padding:0 8px;border-radius:999px;display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--text);background:var(--hover);white-space:nowrap"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent)"><rect x="4" y="8" width="16" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01"/></svg><span>Qwen3.8-Max</span><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span><span style="font-size:11px;line-height:16px;color:var(--muted)">悬停 · 6%</span></div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":300}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

@@ -4,6 +4,13 @@
 > Status: Accepted (protocol/Electron automation is active; scene-family nightly fixtures and PR smokes are active)
 > Cross-references: [acceptance-criteria](02-acceptance-criteria.md) · [milestones](01-mvp-milestones.md) · [ai-development-workflow](03-ai-development-workflow.md) · [change-checklist](05-change-checklist.md)
 
+The full automatic fixture catalog runs through `e2e-nightly.yml`. For focused
+diagnosis, dispatch the existing isolated runner with
+`gh workflow run e2e-run.yml -R SakuraLoveSmile/PI-Desktop --ref <request-branch> -f family=<catalog-family>`.
+This manual entry uses the nightly tier for one family and retains its exact
+candidate/base and artifact report. A focused diagnostic run does not replace
+the complete nightly candidate validation or PR integration gates.
+
 ---
 
 ## 1. Goals
@@ -375,6 +382,13 @@
   Columns remain aligned and readable; horizontal scrolling reaches the last
   column without widening the card, and long question content keeps choices
   visible. Selecting and submitting still returns the original option label.
+
+- Draft lifecycle regression: answer the first question, enter custom text in
+  the next, switch A → B → A, and recover the same question and answers.
+  Keep B and a new request empty, then submit A with its exact original values.
+  Store tests cover failed submission, tool/turn termination, Host reconciliation
+  racing a new request, session removal and retained Host-deferred Team drafts.
+  Drafts are renderer-memory state and do not survive reload.
 
 ### E2E-INTERACTION-unattended-hard-boundary
 
@@ -2155,7 +2169,7 @@ workflow. They are not gates or promised outputs of the current Release run.
   (`aria-label="Stop generating"`) and no Send button is present; type a draft
   and verify the same slot becomes Send (`aria-label="Send"`) with no Stop
   button present. Send two more prompts and inspect the queue above the
-  composer. 3) Remove the second queued row and switch to B. 4) Send a prompt
+  composer. 3) Remove the second queued row from its ⋯ menu and switch to B. 4) Send a prompt
   in B, then return to A before either run completes. 5) Choose Send now on A's
   remaining queued row, then choose Send now on a second row. 6) Observe A
   through the current tool/reply boundary and then the next turn. 7) Start
@@ -2164,8 +2178,8 @@ workflow. They are not gates or promised outputs of the current Release run.
   turn finish without Send now, and delay its host `session.endTurn` response
   until after `agent_end` is delivered. Release finalization and observe both
   follow-ups through their turn boundaries. Repeat with a provider error and an
-  immediate abort. 9) With waiting rows, use move up and move down and confirm
-  the persisted order follows. 10) Edit a waiting row while the composer holds
+  immediate abort. 9) With waiting rows, use each row's ⋯ menu to move up and down and confirm
+  the persisted order follows. 10) Edit a waiting row from its ⋯ menu while the composer holds
   text, then with an empty composer. 11) Delay Host queue admission. Attempt to
   edit/remove the pending row, release admission, then edit/remove the durable
   row. Repeat with a captured file-reference draft. 12) Withhold a local Host
@@ -2179,9 +2193,12 @@ workflow. They are not gates or promised outputs of the current Release run.
   promoted rows are delivered in the order they were promoted, before any
   waiting row, without `AGENT_BUSY`: the first starts the turn and the rest join
   it as adjacent user messages, so the model answers once for the whole block.
-  A promoted row locks move/edit and Send now, but permits removal; promotion is
+  A promoted row locks Move and Edit in its ⋯ menu and replaces Send now with
+  its wait, but permits Remove; promotion is
   one-way. Move up/down swaps only waiting rows, never crosses the promoted
-  block, and persists. Edit is refused with a visible message while the input
+  block, and persists. Two or more waiting rows fold behind a summary until
+  expanded, and Send now appears on hover or focus. Edit is refused with a visible
+  message while the input
   is non-empty, and otherwise removes the row and returns its text plus its
   file-reference chips to the composer. Immediate Stop aborts the current reply
   and preserves A's queued row;
@@ -2192,8 +2209,9 @@ workflow. They are not gates or promised outputs of the current Release run.
   click or session switch. Repeated terminal handling does not double-dispatch.
   Other sessions' queues remain unchanged, and quitting while finalization is
   pending preserves queued work without starting another turn. Pending-admission
-  rows disable all five actions, explain Saving in each tooltip, show Saving
-  on Send now, and remain visible without restoring a second draft. Once acknowledged, remove deletes the durable row and edit restores
+  rows disable the ⋯ trigger, whose label reads Saving, and every menu action;
+  the row shows Saving where Send now would be, and it remains visible without
+  restoring a second draft. Once acknowledged, remove deletes the durable row and edit restores
   exactly its captured draft; neither row reappears after refresh. A local Host
   admission timeout clears the pending row, reports the error, and restores
   the rejected composer draft; retry can queue normally.
@@ -2257,6 +2275,26 @@ workflow. They are not gates or promised outputs of the current Release run.
 - **Acceptance**: C (chat), F (persistence)
 - **Milestone**: M6+
 - **Status**: Draft; host-side reorder covered by `turn_queue` unit tests
+
+#### E2E-QUEUE-row-menu-survives-transcript-scroll: A row's ⋯ menu follows its trigger when the transcript scrolls
+
+- **Preconditions**: Provider configured; a turn is held while at least two prompts are queued, and the transcript is pinned to the bottom.
+- **Steps**: 1) Open a waiting row's ⋯ menu. 2) Scroll the transcript behind it by a few pixels, then let the held turn reflow its content. 3) Confirm the menu is still open beside its trigger, then choose Move up and confirm the order changes.
+- **Expected**: Scrolling or reflowing the transcript repositions the menu with its trigger instead of dismissing it. The menu closes after a choice, on an outside press, on Escape or Tab, or when its trigger leaves the viewport.
+- **Specs linked**: `04-ux/09-interaction-patterns.md` (shared anchored menus)
+- **Acceptance**: C (chat)
+- **Milestone**: M6+
+- **Automation**: `node scripts/e2e-team.mjs` (queue section, first queue action; the scroll check)
+
+#### E2E-QUEUE-row-menu-closes-when-row-leaves-list: A row's ⋯ menu closes when the queue list scrolls its row out of view
+
+- **Preconditions**: Provider configured; a turn is held while at least three prompts are queued, so the queue list (at most 168px tall) scrolls.
+- **Steps**: 1) Scroll the queue list to its top and open the first row's ⋯ menu. 2) Scroll the queue list to its bottom, so that row is fully out of view. 3) Confirm the menu closes, nothing is left floating over the composer, and the list keeps its scroll position.
+- **Expected**: A menu whose trigger is fully outside the queue list closes, and focus is not moved back to the hidden trigger. A trigger that is only partly visible keeps its menu open.
+- **Specs linked**: `04-ux/08-component-spec.md` (queued row)
+- **Acceptance**: C (chat)
+- **Milestone**: M6+
+- **Automation**: `node scripts/e2e-team.mjs` (queue section, after the expanded-queue screenshot; the list-scroll close check)
 
 #### E2E-QUEUE-send-now-abort-offer-after-30s: Abort command appears on the head promoted row after 30 seconds
 
@@ -2448,7 +2486,10 @@ workflow. They are not gates or promised outputs of the current Release run.
 - **Steps**: 1) Click the left-of-input Composer mode chip to enter Plan. 2)
   Send a prompt that would normally require Write/Edit and observe behavior. 3)
   Click the same Composer chip to return to Agent. 4) Begin a turn and try to
-  toggle mode mid-run or while a pending Plan approval is visible.
+  toggle mode mid-run or while a pending Plan approval is visible. 5) Re-enter
+  Plan, then use the chip's close control: it returns to Agent as the + menu's
+  Plan toggle does, and it stays disabled while the plan is being drafted or
+  awaits approval.
 - **Expected**: The Composer chip updates the active session `mode` (Plan and
   Goal hard-deny Write/Edit and plugin tools while Bash follows the selected
   permission mode; Agent allows its normal tools per permission settings). The
@@ -4268,8 +4309,8 @@ workflow. They are not gates or promised outputs of the current Release run.
   follows immediately; arrow keys retain focus and update the selection.
   With reduced motion enabled, the target is shown without a transition.
 - **Expected**: The chip is in the right toolbar with a Bot icon, before the
-  standalone prompt-enhancement Sparkles action and Send/Abort; Off omits the
-  level text. The single anchored menu replaces its root
+  standalone prompt-enhancement Sparkles action and Send/Abort; Off shows the
+  localized Off label. The single anchored menu replaces its root
   with an in-place back row and submenu, never opens tabs or a second popover,
   and always reopens at the root. Model search filters sticky provider groups;
   reasoning levels come from `omit` then the selected model binding's enabled
@@ -6298,7 +6339,8 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
      card's head band, the Mermaid canvas, tool output, the composer placeholder
      and disabled send chip, the dialog scrim and permission backdrop, and the
      dock question card with its option row. Apply custom surface variables,
-     keyboard-focus both searches, then remove the custom theme.
+     keyboard-focus both searches and the composer input, mark the composer shell
+     as a file-drop target, then remove the custom theme.
 - **Expected**:
   - Work panel body reads as quiet `#fafafa` inset paper with a white header band.
   - Settings fields, browser URL, segment tracks, and shortcut keycaps use light inset fills; focused fields lift with a neutral ring.
@@ -6318,12 +6360,18 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
     existing shadows/focus rings. Prose ink mixes follow `--ds-text-primary`,
     and the `one-dark-pro` / `one-light` Shiki plate and its ink stay with the
     Shiki theme by design. This batch does not change plugin APIs.
+  - The composer shell paints its neutral focus ring and glow while its input has
+    focus, paints the accent drop outline while a file is dragged over it, and shows
+    no outline at idle. The critical context-usage meter paints its value and fill
+    with `--ds-danger`, which resolves to the error red in each palette.
 - **Specs linked**: `04-ux/07-ui-design-system.md`, `04-ux/08-component-spec.md`
 - **Acceptance**: D148
 - **Milestone**: M5
 - **Status detail**: `pnpm test:e2e:theme-surfaces` exercises these ordinary fills,
-  focus states, and built-in restoration with real Chromium, production CSS,
-  and deterministic DOM fixtures; plugin installation/lifecycle is not covered.
+  focus states, the composer focus, idle and file-drop cues, the critical usage
+  meter's `--ds-danger` paint, and built-in restoration with real Chromium,
+  production CSS, and deterministic DOM fixtures; plugin installation/lifecycle is
+  not covered.
   Branch runs do not replace post-integration E2E. Other surfaces in this
   scenario retain manual visual checks.
 
@@ -6393,7 +6441,8 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
     level merely because the model supports reasoning.
   - Reopening the first session preserves the user's later explicit selection.
   - The non-reasoning session starts at `off`; its combined chip keeps the Bot
-    icon, omits level text, and its reasoning submenu exposes only Off. Missing
+    icon, shows the localized Off label, and its reasoning submenu exposes only
+    Off. Missing
     capability metadata also falls back to `off`.
 - **Specs linked**: `03-runtime/13-model-catalog-and-selection.md`,
   `04-ux/08-component-spec.md`, ADR 0018, D303
@@ -6641,9 +6690,9 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   - Opening the context usage inspector after a checkpoint shows one line with
     the compaction count and the newest summary's token estimate; before any
     checkpoint that line is absent.
-  - The context usage indicator exposes the same localized remaining-context
-    summary on hover and keyboard focus, and its tooltip remains visible above
-    the home/docked composer without clipping.
+  - The context usage indicator exposes the same localized context summary
+    (used figure by default) on hover and keyboard focus, and its tooltip
+    remains visible above the home/docked composer without clipping.
   - At the hard boundary a durable checkpoint is created before the next model
     request. The complete visible transcript is unchanged, and the continued
     task stays below the model-aware safe budget.
@@ -10440,8 +10489,9 @@ This test plan spec is accepted when:
 - Complete an assistant turn that reports usage.
 - Expect a model badge under the answer and the compact Context inspector in
   the composer toolbar, left of the model picker. The trigger shows the
-  remaining-capacity ring and percentage; clicking it (or activating it from
-  the keyboard) shows remaining tokens plus percentage, used/window counts,
+  context ring and percentage in the configured figure (used capacity by
+  default; see E2E-250); clicking it (or activating it from the keyboard)
+  shows the matching tokens plus percentage, used/window counts,
   two unboxed turn/speed values, one inline exact provider-usage summary, and
   one aggregate tool-usage summary with types, calls, and approximate tokens.
   Per-tool rows, bars, badges, explanatory estimate copy, and inner section
@@ -14895,22 +14945,25 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Preconditions**: An Agent session has completed at least one turn that
   reported token usage. Settings → AI → Defaults is reachable.
 - **Steps**:
-  1. Confirm the composer footer context track shows remaining capacity
-     (track nearly full, percentage ≈ remaining %, tooltip and aria-label
-     use remaining vocabulary).
+  1. On a fresh profile, confirm the composer footer context track shows used
+     capacity by default (track nearly empty at low occupancy, percentage ≈
+     used %, footer label reads Used (`chat.usageContextUsedLabel`),
+     tooltip and aria-label use used vocabulary).
   2. Open Settings → AI → Defaults and switch the Context usage display
-     segmented control from Remaining to Used.
+     segmented control from Used to Remaining.
   3. Return to the chat and inspect the context meter: the track now
-     fills by `usedRatio` (nearly empty at low occupancy), the percentage
-     shows ≈ used %, the popover heading shows used tokens + percentage,
-     and the tooltip/aria-label use used-capacity vocabulary.
+     fills by `remainingRatio` (nearly full at low occupancy), the percentage
+     shows ≈ remaining %, the footer label reads Remaining
+     (`chat.usageContextRemainingLabel`), the popover heading shows remaining tokens +
+     percentage, and the tooltip/aria-label use remaining-capacity vocabulary.
   4. Confirm warning/critical track colors still follow remaining capacity:
      at remaining > 25 % the track stays neutral even when used % is high.
-  5. Switch back to Remaining and confirm the original display returns.
+  5. Switch back to Used and confirm the default display returns.
 - **Expected**: The display mode flips the track fill, percentage, token
-  count, heading, tooltip, and aria-label consistently. Color thresholds
+  count, heading, footer label, tooltip, and aria-label consistently. Color thresholds
   remain based on remaining capacity in both modes. The default for a
-  fresh profile is Remaining.
+  fresh profile is Used; an explicit Remaining choice saved before the
+  default changed is kept.
 - **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/08-component-spec.md`,
   ADR 0223, `08-meta/decisions-log.md` (D398)
 - **Acceptance**: C (conversation & stream), Quality (preference)
@@ -16307,10 +16360,16 @@ the latest destination. These assertions measure work counts, not device FPS.
   runtime compacts against the published safety ceiling, and no request is sent
   with `input + output` beyond that ceiling. Small ASCII requests retain the
   configured budget when it fits.
+- Folded-transcript regression: restore a long session with repeated large
+  system snapshots and continue it through a loopback Responses gateway. Repeat
+  for a delegate after its usage anchor. The actual wire request retains the
+  configured 8192-token output budget and only the current leading system
+  snapshot. A model declaring mid-conversation support keeps its updates.
 - **Specs linked:** `03-runtime/02-agent-runtime.md`,
   `03-runtime/13-model-catalog-and-selection.md`
 - **Acceptance:** F (runtime provider requests), C (chat and stream)
-- **Status:** Unit-covered; deterministic provider fixture pending
+- **Status:** Unit coverage plus `output-cap-request.test.ts` loopback
+  parent/delegate wire coverage. Record actual candidate runs separately.
 
 ### E2E-PROVIDER-certificate-trust-and-terminal-errors
 
@@ -16321,7 +16380,10 @@ the latest destination. These assertions measure work counts, not device FPS.
   desktop sidecar and submit a chat prompt against an untrusted localhost
   certificate. Relaunch with its CA in `NODE_EXTRA_CA_CERTS`, then request the
   same certificate through a hostname absent from its SAN.
-- **Expected:** The child's default CA set includes system roots and extra CAs.
+- **Expected:** After startup the child's default CA set includes non-expired
+  system roots and inherited extra CAs. Deterministic unit fixtures prove that
+  expired OS entries are excluded while bundled and extra roots retain their
+  existing semantics.
   The first request fails once with a non-retriable certificate error and no
   retry status; the trusted request returns text; the hostname mismatch still
   fails once. TLS and hostname verification remain enabled.
@@ -16566,7 +16628,7 @@ the latest destination. These assertions measure work counts, not device FPS.
 
 - **Preconditions:** Isolated npm package directory and plugin import storage;
   a package declaring `pi.skills`, optionally executable extensions. No provider.
-- **Steps:** Open Skills, discover the candidate, cancel import, confirm import,
+- **Steps:** Open Skills, expand pi CLI discovery, discover the candidate, cancel import, confirm import,
   read the registered skill body and resources, reload, and attempt a duplicate.
   Change metadata during confirmation; retry discovery after an error; discover
   with more than 256 hoisted dependencies and an unreadable scope. Simulate a
@@ -16580,7 +16642,8 @@ the latest destination. These assertions measure work counts, not device FPS.
   The header dismiss control closes the discovery panel to a secondary reveal button;
   closing ignores late discovery responses and initiates no imports; reveal triggers
   fresh discovery; busy imports disable dismiss and refresh; remount restores the
-  default expanded state.
+  default collapsed state, with no discovery until explicitly expanded. Discovery
+  failures show a readable summary and expandable details, not an empty result.
 - **Specs:** 07-plugins/16-trusted-extensions; ADR pi-npm-skill-discovery.
 - **Acceptance:** Plugin skill discovery and explicit trust boundary.
 - **Milestone:** Post-MVP compatibility.
@@ -16608,6 +16671,19 @@ the latest destination. These assertions measure work counts, not device FPS.
 
 ### E2E-SETTINGS-destination-scroll-reset
 
+- On entry, the search field has focus. Search for “Large paste”: the result
+  names the actual setting with AI as its category. Enter opens AI and makes
+  that row visible; selecting it again preserves valid anchor navigation.
+- ArrowDown/ArrowUp move focus from the field to results and back; Enter on a
+  result activates it. IME Enter/arrow/Escape events do not navigate or clear.
+  Clear search and Escape restore the directory and focus the search field.
+- Search for a plugin-only keyword: its result appears without a conflicting
+  no-results message. A missing query shows one no-results status and no empty
+  group headings. Clear it, open a plugin, and verify one selected/current
+  destination; return to a built-in category and verify the selection follows.
+- At narrow/default/wide widths in light/dark themes, inspect long result labels,
+  category context, visible keyboard focus, clear control, and pinned return
+  action. Navigation and content must remain independently scrollable.
 - Open Settings → AI and scroll midway down. Select Shortcuts: its title and
   first settings appear at the top. Scroll and return to AI: it starts at top.
 - Re-select the active destination and update settings without navigating:
@@ -16622,8 +16698,9 @@ the latest destination. These assertions measure work counts, not device FPS.
 - Run in light and dark themes.
 - Automated coverage: `pnpm test:e2e:settings-scroll` mounts the production
   SettingsPage, store, translations, and built CSS in isolated Electron. Only
-  preload data is stubbed; search navigation uses SearchDialog's public store
-  entry points. It also checks the Cloud sync developer-mode gate, Experimental
+  preload data is stubbed; rail search uses rendered controls and global search
+  deep links use SearchDialog's public store entry points. It also checks the
+  Cloud sync developer-mode gate, Experimental
   badges, and fallback to General. This covers renderer interaction, not host
   persistence or the full global-search dialog.
 
@@ -16827,6 +16904,13 @@ renderer's durable transcript reads. No real model or provider is contacted.
   produce no transcript result card or automatic Work Panel opening; interrupted progress
   disappears without waiting. Completed report navigation and persistence remain intact.
 - **Progress:** Approved Goal progress accepts pending/in-progress/completed/failed items.
+  Expanding the composer Goal row shows those items first, with full wrapping
+  labels and explicit localized status text. The original Goal description is
+  initially collapsed after the checklist and can be opened independently.
+  Loading, unreadable or unreported progress remains explicit instead of
+  displaying the goal description as if it were completion evidence. Live
+  updates refresh item statuses; an all-completed checklist retains a running
+  execution badge until the authoritative execution actually finishes.
   Unauthorized turns and stale revisions are rejected. A new execution ignores old report
   and progress responses; terminal settlement revokes writes, retains readable progress,
   and session deletion removes it. Failed Team operations do not change dispatch cards;
@@ -17311,11 +17395,11 @@ current CAS revision. Legacy descriptions and reviews without presentation are r
 
 ### E2E-TEAM-horizontal-overflow
 
-- **Status**: Planned for the current repair; the actual overflow offender has not been identified in the integrated app.
+- **Status**: Automated production-shell coverage; record candidate and platform results for each run.
 - **Preconditions**: Isolated Desktop candidate, long task subject and unbroken scope/path fixtures, existing minimum chat width, and no user data.
-- **Steps**: Inspect Overview, Team aggregate, board, member/task detail, independent task tab and the three-column shell at 320/450/620px panel widths and 100%/150% font scale in light/dark and English/Chinese. Record the offending element's `clientWidth`/`scrollWidth`, then verify a bounded local fix while exercising Work Panel tab-strip scrolling, Markdown table/code scrolling and panorama world panning.
-- **Expected**: No page-level horizontal scrollbar or displaced shell content; long content remains accessible in detail, and intentional local scroll/pan surfaces still work.
-- **Automation**: Extend the isolated Team/three-column Electron harness after confirming it measures the production shell. Record the tested commit, panel dimensions, font scale, theme, locale and offender evidence.
+- **Steps**: Inspect Overview, Team aggregate, board, member/task detail, independent task tab and the three-column shell at 320/450/620px panel widths and 100%/150% font scale in light/dark and English/Chinese. Record the offending element's `clientWidth`/`scrollWidth`, then verify a bounded local fix while exercising Work Panel tab-strip scrolling, Markdown table/code scrolling and panorama world panning. Select French through the real language setting and repeat Overview/aggregate progress at 320px and 150% in both themes with the default font and a `Verdana, sans-serif` stack. Measure the long panorama label and aggregate header; use native pointer input to collapse/reopen progress, refresh the Team snapshot and open both panorama entries. The added Verdana case reproduces the 333px-label, `314/319` aggregate overflow on macOS without installing fonts; the stack's fallback still runs when Verdana is unavailable.
+- **Expected**: No page-level horizontal scrollbar or displaced shell content; long content remains accessible in detail, and intentional local scroll/pan surfaces still work. The long progress link truncates while retaining its full accessible name and tooltip, its scaled 16px arrow, and a complete, clickable 24px disclosure within the progress row. The aggregate title truncates before its complete status badge, configured Team icon and two 28px action buttons can be displaced. Failure offender JSON and screenshots retain the failing scale before cleanup, and the French screenshots persist outside the temporary profile under `.artifacts/e2e/team/` for hosted upload.
+- **Automation**: `node scripts/e2e-team.mjs` runs the bilingual matrix and the real French progress regression; `node scripts/e2e-three-column-layout.mjs` covers the production shell. Record the tested commit, panel dimensions, font scale, theme, locale and offender evidence.
 
 ### E2E-STORAGE-plus-legacy-schema-reconciles-before-upstream-chain
 
@@ -17504,23 +17588,41 @@ current CAS revision. Legacy descriptions and reviews without presentation are r
   through successful recovery. Terminal failure and Stop retain their existing
   closure behavior. Covered by the parameterized runtime overflow user-path test.
 
+- Retry/compaction regression: recovery may start after compaction has already
+  removed the failed assistant. Parent and delegate continue the retained
+  summary, with and without a trailing system update, through the real Agent
+  loop. Each loop closes once; delegate lifecycle stays out of the parent
+  session lifecycle. `runtime-compacted-retry.test.ts` supplies the controlled
+  failure-state regression, with existing stream-retry user paths covering the
+  transient failure and recovered assistant bubble.
 
-#### E2E-262: Transcript path:line opens and scrolls the host file viewer
+- Empty-row persistence regression: drive real event persistence and restart
+  its outbox. Empty completed, failed and aborted assistants add no transcript
+  row; thinking, errors, steering reservations and Goal/Team tool lineage
+  remain durable. Empty failed replies still lock their matching approved
+  execution before terminal settlement. Covered by
+  `empty-assistant-persistence.test.mjs` and existing finalization suites.
+
+
+#### E2E-262: Positioned transcript references open and scroll the host file viewer
 
 - **Preconditions:** Isolated Electron/Chromium, an active workspace and session,
   the bundled file-manager view available, and deterministic filesystem IPC
   fixtures.
-- **Steps:** Render a real transcript `path:line:column` reference followed by
-  sentence punctuation; click its verified file chip and wait for the host file
-  viewer to load.
+- **Steps:** Click real user chips using `path:line:column`, `path:start-end`
+  and `path#Lstart-Lend`, including sentence punctuation. Repeat through
+  assistant bare references, explicit Markdown links, inline code and a path
+  containing spaces. Wait for each host file view to load.
 - **Expected:** Despite the bundled file-manager view being available, the
   positioned reference opens in the host's read-only file tab. The file request
-  retains its line and column, and the viewer scrolls the requested line into
+  retains its starting line and optional column, and the viewer scrolls that line into
   the visible center area. The path and file contents remain the same as the
-  reference target.
+  reference target. Every click opens once, including linkified inline code.
+  Host resolver tests retain exact-path priority and reject ambiguous complete
+  suffixes without guessing a shorter name or falling through to another root.
 - **Specs:** `04-ux/08` §11.8; ADR 0262.
 - **Status:** `node scripts/e2e-file-ref-line-scroll.mjs` mounts production
-  `LinkifiedText` and `FilesTab` in isolated Electron with filesystem IPC
+  `LinkifiedText`, `Markdown` and `FilesTab` in isolated Electron with filesystem IPC
   fixtures; no real project files or provider are used.
 
 ### Imported-extension GUI executable discovery regression (#1173)
@@ -17882,11 +17984,13 @@ The scheduled instruction editor keeps its original card and minimum height.
 
 `node scripts/e2e-todo-checklist.mjs` mounts the actual OverviewTab with real
 SQLite Host sessions and production API/store/checklist wiring. Verify empty
-state, default-expanded ordered tasks, disclosure collapse/reopen, live statuses,
-320px dark/light wrapping, cancelled count, stale revision rejection, session
-switch, backend restart and first-read recovery. The external model stream is
-deterministic and no real provider or user profile is accessed. Task rows scroll
-with Overview; the Composer has no Session checklist mounting or popup.
+state, default-expanded ordered tasks, disclosure collapse/reopen, live statuses
+(each row draws a state glyph and title; the status word is visually hidden text
+read from the DOM), 320px dark/light wrapping, cancelled count, stale revision
+rejection, session switch, backend restart and first-read recovery. The external
+model stream is deterministic and no real provider or user profile is accessed.
+Task rows scroll with Overview; the Composer has no Session checklist mounting or
+popup.
 
 ### Expert Team configuration and Overview reference alignment
 
@@ -17909,8 +18013,13 @@ with Overview; the Composer has no Session checklist mounting or popup.
   compare the actual candidate to the supplied reference.
   Overview layout also exercises long titles, project paths and model names at
   320/360/570px in both themes: metadata values retain positive visible width,
-  and header/resources/references introduce no horizontal overflow. Selected
-  reference options retain their existing pressed states and switching path.
+  and header/resources/references introduce no horizontal overflow. Titles clamp
+  to two lines with the full title in a tooltip; changed-file and attachment rows
+  stay on one line (file name, muted folder, a language glyph, and `+N`/`−N`
+  counts only when every recorded edit to that path has exact counts) with the full
+  path in the row tooltip. Reference tabs are underline tabs that keep their pressed
+  states and switching path. The changed-files heading links to the Review tab only
+  when that tab has entries.
 - node --test apps/desktop/test/settings-ipc-partial-write.test.mjs protects
   full committed Main network/menu/developer policy after partial writes and
   guarantees no side effects on rejected configuration. Host/runtime/component
@@ -18087,7 +18196,7 @@ prove account/region eligibility or call a real model.
 
 ### Composer metadata and compact agent rows
 
-The composer footer shows the current session's project, local/remote host, and known local Git branch. Unavailable project/branch metadata is omitted; remote sessions never borrow a local branch. Model menus list all models without a search field. Generation speed, full-turn token totals, cache metrics and context details are available from the bottom-right context meter. Subagent entries use transparent gradient-avatar rows with name, task, localized status and measured elapsed time; clicking a row opens read-only details, with no panorama entry. Validate model keyboard selection, footer metadata, context details and agent navigation in the isolated composer/transcript fixtures, including narrow layouts.
+The workspace strip above the input card shows the current session's project, local/remote host, and known local Git branch; during a run it folds to the branch. Unavailable project/branch metadata is omitted; remote sessions never borrow a local branch. A detached HEAD is named by its short commit (`Detached HEAD · abc1234`), and `No branch` appears only when neither a branch nor a commit is known. Model menus list all models without a search field. Generation speed, full-turn token totals, cache metrics and context details are available from the bottom-right context meter. Subagent entries use transparent gradient-avatar rows with name, task, localized status and measured elapsed time; clicking a row opens read-only details, with no panorama entry. Validate model keyboard selection, workspace metadata, context details and agent navigation in the isolated composer/transcript fixtures, including narrow layouts.
 
 ### E2E-COMPOSER-toolbar-footer
 
@@ -18104,7 +18213,7 @@ The composer footer shows the current session's project, local/remote host, and 
   button, with the existing anchored menu and plugin slot sides/order preserved.
   The Goal contract picker remains during planning and is hidden during Goal
   execution; Plan remains available. Send and Stop share a 32px rounded-square
-  footprint. The context meter visibly includes `chat.usageContextLabel`.
+  footprint. The context meter visibly names its figure with the direction label (`chat.usageContextUsedLabel` by default, `chat.usageContextRemainingLabel` when the display is Remaining).
   ScheduledEditor retains its existing picker placement and behavior. Narrow
   layouts keep controls within the Composer without overlap.
 - **Specs:** `04-ux/08-component-spec.md` §11.
@@ -18141,6 +18250,40 @@ keyboard selection, opaque surfaces and narrow footer geometry in the real rende
 RPC tests execute native Git against temporary repositories; renderer interaction
 fixtures mock only the external Host/session API edge and use the real store and
 components. They do not establish SSH server connectivity or a packaged release.
+
+### Approval-bound Goal verification requirements
+
+- **Preconditions:** Candidate-built Host/runtime with an isolated profile,
+  temporary workspace and deterministic provider/transport fixtures. No live
+  model, desktop profile or external task data.
+- **Path:** Approve a pending Goal through `pi_plans_resolve` with a frozen
+  `requiredVerificationCommands` list. Read the execution descriptor, restart
+  Host, and confirm the exact list survives. Submit a `met` report without
+  checks, then with a missing/duplicate/changed command, non-integer exit code
+  and contradictory result. Observe correction errors in the same execution;
+  execute harmless commands through the real Host tool/persistence boundary,
+  then submit complete passing checks with their durable result IDs and
+  finalize normally. Reject shell-name references, `tool_call` evidence,
+  missing/non-integer native exits and results belonging to another turn;
+  correct the evidence within the same running execution.
+- **Expected:** Invalid drafts leave no successful report. Complete checks
+  publish once and retain the approval/execution identity. The Agent receives
+  the original command list and can resubmit after a tool error without a new
+  approval or model execution. Non-met reports with real failures or explicit
+  not-run/blocked reasons remain supported. Ordinary Goals without the field
+  keep existing behavior. Replayed approval cannot omit/change the binding;
+  non-approve and Plan callers are rejected.
+- **Persistence:** Upgrade a populated P9 database behind the normal verified
+  backup, preserve old proposal/report data with NULL requirements, reopen P10
+  idempotently, and reject a newer unsupported track without mutation.
+- **Coverage:** `node scripts/e2e-required-verification.mjs`
+  (`E2E-GOAL-required-verification-001`, candidate Host selected through
+  `PI_DESKTOP_HOST_BIN`), Host required-verification lifecycle/migration tests, shared
+  MCP/IPC forwarding tests, execution-descriptor decoding and runtime
+  `SubmitGoalReport` tool-error tests. The external controller separately
+  exercises frozen-plan → runtime receipt → Plus request and the unsupported
+  schema gate before any model send. These isolated checks do not establish
+  live-provider behavior or production task recovery.
 
 ### Team Goal settlement and completion reasons
 
@@ -18793,3 +18936,58 @@ push or PR authorization.
 - **Status:** NOT RUN; implementation pending. Record candidate/base/source and
   artifact hashes, fixture safety, actual results and remaining UI/paid-model
   limitations. Synthetic provider behavior is not paid-model evidence.
+
+
+### E2E-SETTINGS-skills-workbench
+
+- Open Skills with no projects or skills. Creation and Market remain easy to
+  reach, empty scope groups are compact, and pi CLI discovery starts collapsed
+  without making a discovery request. Search shows no matches and clearing it
+  restores the scope groups. Project filtering disables New until a project is
+  available; the no-project action opens Projects.
+- With fixture projects and global/project skills, search, filter, create at
+  both target levels, edit a skill, toggle it, and cancel file/folder import.
+  Scope-specific import actions retain their targets and canceled imports leave
+  the list intact. Switching projects updates the project skill collection.
+- **Automation:** `node scripts/e2e-settings-scroll.mjs` mounts production
+  SettingsPage with strict, in-memory preload fixtures. No real skill files,
+  native pickers, marketplace, or model service are accessed. Discovery error,
+  cancellation, focus, and busy paths also run in
+  `node scripts/e2e-pi-skill-discovery-ui.mjs`.
+- **Visual acceptance:** Inspect Skills in light/dark themes at desktop and
+  narrow widths, with empty and populated data; actions remain reachable and
+  paths wrap or truncate without horizontal page overflow. A 560px regression
+  probe verifies readable skill names, visible controls, and working edit/toggle
+  actions using rendered geometry and pointer hit testing.
+
+
+### E2E-SETTINGS-all-page-workbench
+
+- Open every built-in category and a plugin theme destination in Chinese/light
+  and English/dark. At 560, 720, 800, 1120 and 1440 CSS pixels, and 200% zoom,
+  verify readable content, no horizontal page overflow, compact empties and
+  reachable primary actions. At <=720px use the category overlay: search, IME,
+  Escape clear then close, selected-row positioning and trigger focus return.
+  Escape must not run the shell's voice-cancel shortcut.
+- Edit preferences and retry a failed save. A successful write followed by a
+  failed refresh says saved; retry only reads. Release an old deferred refresh
+  after a newer failed save and verify it cannot overwrite the newer state.
+- In each management page complete a normal edit path; exercise read/empty/error
+  states, failed saves retaining drafts, and applicable project/source switches.
+  Keep memory recording immediate, content explicitly saved, Expert Team CAS
+  and inheritance intact, OAuth cancellation real at the mocked boundary, and
+  sync approvals digest-bound. Theme Apply and capability reload responses from
+  retired selections/lifetimes must not affect the current page.
+- **Automation:** `node scripts/e2e-settings-scroll.mjs` mounts the production
+  shell, CSS, store and translations with explicit in-memory preload handlers;
+  checks all destinations and model-editor geometry across the matrix. Dedicated
+  user paths run in `scripts/test-settings-preferences.mjs`,
+  `scripts/test-shortcut-settings.mjs`, `scripts/e2e-settings-models-usability.mjs`,
+  `scripts/e2e-agent-capabilities.mjs`, `scripts/e2e-settings-workspace.mjs` and
+  `scripts/e2e-settings-extensions.mjs`. Existing Storage, Project editor, Memory,
+  Expert Team and team-limit fixtures retain their boundary checks. Unknown IPC
+  fails rather than returning a generic success.
+- **Evidence boundary:** These fixtures use isolated profiles and in-memory
+  records; no real credentials, provider calls, user data or marketplace writes.
+  Browser inspection uses the same production components in a local preview.
+  This is renderer acceptance evidence, not live Host/service or release proof.

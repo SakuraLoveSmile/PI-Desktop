@@ -10,6 +10,7 @@ import {
 import { ComposerModelPicker } from "../chat/composer/ComposerModelPicker";
 import { useComposerModelMenu } from "../chat/composer/hooks/useComposerModelMenu";
 import { thinkingLevelForProvider, thinkingProviderForModel } from "../chat/composer/model";
+import { thinkingLevelLabel } from "../chat/composer/thinking-level-label";
 import type { ScheduledModelSelection } from "./ScheduledExecutionSettings";
 
 /** The same Composer view/controller, with a task-draft persistence callback. */
@@ -50,7 +51,7 @@ export function ScheduledModelPicker({ value, disabled, onChange }: {
       ? t("scheduled.unavailableModel", {provider: value.providerId, model: value.modelId})
       : t("settings.defaultModel");
   return <ComposerModelPicker t={t} controller={controller} modelLabel={label}
-    thinkingLabel={thinkingLevel} thinkingLevel={thinkingLevel}
+    thinkingLabel={thinkingLevelLabel(thinkingLevel, t)} thinkingLevel={thinkingLevel}
     selectedProviderId={value.providerId} selectedModelId={value.modelId}
     controlsBlocked={disabled} onCloseOtherMenus={() => {}}
     rootActions={value.providerId ? <button type="button" className="composer-plus-item"

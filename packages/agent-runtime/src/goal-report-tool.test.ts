@@ -7,6 +7,27 @@ import {
 } from "./goal-report-tool.js";
 
 describe("GoalReportDraftManager", () => {
+  it("corrects a Host required-check rejection within the same execution and preserves honest unrun results", async () => {
+    const saved: unknown[] = [];
+    const onDraftPersistenceFailure = vi.fn();
+    const manager = new GoalReportDraftManager({ sessionId: "session", executionId: "same-execution",
+      onDraftPersistenceFailure,
+      onDraftSubmitted: draft => {
+        if (!draft.checks?.length) throw Object.assign(new Error("required verification command cargo test is missing; resubmit checks"), { errorCode: "INVALID_ARGUMENT" });
+        saved.push(draft);
+      },
+    });
+    const tool = manager.buildTool();
+    expect((await tool.execute("first", { summary: "All passed", verdict: "met", checks: [] })).details)
+      .toMatchObject({ ok: false, error: expect.stringContaining("cargo test") });
+    expect(manager.isDraftValid()).toBe(false);
+    const corrected = { summary: "Toolchain unavailable", verdict: "blocked", checks: [{ id: "required",
+      command: "cargo test", result: "inconclusive", exitCode: null, disposition: "not_run", detail: "Toolchain missing" }] };
+    expect((await tool.execute("corrected", corrected)).details).toMatchObject({ ok: true });
+    expect(saved).toEqual([expect.objectContaining(corrected)]);
+    expect(manager.isDraftValid()).toBe(true);
+    expect(onDraftPersistenceFailure).not.toHaveBeenCalled();
+  });
   it("does not accept a first submission invalidated by steering while Host persistence is pending", async () => {
     let finishSubmission!: () => void;
     const gate = new Promise<void>((resolve) => { finishSubmission = resolve; });

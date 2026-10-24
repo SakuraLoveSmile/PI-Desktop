@@ -292,16 +292,19 @@ function persistAgentEvent(envelope: AgentEventEnvelope): UiMessage | undefined 
         inflightCheckpointer.settleIf(sessionId, finalId);
       });
     }
-    // Empty aborted bubbles are not useful transcript rows. Structured
-    // provider failures remain durable assistant messages so their details
-    // stay attached to the failed turn after reload.
-    const failed =
-      event.message.status === "error" || event.message.status === "aborted";
+    // Empty assistant bubbles are not useful transcript rows, whatever their
+    // status: an empty `complete` message would otherwise be persisted on every
+    // provider retry and grow the request body. Structured provider failures
+    // remain durable so their details stay attached to the failed turn after
+    // reload; a message that still carries a tool row keeps its link to it, and
+    // a steering reply is reserved by the user turn that accepted it.
     const empty =
       !(event.message.content || "").trim() &&
       !(event.message.thinking || "").trim();
+    const carriesTool =
+      Boolean(event.message.toolName) || Boolean(event.message.toolCallId);
     const reservedForSteering = steeringReplies.delete(event.message.id);
-    if (failed && empty && !event.message.error && !reservedForSteering) return;
+    if (empty && !carriesTool && !event.message.error && !reservedForSteering) return;
     void persistenceOutbox
       .enqueue(
         {

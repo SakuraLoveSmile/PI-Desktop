@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** Isolated real Host/Main/renderer acceptance; loopback provider only. */
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { createNativeHarness } from "./e2e/team-closeout-native.mjs";
+import { approveGoalAuto } from "./e2e/goal-approval-ui.mjs";
 import { assertDesktopBuild, repositoryRoot, resolveElectronBinary } from "./e2e/boot.mjs";
 import { Host, resolveHostBinary } from "./e2e/host.mjs";
 const unknown = process.argv.slice(2).filter((arg) => arg !== "--budget-only" && arg !== "--recovery-only");
@@ -21,14 +22,29 @@ const scriptHash = createHash("sha256")
 const candidateAtStart = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
 const baseMain = execFileSync("git", ["rev-parse", "origin/main"], { cwd: root, encoding: "utf8" }).trim();
 // Identify both committed product ancestry and the exact local candidate inputs.
-const baseProductCandidate = "26db5043860db8412a988cdce31362a424eea407";
+const originalBaseProductCandidate = "26db5043860db8412a988cdce31362a424eea407";
+// The public-history rewrite changed documentation, not these product inputs.
+// Preserve the immutable old baseline through its exact three product trees.
+const baseProductCandidate = "43a4725d64feb9aef33fc0889370d39417c2e712";
+const baseProductTrees = { apps: "dbea1acd04f80c949c6e3d518cfa306bdd93fe1c",
+  packages: "c8a5416bfb50d55e34a5131e72a4b4a9bb532041", crates: "6043d555ef889ff9d82d934fd1c9ab0e807a11ae" };
+for (const [path, tree] of Object.entries(baseProductTrees)) {
+  assert.equal(execFileSync("git", ["rev-parse", `${baseProductCandidate}:${path}`], { cwd: root, encoding: "utf8" }).trim(), tree,
+    `Rewritten baseline must retain the original ${path} tree`);
+}
+execFileSync("git", ["merge-base", "--is-ancestor", baseProductCandidate, baseMain], { cwd: root });
+execFileSync("git", ["merge-base", "--is-ancestor", baseMain, candidateAtStart], { cwd: root });
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
-const workspaceDiffSha256 = hash(execFileSync("git", ["diff", "--binary", "HEAD", "--"], { cwd: root }));
-const productSourceDiffSha256 = hash(
-  execFileSync("git", ["diff", "--binary", baseProductCandidate, "--", "apps", "packages", "crates"], {
-    cwd: root,
-  }),
-);
+async function hashGitDiff(args) {
+  const digest = createHash("sha256");
+  const child = spawn("git", ["diff", "--binary", ...args], { cwd: root, stdio: ["ignore", "pipe", "inherit"] });
+  child.stdout.on("data", chunk => digest.update(chunk));
+  const code = await new Promise((yes, no) => { child.once("error", no); child.once("close", yes); });
+  assert.equal(code, 0, "Candidate diff must be complete before hashing");
+  return digest.digest("hex");
+}
+const workspaceDiffSha256 = await hashGitDiff(["HEAD", "--"]);
+const productSourceDiffSha256 = await hashGitDiff([baseProductCandidate, "--", "apps", "packages", "crates"]);
 const untrackedSourceHashes = Object.fromEntries(
   execFileSync("git", ["ls-files", "--others", "--exclude-standard", "-z"], { cwd: root, encoding: "utf8" })
     .split("\0")
@@ -40,6 +56,8 @@ const candidateIdentity = {
   head: candidateAtStart,
   baseMain,
   baseProductCandidate,
+  originalBaseProductCandidate,
+  baseProductTrees,
   workspaceDiffSha256,
   productSourceDiffSha256,
   untrackedSourceHashes,
@@ -88,10 +106,32 @@ async function selectSession(id) {
     await window.__PI_DESKTOP__.selectSession(id);
   }, id);
   await native.renderer.until(
-    () => Boolean(document.querySelector(".composer-input")),
-    null,
-    "selected session composer",
+    (id) => Boolean(
+      // Empty sessions use the welcome composer before a transcript pane exists.
+      (document.querySelector(`.session-pane[data-session-pane="${CSS.escape(id)}"][data-visible="true"]`) ||
+        document.querySelector(`[data-sidebar-session-row="${CSS.escape(id)}"].active`)) &&
+      document.querySelector(".composer-input"),
+    ),
+    id,
+    "selected target session and composer",
   );
+}
+async function reloadSession(id, label) {
+  const previous = await native.renderer.run(() => ({ timeOrigin: performance.timeOrigin, url: location.href }));
+  await native.cdp.call("Page.reload");
+  // Page.reload acknowledges the request before navigation completes. An old
+  // document's installed control surface must not satisfy the readiness check.
+  const current = await until(() => native.renderer.run((previous) => {
+    if (
+      performance.timeOrigin === previous.timeOrigin || location.href !== previous.url ||
+      document.readyState !== "complete" || !window.__PI_DESKTOP__ || !window.piDesktop ||
+      !document.querySelector(".app-shell") ||
+      document.querySelector(".app-shell.app-shell-boot, .app-shell.is-booting, .startup-splash")
+    ) return false;
+    return { timeOrigin: performance.timeOrigin, url: location.href };
+  }, previous), `${label} new document ready`, 15000);
+  await selectSession(id);
+  check(`${label} selected in a new renderer document`, { sessionId: id, previous, current });
 }
 async function submit(content) {
   await native.renderer.click('.composer-input[contenteditable="true"]');
@@ -349,26 +389,15 @@ try {
         permissionMode: "auto",
       })
     ).session;
-    await native.cdp.call("Page.reload");
-    await native.renderer.until(
-      () => Boolean(window.__PI_DESKTOP__ && !document.querySelector(".startup-splash")),
-      null,
-      "created Goal loaded",
-    );
-    await selectSession(goal.id);
+    await reloadSession(goal.id, "created Goal");
     await submit("CLOSEOUT_PENDING_GOAL: ask a bounded recovery question.");
-    await native.renderer.until(
-      () => Boolean(document.querySelector(".plan-approval-approve-menu")),
-      null,
-      "Goal approval",
-    );
-    await native.renderer.click(".plan-approval-approve-menu");
-    await native.renderer.until(
-      () => Boolean(document.querySelector('[data-approval-mode="auto"]')),
-      null,
-      "approval auto",
-    );
-    await native.renderer.click('[data-approval-mode="auto"]');
+    await approveGoalAuto({
+      sessionId: goal.id,
+      label: "Goal",
+      run: native.renderer.run,
+      waitFor: (fn, arg, label) => native.renderer.until(fn, arg, label),
+      click: selector => native.renderer.click(selector),
+    });
     await native.renderer.until(
       () => document.querySelector(".asktool-card")?.innerText.includes("CLOSEOUT durable question"),
       null,
@@ -462,9 +491,7 @@ try {
     const reports = (await ipc("goalReportList", { sessionId: goal.id })).reports;
     assert.equal(reports[0].executionStatus, "interrupted");
     assert.equal(reports[0].status, "pending");
-    await native.cdp.call("Page.reload");
-    await native.renderer.until(() => Boolean(window.__PI_DESKTOP__), null, "reload ready");
-    await selectSession(goal.id);
+    await reloadSession(goal.id, "pending Goal reload");
     await native.renderer.until(
       () => Boolean(document.querySelector(".asktool-card .badge")),
       null,
@@ -564,6 +591,30 @@ try {
 } catch (error) {
   failure = error;
   console.error(error.stack);
+  try {
+    const renderer = await native.renderer.run(() => ({
+      timeOrigin: performance.timeOrigin,
+      url: location.href,
+      readyState: document.readyState,
+      controlInstalled: Boolean(window.__PI_DESKTOP__),
+      shell: document.querySelector(".app-shell")?.className,
+      splash: Boolean(document.querySelector(".startup-splash")),
+      visiblePanes: [...document.querySelectorAll('.session-pane[data-visible="true"]')]
+        .map(node => node.getAttribute("data-session-pane")),
+      activeRows: [...document.querySelectorAll("[data-sidebar-session-row].active")]
+        .map(node => node.getAttribute("data-sidebar-session-row")),
+      askCards: [...document.querySelectorAll(".asktool-card")].map(node => node.innerText),
+    }));
+    // Capture the unmodified renderer before reading durable state; do not
+    // refresh inputs or reselect a session to make a failed recovery pass.
+    writeFileSync(join(runRoot, "failure-navigation.json"), JSON.stringify({
+      renderer,
+      durableAsks: readDb("SELECT key, json_extract(value_json,'$.status') AS status FROM kv WHERE ns='team-lead-ask-v1'"),
+    }, null, 2));
+    await screenshot("failure-navigation");
+  } catch (diagnosticError) {
+    console.error(`Failure navigation diagnostics: ${diagnosticError.stack}`);
+  }
 } finally {
   try {
     await stop();
@@ -618,13 +669,7 @@ async function budgetJourney() {
     { id: lead.id, providerId: provider.id },
   );
   assert.equal(configured.ok, true, JSON.stringify(configured));
-  await native.cdp.call("Page.reload");
-  await native.renderer.until(
-    () => Boolean(window.__PI_DESKTOP__ && !document.querySelector(".startup-splash")),
-    null,
-    "budget session loaded",
-  );
-  await selectSession(lead.id);
+  await reloadSession(lead.id, "budget session");
   await native.renderer.run(() => {
     window.__closeoutEvents = [];
     window.piDesktop.on(window.piDesktop.channels.event.agentMessage, (event) =>
@@ -643,16 +688,37 @@ async function budgetJourney() {
   check("WP8 native settings persist through real Host CAS", { policy: settings.expertTeam.runLimits });
   await selectSession(lead.id);
   await openTeamPanel();
-  await native.renderer.until(
-    () => Boolean(document.querySelector('[data-testid="team-launch-review-confirm-btn"]:not(:disabled)')),
+  const launchControl = await native.renderer.until(
+    async () => {
+      const button = document.querySelector('[data-testid="team-launch-review-confirm-btn"]:not(:disabled)');
+      const panel = button?.closest(".work-panel");
+      if (!button || !panel || panel.getAnimations().some(animation => animation.pending || animation.playState === "running")) return false;
+      button.scrollIntoView({ block: "nearest" });
+      // The panel animates its flex-basis without an `is-entering` class.
+      // Observe painted geometry after scroll before the single trusted click.
+      await new Promise(requestAnimationFrame);
+      const before = button.getBoundingClientRect();
+      await new Promise(requestAnimationFrame);
+      const after = button.getBoundingClientRect();
+      if (["x", "y", "width", "height"].some(key => Math.abs(before[key] - after[key]) > 0.5)) return false;
+      const x = after.x + after.width / 2, y = after.y + after.height / 2;
+      if (!button.contains(document.elementFromPoint(x, y))) return false;
+      return { x, y, width: after.width, height: after.height };
+    },
     null,
     "budget roster confirm",
   );
+  check("WP8 launch control is painted and stable before native confirmation", { launchControl });
   await native.renderer.click('[data-testid="team-launch-review-confirm-btn"]');
   const expert = await until(async () => {
     const members = (await ipc("teamGetRoster", { teamSessionId: lead.id })).members;
     return members.find((m) => m.name === "observer");
-  }, "confirmed expert");
+  }, "confirmed expert").catch(async (error) => {
+    await screenshot("budget-confirm-failed");
+    const review = await ipc("teamGetLaunchReview", { teamSessionId: lead.id });
+    const surface = await native.renderer.run(() => document.querySelector('[data-testid="team-panel"]')?.innerText);
+    throw new Error(`${error.message}; review=${JSON.stringify(review)}; surface=${surface}`, { cause: error });
+  });
   const expertId = expert.sessionId ?? expert.memberSessionId;
   await native.renderer.until(
     (id) =>
@@ -912,7 +978,7 @@ async function policyViaUi(enabled, soft, hard) {
     (s) =>
       document
         .querySelector(s)
-        .closest(".expert-team-role-editor")
+        .closest(".settings-card-block")
         .querySelector(".expert-team-editor-actions button")
         .setAttribute("data-closeout-save", ""),
     save,

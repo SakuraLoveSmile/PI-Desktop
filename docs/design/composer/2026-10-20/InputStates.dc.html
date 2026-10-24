@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Composer input states</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="--ground:#181818;--strip:#262628;--card:#212121f5;--line:rgba(255,255,255,0.05);--hair:rgba(255,255,255,0.08);--text:#ffffff;--secondary:rgba(255,255,255,0.7);--muted:rgba(255,255,255,0.52);--placeholder:rgba(255,255,255,0.42);--hover:rgba(255,255,255,0.06);--warn:#ff8549;--send-bg:rgba(255,255,255,0.18);--send-fg:rgba(24,24,24,0.7);width:960px;height:540px;box-sizing:border-box;position:relative;background:var(--ground);color:var(--text);font-family:'PingFang SC','Hiragino Sans GB','Noto Sans CJK SC',system-ui,sans-serif">
+  <div style="position:absolute;left:24px;top:16px;right:24px;font-size:12px;line-height:18px;color:var(--muted)">输入卡状态（深色）· 聚焦与拖入的规则存在，但两个主题的 .composer-shell 规则覆盖了它们（0,3,0 胜过 0,2,0）<br>锁定为提议；外框与顶部条的接缝待定。以下为代码阅读结果，未渲染验证。</div>
+  <div style="position:absolute;left:24px;right:24px;top:64px;bottom:20px;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(2,1fr);gap:16px">
+    <section style="display:flex;flex-direction:column;gap:10px;min-width:0;padding:12px 14px;box-sizing:border-box;border-radius:16px;border:1px solid var(--line)">
+      <div style="font-size:12px;line-height:16px;color:var(--secondary)">聚焦（:focus-within）· 设计意图</div>
+      <div style="display:flex;flex-direction:column;gap:12px;padding:10px 14px;box-sizing:border-box;border-radius:16px;border:1px solid var(--hair);background:var(--card);box-shadow:0 7px 24px rgba(255,255,255,0.09)">
+        <div style="font-size:14px;line-height:20px;color:var(--placeholder)">发消息或创建任务，/ 调用指令，@ 文件或对话</div>
+        <div style="display:flex;justify-content:flex-end"><span style="display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:var(--send-bg);color:var(--send-fg)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5.5 11.5L12 5l6.5 6.5"/></svg></span></div>
+      </div>
+      <div style="font-size:11px;line-height:16px;color:var(--muted)">两个主题的 .composer-shell 规则都设置了 border 与 box-shadow，特异性更高，焦点样式不生效。</div>
+    </section>
+    <section style="display:flex;flex-direction:column;gap:10px;min-width:0;padding:12px 14px;box-sizing:border-box;border-radius:16px;border:1px solid var(--line)">
+      <div style="font-size:12px;line-height:16px;color:var(--secondary)">拖入（.is-drop-target）· 文件夹行为现有</div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px;line-height:16px;color:var(--secondary);white-space:nowrap">
+        <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        <span>已拖入文件夹</span>
+        <button type="button" style="height:24px;padding:0 8px;border:0;border-radius:10px;background:transparent;color:var(--text);font:inherit;font-size:12px">作为项目打开</button>
+        <button type="button" style="height:24px;padding:0 8px;border:0;border-radius:10px;background:transparent;color:var(--secondary);font:inherit;font-size:12px">仅引用路径</button>
+        <span style="margin-left:auto;display:grid;place-items:center;width:24px;height:24px;color:var(--muted)"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg></span>
+      </div>
+      <div style="margin:0 14px -6px;height:14px;border-radius:12px 12px 0 0;background:var(--strip)"></div>
+      <div style="padding:10px 14px;box-sizing:border-box;border-radius:16px;border:1px solid var(--line);background:var(--card);outline:2px solid rgba(255,255,255,0.72);outline-offset:3px">
+        <div style="font-size:14px;line-height:20px;color:var(--placeholder)">发消息或创建任务，/ 调用指令，@ 文件或对话</div>
+      </div>
+      <div style="font-size:11px;line-height:16px;color:var(--muted)">外框意图：只提示目标、不改变卡片尺寸。被覆盖的原因同上。待定：外框是否包住顶部条。</div>
+    </section>
+    <section style="display:flex;flex-direction:column;gap:10px;min-width:0;padding:12px 14px;box-sizing:border-box;border-radius:16px;border:1px solid var(--line)">
+      <div style="font-size:12px;line-height:16px;color:var(--secondary)">锁定（.is-gated）· 上为现状，下为提议</div>
+      <div style="display:flex;flex-direction:column;gap:6px;padding:6px 12px;box-sizing:border-box;border-radius:16px;border:1px solid var(--line);background:var(--card)">
+        <div style="font-size:13px;line-height:18px;color:var(--placeholder)">发消息或创建任务，/ 调用指令，@ 文件或对话</div>
+        <div style="display:flex;justify-content:flex-end"><span style="display:grid;place-items:center;width:24px;height:24px;border-radius:8px;background:var(--send-bg);color:var(--send-fg);opacity:0.4"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5.5 11.5L12 5l6.5 6.5"/></svg></span></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;padding:6px 12px;box-sizing:border-box;border-radius:16px;border:1px solid var(--line);background:var(--card)">
+        <div style="font-size:13px;line-height:18px;color:var(--secondary)">此会话为只读，不能在此发送</div>
+        <div style="display:flex;justify-content:flex-end"><span style="display:grid;place-items:center;width:24px;height:24px;border-radius:8px;background:var(--send-bg);color:var(--send-fg);opacity:0.4"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5.5 11.5L12 5l6.5 6.5"/></svg></span></div>
+      </div>
+      <div style="font-size:11px;line-height:16px;color:var(--muted)">三种原因：粘贴中；原生会话只读；原生会话运行中。下方占位文案为提议，i18n 中尚无。</div>
+    </section>
+    <section style="display:flex;flex-direction:column;gap:10px;min-width:0;padding:12px 14px;box-sizing:border-box;border-radius:16px;border:1px solid var(--line)">
+      <div style="font-size:12px;line-height:16px;color:var(--secondary)">目标续跑芯片（现有 BlockedGoalResumeChip）</div>
+      <div style="display:flex;align-items:center;gap:8px;white-space:nowrap">
+        <span style="display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:999px;background:rgba(255,133,73,0.14);color:var(--warn);font-size:12px">发送将继续目标 修复 CI</span>
+        <button type="button" style="height:24px;padding:0 8px;border:0;border-radius:10px;background:transparent;color:var(--secondary);font:inherit;font-size:12px">改为普通消息</button>
+      </div>
+      <div style="padding:10px 14px;box-sizing:border-box;border-radius:16px;border:1px solid var(--line);background:var(--card)">
+        <div style="font-size:14px;line-height:20px;color:var(--placeholder)">发消息或创建任务，/ 调用指令，@ 文件或对话</div>
+      </div>
+      <div style="font-size:11px;line-height:16px;color:var(--muted)">芯片位于输入卡上方；与队列、顶部条的堆叠顺序待定。Badge 颜色为近似值。</div>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":540}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

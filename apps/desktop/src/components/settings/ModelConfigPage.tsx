@@ -22,6 +22,7 @@ import { useAppStore } from "../../stores/app-store";
 import { api } from "../../lib/api";
 import { providerDisplayName, providerSearchText } from "../../lib/provider-display";
 import { Button, Input, cx } from "../ui";
+import { SettingsEmptyState, SettingsWorkbenchHeader } from "../../features/settings/primitives";
 import {
   IconCheck,
   IconChevronDown,
@@ -120,6 +121,8 @@ export function ModelConfigPage() {
     login,
     busyAccountId,
     savingAccount,
+    accountSaveError,
+    clearAccountSaveError,
     startLogin,
     finishLogin,
     closeLogin,
@@ -175,6 +178,14 @@ export function ModelConfigPage() {
     );
 
 
+  const refreshAfterWrite = async () => {
+    try {
+      await refreshProviders();
+    } catch (error) {
+      showToast(t("settings.modelSavedRefreshFailed", { error: error instanceof Error ? error.message : String(error) }), { variant: "error" });
+    }
+  };
+
   const setDefaultModel = async (provider: ProviderPublic, modelId: string) => {
     if (isImageCandidate(
       imageCandidates(
@@ -186,12 +197,10 @@ export function ModelConfigPage() {
     )) return;
     setBusyId(provider.id);
     try {
-      await api.setSettings({
-        ...settings,
-        defaultProviderId: provider.id,
-        defaultModelId: modelId,
-      });
-      await refreshProviders();
+      const nextSettings = { ...settings, defaultProviderId: provider.id, defaultModelId: modelId };
+      await api.setSettings(nextSettings);
+      useAppStore.setState({ settings: nextSettings });
+      await refreshAfterWrite();
       showToast(t("settings.defaultUpdated"), { variant: "success" });
     } catch (error) {
       showToast(error instanceof Error ? error.message : String(error), {
@@ -274,9 +283,9 @@ export function ModelConfigPage() {
       }
       setSetupFor(null);
       setCopyDraft(null);
-      await refreshProviders();
+      await refreshAfterWrite();
     } catch (error) {
-      showToast(error instanceof Error ? error.message : String(error), {
+      showToast(t("settings.modelSavedFollowupFailed", { error: error instanceof Error ? error.message : String(error) }), {
         variant: "error",
       });
     }
@@ -308,7 +317,7 @@ export function ModelConfigPage() {
     setBusyId(provider.id);
     try {
       await api.updateProvider({ id: provider.id, enabled: !provider.enabled });
-      await refreshProviders();
+      await refreshAfterWrite();
       showToast(
         t(provider.enabled ? "settings.providerDisabled" : "settings.providerEnabled"),
         { variant: "success" },
@@ -326,7 +335,7 @@ export function ModelConfigPage() {
     setBusyId(provider.id);
     try {
       await api.deleteProvider(provider.id);
-      await refreshProviders();
+      await refreshAfterWrite();
       showToast(t("settings.providerRemoved"), { variant: "success" });
     } catch (error) {
       showToast(error instanceof Error ? error.message : String(error), {
@@ -342,7 +351,7 @@ export function ModelConfigPage() {
     setBusyId(provider.id);
     try {
       await api.setProviderSecret({ id: provider.id, secretValue: value });
-      await refreshProviders();
+      await refreshAfterWrite();
       showToast(
         t(value.trim() ? "settings.pluginProviderKeySaved" : "settings.pluginProviderKeyRemoved"),
         { variant: "success" },
@@ -395,7 +404,7 @@ export function ModelConfigPage() {
     try {
       const result = await api.refreshModelCatalog();
       setCatalogStatus(result.status);
-      await refreshProviders();
+      await refreshAfterWrite();
       if (result.refreshed) {
         showToast(t("settings.modelCatalogUpdated"), { variant: "success" });
       } else {
@@ -424,6 +433,13 @@ export function ModelConfigPage() {
 
   return (
     <div className="settings-stack model-config-page">
+      <SettingsWorkbenchHeader
+        description={t("settings.modelsWorkbenchHint")}
+        actions={<Button variant="primary" className="model-provider-add" onClick={() => setSetupFor("")}>
+          <IconPlus size={14} aria-hidden />
+          {t("settings.addProvider")}
+        </Button>}
+      />
       <section className="settings-card-block">
         <div className="model-config-section-head">
           <h3 className="settings-card-heading">{t("settings.defaultsTitle")}</h3>
@@ -480,16 +496,19 @@ export function ModelConfigPage() {
                   ref={ref}
                   className="settings-text-action model-default-trigger"
                   variant="ghost"
-                  disabled={readyProviders.length === 0}
                   onClick={() => {
+                    if (readyProviders.length === 0) {
+                      setSetupFor("");
+                      return;
+                    }
                     setDefaultModelQuery("");
                     setPickingDefault((current) => !current);
                   }}
-                  aria-haspopup="listbox"
-                  aria-expanded={pickingDefault}
+                  aria-haspopup={readyProviders.length === 0 ? "dialog" : "listbox"}
+                  aria-expanded={readyProviders.length === 0 ? setupFor !== null : pickingDefault}
                 >
-                  {t("settings.changeDefaultModel")}
-                  <IconChevronDown className="model-default-trigger-chevron" size={13} aria-hidden />
+                  {t(readyProviders.length === 0 ? "settings.configureServices" : "settings.changeDefaultModel")}
+                  {readyProviders.length > 0 ? <IconChevronDown className="model-default-trigger-chevron" size={13} aria-hidden /> : null}
                 </Button>
               )}
             >
@@ -566,35 +585,15 @@ export function ModelConfigPage() {
               <span className="provider-section-count">{providers.length}</span>
             ) : null}
           </div>
-          <div className="provider-section-head-actions">
-            <Button
-              variant="primary"
-              className="model-provider-add"
-              onClick={() => setSetupFor("")}
-            >
-              <span className="model-config-btn-inner">
-                <IconPlus size={14} />
-                <span>{t("settings.addProvider")}</span>
-              </span>
-            </Button>
-          </div>
         </div>
 
         <div className="settings-panel model-provider-panel">
           {providers.length === 0 ? (
-            <div className="model-provider-empty">
-              <div className="model-provider-empty-icon" aria-hidden>
-                <IconServer size={18} />
-              </div>
-              <div className="model-provider-empty-title">{t("settings.noProviders")}</div>
-              <div className="model-provider-empty-desc">{t("settings.noProvidersDesc")}</div>
-              <Button variant="primary" onClick={() => setSetupFor("")}>
-                <span className="model-config-btn-inner">
-                  <IconPlus size={14} />
-                  <span>{t("settings.addProvider")}</span>
-                </span>
-              </Button>
-            </div>
+            <SettingsEmptyState
+              icon={<IconServer size={18} />}
+              message={t("settings.noProviders")}
+              hint={t("settings.noProvidersDesc")}
+            />
           ) : (
             <ServiceList
               providers={providers}
@@ -612,11 +611,12 @@ export function ModelConfigPage() {
               }
               isRowBusy={(id) => busyId === id || testingId === id || busyAccountId === id}
               testingId={testingId}
-              onEdit={(provider) =>
-                serviceRowKind(provider) === "account"
-                  ? setEditingAccountId(provider.id)
-                  : setSetupFor(provider.id)
-              }
+              onEdit={(provider) => {
+                if (serviceRowKind(provider) === "account") {
+                  clearAccountSaveError();
+                  setEditingAccountId(provider.id);
+                } else setSetupFor(provider.id);
+              }}
               onMakeDefault={(provider) =>
                 void setDefaultModel(
                   provider,
@@ -707,6 +707,7 @@ export function ModelConfigPage() {
             editingAccount.name
           }
           saving={savingAccount}
+          error={accountSaveError}
           onClose={() => setEditingAccountId(null)}
           onSave={(form) => void saveEditingAccount(editingAccount, form)}
         />

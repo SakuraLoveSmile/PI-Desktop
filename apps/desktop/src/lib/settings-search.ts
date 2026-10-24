@@ -1,7 +1,7 @@
 /**
  * Data-only index of the settings IA, shared by the settings page nav and
- * the global search dialog. Keyword keys are the i18n keys of the rows
- * rendered inside each tab; search matches their translations, so a query
+ * the global search dialog. Keyword keys include translated row titles,
+ * options, and help copy; search matches their translations, so a query
  * like "主题" or "theme" can surface the tab that owns the row.
  */
 
@@ -46,6 +46,8 @@ export type SettingsNavEntry = {
   group: SettingsNavGroupId;
   /** i18n keys of the rows inside the tab; search matches their translations. */
   keywordKeys: string[];
+  /** Visible row/card titles and the option/help keywords owned by each one. */
+  searchTargets?: Record<string, readonly string[]>;
   /**
    * Destination only exists while `AppSettings.developerMode` is on; the
    * rail, the page, and settings search drop it together.
@@ -93,6 +95,22 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.preventScreenSleep",
       "settings.preventScreenSleepDesc",
     ],
+    searchTargets: {
+      "settings.appearance": [],
+      "settings.storage.title": ["settings.storage.backup"],
+      "settings.storage.dataPath": [],
+      "settings.storage.cache": ["settings.storage.clearCache"],
+      "settings.theme": [],
+      "settings.language": ["settings.languageAuto"],
+      "settings.font": [],
+      "settings.fontSize": [],
+      "settings.power": [],
+      "settings.keepAwakeWhileRunning": ["settings.keepAwakeWhileRunningDesc"],
+      "settings.network": [],
+      "settings.proxy": ["settings.proxySystem", "settings.proxyDirect", "settings.proxyCustom", "settings.proxyUrl"],
+      "settings.networkRelaxedMode": ["settings.networkRelaxedModeDesc", "settings.networkRelaxedModeStrictDesc"],
+      "settings.preventScreenSleep": ["settings.preventScreenSleepDesc"],
+    },
   },
   {
     id: "ai",
@@ -106,7 +124,8 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.permissionModeAcceptEdits",
       "settings.permissionModeAuto",
       "settings.defaultsTitle",
-      "settings.imageModel",
+      "settings.executionDefaults",
+      "settings.conversationDisplay",
       "settings.mode",
       "settings.commandShell",
       "settings.linkOpenTarget",
@@ -134,6 +153,24 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.advisorModel",
       "settings.largePasteThreshold",
     ],
+    searchTargets: {
+      "settings.permissions": [],
+      "settings.permissionMode": ["settings.permissionModeAsk", "settings.permissionModeAcceptEdits", "settings.permissionModeAuto"],
+      "settings.executionDefaults": ["settings.defaultsTitle"],
+      "settings.conversationDisplay": [],
+      "settings.mode": [],
+      "settings.commandShell": [],
+      "settings.linkOpenTarget": [],
+      "settings.enterToSend": [],
+      "settings.infiniteProviderRetry": ["settings.infiniteProviderRetryDesc"],
+      "settings.smoothStreaming": ["settings.smoothStreamingDesc"],
+      "settings.thinkingDisplayMode": ["settings.thinkingDisplayDetailed", "settings.thinkingDisplayCompact"],
+      "settings.contextUsageDisplay": ["settings.contextUsageDisplayRemaining", "settings.contextUsageDisplayUsed"],
+      "settings.promptEnhancementTitle": ["settings.promptEnhancementDesc", "settings.promptEnhancementModelTitle", "settings.promptEnhancementThinking"],
+      "settings.promptEnhancementCustomTemplate": ["settings.promptEnhancementEdit", "settings.promptEnhancementUserTemplate"],
+      "settings.promptEnhancementModel": ["settings.promptEnhancementModelFollow"],
+      "settings.largePasteThreshold": [],
+    },
   },
   {
     id: "voice",
@@ -151,6 +188,14 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "liveVoice.adapters.gemini-live.title",
       "liveVoice.adapters.openai-realtime.title",
     ],
+    searchTargets: {
+      "liveVoice.title": ["liveVoice.description", "liveVoice.model", "liveVoice.voice"],
+      "liveVoice.enable": [],
+      "liveVoice.provider": [],
+      "liveVoice.adapters.codex-live.title": [],
+      "liveVoice.adapters.gemini-live.title": [],
+      "liveVoice.adapters.openai-realtime.title": [],
+    },
   },
   {
     id: "shortcuts",
@@ -164,6 +209,9 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.shortcutAction.toggleSidebar",
       "settings.shortcutAction.openWorkPanel",
     ],
+    searchTargets: {
+      "settings.keyboard": ["settings.shortcutAction.openSearch", "settings.shortcutAction.openCommandPalette", "settings.shortcutAction.toggleSidebar", "settings.shortcutAction.openWorkPanel"],
+    },
   },
   {
     id: "instructions",
@@ -174,6 +222,7 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.instructionsGlobal",
       "settings.instructionsPath",
     ],
+    searchTargets: { "settings.instructionsGlobal": ["settings.instructionsPath"] },
   },
   {
     id: "agent",
@@ -184,6 +233,7 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.providers",
       "settings.models",
       "settings.defaultModel",
+      "settings.imageModel",
       "settings.apiKey",
       "settings.baseUrl",
       "settings.apiStyle",
@@ -191,6 +241,11 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.vendorAccounts",
       "settings.vendorSubscription",
     ],
+    searchTargets: {
+      "settings.defaultModel": [],
+      "settings.defaultsTitle": ["settings.imageModel"],
+      "settings.providers": ["settings.models", "settings.apiKey", "settings.baseUrl", "settings.apiStyle", "settings.vendorAccounts", "settings.vendorSubscription"],
+    },
   },
   {
     id: "skills",
@@ -307,6 +362,9 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "project.memoryAdd",
       "project.memoryRemove",
     ],
+    searchTargets: {
+      "settings.memory.projectsTitle": ["project.autoMemoryToggle", "project.memoryAdd", "project.memoryRemove"],
+    },
   },
   {
     id: "sync",
@@ -324,6 +382,9 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.configSync.approvalsTitle",
       "settings.configSync.syncNow",
     ],
+    searchTargets: {
+      "settings.configSync.connectionTitle": ["settings.configSync.endpoint"],
+    },
   },
   {
     id: "remoteHosts",
@@ -348,6 +409,9 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.remoteHosts.statusOffline",
       "settings.remoteHosts.experimental",
     ],
+    searchTargets: {
+      "settings.remoteHosts.addTitle": ["settings.remoteHosts.addSsh", "settings.remoteHosts.addPair", "settings.remoteHosts.pair", "settings.remoteHosts.fieldUrl", "settings.remoteHosts.fieldPairingToken", "settings.remoteHosts.sshHost", "settings.remoteHosts.sshAuthMode", "settings.remoteHosts.sshPassword"],
+    },
   },
   {
     id: "about",
@@ -364,6 +428,16 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.developerMode",
       "settings.devTools",
     ],
+    searchTargets: {
+      "settings.application": [],
+      "settings.logs": [],
+      "settings.feedback": [],
+      "updates.title": [],
+      "updates.preferenceTitle": [],
+      "settings.developer": [],
+      "settings.developerMode": [],
+      "settings.devTools": [],
+    },
   },
 ];
 
@@ -396,7 +470,7 @@ export function isSettingsDestinationHidden(
 export type SettingsSearchHit = {
   tab: SettingsTabId;
   tabLabelKey: string;
-  /** Matched row key; null when the tab label itself matched. */
+  /** Visible row/card title; null for a category match or a dynamic target. */
   rowKey: string | null;
 };
 
@@ -421,13 +495,21 @@ export function searchSettings(
   if (!q) return [];
   const hits: SettingsSearchHit[] = [];
   for (const entry of visibleSettingsNav(developerMode, includeDevelopmentOnly)) {
-    if (t(entry.labelKey).toLowerCase().includes(q)) {
-      hits.push({ tab: entry.id, tabLabelKey: entry.labelKey, rowKey: null });
-    }
+    const categoryLabels = [t(entry.labelKey), t(entry.titleKey)].map((label) => label.trim().toLowerCase());
+    const targets = new Set<string | null>();
+    if (categoryLabels.some((label) => label.includes(q))) targets.add(null);
     for (const key of entry.keywordKeys) {
       if (t(key).toLowerCase().includes(q)) {
-        hits.push({ tab: entry.id, tabLabelKey: entry.labelKey, rowKey: key });
+        // Dialog fields, option names, and help copy are searchable, but they
+        // are not scroll anchors. Only known visible titles can be targets.
+        const rowKey = Object.entries(entry.searchTargets ?? {}).find(
+          ([title, aliases]) => title === key || aliases.includes(key),
+        )?.[0] ?? null;
+        targets.add(rowKey && !categoryLabels.includes(t(rowKey).trim().toLowerCase()) ? rowKey : null);
       }
+    }
+    for (const rowKey of targets) {
+      hits.push({ tab: entry.id, tabLabelKey: entry.labelKey, rowKey });
     }
   }
   return hits.slice(0, limit);

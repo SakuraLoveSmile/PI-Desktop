@@ -24,7 +24,7 @@ const { tr } = await import("../../../packages/i18n/src/locales/tr/index.ts");
 /**
  * The Agent > MCP page owns one block that is not an installed server: the
  * desktop's own loopback control endpoint (ADR 0203). These contracts keep it a
- * machine setting — one strip with one switch above the level groups — instead of
+ * machine setting — one independent strip with one switch — instead of
  * a row that can be filtered, moved, renamed, deleted, or OAuth-authorized.
  */
 const catalogs = { en, "zh-CN": zhCN, "zh-TW": zhTW, de, es, fr, ko, "pt-BR": ptBR, tr };
@@ -46,23 +46,7 @@ const controlBlock = () => blockBetween("const renderControlEndpoint", "const sh
 const controlToggle = () => blockBetween("const toggleControl = async", "const [filter, setFilter");
 const client = () => api.slice(api.indexOf("mcpControlGet:"), api.indexOf("// --- Skill market"));
 
-test("the endpoint is one strip inside the single panel, above the level groups", () => {
-  assert.equal(mcp.match(/<CapabilityToolbar/g)?.length, 1);
-  assert.equal(mcp.match(/<CapabilityPanel/g)?.length, 1);
-  const panel = mcp.indexOf("<CapabilityPanel");
-  const rendered = mcp.indexOf("{renderControlEndpoint()}");
-  const globalGroup = mcp.indexOf('label={t("settings.globalLevel")}');
-  const searchBranch = mcp.indexOf("counts.all === 0 && search.trim()");
-  assert.ok(
-    panel !== -1 && rendered > panel && globalGroup > rendered,
-    "the strip renders inside the panel, above the global group",
-  );
-  // Filtering and the search-empty branch never take it away: it holds no server,
-  // no project, and nothing the level filter or the search field can narrow.
-  assert.ok(searchBranch > rendered, "the strip is outside the search-empty branch");
-  assert.match(mcp, /^ {8}\{renderControlEndpoint\(\)\}$/m);
-});
-
+// The mounted capability suite verifies one independent endpoint across filters.
 test("the endpoint is not a server row and has no move, delete, or OAuth action", () => {
   const block = controlBlock();
   assert.match(block, /className="agent-mcp-scope" role="presentation"/);

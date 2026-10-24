@@ -165,6 +165,8 @@ export type PlanProposal = {
   scheduleTimezone?: string;
   scheduleState?: PlanScheduleState;
   executionKind?: ProposalKind;
+  /** Immutable verification commands explicitly bound when approving a Goal. */
+  requiredVerificationCommands?: string[];
   revisionIntent?: PlanRevisionIntent;
   /** Persisted snapshot alias retained by the host for compatibility. */
   plan: string;
@@ -179,6 +181,7 @@ export type PlanExecution = {
   kind: ProposalKind;
   /** Effective execution kind bound on approval: 'plan' | 'goal'. */
   executionKind?: ProposalKind;
+  requiredVerificationCommands?: string[];
   /** Exact approved Markdown snapshot. */
   plan: string;
   title: string;
@@ -244,6 +247,8 @@ export type PlanResolveRequest =
       executionProviderId?: string;
       executionModelId?: string;
       executionKind?: ProposalKind;
+      /** Goal approval only; must be repeated unchanged for idempotent approval. */
+      requiredVerificationCommands?: string[];
     })
   | (PlanResolveIdentity & {
       action: "schedule";

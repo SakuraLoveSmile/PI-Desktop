@@ -52,7 +52,7 @@ export function PromptEnhancementCard({
         detail={
           hasCustomTemplate
             ? t("settings.promptEnhancementCustomTemplateActive")
-            : undefined
+            : t("settings.promptEnhancementDefaultTemplateActive")
         }
       >
         <TooltipButton

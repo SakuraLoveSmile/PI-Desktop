@@ -21,8 +21,8 @@ const originalHome = process.env.HOME;
 process.env.HOME = fixtureHome;
 const binary = resolveHostBinary();
 const identity = await candidateIdentity();
-const evidence = { scenario, candidate: { ...identity, remoteMain: identity.baseMain,
-  baseMain: execFileSync("git", ["rev-parse", "main"], { encoding: "utf8" }).trim() },
+execFileSync("git", ["merge-base", "--is-ancestor", identity.baseMain, "HEAD"]);
+const evidence = { scenario, candidate: { ...identity, remoteMain: identity.baseMain },
   hostBinarySha256: createHash("sha256").update(await readFile(binary)).digest("hex"),
   environment: "temporary profile; real Host/Runtime; loopback scripted provider; no Electron/UI", timeline: [] };
 const record = (stage, details = {}) => {

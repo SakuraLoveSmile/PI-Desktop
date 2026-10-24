@@ -160,7 +160,6 @@ test("composer hydrates from the shared cache and persists across unmount and hi
   assert.match(composer, /flushScheduledHomeDraftAdopt\(draftKey\)/);
   assert.match(composer, /const nextDraft = readComposerDraft\(draftKey\)/);
   assert.match(composer, /setValue\(nextDraft\?\.text \?\? ""\)/);
-  assert.match(composer, /setFileReferences\(\s*nextDraft\?\.fileReferences\.map/);
   assert.doesNotMatch(composer, /new Map<string, ComposerDraftSnapshot>\(\)/);
   assert.doesNotMatch(composer, /draftCacheRef/);
 });

@@ -37,12 +37,14 @@ export function VendorAccountDialog({
   onClose,
   onSave,
   saving,
+  error,
 }: {
   provider: ProviderPublic;
   initialName: string;
   onClose: () => void;
   onSave: (form: VendorAccountForm) => void;
   saving: boolean;
+  error?: string;
 }) {
   const { t } = useTranslation();
   const [name, setName] = useState(initialName);
@@ -122,7 +124,7 @@ export function VendorAccountDialog({
           <h3 id="vendor-account-title" className="vendor-account-title">
             {t("settings.editVendorAccount")}
           </h3>
-          <Button variant="ghost" size="sm" onClick={() => setAdvancedOpen(true)}>
+          <Button variant="ghost" size="sm" disabled={saving} onClick={() => setAdvancedOpen(true)}>
             {t("settings.advancedSettings")}
           </Button>
         </div>
@@ -152,11 +154,12 @@ export function VendorAccountDialog({
         </div>
 
         <div className="vendor-account-actions">
+          {error ? <div className="provider-setup-error" role="alert">{error}</div> : null}
           <Button variant="ghost" disabled={saving} onClick={onClose}>
             {t("settings.cancel")}
           </Button>
           <Button variant="primary" disabled={!canSave} onClick={submit}>
-            {t("settings.save")}
+            {t(saving ? "settings.saving" : "settings.save")}
           </Button>
         </div>
       </div>

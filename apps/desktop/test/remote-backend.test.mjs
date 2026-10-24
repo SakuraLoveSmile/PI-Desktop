@@ -464,6 +464,21 @@ test("plansResolve synthesizes the local PlanResolutionResult from the RACP resu
   assert.equal(client.calls[0].params.permissionMode, "allow");
 });
 
+test("plansResolve refuses requiredVerificationCommands without silently approving a weaker remote contract", async () => {
+  const { backend, client } = makeBackend({
+    "approval/respond": () => ({ approvalId: "prop-1", status: "resolved", alreadyResolved: false, revision: 3 }),
+  });
+  for (const action of ["approve", "reject"]) {
+    for (const requiredVerificationCommands of [["cargo test --locked"], [], null, undefined]) {
+      await assert.rejects(backend.invoke(IPC.invoke.plansResolve, [{
+        proposalId: "prop-1", sessionId: REMOTE_SESSION_ID, turnId: "turn-1", toolCallId: "call-1",
+        action, targetPermissionMode: "auto", requiredVerificationCommands,
+      }]), error => error.errorCode === "INVALID_ARGUMENT");
+    }
+  }
+  assert.equal(client.calls.length, 0);
+});
+
 test("plansResolve on reject omits permissionMode from the RACP call", async () => {
   const { backend, client } = makeBackend({
     "approval/respond": () => ({

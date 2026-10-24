@@ -23,6 +23,7 @@ mod execution;
 mod execution_turn;
 mod model;
 mod repository;
+pub(crate) mod required_verification;
 mod schedule;
 
 pub use approval::{expire_pending_approvals, gate_session_configure};

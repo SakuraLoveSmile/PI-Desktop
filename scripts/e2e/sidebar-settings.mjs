@@ -71,6 +71,7 @@ export async function checkSidebarSettings({ cdp, check, waitFor, artifactDir })
       const sample = () => {
         const el = document.querySelector('.sidebar');
         if (el) trace.frames.push({ width: el.getBoundingClientRect().width,
+          hidden: el.closest('.app-chat-shell')?.hidden === true,
           animation: getComputedStyle(el).animationName });
       };
       const observer = new MutationObserver(sample);
@@ -80,17 +81,16 @@ export async function checkSidebarSettings({ cdp, check, waitFor, artifactDir })
       };
       document.addEventListener('animationstart', onStart, true);
       trace.stop = () => { observer.disconnect(); document.removeEventListener('animationstart', onStart, true); };
+      trace.sample = sample;
       window.__settingsSidebarTrace = trace;
     })()`);
   };
   const finishTrace = async () => {
     for (let i = 0; i < 24; i++) {
-      await cdp.evaluate(`(() => {
-        const el = document.querySelector('.sidebar');
-        if (el) window.__settingsSidebarTrace.frames.push({ width: el.getBoundingClientRect().width,
-          animation: getComputedStyle(el).animationName });
-      })()`);
-      await delay(10);
+      await cdp.evaluate(`new Promise(resolve => requestAnimationFrame(() => {
+        window.__settingsSidebarTrace.sample();
+        resolve();
+      }))`);
     }
     return cdp.evaluate(`(() => {
       const trace = window.__settingsSidebarTrace;
@@ -127,12 +127,15 @@ export async function checkSidebarSettings({ cdp, check, waitFor, artifactDir })
       String(sameChat),
     );
     const trace = await finishTrace();
+    const visibleFrames = trace.frames.filter(frame => !frame.hidden);
     check(
       trace.animations.length === 0 && (collapsed
-        ? trace.frames.length === 0
-        : trace.frames.length > 0 && trace.frames.every(frame => Math.abs(frame.width - width) < 0.5 && frame.animation === "none")),
+        ? visibleFrames.length === 0
+        : visibleFrames.length > 0 && visibleFrames.every(frame => Math.abs(frame.width - width) < 0.5 && frame.animation === "none")),
       `${label}: settings return restores layout without sidebar entrance`,
-      JSON.stringify({ animations: trace.animations, widths: trace.frames.map(frame => Math.round(frame.width)) }),
+      JSON.stringify({ animations: trace.animations,
+        visibleWidths: visibleFrames.map(frame => Math.round(frame.width)),
+        hiddenFrames: trace.frames.filter(frame => frame.hidden) }),
     );
   };
   const toggle = '[data-nav="toggle-sidebar"]';

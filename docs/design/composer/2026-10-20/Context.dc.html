@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Composer context low</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="--ground:#181818;--card:#212121f5;--line:rgba(255,255,255,0.05);--rule:rgba(255,255,255,0.12);--text:#ffffff;--secondary:rgba(255,255,255,0.7);--muted:rgba(255,255,255,0.52);--track:rgba(255,255,255,0.06);--hover:rgba(255,255,255,0.06);--warn:#ff8549;--prop-danger:#ff6b6b;width:960px;height:520px;box-sizing:border-box;position:relative;background:var(--ground);color:var(--text);font-family:'PingFang SC','Hiragino Sans GB','Noto Sans CJK SC',system-ui,sans-serif">
+  <div style="position:absolute;left:24px;top:16px;right:24px;font-size:12px;line-height:18px;color:var(--muted)">上下文用量（深色）· 统一按已用显示 · 阈值按剩余：已用 ≥75% 警告，≥90% 严重（context-usage.ts）<br>现有 = 代码现状（应用默认仍为剩余）；提议 = 新增。旧画板的圆环未实现，这里沿用现有的 72px 条形。</div>
+  <div style="position:absolute;left:24px;right:24px;top:64px;bottom:20px;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(3,1fr);gap:12px 16px">
+    <section style="display:flex;flex-direction:column;gap:10px;min-width:0;padding:12px 14px;box-sizing:border-box;border-radius:16px;background:var(--card);border:1px solid var(--line)">
+      <div style="font-size:12px;line-height:16px;color:var(--secondary)">现有 · 警告（已用 78%）</div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px;line-height:16px;color:var(--secondary);white-space:nowrap">
+        <span>上下文</span>
+        <span style="display:block;width:72px;height:5px;flex:0 0 72px;overflow:hidden;border-radius:6px;background:var(--track)"><span style="display:block;height:100%;width:78%;background:var(--warn)"></span></span>
+        <span style="color:var(--warn)">78%</span>
+      </div>
+      <div style="font-size:11px;line-height:16px;color:var(--muted)">颜色只作用于填充与数值（composer.css 971–973、999–1001）。</div>
+    </section>
+    <section style="display:flex;flex-direction:column;gap:10px;min-width:0;padding:12px 14px;box-sizing:border-box;border-radius:16px;background:var(--card);border:1px solid var(--line)">
+      <div style="font-size:12px;line-height:16px;color:var(--secondary)">现有 · 严重（已用 92%）</div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px;line-height:16px;color:var(--secondary);white-space:nowrap">
+        <span>上下文</span>
+        <span style="display:block;width:72px;height:5px;flex:0 0 72px;overflow:hidden;border-radius:6px;background:var(--track)"><span style="display:block;height:100%;width:92%;background:transparent"></span></span>
+        <span>92%</span>
+      </div>
+      <div style="font-size:11px;line-height:16px;color:var(--muted)">现状有缺口：composer.css 第 976、1004 行引用的 --ds-danger 未定义，填充透明，数值沿用默认色。</div>
+    </section>
+    <section style="display:flex;flex-direction:column;gap:10px;min-width:0;padding:12px 14px;box-sizing:border-box;border-radius:16px;background:var(--card);border:1px solid var(--line)">
+      <div style="font-size:12px;line-height:16px;color:var(--secondary)">提议 · 警告：条旁出现压缩入口</div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px;line-height:16px;color:var(--secondary);white-space:nowrap">
+        <span>上下文</span>
+        <span style="display:block;width:72px;height:5px;flex:0 0 72px;overflow:hidden;border-radius:6px;background:var(--track)"><span style="display:block;height:100%;width:78%;background:var(--warn)"></span></span>
+        <span style="color:var(--warn)">78%</span>
+        <button type="button" style="margin-left:auto;height:24px;padding:0 8px;border:0;border-radius:10px;background:transparent;color:var(--secondary);font:inherit;font-size:12px;white-space:nowrap">压缩上下文</button>
+      </div>
+      <div style="font-size:11px;line-height:16px;color:var(--muted)">出现条件与浮层里的按钮相同（空闲、无待审批）；浮层按钮保留。</div>
+    </section>
+    <section style="display:flex;flex-direction:column;gap:10px;min-width:0;padding:12px 14px;box-sizing:border-box;border-radius:16px;background:var(--card);border:1px solid var(--line)">
+      <div style="font-size:12px;line-height:16px;color:var(--secondary)">提议 · 严重：入口与提示加强</div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px;line-height:16px;color:var(--secondary);white-space:nowrap">
+        <span>上下文</span>
+        <span style="display:block;width:72px;height:5px;flex:0 0 72px;overflow:hidden;border-radius:6px;background:var(--track)"><span style="display:block;height:100%;width:92%;background:var(--prop-danger)"></span></span>
+        <span style="color:var(--prop-danger)">92%</span>
+        <button type="button" style="margin-left:auto;height:24px;padding:0 10px;border:0;border-radius:10px;background:var(--hover);color:var(--text);font:inherit;font-size:12px;white-space:nowrap">压缩上下文</button>
+      </div>
+      <div style="font-size:12px;line-height:16px;color:var(--secondary)">上下文即将用尽，建议先压缩。（提议文案）</div>
+      <div style="font-size:11px;line-height:16px;color:var(--muted)">提议色 #ff6b6b 需先定义 --ds-danger，现状未定义。</div>
+    </section>
+    <section style="display:flex;flex-direction:column;gap:10px;min-width:0;padding:12px 14px;box-sizing:border-box;border-radius:16px;background:var(--card);border:1px solid var(--line)">
+      <div style="font-size:12px;line-height:16px;color:var(--secondary)">现有 · 压缩中（活动行与禁用按钮）</div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px;line-height:16px;color:var(--secondary)"><span style="display:block;width:7px;height:7px;border-radius:50%;background:var(--muted)"></span>正在压缩上下文…</div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px;line-height:16px;color:var(--secondary);white-space:nowrap">
+        <span>上下文</span>
+        <span style="display:block;width:72px;height:5px;flex:0 0 72px;overflow:hidden;border-radius:6px;background:var(--track)"><span style="display:block;height:100%;width:78%;background:var(--warn)"></span></span>
+        <span style="color:var(--warn)">78%</span>
+        <button type="button" disabled style="margin-left:auto;height:24px;padding:0 8px;border:0;border-radius:10px;background:transparent;color:var(--secondary);font:inherit;font-size:12px;white-space:nowrap;opacity:0.4">压缩上下文</button>
+      </div>
+      <div style="font-size:11px;line-height:16px;color:var(--muted)">运行中按钮禁用（canCompactContext 要求未在运行）。</div>
+    </section>
+    <section style="display:flex;flex-direction:column;gap:10px;min-width:0;padding:12px 14px;box-sizing:border-box;border-radius:16px;background:var(--card);border:1px solid var(--line)">
+      <div style="font-size:12px;line-height:16px;color:var(--secondary)">现有 · 已压缩（转录分隔行，示例数据）</div>
+      <div style="display:flex;align-items:center;gap:10px;font-size:12px;line-height:16px;color:var(--muted)"><span style="flex:1;height:1px;background:var(--rule)"></span><span style="white-space:nowrap">上下文已压缩 · 第 2 次</span><span style="flex:1;height:1px;background:var(--rule)"></span></div>
+      <div style="text-align:center;font-size:12px;line-height:16px;color:var(--muted)">摘要 ≈1.2K tokens</div>
+      <div style="font-size:11px;line-height:16px;color:var(--muted)">摘要失败时显示「摘要生成失败」；浮层压缩行已存在。</div>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":520}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

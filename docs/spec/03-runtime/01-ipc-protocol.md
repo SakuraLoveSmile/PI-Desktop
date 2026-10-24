@@ -492,6 +492,7 @@ type PlanResolveRequest =
       targetPermissionMode: GlobalPermissionMode;
       executionProviderId?: string;
       executionModelId?: string;
+      requiredVerificationCommands?: string[];
     })
   | (PlanResolveIdentity & {
       action: "schedule";
@@ -528,6 +529,18 @@ type PlanResolutionResult = {
 ```
 
 Preload methods:
+
+`requiredVerificationCommands` is an optional external approval requirement for
+Goal executions only. Main forwards it unchanged to Host; it is not derived
+from model-authored Markdown. Only `approve` accepts it. Host binds the exact
+ordered list to the approved proposal and execution in the approval transaction,
+and returns it on proposal/execution descriptors. An idempotent approval must
+repeat the same list; omitting or changing an existing binding is rejected.
+Absent bindings keep legacy Goal behavior. Lists contain 1–200 unique, nonblank
+commands, at most 4096 UTF-8 bytes each and 65536 bytes total, without NUL/CR/LF.
+See the Host RPC report validation contract for required checks.
+Remote backends without this binding capability reject a supplied field before
+the legacy approval transport; they never drop it and approve without a binding.
 
 - `pi-desktop/plans/pending({ sessionId? }) -> PlansPendingResult`
 - `pi-desktop/plans/resolve(PlanResolveRequest) -> PlanResolutionResult`
@@ -1966,8 +1979,12 @@ Renderer IPC kept for the Plan-safe preview facade and URL fallback:
   other folders, which are then searched in the group's own order (ADR 0263),
   so a shorthand resolves in a sibling folder as readily as in the primary one,
   and the match names the folder that answered. Inside one root an exact path
-  beats a shorthand; among shorthands the longest matching tail wins, then the
-  shallowest path. Relative and indexed candidates must resolve to regular files
+  beats a shorthand; a shorthand must match exactly one file by its complete
+  supplied path suffix. Resolution never shortens that suffix to a basename or
+  chooses by depth. Ambiguity returns `match: null` immediately rather than
+  falling through to another root. Supported `:line`, `:line:column`,
+  `:start-end`, `#Lstart` and `#Lstart-Lend` suffixes are removed before path
+  lookup; renderer positioning uses the start line. Relative and indexed candidates must resolve to regular files
   whose real paths remain inside their answering root; an exact path through an
   escaping or dangling link cannot fall back to a same-name indexed file. The
   files-panel ignore set applies. A reference that matches

@@ -528,7 +528,7 @@ async function run({ finishNaturally = false } = {}) {
       })()`);
     }, "queued prompt accepted by the host (Send now enabled)");
     check("Send now promoted the queued row", sent === true);
-    await waitFor(() => cdp.evaluate(`Boolean(document.querySelector(".composer-queued-prompt-send-now:disabled"))`), "promoted queued row");
+    await waitFor(() => cdp.evaluate(`Boolean(document.querySelector('.composer-queued-prompt[data-priority="true"]'))`), "promoted queued row");
 
     const offerPresent = () => cdp.evaluate(`Boolean(document.querySelector(".composer-queued-prompt-abort-tool"))`);
     for (const at of HIDDEN_CHECKS_MS) {

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { SubagentDefinition, UserSubagentRecord } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
@@ -41,6 +41,7 @@ import {
   IconTrash,
 } from "../icons";
 import { TooltipButton } from "../ui";
+import { SettingsWorkbenchHeader } from "../../features/settings/primitives";
 import { SubagentRuntimeSettings } from "./SubagentRuntimeSettings";
 const GLOBAL_SUBAGENTS_PATH = "~/.agents/subagents";
 
@@ -69,6 +70,7 @@ export function AgentSubagentsPage() {
     loading,
     refreshing,
     reload: load,
+    captureOwner,
   } = useHostCollection(fetchSubagentPageData, EMPTY_SUBAGENT_PAGE, (error) =>
     showToast(error instanceof Error ? error.message : String(error), { variant: "error" }),
   );
@@ -77,6 +79,18 @@ export function AgentSubagentsPage() {
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [editor, setEditor] = useState<SubagentEditorState | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [refreshFailed, setRefreshFailed] = useState(false);
+  useEffect(() => {
+    setSaveError(null);
+    setRefreshFailed(false);
+    setSaving(false);
+  }, [captureOwner]);
+  const retryRefresh = async () => {
+    const ownsOperation = captureOwner();
+    const result = await load({ reportError: false });
+    if (ownsOperation() && result !== "stale") setRefreshFailed(result === "failed");
+  };
   const { armed, setArmed } = useArmedDelete();
   const ownedHandles = useMemo(() => new Set(owned.map((row) => row.id)), [owned]);
 
@@ -153,6 +167,7 @@ export function AgentSubagentsPage() {
   };
 
   const openEdit = async (subagent: UserSubagentRecord) => {
+    setSaveError(null);
     setBusyId(subagent.id);
     try {
       const result = await api.readUserSubagent(subagent.id);
@@ -168,6 +183,7 @@ export function AgentSubagentsPage() {
   };
 
   const copyBuiltin = (definition: SubagentDefinition) => {
+    setSaveError(null);
     setEditor({
       draft: draftFromDefinition(definition),
       editing: null,
@@ -176,7 +192,8 @@ export function AgentSubagentsPage() {
   };
 
   const save = async () => {
-    if (!editor) return;
+    if (!editor || saving) return;
+    const ownsOperation = captureOwner();
     const { draft, editing } = editor;
     const payload = {
       name: draft.name.trim(),
@@ -193,11 +210,15 @@ export function AgentSubagentsPage() {
       scope: draft.scope,
     };
     setSaving(true);
+    setSaveError(null);
     try {
       if (editing) await api.updateUserSubagent(editing.id, payload);
       else await api.createUserSubagent(payload);
-      await load();
-      showToast(
+      if (!ownsOperation()) return;
+      const refreshed = await load({ reportError: false });
+      if (!ownsOperation()) return;
+      if (refreshed !== "stale") setRefreshFailed(refreshed === "failed");
+      if (refreshed === "loaded") showToast(
         t(editing ? "settings.subagentSaved" : "settings.subagentCreated", {
           name: payload.name,
         }),
@@ -205,9 +226,9 @@ export function AgentSubagentsPage() {
       );
       setEditor(null);
     } catch (error) {
-      showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
+      if (ownsOperation()) setSaveError(t("settings.capabilitySaveFailed", { message: error instanceof Error ? error.message : String(error) }));
     } finally {
-      setSaving(false);
+      if (ownsOperation()) setSaving(false);
     }
   };
 
@@ -404,15 +425,19 @@ export function AgentSubagentsPage() {
     <AgentCapabilityPage
       className="agent-subagents-page"
       toolbar={
+        <SettingsWorkbenchHeader description={t("settings.subagentsIntro")} actions={addButton}>
         <CapabilityToolbar
           search={search}
           onSearchChange={setSearch}
           searchPlaceholder={t("extensions.subagents.searchPlaceholder")}
-          actions={addButton}
         />
+        </SettingsWorkbenchHeader>
       }
     >
-      <SubagentRuntimeSettings settings={settings} />
+      {refreshFailed ? <div className="settings-save-feedback is-refreshFailed" role="status">
+        <span>{t("settings.saveState.refreshFailed")}</span>
+        <CapabilityButton onClick={() => void retryRefresh()}>{t("errors.action.retry")}</CapabilityButton>
+      </div> : null}
       <CapabilityPanel
         loading={loading}
         refreshing={refreshing}
@@ -445,7 +470,6 @@ export function AgentSubagentsPage() {
                   <CapabilityEmpty
                     message={t("settings.subagentsEmpty")}
                     icon={<IconBot size={18} />}
-                    action={addButton}
                   />
                 ) : (
                   visibleOwned.map(renderRow)
@@ -455,6 +479,7 @@ export function AgentSubagentsPage() {
           </>
         )}
       </CapabilityPanel>
+      <SubagentRuntimeSettings settings={settings} />
 
       {editor ? (
         <SubagentEditorSheet
@@ -463,6 +488,7 @@ export function AgentSubagentsPage() {
           editing={editor.editing}
           initialPresetId={editor.presetId}
           saving={saving}
+          saveError={saveError}
           onClose={() => {
             if (!saving) setEditor(null);
           }}

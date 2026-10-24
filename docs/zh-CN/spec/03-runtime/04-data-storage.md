@@ -1,4 +1,4 @@
-# 04. 数据存储（共享架构 v21，Plus 轨道 v8）
+# 04. 数据存储（共享架构 v21，Plus 轨道 v10）
 
 > **翻译说明：** 本页是与 [英文源规格](/spec/03-runtime/04-data-storage) 一一对应的机器辅助翻译。代码、协议字段和标识符保持原文；如翻译与英文源事实有歧义，以英文版本为准。
 
@@ -1288,7 +1288,7 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
 `PRAGMA user_version` 专用于与上游 PI-Desktop 共享的迁移链，只在合入上游迁移时才会前进
 （ADR plus-schema-version-track）。Plus 专有结构运行在同一数据库内的第二条轨道上，
 因此合入上游永远不会重编号，也不会与 Plus 数据冲突。Plus 步骤有序、仅增量且幂等。
-它们位于 `crates/host-core/src/db/plus_schema.rs`，当前轨道版本为 9：
+它们位于 `crates/host-core/src/db/plus_schema.rs`，当前轨道版本为 10：
 
 | 步骤 | 增加 |
 |---|---|
@@ -1301,6 +1301,7 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
 | P7 | `background_service_ownership`、`owner_project_path` 和会话删除守卫 |
 | P8 | Durable unattended interaction policy and structured terminal error details |
 | P9 | `goal_execution_holds`, the durable blocked/resume/explicit-close lifecycle |
+| P10 | nullable `plan_approvals.required_verification_commands_json`, binding external Goal verification requirements to approval/execution |
 
 P1 到 P4 是早期 fork 构建以 `user_version` 20 到 23 发布的 Plus 专有变更。每个步骤在改动前都会先探测，
 因此来自任一未发布 v20 形态（仅 Goal reports，或仅 workspace kind）的数据库都能保留数据完成升级，
@@ -1315,7 +1316,7 @@ P1 到 P4 是早期 fork 构建以 `user_version` 20 到 23 发布的 Plus 专�
   （`DB_SCHEMA_TOO_NEW`，见进程模型中的启动结果一节）。
 - **旧版 fork 数据库。** 含有 Plus 结构、没有 `plus_schema_meta` 且 `user_version` 为 20 到 23
   的数据库由早期 fork 构建写入。在经过校验的 `pi.sqlite.legacy-v<N>.bak` 之后，一个事务应用全部
-  Plus 步骤、写入 meta（轨道 9，当前共享迁移链），并把 `user_version` 设为 19。失败则回滚事务，
+  Plus 步骤、写入 meta（轨道 10，当前共享迁移链），并把 `user_version` 设为 19。失败则回滚事务，
   旧版数据库保持原样。
 - **较旧的 fork 构建。** 较旧的 fork 构建打开已对账的数据库时，会重新运行自己幂等的步骤，
   并把 `user_version` 留在 20 到 23。本构建下一次打开时先保留 `pi.sqlite.repair-v<N>.bak`，
@@ -1328,8 +1329,11 @@ P1 到 P4 是早期 fork 构建以 `user_version` 20 到 23 发布的 Plus 专�
 - **Known candidate data.** P5/P6/P7 and shipped P8 interaction-policy data
   upgrade through a verified backup to P9. The original Goal P8 candidate is
   also supported: idempotent replay preserves existing holds, sessions,
-  interaction policy and terminal details. Versions above P9 are refused before
-  mutation; older Plus binaries refuse P9, so whole-database downgrade is unsupported.
+  interaction policy and terminal details. P10 adds the nullable approval-bound
+  verification-command list after a verified upgrade backup; existing rows stay
+  NULL without rewriting artifacts or report history. Versions above P10 are
+  refused before mutation; older Plus binaries refuse P10, so whole-database
+  downgrade is unsupported.
 
 - **收件箱恢复。** Host 对照规范 mailbox 和精确认证 JSONL 校验日志，prepared 仍走文件优先恢复；索引修复保留原 Lead turn，消费记录与 durable queue 退休同一事务提交。重复恢复不追加副本、不授人工权限、不启动 provider。支持能力的普通 Agent Lead 在等待边界使用同轮次 inbox；旧 Host 保留队列 continuation。
 - **历史服务恢复。** 冷启动先记 `host_restart` 再标 unfinished process 为 interrupted，不认领旧 PID 或重放命令。历史 P7 未记录平台/stop mechanism，读取省略 `stopMode`，不从本机平台或 escalation flag 推断 TERM/KILL/JobObject。新服务仅经当前 Agent Team 身份、run 和权限闸门显式启动，机制由实际 owned runner 记录。

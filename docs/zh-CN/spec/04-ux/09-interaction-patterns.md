@@ -621,9 +621,11 @@
 - 会话运行中，草稿非空时 Composer 显示 Send，空时显示 Stop。普通 Send 和回车发送
   都是 follow-up 操作。被接受的 follow-up 清空 Composer 并追加到该会话的 Host 持
   久 FIFO 队列；切换会话不会移动或清空其他会话的队列。
-- 队列渲染在 Composer 上方。每行有独立的可键盘访问的 Remove 操作和 Send now 操
-  作（Host 入队返回持久 id 后可用）。入队挂起期间，行操作禁用并显示 Saving 提
-  示，Send now 也显示 Saving；此时编辑/删除不改变队列或 Composer 草稿。
+- 队列渲染在工作区条与 Composer 之上。两条及以上的排队消息折叠为一条摘要，显示数
+  量、下一条消息和队首的中止提示；单条始终列出，手动展开在队列清空前保持。展开的每
+  行在 Host 入队返回持久 id 后，悬停或聚焦时显示 Send now，并把编辑、上移、下移、移
+  除收入 ⋯ 菜单。队首行以等待提示代替 Send now，锁定编辑和移动但保留移除。入队挂起
+  期间，该行显示 Saving 标签、⋯ 触发器禁用；此时编辑/删除不改变队列或 Composer 草稿。
 - Send now 将该行移至队首并请求新的 `agent/stop` 通道。当前助手回复和已完成的工
   具批次正常结束；`agent_end` 和持久回合确认后，提升行通过正常 `agent/prompt` 流
   程在剩余行之前派发。空闲时 Send now 立即派发。等待期间，提升行保留 Remove 并

@@ -12,7 +12,6 @@ import type { ComposerCommand, ExecutionProfile, FsIndexEntry, Mode } from "@pi-
 import { AnchoredMenu } from "../../../components/settings/AnchoredMenu";
 import { TooltipButton, SettingsToggle } from "../../../components/ui";
 import {
-  IconBot,
   IconCheck,
   IconFileText,
   IconFolder,
@@ -21,6 +20,7 @@ import {
   IconPlug,
   IconSearch,
   IconSparkles,
+  IconUser,
   IconUsers,
 } from "../../../components/icons";
 import { ModeIcon } from "./ComposerModeIcon";
@@ -277,7 +277,7 @@ export function ComposerPlusMenu({
               }
             }}
           >
-            <IconBot size={14} className="composer-item-icon" aria-hidden="true" />
+            <IconUser size={14} className="composer-item-icon" aria-hidden="true" />
             <div className="flex-1 text-left min-w-0">
               <div className="font-medium text-sm">{t("chat.profileAgent")}</div>
               <div className="text-xs text-muted truncate">

@@ -27,6 +27,34 @@ fn fresh_database_is_stamped_on_the_plus_track() {
 }
 
 #[test]
+fn required_verification_p9_upgrade_is_additive_nullable_and_idempotent() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("pi.sqlite");
+    let db = Database::open(&path).unwrap();
+    seed_rows(db.conn());
+    let prior = plan_row(db.conn(), "p1");
+    db.conn()
+        .execute(
+            "ALTER TABLE plan_approvals DROP COLUMN required_verification_commands_json",
+            [],
+        )
+        .unwrap();
+    db.conn()
+        .execute("UPDATE plus_schema_meta SET plus_version=9", [])
+        .unwrap();
+    drop(db);
+    for _ in 0..2 {
+        let db = Database::open(&path).unwrap();
+        assert_eq!(meta(db.conn()).unwrap().plus_version, PLUS_SCHEMA_VERSION);
+        assert_eq!(user_version(db.conn()), SCHEMA_VERSION);
+        assert_eq!(plan_row(db.conn(), "p1"), prior);
+        assert_eq!(db.conn().query_row("SELECT required_verification_commands_json FROM plan_approvals WHERE request_id='p1'", [], |row| row.get::<_, Option<String>>(0)).unwrap(), None);
+        assert_eq!(backup_files(dir.path()), vec!["pi.sqlite.plus-v9.bak"]);
+        assert!(db.conn().execute("UPDATE plan_approvals SET required_verification_commands_json='{}' WHERE request_id='p1'", []).is_err());
+    }
+}
+
+#[test]
 fn reopening_a_current_database_changes_nothing() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("pi.sqlite");

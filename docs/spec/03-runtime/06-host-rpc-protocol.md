@@ -742,6 +742,16 @@ contract is being negotiated.
   schedule response. `request_changes` stores a durable revision intent and
   `schedule` commits an approved one-time snapshot; approval commits the
   selected permission mode and `execution_state = queued`
+- `plans.resolve` also accepts optional `requiredVerificationCommands` only for
+  `approve` of a Goal execution. The trusted approver supplies 1–200 unique,
+  nonblank command strings, each at most 4096 UTF-8 bytes and at most 65536
+  bytes total, with no NUL/CR/LF. Host rejects malformed fields and fields on
+  other actions or Plan executions. The approval transaction persists the
+  exact ordered list with the proposal/execution; a repeated approval cannot
+  omit or change an established binding. Proposal and execution descriptors
+  expose the optional list. The local `pi_plans_resolve` MCP input schema and
+  Main IPC path preserve this field, allowing callers to check capability
+  before starting a model turn. Legacy approvals without it remain valid.
 - `plans.claimSchedule` / `plans.cancelSchedule` — atomically claim a due
   schedule (including an explicitly confirmed missed schedule) or cancel a
   scheduled/missed snapshot. A claim is single-use and returns the bound
@@ -866,6 +876,33 @@ Plan interruption fence. Previously blocked holds are not changed or replayed.
     report as a persistence failure. Reconcile progress and retry; honest partial/blocked
     claims and legacy callers without a progress snapshot remain supported.
     Finalization rechecks progress so a later update cannot publish a stale `met` claim.
+  - For an execution with `requiredVerificationCommands`, `submitDraft`
+    validates coverage before writing a draft. Each required command must have
+    exactly one `checks.command` equal to the approved original string. An
+    executed check needs an integer `exitCode`: zero requires `result=passed`,
+    and nonzero requires `result=failed`. `verdict=met` requires every required
+    command to pass. Non-met reports may honestly record an unexecuted check
+    with `result=inconclusive`, `exitCode=null`, `disposition=not_run|blocked`
+    and a nonblank reason. Missing, duplicate, malformed or contradictory
+    records return `INVALID_ARGUMENT` with exact commands and correction
+    guidance, leaving no valid draft. The existing `SubmitGoalReport` tool
+    returns that error to the current running Agent so it can correct and
+    resubmit in the same execution. A bound `met` draft also requires Host
+    observations of every required command from durable Bash tool results in
+    this execution's current or resumed segment turns, within the durable
+    sequence boundary. Each check must reference `kind=tool_result` evidence
+    using the actual tool call ID or durable message ID; tool names, shell IDs
+    and file paths do not identify a command result. Host reads native integer
+    exit codes from the runtime's `AgentToolResult.details` envelope or the
+    legacy bare result, never from output text or model assertions. Missing,
+    failed, malformed or mismatched native proof returns `INVALID_ARGUMENT`
+    before draft persistence so the running Agent can correct its references.
+    The sidecar proxy first waits for the embedding Desktop/headless runtime's
+    existing transcript persistence queue for this session. A pending/failed
+    barrier or a changed Host/turn prevents submission; a model-visible result
+    is not assumed to be durable merely because the tool returned.
+    Honest non-met reports and unbound Goals retain their existing behavior.
+    Finalized reports remain immutable; upgrading does not repair old reports.
   - `goalReports.finalizeReport` and report Retry require the Host's persisted execution state `completed`.
     Attempting to finalize/retry an execution that is `interrupted`, `queued`, `running`, or missing completion
     is rejected with `GOAL_EXECUTION_NOT_TERMINAL`, without writing report files or broadcasting ready.

@@ -35,7 +35,7 @@ const KNOWN_BARE_NAMES = new Set([
 ]);
 
 const FILE_TOKEN_RE =
-  /^(?:(?:[A-Za-z]:[\\/]|~[\\/]|\\\\|\/\/|[\\/])|(?:\.{1,2}[\\/])?)[\p{L}\p{N}_@+. -]+(?:[\\/][\p{L}\p{N}_@+. -]+)*(?::\d+(?::\d+)?)?$/u;
+  /^(?:(?:[A-Za-z]:[\\/]|~[\\/]|\\\\|\/\/|[\\/])|(?:\.{1,2}[\\/])?)[\p{L}\p{N}_@+. -]+(?:[\\/][\p{L}\p{N}_@+. -]+)*(?::\d+(?::\d+|-\d+)?|#[lL]\d+(?:-[lL]?\d+)?)?$/u;
 
 const AT_QUOTED_RE = /^@"([^"\n]+)"$/;
 const AT_UNQUOTED_RE = /^@(\/?[^\s]+)$/;
@@ -49,22 +49,26 @@ export function isHtmlFilePath(path: string): boolean {
 }
 
 function stripLineRef(path: string): string {
-  return path.replace(/:\d+(?::\d+)?$/, "");
+  return path.replace(/(?::\d+(?::\d+|-\d+)?|#[lL]\d+(?:-[lL]?\d+)?)$/u, "");
 }
 
-/** Trailing `:line[:col]` on a file token, if any. */
+/** Trailing line, column, range, or GitHub line anchor on a file token. */
 export function parseFileRefPosition(
   text: string,
 ): { line: number; column?: number } | null {
-  const token = text.trim().replace(/[.,!?;:，。！？；：]+$/u, "");
-  const match = token.match(/:(\d+)(?::(\d+))?$/);
+  let token = text.trim().replace(/[.,!?;:，。！？；：]+$/u, "");
+  if (token.startsWith("@")) token = token.slice(1);
+  if (token.startsWith('"') && token.endsWith('"')) token = token.slice(1, -1);
+  if (!FILE_TOKEN_RE.test(token)) return null;
+  const match = token.match(/(?::(\d+)(?::(\d+)|-(\d+))?|#L(\d+)(?:-L?(\d+))?)$/iu);
   if (!match) return null;
-  const line = Number(match[1]);
-  if (!Number.isFinite(line) || line < 1) return null;
+  const line = Number(match[1] ?? match[4]);
+  if (!Number.isSafeInteger(line) || line < 1) return null;
   const column = match[2] !== undefined ? Number(match[2]) : undefined;
-  return column !== undefined && Number.isFinite(column) && column >= 1
-    ? { line, column }
-    : { line };
+  if (column !== undefined && (!Number.isSafeInteger(column) || column < 1)) return null;
+  const rangeEnd = match[3] ?? match[5];
+  if (rangeEnd !== undefined && (!Number.isSafeInteger(Number(rangeEnd)) || Number(rangeEnd) < line)) return null;
+  return { line, ...(column !== undefined ? { column } : {}) };
 }
 
 function leafName(path: string): string {
@@ -93,7 +97,7 @@ function isAbsoluteFilePath(path: string): boolean {
 
 /**
  * Returns the cleaned path when `text` plausibly names a file (trailing
- * `:line[:col]` refs are stripped), otherwise null. A leading `@` — the
+ * line/column/range refs are stripped), otherwise null. A leading `@` — the
  * composer's file-reference sigil (D124) — is accepted and stripped so
  * `@src/a.ts` previews like `src/a.ts`.
  */
@@ -276,8 +280,11 @@ const PATH_SEGMENT = String.raw`[\p{L}\p{N}_@+. -]+`;
 // Only adjacent characters can extend a dotted directory. Whitespace after an
 // extension is ambiguous with prose; quote such paths with @"...".
 const PATH_CONTINUATION = String.raw`[\p{L}\p{N}_@+.-]*[\\/]`;
-const FILE_END = String.raw`\.[A-Za-z0-9]{1,8}(?:[+@-][\p{L}\p{N}_@+-]*)?(?::\d+(?::\d+)?)?(?![A-Za-z0-9_@+-]|\.[A-Za-z0-9]|${PATH_CONTINUATION})`;
-const BARE_FILE_END = String.raw`(?:${[...KNOWN_BARE_NAMES].join("|")})(?![\p{L}\p{N}_@+.-]|${PATH_CONTINUATION})`;
+const FILE_POSITION = String.raw`(?::\d+(?::\d+|-\d+)?|#[lL]\d+(?:-[lL]?\d+)?)?`;
+// Never truncate a malformed position into a different, valid destination.
+const POSITION_CONTINUATION = String.raw`[:#](?:-?\d|[lL])`;
+const FILE_END = String.raw`\.[A-Za-z0-9]{1,8}(?:[+@-][\p{L}\p{N}_@+-]*)?${FILE_POSITION}(?![A-Za-z0-9_@+-]|\.[A-Za-z0-9]|${PATH_CONTINUATION}|${POSITION_CONTINUATION})`;
+const BARE_FILE_END = String.raw`(?:${[...KNOWN_BARE_NAMES].join("|")})${FILE_POSITION}(?![\p{L}\p{N}_@+.-]|${PATH_CONTINUATION}|${POSITION_CONTINUATION})`;
 const FILE_NAME = String.raw`(?:${PATH_SEGMENT}?${FILE_END}|${BARE_FILE_END})`;
 const UNC_PREFIX = String.raw`(?:\\\\[^\\/\s]+[\\/]|\/\/[^/\s]+\/)`;
 const SPACED_START = String.raw`(?<![\p{L}\p{N}_@+.-])[A-Za-z][\p{L}\p{N}_+-]*(?: [\p{L}\p{N}_+-]+)+`;
@@ -298,8 +305,8 @@ const SCAN_RE = new RegExp([
   String.raw`${SPACED_START}[\\/](?:${PATH_SEGMENT}[\\/])*?${FILE_NAME}`,
   String.raw`${SPACED_START}(?:\.[A-Za-z0-9_-]+)*${FILE_END}`,
   String.raw`(?:${PATH_WORD}[\\/])+(?:${PATH_SEGMENT}[\\/])*?${FILE_NAME}`,
-  String.raw`(?:~\/)?\/?\.{1,2}\/(?:${PATH_WORD}\/)*${PATH_WORD}(?::\d+(?::\d+)?)?`,
-  String.raw`(?:~\/)?\/?(?:${PATH_WORD}\/)+${PATH_WORD}(?::\d+(?::\d+)?)?`,
+  String.raw`(?:~\/)?\/?\.{1,2}\/(?:${PATH_WORD}\/)*${PATH_WORD}${FILE_POSITION}(?![\p{L}\p{N}_@+.-]|${POSITION_CONTINUATION})`,
+  String.raw`(?:~\/)?\/?(?:${PATH_WORD}\/)+${PATH_WORD}${FILE_POSITION}(?![\p{L}\p{N}_@+.-]|${POSITION_CONTINUATION})`,
   String.raw`[\p{L}\p{N}_@+-][\p{L}\p{N}_@+.-]*${FILE_END}`,
 ].join("|"), "gu");
 
@@ -385,6 +392,13 @@ const SKIP_MDAST = new Set([
   "html",
 ]);
 
+function filePreviewHref(target: Extract<ChatPreviewTarget, { kind: "file" }>): string {
+  const path = /^[A-Za-z]:[\\/]/.test(target.path) || target.path.startsWith("\\\\")
+    ? encodeURIComponent(target.path)
+    : target.path;
+  return target.line === undefined ? path : `${path}:${target.line}${target.column === undefined ? "" : `:${target.column}`}`;
+}
+
 /**
  * Turn bare file/URL tokens in markdown phrasing into link nodes so the
  * existing markdown Anchor handler can preview them. Skips fenced code,
@@ -421,9 +435,7 @@ export function linkifyMdastTree(
           const url =
             target.kind === "url"
               ? target.url
-              : /^[A-Za-z]:[\\/]/.test(target.path) || target.path.startsWith("\\\\")
-                ? encodeURIComponent(target.path)
-                : target.path;
+              : filePreviewHref(target);
           next.push({
             type: "link",
             url,
@@ -446,9 +458,7 @@ export function linkifyMdastTree(
           const url =
             segment.target.kind === "url"
               ? segment.target.url
-              : (/^[A-Za-z]:[\\/]/.test(segment.target.path) || segment.target.path.startsWith("\\\\"))
-                ? encodeURIComponent(segment.target.path)
-                : segment.target.path;
+              : filePreviewHref(segment.target);
           next.push({
             type: "link",
             url,

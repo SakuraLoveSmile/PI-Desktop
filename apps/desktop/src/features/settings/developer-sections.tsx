@@ -16,6 +16,20 @@ export function DeveloperSection({
   const { t } = useTranslation();
   const showToast = useAppStore((s) => s.showToast);
   const enabled = settings.developerMode === true;
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const toggleDeveloperMode = async () => {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await saveSettings({ developerMode: !enabled });
+    } catch (cause) {
+      setSaveError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const openConsole = async () => {
     try {
@@ -34,9 +48,11 @@ export function DeveloperSection({
         <SettingsToggle
           checked={enabled}
           label={t("settings.developerMode")}
-          onChange={() => void saveSettings({ developerMode: !enabled })}
+          busy={saving}
+          onChange={() => void toggleDeveloperMode()}
         />
       </SettingsRow>
+      {saveError ? <p className="settings-inline-error" role="alert">{saveError}</p> : null}
       <SettingsRow
         title={t("settings.devTools")}
         description={enabled ? undefined : t("settings.devToolsDisabledHint")}
@@ -56,20 +72,32 @@ export function DeveloperSection({
 export function CloseBehaviorSection() {
   const { t } = useTranslation();
   const [behavior, setBehavior] = useState<CloseBehavior | null>(null);
-  const showToast = useAppStore((state) => state.showToast);
+  const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [request, setRequest] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setLoadFailed(false);
     void api
       .getCloseBehavior()
       .then(({ behavior: next }) => {
         if (!cancelled) setBehavior(next);
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (!cancelled) setLoadFailed(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [request]);
 
   // The "ask" state (unset) is transient and cannot be re-selected: once a
   // choice is made it is remembered permanently. An unset preference shows
@@ -80,11 +108,17 @@ export function CloseBehaviorSection() {
   ];
 
   const choose = async (next: CloseBehavior) => {
+    setSaving(true);
+    setSaveError(false);
+    setSaved(false);
     try {
       await api.setCloseBehavior(next);
       setBehavior(next);
+      setSaved(true);
     } catch {
-      showToast(t("settings.closeBehaviorSaveError"), { variant: "error" });
+      setSaveError(true);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -99,8 +133,16 @@ export function CloseBehaviorSection() {
           onChange={(value) => void choose(value)}
           options={options.map(([value, labelKey]) => ({ value, label: t(labelKey) }))}
           label={t("settings.closeBehaviorTitle")}
+          disabled={loading || loadFailed || saving}
         />
       </SettingsRow>
+      {loading ? <p className="settings-inline-status" role="status">{t("common.loading")}</p> : null}
+      {loadFailed ? <div className="settings-inline-error" role="alert">
+        {t("settings.closeBehaviorLoadError")}
+        <Button variant="secondary" size="sm" onClick={() => setRequest((value) => value + 1)}>{t("errors.action.retry")}</Button>
+      </div> : null}
+      {saveError ? <p className="settings-inline-error" role="alert">{t("settings.closeBehaviorSaveError")}</p> : null}
+      {saved ? <p className="settings-inline-status" role="status">{t("settings.preferenceSaved")}</p> : null}
     </SettingsCard>
   );
 }

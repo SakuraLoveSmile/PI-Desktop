@@ -8,7 +8,7 @@ import { ComposerPlusMenu } from "../../apps/desktop/src/features/chat/composer/
 
 const labels: Record<string, string> = {
   "chat.executionProfile": "Execution profile",
-  "chat.profileAgent": "智能体",
+  "chat.profileAgent": "单智能体",
   "chat.profileAgentDesc": "Single agent",
   "chat.profileTeam": "专家团",
   "chat.profileTeamDesc": "Work with teammates",
@@ -19,6 +19,7 @@ const labels: Record<string, string> = {
   "chat.contractGoalDesc": "Complete a goal",
   "settings.modePlan": "Plan",
   "settings.modeGoal": "Goal",
+  "chat.exitPlanMode": "Exit Plan mode",
 };
 const t = ((key: string) => labels[key] ?? key) as TFunction;
 
@@ -45,6 +46,7 @@ function PickerFixture() {
         <ComposerContractPicker
           t={t} mode={mode} planningLive={false}
           onClick={() => { setProfileOpen(false); setPlusOpen(true); }}
+          onExitPlan={() => setMode("agent")}
         />
       </div></div>
     </div></div>

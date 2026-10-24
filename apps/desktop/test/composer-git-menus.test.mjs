@@ -117,6 +117,14 @@ test("the public branch trigger displays authoritative branch and remains readab
   assert.doesNotMatch(detached, /<span>main<\/span>/);
 });
 
+test("a detached HEAD names its short commit instead of reporting that no branch exists", async (t) => {
+  const ssr = await slotSsr(t);
+  const { ComposerBranchMenu } = await ssr.load("/src/features/chat/composer/ComposerBranchMenu.tsx");
+  const html = ssr.render(createElement(ComposerBranchMenu, { ...props, git: { ...git, branch: null, head: "9f3c2ab4d1e0f7a8b6c5d4e3f2a1b0c9d8e7f6a5" } }));
+  assert.match(html, /Detached HEAD · 9f3c2ab/);
+  assert.doesNotMatch(html, /No branch/);
+});
+
 test("the public location trigger follows actual checkout metadata and remote ownership", async (t) => {
   const ssr = await slotSsr(t);
   const { ComposerLocationMenu } = await ssr.load("/src/features/chat/composer/ComposerLocationMenu.tsx");

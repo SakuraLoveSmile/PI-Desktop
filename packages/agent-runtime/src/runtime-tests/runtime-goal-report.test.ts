@@ -17,7 +17,7 @@ describe("approved Goal report reconciliation", () => {
 
   function fixture() {
     let revision = 0;
-    const host = { call: vi.fn(async (method: string, params: unknown) => {
+    const host = { call: vi.fn(async (method: string, params: unknown): Promise<unknown> => {
       if (method === "goalProgress.issueToken") return { writeToken: "goal-report-test" };
       if (method === "tools.execute") return { ok: true, content: { todos: "recorded" } };
       if (method === "goalProgress.update") {
@@ -123,7 +123,7 @@ describe("approved Goal report reconciliation", () => {
         expect(f.events().filter((event) => event.type === "tool_end").every((event) => !event.isError)).toBe(true);
         expect(f.host.call).not.toHaveBeenCalledWith("goalReports.invalidateDraft", expect.anything());
         expect(f.host.call).toHaveBeenCalledWith("goalReports.submitDraft", {
-          executionId: f.execution.id,
+          sessionId: f.execution.sessionId, executionId: f.execution.id,
           draft: expect.objectContaining({ verdict: scenario === "stale-progress" ? "partial" : "met" }),
         });
         expect(f.agent.state.tools.map((tool) => tool.name)).not.toContain("SubmitGoalReport");
@@ -175,7 +175,7 @@ describe("approved Goal report reconciliation", () => {
         expect(f.agent.continue).toHaveBeenCalledTimes(2);
         expect(f.host.call).toHaveBeenCalledWith("goalReports.invalidateDraft", { executionId: f.execution.id });
         expect(f.host.call).toHaveBeenLastCalledWith("goalReports.submitDraft", {
-          executionId: f.execution.id, draft: expect.objectContaining({ summary: "Verified after mutation" }),
+          sessionId: f.execution.sessionId, executionId: f.execution.id, draft: expect.objectContaining({ summary: "Verified after mutation" }),
         });
         for (const type of ["agent_start", "turn_start", "turn_end", "agent_end"] as const) {
           expect(f.events().filter((event) => event.type === type)).toHaveLength(1);
@@ -185,6 +185,27 @@ describe("approved Goal report reconciliation", () => {
       } finally { await f.runtime.dispose(); }
     },
   );
+
+  it("exposes the actual Bash call ID as model-visible report evidence", async () => {
+    const f = fixture();
+    f.host.call.mockImplementation(async (method: string) => {
+      if (method === "goalProgress.issueToken") return { writeToken: "goal-report-test" };
+      if (method === "tools.execute") return { ok: true, content: { commandShellId: "bash", exitCode: 0, stdout: "", stderr: "" } };
+      return undefined;
+    });
+    f.agent.continue = vi.fn(async () => {
+      const bash = f.agent.state.tools.find(tool => tool.name === "Bash")!;
+      const result = await bash.execute("actual-bash-call", { command: "printf verified" });
+      const text = result.content.filter(block => block.type === "text").map(block => block.text).join("\n");
+      expect(text).toContain('"refId":"actual-bash-call"');
+      expect(text).toContain('"kind":"tool_result"');
+      expect(result.details).toMatchObject({ commandShellId: "bash", exitCode: 0 });
+      await f.call("SubmitGoalReport", { summary: "Verified", verdict: "met" });
+      await f.respond();
+    });
+    try { await f.runtime.executeApprovedPlan(f.execution, "report-turn"); }
+    finally { await f.runtime.dispose(); }
+  });
 
   it("reconciles the progress checklist through its real tools before accepting met", async () => {
     const f = fixture();
@@ -221,7 +242,7 @@ describe("approved Goal report reconciliation", () => {
       await f.runtime.executeApprovedPlan(f.execution, "report-turn");
       expect(f.agent.continue).toHaveBeenCalledTimes(2);
       expect(f.host.call).toHaveBeenLastCalledWith("goalReports.submitDraft", {
-        executionId: f.execution.id, draft: expect.objectContaining({ verdict: "partial" }),
+        sessionId: f.execution.sessionId, executionId: f.execution.id, draft: expect.objectContaining({ verdict: "partial" }),
       });
     } finally { await f.runtime.dispose(); }
   });

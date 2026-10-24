@@ -1,6 +1,6 @@
 # ADR 0223: Context Usage Display Preference
 
-- Status: Accepted
+- Status: Accepted; default amended 2026-10-20 (D398 amendment, see decisions-log)
 - Date: 2026-09-11
 - Deciders: PI-Desktop desktop UI maintainers
 - Amends: 0184

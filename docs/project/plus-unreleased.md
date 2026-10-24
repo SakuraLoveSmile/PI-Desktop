@@ -2,6 +2,29 @@
 
 Upstream v0.15.6 → v0.16.1 has been merged.
 
+- Settings search opens matching rows directly, including option and help
+  matches. Narrow windows use a searchable category overlay with keyboard and
+  focus restoration. All sixteen pages share consistent action and state
+  layouts; editors retain failed-save drafts and keep save/cancel reachable.
+  Shortcuts and project memory gain filters, Expert Team uses a project picker,
+  and optional skill discovery scans only when expanded. Save success remains
+  distinguishable from a failed refresh; scopes and permissions are unchanged.
+
+- The workspace strip (project, location, branch) sits above the input card
+  and folds to the branch while a run is active. The reasoning chip shows Off
+  instead of hiding when reasoning is off. Queued follow-ups fold behind a
+  summary once two or more are waiting, and Edit, Move, and Remove moved into
+  each row's ⋯ menu; Send now appears on hover or focus.
+
+- External Goal approvals can bind required verification commands. Incomplete
+  or contradictory report checks return a correction error to the running
+  Agent before a valid draft is saved. A successful report must reference real
+  persisted Bash results from the same execution, with exact commands and
+  integer zero exit codes. Desktop and headless report submission wait for
+  transcript persistence and reject stale ownership. Existing unbound Goals
+  remain compatible. Plus schema 10 stores the optional binding behind the
+  normal verified upgrade backup; earlier binaries refuse the upgraded profile.
+
 - External schedulers can select a durable unattended interaction policy.
   `asktool` is hidden from discovery and a forbidden call stops the complete
   response before any tool executes, returning durable structured questions.
@@ -240,7 +263,7 @@ Upstream v0.15.6 → v0.16.1 has been merged.
 - OpenCode Zen Muse Spark 1.3 Contributor Free now uses its Responses API instead of falling back to Chat Completions. Other publishers, explicit API metadata and client identity are preserved.
 ### Composer metadata and compact agent rows
 
-The composer footer shows the current session's project, local/remote host, and known local Git branch. Unavailable project/branch metadata is omitted; remote sessions never borrow a local branch. Model menus list all models without a search field. Generation speed, full-turn token totals, cache metrics and context details are available from the bottom-right context meter. Subagent entries use transparent gradient-avatar rows with name, task, localized status and measured elapsed time; clicking a row opens read-only details, with no panorama entry. Validate model keyboard selection, footer metadata, context details and agent navigation in the isolated composer/transcript fixtures, including narrow layouts.
+The composer footer shows the current session's project, local/remote host, and known local Git branch; the branch chip is omitted without a project path and in remote sessions, which never borrow a local branch. A detached HEAD is named by its short commit (`Detached HEAD · abc1234`), and `No branch` appears only when neither a branch nor a commit is known. Model menus list all models without a search field. Generation speed, full-turn token totals, cache metrics and context details are available from the bottom-right context meter. Subagent entries use transparent gradient-avatar rows with name, task, localized status and measured elapsed time; clicking a row opens read-only details, with no panorama entry. Validate model keyboard selection, footer metadata, context details and agent navigation in the isolated composer/transcript fixtures, including narrow layouts.
 
 ### Recorded outputs, delegate details and project Skill suggestions
 
@@ -290,3 +313,15 @@ Validate count-to-dialog, keyboard/hover actions, project review/save, Ignore/co
   manual lane, separate from restart recovery. Candidate build receipts bind
   source/base revisions and executable hashes; these entries make no release,
   live-provider, Windows or user-acceptance claim.
+
+- Overview chrome lines up: the Activity entry shares the 48px disclosure
+  rhythm, file, subagent, reference and checklist rows start their text in the
+  same column as Team task titles, and the subagent panorama link matches Team
+  progress. Subagent badges show the localized outcome such as Completed instead
+  of the raw status, and the badge and panorama node share one tone.
+
+- Normal-session Overview follows the reference layout: session checklist rows
+  are one-line state glyphs with completed rows receding, section headers are
+  muted with dashed dividers, changed files show language glyphs, exact `+N` /
+  `−N` counts and a link to the Review tab, and references use underline tabs.
+  Expert Team task rows and their solid dividers are unchanged.

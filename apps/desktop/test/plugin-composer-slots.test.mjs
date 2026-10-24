@@ -105,17 +105,18 @@ test("Goal planning retains its mode entry and execution removes only that indic
   assert.deepEqual(ended, { left: [...HOST_LEFT, "chat.contractMode: settings.modeGoal"], right: HOST_RIGHT });
 });
 
-test("context footer identifies both known and unavailable usage with a visible label", async (t) => {
+test("context footer names the bar's direction by default, and the unavailable state keeps its label", async (t) => {
   const ssr = await composer(t);
   const { ContextUsageInspector } = await ssr.load("/src/components/ContextUsageInspector.tsx");
   const { ContextUsagePlaceholder } = await ssr.load("/src/features/chat/composer/ContextUsagePlaceholder.tsx");
   const usage = { inputTokens: 1_000, outputTokens: 200, totalTokens: 1_200 };
-  const known = ssr.render(createElement(ContextUsageInspector, { usage, turnUsage: usage, contextWindow: 200_000, tools: [], variant: "footer" }));
+  const used = ssr.render(createElement(ContextUsageInspector, { usage, turnUsage: usage, contextWindow: 200_000, tools: [], variant: "footer" }));
   const unknown = ssr.render(createElement(ContextUsagePlaceholder));
-  for (const html of [known, unknown]) {
-    assert.match(html, /<span class="composer-usage-label">Context<\/span>/);
+  assert.match(used, /<span class="composer-usage-label">Used<\/span>/);
+  assert.match(unknown, /<span class="composer-usage-label">Context<\/span>/);
+  for (const html of [used, unknown]) {
     assert.match(html, /composer-usage-context-track/);
   }
-  assert.match(known, /aria-haspopup="dialog"/);
+  assert.match(used, /aria-haspopup="dialog"/);
   assert.match(unknown, /disabled=""/);
 });

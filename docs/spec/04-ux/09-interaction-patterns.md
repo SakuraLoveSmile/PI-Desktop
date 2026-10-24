@@ -433,9 +433,13 @@ may be retained while exactly one workspace supplies the visible shell context.
   background, markdown links) are the same family: they portal to
   `document.body` as a viewport-fixed layer, measure before reveal so
   they never flash at the origin, clamp inside the viewport instead of
-  flipping, and close on outside press, Escape, Tab, window blur, or a
-  scroll of anything behind them. An empty item list never opens a
-  surface.
+  flipping, and close on outside press, Escape, Tab, window blur, or reader
+  scroll input (wheel, touch movement, or a scroll key outside a text field)
+  of anything behind them. A scroll the app or the layout makes, such as the
+  transcript re-pinning while a turn streams, leaves them open. The transcript's
+  message menu also closes when a turn starts or its pane leaves the screen,
+  because its Edit, Delete and revision items were gated when it opened. An
+  empty item list never opens a surface.
 
 ### 1.6 Local profile footer
 
@@ -781,10 +785,14 @@ may be retained while exactly one workspace supplies the visible shell context.
   actions. Accepted follow-ups clear the composer and
   append to that session's Host-owned, persisted FIFO queue; session switching
   never moves or clears another session's queue.
-- The queue renders above the composer. Each row has an independently
-  keyboard-reachable Remove action and a Send now action once Host admission
-  returns a durable id. While admission is pending, row actions are disabled
-  with Saving tooltips and a Saving label on Send now; edit/remove leave both
+- The queue renders above the workspace strip and the composer. Two or more
+  rows fold behind a summary that shows the count, the next message, and the
+  head's Abort offer; a single row is always listed, and a manual expansion
+  holds until the queue empties. Expanded rows show Send now on hover or focus
+  once Host admission returns a durable id, and keep Edit, Move up, Move down,
+  and Remove in a ⋯ menu. The head row shows its wait in place of Send now and
+  locks Edit and moves, but keeps Remove. While admission is pending, the row
+  shows a Saving label, its ⋯ trigger is disabled, and edit/remove leave both
   the queue and composer draft unchanged.
 - Send now moves its row to the head and requests the new `agent/stop` channel.
   The current assistant response and completed tool batch finish normally;
@@ -1345,6 +1353,15 @@ Project drag/drop follows these patterns:
   outside the project has no relative path to copy and says so. The OS default
   application is no longer what this click does, though that action stays
   reachable from the file view's own context menu.
+- Positioned local references accept `:line`, `:line:column`, `:start-end`,
+  `#Lstart` and `#Lstart-Lend` (case-insensitive `L`). Ranges jump to the start
+  line without adding a selection. Positions are positive safe integers and
+  range ends cannot precede their start. User chips, assistant inline code and
+  Markdown links retain the same target and position; one click opens once.
+  A positioned project file uses the host's read-only `file:` tab even when
+  the bundled file view is available. Main resolves exact paths first, then
+  only a unique complete suffix; ambiguous names open nothing and never fall
+  through to another root. No shorter suffix or depth heuristic guesses a file.
 - In the host `file:` tab, a conversation MP4 that cannot be previewed because
   it is binary or exceeds the text preview limit offers **Open with default
   application**. This applies to named `.mp4` files and extensionless

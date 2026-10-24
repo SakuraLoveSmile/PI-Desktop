@@ -532,11 +532,14 @@ function InlineCode({
       type="button"
       className="chat-code-link"
       title={target.kind === "file" ? fileTitle : urlTitle}
-      onClick={() =>
+      onClick={(event) => {
+        // Linkified code can sit inside an anchor; one click opens it once.
+        event.preventDefault();
+        event.stopPropagation();
         target.kind === "file"
-          ? openFileRef(text ?? target.path, baseDir)
-          : openHttpUrl(target.url)
-      }
+          ? openFileRef(target.path, baseDir, undefined, { line: target.line, column: target.column })
+          : openHttpUrl(target.url);
+      }}
       onContextMenu={
         target.kind === "file" && openFileMenu
           ? (event) =>
@@ -656,7 +659,7 @@ function Anchor({
     const ref = target?.kind === "file" ? target.path : toWorkspaceRel(decoded, root, baseDir);
     if (ref) {
       e.preventDefault();
-      openFileRef(ref, baseDir);
+      openFileRef(ref, baseDir, undefined, target?.kind === "file" ? { line: target.line, column: target.column } : undefined);
     }
   };
   return (

@@ -6,10 +6,6 @@ const appShell = await readFile(
   new URL("../src/features/app/AppShell.tsx", import.meta.url),
   "utf8",
 );
-const settingsPage = await readFile(
-  new URL("../src/features/settings/SettingsPage.tsx", import.meta.url),
-  "utf8",
-);
 
 test("settings hides and inerts chat without aria-hiding a focused descendant", () => {
   const chatShell = appShell.match(
@@ -22,14 +18,7 @@ test("settings hides and inerts chat without aria-hiding a focused descendant", 
   assert.doesNotMatch(chatShell, /aria-hidden/);
 });
 
-test("entering Settings moves focus to its first search control", () => {
-  assert.match(settingsPage, /const settingsSearchRef = useRef<HTMLInputElement>\(null\)/);
-  assert.match(
-    settingsPage,
-    /settingsSearchRef\.current\?\.focus\(\{ preventScroll: true \}\)/,
-  );
-  assert.match(settingsPage, /<input\s+ref=\{settingsSearchRef\}/);
-});
+// Search focus is exercised through the mounted production page in e2e-settings-scroll.
 
 test("chat code loads inside the existing route boundary and stays mounted in Settings", () => {
   assert.match(

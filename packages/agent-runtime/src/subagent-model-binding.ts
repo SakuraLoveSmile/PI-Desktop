@@ -13,7 +13,7 @@ import {
   withOpenCodeSessionHeaders,
 } from "./opencode-session-headers.js";
 import { mergeProviderHeaders, withProviderHeaders } from "./provider-headers.js";
-import { clampOutputToContext } from "./output-cap.js";
+import { clampOutputToContext, requestTranscript } from "./output-cap.js";
 import {
   agentThinkingLevel as agentThinkingLevelFor,
   omitThinkingModel as withOmittedThinking,
@@ -69,6 +69,7 @@ export function subagentModelBinding(opts: {
       retry.headers = undefined;
       retry.status = undefined;
       retry.failure = undefined;
+      const requestContext = requestTranscript(m, context);
       const requestOptions = withProviderHeaders(
         withOpenCodeSessionHeaders(
           {
@@ -76,7 +77,7 @@ export function subagentModelBinding(opts: {
             // Same request-side output cap as the parent runtime: the
             // `omit` branch hits pi-ai's low-level `stream` which never
             // re-derives max_tokens (issue B).
-            maxTokens: clampOutputToContext(m, context, options?.maxTokens),
+            maxTokens: clampOutputToContext(m, requestContext, options?.maxTokens),
             maxRetries: 0,
             sessionId: opts.sessionId,
             fetch: providerRequestFetch(
@@ -105,7 +106,7 @@ export function subagentModelBinding(opts: {
       );
       return createProviderRetryStream(
         m,
-        context,
+        requestContext,
         requestOptions,
         (retryOptions) => {
           const observer = opts.onContext ? contextRequestObserver(m, context, { providerId: opts.provider.id,
@@ -119,8 +120,8 @@ export function subagentModelBinding(opts: {
           } } : retryOptions;
           return accountModelStream(m, () =>
             omitThinking
-              ? models.stream(omitThinkingModel, context, observedOptions)
-              : models.streamSimple(m, context, observedOptions), {
+              ? models.stream(omitThinkingModel, requestContext, observedOptions)
+              : models.streamSimple(m, requestContext, observedOptions), {
                 providerId: opts.provider.id,
                 nativeCost: opts.provider.modelConfig?.nativeCost,
                 onUsage: opts.onUsage,

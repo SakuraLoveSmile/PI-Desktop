@@ -12,6 +12,8 @@ mod project_code_search;
 mod project_history;
 mod project_memory_projects;
 #[cfg(test)]
+mod required_verification_tests;
+#[cfg(test)]
 #[path = "../team/run_limits_pending_tests.rs"]
 mod run_limits_pending_tests;
 mod scheduled_rpc;
@@ -1330,6 +1332,9 @@ fn shell_changed_result(
 
 fn plan_rpc_err(error: impl ToString) -> JsonRpcError {
     let message = error.to_string();
+    if message.starts_with("INVALID_ARGUMENT:") {
+        return rpc_err(1002, message, "INVALID_ARGUMENT");
+    }
     let error_code = message
         .split_whitespace()
         .next()
@@ -4252,6 +4257,8 @@ async fn handle_request_inner(
                             target_permission_mode: target,
                         },
                         crate::plans::PlanResolveOptions {
+                            required_verification_commands: params
+                                .get("requiredVerificationCommands"),
                             execution_provider_id: params
                                 .get("executionProviderId")
                                 .and_then(|v| v.as_str()),

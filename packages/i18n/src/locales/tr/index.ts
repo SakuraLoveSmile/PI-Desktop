@@ -283,6 +283,7 @@ export const tr = {
     contractPlanDesc: "Yürütmeden önce yapılandırılmış bir plan hazırlar ve inceler",
     contractGoalDesc: "Hedef çıktıyı ve kabul kriterlerini tanımlar",
     contractMode: "Sözleşme modu",
+    exitPlanMode: "Plan modundan çık",
     executionProfile: "Yürütme profili",
     tableActions: "Tablo işlemleri",
     copyTableMarkdown: "Tabloyu Markdown olarak kopyala",
@@ -346,6 +347,11 @@ export const tr = {
     },
     queuedPrompts: "Kuyruktaki iletiler",
     queueNext: "Sonraki: {{message}}",
+    queueCount: "Kuyrukta {{count}}",
+    queueMoreActions: "Diğer işlemler",
+    topStripExpand: "Çalışma alanı ayrıntılarını göster",
+    topStripCollapse: "Çalışma alanı ayrıntılarını gizle",
+    thinkingOff: "Kapalı",
     queuedPromptEmpty: "Kuyruktaki ileti",
     removeQueuedPrompt: "Kuyruktaki iletiyi kaldır",
     sendNow: "Şimdi gönder",
@@ -435,6 +441,8 @@ export const tr = {
     usageContextUnavailable: "Bağlam kullanımı henüz mevcut değil",
     compactContext: "Bağlamı sıkıştır",
     usageContextLabel: "Bağlam",
+    usageContextRemainingLabel: "Kalan",
+    usageContextUsedLabel: "Kullanılan",
     usageContextLeft: "{{count}} token kaldı",
     usageContextSpent: "{{count}} token kullanıldı",
     usageContextTokens: "{{used}} / {{window}} token",
@@ -471,6 +479,7 @@ export const tr = {
       noGit: "Bu dizin bir Git deposu değil.",
       worktreeUnavailable: "Commit edilmiş bir HEAD gerekiyor.",
       noBranch: "Dal yok",
+      detachedHead: "Ayrık HEAD · {{sha}}",
       branchName: "Dal adı",
       createSwitch: "Oluştur ve geç",
       branchSearch: "Dalları ara",
@@ -700,6 +709,8 @@ export const tr = {
     progressListLabel: "Hedef görev listesi",
     progressInitializing: "İlerleme yükleniyor…",
     progressFailed: "İlerleme bilgisi kullanılamıyor",
+    progressDescription: "Hedef açıklaması",
+    progressNotReported: "Hedef maddeleri için henüz ilerleme bildirilmedi.",
     planning: "Hedef tanımlanıyor",
     approvalRegion: "Hedef onayı",
     readyAnnouncement: "Hedef sözleşmesi hazır. Çalışma panelinde açık.",
@@ -729,6 +740,54 @@ export const tr = {
     dismiss: "Kapat",
   },
   settings: {
+    "capabilitySaveFailed": "Kaydedilemedi. Taslağınız korundu. {{message}}",
+
+    "categories": "Ayar kategorileri",
+    "executionDefaults": "Çalıştırma",
+    "conversationDisplay": "Sohbet ve görünüm",
+    "activeSessionOverrideState": "Oturuma özel izin ayarını kullanıyor",
+    "activeSessionInheritState": "Varsayılan izni devralıyor",
+    "applicationSupport": "Uygulama ve destek",
+    "technicalDetails": "Teknik ayrıntılar",
+    "protocolVersion": "Protokol {{version}}",
+    "hostVersion": "Host {{version}}",
+    "softwareUpdates": "Yazılım güncellemeleri",
+    "saveState": {
+      "saving": "Kaydediliyor…",
+      "saved": "Ayarlar kaydedildi",
+      "failed": "Kaydedilemedi. Önceki ayarlarınız korunuyor.",
+      "refreshFailed": "Ayarlar kaydedildi ancak mevcut görünüm yenilenemedi."
+    },
+    "shortcutSearch": "Eylem veya tuş ara",
+    "shortcutFilter": "Kısayol filtresi",
+    "shortcutFilterAll": "Tümü",
+    "shortcutFilterModified": "Değiştirilenler",
+    "shortcutCount": "{{count}} kısayol",
+    "shortcutNoMatches": "Bu filtrelerle eşleşen kısayol yok.",
+    "shortcutClearFilters": "Filtreleri temizle",
+    "shortcutRecordingCancel": "Kaydı iptal etmek için Escape tuşuna basın.",
+    "preferenceSaved": "Kaydedildi",
+    "promptEnhancementDefaultTemplateActive": "Yerleşik şablon kullanılıyor",
+    "closeBehaviorLoadError": "Pencereyi kapatma davranışı yüklenemedi. Değiştirmek için yeniden deneyin.",
+    "modelsWorkbenchHint": "Varsayılan modelleri seçin, AI hizmetlerini ve hesaplarını yönetin ve model kataloğunu güncel tutun.",
+    "configureServices": "Hizmetleri yapılandır",
+    "modelSavedRefreshFailed": "Kaydedildi ancak hizmet listesi yenilenemedi: {{error}}",
+    "modelSavedFollowupFailed": "Hizmet kaydedildi ancak varsayılan modeli güncellenemedi: {{error}}",
+    "instructionsLoadFailed": "Talimatlar yüklenemedi: {{message}}",
+    "instructionsSaveFailed": "Talimatlar kaydedilemedi: {{message}}",
+    "instructionsUnsaved": "Kaydedilmemiş değişiklikler",
+    "instructionsSaved": "Talimatlar kaydedildi",
+    "mcpIntro": "Ajanlarınızın genel olarak veya bir projede kullanabileceği sunucuları yönetin.",
+    "subagentsIntro": "Ajan tanımlarını yönetin, ardından aşağıdaki çalıştırma sınırlarını ayarlayın.",
+    "importSessionsScanDesc": "Diğer araçlardaki yerel sohbetleri bulun. İçe aktarmadan önce sohbetleri inceleyip seçin.",
+    "pluginScenic": {
+      "backdropBlur": "Arka plan bulanıklığı",
+      "appliesTo": "{{theme}} temasına uygulanır",
+      "applying": "Uygulanıyor…",
+      "apply": "Uygula",
+      "saved": "Arka plan bulanıklığı kaydedildi."
+    },
+
     storage: {
       unavailableHint: "Depolama dizini şu anda kullanılamıyor. Başlatmadan önce sürücüyü yeniden bağlayın; uygulama boş veri oluşturmaz veya başka bir dizine geçmez.",
       browserSource: "Tarayıcı verisi kaynağı",
@@ -774,6 +833,10 @@ export const tr = {
       operationError: "Depolama işlemi başlatılamadı. {{error}}",
     },
     expertTeam: {
+      "projectOverrides": "Projeye özel ayarlar",
+      "selectProject": "Projeye özel ayar seçin",
+      "removedProject": "Kaldırılan proje",
+
       runLimits: en.settings.expertTeam.runLimits,
       title: "Uzman ekibi",
       description: "Yerleşik altı uzman için model, akıl yürütme düzeyi, araç alt kümesi ve ek talimatları yapılandırın. Değişiklikler yalnızca bundan sonra başlatılan uzmanları etkiler. Composer modeli Lead ve modeli sabitlenmemiş uzmanlar için de geçerlidir. İsteğe bağlı araç kısıtlamaları yalnızca kullanılabilirliği daraltır; izin vermez.",
@@ -926,6 +989,9 @@ sklm: {
       voice: "Ses",
     },
     memory: {
+      "search": "Proje adlarında veya yollarında ara",
+      "resultCount": "{{total}} projenin {{count}} tanesi",
+
       title: "Bellek",
       description:
         "Kaydedilen anıları ve otomatik kaydı projeye göre yönetin. Aynı gruptaki projeler belleği paylaşır; diğer projeler ayrı kalır.",
@@ -934,6 +1000,8 @@ sklm: {
       loadFailed: "Proje listesi yüklenemedi. Yeniden deneyin.",
     },
     configSync: {
+      "retry": "Yeniden dene",
+
       title: "Bulut senkronizasyonu",
       experimental: "Deneysel",
       connectionTitle: "WebDAV bulut senkronizasyonu",
@@ -1223,6 +1291,10 @@ sklm: {
     skillBatchImported: "{{count}} beceri klasörü içe aktarıldı",
     skillBatchFailed: "{{count}} klasör içe aktarılamadı. İlk hata: {{first}}",
     skillsEmpty: "Bu klasörde beceri yok",
+    skillsIntro: "Ajanlarınız için yeniden kullanılabilir iş akışları kaydedin.",
+    skillsGlobalEmptyHint: "Bir beceri oluşturun veya dosya ya da klasörden içe aktarın.",
+    skillsProjectEmptyHint: "Becerilerini burada yönetmek için Projeler bölümünden bir proje ekleyin.",
+    skillsManageProjects: "Projeleri yönet",
     subagentsEmpty: "Henüz kendi alt ajanınız yok",
     subagentRuntimeLimits: "Görev devretme sınırları",
     subagentRuntimeLimitsDesc: "Tek ajanlar ve ekip uzmanları bu sınırlar içinde bağımsız görevleri devredebilir. Değişiklikler sonraki görev çalıştırmasında geçerli olur.",
@@ -1260,6 +1332,8 @@ sklm: {
       turnedOff: "Yerel denetim uç noktası kapalı",
     },
     mcpMarket: {
+      "remotePartial": "Bazı kayıt kaynakları kullanılamıyor ({{names}})",
+
       browse: "Market",
       back: "Sunucularım",
       title: "MCP Market",
@@ -1337,6 +1411,8 @@ sklm: {
     import: "İçe aktar",
     projectArchive: "Proje arşivi",
     remoteHosts: {
+      "retry": "Yeniden dene",
+
       title: "Uzak ana bilgisayarlar",
       listError: "Ana bilgisayarlar yüklenemedi",
       loading: "Yükleniyor…",
@@ -1438,6 +1514,7 @@ sklm: {
     marketCustomUrlPlaceholder: "https://example.com/catalog.json",
     search: "Ayarlarda ara",
     searchPlaceholder: "Ayarlarda ara…",
+    searchResults: "Arama sonuçları ({{count}})",
     noResults: "Eşleşen ayar yok",
     enterToSend: "Enter ile gönder",
     enterToSendDesc: "Kapalı: göndermek için ⌘/Ctrl+Enter.",
@@ -1801,6 +1878,9 @@ sklm: {
     promptEnhancementSaveError: "Prompt iyileştirme ayarları kaydedilemedi.",
   },
   project: {
+    "loadFailed": "Proje listesi yüklenemedi",
+    "loadFailedRetained": "Kullanılabilir projeler aşağıda gösteriliyor. Tam listeyi yüklemek için yeniden deneyin.",
+
     open: "Proje aç",
     openFolder: "Klasörü aç",
     none: "Proje yok",
@@ -2248,7 +2328,7 @@ sklm: {
       goalReport: "Hedef Raporu",
     },
     overview: {
-      specs: "Özellikler", changedFiles: "Değiştirilen dosyalar", attachments: "Ekler", skills: "Beceriler", memory: "Bellek", mcp: "MCP",
+      specs: "Özellikler", changedFiles: "Değiştirilen dosyalar", viewAllChanges: "Tüm değişiklikleri görüntüle", attachments: "Ekler", skills: "Beceriler", memory: "Bellek", mcp: "MCP",
       noRecordedSkills: "Bu görüşmede kaydedilmiş beceri yok", noRecordedMemory: "Bu görüşmede kaydedilmiş bellek yok", noRecordedMcp: "Bu görüşmede kaydedilmiş MCP kullanımı yok",
       recordedChangesNote: "Yalnızca şu anda yüklenmiş görüşmede başarıyla kaydedilen değişiklikler gösterilir; bu, tüm Git değişikliklerinin listesi değildir.",
       noSession: "Oturum seçilmedi", untitled: "Adsız oturum", project: "Proje", model: "Model", modeLabel: "Mod", messages: "Mesajlar", notAvailable: "Kullanılamıyor", progress: "İlerleme", statusLabel: "Geçerli durum", noPlans: "Bu oturumda plan etkinliği yok", artifacts: "Yapaylar", noArtifacts: "Bu oturumda yapay yok", references: "Başvurular", noReferences: "Açık dosya başvurusu yok", mode: { chat: "Sohbet", plan: "Plan", goal: "Hedef" }, subagents: "Subagents", noSubagents: "No subagents delegated in this session", teamSection: "Expert Team", status: { idle: "Boşta", running: "Çalışıyor", planning: "Planlanıyor", awaiting_approval: "Onay bekleniyor", pending: "Beklemede", approved: "Onaylandı", rejected: "Reddedildi", expired: "Süresi doldu", interrupted: "Kesildi", queued: "Kuyrukta", completed: "Tamamlandı", failed: "Başarısız" }
@@ -2323,6 +2403,9 @@ sklm: {
     loadDev: "Yerel eklenti yükle",
     loadDevDone: "Yerel eklenti yüklendi",
     piSkillsTitle: "pi CLI becerileri",
+    piSkillsSummary: "pi CLI ile yüklenmiş yerel beceri paketlerini yeniden kullanın.",
+    piSkillsDiscoveryFailed: "Yerel paketler okunamadı. Yenilemeyi deneyin.",
+    piSkillsDiscoveryPartial: "Bazı konumlar okunamadı. Bulunan paketler kullanılabilir.",
     piSkillsHint: "Yüklü npm paketleri salt okunur olarak keşfedilir. Yalnızca güvendiğiniz paketleri içe aktarın; sonra Eklentiler bölümünden yönetin.",
     piSkillsConfirm: "Bu pi paketi içe aktarılsın ve etkinleştirilsin mi?",
     piSkillsExecutable: "Bu paket çalıştırılabilir uzantılar içerir. İçe aktarma, ajanda güvenilir kodu etkinleştirir ve bağımlılıkları yükleyebilir.",

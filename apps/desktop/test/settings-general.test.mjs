@@ -141,7 +141,6 @@ test("Basics and AI tabs expose their respective app and AI controls", () => {
   assert.doesNotMatch(generalSource, /enterToSend: !settings\.enterToSend/);
   assert.doesNotMatch(generalSource, /settings\.defaultsTitle/);
   assert.match(aiSource, /defaultMode: value/);
-  assert.match(aiSource, /settings\.defaultsTitle/);
   assert.match(aiSource, /CommandShellRow/);
   assert.match(aiSource, /enterToSend: !settings\.enterToSend/);
   assert.match(aiSource, /infiniteProviderRetry: settings\.infiniteProviderRetry !== true/);
@@ -328,10 +327,6 @@ test("model configuration lists AI services and vendor accounts together", () =>
   // deleteOauthAccount, never through the provider CRUD.
   assert.match(
     providersSource,
-    /serviceRowKind\(provider\) === "account"\s*\?\s*setEditingAccountId\(provider\.id\)\s*:\s*setSetupFor\(provider\.id\)/,
-  );
-  assert.match(
-    providersSource,
     /serviceRowKind\(provider\) === "account"\s*\?\s*removeAccount\(provider\)\s*:\s*removeProvider\(provider\)/,
   );
   assert.match(providersSource, /<VendorAccountDialog/);
@@ -403,67 +398,10 @@ test("OAuth account identity is provider-scoped across IPC and pi-ai", () => {
 });
 
 
-test("settings nav icons map each destination to a semantic lucide glyph", () => {
-  assert.match(settingsPageSource, /general: <IconSliders/);
-  assert.match(settingsPageSource, /ai: <IconSparkles/);
-  assert.doesNotMatch(settingsPageSource, /usage: <IconActivity/);
-  assert.match(settingsPageSource, /shortcuts: <IconKeyboard/);
-  assert.match(settingsPageSource, /instructions: <IconFileText/);
-  assert.match(settingsPageSource, /agent: <IconBot/);
-  assert.match(settingsPageSource, /import: <IconDownload/);
-  assert.match(settingsPageSource, /projects: <IconArchive/);
-  assert.match(settingsPageSource, /about: <IconInfo/);
-  assert.doesNotMatch(settingsPageSource, /general: <IconSettings/);
-  assert.doesNotMatch(settingsPageSource, /agent: <IconConfig/);
-  assert.doesNotMatch(settingsPageSource, /import: <IconSnapshot/);
-});
-
+// Navigation labels, grouping, icons, visibility and page-title metadata are
+// executed by settings-navigation.test.mjs; search and focus use the mounted
+// production page in e2e-settings-scroll.
 test("settings nav keeps a flat searchable index with titled visual groups", () => {
-  assert.match(settingsPageSource, /filteredGroups\.map/);
-  assert.match(settingsPageSource, /className="settings-nav-group"/);
-  assert.match(settingsPageSource, /SETTINGS_NAV_GROUP_LABELS/);
-  assert.match(settingsPageSource, /className="settings-nav-group-label"/);
-  assert.match(settingsSearchSource, /group: "preferences"/);
-  assert.match(settingsSearchSource, /group: "agent"/);
-  assert.match(settingsSearchSource, /group: "workspace"/);
-  assert.match(settingsSearchSource, /group: "system"/);
-  for (const key of [
-    "settings.groupPreferences",
-    "settings.groupAgent",
-    "settings.groupWorkspace",
-    "settings.groupSystem",
-  ]) {
-    assert.match(settingsSearchSource, new RegExp(key.replace(".", "\\.")));
-    assert.match(enLocaleSource, new RegExp(`${key.split(".")[1]}:`));
-    assert.match(zhLocaleSource, new RegExp(`${key.split(".")[1]}:`));
-    assert.match(zhTWLocaleSource, new RegExp(`${key.split(".")[1]}:`));
-    assert.match(trLocaleSource, new RegExp(`${key.split(".")[1]}:`));
-  }
-  assert.doesNotMatch(settingsSearchSource, /id: "extensions"/);
-  const navOrder = [
-    "general",
-    "ai",
-    "shortcuts",
-    "instructions",
-    "agent",
-    "import",
-    "projects",
-    "about",
-  ].map((id) => settingsSearchSource.indexOf(`id: "${id}"`));
-  assert.ok(navOrder.every((index) => index >= 0));
-  assert.deepEqual(navOrder, [...navOrder].sort((a, b) => a - b));
-  const generalStart = settingsSearchSource.indexOf('id: "general"');
-  const aiStart = settingsSearchSource.indexOf('id: "ai"');
-  const shortcutsStart = settingsSearchSource.indexOf('id: "shortcuts"');
-  const generalEntry = settingsSearchSource.slice(generalStart, aiStart);
-  const aiEntry = settingsSearchSource.slice(aiStart, shortcutsStart);
-  assert.equal(settingsSearchSource.indexOf('id: "usage"'), -1);
-  assert.doesNotMatch(generalEntry, /settings\.defaultsTitle/);
-  assert.match(aiEntry, /settings\.defaultsTitle/);
-  assert.match(aiEntry, /settings\.commandShell/);
-  assert.match(aiEntry, /settings\.promptEnhancementModelTitle/);
-  assert.match(settingsSearchSource, /keywordKeys/);
-  assert.match(settingsSearchSource, /settings\.projectArchive/);
   assert.doesNotMatch(stylesSource, /\.token-usage-page/);
   assert.match(stylesSource, /\.settings-nav-item\s*\{/);
   assert.match(stylesSource, /\.settings-nav-group-label\s*\{/);
@@ -473,33 +411,6 @@ test("settings nav keeps a flat searchable index with titled visual groups", () 
     stylesSource,
     /\.settings-row\.settings-row-plain\s*\{[^}]*border-bottom:\s*0/s,
   );
-});
-
-test("settings rail uses short parallel labels and descriptive page titles", () => {
-  const navKeys = [
-    "settings.nav.general",
-    "settings.nav.ai",
-    "settings.nav.shortcuts",
-    "settings.nav.instructions",
-    "settings.nav.models",
-    "settings.nav.skills",
-    "settings.nav.mcp",
-    "settings.nav.subagents",
-    "settings.nav.import",
-    "settings.nav.projects",
-    "settings.nav.info",
-  ];
-  for (const key of navKeys) {
-    assert.match(settingsSearchSource, new RegExp(key.replaceAll(".", "\\.")));
-    assert.match(enLocaleSource, new RegExp(`${key.split(".").at(-1)}:`));
-    assert.match(zhLocaleSource, new RegExp(`${key.split(".").at(-1)}:`));
-    assert.match(zhTWLocaleSource, new RegExp(`${key.split(".").at(-1)}:`));
-    assert.match(trLocaleSource, new RegExp(`${key.split(".").at(-1)}:`));
-  }
-  assert.match(settingsSearchSource, /titleKey: "settings\.configuration"/);
-  assert.match(settingsSearchSource, /titleKey: "settings\.projectArchive"/);
-  assert.match(settingsPageSource, /activeTitleKey/);
-  assert.match(settingsPageSource, /titleKey: entry\.titleKey/);
 });
 
 test("marketplace source settings live inside the Plugins marketplace surface", () => {

@@ -67,6 +67,13 @@ request. It does not cancel an active provider stream or running tool. An idle
 runtime returns `{ requested: false }`; immediate `abort()` remains the
 separate cancellation path.
 
+Immediate abort drives active tool cancellation directly. Bash and image tools
+share one ten-second grace window for their execution result and Host abort
+acknowledgement; an unanswered abort RPC cannot extend that window. Partial
+results already returned by the Host are retained. After the deadline, late
+results cannot enter a subsequent turn, and a late abort failure is logged with
+the original turn/tool identity rather than emitted into the current transcript.
+
 ### 4.0 Active-turn steering
 
 `steer` validates the current turn identity before changing any state, then
@@ -249,6 +256,11 @@ state are untouched: the failed assistant is removed from the next model context
 and the same visible message id is reused, so a retry never restarts the turn or
 re-runs a completed tool call.
 
+Compaction may already have removed the failed assistant before retry recovery
+runs. Main sessions and delegates continue from that retained transcript without
+requiring a failed assistant row. Any remaining trailing failed assistants are
+removed while chronological system updates and completed tool results survive.
+
 The application setting `infiniteProviderRetry` is off by default. When enabled,
 the main session and its builtin subagents skip only the ten-retry ceiling for
 `NETWORK_ERROR`, `TIMEOUT`, `STREAM_FAILED`, retryable `PROVIDER_ERROR`
@@ -352,12 +364,13 @@ keeps its full re-run and error path. Every new run recomputes it from the
 prompt's provenance. Ordinary user input, task/message deliveries, copied
 source framing, and restored history cannot enable it.
 
-An accepted silent reply is still not worth resending. Main persists it as an
-empty completed row (the transcript hides it and the host stores no text), but
-the runtime keeps it out of its entries and out of pi's transcript state, and
-the context projection drops any assistant with no content blocks, exactly as
-a restored transcript already did. The next provider request therefore carries
-no empty assistant message.
+An accepted silent reply is still not worth resending. Main omits a genuinely
+empty assistant row from persistence regardless of its status. Rows carrying
+thinking, a structured error, a tool association or a steering reservation
+remain durable, including Goal and Team metadata. The runtime keeps accepted
+silence out of its entries and pi's transcript state; the context projection
+also drops assistants with no content blocks. The next request therefore
+carries no empty assistant message, while normal terminal lifecycle still runs.
 
 Decision D193 and D446 (ADR 0239 amendment); see E2E-146 and
 E2E-SESSION-completion-notice-allows-silence.
@@ -565,6 +578,14 @@ the pi-ai chars/4 baseline plus a CJK correction, then reserves the larger of
 of the configured value and the published catalog window when both are known;
 this prevents an oversized user override from bypassing compaction and output
 protection. Unknown windows preserve the configured output budget.
+
+For parent and delegate requests, both output clamps use the same transcript
+that the provider adapter receives. Unless the model explicitly declares
+mid-conversation system support, pi-ai folds superseded system snapshots into
+one leading current instruction/tool snapshot before estimation and streaming.
+Models that support chronological system updates retain them. Context budget
+calibration, compaction and the Context Insights chronological capture keep
+their existing basis; its provider-payload capture records the actual request.
 
 The incoming user prompt participates in budgeting before the first provider
 request. The automatic summary request retries transient provider failures
@@ -892,6 +913,14 @@ If this continuation still leaves no valid report, the Host settles the Goal as
 blocked; it never synthesizes automatic fallback completion. The report-only
 allowance resets once per resumed segment, not once per model round. There is
 no automatic blocked-Goal retry loop.
+
+Goal execution Bash results expose the actual tool call ID in model-visible
+text with a `tool_result` evidence reference example. `commandShellId` selects
+the shell and must never be used as a report evidence ID. For Goals with
+approval-bound verification commands, Host rejects a successful draft whose
+required checks cannot be proven from this execution's durable native command
+results. The same running execution receives correction guidance through
+`SubmitGoalReport`; it does not need a replacement approval or silent replay.
 
 Automatic completion requires a valid structured draft with `verdict = met`,
 all items in an existing matching Goal progress snapshot completed, and no open
@@ -1524,6 +1553,12 @@ payload hook keeps its own object and its return value still wins.
 + [optional user custom instructions]
 ```
 
+Operational guidance asks for local file citations as Markdown links to exact
+absolute paths, optionally with a starting line/column. Paths containing spaces
+use angle-bracket destinations. Unavailable or other-repository paths remain
+code text rather than guessed links; the renderer still accepts supported
+range/anchor forms supplied by users or existing transcripts.
+
 ### 7.0.0 Chronological system state (issue #1285)
 
 The Pi agent loop owns `toolsAdded` / `toolsRemoved` declarations, including
@@ -1951,7 +1986,7 @@ browseable.
 ### Provider certificate trust (issue #714)
 
 The desktop sidecar's effective trust set is the union of Node's bundled
-roots, the inherited `NODE_EXTRA_CA_CERTS` set, and the OS trust store, with
+roots, the inherited `NODE_EXTRA_CA_CERTS` set, and non-expired OS trust anchors, with
 chain and hostname validation on. On Windows and Linux the launcher passes
 Node's `--use-system-ca` to obtain the system roots. On macOS the Electron
 build applies that flag by replacing the bundled roots instead of adding them
@@ -1960,6 +1995,11 @@ launcher omits the flag and the sidecar merges the three sets into the default
 CA set itself at startup (`agent-runtime system-ca`). Restart after updating
 local trust or the extra-CA startup environment. Headless pi-host launch
 behavior and System/Direct/Custom proxy routing are unchanged.
+
+The startup merge excludes OS entries whose `validTo` is at or before startup
+time, so an expired cached anchor cannot terminate an otherwise valid chain.
+Bundled and inherited extra roots are not filtered. Certificate chain,
+expiration and hostname validation remain enabled; no OS store is modified.
 
 Explicit certificate verification errors are terminal for both setup and
 stream recovery in main sessions and built-in delegates. Their structured

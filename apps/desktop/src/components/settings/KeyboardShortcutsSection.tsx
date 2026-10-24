@@ -16,7 +16,8 @@ import {
   type ShortcutPlatform,
 } from "@pi-desktop/shared";
 import { IconPower, IconSnapshot } from "../icons";
-import { TooltipButton } from "../ui";
+import { Badge, Button, Input, SegmentedControl, TooltipButton } from "../ui";
+import { SettingsEmptyState } from "../../features/settings/primitives";
 
 type Props = {
   settings: AppSettings;
@@ -67,6 +68,11 @@ export function KeyboardShortcutsSection({ settings, platform, saveSettings }: P
   const { t } = useTranslation();
   const [recordingId, setRecordingId] = useState<KeyboardShortcutId | null>(null);
   const [savingId, setSavingId] = useState<KeyboardShortcutId | null>(null);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<"all" | "modified">("all");
+  const [resetting, setResetting] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
   const [error, setError] = useState<{ id: KeyboardShortcutId; message: string } | null>(
     null,
   );
@@ -75,17 +81,31 @@ export function KeyboardShortcutsSection({ settings, platform, saveSettings }: P
     () =>
       GROUP_ORDER.map((group) => ({
         group,
-        shortcuts: KEYBOARD_SHORTCUTS.filter((shortcut) => shortcut.group === group),
-      })),
-    [],
+        shortcuts: KEYBOARD_SHORTCUTS.filter((shortcut) => {
+          if (shortcut.group !== group) return false;
+          if (filter === "modified" && !Object.prototype.hasOwnProperty.call(settings.keybindings ?? {}, shortcut.id)) return false;
+          const binding = resolveKeybinding(shortcut, settings.keybindings, platform);
+          const searchable = [
+            t(shortcutLabelKey(shortcut.id)),
+            binding ?? t("settings.shortcutUnbound"),
+            binding ? keybindingDisplayParts(binding, platform).join("+") : "",
+          ].join(" ").toLocaleLowerCase();
+          return searchable.includes(query.trim().toLocaleLowerCase());
+        }),
+      })).filter(({ shortcuts }) => shortcuts.length > 0),
+    [filter, platform, query, settings.keybindings, t],
   );
   const hasOverrides = Object.keys(settings.keybindings ?? {}).length > 0;
+  const visibleCount = groups.reduce((count, { shortcuts }) => count + shortcuts.length, 0);
+  const busy = savingId !== null || resetting;
 
   const storeBinding = async (
     shortcut: KeyboardShortcutDefinition,
     binding: string | null,
     mode: "binding" | "disabled" | "default" = "binding",
   ) => {
+    setSaved(false);
+    setResetError(null);
     const next = { ...(settings.keybindings ?? {}) };
     if (mode === "default") {
       delete next[shortcut.id];
@@ -115,9 +135,11 @@ export function KeyboardShortcutsSection({ settings, platform, saveSettings }: P
     }
     setSavingId(shortcut.id);
     setError(null);
+    setSaved(false);
     try {
       await saveSettings({ keybindings: next });
       setRecordingId(null);
+      setSaved(true);
     } catch (saveError) {
       setError({
         id: shortcut.id,
@@ -129,10 +151,27 @@ export function KeyboardShortcutsSection({ settings, platform, saveSettings }: P
     }
   };
 
+  const resetAll = async () => {
+    setRecordingId(null);
+    setError(null);
+    setResetError(null);
+    setSaved(false);
+    setResetting(true);
+    try {
+      await saveSettings({ keybindings: {} });
+      setSaved(true);
+    } catch (cause) {
+      setResetError(cause instanceof Error ? cause.message : t("settings.shortcutSaveFailed"));
+    } finally {
+      setResetting(false);
+    }
+  };
+
   const recordBinding = (
     event: ReactKeyboardEvent<HTMLButtonElement>,
     shortcut: KeyboardShortcutDefinition,
   ) => {
+    if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
     event.preventDefault();
     event.stopPropagation();
     if (event.key === "Escape") {
@@ -158,20 +197,47 @@ export function KeyboardShortcutsSection({ settings, platform, saveSettings }: P
         <div>
           <h3 className="settings-card-heading">{t("settings.keyboard")}</h3>
         </div>
-        <button
+        <Button
           type="button"
+          variant="ghost"
           className="settings-text-action"
-          disabled={!hasOverrides || savingId !== null}
-          onClick={() => {
-            setRecordingId(null);
-            setError(null);
-            void saveSettings({ keybindings: {} });
-          }}
+          disabled={!hasOverrides || busy}
+          onClick={() => void resetAll()}
         >
           <IconSnapshot size={13} />
           <span>{t("settings.shortcutResetAll")}</span>
-        </button>
+        </Button>
       </div>
+      <div className="shortcut-filters">
+        <Input
+          value={query}
+          onChange={(event) => { setQuery(event.target.value); setRecordingId(null); }}
+          placeholder={t("settings.shortcutSearch")}
+          aria-label={t("settings.shortcutSearch")}
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229 && query) {
+              event.preventDefault();
+              event.stopPropagation();
+              setQuery("");
+            }
+          }}
+        />
+        <SegmentedControl
+          value={filter}
+          onChange={(value) => { setFilter(value); setRecordingId(null); }}
+          label={t("settings.shortcutFilter")}
+          options={[
+            { value: "all", label: t("settings.shortcutFilterAll") },
+            { value: "modified", label: t("settings.shortcutFilterModified") },
+          ]}
+        />
+        <span className="shortcut-result-count" role="status">{t("settings.shortcutCount", { count: visibleCount })}</span>
+      </div>
+      {resetError ? <div className="shortcut-error" role="alert">{resetError}</div> : null}
+      {saved ? <div className="shortcut-save-state" role="status">{t("settings.preferenceSaved")}</div> : null}
+      {visibleCount === 0 ? <SettingsEmptyState message={t("settings.shortcutNoMatches")} action={
+        <Button variant="secondary" size="sm" onClick={() => { setQuery(""); setFilter("all"); }}>{t("settings.shortcutClearFilters")}</Button>
+      } /> : null}
       <div className="settings-panel shortcut-map">
         {groups.map(({ group, shortcuts }) => (
           <div key={group} className="shortcut-group">
@@ -192,7 +258,9 @@ export function KeyboardShortcutsSection({ settings, platform, saveSettings }: P
                   <div className="shortcut-row-copy">
                     <div className="settings-row-title">
                       {t(shortcutLabelKey(shortcut.id))}
+                      {customized ? <Badge tone="neutral">{t("settings.shortcutFilterModified")}</Badge> : null}
                     </div>
+                    {recording ? <div className="shortcut-recording-hint" role="status">{t("settings.shortcutRecordingCancel")}</div> : null}
                     {rowError ? (
                       <div className="shortcut-error" role="alert">
                         {rowError}
@@ -207,9 +275,10 @@ export function KeyboardShortcutsSection({ settings, platform, saveSettings }: P
                         action: t(shortcutLabelKey(shortcut.id)),
                       })}
                       aria-pressed={recording}
-                      disabled={savingId !== null && savingId !== shortcut.id}
+                      disabled={busy}
                       onClick={() => {
                         setError(null);
+                        setSaved(false);
                         setRecordingId(shortcut.id);
                       }}
                       onBlur={() => setRecordingId((current) =>
@@ -242,7 +311,7 @@ export function KeyboardShortcutsSection({ settings, platform, saveSettings }: P
                       ariaLabel={t("settings.shortcutDisable", {
                         action: t(shortcutLabelKey(shortcut.id)),
                       })}
-                      disabled={disabled || savingId !== null}
+                      disabled={disabled || busy}
                       onClick={() => void storeBinding(shortcut, null, "disabled")}
                     >
                       <IconPower size={13} />
@@ -256,7 +325,7 @@ export function KeyboardShortcutsSection({ settings, platform, saveSettings }: P
                       ariaLabel={t("settings.shortcutReset", {
                         action: t(shortcutLabelKey(shortcut.id)),
                       })}
-                      disabled={!customized || savingId !== null}
+                      disabled={!customized || busy}
                       onClick={() => void storeBinding(shortcut, null, "default")}
                     >
                       <IconSnapshot size={13} />

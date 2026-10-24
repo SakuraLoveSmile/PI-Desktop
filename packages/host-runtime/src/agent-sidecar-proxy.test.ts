@@ -7,6 +7,126 @@ afterEach(async () => {
   await Promise.all(sidecars.splice(0).map((sidecar) => sidecar.dispose()));
 });
 
+function reportProxy(host: SidecarHostLink): AgentSidecar {
+  const proxyUrl = new URL("../../agent-runtime/src/parent-host-proxy.ts", import.meta.url).href;
+  const source = `
+    import { createInterface } from 'node:readline';
+    const { ParentHostProxy } = await import(${JSON.stringify(proxyUrl)});
+    const proxy = new ParentHostProxy();
+    createInterface({ input: process.stdin }).on('line', async line => {
+      const message = JSON.parse(line);
+      if (proxy.handleParentMessage(message)) return;
+      try {
+        const result = await proxy.call(message.params.method, message.params.params);
+        console.log(JSON.stringify({ id: message.id, result }));
+      } catch (error) {
+        console.log(JSON.stringify({ id: message.id, error: { code: error.code, message: error.message, data: error.data } }));
+      }
+    });`;
+  const sidecar = new AgentSidecar({ launch: { command: process.execPath, args: ["--input-type=module", "-e", source] }, onStderr: () => undefined });
+  sidecars.push(sidecar);
+  sidecar.setHost(host);
+  return sidecar;
+}
+
+function deferred<T = void>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(done => { resolve = done; });
+  return { promise, resolve };
+}
+
+describe("Goal draft persistence admission", () => {
+  const input = { sessionId: "s1", executionId: "e1", draft: { verdict: "met" } };
+  function host(calls: string[]): SidecarHostLink {
+    return {
+      async call<T>(method: string): Promise<T> { calls.push(method); return { ok: true } as T; },
+      onNotification: () => () => undefined,
+      onExit: () => () => undefined,
+    };
+  }
+
+  it("awaits prior tool persistence before forwarding the same draft", async () => {
+    const calls: string[] = [];
+    const sidecar = reportProxy(host(calls));
+    const entered = deferred<unknown>();
+    const release = deferred();
+    sidecar.setGoalReportPersistenceBarrier(async request => { entered.resolve(request); await release.promise; });
+    const submitting = sidecar.call("probe", { method: "goalReports.submitDraft", params: input });
+    expect(await entered.promise).toEqual({ sessionId: "s1", executionId: "e1" });
+    expect(calls).toEqual([]);
+    release.resolve();
+    await expect(submitting).resolves.toEqual({ ok: true });
+    expect(calls).toEqual(["goalReports.submitDraft"]);
+  });
+
+  it("returns correction errors without forwarding a non-durable draft", async () => {
+    const calls: string[] = [];
+    const sidecar = reportProxy(host(calls));
+    sidecar.setGoalReportPersistenceBarrier(async () => { throw Object.assign(new Error("tool result is not durable"), { errorCode: "INVALID_ARGUMENT" }); });
+    await expect(sidecar.call("probe", { method: "goalReports.submitDraft", params: input }))
+      .rejects.toMatchObject({ data: { errorCode: "INVALID_ARGUMENT" } });
+    expect(calls).toEqual([]);
+    sidecar.setGoalReportPersistenceBarrier(async () => undefined);
+    await expect(sidecar.call("probe", { method: "goalReports.submitDraft", params: { executionId: "e1", draft: input.draft } }))
+      .rejects.toMatchObject({ data: { errorCode: "INVALID_ARGUMENT" } });
+    expect(calls).toEqual([]);
+  });
+
+  it("does not forward a suspended submission after Host replacement", async () => {
+    const original: string[] = [];
+    const replacement: string[] = [];
+    const sidecar = reportProxy(host(original));
+    const entered = deferred();
+    const release = deferred();
+    sidecar.setGoalReportPersistenceBarrier(async () => { entered.resolve(); await release.promise; });
+    const submitting = sidecar.call("probe", { method: "goalReports.submitDraft", params: input });
+    await entered.promise;
+    sidecar.setHost(host(replacement));
+    release.resolve();
+    await expect(submitting).rejects.toMatchObject({ data: { errorCode: "INVALID_ARGUMENT" } });
+    expect(original).toEqual([]);
+    expect(replacement).toEqual([]);
+    // The registered barrier survives a reconnect for a fresh submission.
+    await expect(sidecar.call("probe", { method: "goalReports.submitDraft", params: input })).resolves.toEqual({ ok: true });
+    expect(replacement).toEqual(["goalReports.submitDraft"]);
+  });
+
+  it("rejects a suspended submission even if the original Host is restored", async () => {
+    const calls: string[] = [];
+    const original = host(calls);
+    const sidecar = reportProxy(original);
+    const entered = deferred();
+    const release = deferred();
+    sidecar.setGoalReportPersistenceBarrier(async () => { entered.resolve(); await release.promise; });
+    const submitting = sidecar.call("probe", { method: "goalReports.submitDraft", params: input });
+    await entered.promise;
+    sidecar.setHost(host([]));
+    sidecar.setHost(original);
+    release.resolve();
+    await expect(submitting).rejects.toMatchObject({ data: { errorCode: "INVALID_ARGUMENT" } });
+    expect(calls).toEqual([]);
+  });
+
+  it("does not forward a suspended submission after sidecar disposal", async () => {
+    const calls: string[] = [];
+    const sidecar = reportProxy(host(calls));
+    const entered = deferred();
+    const release = deferred();
+    const resumed = deferred();
+    sidecar.setGoalReportPersistenceBarrier(async () => {
+      entered.resolve(); await release.promise; resumed.resolve();
+    });
+    const rejected = expect(sidecar.call("probe", { method: "goalReports.submitDraft", params: input }))
+      .rejects.toThrow("agent sidecar disposed");
+    await entered.promise;
+    await sidecar.dispose();
+    release.resolve();
+    await resumed.promise;
+    await rejected;
+    expect(calls).toEqual([]);
+  });
+});
+
 describe("sidecar host proxy allowlist", () => {
   it("allows the Team RPCs used by the Team runtime", () => {
     expect([

@@ -69,7 +69,7 @@ app.whenReady().then(async () => {
   try {
     await win.loadFile(path.join(__dirname, "index.html"));
     await waitFor('!!document.querySelector(".composer-profile-chip")');
-    await checkProfileLabel("智能体");
+    await checkProfileLabel("单智能体");
     await click(".composer-profile-chip");
     await checkMenu(".composer-profile-menu.is-open");
     await click('.composer-profile-menu.is-open [aria-checked="false"]');
@@ -88,11 +88,22 @@ app.whenReady().then(async () => {
     await checkMenu(".composer-plus-menu.is-open");
     await click('.composer-plus-menu.is-open [role="switch"][aria-label="Plan"]');
     await waitFor('document.querySelector(".composer-contract-chip")?.dataset.mode === "plan"');
+    await click(".composer-plus > button");
+    await waitFor('!document.querySelector(".composer-plus-menu.is-open")');
+    await waitFor('!!document.querySelector(".composer-contract-exit:not(:disabled)")');
+    await click('.composer-contract-exit[aria-label="Exit Plan mode"]');
+    await waitFor('!document.querySelector(".composer-contract-chip")');
+    await checkProfileLabel("专家团");
+    await click(".composer-plus > button");
+    await checkMenu(".composer-plus-menu.is-open");
+    await click('.composer-plus-menu.is-open [role="switch"][aria-label="Plan"]');
+    await waitFor('document.querySelector(".composer-contract-chip")?.dataset.mode === "plan"');
     await click('.composer-plus-menu.is-open [role="switch"][aria-label="Plan"]');
     await waitFor('!document.querySelector(".composer-contract-chip")');
     await click('.composer-plus-menu.is-open [role="switch"][aria-label="Goal"]');
     await waitFor('document.querySelector(".composer-contract-chip")?.dataset.mode === "goal"');
-    console.log("COMPOSER_MODE_MENUS " + JSON.stringify({ ok: true, profile: "team", mode: "goal" }));
+    await waitFor('!document.querySelector(".composer-contract-exit")');
+    console.log("COMPOSER_MODE_MENUS " + JSON.stringify({ ok: true, profile: "team", mode: "goal", planExit: true }));
     app.quit();
   } catch (error) {
     console.error("COMPOSER_MODE_MENUS " + JSON.stringify({ ok: false, error: String(error) }));

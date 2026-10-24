@@ -7,9 +7,12 @@
  * portals to `document.body` as a viewport-fixed layer (a transformed or
  * `overflow: hidden` ancestor cannot trap it), it is measured before it is
  * revealed so it never flashes at the viewport origin, it clamps inside the
- * viewport, and it closes on an outside press, Escape, or a scroll of anything
- * behind it. `is-open` gates visibility because a `visibility: hidden` surface
- * cannot take focus.
+ * viewport, and it closes on an outside press, Escape, Tab, window blur, or
+ * reader scroll input (wheel, touch movement, or a scroll key) of anything
+ * behind it. A scroll the app or the layout makes, such as the transcript
+ * re-pinning while a turn streams, leaves it open; the owner closes it when the
+ * state its items were built from changes. `is-open` gates visibility because a
+ * `visibility: hidden` surface cannot take focus.
  *
  * Menus are data, not children: `useContextMenu` owns the open request, call
  * sites hand it a label plus items, and one mounted `<ContextMenu>` renders it.
@@ -34,6 +37,7 @@ import {
   type ContextMenuPoint,
 } from "../lib/context-menu";
 import { texClipboardPayload } from "../lib/selection-tex";
+import { listenForContextMenuDismissal } from "../lib/context-menu-dismiss";
 
 export type ContextMenuItem = {
   /** Stable identity for React keys and for tests naming a row. */
@@ -250,37 +254,11 @@ export function ContextMenu({
 
   useEffect(() => {
     if (!state) return;
-    const menu = menuRef.current;
-    /*
-      Capture phase on purpose: a nested surface that stops propagation on its
-      own press would otherwise leave this menu open behind it.
-    */
-    const onOutside = (event: Event) => {
-      const target = event.target as Node | null;
-      if (target && menu?.contains(target)) return;
-      onClose();
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      // Stop so a surrounding overlay does not also close on this Escape.
-      event.preventDefault();
-      event.stopPropagation();
-      onClose();
-    };
-    window.addEventListener("pointerdown", onOutside, true);
-    window.addEventListener("contextmenu", onOutside, true);
-    window.addEventListener("scroll", onOutside, true);
-    window.addEventListener("resize", onClose);
-    window.addEventListener("blur", onClose);
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      window.removeEventListener("pointerdown", onOutside, true);
-      window.removeEventListener("contextmenu", onOutside, true);
-      window.removeEventListener("scroll", onOutside, true);
-      window.removeEventListener("resize", onClose);
-      window.removeEventListener("blur", onClose);
-      window.removeEventListener("keydown", onKeyDown, true);
-    };
+    return listenForContextMenuDismissal(window, {
+      contains: (node) =>
+        node instanceof Node && Boolean(menuRef.current?.contains(node)),
+      onDismiss: onClose,
+    });
   }, [onClose, state]);
 
   // Keyboard users land on the first item; Enter then runs it instead of
@@ -298,11 +276,6 @@ export function ContextMenu({
   }, [placement, state]);
 
   const onMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    // Tab leaves the menu rather than walking its items.
-    if (event.key === "Tab") {
-      onClose();
-      return;
-    }
     if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
     const items = Array.from(
       event.currentTarget.querySelectorAll<HTMLButtonElement>(

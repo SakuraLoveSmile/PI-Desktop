@@ -13,6 +13,17 @@ import {
 } from "./goal-report.js";
 
 describe("Goal Completion Report v1 Contract & Validation", () => {
+  it("preserves command bytes including escaped trailing spaces while rejecting blank commands", () => {
+    const command = "printf '%s' suffix\\ ";
+    const report = validateGoalReportDraft({ summary: "Verified", verdict: "met", checks: [
+      { id: "exact", command, result: "passed", exitCode: 0 },
+    ] });
+    expect(report.ok).toBe(true);
+    if (report.ok) expect(report.value.checks?.[0]?.command).toBe(command);
+    expect(validateGoalReportDraft({ summary: "Done", verdict: "met", checks: [
+      { id: "blank", command: " \t", result: "passed", exitCode: 0 },
+    ] }).ok).toBe(false);
+  });
   const sampleValidDraft: SubmitGoalReportDraftInput = {
     summary: "Goal was successfully implemented with all tests passing.",
     verdict: "met",

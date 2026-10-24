@@ -134,6 +134,45 @@ globalThis.themeSurfacesProbe = async (theme, custom) => {
     document.activeElement.blur();
     await settle();
   }
+  // Composer cues: the focus ring and the file-drop outline must paint over the
+  // per-theme shell rules, the idle shell must show no outline, and the critical
+  // usage meter must paint with --ds-danger, which has to exist in both palettes.
+  const shell = document.querySelector(".composer-shell");
+  const composerInput = shell.querySelector(".composer-input");
+  const idle = getComputedStyle(shell);
+  const cues = { idle: { border: idle.borderTopColor, shadow: idle.boxShadow, outlineStyle: idle.outlineStyle } };
+  if (cues.idle.outlineStyle !== "none") failures.push("composer idle shell shows an outline");
+  composerInput.focus();
+  await settle();
+  if (!shell.matches(":focus-within")) failures.push("composer input did not receive focus");
+  const focused = getComputedStyle(shell);
+  cues.focused = { border: focused.borderTopColor, shadow: focused.boxShadow };
+  if (cues.focused.border === cues.idle.border) failures.push("composer focus ring does not paint");
+  if (cues.focused.shadow === cues.idle.shadow) failures.push("composer focus glow does not paint");
+  composerInput.blur();
+  await settle();
+  shell.classList.add("is-drop-target");
+  await settle();
+  const dropped = getComputedStyle(shell);
+  cues.dropped = { outlineStyle: dropped.outlineStyle, outlineWidth: dropped.outlineWidth };
+  if (dropped.outlineStyle !== "solid" || dropped.outlineWidth !== "2px") failures.push("composer drop target does not paint");
+  shell.classList.remove("is-drop-target");
+  await settle();
+  const critical = document.querySelector(".composer-usage-context[data-level='critical']");
+  const dangerProbe = document.createElement("span");
+  dangerProbe.style.color = "var(--ds-danger)";
+  document.querySelector(".fixture-controls").append(dangerProbe);
+  const expectedDanger = getComputedStyle(dangerProbe).color;
+  dangerProbe.remove();
+  cues.danger = {
+    defined: getComputedStyle(document.documentElement).getPropertyValue("--ds-danger").trim(),
+    expected: expectedDanger,
+    value: getComputedStyle(critical.querySelector(".composer-usage-value")).color,
+    fill: getComputedStyle(critical.querySelector(".composer-usage-context-fill")).backgroundColor,
+  };
+  if (!cues.danger.defined) failures.push("--ds-danger is not defined");
+  if (cues.danger.value !== expectedDanger) failures.push("critical usage value ignores --ds-danger");
+  if (cues.danger.fill !== expectedDanger) failures.push("critical usage fill ignores --ds-danger");
   if (custom) {
     for (const [id, [, token, channel = "bg"]] of Object.entries(surfaces)) {
       if (channel === "pinned") continue;
@@ -151,7 +190,7 @@ globalThis.themeSurfacesProbe = async (theme, custom) => {
       if (value.shadow !== (DEFAULT_SHADOWS[theme][id] ?? "none")) failures.push(`${id} changed built-in shadow`);
     }
   }
-  return { ok: failures.length === 0, theme, custom, values, failures,
+  return { ok: failures.length === 0, theme, custom, values, cues, failures,
     elevatedToken: getComputedStyle(document.documentElement).getPropertyValue("--ds-bg-elevated-primary").trim(),
     elevatedRgba: rgba(getComputedStyle(document.documentElement).getPropertyValue("--ds-bg-elevated-primary").trim()) };
 };

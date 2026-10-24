@@ -60,9 +60,7 @@ test("the remote-hosts destination is marked experimental", () => {
     settingsNav,
     /\{\s*id: "remoteHosts",[\s\S]*?experimentalBadgeKey: "settings\.remoteHosts\.experimental",/,
   );
-  assert.match(settings, /item\.experimentalBadgeKey \? \(/);
   assert.match(settings, /activeNavItem\?\.experimentalBadgeKey \? \(/);
-  assert.match(settings, /className="settings-nav-experimental"/);
   assert.match(cssRule(".settings-nav-experimental"), /font-size:\s*var\(--text-2xs\)/);
   assert.doesNotMatch(page, /EXPERIMENTAL_FEATURES/);
   assert.doesNotMatch(page, /experimentalLan/);

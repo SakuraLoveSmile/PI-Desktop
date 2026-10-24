@@ -29,6 +29,20 @@ lines or add nested navigation. Search continues to filter destinations as one
 flat index; a cluster and its heading disappear when no destination remains in
 that cluster.
 
+## Search usability amendment (2026-10-23)
+
+The empty-query directory keeps the same flat order and titled clusters.
+With a query, the rail now lists specific matching settings with their owning
+category, reusing the global search index and row anchors. Option/help matches
+resolve to a visible row/card or to the category when the target is dynamic.
+This replaces category-only filtering; it introduces no nested navigation or
+persisted navigation state. Built-in and plugin matches share the empty state,
+and only the current destination is marked selected. The reason is to remove
+the second manual search inside long categories after a keyword already matched.
+
+The keyboard, clear, wrapping, and selection requirements are maintained in
+the Settings IA specification rather than duplicated here.
+
 ## Consequences
 
 - The rail gains clear scan landmarks without introducing another interactive

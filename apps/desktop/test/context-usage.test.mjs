@@ -9,6 +9,7 @@ import {
   contextUsageView,
   estimateResponseOutputTokens,
   estimateToolTokenUsage,
+  contextUsageLabelKey,
   resolveContextUsageDisplay,
   resolveContextWindow,
   toolTokenUsage,
@@ -16,6 +17,12 @@ import {
   settleStoppedAssistantMetrics,
   resolveComposerUsageFooterMetrics,
 } from "../src/lib/context-usage.ts";
+
+test("the footer label names the leading figure as remaining or used", () => {
+  assert.equal(contextUsageLabelKey(resolveContextUsageDisplay(undefined)), "chat.usageContextUsedLabel");
+  assert.equal(contextUsageLabelKey(resolveContextUsageDisplay("used")), "chat.usageContextUsedLabel");
+  assert.equal(contextUsageLabelKey(resolveContextUsageDisplay("remaining")), "chat.usageContextRemainingLabel");
+});
 
 test("context usage exposes the remaining ring percentage", () => {
   const context = calculateContextUsage(
@@ -51,12 +58,26 @@ test("context usage display preference picks the ring's leading figure", () => {
   assert.equal(used.ratio, 100 / 128);
 });
 
-test("an absent or unrecognised display value keeps the remaining default", () => {
-  assert.equal(resolveContextUsageDisplay(undefined), "remaining");
+test("an absent or unrecognised display value falls back to the used default", () => {
+  assert.equal(resolveContextUsageDisplay(undefined), "used");
   assert.equal(resolveContextUsageDisplay("used"), "used");
   assert.equal(resolveContextUsageDisplay("remaining"), "remaining");
-  assert.equal(resolveContextUsageDisplay("bogus"), "remaining");
-  assert.equal(resolveContextUsageDisplay(null), "remaining");
+  assert.equal(resolveContextUsageDisplay("bogus"), "used");
+  assert.equal(resolveContextUsageDisplay(null), "used");
+});
+
+test("footer metrics lead with the used figure when the preference is absent", () => {
+  const metrics = resolveComposerUsageFooterMetrics({
+    usage: { inputTokens: 800, outputTokens: 150, totalTokens: 950 },
+    turnUsage: { inputTokens: 800, outputTokens: 150, totalTokens: 950 },
+    contextWindow: 1000,
+  });
+
+  assert.equal(metrics.context.display, "used");
+  assert.equal(metrics.context.percent, 95);
+  assert.equal(metrics.context.tokens, 950);
+  assert.equal(metrics.context.remainingPercent, 5);
+  assert.equal(metrics.context.level, "critical");
 });
 
 test("context window prefers the selected model catalog over provider fallback", () => {
