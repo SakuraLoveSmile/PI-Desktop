@@ -24,6 +24,8 @@ const desktop = createRequire(${JSON.stringify(fileURLToPath(desktopManifest))})
 const builder = createRequire(desktop.resolve('electron-builder/package.json'));
 const { getConfig } = builder('app-builder-lib/out/util/config/config.js');
 const { MacTargetHelper } = builder('app-builder-lib/out/mac/MacTargetHelper.js');
+// Supply an empty external keychain result without requiring macOS security.
+builder('app-builder-lib/out/codeSign/macCodeSign.js').findIdentityRawResult = Promise.resolve([]);
 (async () => {
   const flag = process.argv.find(arg => arg.startsWith('-c.mac.identity='));
   const config = await getConfig(${JSON.stringify(dirname(fileURLToPath(desktopManifest)))}, null,

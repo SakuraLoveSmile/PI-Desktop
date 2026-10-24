@@ -58,6 +58,15 @@ cloud candidate still must pass its shared CI and actual package gates. The
 independent read-only review found no blocking defect and explicitly retained
 the distinction between ad-hoc integrity and Finder/Gatekeeper qualification.
 
+The first hosted candidate `43d67dd85e971db3b6a3da4d131e5b45a8399fd6`
+(run `40113057699`) passed Rust and isolated smoke. JS stopped in the new
+builder-selection test: Linux has no `/usr/bin/security`, which the real
+electron-builder queries before its ad-hoc fallback. The test now supplies an
+empty external keychain enumeration through the builder's existing result cache;
+configuration merging and identity selection remain real. No assertion, gate or
+product behavior was weakened. Native codesign and actual archive verification
+remain separate mandatory checks. This failed run did not package or publish.
+
 Remaining: exact-SHA hosted candidate and actual package verification, then
 resolve the replacement release version. The external recovery directory's
 `current-status.json` and follow-up receipts extend this record with immutable
