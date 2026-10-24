@@ -1,4 +1,4 @@
-# Cloud-only installer pipeline. Manual dispatch produces candidate artifacts.
+# Cloud-only macOS arm64 installer pipeline. Manual dispatch produces candidate artifacts.
 # Formal tags must already be merged into main and match every app version
 # surface. Both paths share CI gates and a fixed source SHA. Only signed,
 # notarized, fully verified tag bundles can become a published GitHub Release.
@@ -87,43 +87,6 @@ jobs:
             runner_arch: arm64
             artifact: mac-arm64
             platform: macos
-            dist: dist:mac
-          - name: macOS Intel x64
-            os: macos-15-intel
-            arch: x64
-            runner_arch: x86_64
-            artifact: mac-x64
-            platform: macos
-            dist: dist:mac
-          - name: Windows x64
-            os: windows-latest
-            arch: x64
-            artifact: windows-x64
-            platform: windows
-            dist: dist:win
-          - name: Linux x64
-            # Ubuntu 22.04 keeps host-core at glibc 2.35 so Ubuntu 22.04,
-            # Debian 12, and Fedora 36+ can load the binary. ubuntu-latest
-            # (24.04) would raise the floor to 2.39.
-            os: ubuntu-22.04
-            arch: x64
-            runner_arch: x86_64
-            artifact: linux-x64
-            platform: linux
-            feed: linux.yml
-            dist: dist:linux
-          - name: Linux arm64
-            # GitHub's native arm64 runner packages the Electron app and the
-            # host-core sidecar at the same architecture; the `-arm` image
-            # keeps the glibc 2.35 floor the x64 lane documents
-            # (ubuntu-24.04-arm would raise it to 2.39).
-            os: ubuntu-22.04-arm
-            arch: arm64
-            runner_arch: aarch64
-            artifact: linux-arm64
-            platform: linux
-            feed: linux-arm64.yml
-            dist: dist:linux
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     defaults:
@@ -135,10 +98,8 @@ jobs:
           ref: ${{ needs.metadata.outputs.source_sha }}
 
       - name: Verify native runner architecture
-        # A mislabelled or emulated runner would wrap one architecture's
-        # Electron app around the other architecture's Rust sidecar. The
-        # Windows rows carry no `runner_arch` because electron-builder
-        # cross-builds Windows from any runner.
+        # A mislabelled or emulated runner could package the arm64 Electron app
+        # with a Rust sidecar built for a different architecture.
         if: matrix.runner_arch
         run: |
           set -euo pipefail
@@ -187,14 +148,6 @@ jobs:
 
           wait "$host_build_pid"
           trap - EXIT
-
-      - name: Package installers (${{ matrix.dist }})
-        if: matrix.platform != 'macos'
-        # The dist scripts pass --publish never themselves: electron-builder
-        # must not self-publish on tag builds (only the final publish job can).
-        # The explicit architecture keeps the package and native Rust sidecar
-        # aligned with the runner selected by this matrix entry.
-        run: pnpm --filter @pi-desktop/desktop run ${{ matrix.dist }} -- --${{ matrix.arch }} -c.publish.channel="$RELEASE_CHANNEL"
 
       - name: Package unsigned macOS installer
         if: matrix.platform == 'macos' && env.MACOS_SIGN_RELEASE != 'true'
@@ -327,30 +280,6 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: scripts/verify-macos-release.sh apps/desktop/release
 
-      - name: Verify Linux host-core glibc floor
-        if: matrix.platform == 'linux'
-        run: node scripts/check-linux-host-glibc.mjs target/release/pi-desktop-host-core
-
-      - name: Export Linux ASAR release asset
-        if: matrix.platform == 'linux'
-        run: node scripts/export-linux-asar.mjs --arch ${{ matrix.arch }}
-
-      - name: Verify the Linux update feed
-        # electron-builder names the Linux feed `latest-linux.yml` for x64 and
-        # `latest-linux-<arch>.yml` for every other Linux architecture — the
-        # same names electron-updater requests on those architectures — so the
-        # two lanes cannot overwrite each other's feed when the publish job
-        # merges their artifacts.
-        if: matrix.platform == 'linux'
-        run: |
-          set -euo pipefail
-          feed="apps/desktop/release/${RELEASE_CHANNEL}-${{ matrix.feed }}"
-          if [[ ! -f "$feed" ]]; then
-            echo "::error::Expected the Linux updater feed at $feed"
-            ls apps/desktop/release || true
-            exit 1
-          fi
-
       - name: Verify macOS artifact names
         if: matrix.platform == 'macos'
         run: |
@@ -388,115 +317,12 @@ jobs:
           path: |
             apps/desktop/release/*.dmg
             apps/desktop/release/*.zip
-            apps/desktop/release/*.exe
-            apps/desktop/release/*.AppImage
-            apps/desktop/release/*.deb
-            apps/desktop/release/*.rpm
-            apps/desktop/release/*.asar
             apps/desktop/release/*.blockmap
-            apps/desktop/release/${{ needs.metadata.outputs.channel }}*.yml
-
-  pi-host-bundle:
-    name: Bundle pi-host (Linux ${{ matrix.arch }})
-    needs: [metadata, verify]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # Every Linux platform the desktop release publishes. Keep this list
-          # in lockstep with the desktop build matrix above and with
-          # PUBLISHED_TARGETS in apps/desktop/electron/main/remote/pi-host-release.ts:
-          # a bundle the desktop refuses to install is dead weight, and a target
-          # the desktop offers without a bundle fails mid-download.
-          - arch: x64
-            os: ubuntu-22.04
-            runner_arch: x86_64
-          - arch: arm64
-            os: ubuntu-22.04-arm
-            runner_arch: aarch64
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ needs.metadata.outputs.source_sha }}
-
-      - name: Verify native runner architecture
-        if: matrix.runner_arch
-        run: |
-          set -euo pipefail
-          actual_arch="$(uname -m)"
-          expected_arch="${{ matrix.runner_arch }}"
-          if [ "$actual_arch" != "$expected_arch" ]; then
-            echo "::error::Expected $expected_arch runner, got $actual_arch."
-            exit 1
-          fi
-
-      - uses: pnpm/action-setup@v6
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Build inputs (host-core, workspace, sidecar bundle)
-        run: |
-          set -euo pipefail
-          # Ubuntu 22.04 keeps the host-core glibc floor at 2.35, matching the
-          # desktop Linux build so the bundled binary loads on the same distros.
-          cargo build --release --locked -p host-core &
-          host_build_pid=$!
-          trap 'kill "$host_build_pid" 2>/dev/null || true' EXIT
-
-          pnpm install --frozen-lockfile
-          pnpm build:js
-          pnpm --filter @pi-desktop/agent-runtime bundle
-          pnpm --filter @pi-desktop/pi-host build
-
-          wait "$host_build_pid"
-          trap - EXIT
-
-      - name: Verify host-core glibc floor
-        run: node scripts/check-linux-host-glibc.mjs target/release/pi-desktop-host-core
-
-      - name: Assemble pi-host bundle
-        run: node apps/pi-host/scripts/bundle.mjs --platform linux --arch ${{ matrix.arch }}
-
-      - name: Archive bundle with checksum
-        run: |
-          set -euo pipefail
-          VERSION="$(node -p "require('./apps/pi-host/package.json').version")"
-          name="pi-host-${VERSION}-linux-${{ matrix.arch }}"
-          out="apps/pi-host/dist-bundle"
-          if [ ! -d "$out/$name" ]; then
-            echo "::error::expected bundle directory $out/$name"
-            ls -la "$out" || true
-            exit 1
-          fi
-          tar -czf "$out/${name}.tar.gz" -C "$out" "$name"
-          ( cd "$out" && sha256sum "${name}.tar.gz" > "${name}.tar.gz.sha256" )
-          cat "$out/${name}.tar.gz.sha256"
-
-      - name: Upload pi-host bundle
-        uses: actions/upload-artifact@v7
-        with:
-          name: pi-host-linux-${{ matrix.arch }}
-          if-no-files-found: error
-          compression-level: 0
-          path: |
-            apps/pi-host/dist-bundle/pi-host-*-linux-${{ matrix.arch }}.tar.gz
-            apps/pi-host/dist-bundle/pi-host-*-linux-${{ matrix.arch }}.tar.gz.sha256
+            apps/desktop/release/${{ needs.metadata.outputs.channel }}-mac-${{ matrix.arch }}.yml
 
   aggregate:
-    name: Verify complete installer bundle
-    needs: [metadata, build, pi-host-bundle]
+    name: Verify macOS arm64 installer bundle
+    needs: [metadata, build]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -508,13 +334,9 @@ jobs:
           node-version: 24
       - uses: actions/download-artifact@v8
         with:
-          pattern: dist-*
-          path: artifacts
-      - uses: actions/download-artifact@v8
-        with:
-          pattern: pi-host-linux-*
-          path: artifacts
-      - name: Verify all platforms, feeds and checksums
+          name: dist-mac-arm64
+          path: artifacts/dist-mac-arm64
+      - name: Verify macOS arm64 artifacts, feed and checksums
         env:
           RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
           SOURCE_SHA: ${{ needs.metadata.outputs.source_sha }}

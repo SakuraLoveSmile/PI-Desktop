@@ -28,9 +28,9 @@ disagrees, so a green `check:release-docs` is a precondition, not a substitute.
 | `macos-bundle-inventory.mjs` | `node scripts/macos-bundle-inventory.mjs <app-or-release-dir>` | Count what the signing phase has to touch: entries, Mach-O binaries, `.dylib`/`.node`/frameworks/nested bundles, per-directory cost, and the largest binaries (`signing-candidates`). Informational; run after every macOS package build |
 | `macos-signing-watchdog.mjs` | `node scripts/macos-signing-watchdog.mjs [options] -- <command>` | Run a long silent phase (`electron-builder` signing, `notarytool submit --wait`) with a heartbeat, phase tracking, stall diagnostics (last file, `ps` state, codesign log tail), per-file codesign timings, and a hard timeout that fails instead of hanging; it forwards the child output and exit code unchanged and redacts `CSC_KEY_PASSWORD`/`APPLE_APP_SPECIFIC_PASSWORD`/`CSC_LINK` values plus `--password` arguments |
 | `macos-codesign-shim.sh` | used by `macos-signing-watchdog.mjs` | PATH shim that timestamps every `codesign` invocation and then executes the real `codesign`; inert unless `PI_CODESIGN_LOG` is set |
-| `export-linux-asar.mjs` | `node scripts/export-linux-asar.mjs` | Copy the Linux `linux-unpacked/resources/app.asar` into the versioned release asset used for system-Electron repackaging |
-| `build-desktop-release.mjs` | called by the desktop `dist` / `dist:win` scripts | Build the native runner target without publishing; Windows runs separate NSIS and ZIP passes and stamps their updater distribution metadata |
-| `check-linux-host-glibc.mjs` | `node scripts/check-linux-host-glibc.mjs [bin]` | Fail a Linux host-core binary whose needed glibc is above 2.35 |
+| `export-linux-asar.mjs` | `node scripts/export-linux-asar.mjs` | Existing Linux packaging helper; Linux ASAR assets are outside the current macOS arm64 cloud Release scope |
+| `build-desktop-release.mjs` | called by the desktop `dist` / `dist:mac` / `dist:win` / `dist:linux` scripts | Build a native runner target without publishing; Windows runs separate NSIS and ZIP passes and stamps their updater distribution metadata. Only macOS arm64 is currently selected by the cloud Release workflow |
+| `check-linux-host-glibc.mjs` | `node scripts/check-linux-host-glibc.mjs [bin]` | Fail a Linux host-core binary whose needed glibc is above 2.35; the current Release workflow does not build Linux packages |
 | `make-icon.py` | `python3 scripts/make-icon.py` | Derive the package PNG, the macOS tray template, and the iconset/ICNS from the canonical PNG |
 | `publish-screenshots.py` | `python3 scripts/publish-screenshots.py` | Publish documentation screenshots |
 
@@ -102,19 +102,16 @@ shared changelog sources, or the check scripts change. `check:release-docs` is
 deliberately not in CI because release branches must pass it with the stable
 version explicitly supplied for a prerelease preview.
 
-`.github/workflows/release.yml` builds on a `v*.*.*` tag. A `verify` job first
-repeats the `ci.yml` checks (a tag push does not trigger `ci.yml`), and the
-build matrix waits for it. Each platform runner then
-validates the tag against `apps/desktop/package.json` before packaging, then
-runs the native `dist:mac`, `dist:win`, or `dist:linux` command. The Linux
-job uses Ubuntu 22.04 so host-core stays on glibc 2.35, then
-`scripts/check-linux-host-glibc.mjs` refuses a binary that needs a newer
-glibc. Each Linux runner (native x64 and arm64) also exports the exact
-app.asar from its own unpacked tree as a versioned release asset; the macOS
-matrix covers arm64 and Intel x64 and
-the publish job assembles the GitHub Release. Tag builds Developer ID-sign,
-notarize, and staple macOS artifacts; `workflow_dispatch` may set
-`sign_macos: false` only for unsigned debug artifacts. See the [release
+`.github/workflows/release.yml` runs shared CI verification for manual
+candidates and `v*.*.*` tags. Its only packaging target is native macOS arm64 on
+`macos-15`; the job validates runner architecture, builds the native host and
+packages the app without self-publishing. Aggregation requires the macOS arm64
+DMG, ZIP, their blockmaps and architecture feed, then emits the canonical macOS
+feed, manifest and checksums. Intel macOS, Windows, Linux and standalone pi-host
+artifacts are currently outside this cloud release scope; existing application
+and packaging implementations remain in the repository. Formal tags still
+require Developer ID signing, notarization and stapling. Manual candidates may
+set `sign_macos: false` for unsigned debug artifacts. See the [release
 runbook](../docs/spec/06-delivery/06-release-runbook.md).
 
 ### Provider certificate regression

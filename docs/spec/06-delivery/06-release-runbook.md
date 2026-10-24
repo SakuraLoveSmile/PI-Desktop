@@ -7,9 +7,11 @@
 > Packaged metadata uses `pi-desktop-plus`, so electron-updater keeps the Plus
 > cache separate as `pi-desktop-plus-updater`.
 
-> Scope: D126/D285/D603 tag artifacts for macOS arm64 and Intel x64, Windows x64,
-> and Linux x64 and arm64, including the Linux system-Electron ASAR assets;
-> macOS signing/notarization remains the detailed qualification lane below.
+> Current cloud release scope: macOS arm64 only for both manual candidates and
+> formal tags. Intel macOS, Windows, Linux, and standalone pi-host release
+> artifacts are not built by this workflow. Existing application and packaging
+> support for those targets is unchanged; macOS signing/notarization remains the
+> detailed qualification lane below.
 > Cross-references: [milestones](01-mvp-milestones.md) · [process model](../03-runtime/07-process-model.md) · [security](../05-security/01-security.md)
 
 ## 1. Build lanes
@@ -23,8 +25,8 @@ Do not set these values locally to bypass the guard.
 | Lane | Entry point | Signing | Result |
 |---|---|---|---|
 | Development | `pnpm dev`, `pnpm build:js`, Cargo development commands | none required | local development output |
-| Cloud candidate | Manual `release.yml` dispatch | unsigned by default; optional macOS signing | verified Actions bundle only |
-| Formal release | Push `v<version>` after its preparation PR merges | macOS Developer ID + mandatory notarization | verified, immutable GitHub Release |
+| Cloud candidate | Manual `release.yml` dispatch | unsigned by default; optional macOS signing | verified macOS arm64 Actions bundle only |
+| Formal release | Push `v<version>` after its preparation PR merges | macOS Developer ID + mandatory notarization | verified, immutable GitHub Release with macOS arm64 assets only |
 
 `scripts/release-macos.sh` is retired and exits with cloud-workflow guidance.
 There is no local installer or publication fallback when cloud validation fails.
@@ -195,7 +197,7 @@ or dispatched run does not prove a successful build.
 
 Manual dispatch defaults to `sign_macos=false`. Set it to `true` only with the
 six signing secrets configured. Both variants run the same shared CI barriers,
-platform builds and asset aggregation. They produce
+the macOS arm64 build and asset aggregation. They produce
 `release-bundle-<version>-<source-sha>` in Actions only: no GitHub Release is
 created and no public updater feed is published. Unsigned artifacts are debug
 candidates and do not establish Gatekeeper/notarization qualification.
@@ -233,16 +235,15 @@ The workflow executes these barriers in order:
    typecheck, lint, architecture/test-quality gates, tests, runtime-test
    typecheck, Rust fmt/clippy/tests, isolated smoke and release-script behavior
    tests. The full release-documentation gate runs after dependency install.
-3. **Native builds:** build Desktop for macOS arm64/Intel x64, Windows x64,
-   Linux x64/arm64, plus the Linux x64/arm64 pi-host bundles. Fetch the pinned
-   Electron binary on clean runners. Packaging uses `--publish never`; only
-   the final publication job may write a Release.
-4. **Aggregate:** require all seven expected artifact groups; reject missing,
-   unexpected, duplicate or unsafe paths. Check updater versions, actual
-   SHA512/size, and pi-host SHA256 sidecars. Merge both macOS feeds, then emit
-   `release-manifest.json` and `SHA256SUMS` for the complete verified bundle.
-   The manifest records source repository/SHA, run URL/id/attempt, version,
-   channel, kind, signing policy and every asset's name/size/SHA256.
+3. **Native build:** build Desktop for macOS arm64 on `macos-15`. Fetch the
+   pinned Electron binary on the clean runner. Packaging uses `--publish never`;
+   only the final publication job may write a Release.
+4. **Aggregate:** require exactly `dist-mac-arm64` with its DMG and ZIP, both
+   blockmaps, and `<channel>-mac-arm64.yml`; reject missing, unexpected,
+   duplicate or unsafe paths. Check updater version, actual SHA512/size, then
+   emit the canonical `<channel>-mac.yml`, `release-manifest.json` and
+   `SHA256SUMS`. The manifest records source repository/SHA, run URL/id/attempt,
+   version, channel, kind, signing policy and every asset's name/size/SHA256.
 5. **Publish (formal tags only):** `scripts/publish-release.mjs` revalidates
    the bundle and remote tag/main identity, creates a draft, uploads every
    asset, verifies remote SHA256 digests and sizes, then publishes. A published
@@ -251,8 +252,8 @@ The workflow executes these barriers in order:
    identity and may reuse only identical uploaded assets. A mismatched draft
    blocks publication. Do not delete or replace it automatically.
 
-The macOS matrix uses `macos-15` for arm64 and `macos-15-intel` for Intel x64.
-Each verifies `uname -m` and builds the Rust host on the same native runner.
+The sole packaging lane uses native `macos-15` arm64 and verifies `uname -m`
+before building the Rust host on the same runner.
 Signed lanes pin `CSC_NAME` to the configured certificate common name, force
 signing and notarization of the app, separately notarize/staple the DMG, then
 verify code integrity, configured identity, Gatekeeper and both stapled tickets
@@ -268,20 +269,18 @@ It uses electron-builder's installed blockmap implementation with an explicit
 external output, and verifies that generating the map leaves the signed DMG
 bytes unchanged. Aggregation then checks the final stapled artifact's hashes.
 
-Both macOS architectures have explicit DMG/ZIP names (§6), including blockmaps;
-each lane rejects unlabelled or wrong-architecture artifacts. The DMG retains
+The macOS arm64 lane has explicit DMG/ZIP names (§6), including blockmaps, and
+rejects unlabelled or wrong-architecture artifacts. The DMG retains
 its branded 720×440 drag-to-Applications window with only the app and Applications
 link. The ZIP contains `Pi-Desktop-Plus.app` at its root. Neither ships an
 opening-help note or executable first-launch helper.
 
-The Linux builds retain the glibc 2.35 floor (§7), versioned system-Electron ASAR
-assets copied from each installer, and architecture-specific feeds:
-`<channel>-linux.yml` for x64 and `<channel>-linux-arm64.yml` for arm64. The two
-macOS feeds are merged into `<channel>-mac.yml`; Windows NSIS uses
-`<channel>.yml`. Temporary compressed installer/feed artifacts use Actions
-compression level zero before aggregation. Platform output and pi-host inventory
-are checked by `scripts/release-assets.mjs` rather than inferred from successful
-individual build jobs.
+The current release workflow does not build Linux, Windows, Intel macOS or
+standalone pi-host artifacts. Existing platform-specific packaging and update
+behavior described below remains application capability documentation, not a
+claim that those artifacts are present in current candidate bundles or releases.
+The macOS arm64 input and final bundle inventory are checked by
+`scripts/release-assets.mjs`, rather than inferred from a successful build job.
 
 ### 4.4 Documentation site deployment
 
@@ -571,40 +570,34 @@ Manual smoke on a clean profile (`PI_DESKTOP_DATA_DIR=$(mktemp -d)`):
    fallback/rendering, host health, and sidecar health continue to use packaged
    local assets.
 
-## 6. Native-runner release packages
+## 6. Current cloud release artifacts
 
-These commands are implementation references for GitHub-hosted Actions only,
-not local packaging instructions. Each builds the release host, bundles the agent
-runtime and Electron app, and packages on its target native runner:
+The Release workflow builds only the macOS arm64 target on GitHub-hosted Actions.
+Installer commands remain guarded against local and self-hosted execution.
 
 ```text
-macOS Apple Silicon: pnpm --filter @pi-desktop/desktop run dist:mac -- --arm64
-macOS Intel:         pnpm --filter @pi-desktop/desktop run dist:mac -- --x64
-Windows: pnpm --filter @pi-desktop/desktop dist:win
-Linux:   pnpm --filter @pi-desktop/desktop dist:linux -- --x64|--arm64
+Runner: macos-15 (native arm64)
+Input group: dist-mac-arm64
+Inputs: Pi-Desktop-Plus-<version>-arm64.dmg, its .blockmap,
+        Pi-Desktop-Plus-<version>-arm64-mac.zip, its .blockmap,
+        <channel>-mac-arm64.yml
+Final bundle: those four assets plus <channel>-mac.yml,
+              release-manifest.json, and SHA256SUMS
 ```
 
-The Windows `dist:win` command runs `scripts/build-desktop-release.mjs`,
-which invokes electron-builder once for NSIS and once for ZIP so each package
-gets the correct updater distribution marker.
+The macOS arm64 package includes the native `bin/pi-desktop-host-core` binary.
+macOS signing and notarization are mandatory for formal tags. Rollback and
+installer upgrade qualification remain separate release hardening work.
 
-The macOS packages include `bin/pi-desktop-host-core` built for their runner
-architecture; the Linux packages do the same on their native x64 and arm64
-runners; Windows includes `bin/pi-desktop-host-core.exe`. macOS signing and
-notarization are mandatory for formal tags. Rollback and installer upgrade
-qualification remain separate release hardening work.
+The application still contains Windows and Linux support, and the packaging
+scripts retain their target implementations. Those targets are paused in the
+cloud Release workflow: they are not built, attached, or published by candidate
+runs or formal tags under the current scope.
+Standalone pi-host bundles are also absent from new releases. Remote-host
+bootstrap that downloads matching-version pi-host assets is therefore
+unavailable from these releases; the runtime and source capability remain.
 
-Native-runner output matrix:
-
-- macOS arm64: `Pi-Desktop-Plus-<version>-arm64.dmg` and
-  `Pi-Desktop-Plus-<version>-arm64-mac.zip`
-- macOS Intel x64: `Pi-Desktop-Plus-<version>-x64.dmg` and
-  `Pi-Desktop-Plus-<version>-x64-mac.zip`
-- Windows x64: NSIS installer `Pi-Desktop-Plus-Setup-<version>.exe` and portable
-  ZIP `Pi-Desktop-Plus-Portable-<version>.zip`
-- Linux x64 and arm64: AppImage, deb, and rpm
-- Linux system Electron assets: `Pi-Desktop-Plus-<version>-linux-x64.asar` and
-  `Pi-Desktop-Plus-<version>-linux-arm64.asar`
+### 6.1 Existing platform behavior outside current release output
 
 The portable Windows ZIP target does not write `latest.yml`. The Windows
 release helper builds NSIS and ZIP separately and stamps the ZIP app metadata
@@ -628,6 +621,10 @@ resources from the target package, then launch it with:
 electron Pi-Desktop-Plus-<version>-linux-<arch>.asar
 ```
 
+The following describes existing target behavior; it is not a current cloud
+release build matrix. When those targets return to the release workflow, run the
+corresponding platform smoke checks before publishing them.
+
 Shell smoke on each native runner:
 
 1. Confirm no File/Edit/View/Window/Help menu appears inside the window.
@@ -639,6 +636,10 @@ Shell smoke on each native runner:
 6. Verify unknown menu/window IPC actions fail with the window open and closed.
 
 ## 7. Known limitations
+
+The following target-specific notes describe existing application and packaging
+behavior; they do not indicate that these targets are included in current cloud
+release bundles.
 
 - Linux deb/rpm and the Windows portable ZIP remain notify-and-link update
   modes. Packaged macOS, Windows NSIS, and Linux AppImage use in-app
