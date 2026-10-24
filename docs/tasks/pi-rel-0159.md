@@ -54,8 +54,11 @@ The shared task stem is `20261024-chore-pi-rel-0159-release-0-15-9`.
 | T4 | Lead and read-only reviewer | final combined-state checks and representative user paths |
 | T5 | Lead | PR/main integration, formal tag, Actions/release verification and cleanup |
 
-Each worktree uses the matching `chore/20261024-pi-rel-0159-release-0-15-9`
-branch plus its suffix. The lead serially integrates worker commits. Workers
+Initial worker branches use the matching `chore/20261024-pi-rel-0159-release-0-15-9`
+stem plus their suffix. The Goal and provider closeout reuse the existing
+`-goal` and `-stop` trees on `fix/20261024-pi-rel-0159-goals-team-fixtures`
+and `fix/20261024-pi-rel-0159-provider-fixtures`; initial heads remain preserved
+in archive refs. The lead serially integrates worker commits. Workers
 do not push, open PRs, publish, or modify original source worktrees. Existing
 host dependency trees and caches are reused; no local dependency installation
 or installer packaging is planned. Mutable fixtures, logs, artifacts and any
@@ -236,6 +239,95 @@ passes with the fix; both full memory modes pass. No product code, hit-test
 requirement or timeout budget changed. The original CI log did not retain the
 post-failure rectangle, so its exact movement is not asserted retrospectively.
 Final exact-SHA hosted validation remains required before merge.
+
+### Expanded hosted E2E closeout
+
+At `761a3c1ce0bf4c5c65d5f0aa18fd303b67ed4aca`, CI `40079380776`,
+Docs `40079380806`, PR-base `40079380797` and project-memory
+`40079380771` passed. PR integration candidate
+`8af6cd3090b8290f9d87f1a767c2bcf829d92f74` has the same executable tree
+as that head against base `d424021c5`. The expanded nightly run
+`40079399419` passed 103 of 131 isolated suites; nine families failed and
+voice passed. Those failures block landing and are retained in
+`hosted/nightly-761a-full/`; passing regular CI does not supersede them.
+
+- Transcript fixtures now paint their hidden windows, wait for bounded stable
+  frame geometry and mirror the real transcript's disabled native anchoring.
+  Original title-drift and disclosure assertions remain; both suites passed
+  locally. Linux revalidation remains required.
+- Mounted Composer paths exposed real rapid-switch image-draft loss, preview
+  focus restoration ordering and cross-project draft ownership defects. The
+  owner is saved with its own workspace before loading and validating the new
+  owner's snapshot. Real A/A -> B/B -> A/A regression failed before the fix;
+  complete paste/history and IME fixtures passed afterward without dropping
+  existing cases. The retired source-shape assertion lowers the ratchet to
+  8,138, without increasing its trusted baseline.
+- MCP control now waits until the recovered switch accepts input and the real
+  Host request exists. Storage and Settings scroll fixtures paint offscreen.
+  The three original local suites pass with unchanged assertions/timeouts.
+- Plugin controls were genuinely clipped on the existing single-row toolbar.
+  The existing 32px model trigger now activates earlier below 720px when plugin
+  controls are present; its accessible name and menu retain the full selection.
+  The isolated app failed 61/62 checks before the fix and passed 63/63 after it,
+  including full-control geometry and the accessible model name. The retained
+  screenshot was visually inspected; the toolbar remains one row.
+- Real Runtime -> Main -> Rust question delivery exposed a strict Host request
+  contract violation: runtime-local `turnId`/`createdAt` metadata was forwarded
+  into a `deny_unknown_fields` request. `beebfc61f` projects only the existing
+  Host fields, retaining local metadata and the outer authoritative turn ID.
+  The boundary regression failed before the fix; fifteen pending/relay tests
+  and the unchanged real approved-question fixture passed afterward. No Host
+  schema or permission boundary changed.
+- Provider fixtures now use the direct model list and assert the exact typed
+  Plan denial without an extra HTTP request. The cumulative recovery fixture
+  checks all 24 requests, twelve independent completed response events, eleven
+  ordered durable tool results and every retry context; it expects only the
+  nonempty final assistant row, as required by existing persistence behavior.
+  The ten-retry ceiling remains. All three provider paths passed, and bounded
+  cleanup of only the test-owned process group now exits naturally.
+- Subagent controls passed native blur/Enter, bounds, failure and reload paths.
+  The notification fixture observes the actual platform's Host -> badge request
+  -> bell history: count requests on macOS/Linux and overlay image/label/clear
+  on Windows. Native count readback is required when the API accepts it. macOS
+  native readback passed all six transitions. Windows native execution is NOT
+  RUN; its overlay observation is implemented and unit-covered. Final Linux
+  validation is pending; without Unity it must report native badge capability
+  as unavailable, not claim a native badge result. Scheduled model selection, persisted reasoning,
+  actual next-minute execution and AI CRUD passed through the isolated app.
+- The full isolated shell flow passed 197/197 checks on macOS with an unchanged
+  source fingerprint. It measures center-aligned toolbar groups, checks the
+  simulated platform's control inset and distinguishes hidden Settings frames
+  from visible widths. Crash inspection waits for the replacement app document
+  before enabling Runtime observation, avoiding Electron 43.6.0's documented
+  initial-empty-document inspection issue (#54149 / #54176). Automatic reload,
+  same-window chat recovery and diagnostics remain required and passed. This
+  establishes the corrected local observation path; it does not prove the old
+  Linux splash failure's exact cause. Production recovery logic is unchanged.
+- The late-answer recovery path exposed another production defect: a paused
+  Team's queue hold stranded the authenticated durable answer. `7042913cf`
+  admits only that exact live answer through its own session's Team hold,
+  preserving Team pause, other holds and occupied/approval gates. Independent
+  review caught promoted mail being steered into that answer turn;
+  `eb7d4bd61` prevents that additional path. Both defects have actual red/green
+  regressions, including a real steering port, ordinary and Team mail, restore
+  state and independent holds. All eighty AgentHost cases passed. The unchanged
+  full native recovery flow passed again: exactly one late answer, old token
+  rejection, interrupted old Goal, pending new review and no automatic expert
+  launch. Restored snapshots gain no new execution authority.
+- Goal/Team fixtures now follow enabled approval controls and current Settings
+  cards. Temporary Goal recovery uses a real blocked result, explicit acceptance,
+  actual atomic report-write failure, restart and UI Retry; legacy closure and
+  fallback handling retain their executed Rust coverage. Cloud setup uses the
+  real build-receipt writer, never a fabricated attestation. The historical
+  baseline `26db5043860db8412a988cdce31362a424eea407` maps to reachable
+  `43a4725d64feb9aef33fc0889370d39417c2e712` with identical fixed apps/packages/
+  crates trees; ancestry and all three product hashes remain mandatory.
+- Final combined-SHA local checks and Linux hosted validation are required
+  before landing. Native Windows device acceptance and signed/notarized macOS
+  qualification are NOT RUN. Corrected fixtures preserve their behavior
+  coverage; no security or persistence guard is weakened. Final run, release
+  and cleanup receipts under the recovery directory continue this record after
+  its source is tagged; they do not rewrite the immutable released source.
 
 Initial checks: source paths/HEAD/index/dirty state and registered worktrees
 inspected; origin main/tags fetched; original source snapshots verified. Remote
