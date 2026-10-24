@@ -6,6 +6,10 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseReleaseVersion } from "./release-preflight.mjs";
 
+const unsignedDisclosure = "**Unsigned macOS arm64 personal-use build**\n\n" +
+  "This build is unsigned and not notarized. Download the installer and install updates manually. " +
+  "Automatic update installation is not guaranteed.";
+
 class GitHubError extends Error {
   constructor(status, message) { super(`GitHub HTTP ${status}: ${message}`); this.status = status; }
 }
@@ -16,12 +20,15 @@ async function hashFile(path) {
   return hash.digest("hex");
 }
 
-async function verifiedBundle(directory) {
+async function verifiedBundle(directory, allowUnsignedMacos) {
   const manifestPath = join(directory, "release-manifest.json");
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   const parsed = parseReleaseVersion(manifest.version);
-  if (manifest.schemaVersion !== 1 || manifest.kind !== "release" || manifest.signedMacos !== true) {
-    throw new Error("Only a signed, verified formal release bundle can be published");
+  if (manifest.schemaVersion !== 1 || manifest.kind !== "release" || typeof manifest.signedMacos !== "boolean") {
+    throw new Error("Only a verified formal release bundle with an explicit signing status can be published");
+  }
+  if (!manifest.signedMacos && !allowUnsignedMacos) {
+    throw new Error("An unsigned formal release requires an explicit unsigned release opt-in");
   }
   if (manifest.channel !== parsed.channel || !/^[a-f0-9]{40}$/.test(manifest.source?.sha ?? "") ||
       !/^[A-Za-z0-9][A-Za-z0-9_.-]*\/[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(manifest.source?.repository ?? "")) {
@@ -105,10 +112,11 @@ function verifyRemoteAsset(asset, expected) {
   }
 }
 
-function requireMatchingDraft(release, { tag, source, prerelease, marker, id }) {
+function requireMatchingDraft(release, { tag, source, prerelease, marker, disclosure, id }) {
   if (release && !release.draft) throw new Error(`Release ${tag} is already published; assets are immutable`);
   if (!release || (id !== undefined && release.id !== id) || release.tag_name !== tag ||
-      release.target_commitish !== source || release.prerelease !== prerelease || !release.body?.includes(marker)) {
+      release.target_commitish !== source || release.prerelease !== prerelease || !release.body?.includes(marker) ||
+      (disclosure && !release.body.includes(disclosure))) {
     throw new Error("Existing draft does not match this exact verified bundle; retained for inspection");
   }
 }
@@ -124,8 +132,9 @@ async function remoteAssets(api, repository, releaseId) {
   throw new Error("Unexpectedly large release asset list");
 }
 
-export async function publishRelease({ directory, repository, sourceSha, ref }, { api }) {
-  const { manifest, parsed, files } = await verifiedBundle(directory);
+export async function publishRelease({ directory, repository, sourceSha, ref, allowUnsignedMacos = false }, { api }) {
+  if (typeof allowUnsignedMacos !== "boolean") throw new Error("Invalid allowUnsignedMacos value");
+  const { manifest, parsed, files } = await verifiedBundle(directory, allowUnsignedMacos);
   const source = manifest.source.sha;
   const tag = `v${manifest.version}`;
   if (repository !== manifest.source.repository || sourceSha !== source || ref !== `refs/tags/${tag}`) {
@@ -134,15 +143,16 @@ export async function publishRelease({ directory, repository, sourceSha, ref }, 
   await requireRemoteSource(api, repository, tag, source);
   const manifestHash = files.find(file => file.name === "release-manifest.json").sha256;
   const marker = `<!-- pi-release source=${source} manifest=${manifestHash} -->`;
+  const disclosure = manifest.signedMacos ? "" : unsignedDisclosure;
   let release;
   try { release = await api("GET", `/repos/${repository}/releases/tags/${encodeURIComponent(tag)}`); }
   catch (error) { if (error.status !== 404) throw error; }
-  const draftIdentity = { tag, source, prerelease: parsed.prerelease, marker };
+  const draftIdentity = { tag, source, prerelease: parsed.prerelease, marker, disclosure };
   if (release) requireMatchingDraft(release, draftIdentity);
   if (!release) {
     release = await api("POST", `/repos/${repository}/releases`, { json: { tag_name: tag,
       target_commitish: source, name: tag, draft: true, prerelease: parsed.prerelease,
-      generate_release_notes: true, body: marker, make_latest: "false" } });
+      generate_release_notes: true, body: disclosure ? `${disclosure}\n\n${marker}` : marker, make_latest: "false" } });
   }
   if (!Number.isSafeInteger(release.id) || release.id <= 0) throw new Error("GitHub returned an invalid release ID");
   let remote = await remoteAssets(api, repository, release.id);
@@ -186,8 +196,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       throw new Error("Release publication must run on a GitHub-hosted Actions runner");
     }
     if (process.argv.length !== 4 || process.argv[2] !== "--directory") throw new Error("Usage: publish-release.mjs --directory <verified-bundle>");
+    const allowUnsigned = process.env.ALLOW_UNSIGNED_MACOS_RELEASE ?? "false";
+    if (!["true", "false"].includes(allowUnsigned)) throw new Error("ALLOW_UNSIGNED_MACOS_RELEASE must be true or false");
     const url = await publishRelease({ directory: resolve(process.argv[3]), repository: process.env.GITHUB_REPOSITORY,
-      sourceSha: process.env.GITHUB_SHA, ref: process.env.GITHUB_REF }, { api: githubTransport(process.env.GITHUB_TOKEN) });
+      sourceSha: process.env.GITHUB_SHA, ref: process.env.GITHUB_REF, allowUnsignedMacos: allowUnsigned === "true" },
+    { api: githubTransport(process.env.GITHUB_TOKEN) });
     console.log(`Published verified release: ${url}`);
   } catch (error) {
     console.error(`Release publication failed: ${error.message}`);

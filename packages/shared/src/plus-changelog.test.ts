@@ -34,10 +34,11 @@ describe("Plus changelog overlay", () => {
     // accepting the runtime's Plus-only fallback as a complete catalog.
     expect(cutoffIndex).toBeGreaterThanOrEqual(0);
     const catalog = withPlusEntries(locale, upstream);
-    expect(catalog[0]?.version).toBe("0.15.7");
-    expect(catalog[0]?.date).toBe("2026-10-02");
-    expect(catalog[1]).toBe(upstream[cutoffIndex]);
-    expect(catalog.slice(1)).toEqual(upstream.slice(cutoffIndex));
+    expect(catalog[0]?.version).toBe("0.15.8");
+    expect(catalog[0]?.date).toBe("2026-10-24");
+    expect(catalog[1]?.version).toBe("0.15.7");
+    expect(catalog[2]).toBe(upstream[cutoffIndex]);
+    expect(catalog.slice(2)).toEqual(upstream.slice(cutoffIndex));
     const visibleVersions = catalog.map((entry) => entry.version);
     for (const entry of upstream.slice(0, cutoffIndex)) {
       expect(visibleVersions).not.toContain(entry.version);
@@ -70,7 +71,7 @@ describe("Plus changelog overlay", () => {
     ];
     const before = structuredClone(upstream);
     expect(withPlusEntries("en", upstream).map((entry) => entry.version)).toEqual([
-      "0.15.7", PLUS_UPSTREAM_CUTOFF, "9.0.0",
+      "0.15.8", "0.15.7", PLUS_UPSTREAM_CUTOFF, "9.0.0",
     ]);
     expect(upstream).toEqual(before);
   });
@@ -82,9 +83,9 @@ describe("Plus changelog overlay", () => {
     ];
     const catalog = withPlusEntries("en", upstream);
     expect(catalog.map((entry) => entry.version)).toEqual([
-      "0.15.7", PLUS_UPSTREAM_CUTOFF, "0.15.5",
+      "0.15.8", "0.15.7", PLUS_UPSTREAM_CUTOFF, "0.15.5",
     ]);
-    expect(catalog[1]).toBe(upstream[0]);
+    expect(catalog[2]).toBe(upstream[0]);
   });
 
   it("isolates cached results by upstream array and locale", () => {
@@ -102,8 +103,8 @@ describe("Plus changelog overlay", () => {
   it("shows only Plus entries when the upstream cutoff is missing", () => {
     const upstream: ChangelogEntry[] = [{ version: "0.16.1", highlights: ["New upstream release"] }];
     const catalog = withPlusEntries("en", upstream);
-    expect(catalog.map((entry) => entry.version)).toEqual(["0.15.7"]);
+    expect(catalog.map((entry) => entry.version)).toEqual(["0.15.8", "0.15.7"]);
     expect(withPlusEntries("en", upstream)).toBe(catalog);
-    expect(withPlusEntries("en", []).map((entry) => entry.version)).toEqual(["0.15.7"]);
+    expect(withPlusEntries("en", []).map((entry) => entry.version)).toEqual(["0.15.8", "0.15.7"]);
   });
 });

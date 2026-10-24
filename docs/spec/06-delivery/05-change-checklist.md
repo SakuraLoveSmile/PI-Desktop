@@ -261,7 +261,9 @@ documentation-only work or non-release chores.
       its exact clean merged commit, verified fresh remote ancestry and absence
       of an existing tag, and did not bump files or commit.
 - [ ] The tag workflow pinned one full source SHA and passed shared CI,
-      native architecture/signing/notarization and complete asset/feed checks.
+      native architecture and complete asset/feed checks. Record whether the
+      signed/notarized lane or the explicitly enabled unsigned personal-use lane
+      ran; do not treat unsigned output as signing or Gatekeeper qualification.
 - [ ] `release-manifest.json`, `SHA256SUMS`, source/base SHAs, run URL and all
       job conclusions were retained as evidence. Candidate dispatch produced
       Actions artifacts only; publication was not inferred from dispatch.

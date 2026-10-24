@@ -3,7 +3,10 @@
 > Plus uses `SakuraLoveSmile/PI-Desktop` for release feeds. Configure the fork
 > signing identity and Apple team explicitly; upstream credentials are not
 > defaults. Historical upstream mirror automation below remains upstream-only.
-> Unsigned builds are not signed/notarized release evidence.
+> Unsigned builds are not signed/notarized release evidence. Formal tags require
+> signing by default; the repository variable `ALLOW_UNSIGNED_MACOS_RELEASE=true`
+> explicitly permits a personal-use unsigned Release. Such releases require
+> manual download and installation and do not qualify Gatekeeper or notarization.
 > Packaged metadata uses `pi-desktop-plus`, so electron-updater keeps the Plus
 > cache separate as `pi-desktop-plus-updater`.
 
@@ -26,7 +29,7 @@ Do not set these values locally to bypass the guard.
 |---|---|---|---|
 | Development | `pnpm dev`, `pnpm build:js`, Cargo development commands | none required | local development output |
 | Cloud candidate | Manual `release.yml` dispatch | unsigned by default; optional macOS signing | verified macOS arm64 Actions bundle only |
-| Formal release | Push `v<version>` after its preparation PR merges | macOS Developer ID + mandatory notarization | verified, immutable GitHub Release with macOS arm64 assets only |
+| Formal release | Push `v<version>` after its preparation PR merges | Developer ID + notarization by default; explicit opt-in for unsigned personal-use builds | verified, immutable GitHub Release with macOS arm64 assets only |
 
 `scripts/release-macos.sh` is retired and exits with cloud-workflow guidance.
 There is no local installer or publication fallback when cloud validation fails.
@@ -78,8 +81,9 @@ and preserve developer workspace defaults despite the branded executable name.
 The first `pnpm dev` on Electron 43+ downloads the Electron binary on demand
 (the package no longer installs it during `pnpm install`). Clean cloud runners
 explicitly fetch that pinned Electron binary before building or running E2E.
-Unsigned cloud candidates do not request a secure timestamp; signed candidates
-and formal releases require the secure timestamp used for notarization.
+Unsigned cloud lanes do not request a secure timestamp. Every signed lane,
+including signed candidates and formal releases, requires the secure timestamp
+used for notarization.
 Packaged lanes use `build/icon.icns` through electron-builder on macOS and
 `build/icon.ico` for the Windows executable and native window icon. The
 renderer imports the same PNG through `BrandLogo`. The PNG is canonical;
@@ -92,9 +96,11 @@ when macOS `iconutil` is available, without overwriting the canonical source.
 
 1. Repository Actions access and permission to dispatch a candidate. Formal
    publication additionally requires authorization to push the version tag.
-2. Configure all six macOS signing secrets in §4.6 for a formal release or a
-   signed candidate. The certificate and signing TeamIdentifier must belong to
-   the fork operator and match the configured identity.
+2. Configure all six macOS signing secrets in §4.6 for a signed candidate or
+   the default signed formal release. A formal unsigned personal-use release
+   requires `ALLOW_UNSIGNED_MACOS_RELEASE=true` instead. The certificate and
+   signing TeamIdentifier must belong to the fork operator and match the
+   configured identity.
 3. GitHub-hosted native runners with the pinned Node/pnpm, Rust, Electron and
    lockfile dependencies. No prebuilt local output is a release input. The
    workflow checks runner architecture and compiles the native host on it.
@@ -224,8 +230,24 @@ that resolves to another commit, or a source not contained in freshly fetched
 `origin/main`. Stable SemVer uses the `latest` channel. Named prereleases such
 as `alpha`, `beta` and `rc` use their own updater channel and are published with
 `prerelease=true` and `make_latest=false`; malformed or unsafe channels fail.
-Formal tags always require all six signing secrets and fail early if any are
-missing. An unsigned manual candidate cannot be promoted into a formal release.
+Formal tags require all six signing secrets by default and fail early if any are
+missing. To publish an unsigned personal-use formal release, set the repository
+Actions variable explicitly:
+
+```bash
+gh variable set ALLOW_UNSIGNED_MACOS_RELEASE --body true -R SakuraLoveSmile/PI-Desktop
+```
+
+The variable defaults to unset/false; remove it or set it to `false` to restore
+the signed-only formal release policy. The manual `sign_macos` input remains
+independent: explicitly requesting `sign_macos=true` still requires all six
+secrets. The preflight freezes this opt-in in `allow_unsigned_macos` metadata so
+the aggregate and publication jobs use the same decision. An unsigned Release
+records `signedMacos: false`, is labeled unsigned and not notarized, and requires
+manual download and installation for updates. macOS security settings remain
+unchanged; Gatekeeper and automatic in-app installation are not qualified.
+Unsigned manual candidates remain Actions-only and cannot be promoted directly
+to a formal release.
 
 The workflow executes these barriers in order:
 
@@ -257,7 +279,8 @@ before building the Rust host on the same runner.
 Signed lanes pin `CSC_NAME` to the configured certificate common name, force
 signing and notarization of the app, separately notarize/staple the DMG, then
 verify code integrity, configured identity, Gatekeeper and both stapled tickets
-before upload (§4.6–§5). No signing or notarization check is optional for tags.
+before upload (§4.6–§5). These checks apply whenever signing is selected; the
+explicit unsigned personal-use lane is recorded as unqualified.
 
 
 Every builder invocation receives the explicit `-c.publish.channel=<channel>`
@@ -586,8 +609,10 @@ Final bundle: those four assets plus <channel>-mac.yml,
 ```
 
 The macOS arm64 package includes the native `bin/pi-desktop-host-core` binary.
-macOS signing and notarization are mandatory for formal tags. Rollback and
-installer upgrade qualification remain separate release hardening work.
+macOS signing and notarization are mandatory for formal tags by default; the
+documented personal-use opt-in publishes an unsigned, not notarized package.
+Rollback and installer upgrade qualification remain separate release hardening
+work.
 
 The application still contains Windows and Linux support, and the packaging
 scripts retain their target implementations. Those targets are paused in the

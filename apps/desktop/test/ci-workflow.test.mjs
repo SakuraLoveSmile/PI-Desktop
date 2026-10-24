@@ -78,6 +78,20 @@ test("release validates one pinned candidate before starting verification", () =
   // tested with real isolated Git repositories in release-preflight.test.mjs.
 });
 
+test("unsigned release permission is pinned and forwarded through verification and publication", () => {
+  const { metadata, aggregate, publish } = releaseWorkflow.jobs;
+  const preflight = metadata.steps.find(step => step.id === "preflight");
+  assert.equal(preflight.env.ALLOW_UNSIGNED_MACOS_RELEASE,
+    "${{ vars.ALLOW_UNSIGNED_MACOS_RELEASE || 'false' }}");
+  assert.equal(metadata.outputs.allow_unsigned_macos, "${{ steps.preflight.outputs.allow_unsigned_macos }}");
+  const aggregateStep = aggregate.steps.find(step => step.name === "Verify macOS arm64 artifacts, feed and checksums");
+  assert.equal(aggregateStep.env.ALLOW_UNSIGNED_MACOS_RELEASE, "${{ needs.metadata.outputs.allow_unsigned_macos }}");
+  assert(aggregateStep.run.includes('--allow-unsigned-macos "$ALLOW_UNSIGNED_MACOS_RELEASE"'));
+  const publishStep = publish.steps.find(step => step.name === "Create draft, verify remote assets, then publish");
+  assert.equal(publishStep.env.ALLOW_UNSIGNED_MACOS_RELEASE, "${{ needs.metadata.outputs.allow_unsigned_macos }}");
+  assert.equal(publish.if, "needs.metadata.outputs.kind == 'release'");
+});
+
 test("release preparation overlaps independent work and avoids duplicate builds", () => {
   assert.match(
     releaseWorkflowSource,
@@ -211,8 +225,8 @@ test("macOS release signing is required on tag pushes", () => {
   assert.equal(releaseWorkflow.jobs.build.env.MACOS_SIGN_RELEASE, "${{ needs.metadata.outputs.signed_macos }}");
   assert(releaseStep("Package signed and notarized macOS installer").run.includes("-c.mac.forceCodeSigning=true"),
     "the cloud signing command must require a valid signing identity");
-  // release-preflight.test.mjs proves that tags require signing even when the
-  // manual input is false, and that unsigned candidates require no secrets.
+  // release-preflight.test.mjs proves tags require signing by default, explicit
+  // unsigned opt-in preserves main/tag checks, and requested signing needs secrets.
 
   const unsignedBlock = releaseWorkflowSource.match(
     /- name: Package unsigned macOS installer[\s\S]*?(?=\n      - name:)/,

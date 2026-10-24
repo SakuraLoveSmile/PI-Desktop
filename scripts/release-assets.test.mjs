@@ -108,6 +108,20 @@ test("prerelease aggregation uses only its own update channel", async t => {
   assert(!names.some(name => name.startsWith("latest")));
 });
 
+test("the CLI requires an explicit opt-in for unsigned formal artifacts", async t => {
+  const f = await fixture(t);
+  const options = { ...f.options, kind: "release", allowUnsignedMacos: true };
+  const argumentsList = Object.entries(options).flatMap(([key, value]) => [
+    `--${key.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)}`, String(value),
+  ]);
+  await execute(process.execPath, [fileURLToPath(new URL("./release-assets.mjs", import.meta.url)), ...argumentsList]);
+  const manifest = JSON.parse(await readFile(join(f.output, "release-manifest.json"), "utf8"));
+  assert.equal(manifest.kind, "release");
+  assert.equal(manifest.signedMacos, false);
+  assert.equal(manifest.assets.length, 5);
+  assert.equal((await readdir(f.output)).length, 7);
+});
+
 test("ordinary YAML feeds are safely read without depending on npm packages", async t => {
   const f = await fixture(t);
   const path = join(f.input, "dist-mac-arm64", "latest-mac-arm64.yml");
@@ -177,6 +191,8 @@ test("invalid provenance, channels and release signing cannot produce a manifest
     { source: "main" }, { repository: "../PI-Desktop" }, { runId: "../1" }, { runAttempt: "0" },
     { version: "../0.15.8" }, { channel: "../latest" }, { channel: "beta" }, { signedMacos: "false" },
     { kind: "unknown" }, { kind: "release", signedMacos: false },
+    { kind: "release", allowUnsignedMacos: false }, { allowUnsignedMacos: "true" },
+    { allowUnsignedMacos: null },
   ]) await assert.rejects(aggregateReleaseAssets({ ...f.options, ...update }), /Invalid|requires/);
   await assert.rejects(aggregateReleaseAssets({ ...f.options, output: join(f.input, "nested") }), /overlap/);
   await assert.rejects(readdir(f.output), { code: "ENOENT" });

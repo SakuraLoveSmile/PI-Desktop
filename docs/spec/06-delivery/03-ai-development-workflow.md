@@ -374,9 +374,12 @@ including unpacked `pack --dir` output. Local `pnpm dev` and ordinary developmen
 compilation remain supported. Do not bypass installer guards or revive the
 retired `scripts/release-macos.sh` lane. A manual `release.yml` candidate yields
 verified Actions artifacts only; a formal version tag must identify a clean,
-already merged main commit, require macOS signing/notarization, and pass shared
-CI and complete asset verification before draft/upload/remote verification and
-publication. Existing published releases are immutable. See the
+already merged main commit and pass shared CI and complete asset verification
+before draft/upload/remote verification and publication. Signing and
+notarization are required by default; the explicit repository variable
+`ALLOW_UNSIGNED_MACOS_RELEASE=true` opts into a personal-use unsigned release
+that requires manual download and installation. Existing published releases
+are immutable. See the
 [release runbook](06-release-runbook.md) for preparation, tagging, channels,
 secrets, failure recovery and evidence.
 

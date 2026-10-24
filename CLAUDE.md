@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Policy-Sync: 2026-10-24.1
+Policy-Sync: 2026-10-24.2
 
 Instructions for Claude Code CLI and Claude Cowork on PI-Desktop.
 
@@ -98,8 +98,11 @@ local package when a cloud gate fails.
 
 Use `.github/workflows/release.yml` for a manual candidate or a formal version
 tag, following `docs/spec/06-delivery/06-release-runbook.md`. Manual candidates
-produce verified Actions artifacts only. Only a signed, verified tag already
-contained in remote `main` can publish a GitHub Release.
+produce verified Actions artifacts only. A verified formal tag already
+contained in remote `main` can publish a GitHub Release after the shared gates
+and asset checks pass. Signing is required by default; the repository variable
+`ALLOW_UNSIGNED_MACOS_RELEASE=true` explicitly opts into a personal-use unsigned
+macOS release that requires manual download and installation.
 
 Task-candidate validation may run on GitHub-hosted Actions at the exact request
 SHA after incorporating latest `origin/main`. With this lane selected, an

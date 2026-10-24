@@ -9,6 +9,8 @@ const VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\
 const SAFE_NAME = /^[A-Za-z0-9][A-Za-z0-9._+-]*$/;
 
 function validateOptions(options) {
+  const { allowUnsignedMacos = false } = options;
+  if (typeof allowUnsignedMacos !== "boolean") throw new Error("Invalid allow-unsigned-macos value");
   for (const key of ["input", "output", "version", "source", "repository", "runId", "runAttempt", "channel"]) {
     if (typeof options[key] !== "string" || !options[key]) throw new Error(`Invalid ${key}`);
   }
@@ -27,7 +29,9 @@ function validateOptions(options) {
   if (!["candidate", "release"].includes(options.kind) || typeof options.signedMacos !== "boolean") {
     throw new Error("Invalid build kind or signed-macos value");
   }
-  if (options.kind === "release" && !options.signedMacos) throw new Error("A release requires signed macOS artifacts");
+  if (options.kind === "release" && !options.signedMacos && !allowUnsignedMacos) {
+    throw new Error("A release requires signed macOS artifacts or an explicit unsigned release opt-in");
+  }
 }
 
 function requiredLayout(version, channel) {
@@ -207,7 +211,7 @@ export async function aggregateReleaseAssets(options) {
 }
 
 function parseArguments(argumentsList) {
-  const keys = new Map(["input", "output", "version", "source", "repository", "run-id", "run-attempt", "channel", "kind", "signed-macos"]
+  const keys = new Map(["input", "output", "version", "source", "repository", "run-id", "run-attempt", "channel", "kind", "signed-macos", "allow-unsigned-macos"]
     .map(key => [`--${key}`, key.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())]));
   const options = {};
   for (let index = 0; index < argumentsList.length; index += 2) {
@@ -216,8 +220,8 @@ function parseArguments(argumentsList) {
     if (Object.hasOwn(options, key)) throw new Error(`Duplicate argument: ${argumentsList[index]}`);
     const value = argumentsList[index + 1];
     if (!value || value.startsWith("--")) throw new Error(`Missing value: ${argumentsList[index]}`);
-    if (key === "signedMacos") {
-      if (!["true", "false"].includes(value)) throw new Error("Invalid signed-macos value");
+    if (["signedMacos", "allowUnsignedMacos"].includes(key)) {
+      if (!["true", "false"].includes(value)) throw new Error(`Invalid ${argumentsList[index]} value`);
       options[key] = value === "true";
     } else options[key] = value;
   }

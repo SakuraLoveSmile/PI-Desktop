@@ -40,10 +40,12 @@ function versionSurfaces(root, expected) {
   if (mismatches.length) throw new Error(`Release version surfaces disagree with ${expected}: ${mismatches.join(", ")}`);
 }
 
-export function releasePreflight({ root, eventName, ref, sourceSha, signMacos = "false", env = process.env }) {
+export function releasePreflight({ root, eventName, ref, sourceSha, signMacos = "false", allowUnsignedMacos = false, env = process.env }) {
   if (!["push", "workflow_dispatch"].includes(eventName)) throw new Error("Release only accepts a tag push or manual candidate build");
   if (!/^[a-f0-9]{40}$/.test(sourceSha ?? "")) throw new Error("The candidate must identify a full commit SHA");
   if (!["true", "false"].includes(String(signMacos))) throw new Error("sign_macos must be true or false");
+  if (![true, false, "true", "false"].includes(allowUnsignedMacos)) throw new Error("allow_unsigned_macos must be true or false");
+  const allowUnsigned = String(allowUnsignedMacos) === "true";
   const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
   const resolved = git("rev-parse", "--verify", `${sourceSha}^{commit}`);
   if (resolved !== sourceSha || git("rev-parse", "HEAD") !== resolved) throw new Error("Checkout does not match the pinned source SHA");
@@ -58,7 +60,7 @@ export function releasePreflight({ root, eventName, ref, sourceSha, signMacos = 
   } else if (!/^refs\/(?:heads|tags)\/[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(ref ?? "")) {
     throw new Error("Manual candidate builds require a valid branch or tag reference");
   }
-  const signedMacos = isRelease || String(signMacos) === "true";
+  const signedMacos = (isRelease && !allowUnsigned) || String(signMacos) === "true";
   if (signedMacos) {
     const missing = signingSecrets.filter(name => !env[name]);
     if (missing.length) throw new Error(`Missing GitHub Actions macOS signing secrets: ${missing.join(", ")}`);
@@ -69,6 +71,7 @@ export function releasePreflight({ root, eventName, ref, sourceSha, signMacos = 
     source_sha: resolved, base_sha: baseSha, version: parsed.version,
     document_version: parsed.stableVersion, channel: parsed.channel,
     prerelease: String(parsed.prerelease), signed_macos: String(signedMacos),
+    allow_unsigned_macos: String(allowUnsigned),
     kind: isRelease ? "release" : "candidate", tag: `v${parsed.version}`,
   };
 }
@@ -76,7 +79,8 @@ export function releasePreflight({ root, eventName, ref, sourceSha, signMacos = 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const metadata = releasePreflight({ root: process.cwd(), eventName: process.env.GITHUB_EVENT_NAME,
-      ref: process.env.GITHUB_REF, sourceSha: process.env.GITHUB_SHA, signMacos: process.env.SIGN_MACOS ?? "false" });
+      ref: process.env.GITHUB_REF, sourceSha: process.env.GITHUB_SHA, signMacos: process.env.SIGN_MACOS ?? "false",
+      allowUnsignedMacos: process.env.ALLOW_UNSIGNED_MACOS_RELEASE ?? "false" });
     if (!process.env.GITHUB_OUTPUT) throw new Error("GITHUB_OUTPUT is required");
     appendFileSync(process.env.GITHUB_OUTPUT, Object.entries(metadata).map(([key, value]) => `${key}=${value}\n`).join(""));
     console.log(JSON.stringify(metadata));

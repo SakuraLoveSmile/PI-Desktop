@@ -16922,11 +16922,14 @@ renderer's durable transcript reads. No real model or provider is contacted.
 - Remote case: run bootstrap against a disposable SSH fixture with old host
   sentinels; Plus uses its own install, pid/log and data roots and does not
   stop the old host. Explicit path overrides retain their documented meaning.
-- Release case: missing signing inputs and wrong certificate/team fail closed;
-  fixture signatures do not qualify actual notarization or live updates.
+- Release case: missing signing inputs fail closed for the default signed lane
+  and for an explicitly requested signed build; the explicit unsigned personal-
+  use lane records `signedMacos: false` and requires manual download/install.
+  Fixture signatures do not qualify actual notarization or live updates.
 - Evidence: record candidate/base, OS/architecture, tests and native scenarios
   separately. Native Windows/Linux and signed release evidence are required
-  before claiming those distribution lanes qualified.
+  before claiming those distribution lanes qualified; an unsigned personal-use
+  Release does not qualify signing, notarization or Gatekeeper behavior.
 
 ### E2E-PLAN-review-revision-and-execution
 

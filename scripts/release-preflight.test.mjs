@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { releasePreflight, parseReleaseVersion } from "./release-preflight.mjs";
 
 function fixture(t, version = "1.2.3") {
@@ -47,6 +48,44 @@ test("formal releases require main membership and signing even if input is false
   assert.throws(() => releasePreflight({ ...options, env: {} }), /Missing GitHub Actions macOS signing secrets: CSC_LINK/);
   git("update-ref", "refs/remotes/origin/main", git("rev-parse", "HEAD^"));
   assert.throws(() => releasePreflight(options), /already be merged/);
+});
+
+test("formal unsigned releases require an explicit opt-in and preserve source checks", t => {
+  const { options, git } = fixture(t);
+  const result = releasePreflight({ ...options, env: {}, allowUnsignedMacos: true });
+  assert.equal(result.kind, "release");
+  assert.equal(result.signed_macos, "false");
+  assert.equal(result.allow_unsigned_macos, "true");
+  assert.equal(releasePreflight(options).allow_unsigned_macos, "false");
+  assert.equal(releasePreflight({ ...options, env: {}, allowUnsignedMacos: "true" }).signed_macos, "false");
+  assert.throws(() => releasePreflight({ ...options, env: {}, allowUnsignedMacos: true, signMacos: true }), /Missing/);
+  assert.throws(() => releasePreflight({ ...options, env: {}, allowUnsignedMacos: "false" }), /Missing/);
+  assert.throws(() => releasePreflight({ ...options, env: {}, allowUnsignedMacos: true, ref: "refs/tags/v9.9.9" }), /exactly match/);
+  git("update-ref", "refs/remotes/origin/main", git("rev-parse", "HEAD^"));
+  assert.throws(() => releasePreflight({ ...options, env: {}, allowUnsignedMacos: true }), /already be merged/);
+});
+
+test("unsigned release opt-in rejects malformed flags before builds", t => {
+  const { options } = fixture(t);
+  for (const allowUnsignedMacos of ["yes", "TRUE", "", null, 1, {}]) {
+    assert.throws(() => releasePreflight({ ...options, allowUnsignedMacos }), /allow_unsigned_macos must be true or false/);
+  }
+});
+
+test("the preflight CLI freezes the repository unsigned opt-in in workflow outputs", t => {
+  const { options, root } = fixture(t);
+  const output = join(root, "workflow-output");
+  const stdout = execFileSync(process.execPath, [fileURLToPath(new URL("./release-preflight.mjs", import.meta.url))], {
+    cwd: root, encoding: "utf8", env: { ...process.env, GITHUB_EVENT_NAME: options.eventName,
+      GITHUB_REF: options.ref, GITHUB_SHA: options.sourceSha, SIGN_MACOS: "false",
+      ALLOW_UNSIGNED_MACOS_RELEASE: "true", GITHUB_OUTPUT: output },
+  });
+  const metadata = JSON.parse(stdout);
+  assert.equal(metadata.kind, "release");
+  assert.equal(metadata.signed_macos, "false");
+  assert.equal(metadata.allow_unsigned_macos, "true");
+  const outputs = Object.fromEntries(readFileSync(output, "utf8").trim().split("\n").map(line => line.split("=")));
+  assert.deepEqual(outputs, metadata);
 });
 
 test("wrong tag, wrong checkout and inconsistent version surfaces are refused", t => {
