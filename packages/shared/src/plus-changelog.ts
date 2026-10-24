@@ -6,6 +6,21 @@ export const PLUS_UPSTREAM_CUTOFF = "0.15.6";
 const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   en: [
     {
+      version: "0.15.9",
+      date: "2026-10-24",
+      highlights: [
+        "Find exact settings with direct search results and a searchable category chooser in narrow windows; filter shortcuts and project memory.",
+        "Keep editor actions reachable, retain failed-save drafts for retry, distinguish saved settings from refresh failures, and expand optional skill discovery only when needed.",
+        "Bind required verification commands to Goals and accept completion only with durable, successful shell evidence from the same execution; show concrete progress statuses.",
+        "Keep Stop within one ten-second cancellation window even when a tool and its cancellation both stop responding, and isolate late results from the next turn.",
+        "Correct long-session output budgets and compaction retries, omit genuinely empty saved replies, and preserve AskTool drafts across chats.",
+        "Open positioned file links precisely, reject ambiguous file names, and exclude expired system trust anchors while retaining certificate and hostname verification.",
+        "Improve the Composer workspace strip, queue controls, thinking labels, Plan exit and context usage; keep Overview file changes and expert statuses clear, and dismiss menus on user scrolling.",
+        "Keep session lists responsive and pin recovery windows only on macOS.",
+        "Goal verification upgrades local profiles to Plus schema P10 with a migration backup. Older builds cannot reopen an upgraded profile; restore the preserved pre-upgrade profile before downgrading.",
+      ],
+    },
+    {
       version: "0.15.8",
       date: "2026-10-24",
       highlights: [
@@ -38,6 +53,21 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "zh-CN": [
+    {
+      version: "0.15.9",
+      date: "2026-10-24",
+      highlights: [
+        "设置搜索可直达具体设置项；窄窗口提供可搜索的分类目录，快捷键和项目记忆支持筛选。",
+        "编辑器操作保持可见；保存失败保留草稿供重试，区分保存成功与刷新失败，技能发现仅在展开时扫描。",
+        "目标可绑定必验命令，仅接受同次执行中已持久化且成功的 Shell 证据，并展示具体进度状态。",
+        "即使工具执行和取消请求都无响应，停止操作也在同一个十秒取消窗口内收敛，迟到结果不会影响下一回合。",
+        "修复长会话输出额度与压缩后的重试，不再保存无内容的空回复，切换会话保留提问草稿。",
+        "文件链接准确跳转到指定位置，同名歧义不再猜测打开；排除过期系统信任证书并保留证书与主机名校验。",
+        "改进输入区工作区条、队列、思考标签、规划退出和上下文用量；概要清晰展示文件变化与专家状态，用户滚动时关闭菜单。",
+        "减少会话列表重复计算，恢复窗口仅在 macOS 保持置顶。",
+        "目标验证会将本地档案升级为 Plus P10，并保留迁移备份。旧版无法重开升级后的档案；降级前须恢复保留的升级前档案。",
+      ],
+    },
     {
       version: "0.15.8",
       date: "2026-10-24",
@@ -72,6 +102,21 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   "zh-TW": [
     {
+      version: "0.15.9",
+      date: "2026-10-24",
+      highlights: [
+        "設定搜尋可直接前往具體設定項；窄視窗提供可搜尋的分類目錄，快速鍵和專案記憶支援篩選。",
+        "編輯器操作保持可見；儲存失敗保留草稿供重試，區分儲存成功與重新整理失敗，技能探索僅在展開時掃描。",
+        "目標可綁定必驗指令，僅接受同次執行中已持久儲存且成功的 Shell 證據，並顯示具體進度狀態。",
+        "即使工具執行和取消請求都無回應，停止操作也在同一個十秒取消視窗內完成收斂，延遲結果不會影響下一回合。",
+        "修正長工作階段輸出額度與壓縮後的重試，不再儲存無內容的空回覆，切換工作階段保留提問草稿。",
+        "檔案連結準確跳至指定位置，同名歧義不再猜測開啟；排除過期系統信任憑證並保留憑證與主機名稱驗證。",
+        "改進輸入區工作區列、佇列、思考標籤、規劃退出與上下文用量；概要清楚顯示檔案變更與專家狀態，使用者捲動時關閉選單。",
+        "減少工作階段清單重複計算，復原視窗僅在 macOS 保持置頂。",
+        "目標驗證會將本機設定檔升級為 Plus P10，並保留遷移備份。舊版無法重新開啟升級後的設定檔；降級前須還原保留的升級前設定檔。",
+      ],
+    },
+    {
       version: "0.15.8",
       date: "2026-10-24",
       highlights: [
@@ -104,6 +149,21 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   tr: [
+    {
+      version: "0.15.9",
+      date: "2026-10-24",
+      highlights: [
+        "Ayar araması doğrudan ilgili satıra gider; dar pencerelerde aranabilir kategori seçici, kısayol ve proje belleği filtreleri sunulur.",
+        "Düzenleyici eylemleri erişilebilir kalır, kaydetme hataları taslakları korur, kaydetme ile yenileme hataları ayrılır ve isteğe bağlı beceri keşfi yalnızca açıldığında tarar.",
+        "Hedeflere zorunlu doğrulama komutları bağlayın; tamamlanma yalnızca aynı yürütmeden kalıcı, başarılı kabuk kanıtlarıyla kabul edilir ve somut ilerleme durumları gösterilir.",
+        "Araç ve iptal isteği yanıt vermese bile Durdur tek bir on saniyelik iptal penceresinde tamamlanır; geç gelen sonuçlar sonraki turu etkilemez.",
+        "Uzun oturumlarda çıktı sınırları ve sıkıştırma sonrası yeniden denemeler düzeltilir, boş yanıtlar kaydedilmez ve sohbetler arasında soru taslakları korunur.",
+        "Dosya bağlantıları doğru konumu açar ve belirsiz adları reddeder; sertifika ve ana makine doğrulaması korunarak süresi dolmuş sistem güven sertifikaları dışlanır.",
+        "Çalışma alanı çubuğu, kuyruk, düşünme etiketleri, Plan çıkışı ve bağlam kullanımı iyileştirilir; Genel Bakış dosya değişikliklerini ve uzman durumlarını gösterir, kullanıcı kaydırdığında menüler kapanır.",
+        "Oturum listelerinde yinelenen hesaplamalar azaltılır; kurtarma pencereleri yalnızca macOS üzerinde üstte tutulur.",
+        "Hedef doğrulama, geçiş yedeğiyle yerel profilleri Plus P10 şemasına yükseltir. Eski derlemeler yükseltilmiş profilleri açamaz; sürüm düşürmeden önce korunmuş eski profili geri yükleyin.",
+      ],
+    },
     {
       version: "0.15.8",
       date: "2026-10-24",
@@ -138,6 +198,21 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   de: [
     {
+      version: "0.15.9",
+      date: "2026-10-24",
+      highlights: [
+        "Die Einstellungssuche führt direkt zum passenden Eintrag; schmale Fenster erhalten eine durchsuchbare Kategorienauswahl, Tastenkürzel und Projektgedächtnis eigene Filter.",
+        "Editoraktionen bleiben erreichbar, fehlgeschlagene Speichervorgänge behalten Entwürfe, Speicher- und Aktualisierungsfehler bleiben unterscheidbar und die optionale Skill-Suche startet erst beim Aufklappen.",
+        "Ziele können Pflichtprüfbefehle binden und werden nur mit dauerhaft gespeicherten, erfolgreichen Shell-Nachweisen derselben Ausführung abgeschlossen; konkrete Fortschrittszustände werden angezeigt.",
+        "Stopp endet innerhalb eines gemeinsamen Zehn-Sekunden-Fensters, auch wenn Werkzeug und Abbruch nicht antworten; verspätete Ergebnisse beeinflussen den nächsten Durchlauf nicht.",
+        "Ausgabebudgets und Wiederholungen nach Komprimierung bleiben korrekt, leere Antworten werden nicht gespeichert und Frageentwürfe bleiben beim Chatwechsel erhalten.",
+        "Dateilinks öffnen die genaue Position und lehnen mehrdeutige Namen ab; abgelaufene Systemzertifikate werden bei weiterhin aktiver Zertifikats- und Hostnamenprüfung ausgeschlossen.",
+        "Verbesserungen für Arbeitsbereichsleiste, Warteschlange, Denkstufen, Plan-Ausstieg und Kontextverbrauch; die Übersicht zeigt Dateiänderungen und Expertenzustände, Menüs schließen beim bewussten Scrollen.",
+        "Sitzungslisten vermeiden wiederholte Berechnungen; Wiederherstellungsfenster bleiben nur unter macOS im Vordergrund.",
+        "Die Zielprüfung aktualisiert lokale Profile mit Migrationssicherung auf Plus-Schema P10. Ältere Builds können diese Profile nicht öffnen; vor einem Downgrade das gesicherte frühere Profil wiederherstellen.",
+      ],
+    },
+    {
       version: "0.15.8",
       date: "2026-10-24",
       highlights: [
@@ -170,6 +245,21 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   es: [
+    {
+      version: "0.15.9",
+      date: "2026-10-24",
+      highlights: [
+        "La búsqueda abre el ajuste exacto; las ventanas estrechas ofrecen categorías con búsqueda y filtros para atajos y memoria del proyecto.",
+        "Las acciones de edición siguen accesibles, los fallos de guardado conservan borradores, se distinguen de los fallos de actualización y el descubrimiento opcional de habilidades solo explora al desplegarse.",
+        "Vincula comandos de verificación obligatorios a los objetivos y acepta su finalización solo con pruebas de shell duraderas y correctas de la misma ejecución; muestra estados de progreso concretos.",
+        "Detener termina dentro de una única ventana de cancelación de diez segundos aunque la herramienta y su cancelación no respondan; los resultados tardíos no afectan al siguiente turno.",
+        "Corrige presupuestos de salida y reintentos tras compactar sesiones largas, omite respuestas vacías guardadas y conserva borradores de preguntas al cambiar de chat.",
+        "Los enlaces abren la posición exacta y rechazan nombres ambiguos; se excluyen certificados del sistema caducados manteniendo la verificación de certificados y nombres de host.",
+        "Mejora la barra del espacio de trabajo, la cola, las etiquetas de razonamiento, la salida de Plan y el uso de contexto; la vista general muestra cambios y estados de expertos, y los menús se cierran al desplazarse.",
+        "Evita cálculos repetidos en las listas de sesiones y mantiene las ventanas de recuperación en primer plano solo en macOS.",
+        "La verificación de objetivos actualiza los perfiles locales al esquema Plus P10 con copia de migración. Las versiones anteriores no pueden abrirlos; restaura el perfil previo conservado antes de volver a una versión anterior.",
+      ],
+    },
     {
       version: "0.15.8",
       date: "2026-10-24",
@@ -204,6 +294,21 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   fr: [
     {
+      version: "0.15.9",
+      date: "2026-10-24",
+      highlights: [
+        "La recherche ouvre le réglage exact ; les fenêtres étroites proposent des catégories recherchables et des filtres pour les raccourcis et la mémoire du projet.",
+        "Les actions restent accessibles, les échecs de sauvegarde conservent les brouillons, se distinguent des échecs de rafraîchissement et la découverte facultative des compétences ne démarre qu’au dépliage.",
+        "Associez des commandes de vérification obligatoires aux objectifs ; leur achèvement exige des preuves shell durables et réussies de la même exécution, avec des états de progression précis.",
+        "L’arrêt se termine dans une seule fenêtre d’annulation de dix secondes même si l’outil et son annulation ne répondent plus ; les résultats tardifs restent isolés du tour suivant.",
+        "Corrige les budgets de sortie et les nouvelles tentatives après compactage, évite les réponses vides sauvegardées et conserve les brouillons de questions entre les discussions.",
+        "Les liens de fichiers ouvrent la position exacte et refusent les noms ambigus ; les certificats système expirés sont exclus sans désactiver la vérification des certificats et des noms d’hôte.",
+        "Améliore la barre d’espace de travail, la file, les niveaux de réflexion, la sortie du mode Plan et l’usage du contexte ; la vue d’ensemble précise les changements et les états des experts, et les menus se ferment au défilement volontaire.",
+        "Évite les recalculs des listes de sessions et garde les fenêtres de récupération au premier plan uniquement sous macOS.",
+        "La vérification des objectifs migre les profils locaux vers le schéma Plus P10 avec sauvegarde. Les anciennes versions ne peuvent pas les rouvrir ; restaurez le profil précédent conservé avant toute rétrogradation.",
+      ],
+    },
+    {
       version: "0.15.8",
       date: "2026-10-24",
       highlights: [
@@ -237,6 +342,21 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   ko: [
     {
+      version: "0.15.9",
+      date: "2026-10-24",
+      highlights: [
+        "설정 검색에서 정확한 항목으로 바로 이동하며, 좁은 창에서는 검색 가능한 분류 선택기와 단축키·프로젝트 메모리 필터를 제공합니다.",
+        "편집기 작업 버튼을 계속 사용할 수 있고 저장 실패 시 초안을 유지합니다. 저장과 새로 고침 실패를 구분하며 선택적 스킬 검색은 펼칠 때만 시작합니다.",
+        "목표에 필수 검증 명령을 연결하고 같은 실행에서 영구 저장된 성공한 셸 증거가 있어야 완료를 인정하며 구체적인 진행 상태를 표시합니다.",
+        "도구 실행과 취소 요청이 모두 응답하지 않아도 하나의 10초 취소 시간 안에 중지를 마치고 늦은 결과가 다음 턴에 영향을 주지 않게 합니다.",
+        "긴 세션의 출력 한도와 압축 후 재시도를 수정하고 빈 응답을 저장하지 않으며 채팅 간 질문 초안을 유지합니다.",
+        "파일 링크가 정확한 위치를 열고 모호한 이름은 거부하며 인증서와 호스트 이름 검증을 유지한 채 만료된 시스템 신뢰 인증서를 제외합니다.",
+        "입력창의 작업 공간 표시줄, 대기열, 사고 수준, 계획 종료와 컨텍스트 사용량을 개선합니다. 개요는 파일 변경과 전문가 상태를 표시하고 사용자 스크롤 시 메뉴를 닫습니다.",
+        "세션 목록의 반복 계산을 줄이고 복구 창은 macOS에서만 맨 위에 유지합니다.",
+        "목표 검증은 마이그레이션 백업을 남기고 로컬 프로필을 Plus P10으로 업그레이드합니다. 이전 빌드는 업그레이드된 프로필을 열 수 없으므로 다운그레이드 전에 보관된 이전 프로필을 복원해야 합니다.",
+      ],
+    },
+    {
       version: "0.15.8",
       date: "2026-10-24",
       highlights: [
@@ -269,6 +389,21 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "pt-BR": [
+    {
+      version: "0.15.9",
+      date: "2026-10-24",
+      highlights: [
+        "A busca abre a configuração exata; janelas estreitas oferecem categorias pesquisáveis e filtros para atalhos e memória do projeto.",
+        "As ações dos editores continuam acessíveis, falhas ao salvar preservam rascunhos, diferem de falhas de atualização e a descoberta opcional de habilidades só verifica ao ser expandida.",
+        "Vincule comandos de verificação obrigatórios às metas e aceite a conclusão apenas com evidências de shell persistidas e bem-sucedidas da mesma execução; veja estados concretos de progresso.",
+        "Parar termina em uma única janela de cancelamento de dez segundos mesmo quando a ferramenta e seu cancelamento não respondem; resultados tardios não afetam o próximo turno.",
+        "Corrige limites de saída e novas tentativas após compactar sessões longas, evita respostas vazias salvas e mantém rascunhos de perguntas entre conversas.",
+        "Links de arquivos abrem a posição exata e rejeitam nomes ambíguos; certificados de sistema expirados são excluídos mantendo a verificação de certificados e nomes de host.",
+        "Melhora a barra do espaço de trabalho, a fila, os níveis de raciocínio, a saída de Plan e o uso de contexto; a visão geral exibe alterações e estados dos especialistas, e menus fecham ao rolar manualmente.",
+        "Evita cálculos repetidos nas listas de sessões e mantém janelas de recuperação no topo apenas no macOS.",
+        "A verificação de metas atualiza perfis locais para o esquema Plus P10 com backup de migração. Versões antigas não podem reabri-los; restaure o perfil anterior preservado antes de voltar a uma versão antiga.",
+      ],
+    },
     {
       version: "0.15.8",
       date: "2026-10-24",

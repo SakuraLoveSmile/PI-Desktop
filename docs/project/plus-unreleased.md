@@ -2,6 +2,14 @@
 
 Upstream v0.15.6 → v0.16.1 has been merged.
 
+- Settings search opens matching rows directly, including option and help
+  matches. Narrow windows use a searchable category overlay with keyboard and
+  focus restoration. All sixteen pages share consistent action and state
+  layouts; editors retain failed-save drafts and keep save/cancel reachable.
+  Shortcuts and project memory gain filters, Expert Team uses a project picker,
+  and optional skill discovery scans only when expanded. Save success remains
+  distinguishable from a failed refresh; scopes and permissions are unchanged.
+
 - The workspace strip (project, location, branch) sits above the input card
   and folds to the branch while a run is active. The reasoning chip shows Off
   instead of hiding when reasoning is off. Queued follow-ups fold behind a
