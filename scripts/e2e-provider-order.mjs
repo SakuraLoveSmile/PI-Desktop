@@ -49,6 +49,7 @@ app.whenReady().then(async () => {
   let failure;
   try {
     await host.start();
+    console.error("PROVIDER_ORDER_STAGE host-ready");
     const fixtures = [];
     for (const name of ["A", "B", "C"]) {
       const { provider } = await host.call("providers.create", {
@@ -96,18 +97,33 @@ app.whenReady().then(async () => {
     registrar.handle(IPC.invoke.settingsSet, (settings) => host.call("settings.set", settings));
     registrar.handle(IPC.invoke.sessionList, () => host.call("session.list"));
     registrar.handle(IPC.invoke.appGetOnboarding, async () => ({ dismissed: true }));
-    window = new BrowserWindow({ show: false, width: 1000, height: 1000, webPreferences: {
+    // Fit the fixed content viewport inside macOS and default Xvfb work areas.
+    window = new BrowserWindow({ show: false, width: 1000, height: 760, useContentSize: true, webPreferences: {
       preload: ${JSON.stringify(join(root, "apps/desktop/out/preload/index.cjs"))},
       sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false,
     } });
     window.webContents.on("console-message", (event) => console.error(event.message));
     await window.loadFile(path.join(__dirname, "index.html"));
+    console.error("PROVIDER_ORDER_STAGE loaded");
+    // Drag previews and the probe's waits require real display frames. Show
+    // the fixture without taking keyboard focus, including under Linux/Xvfb.
+    window.showInactive();
+    const surface = await window.webContents.executeJavaScript("({ visibility: document.visibilityState, width: innerWidth, height: innerHeight })");
+    console.error("PROVIDER_ORDER_STAGE " + JSON.stringify({ visible: window.isVisible(), minimized: window.isMinimized(), ...surface }));
+    if (!window.isVisible() || window.isMinimized() || surface.visibility !== "visible" || surface.width !== 1000 || surface.height !== 760) {
+      throw new Error("Provider order fixture requires a visible 1000x760 content viewport");
+    }
+    await window.webContents.executeJavaScript("new Promise(resolve => requestAnimationFrame(() => resolve()))");
+    console.error("PROVIDER_ORDER_STAGE first-frame");
     const interactions = await window.webContents.executeJavaScript("globalThis.providerOrderProbe()");
+    console.error("PROVIDER_ORDER_STAGE interactions-complete");
     const performance = await window.webContents.executeJavaScript("globalThis.cardReorderPerformance()");
+    console.error("PROVIDER_ORDER_STAGE performance-complete");
     await host.restart();
     await window.loadFile(path.join(__dirname, "index.html"));
+    console.error("PROVIDER_ORDER_STAGE restarted");
     const restart = await window.webContents.executeJavaScript("globalThis.providerOrderProbe(true)");
-    console.log("PROVIDER_ORDER_PROBE " + JSON.stringify({ ...interactions, restart: restart.ok, performance }));
+    console.log("PROVIDER_ORDER_PROBE " + JSON.stringify({ ...interactions, restart: restart.ok, performance, surface }));
   } catch (error) {
     failure = error;
     console.error("PROVIDER_ORDER_PROBE " + JSON.stringify({ ok: false, error: String(error) }));
