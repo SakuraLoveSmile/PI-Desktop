@@ -185,7 +185,16 @@ try {
       `enabled ${text}`,
     );
     const point = await evaluate(
-      `(() => { const button = [...document.querySelectorAll(${JSON.stringify(selector)})].find(e => (${byLabel} ? e.getAttribute('aria-label') : e.textContent.trim()) === ${JSON.stringify(text)}); if (!button || button.disabled) return null; button.scrollIntoView({block:'nearest'}); const r=button.getBoundingClientRect(), x=r.x+r.width/2, y=r.y+r.height/2; return button.contains(document.elementFromPoint(x,y)) ? {x,y} : null; })()`,
+      `(async () => {
+        const button = [...document.querySelectorAll(${JSON.stringify(selector)})].find(e => (${byLabel} ? e.getAttribute('aria-label') : e.textContent.trim()) === ${JSON.stringify(text)});
+        if (!button || button.disabled) return null;
+        button.scrollIntoView({block:'nearest'});
+        // Let resize/scroll observers publish the painted hit target before
+        // dispatching native input, especially after viewport restoration.
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const r = button.getBoundingClientRect(), x = r.x + r.width / 2, y = r.y + r.height / 2;
+        return button.contains(document.elementFromPoint(x,y)) ? {x,y} : null;
+      })()`,
     );
     assert.ok(point, `button hit target: ${text}`);
     await send("Input.dispatchMouseEvent", {
@@ -269,9 +278,35 @@ try {
   await screenshot("chat-batch-narrow.png");
   assert.ok(await evaluate(`document.querySelector('.generated-image-thumbnails')?.getBoundingClientRect().right <= innerWidth`),"batch thumbnails stay inside narrow window");
   await send("Emulation.setDeviceMetricsOverride", { ...desktopViewport, deviceScaleFactor: 1, mobile: false });
+  await evaluate(`new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))`);
+  assert.deepEqual(await evaluate(`({width:innerWidth,height:innerHeight})`), desktopViewport, "desktop chat viewport restored");
+  await evaluate(`(() => {
+    window.__imageSelectionInput = [];
+    const record = event => {
+      const button = document.querySelectorAll('.generated-image-thumbnails button')[1];
+      window.__imageSelectionInput.push({type:event.type, x:event.clientX, y:event.clientY,
+        target:event.target?.closest('button,a')?.getAttribute('aria-label'),
+        secondImage:button?.getBoundingClientRect().toJSON()});
+    };
+    for (const type of ['pointerdown','pointerup','click']) document.addEventListener(type, record, true);
+    window.__stopImageSelectionInput = () => {
+      for (const type of ['pointerdown','pointerup','click']) document.removeEventListener(type, record, true);
+    };
+  })()`);
   assert.ok(await watchImageContinuity('.generated-image-set', '.generated-image-preview img'));
   await click("生成图片 2", ".generated-image-thumbnails button", true);
-  await waitFor(() => evaluate(`(() => {const selected=document.querySelectorAll('.generated-image-thumbnails button')[1];const featured=document.querySelector('.generated-image-preview img');return selected?.getAttribute('aria-current')==='true' && featured?.naturalWidth===480 && featured.src===selected.querySelector('img')?.src})()`),5000,"second image selected in chat");
+  await waitFor(() => evaluate(`(() => {const selected=document.querySelectorAll('.generated-image-thumbnails button')[1];const featured=document.querySelector('.generated-image-preview img');return selected?.getAttribute('aria-current')==='true' && featured?.naturalWidth===480 && featured.src===selected.querySelector('img')?.src})()`),5000,"second image selected in chat").catch(async error => {
+    console.error("IMAGE_SELECTION_DIAGNOSTICS", JSON.stringify(await evaluate(`({
+      viewport:{width:innerWidth,height:innerHeight}, input:window.__imageSelectionInput,
+      thumbnails:[...document.querySelectorAll('.generated-image-thumbnails button')].map(button=>({
+        label:button.getAttribute('aria-label'), selected:button.getAttribute('aria-current'),
+        bounds:button.getBoundingClientRect().toJSON(), imageWidth:button.querySelector('img')?.naturalWidth})),
+      preview:[...document.querySelectorAll('.generated-image-preview img')].map(image=>({
+        imageWidth:image.naturalWidth, selected: [...document.querySelectorAll('.generated-image-thumbnails img')].findIndex(thumb=>thumb.src===image.src)}))
+    })`)));
+    throw error;
+  });
+  await evaluate(`window.__stopImageSelectionInput()`);
   const cardContinuity = await imageStayedVisible();
   assert.ok(cardContinuity.every(Boolean), `batch image remains painted while switching selection: ${JSON.stringify(cardContinuity)}`);
   assert.ok(await evaluate(`document.querySelector('.generated-image-actions a[download="generated-image-2.png"]')?.href.startsWith('data:image/png;base64,')`));
