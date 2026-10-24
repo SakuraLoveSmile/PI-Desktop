@@ -3299,7 +3299,9 @@ reasoning-level control.
   context inspector hides its percentage at the floor and the enhancement
   loading state becomes icon-only, preserving the action hit targets without
   clipping or overlapping toolbar content. Home and thread-docked composers
-  use the same responsive rules.
+  use the same responsive rules. With plugin composer controls mounted below
+  720px, the model trigger uses that same 32px icon-only variant early, retaining
+  its complete accessible name and menu while reserving room for plugin actions.
 - The combined chip opens the complete model list directly above itself, without search,
   provider-labelled rows, the current model's reasoning slider and a Model
   configurations action. There is no Default/Custom tab or intermediate root

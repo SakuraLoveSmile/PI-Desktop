@@ -59,6 +59,12 @@ export async function driveComposerDraft({ renderer, check }) {
       }),
   );
   check("the lab's toolbar controls fit the toolbar whole", cut.length === 0, JSON.stringify(cut));
+  const modelAccess = await page(() => {
+    const trigger = document.querySelector('.composer-model-thinking-chip');
+    return { label: trigger?.getAttribute('aria-label') ?? '', width: trigger?.getBoundingClientRect().width ?? 0 };
+  });
+  check("the compact model trigger retains the full selection name", modelAccess.label.includes('stub-1')
+    && modelAccess.width >= 28, JSON.stringify(modelAccess));
 
   const start = await view();
   check("the lab follows the live draft", /^\d+$/.test(start.follows ?? ""), JSON.stringify(start.follows));

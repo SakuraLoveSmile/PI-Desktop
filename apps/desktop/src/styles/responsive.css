@@ -44,6 +44,27 @@
   justify-content: flex-end;
 }
 
+/* Plugin controls use the existing compact model trigger before being clipped. */
+@container composer-stack (max-width: 720px) {
+  .composer-toolbar:has(.pi-plugin-slot[data-pi-slot="composerControl"]) .composer-model-thinking-chip {
+    width: 32px;
+    max-width: 32px;
+    flex: 0 0 32px;
+    justify-content: center;
+    gap: 0 !important;
+    padding: 0 !important;
+  }
+
+  .composer-toolbar:has(.pi-plugin-slot[data-pi-slot="composerControl"]) :is(
+    .composer-model-thinking-model,
+    .composer-model-thinking-dot,
+    .composer-model-thinking-level,
+    .composer-model-thinking-chevron
+  ) {
+    display: none;
+  }
+}
+
 @container composer-stack (max-width: 560px) {
   .composer-model-thinking-dot,
   .composer-model-thinking-level {
