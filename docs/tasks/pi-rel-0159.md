@@ -163,15 +163,50 @@ tests, 95 English/Chinese documentation pairs and 627 documentation pages also
 passed. Remaining combined gates are in progress; no hosted result, merge or
 publication is yet claimed.
 
+Final review found a project-switch editor ownership defect in MCP and Skills:
+a pending save in project A left its draft open after switching to B, permitting
+a later save to target B. `3e25d0d6b` binds drafts to their original path, retires
+editors on ownership changes, and rejects stale Skills reads. Public SettingsPage
+red/green cases prove no B write, stale-read isolation and retained failed-save
+retry behavior. Independent re-review found the issue resolved, with no further
+material finding in the Goal/P10 and Stop integration.
+
+At `fcbe16c46` / base `d424021c5`, the final combined Rust source passed
+`cargo fmt --all -- --check`, `cargo test -p host-core --locked` (1,277 passed,
+one existing ignored case) and workspace/all-target/all-feature Clippy (three
+warnings, no errors). No Rust source changed afterward. A source-specific
+development build produced Host SHA256
+`35f284bc595c7afeda2184a4752c9844965901174856413ffec4fbe66ce2f455`.
+The isolated `required-verification`, `goal-team-renderer-ui` and
+`composer-mode-menus` suites passed against that clean candidate and binary,
+with unchanged-candidate fingerprints and no excluded/skipped cases.
+
+Desktop/runtime-test typechecks and lint also passed there. Full workspace tests
+then exposed stale Plus changelog expectations, including a version collision:
+upstream already has a 0.15.9 entry while Plus must show its own 0.15.9 notes.
+The corrected test keeps the exact Plus prefix, complete cutoff tail and original
+upstream object exclusion; a colliding version is allowed exactly once only when
+owned by the Plus prefix. The 28 focused changelog tests passed. This changes the
+release-catalog expectation without weakening the history boundary. Final JS
+checks are rerun after the Settings ownership fix.
+
+Lead browser inspection used production Settings components and generated
+styles with an isolated fixture preload: Chinese/light search navigated to and
+highlighted the exact context-usage row; the populated Skills screen retained
+its scope filters, list controls and collapsed optional discovery. This is
+fixture UI evidence, not real account or installed-app validation.
+
 Initial checks: source paths/HEAD/index/dirty state and registered worktrees
 inspected; origin main/tags fetched; original source snapshots verified. Remote
 0.15.9 tag and Release were absent. No classic protection or ruleset is enabled,
 so repository gates must be observed explicitly.
 
-NOT RUN on the combined candidate: JS build/typecheck/lint/unit, Rust
-format/clippy/test, test-quality/architecture/catalog/release-document checks,
-isolated task-candidate and PR-integration E2E, Settings browser acceptance,
-formal release workflow, publication integrity and cleanup. These remain required.
+Remaining: final post-fix JS checks and Settings interactions, exact-SHA hosted
+task-candidate and PR-integration gates, formal release workflow, publication
+integrity and cleanup. These remain required. Detailed local logs/reports are in
+the integration tree's `.artifacts/pi-rel-0159-integrated/`. Final remote run and
+publication receipts will be preserved under the task's recovery directory;
+they extend this record without modifying the immutable tagged source.
 
 Hosted validation can use existing CI and the existing nightly dispatcher
 (ten isolated fixture families); the latter covers Settings/storage/extensions,
