@@ -914,7 +914,16 @@ async function verifyTeamLayoutMatrix(sendCdp, evaluate, locale) {
           const metrics = await evaluate(`(() => {
             const root=document.documentElement;
             const surface=document.querySelector('.team-panel, .work-panel-overview, .team-work-tab');
-            return { page: [root.clientWidth, root.scrollWidth], surface: [surface.clientWidth, surface.scrollWidth] };
+            const bounds=surface.getBoundingClientRect(), surfaceStyle=getComputedStyle(surface);
+            const right=bounds.left+surface.clientWidth-parseFloat(surfaceStyle.paddingRight);
+            const overflowing=surface.scrollWidth > surface.clientWidth ? Array.from(surface.querySelectorAll('*')).map(node => {
+              const rect=node.getBoundingClientRect(), style=getComputedStyle(node);
+              return { tag:node.tagName, className:node.getAttribute('class'), text:node.textContent?.slice(0,100), right:rect.right,
+                width:rect.width, clientWidth:node.clientWidth, scrollWidth:node.scrollWidth,
+                display:style.display, minWidth:style.minWidth, flexShrink:style.flexShrink, flexWrap:style.flexWrap,
+                fontFamily:style.fontFamily,fontSize:style.fontSize,whiteSpace:style.whiteSpace,overflowX:style.overflowX };
+            }).filter(node => node.right > right+0.5).sort((a,b) => b.right-a.right).slice(0,20) : [];
+            return { page: [root.clientWidth, root.scrollWidth], surface: [surface.clientWidth, surface.scrollWidth], contentRight:right, overflowing };
           })()`);
           assert.ok(metrics.page[1] <= metrics.page[0] && metrics.surface[1] <= metrics.surface[0], `${locale}/${surface}/${width}/${scale}/${theme} overflows: ${JSON.stringify(metrics)}`);
           if (scale === 1.5 && width === 320) await saveScreenshot(sendCdp, `team-${surface}-${locale}-${theme}-320-150.png`);
