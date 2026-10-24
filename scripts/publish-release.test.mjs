@@ -1,22 +1,24 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { publishRelease } from "./publish-release.mjs";
 
 const sha256 = bytes => createHash("sha256").update(bytes).digest("hex");
 const repository = "fixture/pi-desktop";
 const sourceSha = "a".repeat(40);
 
-async function fixture(t, version = "1.2.3") {
+async function fixture(t, version = "1.2.3", signedMacos = true) {
   const directory = await mkdtemp(join(tmpdir(), "pi-release-publish-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const bytes = Buffer.from("a fixture installer, not a real build\n");
   const name = `installer-${version}.zip`;
   const channel = version.includes("-") ? version.split("-")[1].split(".")[0] : "latest";
-  const manifest = { schemaVersion: 1, kind: "release", version, channel, signedMacos: true,
+  const manifest = { schemaVersion: 1, kind: "release", version, channel, signedMacos,
     source: { repository, sha: sourceSha }, build: { runId: "1", runAttempt: "1", url: "https://example.invalid/run/1" },
     assets: [{ name, size: bytes.length, sha256: sha256(bytes) }] };
   const manifestBytes = JSON.stringify(manifest);
@@ -88,6 +90,61 @@ test("stable release is a draft until every uploaded digest is verified", async 
   assert.equal(publish.method, "PATCH");
   assert.deepEqual(publish.json, { draft: false, prerelease: false, make_latest: "true" });
   assert.equal(remote.assets.length, 3);
+});
+
+test("unsigned releases are refused without opt-in before contacting GitHub", async t => {
+  const input = await fixture(t, "1.2.3", false);
+  const remote = github();
+  await assert.rejects(publishRelease(input, remote), /unsigned|signed/);
+  assert.equal(remote.calls.length, 0);
+});
+
+test("unsigned publication with opt-in discloses personal-use and manual installation", async t => {
+  const input = await fixture(t, "1.2.3", false);
+  const remote = github();
+  await publishRelease({ ...input, allowUnsignedMacos: true }, remote);
+  assert.equal(remote.release.draft, false);
+  assert(remote.release.body.includes("macOS arm64 personal-use"));
+  assert(remote.release.body.includes("unsigned and not notarized"));
+  assert(remote.release.body.includes("install updates manually"));
+  assert.equal(remote.assets.length, 3);
+});
+
+test("unsigned opt-in accepts only boolean API values", async t => {
+  const input = await fixture(t);
+  for (const allowUnsignedMacos of ["true", "false", null, 1, {}]) {
+    const remote = github();
+    await assert.rejects(publishRelease({ ...input, allowUnsignedMacos }, remote), /Invalid allowUnsignedMacos/);
+    assert.equal(remote.calls.length, 0);
+  }
+});
+
+test("the publication CLI rejects malformed unsigned policy before API setup", () => {
+  assert.throws(() => execFileSync(process.execPath,
+    [fileURLToPath(new URL("./publish-release.mjs", import.meta.url)), "--directory", "/unused-fixture"], {
+      encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, GITHUB_ACTIONS: "true",
+        RUNNER_ENVIRONMENT: "github-hosted", ALLOW_UNSIGNED_MACOS_RELEASE: "yes", GITHUB_TOKEN: "" },
+    }), error => {
+    assert.equal(error.status, 1);
+    assert(error.stderr.includes("ALLOW_UNSIGNED_MACOS_RELEASE must be true or false"));
+    return true;
+  });
+});
+
+test("resumed unsigned drafts retain their disclosure and reject its removal", async t => {
+  const input = { ...await fixture(t, "1.2.3", false), allowUnsignedMacos: true };
+  const remote = github({ failUploadOnce: true });
+  await assert.rejects(publishRelease(input, remote), /upload interrupted/);
+  assert.equal(remote.release.draft, true);
+  const body = remote.release.body;
+  remote.release.body = body.slice(body.indexOf("<!-- pi-release"));
+  await assert.rejects(publishRelease(input, remote), /does not match/);
+  assert.equal(remote.release.draft, true);
+  remote.release.body = body;
+  await publishRelease(input, remote);
+  assert.equal(remote.release.draft, false);
+  assert.equal(remote.release.body, body);
+  assert.equal(remote.calls.filter(call => call.method === "POST" && call.endpoint.endsWith("/releases")).length, 1);
 });
 
 test("prerelease publication does not become the stable latest release", async t => {

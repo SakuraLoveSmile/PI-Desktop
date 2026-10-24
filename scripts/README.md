@@ -109,9 +109,14 @@ packages the app without self-publishing. Aggregation requires the macOS arm64
 DMG, ZIP, their blockmaps and architecture feed, then emits the canonical macOS
 feed, manifest and checksums. Intel macOS, Windows, Linux and standalone pi-host
 artifacts are currently outside this cloud release scope; existing application
-and packaging implementations remain in the repository. Formal tags still
-require Developer ID signing, notarization and stapling. Manual candidates may
-set `sign_macos: false` for unsigned debug artifacts. See the [release
+and packaging implementations remain in the repository. Formal tags require
+Developer ID signing, notarization and stapling by default. Setting the
+repository variable `ALLOW_UNSIGNED_MACOS_RELEASE=true` opts into publishing an
+unsigned, not notarized macOS arm64 Release for personal use; it is identified as
+unsigned in the manifest and Release notes, and updates require manual download
+and installation. This opt-in does not change macOS security settings or qualify
+Gatekeeper/notarization. Manual candidates may set `sign_macos: false` for
+unsigned debug artifacts. See the [release
 runbook](../docs/spec/06-delivery/06-release-runbook.md).
 
 ### Provider certificate regression

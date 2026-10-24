@@ -9367,10 +9367,12 @@ the latest destination. These assertions measure work counts, not device FPS.
   工具描述，均标识 Pi-Desktop-Plus，且不改变角色、工具调用、审批或取消行为。
 - **远程场景**：对带有旧主机哨兵的临时 SSH 夹具运行 bootstrap；Plus 使用自己的
   安装、pid/日志与数据根目录，不停止旧主机。显式路径覆盖保留其文档化语义。
-- **发布场景**：缺少签名输入、证书或团队不匹配都会失败关闭；夹具签名不代表真实
+- **发布场景**：默认签名通道及明确请求签名的构建在缺少签名输入时失败关闭；明确启用的
+  未签名自用通道记录 `signedMacos: false`，并要求手动下载/安装。夹具签名不代表真实
   公证或实时更新已合格。
 - **证据**：分别记录候选/基线、操作系统与架构、测试与原生场景。在声明 Windows/Linux
-  原生通道与已签名发布通道合格之前，必须先取得对应证据。
+  原生通道与签名发布通道合格之前，必须先取得对应证据；未签名自用 Release
+  不代表签名、公证或 Gatekeeper 行为已合格。
 
 
 ### E2E-MAC-local-network-manual-discovery

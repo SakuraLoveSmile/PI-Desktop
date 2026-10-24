@@ -1,7 +1,8 @@
 # Cloud-only macOS arm64 installer pipeline. Manual dispatch produces candidate artifacts.
 # Formal tags must already be merged into main and match every app version
-# surface. Both paths share CI gates and a fixed source SHA. Only signed,
-# notarized, fully verified tag bundles can become a published GitHub Release.
+# surface. Both paths share CI gates and a fixed source SHA. Tags require signing
+# and notarization unless ALLOW_UNSIGNED_MACOS_RELEASE explicitly opts in to
+# personal-use unsigned releases. Every published bundle is fully verified.
 # Version preparation and tagging are documented in the release runbook.
 
 name: Release
@@ -12,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       sign_macos:
-        description: 'Sign and notarize candidate macOS artifacts; formal tags always require signing'
+        description: 'Sign and notarize macOS artifacts; tags require signing unless unsigned releases are explicitly enabled'
         required: false
         default: false
         type: boolean
@@ -38,6 +39,7 @@ jobs:
       channel: ${{ steps.preflight.outputs.channel }}
       prerelease: ${{ steps.preflight.outputs.prerelease }}
       signed_macos: ${{ steps.preflight.outputs.signed_macos }}
+      allow_unsigned_macos: ${{ steps.preflight.outputs.allow_unsigned_macos }}
       kind: ${{ steps.preflight.outputs.kind }}
       tag: ${{ steps.preflight.outputs.tag }}
     steps:
@@ -54,6 +56,7 @@ jobs:
         id: preflight
         env:
           SIGN_MACOS: ${{ inputs.sign_macos || false }}
+          ALLOW_UNSIGNED_MACOS_RELEASE: ${{ vars.ALLOW_UNSIGNED_MACOS_RELEASE || 'false' }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -152,7 +155,7 @@ jobs:
       - name: Package unsigned macOS installer
         if: matrix.platform == 'macos' && env.MACOS_SIGN_RELEASE != 'true'
         env:
-          # Debug-only lane: workflow_dispatch with sign_macos=false.
+          # Candidates and explicitly permitted personal-use unsigned releases.
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: |
           set -euo pipefail
@@ -343,12 +346,14 @@ jobs:
           RELEASE_CHANNEL: ${{ needs.metadata.outputs.channel }}
           BUILD_KIND: ${{ needs.metadata.outputs.kind }}
           MACOS_SIGN_RELEASE: ${{ needs.metadata.outputs.signed_macos }}
+          ALLOW_UNSIGNED_MACOS_RELEASE: ${{ needs.metadata.outputs.allow_unsigned_macos }}
         run: |
           node scripts/release-assets.mjs --input artifacts --output dist \
             --version "$RELEASE_VERSION" --source "$SOURCE_SHA" \
             --repository "$GITHUB_REPOSITORY" --run-id "$GITHUB_RUN_ID" \
             --run-attempt "$GITHUB_RUN_ATTEMPT" --channel "$RELEASE_CHANNEL" \
-            --kind "$BUILD_KIND" --signed-macos "$MACOS_SIGN_RELEASE"
+            --kind "$BUILD_KIND" --signed-macos "$MACOS_SIGN_RELEASE" \
+            --allow-unsigned-macos "$ALLOW_UNSIGNED_MACOS_RELEASE"
       - uses: actions/upload-artifact@v7
         with:
           name: release-bundle-${{ needs.metadata.outputs.version }}-${{ needs.metadata.outputs.source_sha }}
@@ -378,4 +383,5 @@ jobs:
       - name: Create draft, verify remote assets, then publish
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          ALLOW_UNSIGNED_MACOS_RELEASE: ${{ needs.metadata.outputs.allow_unsigned_macos }}
         run: node scripts/publish-release.mjs --directory dist

@@ -6,6 +6,14 @@ export const PLUS_UPSTREAM_CUTOFF = "0.15.6";
 const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   en: [
     {
+      version: "0.15.8",
+      date: "2026-10-24",
+      highlights: [
+        "Download macOS Apple Silicon builds from GitHub Releases. Personal unsigned builds use manual installation and updates.",
+        "Installers are built in GitHub Actions and published with verified checksums and update metadata.",
+      ],
+    },
+    {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
@@ -24,6 +32,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "zh-CN": [
+    {
+      version: "0.15.8",
+      date: "2026-10-24",
+      highlights: [
+        "可从 GitHub Releases 下载 macOS Apple Silicon 版本；个人使用的未签名版本需手动安装和更新。",
+        "安装包通过 GitHub Actions 云端构建，并附带经过校验的文件摘要和更新元数据。",
+      ],
+    },
     {
       version: "0.15.7",
       date: "2026-10-02",
@@ -44,6 +60,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   "zh-TW": [
     {
+      version: "0.15.8",
+      date: "2026-10-24",
+      highlights: [
+        "可從 GitHub Releases 下載 macOS Apple Silicon 版本；個人使用的未簽名版本需手動安裝與更新。",
+        "安裝套件透過 GitHub Actions 雲端建置，並附上經過驗證的檔案雜湊與更新中繼資料。",
+      ],
+    },
+    {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
@@ -62,6 +86,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   tr: [
+    {
+      version: "0.15.8",
+      date: "2026-10-24",
+      highlights: [
+        "macOS Apple Silicon derlemelerini GitHub Releases üzerinden indirin. Kişisel imzasız derlemeler elle kurulur ve güncellenir.",
+        "Kurulum paketleri GitHub Actions üzerinde derlenir ve doğrulanmış sağlama toplamları ile güncelleme meta verileriyle yayımlanır.",
+      ],
+    },
     {
       version: "0.15.7",
       date: "2026-10-02",
@@ -82,6 +114,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   de: [
     {
+      version: "0.15.8",
+      date: "2026-10-24",
+      highlights: [
+        "macOS-Builds für Apple Silicon sind über GitHub Releases verfügbar. Unsignierte Builds für den persönlichen Gebrauch werden manuell installiert und aktualisiert.",
+        "Installationspakete werden in GitHub Actions erstellt und mit geprüften Prüfsummen und Update-Metadaten veröffentlicht.",
+      ],
+    },
+    {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
@@ -100,6 +140,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   es: [
+    {
+      version: "0.15.8",
+      date: "2026-10-24",
+      highlights: [
+        "Descarga versiones para macOS Apple Silicon desde GitHub Releases. Las versiones personales sin firma se instalan y actualizan manualmente.",
+        "Los instaladores se compilan en GitHub Actions y se publican con sumas de verificación y metadatos de actualización validados.",
+      ],
+    },
     {
       version: "0.15.7",
       date: "2026-10-02",
@@ -120,6 +168,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   fr: [
     {
+      version: "0.15.8",
+      date: "2026-10-24",
+      highlights: [
+        "Téléchargez les versions macOS Apple Silicon depuis GitHub Releases. Les versions personnelles non signées s’installent et se mettent à jour manuellement.",
+        "Les programmes d’installation sont compilés dans GitHub Actions et publiés avec des sommes de contrôle et des métadonnées de mise à jour vérifiées.",
+      ],
+    },
+    {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
@@ -139,6 +195,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   ko: [
     {
+      version: "0.15.8",
+      date: "2026-10-24",
+      highlights: [
+        "GitHub Releases에서 macOS Apple Silicon 빌드를 다운로드할 수 있습니다. 개인용 미서명 빌드는 수동으로 설치하고 업데이트합니다.",
+        "설치 파일은 GitHub Actions에서 빌드되며 검증된 체크섬과 업데이트 메타데이터와 함께 게시됩니다.",
+      ],
+    },
+    {
       version: "0.15.7",
       date: "2026-10-02",
       highlights: [
@@ -157,6 +221,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "pt-BR": [
+    {
+      version: "0.15.8",
+      date: "2026-10-24",
+      highlights: [
+        "Baixe versões para macOS Apple Silicon pelo GitHub Releases. Versões pessoais sem assinatura são instaladas e atualizadas manualmente.",
+        "Os instaladores são compilados no GitHub Actions e publicados com somas de verificação e metadados de atualização validados.",
+      ],
+    },
     {
       version: "0.15.7",
       date: "2026-10-02",

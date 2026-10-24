@@ -61,7 +61,8 @@ electron-vite 可执行文件。Windows Main 在 Electron 就绪前注册与 NSI
 启动器设置 `PI_DESKTOP_DEV=1`，禁用开发环境更新交付并保留开发工作区默认值。
 Electron 43+ 首次 `pnpm dev` 按需下载 Electron 二进制，`pnpm install` 不再下载。
 干净的云端 runner 在构建或 E2E 前显式获取该固定版本二进制。
-未签名云端候选不请求安全时间戳；签名候选和正式发布必须使用公证所需时间戳。
+未签名云端通道不请求安全时间戳；所有签名通道（包括签名候选和正式发布）
+都必须使用公证所需的安全时间戳。
 打包使用 macOS `build/icon.icns` 和 Windows `build/icon.ico`；渲染器的
 `BrandLogo` 使用相同规范 PNG。`scripts/make-icon.py` 从
 `build/icon_1024.png` 生成多尺寸 ICO、512px Windows/Linux PNG、透明单色
@@ -70,7 +71,8 @@ Electron 43+ 首次 `pnpm dev` 按需下载 Electron 二进制，`pnpm install` 
 ## 2. 先决条件（发布通道）
 
 1. 具有仓库 Actions 访问和候选构建触发权限；正式发布还需要版本标签推送授权。
-2. 正式发布或签名候选配置 §4.6 的六个签名 Secret；证书和 TeamIdentifier
+2. 默认签名正式发布或签名候选配置 §4.6 的六个签名 Secret；未签名自用正式版本
+   则须显式开启 `ALLOW_UNSIGNED_MACOS_RELEASE=true`。证书和 TeamIdentifier
    属于本 fork 发布者，并与配置身份一致。
 3. GitHub 托管的原生 runner，使用固定 Node/pnpm、Rust、Electron 和锁文件依赖。
    不使用本地产物作为发布输入。工作流检查架构并在相同 runner 上编译原生 host。
@@ -176,8 +178,19 @@ git push origin v<version>
 正式预检拒绝标签与应用/Cargo/协议版本不一致、标签指向其他提交或源码不属于
 新获取的 `origin/main`。稳定 SemVer 使用 `latest`；`alpha`、`beta`、`rc`
 等预发布使用独立更新渠道，并设置 `prerelease=true`、`make_latest=false`。
-非法版本或不安全渠道会失败。正式标签始终要求六个签名 Secret，缺失即尽早失败。
-不能将未签名候选提升为正式 Release。
+非法版本或不安全渠道会失败。正式标签默认要求六个签名 Secret，缺失即尽早失败。
+若要发布仅供个人使用的未签名正式版本，可显式设置仓库 Actions 变量：
+
+```bash
+gh variable set ALLOW_UNSIGNED_MACOS_RELEASE --body true -R SakuraLoveSmile/PI-Desktop
+```
+
+变量未设置或为 `false` 时仍执行默认签名策略；删除变量或设为 `false` 即可恢复。
+手动 `sign_macos` 输入独立生效：明确请求 `sign_macos=true` 仍须提供全部六个 Secret。
+预检会把 opt-in 决定固定到 `allow_unsigned_macos` 元数据，供聚合和发布作业沿用。
+未签名 Release 会在清单中记录 `signedMacos: false`，并注明未签名、未公证及仅供个人使用；
+更新需要手动下载和安装。此选项不修改 macOS 安全设置，也不代表通过 Gatekeeper 或公证。
+未签名手动候选仍只生成 Actions 工件，不能直接提升为正式 Release。
 
 门禁顺序：
 
@@ -204,7 +217,8 @@ The sole packaging lane uses native `macos-15` arm64 and verifies `uname -m`
 before building the Rust host on the same runner. Signed lanes pin `CSC_NAME`
 to the configured certificate common name,
 强制应用签名和公证，独立对 DMG 公证/装订，上传前验证代码、身份、Gatekeeper
-和两份票据（§4.6–§5）。正式标签不能跳过这些检查。
+和两份票据（§4.6–§5）。这些检查适用于所有选择签名的通道；显式启用的未签名自用
+通道会标记为未获得签名、公证和 Gatekeeper 资格。
 
 
 每次 builder 调用都显式接收预检给出的 `-c.publish.channel=<channel>`，
@@ -332,7 +346,9 @@ override 作用于它。它的 `signApplication()` 对每个文件 `await` 一�
 
 ## 5. 验证门
 
-未签名调试产物（`workflow_dispatch` 且 `sign_macos: false`）不视为通过 Gatekeeper。标签发布必须通过以下签名、公证和装订检查，否则工作流失败。
+未签名调试产物（`workflow_dispatch` 且 `sign_macos: false`）和未签名自用正式 Release
+都不视为通过 Gatekeeper。正式标签默认必须通过签名、公证和装订检查；仅在显式启用自用
+未签名仓库变量时才使用未签名通道。夹具签名不能证明真实发布资格。
 
 存在两次独立的公证提交，因为 Apple 每次公证一个工件，而 electron-builder 只覆盖应用：
 
@@ -495,8 +511,10 @@ Final bundle: those four assets plus <channel>-mac.yml,
 ```
 
 The macOS arm64 package includes the native `bin/pi-desktop-host-core` binary.
-macOS signing and notarization are mandatory for formal tags. Rollback and
-installer upgrade qualification remain separate release hardening work.
+macOS signing and notarization are mandatory for formal tags by default; the
+documented personal-use opt-in publishes an unsigned, not notarized package.
+Rollback and installer upgrade qualification remain separate release hardening
+work.
 
 The application still contains Windows and Linux support, and the packaging
 scripts retain their target implementations. Those targets are paused in the
