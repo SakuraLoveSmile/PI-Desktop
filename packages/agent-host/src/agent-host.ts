@@ -146,6 +146,8 @@ type TurnRecord = RacpTurn & {
   /** The runtime's own turn id when it differs from the RACP id (queued turns). */
   runtimeTurnId?: string;
   principalSubject?: string;
+  /** Only a fresh trusted user answer may start negotiation across its Team pause. */
+  liveQuestionAnswer?: boolean;
 };
 
 type SessionState = {
@@ -538,6 +540,7 @@ export class AgentHost {
       const position = this.queue.adoptPersisted(record);
       const turn = this.ensureTurn(state, record.id);
       turn.status = "queued";
+      if (!restored) turn.liveQuestionAnswer = true;
       turn.admission = "queue";
       turn.queuePosition = position;
       turn.effectivePermissionMode = record.effectivePermissionMode;
@@ -1127,18 +1130,24 @@ export class AgentHost {
         const state = this.state(sessionId);
         const restored = this.queue.isHeld(sessionId);
         const recovery = restored ? this.queue.peekEligible(sessionId) : undefined;
-        if (this.queue.isHeldByOtherThan(sessionId, "restore") || this.isOccupied(state)) return;
-        if (restored && !recovery) return;
-        const head = recovery ?? this.queue.peek(sessionId);
+        // A fresh owner answer starts a new user negotiation, not a Team
+        // Resume. Select only its authenticated identity and leave every
+        // ordinary queued input, Team message and independent hold intact.
+        const liveAnswer = restored && !this.queue.isHeldByOtherThan(sessionId, `team:${sessionId}`)
+          ? this.queue.list(sessionId).find(record => state.turns.get(record.id)?.liveQuestionAnswer)
+          : undefined;
+        if ((this.queue.isHeldByOtherThan(sessionId, "restore") && !liveAnswer) || this.isOccupied(state)) return;
+        if (restored && !recovery && !liveAnswer) return;
+        const head = liveAnswer ?? recovery ?? this.queue.peek(sessionId);
         const headTurn = head ? this.ensureTurn(state, head.id) : undefined;
         if (headTurn?.deliveryPending) return;
         if (headTurn?.deliveredIntoTurnId) {
           if (!(await this.removeDeliveredInput(state, headTurn.id))) return;
           continue;
         }
-        const record = recovery
-          ? await this.queue.shiftEligible(sessionId)
-          : await this.queue.shift(sessionId);
+        const record = liveAnswer
+          ? await this.queue.remove(sessionId, liveAnswer.id)
+          : recovery ? await this.queue.shiftEligible(sessionId) : await this.queue.shift(sessionId);
         if (!record) return;
         const turn = this.ensureTurn(state, record.id);
         this.startingQueuedTurns.set(sessionId, turn);
