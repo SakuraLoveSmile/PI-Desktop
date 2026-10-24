@@ -71,8 +71,8 @@ export function createApprovedGoalFixture(projectPath) {
       await waitFor(() => evaluate(`!!document.querySelector('.composer-contract-chip[data-mode="goal"]')`), "Goal contract hydrated");
       await submitComposerPrompt(sendCdp, evaluate, "AG_APPROVED_GOAL: negotiate source verification with an expert.");
       const proposal = await waitFor(async () => (await invoke("plansPending", { sessionId: goal.id })).plans.find(plan => plan.status === "pending"), "Goal approval");
-      await waitFor(() => evaluate(`!!document.querySelector('.plan-approval-approve-menu')`), "Goal approval menu");
-      await evaluate(`document.querySelector('.plan-approval-approve-menu').click()`);
+      await waitFor(() => evaluate(`!!document.querySelector('.plan-approval-approve-menu:not(:disabled)')`), "Goal approval menu");
+      await evaluate(`(() => { const trigger = document.querySelector('.plan-approval-approve-menu:not(:disabled)'); trigger.scrollIntoView({ block: 'center' }); trigger.click(); })()`);
       await waitFor(() => evaluate(`!!document.querySelector('[data-approval-mode="auto"]')`), "Auto permission option");
       await evaluate(`document.querySelector('[data-approval-mode="auto"]').click()`);
       const review = await waitFor(async () => { const { review } = await invoke("teamGetLaunchReview", { teamSessionId: goal.id }); return review?.status === "pending" && review.launchPolicy === "user_confirmed" ? review : null; }, "approved Goal pending roster");
@@ -129,8 +129,8 @@ export function createApprovedGoalFixture(projectPath) {
       await waitFor(() => evaluate(`!!document.querySelector('.composer-contract-chip[data-mode="goal"]')`), "cancel Goal contract");
       await submitComposerPrompt(sendCdp, evaluate, "AG_APPROVED_GOAL: negotiate expert source verification, then cancel roster.");
       await waitFor(async () => (await invoke("plansPending", { sessionId: cancelled.id })).plans.some(plan => plan.status === "pending"), "cancel Goal approval");
-      await waitFor(() => evaluate(`!!document.querySelector('.plan-approval-approve-menu')`), "cancel Goal approval menu");
-      await evaluate(`document.querySelector('.plan-approval-approve-menu').click()`);
+      await waitFor(() => evaluate(`!!document.querySelector('.plan-approval-approve-menu:not(:disabled)')`), "cancel Goal approval menu");
+      await evaluate(`(() => { const trigger = document.querySelector('.plan-approval-approve-menu:not(:disabled)'); trigger.scrollIntoView({ block: 'center' }); trigger.click(); })()`);
       await waitFor(() => evaluate(`!!document.querySelector('[data-approval-mode="auto"]')`), "cancel Goal Auto permission");
       await evaluate(`document.querySelector('[data-approval-mode="auto"]').click()`);
       const cancelReview = await waitFor(async () => { const { review } = await invoke("teamGetLaunchReview", { teamSessionId: cancelled.id }); return review?.status === "pending" ? review : null; }, "cancel Goal roster pending");

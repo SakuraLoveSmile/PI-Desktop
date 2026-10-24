@@ -126,7 +126,7 @@ ipcMain.handle("fixture:invoke", async (_event, channel, ...args) => {
 });
 app.whenReady().then(async () => {
   win = new BrowserWindow({ show: false, width: 1000, height: 920,
-    webPreferences: { preload: path.join(__dirname, "preload.cjs"), sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } });
+    webPreferences: { offscreen: true, preload: path.join(__dirname, "preload.cjs"), sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } });
   win.webContents.on("console-message", (event) => console.error(event.message));
   try {
     await win.loadFile(path.join(__dirname, "index.html"));

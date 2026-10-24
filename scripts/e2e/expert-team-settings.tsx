@@ -28,7 +28,7 @@ async function until(condition: () => boolean, label: string) {
   while (!condition() && performance.now() < deadline) {
     await act(async () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
   }
-  assert(condition(), `Expected UI state: ${label}`);
+  assert(condition(), `Expected UI state: ${label}; tab=${useAppStore.getState().settingsTab}; surface=${document.querySelector(".settings-content")?.textContent?.slice(0, 700)}`);
 }
 function findButton(parent: ParentNode, label: string): HTMLButtonElement {
   const found = [...parent.querySelectorAll<HTMLButtonElement>("button")].find((button) => button.textContent?.trim() === label);

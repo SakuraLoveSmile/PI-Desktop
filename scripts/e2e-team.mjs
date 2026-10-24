@@ -5,6 +5,7 @@ import { once } from "node:events";
 import { createServer } from "node:http";
 import { createServer as createTcpServer } from "node:net";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { readlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -661,7 +662,12 @@ function findAppHostPids() {
     }
   }
   const hostName = basename(resolveHostBinary());
-  return processes.filter((entry) => descendants.has(entry.ppid) && basename(entry.command) === hostName).map((entry) => entry.pid);
+  return processes.filter((entry) => {
+    if (!descendants.has(entry.ppid)) return false;
+    if (process.platform !== "linux") return basename(entry.command) === hostName;
+    try { return basename(readlinkSync(`/proc/${entry.pid}/exe`)) === hostName; }
+    catch { return false; } // The owned child can exit between ps and procfs.
+  }).map((entry) => entry.pid);
 }
 
 async function refreshWhileDragging(sendCdp, evaluate) {

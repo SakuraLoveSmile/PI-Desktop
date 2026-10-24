@@ -22,8 +22,8 @@ const originalHome = process.env.HOME;
 process.env.HOME = fixtureHome;
 const binary = resolveHostBinary();
 const candidate = await candidateIdentity();
+execFileSync("git", ["merge-base", "--is-ancestor", candidate.baseMain, "HEAD"]);
 candidate.remoteMain = candidate.baseMain;
-candidate.baseMain = execFileSync("git", ["rev-parse", "main"], { encoding: "utf8" }).trim();
 const evidence = { scenario, candidate,
   hostBinarySha256: createHash("sha256").update(await readFile(binary)).digest("hex"),
   runtimeSha256: createHash("sha256").update(await readFile(new URL("../packages/agent-runtime/dist/runtime.js", import.meta.url))).digest("hex"),

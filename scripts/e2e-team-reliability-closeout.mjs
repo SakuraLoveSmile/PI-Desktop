@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** Isolated real Host/Main/renderer acceptance; loopback provider only. */
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
@@ -21,14 +21,29 @@ const scriptHash = createHash("sha256")
 const candidateAtStart = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
 const baseMain = execFileSync("git", ["rev-parse", "origin/main"], { cwd: root, encoding: "utf8" }).trim();
 // Identify both committed product ancestry and the exact local candidate inputs.
-const baseProductCandidate = "26db5043860db8412a988cdce31362a424eea407";
+const originalBaseProductCandidate = "26db5043860db8412a988cdce31362a424eea407";
+// The public-history rewrite changed documentation, not these product inputs.
+// Preserve the immutable old baseline through its exact three product trees.
+const baseProductCandidate = "43a4725d64feb9aef33fc0889370d39417c2e712";
+const baseProductTrees = { apps: "dbea1acd04f80c949c6e3d518cfa306bdd93fe1c",
+  packages: "c8a5416bfb50d55e34a5131e72a4b4a9bb532041", crates: "6043d555ef889ff9d82d934fd1c9ab0e807a11ae" };
+for (const [path, tree] of Object.entries(baseProductTrees)) {
+  assert.equal(execFileSync("git", ["rev-parse", `${baseProductCandidate}:${path}`], { cwd: root, encoding: "utf8" }).trim(), tree,
+    `Rewritten baseline must retain the original ${path} tree`);
+}
+execFileSync("git", ["merge-base", "--is-ancestor", baseProductCandidate, baseMain], { cwd: root });
+execFileSync("git", ["merge-base", "--is-ancestor", baseMain, candidateAtStart], { cwd: root });
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
-const workspaceDiffSha256 = hash(execFileSync("git", ["diff", "--binary", "HEAD", "--"], { cwd: root }));
-const productSourceDiffSha256 = hash(
-  execFileSync("git", ["diff", "--binary", baseProductCandidate, "--", "apps", "packages", "crates"], {
-    cwd: root,
-  }),
-);
+async function hashGitDiff(args) {
+  const digest = createHash("sha256");
+  const child = spawn("git", ["diff", "--binary", ...args], { cwd: root, stdio: ["ignore", "pipe", "inherit"] });
+  child.stdout.on("data", chunk => digest.update(chunk));
+  const code = await new Promise((yes, no) => { child.once("error", no); child.once("close", yes); });
+  assert.equal(code, 0, "Candidate diff must be complete before hashing");
+  return digest.digest("hex");
+}
+const workspaceDiffSha256 = await hashGitDiff(["HEAD", "--"]);
+const productSourceDiffSha256 = await hashGitDiff([baseProductCandidate, "--", "apps", "packages", "crates"]);
 const untrackedSourceHashes = Object.fromEntries(
   execFileSync("git", ["ls-files", "--others", "--exclude-standard", "-z"], { cwd: root, encoding: "utf8" })
     .split("\0")
@@ -40,6 +55,8 @@ const candidateIdentity = {
   head: candidateAtStart,
   baseMain,
   baseProductCandidate,
+  originalBaseProductCandidate,
+  baseProductTrees,
   workspaceDiffSha256,
   productSourceDiffSha256,
   untrackedSourceHashes,
@@ -358,11 +375,11 @@ try {
     await selectSession(goal.id);
     await submit("CLOSEOUT_PENDING_GOAL: ask a bounded recovery question.");
     await native.renderer.until(
-      () => Boolean(document.querySelector(".plan-approval-approve-menu")),
+      () => Boolean(document.querySelector(".plan-approval-approve-menu:not(:disabled)")),
       null,
       "Goal approval",
     );
-    await native.renderer.click(".plan-approval-approve-menu");
+    await native.renderer.click(".plan-approval-approve-menu:not(:disabled)");
     await native.renderer.until(
       () => Boolean(document.querySelector('[data-approval-mode="auto"]')),
       null,
@@ -652,7 +669,12 @@ async function budgetJourney() {
   const expert = await until(async () => {
     const members = (await ipc("teamGetRoster", { teamSessionId: lead.id })).members;
     return members.find((m) => m.name === "observer");
-  }, "confirmed expert");
+  }, "confirmed expert").catch(async (error) => {
+    await screenshot("budget-confirm-failed");
+    const review = await ipc("teamGetLaunchReview", { teamSessionId: lead.id });
+    const surface = await native.renderer.run(() => document.querySelector('[data-testid="team-panel"]')?.innerText);
+    throw new Error(`${error.message}; review=${JSON.stringify(review)}; surface=${surface}`, { cause: error });
+  });
   const expertId = expert.sessionId ?? expert.memberSessionId;
   await native.renderer.until(
     (id) =>
@@ -912,7 +934,7 @@ async function policyViaUi(enabled, soft, hard) {
     (s) =>
       document
         .querySelector(s)
-        .closest(".expert-team-role-editor")
+        .closest(".settings-card-block")
         .querySelector(".expert-team-editor-actions button")
         .setAttribute("data-closeout-save", ""),
     save,

@@ -5,7 +5,7 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
 import { createServer as createTcpServer } from 'node:net';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Host, resolveHostBinary } from './e2e/host.mjs';
@@ -319,12 +319,26 @@ try {
   const failedExecutionId = retryApproval.execution?.id;
   assert.ok(failedExecutionId, 'approved retry fixture must have an execution');
   await host.call('plans.claimExecution', { executionId: failedExecutionId });
-  await host.call('plans.finishExecution', { executionId: failedExecutionId, status: 'completed' });
-  const markedFailed = await host.call('goalReports.markFailed', {
-    sessionId: retrySession.id,
-    executionId: failedExecutionId,
-    errorCode: 'REPORT_PERSISTENCE_BARRIER_FAILED',
+  // An unverified Goal cannot complete implicitly. Explicit user acceptance
+  // permits Host-fact fallback, while an actual filesystem failure exercises
+  // publication recovery rather than manufacturing a completed execution.
+  const blocked = await host.call('goalExecutions.settle', {
+    sessionId: retrySession.id, executionId: failedExecutionId, ended: 'agent_stopped',
   });
+  assert.equal(blocked.hold?.state, 'blocked');
+  const reportTarget = join(dataDir, 'goal_reports', retrySession.id, `${failedExecutionId}.json`);
+  mkdirSync(reportTarget, { recursive: true });
+  let accepted;
+  try {
+    accepted = await host.call('goalExecutions.close', {
+      sessionId: retrySession.id, executionId: failedExecutionId,
+      expectedVersion: blocked.hold.version, action: 'accept',
+    });
+  } finally { rmSync(reportTarget, { recursive: true }); }
+  assert.equal(accepted.hold?.state, 'accepted');
+  const markedFailed = { report: (await host.call('goalReports.list', {
+    sessionId: retrySession.id,
+  })).reports.find(report => report.executionId === failedExecutionId) };
   assert.equal(markedFailed.report?.status, 'failed');
   await host.call('session.endTurn', {
     turnId: retryTurn.turnId,
@@ -358,7 +372,7 @@ try {
   writeFileSync(failureScreenshotPath, Buffer.from(failureScreenshot.data, 'base64'));
 
   await evaluate(`document.querySelector('[data-testid="goal-report-retry-btn"]').click()`);
-  await waitFor(() => evaluate(`!!document.querySelector('[data-testid="goal-report-fallback-notice"]')`), 30000, 'retried fallback report');
+  await waitFor(() => evaluate(`!!document.querySelector('[data-testid="goal-report-user-accepted-notice"]')`), 30000, 'retried fallback report');
   const retriedList = await invoke('goalReportList', { sessionId: retrySession.id });
   const retriedSummary = retriedList.reports?.find(item => item.executionId === failedExecutionId);
   assert.equal(retriedSummary?.status, 'ready');
@@ -366,6 +380,7 @@ try {
   assert.equal(retriedSummary?.verdict, 'unknown');
   const retriedReport = await invoke('goalReportGet', { sessionId: retrySession.id, executionId: failedExecutionId });
   assert.equal(retriedReport.report?.verdict, 'unknown');
+  assert.equal(retriedReport.report?.closure, 'user_accepted');
   assert.deepEqual(retriedReport.report?.checks, [], 'fallback must not invent passed checks');
   assert.equal(calls, 6, 'report Retry must not rerun the Goal or call the model');
   const retriedScreenshotPath = join(root, 'goal-report-retried.png');
