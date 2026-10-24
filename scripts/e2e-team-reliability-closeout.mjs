@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { createNativeHarness } from "./e2e/team-closeout-native.mjs";
+import { approveGoalAuto } from "./e2e/goal-approval-ui.mjs";
 import { assertDesktopBuild, repositoryRoot, resolveElectronBinary } from "./e2e/boot.mjs";
 import { Host, resolveHostBinary } from "./e2e/host.mjs";
 const unknown = process.argv.slice(2).filter((arg) => arg !== "--budget-only" && arg !== "--recovery-only");
@@ -374,18 +375,13 @@ try {
     );
     await selectSession(goal.id);
     await submit("CLOSEOUT_PENDING_GOAL: ask a bounded recovery question.");
-    await native.renderer.until(
-      () => Boolean(document.querySelector(".plan-approval-approve-menu:not(:disabled)")),
-      null,
-      "Goal approval",
-    );
-    await native.renderer.click(".plan-approval-approve-menu:not(:disabled)");
-    await native.renderer.until(
-      () => Boolean(document.querySelector('[data-approval-mode="auto"]')),
-      null,
-      "approval auto",
-    );
-    await native.renderer.click('[data-approval-mode="auto"]');
+    await approveGoalAuto({
+      sessionId: goal.id,
+      label: "Goal",
+      run: native.renderer.run,
+      waitFor: (fn, arg, label) => native.renderer.until(fn, arg, label),
+      click: selector => native.renderer.click(selector),
+    });
     await native.renderer.until(
       () => document.querySelector(".asktool-card")?.innerText.includes("CLOSEOUT durable question"),
       null,

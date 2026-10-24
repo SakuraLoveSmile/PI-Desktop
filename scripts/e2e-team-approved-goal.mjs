@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { approveGoalAuto } from "./e2e/goal-approval-ui.mjs";
 
 export function createApprovedGoalFixture(projectPath) {
   let expertStarted = false, expertRead = false, resultSeen = false, reportRejected = false;
@@ -65,37 +66,11 @@ export function createApprovedGoalFixture(projectPath) {
       throw new Error(`Unexpected approved Goal prompt ${userText.slice(0, 200)}`);
     },
     async runJourney({ planLead: goal, invoke, evaluate, sendCdp, waitFor, calls, submitComposerPrompt, saveScreenshot }) {
-      async function approveAuto(sessionId, label) {
-        const pane = `[data-session-pane="${sessionId}"][data-visible="true"]`;
-        const trigger = `${pane} [data-testid="plan-approval-bar"][data-status="pending"] .plan-approval-approve-menu:not(:disabled)`;
-        await waitFor(() => evaluate(`!!document.querySelector(${JSON.stringify(trigger)})`), `${label} approval menu`);
-        const scope = await evaluate(`(() => {
-          const target = document.querySelector(${JSON.stringify(trigger)});
-          const first = document.querySelector('.plan-approval-approve-menu:not(:disabled)');
-          const scope = first !== target ? {
-            intended: ${JSON.stringify(sessionId)}, firstGlobal: first?.closest('[data-session-pane]')?.getAttribute('data-session-pane'),
-            firstGlobalVisible: first?.closest('[data-session-pane]')?.getAttribute('data-visible')
-          } : null;
-          target.scrollIntoView({ block: 'center' });
-          return scope;
-        })()`);
-        if (scope) console.log("TEAM_APPROVAL_SCOPE", JSON.stringify(scope));
-        await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
-        await evaluate(`document.querySelector(${JSON.stringify(trigger)}).click()`);
-        await waitFor(() => evaluate(`document.querySelector(${JSON.stringify(trigger)})?.getAttribute('aria-expanded') === 'true' && !!document.querySelector('.plan-approval-menu.is-open [data-approval-mode="auto"]:not(:disabled)')`), `${label} Auto permission`).catch(async error => {
-          const state = await evaluate(`(() => {
-            const target=document.querySelector(${JSON.stringify(trigger)});
-            return { expanded:target?.getAttribute('aria-expanded'), target:target?.getBoundingClientRect().toJSON(),
-              triggers:Array.from(document.querySelectorAll('.plan-approval-approve-menu')).map(node => ({
-                session:node.closest('[data-session-pane]')?.getAttribute('data-session-pane'),
-                visible:node.closest('[data-session-pane]')?.getAttribute('data-visible'), disabled:node.disabled,
-                rect:node.getBoundingClientRect().toJSON() })),
-              menus:Array.from(document.querySelectorAll('.plan-approval-menu')).map(node => ({ className:node.className, text:node.innerText })) };
-          })()`);
-          throw new Error(`${error.message}; approval=${JSON.stringify(state)}`, { cause:error });
-        });
-        await evaluate(`document.querySelector('.plan-approval-menu.is-open [data-approval-mode="auto"]:not(:disabled)').click()`);
-      }
+      const run = (fn, arg) => evaluate(`(${fn})(${JSON.stringify(arg ?? null)})`);
+      const approveAuto = (sessionId, label) => approveGoalAuto({
+        sessionId, label, run,
+        waitFor: (fn, arg, label) => waitFor(() => run(fn, arg), label),
+      });
       await writeFile(join(projectPath, "approved-goal-source.md"), "APPROVED_GOAL_SOURCE\n");
       await waitFor(() => evaluate(`!!document.querySelector('[data-sidebar-session-row="${goal.id}"]') && !document.querySelector('.startup-splash')`), "Goal session");
       await evaluate(`document.querySelector('[data-sidebar-session-row="${goal.id}"] .thread-item-main').click()`);
