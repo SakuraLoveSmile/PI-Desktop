@@ -74,12 +74,14 @@ async function settle(scroller: HTMLElement, title: HTMLElement) {
   await new Promise<void>((resolve, reject) => {
     let previous = "";
     let stableFrames = 0;
+    let sampledFrames = 0;
     let frame = 0;
     const timeout = window.setTimeout(() => {
       cancelAnimationFrame(frame);
-      reject(new Error(`Disclosure geometry did not settle: ${previous}`));
+      reject(new Error(`Disclosure geometry did not settle: ${JSON.stringify({ sampledFrames, visibility: document.visibilityState, width: innerWidth, height: innerHeight, previous })}`));
     }, 2000);
     const sample = () => {
+      sampledFrames += 1;
       const current = JSON.stringify(geometry(scroller, title));
       stableFrames = current === previous ? stableFrames + 1 : 0;
       previous = current;

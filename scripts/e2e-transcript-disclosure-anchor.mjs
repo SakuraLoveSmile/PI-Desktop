@@ -58,21 +58,29 @@ app.setPath("userData", path.join(__dirname, "profile"));
 app.whenReady().then(async () => {
   const window = new BrowserWindow({
     show: false,
+    width: 800,
+    height: 640,
+    useContentSize: true,
     webPreferences: {
-      offscreen: true,
       sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
-      // Offscreen rendering keeps real layout and frames active on Linux too.
+      // Sample geometry from real display frames without taking keyboard focus.
       backgroundThrottling: false,
     },
   });
   window.webContents.on("console-message", (event) => console.error(event.message));
   try {
     await window.loadFile(path.join(__dirname, "index.html"));
-    console.error("TRANSCRIPT_DISCLOSURE_STAGE loaded");
+    await window.webContents.executeJavaScript("window.addEventListener('error', event => console.error(event.error?.stack ?? event.message)); window.addEventListener('unhandledrejection', event => console.error(event.reason?.stack ?? String(event.reason)));");
+    window.showInactive();
+    const surface = await window.webContents.executeJavaScript("({ visibility: document.visibilityState, width: innerWidth, height: innerHeight })");
+    console.error("TRANSCRIPT_DISCLOSURE_STAGE " + JSON.stringify({ visible: window.isVisible(), minimized: window.isMinimized(), ...surface }));
+    if (!window.isVisible() || window.isMinimized() || surface.visibility !== "visible" || surface.width !== 800 || surface.height !== 640) {
+      throw new Error("Disclosure fixture requires a visible 800x640 content viewport");
+    }
     const result = await window.webContents.executeJavaScript("globalThis.transcriptDisclosureProbe()");
-    console.log("TRANSCRIPT_DISCLOSURE_PROBE " + JSON.stringify(result));
+    console.log("TRANSCRIPT_DISCLOSURE_PROBE " + JSON.stringify({ ...result, surface }));
     app.quit();
   } catch (error) {
     console.error("TRANSCRIPT_DISCLOSURE_PROBE " + JSON.stringify({ ok: false, error: String(error) }));
