@@ -14,8 +14,13 @@ export async function waitForLeadAsk(options: {
   pending: (request?: AskToolRequest) => void;
 }): Promise<Answers | undefined> {
   const identity = { sessionId: options.request.sessionId, callerSessionId: options.request.sessionId, turnId: options.turnId };
+  // Renderer lifecycle metadata stays local. Host owns the separate turnId
+  // envelope and accepts only its existing durable question contract.
+  const { requestId, sessionId, toolCallId, questions, teamPending, teamManaged } = options.request;
   const registered = await options.host.call<{ ask: DurableAsk; deadlineMs: number }>("team.registerLeadAsk", {
-    ...identity, request: options.request,
+    ...identity, request: { requestId, sessionId, toolCallId, questions,
+      ...(teamPending === undefined ? {} : { teamPending }),
+      ...(teamManaged === undefined ? {} : { teamManaged }) },
   });
   options.signal?.throwIfAborted();
   if (!Number.isFinite(registered?.deadlineMs)) throw new Error("ASKTOOL_INVALID_STATE: Host question deadline missing");
