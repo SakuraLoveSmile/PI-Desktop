@@ -3049,6 +3049,10 @@ primary, medium-weight headers and solid subtle separators, because the Team
 progress geometry pins them. The session checklist header is secondary and regular
 in both modes. The subagent summary's panorama link uses the flat 13px text and
 16px arrow of the Team progress link and sits between its label and chevron.
+In Team progress, a long panorama label truncates within its flex allocation at
+narrow widths and larger font scales. Its full tooltip and accessible name, the
+16px arrow (scaled with text), and the fixed 24px disclosure remain available;
+the link must not push the disclosure outside the progress row.
 The metadata header remains above the scroll area without shrinking. Its icon
 and title share a compact row; project and model occupy full-width metadata
 rows, followed by mode and message count side by side. Long values truncate

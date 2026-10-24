@@ -17388,11 +17388,11 @@ current CAS revision. Legacy descriptions and reviews without presentation are r
 
 ### E2E-TEAM-horizontal-overflow
 
-- **Status**: Planned for the current repair; the actual overflow offender has not been identified in the integrated app.
+- **Status**: Automated production-shell coverage; record candidate and platform results for each run.
 - **Preconditions**: Isolated Desktop candidate, long task subject and unbroken scope/path fixtures, existing minimum chat width, and no user data.
-- **Steps**: Inspect Overview, Team aggregate, board, member/task detail, independent task tab and the three-column shell at 320/450/620px panel widths and 100%/150% font scale in light/dark and English/Chinese. Record the offending element's `clientWidth`/`scrollWidth`, then verify a bounded local fix while exercising Work Panel tab-strip scrolling, Markdown table/code scrolling and panorama world panning.
-- **Expected**: No page-level horizontal scrollbar or displaced shell content; long content remains accessible in detail, and intentional local scroll/pan surfaces still work.
-- **Automation**: Extend the isolated Team/three-column Electron harness after confirming it measures the production shell. Record the tested commit, panel dimensions, font scale, theme, locale and offender evidence.
+- **Steps**: Inspect Overview, Team aggregate, board, member/task detail, independent task tab and the three-column shell at 320/450/620px panel widths and 100%/150% font scale in light/dark and English/Chinese. Record the offending element's `clientWidth`/`scrollWidth`, then verify a bounded local fix while exercising Work Panel tab-strip scrolling, Markdown table/code scrolling and panorama world panning. Select French through the real language setting and repeat Overview/aggregate progress at 320px and 150% in both themes; measure the long panorama label and use native pointer input to collapse/reopen progress and open the panorama.
+- **Expected**: No page-level horizontal scrollbar or displaced shell content; long content remains accessible in detail, and intentional local scroll/pan surfaces still work. The long progress link truncates while retaining its full accessible name and tooltip, its scaled 16px arrow, and a complete, clickable 24px disclosure within the progress row.
+- **Automation**: `node scripts/e2e-team.mjs` runs the bilingual matrix and the real French progress regression; `node scripts/e2e-three-column-layout.mjs` covers the production shell. Record the tested commit, panel dimensions, font scale, theme, locale and offender evidence.
 
 ### E2E-STORAGE-plus-legacy-schema-reconciles-before-upstream-chain
 

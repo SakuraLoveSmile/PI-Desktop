@@ -950,6 +950,79 @@ async function verifyTeamLayoutMatrix(sendCdp, evaluate, locale) {
   console.log(`PASS Team layout matrix ${locale}: Overview/aggregate/board/long detail/task tab, 320/450/620px, 100%/150%, dark/light`);
 }
 
+async function verifyLongTeamProgress(sendCdp, evaluate, invoke, leadId) {
+  // Use a shipped, longer translation through the real language-setting path.
+  // This reproduces constrained text metrics without substituting a font or
+  // changing the existing bilingual matrix, panel widths or overflow standard.
+  await invoke("settingsSet", { language: "fr" });
+  await sendCdp("Page.reload");
+  await waitFor(() => evaluate(`document.documentElement.lang === 'fr' &&
+    !!document.querySelector('[data-sidebar-session-row="${leadId}"]') &&
+    !document.querySelector('.startup-splash')`), "French shell for long progress labels");
+  await evaluate(`document.querySelector('[data-sidebar-session-row="${leadId}"] button.thread-item-main')?.click()`);
+  await waitFor(() => evaluate(`!!document.querySelector('[data-session-pane="${leadId}"][data-visible="true"]')`), "Lead reopened in French");
+  await sendCdp("Emulation.setDeviceMetricsOverride", { width: 1600, height: 1000, deviceScaleFactor: 1, mobile: false });
+  const clickProgressControl = async (selector) => {
+    const point = await evaluate(`(() => {
+      const control=document.querySelector(${JSON.stringify(selector)});
+      const rect=control.getBoundingClientRect(), x=rect.left+rect.width/2, y=rect.top+rect.height/2;
+      if (!control.contains(document.elementFromPoint(x,y))) throw new Error('Progress control is obscured');
+      return {x,y};
+    })()`);
+    await sendCdp("Input.dispatchMouseEvent", {type:"mouseMoved",...point});
+    await sendCdp("Input.dispatchMouseEvent", {type:"mousePressed",...point,button:"left",buttons:1,clickCount:1});
+    await sendCdp("Input.dispatchMouseEvent", {type:"mouseReleased",...point,button:"left",buttons:0,clickCount:1});
+  };
+  try {
+    for (const surface of ["overview", "aggregate"]) {
+      await openTeamPanel(sendCdp, evaluate);
+      if (surface === "overview") await activateOverviewTab(sendCdp, evaluate);
+      await waitFor(() => evaluate(`document.querySelector('.team-progress-title')?.textContent === 'Progression des tâches'`), "real French Team progress");
+      await resizePanel(sendCdp, evaluate, 320);
+      for (const theme of ["dark", "light"]) {
+        await evaluate(`document.documentElement.style.setProperty('--font-scale', '1.5'); document.documentElement.setAttribute('data-theme', '${theme}'); true`);
+        await evaluate(`document.querySelector('.team-progress-header').scrollIntoView({block:'center'}); true`);
+        await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
+        const metrics = await evaluate(`(() => {
+          const surface=document.querySelector('.team-panel, .work-panel-overview');
+          const progress=surface.querySelector('.team-progress-header');
+          const link=progress.querySelector('.team-progress-panorama');
+          const label=link.querySelector('span');
+          const toggle=progress.querySelector('.team-progress-toggle');
+          const rect=node => node.getBoundingClientRect().toJSON();
+          return { page:[document.documentElement.clientWidth,document.documentElement.scrollWidth],
+            surface:[surface.clientWidth,surface.scrollWidth], progress:rect(progress), toggle:rect(toggle), arrow:rect(link.querySelector('svg')),
+            link:{...rect(link),label:label.textContent,ariaLabel:link.getAttribute('aria-label'),
+              font:getComputedStyle(link).font,fontFamily:getComputedStyle(link).fontFamily,
+              textWidth:label.scrollWidth,labelWidth:label.clientWidth},
+            children:Array.from(progress.children).map(node => ({className:node.className,...rect(node),
+              flex:getComputedStyle(node).flex,minWidth:getComputedStyle(node).minWidth})) };
+        })()`);
+        console.log("TEAM_LONG_PROGRESS_BOUNDS", JSON.stringify({ surface, theme, metrics }));
+        assert.ok(metrics.page[1] <= metrics.page[0] && metrics.surface[1] <= metrics.surface[0], `fr/${surface}/320/1.5/${theme} progress overflows: ${JSON.stringify(metrics)}`);
+        assert.equal(metrics.toggle.width, 24, "long progress labels preserve the 24px disclosure width");
+        assert.equal(metrics.toggle.height, 24, "long progress labels preserve the 24px disclosure height");
+        assert.equal(metrics.arrow.width, 24, "the 16px panorama arrow retains its 150% scaled width");
+        assert.equal(metrics.arrow.height, 24, "the 16px panorama arrow retains its 150% scaled height");
+        assert.ok(metrics.toggle.right <= metrics.progress.right && metrics.toggle.left >= metrics.progress.left, "the complete disclosure stays inside its progress row");
+        assert.ok(metrics.link.labelWidth > 0 && metrics.link.textWidth > metrics.link.labelWidth, "the real long label truncates within its available space");
+        assert.equal(metrics.link.ariaLabel, metrics.link.label, "the full panorama label remains accessible");
+        await saveScreenshot(sendCdp, `team-long-progress-${surface}-${theme}.png`);
+        await clickProgressControl('.team-progress-toggle');
+        await waitFor(() => evaluate(`document.querySelector('.team-progress-body')?.hidden === true`), "long-label progress collapse");
+        await clickProgressControl('.team-progress-toggle');
+        await waitFor(() => evaluate(`document.querySelector('.team-progress-body')?.hidden === false`), "long-label progress reopen");
+      }
+      await clickProgressControl('.team-progress-panorama');
+      await waitFor(() => evaluate(`!!document.querySelector('[data-panorama-canvas]')`), "long-label panorama link remains clickable");
+    }
+  } finally {
+    await evaluate(`document.documentElement.style.removeProperty('--font-scale'); document.documentElement.setAttribute('data-theme', 'dark'); true`);
+    await sendCdp("Emulation.clearDeviceMetricsOverride");
+  }
+  console.log("PASS French long progress labels: Overview/aggregate, 320px, 150%, dark/light, full disclosure, native collapse/reopen and panorama link");
+}
+
 try {
   await host.start();
   await host.call("workspace.set", { path: projectPath });
@@ -1601,6 +1674,7 @@ try {
   else console.log("NOT RUN Team layout matrix: core-only gate covers execution/lifecycle; panel drag/layout is unchanged by this candidate.");
   assert.equal(titleRequests.length, 3, "renderer reload must not duplicate title requests");
   console.log("PASS Chinese Team presentation: compact progress and identities survive renderer reload without another title request");
+  if (process.env.PI_E2E_TEAM_CORE_ONLY !== "1") await verifyLongTeamProgress(sendCdp, evaluate, invoke, lead.id);
   }
 } catch (error) {
   if (socket?.readyState === 1 && lastSendCdp) {
