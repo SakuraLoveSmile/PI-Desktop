@@ -12,12 +12,14 @@ const [fixtureDir, hostBinary] = process.argv.slice(2);
 app.setPath("userData", join(fixtureDir, "profile"));
 // Observe the real OS boundary; never replace its success/failure or readback.
 const badgeWrites = [];
-const setNativeBadgeCount = app.setBadgeCount.bind(app);
-app.setBadgeCount = (count) => {
-  const accepted = setNativeBadgeCount(count);
-  badgeWrites.push({ requestedCount: count, accepted });
-  return accepted;
-};
+if (process.platform !== "win32") {
+  const setNativeBadgeCount = app.setBadgeCount.bind(app);
+  app.setBadgeCount = (count) => {
+    const accepted = setNativeBadgeCount(count);
+    badgeWrites.push({ method: "count", requestedCount: count, accepted });
+    return accepted;
+  };
+}
 let host, win, badge, watchdog, seeded;
 const handlers = new Map();
 const routes = new Map([
@@ -29,7 +31,9 @@ const routes = new Map([
 async function stop(code) {
   clearTimeout(watchdog);
   await host?.stop();
-  app.setBadgeCount(0);
+  if (process.platform === "win32") {
+    if (win && !win.isDestroyed()) win.setOverlayIcon(null, "");
+  } else app.setBadgeCount(0);
   app.exit(code);
 }
 app.whenReady().then(async () => {
@@ -40,6 +44,14 @@ app.whenReady().then(async () => {
       webPreferences: { preload: join(fixtureDir, "preload.cjs"), sandbox: true,
         offscreen: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } });
     win.webContents.on("console-message", (event) => console.error(event.message));
+    if (process.platform === "win32") {
+      const setNativeOverlayIcon = win.setOverlayIcon.bind(win);
+      win.setOverlayIcon = (image, label) => {
+        setNativeOverlayIcon(image, label);
+        badgeWrites.push({ method: "overlay", label, cleared: image === null,
+          nonEmptyImage: image !== null && !image.isEmpty() });
+      };
+    }
     badge = createTaskbarUnreadBadge({ getHost: () => host, getMainWindow: () => win,
       isQuitting: () => false, logger: { app: (...args) => console.error(...args) } });
     registerNotificationIpc({ registrar: { handle: (channel, handler) => handlers.set(channel, handler) },
@@ -82,8 +94,9 @@ app.whenReady().then(async () => {
         // Still verify every host-to-shell request, and read back accepted writes.
         await badge.refresh();
         const write = badgeWrites.at(-1);
-        if (!write) throw new Error("Production shell badge made no native count request");
-        return { ...write, platform: process.platform, nativeCount: app.getBadgeCount() };
+        if (!write) throw new Error("Production shell badge made no native request");
+        return { ...write, platform: process.platform,
+          nativeCount: write.method === "count" ? app.getBadgeCount() : null };
       }
       if (name === "list") return host.call("notification.list", { limit: 200 });
       if (name === "screenshot") {

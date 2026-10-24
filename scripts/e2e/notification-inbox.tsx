@@ -31,7 +31,9 @@ const rows = () => Array.from(document.querySelectorAll<HTMLButtonElement>(".not
 const row = (id: string) => rows().find((button) => button.dataset.notificationId === id);
 const dialog = () => document.querySelector("#notification-popover");
 const state = () => useAppStore.getState();
-type ShellBadgeResult = { requestedCount: number; accepted: boolean; platform: string; nativeCount: number };
+type ShellBadgeResult =
+  | { method: "count"; requestedCount: number; accepted: boolean; platform: string; nativeCount: number }
+  | { method: "overlay"; label: string; cleared: boolean; nonEmptyImage: boolean; platform: "win32"; nativeCount: null };
 const shellBadgeChecks: ShellBadgeResult[] = [];
 async function open() {
   flushSync(() => trigger().click());
@@ -44,10 +46,20 @@ function filter(value: "all" | "unread") {
 async function expectBadge(count: number) {
   await until(() => state().unreadNotificationCount === count, "Store unread count is " + count);
   const shellBadge = await action("dock") as ShellBadgeResult;
-  assert(typeof shellBadge.accepted === "boolean", "Native shell reports whether the badge API is supported");
-  assert(shellBadge.requestedCount === count, "Production shell badge requests unread count " + count);
-  if (shellBadge.accepted) {
-    assert(shellBadge.nativeCount === count, "Accepted native shell unread count equals " + count);
+  if (shellBadge.method === "overlay") {
+    assert(shellBadge.platform === "win32", "Production overlay request uses the Windows shell");
+    assert(count > 0
+      ? !shellBadge.cleared && shellBadge.nonEmptyImage && shellBadge.label === String(count)
+      : shellBadge.cleared && !shellBadge.nonEmptyImage && shellBadge.label === "",
+    "Production Windows overlay image and accessible count label match unread count " + count);
+    assert(shellBadge.nativeCount === null, "Windows exposes no native overlay count readback");
+  } else {
+    assert(shellBadge.method === "count", "Production shell uses the native badge count request");
+    assert(typeof shellBadge.accepted === "boolean", "Native shell reports whether the badge API is supported");
+    assert(shellBadge.requestedCount === count, "Production shell badge requests unread count " + count);
+    if (shellBadge.accepted) {
+      assert(shellBadge.nativeCount === count, "Accepted native shell unread count equals " + count);
+    }
   }
   shellBadgeChecks.push(shellBadge);
   const badge = document.querySelector(".notification-badge");
@@ -118,9 +130,10 @@ window.notificationInboxProbe = async ({ reloadOnly = false } = {}) => {
   flushSync(() => root.unmount());
   return { ok: true, checks, host: "real-stdio-sqlite", renderer: "production-notification-center-api-zustand",
     main: "production-notification-ipc-taskbar-badge", nativeBadge: {
-      readback: shellBadgeChecks.every((check) => check.accepted) ? "verified" : "native-api-unavailable",
+      readback: shellBadgeChecks.some((check) => check.method === "overlay") ? "unavailable-no-overlay-readback"
+        : shellBadgeChecks.every((check) => check.method === "count" && check.accepted) ? "verified" : "native-api-unavailable",
       checks: shellBadgeChecks,
     },
-    nativeBadgeContract: "real setBadgeCount requests; getBadgeCount readback for accepted writes",
+    nativeBadgeContract: "real setOverlayIcon image/label/clear on Windows; real setBadgeCount and accepted-write readback on macOS/Linux",
     providerCalls: 0, nativeNotificationsShown: 0 };
 };
