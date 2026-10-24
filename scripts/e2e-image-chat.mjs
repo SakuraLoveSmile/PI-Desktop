@@ -237,8 +237,6 @@ try {
   assert.ok(await evaluate(`!document.body.innerText.includes('infiniteProviderRetry is invalid')`));
   await click("返回应用");
   await evaluate(`document.querySelector('.composer-model-thinking-chip').click()`);
-  await waitFor(() => evaluate(`!!document.querySelector('.composer-menu-entry')`),5000,"composer model root");
-  await evaluate(`document.querySelector('.composer-menu-entry').click()`);
   await waitFor(() => evaluate(`document.querySelectorAll('.composer-model-option').length>0`),5000,"composer model options");
   assert.equal(await evaluate(`document.querySelectorAll('.composer-model-option').length`),1,"image-only provider must not be a chat candidate");
   assert.ok(await evaluate(`![...document.querySelectorAll('.composer-model-group-label')].some(e=>e.textContent.includes('Image-only fixture'))`));

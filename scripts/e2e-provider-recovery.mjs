@@ -28,7 +28,14 @@ const server = createServer(async (req, res) => {
   const body = JSON.parse(raw);
   const nth = ++scenario.count;
   const toolResults = body.messages?.filter((m) => m.role === "tool").length ?? 0;
-  scenario.requests.push({ nth, at: Date.now(), path: req.url, toolResults });
+  scenario.requests.push({
+    nth,
+    at: Date.now(),
+    path: req.url,
+    toolResults,
+    toolResultIds: body.messages?.filter((message) => message.role === "tool")
+      .map((message) => message.tool_call_id) ?? [],
+  });
   console.log("REQUEST", scenario.name, nth, "tools", toolResults);
   if (
     scenario.mode === "always" ||
@@ -160,8 +167,26 @@ const child = spawn(
     `--user-data-dir=${join(artifacts, "profile")}`,
     ".",
   ],
-  { cwd: appDir, env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true },
+  {
+    cwd: appDir,
+    env,
+    stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
+    detached: process.platform !== "win32",
+  },
 );
+const childClose = new Promise((resolve) => child.once("close", resolve));
+const waitForChildExit = async (timeoutMs) => {
+  let timer;
+  const exited = await Promise.race([
+    childClose.then(() => true),
+    new Promise((resolve) => {
+      timer = setTimeout(() => resolve(false), timeoutMs);
+    }),
+  ]);
+  clearTimeout(timer);
+  return exited;
+};
 child.stdout.on("data", (b) => (output += b));
 child.stderr.on("data", (b) => (output += b));
 let ws;
@@ -433,7 +458,15 @@ try {
         });
         killer.on("exit", r);
       });
-    else child.kill("SIGTERM");
+    else {
+      const killGroup = (signal) => {
+        try { process.kill(-child.pid, signal); }
+        catch (error) { if (error.code !== "ESRCH") throw error; }
+      };
+      killGroup("SIGTERM");
+      if (!(await waitForChildExit(3000))) killGroup("SIGKILL");
+    }
+    assert(await waitForChildExit(3000), "Electron process tree closes during E2E cleanup");
   }
   server.closeAllConnections();
   await new Promise((r) => server.close(r));

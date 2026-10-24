@@ -24,7 +24,10 @@ export function verifyProviderRecovery(cases) {
     );
     if (index !== 3) {
       assert.equal(errors.length, 0);
-      assert.equal(assistants.length, index === 4 ? 12 : 1);
+      // Tool-only responses have no visible content, so Main omits those
+      // empty assistant rows. Public lifecycle and tool history below still
+      // prove all twelve successful responses and eleven actual executions.
+      assert.equal(assistants.length, 1);
       assert(assistants.every((m) => m.status === "complete"));
       assert.equal(assistants.at(-1).content, "RECOVERED_699");
       assert(result.text.includes("RECOVERED_699"));
@@ -52,7 +55,20 @@ export function verifyProviderRecovery(cases) {
       );
     }
     if (index === 4) {
+      const toolIds = Array.from({ length: 11 }, (_, tool) => `call_${tool}`);
+      const completed = events.filter((event) => event.type === "message_end" && event.message.role === "assistant")
+        .map((event) => event.message);
+      assert.equal(completed.length, 12, "eleven tool-only responses and one final response completed");
+      assert.equal(new Set(completed.map((message) => message.id)).size, 12, "successful responses retain separate identities");
+      assert(completed.every((message) => message.status === "complete"));
+      assert(completed.slice(0, -1).every((message) => message.content === ""));
+      assert.equal(completed.at(-1).content, "RECOVERED_699");
+      assert.deepEqual(events.filter((event) => event.type === "tool_start").map((event) => event.toolCallId), toolIds,
+        "each Read starts exactly once despite provider retries");
+      assert.deepEqual(events.filter((event) => event.type === "tool_end").map((event) => event.toolCallId), toolIds,
+        "each Read settles exactly once despite provider retries");
       assert.equal(tools.length, 11, "eleven actual tools preserved");
+      assert.deepEqual(tools.map((message) => message.toolCallId), toolIds, "ordered durable tool history retained");
       assert(
         tools.every((m) => m.toolName === "Read" && m.toolStatus === "success"),
         "all real Reads succeeded",
@@ -62,6 +78,10 @@ export function verifyProviderRecovery(cases) {
         11,
         "successful tool context retained at final response",
       );
+      for (const request of result.requests) {
+        assert.deepEqual(request.toolResultIds, toolIds.slice(0, Math.floor((request.nth - 1) / 2)),
+          `request ${request.nth}: completed tool context survives every retry`);
+      }
       assert.deepEqual(
         retries.map((r) => r.attempt),
         Array(12).fill(1),

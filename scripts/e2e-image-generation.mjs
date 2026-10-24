@@ -102,8 +102,13 @@ try {
     mode: "plan",
     projectPath: project,
   });
-  const denied = await execute(plan.id, [{ prompt: "must not run" }]);
-  assert.equal(denied.ok, false);
+  // The persisted session mode owns authorization, even though this stale
+  // caller still claims Agent mode. Host denial crosses the reverse RPC as an error.
+  await assert.rejects(
+    execute(plan.id, [{ prompt: "must not run" }]),
+    (error) => error.errorCode === "TOOL_DISABLED_IN_PLAN",
+    "Host rejects image generation in Plan before executing the local tool",
+  );
   assert.equal(requests, 4);
   await host.restart();
   const restored = await host.call("settings.get");
