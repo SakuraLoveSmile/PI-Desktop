@@ -17,14 +17,23 @@ export async function executionAskDesktop({ root, scratch, dataDir, binary, bund
   await mkdir(resources, { recursive: true });
   await cp(bundle, join(resources, "agent-runtime"), { recursive: true });
   const entry = join(scratch, "desktop-fixture.cjs");
-  await writeFile(entry, `Object.defineProperty(process, 'resourcesPath', {value: ${JSON.stringify(resources)}});
+  const metadata = JSON.parse(await readFile(join(root, "apps/desktop/package.json"), "utf8"));
+  // A directory entry supplies Electron's real app version on every platform.
+  // A bare CJS file falls back to 0.0 on Linux, which storage correctly rejects.
+  await writeFile(join(scratch, "package.json"), JSON.stringify({
+    name: metadata.name, version: metadata.version, main: "desktop-fixture.cjs",
+  }));
+  await writeFile(entry, `const { app } = require('electron');
+if (app.getVersion() !== ${JSON.stringify(metadata.version)}) throw new Error('Fixture app version does not match the candidate');
+console.info('EXECUTION_ASK_DESKTOP_VERSION ' + app.getVersion());
+Object.defineProperty(process, 'resourcesPath', {value: ${JSON.stringify(resources)}});
 import(${JSON.stringify(pathToFileURL(join(root, "apps/desktop/out/main/index.js")).href)}).catch(error => {console.error(error); process.exit(1);});\n`);
   const probe = createServer();
   await new Promise(done => probe.listen(0, "127.0.0.1", done));
   const port = probe.address().port;
   await new Promise(done => probe.close(done));
   const { electronBinary, appDir } = resolveElectronBinary(root);
-  const child = spawn(electronBinary, [`--remote-debugging-port=${port}`, `--user-data-dir=${join(scratch, "profile")}`, entry], {
+  const child = spawn(electronBinary, [`--remote-debugging-port=${port}`, `--user-data-dir=${join(scratch, "profile")}`, scratch], {
     cwd: appDir, detached: process.platform !== "win32", stdio: ["ignore", "pipe", "pipe"],
     env: { ...env, PI_DESKTOP_DATA_DIR: dataDir, PI_DESKTOP_HOST_BIN: binary,
       PI_DESKTOP_MCP_CONTROL: "1", PI_DESKTOP_MCP_PORT: "0", PI_DESKTOP_START_MAXIMIZED: "0" },
