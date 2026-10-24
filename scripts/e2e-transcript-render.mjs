@@ -151,15 +151,18 @@ const path = require("node:path");
 app.setPath("userData", path.join(__dirname, "profile"));
 app.on("window-all-closed", () => app.quit());
 app.whenReady().then(async () => {
-  const window = new BrowserWindow({ width: 1200, height: 850, title: "PI-Desktop · Isolated design preview", show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } });
+  const window = new BrowserWindow({ width: 1200, height: 850, title: "PI-Desktop · Isolated design preview", show: false, webPreferences: { offscreen: process.env.PI_COMPOSER_PREVIEW !== "1", sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } });
   window.webContents.on("console-message", (event) => console.error(event.message));
   try {
     await window.loadFile(path.join(__dirname, "index.html"));
     await window.webContents.executeJavaScript("window.addEventListener('error', event => console.error(event.error?.stack ?? event.message)); window.addEventListener('unhandledrejection', event => console.error(event.reason?.stack ?? String(event.reason)));");
-    const result = await window.webContents.executeJavaScript("(async () => { const render = await globalThis.transcriptRenderProbe(); const slot = await globalThis.transcriptRuntimeSlotProbe(); const smoothText = await globalThis.smoothTextThrottleProbe(); const longHistory = await globalThis.transcriptLongHistoryProbe(); return { ...render, runtimeSlot: slot, smoothText, longHistory, ok: render.ok && slot.ok && smoothText.ok && longHistory.ok }; })()");
+    const result = await window.webContents.executeJavaScript("(async () => { console.info('TRANSCRIPT_STAGE render'); const render = await globalThis.transcriptRenderProbe(); console.info('TRANSCRIPT_STAGE runtime-slot'); const slot = await globalThis.transcriptRuntimeSlotProbe(); console.info('TRANSCRIPT_STAGE smooth-text'); const smoothText = await globalThis.smoothTextThrottleProbe(); console.info('TRANSCRIPT_STAGE long-history'); const longHistory = await globalThis.transcriptLongHistoryProbe(); console.info('TRANSCRIPT_STAGE render-complete'); return { ...render, runtimeSlot: slot, smoothText, longHistory, ok: render.ok && slot.ok && smoothText.ok && longHistory.ok }; })()");
+    console.error("TRANSCRIPT_STAGE context-overflow");
     const contextOverflowRecovery = await require(${JSON.stringify(join(root, "scripts/e2e/context-overflow-recovery.cjs"))})(window);
+    console.error("TRANSCRIPT_STAGE activity-rail");
     result.activityRail = await window.webContents.executeJavaScript("globalThis.sessionActivityRailProbe()");
     result.ok = result.ok && result.activityRail.ok;
+    console.error("TRANSCRIPT_STAGE readability");
     const readability = await window.webContents.executeJavaScript("globalThis.transcriptReadabilityProbe()");
     result.readability = readability;
     result.ok = result.ok && readability.ok;
@@ -167,6 +170,7 @@ app.whenReady().then(async () => {
       await require("node:fs/promises").writeFile(process.env.PI_TRANSCRIPT_SCREENSHOT, (await window.webContents.capturePage()).toPNG());
     }
     await window.webContents.executeJavaScript("globalThis.cleanupReadabilityProbe()");
+    console.error("TRANSCRIPT_STAGE activity-integration");
     result.activityIntegration = await window.webContents.executeJavaScript("globalThis.sessionActivityIntegrationProbe().catch(error => ({ ok: false, error: error?.stack ?? String(error) }))");
     if (!result.activityIntegration.ok) throw new Error(result.activityIntegration.error);
     result.ok = result.ok && result.activityIntegration.ok;

@@ -59,17 +59,18 @@ app.whenReady().then(async () => {
   const window = new BrowserWindow({
     show: false,
     webPreferences: {
+      offscreen: true,
       sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
-      // A hidden window still has to deliver ResizeObserver callbacks and
-      // animation frames, because that is what the product scroll logic uses.
+      // Offscreen rendering keeps real layout and frames active on Linux too.
       backgroundThrottling: false,
     },
   });
   window.webContents.on("console-message", (event) => console.error(event.message));
   try {
     await window.loadFile(path.join(__dirname, "index.html"));
+    console.error("TRANSCRIPT_DISCLOSURE_STAGE loaded");
     const result = await window.webContents.executeJavaScript("globalThis.transcriptDisclosureProbe()");
     console.log("TRANSCRIPT_DISCLOSURE_PROBE " + JSON.stringify(result));
     app.quit();
