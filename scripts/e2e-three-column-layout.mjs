@@ -378,6 +378,7 @@ async function main() {
     const cdp = await CdpClient.connect(target.webSocketDebuggerUrl);
     activeCdp = cdp;
     await cdp.send("Runtime.enable");
+    await cdp.send("Page.enable");
     await cdp.send("Emulation.setFocusEmulationEnabled", { enabled: true });
 
     const measure = () => cdp.evaluate(MEASURE);
@@ -623,12 +624,17 @@ async function main() {
       stack.style.transition = "none";
       stack.style.width = "450px";
       const modelLabelStyles = getComputedStyle(modelLabel);
+      const leftBox = left.getBoundingClientRect();
+      const rightBox = right.getBoundingClientRect();
       const result = {
         width: Math.round(bar.getBoundingClientRect().width),
         clipped: bar.scrollWidth > bar.clientWidth + 1,
-        sameRow:
-          Math.round(left.getBoundingClientRect().top) ===
-          Math.round(right.getBoundingClientRect().top),
+        sameRow: Math.abs((leftBox.top + leftBox.height / 2) -
+          (rightBox.top + rightBox.height / 2)) < 1,
+        groupGeometry: {
+          left: { top: leftBox.top, height: leftBox.height },
+          right: { top: rightBox.top, height: rightBox.height },
+        },
         modelLabelHidden: modelLabelStyles.display === "none",
         modelChipWidth: Math.round(modelChip.getBoundingClientRect().width),
       };
@@ -732,6 +738,7 @@ async function main() {
         const controls = document.querySelector(".window-controls");
         const sidebar = document.querySelector(".sidebar");
         const platform = document.documentElement.dataset.platform;
+        const usesNativeControls = platform === "win32" || platform === "linux";
         const inset = parseFloat(getComputedStyle(row).paddingLeft);
         const actionRight = Math.max(...actions.map(el => el.getBoundingClientRect().right));
         return {
@@ -741,8 +748,8 @@ async function main() {
           leftClear: actions.length > 0 && headerBox.left >= actionRight + 8,
           insetClear: actions[0].getBoundingClientRect().left >= (sidebar?.getBoundingClientRect().right ?? 0) + inset,
           rightClear: headerBox.right <= window.innerWidth -
-            (platform === "win32" || platform === "linux" ? 120 : 0) &&
-            (!controls || headerBox.right <= controls.getBoundingClientRect().left),
+            (usesNativeControls ? 120 : 0) &&
+            (!usesNativeControls || !controls || headerBox.right <= controls.getBoundingClientRect().left),
           tabClear: !firstTab || firstTab.getBoundingClientRect().left >= actionRight + 8,
           rowRegion: getComputedStyle(row).webkitAppRegion,
           spacerRegion: getComputedStyle(spacer).webkitAppRegion,
@@ -1752,11 +1759,18 @@ async function main() {
     });
 
     const crashSentinel = `renderer-crash-${Date.now()}`;
+    const beforeCrashFrame = (await cdp.send("Page.getFrameTree")).frameTree.frame;
     await cdp.evaluate(
       `window.__PI_E2E_RENDERER_CRASH_SENTINEL = ${JSON.stringify(crashSentinel)}`,
     );
+    // Observe navigation without evaluating the replacement renderer's initial
+    // empty document. Electron's sandbox preload belongs to the committed app
+    // document; evaluating before that commit can create a different context.
+    await cdp.send("Runtime.disable");
     void cdp.send("Page.crash").catch(() => undefined);
     let recoveryCdp = cdp;
+    let recoveryFrame = null;
+    let recoveryRuntimeEnabled = false;
     const recoveryState = await waitFor(async () => {
       if (recoveryCdp.closed) {
         const page = (await listTargets(cdpPort).catch(() => [])).find(
@@ -1769,11 +1783,21 @@ async function main() {
         if (!connected) return false;
         recoveryCdp = connected;
         activeCdp = recoveryCdp;
-        await recoveryCdp.send("Runtime.enable").catch(() => undefined);
+        await recoveryCdp.send("Page.enable");
+        recoveryRuntimeEnabled = false;
+      }
+      recoveryFrame = (await recoveryCdp.send("Page.getFrameTree").catch(() => null))?.frameTree?.frame;
+      if (!recoveryFrame || recoveryFrame.loaderId === beforeCrashFrame.loaderId ||
+        !recoveryFrame.url.includes("out/renderer/index.html")) return false;
+      if (!recoveryRuntimeEnabled) {
+        await recoveryCdp.send("Runtime.enable");
+        recoveryRuntimeEnabled = true;
       }
       const state = await recoveryCdp
         .evaluate(`({
           sentinel: window.__PI_E2E_RENDERER_CRASH_SENTINEL,
+          href: location.href,
+          readyState: document.readyState,
           chatSurface: Boolean(document.querySelector('.chat-surface')),
           splash: Boolean(document.querySelector('.startup-splash')),
         })`)
@@ -1788,7 +1812,7 @@ async function main() {
     check(
       recoveryState.chatSurface && recoveredTarget?.id === target.id,
       "the existing app window restores the chat after a renderer crash",
-      JSON.stringify({ recoveryState, targetId: recoveredTarget?.id }),
+      JSON.stringify({ recoveryState, targetId: recoveredTarget?.id, frame: recoveryFrame }),
     );
     const diagnostics = await readFile(
       join(dataDir, "logs", "app", "diagnostics.log"),
@@ -1835,9 +1859,14 @@ async function main() {
     console.error(`FAIL three-column layout — ${error.message}`);
     try {
       if (activeCdp) {
+        console.error("--- renderer frame tree ---", JSON.stringify(
+          await activeCdp.send("Page.getFrameTree").catch(() => null),
+        ));
         console.error("--- renderer console tail ---");
         for (const line of activeCdp.console.slice(-12)) console.error(line);
         const dump = await activeCdp.evaluate(`({
+          href: location.href,
+          readyState: document.readyState,
           body: (document.body?.innerText || "").slice(0, 300),
           shell: !!document.querySelector(".app-shell"),
           splash: !!document.querySelector(".startup-splash"),
