@@ -18,6 +18,7 @@ pub(crate) fn execution_from_proposal(proposal: &PlanProposal) -> Result<Option<
             .clone()
             .unwrap_or_else(|| proposal.kind.clone()),
         execution_kind: proposal.execution_kind.clone(),
+        required_verification_commands: proposal.required_verification_commands.clone(),
         plan: proposal.plan.clone(),
         title: proposal.title.clone(),
         question: proposal.question.clone(),

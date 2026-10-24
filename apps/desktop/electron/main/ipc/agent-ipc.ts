@@ -1007,6 +1007,7 @@ export function registerAgentIpc({
       ...(version !== undefined ? { version } : {}),
       ...(targetPermissionMode ? { targetPermissionMode } : {}),
       ...("executionKind" in resolution && resolution.executionKind ? { executionKind: resolution.executionKind } : {}),
+      ...("requiredVerificationCommands" in resolution ? { requiredVerificationCommands: resolution.requiredVerificationCommands } : {}),
       ...("executionProviderId" in resolution ? { executionProviderId: resolution.executionProviderId } : {}),
       ...("executionModelId" in resolution ? { executionModelId: resolution.executionModelId } : {}),
       ...("scheduledFor" in resolution ? { scheduledFor: resolution.scheduledFor } : {}),

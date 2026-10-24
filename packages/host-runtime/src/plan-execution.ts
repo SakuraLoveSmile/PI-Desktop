@@ -46,12 +46,20 @@ export function planExecutionFromUnknown(value: unknown): PlanExecution | null {
       return null;
     }
   }
+  if (value.requiredVerificationCommands !== undefined && (
+    !Array.isArray(value.requiredVerificationCommands) ||
+    value.requiredVerificationCommands.length === 0 ||
+    !value.requiredVerificationCommands.every(command => typeof command === "string")
+  )) return null;
   return {
     id: value.id,
     proposalId: value.proposalId,
     sessionId: value.sessionId,
     // Legacy queued rows predate the discriminator and are Plan by definition.
     kind: normalizeProposalKind(value.kind),
+    ...(value.requiredVerificationCommands !== undefined
+      ? { requiredVerificationCommands: [...value.requiredVerificationCommands as string[]] }
+      : {}),
     plan: value.plan,
     title: value.title,
     question: value.question,

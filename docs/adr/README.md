@@ -20,6 +20,7 @@ Each ADR includes:
 
 | ID | Title | Status |
 |---|---|---|
+| goal-required-verification-commands | [Approval-bound Goal verification commands](goal-required-verification-commands.md) | Accepted for implementation |
 | goal-blocked-state | [Goal blocked state and same-execution continuation](goal-blocked-state.md) | Accepted for implementation |
 | team-lead-pending-questions-and-replacements | [Durable Lead questions and bounded replacement](team-lead-pending-questions-and-replacements.md) | Accepted for implementation |
 | team-run-limits | [Host-owned Team wall-clock limits](team-run-limits.md) | Accepted for implementation |

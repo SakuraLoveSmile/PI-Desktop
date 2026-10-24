@@ -3824,6 +3824,10 @@ export class DesktopAgentRuntime {
           text = JSON.stringify(rawContent, null, 2);
         }
         if (!result.ok) this.failedHostToolCalls.add(toolCallId);
+        if (isBash && this.goalReportDraftManager) {
+          text += `\n\nGoal report evidence reference: ${JSON.stringify({ kind: "tool_result", refId: toolCallId })}. ` +
+            "Use this actual tool call ID in evidences[].refId, and reference that evidence's id in checks[].evidenceRefs. commandShellId is the shell selector, not an evidence ID.";
+        }
         return {
           content: [{ type: "text", text }, ...imageBlocks],
           details,
@@ -9228,6 +9232,7 @@ export class DesktopAgentRuntime {
           // error propagates into the SubmitGoalReport tool result so the
           // executing Agent can retry.
           await this.host.call("goalReports.submitDraft", {
+            sessionId: execution.sessionId,
             executionId: execution.id,
             draft,
           });

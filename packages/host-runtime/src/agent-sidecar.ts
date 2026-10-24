@@ -41,6 +41,11 @@ export type VendorAuthResolver = (input: {
   providerId: string;
 }) => Promise<unknown>;
 
+export type GoalReportPersistenceBarrier = (input: {
+  sessionId: string;
+  executionId: string;
+}) => Promise<void>;
+
 // The sidecar runs model-directed code paths; it must not be able to pull
 // secrets or mutate configuration through the parent proxy. Tight allowlist
 // of host methods the agent loop legitimately needs.
@@ -185,6 +190,8 @@ export class AgentSidecar {
   private exitNotified = false;
   private stderrTail: string[] = [];
   private host: SidecarHostLink | null = null;
+  private hostGeneration = 0;
+  private goalReportPersistenceBarrier?: GoalReportPersistenceBarrier;
   private ordinaryTeamInboxHandler?: (method: string, params: Record<string, unknown>) => Promise<unknown>;
   private unsubscribeHost: (() => void) | null = null;
   private unsubscribeHostExit: (() => void) | null = null;
@@ -414,6 +421,7 @@ export class AgentSidecar {
 
   setHost(host: SidecarHostLink) {
     if (this.closed) return;
+    this.hostGeneration += 1;
     if (this.host && this.host !== host) {
       for (const controller of this.localToolControllers.values()) controller.abort();
     }
@@ -435,6 +443,7 @@ export class AgentSidecar {
       this.writeToChild(payload);
     });
     this.unsubscribeHostExit = host.onExit(() => {
+      this.hostGeneration += 1;
       for (const controller of this.localToolControllers.values()) controller.abort();
       this.unsubscribeHost?.();
       this.unsubscribeHost = null;
@@ -446,6 +455,11 @@ export class AgentSidecar {
   /** Internal Main admission path; mailbox bodies must never bypass its gate. */
   setOrdinaryTeamInboxHandler(handler: (method: string, params: Record<string, unknown>) => Promise<unknown>): void {
     this.ordinaryTeamInboxHandler = handler;
+  }
+
+  /** The embedding host owns transcript persistence, before draft validation. */
+  setGoalReportPersistenceBarrier(handler: GoalReportPersistenceBarrier): void {
+    this.goalReportPersistenceBarrier = handler;
   }
 
   /**
@@ -683,8 +697,25 @@ export class AgentSidecar {
           );
           return;
         }
-        if (!this.host) throw new Error("host unavailable");
-        const result = await this.host.call(method, params);
+        const host = this.host;
+        if (!host) throw new Error("host unavailable");
+        const barrier = this.goalReportPersistenceBarrier;
+        if (method === "goalReports.submitDraft" && barrier) {
+          const rejectDraft = (message: string) => Object.assign(new Error(message), {
+            code: 1002, errorCode: "INVALID_ARGUMENT",
+          });
+          if (typeof params.sessionId !== "string" || !params.sessionId.trim() ||
+              typeof params.executionId !== "string" || !params.executionId.trim()) {
+            throw rejectDraft("Goal report persistence requires sessionId and executionId. Retry SubmitGoalReport in the current execution.");
+          }
+          const generation = this.hostGeneration;
+          await barrier({ sessionId: params.sessionId, executionId: params.executionId });
+          if (this.disposed || this.closed || this.host !== host || this.hostGeneration !== generation ||
+              this.goalReportPersistenceBarrier !== barrier) {
+            throw rejectDraft("Goal report persistence ownership changed. Retry SubmitGoalReport in the current execution.");
+          }
+        }
+        const result = await host.call(method, params);
         this.writeToChild(
           JSON.stringify({ jsonrpc: "2.0", id: msg.id, result }) + "\n",
         );

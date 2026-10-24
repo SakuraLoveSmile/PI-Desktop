@@ -492,6 +492,7 @@ type PlanResolveRequest =
       targetPermissionMode: GlobalPermissionMode;
       executionProviderId?: string;
       executionModelId?: string;
+      requiredVerificationCommands?: string[];
     })
   | (PlanResolveIdentity & {
       action: "schedule";
@@ -528,6 +529,18 @@ type PlanResolutionResult = {
 ```
 
 Preload methods:
+
+`requiredVerificationCommands` is an optional external approval requirement for
+Goal executions only. Main forwards it unchanged to Host; it is not derived
+from model-authored Markdown. Only `approve` accepts it. Host binds the exact
+ordered list to the approved proposal and execution in the approval transaction,
+and returns it on proposal/execution descriptors. An idempotent approval must
+repeat the same list; omitting or changing an existing binding is rejected.
+Absent bindings keep legacy Goal behavior. Lists contain 1–200 unique, nonblank
+commands, at most 4096 UTF-8 bytes each and 65536 bytes total, without NUL/CR/LF.
+See the Host RPC report validation contract for required checks.
+Remote backends without this binding capability reject a supplied field before
+the legacy approval transport; they never drop it and approve without a binding.
 
 - `pi-desktop/plans/pending({ sessionId? }) -> PlansPendingResult`
 - `pi-desktop/plans/resolve(PlanResolveRequest) -> PlanResolutionResult`

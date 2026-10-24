@@ -478,6 +478,13 @@ impl PlanManager {
         // The stored kind is authoritative: it decides both the artifact
         // directory to verify and the mode the approval must leave behind.
         let kind = normalize_kind(&current.kind).unwrap_or(KIND_PLAN);
+        if options.required_verification_commands.is_some()
+            && (action != "approve" || kind != KIND_GOAL)
+        {
+            return Err(anyhow!("INVALID_ARGUMENT: requiredVerificationCommands is only supported when approving a Goal proposal"));
+        }
+        let required_commands =
+            required_verification::parse_commands(options.required_verification_commands)?;
         if current.session_id != session_id
             || current.turn_id != turn_id
             || current.tool_call_id != tool_call_id
@@ -563,7 +570,8 @@ impl PlanManager {
                 && same_binding
                 && same_schedule
                 && same_revision
-                && same_execution_kind;
+                && same_execution_kind
+                && current.required_verification_commands == required_commands;
             if same_resolution {
                 return resolution_from_proposal(current);
             }
@@ -711,7 +719,7 @@ impl PlanManager {
                   execution_id = ?5, execution_state = ?6,
                   execution_provider_id = ?13, execution_model_id = ?14,
                   revision_intent_json = ?15, revision_state = ?16,
-                  execution_kind = ?17
+                  execution_kind = ?17, required_verification_commands_json = ?18
               WHERE request_id = ?7 AND session_id = ?8 AND turn_id = ?9
                 AND tool_call_id = ?10 AND status = 'pending' AND version = ?11
                  AND expires_at > ?12",
@@ -734,6 +742,10 @@ impl PlanManager {
                 revision_intent_json,
                 revision_intent_json.as_ref().map(|_| "ready"),
                 effective_execution_kind,
+                required_commands
+                    .as_ref()
+                    .map(serde_json::to_string)
+                    .transpose()?,
             ])?;
         if changed != 1 {
             return Err(plan_error("PLAN_APPROVAL_STALE"));

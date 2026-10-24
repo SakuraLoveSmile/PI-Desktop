@@ -137,13 +137,14 @@ struct ProposalFacts {
     created_at: i64,
     execution_state: Option<String>,
     error_code: Option<String>,
+    required_verification_commands: Option<Vec<String>>,
 }
 
 fn load_proposal_facts(conn: &Connection, execution_id: &str) -> Result<ProposalFacts> {
     conn.prepare_cached(
         "SELECT request_id, session_id, kind, title, plan_json,
                 artifact_relative_path, artifact_sha256, created_at,
-                execution_state, error_code, execution_kind
+                execution_state, error_code, execution_kind, required_verification_commands_json
          FROM plan_approvals WHERE execution_id = ?1",
     )?
     .query_row(params![execution_id], |row| {
@@ -161,6 +162,17 @@ fn load_proposal_facts(conn: &Connection, execution_id: &str) -> Result<Proposal
             created_at: row.get(7)?,
             execution_state: row.get(8)?,
             error_code: row.get(9)?,
+            required_verification_commands: row
+                .get::<_, Option<String>>(11)?
+                .map(|raw| serde_json::from_str(&raw))
+                .transpose()
+                .map_err(|error| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        11,
+                        rusqlite::types::Type::Text,
+                        Box::new(error),
+                    )
+                })?,
         })
     })
     .with_context(|| format!("PLAN_EXECUTION_NOT_FOUND: execution {execution_id} not found"))
@@ -206,6 +218,42 @@ pub fn bind_execution_turn(db: &Database, execution_id: &str, turn_id: &str) -> 
     Ok(())
 }
 
+/// Bound successful reports require native proof before the Agent loses the
+/// opportunity to correct a draft in the same execution.
+fn validate_native_checks(
+    db: &Database,
+    execution_id: &str,
+    facts: &ProposalFacts,
+    draft: &Value,
+    durable_seq: i64,
+) -> Result<()> {
+    let Some(commands) = facts.required_verification_commands.as_deref() else {
+        return Ok(());
+    };
+    if draft.get("verdict").and_then(Value::as_str) != Some("met") {
+        return Ok(());
+    }
+    let observations = evidence::execution_check_observations(
+        db,
+        &facts.session_id,
+        execution_id,
+        durable_seq,
+        draft,
+    )?;
+    for command in commands {
+        if !observations.iter().any(|row| {
+            row.command.as_deref() == Some(command)
+                && row.result == "passed"
+                && row.exit_code == Some(0)
+        }) {
+            return Err(anyhow!(
+                "INVALID_ARGUMENT: required command lacks durable native success evidence: {command:?}. Use checks.evidenceRefs pointing to kind=tool_result evidence with refId equal to the actual Bash toolCallId (not commandShellId or tool name). The recorded command must match exactly and have integer exitCode 0 in this execution. Correct the references after its tool result is persisted, or report a non-met blocked/not_run result."
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Validates and persists a structured report draft from the SubmitGoalReport tool.
 /// Invalidates a previously submitted structured draft (e.g. subsequent tool calls or steering).
 pub fn invalidate_draft(db: &Database, execution_id: &str) -> Result<()> {
@@ -231,14 +279,51 @@ pub fn invalidate_draft(db: &Database, execution_id: &str) -> Result<()> {
 
 pub fn submit_draft(db: &Database, execution_id: &str, draft: &Value) -> Result<()> {
     let raw = serde_json::to_string(draft)?;
-    if raw.len() > MAX_REPORT_JSON_BYTES {
-        return Err(anyhow!(
+    let validation = if raw.len() > MAX_REPORT_JSON_BYTES {
+        Err(anyhow!(
             "REPORT_SIZE_EXCEEDED: draft size {} bytes exceeds limit {}",
             raw.len(),
             MAX_REPORT_JSON_BYTES
-        ));
+        ))
+    } else {
+        validate_structured_draft(draft)
+    };
+    let facts = match load_proposal_facts(db.conn(), execution_id) {
+        Ok(facts) => facts,
+        Err(error) => {
+            validation?;
+            return Err(error);
+        }
+    };
+    if facts.kind != "goal" {
+        validation?;
+        return Err(anyhow!("INVALID_ARGUMENT: execution is not a goal"));
     }
-    validate_structured_draft(draft)?;
+
+    if facts.execution_state.as_deref() != Some("running") {
+        validation?;
+        return Err(anyhow!("INVALID_ARGUMENT: goal execution is not running"));
+    }
+    let status: Option<String> = db
+        .conn()
+        .prepare_cached("SELECT status FROM goal_reports WHERE execution_id = ?1")?
+        .query_row(params![execution_id], |row| row.get(0))
+        .optional()?;
+    if let Some(status) = status.as_deref() {
+        if matches!(status, "ready" | "failed") {
+            validation?;
+            return Err(anyhow!(
+                "INVALID_ARGUMENT: cannot submit a draft for a {status} report"
+            ));
+        }
+    }
+    if facts.required_verification_commands.is_some() {
+        // A rejected replacement must not leave an older met claim eligible
+        // for automatic completion. Terminal reports remain immutable above.
+        invalidate_draft(db, execution_id)?;
+    }
+
+    validation?;
     let object = draft
         .as_object()
         .ok_or_else(|| anyhow!("INVALID_ARGUMENT: draft must be an object"))?;
@@ -253,29 +338,13 @@ pub fn submit_draft(db: &Database, execution_id: &str, draft: &Value) -> Result<
         .ok_or_else(|| anyhow!("INVALID_ARGUMENT: draft.verdict must be a non-empty string"))?
         .trim();
 
-    let facts = load_proposal_facts(db.conn(), execution_id)?;
-    if facts.kind != "goal" {
-        return Err(anyhow!("INVALID_ARGUMENT: execution is not a goal"));
-    }
-
-    if facts.execution_state.as_deref() != Some("running") {
-        return Err(anyhow!("INVALID_ARGUMENT: goal execution is not running"));
-    }
+    crate::plans::required_verification::validate_checks(
+        facts.required_verification_commands.as_deref(),
+        draft,
+    )?;
     let progress = progress::load_matching_progress(db, execution_id, &facts)?;
     progress::validate_met_progress(draft, progress.as_ref())?;
-
-    let status: Option<String> = db
-        .conn()
-        .prepare_cached("SELECT status FROM goal_reports WHERE execution_id = ?1")?
-        .query_row(params![execution_id], |row| row.get(0))
-        .optional()?;
-    if let Some(status) = status.as_deref() {
-        if matches!(status, "ready" | "failed") {
-            return Err(anyhow!(
-                "INVALID_ARGUMENT: cannot submit a draft for a {status} report"
-            ));
-        }
-    }
+    validate_native_checks(db, execution_id, &facts, draft, i64::MAX)?;
 
     let dir = reports_dir(db.data_dir(), &facts.session_id);
     fs::create_dir_all(&dir).map_err(|err| {
@@ -535,6 +604,9 @@ pub(crate) fn finalize_with_closure(
             .and_then(|s| serde_json::from_str::<Value>(&s).ok())
             .filter(|draft| validate_structured_draft(draft).is_ok())
             .filter(|draft| progress::validate_met_progress(draft, progress.as_ref()).is_ok())
+            .filter(|draft| {
+                validate_native_checks(db, execution_id, &facts, draft, durable_seq).is_ok()
+            })
     } else {
         None
     };
@@ -578,13 +650,23 @@ pub(crate) fn finalize_with_closure(
                 durable_seq,
                 &draft,
             );
-            let check_observations = evidence::generate_check_observations(
-                db.data_dir(),
-                db.conn(),
-                &facts.session_id,
-                durable_seq,
-                &draft,
-            );
+            let check_observations = if facts.required_verification_commands.is_some() {
+                evidence::execution_check_observations(
+                    db,
+                    &facts.session_id,
+                    execution_id,
+                    durable_seq,
+                    &draft,
+                )?
+            } else {
+                evidence::generate_check_observations(
+                    db.data_dir(),
+                    db.conn(),
+                    &facts.session_id,
+                    durable_seq,
+                    &draft,
+                )
+            };
 
             let mut limitations: Vec<Value> = draft
                 .get("limitations")

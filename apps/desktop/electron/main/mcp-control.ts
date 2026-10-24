@@ -16,6 +16,11 @@ export type McpJsonSchema = {
   items?: McpJsonSchema;
   enum?: string[];
   minimum?: number;
+  minItems?: number;
+  maxItems?: number;
+  uniqueItems?: boolean;
+  minLength?: number;
+  maxLength?: number;
   pattern?: string;
 };
 
@@ -510,6 +515,11 @@ const CORE_TOOL_SPECS = [
       action: { type: "string", enum: ["approve", "reject"] },
       version: { type: "integer" },
       targetPermissionMode: { type: "string", enum: ["ask", "accept-edits", "auto"] },
+      requiredVerificationCommands: {
+        type: "array", minItems: 1, maxItems: 200, uniqueItems: true,
+        items: { type: "string", minLength: 1, maxLength: 4096 },
+        description: "Goal approval only. Immutable verification commands, <=4096 UTF-8 bytes each and <=65536 total; single-line, no NUL, no duplicates. Every required command must appear exactly once in SubmitGoalReport.checks with its actual result. Repeat unchanged on approval retry.",
+      },
       confirm: booleanSchema("Required acknowledgement for approval or rejection."),
     }, ["proposalId", "sessionId", "turnId", "toolCallId", "action", "confirm"]),
     "plans/resolve",

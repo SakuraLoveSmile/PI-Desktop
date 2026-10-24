@@ -1,7 +1,10 @@
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{collections::HashMap, path::Path};
+use std::{
+    collections::{HashMap, HashSet},
+    path::Path,
+};
 
 use crate::transcripts;
 
@@ -139,6 +142,52 @@ pub fn generate_check_observations(
     durable_seq: i64,
     draft: &Value,
 ) -> Vec<GoalReportCheckObservation> {
+    generate_observations(data_dir, conn, session_id, durable_seq, draft, None)
+}
+
+/// Native proof for approval-bound checks is confined to this execution's
+/// current turn and retained resumed segments, never merely the same session.
+pub(super) fn execution_check_observations(
+    db: &crate::db::Database,
+    session_id: &str,
+    execution_id: &str,
+    durable_seq: i64,
+    draft: &Value,
+) -> anyhow::Result<Vec<GoalReportCheckObservation>> {
+    let mut turns = HashSet::new();
+    let current: Option<String> = db
+        .conn()
+        .query_row(
+            "SELECT turn_id FROM goal_reports WHERE execution_id=?1 AND session_id=?2",
+            params![execution_id, session_id],
+            |row| row.get(0),
+        )
+        .optional()?
+        .flatten();
+    if let Some(turn) = current {
+        turns.insert(turn);
+    }
+    if let Some(hold) = crate::goal_holds::get_hold(db, session_id, execution_id)? {
+        turns.extend(hold.segments.into_iter().map(|segment| segment.turn_id));
+    }
+    Ok(generate_observations(
+        db.data_dir(),
+        db.conn(),
+        session_id,
+        durable_seq,
+        draft,
+        Some(&turns),
+    ))
+}
+
+fn generate_observations(
+    data_dir: &Path,
+    conn: &Connection,
+    session_id: &str,
+    durable_seq: i64,
+    draft: &Value,
+    owning_turns: Option<&HashSet<String>>,
+) -> Vec<GoalReportCheckObservation> {
     let mut observations = Vec::new();
     let Some(checks) = draft.get("checks").and_then(Value::as_array) else {
         return observations;
@@ -171,6 +220,7 @@ pub fn generate_check_observations(
             draft,
             command.as_deref(),
             &evidence_refs,
+            owning_turns,
         );
 
         observations.push(GoalReportCheckObservation {
@@ -194,6 +244,7 @@ fn durable_check_result(
     draft: &Value,
     command: Option<&str>,
     evidence_refs: &[String],
+    owning_turns: Option<&HashSet<String>>,
 ) -> (String, Option<i64>, Option<String>) {
     let Some(command) = command.filter(|command| !command.trim().is_empty()) else {
         return (
@@ -205,14 +256,14 @@ fn durable_check_result(
             ),
         );
     };
-    let seq_by_message_id: HashMap<String, i64> = conn
+    let indexed_messages: HashMap<String, (Option<String>, bool)> = conn
         .prepare_cached(
-            "SELECT id, seq FROM messages WHERE session_id = ?1 AND seq <= ?2 AND role = 'tool'",
+            "SELECT id, turn_id, is_error FROM messages WHERE session_id = ?1 AND seq <= ?2 AND role = 'tool'",
         )
         .ok()
         .and_then(|mut stmt| {
             stmt.query_map(params![session_id, durable_seq], |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+                Ok((row.get::<_, String>(0)?, (row.get::<_, Option<String>>(1)?, row.get::<_, bool>(2)?)))
             })
             .ok()
             .map(|rows| rows.filter_map(Result::ok).collect())
@@ -243,8 +294,14 @@ fn durable_check_result(
         let Some(ref_id) = evidence.get("refId").and_then(Value::as_str) else {
             continue;
         };
-        let Some((record, block)) = records.iter().find_map(|record| {
-            if !seq_by_message_id.contains_key(&record.id) {
+        let mut matches = records.iter().filter_map(|record| {
+            let (turn, _) = indexed_messages.get(&record.id)?;
+            if record.role != "tool" {
+                return None;
+            }
+            if owning_turns
+                .is_some_and(|turns| !turn.as_ref().is_some_and(|turn| turns.contains(turn)))
+            {
                 return None;
             }
             record
@@ -258,9 +315,16 @@ fn durable_check_result(
                             || record.id == ref_id)
                 })
                 .map(|block| (record, block))
-        }) else {
+        });
+        let Some((record, block)) = matches.next() else {
             continue;
         };
+        if matches.next().is_some() {
+            return (
+                "inconclusive".to_string(), None,
+                Some("Tool evidence identity matches multiple durable results in this execution; use a unique durable message ID.".to_string()),
+            );
+        }
         if block.get("name").and_then(Value::as_str) != Some("Bash")
             || record.tool_name.as_deref() != Some("Bash")
             || block
@@ -274,15 +338,39 @@ fn durable_check_result(
         let Some(tool_result) = block.get("result") else {
             continue;
         };
-        let exit_code = tool_result.get("exitCode").and_then(Value::as_i64);
-        let is_error = block
-            .get("isError")
-            .and_then(Value::as_bool)
-            .unwrap_or(false)
+        // AgentToolResult stores native Bash facts in details. Older records
+        // contain the bare Host result. Never parse the model-visible text.
+        let native = if tool_result.get("content").is_some() {
+            tool_result.get("details").filter(|value| value.is_object())
+        } else {
+            Some(tool_result)
+        };
+        let exit_code = native
+            .and_then(|value| value.get("exitCode"))
+            .and_then(Value::as_i64);
+        let is_error = record.is_error
+            || indexed_messages
+                .get(&record.id)
+                .is_some_and(|(_, error)| *error)
+            || tool_result
+                .get("isError")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+            || block
+                .get("isError")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
             || block
                 .get("status")
                 .and_then(Value::as_str)
                 .is_some_and(|status| matches!(status, "error" | "failed"));
+        if is_error {
+            return (
+                "failed".to_string(),
+                exit_code,
+                Some("Durable tool result recorded an error.".to_string()),
+            );
+        }
         if let Some(code) = exit_code {
             return if code == 0 {
                 (
@@ -299,13 +387,6 @@ fn durable_check_result(
                     )),
                 )
             };
-        }
-        if is_error {
-            return (
-                "failed".to_string(),
-                None,
-                Some("Durable tool result recorded an error.".to_string()),
-            );
         }
         if block.get("status").and_then(Value::as_str) == Some("success") {
             return (

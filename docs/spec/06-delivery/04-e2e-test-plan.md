@@ -18244,6 +18244,40 @@ RPC tests execute native Git against temporary repositories; renderer interactio
 fixtures mock only the external Host/session API edge and use the real store and
 components. They do not establish SSH server connectivity or a packaged release.
 
+### Approval-bound Goal verification requirements
+
+- **Preconditions:** Candidate-built Host/runtime with an isolated profile,
+  temporary workspace and deterministic provider/transport fixtures. No live
+  model, desktop profile or external task data.
+- **Path:** Approve a pending Goal through `pi_plans_resolve` with a frozen
+  `requiredVerificationCommands` list. Read the execution descriptor, restart
+  Host, and confirm the exact list survives. Submit a `met` report without
+  checks, then with a missing/duplicate/changed command, non-integer exit code
+  and contradictory result. Observe correction errors in the same execution;
+  execute harmless commands through the real Host tool/persistence boundary,
+  then submit complete passing checks with their durable result IDs and
+  finalize normally. Reject shell-name references, `tool_call` evidence,
+  missing/non-integer native exits and results belonging to another turn;
+  correct the evidence within the same running execution.
+- **Expected:** Invalid drafts leave no successful report. Complete checks
+  publish once and retain the approval/execution identity. The Agent receives
+  the original command list and can resubmit after a tool error without a new
+  approval or model execution. Non-met reports with real failures or explicit
+  not-run/blocked reasons remain supported. Ordinary Goals without the field
+  keep existing behavior. Replayed approval cannot omit/change the binding;
+  non-approve and Plan callers are rejected.
+- **Persistence:** Upgrade a populated P9 database behind the normal verified
+  backup, preserve old proposal/report data with NULL requirements, reopen P10
+  idempotently, and reject a newer unsupported track without mutation.
+- **Coverage:** `node scripts/e2e-required-verification.mjs`
+  (`E2E-GOAL-required-verification-001`, candidate Host selected through
+  `PI_DESKTOP_HOST_BIN`), Host required-verification lifecycle/migration tests, shared
+  MCP/IPC forwarding tests, execution-descriptor decoding and runtime
+  `SubmitGoalReport` tool-error tests. The external controller separately
+  exercises frozen-plan → runtime receipt → Plus request and the unsupported
+  schema gate before any model send. These isolated checks do not establish
+  live-provider behavior or production task recovery.
+
 ### Team Goal settlement and completion reasons
 
 - `E2E-GOAL-report-waits-for-settled-team`: an approved Team Goal dispatches an

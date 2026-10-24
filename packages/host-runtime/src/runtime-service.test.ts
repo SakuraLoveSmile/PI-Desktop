@@ -13,6 +13,7 @@ class FakeHost implements RuntimeHostLink {
   private turnCounter = 0;
   messages = new Map<string, UiMessage[]>();
   failAppend = false;
+  beforeAppend: ((params: Record<string, unknown>) => Promise<void>) | null = null;
   beforeBegin: (() => void) | null = null;
   session: Record<string, unknown> = { id: "s1", mode: "agent", permissionMode: "ask", providerId: "p1", modelId: "m1" };
 
@@ -31,6 +32,7 @@ class FakeHost implements RuntimeHostLink {
         this.turnCounter += 1;
         return { turnId: `turn-${this.turnCounter}` } as T;
       case "session.appendMessage": {
+        await this.beforeAppend?.(params);
         if (this.failAppend) throw Object.assign(new Error("disk full"), { errorCode: "INTERNAL" });
         const list = this.messages.get(String(params.sessionId)) ?? [];
         list.push(params.message as UiMessage);
@@ -66,6 +68,7 @@ class FakeSidecar implements RuntimeSidecarLink {
   notify: ((method: string, params: unknown) => void) | null = null;
   exit: ((info: { intentional: boolean; code: number | null; signal: NodeJS.Signals | null }) => void) | null = null;
   roots = new Map<string, string | undefined>();
+  reportBarrier?: (input: { sessionId: string; executionId: string }) => Promise<void>;
   rejectPrompt = false;
   promptError: Error | null = null;
   running = false;
@@ -119,6 +122,9 @@ class FakeSidecar implements RuntimeSidecarLink {
   }
   clearProjectInstructionRoot(): void {}
   clearVendorAuthBindings(): void {}
+  setGoalReportPersistenceBarrier(handler: (input: { sessionId: string; executionId: string }) => Promise<void>): void {
+    this.reportBarrier = handler;
+  }
 }
 
 const launch: LaunchResolver = {
@@ -155,6 +161,45 @@ function build() {
   service.onTurnEnded((info) => ended.push(info));
   return { host, sidecar, service, events, ended, logs };
 }
+
+describe("RuntimeService Goal report persistence admission", () => {
+  it("waits for this session's native tool result to be durably appended", async () => {
+    const { host, sidecar, service } = build();
+    await service.beginTurn("s1", "p1", "m1");
+    let release!: () => void;
+    let entered!: () => void;
+    const appended = new Promise<void>(done => { entered = done; });
+    const held = new Promise<void>(done => { release = done; });
+    host.beforeAppend = async () => { entered(); await held; };
+    sidecar.notify?.("agent.event", { sessionId: "s1", turnId: "turn-1", ts: 1,
+      event: { type: "tool_start", toolCallId: "bash-result", toolName: "Bash", args: { command: "true" } } });
+    sidecar.notify?.("agent.event", { sessionId: "s1", turnId: "turn-1", ts: 2,
+      event: { type: "tool_end", toolCallId: "bash-result", result: { details: { exitCode: 0 } } } });
+    await appended;
+    let settled = false;
+    const pending = sidecar.reportBarrier!({ sessionId: "s1", executionId: "e1" }).then(() => { settled = true; });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    expect(host.messages.get("s1")).toBeUndefined();
+    release();
+    await pending;
+    expect(host.messages.get("s1")?.[0]).toMatchObject({ id: "bash-result", toolResult: { details: { exitCode: 0 } } });
+    await service.dispose();
+  });
+
+  it("rejects failed persistence and stale sessions instead of forwarding success", async () => {
+    const { host, sidecar, service } = build();
+    await service.beginTurn("s1", "p1", "m1");
+    host.failAppend = true;
+    sidecar.notify?.("agent.event", { sessionId: "s1", turnId: "turn-1", ts: 1,
+      event: { type: "tool_end", toolCallId: "failed-result", result: { details: { exitCode: 0 } } } });
+    await expect(sidecar.reportBarrier!({ sessionId: "s1", executionId: "e1" }))
+      .rejects.toMatchObject({ errorCode: "INVALID_ARGUMENT" });
+    await expect(sidecar.reportBarrier!({ sessionId: "other", executionId: "e1" }))
+      .rejects.toMatchObject({ errorCode: "INVALID_ARGUMENT" });
+    await service.dispose();
+  });
+});
 
 describe("RuntimeService manual compaction against a lost reply (#795)", () => {
   const timeout = () => new Error("sidecar RPC timeout: agent.compact");

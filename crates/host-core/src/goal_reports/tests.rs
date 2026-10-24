@@ -10,6 +10,12 @@ mod completion_eligibility;
 #[path = "tests/progress_reconciliation.rs"]
 mod progress_reconciliation;
 
+#[path = "tests/required_verification.rs"]
+mod required_verification;
+
+#[path = "tests/native_evidence.rs"]
+mod native_evidence;
+
 fn create_test_db() -> (tempfile::TempDir, Database) {
     let dir = tempfile::tempdir().unwrap();
     let db_path = dir.path().join("pi.sqlite");

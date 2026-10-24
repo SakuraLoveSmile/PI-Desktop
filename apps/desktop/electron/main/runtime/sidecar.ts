@@ -24,6 +24,8 @@ import type { PluginRuntime } from "../plugin-runtime";
 import type { RuntimeState } from "./context";
 import type { FinishTurn } from "./plans";
 import { formatSkillToolContent, type LoadedSkillDocument } from "../skill-document";
+import type { PersistenceOutbox } from "../persistence-outbox";
+import { createGoalReportPersistenceBarrier } from "./goal-report-persistence";
 
 export type SidecarRuntimeDependencies = {
   runtimeState: RuntimeState;
@@ -35,6 +37,7 @@ export type SidecarRuntimeDependencies = {
   approvedExecutionIdsBySession: Map<string, string>;
   claimedExecutionSessions: Map<string, string>;
   inflightCheckpointer: InflightCheckpointer;
+  persistenceOutbox: PersistenceOutbox;
   finishTurn: FinishTurn;
   finishApprovedExecution: (...args: any[]) => Promise<void>;
   superviseRestart: (kind: "host" | "sidecar") => Promise<void>;
@@ -74,6 +77,7 @@ export function createSidecarRuntime({
   approvedExecutionIdsBySession,
   claimedExecutionSessions,
   inflightCheckpointer,
+  persistenceOutbox,
   finishTurn,
   isStaleTerminalEvent,
   finishApprovedExecution,
@@ -388,6 +392,12 @@ export function createSidecarRuntime({
   const startSidecar = async (): Promise<void> => {
 
   const s = new AgentSidecar((text) => logger.child("agent", text));
+  s.setGoalReportPersistenceBarrier(createGoalReportPersistenceBarrier({
+    getHost: () => runtimeState.host,
+    persistenceOutbox,
+    claimedExecutionSessions,
+    activeTurns,
+  }));
   wireSidecar(s);
   s.setProjectInstructionResolver(async ({ projectPath, path }) => {
     // The root is registered by Electron main from the host-owned session

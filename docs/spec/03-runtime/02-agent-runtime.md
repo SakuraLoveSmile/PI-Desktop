@@ -907,6 +907,14 @@ blocked; it never synthesizes automatic fallback completion. The report-only
 allowance resets once per resumed segment, not once per model round. There is
 no automatic blocked-Goal retry loop.
 
+Goal execution Bash results expose the actual tool call ID in model-visible
+text with a `tool_result` evidence reference example. `commandShellId` selects
+the shell and must never be used as a report evidence ID. For Goals with
+approval-bound verification commands, Host rejects a successful draft whose
+required checks cannot be proven from this execution's durable native command
+results. The same running execution receives correction guidance through
+`SubmitGoalReport`; it does not need a replacement approval or silent replay.
+
 Automatic completion requires a valid structured draft with `verdict = met`,
 all items in an existing matching Goal progress snapshot completed, and no open
 current-decision Team task, queued dispatch, running member or unconsumed result.

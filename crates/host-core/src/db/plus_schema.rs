@@ -18,7 +18,7 @@ use std::ops::RangeInclusive;
 
 /// Plus track version produced by this build. Add the step to [`STEPS`]
 /// together with every bump.
-pub(crate) const PLUS_SCHEMA_VERSION: i64 = 9;
+pub(crate) const PLUS_SCHEMA_VERSION: i64 = 10;
 
 /// `user_version` a legacy fork database is reset to: the last number the
 /// fork shared with upstream before it used v20..=v23 for Plus-only changes.
@@ -46,7 +46,8 @@ pub(super) const PLUS_TABLES: [&str; 10] = [
 
 /// Columns only the Plus track adds, as `(table, column)`. Same contract as
 /// [`PLUS_TABLES`].
-pub(super) const PLUS_COLUMNS: [(&str, &str); 11] = [
+pub(super) const PLUS_COLUMNS: [(&str, &str); 12] = [
+    ("plan_approvals", "required_verification_commands_json"),
     ("plan_approvals", "artifact_workspace_kind"),
     ("plan_approvals", "execution_kind"),
     ("plan_approvals", "execution_model_id"),
@@ -74,8 +75,15 @@ type Step = fn(&Connection) -> Result<()>;
 /// shared chain. Every step must stay idempotent: [`apply_pending`] replays
 /// all of them to re-verify a database an upstream step may have rebuilt.
 const STEPS: [Step; PLUS_SCHEMA_VERSION as usize] = [
-    step_p1, step_p2, step_p3, step_p4, step_p5, step_p6, step_p7, step_p8, step_p9,
+    step_p1, step_p2, step_p3, step_p4, step_p5, step_p6, step_p7, step_p8, step_p9, step_p10,
 ];
+
+/// P10: immutable required verification commands on approved Goal executions.
+fn step_p10(conn: &Connection) -> Result<()> {
+    add_column_if_missing(conn, "plan_approvals", "required_verification_commands_json",
+        "TEXT CHECK (required_verification_commands_json IS NULL OR (json_valid(required_verification_commands_json) AND json_type(required_verification_commands_json) = 'array'))")?;
+    Ok(())
+}
 
 /// P8: durable unattended interaction policy and atomic terminal details.
 fn step_p8(conn: &Connection) -> Result<()> {

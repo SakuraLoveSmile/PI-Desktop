@@ -733,6 +733,7 @@ const sidecarRuntime = createSidecarRuntime({
   approvedExecutionIdsBySession,
   claimedExecutionSessions,
   inflightCheckpointer,
+  persistenceOutbox,
   finishTurn,
   isStaleTerminalEvent,
   finishApprovedExecution,

@@ -402,6 +402,11 @@ export function createRemoteBackend(options: RemoteBackendOptions): RemoteBacken
       }
       case IPC.invoke.plansResolve: {
         const resolution = args[0] as PlanResolveRequest;
+        if ("requiredVerificationCommands" in resolution) {
+          throw Object.assign(new Error("Remote approvals do not support required verification commands"), {
+            errorCode: ErrorCodes.INVALID_ARGUMENT,
+          });
+        }
         if (resolution.action !== "approve" && resolution.action !== "reject") {
           throw Object.assign(new Error("Remote Plan revision and scheduling are unavailable"), {
             errorCode: ErrorCodes.INVALID_ARGUMENT,

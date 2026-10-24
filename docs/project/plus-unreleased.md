@@ -8,6 +8,15 @@ Upstream v0.15.6 → v0.16.1 has been merged.
   summary once two or more are waiting, and Edit, Move, and Remove moved into
   each row's ⋯ menu; Send now appears on hover or focus.
 
+- External Goal approvals can bind required verification commands. Incomplete
+  or contradictory report checks return a correction error to the running
+  Agent before a valid draft is saved. A successful report must reference real
+  persisted Bash results from the same execution, with exact commands and
+  integer zero exit codes. Desktop and headless report submission wait for
+  transcript persistence and reject stale ownership. Existing unbound Goals
+  remain compatible. Plus schema 10 stores the optional binding behind the
+  normal verified upgrade backup; earlier binaries refuse the upgraded profile.
+
 - External schedulers can select a durable unattended interaction policy.
   `asktool` is hidden from discovery and a forbidden call stops the complete
   response before any tool executes, returning durable structured questions.

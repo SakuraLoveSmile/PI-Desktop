@@ -65,6 +65,16 @@ describe("planExecutionFromUnknown", () => {
     });
   });
 
+  it("preserves the exact ordered Goal verification requirement without silently dropping malformed bindings", () => {
+    const requiredVerificationCommands = ["cargo test --locked", " pnpm test "];
+    expect(planExecutionFromUnknown({ ...validRecord, requiredVerificationCommands }))
+      .toMatchObject({ requiredVerificationCommands });
+    for (const invalid of [null, [], "cargo test", [42]]) {
+      expect(planExecutionFromUnknown({ ...validRecord, requiredVerificationCommands: invalid })).toBeNull();
+    }
+    expect(planExecutionFromUnknown(validRecord)).not.toHaveProperty("requiredVerificationCommands");
+  });
+
   it("rejects explicitly invalid workspaceKind at the boundary", () => {
     expect(
       planExecutionFromUnknown({

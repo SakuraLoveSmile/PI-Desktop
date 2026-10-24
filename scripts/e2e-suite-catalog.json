@@ -244,6 +244,13 @@
       ]
     },
     {
+      "id": "required-verification",
+      "family": "goals-team",
+      "script": "scripts/e2e-required-verification.mjs",
+      "tier": "nightly",
+      "safety": "Isolated Host and real report tool with deterministic fixture results; no model, provider, production profile, or verification command execution."
+    },
+    {
       "id": "goal-team-renderer-ui",
       "family": "goals-team",
       "script": "scripts/e2e-goal-team-renderer-ui.mjs",
