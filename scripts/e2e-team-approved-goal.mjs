@@ -65,16 +65,45 @@ export function createApprovedGoalFixture(projectPath) {
       throw new Error(`Unexpected approved Goal prompt ${userText.slice(0, 200)}`);
     },
     async runJourney({ planLead: goal, invoke, evaluate, sendCdp, waitFor, calls, submitComposerPrompt, saveScreenshot }) {
+      async function approveAuto(sessionId, label) {
+        const pane = `[data-session-pane="${sessionId}"][data-visible="true"]`;
+        const trigger = `${pane} [data-testid="plan-approval-bar"][data-status="pending"] .plan-approval-approve-menu:not(:disabled)`;
+        await waitFor(() => evaluate(`!!document.querySelector(${JSON.stringify(trigger)})`), `${label} approval menu`);
+        const scope = await evaluate(`(() => {
+          const target = document.querySelector(${JSON.stringify(trigger)});
+          const first = document.querySelector('.plan-approval-approve-menu:not(:disabled)');
+          const scope = first !== target ? {
+            intended: ${JSON.stringify(sessionId)}, firstGlobal: first?.closest('[data-session-pane]')?.getAttribute('data-session-pane'),
+            firstGlobalVisible: first?.closest('[data-session-pane]')?.getAttribute('data-visible')
+          } : null;
+          target.scrollIntoView({ block: 'center' });
+          return scope;
+        })()`);
+        if (scope) console.log("TEAM_APPROVAL_SCOPE", JSON.stringify(scope));
+        await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
+        await evaluate(`document.querySelector(${JSON.stringify(trigger)}).click()`);
+        await waitFor(() => evaluate(`document.querySelector(${JSON.stringify(trigger)})?.getAttribute('aria-expanded') === 'true' && !!document.querySelector('.plan-approval-menu.is-open [data-approval-mode="auto"]:not(:disabled)')`), `${label} Auto permission`).catch(async error => {
+          const state = await evaluate(`(() => {
+            const target=document.querySelector(${JSON.stringify(trigger)});
+            return { expanded:target?.getAttribute('aria-expanded'), target:target?.getBoundingClientRect().toJSON(),
+              triggers:Array.from(document.querySelectorAll('.plan-approval-approve-menu')).map(node => ({
+                session:node.closest('[data-session-pane]')?.getAttribute('data-session-pane'),
+                visible:node.closest('[data-session-pane]')?.getAttribute('data-visible'), disabled:node.disabled,
+                rect:node.getBoundingClientRect().toJSON() })),
+              menus:Array.from(document.querySelectorAll('.plan-approval-menu')).map(node => ({ className:node.className, text:node.innerText })) };
+          })()`);
+          throw new Error(`${error.message}; approval=${JSON.stringify(state)}`, { cause:error });
+        });
+        await evaluate(`document.querySelector('.plan-approval-menu.is-open [data-approval-mode="auto"]:not(:disabled)').click()`);
+      }
       await writeFile(join(projectPath, "approved-goal-source.md"), "APPROVED_GOAL_SOURCE\n");
       await waitFor(() => evaluate(`!!document.querySelector('[data-sidebar-session-row="${goal.id}"]') && !document.querySelector('.startup-splash')`), "Goal session");
       await evaluate(`document.querySelector('[data-sidebar-session-row="${goal.id}"] .thread-item-main').click()`);
+      await waitFor(() => evaluate(`!!document.querySelector('[data-sidebar-session-row="${goal.id}"].active')`), "Goal session selected");
       await waitFor(() => evaluate(`!!document.querySelector('.composer-contract-chip[data-mode="goal"]')`), "Goal contract hydrated");
       await submitComposerPrompt(sendCdp, evaluate, "AG_APPROVED_GOAL: negotiate source verification with an expert.");
       const proposal = await waitFor(async () => (await invoke("plansPending", { sessionId: goal.id })).plans.find(plan => plan.status === "pending"), "Goal approval");
-      await waitFor(() => evaluate(`!!document.querySelector('.plan-approval-approve-menu:not(:disabled)')`), "Goal approval menu");
-      await evaluate(`(() => { const trigger = document.querySelector('.plan-approval-approve-menu:not(:disabled)'); trigger.scrollIntoView({ block: 'center' }); trigger.click(); })()`);
-      await waitFor(() => evaluate(`!!document.querySelector('[data-approval-mode="auto"]')`), "Auto permission option");
-      await evaluate(`document.querySelector('[data-approval-mode="auto"]').click()`);
+      await approveAuto(goal.id, "Goal");
       const review = await waitFor(async () => { const { review } = await invoke("teamGetLaunchReview", { teamSessionId: goal.id }); return review?.status === "pending" && review.launchPolicy === "user_confirmed" ? review : null; }, "approved Goal pending roster");
       const originalTurn = review.leadTurnId;
       assert.equal((await invoke("agentGetStatus", goal.id)).status.isRunning, true);
@@ -126,13 +155,11 @@ export function createApprovedGoalFixture(projectPath) {
       await sendCdp("Page.reload");
       await waitFor(() => evaluate(`!!document.querySelector('[data-sidebar-session-row="${cancelled.id}"]') && !document.querySelector('.startup-splash')`), "cancel Goal session");
       await evaluate(`document.querySelector('[data-sidebar-session-row="${cancelled.id}"] .thread-item-main').click()`);
+      await waitFor(() => evaluate(`!!document.querySelector('[data-sidebar-session-row="${cancelled.id}"].active')`), "cancel Goal session selected");
       await waitFor(() => evaluate(`!!document.querySelector('.composer-contract-chip[data-mode="goal"]')`), "cancel Goal contract");
       await submitComposerPrompt(sendCdp, evaluate, "AG_APPROVED_GOAL: negotiate expert source verification, then cancel roster.");
       await waitFor(async () => (await invoke("plansPending", { sessionId: cancelled.id })).plans.some(plan => plan.status === "pending"), "cancel Goal approval");
-      await waitFor(() => evaluate(`!!document.querySelector('.plan-approval-approve-menu:not(:disabled)')`), "cancel Goal approval menu");
-      await evaluate(`(() => { const trigger = document.querySelector('.plan-approval-approve-menu:not(:disabled)'); trigger.scrollIntoView({ block: 'center' }); trigger.click(); })()`);
-      await waitFor(() => evaluate(`!!document.querySelector('[data-approval-mode="auto"]')`), "cancel Goal Auto permission");
-      await evaluate(`document.querySelector('[data-approval-mode="auto"]').click()`);
+      await approveAuto(cancelled.id, "cancel Goal");
       const cancelReview = await waitFor(async () => { const { review } = await invoke("teamGetLaunchReview", { teamSessionId: cancelled.id }); return review?.status === "pending" ? review : null; }, "cancel Goal roster pending");
       assert.equal((await invoke("agentGetStatus", cancelled.id)).status.isRunning, true);
       const callsBeforeCancel = calls.length;
