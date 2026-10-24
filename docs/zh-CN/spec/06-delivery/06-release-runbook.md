@@ -7,9 +7,11 @@
 > **翻译说明：** 本页是与 [英文源规格](/spec/06-delivery/06-release-runbook) 一一对应的机器辅助翻译。代码、协议字段和标识符保持原文；如翻译与英文源事实有歧义，以英文版本为准。
 
 
-> 范围：macOS arm64、Intel x64、Windows x64 和 Linux x64 及 arm64 的 D126/D285/D603 标记工件，
-> 包括 Linux 系统 Electron ASAR 资产；
-> macOS signing/notarization 保留下面的详细资格通道。
+> Current cloud release scope: macOS arm64 only for both manual candidates and
+> formal tags. Intel macOS, Windows, Linux, and standalone pi-host release
+> artifacts are not built by this workflow. Existing application and packaging
+> support for those targets is unchanged; macOS signing/notarization remains the
+> detailed qualification lane below.
 > 交叉引用：[里程碑](/zh-CN/spec/06-delivery/01-mvp-milestones) · [进程模型](/zh-CN/spec/03-runtime/07-process-model) · [安全性](/zh-CN/spec/05-security/01-security)
 
 ## 1. 构建通道
@@ -22,8 +24,8 @@
 | 通道 | 入口 | 签名 | 结果 |
 |---|---|---|---|
 | 开发 | `pnpm dev`、`pnpm build:js`、Cargo 开发命令 | 不要求 | 本地开发产物 |
-| 云端候选 | 手动触发 `release.yml` | 默认未签名，可选 macOS 签名 | 仅验证后的 Actions 工件 |
-| 正式发布 | 版本准备 PR 合并后推送 `v<version>` | macOS Developer ID 和强制公证 | 验证后不可变的 GitHub Release |
+| Cloud candidate | Manual `release.yml` dispatch | Unsigned by default; optional macOS signing | Verified macOS arm64 Actions bundle only |
+| Formal release | Push `v<version>` after its preparation PR merges | macOS Developer ID + mandatory notarization | Verified, immutable GitHub Release with macOS arm64 assets only |
 
 `scripts/release-macos.sh` 已退役，只输出云端操作提示并退出。
 云端验证失败时，不存在本地安装包或发布兜底通道。
@@ -150,10 +152,12 @@ gh workflow run release.yml --ref main -f sign_macos=false
 后续所有 job 检出相同提交。验证记录保留 run URL、source/base SHA、各 job
 结论与最终工件标识。已排队或已触发不代表构建成功。
 
-手动构建默认 `sign_macos=false`；只有配置六个签名 Secret 后才设置 true。
-两种候选都经过共享 CI、平台构建和聚合，只生成 Actions 中的
-`release-bundle-<version>-<source-sha>`，不创建 GitHub Release，不发布公共更新源。
-未签名工件仅用于调试，不能证明通过 Gatekeeper 或公证。
+Manual dispatch defaults to `sign_macos=false`. Set it to `true` only with the
+six signing secrets configured. Both variants run the same shared CI barriers,
+the macOS arm64 build and asset aggregation. They produce
+`release-bundle-<version>-<source-sha>` in Actions only: no GitHub Release is
+created and no public updater feed is published. Unsigned artifacts are debug
+candidates and do not establish Gatekeeper/notarization qualification.
 
 ### 4.3 正式标签和发布
 
@@ -182,21 +186,23 @@ git push origin v<version>
 2. **共享验证：** 在相同源码复用 `ci.yml`：JS 构建、类型、lint、架构、测试质量、
    单元测试、运行时测试类型、Rust fmt/clippy/test、隔离 smoke 和发布脚本行为测试。
    安装依赖后运行完整发布文档门禁。
-3. **原生构建：** macOS arm64/Intel x64、Windows x64、Linux x64/arm64 Desktop，
-   以及 Linux x64/arm64 pi-host。干净 runner 显式获取固定 Electron。
-   打包使用 `--publish never`，只有最终发布 job 可写 Release。
-4. **聚合：** 要求七组预期工件，拒绝缺失、意外、重复或不安全路径；
-   验证更新源版本、实际 SHA512/大小和 pi-host SHA256 sidecar。
-   合并两份 macOS 更新源，生成 `release-manifest.json` 与 `SHA256SUMS`。
-   manifest 记录源仓库/SHA、run URL/id/attempt、版本、渠道、类型、签名策略和
-   每个资产的名称/大小/SHA256。
+3. **Native build:** build Desktop for macOS arm64 on `macos-15`. Fetch the
+   pinned Electron binary on the clean runner. Packaging uses `--publish never`;
+   only the final publication job may write a Release.
+4. **Aggregate:** require exactly `dist-mac-arm64` with its DMG and ZIP, both
+   blockmaps, and `<channel>-mac-arm64.yml`; reject missing, unexpected,
+   duplicate or unsafe paths. Check updater version and actual SHA512/size, then
+   emit the canonical `<channel>-mac.yml`, `release-manifest.json` and
+   `SHA256SUMS`. The manifest records source repository/SHA, run URL/id/attempt,
+   version, channel, kind, signing policy and every asset's name/size/SHA256.
 5. **正式发布：** `scripts/publish-release.mjs` 重新验证工件和远端 tag/main 身份，
    创建草稿、上传全部资产、验证远端 SHA256 与大小后才公开。
    已公开 Release 不可变，不覆盖资产。失败草稿保留供检查；重试须匹配准确的
    source/manifest 身份，只复用相同资产，身份不符则阻塞，不自动删除或替换草稿。
 
-macOS arm64 使用 `macos-15`，Intel x64 使用 `macos-15-intel`；检查 `uname -m`，
-在同一原生 runner 构建 Rust host。签名通道将 `CSC_NAME` 固定为配置证书通用名，
+The sole packaging lane uses native `macos-15` arm64 and verifies `uname -m`
+before building the Rust host on the same runner. Signed lanes pin `CSC_NAME`
+to the configured certificate common name,
 强制应用签名和公证，独立对 DMG 公证/装订，上传前验证代码、身份、Gatekeeper
 和两份票据（§4.6–§5）。正式标签不能跳过这些检查。
 
@@ -208,15 +214,17 @@ blockmap，并刷新该渠道 macOS 更新源中的 SHA512 和大小。
 它使用已安装的 electron-builder blockmap 实现并显式指定外置输出，
 同时验证生成 blockmap 不改变已签名 DMG 字节。聚合随后检查最终装订产物的哈希。
 
-两种 macOS 架构均使用明确命名的 DMG/ZIP 和 blockmap（§6），拒绝无架构或架构错误资产。
+The macOS arm64 lane has explicit DMG/ZIP names (§6), including blockmaps, and
+rejects unlabelled or wrong-architecture artifacts.
 DMG 保持品牌 720×440 拖入 Applications 布局，仅显示应用和 Applications 链接。
 ZIP 根目录包含 `Pi-Desktop-Plus.app`，两者都不附首次启动说明或可执行辅助脚本。
 
-Linux 保持 glibc 2.35 下限（§7），从安装包复制版本化的系统 Electron ASAR，
-并分别生成 `<channel>-linux.yml`（x64）、`<channel>-linux-arm64.yml`（arm64）。
-macOS 合并为 `<channel>-mac.yml`，Windows NSIS 使用 `<channel>.yml`。
-已压缩的临时安装包和更新源采用 Actions 压缩级别零。
-`scripts/release-assets.mjs` 验证平台与 pi-host 完整库存，不能仅凭各构建 job 成功推断完整性。
+The current release workflow does not build Linux, Windows, Intel macOS or
+standalone pi-host artifacts. Existing platform-specific packaging and update
+behavior described below remains application capability documentation, not a
+claim that those artifacts are present in current candidate bundles or releases.
+The macOS arm64 input and final bundle inventory are checked by
+`scripts/release-assets.mjs`, rather than inferred from a successful build job.
 
 ### 4.4 文档站部署
 
@@ -471,38 +479,34 @@ project/Temporary 使用消息加会话图标创建控件。
    切换、语法高亮、shell 高亮、KaTeX、Mermaid fallback/rendering、
    主机运行状况和 sidecar 运行状况继续使用打包的本地资产。
 
-## 6. 本机运行器发布包
+## 6. Current cloud release artifacts
 
-以下命令仅是 GitHub 托管 Actions 的实现参考，不是本地打包步骤。
-各命令先构建 release host，打包 agent runtime 和 Electron 应用，
-再在对应操作系统的原生 runner 中打包：
+The Release workflow builds only the macOS arm64 target on GitHub-hosted Actions.
+Installer commands remain guarded against local and self-hosted execution.
 
 ```text
-macOS Apple Silicon: pnpm --filter @pi-desktop/desktop run dist:mac -- --arm64
-macOS Intel:         pnpm --filter @pi-desktop/desktop run dist:mac -- --x64
-Windows: pnpm --filter @pi-desktop/desktop dist:win
-Linux:   pnpm --filter @pi-desktop/desktop dist:linux -- --x64|--arm64
+Runner: macos-15 (native arm64)
+Input group: dist-mac-arm64
+Inputs: Pi-Desktop-Plus-<version>-arm64.dmg, its .blockmap,
+        Pi-Desktop-Plus-<version>-arm64-mac.zip, its .blockmap,
+        <channel>-mac-arm64.yml
+Final bundle: those four assets plus <channel>-mac.yml,
+              release-manifest.json, and SHA256SUMS
 ```
 
-Windows 的 `dist:win` 命令会运行 `scripts/build-desktop-release.mjs`，分别调用
-一次 electron-builder 构建 NSIS 和 ZIP，确保每个包写入正确的更新器发行类型标记。
+The macOS arm64 package includes the native `bin/pi-desktop-host-core` binary.
+macOS signing and notarization are mandatory for formal tags. Rollback and
+installer upgrade qualification remain separate release hardening work.
 
-macOS 软件包包括按本机架构构建的 `bin/pi-desktop-host-core`；
-Linux 软件包在其本机 x64 与 arm64 运行器上做同样的事；Windows
-软件包包括 `bin/pi-desktop-host-core.exe`。正式标签强制 macOS 签名和公证；
-回滚和安装程序升级资格仍属于独立的发布加固工作。
+The application still contains Windows and Linux support, and the packaging
+scripts retain their target implementations. Those targets are paused in the
+cloud Release workflow: they are not built, attached, or published by candidate
+runs or formal tags under the current scope.
+Standalone pi-host bundles are also absent from new releases. Remote-host
+bootstrap that downloads matching-version pi-host assets is therefore
+unavailable from these releases; the runtime and source capability remain.
 
-Native-runner 输出矩阵：
-
-- macOS arm64：`Pi-Desktop-Plus-<version>-arm64.dmg` 和
-  `Pi-Desktop-Plus-<version>-arm64-mac.zip`
-- macOS Intel x64：`Pi-Desktop-Plus-<version>-x64.dmg` 和
-  `Pi-Desktop-Plus-<version>-x64-mac.zip`
-- Windows x64：NSIS 安装程序 `Pi-Desktop-Plus-Setup-<version>.exe` 和便携版
-  ZIP `Pi-Desktop-Plus-Portable-<version>.zip`
-- Linux x64 和 arm64：AppImage、deb 和 rpm
-- Linux 系统 Electron 资产：`Pi-Desktop-Plus-<version>-linux-x64.asar` 和
-  `Pi-Desktop-Plus-<version>-linux-arm64.asar`
+### 6.1 Existing platform behavior outside current release output
 
 便携版 Windows ZIP 目标不会写入 `latest.yml`。Windows 发布脚本会分别构建 NSIS
 和 ZIP，并给 ZIP 的应用元数据写入 `piDistribution = "zip"`；已打包的 ZIP 运行使用
@@ -522,7 +526,11 @@ Electron 二进制文件的应用发生冲突。
 electron Pi-Desktop-Plus-<version>-linux-<arch>.asar
 ```
 
-每个本机运行器上的外壳冒烟测试：
+The following describes existing target behavior; it is not a current cloud
+release build matrix. When those targets return to the release workflow, run the
+corresponding platform smoke checks before publishing them.
+
+Shell smoke checks for those platform targets:
 
 1. 确认窗口中没有出现 File/Edit/View/Window/Help 菜单。
 2. 验证 F10 和 Shift+F10 对焦点内容仍然可用。
@@ -533,6 +541,10 @@ electron Pi-Desktop-Plus-<version>-linux-<arch>.asar
 6. 验证未知的 menu/window IPC 操作在窗口打开和关闭时失败。
 
 ## 7. 已知限制
+
+The following target-specific notes describe existing application and packaging
+behavior; they do not indicate that these targets are included in current cloud
+release bundles.
 
 - Linux deb/rpm 和 Windows 便携版 ZIP 仍保持通知和链接更新模式。打包的 macOS、Windows NSIS 和 Linux AppImage 使用应用内 `electron-updater`。
 - Linux x64 和 arm64 包在 Ubuntu 22.04 上构建（本机 `ubuntu-22.04` 和

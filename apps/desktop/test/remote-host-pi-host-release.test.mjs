@@ -36,8 +36,8 @@ test("artifact name and URLs follow the release tag layout the desktop pins", ()
   assert.equal(piHostBundleDir(VERSION, LINUX_X64), "pi-host-0.15.1-beta.5-linux-x64");
   assert.equal(piHostArtifactName(VERSION, LINUX_X64), ARTIFACT_NAME);
   const urls = piHostArtifactUrls(VERSION, LINUX_X64);
-  // Both files are uploaded to the same v-tagged release by `release.yml`, so
-  // the desktop can derive them without an API call.
+  // Both files share a v-tagged release layout, so the desktop can derive
+  // their URLs without an API call when matching-version bundles are available.
   assert.equal(urls.tarball, `${RELEASE_BASE}/${ARTIFACT_NAME}`);
   assert.equal(urls.checksum, `${RELEASE_BASE}/${ARTIFACT_NAME}.sha256`);
 });
@@ -64,14 +64,13 @@ test("resolveTarget refuses a platform or architecture the release cannot serve"
   assert.equal(resolveTarget(""), null);
 });
 
-test("isPublishedTarget matches the release matrix's Linux architectures", () => {
+test("isPublishedTarget preserves the supported remote bundle targets", () => {
   assert.equal(targetKey(LINUX_X64), "linux-x64");
   assert.equal(isPublishedTarget(LINUX_X64), true);
-  // The desktop matrix publishes Linux x64 and arm64, and release.yml's
-  // pi-host-bundle job builds one bundle per lane.
+  // These targets remain supported for existing matching-version bundles;
+  // the current macOS-only Release workflow does not produce new bundles.
   assert.equal(isPublishedTarget({ platform: "linux", arch: "arm64" }), true);
-  // Publishing parity: a 404 halfway through a download is what this guard
-  // exists to prevent, so every unpublished cell must be refused here.
+  // Unsupported target formats are refused before attempting a download.
   assert.equal(isPublishedTarget({ platform: "darwin", arch: "x64" }), false);
   assert.equal(isPublishedTarget({ platform: "darwin", arch: "arm64" }), false);
 });

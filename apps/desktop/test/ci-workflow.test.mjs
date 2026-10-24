@@ -16,7 +16,6 @@ const [
   pluginSdkPackageSource,
   sharedPackageSource,
   releaseMacScriptSource,
-  releaseAsarScriptSource,
 ] = await Promise.all([
   read("../../../.github/workflows/ci.yml"),
   read("../../../.github/workflows/release.yml"),
@@ -28,7 +27,6 @@ const [
   read("../../../packages/plugin-sdk/package.json"),
   read("../../../packages/shared/package.json"),
   read("../../../scripts/release-macos.sh"),
-  read("../../../scripts/export-linux-asar.mjs"),
 ]);
 
 // Parse executable workflow configuration; release domain behavior is exercised
@@ -72,10 +70,10 @@ test("CI does not typecheck workspace dependencies twice", () => {
 });
 
 test("release validates one pinned candidate before starting verification", () => {
-  const { metadata, verify, build, "pi-host-bundle": host } = releaseWorkflow.jobs;
+  const { metadata, verify, build } = releaseWorkflow.jobs;
   assert.equal(metadata.steps.find(step => step.id === "preflight").run, "node scripts/release-preflight.mjs");
   assert.equal(verify.needs, "metadata");
-  for (const job of [build, host]) assert.deepEqual(job.needs, ["metadata", "verify"]);
+  assert.deepEqual(build.needs, ["metadata", "verify"]);
   // Exact tag/version, source identity, main ancestry and signing refusal are
   // tested with real isolated Git repositories in release-preflight.test.mjs.
 });
@@ -147,33 +145,27 @@ test("manual Linux package validation covers the RPM desktop identity", () => {
   );
 });
 
-test("release workflow publishes the Linux ASAR beside installers", () => {
-  assert.match(
-    releaseWorkflowSource,
-    /if: matrix\.platform == 'linux'[\s\S]*?node scripts\/export-linux-asar\.mjs --arch \$\{\{ matrix\.arch \}\}/,
-  );
-  assert.match(releaseWorkflowSource, /apps\/desktop\/release\/\*\.asar/);
-  assert.match(
-    releaseAsarScriptSource,
-    /linuxUnpackedDirName\(releaseArch\)\}\/resources\/app\.asar/,
-  );
-  assert.match(
-    releaseAsarScriptSource,
-    /Pi-Desktop-Plus-\$\{releaseVersion\}-linux-\$\{releaseArch\}\.asar/,
-  );
-});
-
-test("the release matrix ships native Linux x64 and arm64 lanes", () => {
-  const lanes = releaseWorkflow.jobs.build.strategy.matrix.include.filter(row => row.platform === "linux");
-  assert.deepEqual(lanes.map(({ arch, os, runner_arch, artifact, feed }) => ({ arch, os, runner_arch, artifact, feed })), [
-    { arch: "x64", os: "ubuntu-22.04", runner_arch: "x86_64", artifact: "linux-x64", feed: "linux.yml" },
-    { arch: "arm64", os: "ubuntu-22.04-arm", runner_arch: "aarch64", artifact: "linux-arm64", feed: "linux-arm64.yml" },
+test("release builds only native macOS arm64 and aggregates only that artifact", () => {
+  assert.deepEqual(releaseWorkflow.jobs.build.strategy.matrix.include, [
+    { name: "macOS arm64", os: "macos-15", arch: "arm64", runner_arch: "arm64", artifact: "mac-arm64", platform: "macos" },
   ]);
   assert.equal(releaseStep("Verify native runner architecture").if, "matrix.runner_arch");
-  assert.deepEqual(releaseWorkflow.jobs["pi-host-bundle"].strategy.matrix.include,
-    lanes.map(({ arch, os, runner_arch }) => ({ arch, os, runner_arch })));
-  // Architecture-specific feed names, missing lanes and checksum integrity are
-  // exercised by the complete input fixture in release-assets.test.mjs.
+  assert.equal(releaseWorkflow.jobs["pi-host-bundle"], undefined);
+  const aggregate = releaseWorkflow.jobs.aggregate;
+  assert.deepEqual(aggregate.needs, ["metadata", "build"]);
+  const downloads = aggregate.steps.filter(step => step.uses?.startsWith("actions/download-artifact@"));
+  assert.deepEqual(downloads.map(step => step.with), [
+    { name: "dist-mac-arm64", path: "artifacts/dist-mac-arm64" },
+  ]);
+  const upload = releaseStep("Upload artifacts");
+  assert.equal(upload.with.name, "dist-${{ matrix.artifact }}");
+  assert.deepEqual(upload.with.path.trim().split("\n"), [
+    "apps/desktop/release/*.dmg", "apps/desktop/release/*.zip",
+    "apps/desktop/release/*.blockmap",
+    "apps/desktop/release/${{ needs.metadata.outputs.channel }}-mac-${{ matrix.arch }}.yml",
+  ]);
+  // The aggregation fixture proves this complete arm64-only bundle is valid
+  // and rejects extra platform groups, missing artifacts and invalid hashes.
 });
 
 test("the Linux package config lets the workflow choose the architecture", () => {
@@ -203,20 +195,14 @@ test("the Linux package config lets the workflow choose the architecture", () =>
   );
 });
 
-test("release matrix packages both native macOS architectures", () => {
-  const lanes = releaseWorkflow.jobs.build.strategy.matrix.include.filter(row => row.platform === "macos");
-  assert.deepEqual(lanes.map(({ arch, os, runner_arch }) => ({ arch, os, runner_arch })), [
-    { arch: "arm64", os: "macos-15", runner_arch: "arm64" },
-    { arch: "x64", os: "macos-15-intel", runner_arch: "x86_64" },
-  ]);
+test("macOS release artifacts retain architecture-labelled names and a canonical feed", () => {
   const config = JSON.parse(desktopPackageSource).build;
   assert.equal(config.mac.artifactName, "Pi-Desktop-Plus-${version}-${arch}-mac.${ext}");
   assert.equal(config.dmg.artifactName, "Pi-Desktop-Plus-${version}-${arch}.${ext}");
-  assert.equal(releaseStep("Package installers (${{ matrix.dist }})").if, "matrix.platform != 'macos'");
   assert.equal(releaseStep("Disambiguate macOS update metadata").run,
     'mv "apps/desktop/release/${RELEASE_CHANNEL}-mac.yml" "apps/desktop/release/${RELEASE_CHANNEL}-mac-${{ matrix.arch }}.yml"');
-  // release-assets.test.mjs rejects wrong/missing architecture artifacts and
-  // merges both macOS feeds only after checking every final file hash and size.
+  // release-assets.test.mjs verifies every final file hash and size before
+  // exposing the canonical feed used by existing macOS updater clients.
 });
 
 test("macOS release signing is required on tag pushes", () => {
@@ -337,22 +323,6 @@ test("both macOS lanes only reference scripts that exist", async () => {
     }
   }
   assert.deepEqual(missing, []);
-});
-
-test("macOS signing instrumentation stays out of the Windows and Linux lanes", () => {
-  const instrumentation =
-    /macos-signing-watchdog|macos-signing-diagnostics|macos-bundle-inventory/;
-  const stepBlock = (name) =>
-    releaseWorkflowSource.match(new RegExp(`- name: ${name}[^]*?(?=\\n      - name:)`))?.[0] ??
-    "";
-  assert.doesNotMatch(stepBlock("Package installers"), instrumentation);
-  assert.doesNotMatch(stepBlock("Verify Linux host-core glibc floor"), instrumentation);
-  assert.doesNotMatch(stepBlock("Export Linux ASAR release asset"), instrumentation);
-  // The unsigned macOS debug lane reports its bundle size but must not gain a
-  // signing identity, notarization, or publishing behaviour.
-  const unsignedBlock = stepBlock("Package unsigned macOS installer");
-  assert.ok(unsignedBlock, "unsigned macOS debug package step is missing");
-  assert.doesNotMatch(unsignedBlock, instrumentation);
 });
 
 test("GitHub releases trigger the CNB mirror pipeline with a JSON payload", () => {

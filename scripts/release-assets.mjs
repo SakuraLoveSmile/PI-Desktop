@@ -7,8 +7,6 @@ import { fileURLToPath } from "node:url";
 
 const VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 const SAFE_NAME = /^[A-Za-z0-9][A-Za-z0-9._+-]*$/;
-const MAC_ARCHES = ["arm64", "x64"];
-const LINUX_ARCHES = ["x64", "arm64"];
 
 function validateOptions(options) {
   for (const key of ["input", "output", "version", "source", "repository", "runId", "runAttempt", "channel"]) {
@@ -33,28 +31,11 @@ function validateOptions(options) {
 }
 
 function requiredLayout(version, channel) {
-  const layout = new Map();
-  for (const arch of MAC_ARCHES) {
-    const dmg = `Pi-Desktop-Plus-${version}-${arch}.dmg`;
-    const zip = `Pi-Desktop-Plus-${version}-${arch}-mac.zip`;
-    layout.set(`dist-mac-${arch}`, [dmg, `${dmg}.blockmap`, zip, `${zip}.blockmap`, `${channel}-mac-${arch}.yml`]);
-  }
-  const installer = `Pi-Desktop-Plus-Setup-${version}.exe`;
-  layout.set("dist-windows-x64", [installer, `${installer}.blockmap`,
-    `Pi-Desktop-Plus-Portable-${version}.zip`, `PI-Desktop-Portable-${version}.exe`, `${channel}.yml`]);
-  for (const arch of LINUX_ARCHES) {
-    const imageArch = arch === "x64" ? "x86_64" : "arm64";
-    const debArch = arch === "x64" ? "amd64" : "arm64";
-    const rpmArch = arch === "x64" ? "x86_64" : "aarch64";
-    layout.set(`dist-linux-${arch}`, [`Pi-Desktop-Plus-${version}-linux-${imageArch}.AppImage`,
-      `pi-desktop-plus_${version}_${debArch}.deb`, `pi-desktop-plus-${version}-${rpmArch}.rpm`,
-      `Pi-Desktop-Plus-${version}-linux-${arch}.asar`, `${channel}-linux${arch === "x64" ? "" : "-arm64"}.yml`]);
-  }
-  for (const arch of LINUX_ARCHES) {
-    const archive = `pi-host-${version}-linux-${arch}.tar.gz`;
-    layout.set(`pi-host-linux-${arch}`, [archive, `${archive}.sha256`]);
-  }
-  return layout;
+  const dmg = `Pi-Desktop-Plus-${version}-arm64.dmg`;
+  const zip = `Pi-Desktop-Plus-${version}-arm64-mac.zip`;
+  return new Map([["dist-mac-arm64", [
+    dmg, `${dmg}.blockmap`, zip, `${zip}.blockmap`, `${channel}-mac-arm64.yml`,
+  ]]]);
 }
 
 async function existing(path) {
@@ -175,47 +156,19 @@ function verifyFeed(feed, label, version, allowed, inventory) {
   return feed;
 }
 
-async function verifyAndMergeFeeds(staging, options, inventory) {
+async function verifyMacFeed(staging, options, inventory) {
   const { version, channel } = options;
-  const macFeeds = [];
-  for (const arch of MAC_ARCHES) {
-    const name = `${channel}-mac-${arch}.yml`;
-    const feed = await parseFeed(join(staging, name));
-    macFeeds.push(verifyFeed(feed, name, version,
-      [`Pi-Desktop-Plus-${version}-${arch}-mac.zip`, `Pi-Desktop-Plus-${version}-${arch}.dmg`], inventory));
-  }
-  const windowsFeed = `${channel}.yml`;
-  verifyFeed(await parseFeed(join(staging, windowsFeed)), windowsFeed, version,
-    [`Pi-Desktop-Plus-Setup-${version}.exe`], inventory);
-  for (const arch of LINUX_ARCHES) {
-    const name = `${channel}-linux${arch === "x64" ? "" : "-arm64"}.yml`;
-    const installers = requiredLayout(version, channel).get(`dist-linux-${arch}`)
-      .filter(file => [".AppImage", ".deb", ".rpm"].some(extension => file.endsWith(extension)));
-    verifyFeed(await parseFeed(join(staging, name)), name, version,
-      installers, inventory);
-  }
-  const files = macFeeds.flatMap(feed => feed.files);
-  const zip = files.find(file => file.url.endsWith(".zip"));
-  const merged = { ...macFeeds[0], files, path: zip.url, sha512: zip.sha512 };
+  const sourceName = `${channel}-mac-arm64.yml`;
+  const feed = verifyFeed(await parseFeed(join(staging, sourceName)), sourceName, version,
+    [`Pi-Desktop-Plus-${version}-arm64-mac.zip`, `Pi-Desktop-Plus-${version}-arm64.dmg`], inventory);
+  const zip = feed.files.find(file => file.url.endsWith(".zip"));
+  const canonical = { ...feed, path: zip.url, sha512: zip.sha512 };
   // JSON is a YAML 1.2 subset accepted by electron-updater's YAML reader.
   const name = `${channel}-mac.yml`;
-  await writeFile(join(staging, name), JSON.stringify(merged, null, 2) + "\n", { flag: "wx" });
+  await writeFile(join(staging, name), JSON.stringify(canonical, null, 2) + "\n", { flag: "wx" });
   inventory.set(name, await hashAsset(join(staging, name)));
-  for (const arch of MAC_ARCHES) {
-    const name = `${channel}-mac-${arch}.yml`;
-    await rm(join(staging, name));
-    inventory.delete(name);
-  }
-}
-
-async function verifyHostChecksums(staging, version, inventory) {
-  for (const arch of LINUX_ARCHES) {
-    const name = `pi-host-${version}-linux-${arch}.tar.gz`;
-    const text = await readMetadata(join(staging, `${name}.sha256`));
-    const checksum = /^([a-fA-F0-9]{64}) [ *]([^\r\n]+)\r?\n?$/.exec(text);
-    if (!checksum || checksum[2] !== name) throw new Error(`Invalid headless checksum filename: ${name}.sha256`);
-    if (checksum[1].toLowerCase() !== inventory.get(name).sha256) throw new Error(`Headless SHA256 mismatch: ${name}`);
-  }
+  await rm(join(staging, sourceName));
+  inventory.delete(sourceName);
 }
 
 /** Validate a complete downloaded build before atomically exposing its assets. */
@@ -232,8 +185,7 @@ export async function aggregateReleaseAssets(options) {
       await copyFile(file.source, join(staging, name), constants.COPYFILE_EXCL);
       inventory.set(name, await hashAsset(join(staging, name)));
     }
-    await verifyHostChecksums(staging, options.version, inventory);
-    await verifyAndMergeFeeds(staging, options, inventory);
+    await verifyMacFeed(staging, options, inventory);
     const assets = [...inventory].sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
       .map(([name, { size, sha256 }]) => ({ name, size, sha256 }));
     const manifest = { schemaVersion: 1, kind: options.kind, version: options.version, channel: options.channel,

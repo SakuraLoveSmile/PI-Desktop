@@ -823,6 +823,11 @@ identify the platform validation still needed.
 
 ### Release & Packaging
 
+The current fork Release workflow builds macOS arm64 only. Linux release
+scenarios E2E-192/E2E-192a are retained as inactive qualification plans for
+paused targets; E2E-200 can still use the separate manual Linux validation
+workflow. They are not gates or promised outputs of the current Release run.
+
 #### E2E-192: Linux release publishes a system-Electron ASAR asset
 
 - **Preconditions**: A `vX.Y.Z` tag matches `apps/desktop/package.json`; the
@@ -896,20 +901,21 @@ identify the platform validation still needed.
 #### E2E-196a: Unsigned macOS debug lane
 
 - **Preconditions**: The Release workflow is manually dispatched with
-  `sign_macos: false`; Windows and Linux release credentials are not affected.
-  This path must not be used to publish a GitHub Release tag.
+  `sign_macos: false`. This path must not publish a GitHub Release.
 - **Steps**: 1) Dispatch the Release workflow with `sign_macos: false`. 2)
-  Confirm both macOS architectures complete ordinary DMG/ZIP packaging without
-  certificate secrets. 3) Inspect the artifacts and workflow steps.
-- **Expected**: macOS DMG/ZIP artifacts are produced and uploaded without
-  Developer ID signatures or notarization, using explicit `-arm64` and `-x64`
-  filename markers for their native architecture; macOS staple and Gatekeeper
-  checks are explicitly skipped. Windows/Linux artifacts and the merged updater
-  feed are validated in the Actions candidate bundle only. No GitHub Release
-  or public updater feed is published. This exception does not satisfy E2E-196c.
-  All jobs use the same pinned source SHA; record run URL, source/base SHAs, job
-  conclusions and final bundle identity. Local/self-hosted packaging (including
-  `pack --dir`) is rejected; development compilation remains supported.
+  Confirm only the native macOS arm64 packaging job runs, without certificate
+  secrets. 3) Inspect `dist-mac-arm64` and the verified candidate bundle.
+- **Expected**: Exactly the arm64 DMG, ZIP and their blockmaps are packaged.
+  The verified bundle contains those four files, the canonical channel macOS
+  feed, `release-manifest.json` and `SHA256SUMS` (seven files). The feed lists
+  only the arm64 DMG and ZIP with matching size/SHA512; the manifest records
+  five assets. No Intel, Windows, Linux or standalone pi-host packages are
+  built. Signing, notarization and Gatekeeper checks are skipped. No GitHub
+  Release or public updater feed is published; this does not satisfy E2E-196c.
+  Shared CI and all package jobs use the pinned source SHA; record run URL,
+  source/base SHAs, job conclusions and final bundle identity. Local/self-hosted
+  packaging (including `pack --dir`) is rejected; development compilation
+  remains supported.
 - **Specs linked**: `06-delivery/06-release-runbook.md`
 - **Acceptance**: Quality (debug packaging)
 - **Milestone**: M6+
@@ -941,9 +947,9 @@ identify the platform validation still needed.
   pushed, or the Release workflow is dispatched with `sign_macos: true`
   (manual dispatch defaults to false); the tag already belongs to remote main.
   GitHub Actions has `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`,
-  `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` and `MAC_SIGNING_IDENTITY` secrets; both native macOS
-  runners are available.
-- **Steps**: 1) Run the tag workflow. 2) For each macOS architecture, inspect
+  `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` and `MAC_SIGNING_IDENTITY` secrets; the native macOS arm64
+  runner is available.
+- **Steps**: 1) Run the tag workflow. 2) For macOS arm64, inspect
   the unpacked app with `codesign -dv --verbose=4` and confirm authority
   matching the configured fork certificate and TeamIdentifier. 3) Run
   `codesign --verify --deep --strict --verbose=2`,
@@ -953,14 +959,14 @@ identify the platform validation still needed.
   `Accepted` and then run `xcrun stapler validate` against the matching DMG.
   5) Download the DMG on a clean macOS profile, move the app to
   `/Applications`, and open it without clearing `com.apple.quarantine`.
-- **Expected**: Each macOS app passes signature integrity, Gatekeeper reports
+- **Expected**: The macOS arm64 app passes signature integrity, Gatekeeper reports
   `source=Notarized Developer ID`, and both app and DMG contain valid stapled
   tickets. The DMG has its own submission: a DMG that was never submitted has
   no ticket and fails `stapler staple` with error 65, so a tag build must never
   reach that state. The app opens normally; no `xattr` quarantine-removal
   command or Security & Privacy override is required. Missing secrets, a
   rejected submission, or an exhausted staple retry fail the job. Formal tags
-  publish only after shared CI, complete platform/feed/hash aggregation, draft
+  publish only after shared CI, complete arm64 asset/feed/hash aggregation, draft
   uploads and remote digest/size verification. Published assets are immutable;
   failed drafts remain for inspection and only an identical bundle can resume.
   Signed manual candidates still produce Actions artifacts only.

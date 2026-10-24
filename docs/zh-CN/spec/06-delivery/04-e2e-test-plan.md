@@ -1871,6 +1871,9 @@ task-candidate E2E 从请求工作树运行，但使用主工作区已经准备�
 
 #### E2E-192a：Linux arm64 发布通道发布原生 arm64 包
 
+> Inactive qualification plan: the current fork Release workflow builds only
+> macOS arm64. Linux packages and standalone pi-host bundles are paused.
+
 - **先决条件**：`vX.Y.Z` 标签与 `apps/desktop/package.json` 一致；仓库可使用 GitHub
   的 arm64 `ubuntu-22.04-arm` 运行器。
 - **步骤**：1) 运行标签发布工作流程。2) 确认 arm64 通道运行在
@@ -3865,15 +3868,28 @@ IPC 请求无法关闭。
 - **状态**：单位覆盖（`mermaid-rendering.test.mjs`）；提供安全性和
   视觉场景草稿
 
-#### E2E-196a：未签名的 macOS 调试通道
+#### E2E-196a: Unsigned macOS debug lane
 
-- **先决条件**：手动运行 Release 工作流并设置 `sign_macos: false`；Windows 和 Linux 的发布凭据不受影响。该路径不得用于发布 GitHub Release 标签。
-- **步骤**：1) 以 `sign_macos: false` 手动运行 Release 工作流。2) 确认两个 macOS 架构都完成普通的 DMG/ZIP 打包，且没有使用证书密钥。3) 检查工件和工作流步骤。
-- **预期**：macOS DMG/ZIP 工件生成并上传，文件名分别带有 `-arm64` 和 `-x64` 架构标记，不包含 Developer ID 签名或公证；macOS 装订和 Gatekeeper 检查明确跳过。Windows/Linux 工件和合并后的更新源仍正常发布。该例外不满足 E2E-196c。
-- **关联规格**：`06-delivery/06-release-runbook.md`
-- **验收**：质量（调试打包）
-- **里程碑**：M6+
-- **状态**：可选调试通道；标签发布必须满足 E2E-196c。
+- **Preconditions**: The Release workflow is manually dispatched with
+  `sign_macos: false`. This path must not publish a GitHub Release.
+- **Steps**: 1) Dispatch the Release workflow with `sign_macos: false`. 2)
+  Confirm only the native macOS arm64 packaging job runs, without certificate
+  secrets. 3) Inspect `dist-mac-arm64` and the verified candidate bundle.
+- **Expected**: Exactly the arm64 DMG, ZIP and their blockmaps are packaged.
+  The verified bundle contains those four files, the canonical channel macOS
+  feed, `release-manifest.json` and `SHA256SUMS` (seven files). The feed lists
+  only the arm64 DMG and ZIP with matching size/SHA512; the manifest records
+  five assets. No Intel, Windows, Linux or standalone pi-host packages are
+  built. Signing, notarization and Gatekeeper checks are skipped. No GitHub
+  Release or public updater feed is published; this does not satisfy E2E-196c.
+  Shared CI and all package jobs use the pinned source SHA; record run URL,
+  source/base SHAs, job conclusions and final bundle identity. Local/self-hosted
+  packaging (including `pack --dir`) is rejected; development compilation
+  remains supported.
+- **Specs linked**: `06-delivery/06-release-runbook.md`
+- **Acceptance**: Quality (debug packaging)
+- **Milestone**: M6+
+- **Status**: Opt-in debug lane; tag releases must satisfy E2E-196c.
 
 #### E2E-196b：macOS 软件包不附带首次启动助手
 
@@ -3889,15 +3905,41 @@ IPC 请求无法关闭。
 - **里程碑**：M6+
 - **状态**：`packaging-footprint.test.mjs` 已自动覆盖；本机归档检查仍由发布运行器验证
 
-#### E2E-196c：macOS 标签工件通过 Gatekeeper 且无需移除隔离属性
+#### E2E-196c: macOS tag artifacts pass Gatekeeper without a quarantine bypass
 
-- **先决条件**：推送与 `apps/desktop/package.json` 匹配的 `vX.Y.Z` 标签，或手动运行 Release 工作流并保持 `sign_macos: true`（默认）；GitHub Actions 已配置 `CSC_LINK`、`CSC_KEY_PASSWORD`、`APPLE_ID`、`APPLE_APP_SPECIFIC_PASSWORD` 和 `APPLE_TEAM_ID` 密钥；两个本机 macOS 运行器均可用。
-- **步骤**：1) 运行标签工作流。2) 对每个 macOS 架构检查解压后的应用，使用 `codesign -dv --verbose=4` 确认权限为 `Developer ID Application: XingYu Liu (DUV63RKYTW)`。3) 对应用运行 `codesign --verify --deep --strict --verbose=2`、`spctl --assess --type execute --verbose=4` 和 `xcrun stapler validate`，并检查 `Contents/Resources/bin/pi-desktop-host-core`。4) 确认工作流的 DMG 步骤报告 Apple 公证状态为 `Accepted`，然后对对应的 DMG 运行 `xcrun stapler validate`。5) 在干净的 macOS 配置文件中下载 DMG，将应用移到 `/Applications` 后不清除 `com.apple.quarantine` 直接打开。
-- **预期**：每个 macOS 应用通过签名完整性检查，Gatekeeper 报告 `source=Notarized Developer ID`，应用和 DMG 都包含有效的装订票据。DMG 有自己的提交：从未提交过的 DMG 没有票据，装订会以 error 65 失败，因此标签构建绝不能走到该状态。应用可正常打开，无需 `xattr` 命令或“安全性与隐私”覆盖。缺少密钥、提交被拒或装订重试耗尽都会让作业失败。
-- **关联规格**：`06-delivery/06-release-runbook.md`、`05-security/01-security.md`、ADR 0289
-- **验收**：质量、安全
-- **里程碑**：M6+
-- **状态**：工作流脚本/单元已覆盖；每次发布仍需在干净机器上验证（适用变更合入前需在具备条件的环境中运行 E2E）
+- **Preconditions**: A `vX.Y.Z` tag matching `apps/desktop/package.json` is
+  pushed, or the Release workflow is dispatched with `sign_macos: true`
+  (manual dispatch defaults to false); the tag already belongs to remote main.
+  GitHub Actions has `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`,
+  `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` and `MAC_SIGNING_IDENTITY` secrets; the native macOS arm64
+  runner is available.
+- **Steps**: 1) Run the tag workflow. 2) For macOS arm64, inspect
+  the unpacked app with `codesign -dv --verbose=4` and confirm authority
+  matching the configured fork certificate and TeamIdentifier. 3) Run
+  `codesign --verify --deep --strict --verbose=2`,
+  `spctl --assess --type execute --verbose=4`, and `xcrun stapler validate`
+  against the app, including `Contents/Resources/bin/pi-desktop-host-core`.
+  4) Confirm the workflow's DMG step reported an Apple notary status of
+  `Accepted` and then run `xcrun stapler validate` against the matching DMG.
+  5) Download the DMG on a clean macOS profile, move the app to
+  `/Applications`, and open it without clearing `com.apple.quarantine`.
+- **Expected**: The macOS arm64 app passes signature integrity, Gatekeeper reports
+  `source=Notarized Developer ID`, and both app and DMG contain valid stapled
+  tickets. The DMG has its own submission: a DMG that was never submitted has
+  no ticket and fails `stapler staple` with error 65, so a tag build must never
+  reach that state. The app opens normally; no `xattr` quarantine-removal
+  command or Security & Privacy override is required. Missing secrets, a
+  rejected submission, or an exhausted staple retry fail the job. Formal tags
+  publish only after shared CI, complete arm64 asset/feed/hash aggregation, draft
+  uploads and remote digest/size verification. Published assets are immutable;
+  failed drafts remain for inspection and only an identical bundle can resume.
+  Signed manual candidates still produce Actions artifacts only.
+- **Specs linked**: `06-delivery/06-release-runbook.md`,
+  `05-security/01-security.md`, ADR 0289
+- **Acceptance**: Quality, Security
+- **Milestone**: M6+
+- **Status**: Workflow script/unit-covered; clean-machine journey required for
+  each release (run only in a capable environment when this surface changes)
 
 #### E2E-212：GitHub Release 启动 CNB 镜像流水线
 
