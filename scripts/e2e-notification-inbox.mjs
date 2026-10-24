@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Real isolated Host/SQLite, IPC, Electron Dock badge and NotificationCenter user path. */
+/** Real isolated Host/SQLite, IPC, Electron shell badge and NotificationCenter user path. */
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";

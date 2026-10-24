@@ -31,6 +31,8 @@ const rows = () => Array.from(document.querySelectorAll<HTMLButtonElement>(".not
 const row = (id: string) => rows().find((button) => button.dataset.notificationId === id);
 const dialog = () => document.querySelector("#notification-popover");
 const state = () => useAppStore.getState();
+type ShellBadgeResult = { requestedCount: number; accepted: boolean; platform: string; nativeCount: number };
+const shellBadgeChecks: ShellBadgeResult[] = [];
 async function open() {
   flushSync(() => trigger().click());
   await until(() => !!dialog() && !document.querySelector(".notification-action:disabled:not(:last-child)"), "Popover opens and refresh finishes");
@@ -41,9 +43,15 @@ function filter(value: "all" | "unread") {
 }
 async function expectBadge(count: number) {
   await until(() => state().unreadNotificationCount === count, "Store unread count is " + count);
-  assert(await action("dock") === count, "Native Dock unread count equals " + count);
+  const shellBadge = await action("dock") as ShellBadgeResult;
+  assert(typeof shellBadge.accepted === "boolean", "Native shell reports whether the badge API is supported");
+  assert(shellBadge.requestedCount === count, "Production shell badge requests unread count " + count);
+  if (shellBadge.accepted) {
+    assert(shellBadge.nativeCount === count, "Accepted native shell unread count equals " + count);
+  }
+  shellBadgeChecks.push(shellBadge);
   const badge = document.querySelector(".notification-badge");
-  assert(count ? badge?.textContent === String(count) : !badge, "Bell unread count equals native Dock count");
+  assert(count ? badge?.textContent === String(count) : !badge, "Bell unread count equals the requested shell count");
 }
 async function create(title: string, failed = false) {
   const result = await action("create", { title, failed }) as { session: SessionSummary; notification: AppNotification };
@@ -60,10 +68,10 @@ window.notificationInboxProbe = async ({ reloadOnly = false } = {}) => {
   useAppStore.setState({ sessions: [completed.session] });
   await open();
   await expectBadge(1);
-  assert(rows().length === 1 && row(completed.notification.id), "Successful-only durable inbox must not be empty when Dock shows 1");
+  assert(rows().length === 1 && row(completed.notification.id), "Successful-only durable inbox must not be empty when unread count is 1");
   assert(row(completed.notification.id)?.textContent?.includes("Successful task"), "Completion title renders");
   assert(!document.querySelector(".notification-empty"), "Completion is visible instead of empty state");
-  checks.push("success-only-list-recovery-dock-1-bell-1-visible-completion");
+  checks.push("success-only-list-recovery-shell-request-1-bell-1-visible-completion");
   if (reloadOnly) return { ok: true, checks };
   const failure = await create("Failed task", true);
   await expectBadge(2);
@@ -93,7 +101,7 @@ window.notificationInboxProbe = async ({ reloadOnly = false } = {}) => {
   assert(rows().length === 0 && document.querySelector(".notification-empty"), "Unread shows empty after acknowledgement");
   filter("all");
   assert(rows().length === 2, "Acknowledgement keeps both rows in All");
-  checks.push("mark-all-read-both-kinds-clears-bell-and-dock");
+  checks.push("mark-all-read-both-kinds-clears-bell-and-shell-request");
 
   await create("Completion after acknowledgement");
   await expectBadge(1);
@@ -105,9 +113,14 @@ window.notificationInboxProbe = async ({ reloadOnly = false } = {}) => {
   durable = await action("list") as NotificationListResult;
   assert(durable.notifications.length === 0 && durable.unreadCount === 0, "Clear empties real durable inbox");
   assert(rows().length === 0 && document.querySelector(".notification-empty"), "Clear shows empty UI");
-  checks.push("new-success-after-read-clear-all-real-sqlite-bell-dock");
+  checks.push("new-success-after-read-clear-all-real-sqlite-bell-shell-request");
   unsubscribe();
   flushSync(() => root.unmount());
   return { ok: true, checks, host: "real-stdio-sqlite", renderer: "production-notification-center-api-zustand",
-    main: "production-notification-ipc-taskbar-badge", nativeBadge: "electron-app-getBadgeCount", providerCalls: 0, nativeNotificationsShown: 0 };
+    main: "production-notification-ipc-taskbar-badge", nativeBadge: {
+      readback: shellBadgeChecks.every((check) => check.accepted) ? "verified" : "native-api-unavailable",
+      checks: shellBadgeChecks,
+    },
+    nativeBadgeContract: "real setBadgeCount requests; getBadgeCount readback for accepted writes",
+    providerCalls: 0, nativeNotificationsShown: 0 };
 };

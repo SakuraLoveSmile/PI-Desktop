@@ -10,6 +10,14 @@ import { createTaskbarUnreadBadge } from "../../apps/desktop/electron/main/taskb
 
 const [fixtureDir, hostBinary] = process.argv.slice(2);
 app.setPath("userData", join(fixtureDir, "profile"));
+// Observe the real OS boundary; never replace its success/failure or readback.
+const badgeWrites = [];
+const setNativeBadgeCount = app.setBadgeCount.bind(app);
+app.setBadgeCount = (count) => {
+  const accepted = setNativeBadgeCount(count);
+  badgeWrites.push({ requestedCount: count, accepted });
+  return accepted;
+};
 let host, win, badge, watchdog, seeded;
 const handlers = new Map();
 const routes = new Map([
@@ -30,7 +38,7 @@ app.whenReady().then(async () => {
     await host.start();
     win = new BrowserWindow({ show: false, width: 620, height: 640,
       webPreferences: { preload: join(fixtureDir, "preload.cjs"), sandbox: true,
-        contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } });
+        offscreen: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } });
     win.webContents.on("console-message", (event) => console.error(event.message));
     badge = createTaskbarUnreadBadge({ getHost: () => host, getMainWindow: () => win,
       isQuitting: () => false, logger: { app: (...args) => console.error(...args) } });
@@ -70,9 +78,12 @@ app.whenReady().then(async () => {
       if (name === "seed") return seeded;
       if (name === "create") return createOutcome(input, true);
       if (name === "dock") {
-        // Explicit sync to the real refresh promise, with real native count readback.
+        // Linux requires a Unity launcher; headless Linux can reject this API.
+        // Still verify every host-to-shell request, and read back accepted writes.
         await badge.refresh();
-        return app.getBadgeCount();
+        const write = badgeWrites.at(-1);
+        if (!write) throw new Error("Production shell badge made no native count request");
+        return { ...write, platform: process.platform, nativeCount: app.getBadgeCount() };
       }
       if (name === "list") return host.call("notification.list", { limit: 200 });
       if (name === "screenshot") {

@@ -147,6 +147,8 @@ try {
       `(async () => { const r = await window.piDesktop.invoke(window.piDesktop.channels.invoke[${JSON.stringify(name)}], ...${JSON.stringify(args)}); if (!r.ok) throw new Error(JSON.stringify(r.error)); return r.data; })()`,
     );
   await send("Page.enable");
+  await send("Page.bringToFront");
+  await send("Emulation.setFocusEmulationEnabled", { enabled: true });
   const click = async (text, selector = "button", byLabel = false) => {
     await waitFor(
       () =>
@@ -234,16 +236,22 @@ try {
   await click("Auto", '.composer-permission-menu [role="menuitemradio"]');
   assert.ok(await evaluate(`document.body.innerText.includes('Auto can run restricted actions')`));
   await click(await evaluate(`document.querySelector('.scheduled-execution-toolbar .composer-model-thinking-chip').getAttribute('aria-label')`), 'button[aria-haspopup]', true);
-  await waitFor(() => evaluate(`!!document.querySelector('.composer-model-menu.is-open .composer-menu-root')`), 5000, "measured root menu");
-  await evaluate(`document.querySelector('.composer-menu-root .composer-menu-entry').click()`);
-  await waitFor(() => evaluate(`document.activeElement?.getAttribute('aria-label') === 'Search models'`), 5000, "model search focus");
-  await fill('.composer-model-search input', 'fixture-alt');
-  await waitFor(() => evaluate(`document.querySelectorAll('.composer-model-option').length === 1`), 5000, "filtered model");
-  await key("ArrowDown", 40);
+  await waitFor(() => evaluate(`!!document.querySelector('.composer-model-menu.is-open .composer-model-list') && document.activeElement?.matches('.composer-model-option')`), 5000, "direct model list with keyboard focus");
+  const modelRows = await evaluate(`[...document.querySelectorAll('.composer-model-option')].map(e => ({
+    model: e.title, provider: e.querySelector('.composer-model-option-provider')?.textContent.trim(),
+    focused: e === document.activeElement
+  }))`);
+  const alternateIndex = modelRows.findIndex(row => row.model === "fixture-alt" && row.provider === "Scheduled alternate model");
+  const focusedIndex = modelRows.findIndex(row => row.focused);
+  assert.ok(alternateIndex >= 0 && focusedIndex >= 0, "direct list exposes the requested provider/model and a focused option");
+  for (let step = 0; step < (alternateIndex - focusedIndex + modelRows.length) % modelRows.length; step++) {
+    await key("ArrowDown", 40);
+  }
+  assert.equal(await evaluate(`document.activeElement?.title`), "fixture-alt", "keyboard navigation reaches the requested model");
+  assert.equal(await evaluate(`document.activeElement?.querySelector('.composer-model-option-provider')?.textContent.trim()`), "Scheduled alternate model", "keyboard navigation retains provider identity");
   await key("Enter", 13);
-  await waitFor(() => evaluate(`!!document.querySelector('.composer-menu-root')`), 5000, "task model selection returns to root");
-  // The reasoning level is an inline slider on the measured root menu (issue
-  // #417); there is no separate reasoning view left to open.
+  await waitFor(() => evaluate(`document.querySelector('.composer-model-option[aria-checked="true"]')?.querySelector('.composer-model-option-provider')?.textContent.trim() === 'Scheduled alternate model'`), 5000, "task model selection remains on the direct list");
+  // Reasoning remains on the same surface as the directly visible model list.
   await click("high", ".composer-thinking-tick");
   await waitFor(() => evaluate(`document.querySelector('.composer-thinking-range')?.getAttribute('aria-valuetext') === 'high'`), 5000, "reasoning slider at high");
   await key("Escape", 27);
@@ -324,9 +332,8 @@ try {
   await click(await evaluate(`document.querySelector('.scheduled-execution-toolbar .composer-model-thinking-chip').getAttribute('aria-label')`), 'button[aria-haspopup]', true);
   await waitFor(() => evaluate(`!!document.querySelector('.composer-model-menu.is-open')`), 5000, "composer model menu");
   await screenshot("after-model-menu.png");
-  await evaluate(`document.querySelector('.composer-menu-root .composer-menu-entry').click()`);
-  await waitFor(() => evaluate(`!!document.querySelector('.composer-model-search')`), 5000, "shared model submenu");
-  await screenshot("after-model-search.png");
+  await waitFor(() => evaluate(`document.querySelector('.composer-model-option[aria-checked="true"]')?.title === 'fixture-alt' && document.activeElement?.matches('.composer-model-option')`), 5000, "shared direct list restores selected model and focus");
+  await screenshot("after-model-list.png");
   await key("Escape", 27);
   await choose("Cadence", "Weekly");
   await openSelect("Day of the week");

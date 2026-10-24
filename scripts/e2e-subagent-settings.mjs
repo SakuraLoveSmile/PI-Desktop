@@ -59,8 +59,11 @@ app.whenReady().then(async () => {
     win.webContents.focus();
     win.webContents.sendInputEvent({ type: "keyDown", keyCode: "Backspace" });
     win.webContents.sendInputEvent({ type: "keyUp", keyCode: "Backspace" });
+    await win.webContents.executeJavaScript("new Promise(requestAnimationFrame)");
     if (value) await win.webContents.insertText(value);
     await win.webContents.executeJavaScript("new Promise(resolve => requestAnimationFrame(resolve))");
+    const entered = await win.webContents.executeJavaScript("document.activeElement?.value");
+    if (entered !== value) throw new Error("Native number input did not settle before commit: " + JSON.stringify({ expected: value, entered }));
     const keyCode = commit === "Enter" ? "Enter" : "Tab";
     win.webContents.sendInputEvent({ type: "keyDown", keyCode });
     win.webContents.sendInputEvent({ type: "keyUp", keyCode });
@@ -69,12 +72,25 @@ app.whenReady().then(async () => {
   win.webContents.on("console-message", (event) => console.error(event.message));
   try {
     await win.loadFile(path.join(__dirname, "index.html"));
+    const focused = win.isFocused() ? Promise.resolve() : new Promise(resolve => win.once("focus", resolve));
+    win.show();
+    win.focus();
+    await focused;
+    win.webContents.focus();
+    win.webContents.debugger.attach("1.3");
+    await win.webContents.debugger.sendCommand("Emulation.setFocusEmulationEnabled", { enabled: true });
+    await win.webContents.executeJavaScript("new Promise(requestAnimationFrame)");
+    console.error("SUBAGENT_SETTINGS_STAGE native-focused-frame-ready");
     const result = await win.webContents.executeJavaScript("window.subagentSettingsProbe()");
     await win.webContents.executeJavaScript("new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
     writeFileSync(process.env.PI_E2E_EVIDENCE_PATH, (await win.capturePage()).toPNG());
     console.log("SUBAGENT_SETTINGS " + JSON.stringify(result));
     app.exit(0);
-  } catch (error) { console.error(error); app.exit(1); }
+  } catch (error) {
+    console.error(error);
+    writeFileSync(process.env.PI_E2E_EVIDENCE_PATH, (await win.capturePage()).toPNG());
+    app.exit(1);
+  }
 });
 `);
   const env = { ...process.env, PI_E2E_EVIDENCE_PATH: evidencePath }; delete env.ELECTRON_RUN_AS_NODE;
