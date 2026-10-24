@@ -274,6 +274,43 @@ The workflow executes these barriers in order:
    identity and may reuse only identical uploaded assets. A mismatched draft
    blocks publication. Do not delete or replace it automatically.
 
+### 4.4 Recover a failed publication
+
+Use recovery only when the original tag run completed its shared CI, native
+build and aggregation gates successfully, but the publish job failed after
+creating a draft or uploading assets. For example, run `40063318462` passed all
+six required gates and uploaded all seven assets into draft `422526425`; its
+publisher then failed because GitHub's release-by-tag endpoint does not return
+draft releases. The recovery workflow locates drafts through the paginated
+release list and checks the matching draft again by its numeric ID.
+
+Run the recovery workflow from current `main` with the original run ID:
+
+```bash
+gh workflow run recover-release-publication.yml --ref main \
+  -f release_run_id=40063318462 -R SakuraLoveSmile/PI-Desktop
+```
+
+Recovery accepts only a completed failed/cancelled tag-push run for this
+repository, with a canonical version tag, matching source SHA, all six required
+gates successful, a failed/cancelled publish job, and one unique, unexpired
+`release-bundle` artifact. The metadata step runs
+`node scripts/recover-release-publication.mjs --run-id <release_run_id>` and
+pins the unique artifact by its immutable numeric ID. The publish step downloads
+that artifact and runs
+`node scripts/recover-release-publication.mjs --run-id <release_run_id> --artifact-id <artifact_id> --directory dist`
+on a GitHub-hosted runner. It verifies that the manifest's `build.runAttempt`
+matches the original run's current `run_attempt`, so a bundle from a different
+attempt cannot be substituted. Recovery uses the publisher code checked out
+from the dispatch's current `main` SHA. It preserves the original tag, version,
+source SHA, manifest and matching draft, and does not rebuild or overwrite
+assets. Any `ALLOW_UNSIGNED_MACOS_RELEASE` opt-in must still be enabled and is
+frozen across recovery steps when the original release is unsigned.
+
+Recovery is not for build, test, aggregate, identity, digest or partial-run
+failures. A draft or asset mismatch remains in place for inspection and blocks
+recovery; never delete or replace it to make the workflow proceed.
+
 The sole packaging lane uses native `macos-15` arm64 and verifies `uname -m`
 before building the Rust host on the same runner.
 Signed lanes pin `CSC_NAME` to the configured certificate common name, force

@@ -119,6 +119,16 @@ Gatekeeper/notarization. Manual candidates may set `sign_macos: false` for
 unsigned debug artifacts. See the [release
 runbook](../docs/spec/06-delivery/06-release-runbook.md).
 
+For a tag run whose CI/build/aggregate gates passed but only publication failed,
+use the main-only `recover-release-publication.yml` workflow with the original
+run ID. The metadata step validates it with `--run-id <id>` and pins the
+immutable artifact ID; publication rechecks using
+`--run-id <id> --artifact-id <id> --directory dist`, including the original
+run attempt in the manifest. It republishes through the current-main
+`scripts/recover-release-publication.mjs` path without rebuilding or replacing
+assets. See the release runbook's recovery section. Build or validation failures
+and mismatched drafts are not recoverable through this path.
+
 ### Provider certificate regression
 
 - `node scripts/e2e-provider-certificates.mjs`: real desktop launcher and

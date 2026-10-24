@@ -213,6 +213,35 @@ gh variable set ALLOW_UNSIGNED_MACOS_RELEASE --body true -R SakuraLoveSmile/PI-D
    已公开 Release 不可变，不覆盖资产。失败草稿保留供检查；重试须匹配准确的
    source/manifest 身份，只复用相同资产，身份不符则阻塞，不自动删除或替换草稿。
 
+### 4.4 恢复失败的发布
+
+仅当原始标签运行已通过共享 CI、原生构建和聚合门禁，而发布作业在创建草稿或上传资产后失败，
+才使用恢复流程。例如运行 `40063318462` 已通过六项必需门禁，并将七个资产上传至草稿
+`422526425`；随后发布器因 GitHub 的按标签查询接口不会返回草稿 Release 而失败。
+恢复工作流通过分页 Release 列表查找草稿，并按数字 ID 再次核对匹配的草稿。
+
+从当前 `main` 使用原始运行 ID 启动恢复工作流：
+
+```bash
+gh workflow run recover-release-publication.yml --ref main \
+  -f release_run_id=40063318462 -R SakuraLoveSmile/PI-Desktop
+```
+
+恢复流程仅接受此仓库中已完成、因失败或取消结束的标签推送运行；标签必须是规范版本标签，
+source SHA 必须一致，六项必需门禁都成功，publish job 必须失败或取消，并且必须存在唯一且未过期的
+`release-bundle` 工件。恢复作业下载该不可变工件，并在 GitHub 托管 runner 上执行
+`scripts/recover-release-publication.mjs`。元数据步骤运行
+`node scripts/recover-release-publication.mjs --run-id <release_run_id>`，并以不可变数字 ID 固定唯一工件。
+发布步骤下载该工件，并运行
+`node scripts/recover-release-publication.mjs --run-id <release_run_id> --artifact-id <artifact_id> --directory dist`。
+脚本会验证清单中的 `build.runAttempt` 与原始运行当前的 `run_attempt` 完全一致，避免替换为其他
+attempt 的工件。恢复使用此次从当前 `main` SHA 检出的发布器代码。流程保留原标签、版本、source SHA、
+manifest 和匹配草稿，不重建或覆盖资产。原始 Release 为未签名版本时，仍须启用
+`ALLOW_UNSIGNED_MACOS_RELEASE`，且该许可会在恢复步骤间保持一致。
+
+构建、测试、聚合、身份、摘要校验或未完整运行失败时不得使用恢复流程。草稿或资产不匹配时，
+恢复会阻塞并保留现场供检查；不得为继续工作流而删除或替换它们。
+
 The sole packaging lane uses native `macos-15` arm64 and verifies `uname -m`
 before building the Rust host on the same runner. Signed lanes pin `CSC_NAME`
 to the configured certificate common name,

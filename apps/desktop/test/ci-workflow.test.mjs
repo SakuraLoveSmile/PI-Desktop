@@ -36,7 +36,40 @@ const builderRequire = createRequire(desktopRequire.resolve("electron-builder/pa
 const { load } = builderRequire("js-yaml");
 const releaseWorkflow = load(releaseWorkflowSource);
 const ciWorkflow = load(ciWorkflowSource);
+const recoveryWorkflow = load(await read("../../../.github/workflows/recover-release-publication.yml"));
 const releaseStep = (name) => releaseWorkflow.jobs.build.steps.find(step => step.name === name);
+
+test("publication recovery is main-only and downloads the original pinned artifact with isolated write permission", () => {
+  assert.deepEqual(Object.keys(recoveryWorkflow.on), ["workflow_dispatch"]);
+  assert.equal(recoveryWorkflow.on.workflow_dispatch.inputs.release_run_id.type, "string");
+  assert.equal(recoveryWorkflow.on.workflow_dispatch.inputs.release_run_id.required, true);
+  assert.deepEqual(recoveryWorkflow.permissions, { contents: "read", actions: "read" });
+  const { metadata, publish } = recoveryWorkflow.jobs;
+  assert.equal(metadata.if, "github.ref == 'refs/heads/main'");
+  assert.equal(publish.needs, "metadata");
+  assert.deepEqual(publish.permissions, { contents: "write", actions: "read" });
+  assert.deepEqual(publish.concurrency, {
+    group: "release-refs/tags/${{ needs.metadata.outputs.tag }}", "cancel-in-progress": false,
+  });
+  for (const job of [metadata, publish]) {
+    assert.equal(job["runs-on"], "ubuntu-latest");
+    const checkout = job.steps.find(step => step.uses?.startsWith("actions/checkout@"));
+    assert.equal(checkout.with.ref, "${{ github.sha }}");
+  }
+  const verify = metadata.steps.find(step => step.id === "verify");
+  assert.equal(verify.env.RELEASE_RUN_ID, "${{ inputs.release_run_id }}");
+  assert.equal(verify.env.ALLOW_UNSIGNED_MACOS_RELEASE, "${{ vars.ALLOW_UNSIGNED_MACOS_RELEASE || 'false' }}");
+  assert.equal(verify.run, 'node scripts/recover-release-publication.mjs --run-id "$RELEASE_RUN_ID"');
+  const download = publish.steps.find(step => step.uses?.startsWith("actions/download-artifact@"));
+  assert.deepEqual(download.with, {
+    "artifact-ids": "${{ needs.metadata.outputs.artifact_id }}", "run-id": "${{ needs.metadata.outputs.run_id }}",
+    "github-token": "${{ github.token }}", path: "dist", "merge-multiple": true,
+  });
+  const recover = publish.steps.at(-1);
+  assert.equal(recover.env.ALLOW_UNSIGNED_MACOS_RELEASE, "${{ needs.metadata.outputs.allow_unsigned_macos }}");
+  assert.equal(recover.env.RELEASE_ARTIFACT_ID, "${{ needs.metadata.outputs.artifact_id }}");
+  assert.equal(recover.run, 'node scripts/recover-release-publication.mjs --run-id "$RELEASE_RUN_ID" --artifact-id "$RELEASE_ARTIFACT_ID" --directory dist');
+});
 
 test("CI skips documentation-only pushes and pull requests", () => {
   assert.equal(
