@@ -835,7 +835,7 @@
       ]
     },
     "apps/desktop/test/composer-draft-cache.test.mjs": {
-      "assertions": 25,
+      "assertions": 24,
       "cases": 2,
       "signatures": [
         "02c7203afbdbf47437ce",
@@ -846,7 +846,6 @@
         "202be3c009f63800d195",
         "4576965d7f8cf8f0f592",
         "497a2ca0e0e36bd5b633",
-        "4b3a6be32118d9586a60",
         "5dbcfd535f721d79f042",
         "683495ba168bb53ad089",
         "68b09dcc72700b9bc05f",

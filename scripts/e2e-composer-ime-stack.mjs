@@ -61,10 +61,15 @@ const { app, BrowserWindow } = require("electron");
 const path = require("node:path");
 app.setPath("userData", path.join(__dirname, "profile"));
 app.whenReady().then(async () => {
-  const window = new BrowserWindow({ show: false, width: 1040, height: 760, webPreferences: { backgroundThrottling: false, sandbox: true, contextIsolation: true, nodeIntegration: false } });
+  const window = new BrowserWindow({ show: false, width: 1040, height: 760, webPreferences: { offscreen: true, backgroundThrottling: false, sandbox: true, contextIsolation: true, nodeIntegration: false } });
   window.webContents.on("console-message", (event) => console.error(event.message));
   try {
     await window.loadFile(path.join(__dirname, "index.html"));
+    console.error("COMPOSER_IME_STAGE renderer-loaded");
+    window.webContents.debugger.attach("1.3");
+    await window.webContents.debugger.sendCommand("Emulation.setFocusEmulationEnabled", { enabled: true });
+    await window.webContents.executeJavaScript("new Promise(requestAnimationFrame)");
+    console.error("COMPOSER_IME_STAGE frame-ready");
     const result = await window.webContents.executeJavaScript("globalThis.composerImeStackProbe()");
     console.log("COMPOSER_IME_STACK_PROBE " + JSON.stringify(result));
     app.exit(result && result.ok ? 0 : 1);

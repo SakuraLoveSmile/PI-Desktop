@@ -251,7 +251,13 @@ globalThis.composerPasteProbe = async () => {
     render("paste-a", "/project-a");
     await new Promise(requestAnimationFrame);
     assert(readEditorValue(controller.ref.current!) === referenceDraft,
-      "Settings round-trip lost a workspace file reference from the draft");
+      "Settings round-trip lost a workspace file reference from the draft: " + JSON.stringify({
+        text: readEditorValue(controller.ref.current!),
+        value: controller.value,
+        referenceCount: controller.fileReferences.length,
+        cachedText: readComposerDraft("paste-a")?.text,
+        cachedReferenceCount: readComposerDraft("paste-a")?.fileReferences.length,
+      }));
     assert(controller.fileReferences.length === 2 && controller.ref.current!.textContent!.includes("main.ts"),
       "Settings round-trip must restore both workspace and scratch chips");
     flushSync(() => root.render(null));
@@ -602,6 +608,7 @@ globalThis.composerPasteProbe = async () => {
       "closing did not restore the draft caret");
     for (const key of ["Enter", " "]) {
       chip.focus();
+      assert(document.activeElement === chip, "preview opener did not receive attachment focus");
       const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
       flushSync(() => chip.dispatchEvent(event));
       assert(event.defaultPrevented, "preview key inserted text or sent the draft");
@@ -610,6 +617,8 @@ globalThis.composerPasteProbe = async () => {
         "preview key altered or sent the draft");
       await globalThis.composerPreviewPressKey("Escape");
       await until(() => !dialog(), "native Escape did not dismiss the preview");
+      await until(() => document.activeElement === chip,
+        `native Escape did not restore attachment focus (editorFocused=${document.activeElement === editor})`);
       assert(!dialog() && document.activeElement === chip, "cancel did not close and restore attachment focus");
     }
     // The isolated host supplies real images within the allowed scratch directory.
@@ -761,6 +770,7 @@ globalThis.composerPasteProbe = async () => {
     close();
 
     // An image-only draft remains sendable and survives session switching.
+    console.log("COMPOSER_PASTE_STAGE image-only-session-switch");
     editor = await paste("", [image], true);
     assert(readEditorValue(editor) === "" && controller.draftSnapshot("").fileReferences.length === 1,
       "image-only draft lost its sendable attachment");
@@ -773,7 +783,14 @@ globalThis.composerPasteProbe = async () => {
     render("paste-a");
     await new Promise(requestAnimationFrame);
     assert(controller.fileReferences[0]?.path === attachedId && document.querySelector(".composer-image-attachment"),
-      "image-only draft did not survive session switching");
+      "image-only draft did not survive session switching: " + JSON.stringify({
+        draftKey: controller.draftKey,
+        activeSessionId: useAppStore.getState().activeSessionId,
+        referenceCount: controller.fileReferences.length,
+        cachedReferenceCount: readComposerDraft("paste-a")?.fileReferences.length,
+        hasOriginalReference: controller.fileReferences.some((reference) => reference.path === attachedId),
+        hasAttachmentRow: Boolean(document.querySelector(".composer-image-attachment")),
+      }));
 
     await paste("file names", nativeFiles);
     assert(

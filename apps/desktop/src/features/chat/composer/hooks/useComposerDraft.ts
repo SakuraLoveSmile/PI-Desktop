@@ -384,7 +384,7 @@ export function useComposerDraft({
     commitEditorDom();
   };
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const previousKey = draftKeyRef.current;
     if (previousKey !== draftKey) {
       invalidatePromptEnhancement();
@@ -392,12 +392,15 @@ export function useComposerDraft({
       if (previousKey === HOME_DRAFT_KEY) flushScheduledHomeDraftAdopt(draftKey);
       draftKeyRef.current = draftKey;
       const nextDraft = readComposerDraft(draftKey);
+      const nextReferences = nextDraft?.fileReferences.map((fileReference) =>
+        createFileReferenceFromSnapshot(fileReference, referenceSessionId),
+      ) ?? [];
+      // Publish the new owner's snapshot before passive effects can capture it.
+      // A rapid switch must not serialize the previous render's attachments.
+      valueRef.current = nextDraft?.text ?? "";
+      fileReferencesRef.current = nextReferences;
       setValue(nextDraft?.text ?? "");
-      setFileReferences(
-        nextDraft?.fileReferences.map((fileReference) =>
-          createFileReferenceFromSnapshot(fileReference, referenceSessionId),
-        ) ?? [],
-      );
+      setFileReferences(nextReferences);
       setCursor(nextDraft?.text.length ?? 0);
       return;
     }
@@ -406,10 +409,11 @@ export function useComposerDraft({
   }, [draftKey, referenceSessionId]);
 
   useEffect(() => {
+    if (draftKey !== draftKeyRef.current) return;
     captureComposerDraft(
       draftKey,
       valueRef.current,
-      fileReferences,
+      fileReferencesRef.current,
       workspacePath,
     );
   }, [draftKey, fileReferences, referenceSessionId, workspacePath]);

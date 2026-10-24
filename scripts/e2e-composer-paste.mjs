@@ -92,6 +92,21 @@ const history = [];
 const opened = [];
 let completeOpens;
 const opensDone = new Promise(resolve => { completeOpens = resolve; });
+async function loadDrawableFixture(window) {
+  await window.loadFile(path.join(__dirname, "index.html"));
+  console.error("COMPOSER_PASTE_STAGE renderer-loaded");
+  // Native Tab traversal requires a real focused widget, unlike paint-only probes.
+  const focused = window.isFocused() ? Promise.resolve() : new Promise(resolve => window.once("focus", resolve));
+  window.show();
+  window.focus();
+  await focused;
+  window.webContents.focus();
+  console.error("COMPOSER_PASTE_STAGE native-focused");
+  window.webContents.debugger.attach("1.3");
+  await window.webContents.debugger.sendCommand("Emulation.setFocusEmulationEnabled", { enabled: true });
+  await window.webContents.executeJavaScript("new Promise(requestAnimationFrame)");
+  console.error("COMPOSER_PASTE_STAGE frame-ready");
+}
 ipcMain.handle("pi-desktop/composer/pasteFiles", async (_event, input) => {
   const files = await saveComposerPasteFiles(__dirname, input.sessionId, input.files);
   for (let i = 0; i < files.length; i++) {
@@ -161,7 +176,7 @@ app.whenReady().then(async () => {
         window.webContents.sendInputEvent({ type: "keyDown", keyCode });
         window.webContents.sendInputEvent({ type: "keyUp", keyCode });
       });
-      await window.loadFile(path.join(__dirname, "index.html"));
+      await loadDrawableFixture(window);
       await window.webContents.executeJavaScript('globalThis.composerPreviewPressKey = key => new Promise(resolve => { document.addEventListener("keyup", () => requestAnimationFrame(resolve), { once: true }); console.log("PI_PREVIEW_KEY:" + key); }); void 0');
       const result = await window.webContents.executeJavaScript('globalThis.composerHistoryProbe("verify")');
       assert.equal(result.ok, true, JSON.stringify(result));
@@ -182,8 +197,7 @@ app.whenReady().then(async () => {
   } });
   window.webContents.on("console-message", (event) => console.error(event.message));
   try {
-    await window.loadFile(path.join(__dirname, "index.html"));
-    window.webContents.debugger.attach("1.3");
+    await loadDrawableFixture(window);
     const { root } = await window.webContents.debugger.sendCommand("DOM.getDocument");
     const { nodeId } = await window.webContents.debugger.sendCommand("DOM.querySelector", { nodeId: root.nodeId, selector: "#native-files" });
     await window.webContents.debugger.sendCommand("DOM.setFileInputFiles", { nodeId, files: [path.join(__dirname, "native-image.png"), path.join(__dirname, "native notes.txt")] });

@@ -90,13 +90,15 @@ export function useComposerImagePreview({
         const current = useAppStore.getState();
         if (!editor.isConnected || (current.activeSessionId ?? "") !== reference.sessionId ||
           (current.workspace?.path ?? null) !== openingWorkspace) return;
-        if (focused instanceof HTMLElement && focused.isConnected && (editor.contains(focused) || focused.closest(".composer-image-attachments"))) focused.focus();
-        else editor.focus();
         if (range && editor.contains(range.commonAncestorContainer)) {
           const selection = window.getSelection();
           selection?.removeAllRanges();
           selection?.addRange(range);
         }
+        // Restoring a contenteditable selection can focus it. Restore the
+        // originating control last so attachment openers retain keyboard focus.
+        if (focused instanceof HTMLElement && focused.isConnected && (editor.contains(focused) || focused.closest(".composer-image-attachments"))) focused.focus();
+        else editor.focus();
       },
     });
   }, [editorRef]);
