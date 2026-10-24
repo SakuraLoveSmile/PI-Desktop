@@ -67,6 +67,13 @@ request. It does not cancel an active provider stream or running tool. An idle
 runtime returns `{ requested: false }`; immediate `abort()` remains the
 separate cancellation path.
 
+Immediate abort drives active tool cancellation directly. Bash and image tools
+share one ten-second grace window for their execution result and Host abort
+acknowledgement; an unanswered abort RPC cannot extend that window. Partial
+results already returned by the Host are retained. After the deadline, late
+results cannot enter a subsequent turn, and a late abort failure is logged with
+the original turn/tool identity rather than emitted into the current transcript.
+
 ### 4.0 Active-turn steering
 
 `steer` validates the current turn identity before changing any state, then

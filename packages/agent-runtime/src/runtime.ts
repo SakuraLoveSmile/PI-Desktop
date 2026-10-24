@@ -3517,11 +3517,13 @@ export class DesktopAgentRuntime {
           resolveAborted = resolve;
         });
         let abortGraceTimer: ReturnType<typeof setTimeout> | undefined;
+        let abortDeadlineExpired = false;
         let stopped = false;
         const abort = () => {
           if (abortRequested || settled) return;
           abortRequested = true;
           if (hostAbortsTool) {
+            const abortTurnId = this.turnId;
             abortPromise = this.host
               .call("tools.abort", {
                 sessionId: this.sessionId,
@@ -3530,7 +3532,13 @@ export class DesktopAgentRuntime {
               .then(
                 () => undefined,
                 (error) => {
-                  abortError = error;
+                  if (abortDeadlineExpired) {
+                    process.stderr.write(
+                      `[agent-runtime] tool abort acknowledgement failed after deadline (session=${this.sessionId} turn=${abortTurnId} toolCall=${toolCallId}) code=${classifyAgentError(error).code}\n`,
+                    );
+                  } else {
+                    abortError = error;
+                  }
                 },
               );
           }
@@ -3539,9 +3547,12 @@ export class DesktopAgentRuntime {
           cleanup(true);
           if (hostAbortsTool) {
             // Bounded window for the partial output the host collected before
-            // the kill; past it the turn ends regardless.
+            // the kill and its acknowledgement; past it the turn ends regardless.
             abortGraceTimer = setTimeout(
-              () => resolveAborted(abortedMarker),
+              () => {
+                abortDeadlineExpired = true;
+                resolveAborted(abortedMarker);
+              },
               TOOL_ABORT_GRACE_MS,
             );
           } else {
@@ -3642,13 +3653,15 @@ export class DesktopAgentRuntime {
           executionFailed = true;
           executionError = error;
         } finally {
+          // The abort RPC shares the original grace window, including when
+          // execute has already returned partial output or an error.
+          if (abortPromise) await Promise.race([abortPromise, aborted]);
           this.delegatePermissionScopes.delete(toolCallId);
           cleanup(true);
           // cleanup is a no-op once the abort path has run, so the grace timer
           // it armed is released here instead.
           if (abortGraceTimer) clearTimeout(abortGraceTimer);
         }
-        if (abortPromise) await abortPromise;
         if (abortError) throw abortError;
         if (stopped) {
           throw Object.assign(
