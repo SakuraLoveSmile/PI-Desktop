@@ -1,6 +1,6 @@
 {
   "name": "@pi-desktop/desktop",
-  "version": "0.15.9",
+  "version": "0.15.10",
   "desktopName": "pi-desktop-plus.desktop",
   "private": true,
   "description": "Pi-Desktop-Plus Electron application",

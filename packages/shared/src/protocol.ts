@@ -2,7 +2,7 @@ export const PROTOCOL_VERSION = 11 as const;
 export const SCHEMA_VERSION = 22 as const;
 export const APP_ID = "cn.sakura.pi-desktop";
 export const APP_NAME = "Pi-Desktop-Plus";
-export const APP_VERSION = "0.15.9";
+export const APP_VERSION = "0.15.10";
 
 export const APP_MENU_COMMANDS = [
   "newTask",

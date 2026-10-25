@@ -6,6 +6,15 @@ export const PLUS_UPSTREAM_CUTOFF = "0.15.6";
 const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   en: [
     {
+      version: "0.15.10",
+      date: "2026-10-25",
+      highlights: [
+        "Fix macOS app launch failures caused by a missing resource seal by completing ad-hoc signing after packaging.",
+        "Verify app and Host signatures inside the actual ZIP and DMG before publishing.",
+        "Personal-use macOS Apple Silicon builds remain unnotarized and require manual download and installation.",
+      ],
+    },
+    {
       version: "0.15.9",
       date: "2026-10-24",
       highlights: [
@@ -53,6 +62,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "zh-CN": [
+    {
+      version: "0.15.10",
+      date: "2026-10-25",
+      highlights: [
+        "修复 macOS 应用因缺少资源封装而无法启动的问题，打包后完成 ad-hoc 签名。",
+        "发布前校验实际 ZIP 和 DMG 内应用及 Host 的签名。",
+        "个人使用的 macOS Apple Silicon 版本仍未经公证，需手动下载和安装。",
+      ],
+    },
     {
       version: "0.15.9",
       date: "2026-10-24",
@@ -102,6 +120,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   "zh-TW": [
     {
+      version: "0.15.10",
+      date: "2026-10-25",
+      highlights: [
+        "修正 macOS 應用程式因缺少資源封裝而無法啟動的問題，封裝後完成 ad-hoc 簽名。",
+        "發佈前驗證實際 ZIP 和 DMG 內應用程式及 Host 的簽名。",
+        "個人使用的 macOS Apple Silicon 版本仍未經公證，需手動下載與安裝。",
+      ],
+    },
+    {
       version: "0.15.9",
       date: "2026-10-24",
       highlights: [
@@ -149,6 +176,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   tr: [
+    {
+      version: "0.15.10",
+      date: "2026-10-25",
+      highlights: [
+        "Paketleme sonrasında ad-hoc imzalamayı tamamlayarak eksik kaynak mühründen kaynaklanan macOS açılış hatalarını düzeltir.",
+        "Yayımlamadan önce gerçek ZIP ve DMG içindeki uygulama ve Host imzalarını doğrular.",
+        "Kişisel kullanım için macOS Apple Silicon derlemeleri noter onaysız kalır; elle indirme ve kurulum gerekir.",
+      ],
+    },
     {
       version: "0.15.9",
       date: "2026-10-24",
@@ -198,6 +234,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   de: [
     {
+      version: "0.15.10",
+      date: "2026-10-25",
+      highlights: [
+        "Behebt macOS-Startfehler durch fehlende Ressourcenversiegelung mit vollständiger Ad-hoc-Signierung nach dem Paketieren.",
+        "Prüft vor der Veröffentlichung die Signaturen von App und Host in den tatsächlichen ZIP- und DMG-Dateien.",
+        "macOS-Apple-Silicon-Builds für den persönlichen Gebrauch bleiben ohne Notarisierung und erfordern manuellen Download und Installation.",
+      ],
+    },
+    {
       version: "0.15.9",
       date: "2026-10-24",
       highlights: [
@@ -245,6 +290,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   es: [
+    {
+      version: "0.15.10",
+      date: "2026-10-25",
+      highlights: [
+        "Corrige fallos de inicio en macOS por un sellado de recursos ausente al completar la firma ad hoc después del empaquetado.",
+        "Verifica las firmas de la aplicación y de Host dentro de los ZIP y DMG reales antes de publicar.",
+        "Las compilaciones personales de macOS para Apple Silicon siguen sin notarizarse y requieren descarga e instalación manuales.",
+      ],
+    },
     {
       version: "0.15.9",
       date: "2026-10-24",
@@ -294,6 +348,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   fr: [
     {
+      version: "0.15.10",
+      date: "2026-10-25",
+      highlights: [
+        "Corrige les échecs de lancement sur macOS dus à un scellement des ressources absent en terminant la signature ad hoc après la création du paquet.",
+        "Vérifie les signatures de l’application et de Host dans les véritables archives ZIP et DMG avant publication.",
+        "Les versions macOS Apple Silicon à usage personnel restent non notarisées et nécessitent un téléchargement et une installation manuels.",
+      ],
+    },
+    {
       version: "0.15.9",
       date: "2026-10-24",
       highlights: [
@@ -342,6 +405,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   ko: [
     {
+      version: "0.15.10",
+      date: "2026-10-25",
+      highlights: [
+        "패키징 후 ad-hoc 서명을 완료하여 리소스 봉인 누락으로 발생하던 macOS 앱 실행 실패를 수정합니다.",
+        "게시 전에 실제 ZIP과 DMG 안의 앱 및 Host 서명을 검증합니다.",
+        "개인용 macOS Apple Silicon 빌드는 여전히 공증되지 않으며 수동 다운로드와 설치가 필요합니다.",
+      ],
+    },
+    {
       version: "0.15.9",
       date: "2026-10-24",
       highlights: [
@@ -389,6 +461,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "pt-BR": [
+    {
+      version: "0.15.10",
+      date: "2026-10-25",
+      highlights: [
+        "Corrige falhas de inicialização no macOS causadas pela ausência do selo de recursos, concluindo a assinatura ad hoc após o empacotamento.",
+        "Verifica as assinaturas do aplicativo e do Host nos arquivos ZIP e DMG reais antes da publicação.",
+        "As compilações pessoais do macOS para Apple Silicon continuam sem notarização e exigem download e instalação manuais.",
+      ],
+    },
     {
       version: "0.15.9",
       date: "2026-10-24",
