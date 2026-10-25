@@ -42,8 +42,9 @@ Local-first · Model-agnostic · Plugin-powered · macOS / Windows / Linux
 
 > **Current release line: 0.15.x (Early Preview).**
 
-Version 0.15.9 improves Settings navigation and save recovery, Goal verification,
-the Composer and Overview, and runtime cancellation. Goal verification upgrades
+Version 0.15.10 fixes the macOS resource seal and verifies app/Host signatures
+inside the published ZIP and DMG. Personal-use Apple Silicon builds remain
+unnotarized and require manual download and installation. Goal verification upgrades
 local profiles to Plus schema P10 behind a migration backup; older builds require
 restoring the pre-upgrade profile before downgrading.
 

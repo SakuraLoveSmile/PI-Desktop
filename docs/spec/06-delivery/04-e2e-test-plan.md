@@ -17009,6 +17009,11 @@ renderer's durable transcript reads. No real model or provider is contacted.
 - Release case: missing signing inputs fail closed for the default signed lane
   and for an explicitly requested signed build; the explicit unsigned personal-
   use lane records `signedMacos: false` and requires manual download/install.
+  Both lanes require complete app resource seals and strict app/Host signature
+  integrity in the loose bundle, extracted ZIP and read-only mounted DMG before
+  upload. A missing seal/Host, invalid signature, archive failure or detach
+  failure blocks the gate. Unsigned packaging explicitly requests ad-hoc signing;
+  disabling certificate discovery must not skip the final sealing pass.
   Fixture signatures do not qualify actual notarization or live updates.
 - Evidence: record candidate/base, OS/architecture, tests and native scenarios
   separately. Native Windows/Linux and signed release evidence are required

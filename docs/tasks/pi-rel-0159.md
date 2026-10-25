@@ -2,6 +2,113 @@
 
 Status: 实现中. Project: `fork-pi-desktop`. Created: 2026-10-24, Asia/Taipei.
 
+## Reopened: macOS bundle seal (2026-10-25)
+
+The three workstreams landed through PR #66 and version `0.15.9` was published
+from `3389c46f4aae393d1639c11c868f0f1645143b89` (Release run
+`40104984525`). The seven cloud jobs and asset/hash/container checks passed;
+the original task worktrees and ten local branches were archived and removed.
+Those historical receipts remain under the recovery directory below. They did
+not prove final bundle signature integrity.
+
+The user's installed `0.15.9` and the official ZIP share the same executable
+and Info.plist bytes. The bundle has no `Contents/_CodeSignature/CodeResources`;
+`codesign --verify --deep --strict` fails with "code has no resources but
+signature indicates they must be present". The executable retains the
+`electron-main-linked` linker ad-hoc signature (`Info.plist=not bound`,
+`Sealed Resources=none`). This is a packaging defect, not a download checksum
+failure. No installed file, quarantine attribute or system security setting was
+changed during diagnosis.
+
+Follow-up branch: `fix/20261025-pi-rel-0159-macos-bundle-seal`, based on the
+published source above. Worktree:
+`/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop/20261025-fix-pi-rel-0159-macos-bundle-seal`.
+The lead exclusively owns workflow, verification script, tests and this record;
+the independent analyst confirmed the root cause read-only. Existing primary
+checkout policy edits remain excluded. Host dependency links are reused.
+
+Scope: explicitly select electron-builder's ad-hoc identity in the unsigned
+cloud lane and block every macOS upload unless the loose app and actual ZIP/DMG
+apps have complete resource seals and valid strict app/Host signatures. Preserve
+hardened runtime, entitlements, independent UUIDs, cloud-only packaging and the
+full Developer ID/team/notarization/stapler gate. No runtime/data behavior changes.
+
+Acceptance: the real workflow command selects identity `-` (red baseline saved
+with actual `null`); all signature/asset failures stop the gate and mounted DMGs
+are detached; native codesign detects resource tampering; exact-SHA GitHub-hosted
+packaging verifies the actual ZIP and DMG. Local fixtures do not qualify the
+cloud packages or Gatekeeper. Evidence lives in
+`.artifacts/pi-rel-0159-macos-bundle-seal/` until archived.
+
+Local follow-up verification: 41 targeted packaging/verification tests passed,
+including the native codesign tamper test; the release/publication/cloud-guard
+command passed all 86 tests (the sets overlap). The new gate rejects the
+original installed/official-asset tuple before extraction because its seal is
+missing. Bash syntax, diff whitespace, policy synchronization, source-regex
+budget, scenario index, Biome, style tokens, documentation locale/content checks
+and release-document version alignment passed. The primary four-document diff
+still has SHA256 `65f2a631ce8ddc825240a86d46a497ec6b75618abc769035ad3fc45eb9e58c78`.
+
+The local pnpm wrappers tried automatic dependency verification and stopped on
+the shared node_modules symlink before running their checks; the underlying
+existing Node/Biome checks were then run directly, without installing another
+environment. Runtime builds, full runtime E2E and Rust checks were NOT RUN
+locally because this follow-up changes only release tooling and tests. The
+cloud candidate still must pass its shared CI and actual package gates. The
+independent read-only review found no blocking defect and explicitly retained
+the distinction between ad-hoc integrity and Finder/Gatekeeper qualification.
+
+The first hosted candidate `43d67dd85e971db3b6a3da4d131e5b45a8399fd6`
+(run `40113057699`) passed Rust and isolated smoke. JS stopped in the new
+builder-selection test: Linux has no `/usr/bin/security`, which the real
+electron-builder queries before its ad-hoc fallback. The test now supplies an
+empty external keychain enumeration through the builder's existing result cache;
+configuration merging and identity selection remain real. No assertion, gate or
+product behavior was weakened. Native codesign and actual archive verification
+remain separate mandatory checks. This failed run did not package or publish.
+
+The repaired candidate `45838ad2d5866ada2a349653c9c640791538619a` passed
+all six validation/build/aggregate jobs in GitHub Actions run
+[40113692854](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/40113692854).
+Candidate publication was skipped as required. The downloaded artifact
+`12568245783` matched its API SHA256; all seven files, manifest, checksums,
+updater size/SHA512, ZIP CRC, DMG integrity and loose/ZIP/DMG strict app/Host
+signatures passed. The real extracted cloud app also launched with temporary
+HOME/data/profile roots: the exact main renderer showed the app and real
+preload/Main/Host project/session IPC returned successful empty lists. Its
+process exited, image mounts were absent and signatures remained valid.
+These results qualify that source's repaired `0.15.9` candidate only.
+
+On 2026-10-25 the user explicitly approved **0.15.10** as the replacement
+personal-use, non-notarized macOS arm64 release. Published `v0.15.9` and its assets
+remain immutable. PR #67 will include the version surfaces, nine locale notes
+and current README summary. Existing changelog expectations move to the new
+first entry while retaining every historical entry and upstream object check.
+No application behavior, schema or public protocol version changes are added.
+
+Prepared 0.15.10 local verification: release-document alignment passed; both
+shared changelog files passed all 28 tests; the release/publication/cloud-guard
+suite passed all 86 tests without skips. Policy synchronization, test-quality
+ratchet, scenario index, repository-configured Biome lint (142 files), style
+tokens, documentation locale/content checks (95 pairs, 627 pages) and diff
+whitespace checks passed. A file-scoped Biome invocation processed nothing
+because shared catalog files are outside its configured include set; the actual
+repository lint was subsequently run successfully. Independent read-only review
+found no blocker and confirmed retained changelog history and unnotarized limits.
+No local installer build or dependency installation ran. New-SHA cloud results
+remain required before merge.
+
+Remaining: validate the prepared 0.15.10 source and its exact hosted PR
+integration candidate, merge through repository gates, use the guarded tag
+helper on clean merged source, publish through Actions, inspect the actual
+formal assets, and archive/remove this request's remaining worktree and merged
+local branch. The external recovery directory's `current-status.json` and
+follow-up receipts extend this record with immutable source/run/artifact
+identities after merge without rewriting tagged source. Complete ad-hoc integrity
+does not establish Developer ID, notarization or Gatekeeper qualification;
+quarantined Finder acceptance remains NOT RUN. Installing or rewriting the
+user's real application/profile remains outside scope.
+
 ## Goal and authorization
 
 Finish the retained upstream fixes, Goal verification evidence, and Settings
@@ -98,7 +205,10 @@ and stop only this request's processes.
   manifest, checksums and asset identities. Archive residual unique/ignored
   work and check live path references before cleanup.
 
-## Verification and remaining work
+## Historical 0.15.9 integration log
+
+The following dated preparation log is retained as history. The reopened
+section above and external immutable receipts define the current state.
 
 ### Integration inventory
 
