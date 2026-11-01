@@ -47,7 +47,8 @@ test("the host owns the branch root search and the pager stamp", () => {
   // survives; a full rewrite from a stale snapshot would delete it.
   assert.match(host, /transcripts::update_message\(db\.data_dir\(\), session_id, &record\)/);
   assert.match(transcripts, /pub fn update_message\(/);
-  assert.match(transcripts, /fs::read_to_string\(&path\)/);
+  // Torn-tail updates and preservation of concurrent appends are verified by
+  // the behavioral Rust transcript tests, independent of the read API.
 });
 
 test("a transcript rewrite keeps each message's owning turn", () => {
