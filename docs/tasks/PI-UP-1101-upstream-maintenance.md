@@ -1,6 +1,6 @@
 # PI-UP-1101: Adopt verified upstream maintenance fixes
 
-- Project: `fork-pi-desktop`; status: 实现中.
+- Project: `fork-pi-desktop`; status: 待体验 (code validated; merge tracked separately).
 - Created: 2026-11-01 (Asia/Taipei).
 - Authority: this record. The user authorized merging useful PRs after the
   read-only upstream audit, including the necessary branch, PR and gated merge.
@@ -150,15 +150,49 @@ remote merge; record tested head/base/integration SHA and run URLs.
 
 ## Final candidate and landing evidence
 
-Before publishing, freeze this branch, refresh `origin/main`, build and attest
-the complete candidate using the provisioned host dependency overlays, then run
-the combined targeted checks and isolated E2E. The exact head/base, artifact
-hashes and suite results are recorded in `.review-evidence/build-candidate.json`
-and copied to the evidence directory. A dirty or changed candidate is not a
-passing candidate. Required checks, CI job conclusions and the integration
-candidate SHA/run URLs belong in the PR's validation record before merge.
-Any failed gate must be resolved on this branch; this record does not waive it.
-Only explicit user confirmation grants 已验收.
+- PR: [SakuraLoveSmile/PI-Desktop#68](https://github.com/SakuraLoveSmile/PI-Desktop/pull/68).
+- Validated code candidate: `46a89f7ff75b23897cc471e2783ac5ce7dcf90bf`;
+  base: `feb1a40e5a523a2935bf9434f36005aa99d1d91a`. The candidate was clean,
+  with the empty workspace-diff digest, throughout build and E2E.
+- Local environment: macOS, Node 22.23.2, provisioned dependency overlays,
+  isolated temporary profiles/workspaces, localhost model fixtures. Native Host
+  SHA256: `7fea9889cefc174885bbc35fe93f626474843d71a2bf6c3240c3849e0896eb73`.
+- Final combined tests: runtime 372, host-runtime 195, shared usage 12 and
+  Desktop 95 (674 JS cases); catalog/checker tests 25; Rust sessions 97 and
+  transcript 27. All passed. All nine workspace builds, complete native
+  Host/Desktop build, Desktop/runtime-regression typechecks, configured lint,
+  architecture, test-quality, paired docs and generated scenario checks passed.
+- Fourteen isolated E2E suites passed: five smokes; native Chromium IME;
+  production Electron paste/history/restart; checkpoint RPC/disk lifecycle;
+  production sidecar hosted search and retry-idle; Team member interrupt and
+  open-task gate; temporary Goal; Plus curated plugin installation/restart.
+  Sources, base, binary and compiled artifact hashes remained unchanged.
+- Hosted integration candidate:
+  `b395a420e47b5f272573253532980fb62b6ca52b`. Its entire tree equals the validated
+  code candidate. The downloaded E2E build receipt and result both identify
+  this merge ref, not only the branch head.
+- [CI run 41289537588](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/41289537588):
+  JS build/typecheck/lint/architecture/full workspace tests, Rust format/Clippy/
+  full tests, and five isolated Linux smoke suites all passed. Rust reported
+  1,280 passed and one existing ignored case. Hosted Node: 24.22.1.
+- [Docs run 41289537573](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/41289537573)
+  and [PR-base run 41289537533](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/41289537533)
+  passed. The earlier interrupted local full Rust run is superseded by this
+  complete hosted result; it is not reclassified as a local pass.
+- This final record update changes documentation only. Keep its executable tree
+  identical to the validated code candidate, re-attest the final source head,
+  and wait for all checks on the final PR head before merging. Final run links
+  and merge SHA are discoverable from the PR above; they are not guessed here.
+- Durable evidence archive:
+  `/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop/.archives/20261101-pi-up-1101/`.
+  It retains logs, command inventories, local/hosted build receipts, E2E results,
+  pre-existing primary-file hashes and worker patch-equivalence evidence, with
+  `SHA256SUMS`; `/tmp/pi-up-1101-artifacts` is the working copy.
+
+No Windows-device/OS candidate-window verification, real provider calls,
+installer build, release or installed-user-instance change is claimed. The
+provider-signature slice remains parent-only. User acceptance is still pending;
+only explicit confirmation grants 已验收.
 
 ## Delivery and recovery
 
