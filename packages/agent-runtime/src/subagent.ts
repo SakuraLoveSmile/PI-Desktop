@@ -475,7 +475,6 @@ export class SubagentRun {
       parentToolCallId: this.opts.parentToolCallId,
       onContext: request => this.emit({ type: "context_insights", request }),
     }, this.retryState);
-    if (this.interactionMode === "interactive") return binding;
     return { ...binding, streamFn: (...args: Parameters<typeof binding.streamFn>) =>
       withMalformedToolCallGuard(withInteractionPolicy(binding.streamFn(...args), this.interactionMode, normalizeInteractionQuestions)) };
   }
