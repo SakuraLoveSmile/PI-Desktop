@@ -96,6 +96,7 @@ app, not this worktree):
 | Date | Code revision | Environment | Command or action | Result / evidence |
 | --- | --- | --- | --- | --- |
 | 2026-11-02 | baseline `ec350c489` | worktree, Node 22.23.2 | targeted updater tests | 24 passed (pre-change baseline) |
+| 2026-11-02 | `7b33f7575` | worktree, Node 22.23.2 | `node scripts/check-pr-base-main.mjs` | Passed: `origin/main` `ec350c489` is an ancestor of the task head. |
 | 2026-11-02 | uncommitted change | worktree, Node 22.23.2 | same targeted tests before the implementation (new expectations only) | 6 failed: missing `resolveMacSigning`/`resolveMacSigningLane`, ad-hoc controller case in-app, darwin default automatic. Red baseline recorded. |
 | 2026-11-02 | uncommitted change | worktree, Node 22.23.2 | `node --test` updater + macOS identity packaging suites | 34/34 passed |
 | 2026-11-02 | uncommitted change | worktree, Node 22.23.2 | `node --test scripts/release-builder-arguments.test.mjs scripts/require-cloud-build.test.mjs` | 6/6 passed |
@@ -109,7 +110,7 @@ app, not this worktree):
 
 | Commit | Behavior change and reason | Validation | Merge / release |
 | --- | --- | --- | --- |
-| pending | Unsigned macOS packages stop attempting in-app installs; manual notify-and-link instead. | pending | Not authorized |
+| `7b33f7575` | Unsigned macOS packages stop attempting in-app installs; manual notify-and-link instead. | Unit/integration tests, typecheck (changed files clean), docs and policy gates as recorded above | Not authorized; no push/PR/merge/release |
 
 ## Delivery and recovery
 
