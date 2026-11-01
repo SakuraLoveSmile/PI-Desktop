@@ -4,6 +4,37 @@ import { createRuntime } from "./runtime-test-harness.js";
 
 describe("DesktopAgentRuntime configuration matching", () => {
 
+  it.each([
+    "git log --oneline | grep apply",
+    "git pull && kubectl apply -f k8s/",
+    "git diff --stat; terraform apply",
+    "git commit -m \"apply review feedback\"",
+    "git grep apply",
+    "echo git apply p.diff",
+    "git -C repo log | grep apply",
+    "git apply-patch",
+  ])("keeps the turn open after repeated failures of %s", async (command) => {
+    const host = {
+      call: vi.fn().mockResolvedValue({
+        ok: false,
+        isError: true,
+        errorCode: "TOOL_FAILED",
+        content: { exitCode: 1, stderr: "" },
+      }),
+    };
+    const runtime = createRuntime({ host });
+    try {
+      const bash = runtime["agent"].state.tools.find((tool) => tool.name === "Bash");
+      if (!bash) throw new Error("Bash must remain available");
+      for (const id of ["read-1", "read-2", "read-3"]) {
+        const result = await bash.execute(id, { command });
+        expect(result).not.toHaveProperty("terminate", true);
+      }
+    } finally {
+      await runtime.dispose();
+    }
+  });
+
   it("terminates a repeated Edit mismatch on the third failed attempt", async () => {
     const host = {
       call: vi

@@ -1,3 +1,4 @@
+import { recoverMalformedToolCalls } from "./tool-call-recovery.js";
 import { readSystemMessage } from "./system-transcript-journal.js";
 /**
  * Project pi session entries into the model context.
@@ -98,8 +99,8 @@ export function buildSessionContext(
   messages: AgentMessage[];
 } {
   return {
-    messages: buildContextEntries(pathEntries).flatMap((entry) =>
+    messages: recoverMalformedToolCalls(buildContextEntries(pathEntries).flatMap((entry) =>
       sessionEntryToContextMessages(entry, identity),
-    ),
+    )),
   };
 }

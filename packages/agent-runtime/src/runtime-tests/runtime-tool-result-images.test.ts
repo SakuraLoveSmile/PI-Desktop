@@ -134,4 +134,27 @@ describe("toolResultFromUi image restoration (issue #1073)", () => {
     expect(restored.content).toEqual(expected);
     await runtime.dispose();
   });
+  it.each(["MCP content property", "plugin bare content-block array"])(
+    "keeps embedded text resources and links visible during live execution and restore: %s",
+    async (shape) => {
+      const content = [
+        { type: "text", text: "Fetched contents" },
+        { type: "resource", resource: { uri: "file:///notes.txt", text: "Actual file body" } },
+        { type: "resource_link", name: "large.txt", uri: "https://example.test/large.txt" },
+      ];
+      const host = { call: vi.fn(async (method: string) => method === "project.instructions.resolve"
+        ? { entries: [] } : { ok: true, content: shape === "MCP content property" ? { content } : content }) };
+      const runtime = createRuntime({ host });
+      try {
+        const read = runtime["agent"].state.tools.find((tool) => tool.name === "Read");
+        if (!read) throw new Error("Read must remain available");
+        const result = await read.execute("resource-result", { path: "notes.txt" });
+        const expected = [{ type: "text", text: "Fetched contents\nActual file body\n[resource link] large.txt: https://example.test/large.txt" }];
+        expect(result.content).toEqual(expected);
+        expect(toolResultFromUi({ id: "resource-result", role: "tool", content: "", createdAt: new Date(1).toISOString(),
+          toolCallId: "resource-result", toolName: "Read", toolResult: result, toolStatus: "success" }, 1).content).toEqual(expected);
+      } finally { await runtime.dispose(); }
+    },
+  );
+
 });

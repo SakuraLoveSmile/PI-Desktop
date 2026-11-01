@@ -1,3 +1,4 @@
+import { restoredToolResultContent } from "./tool-result-content.js";
 /**
  * Rebuild a delegate's model context from its persisted transcript rows
  * (ADR 0279).
@@ -424,31 +425,7 @@ function truncateSeededMessages(
 
 function toolResultFromUi(m: UiMessage, timestamp: number): ToolResultMessage {
   const raw = m.toolResult;
-  const blocks: ToolResultMessage["content"] = [];
-  const rawBlocks =
-    isRecord(raw) && Array.isArray(raw.content) ? raw.content : undefined;
-  if (rawBlocks) {
-    for (const block of rawBlocks) {
-      if (!isRecord(block)) continue;
-      if (block.type === "text" && typeof block.text === "string") {
-        blocks.push({ type: "text", text: block.text });
-      } else if (
-        block.type === "image" &&
-        typeof block.data === "string" &&
-        typeof block.mimeType === "string"
-      ) {
-        blocks.push({
-          type: "image",
-          data: block.data,
-          mimeType: block.mimeType,
-        });
-      }
-    }
-  } else if (typeof raw === "string" && raw.trim()) {
-    blocks.push({ type: "text", text: raw });
-  } else if (raw !== undefined && raw !== null) {
-    blocks.push({ type: "text", text: safeJson(raw) });
-  }
+  const blocks = restoredToolResultContent(raw);
   if (blocks.length === 0) {
     blocks.push({
       type: "text",
