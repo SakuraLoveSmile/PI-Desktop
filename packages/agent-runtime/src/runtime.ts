@@ -1,3 +1,6 @@
+import { isValidToolCall, recoverMalformedToolCalls, withMalformedToolCallGuard } from "./tool-call-recovery.js";
+import { captureAssistantProviderReplay, restoreAssistantProviderReplay, providerReplayForBubble, providerReplayToolCallSignatures } from "./assistant-provider-replay.js";
+import { restoredToolResultContent, hostContentBlockText } from "./tool-result-content.js";
 import { TeamRunLimitStop } from "./team/run-limit-stop.js";
 import { AskToolInputs } from "./ask-tool-inputs.js";
 import { interactionRequiredError, normalizeInteractionQuestions, readInteractionRequiredError, withInteractionPolicy } from "./interaction-policy.js";
@@ -1116,13 +1119,20 @@ function mutationFailureKey(path: unknown): string {
   return String(path).replaceAll("\\", "/").replace(/^\.\//, "");
 }
 
+// Git consumes these values before the subcommand, including quoted paths/config.
+const gitOptionArgument = String.raw`(?:"(?:\\.|[^"\\])*"|'[^']*'|[^\s;&|]+)`;
+const gitApplyCommand = new RegExp(
+  String.raw`(?:^|[;&|]\s*)(?:env\s+|command\s+)?(?:\S+\/)?git(?:\s+(?:(?:-[Cc]|--git-dir|--work-tree)\s+${gitOptionArgument}|-[^\s;&|]+))*\s+apply(?:\s|$)`,
+  "m",
+);
+
 function isPatchCommand(command: unknown): boolean {
   if (typeof command !== "string") return false;
   return (
     /(?:^|[;&|]\s*)(?:env\s+|command\s+)?(?:\S+\/)?apply_patch(?:\s|$)/m.test(
       command,
     ) ||
-    /\bgit(?:\s+\S+)*\s+apply(?:\s|$)/m.test(command) ||
+    gitApplyCommand.test(command) ||
     /(?:^|[;&|]\s*)(?:env\s+|command\s+)?(?:\S+\/)?patch(?:\s|$)/m.test(
       command,
     )
@@ -1540,62 +1550,7 @@ export function toolResultFromUi(
   timestamp: number,
 ): ToolResultMessage {
   const raw: unknown = m.toolResult;
-  const blocks: ToolResultMessage["content"] = [];
-  const rawBlocks =
-    isRecord(raw) && Array.isArray(raw.content) ? raw.content : undefined;
-  if (rawBlocks) {
-    for (const b of rawBlocks) {
-      if (!isRecord(b)) continue;
-      if (b.type === "text" && typeof b.text === "string") {
-        blocks.push({ type: "text", text: b.text });
-      } else if (
-        b.type === "image" &&
-        typeof b.data === "string" &&
-        typeof b.mimeType === "string"
-      ) {
-        blocks.push({ type: "image", data: b.data, mimeType: b.mimeType });
-      }
-    }
-  } else if (Array.isArray(raw)) {
-    // Plugin tools may return a bare content-block array; restore its text
-    // and image blocks so a restart does not flatten them into JSON (#1360).
-    for (const b of raw) {
-      if (!isRecord(b)) continue;
-      if (b.type === "text" && typeof b.text === "string") {
-        blocks.push({ type: "text", text: b.text });
-      } else if (
-        b.type === "image" &&
-        typeof b.data === "string" &&
-        typeof b.mimeType === "string"
-      ) {
-        blocks.push({ type: "image", data: b.data, mimeType: b.mimeType });
-      }
-    }
-  } else if (typeof raw === "string" && raw.trim()) {
-    blocks.push({ type: "text", text: raw });
-  } else if (raw !== undefined && raw !== null) {
-    // A host Read of an image file returns a top-level `images` array rather
-    // than content blocks; restore those as real image content so the model
-    // sees the picture across a restart, not just the JSON text (#1073).
-    const rawObject = isRecord(raw) ? raw : undefined;
-    const images = rawObject?.images;
-    if (rawObject && Array.isArray(images)) {
-      const rest = { ...rawObject };
-      delete rest.images;
-      blocks.push({ type: "text", text: safeJson(rest) });
-      for (const image of images) {
-        if (
-          isRecord(image) &&
-          typeof image.data === "string" &&
-          typeof image.mimeType === "string"
-        ) {
-          blocks.push({ type: "image", data: image.data, mimeType: image.mimeType });
-        }
-      }
-    } else {
-      blocks.push({ type: "text", text: safeJson(raw) });
-    }
-  }
+  const blocks = restoredToolResultContent(raw);
   const interrupted = m.toolStatus === "running";
   const rawRecord: Record<string, unknown> | undefined = isRecord(raw)
     ? raw
@@ -1643,7 +1598,7 @@ function estimateToolTokenUsage(
   result: unknown,
   isError: boolean,
   timestamp: number,
-): ToolTokenUsage {
+): ToolTokenUsage | undefined {
   const toolCall = {
     role: "assistant" as const,
     content: [
@@ -1661,6 +1616,8 @@ function estimateToolTokenUsage(
     stopReason: "toolUse" as const,
     timestamp,
   } satisfies AssistantMessage;
+  // Optional telemetry must not suppress a terminal tool event.
+  if (!isValidToolCall(toolCall.content[0])) return undefined;
   const toolRow = {
     id: toolCallId,
     role: "tool" as const,
@@ -2139,14 +2096,6 @@ export class DesktopAgentRuntime {
           m.api,
         );
         const hookedOptions = this.withExtensionProviderHooks(requestOptions, m);
-        // The watchdog must be able to *stop* what it abandons. It wraps the
-        // retry adapter, so draining alone would let the adapter wake from its
-        // backoff and open a second request for this turn while the runtime is
-        // already re-running the turn — two provider requests and two bills for
-        // one answer. So the stall trips a signal this request owns, combined
-        // with pi's own run signal (Stop must keep working): the adapter refuses
-        // to start an attempt on an aborted signal, and its backoff sleep rejects.
-        const stallAbort = new AbortController();
         // Both output clamps must see the instructions the adapter sends,
         // rather than charging every superseded system snapshot again.
         const requestContext = requestTranscript(m, context);
@@ -2160,7 +2109,6 @@ export class DesktopAgentRuntime {
           maxTokens: clampOutputToContext(m, requestContext, hookedOptions.maxTokens),
           signal: AbortSignal.any([
             ...(hookedOptions.signal ? [hookedOptions.signal] : []),
-            stallAbort.signal,
             this.teamBudgetStop.providerSignal,
           ]),
         };
@@ -2172,17 +2120,22 @@ export class DesktopAgentRuntime {
           attemptOptions,
           (retryOptions) => {
             this.teamBudgetStop.assertModelAdmission();
+            // Backoff owns its own clock; only a live provider attempt can stall.
+            const stallAbort = new AbortController();
+            const providerOptions = { ...retryOptions, signal: AbortSignal.any([
+              ...(retryOptions.signal ? [retryOptions.signal] : []), stallAbort.signal,
+            ]) };
             const observer = contextRequestObserver(m, context, { providerId: this.provider.id,
               turnId: usageTurnId, step: contextInsightsStep, mode: this.mode },
               request => this.emit({ type: "context_insights", request }, usageTurnId),
               () => ({ providerStatus: this.providerResponseStatus, requestBytes: this.providerRequestBytes,
-                aborted: retryOptions.signal?.aborted }));
-            const observedOptions = { ...retryOptions, onPayload: async (payload: unknown, requestModel: Model<Api>) => {
+                aborted: providerOptions.signal.aborted }));
+            const observedOptions = { ...providerOptions, onPayload: async (payload: unknown, requestModel: Model<Api>) => {
               const replacement = await retryOptions.onPayload?.(payload, requestModel);
               observer.onPayload(replacement === undefined ? payload : replacement);
               return replacement;
             } };
-            return accountModelStream(m, () =>
+            return withStreamIdleTimeout(accountModelStream(m, () =>
             this.thinkingLevel === "omit"
               ? this.models.stream(omitThinkingModel(m), requestContext, observedOptions)
               : this.models.streamSimple(m, requestContext, observedOptions), {
@@ -2190,7 +2143,7 @@ export class DesktopAgentRuntime {
                 nativeCost: this.provider.modelConfig?.nativeCost,
                 onUsage: (usage) => this.emit({ type: "usage", usage }, usageTurnId),
                 ...observer,
-              });
+              }), m, streamIdleTimeoutMs(), () => stallAbort.abort());
           },
           {
             claim: (error, phase) => this.claimProviderRetry(error, phase),
@@ -2209,13 +2162,9 @@ export class DesktopAgentRuntime {
             },
           },
         );
-        // Zero-event idle watchdog: a stream that emits nothing for the
-        // configured budget ends as a STREAM_FAILED error and re-enters the
-        // shared transient retry path instead of hanging the turn on a
-        // connection the provider never closes.
-        return withInteractionPolicy(withStreamIdleTimeout(retryStream, m, streamIdleTimeoutMs(), () =>
-          stallAbort.abort(),
-        ), this.interactionMode, normalizeInteractionQuestions);
+        return withMalformedToolCallGuard(withInteractionPolicy(
+          retryStream, this.interactionMode, normalizeInteractionQuestions,
+        ));
       },
       // A vendor account has no long-lived key. Leaving it unset keeps pi-ai
       // from overriding the auth the provider just resolved for this request.
@@ -3083,6 +3032,7 @@ export class DesktopAgentRuntime {
     // the provider APIs require.
     let toolCarrier: AssistantMessage | undefined;
     let toolCarrierTurnId: string | undefined;
+    let carrierToolSignatures = new Map<string, string>();
     for (const m of orderSystemRows(history)) {
       // Subagent rows belong to the transcript and to review, never to the
       // parent's model context (ADR 0062): the parent only ever saw the `Task`
@@ -3118,20 +3068,28 @@ export class DesktopAgentRuntime {
         // but must never become model context on the next turn.
         if (m.status === "error" || m.isError || m.error) continue;
         const content: AssistantMessage["content"] = [];
-        if (m.thinking?.trim()) {
-          // Completions DeepSeek replay needs thinkingSignature so convertMessages
-          // maps the block to reasoning_content instead of dropping it (#296).
-          content.push({
-            type: "thinking" as const,
-            thinking: m.thinking,
-            ...(deepSeekCompletionsReplay
-              ? { thinkingSignature: "reasoning_content" as const }
-              : {}),
-          });
-        }
-        content.push(...restoreHostedSearchReplay(m.hostedSearch));
-        if (m.content?.trim()) {
-          content.push({ type: "text" as const, text: m.content });
+        const replayed = restoreAssistantProviderReplay(m.providerReplay, m.thinking ?? "", m.content ?? "");
+        if (replayed) {
+          const firstText = replayed.findIndex((block) => block.type === "text");
+          const hosted = restoreHostedSearchReplay(m.hostedSearch);
+          if (firstText < 0) content.push(...replayed, ...hosted);
+          else content.push(...replayed.slice(0, firstText), ...hosted, ...replayed.slice(firstText));
+        } else {
+          if (m.thinking?.trim()) {
+            // Completions DeepSeek replay needs thinkingSignature so convertMessages
+            // maps the block to reasoning_content instead of dropping it (#296).
+            content.push({
+              type: "thinking" as const,
+              thinking: m.thinking,
+              ...(deepSeekCompletionsReplay
+                ? { thinkingSignature: "reasoning_content" as const }
+                : {}),
+            });
+          }
+          content.push(...restoreHostedSearchReplay(m.hostedSearch));
+          if (m.content?.trim()) {
+            content.push({ type: "text" as const, text: m.content });
+          }
         }
         // Kept even when empty: a call-only turn has no text of its own and
         // becomes the carrier for the tool rows that follow. Assistants that
@@ -3154,6 +3112,7 @@ export class DesktopAgentRuntime {
         append(m.id, assistant, m.turnId);
         toolCarrier = assistant;
         toolCarrierTurnId = m.turnId;
+        carrierToolSignatures = providerReplayToolCallSignatures(m.providerReplay);
       } else if (m.role === "tool") {
         if (!m.toolCallId || !m.toolName) continue;
         // A carrier from a different durable turn cannot own this tool call.
@@ -3173,12 +3132,15 @@ export class DesktopAgentRuntime {
           };
           append(`${m.id}:carrier`, toolCarrier, m.turnId);
           toolCarrierTurnId = m.turnId;
+          carrierToolSignatures = new Map();
         }
+        const thoughtSignature = carrierToolSignatures.get(m.toolCallId);
         toolCarrier.content.push({
           type: "toolCall",
           id: m.toolCallId,
           name: m.toolName,
           arguments: toJsonObject(m.toolArgs),
+          ...(thoughtSignature ? { thoughtSignature } : {}),
         });
         toolCarrier.stopReason = "toolUse";
         append(m.id, toolResultFromUi(m, timestamp), m.turnId);
@@ -3783,9 +3745,8 @@ export class DesktopAgentRuntime {
           // and hand images to the model instead of stringifying (#1360).
           const textParts: string[] = [];
           for (const block of rawContent) {
-            if (isRecord(block) && block.type === "text" && typeof block.text === "string") {
-              textParts.push(block.text);
-            }
+            const blockText = hostContentBlockText(block);
+            if (blockText !== undefined) textParts.push(blockText);
           }
           collectImageBlocks(rawContent);
           text = textParts.join("\n") || JSON.stringify(rawContent, null, 2);
@@ -3795,9 +3756,8 @@ export class DesktopAgentRuntime {
           const contentBlocks = rawContent.content;
           const textParts: string[] = [];
           for (const block of contentBlocks) {
-            if (isRecord(block) && block.type === "text" && typeof block.text === "string") {
-              textParts.push(block.text);
-            }
+            const blockText = hostContentBlockText(block);
+            if (blockText !== undefined) textParts.push(blockText);
           }
           collectImageBlocks(contentBlocks);
           text = textParts.join("\n") || JSON.stringify(rawContent, null, 2);
@@ -8774,7 +8734,12 @@ export class DesktopAgentRuntime {
               ? { error: classifiedError, isError: true }
               : {}),
             ...(hostedSearch ? { hostedSearch } : {}),
+            providerReplay: failed || aborted ? undefined : providerReplayForBubble(
+              captureAssistantProviderReplay(event.message.content),
+              nextText === content.text && nextThinking === content.thinking,
+            ),
           };
+          if (!this.currentAssistant.providerReplay) delete this.currentAssistant.providerReplay;
           this.emit({ type: "message_end", message: this.currentAssistant });
           this.activeProviderRetryAttempt = 0;
           this.streamStartedAt = undefined;
@@ -9392,6 +9357,8 @@ export class DesktopAgentRuntime {
     this.pendingUserMessageId = userMessageId;
     this.resetRunRecoveryState();
     this.autonomousExecution = false;
+    const recovered = recoverMalformedToolCalls(this.agent.state.messages);
+    if (recovered !== this.agent.state.messages) this.setAgentMessages(recovered);
     if (this.executionProfile === "team" && this.teamContext?.isLead) {
       this.setAgentSystemPrompt(this.composeSystemPrompt());
     }

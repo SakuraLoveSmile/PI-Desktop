@@ -10125,3 +10125,34 @@ Final lifecycle and evidence scope: Native scenarios 001–010 use isolated Host
 | Plus 场景 | 用户路径 | 自动化入口 |
 | --- | --- | --- |
 | E2E-PLUS-worktree-memory-owner | 槽位启动 → 后续回合 → 更新/删除 → 映射失效 | project-context --worktree-memory；Rust 与启动/运行时测试 |
+
+
+### E2E-SESSION-checkpoint-write-lifecycle
+
+- 挂起流式回复已经发出的检查点 RPC，结算快照并关闭。Host 传输保持到保存响应返回，
+  重启受控 RPC 对端后读到同一条回复。
+- 挂起旧回合写入，结算并观察同会话新回合。新写入在旧写入之后，其他会话可以独立保存。
+  Flush 后磁盘保留新快照，待保存会话为空。
+- **自动化：** `node scripts/e2e-checkpoint-lifecycle.mjs` 使用生产 HostProcess、
+  TurnEventPipeline、InflightCheckpointer 与临时磁盘上的受控 RPC 对端；不代表原生
+  Rust 恢复或 UI。Rust transcript/session 测试验证存储侧及 UTF-8 截断恢复。
+
+### E2E-RUNTIME-provider-attempt-idle
+
+- localhost 提供商返回 429 和 30 秒 Retry-After，在 30 秒流空闲限制下，下一次请求成功，
+  不因退避误报超时或多重试。退避期间 Stop 后不发第二个请求。
+- 从不返回响应头的请求先超时并关闭连接，再开始重试；两次请求不重叠，成功答案可见。
+- **自动化：** `node scripts/e2e-provider-retry-idle.mjs --bundle
+  packages/agent-runtime/dist-bundle/sidecar.js` 使用生产 sidecar、localhost HTTP 与临时数据，
+  不访问付费提供商或用户配置。异常工具批次、Continue、签名和缓存预算压缩另由实际
+  adapter 与受控外部边界的运行时集成测试覆盖。
+
+### E2E-COMPOSER-native-ime-slash
+
+- 原生中文合成输入斜杠类字符时，textarea 保留正在合成的值；提交后草稿恰好一个 `/`，
+  菜单只打开一次，后续输入命令并接受正常。遗漏 compositionend 时由普通输入恢复；
+  会话和工作区切换隔离草稿。
+- **自动化：** `node scripts/e2e-composer-ime-stack.mjs` 在隔离 Chromium 中挂载生产
+  Composer/input/hooks，使用 CDP 原生合成。`node scripts/e2e-composer-paste.mjs` 保留
+  生产 Electron 历史、重启和会话/工作区草稿路径。该证据验证 Chromium 合成事件，
+  不代表操作系统候选窗或 Windows 真机测试。

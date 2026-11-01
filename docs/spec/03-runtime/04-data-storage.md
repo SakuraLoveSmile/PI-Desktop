@@ -1123,6 +1123,13 @@ type Block =
 - Assistant thinking is stored only in `thinking` blocks inside the file. The
   derived `text` column contains final answer text, so transcript search and
   answer previews do not expose or mix reasoning.
+- Optional assistant `providerReplay` metadata uses version 1: ordered thinking
+  and text block UTF-16 lengths/signatures, plus call-id-linked function-call
+  signatures. It lives in the existing JSONL `meta` object, including signed
+  call-only assistant rows; SQLite schema and search projections are unchanged.
+  Capture is bounded to 64 KiB per row. Missing/invalid metadata or mismatched
+  text lengths retain the plain replay path; valid call signatures can still
+  be restored independently of text lengths. Legacy rows need no migration.
 - Per-response usage/model metadata rides in the file line's `meta` object;
   `turns` holds the summable rollup — no `json_each` at query time. Optional
   response stream duration and estimated tool token footprints are preserved
@@ -1536,6 +1543,13 @@ sweep promotes a leftover checkpoint whose final row never landed: as
 checkpoint. A user Stop does not touch the checkpoint, because the runtime's
 own aborted final row is still on its way and removes it on arrival.
 Electron handshake awaits the outbox drain before a cold `session.get`.
+Settling drops unissued snapshots but retains already-issued checkpoint writes
+until their replies arrive. Subsequent turns in the same session serialize
+behind those writes; other sessions remain independent. Shutdown drains issued
+writes before closing the Host transport, even if their snapshots were settled.
+A torn UTF-8 inflight file is treated as an absent checkpoint. Transcript
+metadata updates tolerate a torn append tail while preserving valid records,
+so recovery does not require deleting the transcript or resetting user data.
 Renderer-side Stop never rewrites a transcript that has a
 started reply (spec 01 §5.3); its only rewrite is the undo of an unanswered
 prompt, computed from the full durable transcript merged with the live rows.

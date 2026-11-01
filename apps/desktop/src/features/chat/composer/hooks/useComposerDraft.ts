@@ -61,7 +61,7 @@ export type ComposerDraftController = {
   cursor: number;
   setCursor: Dispatch<SetStateAction<number>>;
   composing: boolean;
-  setComposing: Dispatch<SetStateAction<boolean>>;
+  setComposing: (next: boolean) => void;
   inputFocused: boolean;
   setInputFocused: Dispatch<SetStateAction<boolean>>;
   placeholderIndex: number;
@@ -73,7 +73,7 @@ export type ComposerDraftController = {
   referenceByTokenRef: { current: Map<string, ComposerFileReference> };
   removeChipByTokenRef: { current: (token: string) => void };
   updateCursor: (next: number) => void;
-  handleInput: (source: string, caret: number) => string;
+  handleInput: (source: string, caret: number, composing?: boolean) => string;
   readLiveDraft: () => string;
   persistDraft: (key?: string) => void;
   paintCurrentDraft: (element: HTMLElement, nextValue: string) => void;
@@ -145,7 +145,7 @@ export function useComposerDraft({
   // cursor so autocomplete trigger detection stays quiet.
   const updateCursor = (next: number) =>
     setCursor((current) => (current === next ? current : next));
-  const [composing, setComposing] = useState(false);
+  const [composing, setComposingState] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
@@ -163,6 +163,13 @@ export function useComposerDraft({
 
   const valueRef = useRef(value);
   valueRef.current = value;
+  const compositionRef = useRef<{ draftKey: string; empty: boolean } | null>(null);
+  const setComposing = (next: boolean) => {
+    if (next) {
+      compositionRef.current = { draftKey: draftKeyRef.current, empty: valueRef.current === "" };
+    }
+    setComposingState(next);
+  };
   const fileReferencesRef = useRef(fileReferences);
   fileReferencesRef.current = fileReferences;
 
@@ -171,6 +178,7 @@ export function useComposerDraft({
     const current = valueRef.current;
     const next = typeof action === "function" ? action(current) : action;
     if (next !== current) {
+      compositionRef.current = null;
       markComposerDraftEdited(draftKeyRef.current);
       valueRef.current = next;
     }
@@ -327,11 +335,18 @@ export function useComposerDraft({
   removeChipByTokenRef.current = removeChipByToken;
 
   /** Commit a native contenteditable input while preserving IME correction. */
-  const handleInput = (source: string, caret: number): string => {
+  const handleInput = (source: string, caret: number, composingInput = false): string => {
+    if (composingInput && compositionRef.current?.draftKey !== draftKeyRef.current) {
+      compositionRef.current = { draftKey: draftKeyRef.current, empty: valueRef.current === "" };
+    }
+    // Pre-edit updates already change valueRef; retain whether this composition began empty.
+    const startedEmpty =
+      compositionRef.current?.draftKey === draftKeyRef.current && compositionRef.current.empty;
     const nextValue =
-      valueRef.current === ""
+      !composingInput && (valueRef.current === "" || startedEmpty)
         ? rewriteIdeographicCommaTrigger(source)
         : source;
+    if (!composingInput) compositionRef.current = null;
     markComposerDraftEdited(draftKeyRef.current);
     invalidatePromptEnhancement();
     if (nextValue === source) {
@@ -354,6 +369,7 @@ export function useComposerDraft({
     if (!element) return;
     const nextValue = readEditorValue(element);
     const { start } = editorSelectionRange(element);
+    compositionRef.current = null;
     markComposerDraftEdited(draftKeyRef.current);
     invalidatePromptEnhancement();
     editorValueRef.current = nextValue;
@@ -385,6 +401,7 @@ export function useComposerDraft({
   useLayoutEffect(() => {
     const previousKey = draftKeyRef.current;
     if (previousKey !== draftKey) {
+      compositionRef.current = null;
       invalidatePromptEnhancement();
       persistDraft(previousKey);
       if (previousKey === HOME_DRAFT_KEY) flushScheduledHomeDraftAdopt(draftKey);
@@ -467,6 +484,7 @@ export function useComposerDraft({
     // Validate the loaded owner's workspace, including when only its session
     // changes. The departing owner's path must never invalidate incoming refs.
     if (workspacePathRef.current === workspacePath) return;
+    compositionRef.current = null;
     workspacePathRef.current = workspacePath;
     const current = fileReferencesRef.current;
     // Plugin marks carry their text, not a workspace path.
@@ -511,6 +529,7 @@ export function useComposerDraft({
 
   useEffect(() => {
     if (!composerPrefill || composerPrefill.sessionId !== activeSessionId) return;
+    compositionRef.current = null;
     markComposerDraftEdited(draftKeyForSession(composerPrefill.sessionId));
     setValue(composerPrefill.text);
     setFileReferences((current) => [
@@ -532,6 +551,7 @@ export function useComposerDraft({
 
   useEffect(() => {
     if (!prefill?.text) return;
+    compositionRef.current = null;
     markComposerDraftEdited(draftKeyRef.current);
     setValue(prefill.text);
     setFileReferences([]);
@@ -549,6 +569,7 @@ export function useComposerDraft({
     caret: number,
     focus = true,
   ) => {
+    compositionRef.current = null;
     const detached = detachImageTokens(nextText, nextReferences, caret);
     nextText = detached.text;
     nextReferences = detached.references;

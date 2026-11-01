@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Type } from "typebox";
 import type { AgentEventEnvelope, SubagentDefinition } from "@pi-desktop/shared";
-import type { Message } from "@earendil-works/pi-ai";
+import { createAssistantMessageEventStream, type Message } from "@earendil-works/pi-ai";
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import {
   composeSubagentSystemPrompt,
   MAX_SUBAGENT_REPORT_CHARS,
@@ -142,6 +143,66 @@ describe("composeSubagentSystemPrompt", () => {
 });
 
 describe("SubagentRun event forwarding", () => {
+  it.each(["blank name", "blank id"])(
+    "rejects the whole malformed tool batch before an interactive delegate executes siblings: %s",
+    async (invalid) => {
+      const execute = vi.fn(async () => ({ content: [{ type: "text" as const, text: "Changed" }], details: {} }));
+      const events: AgentEventEnvelope[] = [];
+      let requests = 0;
+      vi.stubGlobal("fetch", vi.fn(async () => {
+        requests++;
+        if (requests > 2) throw new Error("Unexpected provider request");
+        const delta = requests === 1 ? { role: "assistant", tool_calls: [
+          { index: 0, id: "valid-sibling", type: "function", function: { name: "Write", arguments: "{}" } },
+          { index: 1, id: invalid === "blank id" ? "" : "malformed", type: "function",
+            function: { name: invalid === "blank name" ? "" : "Write", arguments: "{}" } },
+        ] } : { role: "assistant", content: "Finished" };
+        const chunk = (delta: unknown, finish: string | null) => `data: ${JSON.stringify({ id: "fixture", object: "chat.completion.chunk",
+          created: 1, model: "local-model", choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`;
+        return new Response(chunk(delta, null) + chunk({}, requests === 1 ? "tool_calls" : "stop") + "data: [DONE]\n\n",
+          { headers: { "content-type": "text/event-stream" } });
+      }));
+      try {
+        const run = new SubagentRun({
+          definition: definition({ tools: ["Write"] }), sessionId: "interactive-malformed", turnId: "turn-1",
+          parentToolCallId: "task-1", task: "Make the requested change", provider: { ...provider, apiStyle: "chat_completions" },
+          thinkingLevel: "off", systemPrompt: "system",
+          tools: [{ name: "Write", label: "Write", description: "Apply a change", parameters: Type.Object({}), execute }],
+          onEvent: (event) => events.push(event),
+        });
+        const result = await run.run();
+        expect(execute).not.toHaveBeenCalled();
+        expect(requests).toBe(1);
+        expect(result).toMatchObject({ status: "failed", error: { details: { origin: "local", phase: "context-validation" } } });
+        expect(events.some(({ event }) => event.type === "tool_start")).toBe(false);
+      } finally { vi.unstubAllGlobals(); }
+    },
+  );
+
+  it("resumes a malformed-call history without executing its old tools", async () => {
+    const { run } = createRun({ initialMessages: [assistantMessage({ content: [
+      { type: "text", text: "Retained findings." },
+      { type: "toolCall", id: "bad-call", name: "", arguments: {} },
+    ] })] as AgentMessage[] });
+    const requests: Message[][] = [];
+    run.agent.streamFunction = (_model: unknown, context: { messages: Message[] }) => {
+      requests.push(context.messages);
+      const message = assistantMessage({ content: [{ type: "text", text: "Finished the review." }], stopReason: "stop" });
+      const stream = createAssistantMessageEventStream();
+      queueMicrotask(() => {
+        stream.push({ type: "start", partial: message } as never);
+        stream.push({ type: "done", reason: "stop", message } as never);
+        stream.end(message as never);
+      });
+      return stream;
+    };
+    const result = await run.run();
+    expect(result.status).toBe("completed");
+    expect(requests).toHaveLength(1);
+    expect(JSON.stringify(requests)).toContain("Retained findings.");
+    expect(JSON.stringify(requests)).not.toContain("bad-call");
+  });
+
   it("keeps the no-pass selection out of the agent's canonical state", () => {
     const { run } = createRun({ thinkingLevel: "omit" });
 

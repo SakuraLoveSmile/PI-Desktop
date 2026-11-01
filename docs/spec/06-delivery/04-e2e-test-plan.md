@@ -18996,3 +18996,44 @@ push or PR authorization.
   records; no real credentials, provider calls, user data or marketplace writes.
   Browser inspection uses the same production components in a local preview.
   This is renderer acceptance evidence, not live Host/service or release proof.
+
+
+### E2E-SESSION-checkpoint-write-lifecycle
+
+- Observe a streaming reply, hold its issued checkpoint RPC, settle the snapshot
+  and begin shutdown. The Host transport stays alive until the save completes;
+  restarting the controlled peer reads the same persisted reply.
+- Hold an old turn's save, settle it and observe a newer turn in the same
+  session. Its save follows the old one; an unrelated session saves immediately.
+  Flush completes with the newer snapshot on disk and no pending sessions.
+- **Automation:** `node scripts/e2e-checkpoint-lifecycle.mjs` uses production
+  HostProcess, TurnEventPipeline and InflightCheckpointer with a controlled RPC
+  peer and real temporary disk. It does not validate native Rust recovery or UI;
+  Rust transcript/session tests cover the storage half, including torn UTF-8.
+
+### E2E-RUNTIME-provider-attempt-idle
+
+- A loopback provider answers 429 with a 30-second Retry-After. With a 30-second
+  stream-idle limit, the next attempt completes once, without a spurious timeout
+  or extra retry. Stop during backoff aborts without a second request.
+- A request that never returns headers times out and closes its socket before
+  the retry starts; attempts do not overlap and the recovered answer is visible.
+- **Automation:** `node scripts/e2e-provider-retry-idle.mjs --bundle
+  packages/agent-runtime/dist-bundle/sidecar.js` uses the production bundled
+  sidecar and localhost HTTP with temporary state. No paid provider or user
+  profile is accessed. Parent/delegate malformed batches, Continue, signatures
+  and cached-budget compaction additionally run through runtime integration
+  tests with real adapters and controlled external boundaries.
+
+### E2E-COMPOSER-native-ime-slash
+
+- Start native Chinese composition containing a slash-like character. While
+  composition is active, the controlled textarea keeps the native value. Commit
+  it: the draft contains exactly one `/`, the menu opens once, and typing a
+  command and accepting it works. An IME that omits compositionend still recovers
+  on the next ordinary input event. Session/workspace changes isolate drafts.
+- **Automation:** `node scripts/e2e-composer-ime-stack.mjs` mounts production
+  Composer/input/hooks in isolated Chromium and drives CDP native composition.
+  `node scripts/e2e-composer-paste.mjs` retains production Electron history,
+  restart and session/workspace draft paths. This verifies Chromium composition
+  events, not an operating-system candidate-window or Windows-device session.

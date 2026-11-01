@@ -1,3 +1,4 @@
+import { recoverMalformedToolCalls, withMalformedToolCallGuard } from "./tool-call-recovery.js";
 /**
  * Subagents: bounded delegate agent loops spawned by the `Task` tool (ADR 0062).
  *
@@ -310,7 +311,7 @@ export class SubagentRun {
         model: binding.model,
         tools: this.interactionMode === "unattended" ? opts.tools.filter(tool => tool.name !== "asktool") : opts.tools,
         thinkingLevel: binding.agentThinkingLevel,
-        messages: opts.initialMessages ? [...opts.initialMessages] : [],
+        messages: recoverMalformedToolCalls(opts.initialMessages ? [...opts.initialMessages] : []),
       },
       toolExecution: "parallel",
     });
@@ -474,9 +475,8 @@ export class SubagentRun {
       parentToolCallId: this.opts.parentToolCallId,
       onContext: request => this.emit({ type: "context_insights", request }),
     }, this.retryState);
-    if (this.interactionMode === "interactive") return binding;
     return { ...binding, streamFn: (...args: Parameters<typeof binding.streamFn>) =>
-      withInteractionPolicy(binding.streamFn(...args), this.interactionMode, normalizeInteractionQuestions) };
+      withMalformedToolCallGuard(withInteractionPolicy(binding.streamFn(...args), this.interactionMode, normalizeInteractionQuestions)) };
   }
 
   private installContextOutcome(
