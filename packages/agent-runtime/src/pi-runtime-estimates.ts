@@ -1,12 +1,12 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import {
-  calculateContextTokens,
   estimateMessageTokens as estimateProviderMessageTokens,
   getLastAssistantUsageInfo,
 } from "@earendil-works/pi-ai/utils/estimate";
 import { LocalRequestError } from "@earendil-works/pi-ai";
 import { validateHostedSearchMessages } from "@earendil-works/pi-ai/utils/hosted-search";
 import type { Api, Message, Model } from "@earendil-works/pi-ai";
+import { contextOccupancyTokens } from "@pi-desktop/shared";
 
 export type ContextUsageEstimate = {
   tokens: number;
@@ -82,7 +82,16 @@ export function estimateContextTokens(
     return { tokens, usageTokens: 0, trailingTokens: tokens, lastUsageIndex: null };
   }
   const lastUsageIndex = providerMessageIndices[usageInfo.index]!;
-  const usageTokens = calculateContextTokens(usageInfo.usage);
+  const occupancy = contextOccupancyTokens({
+    inputTokens: usageInfo.usage.input,
+    outputTokens: usageInfo.usage.output,
+    cacheReadTokens: usageInfo.usage.cacheRead,
+    cacheWriteTokens: usageInfo.usage.cacheWrite,
+    totalTokens: usageInfo.usage.totalTokens,
+  });
+  // Gateways can omit cache from total or report only a partial bucket breakdown.
+  const total = usageInfo.usage.totalTokens;
+  const usageTokens = Math.max(occupancy, Number.isFinite(total) ? Math.round(total) : 0);
   let trailingTokens = 0;
   for (let index = lastUsageIndex + 1; index < messages.length; index++) {
     trailingTokens += estimateTokens(messages[index]!, model);
