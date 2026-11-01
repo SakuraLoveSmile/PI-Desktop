@@ -146,6 +146,8 @@ IDs come from executable result/test calls and annotated dynamic suites. 文档�
 | settings-extensions | settings-storage | nightly | [scripts/e2e-settings-extensions.mjs](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-settings-extensions.mjs)  | Production renderer components with explicit in-memory preload fixtures and an isolated Electron profile; unknown IPC fails. No real accounts, provider calls, user data or marketplace writes.  |
 | settings-models-usability | settings-storage | nightly | [scripts/e2e-settings-models-usability.mjs](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-settings-models-usability.mjs)  | Production renderer components with explicit in-memory preload fixtures and an isolated Electron profile; unknown IPC fails. No real accounts, provider calls, user data or marketplace writes.  |
 | settings-workspace | settings-storage | nightly | [scripts/e2e-settings-workspace.mjs](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-settings-workspace.mjs)  | Production renderer components with explicit in-memory preload fixtures and an isolated Electron profile; unknown IPC fails. No real accounts, provider calls, user data or marketplace writes.  |
+| checkpoint-lifecycle | sessions | nightly | [scripts/e2e-checkpoint-lifecycle.mjs](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-checkpoint-lifecycle.mjs)  | Production HostProcess/checkpointer with a controlled RPC peer and temporary disk; no native Host, user profile, Desktop or provider.  |
+| provider-retry-idle | runtime-provider | nightly | [scripts/e2e-provider-retry-idle.mjs](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-provider-retry-idle.mjs)  | Production bundled sidecar and localhost HTTP in temporary state; real thirty-second retry/idle timing, no user profile or paid provider.  |
 
 ## Executable IDs
 
@@ -204,6 +206,7 @@ IDs come from executable result/test calls and annotated dynamic suites. 文档�
 | E2E-CI-approval | [scripts/e2e-suite-catalog.json (approval)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
 | E2E-CI-restart | [scripts/e2e-suite-catalog.json (restart)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
 | E2E-COMPOSER-compact-running-input | [scripts/e2e-suite-catalog.json (transcript-render)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
+| E2E-COMPOSER-native-ime-slash | [scripts/e2e-suite-catalog.json (composer-ime-stack)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
 | E2E-COMPOSER-toolbar-footer | [scripts/e2e-suite-catalog.json (transcript-render)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
 | E2E-DELEGATION-standard-delegates-to-subagents | [scripts/e2e-subagent-models.mjs:352](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-subagent-models.mjs#L352) |
 | E2E-fatal | [scripts/e2e-smoke.mjs:836](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-smoke.mjs#L836) |
@@ -267,9 +270,11 @@ IDs come from executable result/test calls and annotated dynamic suites. 文档�
 | E2E-RUNTIME-background-bash-timeout-is-visible | [scripts/e2e-background-bash-limit.mjs:171](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-background-bash-limit.mjs#L171) |
 | E2E-RUNTIME-edit-accepts-tag-with-legacy-arguments | [scripts/e2e-edit-legacy.mjs:15](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-edit-legacy.mjs#L15) |
 | E2E-runtime-module | [scripts/e2e-smoke.mjs:831](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-smoke.mjs#L831) |
+| E2E-RUNTIME-provider-attempt-idle | [scripts/e2e-suite-catalog.json (provider-retry-idle)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
 | E2E-RUNTIME-shell-capacity-diagnostics | [scripts/e2e-tool-admission.mjs:183](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-tool-admission.mjs#L183); [scripts/e2e-suite-catalog.json (tool-admission)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
 | E2E-SESSION-activity-aggregate | [scripts/e2e-suite-catalog.json (session-activity-aggregate)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
 | E2E-SESSION-activity-full-history-ui | [scripts/e2e-suite-catalog.json (session-activity-history)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
+| E2E-SESSION-checkpoint-write-lifecycle | [scripts/e2e-suite-catalog.json (checkpoint-lifecycle)](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-suite-catalog.json) |
 | E2E-SESSION-independent-top-level-communication | [scripts/e2e-session-collaboration.mjs:162](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-session-collaboration.mjs#L162) |
 | E2E-SESSION-revision-round-trip | [scripts/e2e-smoke.mjs:820](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-smoke.mjs#L820) |
 | E2E-SKILL-MARKET-EXPANSION | [scripts/e2e-skill-market.mjs:217](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-skill-market.mjs#L217) |

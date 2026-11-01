@@ -935,8 +935,8 @@
       ]
     },
     "apps/desktop/test/composer-ime.test.mjs": {
-      "assertions": 10,
-      "cases": 5,
+      "assertions": 9,
+      "cases": 4,
       "signatures": [
         "0cb6798400c6209d1c88",
         "0e5e563acbd9c3499263",
@@ -944,20 +944,18 @@
         "2bb0cfa3a1e755c750cf",
         "4239f7276f3c86133361",
         "44244fe98e1b3e0700e2",
-        "7f23220d4a60c94f3c7f",
         "8f5e5ed24b705153bbb9",
         "d49733598a752e9438f5",
         "de7867ee54ea62ebbc9f"
       ]
     },
     "apps/desktop/test/composer-input-history.test.mjs": {
-      "assertions": 22,
+      "assertions": 21,
       "cases": 5,
       "signatures": [
         "092db814c9ef8e01e838",
         "1fcac2aee859b9f31b39",
         "2797626a78ae8b461902",
-        "2a5ed61a6d51a243b4bb",
         "315cce108e520030e24f",
         "38780c760962e7e64083",
         "42f9a6205a1e07965849",
@@ -5372,14 +5370,13 @@
       ]
     },
     "apps/desktop/test/regenerate-branch-archive.test.mjs": {
-      "assertions": 15,
+      "assertions": 14,
       "cases": 4,
       "signatures": [
         "0a6d24a67c0399f71ce2",
         "41a9e90844afab19f67c",
         "48979f534c5624e090bd",
         "4c50a87d5f76963e1794",
-        "5b5637834dcb294a6700",
         "72c0eb14701d6f8021e5",
         "7771de7305e03346ede5",
         "83607fb0d276652d09fa",

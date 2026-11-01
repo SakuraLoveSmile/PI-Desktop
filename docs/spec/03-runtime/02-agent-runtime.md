@@ -45,6 +45,18 @@ The Node runtime normalizes text and image content from host tool results,
 including MCP `content` blocks and bare plugin content-block arrays. Well-formed
 image blocks are passed to vision-capable models and retained when tool history
 is restored; malformed image entries are ignored without failing the tool call.
+Live and restored parent/delegate results use the same projection for MCP text,
+embedded resources, resource links and images, including bare content arrays.
+
+Before any tool in a completed provider batch executes, parent and delegate
+runtimes reject a batch containing a missing/blank tool name or wire call id.
+Continue repairs only the model-facing history: malformed calls and their
+matching results are removed while valid completed siblings and the durable
+transcript remain intact. The existing duplicate-call policy is unchanged.
+Parent-session assistant provider signatures are restored from optional
+versioned message metadata (storage spec §4.7), scoped to the owning durable
+turn; unsigned legacy rows retain their existing replay path. Delegate signature
+capture/replay is outside this maintenance slice.
 
 ## 4. Runtime API (package-level)
 
@@ -301,6 +313,12 @@ the previous dispatcher and closes it gracefully, and it reproduces the
 configured route, so another session's in-flight request finishes on the pool it
 started on and a proxy is never silently dropped.
 
+The stream-idle watchdog belongs to each network attempt. It starts before the
+attempt requests headers, resets on stream activity and is disposed before
+retry backoff. A server-requested wait does not consume stream-idle time. Stop
+cancels both active requests and backoff; a timed-out request is aborted before
+another attempt begins. Existing retry budgets and Team admission remain in force.
+
 ### 5e. Silent-turn recovery
 
 An ordinary turn that ends with no tool call and no visible assistant text is invisible
@@ -556,6 +574,13 @@ and schemas exactly once. The budget uses the larger of this full-request
 estimate and the calibrated message estimate. This is a hard floor before the
 first calibration sample and prevents counting overhead twice after an
 unanchored residual has learned it.
+
+The usage anchor counts input, output, cache-read and cache-write buckets;
+reasoning already belongs to provider output and is not added again. Use the
+larger of that occupancy and a finite reported total so both omitted-cache
+totals and partial bucket reports remain conservative. Restored parent history
+and delegate preparation use the same anchor. This runtime budget does not
+change the renderer's frozen D355 display formula.
 
 The calibration still measures the two errors separately — per-character bias
 as a scale-free ratio over the guessed tail, and an unanchored residual as a

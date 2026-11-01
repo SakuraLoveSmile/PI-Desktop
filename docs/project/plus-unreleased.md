@@ -2,6 +2,15 @@
 
 Upstream v0.15.6 → v0.16.1 has been merged.
 
+- Selected upstream maintenance fixes preserve signed parent-session history
+  and image/MCP tool results across parent/delegate resume, recover malformed tool
+  calls on Continue, and separate retry backoff from stream-idle timeouts.
+  Context budgeting includes cached input even when a provider total omits it.
+  Checkpoint shutdown drains issued saves, torn UTF-8 tails no longer block
+  recovery, plugin commands respect ownership, and native Chinese IME slash
+  input no longer duplicates. The git-apply failure guard ignores incidental
+  text. Pi dependencies, Plus profiles and database schema are unchanged.
+
 - Settings search opens matching rows directly, including option and help
   matches. Narrow windows use a searchable category overlay with keyboard and
   focus restoration. All sixteen pages share consistent action and state

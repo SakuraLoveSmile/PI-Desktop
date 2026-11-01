@@ -107,7 +107,9 @@
     "check:e2e-catalog": "node scripts/generate-scenario-index.mjs --check",
     "docs:scenarios": "node scripts/generate-scenario-index.mjs",
     "check:runtime-tests": "node packages/agent-runtime/node_modules/typescript/bin/tsc -p packages/agent-runtime/tsconfig.runtime-tests.json",
-    "audit:test-maintenance": "node scripts/audit-test-maintenance.mjs"
+    "audit:test-maintenance": "node scripts/audit-test-maintenance.mjs",
+    "test:e2e:checkpoint-lifecycle": "node scripts/e2e-checkpoint-lifecycle.mjs",
+    "test:e2e:provider-retry-idle": "node scripts/e2e-provider-retry-idle.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.13",

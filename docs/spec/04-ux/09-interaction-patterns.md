@@ -1388,6 +1388,11 @@ Project drag/drop follows these patterns:
 
 ### 8a.4 IME (first normative IME rules)
 
+- The controlled draft preserves the native composing value. Slash-like
+  characters are normalized only after composition commits, so one native
+  Chinese IME slash produces one `/` and opens the command menu once. A
+  session/workspace switch cancels composition and cannot copy the outgoing
+  draft into the new context.
 - All autocomplete key handling sits behind the standard guard
   (`isComposing || keyCode === 229`).
 - During active composition the trigger detector neither opens, updates,

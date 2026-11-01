@@ -81,7 +81,10 @@
       "family": "composer",
       "script": "scripts/e2e-composer-ime-stack.mjs",
       "tier": "nightly",
-      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked."
+      "safety": "Fixture-only default: isolated Host/profile or rendered component; model endpoints are loopback fixtures or never invoked.",
+      "scenarioIds": [
+        "E2E-COMPOSER-native-ime-slash"
+      ]
     },
     {
       "id": "composer-input-history",
@@ -1086,6 +1089,26 @@
       "script": "scripts/e2e-settings-workspace.mjs",
       "tier": "nightly",
       "safety": "Production renderer components with explicit in-memory preload fixtures and an isolated Electron profile; unknown IPC fails. No real accounts, provider calls, user data or marketplace writes."
+    },
+    {
+      "id": "checkpoint-lifecycle",
+      "family": "sessions",
+      "script": "scripts/e2e-checkpoint-lifecycle.mjs",
+      "tier": "nightly",
+      "scenarioIds": [
+        "E2E-SESSION-checkpoint-write-lifecycle"
+      ],
+      "safety": "Production HostProcess/checkpointer with a controlled RPC peer and temporary disk; no native Host, user profile, Desktop or provider."
+    },
+    {
+      "id": "provider-retry-idle",
+      "family": "runtime-provider",
+      "script": "scripts/e2e-provider-retry-idle.mjs",
+      "tier": "nightly",
+      "scenarioIds": [
+        "E2E-RUNTIME-provider-attempt-idle"
+      ],
+      "safety": "Production bundled sidecar and localhost HTTP in temporary state; real thirty-second retry/idle timing, no user profile or paid provider."
     }
   ]
 }
