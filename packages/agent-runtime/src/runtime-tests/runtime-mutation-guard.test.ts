@@ -13,6 +13,8 @@ describe("DesktopAgentRuntime configuration matching", () => {
     "echo git apply p.diff",
     "git -C repo log | grep apply",
     "git apply-patch",
+    'git -C "my repo" log | grep apply',
+    'git --work-tree "my repo" diff; terraform apply',
   ])("keeps the turn open after repeated failures of %s", async (command) => {
     const host = {
       call: vi.fn().mockResolvedValue({
@@ -33,6 +35,25 @@ describe("DesktopAgentRuntime configuration matching", () => {
     } finally {
       await runtime.dispose();
     }
+  });
+
+  it.each([
+    'git -C "my repo" apply --check fix.patch',
+    "git --git-dir .git apply fix.patch",
+    'git --work-tree "my repo" apply fix.patch',
+    "git -c 'core.commentChar=# note' apply fix.patch",
+  ])("terminates repeated patch failures with Git global options: %s", async (command) => {
+    const host = { call: vi.fn().mockResolvedValue({ ok: false, isError: true, errorCode: "TOOL_FAILED",
+      content: { exitCode: 128, stderr: "corrupt patch" } }) };
+    const runtime = createRuntime({ host });
+    try {
+      const bash = runtime["agent"].state.tools.find((tool) => tool.name === "Bash");
+      if (!bash) throw new Error("Bash must remain available");
+      for (const id of ["patch-1", "patch-2"]) {
+        expect(await bash.execute(id, { command })).not.toHaveProperty("terminate", true);
+      }
+      expect(await bash.execute("patch-3", { command })).toHaveProperty("terminate", true);
+    } finally { await runtime.dispose(); }
   });
 
   it("terminates a repeated Edit mismatch on the third failed attempt", async () => {

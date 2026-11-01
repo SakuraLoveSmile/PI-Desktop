@@ -1119,13 +1119,20 @@ function mutationFailureKey(path: unknown): string {
   return String(path).replaceAll("\\", "/").replace(/^\.\//, "");
 }
 
+// Git consumes these values before the subcommand, including quoted paths/config.
+const gitOptionArgument = String.raw`(?:"(?:\\.|[^"\\])*"|'[^']*'|[^\s;&|]+)`;
+const gitApplyCommand = new RegExp(
+  String.raw`(?:^|[;&|]\s*)(?:env\s+|command\s+)?(?:\S+\/)?git(?:\s+(?:(?:-[Cc]|--git-dir|--work-tree)\s+${gitOptionArgument}|-[^\s;&|]+))*\s+apply(?:\s|$)`,
+  "m",
+);
+
 function isPatchCommand(command: unknown): boolean {
   if (typeof command !== "string") return false;
   return (
     /(?:^|[;&|]\s*)(?:env\s+|command\s+)?(?:\S+\/)?apply_patch(?:\s|$)/m.test(
       command,
     ) ||
-    /(?:^|[;&|]\s*)(?:env\s+|command\s+)?(?:\S+\/)?git(?:\s+(?:-[Cc]\s+[^\s;&|]+|-[^\s;&|]+))*\s+apply(?:\s|$)/m.test(command) ||
+    gitApplyCommand.test(command) ||
     /(?:^|[;&|]\s*)(?:env\s+|command\s+)?(?:\S+\/)?patch(?:\s|$)/m.test(
       command,
     )
