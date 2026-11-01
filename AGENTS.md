@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Policy-Sync: 2026-10-24.2
+Policy-Sync: 2026-11-01.1
 
 Mandatory rules for AI coding agents working in PI-Desktop.
 
@@ -208,11 +208,14 @@ development workspaces.
 
 Create every new worktree, including subagent and temporary validation or
 integration worktrees, under
-`/Users/sakurasep/Documents/Code/Project/Project Worktree/PI-Desktop/<short-description>/`.
+`/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop/<YYYYMMDD>-<type>-<task-id>-<slug>/`.
 Do not use sibling, in-repository, or tool-default directories. Inspect
 `git status --short --branch`, `git worktree list`, and task ownership first.
 If a tool cannot select this location, use `git worktree add` with a quoted
 absolute path instead.
+
+Use the creation date in Asia/Taipei and a project-unique lowercase task ID
+for the branch and worktree stem; preserve existing task paths and names.
 
 ### Never
 
@@ -233,13 +236,13 @@ absolute path instead.
 ```bash
 git fetch origin main
 
-mkdir -p "/Users/sakurasep/Documents/Code/Project/Project Worktree/PI-Desktop"
+mkdir -p "/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop"
 git worktree add \
-  -b <type>/<short-description> \
-  "/Users/sakurasep/Documents/Code/Project/Project Worktree/PI-Desktop/<short-description>" \
+  -b <type>/<YYYYMMDD>-<task-id>-<slug> \
+  "/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop/<YYYYMMDD>-<type>-<task-id>-<slug>" \
   origin/main
 
-cd "/Users/sakurasep/Documents/Code/Project/Project Worktree/PI-Desktop/<short-description>"
+cd "/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop/<YYYYMMDD>-<type>-<task-id>-<slug>"
 ```
 
 All implementation, targeted validation, conflict resolution, and

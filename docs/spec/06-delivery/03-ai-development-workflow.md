@@ -47,14 +47,15 @@ The rules below govern every change to the PI-Desktop codebase and documentation
   checkout must never be moved, stashed, or overwritten merely to start a new
   request.
 - Use one short-lived branch per request. Name it
-  `<type>/<short-description>`, where `type` matches the conventional change
-  type when practical, for example `feat/provider-import` or
-  `docs/request-branch-workflow`.
+  `<type>/<YYYYMMDD>-<task-id>-<slug>`, where `type` matches the conventional change
+  type when practical. Use the creation date in Asia/Taipei and a
+  project-unique lowercase task ID, for example
+  `chore/20261101-pi-rel-01511-macos-release`.
 - Use one dedicated worktree per request. Do not implement a new request in the
   primary checkout or reuse another request's worktree.
 - All new worktrees, including subagent and temporary validation or integration
   worktrees, belong under
-  `/Users/sakurasep/Documents/Code/Project/Project Worktree/PI-Desktop/<short-description>/`.
+  `/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop/<YYYYMMDD>-<type>-<task-id>-<slug>/`.
   Inspect working state, `git worktree list`, and task ownership first. Use a
   quoted absolute path with `git worktree add` when tooling cannot select this
   location; do not use sibling, in-repository, or tool-default directories.
@@ -490,7 +491,7 @@ The repository uses a mandatory request-branch and worktree workflow:
   including docs, chores, and small fixes. Create each branch and worktree from
   current `origin/main`, then remove both immediately after the branch is merged
   into `main`.
-- **Branch names** use `<type>/<short-description>` with a lowercase,
+- **Branch names** use `<type>/<YYYYMMDD>-<task-id>-<slug>` with a lowercase,
   kebab-case description. Allowed type prefixes mirror §4.1.
 - **No long-lived development branch** exists. Each request gets a new branch;
   an old request branch must not be reused for unrelated work.
@@ -514,7 +515,7 @@ Typical request start (run from the primary checkout; choose a path outside it):
 ```bash
 git status --short
 git fetch origin main
-git worktree add -b <type>/<short-description> <worktree-path> origin/main
+git worktree add -b <type>/<YYYYMMDD>-<task-id>-<slug> <worktree-path> origin/main
 ```
 
 Start directly from the fetched `origin/main`. The primary checkout and local
@@ -541,8 +542,8 @@ git fetch origin main
 git rebase origin/main   # private branch; do not force-push a shared branch
 pnpm check:pr-base
 # run local candidate E2E, or select exact-SHA hosted validation (R7)
-git push -u origin <type>/<short-description>
-gh pr create --base main --head <type>/<short-description>
+git push -u origin <type>/<YYYYMMDD>-<task-id>-<slug>
+gh pr create --base main --head <type>/<YYYYMMDD>-<task-id>-<slug>
 gh pr checks --watch
 # selected hosted candidate gates must also pass at the recorded SHA
 gh pr merge --merge
@@ -551,10 +552,10 @@ git fetch origin main
 git switch main
 git merge --ff-only origin/main
 git worktree remove <worktree-path>
-git branch -d <type>/<short-description>
+git branch -d <type>/<YYYYMMDD>-<task-id>-<slug>
 git worktree prune
 # Only when the user explicitly authorized remote-branch deletion:
-git push origin --delete <type>/<short-description>
+git push origin --delete <type>/<YYYYMMDD>-<task-id>-<slug>
 ```
 
 After the remote merge, synchronize local `main` with a fast-forward when

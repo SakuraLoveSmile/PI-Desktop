@@ -51,8 +51,9 @@
 - [ ] 识别并保留现有的未提交工作。
 - [ ] 获取 `origin/main`，并且本地 `main` 快进
   工作树是干净的。
-- [ ] 专用的 `<type>/<short-description>` 请求分支和工作树是
+- [ ] 专用的 `<type>/<YYYYMMDD>-<task-id>-<slug>` 请求分支和工作树是
   从更新的 `main` 提交创建。
+- [ ] 新工作树位于 `/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop/<YYYYMMDD>-<type>-<task-id>-<slug>/`；日期取创建时台北日期，任务编号为项目内唯一的小写标识。
 - [ ] 请求工作树在安全的情况下复用主工作区的宿主工具链、兼容依赖树、包存储、缓存和忽略的本地配置；不为 E2E 安装单独环境。
 - [ ] 只有可变、不兼容或并发敏感的环境状态保留在工作树本地并被忽略。
 - [ ] 在执行开始之前，当前分支不是 `main`。
