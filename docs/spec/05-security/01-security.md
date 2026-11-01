@@ -229,8 +229,14 @@ claim availability or freshness against a malicious server.
   GitHub's latest stable release rather than a same-channel prerelease pin.
 - Feed manifests bind artifacts with electron-builder hashes. An error,
   unavailable feed, hash mismatch, or invalid updater state must not install.
-- Packaged macOS, Windows NSIS, and Linux AppImage download and install in-app
-  from the GitHub Releases feed. Linux deb/rpm and Windows ZIP detect a
+- Developer ID-signed packaged macOS, Windows NSIS, and Linux AppImage download
+  and install in-app from the GitHub Releases feed. Ad-hoc, unsigned, or
+  unstamped packaged macOS never starts that lane: Main reads the
+  `piMacSigning` marker from the packaged manifest, and anything other than
+  `developer-id` uses notify-and-link. This is a validation boundary, not a UI
+  preference: Squirrel.Mac checks the downloaded bundle against the running
+  app's designated requirement, and an ad-hoc requirement is a cdhash no later
+  build can satisfy. Linux deb/rpm, Windows ZIP, and ad-hoc macOS detect a
   release and open the fixed releases page. Legacy Windows portable
   executables remain manual when `PORTABLE_EXECUTABLE_FILE` is present.
 - D126 tag releases publish Windows NSIS and Linux AppImage installers with
@@ -238,15 +244,17 @@ claim availability or freshness against a malicious server.
   ZIP. The NSIS and AppImage artifacts activate the existing in-app lanes.
   The portable ZIP uses notify-and-link delivery and does not write
   `latest.yml`. macOS tag artifacts are Developer ID-signed, notarized, and
-  stapled before upload; rollback and staged-rollout qualification remain
-  release follow-ups.
+  stapled before upload unless the explicit unsigned personal-use opt-in is
+  enabled; that unsigned lane publishes update metadata but stays on
+  notify-and-link delivery in the client. Rollback and staged-rollout
+  qualification remain release follow-ups.
 - The client carries no GitHub token. A private or otherwise unreachable feed
   fails closed; automatic failures stay ambient and explicit checks expose the
   error.
 - Neither macOS DMG nor ZIP ships first-launch guidance or an executable
   quarantine-clearing helper. GitHub tag artifacts remain Developer ID-signed,
-  notarized, and stapled; opt-in unsigned builds are debug artifacts and do not
-  imply Gatekeeper qualification.
+  notarized, and stapled; opt-in unsigned packages do not imply Gatekeeper
+  qualification and must not enter the in-app install lane.
 - Localized product "what's new" text (D164/D345) is selected in Main from the
   shipped changelog catalog and attached to `UpdateState.releaseNotes`. The
   renderer cannot supply a notes URL, feed, or remote body; missing catalog

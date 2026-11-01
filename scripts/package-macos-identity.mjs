@@ -31,7 +31,10 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { shouldUseSecureTimestamp } from "./macos-signing-policy.mjs";
+import {
+  resolveMacSigningLane,
+  shouldUseSecureTimestamp,
+} from "./macos-signing-policy.mjs";
 import { requireCloudPackageBuild } from "./require-cloud-build.mjs";
 
 requireCloudPackageBuild();
@@ -177,6 +180,16 @@ if (secureTimestampRequested) {
       "notarization candidate",
   );
 }
+
+/*
+  Stamp the signing lane the update controller reads after installation. This
+  wrapper is the only macOS packaging entry point, so the marker stays bound
+  to the identity decision the lane actually made. `unknown` stays conservative:
+  a package without the marker never attempts an in-app install.
+*/
+const macSigningLane = resolveMacSigningLane(forwarded, process.env);
+flags.push(`-c.extraMetadata.piMacSigning=${macSigningLane}`);
+console.error(`[package-macos] stamping macOS signing lane: ${macSigningLane}`);
 
 console.error(`[package-macos] packaging with ${flags.join(" ")}`);
 const status = run("pnpm", ["exec", "electron-builder", ...flags, ...forwarded]);

@@ -25,8 +25,10 @@ const [
 const {
   resolveDefaultUpdatePreference,
   resolveEffectiveUpdatePreference,
+  resolveMacSigning,
   resolveStoredUpdatePreference,
   resolveUpdateMode,
+  supportsAutomaticUpdates,
 } = policy;
 const { ManualUpdateReminderTracker } = reminders;
 const { persistUpdatePreference } = settingsPreference;
@@ -39,7 +41,17 @@ const { persistUpdatePreference } = settingsPreference;
     resolveDefaultUpdatePreference("win32", true, { PORTABLE_EXECUTABLE_FILE: "PI-Desktop.exe" }),
     "manual",
   );
-  assert.equal(resolveDefaultUpdatePreference("darwin", true), "automatic");
+  // macOS in-app delivery requires the stable Developer ID requirement that
+  // Squirrel.Mac can match; ad-hoc and unstamped builds must stay manual.
+  assert.equal(resolveDefaultUpdatePreference("darwin", true), "manual");
+  assert.equal(resolveDefaultUpdatePreference("darwin", true, {}, undefined, "adhoc"), "manual");
+  assert.equal(
+    resolveDefaultUpdatePreference("darwin", true, {}, undefined, "developer-id"),
+    "automatic",
+  );
+  assert.equal(supportsAutomaticUpdates("darwin", true, {}, "developer-id"), true);
+  assert.equal(supportsAutomaticUpdates("darwin", true, {}, "adhoc"), false);
+  assert.equal(supportsAutomaticUpdates("darwin", true), false);
   assert.equal(resolveDefaultUpdatePreference("linux", true, { APPIMAGE: "/tmp/app.AppImage" }), "automatic");
   assert.equal(resolveDefaultUpdatePreference("linux", true, {}), "manual");
 });
@@ -58,9 +70,23 @@ test("manual preference disables in-app delivery and explicit automatic restores
   assert.equal(resolveUpdateMode("win32", true, {}, "portable"), "manual");
   assert.equal(resolveUpdateMode("win32", true, {}, "zip", "automatic"), "in-app");
   assert.equal(resolveUpdateMode("win32", true, {}, "portable", "automatic"), "in-app");
-  assert.equal(resolveUpdateMode("darwin", true, {}, undefined, "automatic"), "in-app");
+  assert.equal(
+    resolveUpdateMode("darwin", true, {}, undefined, "automatic", "developer-id"),
+    "in-app",
+  );
+  assert.equal(resolveUpdateMode("darwin", true, {}, undefined, "automatic", "adhoc"), "manual");
+  assert.equal(resolveUpdateMode("darwin", true, {}, undefined, "automatic"), "manual");
   assert.equal(resolveUpdateMode("linux", true, {}, undefined, "automatic"), "manual");
   assert.equal(resolveUpdateMode("win32", false, {}, undefined, "automatic"), "disabled");
+});
+
+test("macOS signing metadata fails closed unless it names the Developer ID lane", () => {
+  assert.equal(resolveMacSigning("developer-id"), "developer-id");
+  assert.equal(resolveMacSigning("adhoc"), "adhoc");
+  assert.equal(resolveMacSigning("unknown"), "unknown");
+  assert.equal(resolveMacSigning(undefined), "unknown");
+  assert.equal(resolveMacSigning("Developer ID Application: Example"), "unknown");
+  assert.equal(resolveMacSigning("installed"), "unknown");
 });
 
 test("manual update reminder is persisted once per version and stays visible only in the current run", () => {

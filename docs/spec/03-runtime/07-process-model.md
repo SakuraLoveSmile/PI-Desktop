@@ -316,12 +316,16 @@ the next launch rather than changing the NSIS installer or writing into
   download/install flow on supported packages; Manual mode checks the fixed
   stable feed without starting downloads or installing on quit, and reminds
   once per available version. Defaults are Automatic for Windows NSIS,
-  packaged macOS, and Linux AppImage; Windows ZIP/portable and packages without
-  automatic-install support default to Manual. Windows ZIP/portable users can
-  explicitly opt into Automatic after a warning that the NSIS installer may
-  replace the extracted copy. Preference and last-reminded version use the
-  existing host-owned app settings JSON; neither is included in portable
-  configuration sync.
+  Developer ID-signed packaged macOS, and Linux AppImage; ad-hoc or unstamped
+  macOS packages, Windows ZIP/portable, and packages without automatic-install
+  support default to Manual. The single macOS packaging entry point stamps
+  `piMacSigning` into the packaged manifest, and only `developer-id` enables
+  the in-app lane: Squirrel.Mac validates an update against the running app's
+  designated requirement, which an ad-hoc signature pins to that build's
+  cdhash. Windows ZIP/portable users can explicitly opt into Automatic after a
+  warning that the NSIS installer may replace the extracted copy. Preference
+  and last-reminded version use the existing host-owned app settings JSON;
+  neither is included in portable configuration sync.
 
 ## 7. Remote target topology (post-MVP)
 

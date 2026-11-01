@@ -45,9 +45,11 @@ import {
 import {
   resolveDefaultUpdatePreference,
   resolveEffectiveUpdatePreference,
+  resolveMacSigning,
   resolveStoredUpdatePreference,
   resolveUpdateMode as resolveUpdateModePolicy,
   supportsAutomaticUpdates,
+  type MacSigning,
   type WindowsDistribution,
 } from "./update-policy";
 import { ManualUpdateReminderTracker } from "./manual-update-reminder";
@@ -111,6 +113,8 @@ export type UpdaterOptions = {
   platform?: NodeJS.Platform;
   isPackaged?: boolean;
   distribution?: WindowsDistribution;
+  /** Overrides the `piMacSigning` marker read from the packaged manifest. */
+  macSigning?: MacSigning;
 };
 
 export class AppUpdaterController {
@@ -121,6 +125,7 @@ export class AppUpdaterController {
   private readonly isPackaged: boolean;
   private readonly env: NodeJS.ProcessEnv;
   private readonly distribution?: WindowsDistribution;
+  private readonly macSigning?: MacSigning;
   private readonly defaultPreference: UpdatePreference;
   private readonly automaticSupported: boolean;
   private readonly readUpdateSettings?: () => Promise<UpdaterSettings>;
@@ -157,31 +162,51 @@ export class AppUpdaterController {
   private readonly autoUpdater: AppUpdater;
   private readonly cacheMaintenance: UpdateCacheMaintenance;
 
-  private readPackagedDistribution(
+  /**
+   * Package metadata stamped by the packaging lanes.
+   *
+   * `piDistribution` selects Windows delivery for installer/zip/portable
+   * builds and `piMacSigning` records the macOS signing lane. Both live in the
+   * packaged `package.json`, so a copied or renamed executable cannot silently
+   * claim a different delivery lane.
+   */
+  private readPackagedMetadata(
     isPackaged: boolean,
-  ): WindowsDistribution | undefined {
-    if (!isPackaged) return undefined;
-    try {
-      const packageJson = JSON.parse(
-        readFileSync(join(app.getAppPath(), "package.json"), "utf8"),
-      ) as unknown;
-      if (typeof packageJson !== "object" || packageJson === null) {
-        return undefined;
-      }
-      const distribution = (packageJson as Record<string, unknown>)
-        .piDistribution;
-      return distribution === "installed" || distribution === "zip" || distribution === "portable"
-        ? distribution
-        : undefined;
-    } catch (error) {
-      this.logger.app(
-        "updater",
-        "warn",
-        "packaged distribution metadata unavailable",
-        { data: { detail: String(error) } },
-      );
+    platform: NodeJS.Platform,
+  ): Record<string, unknown> | undefined {
+    if (!isPackaged || (platform !== "win32" && platform !== "darwin")) {
       return undefined;
     }
+    try {
+      const packageJson: unknown = JSON.parse(
+        readFileSync(join(app.getAppPath(), "package.json"), "utf8"),
+      );
+      return typeof packageJson === "object" && packageJson !== null
+        ? (packageJson as Record<string, unknown>)
+        : undefined;
+    } catch (error) {
+      this.logger.app("updater", "warn", "packaged metadata unavailable", {
+        data: { detail: String(error) },
+      });
+      return undefined;
+    }
+  }
+
+  private readPackagedDistribution(
+    packageJson: Record<string, unknown> | undefined,
+  ): WindowsDistribution | undefined {
+    const distribution = packageJson?.piDistribution;
+    return distribution === "installed" || distribution === "zip" || distribution === "portable"
+      ? distribution
+      : undefined;
+  }
+
+  private readPackagedMacSigning(
+    packageJson: Record<string, unknown> | undefined,
+  ): MacSigning | undefined {
+    return packageJson?.piMacSigning === undefined
+      ? undefined
+      : resolveMacSigning(packageJson.piMacSigning);
   }
 
   constructor(options: UpdaterOptions) {
@@ -190,26 +215,35 @@ export class AppUpdaterController {
     this.getLocale = options.getLocale ?? (() => "en");
     const platform = options.platform ?? process.platform;
     const isPackaged = options.isPackaged ?? app.isPackaged;
+    const packagedMetadata = this.readPackagedMetadata(isPackaged, platform);
     const distribution =
       options.distribution ??
       (platform === "win32"
-        ? this.readPackagedDistribution(isPackaged)
+        ? this.readPackagedDistribution(packagedMetadata)
+        : undefined);
+    const macSigning =
+      options.macSigning ??
+      (platform === "darwin"
+        ? this.readPackagedMacSigning(packagedMetadata) ?? "unknown"
         : undefined);
     this.platform = platform;
     this.isPackaged = isPackaged;
     this.env = process.env;
     this.distribution = distribution;
+    this.macSigning = macSigning;
     this.defaultPreference = resolveDefaultUpdatePreference(
       platform,
       isPackaged,
       this.env,
       distribution,
+      macSigning,
     );
     this.preference = this.defaultPreference;
     this.automaticSupported = supportsAutomaticUpdates(
       platform,
       isPackaged,
       this.env,
+      macSigning,
     );
     this.readUpdateSettings = options.readUpdateSettings;
     this.persistLastNotifiedVersion = options.persistLastNotifiedVersion;
@@ -220,7 +254,13 @@ export class AppUpdaterController {
       this.env,
       distribution,
       this.preference,
+      macSigning,
     );
+    if (platform === "darwin" && isPackaged) {
+      this.logger.app("updater", "info", "macOS update delivery resolved", {
+        data: { macSigning: macSigning ?? "unknown", mode },
+      });
+    }
     const defaultCacheBasePath = defaultUpdateCacheBasePath({
       platform,
       env: process.env,
@@ -348,6 +388,7 @@ export class AppUpdaterController {
       this.env,
       this.distribution,
       effectivePreference,
+      this.macSigning,
     );
     const preferenceChanged =
       effectivePreference !== this.preference || mode !== previousMode;

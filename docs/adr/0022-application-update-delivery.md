@@ -127,3 +127,17 @@ available on supported Windows packages only after the UI warns that NSIS may
 replace the extracted no-install copy. Unsupported installer formats remain
 Manual. This additive setting requires no database schema or host protocol
 version change.
+
+## Amendment (PI-UPD-1102)
+
+Packaged macOS in-app delivery is limited to Developer ID-signed builds. The
+single macOS packaging entry point stamps `piMacSigning` into the packaged
+manifest: `developer-id` for the signed lane, `adhoc` for the unsigned lane,
+and `unknown` when the lane names neither ad-hoc signing nor signing
+credentials. The updater treats `developer-id` as the only automatic-capable
+macOS lane and puts ad-hoc/unknown packages on the existing Manual
+notify-and-link path. This is a validation constraint, not a preference:
+Squirrel.Mac validates a downloaded update against the running app's designated
+requirement, and an ad-hoc requirement is the running binary's cdhash, so a
+different unsigned build can never satisfy it. Signature validation is not
+weakened, and every unsigned release still requires a manual installation.
