@@ -66,10 +66,10 @@ Before editing any file for a new request:
 - [ ] Existing uncommitted work is identified and preserved.
 - [ ] `origin/main` is fetched and local `main` is fast-forwarded when its
   worktree is clean.
-- [ ] A dedicated `<type>/<short-description>` request branch and worktree are
+- [ ] A dedicated `<type>/<YYYYMMDD>-<task-id>-<slug>` request branch and worktree are
   created from that updated `main` commit.
 - [ ] The worktree is under
-  `/Users/sakurasep/Documents/Code/Project/Project Worktree/PI-Desktop/<short-description>/`,
+  `/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop/<YYYYMMDD>-<type>-<task-id>-<slug>/`,
   including subagent and temporary validation or integration worktrees.
   Working state, registered worktrees, and task ownership were checked first.
 - [ ] The request worktree reuses the primary checkout's host toolchains,
@@ -213,7 +213,7 @@ merge happened remotely via PR/MR or locally in the primary checkout:
 - [ ] `git worktree remove <worktree-path>` succeeded without forcing, or the
   managed archive operation completed and the old checkout is absent. Removal
   ran outside the checkout and preserved the shared worktree root and archives.
-- [ ] `git branch -d <type>/<short-description>` succeeded (no `-D` fallback on
+- [ ] `git branch -d <type>/<YYYYMMDD>-<task-id>-<slug>` succeeded (no `-D` fallback on
   an unmerged branch).
 - [ ] `git worktree prune` leaves `git worktree list` free of stale entries for
   this request.

@@ -6,6 +6,18 @@ export const PLUS_UPSTREAM_CUTOFF = "0.15.6";
 const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   en: [
     {
+      version: "0.15.11",
+      date: "2026-11-01",
+      highlights: [
+        "Recover session history after interrupted writes and finish pending checkpoints before session settlement or shutdown.",
+        "Preserve parent-session provider signatures and image/MCP tool results when resuming parent or delegated sessions.",
+        "Recover malformed tool calls on Continue while preserving saved conversation history.",
+        "Include cached input in runtime context budgets and keep retry backoff outside each provider attempt's stream-idle timeout.",
+        "Prevent plugin commands from replacing another owner's entry and improve git-apply failure detection.",
+        "Avoid duplicate slashes when using a Chinese input method.",
+      ],
+    },
+    {
       version: "0.15.10",
       date: "2026-10-25",
       highlights: [
@@ -62,6 +74,18 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "zh-CN": [
+    {
+      version: "0.15.11",
+      date: "2026-11-01",
+      highlights: [
+        "写入中断后仍可恢复会话历史，回合结束或关闭前完成待写入的检查点。",
+        "保留主会话的提供商签名，并在主会话或委派会话恢复时保留图片和 MCP 工具结果。",
+        "点击继续可恢复异常工具调用，同时保留已保存的会话历史。",
+        "运行时上下文预算计入缓存输入，重试退避时间不再计入每次请求的流空闲超时。",
+        "插件命令不能覆盖其他所有者的条目，Git Apply 失败识别更准确。",
+        "使用中文输入法输入斜杠时不再重复。",
+      ],
+    },
     {
       version: "0.15.10",
       date: "2026-10-25",
@@ -120,6 +144,18 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   "zh-TW": [
     {
+      version: "0.15.11",
+      date: "2026-11-01",
+      highlights: [
+        "寫入中斷後仍可復原工作階段歷史，回合結束或關閉前完成待寫入的檢查點。",
+        "保留主工作階段的供應商簽章，並在主工作階段或委派工作階段恢復時保留圖片和 MCP 工具結果。",
+        "按下繼續可復原異常工具呼叫，同時保留已儲存的工作階段歷史。",
+        "執行階段的上下文預算計入快取輸入，重試退避時間不再計入每次請求的串流閒置逾時。",
+        "外掛指令無法覆蓋其他擁有者的項目，Git Apply 失敗辨識更準確。",
+        "使用中文輸入法輸入斜線時不再重複。",
+      ],
+    },
+    {
       version: "0.15.10",
       date: "2026-10-25",
       highlights: [
@@ -176,6 +212,18 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   tr: [
+    {
+      version: "0.15.11",
+      date: "2026-11-01",
+      highlights: [
+        "Kesintiye uğrayan yazmalardan sonra oturum geçmişini kurtarın; tur tamamlanmadan veya uygulama kapanmadan bekleyen kontrol noktalarını kaydedin.",
+        "Ana oturumun sağlayıcı imzalarını, ana veya devredilen oturumlar sürdürülürken görsel ve MCP araç sonuçlarını koruyun.",
+        "Kaydedilmiş konuşma geçmişini koruyarak Devam ile hatalı araç çağrılarından kurtulun.",
+        "Çalışma zamanı bağlam bütçeleri önbellekteki girdiyi içerir; yeniden deneme beklemesi her sağlayıcı denemesinin akış boşta kalma süresine dahil edilmez.",
+        "Eklenti komutlarının başka bir sahibin kaydını değiştirmesi engellenir ve git-apply hata tespiti iyileştirilir.",
+        "Çince giriş yöntemi kullanılırken eğik çizginin yinelenmesi önlenir.",
+      ],
+    },
     {
       version: "0.15.10",
       date: "2026-10-25",
@@ -234,6 +282,18 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   de: [
     {
+      version: "0.15.11",
+      date: "2026-11-01",
+      highlights: [
+        "Sitzungsverläufe nach unterbrochenen Schreibvorgängen wiederherstellen und ausstehende Prüfpunkte vor Rundenende oder Herunterfahren speichern.",
+        "Anbietersignaturen der Hauptsitzung sowie Bild- und MCP-Werkzeugergebnisse beim Fortsetzen von Haupt- oder delegierten Sitzungen erhalten.",
+        "Mit Fortsetzen fehlerhafte Werkzeugaufrufe beheben und dabei den gespeicherten Gesprächsverlauf erhalten.",
+        "Zwischengespeicherte Eingaben im Laufzeit-Kontextbudget berücksichtigen; Wartezeiten vor Wiederholungen zählen nicht zum Stream-Leerlaufzeitlimit des jeweiligen Anbieterversuchs.",
+        "Plugin-Befehle können keine Einträge anderer Eigentümer ersetzen; die Erkennung von git-apply-Fehlern wird verbessert.",
+        "Doppelte Schrägstriche bei chinesischen Eingabemethoden vermeiden.",
+      ],
+    },
+    {
       version: "0.15.10",
       date: "2026-10-25",
       highlights: [
@@ -290,6 +350,18 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   es: [
+    {
+      version: "0.15.11",
+      date: "2026-11-01",
+      highlights: [
+        "Recupera el historial tras escrituras interrumpidas y guarda los puntos de control pendientes antes de finalizar el turno o cerrar.",
+        "Conserva las firmas del proveedor de la sesión principal y los resultados de imágenes y herramientas MCP al reanudar sesiones principales o delegadas.",
+        "Continuar recupera las llamadas a herramientas mal formadas sin alterar el historial guardado.",
+        "El presupuesto de contexto incluye la entrada en caché; la espera entre reintentos no cuenta para el tiempo de inactividad del flujo de cada intento del proveedor.",
+        "Los comandos de complementos no pueden reemplazar entradas de otros propietarios y mejora la detección de errores de git-apply.",
+        "Evita barras duplicadas al usar un método de entrada chino.",
+      ],
+    },
     {
       version: "0.15.10",
       date: "2026-10-25",
@@ -348,6 +420,18 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   fr: [
     {
+      version: "0.15.11",
+      date: "2026-11-01",
+      highlights: [
+        "Récupérez l’historique après une écriture interrompue et enregistrez les points de contrôle en attente avant la fin du tour ou la fermeture.",
+        "Conservez les signatures du fournisseur de la session principale ainsi que les images et résultats d’outils MCP lors de la reprise des sessions principales ou déléguées.",
+        "Continuer permet de récupérer les appels d’outils mal formés tout en préservant l’historique enregistré.",
+        "Le budget de contexte inclut les entrées en cache ; l’attente entre les tentatives ne compte pas dans le délai d’inactivité du flux de chaque tentative du fournisseur.",
+        "Les commandes des extensions ne peuvent plus remplacer les entrées d’un autre propriétaire et la détection des échecs de git-apply est améliorée.",
+        "Évite les barres obliques en double avec une méthode de saisie chinoise.",
+      ],
+    },
+    {
       version: "0.15.10",
       date: "2026-10-25",
       highlights: [
@@ -405,6 +489,18 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   ko: [
     {
+      version: "0.15.11",
+      date: "2026-11-01",
+      highlights: [
+        "쓰기 중단 후에도 세션 기록을 복구하고, 턴 종료나 앱 종료 전에 대기 중인 체크포인트를 저장합니다.",
+        "기본 세션의 공급자 서명을 보존하고, 기본 또는 위임 세션을 재개할 때 이미지와 MCP 도구 결과를 유지합니다.",
+        "계속을 누르면 저장된 대화 기록을 유지하면서 잘못된 도구 호출을 복구합니다.",
+        "런타임 컨텍스트 예산에 캐시된 입력을 포함하고, 재시도 대기 시간은 각 공급자 시도의 스트림 유휴 제한 시간에서 제외합니다.",
+        "플러그인 명령이 다른 소유자의 항목을 덮어쓰지 못하도록 하고 git-apply 실패 감지를 개선합니다.",
+        "중국어 입력기 사용 시 슬래시가 중복 입력되는 문제를 방지합니다.",
+      ],
+    },
+    {
       version: "0.15.10",
       date: "2026-10-25",
       highlights: [
@@ -461,6 +557,18 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "pt-BR": [
+    {
+      version: "0.15.11",
+      date: "2026-11-01",
+      highlights: [
+        "Recupere o histórico após gravações interrompidas e salve os pontos de controle pendentes antes de encerrar o turno ou o aplicativo.",
+        "Preserve as assinaturas do provedor da sessão principal e os resultados de imagens e ferramentas MCP ao retomar sessões principais ou delegadas.",
+        "Continuar recupera chamadas de ferramentas malformadas sem alterar o histórico salvo.",
+        "O orçamento de contexto inclui entradas em cache; a espera entre tentativas não conta para o limite de inatividade do fluxo de cada tentativa do provedor.",
+        "Comandos de plugins não podem substituir entradas de outros proprietários e a detecção de falhas do git-apply foi aprimorada.",
+        "Evita barras duplicadas ao usar um método de entrada chinês.",
+      ],
+    },
     {
       version: "0.15.10",
       date: "2026-10-25",

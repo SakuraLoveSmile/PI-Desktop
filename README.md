@@ -42,8 +42,10 @@ Local-first · Model-agnostic · Plugin-powered · macOS / Windows / Linux
 
 > **Current release line: 0.15.x (Early Preview).**
 
-Version 0.15.10 fixes the macOS resource seal and verifies app/Host signatures
-inside the published ZIP and DMG. Personal-use Apple Silicon builds remain
+Version 0.15.11 improves session recovery, checkpoint completion, tool-result
+replay, provider retry timing, plugin command ownership, and Chinese IME input.
+App/Host signatures are verified inside the published ZIP and DMG.
+Personal-use Apple Silicon builds remain
 unnotarized and require manual download and installation. Goal verification upgrades
 local profiles to Plus schema P10 behind a migration backup; older builds require
 restoring the pre-upgrade profile before downgrading.

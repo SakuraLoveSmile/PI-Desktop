@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Policy-Sync: 2026-10-24.2
+Policy-Sync: 2026-11-01.1
 
 Instructions for Claude Code CLI and Claude Cowork on PI-Desktop.
 
@@ -49,13 +49,16 @@ Create the worktree from current remote `main`:
 
 ```bash
 git fetch origin main
-mkdir -p "/Users/sakurasep/Documents/Code/Project/Project Worktree/PI-Desktop"
+mkdir -p "/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop"
 git worktree add \
-  -b <type>/<short-description> \
-  "/Users/sakurasep/Documents/Code/Project/Project Worktree/PI-Desktop/<short-description>" \
+  -b <type>/<YYYYMMDD>-<task-id>-<slug> \
+  "/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop/<YYYYMMDD>-<type>-<task-id>-<slug>" \
   origin/main
-cd "/Users/sakurasep/Documents/Code/Project/Project Worktree/PI-Desktop/<short-description>"
+cd "/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop/<YYYYMMDD>-<type>-<task-id>-<slug>"
 ```
+
+Use the creation date in Asia/Taipei and a project-unique lowercase task ID
+for the branch and worktree stem; preserve existing task paths and names.
 
 Every new worktree, including subagent and temporary validation or integration
 worktrees, must use this central location. Do not use sibling, in-repository,
