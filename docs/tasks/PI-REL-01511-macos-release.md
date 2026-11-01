@@ -1,6 +1,6 @@
 # PI-REL-01511: Publish the 0.15.11 macOS maintenance release
 
-- Project: `fork-pi-desktop`; status: 实现中.
+- Project: `fork-pi-desktop`; status: 待体验 (published; user acceptance pending).
 - Created: 2026-11-01 (Asia/Taipei).
 - Goal / authorization: publish a new installer containing the maintenance
   fixes landed by PI-UP-1101. The user's release request authorizes the
@@ -79,13 +79,73 @@ starts a service, uses real profiles/providers or delegates further.
   correction found no remaining blockers. Primary user-edit hashes remained
   unchanged. Final code diff before the record update:
   `7ad887f91decfbdc6f85a7e0f2be8b31d11f772c578e31ed2a36da5f6bbde111`.
-- Preparation head, base, PR and integration candidate: pending.
-- Tag source, formal workflow and asset verification: pending.
-- Merge, publication and cleanup: pending; these are tracked separately from
-  user acceptance. Only explicit user feedback establishes 已验收.
-- Previous PI-UP-1101 checks describe the previous source. The new release
-  workflow will independently validate the exact tagged source; historical
-  results are not reported as rerun here.
+- Preparation [PR #69](https://github.com/SakuraLoveSmile/PI-Desktop/pull/69)
+  head: `9cbfd523ff79903fccfdee2857fb33ead12146a7`; base:
+  `0de3a8731f40350fcc1408bd54727c828353dc57`. All five current-head checks passed:
+  [CI](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/41292906395),
+  [Docs](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/41292906390),
+  [PR base](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/41292906391).
+- Hosted integration candidate `8ef9ca437c89c0b79923afe39af37956624404b9`
+  has the same complete tree as the preparation head. Downloaded build and
+  result receipts identify that candidate, a clean workspace and unchanged
+  artifacts; all five isolated smoke suites passed. Rust: 1,280 passed / one
+  existing ignored case. Workspace Vitest: 4,076 passed (the shared package's
+  generated output is also collected by existing CI); Desktop: 4,243 passed /
+  five existing skips; docs: 11 passed. Environment: Ubuntu, Node 24.22.1.
+- Gated merge and release source:
+  `a35b75d779a53c9d7b0023aa0cb08d1885cfde69`, with the same full tree as the
+  validated integration candidate. The guarded release helper created fresh
+  annotated tag `v0.15.11`, which was pushed successfully.
+- Formal [release workflow](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/41293723895)
+  passed all seven jobs against that exact source: metadata, JS, Rust, isolated
+  smoke, macOS arm64 build, installer aggregation and publication. Tagged-source
+  smoke receipts record
+  source and fetched main both as the release SHA above; preflight's comparison
+  base remains `0de3a8731f40350fcc1408bd54727c828353dc57`. Test totals match the
+  preparation run. The native build ran on GitHub-hosted `macos-15` arm64 and
+  strict app/Host signatures and resource seals passed in loose, ZIP-extracted
+  and DMG-mounted forms. No notarization assessment is claimed.
+- [v0.15.11](https://github.com/SakuraLoveSmile/PI-Desktop/releases/tag/v0.15.11)
+  was published on 2026-11-01 at 09:51:34 UTC as the stable latest release.
+  Its seven assets include DMG, ZIP, their blockmaps, updater metadata,
+  `release-manifest.json` and `SHA256SUMS`. The publication job verified remote
+  asset digests and sizes before publishing the draft. Independent download
+  verification passed for all seven assets: remote SHA256/size, complete
+  `SHA256SUMS`, manifest source/build identity and updater SHA512/size. ZIP CRC,
+  app ID/version, DMG `hdiutil verify`, extracted app/Host strict resource seals
+  and arm64 executables also passed on local macOS. The app was neither
+  installed nor launched; existing user profiles and security settings were
+  not accessed or changed.
 
-Next: validate preparation, commit and publish its PR, pass current-source
-gates, merge, create the fresh tag, then verify cloud publication and cleanup.
+  | Installer | Bytes | SHA256 |
+  | --- | ---: | --- |
+  | [DMG](https://github.com/SakuraLoveSmile/PI-Desktop/releases/download/v0.15.11/Pi-Desktop-Plus-0.15.11-arm64.dmg) | 138557348 | `8699bd36b5bc9fee258b2b46fc1c4914d81b983dad7d74c7151be7236bcbb651` |
+  | [ZIP](https://github.com/SakuraLoveSmile/PI-Desktop/releases/download/v0.15.11/Pi-Desktop-Plus-0.15.11-arm64-mac.zip) | 136143409 | `848e4307e5ddab25915fc3839deab51729efc48b081989cc23df9d26a89abd5d` |
+- Primary main already fast-forwarded to the release source; all four original
+  user-file hashes and empty staged diff were verified unchanged. Recovery
+  copies, original binary diffs and the synchronization receipt are retained.
+- Publication and cleanup remain separate from user acceptance. Only explicit
+  user feedback establishes 已验收.
+- Previous PI-UP-1101 checks describe the previous source. This release's own
+  workflow independently validated the exact tagged source; historical
+  results are not reported as rerun here. Windows/Linux/Intel installers,
+  Developer ID/notarization, Gatekeeper/Finder acceptance, automatic installer
+  updates and real providers were NOT RUN / outside this release lane.
+
+## Closeout and experience
+
+The record-only closeout follows the preparation merge and publication. It
+changes no executable source or immutable tag. Its PR must pass the current
+documentation/base gates; no repeated runtime tests are needed for this
+documentation-only receipt. After merge, synchronize main and retire this
+task's local branch/worktree. Preserve the remote source branch.
+
+The durable archive above retains the verified downloaded installers,
+manifests, raw job logs, source/build/E2E receipts and recoverable primary user
+edits. `final-delivery.json` is the mechanical end-state receipt: merged
+closeout, local/remote main, no remaining task checkout/local branch and
+unchanged primary user-file hashes/staging. It is evidence linked by this
+authoritative task record, not a second task plan.
+
+Next: manually download/install the Apple Silicon build and assess the fixes.
+User installation/experience remains pending and does not block publication.
