@@ -297,14 +297,18 @@ function persistAgentEvent(envelope: AgentEventEnvelope): UiMessage | undefined 
     // provider retry and grow the request body. Structured provider failures
     // remain durable so their details stay attached to the failed turn after
     // reload; a message that still carries a tool row keeps its link to it, and
-    // a steering reply is reserved by the user turn that accepted it.
+    // a steering reply is reserved by the user turn that accepted it. Signed
+    // call-only replies keep the provider replay metadata needed after reload.
     const empty =
       !(event.message.content || "").trim() &&
       !(event.message.thinking || "").trim();
     const carriesTool =
       Boolean(event.message.toolName) || Boolean(event.message.toolCallId);
     const reservedForSteering = steeringReplies.delete(event.message.id);
-    if (empty && !carriesTool && !event.message.error && !reservedForSteering) return;
+    if (
+      empty && !carriesTool && !event.message.error && !reservedForSteering &&
+      !event.message.providerReplay
+    ) return;
     void persistenceOutbox
       .enqueue(
         {
