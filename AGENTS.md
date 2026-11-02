@@ -4,6 +4,15 @@ Mandatory rules for AI agents working in PI-Desktop. This file is the single
 authority for agent policy: it states constraints and routes each procedure to
 its owning document. Tool entry points import this file; never copy it.
 
+<!-- development-workflow:begin v1 -->
+
+```text
+Project-ID: fork-pi-desktop
+Worktree-Root: /Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop
+```
+
+<!-- development-workflow:end -->
+
 Precedence: this file wins for workflow and safety; domain specs under
 `docs/spec/` win for product behavior, protocols, persistence, security
 boundaries and acceptance criteria; ADRs record rationale, not contract.
@@ -20,9 +29,8 @@ speed — change safely, not quickly.
 
 Isolation:
 
-- `1 request = 1 branch + 1 dedicated worktree` under the central worktree root
-  `/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop`,
-  named as the workflow spec defines.
+- `1 request = 1 branch + 1 dedicated worktree` under the `Worktree-Root` of
+  the identity block above, named as the workflow spec defines.
 - Never develop on `main` or in the primary checkout. Never reuse or modify
   another task's branch or worktree.
 - Post-merge cleanup is mandatory and part of delivery. It authorizes only

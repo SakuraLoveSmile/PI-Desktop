@@ -1,7 +1,7 @@
 # PI-POLICY-1102: Agent policy becomes a single source with enforceable budgets
 
-- Project: `fork-pi-desktop`; task ID: `PI-POLICY-1102`; status: 待体验
-  (implemented, validated and merged; user acceptance pending).
+- Project: `fork-pi-desktop`; task ID: `PI-POLICY-1102`; status: 已验收
+  (implemented, validated, merged and accepted by the user on 2026-11-02).
 - Created: 2026-11-02 (Asia/Taipei).
 - Authoritative record: this file. Linked evidence only supplements it.
 - Goal / authorization: the user asked to optimize the project policy because it
@@ -121,6 +121,8 @@ CONTRIBUTING.md 6,144 and spec 05 12,288.
 | 2026-11-02 | merged head `43dc869ed` | worktree | `git diff --check`, `node scripts/check-pr-base-main.mjs`, docs rebuild | PASS |
 | 2026-11-02 | PR #74 head | GitHub Actions | JS build/typecheck/lint/architecture/test, Docs checks, head-contains-base, isolated launch smoke, Rust host-core | five checks SUCCESS |
 | 2026-11-02 | merge `0450f9ae2` | primary checkout and task worktree | local `main` fast-forwarded to `0450f9ae2`; worktree removed; merged branch deleted; registrations pruned | clean, `git worktree list` lists only the primary checkout |
+| 2026-11-02 | `8909ef026` + leftover branch | leftovers worktree, fixture registry | `development-workflow.py audit --registry /tmp/registry-policy-test.json` | PASS for `fork-pi-desktop` after the identity block returned |
+| 2026-11-02 | `8909ef026` + leftover branch | leftovers worktree | `check-agent-policy`, `check-locales`, `check-docs` | PASS: 12,269/13,312 B, 95 pairs, 632 pages |
 
 ## Commit and integration
 
@@ -132,8 +134,24 @@ CONTRIBUTING.md 6,144 and spec 05 12,288.
 
 - Experience entry: `AGENTS.md` at repository root, then
   `docs/spec/06-delivery/03-ai-development-workflow.md`.
-- Delivered: implementation, checks, PR #74 and merge `0450f9ae2`. The remote task branch is retained because deleting it needs explicit authorization.
-- User confirmation: required before 已验收.
+- Delivered: implementation, checks, PR #74 and merge `0450f9ae2`; both merged remote branches were later deleted with explicit authorization.
+- User confirmation: given on 2026-11-02; the user accepted the delivered policy.
 - Resume: the worktree no longer exists; start from `main` at `0450f9ae2` and read this record.
 - Rollback: the change is documentation, CI and one script; revert the commit.
 - Worktree cleanup: done on 2026-11-02; the worktree was removed, the merged local branch deleted, registrations pruned, and the primary checkout fast-forwarded to `0450f9ae2`.
+
+## Leftover handling after the merge
+
+- Restored the machine-readable identity block (`Project-ID`, `Worktree-Root`)
+  in `AGENTS.md` so `development-workflow.py audit` passes again. The block now
+  carries identity only; the isolation rule points at it instead of repeating
+  the path.
+- Updated the global guidance (`~/.codex/guidance/development-workflow.md`,
+  version 2026-11-02.1) to state that the managed block is identity-only and
+  that workflow rules stay in the project entry or its specs.
+- The Chinese workflow spec no longer links a fragment of an English heading in
+  the Chinese test plan, so translating that heading cannot break the link.
+- Out of scope but reported: the same audit still fails for `personal-feedback`
+  because its registered worktree root differs; that project was not touched.
+- Status moved to `已验收` after the user explicitly accepted the delivered policy
+  on 2026-11-02.
