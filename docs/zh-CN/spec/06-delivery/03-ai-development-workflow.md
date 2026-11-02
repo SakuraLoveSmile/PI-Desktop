@@ -284,7 +284,7 @@ Conventional Commits：`type(scope): description`，仅限英文。类型：`fea
 
 ## 13. 测试质量与清单
 
-测试行为或稳定合约，绝不要测试仓库源码文本。断言清单与 `pnpm check:test-quality` 棘轮、运行时测试预算、季度审计、CI 分层、fixture 边界和生成的索引由 [07-test-maintenance](/zh-CN/spec/06-delivery/07-test-maintenance) 和[测试计划 §10](/zh-CN/spec/06-delivery/04-e2e-test-plan#_10-ci-tiers-and-fixture-boundaries) 负责。绝不把被跳过、被排除或仅目录场景计为通过的验收；仅文档场景不需要 ID，被替换的行为在同一变更中移除其过时的测试和 ID。
+测试行为或稳定合约，绝不要测试仓库源码文本。断言清单与 `pnpm check:test-quality` 棘轮、运行时测试预算、季度审计、CI 分层、fixture 边界和生成的索引由 [07-test-maintenance](/zh-CN/spec/06-delivery/07-test-maintenance) 和[测试计划 §10](/zh-CN/spec/06-delivery/04-e2e-test-plan) 负责。绝不把被跳过、被排除或仅目录场景计为通过的验收；仅文档场景不需要 ID，被替换的行为在同一变更中移除其过时的测试和 ID。
 
 ---
 
