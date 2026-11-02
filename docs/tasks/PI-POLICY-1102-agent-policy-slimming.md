@@ -1,7 +1,7 @@
 # PI-POLICY-1102: Agent policy becomes a single source with enforceable budgets
 
 - Project: `fork-pi-desktop`; task ID: `PI-POLICY-1102`; status: 待体验
-  (implemented and validated locally; push, PR and merge await authorization).
+  (implemented, validated and merged; user acceptance pending).
 - Created: 2026-11-02 (Asia/Taipei).
 - Authoritative record: this file. Linked evidence only supplements it.
 - Goal / authorization: the user asked to optimize the project policy because it
@@ -12,7 +12,8 @@
 - Baseline: `9c09758ba3d2b590a8154e1eb2f772b347f9fca4` (`origin/main`).
 - Branch: `docs/20261102-pi-policy-1102-agent-policy-slimming`.
 - Worktree: `/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop/20261102-docs-pi-policy-1102-agent-policy-slimming`.
-- Target: remote `main` through a pull request.
+- PR: [#74](https://github.com/SakuraLoveSmile/PI-Desktop/pull/74), merged as `0450f9ae208c8b554ca360534d9fb13eaf492c7c`.
+- Target: remote `main`.
 
 ## Problem statement
 
@@ -117,20 +118,22 @@ CONTRIBUTING.md 6,144 and spec 05 12,288.
 | 2026-11-02 | English policy landed (uncommitted) | worktree + host docs dependencies | `docs/node_modules/.bin/vitepress build .` | PASS: build complete in 34.40 s, no dead links |
 | 2026-11-02 | Chinese mirrors landed (uncommitted) | worktree | `node docs/scripts/check-locales.mjs` | PASS: 95 English/Chinese pairs |
 | 2026-11-02 | Chinese mirrors landed (uncommitted) | worktree | `node docs/scripts/check-agent-policy.mjs` / `check-docs.mjs` / scenario index | PASS on all; 34 zh table lines and 2 fence lines match the English shape |
-| 2026-11-02 | (pending) | worktree | full diff review, `git diff --check`, docs rebuild, `check-pr-base` | reserved |
+| 2026-11-02 | merged head `43dc869ed` | worktree | `git diff --check`, `node scripts/check-pr-base-main.mjs`, docs rebuild | PASS |
+| 2026-11-02 | PR #74 head | GitHub Actions | JS build/typecheck/lint/architecture/test, Docs checks, head-contains-base, isolated launch smoke, Rust host-core | five checks SUCCESS |
+| 2026-11-02 | merge `0450f9ae2` | primary checkout and task worktree | local `main` fast-forwarded to `0450f9ae2`; worktree removed; merged branch deleted; registrations pruned | clean, `git worktree list` lists only the primary checkout |
 
 ## Commit and integration
 
 | Commit | Behavior change and reason | Validation | Merge / release |
 | --- | --- | --- | --- |
-| `3199889b6` | Replace the mirrored policy with one authority plus an enforceable budget | policy gate, docs check, 95 locale pairs, scenario index, VitePress build | push/PR/merge not authorized; branch local |
+| `43dc869ed` | Replace the mirrored policy with one authority plus an enforceable budget | policy gate, docs check, 95 locale pairs, scenario index, VitePress build, five CI workflows | merged as `0450f9ae2` in [#74](https://github.com/SakuraLoveSmile/PI-Desktop/pull/74) |
 
 ## Delivery and recovery
 
 - Experience entry: `AGENTS.md` at repository root, then
   `docs/spec/06-delivery/03-ai-development-workflow.md`.
-- Not yet done: implementation, checks, review, commit, PR.
+- Delivered: implementation, checks, PR #74 and merge `0450f9ae2`. The remote task branch is retained because deleting it needs explicit authorization.
 - User confirmation: required before 已验收.
-- Resume: verify this worktree path, HEAD, index and uncommitted state first.
+- Resume: the worktree no longer exists; start from `main` at `0450f9ae2` and read this record.
 - Rollback: the change is documentation, CI and one script; revert the commit.
-- Worktree cleanup: not yet applicable; the branch is local and unpushed.
+- Worktree cleanup: done on 2026-11-02; the worktree was removed, the merged local branch deleted, registrations pruned, and the primary checkout fast-forwarded to `0450f9ae2`.
