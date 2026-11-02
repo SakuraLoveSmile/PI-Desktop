@@ -6,6 +6,14 @@ export const PLUS_UPSTREAM_CUTOFF = "0.15.6";
 const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   en: [
     {
+      version: "0.15.12",
+      date: "2026-11-02",
+      highlights: [
+        "Keep unsigned macOS builds on manual update delivery: Check for Updates reports the new version and opens the release page instead of downloading an installer macOS cannot validate.",
+        "Developer ID-signed builds keep automatic in-app updates; Windows and Linux update behavior is unchanged.",
+      ],
+    },
+    {
       version: "0.15.11",
       date: "2026-11-01",
       highlights: [
@@ -74,6 +82,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "zh-CN": [
+    {
+      version: "0.15.12",
+      date: "2026-11-02",
+      highlights: [
+        "未签名 macOS 版本改为手动更新：检查更新会提示新版本并打开发布页，不再下载 macOS 无法校验的安装包。",
+        "Developer ID 签名的版本仍自动应用内更新；Windows 和 Linux 的更新行为不变。",
+      ],
+    },
     {
       version: "0.15.11",
       date: "2026-11-01",
@@ -144,6 +160,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   "zh-TW": [
     {
+      version: "0.15.12",
+      date: "2026-11-02",
+      highlights: [
+        "未簽署 macOS 版本改為手動更新：檢查更新會回報新版本並打開發佈頁，不再下載 macOS 無法驗證的安裝套件。",
+        "Developer ID 簽署的版本仍自動於應用程式內更新；Windows 與 Linux 的更新行為不變。",
+      ],
+    },
+    {
       version: "0.15.11",
       date: "2026-11-01",
       highlights: [
@@ -212,6 +236,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   tr: [
+    {
+      version: "0.15.12",
+      date: "2026-11-02",
+      highlights: [
+        "İmzasız macOS sürümleri artık manuel güncelleme kullanır: Güncellemeleri denetle yeni sürümü bildirir ve macOS'un doğrulayamadığı bir yükleyiciyi indirmek yerine sürüm sayfasını açar.",
+        "Developer ID ile imzalanmış sürümler otomatik uygulama içi güncellemeyi korur; Windows ve Linux güncelleme davranışı değişmez.",
+      ],
+    },
     {
       version: "0.15.11",
       date: "2026-11-01",
@@ -282,6 +314,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   de: [
     {
+      version: "0.15.12",
+      date: "2026-11-02",
+      highlights: [
+        "Nicht signierte macOS-Builds verwenden jetzt manuelle Updates: Die Update-Prüfung meldet die neue Version und öffnet die Release-Seite, statt einen Installer herunterzuladen, den macOS nicht validieren kann.",
+        "Mit Developer ID signierte Builds behalten automatische In-App-Updates; das Update-Verhalten unter Windows und Linux bleibt unverändert.",
+      ],
+    },
+    {
       version: "0.15.11",
       date: "2026-11-01",
       highlights: [
@@ -350,6 +390,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   es: [
+    {
+      version: "0.15.12",
+      date: "2026-11-02",
+      highlights: [
+        "Las compilaciones de macOS sin firma usan ahora actualizaciones manuales: Buscar actualizaciones muestra la nueva versión y abre la página de versiones en lugar de descargar un instalador que macOS no puede validar.",
+        "Las compilaciones firmadas con Developer ID conservan las actualizaciones automáticas dentro de la app; el comportamiento en Windows y Linux no cambia.",
+      ],
+    },
     {
       version: "0.15.11",
       date: "2026-11-01",
@@ -420,6 +468,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   fr: [
     {
+      version: "0.15.12",
+      date: "2026-11-02",
+      highlights: [
+        "Les versions macOS non signées utilisent désormais les mises à jour manuelles : la recherche de mises à jour annonce la nouvelle version et ouvre la page des versions au lieu de télécharger un installeur que macOS ne peut pas valider.",
+        "Les versions signées avec un Developer ID conservent les mises à jour automatiques intégrées ; le comportement sous Windows et Linux reste inchangé.",
+      ],
+    },
+    {
       version: "0.15.11",
       date: "2026-11-01",
       highlights: [
@@ -489,6 +545,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   ko: [
     {
+      version: "0.15.12",
+      date: "2026-11-02",
+      highlights: [
+        "서명되지 않은 macOS 빌드는 이제 수동 업데이트를 사용합니다. 업데이트 확인은 새 버전을 알리고 macOS가 검증할 수 없는 설치 프로그램을 다운로드하는 대신 릴리스 페이지를 엽니다.",
+        "Developer ID로 서명된 빌드는 자동 인앱 업데이트를 유지하며 Windows와 Linux의 업데이트 동작은 변경되지 않습니다.",
+      ],
+    },
+    {
       version: "0.15.11",
       date: "2026-11-01",
       highlights: [
@@ -557,6 +621,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "pt-BR": [
+    {
+      version: "0.15.12",
+      date: "2026-11-02",
+      highlights: [
+        "Builds de macOS sem assinatura agora usam atualizações manuais: Verificar atualizações informa a nova versão e abre a página de versões em vez de baixar um instalador que o macOS não consegue validar.",
+        "Builds assinados com Developer ID mantêm as atualizações automáticas no aplicativo; o comportamento no Windows e Linux não muda.",
+      ],
+    },
     {
       version: "0.15.11",
       date: "2026-11-01",
