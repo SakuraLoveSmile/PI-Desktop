@@ -4,421 +4,283 @@
 > Status: Accepted
 > Cross-references: [00-baseline](../00-baseline.md) · [decisions-log](../08-meta/decisions-log.md) · [acceptance-criteria](02-acceptance-criteria.md) · [e2e-test-plan](04-e2e-test-plan.md) · [change-checklist](05-change-checklist.md) · [ADR index](../../adr/README.md)
 
+This spec owns development workflow: change tiers, delivery order, branch and
+worktree mechanics, validation staging, commit rules, GitHub intake, merge
+cleanup, and release gating. `AGENTS.md` states the
+non-negotiables and routes here; the [change checklist](05-change-checklist.md)
+is the runnable form.
+
 ---
 
-## 1. Core Immutable Rules
+## 1. Core rules
 
-The rules below govern every change to the PI-Desktop codebase and documentation. R1–R4 restate the five numbered Immutable Rules in `AGENTS.md` (R4 covers both the merge-back and worktree clean-up rules); R5 and R6 restate its GitHub issue and pull request handling sections. They cannot be relaxed by an agent without explicit human override.
+These rules govern every change and are the single definition: no other policy
+file keeps a second copy, and only an explicit human override relaxes one. R5
+and R6 are the GitHub intake rules in §8.
 
 ### R1 — Spec-first / Spec-sync
 
 > **No behavior change without updating the corresponding spec.**
 
-- Every code, config, or UX change that alters observable behavior must update the relevant `docs/spec/` document before or alongside the change.
-- Architectural boundary changes (process model, IPC contract, storage ownership, security boundary) also require an ADR — see `docs/adr/README.md`.
-- Pure refactor that preserves behavior and API contracts does not require spec updates, but must still be committed (R2).
+- Any code, config, or UX change that alters observable behavior updates the relevant `docs/spec/` document before or alongside it.
+- Architectural boundary changes (process model, IPC contract, storage ownership, security boundary) also need an ADR — see `docs/adr/README.md`; a behavior-preserving refactor needs no spec update but is still committed (R2).
+- Workflow or validation-policy changes update the relevant `docs/spec/06-delivery/` document and leave no contradictory workflow instruction in the repository.
 
 ### R2 — Commit-per-change
 
-> **Every completed logical change must be git committed.**
+> **Every completed logical change is git committed.**
 
-- No large uncommitted piles of work. Each logical unit of work — a feature, a fix, a spec update, a chore — gets its own commit.
-- Uncommitted work at session end is a violation of this rule.
-- If a change is incomplete, either commit it as a draft with a `WIP:` prefix or roll it back.
+- Each logical unit — feature, fix, spec update, chore — gets its own commit; no large uncommitted piles, and no uncommitted work at session end.
+- An incomplete change is committed as a draft with a `WIP:` prefix or rolled back.
 
 ### R3 — E2E coverage doc
 
-> **Every feature/fix that affects user-visible or protocol-visible behavior must update e2e test documentation.**
+> **Every feature or fix that changes user-visible or protocol-visible behavior updates the E2E test documentation.**
 
-- "User-visible": anything the end-user sees or interacts with (UI, CLI output, dialogs, notifications).
-- "Protocol-visible": IPC messages, RPC methods, plugin API surfaces, event payloads.
-- Document the scenario in `06-delivery/04-e2e-test-plan.md` — even before the automated test exists.
-- Internal-only changes (logging format, internal variable rename) do not require e2e doc updates.
+- Document the scenario in `04-e2e-test-plan.md` even before the automated test exists, and link acceptance criteria IDs (A–H). "User-visible" is UI, CLI output, dialogs and notifications; "protocol-visible" is IPC messages, RPC methods, plugin API surfaces and event payloads.
+- Internal-only changes (logging format, internal rename) need no E2E doc update.
 
 ### R4 — Request branch + worktree + merge gate
 
-> **Every development request starts from current `origin/main` in a
-> dedicated branch and worktree. Opening or updating a pull request
-> requires that head to contain the latest `origin/main`.**
+> **Every development request starts from current `origin/main` in a dedicated branch and worktree, and a pull request head contains the latest `origin/main`.**
 
-- Before editing, preserve any existing uncommitted work, fetch `origin/main`,
-  create a new request branch and worktree directly from current `origin/main`.
-  Local `main` remains a coordination surface. Existing work in the primary
-  checkout must never be moved, stashed, or overwritten merely to start a new
-  request.
-- Use one short-lived branch per request. Name it
-  `<type>/<YYYYMMDD>-<task-id>-<slug>`, where `type` matches the conventional change
-  type when practical. Use the creation date in Asia/Taipei and a
-  project-unique lowercase task ID, for example
-  `chore/20261101-pi-rel-01511-macos-release`.
-- Use one dedicated worktree per request. Do not implement a new request in the
-  primary checkout or reuse another request's worktree.
-- All new worktrees, including subagent and temporary validation or integration
-  worktrees, belong under
-  `/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop/<YYYYMMDD>-<type>-<task-id>-<slug>/`.
-  Inspect working state, `git worktree list`, and task ownership first. Use a
-  quoted absolute path with `git worktree add` when tooling cannot select this
-  location; do not use sibling, in-repository, or tool-default directories.
-- Reuse the primary checkout's development environment where safe: installed
-  toolchains, package-manager stores, build caches, and ignored local
-  environment configuration remain the canonical environment. Reference or
-  link those resources into the request worktree when required; do not copy
-  environment state into tracked files. Generate other worktree-local state only
-  when isolation or version compatibility requires it.
-- Local task-candidate E2E runs from the request worktree but must reuse the host
-  dependency/runtime environment already provisioned in the primary checkout.
-  Do not run `pnpm install`, `npm install`, or create a second environment
-  solely for E2E. Keep temporary profiles, data directories, sockets, ports,
-  logs, and artifacts isolated; install or rebuild only when host dependencies
-  are missing or incompatible, and record the reason.
-- Development commits and direct pushes on `main` are forbidden.
-- A commit request does not itself authorize remote publishing. If remote
-  delivery has not been authorized, stop after the request-branch commit in the
-  worktree. Do not merge the task into local `main` to create an E2E candidate.
-- Before opening or updating a PR/MR, fetch `origin/main` and make it an
-  ancestor of the request head (`git merge-base --is-ancestor origin/main HEAD`,
-  or `pnpm check:pr-base`). Refresh in the task worktree (`git rebase
-  origin/main` on a private branch; a non-destructive merge when rewriting
-  history would be unsafe). Do not open or update a PR that is behind
-  `origin/main`.
-- When a push or other remote delivery is authorized, the fixed delivery order
-  in `AGENTS.md` applies: refresh against latest `origin/main`, run
-  local task-candidate E2E or select the exact-SHA hosted lane, push the request
-  branch, open a PR/MR targeting `main`, pass the selected hosted candidate
-  gates and the required remote checks (including the PR-base
-  gate) and reviews, and merge using a permitted strategy. Then fetch and
-  safely synchronize local `main` with the landed change. Do not infer
-  permission to push directly to `main`, force-push, or discard unrelated
-  local work.
-- Both routes retain the required validation, security, and conflict gates.
-  Relevant E2E runs on a candidate that already contains latest `origin/main`
-  (R7). If a gate, authentication, permissions, or required review prevents
-  integration, report the actual blocker and remaining work; the requested
-  integration is not Done.
-- Post-merge cleanup follows `AGENTS.md` §5 "Verified merge and cleanup".
-  After verifying the user-authorized local or remote integration and its
-  checks, automatically clean this request's worktrees and merged branches in
-  the same task; no separate cleanup approval is needed for its own resources.
-  Preserve dirty/untracked contents and needed ignored artifacts in verified
-  recovery archives first. Verify no running task, service, or needed path
-  reference still uses the checkout; retain it and report the exact blocker
-  when it remains in use. Remove from outside the checkout, preserve the shared
-  worktree root, and prune registrations and retire empty parent/name marker
-  containers, obsolete integration branches and visible snapshot branches.
-  Backup commits belong in archive refs outside `refs/heads/` or verified files.
-  Check Git worktrees, local branches and physical paths, and report any blocker
-  by its exact path/ref. Preserve the primary checkout, active/unmerged work,
-  archives and unrelated tasks; batch cleanup needs explicit user scope, and
-  remote-branch deletion is not implied.
-- If the user requests a launch after delivery, build and start the app from
-  the integrated `main` checkout and its development environment.
+- One request = one short-lived branch + one dedicated worktree from the fetched `origin/main`. Never develop on `main` or in the primary checkout, never push `main` directly, and never reuse or modify another request's branch or worktree.
+- Branch `<type>/<YYYYMMDD>-<task-id>-<slug>`: conventional type, creation date in Asia/Taipei, project-unique lowercase task ID, kebab-case slug (for example `chore/20261101-pi-rel-01511-macos-release`).
+- Worktree under the central worktree root declared in `AGENTS.md`, named `<YYYYMMDD>-<type>-<task-id>-<slug>`, including subagent and temporary ones; check working state, `git worktree list`, and task ownership first; use a quoted absolute path with `git worktree add`; sibling, in-repository, and tool-default directories are not allowed.
+- Preserve existing work in the primary checkout — never move, stash, or overwrite it to start a request; local `main` is a coordination surface, not a development or E2E workspace. Reuse the primary checkout's toolchains, package stores, caches, and ignored configuration; only mutable or incompatible state stays worktree-local and ignored, and environment state is never copied into tracked files.
+- Commit authorization and remote publishing are separate: a commit request stops at the request-branch commit, while push, PR, merge, and release need explicit authorization. Never merge a task into local `main` to create an E2E candidate.
+- Before opening or updating a PR/MR, fetch `origin/main` and make it an ancestor of the request head (`git merge-base --is-ancestor origin/main HEAD`, or `pnpm check:pr-base`), refreshing inside the task worktree; never open or update a PR behind `origin/main`. Resolve conflicts only in the task worktree and hand back to the user when one lands in a file this task did not touch.
+- Local-only and remote delivery retain the same validation, security, and conflict gates; a blocked gate, authentication, permission, or review is reported as the actual blocker — the integration is not Done. Post-merge cleanup is mandatory (§7), and a requested launch builds and starts from the integrated `main` checkout and its environment.
+
+### R7 — Code-bearing changes need relevant candidate E2E
+
+> **Every code-bearing change passes relevant E2E on a candidate that already contains the latest `origin/main`, before merge or commit-only completion. Hosted validation may follow an authorized branch push or PR.**
+
+- Code-bearing means `apps/`, `packages/`, `crates/`, runtime scripts, build or CI configuration, packaging, protocol behavior, or persisted data; documentation-only changes that do not alter executable behavior are exempt. An E2E run on a branch behind `origin/main` is exploratory and does not satisfy this rule, and the task is never merged into local `main` to create the candidate.
+- Select suites from `04-e2e-test-plan.md`: build, typecheck, lint, unit and integration tests, manual review, and source inspection do not replace relevant E2E, and required validation needs no separate user request.
+- A suite that cannot run is recorded as `NOT RUN` with reason, alternative validation, and remaining risk; the gate stays unsatisfied until it passes on a candidate containing latest `origin/main`. A failed required suite blocks merge until classified and fixed, and a hosted retrigger counts only on the intended candidate.
+
+See §5 for the two stages, evidence fields, and rerun rules.
+
+---
+
+## 2. Change tiers
+
+Every request declares one tier; it sets which records, evidence, and checklist
+items apply, and the [change checklist](05-change-checklist.md) follows it.
+
+| Tier | Trigger | Task record | Candidate E2E | Delivery note |
+|---|---|---|---|---|
+| **T0** | Docs, copy, i18n text, comments, or visual styling; no runtime, rule, interaction, responsive-usability, accessibility, content-layout, or user-path change | Not required | Not required | One line |
+| **T1** | Normal code or config change | Required | Only when user-visible or protocol-visible | Full report |
+| **T2** | Architecture, public contract, persistence, security, or release change | Required with full evidence | Required | Full report plus cleanup archive |
+
+- T0 still uses a dedicated branch and worktree and passes repository CI, but skips the task record, candidate E2E, and full delivery report.
+- A change that straddles tiers takes the higher tier; a would-be T0 change that alters a rule, interaction, responsive usability, accessibility, or content layout is T1.
+
+---
+
+## 3. Delivery order
+
+Every request follows this order; steps may iterate when implementation reveals
+new requirements. It never inserts `merge task → local main` between steps 6 and
+8: after incorporating `origin/main`, the request branch itself is the local
+integration candidate.
+
+| # | Step | Gate or output |
+|---|---|---|
+| 1 | Create a dedicated branch and worktree from current `origin/main` | Isolated files; state, worktree list, and ownership checked |
+| 2 | Implement in the request worktree | Planned change complete |
+| 3 | Run targeted static, unit, and integration checks | Risk-based results |
+| 4 | Review the full task diff | Nothing unexpected, unrelated, or secret |
+| 5 | Commit the task | Conventional commit (§6) |
+| 6 | Refresh against latest `origin/main` (`pnpm check:pr-base`) | `origin/main` is an ancestor of the request head |
+| 7 | Resolve conflicts inside the task worktree | Candidate contains both sides |
+| 8 | Run local task-candidate E2E, or select exact-SHA hosted validation | Candidate result, or recorded `NOT RUN` (§5) |
+| 9 | Push the request branch when authorized | Published branch |
+| 10 | Open or update the pull request targeting `main` | Only this task's changes; PR-base passes |
+| 11 | Pass hosted candidate gates, then PR integration gates | Run URL, tested SHA, base revision, job conclusions |
+| 12 | Merge into remote `main` through repository gates | Authorized merge verified |
+| 13 | Synchronize local `main` with the landed change | Local `main` contains the merge |
+| 14 | Remove the worktree and merged local branch | Cleanup verified (§7) |
+
+Steps 1–8 apply to every request; a linked issue or pull request is verified
+per §8 before step 1. A commit-only request stops after step 5, or after step 8
+when the user asks for a validated candidate. Steps 9–14 need explicit
+remote-delivery authorization, and branch-only or draft-only limits narrow the
+scope. Before step 2, read `00-baseline.md` and the change area's specs, and
+record the plan in the task record (§4).
+
+```bash
+# From the primary checkout; the worktree path uses the central root from AGENTS.md.
+git fetch origin main
+git worktree add -b <type>/<YYYYMMDD>-<task-id>-<slug> <central-worktree-root>/<YYYYMMDD>-<type>-<task-id>-<slug> origin/main
+
+# Inside the request worktree before candidate E2E and before PR creation or update.
+git fetch origin main
+git rebase origin/main   # private branch; never force-push a shared branch
+pnpm check:pr-base
+```
+
+Start directly from the fetched `origin/main`; do not synchronize, merge, or
+resolve unrelated local divergence to begin request work, and refresh without
+rewriting history when a rebase would be unsafe. Authorized delivery: push, open
+the PR, pass the hosted gates, merge with a permitted strategy, fast-forward
+local `main`, remove the worktree, delete the merged local branch with `git
+branch -d` (never `-D`), prune stale registrations, and delete the remote branch
+only when authorized. Use a short-lived `main` worktree when the primary
+checkout cannot take the synchronization.
+
+---
+
+## 4. Task record and status
+
+- Keep one authoritative task record per request: reuse the existing plan or task file, otherwise create one under `docs/tasks/`; linked evidence supplements it. Record scope, frozen decisions, branch/worktree/target, acceptance scenarios, code revision, actual and missing validation, remaining work, and runtime resources.
+- On resume, verify the task path, HEAD, index, uncommitted work, and next action; old passing results are not current evidence.
+- Status uses only `未开始` (not started), `实现中` (in progress), `待体验` (ready for user experience), and `已验收` (user accepted). Missing required validation keeps the task in progress, and only explicit user confirmation grants acceptance; track merge and release separately and retain the verified-cleanup rules.
+- T0 needs no task record; a one-line delivery note replaces it.
+
+---
+
+## 5. Validation and E2E stages
+
+### 5.1 Stages and evidence
+
+Task-candidate validation runs the request's commits plus latest `origin/main`
+and conflict resolutions, in the request worktree or on its exact SHA on
+GitHub-hosted Actions. PR integration validation verifies the code about to land
+through the GitHub PR merge ref, a merge queue candidate, an equivalent
+synthetic merge commit, or another trusted integration candidate from target
+`main`.
+
+- E2E validates executable integration state, not a branch name: `latest applicable main + task changes = candidate executable state`. A result is valid only when its tested commit and base revision are known; the PR integration gate then protects against `main` changing before merge.
+- A PR head and an integration candidate are equivalent only when they produce the same executable tree against the target `main`; if `main` changed after candidate validation, the earlier result stays evidence but does not prove the new candidate.
+- Hosted candidate validation may follow an authorized branch push and PR, but its result and the separate PR integration jobs are both required before merge; neither stage merges the task into local `main`.
+- Evidence binds the tested SHA, base revision, and environment: record `Task candidate / Base main / E2E suites / Result / Environment` plus run URL and job conclusions.
+- A pending, failed, or missing hosted result is not passing evidence; a recorded `NOT RUN` still allows the branch push and PR so validation can happen in a capable environment. After the merge, rerun affected suites when the landed executable content differs from the gated commit.
+
+### 5.2 Risk-based local checks
+
+- Local validation is risk-based, not an automatic prerequisite: documentation-only and low-risk mechanical changes normally need no local tests, without a separate approval or waiver. Security boundaries, protocol contracts, data migrations, build configuration, and widely shared behavior need the smallest targeted non-E2E validation; a full local suite is not the default.
+- E2E documentation and execution are separate: R3 still requires scenario updates, while every code-bearing change runs at least one relevant suite plus the union for its affected surfaces, with commands from the root `package.json` and `04-e2e-test-plan.md`.
+- Local task-candidate E2E uses the request worktree's source and the host environment described in R4 and `04-e2e-test-plan.md`, never a second dependency environment installed solely for E2E; record any missing or incompatible host dependency that forced an install or rebuild, keep temporary profiles, data, sockets, ports, logs, and artifacts isolated, and treat a stale-branch run as debugging evidence only.
+
+### 5.3 Marketplace and update diagnosis gate
+
+Plugin update incidents need an evidence-first flow before any code change:
+
+1. Capture the exact plugin ID, installed version, displayed version, expected release, catalog URL, and observation time, then inspect the live catalog entry, the local catalog cache, and the installed registry independently.
+2. Classify the boundary: publisher/catalog data, fetch/cache fallback, host version comparison, IPC propagation, or renderer presentation.
+3. Run `pnpm check:marketplace -- --url <catalog-url> --plugin <id>`. Missing `shasum`, `url`, positive `sizeBytes`, or `permissions`, or a catalog `author` that is not a string (for example `{ name, url }` copied from a plugin manifest), is a release-data failure, not evidence of a stale renderer; incomplete releases remain non-installable.
+4. Reproduce with a fixture of unsorted versions and incomplete metadata before changing host or renderer code.
+
+State which boundary failed and what evidence rules out the others; a client-side fallback may preserve safe discovery but never conceals an invalid marketplace release.
+
+---
+
+## 6. Git commit rules
+
+Conventional Commits: `type(scope): description`, English only. Types:
+`feat`, `fix`, `docs`, `test`, `chore`, `refactor`, `perf`, `build`, `ci`;
+scope is optional but encouraged (`feat(host-core):`, `docs(spec):`).
+
+- Subject, then a blank line, then a body; single-line commits are rejected. The body is 1–3 short paragraphs explaining **why**, not a diff listing, wrapped around 72 columns.
+- Do not add `Co-Authored-By` or `Signed-off-by` unless requested; a related issue goes as a trailer after a blank line (`fixes #N`, `closes #N`).
+- One logical change per commit; tightly coupled spec updates share the code commit, and a pure docs change may be an adjacent `docs:` commit. Never commit secrets, API keys, tokens, passwords, local-only data, `node_modules/`, build artifacts, release packages, or generated files CI rebuilds.
+- Stage files by explicit path, re-run `git status` to confirm what is staged, and inspect the staged diff for unrelated work. Do not force-push, and never force-push a contributor's branch; the hard-prohibition command list in `AGENTS.md` applies.
+- Pre-commit check: one logical unit; no secrets or local data; specs and E2E docs updated per §10; `git diff --stat` reviewed; conventional message.
+
+---
+
+## 7. Integration and cleanup
+
+Merge authorization belongs to the user. After an authorized merge is verified,
+post-merge cleanup is mandatory and part of delivery; it covers only this
+request's own resources and needs no further approval for them.
+
+1. Verify the expected commits or equivalent integrated changes are present in the intended `main` and the required integration checks passed. Local-only delivery verifies local `main`; remote delivery also verifies remote `main` and safely synchronizes local `main`.
+2. Before removal, preserve dirty/untracked work and needed ignored artifacts (packages, screenshots, local configuration) in a verified recoverable archive; never discard unsaved data or force-delete an unmerged branch. Retain and report the exact blocker when a running task, service, or needed path still uses the checkout, and resolve a dirty or locked worktree without forcing removal.
+3. Remove or archive this request's worktrees, prune stale Git registrations, and remove empty container directories only after verifying they hold nothing beyond worktree-name markers. Use the managed archive operation for managed worktrees, run removal from outside the checkout, and preserve the shared worktree root, other tasks, and recovery archives.
+4. Delete the verified merged task branch and obsolete integration branches. Do not keep backup snapshots as normal local branches; keep recovery snapshots in archive refs outside `refs/heads/` or verified backup files, preserving their commits before retiring visible temporary refs.
+5. Verify `git worktree list`, the local branch list, and the physical request paths. Report cleanup separately from the merge; cleanup is incomplete while a task worktree, empty container, or temporary backup branch remains in place.
+
+Preserve the primary checkout, active/unmerged work, needed archives, and
+resources outside this request; another task's resources need an explicitly
+user-authorized batch cleanup, and remote-branch deletion is never implied.
+Report a blocked cleanup with the exact remaining path/ref and recovery state.
+
+---
+
+## 8. GitHub issue and pull request intake
+
+A linked issue or pull request is intake, not proof: fetch it, verify the claim
+against current code, and never implement before the investigation concludes.
 
 ### R5 — Verify linked GitHub issues before work, then reply and close
 
 > **A linked GitHub issue is not a task until the reported problem is shown to exist. After the outcome is conclusive, reply on that issue and close it.**
 
-This rule applies when the user prompt includes a GitHub issue URL or an
-unambiguous issue number for this repository.
+Applies when the user prompt includes a GitHub issue URL or an unambiguous issue
+number for this repository.
 
-- Fetch the issue (title, body, labels, comments, and state) before creating a
-  worktree or changing files for the claimed problem.
-- Independently verify the claim against the current codebase. For a bug,
-  reproduce it or cite concrete code/spec evidence. For a feature or
-  improvement, confirm the requested behavior is actually missing or incomplete
-  and in scope.
-- Do not start implementation until verification confirms the problem exists.
-- If the problem does not exist (already fixed, invalid, or a
-  misunderstanding): comment with the verification evidence and close the issue
-  when that conclusion is clear. If verification is inconclusive, comment with
-  what was tried and leave the issue open.
-- If the problem exists: follow R4, implement the smallest coherent change,
-  and after the request is merged into local `main`, comment with the
-  resolution and close the issue.
-- Write the GitHub comment in the language of the original issue title and
-  body. Code, commits, specs, and other repository documentation stay English.
-- An issue link authorizes commenting on and closing **that** issue only. It
-  does not authorize a git push. Remote publishing remains opt-in per R4 and
-  `AGENTS.md`.
-- Do not comment on or close unrelated issues. Do not reopen a closed issue
-  unless the user explicitly asks.
+- Fetch the issue (title, body, labels, comments, state) before creating a worktree or changing files, and independently verify the claim against current code. For a bug, reproduce it or cite concrete code/spec evidence and classify it as `confirmed regression`, `confirmed existing defect`, `already fixed`, `expected behavior`, `environment-specific failure`, or `insufficient evidence`; for a feature, confirm the requested behavior is missing or incomplete and in scope.
+- Problem does not exist: comment the verification evidence and close when the conclusion is clear, or comment what was tried and leave it open when inconclusive. For a confirmed problem, follow R4 with the smallest coherent change and, after the integration, comment the resolution and close.
+- Write the comment in the language of the original issue title and body; code, commits, specs, and repository documentation stay English. An issue link authorizes commenting on and closing **that** issue only, not a git push, and unrelated issues are never touched or reopened unless the user asks.
+- Public intake uses `.github/ISSUE_TEMPLATE` only (`blank_issues_enabled: false`); English is the source label language with Chinese on the same fields, bug reports require description, reproduction steps, expected and actual behavior, app version, and OS (Settings → Info prefills them, D313), feature requests require the problem and proposed change, and these fields are not weakened.
 
 ### R6 — Land a linked pull request only when it fixes the root cause with a minimal diff
 
 > **A linked GitHub pull request lands only when it actually removes the reported failure mode at the root, with the smallest coherent change. A sound direction is not enough. Completeness nits may follow after merge; an incomplete fix may not.**
 
-This rule applies when the user prompt includes a GitHub pull request URL or
-an unambiguous pull request number for this repository.
+Applies when the user prompt includes a GitHub pull request URL or an
+unambiguous pull request number for this repository.
 
-- Fetch the pull request (title, body, files, commits, comments, checks, draft
-  state, base/head, and linked issues) before creating a replacement
-  implementation or requesting a rewrite.
-- Independently verify all of:
-  1. The reported problem is real and in scope (same bar as R5).
-  2. The change must fix the reported root cause with the smallest coherent
-     change — not a nearby symptom, a docs-only restatement, a config
-     contract test, or a partial workaround that leaves the original path
-     intact.
-  3. Extra files, refactors, and spec theater do not compensate for an
-     incomplete fix. The approach must still be compatible with the
-     baseline, security boundaries, and architecture (or be a justified
-     spec-backed amendment).
-- Do not reimplement the pull request as a replacement, close it for nits, or
-  ask the contributor to start over when (1)–(3) hold.
-- If (1)–(3) hold:
-  1. Merge **that** pull request first, preserving the contributor's commits.
-     Use a repository-permitted merge strategy that keeps the contributor as
-     author of the landed work.
-  2. Missing additional test coverage, documentation, naming cleanup,
-     formatting, and other non-blocking polish are follow-up work **only
-     when they are not required to prove the root-cause fix**. Build,
-     typecheck, relevant existing test, required E2E, security, data-safety,
-     protocol-compatibility, and merge-conflict failures remain landing
-     blockers.
-  3. Landing blockers that would break `main` (the change does not compile,
-     fails existing tests for the changed area, or has merge conflicts) may
-     receive the smallest commits **on top of** the author's work so the pull
-     request can land. Do not squash away the author. Do not rewrite the
-     design. Do not expand the diff beyond the root-cause fix.
-  4. After the pull request is in `main`, follow R4 for any follow-up
-     improvements from the updated `main`.
-  5. Comment on the pull request in its language: acknowledge the
-     contribution, state what was merged, and list follow-up if any.
-- If (1)–(3) fail, or a harm blocker exists (secrets, sandbox or privilege
-  bypass, malicious or clearly destructive changes, out-of-scope reversal of
-  a frozen decision, unrelated drive-by payload): do not merge, do not
-  approve as "direction is fine, follow up later", and comment with the
-  evidence in the pull request's language. Prefer a minimal completion of
-  the author's approach when that approach can actually reach the root
-  cause. Do not silently reimplement the same idea as if the pull request
-  never existed unless the user asks to take the work over.
-- Do not merge a draft pull request the author has not marked ready, unless
-  the user explicitly asks to merge the draft. Comment with the review and
-  wait until it is ready.
-- A pull request link authorizes reviewing, commenting on, and merging
-  **that** pull request when this rule applies. It does not authorize
-  force-pushing the contributor's branch or publishing unrelated branches.
-  Follow-up still follows R4's opt-in remote publishing rule.
-- Do not comment on or merge unrelated pull requests. An already-merged pull
-  request is not reopened; remaining gaps become ordinary follow-up.
-- When both an issue and a pull request are linked, R6 applies to the pull
-  request and R5 still applies to the issue after the merged outcome.
+- Fetch the pull request (title, body, files, commits, comments, checks, draft state, base/head, linked issues) before creating a replacement or requesting a rewrite.
+- Independently verify all three: (1) the problem is real and in scope (same bar as R5); (2) the change fixes that root cause with the smallest coherent change — not a nearby symptom, a docs-only rewrite, a config contract test, or a partial workaround that leaves the original path intact; (3) extra files, refactors, and spec theater do not compensate for an incomplete fix, and the approach stays compatible with the baseline, security boundaries, and architecture, or is a justified spec-backed amendment.
+- When verified, merge **that** pull request first with a permitted strategy that preserves the contributor's commits and authorship. Missing tests, documentation, i18n, naming, and formatting are follow-up only when they are not required to prove the root-cause fix. A landing blocker that would break `main` — build, typecheck, test or required E2E failure, merge conflict, head behind `origin/main`, data-corruption risk, security violation, secret leakage, privilege or sandbox bypass, incompatible protocol change, unfixed root cause, or an oversized diff without reason — may receive the smallest commits **on top of** the author's work; never squash away the author, rewrite the design, or expand the diff. Follow up from updated `main` under a new R4 request and comment in the pull request's language.
+- When verification fails or a harm blocker exists — secrets, sandbox or privilege bypass, malicious or destructive change, out-of-scope reversal of a frozen decision, unrelated drive-by payload — do not merge, do not approve as "direction is fine, follow up later", and comment with the evidence in the pull request's language. Prefer a minimal completion of the author's approach when it can reach the root cause; never silently reimplement the same idea unless the user asks to take the work over.
+- Do not merge an unready draft unless the user explicitly asks; comment with the review and wait until it is ready. The link authorizes reviewing, commenting on, and merging **that** pull request only — never force-pushing the contributor's branch or publishing unrelated branches, and unrelated pull requests are neither commented on nor merged. An already-merged pull request is not reopened.
+- When an issue and a pull request are both linked, R6 governs the pull request and R5 still governs the issue after the merged outcome.
 
 #### R6.1 — Temporary pull-request type restriction
 
-> **While this subsection is in force, outside contributions are limited to
-> `perf` and `fix` pull requests; maintainer-planned work keeps every type.**
+> **While this subsection is in force, outside contributions are limited to `perf` and `fix` pull requests; maintainer-planned work keeps every type.**
 
 - Effective 2026-09-26 until a maintainer removes this subsection.
-- The restriction governs outside contributions. Maintainers — accounts with
-  write access to this repository, plus the branches and automated agent work
-  they direct — keep every change type, including `feat`.
-- An outside pull request of any other change type — `feat`, `refactor`,
-  `docs`, `test`, `chore`, `build`, or `ci` — is not a landing candidate.
-  Comment with this policy in the pull request's language, then close it
-  without merging, and do not reimplement it as a replacement while the
-  restriction is in force. The type is read from the pull request's title and
-  commits; relabelling other work as `fix` or `perf` does not qualify it.
-- Feature intent goes to a feature request issue, not to a pull request.
-- `fix` and `perf` pull requests still carry the full R6 bar: the real root
-  cause, the smallest coherent change, and no harm blockers.
-- Closing a pull request whose type is out of scope does not violate R6's "do
-  not discard contributor work" clause; that clause protects an in-scope
-  root-cause fix.
-- Removing this subsection lifts the restriction. It is not a permanent
-  narrowing of the contribution scope.
-
-### R7 — Code-bearing changes require relevant candidate E2E before merge
-
-> **Every code-bearing change must pass relevant E2E on a candidate that
-> already contains the latest `origin/main`, before merge or commit-only
-> completion. Hosted validation may follow an authorized branch push/PR.**
-
-This rule applies to changes that modify executable or runtime-affecting
-content, including `apps/`, `packages/`, `crates/`, runtime scripts, build or
-CI configuration, packaging behavior, protocol behavior, and persisted data.
-Documentation-only changes are exempt when they do not alter executable
-behavior.
-
-E2E execution is mandatory for code-bearing changes. Task-candidate E2E runs
-from the request worktree or its exact SHA on GitHub-hosted Actions after
-incorporating `origin/main`. When the hosted lane is selected, an authorized
-branch push and PR may precede that gate; successful hosted results are required
-before merge. Record source SHA, base revision, run URL and all job conclusions. Do not merge the
-task into local `main` to satisfy this gate. An E2E run on a branch that is
-behind `origin/main` does not satisfy R7. Select suites using the
-regression-surface guidance in `04-e2e-test-plan.md`; build, typecheck,
-lint, unit tests, integration tests, manual review, and source inspection do
-not replace relevant E2E.
-
-Required validation is part of the authorized integration workflow and does
-not require a separate user request to run tests.
-
-If a required suite cannot run in the current environment, record the suite,
-reason, alternative validation, and remaining risk as `NOT RUN`. The branch
-push and PR/MR may still proceed with that record so the change can be
-validated in a capable environment, but the gate is not satisfied and delivery
-remains incomplete until the suite passes against a candidate that contains
-latest `origin/main`. A failed required suite blocks merge and declaring the change delivered until
-the failure is classified and fixed. A hosted check may be retriggered only on
-the intended candidate; dispatching it is not passing evidence.
-
-After the PR/MR merges into remote `main`, rerun the affected suites when the
-landed executable content differs from the commit the gate ran on (landing
-fixes, conflict resolution, or commits added during review). Otherwise the
-recorded result stands. Always state the commit the recorded E2E evidence
-applies to.
-
-### GitHub issue templates
-
-`.github/ISSUE_TEMPLATE` is the only public intake path (`blank_issues_enabled:
-false`). English is the source label language; Chinese remains on the same
-fields.
-
-- **Bug report** requires: description, reproduction steps, expected behavior,
-  actual behavior, app version, and OS. Logs, extra environment, and
-  screenshots are optional. Settings → Info prefills version, OS, and
-  environment when opened from the app (D313).
-- **Feature request** requires: problem and proposed change. Alternatives and
-  extra context are optional.
-
-Do not weaken these required fields. Blank issues stay disabled.
+- The restriction governs outside contributions. Maintainers — accounts with write access to this repository, plus the branches and automated agent work they direct — keep every change type, including `feat`.
+- An outside pull request of any other change type — `feat`, `refactor`, `docs`, `test`, `chore`, `build`, or `ci` — is not a landing candidate: comment the policy in the pull request's language, close it without merging, and do not reimplement it while the restriction is in force. The type is read from the title and commits; relabelling as `fix` or `perf` does not qualify it.
+- Feature intent goes to a feature request issue, not a pull request; `fix` and `perf` pull requests still carry the full R6 bar.
+- Closing an out-of-scope-type pull request does not violate R6's "do not discard contributor work" clause, which protects an in-scope root-cause fix. Removing this subsection lifts the restriction; it is not a permanent narrowing.
 
 ---
 
-## 2. Development Loop
-
-Every change follows this sequence. Steps may be iterated if the implementation reveals new requirements. If the prompt includes a GitHub issue, complete R5 verification before step 1. If the prompt includes a GitHub pull request, complete the R6 root-cause review (and merge only when the change actually fixes the problem with a minimal diff) before starting a replacement or follow-up implementation.
-
-```
-0. If a GitHub issue is linked: verify the claim (R5) before any implementation
-0b. If a GitHub pull request is linked: review root cause and minimality (R6); merge only when it actually fixes the problem; start follow-up only after it is in `main`
-1. Sync main + create a request branch and worktree
-2. Read baseline + relevant specs
-3. Plan change + list impacted specs and necessary validation
-4. Implement
-5. Update specs / ADR / decisions-log if needed
-6. Update or add e2e scenarios when R3 applies
-7. Run targeted local checks necessary for the change's risk
-8. Commit with conventional message
-9. Update BOARD if milestone-related
-10. Refresh against latest `origin/main` (`pnpm check:pr-base`) and run
-    local candidate E2E or select hosted exact-SHA validation (R7); when remote
-    delivery is authorized, push branch + open PR/MR, then pass hosted gates
-11. Merge the PR/MR into remote `main` through the remote gates when remote
-    delivery is authorized, synchronize local `main`, verify, and clean up
-12. If launch was requested: build and start from integrated main
-```
-
-### Step-by-step
-
-| Step | Action | Output |
-|---|---|---|
-| **0. Issue verify** | When a GitHub issue is linked, fetch it and independently verify that the reported problem exists. Stop here (comment, and close only if conclusive) when it does not. | Verified issue, or a comment and close/leave-open decision. |
-| **0b. PR review** | When a GitHub pull request is linked, fetch it and independently verify that it fixes the reported root cause with the smallest coherent change. Merge only when it does; start follow-up only after it is in `main`. Stop (comment, do not rewrite) when it does not. | Merged contributor PR plus follow-up plan, or a comment and no merge. |
-| **1. Branch + worktree** | Preserve existing work, update from `origin/main`, and create a dedicated request branch in a dedicated worktree. Reuse the primary checkout's environment where safe. | Isolated task files on current `origin/main` with a consistent development environment. |
-| **2. Read** | Read `00-baseline.md` and any specs relevant to the change area. | Mental model of constraints. |
-| **3. Plan** | Describe the intended change. List every spec, ADR, and e2e scenario that will need updates, and assess whether local validation is necessary. | Change plan + impact and validation list. |
-| **4. Implement** | Write code, config, or assets. | Changed files. |
-| **5. Spec-sync** | Update specs per the impact list. Add ADR if architectural. Update `decisions-log.md` if an implementation default changes. | Updated docs/spec/\* and/or docs/adr/\*. |
-| **6. E2E doc** | When R3 applies, add or update scenario entries in `04-e2e-test-plan.md` and link to acceptance criteria IDs (A–H). Otherwise, confirm no scenario update is needed. | Updated e2e test plan, or confirmed not applicable. |
-| **7. Validate** | Use change risk and regression scope to select the smallest useful local checks. The relevant E2E gate for a code-bearing change runs in the request worktree after `origin/main` is incorporated (`pnpm check:pr-base`) before merge or commit-only completion; the hosted lane may follow an authorized push/PR. A suite that cannot run is recorded as `NOT RUN` and keeps delivery incomplete. | Targeted check and E2E results, or an explicit environment limitation. |
-| **8. Commit** | Git commit with conventional message (see §4). | One or more commits. |
-| **9. BOARD** | If the change completes a milestone deliverable, update `docs/project/BOARD.md`. | Updated board. |
-| **10. Refresh + gate** | Refresh against latest `origin/main`, confirm it is an ancestor of HEAD (`pnpm check:pr-base`), then run local task-candidate E2E or select exact-SHA hosted validation. When remote publishing is authorized, push the request branch and open a PR/MR targeting `main`; pass the selected hosted gates before merge. | Verified candidate with the E2E gate result, or a recorded `NOT RUN` limitation; reviewable remote change or a local-only delivery route. |
-| **11. Remote merge + cleanup** | For authorized remote delivery, merge the PR/MR into remote `main` through the required gates (including the PR-base check) and synchronize local `main`; rerun the affected suites when the landed executable content differs from the commit the gate ran on. Verify the expected commits and remove the merged worktree and branch. | Requested integration complete, or an explicit blocker / narrower user-requested handoff. |
-| **12. Launch** | When requested, build and start from the integrated `main` checkout and its development environment. | Running app includes the delivered change. |
-
-### Local Validation and E2E Execution Policy
-
-- Local validation is risk-based rather than an automatic prerequisite for
-  delivery. Documentation-only changes and low-risk mechanical edits normally
-  require no local tests or checks and proceed to the authorized delivery route
-  under R4. No separate approval or waiver is needed to skip unnecessary checks;
-  the required E2E gate on a candidate that already contains latest
-  `origin/main` still applies to code-bearing changes.
-- Changes with material regression risk, including security boundaries,
-  protocol contracts, data migrations, build configuration, or widely shared
-  behavior, normally require the smallest targeted non-E2E validation that can
-  address that risk. A full local suite is not the default.
-- E2E scenario documentation and E2E execution are separate concerns. R3 still
-  requires scenario updates for user-visible or protocol-visible behavior.
-- Every code-bearing change must run at least one relevant E2E suite on a
-  candidate that contains latest `origin/main` before merge or commit-only
-  completion, and must run the union of suites required by the affected
-  regression surfaces. The available commands are defined by the root
-  `package.json` and the selection matrix in `04-e2e-test-plan.md`.
-- Local task-candidate E2E uses the request worktree's source and the
-  host dependency/runtime environment described in R4. Do not reinstall the
-  repository environment for each run; only missing or incompatible host
-  dependencies justify installation or rebuild, and that reason must be
-  recorded. Temporary profiles, data, sockets, ports, logs, and artifacts
-  remain isolated from the host's mutable runtime state.
-- Development-time iteration remains risk-based: an E2E run on a stale request
-  branch may be used for debugging, but only a run after incorporating
-  `origin/main` satisfies this policy.
-- If the environment cannot run a required suite, record the suite, reason,
-  alternative validation, and remaining risk as `NOT RUN`. The branch push and
-  PR/MR may proceed with that record, but the gate is not satisfied and
-  delivery remains incomplete until the suite passes against a candidate that
-  contains latest `origin/main`.
-- Exact-SHA hosted E2E may satisfy the task-candidate gate when it runs the
-  required suites against the recorded current-main candidate. PR integration
-  jobs remain required separately. Observe and report their result; after
-  the remote merge, rerun the affected suites when the landed executable
-  content differs from the commit the gate ran on. Otherwise the recorded
-  result stands.
-
-### Cloud packaging and release policy
+## 9. Cloud packaging and release
 
 Installer and release packages are built only on GitHub-hosted Actions runners,
-including unpacked `pack --dir` output. Local `pnpm dev` and ordinary development
-compilation remain supported. Do not bypass installer guards or revive the
-retired `scripts/release-macos.sh` lane. A manual `release.yml` candidate yields
-verified Actions artifacts only; a formal version tag must identify a clean,
-already merged main commit and pass shared CI and complete asset verification
-before draft/upload/remote verification and publication. Signing and
-notarization are required by default; the explicit repository variable
-`ALLOW_UNSIGNED_MACOS_RELEASE=true` opts into a personal-use unsigned release
-that requires manual download and installation. Existing published releases
-are immutable. See the
-[release runbook](06-release-runbook.md) for preparation, tagging, channels,
-secrets, failure recovery and evidence.
+including unpacked `pack --dir` output. Local `pnpm dev`, JavaScript builds,
+Rust development builds, and targeted checks remain available; installer
+wrappers reject local and self-hosted execution, and `scripts/release-macos.sh`
+is retired. Do not bypass the guard or fall back to a local package when a cloud
+gate fails.
 
-### Marketplace/update diagnosis gate
-
-Plugin update incidents require an evidence-first prompt flow before code
-changes:
-
-1. Capture the exact plugin ID, installed version, displayed version, expected
-   release, catalog URL, and observation time.
-2. Fetch the live catalog and inspect the exact entry, then inspect the local
-   catalog cache and installed registry independently.
-3. Classify the failure boundary: publisher/catalog data, fetch/cache fallback,
-   host version comparison, IPC propagation, or renderer presentation.
-4. Run `pnpm check:marketplace -- --url <catalog-url> --plugin <id>`. Missing
-   `shasum`, `url`, positive `sizeBytes`, or `permissions`, or a catalog
-   `author` that is not a string (for example `{ name, url }` copied from a
-   plugin manifest), is a release-data failure, not evidence of a stale
-   renderer. Incomplete releases remain non-installable.
-5. Reproduce with a fixture containing unsorted versions and incomplete
-   metadata before changing host or renderer code.
-
-The agent must state which boundary failed and what evidence rules out the
-other boundaries. A client-side fallback may preserve safe discovery, but it
-must not be used to conceal an invalid marketplace release.
+Follow `.github/workflows/release.yml` and the
+[release runbook](06-release-runbook.md) for a manual candidate or formal
+version tag. Manual candidates produce verified Actions artifacts only; a
+verified formal tag already contained in remote `main` can publish a GitHub
+Release after the shared gates and asset checks pass. Signing is required by
+default, `ALLOW_UNSIGNED_MACOS_RELEASE=true` opts into a personal-use unsigned
+release requiring manual download and installation, and published releases are
+immutable.
 
 ---
 
-## 3. Spec Update Matrix
-
-Which change types require which doc updates.
+## 10. Spec update matrix
 
 | Change type | Spec update | ADR | Decisions-log | E2E doc | BOARD |
 |---|---|---|---|---|---|
 | New feature (user-visible) | Related domain spec | If architectural boundary | — | New scenario | If milestone deliverable |
 | Bug fix (user-visible) | Related spec if behavior clarified | — | — | New or updated scenario | — |
-| Bug fix (internal) | — | — | — | — | — |
-| Refactor (behavior preserved) | — | — | — | — | — |
+| Internal bug fix or refactor | — | — | — | — | — |
 | Architectural change | Related specs + baseline | **New ADR** | Update entry if default changes | Update affected scenarios | — |
 | New IPC/RPC method | `03-runtime/01-ipc-protocol.md` or `06-host-rpc-protocol.md` | If contract boundary | — | New protocol scenario | — |
 | Plugin API addition | `07-plugins/03-plugin-api.md` | If boundary change | — | New plugin scenario | If M4 deliverable |
@@ -426,314 +288,81 @@ Which change types require which doc updates.
 | UX change | Related `04-ux/` spec | — | — | New UI scenario | — |
 | Spec-only update | The spec itself | — | — | — | — |
 | Chore (deps, tooling) | — | — | If tooling decision | — | — |
-| **App version release / stable tag** | `06-delivery/06-release-runbook.md` (mandatory version-surface gate before tag: shipped-locale `packages/shared/src/plus-changelog.ts`, the merged catalog/test list, all workspace/Cargo/`APP_VERSION` versions, and the release line in `README.md` + `README.zh-CN.md`) | — | If release policy changes | Confirm E2E-067B still accurate | If milestone ship |
+| App version release / stable tag | `06-delivery/06-release-runbook.md` version-surface gate (§11) | — | If release policy changes | Confirm E2E-067B still accurate | If milestone ship |
 
 ---
 
-## 4. Git Commit Rules
+## 11. Definition of Done
 
-### 4.1 Conventional Commits
+A change is **Done** when all applicable conditions are true under the user's
+delivery scope; T0 uses the reduced set in §2.
 
-Format: `type(scope): description`
+1. A dedicated request branch and worktree were created from an up-to-date `origin/main`, reusing the primary environment where safe.
+2. The planned change is implemented, impacted specs are updated (R1), and E2E scenarios are documented or confirmed not needed (R3).
+3. Targeted local validation passes. For a code-bearing change the relevant E2E gate ran on a candidate containing latest `origin/main`, locally or hosted, or the limitation is recorded as `NOT RUN`; triggered remote gates pass, including the PR-base check.
+4. The change is committed with a conventional message, contains no secrets or local data, and `BOARD` is updated if a milestone deliverable completed.
+5. For authorized remote delivery, the PR/MR passed its gates and merged into remote `main`, local `main` includes the landed change, and affected suites were rerun when the landed executable content differs from the gated commit.
+6. The expected commits are verified in `main`, and the request worktree and merged local branch are removed (§7).
+7. A linked issue was verified before implementation and commented and closed when conclusive; a linked pull request passed the R6 bar and its contributor work was not discarded.
+8. A requested launch was built and started from the integrated `main` checkout, and the delivery report required by `AGENTS.md` is written (T0 records one line in the task note or pull request description).
 
-| Type | Use for |
-|---|---|
-| `feat` | New feature |
-| `fix` | Bug fix |
-| `docs` | Documentation-only change |
-| `test` | Adding or updating tests |
-| `chore` | Build, deps, tooling, CI |
-| `refactor` | Code restructuring, no behavior change |
-| `perf` | Performance improvement |
-| `build` | Build system or external dependency change |
-| `ci` | CI/CD configuration change |
+### Release and version-tag gate
 
-**Scope** is optional but encouraged — e.g. `feat(host-core):`, `fix(ui):`, `docs(spec):`.
-
-### 4.2 Language
-
-- Commit messages: **English only** (matches baseline language policy).
-- Body: optional; use for non-obvious context.
-
-### 4.3 One logical change per commit
-
-- Prefer small, focused commits.
-- Spec updates that are tightly coupled to the code change should be in the same commit.
-- Pure doc changes (spec rewrite, ADR) may be a separate adjacent `docs:` commit.
-
-### 4.4 Never commit
-
-- Secrets, API keys, tokens, passwords
-- Local-only data (user configs, session data, logs)
-- `node_modules/`, build artifacts, release packages
-- Generated files that should be rebuilt per CI
-
-### 4.5 Pre-commit checklist
-
-Before committing, verify:
-
-1. Change is one logical unit (or clearly split).
-2. No secrets or local data in the diff.
-3. Specs updated per §3 matrix.
-4. E2E doc updated if behavior changed.
-5. `git diff --stat` review — nothing unexpected.
-6. Commit message follows conventional format.
-
----
-
-## 5. Branching Model
-
-The repository uses a mandatory request-branch and worktree workflow:
-
-- **`main`** is always deployable and is the protected integration target. Do
-  not develop or create development commits on it, or push it directly.
-- **Request branches and worktrees** are mandatory for every development request,
-  including docs, chores, and small fixes. Create each branch and worktree from
-  current `origin/main`, then remove both immediately after the branch is merged
-  into `main`.
-- **Branch names** use `<type>/<YYYYMMDD>-<task-id>-<slug>` with a lowercase,
-  kebab-case description. Allowed type prefixes mirror §4.1.
-- **No long-lived development branch** exists. Each request gets a new branch;
-  an old request branch must not be reused for unrelated work.
-- **The primary checkout owns the default development environment.** Request
-  worktrees reuse its toolchains, package-manager stores, caches, and ignored
-  local configuration where safe. A request may create isolated local state
-  when sharing would be unsafe or incompatible, but that state stays ignored
-  and must not leak into commits.
-- **Delivery follows R4's authorization boundary and its fixed order.**
-  Commit-only delivery stops at the request-branch commit in the worktree.
-  Authorized push/remote delivery first refreshes against latest `origin/main`
-  (`pnpm check:pr-base`), runs local candidate E2E or selects the exact-SHA hosted
-  lane (R7), then pushes the request branch and opens the PR/MR. After the
-  selected hosted gates pass, it merges into remote `main`
-  through the PR/MR gates (including the PR-base check), and synchronizes
-  local `main`. Explicit branch-only or draft-only requests retain their
-  narrower scope. Do not open or update a PR that is behind `origin/main`.
-
-Typical request start (run from the primary checkout; choose a path outside it):
-
-```bash
-git status --short
-git fetch origin main
-git worktree add -b <type>/<YYYYMMDD>-<task-id>-<slug> <worktree-path> origin/main
-```
-
-Start directly from the fetched `origin/main`. The primary checkout and local
-`main` are coordination surfaces; do not synchronize, merge or resolve unrelated
-local divergence merely to start request work. Preserve all existing commits and
-changes. Refresh the request candidate against remote `main` in its own worktree.
-
-
-Environment reuse is resource-specific. Package-manager stores and language
-toolchains are normally shared automatically. A compatible dependency tree
-and Electron/Rust build targets should be referenced or linked from the
-primary checkout when a task needs them; do not run `pnpm install` or
-`npm install` merely because the request uses a separate worktree. Build
-outputs that can race, mutable runtime data, temporary E2E profiles, and
-incompatible dependency trees must remain worktree-local. Clean CI and release
-runners are the exception and may install from lockfiles.
-
-Typical authorized GitHub delivery (use the hosting platform's equivalent when
-needed; synchronize and clean up from the clean primary checkout after merge):
-
-```bash
-# from the request worktree
-git fetch origin main
-git rebase origin/main   # private branch; do not force-push a shared branch
-pnpm check:pr-base
-# run local candidate E2E, or select exact-SHA hosted validation (R7)
-git push -u origin <type>/<YYYYMMDD>-<task-id>-<slug>
-gh pr create --base main --head <type>/<YYYYMMDD>-<task-id>-<slug>
-gh pr checks --watch
-# selected hosted candidate gates must also pass at the recorded SHA
-gh pr merge --merge
-git fetch origin main
-# from a clean primary checkout
-git switch main
-git merge --ff-only origin/main
-git worktree remove <worktree-path>
-git branch -d <type>/<YYYYMMDD>-<task-id>-<slug>
-git worktree prune
-# Only when the user explicitly authorized remote-branch deletion:
-git push origin --delete <type>/<YYYYMMDD>-<task-id>-<slug>
-```
-
-After the remote merge, synchronize local `main` with a fast-forward when
-possible. Reset local `main` to `origin/main` only after the request commits
-are verified present in remote `main` and no local-only commits remain.
-
-If the primary checkout cannot take that synchronization, use a short-lived
-worktree for `main` instead of disturbing unrelated work.
-
-Do not merge the request branch into local `main` to create an E2E candidate
-or to open a PR. Local-only delivery (no remote PR/MR) stays on the request
-branch until the user explicitly asks to integrate it.
-
-Before direct removal, the worktree must be clean. Preserve any remaining
-changes and needed ignored artifacts in a verified recoverable archive;
-cleanup does not authorize committing or discarding them. A managed archive
-operation may preserve the contents and retire the checkout instead. Use
-`git branch -d` rather than `-D` so an unmerged branch refuses to delete.
-If removal reports the worktree as dirty or locked, resolve that state without
-forcing removal. Other requests' resources require an explicitly authorized
-batch cleanup. Follow `AGENTS.md` §5 for verification and reporting.
-
----
-
-## 6. Definition of Done
-
-A change is **Done** when all applicable conditions are true, respecting an
-explicit branch-only or draft-only delivery scope:
-
-1. A dedicated request branch and worktree were created from an up-to-date
-   `main`.
-2. Code (or doc) implements the planned change.
-3. All impacted specs are updated.
-4. E2E scenarios are documented (or confirmed not needed per §3).
-5. Necessary targeted local validation passes; for a code-bearing change the
-   relevant E2E gate has run on a candidate that contains latest `origin/main`
-   before merge or commit-only completion, locally or on hosted Actions, or the
-   environment limitation is recorded as `NOT RUN` and delivery remains
-   incomplete until that suite passes; automatically triggered remote gates
-   also pass, including the PR-base ancestry check.
-6. Change is committed with a conventional message.
-7. BOARD is updated if a milestone deliverable completed.
-8. No secrets or local data are present in the commit.
-9. Before a PR/MR is opened or updated, `origin/main` is an ancestor of the
-   request head (`pnpm check:pr-base`). When remote delivery was authorized,
-   the PR/MR was reviewed and merged into remote `main`, local `main` includes
-   the landed change, and the affected suites were rerun when the landed
-   executable content differs from the commit the gate ran on.
-10. After integration, the expected commits were verified in `main`, the request
-    worktree was removed, and the merged request branch was deleted.
-11. If a GitHub issue was linked: the claim was verified before implementation;
-    the issue received a comment in its language; and the issue was closed when
-    the outcome was conclusive.
-12. If a GitHub pull request was linked: the root-cause bar was reviewed; the
-    pull request was merged only when it actually fixed the problem with a
-    minimal diff; follow-up landed after merge; the contributor's work was
-    not discarded.
-13. If launch was requested after delivery: the app was built and started from
-    the integrated `main` checkout and its development environment.
-
-### Release / version-tag gate
-
-When the change is a **stable app version release** (version bump + tag),
-Definition of Done also requires, **before** the tag, that every
-version-bearing surface describes the new version: the shipped-locale in-app
-Plus changelog entries in `packages/shared/src/plus-changelog.ts`, merged by
-`changelog.ts` (English and every
-shipped product locale, with aligned highlight counts) with its `changelog.test.ts` list, every app
-`package.json` (root, `apps/*`, and `docs/package.json`; `packages/*` keep the
-upstream-synced version, ADR plus-version-line), the Cargo workspace version and
-`host-core` lockfile entry, `APP_VERSION`, and the release line stated in
-`README.md` + `README.zh-CN.md`. `node scripts/check-release-docs.mjs` must
-pass; `scripts/release.mjs` runs it and refuses to tag otherwise. See
+A **stable app version release** (version bump + tag) additionally requires,
+**before** the tag, that every version-bearing surface describes the new
+version: shipped-locale in-app Plus changelog entries in
+`packages/shared/src/plus-changelog.ts`, merged by `changelog.ts` (English and
+every shipped product locale, aligned highlight counts) with its
+`changelog.test.ts` list; every app `package.json` (root, `apps/*`, and
+`docs/package.json`, with `packages/*` keeping the upstream-synced version, ADR
+plus-version-line); the Cargo workspace version and `host-core` lockfile entry;
+`APP_VERSION`; and the release line in `README.md` + `README.zh-CN.md`.
+`node scripts/check-release-docs.mjs` must pass, `scripts/release.mjs` runs it
+and refuses to tag otherwise, and GitHub release notes are not a substitute. See
 [06-release-runbook.md §4.1](06-release-runbook.md#41-mandatory-release-version-surface-gate-d164--d260),
-D164, and D260. GitHub release notes are not a substitute.
+D164, and D260.
 
 ---
 
-## 7. Forbidden Practices
+## 12. Forbidden practices
 
-| Practice | Why |
-|---|---|
-| Committing secrets | Security violation |
-| Large uncommitted diffs | Violates R2; loss of granularity |
-| Changing behavior without spec update | Violates R1; specs become unreliable |
-| Skipping e2e doc for user-visible changes | Violates R3; traceability gap |
-| Declaring a code-bearing change complete without successful relevant E2E after incorporating latest `origin/main` | Violates R7 and leaves cross-process behavior unverified |
-| Treating the full local test/check suite as an automatic pre-push requirement | Ignores risk-based validation and delays delivery without evidence of need |
-| Developing or creating development commits on `main`, or pushing it directly | Violates R4; bypasses isolation and review gates |
-| Developing a new request in the primary checkout or another request's worktree | Violates R4; mixes task files and local state |
-| Reusing a request branch for unrelated work | Mixes request scope and weakens traceability |
-| Opening or updating a PR/MR whose head is behind `origin/main` | Violates R4; review starts on a stale base |
-| Stopping at a task-branch commit or push when the user requested remote delivery | Violates R4 unless the user explicitly limited delivery to a branch or draft |
-| Leaving a merged request worktree on disk | Violates R4; stale worktrees accumulate and invite cross-request contamination |
-| Modifying baseline frozen decisions without ADR + version bump | Baseline is frozen; changes need formal process |
-| Committing generated artifacts that CI should rebuild | Repo bloat, merge conflicts |
-| Mixing multiple logical changes in one commit without clear message | Loss of history granularity |
-| Implementing a linked GitHub issue without verifying the problem exists | Violates R5; wastes work on invalid or already-fixed claims |
-| Closing a linked GitHub issue without a comment in the issue language | Violates R5; leaves no public record of the outcome |
-| Closing, rewriting, or requesting a restart of a linked pull request that already fixes the root cause with a minimal diff, solely for nits | Violates R6; discards the contributor's work |
-| Blocking merge of a root-cause-complete linked pull request solely for missing specs, extra tests, style, or agent-workflow completeness | Violates R6; those are follow-up after merge |
-| Merging a linked pull request that only has a sound direction, leaves the original failure mode, or is larger than the smallest coherent fix without a stated reason | Violates R6; direction is not enough |
-| Merging a linked pull request that introduces a harm blocker | Violates R6 |
-| Force-pushing a contributor's branch to land a linked pull request | Violates R6; landing fixes go on top of the author's commits |
-| Tagging a stable app release without updating `packages/shared/src/plus-changelog.ts` for every shipped locale | Violates D164 / D345 / release runbook; in-app What's new is empty for that locale and version |
-| Tagging a stable app release while `README.md` / `README.zh-CN.md` still state an older release line, or bypassing the final cloud documentation gate | Violates D260 / release runbook; published documentation advertises a version the release no longer matches |
-| Merging or declaring a code-bearing change delivered before the required E2E passes against a candidate containing latest `origin/main` | Violates R7; an authorized push/PR for hosted validation does not waive the gate |
+Rule violations:
+
+- Changing behavior without a spec update (R1); accumulating uncommitted work or leaving a logical change uncommitted (R2); skipping E2E docs for user-visible changes (R3).
+- Developing or pushing `main` directly, in the primary checkout, or another request's worktree; reusing a request branch; opening or updating a PR/MR behind `origin/main`; leaving a merged worktree on disk (R4).
+- Stopping at a task-branch commit or push when the user requested remote delivery, unless delivery was explicitly limited to a branch or draft (R4).
+- Implementing a linked issue without verifying the problem, or closing one without a comment in the issue language (R5).
+- Discarding a root-cause-complete pull request for nits, blocking it solely for follow-up polish, merging one with only a sound direction or a harm blocker, or force-pushing its branch (R6).
+- Declaring a code-bearing change delivered before required E2E passes against a candidate containing latest `origin/main`, or treating the full local suite as an automatic pre-push requirement (R7).
+
+Release, baseline, and repository violations:
+
+- Tagging a stable release without updating `packages/shared/src/plus-changelog.ts` for every shipped locale (D164/D345), while either README states an older release line, bypassing the final cloud documentation gate (D260), or substituting a local package build for a failing cloud gate.
+- Modifying baseline frozen decisions without an ADR and version bump; committing secrets, local data, generated artifacts CI rebuilds, or unrelated changes in one commit.
 
 ---
 
-## 8. Acceptance Criteria for This Workflow
+## 13. Test quality and inventory
 
-This workflow spec itself is accepted when:
+Test the behavior or stable contract, never repository source text. The
+assertion inventory and `pnpm check:test-quality` ratchet, runtime-test budget,
+quarterly audit, CI tiers, fixture boundaries, and the generated index are owned
+by [07-test-maintenance](07-test-maintenance.md) and
+[test plan §10](04-e2e-test-plan.md#10-ci-tiers-and-fixture-boundaries). Never
+count a skipped, excluded, or catalog-only scenario as passed acceptance;
+document-only cases need no ID, and replaced behavior removes its obsolete tests
+and IDs in the same change.
 
-- [ ] R1/R2/R3/R4/R5/R6/R7 are stated clearly and cross-linked to relevant specs.
-- [ ] Development loop is documented and referenced by `AGENTS.md`.
-- [ ] Spec update matrix covers all change types in the baseline.
-- [ ] Git commit rules match existing repo commit style (`docs:`, `chore:`).
-- [ ] Every development request is required to use a dedicated branch and
-      worktree created from current `origin/main`.
-- [ ] Request worktrees reuse the primary checkout's environment where safe
-      without committing local environment state.
-- [ ] Opening or updating a PR/MR requires `origin/main` to be an ancestor of
-      the request head (`pnpm check:pr-base`); a PR behind `origin/main` is
-      rejected.
-- [ ] Remote publishing requires authorization and uses PR/MR gates before
-      remote `main` integration and local synchronization.
-- [ ] Refreshing against latest `origin/main` precedes PR creation/update;
-      the relevant local or exact-SHA hosted E2E gate precedes merge. Do not
-      merge the task into local `main` to create that candidate.
-- [ ] Worktree removal and branch deletion are required immediately after the
-      request branch is merged into `main`.
-- [ ] Relevant E2E execution is mandatory for code-bearing changes on a
-      candidate that contains latest `origin/main` before merge or completion,
-      without a separate test request; E2E documentation remains mandatory
-      under R3.
-- [ ] Local validation is risk-based; unnecessary checks may be skipped without
-      blocking commit, push, or PR/MR creation.
-- [ ] Definition of Done is complete and actionable.
-- [ ] Forbidden practices list covers known risk areas.
-- [ ] `AGENTS.md` points to this doc, `04-e2e-test-plan.md`, and `05-change-checklist.md`.
-- [ ] Linked GitHub issues are verified before implementation, then commented
-      on in the issue language and closed when conclusive.
-- [ ] Linked GitHub pull requests land only when they fix the reported root
-      cause with a minimal diff; contributor work is not discarded for nits.
-- [ ] Outside contributions are limited to `perf` and `fix` pull requests while
-      the temporary type restriction in R6.1 is in force.
+---
 
-- [ ] All indexes updated (NAV, delivery README, spec README, docs README, BOARD).
+## 14. Workflow acceptance criteria
 
+This workflow spec is accepted when:
 
-## Test quality, executable inventory and retirement
-
-Behavior and stable contracts are the test boundary. Do not add tests that read
-repository source/CSS and assert implementation text with regular expressions.
-Regex assertions on actual rendered or protocol output remain valid. Bug fixes
-need a red repro or explicit baseline and a regression test. Pure style, copy
-and i18n changes may omit new tests when existing/static validation proves the
-unchanged behavior; record the reason and residual risk instead of adding a
-quantity quota.
-
-`node scripts/check-test-quality.mjs --base <actual-base>` compares the AST
-source-provenance inventory and per-file/case signatures. Source/CSS assertions
-may only decrease; fixture reads are excluded. Retiring allowances requires
-`--write-baseline` and cannot introduce growth or later reuse retired capacity.
-Runtime domain tests and shared helpers under `src/runtime-tests` have an
-800-line per-file budget. These are maintenance limits, not coverage targets.
-
-PR CI runs five isolated smokes; the nightly fixture workflow runs the other
-automatic scene families. The [test plan](04-e2e-test-plan.md#10-ci-tiers-and-fixture-boundaries)
-and [generated index](08-scenario-index.md) describe actual commands and manual
-boundaries. Never count a skipped or catalog-only scenario as passed acceptance.
-Document-only scenarios do not require IDs. English and Chinese executable
-indexes come from one source, not a hand-maintained mirrored matrix.
-
-When behavior is replaced, delete its obsolete tests and executable IDs in the
-same change. The quarterly maintenance audit reports recent churn for review;
-without evidence that a test caught regressions, that fact remains unknown.
-High churn alone never authorizes deleting a test. Policy changes synchronize
-AGENTS/CLAUDE and their Policy-Sync token; `pnpm check:agent-policy` remains the
-mechanical gate.
+- [ ] R1–R7 are stated once and cross-linked to the owning specs.
+- [ ] Delivery order, branch/worktree mechanics, validation staging, and merge cleanup are documented, and `AGENTS.md` routes here.
+- [ ] The spec matrix covers every change type in the baseline, and commit rules match the repository commit style.
+- [ ] Change tiers are defined and referenced by the change checklist, and Definition of Done and forbidden practices are complete and actionable.
+- [ ] `AGENTS.md` points to this document, `04-e2e-test-plan.md`, and `05-change-checklist.md`.
+- [ ] Policy files stay within their byte budgets and keep their required anchors; `pnpm check:agent-policy` enforces both.
+- [ ] Intake rules apply, including the temporary scope while R6.1 is in force, and all indexes (NAV, delivery README, spec README, docs README, BOARD) are updated.
