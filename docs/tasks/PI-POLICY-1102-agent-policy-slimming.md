@@ -1,7 +1,7 @@
 # PI-POLICY-1102: Agent policy becomes a single source with enforceable budgets
 
-- Project: `fork-pi-desktop`; task ID: `PI-POLICY-1102`; status: 待体验
-  (implemented, validated and merged; user acceptance pending).
+- Project: `fork-pi-desktop`; task ID: `PI-POLICY-1102`; status: 已验收
+  (implemented, validated, merged and accepted by the user on 2026-11-02).
 - Created: 2026-11-02 (Asia/Taipei).
 - Authoritative record: this file. Linked evidence only supplements it.
 - Goal / authorization: the user asked to optimize the project policy because it
@@ -135,7 +135,7 @@ CONTRIBUTING.md 6,144 and spec 05 12,288.
 - Experience entry: `AGENTS.md` at repository root, then
   `docs/spec/06-delivery/03-ai-development-workflow.md`.
 - Delivered: implementation, checks, PR #74 and merge `0450f9ae2`; both merged remote branches were later deleted with explicit authorization.
-- User confirmation: required before 已验收.
+- User confirmation: given on 2026-11-02; the user accepted the delivered policy.
 - Resume: the worktree no longer exists; start from `main` at `0450f9ae2` and read this record.
 - Rollback: the change is documentation, CI and one script; revert the commit.
 - Worktree cleanup: done on 2026-11-02; the worktree was removed, the merged local branch deleted, registrations pruned, and the primary checkout fast-forwarded to `0450f9ae2`.
@@ -153,4 +153,5 @@ CONTRIBUTING.md 6,144 and spec 05 12,288.
   the Chinese test plan, so translating that heading cannot break the link.
 - Out of scope but reported: the same audit still fails for `personal-feedback`
   because its registered worktree root differs; that project was not touched.
-- Status stays `待体验` until the user explicitly accepts the delivered policy.
+- Status moved to `已验收` after the user explicitly accepted the delivered policy
+  on 2026-11-02.
