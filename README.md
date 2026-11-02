@@ -42,13 +42,14 @@ Local-first · Model-agnostic · Plugin-powered · macOS / Windows / Linux
 
 > **Current release line: 0.15.x (Early Preview).**
 
-Version 0.15.11 improves session recovery, checkpoint completion, tool-result
-replay, provider retry timing, plugin command ownership, and Chinese IME input.
-App/Host signatures are verified inside the published ZIP and DMG.
-Personal-use Apple Silicon builds remain
-unnotarized and require manual download and installation. Goal verification upgrades
-local profiles to Plus schema P10 behind a migration backup; older builds require
-restoring the pre-upgrade profile before downgrading.
+Version 0.15.12 keeps unsigned macOS builds on manual update delivery: Check
+for Updates reports the new version and opens the release page instead of
+attempting an in-app install that macOS cannot validate. Developer ID-signed
+builds keep automatic in-app updates; Windows and Linux delivery is unchanged.
+Personal-use Apple Silicon builds remain unnotarized and require manual
+download and installation. Goal verification upgrades local profiles to Plus
+schema P10 behind a migration backup; older builds require restoring the
+pre-upgrade profile before downgrading.
 
 ---
 
