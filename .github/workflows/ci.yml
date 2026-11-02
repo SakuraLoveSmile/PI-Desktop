@@ -68,7 +68,7 @@ jobs:
 
       - name: Check agent policy and release tooling
         run: |
-          node scripts/check-agent-policy-sync.mjs
+          node scripts/check-agent-policy.mjs
           node --test scripts/release-*.test.mjs scripts/publish-release.test.mjs scripts/require-cloud-build.test.mjs scripts/refresh-macos-release-metadata.test.mjs
 
       - name: Check release documents and version surfaces

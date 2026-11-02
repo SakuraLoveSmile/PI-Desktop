@@ -1,300 +1,168 @@
 # 05. Change Checklist
 
-> A practical checklist agents must run before finishing work.  
+> A runnable checklist for finishing a change. Each item links to the owning
+> rule in [03-ai-development-workflow.md](03-ai-development-workflow.md); this
+> file tracks completion and does not define policy.
 > Cross-references: [ai-development-workflow](03-ai-development-workflow.md) · [e2e-test-plan](04-e2e-test-plan.md) · [decisions-log](../08-meta/decisions-log.md) · [ADR index](../../adr/README.md) · [BOARD](../../project/BOARD.md)
+
+Declare the tier from [03 §2](03-ai-development-workflow.md#2-change-tiers)
+first; it decides which sections below apply.
 
 ---
 
 ## 0. GitHub Issue Intake
 
-When the prompt includes a GitHub issue URL or an unambiguous issue number for
-this repository, complete this gate before the request-start checklist:
+When the prompt includes a GitHub issue URL or an unambiguous issue number:
 
-- [ ] Issue title, body, labels, comments, and state were fetched.
-- [ ] The reported problem was independently verified (reproduced or evidenced
-  for a bug; confirmed missing or incomplete and in scope for a feature).
-- [ ] Implementation started only after the problem was confirmed to exist.
-- [ ] If the problem does not exist: the issue received a verification comment
-  and was closed when the conclusion was clear, or left open when inconclusive.
-- [ ] After a confirmed fix was merged: the issue received a resolution comment
-  and was closed.
-- [ ] The comment uses the issue's language.
-- [ ] No unrelated issue was commented on or closed.
-- [ ] Git push was not inferred from the issue link.
+- [ ] Issue title, body, labels, comments, and state fetched.
+- [ ] Reported problem independently verified against current code.
+- [ ] Bug classified as `confirmed regression`, `confirmed existing defect`, `already fixed`, `expected behavior`, `environment-specific failure`, or `insufficient evidence`.
+- [ ] Implementation started only after the problem was confirmed.
+- [ ] Problem absent: verification comment posted, then closed if conclusive or left open with what was tried.
+- [ ] Problem confirmed: smallest coherent fix implemented, then resolution comment posted and the issue closed after integration.
+- [ ] Comment written in the issue's language; no unrelated issue touched; no push inferred from the link.
 
-See [R5 — Verify linked GitHub issues](03-ai-development-workflow.md#r5--verify-linked-github-issues-before-work-then-reply-and-close).
+See [R5](03-ai-development-workflow.md#r5--verify-linked-github-issues-before-work-then-reply-and-close).
 
 ---
 
 ## 0.1 GitHub Pull Request Intake
 
-When the prompt includes a GitHub pull request URL or an unambiguous pull
-request number for this repository, complete this gate before rewriting the
-change or starting follow-up:
+When the prompt includes a GitHub pull request URL or an unambiguous number:
 
-- [ ] Pull request title, body, files, commits, comments, checks, draft
-  state, base/head, and linked issues were fetched.
-- [ ] The **root-cause bar** was independently judged: real in-scope problem;
-  the change actually removes that failure mode at the root; the diff is the
-  smallest coherent fix; approach compatible with baseline, security, and
-  architecture.
-- [ ] Completeness gaps (specs, extra tests, i18n, e2e docs, style, naming)
-  were not treated as merge blockers **unless** they are required to prove
-  the root-cause fix.
-- [ ] If the root-cause bar holds: the pull request was merged first,
-  preserving the contributor's commits; landing blockers received only
-  smallest-on-top commits.
-- [ ] Follow-up started only after the pull request was in `main`, using a
-  new R4 request branch and worktree.
-- [ ] If the root-cause bar fails or a harm blocker exists: the pull
-  request was not merged, was not approved as "direction is fine", and a
-  comment recorded the evidence. The idea was not silently reimplemented.
-- [ ] A draft pull request was not merged unless the user explicitly asked.
-- [ ] The comment uses the pull request's language.
-- [ ] No unrelated pull request was commented on or merged.
-- [ ] The contributor's branch was not force-pushed. Unrelated remote
-  publishing was not inferred from the pull request link.
+- [ ] PR title, body, files, commits, comments, checks, draft state, base/head, and linked issues fetched.
+- [ ] Root-cause bar verified: real in-scope problem, smallest coherent fix, compatible with baseline, security boundaries, and architecture.
+- [ ] Follow-up polish (specs, tests, i18n, E2E docs, style, naming) not treated as a merge blocker unless required to prove the root cause.
+- [ ] Root-cause-complete PR merged first, preserving contributor commits and authorship.
+- [ ] Landing blockers received only smallest on-top commits; contributor branch not force-pushed.
+- [ ] Follow-up started from updated `main` under a new request.
+- [ ] Failed bar or harm blocker: no merge, no "direction is fine" approval, evidence comment posted in the PR's language.
+- [ ] Draft PR not merged unless explicitly asked; no unrelated PR touched; no unrelated remote publishing inferred from the link.
 
-See [R6 — Land a linked pull request only when it fixes the root cause with a minimal diff](03-ai-development-workflow.md#r6--land-a-linked-pull-request-only-when-it-fixes-the-root-cause-with-a-minimal-diff).
+See [R6](03-ai-development-workflow.md#r6--land-a-linked-pull-request-only-when-it-fixes-the-root-cause-with-a-minimal-diff).
 
 ---
 
-## 1. Request Start Checklist
+## 1. Request Start
 
-Before editing any file for a new request:
-
-- [ ] Existing uncommitted work is identified and preserved.
-- [ ] `origin/main` is fetched and local `main` is fast-forwarded when its
-  worktree is clean.
-- [ ] A dedicated `<type>/<YYYYMMDD>-<task-id>-<slug>` request branch and worktree are
-  created from that updated `main` commit.
-- [ ] The worktree is under
-  `/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop/<YYYYMMDD>-<type>-<task-id>-<slug>/`,
-  including subagent and temporary validation or integration worktrees.
-  Working state, registered worktrees, and task ownership were checked first.
-- [ ] The request worktree reuses the primary checkout's host toolchains,
-  compatible dependency tree, package stores, caches, and ignored local
-  configuration where safe; no separate environment is installed for E2E.
-- [ ] Only mutable, incompatible, or concurrency-sensitive environment state
-  stays worktree-local and ignored.
-- [ ] The current branch is not `main` before implementation begins.
-- [ ] Delivery scope is recorded: a commit request stays on the request
-  branch; a push request includes PR-based remote `main` integration after
-  `pnpm check:pr-base`. Explicit branch-only or draft-only limits are honored.
+- [ ] Tier declared; T0 skips the task record, candidate E2E, and full delivery report.
+- [ ] Existing uncommitted work identified and preserved.
+- [ ] `origin/main` fetched; dedicated `<type>/<YYYYMMDD>-<task-id>-<slug>` branch and worktree created from it.
+- [ ] Worktree under the central root declared in `AGENTS.md`, named for this task; working state, `git worktree list`, and task ownership checked.
+- [ ] Current branch is not `main`; no other request's branch or worktree is reused.
+- [ ] Host toolchains, package stores, caches, and ignored configuration reused; no separate environment installed for E2E; only mutable or incompatible state stays worktree-local and ignored.
+- [ ] Delivery scope recorded: commit-only stays on the request branch; push, PR, merge, and release need explicit authorization.
 
 ---
 
-## 2. Impact Analysis
+## 2. Task Record and Evidence
 
-Before starting implementation, answer these questions:
+T1 and T2 record this; T0 skips it.
 
-- [ ] What behavior changes does this change introduce?
-- [ ] Which specs are affected? (list file paths)
-- [ ] Does this change touch an architectural boundary? (process model, IPC, storage, security, plugin API)
-- [ ] Does this change affect user-visible or protocol-visible behavior?
-- [ ] Is local validation necessary for this change's risk and regression
-  scope? If so, what is the smallest targeted check set?
-- [ ] Which milestone deliverable does this relate to? (M1–M6, or none)
-
-Reference the [spec update matrix](03-ai-development-workflow.md#3-spec-update-matrix) to determine required doc updates.
+- [ ] One authoritative task record exists: the existing plan or a file under `docs/tasks/`.
+- [ ] Scope, frozen decisions, branch/worktree/target, acceptance scenarios, and code revision recorded.
+- [ ] Actual validation, missing validation, remaining work, and runtime resources recorded.
+- [ ] Status set to `未开始`, `实现中`, `待体验`, or `已验收`; only explicit user confirmation sets `已验收`.
+- [ ] On resume: path, HEAD, index, uncommitted work, and next action re-checked.
 
 ---
 
-## 3. Spec Sync Checklist
+## 3. Impact Analysis
 
-After implementation (or alongside it):
-
-- [ ] Every affected spec file is updated with the new behavior.
-- [ ] If `AGENTS.md` changed: `CLAUDE.md` still mirrors the non-negotiables,
-  both files share the same `Policy-Sync:` token, and `pnpm check:agent-policy`
-  passes. The reverse applies when only `CLAUDE.md` changed.
-- [ ] If architectural boundary changed: ADR is written or updated in `docs/adr/`.
-- [ ] If an implementation default changed: `decisions-log.md` entry updated.
-- [ ] If baseline frozen decisions are affected: baseline bump + explicit ADR (not MVP-normal).
-- [ ] Cross-references between specs are still correct (no stale links).
+- [ ] Observable behavior changes listed.
+- [ ] Affected specs listed by path against the [spec update matrix](03-ai-development-workflow.md#10-spec-update-matrix).
+- [ ] Architectural boundary, user-visible or protocol-visible behavior, and milestone deliverable assessed.
+- [ ] Validation scope chosen by risk, not by diff size.
+- [ ] Plan and impacted surfaces recorded in the task record.
 
 ---
 
-## 4. E2E / Test Doc Checklist
+## 4. Spec Sync
 
-- [ ] If user-visible or protocol-visible behavior changed: new or updated scenario in [04-e2e-test-plan.md](04-e2e-test-plan.md).
-- [ ] If a scenario was added or updated, it follows the template (ID, title,
-  preconditions, steps, expected, specs, acceptance, milestone, status).
-- [ ] If a scenario was added or updated, the traceability matrix in §8 is current.
-- [ ] Unit tests added or updated when the change's risk makes them necessary.
-- [ ] Integration tests added or updated when an IPC/RPC contract change or
-  cross-component regression risk makes them necessary.
-- [ ] New tests assert behavior or stable contracts, not repository source/CSS
-  text; `pnpm check:test-quality -- --base <base>` passes against the actual base.
-- [ ] Retired source assertions lower their checked-in inventory; replacement
-  coverage is recorded and obsolete tests/scenario IDs are removed in the same PR.
-- [ ] Runtime domain tests/helpers stay within the 800-line per-file budget.
-- [ ] Pure copy/i18n/style exemptions record affected-surface verification and
-  residual risk; they do not exempt interaction, responsive, accessibility,
-  runtime-rule, or content-layout changes.
-- [ ] The smallest necessary targeted local checks passed, or local validation
-  was assessed as unnecessary with no separate approval or waiver required.
-- [ ] Relevant E2E suites were selected and passed on a candidate that contains
-  latest `origin/main` before merge or commit-only completion. For exact-SHA
-  hosted validation, an authorized push/PR may precede the gate; required
-  validation needs no separate user request. Documentation-only changes retain
-  their existing exemption.
-- [ ] Local task-candidate E2E used the host development environment already
-  provisioned in the primary checkout; no `pnpm install`/`npm install` or
-  second dependency/runtime environment was created solely for E2E. Any
-  missing/incompatible-host exception is recorded with its reason.
-- [ ] Results apply to the commit the gate ran on, and the affected suites were
-  rerun when the landed executable content changed. Any required suite not run
-  is recorded with its reason, alternative validation, and remaining risk;
-  delivery remains incomplete until that gate passes.
-- [ ] Hosting-platform E2E jobs that start before the remote merge were observed
-  and reported; exact-SHA hosted candidate jobs can satisfy the candidate gate,
-  while PR integration gates remain separate. A post-merge rerun
-  happened when the landed executable content differs from the commit the gate
-  ran on. Dispatch or rerun follows the hosting platform's or repository
-  workflow's requirements.
+- [ ] Every affected spec updated for the new behavior.
+- [ ] Architectural boundary change has an ADR in `docs/adr/`.
+- [ ] Implementation default change updates `decisions-log.md`.
+- [ ] Baseline frozen decision change has an ADR and version bump.
+- [ ] Cross-references and anchors still resolve.
+- [ ] Policy files stay within their byte budgets and keep their required anchors; `pnpm check:agent-policy` passes.
 
 ---
 
-## 5. Git Commit Checklist
+## 5. Tests and E2E Docs
 
-- [ ] Change is one logical unit (or split into focused commits).
-- [ ] No secrets, tokens, or local data in the diff.
-- [ ] No `node_modules/`, build artifacts, or release packages in the diff.
-- [ ] Commit message follows conventional format: `type(scope): description` (English only).
-- [ ] Spec updates committed with code when tightly coupled, or adjacent `docs:` commit for pure docs.
-- [ ] `git diff --stat` reviewed — nothing unexpected.
-
----
-
-## 6. Pull/Merge Request Checklist
-
-Before marking requested integration complete, apply the R4 delivery scope;
-explicit branch-only or draft-only requests retain their narrower scope:
-
-- [ ] Before a PR/MR is opened or updated, `origin/main` is an ancestor of the
-  request head (`pnpm check:pr-base`). A PR behind `origin/main` is not opened.
-- [ ] For a code-bearing change: the relevant E2E gate ran against a candidate
-  that contains latest `origin/main` before merge or commit-only completion,
-  locally or on GitHub-hosted Actions at the exact recorded SHA, or its `NOT RUN`
-  limitation is recorded with reason, alternative validation, and remaining risk.
-- [ ] Commit-only delivery did not publish remotely without separate
-  authorization.
-- [ ] For authorized remote delivery: the request branch was pushed, its PR/MR
-  targeted `main` with only this task's changes, and the description documented
-  impacted specs, E2E scenarios, and validation.
-- [ ] For authorized remote delivery: PR self-review, required checks (including
-  the PR-base ancestry gate), and reviews passed; the PR/MR merged into remote
-  `main` using a permitted strategy; local `main` was synchronized with the
-  landed change; when the landed executable content differs from the commit the
-  gate ran on, the affected suites were rerun and recorded.
-- [ ] No direct push to `main`, force-push, discarded unrelated work, or bypassed
-  gate was inferred from the delivery request. Genuine blockers were reported.
-- [ ] Request worktree is removed after merge.
-- [ ] Merged request branch is deleted locally (`git branch -d`).
-- [ ] Any remotely published request branch is deleted after merge only when
-  the user explicitly authorized remote-branch deletion.
-- [ ] Issue reference is included when applicable (e.g. `Refs #12` or
-  `Closes #12`).
+- [ ] User-visible or protocol-visible behavior: E2E scenario added or updated in [04-e2e-test-plan.md](04-e2e-test-plan.md).
+- [ ] Scenario follows the template, and the traceability matrix and generated index are current.
+- [ ] Unit or integration tests added or updated when the change's risk requires them.
+- [ ] New tests assert behavior or stable contracts, not repository source or CSS text; `pnpm check:test-quality -- --base <base>` passes against the actual base.
+- [ ] Retired source assertions lower their checked-in inventory; replacement coverage recorded; obsolete tests and scenario IDs removed.
+- [ ] Runtime domain tests and helpers stay within the 800-line budget.
+- [ ] Pure copy, i18n, or styling exemption records affected-surface verification and residual risk; it does not cover interaction, responsive, accessibility, runtime-rule, or content-layout changes.
+- [ ] T1/T2: the smallest targeted local checks passed, or local validation was assessed as unnecessary.
+- [ ] T1/T2: relevant E2E suites ran on a candidate containing latest `origin/main` before merge or commit-only completion; T0 and documentation-only changes are exempt.
+- [ ] Hosted exact-SHA lane: an authorized push or PR may precede the gate, but its result is required before merge, and PR integration jobs are observed separately.
+- [ ] Local task-candidate E2E reused the host environment; no dependency install or second runtime environment was created solely for E2E, and any missing or incompatible host cause is recorded.
+- [ ] Evidence binds the tested SHA, base revision, environment, and (hosted) run URL and job conclusions; affected suites rerun when landed executable content differs from the gated commit.
+- [ ] Any required suite not run is recorded as `NOT RUN` with reason, alternative validation, and remaining risk; delivery stays incomplete until it passes.
 
 ---
 
-## 6.1 Merge Cleanup Checklist
+## 6. Commit
 
-Run immediately after the request branch is integrated into `main`, whether the
-merge happened remotely via PR/MR or locally in the primary checkout:
-
-- [ ] Expected commits are verified present in local `main`, and remote `main`
-  when remote delivery was requested.
-- [ ] Before direct removal, the request worktree is clean; otherwise a
-  verified recoverable archive preserves all remaining request contents.
-- [ ] No running task, service, or needed path reference still uses the
-  checkout; a retained checkout is reported by exact path and blocker.
-- [ ] `git worktree remove <worktree-path>` succeeded without forcing, or the
-  managed archive operation completed and the old checkout is absent. Removal
-  ran outside the checkout and preserved the shared worktree root and archives.
-- [ ] `git branch -d <type>/<YYYYMMDD>-<task-id>-<slug>` succeeded (no `-D` fallback on
-  an unmerged branch).
-- [ ] `git worktree prune` leaves `git worktree list` free of stale entries for
-  this request.
-- [ ] Cleanup followed `AGENTS.md` §5 in the same task after the authorized
-  merge was verified, without another approval for this request's own resources.
-- [ ] Dirty/untracked contents and needed ignored artifacts were preserved in
-  verified recovery archives before removal.
-- [ ] Empty request containers/name-marker directories and obsolete integration
-  branches were retired; `git worktree list`, local branches and physical paths
-  agree that no redundant request resources remain in normal locations.
-- [ ] Backup snapshots are recoverable through archive refs or backup files,
-  with no temporary backup branches left under `refs/heads/`.
-- [ ] The primary checkout and active/unmerged work were preserved. Any other
-  task's resources were touched only within explicitly authorized batch scope.
-
-- [ ] If launch was requested after delivery, the app was built and started
-  from the integrated `main` checkout and its development environment.
+- [ ] One logical change, or focused commits for clearly separate units.
+- [ ] No secrets, local data, `node_modules/`, build artifacts, release packages, or generated files CI rebuilds.
+- [ ] Conventional message `type(scope): description`; subject, blank line, then a body explaining why; issue trailer where relevant.
+- [ ] `git diff --stat` reviewed; files staged by explicit path and `git status` re-checked after staging.
+- [ ] No force-push and no hard-prohibition command from `AGENTS.md`.
 
 ---
 
-## 7. App version release checklist (stable tag)
+## 7. Pull/Merge Request
 
-Required for every stable app version bump / tag (D164). Skip only for
-documentation-only work or non-release chores.
-
-- [ ] `packages/shared/src/plus-changelog.ts` has a newest-first Plus entry for the
-      release version under `en` and every shipped product locale (no leading
-      `v`).
-- [ ] Highlight counts match across locales; English is the source of truth.
-- [ ] Bullets are short user-facing product notes (not raw PR/commit lists).
-- [ ] Pre-release-only versions are omitted from the product catalog unless
-      product explicitly ships in-app notes for that channel.
-- [ ] `packages/shared/src/changelog.test.ts` lists the new version first.
-- [ ] `pnpm --filter @pi-desktop/shared test` passes catalog alignment.
-- [ ] `README.md` and `README.zh-CN.md` state the current
-      `<major>.<minor>.x` release line and contain no toolchain, command,
-      Highlights, or roadmap claim the release invalidates.
-- [ ] `node scripts/check-release-docs.mjs` passes (version surfaces,
-      shipped-locale catalog, README release line).
-- [ ] Documentation commit is on the release branch **before**
-      `node scripts/release.mjs <version> --tag`.
-- [ ] Installer builds, including unpacked `pack --dir`, ran only on
-      GitHub-hosted Actions; no local packaging fallback was used.
-- [ ] The preparation PR merged into `main` after cloud checks; tag mode used
-      its exact clean merged commit, verified fresh remote ancestry and absence
-      of an existing tag, and did not bump files or commit.
-- [ ] The tag workflow pinned one full source SHA and passed shared CI,
-      native architecture and complete asset/feed checks. Record whether the
-      signed/notarized lane or the explicitly enabled unsigned personal-use lane
-      ran; do not treat unsigned output as signing or Gatekeeper qualification.
-- [ ] `release-manifest.json`, `SHA256SUMS`, source/base SHAs, run URL and all
-      job conclusions were retained as evidence. Candidate dispatch produced
-      Actions artifacts only; publication was not inferred from dispatch.
-- [ ] Formal publication used draft → upload → remote digest/size verification
-      → publish; no published asset was overwritten. Failed drafts were retained
-      and any retry matched their exact source/manifest identity.
-- [ ] Prerelease feeds use their named channel and do not become GitHub latest.
-- [ ] GitHub auto-generated release body is treated as web-only, not the
-      in-app source ([06-release-runbook.md §4.1](06-release-runbook.md#41-mandatory-release-version-surface-gate-d164--d260)).
+- [ ] `pnpm check:pr-base` passes before the PR is opened or updated; the PR targets `main` with only this task's changes.
+- [ ] Description states impacted specs, E2E scenarios, and validation results.
+- [ ] PR self-review, required checks (including the PR-base gate), and reviews passed.
+- [ ] Only authorized push, merge, and publish actions were performed; a genuine blocker was reported instead of bypassed.
 
 ---
 
-## 8. Final Definition-of-Done Gate
+## 8. Merge Cleanup
 
-Before marking work complete, verify **all applicable** conditions under the
-user's delivery scope:
+- [ ] Expected commits or equivalent changes verified in local `main`, and in remote `main` when remote delivery was requested.
+- [ ] Request contents archived recoverably before removal; unsaved data and needed ignored artifacts preserved.
+- [ ] No running task, service, or needed path still uses the checkout; a retained checkout is reported by exact path.
+- [ ] `git worktree remove` succeeded without forcing; `git worktree prune` leaves no stale entry for this request.
+- [ ] Merged task branch deleted with `git branch -d`; remote branch deleted only when explicitly authorized.
+- [ ] Recovery snapshots live in archive refs or verified files, with no backup branch left under `refs/heads/`.
+- [ ] Empty request containers and obsolete integration branches retired; `git worktree list`, local branches, and physical paths agree no redundant request resources remain.
+- [ ] Cleanup completed in the same task as the merge, without another approval for this request's own resources.
+- [ ] Primary checkout, active work, and other tasks' resources preserved.
+- [ ] Launch requested after delivery: app built and started from the integrated `main` checkout.
 
-| # | Gate | Source |
-|---|---|---|
-| 1 | Request branch and worktree created from an up-to-date `origin/main`; primary environment reused where safe | [R4 — Request branch + worktree + merge gate](03-ai-development-workflow.md#r4--request-branch--worktree--merge-gate) |
-| 2 | Code/doc implements the planned change | Step 4 of [development loop](03-ai-development-workflow.md#2-development-loop) |
-| 3 | All impacted specs updated | [R1 — Spec-sync](03-ai-development-workflow.md#r1--spec-first--spec-sync) |
-| 4 | E2E scenarios documented (or confirmed not needed) | [R3 — E2E coverage doc](03-ai-development-workflow.md#r3--e2e-coverage-doc) |
-| 5 | Targeted local checks follow the existing risk standard; for a code-bearing change the relevant E2E gate passed on a candidate that contains latest `origin/main` (`pnpm check:pr-base`) before merge or commit-only completion (authorized push/PR may precede exact-SHA hosted validation) (or its `NOT RUN` limitation is recorded); after the remote merge the affected suites were rerun when the landed executable content changed; required tests need no separate user request | Steps 7, 10, and 11 of development loop |
-| 6 | Change committed with conventional message | [R2 — Commit-per-change](03-ai-development-workflow.md#r2--commit-per-change) |
-| 7 | BOARD updated if milestone deliverable completed | Step 9 of development loop |
-| 8 | No secrets or local data in commit | [§4.4 Never commit](03-ai-development-workflow.md#44-never-commit) |
-| 9 | Requested local/remote `main` integration completed under R4; expected commits verified and merged worktree/branch removed; any requested launch uses integrated `main` | [R4 — Request branch + worktree + merge gate](03-ai-development-workflow.md#r4--request-branch--worktree--merge-gate) |
-| 10 | No merged worktree left on disk; `git worktree list` has no stale entry for this request | [§6.1 Merge Cleanup Checklist](#61-merge-cleanup-checklist) |
-| 11 | If a GitHub issue was linked: verified before work; commented in the issue language; closed when conclusive | [R5 — Verify linked GitHub issues](03-ai-development-workflow.md#r5--verify-linked-github-issues-before-work-then-reply-and-close) |
-| 12 | If a GitHub pull request was linked: root-cause bar reviewed; merged only when it actually fixes the problem with a minimal diff; follow-up after merge; contributor work not discarded for nits | [R6 — Land a linked pull request only when it fixes the root cause with a minimal diff](03-ai-development-workflow.md#r6--land-a-linked-pull-request-only-when-it-fixes-the-root-cause-with-a-minimal-diff) |
+---
 
-If any applicable gate fails, the requested integration is **not Done**; report
-the blocker without weakening the gate.
+## 9. Release Checklist (Stable Tag)
+
+Skip for documentation-only work and non-release chores; the
+[release runbook](06-release-runbook.md#41-mandatory-release-version-surface-gate-d164--d260)
+owns the procedure.
+
+- [ ] `packages/shared/src/plus-changelog.ts` has newest-first entries for the version under every shipped locale, with aligned highlight counts and English as the source of truth.
+- [ ] Entries are short user-facing product notes, not raw PR or commit lists; pre-release-only versions are omitted unless product explicitly ships in-app notes for that channel.
+- [ ] `packages/shared/src/changelog.test.ts` lists the new version first; `pnpm --filter @pi-desktop/shared test` passes.
+- [ ] `README.md` and `README.zh-CN.md` state the current release line and no claim the release invalidates.
+- [ ] `node scripts/check-release-docs.mjs` passes before tagging; release documentation committed on the release branch.
+- [ ] Installers built only on GitHub-hosted Actions, including `pack --dir`; no local packaging fallback.
+- [ ] Tag workflow used the clean merged commit with fresh remote ancestry and no existing tag; shared CI and complete asset checks passed; recording which signing lane ran, unsigned output is not Gatekeeper qualification.
+- [ ] Evidence retained: `release-manifest.json`, `SHA256SUMS`, source and base SHAs, run URL, and all job conclusions.
+- [ ] Formal publication used draft → upload → remote digest and size verification → publish; no published asset overwritten, failed drafts retained, and any retry matched their exact source and manifest identity.
+- [ ] Prerelease feeds use their named channel and never become GitHub latest; GitHub release notes are not the in-app source.
+
+---
+
+## 10. Final Definition-of-Done Gate
+
+- [ ] All applicable [Definition of Done](03-ai-development-workflow.md#11-definition-of-done) conditions are true under the delivery scope.
+- [ ] T0 records one delivery line; T1/T2 write the delivery report required by `AGENTS.md` (behavior change, files, checks run, checks skipped and marked `NOT RUN`, risks).
+- [ ] Linked issue and pull request outcomes recorded per §0 and §0.1.
+- [ ] Indexes updated (NAV, delivery README, spec README, docs README, BOARD).
+- [ ] A failing gate was reported as a blocker, not weakened.
