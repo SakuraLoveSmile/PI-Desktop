@@ -1,17 +1,22 @@
 # PI-UPD-1102: Unsigned macOS packages use manual update delivery
 
-- Project: `fork-pi-desktop`; task ID: `PI-UPD-1102`; status: 实现中
-  (code complete; packaged validation and release pending).
+- Project: `fork-pi-desktop`; task ID: `PI-UPD-1102`; status: 待体验
+  (fix merged and published in 0.15.12; user acceptance pending).
 - Created: 2026-11-02 (Asia/Taipei).
 - Authoritative record: this file. Linked evidence only supplements it.
 - Goal / authorization: the user asked for a code fix for the failed in-app
   update on unsigned macOS installs because the Apple Developer certificate is
-  still pending.
+  still pending. On 2026-11-02 the user authorized the complete delivery:
+  push, PR, merge, and the 0.15.12 unsigned release.
 - Baseline: `ec350c489eb523114d05f87e0c8e4d5d0f750891` (`origin/main`).
 - Branch: `fix/20261102-pi-upd-1102-unsigned-macos-manual-update`.
 - Worktree: `/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop/20261102-fix-pi-upd-1102-unsigned-macos-manual-update`.
-- Target: remote `main` after the review and integration gates. No push, merge,
-  tag, release or installation is authorized by this request.
+- PR: [#71](https://github.com/SakuraLoveSmile/PI-Desktop/pull/71), merged as
+  `b28a3c25179eaf7af683161feb9b4e801cdac253`.
+- Release: [v0.15.12](https://github.com/SakuraLoveSmile/PI-Desktop/releases/tag/v0.15.12),
+  published from `5a55d4eec423f8db434281ae090125568d2d006b`.
+- Target: remote `main` and the released unsigned 0.15.12 package. Final
+  installation of the produced DMG remains the user's manual action.
 
 ## Scope and confirmed decisions
 
@@ -104,25 +109,31 @@ app, not this worktree):
 | 2026-11-02 | uncommitted change | worktree, Node 22.23.2 | `node scripts/check-test-quality.mjs --base ec350c489...` | Passed (8120 assertions/extractions, no growth). |
 | 2026-11-02 | uncommitted change | worktree, Node 22.23.2 | `node scripts/check-architecture.mjs`, `check-agent-policy-sync.mjs`, `generate-scenario-index.mjs --check`, `check-release-docs.mjs` | All passed. |
 | 2026-11-02 | uncommitted change | worktree, Node 22.23.2 | `docs/scripts/check-locales.mjs`, `docs/scripts/check-docs.mjs` | 95 locale pairs and 630 pages verified; only pre-existing ADR-format warnings. |
-| 2026-11-02 | uncommitted change | worktree, Node 22.23.2 | Packaged app / actual Squirrel install | NOT RUN. Installer builds are cloud-only and no release was authorized. |
+| 2026-11-02 | `c141545d1` | GitHub-hosted PR #71 checks | JS build/typecheck/lint/architecture/tests, docs, Rust, isolated smoke, PR base | All five checks passed before merge. |
+| 2026-11-02 | merge `b28a3c251` | remote `main` | PR #71 merge | Merged through the repository gate; `origin/main` contains the fix. |
+| 2026-11-02 | release `v0.15.12` source `5a55d4eec` | downloaded release assets, macOS arm64 | ZIP/DMG download + SHA256/SHA512; `hdiutil verify`; app identity; packaged manifest | ZIP `302acd59...` and DMG `0b7642cf...` match `release-manifest.json`/`SHA256SUMS`; ZIP sha512 matches `latest-mac.yml`; DMG checksum valid; app is 0.15.12, ad-hoc signed, and packaged `piMacSigning` is `adhoc`. |
+| 2026-11-02 | release `v0.15.12` | user's macOS install | Actual installation and manual notify-and-link behavior | NOT RUN. The user installs the DMG manually; acceptance and behavior observation remain pending. |
 
 ## Commit and integration
 
 | Commit | Behavior change and reason | Validation | Merge / release |
 | --- | --- | --- | --- |
-| `7b33f7575` | Unsigned macOS packages stop attempting in-app installs; manual notify-and-link instead. | Unit/integration tests, typecheck (changed files clean), docs and policy gates as recorded above | Not authorized; no push/PR/merge/release |
+| `7b33f7575` | Unsigned macOS packages stop attempting in-app installs; manual notify-and-link instead. | Unit/integration tests, typecheck (changed files clean), docs and policy gates as recorded above | Merged as `b28a3c251`; published in [v0.15.12](https://github.com/SakuraLoveSmile/PI-Desktop/releases/tag/v0.15.12) |
+| `c141545d1` | Record the validation evidence and commit binding. | Docs checks | Included in the same merge and release |
 
 ## Delivery and recovery
 
-- Experience entry: Settings -> Info -> Updates, or the automatic check on a
-  packaged unsigned build.
-- Not done / not verified: packaged macOS artifact behavior (installer builds
-  are cloud-only), native Squirrel acceptance on a signed lane, and actual
-  installation of the fixed build.
+- Experience entry: install the published 0.15.12 DMG, then open Settings ->
+  Info -> Updates, or wait for the automatic check on the packaged unsigned
+  build.
+- Not verified: actual installation, the user-visible manual update path on
+  the installed 0.15.12 build, and native Squirrel acceptance on a signed lane.
 - User confirmation: none yet. Acceptance remains pending explicit user
   confirmation (已验收).
-- Next step: run targeted tests, typecheck, review the diff. A follow-up
-  release is required to produce the fixed installer; that release is not
-  authorized by this task.
-- Rollback: revert the single code commit; the legacy in-app attempt returns.
-- Worktree close-out: not applicable yet (uncommitted work in progress).
+- Next step: the user installs the 0.15.12 DMG manually and checks that the
+  next update appears as a manual notification with `View release` instead of
+  a failed in-app install.
+- Rollback: revert `7b33f7575` if it is ever backed out; the legacy in-app
+  attempt returns. Do not move the published tag or replace release assets.
+- Worktree close-out: this fix worktree and local branch are retired after the
+  closeout merge; the published tag and release remain immutable.
