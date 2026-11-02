@@ -10,10 +10,24 @@
  * must never leak into the release lane.
  */
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import {
+  chmodSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { delimiter, join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { describeComparisonFailures } from "../../../scripts/macos-identity-gate.mjs";
-import { shouldUseSecureTimestamp } from "../../../scripts/macos-signing-policy.mjs";
+import {
+  resolveMacSigningLane,
+  shouldUseSecureTimestamp,
+} from "../../../scripts/macos-signing-policy.mjs";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
@@ -50,6 +64,87 @@ test("the wrapper always supplies the distribution, the gate and a post-check", 
   assert.match(wrapper, /mainExecutableUuid\(/);
   assert.match(wrapper, /verified \$\{packaged\.length\} packaged bundle/);
 });
+
+test("the packaging lane resolves the signing identity used for update delivery", () => {
+  assert.equal(resolveMacSigningLane(["-c.mac.identity=-"], {}), "adhoc");
+  assert.equal(resolveMacSigningLane(["--config.mac.identity", "-"], {}), "adhoc");
+  assert.equal(
+    resolveMacSigningLane(
+      ["-c.publish.channel=latest", "-c.mac.forceCodeSigning=true", "-c.mac.notarize=true"],
+      {},
+    ),
+    "developer-id",
+  );
+  assert.equal(resolveMacSigningLane([], { CSC_LINK: "certificate.p12" }), "developer-id");
+  assert.equal(
+    resolveMacSigningLane([], { CSC_NAME: "Developer ID Application: Example" }),
+    "developer-id",
+  );
+  assert.equal(resolveMacSigningLane([], {}), "unknown");
+  assert.equal(resolveMacSigningLane(["-c.mac.notarize=false"], {}), "unknown");
+});
+
+test(
+  "the macOS packaging wrapper stamps the signing lane into the package",
+  { skip: process.platform !== "darwin" },
+  (t) => {
+    const scratch = mkdtempSync(join(tmpdir(), "pi-mac-signing-lane-"));
+    t.after(() => rmSync(scratch, { recursive: true, force: true }));
+    const log = join(scratch, "calls.jsonl");
+    const pnpm = join(scratch, "pnpm");
+    writeFileSync(
+      pnpm,
+      `#!${process.execPath}\nrequire('node:fs').appendFileSync(process.env.PI_SIGNING_LANE_LOG, JSON.stringify(process.argv.slice(2)) + '\\n');\n`,
+    );
+    chmodSync(pnpm, 0o755);
+    // The wrapper's post-pack UUID check must not depend on whatever release
+    // artifacts happen to exist in the checkout running the tests.
+    const dwarfdump = join(scratch, "dwarfdump");
+    writeFileSync(dwarfdump, "#!/bin/sh\nexit 1\n");
+    chmodSync(dwarfdump, 0o755);
+    const wrapper = fileURLToPath(
+      new URL("../../../scripts/package-macos-identity.mjs", import.meta.url),
+    );
+    const builderArgs = (args) => {
+      execFileSync(
+        process.execPath,
+        [wrapper, "--mac", "--publish", "never", ...args],
+        {
+          env: {
+            ...process.env,
+            GITHUB_ACTIONS: "true",
+            RUNNER_ENVIRONMENT: "github-hosted",
+            PI_ELECTRON_DIST: join(scratch, "electron-dist"),
+            PI_SIGNING_LANE_LOG: log,
+            PATH: `${scratch}${delimiter}${process.env.PATH ?? ""}`,
+            CSC_LINK: "",
+            CSC_NAME: "",
+          },
+          stdio: "pipe",
+        },
+      );
+      const calls = readFileSync(log, "utf8")
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line));
+      return calls.at(-1);
+    };
+
+    assert.ok(
+      builderArgs(["-c.mac.identity=-"]).includes(
+        "-c.extraMetadata.piMacSigning=adhoc",
+      ),
+    );
+    assert.ok(
+      builderArgs(["-c.mac.forceCodeSigning=true", "-c.mac.notarize=true"]).includes(
+        "-c.extraMetadata.piMacSigning=developer-id",
+      ),
+    );
+    assert.ok(
+      builderArgs([]).includes("-c.extraMetadata.piMacSigning=unknown"),
+    );
+  },
+);
 
 test("notarization requests retain secure timestamps independently of unrelated builder flags", () => {
   for (const args of [

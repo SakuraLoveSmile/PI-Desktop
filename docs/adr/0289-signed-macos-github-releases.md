@@ -83,3 +83,11 @@ for the official `vastsa/PI-Desktop` release lane.
   password: deferred; the existing electron-builder 26 Apple ID path is
   already wired.
 - Separate macOS updater implementation: rejected; reuse `electron-updater`.
+
+## Amendment (PI-UPD-1102)
+
+Decision 5's packaged-macOS in-app lane applies only to builds stamped with
+`piMacSigning = "developer-id"` by the macOS packaging entry point. Ad-hoc or
+unstamped macOS packages use notify-and-link delivery. The consequence above
+about downloads and restarts therefore describes Developer ID-signed installs
+only; see the PI-UPD-1102 amendment in ADR 0022.

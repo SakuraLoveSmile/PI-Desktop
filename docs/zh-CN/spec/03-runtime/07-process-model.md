@@ -222,10 +222,13 @@ sidecar/host 关闭序列在更新程序替换应用程序之前运行。
 - 打包版本使用 Main 拥有的更新控制器，并使用按安装实例持久化的
   `updatePreference`。自动模式在受支持的包上保持现有应用内下载/安装流程；手动模式
   继续检查固定稳定版更新，但不自动下载或退出安装，并对每个可用版本只提醒一次。
-  Windows NSIS、已打包 macOS 和 Linux AppImage 默认自动；Windows ZIP/便携版，以及
-  不支持自动安装的包默认手动。Windows ZIP/便携版可在确认 NSIS 可能替换解压副本的
-  警告后明确选择自动。偏好和最近提醒版本保存在 Host 所有的应用设置 JSON 中，且不会
-  进入便携配置同步。
+  Windows NSIS、Developer ID 签名的已打包 macOS 和 Linux AppImage 默认自动；ad-hoc
+  或未写入签名标记的 macOS 包、Windows ZIP/便携版，以及不支持自动安装的包默认手动。
+  唯一的 macOS 打包入口会把 `piMacSigning` 写入打包清单，只有 `developer-id` 会启用
+  应用内通道：Squirrel.Mac 用运行中应用的 designated requirement 校验更新，而 ad-hoc
+  签名会把该要求固定为当前构建的 cdhash。Windows ZIP/便携版可在确认 NSIS 可能替换
+  解压副本的警告后明确选择自动。偏好和最近提醒版本保存在 Host 所有的应用设置 JSON
+  中，且不会进入便携配置同步。
 
 ## 7. 远程目标拓扑（MVP 后）
 

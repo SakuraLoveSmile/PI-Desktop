@@ -3028,19 +3028,20 @@ Pi-Desktop-Plus 图标；两个表面都不会暴露库存 Electron 名称或图
   自动检查或从应用程序菜单调用检查更新/
   设置 → 信息。
 - **预期**：更新状态报告 `available`（手动平台）或
-  通过应用内下载 Windows NSIS / Linux AppImage 取得进展
-  `availableVersion` 等于较新的稳定标签。Windows 便携版 ZIP 运行保持手动通知加链接路径，
-  不得下载或运行 NSIS 安装程序；旧便携版 exe 在存在 `PORTABLE_EXECUTABLE_FILE` 时同样
-  保持手动更新。客户不得举报
-  最新只是因为没有较新的版本共享相同的 `rc` 预发行版
-  频道。
+  对 Developer ID 签名的已打包 macOS、Windows NSIS 和 Linux AppImage 通过应用内下载取得
+  进展，`availableVersion` 等于较新的稳定标签。ad-hoc、未签名或未写入签名标记的 macOS 包
+  保持手动通知加链接路径，报告 `available`，绝不启动 `electron-updater` 下载或 Squirrel.Mac
+  安装；设置 → 信息中的自动模式保持不可用。Windows 便携版 ZIP 运行同样保持手动通知加链接
+  路径，不得下载或运行 NSIS 安装程序；旧便携版 exe 在存在 `PORTABLE_EXECUTABLE_FILE` 时
+  同样保持手动更新。客户端不得在仅有预发布通道更新时误报为已是最新。
 - **链接规格**：`04-ux/09-interaction-patterns.md`，
   `05-security/01-security.md`、`08-meta/decisions-log.md` (D120)、
   ADR 0022
 - **验收**：A（应用程序启动），质量
 - **里程碑**：M5
 - **状态**：单位覆盖（`auto-update.test.mjs` 断言
-  `allowPrerelease = false`）；打包发现场景草稿
+  `allowPrerelease = false`；`update-preference.test.mjs` 与
+  `updater-controller.test.mjs` 覆盖 ad-hoc/未知 macOS 包保持手动交付）；打包发现场景草稿
 
 #### E2E-067B：已发货语言更新说明和完整变更日志对话框（D164/D345）
 

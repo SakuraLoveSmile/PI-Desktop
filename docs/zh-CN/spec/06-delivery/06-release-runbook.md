@@ -189,8 +189,10 @@ gh variable set ALLOW_UNSIGNED_MACOS_RELEASE --body true -R SakuraLoveSmile/PI-D
 手动 `sign_macos` 输入独立生效：明确请求 `sign_macos=true` 仍须提供全部六个 Secret。
 预检会把 opt-in 决定固定到 `allow_unsigned_macos` 元数据，供聚合和发布作业沿用。
 未签名 Release 会在清单中记录 `signedMacos: false`，并注明未签名、未公证及仅供个人使用；
-更新需要手动下载和安装。此选项不修改 macOS 安全设置，也不代表通过 Gatekeeper 或公证。
-未签名手动候选仍只生成 Actions 工件，不能直接提升为正式 Release。
+更新需要手动下载和安装。macOS 打包入口会给该构建写入 `piMacSigning = "adhoc"`，客户端因此
+只检查固定更新源并打开发布页，而不会启动 Squirrel.Mac 无法校验的应用内安装。此选项不修改
+macOS 安全设置，也不代表通过 Gatekeeper 或公证。未签名手动候选仍只生成 Actions 工件，
+不能直接提升为正式 Release。
 
 门禁顺序：
 
@@ -378,6 +380,11 @@ override 作用于它。它的 `signApplication()` 对每个文件 `await` 一�
 未签名调试产物（`workflow_dispatch` 且 `sign_macos: false`）和未签名自用正式 Release
 都不视为通过 Gatekeeper。正式标签默认必须通过签名、公证和装订检查；仅在显式启用自用
 未签名仓库变量时才使用未签名通道。夹具签名不能证明真实发布资格。
+
+macOS 打包入口（`scripts/package-macos-identity.mjs`）会把签名通道写入打包清单的
+`piMacSigning`：签名发布作业解析为 `developer-id`，未签名通道为 `adhoc`，两者都未声明的
+调用方为 `unknown`。更新控制器只对 `developer-id` 启用应用内通道，因为 Squirrel.Mac 会用
+运行中应用的 designated requirement 校验下载的包。
 
 存在两次独立的公证提交，因为 Apple 每次公证一个工件，而 electron-builder 只覆盖应用：
 
@@ -593,7 +600,7 @@ The following target-specific notes describe existing application and packaging
 behavior; they do not indicate that these targets are included in current cloud
 release bundles.
 
-- Linux deb/rpm 和 Windows 便携版 ZIP 仍保持通知和链接更新模式。打包的 macOS、Windows NSIS 和 Linux AppImage 使用应用内 `electron-updater`。
+- Linux deb/rpm、Windows 便携版 ZIP 以及 ad-hoc 或未写入签名标记的 macOS 包仍保持通知和链接更新模式。Developer ID 签名的已打包 macOS、Windows NSIS 和 Linux AppImage 使用应用内 `electron-updater`。
 - Linux x64 和 arm64 包在 Ubuntu 22.04 上构建（本机 `ubuntu-22.04` 和
   `ubuntu-22.04-arm` 运行器），因此 host-core 需要 glibc 2.35 或更高版本
   （Ubuntu 22.04、Debian 12、Fedora 36+）。每个标签作业都会运行
@@ -604,3 +611,4 @@ release bundles.
   其余所有功能在任何 arm64 Linux 设备上都可用。
 - 回滚和分阶段部署仍是开放工作。预发布具有独立命名更新源且不会成为 GitHub latest。
   现有未签名 macOS 安装可能需先手动安装一次云端发布的已签名 DMG，才能应用内更新。
+  未签名包现在保持通知和链接交付，因此后续每个未签名版本也需要手动安装。

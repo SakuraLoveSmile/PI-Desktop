@@ -248,7 +248,10 @@ independent: explicitly requesting `sign_macos=true` still requires all six
 secrets. The preflight freezes this opt-in in `allow_unsigned_macos` metadata so
 the aggregate and publication jobs use the same decision. An unsigned Release
 records `signedMacos: false`, is labeled unsigned and not notarized, and requires
-manual download and installation for updates. macOS security settings remain
+manual download and installation for updates. The macOS packaging entry point
+stamps `piMacSigning = "adhoc"` into that build, so the client checks the fixed
+feed and opens the release page instead of starting an `electron-updater`
+install that Squirrel.Mac cannot validate. macOS security settings remain
 unchanged; Gatekeeper and automatic in-app installation are not qualified.
 Unsigned manual candidates remain Actions-only and cannot be promoted directly
 to a formal release.
@@ -474,6 +477,13 @@ a configuration switch, so the lane keeps the pinned signer and the diagnostics
 above.
 
 ## 5. Verification gates
+
+The macOS packaging entry point (`scripts/package-macos-identity.mjs`) stamps
+the signing lane into the packaged manifest as `piMacSigning`: signed release
+jobs resolve `developer-id`, the unsigned lane resolves `adhoc`, and a caller
+that names neither resolves `unknown`. The update controller enables the in-app
+lane only for `developer-id`, because Squirrel.Mac validates a downloaded bundle
+against the running app's designated requirement.
 
 Every macOS lane, including unsigned candidates and opted-in personal-use
 releases, must pass `scripts/verify-macos-release.sh --integrity-only
@@ -719,9 +729,9 @@ The following target-specific notes describe existing application and packaging
 behavior; they do not indicate that these targets are included in current cloud
 release bundles.
 
-- Linux deb/rpm and the Windows portable ZIP remain notify-and-link update
-  modes. Packaged macOS, Windows NSIS, and Linux AppImage use in-app
-  `electron-updater`.
+- Linux deb/rpm, the Windows portable ZIP, and ad-hoc or unstamped macOS
+  packages remain notify-and-link update modes. Developer ID-signed packaged
+  macOS, Windows NSIS, and Linux AppImage use in-app `electron-updater`.
 - Linux x64 and arm64 packages are built on Ubuntu 22.04 (native `ubuntu-22.04`
   and `ubuntu-22.04-arm` runners), so host-core needs glibc 2.35 or newer
   (Ubuntu 22.04, Debian 12, Fedora 36+). Each tag job runs
@@ -734,4 +744,6 @@ release bundles.
 - Rollback and staged rollout remain open release work. Prereleases have
   separate named feeds and never become GitHub latest. Existing unsigned macOS
   installs may need one manual signed DMG installation before in-app updates
-  succeed; obtain that installer from the cloud release.
+  succeed; obtain that installer from the cloud release. Unsigned packages now
+  stay on notify-and-link delivery, so each future unsigned release also needs a
+  manual installation.

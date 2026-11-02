@@ -156,8 +156,8 @@ MCP 市场只接受无凭据的公网 HTTPS 源和目录端点。Main 在每一�
   GitHub 的最新稳定版本而不是同通道预发布 pin。
 - Feed 清单将工件与电子构建器哈希绑定。一个错误，
   无法安装提要、哈希不匹配或无效的更新程序状态。
-- 打包的 macOS、Windows NSIS 和 Linux AppImage 从 GitHub Releases 源应用内下载并安装。Linux deb/rpm 和 Windows ZIP 只检测新版本并打开固定发布页；旧 Windows 便携版 exe 在存在 `PORTABLE_EXECUTABLE_FILE` 时仍保持手动更新。
-- D126 标签版本发布 Windows NSIS 和 Linux AppImage 安装程序及其更新清单，以及 Linux deb/rpm 包和 Windows 便携版 ZIP。NSIS、AppImage 与打包的 macOS 走应用内通道。便携版 ZIP 使用通知加链接交付，并且不写入 `latest.yml`。macOS 标签工件在上传前完成 Developer ID 签名、公证和装订；回滚和分阶段推出仍是发布后续工作。
+- Developer ID 签名的已打包 macOS、Windows NSIS 和 Linux AppImage 从 GitHub Releases 源应用内下载并安装。ad-hoc、未签名或没有签名标记的 macOS 包绝不启动该通道：Main 从打包清单读取 `piMacSigning`，除 `developer-id` 外的值都使用通知加链接。这是校验边界，不是界面偏好：Squirrel.Mac 用运行中应用的 designated requirement 校验下载的包，而 ad-hoc 要求就是当前构建的 cdhash，后续构建无法满足。Linux deb/rpm、Windows ZIP 和 ad-hoc macOS 只检测新版本并打开固定发布页；旧 Windows 便携版 exe 在存在 `PORTABLE_EXECUTABLE_FILE` 时仍保持手动更新。
+- D126 标签版本发布 Windows NSIS 和 Linux AppImage 安装程序及其更新清单，以及 Linux deb/rpm 包和 Windows 便携版 ZIP。NSIS、AppImage 与 Developer ID 签名的已打包 macOS 走应用内通道；显式 opt-in 的未签名 macOS 包仍走通知加链接。便携版 ZIP 使用通知加链接交付，并且不写入 `latest.yml`。macOS 标签工件在上传前完成 Developer ID 签名、公证和装订；回滚和分阶段推出仍是发布后续工作。
 - 客户端不携带 GitHub 令牌。私人或其他无法访问的提要
   关闭失败；自动故障保持在环境状态，显式检查会暴露
   错误。

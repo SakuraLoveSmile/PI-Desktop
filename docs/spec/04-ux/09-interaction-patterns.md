@@ -635,9 +635,10 @@ may be retained while exactly one workspace supplies the visible shell context.
   The current release and a discovered available release are identified with
   compact badges. The list scrolls independently, closes by its close control,
   Escape, or the backdrop, and restores focus to the invoking control.
-- D126 tag releases publish all platform manifests and installers. Packaged
-  macOS, Windows NSIS, and Linux AppImage use the in-app lane; Linux deb/rpm
-  and Windows ZIP remain notify-and-link delivery modes.
+- D126 tag releases publish all platform manifests and installers. Developer
+  ID-signed packaged macOS, Windows NSIS, and Linux AppImage use the in-app
+  lane; ad-hoc or unstamped macOS, Linux deb/rpm, and Windows ZIP remain
+  notify-and-link delivery modes.
 
 ## 2. Streaming message behavior
 

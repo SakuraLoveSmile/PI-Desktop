@@ -5511,20 +5511,25 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   automatic check or invoke Check for Updates from the application menu /
   Settings → Info.
 - **Expected**: Update state reports `available` (manual platforms) or
-  advances through in-app download for packaged macOS, Windows NSIS, and
-  Linux AppImage with `availableVersion` equal to the newer stable tag. A
-  Windows portable ZIP run stays on the manual notify-and-link path and must
-  not download or run the NSIS installer; a legacy portable executable is
-  likewise manual when `PORTABLE_EXECUTABLE_FILE` is present. The
-  client must not report up-to-date merely because no newer release shares the
-  same `rc` prerelease channel.
+  advances through in-app download for Developer ID-signed packaged macOS,
+  Windows NSIS, and Linux AppImage with `availableVersion` equal to the newer
+  stable tag. An ad-hoc, unsigned, or unstamped macOS package stays on the
+  manual notify-and-link path, reports `available`, and never starts an
+  `electron-updater` download or a Squirrel.Mac install; Settings → Info keeps
+  Automatic unavailable. A Windows portable ZIP run likewise stays on the
+  manual notify-and-link path and must not download or run the NSIS installer;
+  a legacy portable executable is likewise manual when
+  `PORTABLE_EXECUTABLE_FILE` is present. The client must not report up-to-date
+  merely because no newer release shares the same `rc` prerelease channel.
 - **Specs linked**: `04-ux/09-interaction-patterns.md`,
   `05-security/01-security.md`, `08-meta/decisions-log.md` (D120),
   ADR 0022
 - **Acceptance**: A (app startup), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered (`auto-update.test.mjs` asserts
-  `allowPrerelease = false`); packaged discovery scenario Draft
+  `allowPrerelease = false`; `update-preference.test.mjs` and
+  `updater-controller.test.mjs` cover ad-hoc/unknown macOS manual delivery);
+  packaged discovery scenario Draft
 
 #### E2E-067B: Shipped-locale update notes and full changelog dialog (D164/D345/D349)
 

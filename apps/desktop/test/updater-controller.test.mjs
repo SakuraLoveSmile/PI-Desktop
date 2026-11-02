@@ -49,7 +49,12 @@ class FakeUpdater extends EventEmitter {
   quitAndInstall() {}
 }
 
-function createController({ updater, settings = {}, persist = async () => {} }) {
+function createController({
+  updater,
+  settings = {},
+  persist = async () => {},
+  macSigning = "developer-id",
+}) {
   const logger = { app: () => {} };
   const sent = [];
   const controller = new AppUpdaterController({
@@ -61,6 +66,7 @@ function createController({ updater, settings = {}, persist = async () => {} }) 
     autoUpdater: updater,
     readUpdateSettings: async () => settings,
     persistDismissedVersion: persist,
+    macSigning,
   });
   return { controller, sent };
 }
@@ -118,5 +124,26 @@ test("a restored dismissal blocks that release and a newer release resumes autom
   assert.equal(updater.autoInstallOnAppQuit, true);
   assert.equal(controller.getState().dismissed, false);
   assert.deepEqual(persisted, [null]);
+  controller.dispose();
+});
+
+test("an ad-hoc macOS package degrades a stored automatic preference to manual delivery", async () => {
+  const updater = new FakeUpdater();
+  const { controller } = createController({
+    updater,
+    macSigning: "adhoc",
+    settings: { updatePreference: "automatic" },
+  });
+
+  await controller.check();
+
+  assert.equal(controller.getState().mode, "manual");
+  assert.equal(controller.getState().automaticSupported, false);
+  assert.equal(controller.getState().preference, "manual");
+  assert.deepEqual(updater.downloadStarts, []);
+  assert.equal(updater.autoDownload, false);
+  assert.equal(updater.autoInstallOnAppQuit, false);
+  assert.equal(controller.getState().status, "available");
+  assert.equal(controller.getState().manualReminder, true);
   controller.dispose();
 });
