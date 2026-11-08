@@ -6,6 +6,14 @@ export const PLUS_UPSTREAM_CUTOFF = "0.15.6";
 const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   en: [
     {
+      version: "0.15.13",
+      date: "2026-11-08",
+      highlights: [
+        "Goal reports now verify each check on the Host: for Goals without approved verification commands, the check's command is matched against the Goal's own Bash runs, and the last finished run decides passed or failed instead of relying on the model to cite evidence.",
+        "A check that no finished run settles stays inconclusive and says why. Results are recorded on the report only; whether a report can complete is unchanged.",
+      ],
+    },
+    {
       version: "0.15.12",
       date: "2026-11-02",
       highlights: [
@@ -82,6 +90,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "zh-CN": [
+    {
+      version: "0.15.13",
+      date: "2026-11-08",
+      highlights: [
+        "目标报告现在由 Host 核对每项检查：对没有已批准验证命令的目标，会把检查命令与该目标自己的 Bash 运行记录匹配，以最后一次已完成的运行判定通过或失败，不再依赖模型引用证据。",
+        "没有任何已完成运行能判定的检查会保持“无法确定”并说明原因。结果只记录在报告上，不影响报告能否完成。",
+      ],
+    },
     {
       version: "0.15.12",
       date: "2026-11-02",
@@ -160,6 +176,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   "zh-TW": [
     {
+      version: "0.15.13",
+      date: "2026-11-08",
+      highlights: [
+        "目標報告現在由 Host 核對每項檢查：對沒有已核准驗證指令的目標，會將檢查指令與該目標自己的 Bash 執行記錄比對，以最後一次已完成的執行判定通過或失敗，不再依賴模型引用證據。",
+        "沒有任何已完成的執行能判定的檢查會維持「無法確定」並說明原因。結果只記錄在報告上，不影響報告能否完成。",
+      ],
+    },
+    {
       version: "0.15.12",
       date: "2026-11-02",
       highlights: [
@@ -236,6 +260,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   tr: [
+    {
+      version: "0.15.13",
+      date: "2026-11-08",
+      highlights: [
+        "Hedef raporları artık her kontrolü Host üzerinde doğrular: onaylı doğrulama komutu olmayan hedeflerde kontrolün komutu hedefin kendi Bash çalıştırmalarıyla eşleştirilir; modelin kanıt göstermesine güvenmek yerine son tamamlanan çalıştırma geçti veya kaldı kararını verir.",
+        "Hiçbir tamamlanmış çalıştırmanın karara bağlayamadığı kontrol belirsiz kalır ve nedenini belirtir. Sonuçlar yalnızca rapora kaydedilir; bir raporun tamamlanıp tamamlanamayacağı değişmez.",
+      ],
+    },
     {
       version: "0.15.12",
       date: "2026-11-02",
@@ -314,6 +346,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   de: [
     {
+      version: "0.15.13",
+      date: "2026-11-08",
+      highlights: [
+        "Zielberichte prüfen jede Prüfung jetzt auf dem Host: Bei Zielen ohne genehmigte Prüfbefehle wird der Befehl der Prüfung mit den eigenen Bash-Läufen des Ziels abgeglichen, und der letzte abgeschlossene Lauf entscheidet über bestanden oder fehlgeschlagen, statt sich darauf zu verlassen, dass das Modell Belege nennt.",
+        "Eine Prüfung, die kein abgeschlossener Lauf entscheidet, bleibt unbestimmt und nennt den Grund. Ergebnisse werden nur im Bericht festgehalten; ob ein Bericht abgeschlossen werden kann, bleibt unverändert.",
+      ],
+    },
+    {
       version: "0.15.12",
       date: "2026-11-02",
       highlights: [
@@ -390,6 +430,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   es: [
+    {
+      version: "0.15.13",
+      date: "2026-11-08",
+      highlights: [
+        "Los informes de objetivos ahora verifican cada comprobación en el Host: en los objetivos sin comandos de verificación aprobados, el comando de la comprobación se compara con las ejecuciones de Bash del propio objetivo, y la última ejecución terminada decide si pasó o falló en lugar de depender de que el modelo cite evidencias.",
+        "Una comprobación que ninguna ejecución terminada resuelve queda como no concluyente e indica el motivo. Los resultados solo se registran en el informe; que un informe pueda completarse no cambia.",
+      ],
+    },
     {
       version: "0.15.12",
       date: "2026-11-02",
@@ -468,6 +516,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   fr: [
     {
+      version: "0.15.13",
+      date: "2026-11-08",
+      highlights: [
+        "Les rapports d'objectifs vérifient désormais chaque contrôle sur l'hôte : pour les objectifs sans commandes de vérification approuvées, la commande du contrôle est rapprochée des exécutions Bash propres à l'objectif, et la dernière exécution terminée décide de la réussite ou de l'échec au lieu de dépendre des preuves citées par le modèle.",
+        "Un contrôle qu'aucune exécution terminée ne tranche reste non concluant et en indique la raison. Les résultats sont uniquement consignés dans le rapport ; la possibilité de terminer un rapport ne change pas.",
+      ],
+    },
+    {
       version: "0.15.12",
       date: "2026-11-02",
       highlights: [
@@ -545,6 +601,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   ko: [
     {
+      version: "0.15.13",
+      date: "2026-11-08",
+      highlights: [
+        "목표 보고서가 이제 각 검사를 Host에서 확인합니다. 승인된 검증 명령이 없는 목표는 검사 명령을 해당 목표의 Bash 실행 기록과 대조하며, 모델이 증거를 인용하는 데 의존하지 않고 마지막으로 끝난 실행이 통과 또는 실패를 결정합니다.",
+        "끝난 실행으로 판정되지 않는 검사는 판단 불가로 남고 그 이유를 표시합니다. 결과는 보고서에만 기록되며 보고서를 완료할 수 있는지는 달라지지 않습니다.",
+      ],
+    },
+    {
       version: "0.15.12",
       date: "2026-11-02",
       highlights: [
@@ -621,6 +685,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "pt-BR": [
+    {
+      version: "0.15.13",
+      date: "2026-11-08",
+      highlights: [
+        "Os relatórios de meta agora verificam cada checagem no Host: em metas sem comandos de verificação aprovados, o comando da checagem é comparado com as execuções de Bash da própria meta, e a última execução concluída decide se passou ou falhou, em vez de depender de o modelo citar evidências.",
+        "Uma checagem que nenhuma execução concluída resolve continua inconclusiva e informa o motivo. Os resultados ficam registrados apenas no relatório; a possibilidade de concluir um relatório não muda.",
+      ],
+    },
     {
       version: "0.15.12",
       date: "2026-11-02",
