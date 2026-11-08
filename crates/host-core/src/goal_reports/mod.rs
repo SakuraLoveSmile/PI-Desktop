@@ -22,6 +22,7 @@ pub mod assets;
 pub mod evidence;
 mod progress;
 mod read;
+mod tool_index;
 mod validation;
 
 use validation::validate_structured_draft;

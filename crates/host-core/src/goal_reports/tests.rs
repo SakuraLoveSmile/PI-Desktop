@@ -16,6 +16,9 @@ mod required_verification;
 #[path = "tests/native_evidence.rs"]
 mod native_evidence;
 
+#[path = "tests/reference_observations.rs"]
+mod reference_observations;
+
 fn create_test_db() -> (tempfile::TempDir, Database) {
     let dir = tempfile::tempdir().unwrap();
     let db_path = dir.path().join("pi.sqlite");
