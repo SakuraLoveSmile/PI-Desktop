@@ -6,6 +6,8 @@
  * - Structured report publication with turn timing provenance, metrics, criteria, steps, and files.
  * - Evidence resolutions: records message and approval references up to durableSeq; marks unrecorded refs unresolved.
  * - Check observations: compares Agent claims with Host recorded command exit codes and highlights contradictions.
+ * - Check observations without approved commands: matches each check's command to the execution's own Bash runs,
+ *   whether or not evidence is cited, and lets the last finished run replace a cited earlier one.
  * - Screenshot assets: validates PNG/JPEG/WebP images, copies into report assets, and streams chunks via goalReports.getAsset.
  * - Chunk range bounds, EOF signaling, SHA-256 integrity, and cross-session asset security.
  * - Non-ready states: draft/pending in-flight, corrupt file hash/size detection, and idempotent retry.
@@ -82,6 +84,9 @@ async function scenarioStructuredWithAssets(binary, tempRoot) {
       for (const [id, command, exitCode] of [
         ["recorded-check-1", "cargo test", 0],
         ["recorded-check-2", "npm run lint", 1],
+        ["recorded-check-3", "cargo clippy", 0],
+        ["recorded-check-5a", "cargo fmt --check", 0],
+        ["recorded-check-5b", "cargo fmt --check", 1],
       ]) {
         await ctx.host.call("session.appendMessage", {
           sessionId: session.id,
@@ -118,6 +123,11 @@ async function scenarioStructuredWithAssets(binary, tempRoot) {
         checks: [
           { id: "chk-1", command: "cargo test", result: "passed", exitCode: 0, evidenceRefs: ["ev-check-1"] },
           { id: "chk-2", command: "npm run lint", result: "passed", exitCode: 0, evidenceRefs: ["ev-check-2"] },
+          // Without approved commands the Host finds the command's own run: no evidence cited (chk-3), a command
+          // that never ran (chk-4), and a cited pass that a later run of the same command replaced (chk-5).
+          { id: "chk-3", command: "cargo clippy", result: "passed", exitCode: 0 },
+          { id: "chk-4", command: "npm run e2e", result: "passed", exitCode: 0 },
+          { id: "chk-5", command: "cargo fmt --check", result: "passed", exitCode: 0, evidenceRefs: ["ev-check-5"] },
         ],
         screenshots: [
           { id: "sc-main", evidenceRef: "ev-img", caption: "Main dashboard visual" },
@@ -125,6 +135,7 @@ async function scenarioStructuredWithAssets(binary, tempRoot) {
         evidences: [
           { id: "ev-check-1", kind: "tool_result", refId: "recorded-check-1", summary: "Recorded test result" },
           { id: "ev-check-2", kind: "tool_result", refId: "recorded-check-2", summary: "Recorded lint failure" },
+          { id: "ev-check-5", kind: "tool_result", refId: "recorded-check-5a", summary: "Earlier format pass" },
           { id: "ev-img", kind: "file", refId: imgFileName, summary: "Captured dashboard image" },
           { id: "ev-turn", kind: "message", refId: turnId, summary: "Recorded turn execution" },
           { id: "ev-unrecorded", kind: "tool_call", refId: "tc-never-ran", summary: "Ghost tool call" },
@@ -159,11 +170,27 @@ async function scenarioStructuredWithAssets(binary, tempRoot) {
       assert(rep?.assets[0]?.sha256 === pngSha256, "asset sha256 mismatch");
 
       // Verify check observations and contradiction detection
-      assert(rep?.checkObservations?.length === 2, "checkObservations missing");
-      const obs1 = rep.checkObservations.find((o) => o.checkId === "chk-1");
-      const obs2 = rep.checkObservations.find((o) => o.checkId === "chk-2");
+      assert(rep?.checkObservations?.length === 5, "checkObservations missing");
+      const observation = (checkId) => rep.checkObservations.find((o) => o.checkId === checkId);
+      const obs1 = observation("chk-1");
+      const obs2 = observation("chk-2");
       assert(obs1?.result === "passed", `chk-1 observation not passed: ${shortJson(obs1)}`);
       assert(obs2?.result === "failed", `chk-2 observation not failed: ${shortJson(obs2)}`);
+      // Command matching without cited evidence, and the recorded provenance in the detail text.
+      const obs3 = observation("chk-3");
+      assert(
+        obs3?.result === "passed" && obs3.exitCode === 0 && obs3.detail?.includes("Matched by the check command"),
+        `chk-3 should be matched by its command: ${shortJson(obs3)}`,
+      );
+      const obs4 = observation("chk-4");
+      assert(obs4?.result === "inconclusive", `chk-4 never ran and must stay inconclusive: ${shortJson(obs4)}`);
+      const obs5 = observation("chk-5");
+      assert(
+        obs5?.result === "failed" &&
+          obs5.exitCode === 1 &&
+          obs5.detail?.includes("replaces the cited tool call recorded-check-5a (passed)"),
+        `chk-5 should be replaced by the later failing run: ${shortJson(obs5)}`,
+      );
 
       // Verify evidence resolutions
       const evRes1 = rep.evidenceResolution?.find((e) => e.evidenceId === "ev-img");

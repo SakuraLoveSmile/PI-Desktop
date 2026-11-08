@@ -1,8 +1,9 @@
-//! Durable tool messages of one session, read once per submit or finalize.
+//! Durable tool messages of one execution, read once per submit or finalize.
 //!
 //! Check observations used to re-read the whole transcript and re-run the
 //! message query for every check. [`ToolRunIndex`] does both once; lookups
-//! after that work on memory and apply the same rules the per-check scan did.
+//! after that work on memory and only see the messages of the turns the
+//! execution owns.
 
 use std::{
     collections::{HashMap, HashSet},
@@ -29,9 +30,18 @@ pub(super) fn builds() -> usize {
 /// The session transcript could not be read, so no tool message is known.
 pub(super) struct TranscriptUnreadable;
 
+/// What the message index records about one tool message.
+struct IndexRow {
+    turn: Option<String>,
+    is_error: bool,
+    seq: i64,
+}
+
 /// A transcript line the Host indexed with role `tool`.
 struct ToolMessage {
     record: MessageRecord,
+    /// `messages.seq` of the indexed row.
+    seq: i64,
     /// `messages.is_error` of the indexed row, separate from the line's flag.
     index_error: bool,
 }
@@ -64,14 +74,14 @@ pub(super) struct RecordedOutcome {
 }
 
 impl ToolRunIndex {
-    /// Indexes tool messages the Host recorded up to `durable_seq`. With
-    /// `owning_turns`, only messages of those turns are visible.
+    /// Indexes the tool messages the Host recorded up to `durable_seq` for the
+    /// turns in `owning_turns`; everything else in the session stays invisible.
     pub(super) fn build(
         data_dir: &Path,
         conn: &Connection,
         session_id: &str,
         durable_seq: i64,
-        owning_turns: Option<&HashSet<String>>,
+        owning_turns: &HashSet<String>,
     ) -> Result<Self, TranscriptUnreadable> {
         #[cfg(test)]
         BUILDS.with(|builds| builds.set(builds.get() + 1));
@@ -83,11 +93,14 @@ impl ToolRunIndex {
         let messages = records
             .into_iter()
             .filter_map(|record| {
-                let (turn, index_error) = indexed.get(&record.id)?;
-                let owned = owning_turns
-                    .is_none_or(|turns| turn.as_ref().is_some_and(|turn| turns.contains(turn)));
+                let row = indexed.get(&record.id)?;
+                let owned = row
+                    .turn
+                    .as_ref()
+                    .is_some_and(|turn| owning_turns.contains(turn));
                 (record.role == "tool" && owned).then_some(ToolMessage {
-                    index_error: *index_error,
+                    seq: row.seq,
+                    index_error: row.is_error,
                     record,
                 })
             })
@@ -110,22 +123,43 @@ impl ToolRunIndex {
         }
         Lookup::Unique(first)
     }
+
+    /// The Bash calls whose command equals `command` once both are trimmed,
+    /// oldest first.
+    pub(super) fn bash_runs(&self, command: &str) -> Vec<ToolCall<'_>> {
+        let wanted = command.trim();
+        let mut runs: Vec<ToolCall<'_>> = self
+            .messages
+            .iter()
+            .flat_map(ToolMessage::calls)
+            .filter(|call| {
+                call.is_bash() && call.command().is_some_and(|text| text.trim() == wanted)
+            })
+            .collect();
+        runs.sort_by_key(ToolCall::seq);
+        runs
+    }
 }
 
-/// Message id -> (turn id, error flag) of the indexed tool messages. A failed
+/// Message id -> index row of the tool messages up to `durable_seq`. A failed
 /// query leaves the index empty, which only ever makes checks inconclusive.
 fn indexed_tool_messages(
     conn: &Connection,
     session_id: &str,
     durable_seq: i64,
-) -> HashMap<String, (Option<String>, bool)> {
+) -> HashMap<String, IndexRow> {
     let query = || -> rusqlite::Result<_> {
         let mut statement = conn.prepare_cached(
-            "SELECT id, turn_id, is_error FROM messages
+            "SELECT id, turn_id, is_error, seq FROM messages
              WHERE session_id = ?1 AND seq <= ?2 AND role = 'tool'",
         )?;
         let rows = statement.query_map(params![session_id, durable_seq], |row| {
-            Ok((row.get::<_, String>(0)?, (row.get(1)?, row.get(2)?)))
+            let index_row = IndexRow {
+                turn: row.get(1)?,
+                is_error: row.get(2)?,
+                seq: row.get(3)?,
+            };
+            Ok((row.get::<_, String>(0)?, index_row))
         })?;
         Ok(rows.filter_map(Result::ok).collect())
     };
@@ -136,28 +170,44 @@ fn indexed_tool_messages(
 }
 
 impl ToolMessage {
+    fn calls(&self) -> impl Iterator<Item = ToolCall<'_>> {
+        let blocks = self.record.blocks.as_array().into_iter().flatten();
+        blocks
+            .filter(|block| block.get("type").and_then(Value::as_str) == Some("tool_call"))
+            .map(move |block| ToolCall {
+                message: self,
+                block,
+            })
+    }
+
     /// The first tool call that `ref_id` names, either by its call id or by
     /// this message's own id.
     fn call_named(&self, ref_id: &str) -> Option<ToolCall<'_>> {
-        let block = self
-            .record
-            .blocks
-            .as_array()
-            .into_iter()
-            .flatten()
-            .find(|block| {
-                block.get("type").and_then(Value::as_str) == Some("tool_call")
-                    && (block.get("callId").and_then(Value::as_str) == Some(ref_id)
-                        || self.record.id == ref_id)
-            })?;
-        Some(ToolCall {
-            message: self,
-            block,
-        })
+        self.calls()
+            .find(|call| call.call_id() == Some(ref_id) || self.record.id == ref_id)
     }
 }
 
 impl ToolCall<'_> {
+    fn seq(&self) -> i64 {
+        self.message.seq
+    }
+
+    /// Whether both handles name the same block of the same message.
+    pub(super) fn is_same_call(&self, other: &ToolCall<'_>) -> bool {
+        std::ptr::eq(self.block, other.block)
+    }
+
+    fn call_id(&self) -> Option<&str> {
+        self.block.get("callId").and_then(Value::as_str)
+    }
+
+    /// The call id, or the message id when the block carries none: a name a
+    /// reader can find in the transcript.
+    pub(super) fn id(&self) -> &str {
+        self.call_id().unwrap_or(&self.message.record.id)
+    }
+
     /// Both the block and the message that holds it must name Bash.
     pub(super) fn is_bash(&self) -> bool {
         self.block.get("name").and_then(Value::as_str) == Some("Bash")

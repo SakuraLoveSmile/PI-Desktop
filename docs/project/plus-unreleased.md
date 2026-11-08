@@ -2,6 +2,15 @@
 
 Upstream v0.15.6 → v0.16.1 has been merged.
 
+- Goal report check observations for Goals without approved verification
+  commands no longer depend on the model citing evidence. The Host matches each
+  check's command against the Bash runs of the Goal's own turns, and the last
+  run that finished decides, so a stale cited pass cannot outlive a later
+  failure. The detail text names the deciding tool call. Runs from earlier turns
+  of the session and Team expert sessions are not matched, and observations
+  remain a record that does not change whether a report can complete. Approved
+  command bindings, report files and the database schema are unchanged.
+
 - Selected upstream maintenance fixes preserve signed parent-session history
   and image/MCP tool results across parent/delegate resume, recover malformed tool
   calls on Continue, and separate retry backoff from stream-idle timeouts.

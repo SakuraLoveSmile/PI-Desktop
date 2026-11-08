@@ -901,7 +901,10 @@ Plan interruption fence. Previously blocked holds are not changed or replayed.
     existing transcript persistence queue for this session. A pending/failed
     barrier or a changed Host/turn prevents submission; a model-visible result
     is not assumed to be durable merely because the tool returned.
-    Honest non-met reports and unbound Goals retain their existing behavior.
+    Honest non-met reports and unbound Goals retain their existing submit
+    behavior. At finalization, an unbound Goal's check observations also match
+    each check's command against the execution's own Bash runs; see "Goal report
+    asset reads and check observations" in the IPC protocol.
     Finalized reports remain immutable; upgrading does not repair old reports.
   - `goalReports.finalizeReport` and report Retry require the Host's persisted execution state `completed`.
     Attempting to finalize/retry an execution that is `interrupted`, `queued`, `running`, or missing completion
