@@ -16,6 +16,15 @@ mod required_verification;
 #[path = "tests/native_evidence.rs"]
 mod native_evidence;
 
+#[path = "tests/observation_support.rs"]
+mod observation_support;
+
+#[path = "tests/reference_observations.rs"]
+mod reference_observations;
+
+#[path = "tests/command_match.rs"]
+mod command_match;
+
 fn create_test_db() -> (tempfile::TempDir, Database) {
     let dir = tempfile::tempdir().unwrap();
     let db_path = dir.path().join("pi.sqlite");
@@ -758,6 +767,10 @@ fn test_evidence_resolution_and_check_observations() {
     let session_id = "sess-ev";
     let execution_id = "exec-ev-1";
     seed_goal_execution(&db, session_id, execution_id);
+    // Check observations only read the turns the execution owns.
+    let turn = crate::sessions::begin_turn(&db, session_id, None, None).unwrap();
+    bind_execution_turn(&db, execution_id, &turn).unwrap();
+    crate::sessions::end_turn(&db, &turn, "completed", None, None, false).unwrap();
 
     // Insert a message in this session with seq = 5
     db.conn()
@@ -792,9 +805,9 @@ fn test_evidence_resolution_and_check_observations() {
     .unwrap();
     db.conn()
         .execute(
-            "INSERT INTO messages (id, session_id, seq, role, tool_name, created_at)
-             VALUES ('tool-recorded-1', 'sess-ev', 6, 'tool', 'Bash', 1001)",
-            params![],
+            "INSERT INTO messages (id, session_id, turn_id, seq, role, tool_name, created_at)
+             VALUES ('tool-recorded-1', 'sess-ev', ?1, 6, 'tool', 'Bash', 1001)",
+            params![turn],
         )
         .unwrap();
     db.conn()

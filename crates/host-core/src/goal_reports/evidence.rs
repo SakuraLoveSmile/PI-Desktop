@@ -1,12 +1,11 @@
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{
-    collections::{HashMap, HashSet},
-    path::Path,
-};
+use std::{collections::HashSet, path::Path};
 
-use crate::transcripts;
+use super::tool_index::{Lookup, RecordedOutcome, ToolCall, ToolRunIndex, TranscriptUnreadable};
+
+mod command_match;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -134,19 +133,9 @@ pub fn resolve_evidence_records(
     resolutions
 }
 
-/// Generates Host check observations from recorded command/check facts.
-pub fn generate_check_observations(
-    data_dir: &Path,
-    conn: &Connection,
-    session_id: &str,
-    durable_seq: i64,
-    draft: &Value,
-) -> Vec<GoalReportCheckObservation> {
-    generate_observations(data_dir, conn, session_id, durable_seq, draft, None)
-}
-
-/// Native proof for approval-bound checks is confined to this execution's
-/// current turn and retained resumed segments, never merely the same session.
+/// Native proof for approval-bound checks: only the Bash run the model cited
+/// counts, and only inside this execution's current turn and retained resumed
+/// segments, never merely the same session.
 pub(super) fn execution_check_observations(
     db: &crate::db::Database,
     session_id: &str,
@@ -154,6 +143,73 @@ pub(super) fn execution_check_observations(
     durable_seq: i64,
     draft: &Value,
 ) -> anyhow::Result<Vec<GoalReportCheckObservation>> {
+    observe(
+        db,
+        session_id,
+        execution_id,
+        durable_seq,
+        draft,
+        Matching::References,
+    )
+}
+
+/// Observations for Goals without an approval-bound command list. The cited
+/// evidence is a hint; the Host also finds the check's own command among this
+/// execution's Bash runs, and the last run that ended with a verdict decides.
+/// The result is recorded only and never gates completion.
+pub(super) fn unbound_check_observations(
+    db: &crate::db::Database,
+    session_id: &str,
+    execution_id: &str,
+    durable_seq: i64,
+    draft: &Value,
+) -> anyhow::Result<Vec<GoalReportCheckObservation>> {
+    observe(
+        db,
+        session_id,
+        execution_id,
+        durable_seq,
+        draft,
+        Matching::ReferencesThenCommand,
+    )
+}
+
+/// How a check may be settled from durable Bash runs.
+#[derive(Clone, Copy)]
+enum Matching {
+    /// Only the run that the check's evidence references point at.
+    References,
+    /// The cited run, then the last finished run of the check's own command.
+    ReferencesThenCommand,
+}
+
+fn observe(
+    db: &crate::db::Database,
+    session_id: &str,
+    execution_id: &str,
+    durable_seq: i64,
+    draft: &Value,
+    matching: Matching,
+) -> anyhow::Result<Vec<GoalReportCheckObservation>> {
+    let turns = execution_turns(db, session_id, execution_id)?;
+    Ok(generate_observations(
+        db.data_dir(),
+        db.conn(),
+        session_id,
+        durable_seq,
+        draft,
+        &turns,
+        matching,
+    ))
+}
+
+/// The turns an execution owns: the one its report is bound to and every
+/// resumed segment its hold retained.
+fn execution_turns(
+    db: &crate::db::Database,
+    session_id: &str,
+    execution_id: &str,
+) -> anyhow::Result<HashSet<String>> {
     let mut turns = HashSet::new();
     let current: Option<String> = db
         .conn()
@@ -170,14 +226,7 @@ pub(super) fn execution_check_observations(
     if let Some(hold) = crate::goal_holds::get_hold(db, session_id, execution_id)? {
         turns.extend(hold.segments.into_iter().map(|segment| segment.turn_id));
     }
-    Ok(generate_observations(
-        db.data_dir(),
-        db.conn(),
-        session_id,
-        durable_seq,
-        draft,
-        Some(&turns),
-    ))
+    Ok(turns)
 }
 
 fn generate_observations(
@@ -186,12 +235,21 @@ fn generate_observations(
     session_id: &str,
     durable_seq: i64,
     draft: &Value,
-    owning_turns: Option<&HashSet<String>>,
+    owning_turns: &HashSet<String>,
+    matching: Matching,
 ) -> Vec<GoalReportCheckObservation> {
     let mut observations = Vec::new();
     let Some(checks) = draft.get("checks").and_then(Value::as_array) else {
         return observations;
     };
+    let evidences = draft
+        .get("evidences")
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or_default();
+    // The transcript is read once, for the first check that names a command,
+    // and shared by every later check.
+    let mut index: Option<Result<ToolRunIndex, TranscriptUnreadable>> = None;
 
     for chk in checks {
         let Some(chk_id) = chk.get("id").and_then(Value::as_str) else {
@@ -212,16 +270,30 @@ fn generate_observations(
             })
             .unwrap_or_default();
 
-        let (result, exit_code, detail) = durable_check_result(
-            data_dir,
-            conn,
-            session_id,
-            durable_seq,
-            draft,
-            command.as_deref(),
-            &evidence_refs,
-            owning_turns,
-        );
+        let verdict = match command
+            .as_deref()
+            .filter(|command| !command.trim().is_empty())
+        {
+            None => Verdict::Inconclusive(Gap::NoCommand),
+            Some(command) => {
+                let index = index.get_or_insert_with(|| {
+                    ToolRunIndex::build(data_dir, conn, session_id, durable_seq, owning_turns)
+                });
+                match index {
+                    Ok(index) => {
+                        let cited = cited_run(index, evidences, command, &evidence_refs);
+                        match matching {
+                            Matching::References => cited.into_verdict(),
+                            Matching::ReferencesThenCommand => {
+                                command_match::settle(index, command, cited)
+                            }
+                        }
+                    }
+                    Err(TranscriptUnreadable) => Verdict::Inconclusive(Gap::Unreadable),
+                }
+            }
+        };
+        let (result, exit_code, detail) = verdict.into_parts();
 
         observations.push(GoalReportCheckObservation {
             check_id: chk_id.to_string(),
@@ -236,53 +308,98 @@ fn generate_observations(
     observations
 }
 
-fn durable_check_result(
-    data_dir: &Path,
-    conn: &Connection,
-    session_id: &str,
-    durable_seq: i64,
-    draft: &Value,
-    command: Option<&str>,
-    evidence_refs: &[String],
-    owning_turns: Option<&HashSet<String>>,
-) -> (String, Option<i64>, Option<String>) {
-    let Some(command) = command.filter(|command| !command.trim().is_empty()) else {
-        return (
-            "inconclusive".to_string(),
-            None,
-            Some(
-                "Check command is missing; durable command identity cannot be verified."
-                    .to_string(),
-            ),
-        );
-    };
-    let indexed_messages: HashMap<String, (Option<String>, bool)> = conn
-        .prepare_cached(
-            "SELECT id, turn_id, is_error FROM messages WHERE session_id = ?1 AND seq <= ?2 AND role = 'tool'",
-        )
-        .ok()
-        .and_then(|mut stmt| {
-            stmt.query_map(params![session_id, durable_seq], |row| {
-                Ok((row.get::<_, String>(0)?, (row.get::<_, Option<String>>(1)?, row.get::<_, bool>(2)?)))
-            })
-            .ok()
-            .map(|rows| rows.filter_map(Result::ok).collect())
-        })
-        .unwrap_or_default();
-    let Ok(records) = transcripts::read_transcript(data_dir, session_id) else {
-        return (
-            "inconclusive".to_string(),
-            None,
-            Some("Durable tool result could not be read from the session transcript.".to_string()),
-        );
-    };
+/// What the Host concluded about one check from durable facts.
+enum Verdict {
+    /// A durable Bash run of the check's command was found and judged.
+    Conclusive(Judgment),
+    Inconclusive(Gap),
+}
 
-    for evidence in draft
-        .get("evidences")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-    {
+/// How a Bash run ended, as far as the durable record shows.
+struct Judgment {
+    result: &'static str,
+    exit_code: Option<i64>,
+    detail: String,
+}
+
+impl Judgment {
+    fn new(result: &'static str, exit_code: Option<i64>, detail: impl Into<String>) -> Self {
+        Self {
+            result,
+            exit_code,
+            detail: detail.into(),
+        }
+    }
+
+    /// `None` when the record shows neither an error, an exit code nor a
+    /// successful completion.
+    fn of(outcome: &RecordedOutcome) -> Option<Self> {
+        if outcome.is_error {
+            return Some(Self::new(
+                "failed",
+                outcome.exit_code,
+                "Durable tool result recorded an error.",
+            ));
+        }
+        if let Some(code) = outcome.exit_code {
+            return Some(if code == 0 {
+                let detail = "Command exit code was recorded by the durable tool result.";
+                Self::new("passed", Some(code), detail)
+            } else {
+                let detail =
+                    format!("Command exit code {code} was recorded by the durable tool result.");
+                Self::new("failed", Some(code), detail)
+            });
+        }
+        outcome.succeeded.then(|| {
+            let detail = "Durable tool result recorded successful completion.";
+            Self::new("passed", None, detail)
+        })
+    }
+}
+
+/// A Bash run of the check's command that ended with a verdict.
+struct Judged<'a> {
+    call: ToolCall<'a>,
+    judgment: Judgment,
+}
+
+impl<'a> Judged<'a> {
+    fn of(call: ToolCall<'a>) -> Option<Self> {
+        let judgment = Judgment::of(&call.outcome()?)?;
+        Some(Self { call, judgment })
+    }
+}
+
+/// Where the evidence references of one check led.
+enum Cited<'a> {
+    Run(Judged<'a>),
+    /// A reference names several durable messages, so none can be trusted.
+    Ambiguous,
+    /// No reference led to a judged Bash run of the check's command.
+    Nothing,
+}
+
+impl Cited<'_> {
+    /// The verdict when only references may settle the check.
+    fn into_verdict(self) -> Verdict {
+        match self {
+            Cited::Run(run) => Verdict::Conclusive(run.judgment),
+            Cited::Ambiguous => Verdict::Inconclusive(Gap::Ambiguous),
+            Cited::Nothing => Verdict::Inconclusive(Gap::NoMatch),
+        }
+    }
+}
+
+/// Follows the check's evidence references to a Bash run of its command. The
+/// first evidence in the draft that yields a verdict decides.
+fn cited_run<'a>(
+    index: &'a ToolRunIndex,
+    evidences: &[Value],
+    command: &str,
+    evidence_refs: &[String],
+) -> Cited<'a> {
+    for evidence in evidences {
         let Some(evidence_id) = evidence.get("id").and_then(Value::as_str) else {
             continue;
         };
@@ -294,112 +411,63 @@ fn durable_check_result(
         let Some(ref_id) = evidence.get("refId").and_then(Value::as_str) else {
             continue;
         };
-        let mut matches = records.iter().filter_map(|record| {
-            let (turn, _) = indexed_messages.get(&record.id)?;
-            if record.role != "tool" {
-                return None;
-            }
-            if owning_turns
-                .is_some_and(|turns| !turn.as_ref().is_some_and(|turn| turns.contains(turn)))
-            {
-                return None;
-            }
-            record
-                .blocks
-                .as_array()
-                .into_iter()
-                .flatten()
-                .find(|block| {
-                    block.get("type").and_then(Value::as_str) == Some("tool_call")
-                        && (block.get("callId").and_then(Value::as_str) == Some(ref_id)
-                            || record.id == ref_id)
-                })
-                .map(|block| (record, block))
-        });
-        let Some((record, block)) = matches.next() else {
-            continue;
+        let call = match index.lookup(ref_id) {
+            Lookup::Missing => continue,
+            Lookup::Ambiguous => return Cited::Ambiguous,
+            Lookup::Unique(call) => call,
         };
-        if matches.next().is_some() {
-            return (
-                "inconclusive".to_string(), None,
-                Some("Tool evidence identity matches multiple durable results in this execution; use a unique durable message ID.".to_string()),
-            );
-        }
-        if block.get("name").and_then(Value::as_str) != Some("Bash")
-            || record.tool_name.as_deref() != Some("Bash")
-            || block
-                .get("args")
-                .and_then(|args| args.get("command"))
-                .and_then(Value::as_str)
-                != Some(command)
-        {
+        if !call.is_bash() || call.command() != Some(command) {
             continue;
         }
-        let Some(tool_result) = block.get("result") else {
-            continue;
-        };
-        // AgentToolResult stores native Bash facts in details. Older records
-        // contain the bare Host result. Never parse the model-visible text.
-        let native = if tool_result.get("content").is_some() {
-            tool_result.get("details").filter(|value| value.is_object())
-        } else {
-            Some(tool_result)
-        };
-        let exit_code = native
-            .and_then(|value| value.get("exitCode"))
-            .and_then(Value::as_i64);
-        let is_error = record.is_error
-            || indexed_messages
-                .get(&record.id)
-                .is_some_and(|(_, error)| *error)
-            || tool_result
-                .get("isError")
-                .and_then(Value::as_bool)
-                .unwrap_or(false)
-            || block
-                .get("isError")
-                .and_then(Value::as_bool)
-                .unwrap_or(false)
-            || block
-                .get("status")
-                .and_then(Value::as_str)
-                .is_some_and(|status| matches!(status, "error" | "failed"));
-        if is_error {
-            return (
-                "failed".to_string(),
-                exit_code,
-                Some("Durable tool result recorded an error.".to_string()),
-            );
-        }
-        if let Some(code) = exit_code {
-            return if code == 0 {
-                (
-                    "passed".to_string(),
-                    Some(code),
-                    Some("Command exit code was recorded by the durable tool result.".to_string()),
-                )
-            } else {
-                (
-                    "failed".to_string(),
-                    Some(code),
-                    Some(format!(
-                        "Command exit code {code} was recorded by the durable tool result."
-                    )),
-                )
-            };
-        }
-        if block.get("status").and_then(Value::as_str) == Some("success") {
-            return (
-                "passed".to_string(),
-                None,
-                Some("Durable tool result recorded successful completion.".to_string()),
-            );
+        if let Some(run) = Judged::of(call) {
+            return Cited::Run(run);
         }
     }
+    Cited::Nothing
+}
 
-    (
-        "inconclusive".to_string(),
-        None,
-        Some("No durable tool result matched the check evidence.".to_string()),
-    )
+/// Why a check stays inconclusive.
+enum Gap {
+    NoCommand,
+    Unreadable,
+    Ambiguous,
+    /// Only references may settle the check and none led to a judged run.
+    NoMatch,
+    /// The check's command never ran in this execution.
+    NoRun,
+    /// The command ran this many times and no run recorded how it ended.
+    NoFinishedRun(usize),
+}
+
+impl Gap {
+    fn detail(&self) -> String {
+        match self {
+            Gap::NoCommand => {
+                "Check command is missing; durable command identity cannot be verified.".to_string()
+            }
+            Gap::Unreadable => {
+                "Durable tool result could not be read from the session transcript.".to_string()
+            }
+            Gap::Ambiguous => "Tool evidence identity matches multiple durable results in this execution; use a unique durable message ID.".to_string(),
+            Gap::NoMatch => "No durable tool result matched the check evidence.".to_string(),
+            Gap::NoRun => {
+                "No durable Bash run of the check command was found in this execution.".to_string()
+            }
+            Gap::NoFinishedRun(1) => "The durable Bash run of the check command in this execution did not record how it ended.".to_string(),
+            Gap::NoFinishedRun(runs) => format!("None of the {runs} durable Bash runs of the check command in this execution recorded how it ended."),
+        }
+    }
+}
+
+impl Verdict {
+    fn into_parts(self) -> (String, Option<i64>, Option<String>) {
+        match self {
+            Verdict::Conclusive(judgment) => (
+                judgment.result.to_string(),
+                judgment.exit_code,
+                Some(judgment.detail),
+            ),
+            Verdict::Inconclusive(gap) => ("inconclusive".to_string(), None, Some(gap.detail())),
+        }
+    }
 }

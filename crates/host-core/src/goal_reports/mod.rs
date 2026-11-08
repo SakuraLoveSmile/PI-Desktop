@@ -22,6 +22,7 @@ pub mod assets;
 pub mod evidence;
 mod progress;
 mod read;
+mod tool_index;
 mod validation;
 
 use validation::validate_structured_draft;
@@ -659,13 +660,13 @@ pub(crate) fn finalize_with_closure(
                     &draft,
                 )?
             } else {
-                evidence::generate_check_observations(
-                    db.data_dir(),
-                    db.conn(),
+                evidence::unbound_check_observations(
+                    db,
                     &facts.session_id,
+                    execution_id,
                     durable_seq,
                     &draft,
-                )
+                )?
             };
 
             let mut limitations: Vec<Value> = draft

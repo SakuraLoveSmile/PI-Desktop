@@ -2728,11 +2728,30 @@ attachment references do not grant filesystem access. Unsupported or oversized
 images remain unavailable, and reads are bounded before loading bytes. The
 response carries MIME type, total bytes, hash, offset, base64 data and EOF.
 
-Check observations use persisted tool results from the same session up to the
-report's durable sequence. A model-supplied exit code is only a claim; missing
-or unverifiable references produce `inconclusive`, and a recorded failure must
-not be overwritten by a claimed success. These additive report fields do not
-change the database schema or grant renderer filesystem access.
+Check observations use persisted Bash results from the execution's own turns
+(the bound turn plus retained resumed segments) up to the report's durable
+sequence; results of other turns of the same session never count. A
+model-supplied exit code is only a claim, and a recorded failure must not be
+overwritten by a claimed success. A check that no durable run settles, a check
+without a command and every check while the transcript cannot be read produce
+`inconclusive`.
+
+- Goals bound to approved verification commands observe only the Bash result
+  that a check's evidence reference names, the same proof submit validation
+  demands; a missing, ambiguous or unverifiable reference leaves the check
+  `inconclusive`.
+- Goals without approved commands also look up the check's own command among
+  the execution's Bash runs; leading and trailing whitespace is ignored. The
+  last run that ended with a verdict (an error flag, an integer exit code or a
+  success status) decides, even when the check cites an earlier run with the
+  opposite result, and `detail` names the deciding tool call and any cited call
+  it replaced. A command that never ran, or whose runs never recorded how they
+  ended, stays `inconclusive`. Commands run by Team expert sessions are not in
+  the Lead's turns and are not matched. These observations are recorded for the
+  reader; they do not change whether a `met` report can complete.
+
+These additive report fields do not change the database schema or grant
+renderer filesystem access.
 
 
 ### Expert Team launch approval

@@ -9469,10 +9469,15 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **Steps:** Publish a report with a valid owned screenshot and read its chunks;
   try absolute, parent-traversal, symlink and another-session references. Submit
   a claimed zero exit code without durable evidence and against a recorded
-  nonzero tool result.
+  nonzero tool result. In an execution without approved verification commands,
+  submit a check that cites no evidence for a command the execution ran, one for
+  a command it never ran, and one for a command run again after the cited run.
 - **Expected:** Valid chunks reconstruct the published hash. Unsafe sources and
   cross-session reads are unavailable. Model claims never become Host-verified
   success; absent evidence is inconclusive and recorded failures stay failed.
+  Without approved commands, a check whose command ran in this execution is
+  observed from its last finished run, which replaces a cited earlier run, while
+  commands that never ran or ran only in another turn stay inconclusive.
 - **Automation:** `cargo test -p host-core --locked goal_reports` and
   `node scripts/e2e-goal-report-ui.mjs` (Host transport, not visual QA).
 
