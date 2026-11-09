@@ -44,7 +44,8 @@ export type ShutdownDependencies = {
   mcpOAuth?: Pick<McpOAuthManager, "disposeAll">;
   browserHost: Pick<BrowserHost, "dispose">;
   pluginViews: Pick<PluginViewHost, "dispose">;
-  updater: Pick<AppUpdaterController, "dispose" | "isInstallingUpdate">;
+  updater: Pick<AppUpdaterController, "dispose" | "isInstallingUpdate"> &
+    Partial<Pick<AppUpdaterController, "commitPendingInstall">>;
   logger: Pick<Logger, "app">;
   confirmQuitDialog: () => Promise<boolean>;
   disposePowerSaveBlockers: () => void;
@@ -194,6 +195,15 @@ export function registerShutdownHandlers({
         mcpShutdown,
         remoteHostsShutdown,
       ]);
+      // The assisted macOS install waits for this commit. It is written last,
+      // after the sidecar and host-core have stopped and immediately before Main
+      // exits, so the helper never swaps a bundle that still has live processes;
+      // a quit that fails earlier leaves no commit and the helper does nothing.
+      try {
+        await updater.commitPendingInstall?.();
+      } catch (error) {
+        logger.app("lifecycle", "warn", "update commit failed", { data: String(error) });
+      }
     })();
 
     const releaseQuit = () => {

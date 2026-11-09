@@ -40,11 +40,26 @@ export type UpdatePreference = "automatic" | "manual";
 
 /**
  * Effective update delivery on this install:
- *  - in-app: electron-updater downloads and installs
+ *  - in-app: the app downloads and installs (electron-updater, or the assisted
+ *    lane when `UpdateState.delivery` is `assisted`)
  *  - manual: detect versions and link to the releases page
  *  - disabled: development / unpackaged build
  */
 export type UpdateMode = "in-app" | "manual" | "disabled";
+
+/**
+ * Who performs an in-app install when it is not the platform updater:
+ * `assisted` is PI-Desktop's own installer for ad-hoc signed macOS builds
+ * (ADR plus-assisted-macos-adhoc-update).
+ */
+export type UpdateDelivery = "assisted";
+
+/** Why an ad-hoc macOS install cannot update itself in place; the user can fix each. */
+export type AssistedUpdateBlockedReason =
+  | "translocated"
+  | "read-only"
+  | "not-writable"
+  | "symlink";
 
 export type UpdateStatus =
   | "idle"
@@ -83,6 +98,12 @@ export type UpdateState = {
    * dismissed across restarts until a newer version is detected (#1317).
    */
   dismissed?: boolean;
+  /** `assisted` when this install updates through the assisted macOS lane. */
+  delivery?: UpdateDelivery;
+  /** Set on an ad-hoc macOS install the assisted lane cannot serve, with the reason. */
+  assistedBlockedReason?: AssistedUpdateBlockedReason;
+  /** True when an earlier in-place install of `availableVersion` failed. */
+  assistedInstallFailed?: boolean;
   releasesUrl: string;
 };
 
