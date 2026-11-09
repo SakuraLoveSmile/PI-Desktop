@@ -1,20 +1,26 @@
 # PI-GOAL-1108: Host checks Goal report commands without model-supplied references
 
-- Project: `fork-pi-desktop`; task ID: `PI-GOAL-1108`; tier: T1; status: 实现中
-  (S1 committed as `13e2cfd10`; S2 committed directly above it; nothing
-  pushed; S3 deferred).
+- Project: `fork-pi-desktop`; task ID: `PI-GOAL-1108`; tier: T1; status: 待体验
+  (S1 and S2 merged in PR #77 and published in v0.15.13; user acceptance
+  pending; S3 deferred).
 - Created: 2026-11-08 (Asia/Taipei).
 - Authoritative record: this file. Linked evidence only supplements it.
 - Goal / authorization: the user reviewed the Goal report feature, chose
   optimization 1 ("Host automatic checking"), accepted the default decisions
   D1–D4 below and told the executor to start the work on 2026-11-08. The user
-  authorized the S1 and S2 commits on 2026-11-08 and said a release can be
-  authorized as well; no push, merge or release is authorized yet.
+  authorized the S1 and S2 commits, then the push and the PR, then on
+  2026-11-08 the merge and the release ("请你合并并发布"); the release was
+  published on 2026-11-09 under `PI-REL-01513`.
 - Baseline: `4eb94398bea606ce140c9f45d9fe5fe46b25a909` (`origin/main`).
-- Branch: `feat/20261108-pi-goal-1108-check-observation`.
-- Worktree: `/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop/20261108-feat-pi-goal-1108-check-observation`.
-- PR: none.
-- Target: remote `main`, not authorized yet.
+- Branch: `feat/20261108-pi-goal-1108-check-observation` (merged; the local
+  branch is deleted, the remote branch is kept).
+- Worktree: `/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop/20261108-feat-pi-goal-1108-check-observation`
+  (removed after the merge).
+- PR: [#77](https://github.com/SakuraLoveSmile/PI-Desktop/pull/77), merged as
+  `e758c88d918ebc80a82b23f56c031ab9f5f54dc3` on 2026-11-08T14:57:49Z.
+- Release: [v0.15.13](https://github.com/SakuraLoveSmile/PI-Desktop/releases/tag/v0.15.13),
+  published 2026-11-09T04:14:00Z (task `PI-REL-01513`).
+- Target: remote `main` (landed).
 
 ## Problem statement
 
@@ -103,7 +109,7 @@ Two further weaknesses sit in the same code:
 | --- | --- | --- | --- | --- |
 | S1a | `goal_reports/tests/reference_observations.rs` | pins the old lookup (exit codes, error flags, call id or message id, ambiguity, boundaries, unreadable transcript) on the unmodified code | 5 tests green on the old code | 完成 |
 | S1b | `goal_reports/tool_index.rs`, `evidence.rs`, `mod.rs` (one line) | same tests green unchanged; N checks, one read; public signatures unchanged | 6 tests green; 12 of 12 mutations caught; commit `13e2cfd10` | 完成 |
-| S2 | `evidence.rs`, `evidence/command_match.rs`, `tool_index.rs`, `mod.rs` call site, tests, specs and zh-CN mirrors, E2E script and scenario doc, scenario index, changelog | scenarios 1–5 above | implemented, verified locally and committed; see the validation record | 完成 |
+| S2 | `evidence.rs`, `evidence/command_match.rs`, `tool_index.rs`, `mod.rs` call site, tests, specs and zh-CN mirrors, E2E script and scenario doc, scenario index, changelog | scenarios 1–5 above | implemented, verified locally, committed and merged in PR #77; see the validation record | 完成 |
 | S3 | `runtime.ts` hint | decided from real hit rates | deferred | 未开始 |
 
 S1 design notes:
@@ -174,14 +180,22 @@ S2 design notes:
 | 2026-11-08 | S2 working tree | same | `node scripts/check-test-quality.mjs` | PASS: exit 0; baseline untouched |
 | 2026-11-08 | S2 working tree, host binary built in this worktree | same, `PI_DESKTOP_HOST_BIN` pinned to `target/debug/pi-desktop-host-core`; `packages/shared/dist/ndjson.js` transpiled locally from the tracked source (gitignored, local-only shim) | `node scripts/e2e-goal-report-ui.mjs` | PASS: 2 of 2, including the new chk-3, chk-4 and chk-5 assertions |
 | 2026-11-08 | S2 working tree with the unbound entry point forced to references only | same | the same E2E after a rebuild | red as intended: `E2E-GOAL-UI-001` fails on chk-3 with the old "No durable tool result matched the check evidence." text; restored source and rebuilt binary: PASS 2 of 2 |
+| 2026-11-08 | `064813150` (PR #77 head) | GitHub-hosted, manual `workflow_dispatch` on the PR head (Actions was disabled when the PR opened, so no `pull_request` run fired) | `ci.yml` [run 42491215756](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/42491215756) | PASS: all three jobs (JS build / typecheck / lint / architecture / test; isolated smoke; Rust host-core format / lint / test) |
+| 2026-11-08 | `064813150` | GitHub-hosted, manual dispatch | `docs-check.yml` [run 42492198737](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/42492198737) | PASS |
+| 2026-11-08 | `064813150` against base `4eb94398b` | local worktree | `node scripts/check-pr-base-main.mjs` (`pr-base.yml` runs on `pull_request` only) | PASS (the script and its 3 unit tests); the hosted `pr-base.yml` run is NOT RUN |
+| 2026-11-08 | PR #77 | GitHub | `gh pr merge 77 --merge --match-head-commit 064813150...` | Merged as `e758c88d9` at 14:57:49Z; remote `main` was still `4eb94398b`, so the merged tree equals the tested head tree |
+| 2026-11-09 | `f9cbc4b37` (contains this change) | GitHub-hosted | PR #78's five checks and the `v0.15.13` tag run [42559184767](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/42559184767), which reuses `ci.yml` | PASS (see `PI-REL-01513`) |
 
 NOT RUN, with the reason:
 
 - Electron and visual UI E2E (`verify:ui:*`): the renderer is unchanged and
   those suites run only on explicit request.
-- Hosted CI and any real provider or model run: not authorized. The hit rate of
-  the command match on real model runs is therefore unmeasured, and S3 depends
-  on it.
+- Hosted `pull_request` runs for PR #77: they never fired because GitHub
+  Actions was disabled when the PR opened. The manual dispatches above replaced
+  `ci.yml` and `docs-check.yml`; the hosted `pr-base.yml` run did not happen
+  (its script ran locally).
+- Any real provider or model run: not authorized. The hit rate of the command
+  match on real model runs is therefore unmeasured, and S3 depends on it.
 - The `pnpm` wrappers (`pnpm docs:check`, `pnpm docs:scenarios`,
   `pnpm check:test-quality`): pnpm is not run inside this worktree. The
   underlying `node` scripts ran instead, with module lookup pointed read-only at
@@ -190,20 +204,27 @@ NOT RUN, with the reason:
 ## Commit and integration
 
 - S1: `13e2cfd10` `refactor(host-core): index tool messages once per Goal report
-  pass`, authorized by the user on 2026-11-08. Local only.
-- S2: `feat(goal): match unbound check commands to the Goal's Bash runs`, the
-  commit directly above S1, with the `Task: PI-GOAL-1108` trailer; authorized by
-  the user on 2026-11-08. It carries code, tests, specs, the E2E script, the
-  scenario index and the changelog together. Local only.
-- Nothing is pushed, merged or released.
+  pass`, authorized by the user on 2026-11-08.
+- S2: `064813150` `feat(goal): match unbound check commands to the Goal's Bash
+  runs`, the commit directly above S1, with the `Task: PI-GOAL-1108` trailer;
+  authorized by the user on 2026-11-08. It carries code, tests, specs, the E2E
+  script, the scenario index and the changelog together.
+- Both landed in PR #77, merged as `e758c88d9` (2026-11-08) and published in
+  `v0.15.13` (2026-11-09, `PI-REL-01513`). The remote branch is kept.
 
 ## Delivery and recovery
 
-- Resume: open the worktree above, run `git status --short`, then read this
-  record; old passing results are not current evidence.
-- Rollback: S1 and S2 are self-contained commits; revert them in reverse order.
-  S2 changes no schema, RPC shape, TypeScript type or stored report format, so
+- Entry point: the Goal report observations in the 0.15.13 release; see
+  `PI-REL-01513` for the published assets.
+- Resume: the worktree was removed after the merge. Start a new branch from
+  `origin/main` for S3 or any follow-up, and read this record first; old
+  passing results are not current evidence.
+- Rollback: S1 and S2 are self-contained commits; revert them in reverse order
+  on a new branch from `main` (a shipped change needs a new release). S2
+  changes no schema, RPC shape, TypeScript type or stored report format, so
   reports finalized under S2 stay readable by S1 and the baseline.
-- Runtime resources: none left running. The worktree target directory is a
-  normal Cargo build directory, and `packages/shared/dist/ndjson.js` is an
-  ignored local E2E shim that can be deleted.
+- User confirmation: none yet; acceptance remains pending explicit user
+  confirmation (已验收). Whether the command match hits on real model runs is
+  unmeasured.
+- Runtime resources: none left running. The worktree, its Cargo target
+  directory and the ignored local E2E shim were removed with it.
