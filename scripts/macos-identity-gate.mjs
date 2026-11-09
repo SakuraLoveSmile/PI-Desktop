@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * electron-builder `afterPack` gate: refuse to continue with a candidate whose
- * macOS identity is not independent, or that is missing its host sidecar.
+ * macOS identity is not independent, or that is missing its host sidecar or its
+ * update helper.
  *
  * Why before signing
  * ------------------
@@ -20,7 +21,10 @@
  *   3. the host sidecar really is inside the bundle. electron-builder only prints
  *      `file source doesn't exist` when an `extraResources` source is missing and
  *      then finishes successfully, which shipped a `host unavailable` build once
- *      already; a package without it is not a working product.
+ *      already; a package without it is not a working product;
+ *   4. the update helper of the assisted in-app update (PI-UPD-1109) is inside
+ *      the bundle for the same reason: without it an ad-hoc install could
+ *      download an update and never install it.
  *
  * The signature check is intentionally not part of this gate: signing happens
  * *after* this hook, so a pre-sign candidate is legitimately unsigned. The
@@ -42,6 +46,7 @@ import {
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const sidecarRelativePath = join("Contents", "Resources", "bin", "pi-desktop-host-core");
+const updateHelperRelativePath = join("Contents", "Resources", "bin", "pi-desktop-update-helper");
 
 /** Checks that a pre-sign candidate cannot satisfy yet, with the reason why. */
 const DEFERRED_TO_SIGNING = new Set(["code-signature"]);
@@ -77,6 +82,16 @@ export default async function macosIdentityGate(context) {
       `macOS identity gate: the host sidecar is missing from the bundle (${sidecarRelativePath}). ` +
         "electron-builder only warns when an extraResources source does not exist, so this build would " +
         "ship a 'host unavailable' application. Build the Rust sidecar (pnpm run build:host-release) first.",
+    );
+  }
+
+  const helperPath = join(bundlePath, updateHelperRelativePath);
+  if (!existsSync(helperPath) || statSync(helperPath).size === 0) {
+    throw new Error(
+      `macOS identity gate: the update helper is missing from the bundle (${updateHelperRelativePath}). ` +
+        "electron-builder only warns when an extraResources source does not exist, so this build would " +
+        "ship an app whose in-app update cannot install. Build the helper " +
+        "(pnpm run build:update-helper-release) first.",
     );
   }
 
@@ -125,6 +140,6 @@ export default async function macosIdentityGate(context) {
     .join(" ");
   console.log(
     `[identity-gate] candidate ${productFilename}.app main executable UUID ${candidateUuid} ` +
-      `is independent of ${sourceUuids}; host sidecar present.`,
+      `is independent of ${sourceUuids}; host sidecar and update helper present.`,
   );
 }

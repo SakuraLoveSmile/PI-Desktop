@@ -141,7 +141,7 @@ jobs:
       - name: Prepare package inputs
         run: |
           set -euo pipefail
-          cargo build --release --locked -p host-core &
+          cargo build --release --locked -p host-core -p update-helper &
           host_build_pid=$!
           trap 'kill "$host_build_pid" 2>/dev/null || true' EXIT
 
@@ -151,6 +151,18 @@ jobs:
 
           wait "$host_build_pid"
           trap - EXIT
+
+      - name: Test the macOS update helper
+        # The ad-hoc in-app update replaces the running app with a helper that
+        # ships in the bundle (ADR plus-assisted-macos-adhoc-update). These
+        # tests drive the real macOS tools and the helper binary this job just
+        # built, on the architecture that ships, before anything is packaged.
+        if: matrix.platform == 'macos'
+        run: |
+          set -euo pipefail
+          cargo test --locked -p update-helper
+          PI_UPDATE_HELPER_BIN="$PWD/target/release/pi-desktop-update-helper" \
+            node --test apps/desktop/test/assisted-update-macos.test.mjs
 
       - name: Package unsigned macOS installer
         if: matrix.platform == 'macos' && env.MACOS_SIGN_RELEASE != 'true'

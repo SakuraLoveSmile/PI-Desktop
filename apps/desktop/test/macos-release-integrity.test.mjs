@@ -9,6 +9,7 @@ import test from "node:test";
 const script = fileURLToPath(new URL("../../../scripts/verify-macos-release.sh", import.meta.url));
 const product = "Pi-Desktop-Plus.app";
 const host = "Contents/Resources/bin/pi-desktop-host-core";
+const helper = "Contents/Resources/bin/pi-desktop-update-helper";
 
 async function fixture(t, { nativeCodesign = false } = {}) {
   const root = await mkdtemp(join(tmpdir(), "pi-release-integrity-"));
@@ -21,6 +22,7 @@ async function fixture(t, { nativeCodesign = false } = {}) {
   await mkdir(join(app, "Contents/_CodeSignature"));
   await mkdir(bin);
   await writeFile(join(app, host), "fixture");
+  await writeFile(join(app, helper), "fixture");
   await writeFile(join(app, "Contents/_CodeSignature/CodeResources"), "fixture seal");
   await writeFile(join(release, "Pi-Desktop-Plus-arm64.dmg"), "fixture DMG");
   await writeFile(join(release, "Pi-Desktop-Plus-arm64-mac.zip"), "fixture ZIP");
@@ -34,7 +36,7 @@ fs.appendFileSync(process.env.PI_COMMAND_LOG, JSON.stringify({ command: path.bas
     codesign: `
 const target = args.at(-1);
 const stage = target.includes('/zip/') ? 'zip' : target.includes('/dmg/') ? 'dmg' : 'loose';
-const kind = target.endsWith('pi-desktop-host-core') ? 'host' : 'app';
+const kind = target.endsWith('pi-desktop-host-core') ? 'host' : target.endsWith('pi-desktop-update-helper') ? 'helper' : 'app';
 if (process.env.PI_FAIL_SIGNATURE === stage + ':' + kind) {
   console.error('invalid signature: ' + target);
   process.exit(41);
@@ -80,16 +82,17 @@ if (args[0] === 'attach') {
   return { root, release, app, run, calls };
 }
 
-test("integrity-only verifies the loose, ZIP and read-only DMG apps and their Hosts without Apple credentials", async t => {
+test("integrity-only verifies the loose, ZIP and read-only DMG apps, their Hosts and update helpers without Apple credentials", async t => {
   const f = await fixture(t);
   const result = f.run();
   assert.equal(result.status, 0, result.stdout + result.stderr);
   const calls = await f.calls();
   const signatures = calls.filter(call => call.command === "codesign");
-  assert.equal(signatures.length, 6);
-  for (let i = 0; i < signatures.length; i += 2) {
+  assert.equal(signatures.length, 9);
+  for (let i = 0; i < signatures.length; i += 3) {
     assert.deepEqual(signatures[i].args.slice(0, -1), ["--verify", "--deep", "--strict", "--verbose=2"]);
     assert.deepEqual(signatures[i + 1].args, ["--verify", "--strict", "--verbose=2", join(signatures[i].args.at(-1), host)]);
+    assert.deepEqual(signatures[i + 2].args, ["--verify", "--strict", "--verbose=2", join(signatures[i].args.at(-1), helper)]);
   }
   assert.equal(signatures[0].args.at(-1), f.app);
   const archive = calls.find(call => call.command === "ditto");
@@ -101,9 +104,9 @@ test("integrity-only verifies the loose, ZIP and read-only DMG apps and their Ho
   assert(calls.every(call => !["spctl", "xcrun"].includes(call.command)));
 });
 
-test("any app or Host signature failure blocks integrity verification and detaches a mounted DMG", async t => {
+test("any app, Host or update helper signature failure blocks integrity verification and detaches a mounted DMG", async t => {
   for (const stage of ["loose", "zip", "dmg"]) {
-    for (const kind of ["app", "host"]) {
+    for (const kind of ["app", "host", "helper"]) {
       await t.test(`${stage}:${kind}`, async t => {
         const f = await fixture(t);
         const result = f.run({ PI_FAIL_SIGNATURE: `${stage}:${kind}` });
@@ -128,15 +131,19 @@ test("missing resource seals are rejected in every distributed app", async t => 
   }
 });
 
-test("missing Host or distribution assets fail closed", async t => {
-  for (const missing of [host, "dmg", "zip"]) {
+test("missing Host, update helper or distribution assets fail closed", async t => {
+  for (const missing of [host, helper, "dmg", "zip"]) {
     await t.test(missing, async t => {
       const f = await fixture(t);
-      await rm(missing === host ? join(f.app, host) : join(f.release,
+      const inBundle = missing === host || missing === helper;
+      await rm(inBundle ? join(f.app, missing) : join(f.release,
         missing === "dmg" ? "Pi-Desktop-Plus-arm64.dmg" : "Pi-Desktop-Plus-arm64-mac.zip"));
       const result = f.run();
       assert.equal(result.status, 1, result.stdout + result.stderr);
-      assert.match(result.stderr, missing === host ? /missing host-core/ : /expected exactly one/);
+      assert.match(
+        result.stderr,
+        missing === host ? /missing host-core/ : missing === helper ? /missing update helper/ : /expected exactly one/,
+      );
     });
   }
 });
@@ -158,6 +165,7 @@ test("native codesign accepts a sealed fixture and rejects resource tampering", 
   await mkdir(join(f.app, "Contents/MacOS"));
   await copyFile("/usr/bin/true", join(f.app, "Contents/MacOS/fixture"));
   await copyFile("/usr/bin/true", join(f.app, host));
+  await copyFile("/usr/bin/true", join(f.app, helper));
   await writeFile(join(f.app, "Contents/Info.plist"), `<?xml version="1.0" encoding="UTF-8"?>
 <plist version="1.0"><dict>
 <key>CFBundleIdentifier</key><string>test.pi.release-integrity</string>
@@ -167,7 +175,7 @@ test("native codesign accepts a sealed fixture and rejects resource tampering", 
 </dict></plist>`);
   const resource = join(f.app, "Contents/Resources/sealed.txt");
   await writeFile(resource, "original");
-  for (const target of [join(f.app, host), f.app]) {
+  for (const target of [join(f.app, host), join(f.app, helper), f.app]) {
     const signed = spawnSync("/usr/bin/codesign", ["--force", "--sign", "-", "--timestamp=none", "--options", "runtime", target], { encoding: "utf8" });
     assert.equal(signed.status, 0, signed.stderr);
   }

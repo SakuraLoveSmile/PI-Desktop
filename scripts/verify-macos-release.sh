@@ -8,6 +8,7 @@ PRODUCT_NAME="Pi-Desktop-Plus"
 verify_bundle_integrity() {
   local app="$1"
   local host_core="$app/Contents/Resources/bin/pi-desktop-host-core"
+  local update_helper="$app/Contents/Resources/bin/pi-desktop-update-helper"
   if [[ ! -d "$app" || ! -f "$app/Contents/_CodeSignature/CodeResources" ]]; then
     echo "error: missing app resource seal: $app" >&2
     return 1
@@ -16,9 +17,14 @@ verify_bundle_integrity() {
     echo "error: missing host-core sidecar at $host_core" >&2
     return 1
   fi
-  echo "==> Verifying bundle and host-core integrity: $app"
+  if [[ ! -f "$update_helper" ]]; then
+    echo "error: missing update helper at $update_helper" >&2
+    return 1
+  fi
+  echo "==> Verifying bundle, host-core and update helper integrity: $app"
   codesign --verify --deep --strict --verbose=2 "$app"
   codesign --verify --strict --verbose=2 "$host_core"
+  codesign --verify --strict --verbose=2 "$update_helper"
 }
 
 if [[ "${1:-}" == "--integrity-only" ]]; then
@@ -111,6 +117,7 @@ fi
 APP="${APPS[0]}"
 DMG="${DMGS[0]}"
 HOST_CORE="$APP/Contents/Resources/bin/pi-desktop-host-core"
+UPDATE_HELPER="$APP/Contents/Resources/bin/pi-desktop-update-helper"
 
 echo "==> Inspecting Developer ID signature: $APP"
 SIGNATURE_INFO="$(codesign -dv --verbose=4 "$APP" 2>&1)"
@@ -135,6 +142,14 @@ if [[ -f "$HOST_CORE" ]]; then
   codesign --verify --strict --verbose=2 "$HOST_CORE"
 else
   echo "error: missing host-core sidecar at $HOST_CORE" >&2
+  exit 1
+fi
+
+if [[ -f "$UPDATE_HELPER" ]]; then
+  echo "==> Verifying update helper signature: $UPDATE_HELPER"
+  codesign --verify --strict --verbose=2 "$UPDATE_HELPER"
+else
+  echo "error: missing update helper at $UPDATE_HELPER" >&2
   exit 1
 fi
 

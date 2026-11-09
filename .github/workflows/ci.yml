@@ -125,4 +125,4 @@ jobs:
         run: cargo clippy --workspace --all-targets --all-features
 
       - name: Test
-        run: cargo test -p host-core --locked
+        run: cargo test -p host-core -p update-helper --locked
