@@ -18,9 +18,11 @@ const shownManualReminderVersions = new Set<string>();
 export function UpdateBanner() {
   const { t } = useTranslation();
   const update = useUpdateState();
+  // A failed in-place install is announced once per version like a manual
+  // reminder, but offers a retry only while the install can still be retried.
   const manualReminderVersion =
     update?.status === "available" &&
-    update.mode === "manual" &&
+    (update.mode === "manual" || update.assistedInstallFailed === true) &&
     update.manualReminder === true
       ? update.availableVersion
       : undefined;
@@ -49,10 +51,14 @@ export function UpdateBanner() {
     update.status === "downloaded" ||
     update.status === "downloading" ||
     (update.status === "available" &&
-      update.mode === "manual" &&
+      (update.mode === "manual" || update.assistedInstallFailed === true) &&
       update.manualReminder === true &&
       presentedManualReminder !== update.availableVersion);
   if (!visible) return null;
+  const retryable =
+    update.status === "available" &&
+    update.mode === "in-app" &&
+    update.assistedInstallFailed === true;
 
   const message = bannerMessage(update, t);
   const progress = Math.max(0, Math.min(100, update.progressPercent ?? 0));
@@ -104,7 +110,17 @@ export function UpdateBanner() {
               {t("updates.restart")}
             </Button>
           )}
-          {update.status === "available" && update.mode === "manual" && (
+          {retryable && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => void api.updatesDownload().catch(() => undefined)}
+            >
+              {t("updates.tryAgain")}
+            </Button>
+          )}
+          {update.status === "available" &&
+            (update.mode === "manual" || update.assistedInstallFailed === true) && (
             <Button
               variant="secondary"
               size="sm"
@@ -144,6 +160,9 @@ function bannerMessage(
   }
   if (update.status === "downloaded") {
     return t("updates.downloaded", { version: update.availableVersion });
+  }
+  if (update.assistedInstallFailed === true) {
+    return t("updates.assistedInstallFailed", { version: update.availableVersion });
   }
   return t("updates.available", { version: update.availableVersion });
 }

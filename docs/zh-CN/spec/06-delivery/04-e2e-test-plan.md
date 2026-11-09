@@ -3946,6 +3946,33 @@ IPC 请求无法关闭。
 - **Status**: Workflow script/unit-covered; clean-machine journey required for
   each release (run only in a capable environment when this surface changes)
 
+#### E2E-196d：ad-hoc macOS 版本的辅助原地更新
+
+- **前提条件**：PI-UPD-1109 已实现。已安装的 ad-hoc macOS arm64 应用
+  （`piMacSigning = "adhoc"`，更新偏好为自动，无隔离属性）位于可写目录：自动化夹具用
+  临时目录，发布验证用 `/Applications`。一个更新的 ad-hoc ZIP 列在 `latest-mac.yml`
+  更新源中，带有 SHA-512 与大小。
+- **步骤**：1) 执行更新检查。2) 等待下载完成。3) 点击更新横幅上的重启安装操作。
+  4) 重新启动后打开设置 -> 信息 -> 更新。5) 依次用以下情形重复：损坏的 ZIP、另一个
+  bundle identifier 的暂存应用、带 `com.apple.quarantine` 的暂存应用、只读或 App
+  Translocation 的安装位置、点击安装后被取消的退出、交换失败。
+- **预期**：检查报告较新版本，下载以 `downloaded` 结束；点击之前以及普通退出时都不会
+  安装。点击后应用退出，助手交换两个应用包，新版本重新启动，旧应用作为一份隐藏备份
+  保留。设置里显示辅助通道的信任说明。哈希或大小不符会删除文件且不触碰运行中的应用；
+  bundle identifier 不符、带隔离属性的暂存应用或不合格的位置会被拒绝并给出原因（位置
+  类情形回到通知加链接）；被取消的退出不写提交文件，助手什么都不做；交换失败会还原旧
+  应用并报告失败。该通道从不清除 `com.apple.quarantine`，从不从渲染器取 URL、哈希或
+  路径，`developer-id` 与 `unknown` 构建保持不变。
+- **链接规格**：`05-security/01-security.md`、`03-runtime/07-process-model.md`、
+  `06-delivery/06-release-runbook.md`、ADR plus-assisted-macos-adhoc-update
+- **验收**：质量、安全
+- **里程碑**：M6+
+- **状态**：已有单元、契约和 macOS 集成覆盖（`apps/desktop/test/assisted-*.test.mjs` 与
+  `cargo test -p update-helper`）：通道选择、URL/重定向/大小/哈希规则、暂存拒绝、提交顺序、
+  恢复、渲染器状态、打包足迹，以及真实助手二进制配合真实的 `ditto`、`codesign`、`open`
+  工具交换临时 ad-hoc 应用包。GitHub 托管 macOS runner 上的已打包候选流程，以及连续两个
+  真实版本（首次手动安装，再做应用内更新）均未运行；发布需要用户明确同意
+
 #### E2E-212：GitHub Release 启动 CNB 镜像流水线
 
 - **前提条件**：`vastsa/PI-Desktop` 已配置仓库密钥 `CNB_MIRROR_TOKEN`；

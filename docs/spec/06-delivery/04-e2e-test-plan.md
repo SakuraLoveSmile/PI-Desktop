@@ -991,6 +991,46 @@ workflow. They are not gates or promised outputs of the current Release run.
 - **Status**: Workflow script/unit-covered; clean-machine journey required for
   each release (run only in a capable environment when this surface changes)
 
+#### E2E-196d: Assisted in-place update for ad-hoc macOS builds
+
+- **Preconditions**: PI-UPD-1109 is implemented. An installed ad-hoc macOS
+  arm64 app (`piMacSigning = "adhoc"`, Automatic update preference, no
+  quarantine attribute) sits in a writable directory: a temporary folder in the
+  automated fixture, `/Applications` in the release journey. A newer ad-hoc ZIP
+  is listed in a `latest-mac.yml` feed with its SHA-512 and size.
+- **Steps**: 1) Run an update check. 2) Let the download finish. 3) Use the
+  restart-to-install action of the update banner. 4) After the relaunch, open
+  Settings -> Info -> Updates. 5) Repeat the flow with, in turn: a corrupted
+  ZIP, a staged app with another bundle identifier, a staged app carrying
+  `com.apple.quarantine`, a read-only or App Translocation install location, a
+  quit cancelled after the install click, and an exchange that fails.
+- **Expected**: The check reports the newer version and the download ends in
+  `downloaded`; nothing is installed before the click or on an ordinary quit.
+  After the click the app quits, the helper exchanges the bundles, the new
+  version relaunches, and the old app stays as one hidden backup. Settings
+  shows the trust notice of the assisted lane. A hash or size mismatch deletes
+  the file and leaves the running app untouched; a wrong bundle identifier, a
+  quarantined staged app or an ineligible location is refused with a stated
+  reason (notify-and-link for the location cases); a cancelled quit writes no
+  commit file and the helper does nothing; a failed exchange restores the old
+  app and reports the failure. The lane never clears `com.apple.quarantine`,
+  never takes a URL, hash or path from the renderer, and leaves `developer-id`
+  and `unknown` builds unchanged.
+- **Specs linked**: `05-security/01-security.md`,
+  `03-runtime/07-process-model.md`, `06-delivery/06-release-runbook.md`, ADR
+  plus-assisted-macos-adhoc-update
+- **Acceptance**: Quality, Security
+- **Milestone**: M6+
+- **Status**: Unit, contract and macOS integration covered
+  (`apps/desktop/test/assisted-*.test.mjs` and `cargo test -p update-helper`):
+  lane selection, the URL, redirect, size and hash rules, staging refusals,
+  commit ordering, recovery, the renderer states, the packaging footprint, and
+  the real helper binary exchanging a temporary ad-hoc bundle with the real
+  `ditto`, `codesign` and `open` tools. The packaged-candidate journey on a
+  GitHub-hosted macOS runner and the two consecutive real releases (manual
+  first install, then an in-app update) are not run; the releases need the
+  user's explicit word
+
 #### E2E-212: GitHub Release starts the CNB mirror pipeline
 
 - **Preconditions**: Repository secret `CNB_MIRROR_TOKEN` is configured on

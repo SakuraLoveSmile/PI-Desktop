@@ -7,6 +7,11 @@
  * stables. Delivery mode per install:
  *  - Windows NSIS / Linux AppImage / packaged macOS → full in-app flow: silent
  *    background download, "restart to update" prompt, install-on-quit fallback.
+ *  - Ad-hoc signed macOS in an eligible location (`UpdateState.delivery =
+ *    "assisted"`) → same states, but electron-updater only discovers: the
+ *    download, staging and install belong to ./assisted-update, the install runs
+ *    only on the user's restart, and `autoDownload` / `autoInstallOnAppQuit`
+ *    stay off (ADR plus-assisted-macos-adhoc-update).
  *  - Windows ZIP / legacy portable (`piDistribution = "zip"` or
  *    `PORTABLE_EXECUTABLE_FILE`) → notify + link. The
  *    NSIS installer must not replace a no-install run.
@@ -26,9 +31,18 @@ import type { AppUpdater, UpdateInfo, ProgressInfo } from "electron-updater";
 import {
   formatChangelogNotes,
   IPC,
+  type AssistedUpdateBlockedReason,
+  type UpdateDelivery,
   type UpdatePreference,
   type UpdateState,
 } from "@pi-desktop/shared";
+import { resolveAssistedLane } from "./assisted-update/create-service";
+import {
+  evaluateAssistedEligibility,
+  type AssistedEligibility,
+} from "./assisted-update/eligibility";
+import { AssistedLaneDriver } from "./assisted-update/lane-driver";
+import type { AssistedUpdateLane } from "./assisted-update/service";
 import type { Logger } from "./logger";
 import { parseAllowedExternalUrl } from "./safe-open-external";
 import {
@@ -47,6 +61,7 @@ import {
   resolveEffectiveUpdatePreference,
   resolveMacSigning,
   resolveStoredUpdatePreference,
+  resolveUpdateDelivery,
   resolveUpdateMode as resolveUpdateModePolicy,
   supportsAutomaticUpdates,
   type MacSigning,
@@ -115,6 +130,10 @@ export type UpdaterOptions = {
   distribution?: WindowsDistribution;
   /** Overrides the `piMacSigning` marker read from the packaged manifest. */
   macSigning?: MacSigning;
+  /** Overrides the assisted-lane location check (controller tests). */
+  assistedEligibility?: AssistedEligibility;
+  /** Overrides the assisted-lane service (controller tests). */
+  assistedLane?: AssistedUpdateLane;
 };
 
 export class AppUpdaterController {
@@ -128,6 +147,11 @@ export class AppUpdaterController {
   private readonly macSigning?: MacSigning;
   private readonly defaultPreference: UpdatePreference;
   private readonly automaticSupported: boolean;
+  private readonly assistedEligible: boolean;
+  private readonly assistedBlockedReason?: AssistedUpdateBlockedReason;
+  private readonly delivery?: UpdateDelivery;
+  /** Set only on an eligible ad-hoc macOS install; null everywhere else. */
+  private readonly assisted: AssistedLaneDriver | null;
   private readonly readUpdateSettings?: () => Promise<UpdaterSettings>;
   private readonly persistLastNotifiedVersion?: (version: string) => Promise<void>;
   private readonly persistDismissedVersion?: (
@@ -226,6 +250,18 @@ export class AppUpdaterController {
       (platform === "darwin"
         ? this.readPackagedMacSigning(packagedMetadata) ?? "unknown"
         : undefined);
+    const eligibility: AssistedEligibility =
+      options.assistedEligibility ??
+      evaluateAssistedEligibility({
+        platform,
+        arch: process.arch,
+        isPackaged,
+        macSigning,
+        execPath: process.execPath,
+      });
+    this.assistedEligible = eligibility.eligible;
+    this.assistedBlockedReason = eligibility.eligible ? undefined : eligibility.reason;
+    this.delivery = resolveUpdateDelivery(platform, isPackaged, macSigning, this.assistedEligible);
     this.platform = platform;
     this.isPackaged = isPackaged;
     this.env = process.env;
@@ -237,6 +273,7 @@ export class AppUpdaterController {
       this.env,
       distribution,
       macSigning,
+      this.assistedEligible,
     );
     this.preference = this.defaultPreference;
     this.automaticSupported = supportsAutomaticUpdates(
@@ -244,6 +281,7 @@ export class AppUpdaterController {
       isPackaged,
       this.env,
       macSigning,
+      this.assistedEligible,
     );
     this.readUpdateSettings = options.readUpdateSettings;
     this.persistLastNotifiedVersion = options.persistLastNotifiedVersion;
@@ -255,10 +293,16 @@ export class AppUpdaterController {
       distribution,
       this.preference,
       macSigning,
+      this.assistedEligible,
     );
     if (platform === "darwin" && isPackaged) {
       this.logger.app("updater", "info", "macOS update delivery resolved", {
-        data: { macSigning: macSigning ?? "unknown", mode },
+        data: {
+          macSigning: macSigning ?? "unknown",
+          mode,
+          delivery: this.delivery ?? "platform",
+          assistedBlockedReason: this.assistedBlockedReason ?? null,
+        },
       });
     }
     const defaultCacheBasePath = defaultUpdateCacheBasePath({
@@ -302,8 +346,31 @@ export class AppUpdaterController {
       status: "idle",
       currentVersion: options.currentVersion,
       releasesUrl: RELEASES_URL,
+      delivery: this.delivery,
+      assistedBlockedReason: this.assistedBlockedReason,
     };
+    const assistedLane = resolveAssistedLane({
+      override: options.assistedLane,
+      eligibility,
+      logger: this.logger,
+      cacheBasePath: requestedCacheBasePath ?? defaultCacheBasePath,
+      runningVersion: options.currentVersion,
+    });
+    this.assisted = assistedLane ? this.createAssistedDriver(assistedLane) : null;
     if (mode !== "disabled") this.attachListeners();
+    if (mode !== "disabled") this.assisted?.recover();
+  }
+
+  private createAssistedDriver(lane: AssistedUpdateLane): AssistedLaneDriver {
+    return new AssistedLaneDriver(lane, {
+      state: () => this.state,
+      setState: (patch) => this.setState(patch),
+      isDismissed: (version) => this.dismissedVersion === version,
+      releaseNotes: (version) => this.notesFor(version),
+      manualReminder: (version) => this.manualReminderFor(version),
+      isDisposed: () => this.disposed,
+      log: (level, message, data) => this.logger.app("updater", level, message, { data }),
+    });
   }
 
   /** Localized product notes for a discovered version, if catalogued. */
@@ -389,6 +456,7 @@ export class AppUpdaterController {
       this.distribution,
       effectivePreference,
       this.macSigning,
+      this.assistedEligible,
     );
     const preferenceChanged =
       effectivePreference !== this.preference || mode !== previousMode;
@@ -396,8 +464,10 @@ export class AppUpdaterController {
     const dismissed =
       this.state.availableVersion !== undefined &&
       this.dismissedVersion === this.state.availableVersion;
-    this.autoUpdater.autoDownload = mode === "in-app" && !dismissed;
-    this.autoUpdater.autoInstallOnAppQuit = mode === "in-app" && !dismissed;
+    // On the assisted lane electron-updater only discovers; its own download
+    // and install-on-quit would hand an ad-hoc bundle to Squirrel.Mac.
+    this.autoUpdater.autoDownload = mode === "in-app" && !dismissed && !this.assisted;
+    this.autoUpdater.autoInstallOnAppQuit = mode === "in-app" && !dismissed && !this.assisted;
     if (!preferenceChanged) return;
 
     const patch: Partial<UpdateState> = {
@@ -460,6 +530,7 @@ export class AppUpdaterController {
       this.activeDownloadCancellation.cancel();
       this.activeDownloadCancellation = undefined;
     }
+    this.assisted?.dismiss(version);
     await this.persistDismissedVersionInOrder(version);
   }
 
@@ -536,6 +607,12 @@ export class AppUpdaterController {
       if (this.dismissedVersion && this.dismissedVersion !== info.version) {
         this.dismissedVersion = undefined;
         void this.persistDismissedVersionInOrder(null);
+      }
+      if (this.assisted) {
+        this.autoUpdater.autoDownload = false;
+        this.autoUpdater.autoInstallOnAppQuit = false;
+        this.assisted.onOffer(info);
+        return;
       }
       const dismissed = this.dismissedVersion === info.version;
       const automatic = this.state.mode === "in-app" && !dismissed;
@@ -694,6 +771,11 @@ export class AppUpdaterController {
     if (this.state.status === "downloading" || this.state.status === "downloaded") {
       return this.state;
     }
+    if (this.assisted) {
+      // downloadUpdate() would hand the ad-hoc bundle to Squirrel.Mac.
+      await this.assisted.download(this.state.availableVersion);
+      return this.state;
+    }
     await this.autoUpdater.downloadUpdate();
     return this.state;
   }
@@ -710,16 +792,34 @@ export class AppUpdaterController {
   }
 
   /** Quit and install a downloaded update (in-app mode). */
-  install(): void {
+  install(): void | Promise<void> {
     if (this.state.mode !== "in-app" || this.state.status !== "downloaded") {
       throw new Error("no downloaded update to install");
     }
+    if (this.assisted) return this.installAssisted(this.assisted);
     // Marked before the call: quitAndInstall spawns the installer itself, so
     // the shutdown handler must already know this quit is the update restart.
     this.installRequested = true;
     // Fires 'before-quit' first, so host/sidecar shutdown still runs.
     this.autoUpdater.quitAndInstall(false, true);
   }
+  /**
+   * The helper starts first, so a failure leaves the app running; the commit
+   * file is written by the shutdown path once the sidecar and host-core are
+   * down (`commitPendingInstall`).
+   */
+  private async installAssisted(assisted: AssistedLaneDriver): Promise<void> {
+    if (this.installRequested) return;
+    await assisted.install();
+    this.installRequested = true;
+    app.quit();
+  }
+
+  /** Lets the assisted helper proceed; called by the quit path just before Main exits. */
+  async commitPendingInstall(): Promise<void> {
+    await this.assisted?.commit();
+  }
+
   /** Adopt legacy NSIS cache files before the first update check. */
   reclaimRelocatedUpdateCache(): Promise<void> {
     if (this.state.mode === "disabled") return Promise.resolve();
@@ -753,6 +853,7 @@ export class AppUpdaterController {
 
   dispose() {
     this.disposed = true;
+    this.assisted?.dispose();
     if (this.initialTimer) clearTimeout(this.initialTimer);
     if (this.intervalTimer) clearInterval(this.intervalTimer);
     this.initialTimer = null;

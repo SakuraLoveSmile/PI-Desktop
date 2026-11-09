@@ -334,6 +334,10 @@ test("Windows/Linux explicit minimize paths use the native taskbar", () => {
       to: "bin/pi-desktop-host-core",
     },
     {
+      from: "../../target/release/pi-desktop-update-helper",
+      to: "bin/pi-desktop-update-helper",
+    },
+    {
       from: "build/tray-icon-mac.png",
       to: "tray-icon-mac.png",
     },

@@ -6,7 +6,9 @@
 > Unsigned builds are not signed/notarized release evidence. Formal tags require
 > signing by default; the repository variable `ALLOW_UNSIGNED_MACOS_RELEASE=true`
 > explicitly permits a personal-use unsigned Release. Such releases require
-> manual download and installation and do not qualify Gatekeeper or notarization.
+> manual download and installation, and do not qualify Gatekeeper or
+> notarization. Builds that contain the assisted in-place update (PI-UPD-1109)
+> update from inside the app; only the first install of that lane stays manual.
 > Packaged metadata uses `pi-desktop-plus`, so electron-updater keeps the Plus
 > cache separate as `pi-desktop-plus-updater`.
 
@@ -252,7 +254,18 @@ manual download and installation for updates. The macOS packaging entry point
 stamps `piMacSigning = "adhoc"` into that build, so the client checks the fixed
 feed and opens the release page instead of starting an `electron-updater`
 install that Squirrel.Mac cannot validate. macOS security settings remain
-unchanged; Gatekeeper and automatic in-app installation are not qualified.
+unchanged; Gatekeeper is not qualified. The assisted in-place update lane
+(PI-UPD-1109) replaces the manual step for ad-hoc builds that already contain
+it. The package must carry `Resources/bin/pi-desktop-update-helper` (built by
+`build:update-helper-release`; the pre-sign gate and
+`scripts/verify-macos-release.sh` refuse a bundle without it and the packaging
+footprint test pins it), and the build job runs the helper tests ("Test the
+macOS update helper": `cargo test -p update-helper` plus the macOS integration
+test against the helper it just built) before it packages. The lane reads the
+ZIP's SHA-512 and size from the update metadata and expects the exact asset name
+`Pi-Desktop-Plus-<version>-arm64-mac.zip`, so the aggregate checks of those
+fields are part of its contract. The first release containing the lane is still
+installed by hand.
 Unsigned manual candidates remain Actions-only and cannot be promoted directly
 to a formal release.
 
@@ -481,9 +494,11 @@ above.
 The macOS packaging entry point (`scripts/package-macos-identity.mjs`) stamps
 the signing lane into the packaged manifest as `piMacSigning`: signed release
 jobs resolve `developer-id`, the unsigned lane resolves `adhoc`, and a caller
-that names neither resolves `unknown`. The update controller enables the in-app
-lane only for `developer-id`, because Squirrel.Mac validates a downloaded bundle
-against the running app's designated requirement.
+that names neither resolves `unknown`. The update controller enables the
+`electron-updater` lane only for `developer-id`, because Squirrel.Mac validates
+a downloaded bundle against the running app's designated requirement. An `adhoc`
+package may use the assisted lane of PI-UPD-1109 instead when its install
+location is eligible; `unknown` stays notify-and-link.
 
 Every macOS lane, including unsigned candidates and opted-in personal-use
 releases, must pass `scripts/verify-macos-release.sh --integrity-only
@@ -729,9 +744,11 @@ The following target-specific notes describe existing application and packaging
 behavior; they do not indicate that these targets are included in current cloud
 release bundles.
 
-- Linux deb/rpm, the Windows portable ZIP, and ad-hoc or unstamped macOS
-  packages remain notify-and-link update modes. Developer ID-signed packaged
-  macOS, Windows NSIS, and Linux AppImage use in-app `electron-updater`.
+- Linux deb/rpm, the Windows portable ZIP, and unstamped macOS packages remain
+  notify-and-link update modes, and so do ad-hoc macOS packages whose install
+  location is not eligible for the assisted in-place lane (PI-UPD-1109).
+  Developer ID-signed packaged macOS, Windows NSIS, and Linux AppImage use
+  in-app `electron-updater`.
 - Linux x64 and arm64 packages are built on Ubuntu 22.04 (native `ubuntu-22.04`
   and `ubuntu-22.04-arm` runners), so host-core needs glibc 2.35 or newer
   (Ubuntu 22.04, Debian 12, Fedora 36+). Each tag job runs
@@ -744,6 +761,10 @@ release bundles.
 - Rollback and staged rollout remain open release work. Prereleases have
   separate named feeds and never become GitHub latest. Existing unsigned macOS
   installs may need one manual signed DMG installation before in-app updates
-  succeed; obtain that installer from the cloud release. Unsigned packages now
-  stay on notify-and-link delivery, so each future unsigned release also needs a
-  manual installation.
+  succeed; obtain that installer from the cloud release. Unsigned builds that
+  predate the assisted lane (PI-UPD-1109) stay on notify-and-link delivery, so
+  every release up to and including the first one that contains the lane needs
+  a manual installation; after that, an eligible ad-hoc install updates in
+  place. Qualifying the lane needs two consecutive real releases (E2E-196d), and
+  its trust model is weaker than Developer ID (ADR
+  `plus-assisted-macos-adhoc-update`).

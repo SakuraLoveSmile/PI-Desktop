@@ -23,10 +23,11 @@
     "lint": "node ../../scripts/check-style-tokens.mjs",
     "clean": "node -e \"fs.rmSync('out',{recursive:true,force:true});fs.rmSync('dist',{recursive:true,force:true})\"",
     "build:host-release": "cargo build --release --manifest-path ../../Cargo.toml -p host-core",
+    "build:update-helper-release": "node ../../scripts/build-update-helper.mjs",
     "bundle:runtime": "pnpm -C ../../packages/agent-runtime bundle",
-    "pack": "node ../../scripts/require-cloud-build.mjs && pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && node ../../scripts/package-macos-identity.mjs --dir",
-    "dist": "node ../../scripts/require-cloud-build.mjs && pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && node ../../scripts/build-desktop-release.mjs",
-    "dist:mac": "node ../../scripts/require-cloud-build.mjs && pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && node ../../scripts/package-macos-identity.mjs --mac --publish never",
+    "pack": "node ../../scripts/require-cloud-build.mjs && pnpm run build:deps && pnpm run build:host-release && pnpm run build:update-helper-release && pnpm run bundle:runtime && electron-vite build && node ../../scripts/package-macos-identity.mjs --dir",
+    "dist": "node ../../scripts/require-cloud-build.mjs && pnpm run build:deps && pnpm run build:host-release && pnpm run build:update-helper-release && pnpm run bundle:runtime && electron-vite build && node ../../scripts/build-desktop-release.mjs",
+    "dist:mac": "node ../../scripts/require-cloud-build.mjs && pnpm run build:deps && pnpm run build:host-release && pnpm run build:update-helper-release && pnpm run bundle:runtime && electron-vite build && node ../../scripts/package-macos-identity.mjs --mac --publish never",
     "dist:win": "node ../../scripts/require-cloud-build.mjs && pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && node ../../scripts/build-desktop-release.mjs win",
     "dist:linux": "node ../../scripts/require-cloud-build.mjs && pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && node ../../scripts/build-desktop-release.mjs linux"
   },
@@ -170,6 +171,10 @@
         {
           "from": "../../target/release/pi-desktop-host-core",
           "to": "bin/pi-desktop-host-core"
+        },
+        {
+          "from": "../../target/release/pi-desktop-update-helper",
+          "to": "bin/pi-desktop-update-helper"
         },
         {
           "from": "build/tray-icon-mac.png",

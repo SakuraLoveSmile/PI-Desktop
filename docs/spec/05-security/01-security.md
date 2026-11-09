@@ -230,31 +230,76 @@ claim availability or freshness against a malicious server.
 - Feed manifests bind artifacts with electron-builder hashes. An error,
   unavailable feed, hash mismatch, or invalid updater state must not install.
 - Developer ID-signed packaged macOS, Windows NSIS, and Linux AppImage download
-  and install in-app from the GitHub Releases feed. Ad-hoc, unsigned, or
-  unstamped packaged macOS never starts that lane: Main reads the
-  `piMacSigning` marker from the packaged manifest, and anything other than
-  `developer-id` uses notify-and-link. This is a validation boundary, not a UI
-  preference: Squirrel.Mac checks the downloaded bundle against the running
-  app's designated requirement, and an ad-hoc requirement is a cdhash no later
-  build can satisfy. Linux deb/rpm, Windows ZIP, and ad-hoc macOS detect a
-  release and open the fixed releases page. Legacy Windows portable
-  executables remain manual when `PORTABLE_EXECUTABLE_FILE` is present.
+  and install in-app from the GitHub Releases feed through `electron-updater`.
+  Ad-hoc, unsigned, or unstamped packaged macOS never starts that lane: Main
+  reads the `piMacSigning` marker from the packaged manifest, and anything
+  other than `developer-id` stays out of `electron-updater`'s download and
+  install. This is a validation boundary, not a UI preference: Squirrel.Mac
+  checks the downloaded bundle against the running app's designated
+  requirement, and an ad-hoc requirement is a cdhash no later build can
+  satisfy. Ad-hoc macOS installs that meet the assisted-lane rules below use
+  that lane instead; unstamped macOS, ineligible ad-hoc installs, Linux
+  deb/rpm, and Windows ZIP detect a release and open the fixed releases page.
+  Legacy Windows portable executables remain manual when
+  `PORTABLE_EXECUTABLE_FILE` is present.
 - D126 tag releases publish Windows NSIS and Linux AppImage installers with
   their update manifests, plus Linux deb/rpm packages and a Windows portable
   ZIP. The NSIS and AppImage artifacts activate the existing in-app lanes.
   The portable ZIP uses notify-and-link delivery and does not write
   `latest.yml`. macOS tag artifacts are Developer ID-signed, notarized, and
   stapled before upload unless the explicit unsigned personal-use opt-in is
-  enabled; that unsigned lane publishes update metadata but stays on
-  notify-and-link delivery in the client. Rollback and staged-rollout
-  qualification remain release follow-ups.
+  enabled; that unsigned lane publishes update metadata, and its ad-hoc builds
+  update through the assisted lane below or, when the install is ineligible,
+  stay on notify-and-link delivery. Rollback and staged-rollout qualification
+  remain release follow-ups.
 - The client carries no GitHub token. A private or otherwise unreachable feed
   fails closed; automatic failures stay ambient and explicit checks expose the
   error.
 - Neither macOS DMG nor ZIP ships first-launch guidance or an executable
   quarantine-clearing helper. GitHub tag artifacts remain Developer ID-signed,
   notarized, and stapled; opt-in unsigned packages do not imply Gatekeeper
-  qualification and must not enter the in-app install lane.
+  qualification and must not enter the `electron-updater` install lane.
+- Assisted lane for ad-hoc macOS (PI-UPD-1109,
+  [ADR](../../adr/plus-assisted-macos-adhoc-update.md)). Builds that predate
+  the lane, `unknown` stamps and ineligible installs stay on notify-and-link.
+  - Scope: only a packaged arm64 macOS build stamped `piMacSigning = "adhoc"`
+    whose app bundle is outside App Translocation, on a writable volume, not
+    reached through a symlink, and writable by the current user together with
+    its parent directory. Any other install uses notify-and-link and states
+    why (`UpdateState.assistedBlockedReason`).
+  - Trust anchor: the fixed HTTPS GitHub repository. The package hash in the
+    feed comes from the same release as the package, so it detects corruption
+    or a swapped asset but is not an independent signature and does not defend
+    against a compromised repository or release. The UI states this.
+  - Discovery stays `electron-updater`'s check with `allowPrerelease = false`
+    and automatic download disabled. Main picks the ZIP named exactly
+    `Pi-Desktop-Plus-<version>-<arch>-mac.zip` and builds its URL from the
+    fixed repository and release tag; an absolute URL in the feed is ignored,
+    and the renderer never supplies a URL, hash, size or path.
+  - Download goes through Electron's network stack (the outbound proxy
+    applies), follows at most five redirects and only to GitHub HTTPS asset
+    hosts, sends no credential, caps the size at 1 GiB and hashes while
+    writing. A SHA-512 or
+    size mismatch deletes the file; a partial file is never installable.
+  - Staging extracts with `ditto -x -k` into a hidden directory on the
+    installed app's volume. The staged bundle must be the only app, carry the
+    running app's `CFBundleIdentifier` and architecture, carry the offered
+    version (strictly higher than the running one), pass
+    `codesign --verify --deep --strict` (integrity, not identity), and carry
+    no `com.apple.quarantine`; the lane never clears that attribute.
+  - Install starts only from the user's restart action and never on ordinary
+    quit. Main starts the helper from a copy outside the bundle and writes its
+    commit file after the sidecar and host-core shutdown finished, immediately
+    before Main exits. The helper outlives Main on purpose, has no network,
+    SQLite or credential access, never elevates, locks per target, exchanges
+    the bundles atomically, relaunches, restores the old app on failure, and
+    acts only on owner-only job files Main created.
+  - One backup of the previous app is kept; Main removes older backups it
+    recorded, and only directories whose names match the lane's own pattern.
+  - A failed install is not retried on its own. The next launch reads the
+    helper's result file, marks the offered version as failed
+    (`UpdateState.assistedInstallFailed`) and only an explicit "Try again"
+    downloads it again.
 - Localized product "what's new" text (D164/D345) is selected in Main from the
   shipped changelog catalog and attached to `UpdateState.releaseNotes`. The
   renderer cannot supply a notes URL, feed, or remote body; missing catalog

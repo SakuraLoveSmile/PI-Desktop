@@ -7,6 +7,7 @@ import { useUpdateState } from "../../hooks/use-update-state";
 import { Button, Textarea } from "../../components/ui";
 import { IconFileText } from "../../components/icons";
 import { SettingsMenuSelect } from "../../components/settings/SettingsMenuSelect";
+import { assistedBlockedMessage } from "./assisted-update-copy";
 import { persistUpdatePreference } from "./update-preference";
 import { SettingsCard, SettingsRow } from "./primitives";
 
@@ -173,6 +174,21 @@ export function UpdatesRow({
         {t("updates.viewRelease")}
       </Button>
     );
+  } else if (
+    update?.status === "available" &&
+    update.mode === "in-app" &&
+    update.delivery === "assisted"
+  ) {
+    // The assisted lane starts no download for a dismissed offer or for a
+    // version whose earlier in-place install failed; this is the explicit start.
+    action = (
+      <Button
+        variant="secondary"
+        onClick={() => void api.updatesDownload().catch(() => undefined)}
+      >
+        {update.assistedInstallFailed ? t("updates.tryAgain") : t("updates.download")}
+      </Button>
+    );
   } else {
     action = (
       <Button
@@ -197,9 +213,11 @@ export function UpdatesRow({
         statusText = t("updates.upToDate");
         break;
       case "available":
-        statusText = `${t("updates.available", { version: update.availableVersion })}${
-          update.mode === "manual" ? ` ${t("updates.manualHint")}` : ""
-        }`;
+        statusText = update.assistedInstallFailed
+          ? t("updates.assistedInstallFailed", { version: update.availableVersion })
+          : `${t("updates.available", { version: update.availableVersion })}${
+              update.mode === "manual" ? ` ${t("updates.manualHint")}` : ""
+            }`;
         break;
       case "downloading":
         statusText = t("updates.downloading", {
@@ -248,10 +266,16 @@ export function UpdatesRow({
           />
           {update?.automaticSupported === false ? (
             <div className="text-right text-xs-plus text-text-muted">
-              {t("updates.automaticUnsupported")}
+              {update.assistedBlockedReason
+                ? assistedBlockedMessage(update.assistedBlockedReason, t)
+                : t("updates.automaticUnsupported")}
             </div>
           ) : null}
-          {update?.automaticSupported && update.defaultPreference === "manual" ? (
+          {update?.delivery === "assisted" ? (
+            <div className="text-right text-xs-plus text-text-muted">
+              {t("updates.assistedNotice")}
+            </div>
+          ) : update?.automaticSupported && update.defaultPreference === "manual" ? (
             <div className="text-right text-xs-plus text-text-muted">
               {t("updates.automaticPortableWarning")}
             </div>

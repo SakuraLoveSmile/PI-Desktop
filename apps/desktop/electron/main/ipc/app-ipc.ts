@@ -228,7 +228,7 @@ export function registerAppIpc({
   handle(IPC.invoke.updatesCheck, async () => updater.check({ manual: true }));
   handle(IPC.invoke.updatesDownload, async () => updater.download());
   handle(IPC.invoke.updatesInstall, async () => {
-    updater.install();
+    await updater.install();
     return { ok: true };
   });
   handle(IPC.invoke.updatesOpenReleases, async () => {

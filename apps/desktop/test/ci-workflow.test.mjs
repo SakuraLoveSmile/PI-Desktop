@@ -126,10 +126,10 @@ test("unsigned release permission is pinned and forwarded through verification a
 });
 
 test("release preparation overlaps independent work and avoids duplicate builds", () => {
-  assert.match(
-    releaseWorkflowSource,
-    /cargo build --release --locked -p host-core &/,
-  );
+  // One background cargo invocation builds both binaries the bundle ships, so
+  // their shared dependencies compile once and overlap the JS install.
+  const prepareLines = releaseStep("Prepare package inputs").run.split("\n").map(line => line.trim());
+  assert(prepareLines.includes("cargo build --release --locked -p host-core -p update-helper &"));
   assert.match(releaseWorkflowSource, /wait "\$host_build_pid"/);
   assert.match(
     releaseWorkflowSource,
@@ -152,7 +152,7 @@ test("release builds are gated on the CI checks and least-privilege permissions"
   for (const command of ["pnpm build:js", "pnpm --filter @pi-desktop/desktop typecheck", "pnpm lint", "pnpm -r --if-present test"]) {
     assert(runs.includes(command), `shared CI must run ${command}`);
   }
-  assert(ciWorkflow.jobs.rust.steps.some(step => step.run === "cargo test -p host-core --locked"));
+  assert(ciWorkflow.jobs.rust.steps.some(step => step.run === "cargo test -p host-core -p update-helper --locked"));
   assert.equal(ciWorkflow.jobs["e2e-smoke"].uses, "./.github/workflows/e2e-run.yml");
 });
 

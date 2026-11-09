@@ -20,6 +20,7 @@ Each ADR includes:
 
 | ID | Title | Status |
 |---|---|---|
+| plus-assisted-macos-adhoc-update | [Assisted in-place update for ad-hoc macOS builds](plus-assisted-macos-adhoc-update.md) | Implemented candidate (amends 0022 / 0289) |
 | goal-required-verification-commands | [Approval-bound Goal verification commands](goal-required-verification-commands.md) | Accepted for implementation |
 | goal-blocked-state | [Goal blocked state and same-execution continuation](goal-blocked-state.md) | Accepted for implementation |
 | team-lead-pending-questions-and-replacements | [Durable Lead questions and bounded replacement](team-lead-pending-questions-and-replacements.md) | Accepted for implementation |

@@ -30,9 +30,10 @@ PI-Desktop/
 │   ├── electron.vite.config.ts
 │   └── package.json          # 同时承载 electron-builder 配置
 ├── crates/
-│ └── host-core/              # Rust 特权宿主（二进制 pi-desktop-host-core）
-│   ├── Cargo.toml
-│   └── src/                  # rpc/、tools/，其余每个领域一个模块
+│ ├── host-core/              # Rust 特权宿主（二进制 pi-desktop-host-core）
+│ │   ├── Cargo.toml
+│ │   └── src/                  # rpc/、tools/，其余每个领域一个模块
+│ └── update-helper/          # macOS 更新安装助手（二进制 pi-desktop-update-helper）
 ├── packages/
 │ ├── shared/                 # IPC/协议契约、错误码、更新日志
 │ ├── i18n/                   # en 与 zh-CN 目录及 locale 辅助函数
@@ -81,6 +82,13 @@ Rust 宿主服务：
 - 插件宿主服务
 - 持久化（SQLite、转录、工件、密钥）
 - 审计日志
+
+### `crates/update-helper`
+辅助 macOS 更新通道的安装程序（PI-UPD-1109，二进制 `pi-desktop-update-helper`，crate 版本独立）。
+Main 从应用包之外的副本以分离方式启动它；应用退出后它交换暂存包与已安装包，重新启动，并通过结果
+文件汇报。没有网络、SQLite 或凭据访问；作业文件由 Main 拥有。它由
+`pnpm --filter @pi-desktop/desktop run build:update-helper-release` 构建（仅 macOS），仅随 macOS 包以
+`Contents/Resources/bin/pi-desktop-update-helper` 发布，并由 `cargo test -p update-helper`（CI 与发布任务）测试。
 
 ### `packages/agent-runtime`
 Node 对 pi 的包装：

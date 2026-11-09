@@ -30,6 +30,7 @@ disagrees, so a green `check:release-docs` is a precondition, not a substitute.
 | `macos-codesign-shim.sh` | used by `macos-signing-watchdog.mjs` | PATH shim that timestamps every `codesign` invocation and then executes the real `codesign`; inert unless `PI_CODESIGN_LOG` is set |
 | `export-linux-asar.mjs` | `node scripts/export-linux-asar.mjs` | Existing Linux packaging helper; Linux ASAR assets are outside the current macOS arm64 cloud Release scope |
 | `build-desktop-release.mjs` | called by the desktop `dist` / `dist:mac` / `dist:win` / `dist:linux` scripts | Build a native runner target without publishing; Windows runs separate NSIS and ZIP passes and stamps their updater distribution metadata. Only macOS arm64 is currently selected by the cloud Release workflow |
+| `build-update-helper.mjs` | called by the desktop `build:update-helper-release` script (part of `pack`, `dist` and `dist:mac`) | Build `pi-desktop-update-helper`, the installer helper of the assisted macOS update lane, with `cargo build --release -p update-helper`; it does nothing on other platforms, which do not package it |
 | `check-linux-host-glibc.mjs` | `node scripts/check-linux-host-glibc.mjs [bin]` | Fail a Linux host-core binary whose needed glibc is above 2.35; the current Release workflow does not build Linux packages |
 | `make-icon.py` | `python3 scripts/make-icon.py` | Derive the package PNG, the macOS tray template, and the iconset/ICNS from the canonical PNG |
 | `publish-screenshots.py` | `python3 scripts/publish-screenshots.py` | Publish documentation screenshots |
