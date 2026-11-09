@@ -264,6 +264,26 @@ front of the launcher or a plugin panel (ADR 0086).
 reaches `downloaded`. Electron still emits `before-quit`, so the normal
 sidecar/host shutdown sequence runs before the updater replaces the app.
 
+On an ad-hoc macOS install that uses the assisted lane (PI-UPD-1109, ADR
+`plus-assisted-macos-adhoc-update`), electron-updater only discovers the
+update (`autoDownload` and `autoInstallOnAppQuit` stay off and neither
+`downloadUpdate()` nor `quitAndInstall()` is called). Main downloads the ZIP
+through Electron's network stack, checks the feed hash and size, and stages the
+extracted app next to the installed one before the state reaches `downloaded`.
+Then `updates/install` does not call Electron's quit-and-install. Main copies
+`pi-desktop-update-helper` out of the bundle, starts it detached, and quits
+through the same `before-quit` shutdown sequence. It writes the helper's commit file once the sidecar and host-core
+shutdown has finished, immediately before Main exits, so a cancelled or failed
+quit leaves the helper with nothing to do. The helper is started by Main and
+outlives it on purpose, which is why it runs from a copy outside the bundle:
+after the app exits it exchanges the staged and installed app bundles,
+relaunches the new app, and reports through a result file under the updater
+cache. The next launch reads that result and removes the job directory. The
+helper exits on its own after the exchange or the rollback (every wait is
+bounded), never talks to Rust host-core, SQLite, the sidecar or the network, and
+adds no link to the frozen Renderer → Preload IPC → Electron Main → host-core /
+agent runtime chain.
+
 For Windows NSIS installs, `PI_DESKTOP_UPDATE_CACHE_DIR` may override the
 electron-updater cache base with an absolute, writable directory. The packaged
 `app-update.yml` remains authoritative for the cache subdirectory name. On first
@@ -302,6 +322,9 @@ the next launch rather than changing the NSIS installer or writing into
 ### Release
 - package Electron app
 - ship Rust host binary in resources (`Resources/bin/pi-desktop-host-core`)
+- ship the macOS update helper next to it (`Resources/bin/pi-desktop-update-helper`,
+  macOS packages only; PI-UPD-1109; the packaging scripts build it with
+  `build:update-helper-release` and the pre-sign gate refuses a bundle without it)
 - agent sidecar runs the bundled `agent-runtime/sidecar.js` on the Electron
   binary itself with `ELECTRON_RUN_AS_NODE=1` — no separate Node runtime is
   shipped (resolves **D008**)
@@ -320,9 +343,15 @@ the next launch rather than changing the NSIS installer or writing into
   macOS packages, Windows ZIP/portable, and packages without automatic-install
   support default to Manual. The single macOS packaging entry point stamps
   `piMacSigning` into the packaged manifest, and only `developer-id` enables
-  the in-app lane: Squirrel.Mac validates an update against the running app's
-  designated requirement, which an ad-hoc signature pins to that build's
-  cdhash. Windows ZIP/portable users can explicitly opt into Automatic after a
+  the `electron-updater` lane: Squirrel.Mac validates an update against the
+  running app's designated requirement, which an ad-hoc signature pins to that
+  build's cdhash. An eligible ad-hoc macOS install may opt into Automatic,
+  which runs the assisted lane (checks and the download happen on their own,
+  the install still waits for the user's restart action). Ad-hoc macOS keeps
+  the Manual default, so the lane is an explicit choice, and an install that is
+  not eligible (translocated, read-only, not writable or reached through a
+  symlink) cannot select Automatic and says why in Settings. Windows
+  ZIP/portable users can explicitly opt into Automatic after a
   warning that the NSIS installer may replace the extracted copy. Preference
   and last-reminded version use the existing host-owned app settings JSON;
   neither is included in portable configuration sync.

@@ -52,7 +52,11 @@ PI-Desktop 使用分层桌面架构：
 Electron Main 独家拥有更新客户端和修复的 GitHub 版本
 目标。渲染器可以请求白名单操作并渲染类型化状态，
 但无法提供提要 URL 或直接访问更新程序。应用程序更新可以
-不通过 Rust host-core 或代理 sidecar (D120 / ADR 0022)。
+不通过 Rust host-core 或代理 sidecar (D120 / ADR 0022)。面向 ad-hoc 构建的 macOS 辅助更新
+通道（PI-UPD-1109，ADR `plus-assisted-macos-adhoc-update`）保持这一归属：Main
+（`electron/main/assisted-update/`）负责发现、下载、校验并暂存更新，仅为在 Main 退出后交换应用包而
+启动一个安装助手；助手不会在 Renderer → Preload IPC → Electron Main → host-core / agent runtime
+链上增加环节。
 
 ### 3. 2 用户界面（React）
 - 会话用户体验

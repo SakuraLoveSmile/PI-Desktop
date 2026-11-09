@@ -141,3 +141,19 @@ Squirrel.Mac validates a downloaded update against the running app's designated
 requirement, and an ad-hoc requirement is the running binary's cdhash, so a
 different unsigned build can never satisfy it. Signature validation is not
 weakened, and every unsigned release still requires a manual installation.
+
+## Amendment (PI-UPD-1109)
+
+The PI-UPD-1102 constraint is narrowed, not removed. Only `developer-id` macOS
+packages download and install through `electron-updater`; the Squirrel.Mac
+validation rule above is unchanged and no signature validation is weakened. A
+package stamped `adhoc` may instead use the assisted lane of
+[plus-assisted-macos-adhoc-update](plus-assisted-macos-adhoc-update.md) when
+its install location is eligible: the same fixed feed and stable-only
+discovery, a Main-side download checked against the feed hash and size, an
+install that starts only from the user's restart action, and a detached helper
+that exchanges the bundles and never clears quarantine. `unknown` stamps,
+ineligible ad-hoc installs, Linux deb/rpm and Windows ZIP stay on
+notify-and-link, and the renderer still supplies no URL, hash or path. The
+amendment takes effect in the first release that contains the lane; builds that
+predate it cannot update themselves in place.

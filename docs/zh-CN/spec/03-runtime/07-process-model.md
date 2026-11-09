@@ -193,6 +193,19 @@ shutdown: Electron Main 隐藏窗口并使进程保持活动状态
 达到 `downloaded`。 Electron 仍然发出 `before-quit`，所以正常
 sidecar/host 关闭序列在更新程序替换应用程序之前运行。
 
+在使用辅助通道的 ad-hoc macOS 安装上（PI-UPD-1109，ADR `plus-assisted-macos-adhoc-update`），
+electron-updater 只负责发现更新（`autoDownload` 与 `autoInstallOnAppQuit` 保持关闭，既不调用
+`downloadUpdate()` 也不调用 `quitAndInstall()`）。Main 通过 Electron 网络栈下载 ZIP，核对更新源中的
+哈希与大小，并在状态到达 `downloaded` 之前把解出的应用暂存到已安装应用旁边。随后 `updates/install`
+不调用 Electron 的退出并安装路径：Main 把 `pi-desktop-update-helper` 复制到应用包之外，
+以分离方式启动，再沿同一条 `before-quit` 关闭序列退出。Main 在 sidecar 与 host-core 关闭
+完成之后、自身退出之前写入助手的提交文件，因此被取消或失败的退出不会让助手做任何事。助手由
+Main 启动并有意比它活得更久，这也是它从应用包之外的副本运行的原因：应用退出后交换暂存包与
+已安装包，重新启动新应用，并通过更新缓存下的结果文件汇报；下次启动时读取该结果并清理作业
+目录。助手在交换或回滚完成后自行退出（每一步等待都有上限），从不访问 Rust host-core、
+SQLite、sidecar 或网络，也不会在冻结的 Renderer → Preload IPC → Electron Main → host-core /
+agent runtime 链上增加环节。
+
 ## 6. 开发与发布
 
 ### 开发
@@ -210,6 +223,8 @@ sidecar/host 关闭序列在更新程序替换应用程序之前运行。
 ### 发布
 - Electron 应用程序包
 - 在资源中发送 Rust 主机二进制文件 (`Resources/bin/pi-desktop-host-core`)
+- 在同一目录发送 macOS 更新助手（`Resources/bin/pi-desktop-update-helper`，仅 macOS 包；
+  PI-UPD-1109；打包脚本用 `build:update-helper-release` 构建它，签名前闸门会拒绝缺少它的应用包）
 - 代理 sidecar 在 Electron 上运行捆绑的 `agent-runtime/sidecar.js`
   二进制文件本身与 `ELECTRON_RUN_AS_NODE=1` — 没有单独的 Node 运行时
   已发货（解决 **D008**）
@@ -225,8 +240,12 @@ sidecar/host 关闭序列在更新程序替换应用程序之前运行。
   Windows NSIS、Developer ID 签名的已打包 macOS 和 Linux AppImage 默认自动；ad-hoc
   或未写入签名标记的 macOS 包、Windows ZIP/便携版，以及不支持自动安装的包默认手动。
   唯一的 macOS 打包入口会把 `piMacSigning` 写入打包清单，只有 `developer-id` 会启用
-  应用内通道：Squirrel.Mac 用运行中应用的 designated requirement 校验更新，而 ad-hoc
-  签名会把该要求固定为当前构建的 cdhash。Windows ZIP/便携版可在确认 NSIS 可能替换
+  `electron-updater` 通道：Squirrel.Mac 用运行中应用的 designated requirement 校验更新，
+  而 ad-hoc 签名会把该要求固定为当前构建的 cdhash。满足条件的 ad-hoc macOS 安装可选择
+  自动，此时运行辅助通道（定时检查与下载自行进行，安装仍等用户点击重启）。ad-hoc macOS 仍默认
+  手动，因此该通道需要用户明确选择；不满足条件的安装（App Translocation、只读、不可写或经符号链接
+  访问）无法选择自动，并会在设置中说明原因。Windows
+  ZIP/便携版可在确认 NSIS 可能替换
   解压副本的警告后明确选择自动。偏好和最近提醒版本保存在 Host 所有的应用设置 JSON
   中，且不会进入便携配置同步。
 

@@ -11,6 +11,7 @@ ADR 记录那些不应被静默改变的架构选择。中文入口与英文索�
 
 | 决策 | 说明 |
 |---|---|
+| [ad-hoc macOS 版本的辅助原地更新](/adr/plus-assisted-macos-adhoc-update) | PI-UPD-1109 已实现（候选）。ad-hoc 包经哈希校验下载，用户点击后由辅助程序原子替换；信任锚是固定的 HTTPS GitHub 仓库，弱于 Developer ID |
 | [待处理 Lead 问题与一次替换](/adr/team-lead-pending-questions-and-replacements) | WP11 认证迟答、旧执行令牌失效和失败成员原权限继承 |
 | [团队运行上限](/adr/team-run-limits) | WP8 持久预算与安全暂停；保留运行中的工具与后台任务 |
 | [派发时效与队列年龄](/adr/team-task-dispatch-age) | WP10 显式关联派发、未开始取消和认证时间元数据 |

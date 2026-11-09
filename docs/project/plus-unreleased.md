@@ -2,6 +2,19 @@
 
 Upstream v0.15.6 → v0.16.1 has been merged.
 
+- Unsigned (ad-hoc) macOS builds can update from inside the app. With
+  Automatic selected, an eligible install (Apple silicon, a writable location
+  outside App Translocation, not reached through a symlink) downloads the
+  release ZIP, checks its SHA-512 and size against the release feed, stages the
+  new app next to the installed one and installs only after Restart to update:
+  a helper exchanges the two apps once the app has quit, keeps one backup and
+  relaunches. Settings states the trust model (the hash comes from the same
+  release, so it is not an independent signature) and names the reason when an
+  install cannot use the lane; a failed install offers Try again and the release
+  link. Ad-hoc macOS still defaults to Manual, Developer ID, Windows, Linux and
+  the database are unchanged, and the first build that contains the lane still
+  needs a manual install.
+
 - Goal report check observations for Goals without approved verification
   commands no longer depend on the model citing evidence. The Host matches each
   check's command against the Bash runs of the Goal's own turns, and the last

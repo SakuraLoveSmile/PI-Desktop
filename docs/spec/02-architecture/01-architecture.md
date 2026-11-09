@@ -50,7 +50,13 @@ PI-Desktop uses a layered desktop architecture:
 Electron Main exclusively owns the update client and fixed GitHub Releases
 target. The renderer can request allowlisted operations and render typed state,
 but cannot supply a feed URL or access the updater directly. App updates do
-not pass through Rust host-core or the agent sidecar (D120 / ADR 0022).
+not pass through Rust host-core or the agent sidecar (D120 / ADR 0022). The
+assisted macOS update lane for ad-hoc builds (PI-UPD-1109, ADR
+`plus-assisted-macos-adhoc-update`) keeps that ownership: Main
+(`electron/main/assisted-update/`) discovers, downloads, verifies and stages
+the update, and starts a short-lived installer helper only to exchange app
+bundles after Main exits. The helper adds no link to the Renderer → Preload IPC
+→ Electron Main → host-core / agent runtime chain.
 
 ### 3.2 UI (React)
 - session UX

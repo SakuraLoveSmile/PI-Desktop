@@ -156,17 +156,40 @@ MCP 市场只接受无凭据的公网 HTTPS 源和目录端点。Main 在每一�
   GitHub 的最新稳定版本而不是同通道预发布 pin。
 - Feed 清单将工件与电子构建器哈希绑定。一个错误，
   无法安装提要、哈希不匹配或无效的更新程序状态。
-- Developer ID 签名的已打包 macOS、Windows NSIS 和 Linux AppImage 从 GitHub Releases 源应用内下载并安装。ad-hoc、未签名或没有签名标记的 macOS 包绝不启动该通道：Main 从打包清单读取 `piMacSigning`，除 `developer-id` 外的值都使用通知加链接。这是校验边界，不是界面偏好：Squirrel.Mac 用运行中应用的 designated requirement 校验下载的包，而 ad-hoc 要求就是当前构建的 cdhash，后续构建无法满足。Linux deb/rpm、Windows ZIP 和 ad-hoc macOS 只检测新版本并打开固定发布页；旧 Windows 便携版 exe 在存在 `PORTABLE_EXECUTABLE_FILE` 时仍保持手动更新。
-- D126 标签版本发布 Windows NSIS 和 Linux AppImage 安装程序及其更新清单，以及 Linux deb/rpm 包和 Windows 便携版 ZIP。NSIS、AppImage 与 Developer ID 签名的已打包 macOS 走应用内通道；显式 opt-in 的未签名 macOS 包仍走通知加链接。便携版 ZIP 使用通知加链接交付，并且不写入 `latest.yml`。macOS 标签工件在上传前完成 Developer ID 签名、公证和装订；回滚和分阶段推出仍是发布后续工作。
+- Developer ID 签名的已打包 macOS、Windows NSIS 和 Linux AppImage 通过 `electron-updater` 从 GitHub Releases 源应用内下载并安装。ad-hoc、未签名或没有签名标记的 macOS 包绝不启动该通道：Main 从打包清单读取 `piMacSigning`，除 `developer-id` 外的值都不进入 `electron-updater` 的下载与安装。这是校验边界，不是界面偏好：Squirrel.Mac 用运行中应用的 designated requirement 校验下载的包，而 ad-hoc 要求就是当前构建的 cdhash，后续构建无法满足。满足下文辅助通道条件的 ad-hoc macOS 安装改用该通道；没有签名标记的 macOS、不满足条件的 ad-hoc 安装、Linux deb/rpm 和 Windows ZIP 只检测新版本并打开固定发布页；旧 Windows 便携版 exe 在存在 `PORTABLE_EXECUTABLE_FILE` 时仍保持手动更新。
+- D126 标签版本发布 Windows NSIS 和 Linux AppImage 安装程序及其更新清单，以及 Linux deb/rpm 包和 Windows 便携版 ZIP。NSIS、AppImage 与 Developer ID 签名的已打包 macOS 走应用内通道；显式 opt-in 的未签名 macOS 包发布更新元数据，其 ad-hoc 构建走下文的辅助通道，安装位置不满足条件时仍走通知加链接。便携版 ZIP 使用通知加链接交付，并且不写入 `latest.yml`。macOS 标签工件在上传前完成 Developer ID 签名、公证和装订；回滚和分阶段推出仍是发布后续工作。
 - 客户端不携带 GitHub 令牌。私人或其他无法访问的提要
   关闭失败；自动故障保持在环境状态，显式检查会暴露
   错误。
-- 未签名 macOS 分发包为可信来源保留范围明确的首次启动兜底路径。DMG 是双图标安装，
-  不再放入该说明。ZIP 安装包包含文本说明和可执行助手：它只搜索
-  `/Applications/PI-Desktop.app` 和 `~/Applications/PI-Desktop.app`，并在删除前先校验
-  `CFBundleIdentifier=net.aiuo.pi-desktop`，再删除唯一的 `com.apple.quarantine` 属性并
-  打开应用。它不接受任意路径，不提升权限，也不替代 Developer ID 签名或公证。说明给出
-  手动的 `com.apple.quarantine` 命令，并说明已签名/公证版本无需执行。
+- macOS DMG 与 ZIP 都不附带首次启动说明，也不附带可执行的隔离属性清除助手。GitHub
+  标签工件仍为 Developer ID 签名、公证并装订；显式 opt-in 的未签名包不代表通过
+  Gatekeeper 验证，也不得进入 `electron-updater` 安装通道。
+- ad-hoc macOS 的辅助通道（PI-UPD-1109，
+  [ADR](../../../adr/plus-assisted-macos-adhoc-update.md)）。早于该通道的构建、`unknown`
+  标记和不满足条件的安装仍使用通知加链接。
+  - 范围：仅限 `piMacSigning = "adhoc"` 的已打包 arm64 macOS 构建，且应用包不在 App
+    Translocation 路径下、所在卷可写、不经符号链接访问，当前用户对应用包及其父目录都
+    有写权限。其他安装使用通知加链接并说明原因（`UpdateState.assistedBlockedReason`）。
+  - 信任锚：固定的 HTTPS GitHub 仓库。提要里的包哈希与包出自同一发布，只能发现损坏或被
+    单独替换的资产，不是独立签名，也无法防御仓库或发布被攻破；界面会如实说明。
+  - 发现仍用 `electron-updater` 的检查，`allowPrerelease = false`，关闭自动下载。Main
+    只选名为 `Pi-Desktop-Plus-<version>-<arch>-mac.zip` 的 ZIP，并由固定仓库与发布标签
+    拼出 URL；提要中的绝对 URL 被忽略，渲染器永远不提供 URL、哈希、大小或路径。
+  - 下载走 Electron 网络栈（出站代理生效），最多跟随五次重定向且只到 GitHub HTTPS 资产
+    主机，不发送凭据，大小上限 1 GiB，边写边算哈希。SHA-512 或大小不符就删除文件；半截文件
+    永远不可安装。
+  - 暂存用 `ditto -x -k` 解压到已安装应用同一卷上的隐藏目录。暂存包必须只含一个应用，
+    `CFBundleIdentifier` 与架构和运行中的应用一致，版本等于所提供的版本且严格高于当前
+    版本，通过 `codesign --verify --deep --strict`（只验完整性，不验身份），且不带
+    `com.apple.quarantine`；该通道从不清除此属性。
+  - 安装只在用户点击重启时开始，普通退出不会触发。Main 从包外的副本启动助手，在 sidecar
+    与 host-core 关闭完成之后、Main 退出之前写它的提交文件。助手有意比 Main 活得更久，没有
+    网络、SQLite 或凭据访问，从不提权，按目标加锁，
+    原子交换两个应用包，重新启动，失败时还原旧应用，并且只处理 Main 创建的仅属主可访问
+    的作业文件。
+  - 保留一份旧应用备份；Main 清除它记录过的更早备份，且只清除名称符合该通道自身命名模式的目录。
+  - 失败的安装不会自行重试。下次启动时读取助手的结果文件，把所提供的版本标记为失败
+    （`UpdateState.assistedInstallFailed`），只有用户明确点击“重试”才会再次下载。
 - 本地化产品“新增内容”文本 (D164/D345) 在 Main 中从
   已发布变更日志目录并附加到 `UpdateState.releaseNotes`。的
   渲染器无法提供注释 URL、提要或远程主体；缺少目录

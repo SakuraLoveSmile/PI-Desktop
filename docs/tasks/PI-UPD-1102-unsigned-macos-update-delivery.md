@@ -17,6 +17,10 @@
   published from `5a55d4eec423f8db434281ae090125568d2d006b`.
 - Target: remote `main` and the released unsigned 0.15.12 package. Final
   installation of the produced DMG remains the user's manual action.
+- Follow-up: task `PI-UPD-1109` revisits the frozen decision below ("unsigned
+  installs never update in-app") for eligible ad-hoc macOS installs through an
+  assisted installer, in a later release. This record stays authoritative for
+  what shipped in 0.15.12.
 
 ## Scope and confirmed decisions
 

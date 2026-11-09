@@ -29,9 +29,10 @@ PI-Desktop/
 │   ├── electron.vite.config.ts
 │   └── package.json          # also holds the electron-builder config
 ├── crates/
-│ └── host-core/              # Rust privileged host (binary pi-desktop-host-core)
-│   ├── Cargo.toml
-│   └── src/                  # rpc/, tools/, plus one module per domain
+│ ├── host-core/              # Rust privileged host (binary pi-desktop-host-core)
+│ │   ├── Cargo.toml
+│ │   └── src/                  # rpc/, tools/, plus one module per domain
+│ └── update-helper/          # macOS update installer (binary pi-desktop-update-helper)
 ├── packages/
 │ ├── shared/                 # IPC/protocol contracts, error codes, changelog
 │ ├── i18n/                   # shipped UI catalogs plus locale helpers
@@ -96,6 +97,17 @@ Rust host services:
 - plugin host services
 - persistence (SQLite, transcripts, artifacts, secrets)
 - audit logging
+
+### `crates/update-helper`
+Installer for the assisted macOS update lane (PI-UPD-1109, binary
+`pi-desktop-update-helper`, independent crate version). Main starts it detached
+from a copy outside the app bundle; after the app exits it exchanges the staged
+and installed bundles, relaunches, and reports through a result file. No
+network, SQLite, or credential access; Main owns the job files. It is built by
+`pnpm --filter @pi-desktop/desktop run build:update-helper-release` (macOS
+only), shipped as `Contents/Resources/bin/pi-desktop-update-helper` in macOS
+packages only, and tested by `cargo test -p update-helper` (CI and the release
+job).
 
 ### `packages/agent-runtime`
 Node wrapper over pi:

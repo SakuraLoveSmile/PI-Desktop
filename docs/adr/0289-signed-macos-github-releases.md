@@ -91,3 +91,15 @@ Decision 5's packaged-macOS in-app lane applies only to builds stamped with
 unstamped macOS packages use notify-and-link delivery. The consequence above
 about downloads and restarts therefore describes Developer ID-signed installs
 only; see the PI-UPD-1102 amendment in ADR 0022.
+
+## Amendment (PI-UPD-1109)
+
+Unsigned (ad-hoc) macOS packages published under the explicit opt-in may update
+in place through the assisted lane of
+[plus-assisted-macos-adhoc-update](plus-assisted-macos-adhoc-update.md), from the
+first release that contains it. That lane does not use Squirrel.Mac to install
+and its trust anchor is the
+fixed HTTPS GitHub repository, not a signature chain, so the consequence above
+about Developer ID installs is unchanged. It reverses this ADR's rejection of a
+separate macOS updater implementation for the ad-hoc lane only; discovery still
+reuses `electron-updater`.

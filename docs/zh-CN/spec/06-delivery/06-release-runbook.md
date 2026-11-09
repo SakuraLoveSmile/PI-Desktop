@@ -2,6 +2,7 @@
 
 > Plus 更新源为 `SakuraLoveSmile/PI-Desktop`。签名身份与 Apple Team ID 必须显式配置，
 > 不使用上游证书作为默认值。下文历史上游镜像自动化仍仅用于上游，未签名构建不代表已完成签名/公证。
+> 未签名 Release 需手动下载并安装；包含辅助原地更新（PI-UPD-1109）的构建可在应用内更新，只有该通道的首次安装仍需手动。
 > 打包元数据使用 `pi-desktop-plus`，更新缓存为独立的 `pi-desktop-plus-updater`。
 
 > **翻译说明：** 本页是与 [英文源规格](/spec/06-delivery/06-release-runbook) 一一对应的机器辅助翻译。代码、协议字段和标识符保持原文；如翻译与英文源事实有歧义，以英文版本为准。
@@ -191,8 +192,14 @@ gh variable set ALLOW_UNSIGNED_MACOS_RELEASE --body true -R SakuraLoveSmile/PI-D
 未签名 Release 会在清单中记录 `signedMacos: false`，并注明未签名、未公证及仅供个人使用；
 更新需要手动下载和安装。macOS 打包入口会给该构建写入 `piMacSigning = "adhoc"`，客户端因此
 只检查固定更新源并打开发布页，而不会启动 Squirrel.Mac 无法校验的应用内安装。此选项不修改
-macOS 安全设置，也不代表通过 Gatekeeper 或公证。未签名手动候选仍只生成 Actions 工件，
-不能直接提升为正式 Release。
+macOS 安全设置，也不代表通过 Gatekeeper 或公证。辅助原地更新通道（PI-UPD-1109）替代已包含它的
+ad-hoc 构建的逐版本手动步骤。安装包必须带有 `Resources/bin/pi-desktop-update-helper`（由
+`build:update-helper-release` 构建；签名前闸门和 `scripts/verify-macos-release.sh` 会拒绝缺少它的
+应用包，打包足迹测试也固定它），构建作业在打包之前运行助手测试（“Test the macOS update helper”：
+`cargo test -p update-helper`，以及针对刚构建的助手的 macOS 集成测试）。该通道从更新元数据读取 ZIP
+的 SHA-512 与大小，并要求资产名恰为 `Pi-Desktop-Plus-<version>-arm64-mac.zip`，因此聚合作业对这些
+字段的检查是它契约的一部分。首个包含该通道的版本仍需手动安装。未签名手动候选仍只生成 Actions
+工件，不能直接提升为正式 Release。
 
 门禁顺序：
 
@@ -383,8 +390,9 @@ override 作用于它。它的 `signApplication()` 对每个文件 `await` 一�
 
 macOS 打包入口（`scripts/package-macos-identity.mjs`）会把签名通道写入打包清单的
 `piMacSigning`：签名发布作业解析为 `developer-id`，未签名通道为 `adhoc`，两者都未声明的
-调用方为 `unknown`。更新控制器只对 `developer-id` 启用应用内通道，因为 Squirrel.Mac 会用
-运行中应用的 designated requirement 校验下载的包。
+调用方为 `unknown`。更新控制器只对 `developer-id` 启用 `electron-updater` 通道，因为
+Squirrel.Mac 会用运行中应用的 designated requirement 校验下载的包。`adhoc` 包在安装位置
+满足条件时可改用 PI-UPD-1109 的辅助通道；`unknown` 仍为通知加链接。
 
 存在两次独立的公证提交，因为 Apple 每次公证一个工件，而 electron-builder 只覆盖应用：
 
@@ -600,7 +608,7 @@ The following target-specific notes describe existing application and packaging
 behavior; they do not indicate that these targets are included in current cloud
 release bundles.
 
-- Linux deb/rpm、Windows 便携版 ZIP 以及 ad-hoc 或未写入签名标记的 macOS 包仍保持通知和链接更新模式。Developer ID 签名的已打包 macOS、Windows NSIS 和 Linux AppImage 使用应用内 `electron-updater`。
+- Linux deb/rpm、Windows 便携版 ZIP 以及未写入签名标记的 macOS 包仍保持通知和链接更新模式，安装位置不满足辅助原地通道（PI-UPD-1109）条件的 ad-hoc macOS 包也是如此。Developer ID 签名的已打包 macOS、Windows NSIS 和 Linux AppImage 使用应用内 `electron-updater`。
 - Linux x64 和 arm64 包在 Ubuntu 22.04 上构建（本机 `ubuntu-22.04` 和
   `ubuntu-22.04-arm` 运行器），因此 host-core 需要 glibc 2.35 或更高版本
   （Ubuntu 22.04、Debian 12、Fedora 36+）。每个标签作业都会运行
@@ -611,4 +619,6 @@ release bundles.
   其余所有功能在任何 arm64 Linux 设备上都可用。
 - 回滚和分阶段部署仍是开放工作。预发布具有独立命名更新源且不会成为 GitHub latest。
   现有未签名 macOS 安装可能需先手动安装一次云端发布的已签名 DMG，才能应用内更新。
-  未签名包现在保持通知和链接交付，因此后续每个未签名版本也需要手动安装。
+  早于辅助通道（PI-UPD-1109）的未签名构建保持通知和链接交付，因此直到并包括首个包含该通道的版本
+  之前的每个版本都需要手动安装；此后满足条件的 ad-hoc 安装可原地更新。该通道的验收需要连续两个
+  真实版本（E2E-196d），其信任模型弱于 Developer ID（ADR `plus-assisted-macos-adhoc-update`）。

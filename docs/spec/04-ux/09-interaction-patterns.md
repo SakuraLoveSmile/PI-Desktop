@@ -606,10 +606,11 @@ may be retained while exactly one workspace supplies the visible shell context.
 - Settings → Info adds a persisted Automatic / Manual update preference.
   Automatic preserves the existing in-app flow where supported; Manual keeps
   scheduled checks but never starts an automatic download or install-on-quit.
-  Installed Windows NSIS, packaged macOS, and Linux AppImage default to
-  Automatic. Windows ZIP/portable defaults to Manual, with a warning before an
-  explicit Automatic opt-in; packages without an automatic installer remain
-  Manual.
+  Installed Windows NSIS, Developer ID-signed macOS, and Linux AppImage default
+  to Automatic. Windows ZIP/portable defaults to Manual, with a warning before
+  an explicit Automatic opt-in; ad-hoc macOS and packages without an automatic
+  installer remain Manual (an eligible ad-hoc macOS install may choose
+  Automatic, see the assisted lane below).
 - Manual mode raises one ambient reminder for each newly available version.
   The last reminded version is Host-persisted, so repeated checks, dismissal,
   route remounts, and app restarts do not re-announce that version. Settings →
@@ -637,8 +638,26 @@ may be retained while exactly one workspace supplies the visible shell context.
   Escape, or the backdrop, and restores focus to the invoking control.
 - D126 tag releases publish all platform manifests and installers. Developer
   ID-signed packaged macOS, Windows NSIS, and Linux AppImage use the in-app
-  lane; ad-hoc or unstamped macOS, Linux deb/rpm, and Windows ZIP remain
-  notify-and-link delivery modes.
+  lane; unstamped macOS, Linux deb/rpm, and Windows ZIP remain notify-and-link
+  delivery modes, and so does ad-hoc macOS unless it uses the assisted lane
+  below.
+- Assisted lane for ad-hoc macOS (PI-UPD-1109). The preference stays Manual by
+  default. With Automatic, the update checks run on their schedule, the
+  download starts on its own and the notice reuses the `downloading` and
+  `downloaded` states; the install happens only after the user clicks Restart
+  to update, never on an ordinary quit. Settings → Info states under the
+  preference that the copy is not signed with an Apple Developer ID, so updates
+  cannot be checked against a developer identity; that Automatic downloads the
+  release from the project's GitHub page, verifies its published checksum and
+  replaces the app in place; and that the previous version is kept as a backup.
+  If the user dismissed
+  the offer, or the earlier in-place install of that version failed, nothing is
+  downloaded on its own: Settings shows Download (Try again after a failure),
+  and a failed install is announced once per version in the notice with Try
+  again and View release. An ad-hoc install that cannot use the lane keeps
+  Manual, disables Automatic and names the reason: running from a disk image or
+  a quarantined location (App Translocation), a read-only volume, no write
+  access to the app or its folder, or the app reached through a symlink.
 
 ## 2. Streaming message behavior
 
