@@ -42,12 +42,12 @@ Local-first · Model-agnostic · Plugin-powered · macOS / Windows / Linux
 
 > **Current release line: 0.15.x (Early Preview).**
 
-Version 0.15.13 makes the Host verify Goal report checks: for Goals without
-approved verification commands, each check's command is matched against the
-Goal's own Bash runs instead of relying on the model to cite evidence. Unsigned
-macOS builds stay on manual update delivery: Check for Updates reports the new
-version and opens the release page. Developer ID-signed builds keep automatic
-in-app updates; Windows and Linux delivery is unchanged. Personal-use Apple
+Version 0.15.14 lets unsigned macOS builds update in place: with automatic
+updates turned on, the app downloads the release from GitHub, checks its
+SHA-512 and size, and installs it when you click Restart to update, keeping one
+backup of the previous app. Manual stays the default, and the first install of
+this version is still a manual download. Developer ID-signed builds keep
+automatic in-app updates; Windows and Linux delivery is unchanged. Personal-use Apple
 Silicon builds remain unnotarized and require manual download and installation.
 Goal verification upgrades local profiles to Plus schema P10 behind a migration
 backup; older builds require restoring the pre-upgrade profile before
