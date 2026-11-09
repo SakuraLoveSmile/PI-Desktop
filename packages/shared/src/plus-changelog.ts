@@ -6,6 +6,14 @@ export const PLUS_UPSTREAM_CUTOFF = "0.15.6";
 const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   en: [
     {
+      version: "0.15.14",
+      date: "2026-11-09",
+      highlights: [
+        "Unsigned macOS builds can now update in place. With automatic updates turned on, the app downloads the new release from this project's GitHub page, checks its SHA-512 and size, and installs it when you click Restart to update, keeping one backup of the previous app. Manual stays the default, and the first install of this version is still a manual download.",
+        "The Updates settings explain why an install cannot update itself (a temporary, read-only or non-writable location) and offer Try again and the release link after a failed install. The checksum comes from the same release, so it detects corruption but is not an independent signature.",
+      ],
+    },
+    {
       version: "0.15.13",
       date: "2026-11-08",
       highlights: [
@@ -90,6 +98,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "zh-CN": [
+    {
+      version: "0.15.14",
+      date: "2026-11-09",
+      highlights: [
+        "未签名的 macOS 版本现在可以在应用内就地更新。开启自动更新后，应用会从本项目的 GitHub 发布页下载新版本，校验 SHA-512 与大小，并在你点击“重启以更新”时完成安装，同时保留一份旧版本备份。默认仍为手动更新，本版本的首次安装仍需手动下载。",
+        "更新设置会说明无法就地更新的原因（临时位置、只读位置或不可写位置），安装失败后提供“重试”和发布页链接。校验值来自同一个发布，只能发现文件损坏，不是独立签名。",
+      ],
+    },
     {
       version: "0.15.13",
       date: "2026-11-08",
@@ -176,6 +192,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   "zh-TW": [
     {
+      version: "0.15.14",
+      date: "2026-11-09",
+      highlights: [
+        "未簽署的 macOS 版本現在可以在應用程式內就地更新。開啟自動更新後，應用程式會從本專案的 GitHub 頁面下載新版本，驗證 SHA-512 與大小，並在你按下「重啟以更新」時完成安裝，同時保留一份舊版本備份。預設仍為手動更新，本版本的首次安裝仍需手動下載。",
+        "更新設定會說明無法就地更新的原因（暫時位置、唯讀位置或不可寫入的位置），安裝失敗後提供「重試」與發行頁連結。檢查碼來自同一個發行版本，只能發現檔案損毀，並非獨立簽章。",
+      ],
+    },
+    {
       version: "0.15.13",
       date: "2026-11-08",
       highlights: [
@@ -260,6 +284,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   tr: [
+    {
+      version: "0.15.14",
+      date: "2026-11-09",
+      highlights: [
+        "İmzasız macOS sürümleri artık uygulama içinde yerinde güncellenebilir. Otomatik güncellemeler açıkken uygulama yeni sürümü bu projenin GitHub sayfasından indirir, SHA-512 değerini ve boyutunu doğrular ve “Güncellemek için yeniden başlat” düğmesine tıkladığınızda kurar; önceki uygulamanın bir yedeğini saklar. Varsayılan hâlâ elle güncellemedir ve bu sürümün ilk kurulumu yine elle indirilir.",
+        "Güncelleme ayarları, bir kurulumun neden kendini güncelleyemediğini (geçici, salt okunur veya yazılamayan bir konum) açıklar ve kurulum başarısız olursa “Yeniden dene” ile sürüm bağlantısını sunar. Sağlama değeri aynı sürümden geldiği için bozulmayı yakalar ancak bağımsız bir imza değildir.",
+      ],
+    },
     {
       version: "0.15.13",
       date: "2026-11-08",
@@ -346,6 +378,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   de: [
     {
+      version: "0.15.14",
+      date: "2026-11-09",
+      highlights: [
+        "Nicht signierte macOS-Builds lassen sich jetzt direkt in der App aktualisieren. Bei aktivierten automatischen Updates lädt die App die neue Version von der GitHub-Seite dieses Projekts herunter, prüft SHA-512 und Größe und installiert sie, sobald Sie auf „Zum Aktualisieren neu starten“ klicken; eine Sicherung der vorherigen App bleibt erhalten. Standard bleibt die manuelle Aktualisierung, und die erste Installation dieser Version erfolgt weiterhin manuell.",
+        "Die Update-Einstellungen erklären, warum eine Installation sich nicht selbst aktualisieren kann (temporärer, schreibgeschützter oder nicht beschreibbarer Speicherort), und bieten nach einer fehlgeschlagenen Installation „Erneut versuchen“ sowie den Link zur Version an. Die Prüfsumme stammt aus demselben Release, erkennt also Beschädigungen, ist aber keine unabhängige Signatur.",
+      ],
+    },
+    {
       version: "0.15.13",
       date: "2026-11-08",
       highlights: [
@@ -430,6 +470,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   es: [
+    {
+      version: "0.15.14",
+      date: "2026-11-09",
+      highlights: [
+        "Las compilaciones de macOS sin firmar ahora pueden actualizarse en el propio lugar desde la aplicación. Con las actualizaciones automáticas activadas, la aplicación descarga la nueva versión desde la página de GitHub de este proyecto, comprueba su SHA-512 y su tamaño, y la instala cuando se pulsa «Reiniciar para actualizar», conservando una copia de seguridad de la aplicación anterior. La opción predeterminada sigue siendo la actualización manual y la primera instalación de esta versión se sigue haciendo a mano.",
+        "Los ajustes de actualización explican por qué una instalación no puede actualizarse sola (ubicación temporal, de solo lectura o sin permiso de escritura) y ofrecen «Reintentar» y el enlace de la versión tras una instalación fallida. La suma de comprobación procede de la misma versión, por lo que detecta daños, pero no es una firma independiente.",
+      ],
+    },
     {
       version: "0.15.13",
       date: "2026-11-08",
@@ -516,6 +564,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   fr: [
     {
+      version: "0.15.14",
+      date: "2026-11-09",
+      highlights: [
+        "Les versions macOS non signées peuvent désormais se mettre à jour sur place depuis l'application. Lorsque les mises à jour automatiques sont activées, l'application télécharge la nouvelle version depuis la page GitHub du projet, vérifie son SHA-512 et sa taille, puis l'installe quand vous cliquez sur « Redémarrer pour mettre à jour », en conservant une sauvegarde de l'application précédente. Le mode manuel reste le choix par défaut, et la première installation de cette version reste manuelle.",
+        "Les réglages de mise à jour expliquent pourquoi une installation ne peut pas se mettre à jour d'elle-même (emplacement temporaire, en lecture seule ou non modifiable) et proposent « Réessayer » ainsi que le lien de la version après un échec d'installation. La somme de contrôle provient de la même version : elle détecte une corruption, mais n'est pas une signature indépendante.",
+      ],
+    },
+    {
       version: "0.15.13",
       date: "2026-11-08",
       highlights: [
@@ -601,6 +657,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   ko: [
     {
+      version: "0.15.14",
+      date: "2026-11-09",
+      highlights: [
+        "서명되지 않은 macOS 빌드도 이제 앱 안에서 제자리 업데이트할 수 있습니다. 자동 업데이트를 켜면 앱이 이 프로젝트의 GitHub 페이지에서 새 버전을 내려받아 SHA-512와 크기를 확인하고, ‘다시 시작하여 업데이트’를 누르면 설치하며 이전 앱의 백업을 하나 남깁니다. 기본값은 여전히 수동 업데이트이며, 이 버전의 첫 설치는 계속 직접 내려받아야 합니다.",
+        "업데이트 설정은 설치가 스스로 업데이트할 수 없는 이유(임시, 읽기 전용 또는 쓰기 불가 위치)를 설명하고, 설치에 실패하면 ‘다시 시도’와 릴리스 링크를 제공합니다. 체크섬은 같은 릴리스에서 오므로 손상은 감지하지만 독립적인 서명은 아닙니다.",
+      ],
+    },
+    {
       version: "0.15.13",
       date: "2026-11-08",
       highlights: [
@@ -685,6 +749,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "pt-BR": [
+    {
+      version: "0.15.14",
+      date: "2026-11-09",
+      highlights: [
+        "As versões do macOS sem assinatura agora podem ser atualizadas no próprio aplicativo. Com as atualizações automáticas ativadas, o aplicativo baixa a nova versão da página do GitHub deste projeto, confere o SHA-512 e o tamanho e a instala quando você clica em “Reiniciar para atualizar”, mantendo uma cópia de segurança do aplicativo anterior. O padrão continua sendo a atualização manual, e a primeira instalação desta versão ainda é feita manualmente.",
+        "As configurações de atualização explicam por que uma instalação não consegue se atualizar sozinha (local temporário, somente leitura ou sem permissão de escrita) e oferecem “Tentar novamente” e o link da versão após uma instalação com falha. O checksum vem da mesma versão, então detecta corrupção, mas não é uma assinatura independente.",
+      ],
+    },
     {
       version: "0.15.13",
       date: "2026-11-08",
