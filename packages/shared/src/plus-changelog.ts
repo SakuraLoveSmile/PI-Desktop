@@ -6,6 +6,13 @@ export const PLUS_UPSTREAM_CUTOFF = "0.15.6";
 const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   en: [
     {
+      version: "0.15.15",
+      date: "2026-11-10",
+      highlights: [
+        "A task dispatched into a new worktree of a project whose main checkout was archived now appears in the sidebar with its project. Archive visibility follows the checkouts a sidebar row keeps open, so archiving any open checkout still hides that row.",
+      ],
+    },
+    {
       version: "0.15.14",
       date: "2026-11-09",
       highlights: [
@@ -98,6 +105,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "zh-CN": [
+    {
+      version: "0.15.15",
+      date: "2026-11-10",
+      highlights: [
+        "派发到已归档项目的新工作树中的任务，现在会和所属项目一起显示在侧边栏。归档可见性改为跟随侧边栏行保持打开的检出，因此归档任一打开的检出仍会隐藏该行。",
+      ],
+    },
     {
       version: "0.15.14",
       date: "2026-11-09",
@@ -192,6 +206,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   "zh-TW": [
     {
+      version: "0.15.15",
+      date: "2026-11-10",
+      highlights: [
+        "派發到已封存專案的新工作樹中的任務，現在會和所屬專案一起顯示在側邊欄。封存可見性改為跟隨側邊欄列保持開啟的檢出，因此封存任一開啟的檢出仍會隱藏該列。",
+      ],
+    },
+    {
       version: "0.15.14",
       date: "2026-11-09",
       highlights: [
@@ -284,6 +305,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   tr: [
+    {
+      version: "0.15.15",
+      date: "2026-11-10",
+      highlights: [
+        "Arşivlenmiş bir projenin yeni çalışma ağacına gönderilen görevler artık projeleriyle birlikte kenar çubuğunda görünür. Arşiv görünürlüğü, kenar çubuğu satırının açık tuttuğu çalışma kopyalarını izler; açık bir kopyayı arşivlemek satırı yine gizler.",
+      ],
+    },
     {
       version: "0.15.14",
       date: "2026-11-09",
@@ -378,6 +406,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   de: [
     {
+      version: "0.15.15",
+      date: "2026-11-10",
+      highlights: [
+        "Aufgaben, die in einen neuen Arbeitsbaum eines archivierten Projekts gesendet werden, erscheinen jetzt mit ihrem Projekt in der Seitenleiste. Die Archivsichtbarkeit folgt den Checkouts, die eine Zeile der Seitenleiste geöffnet hält; das Archivieren eines geöffneten Checkouts blendet die Zeile weiterhin aus.",
+      ],
+    },
+    {
       version: "0.15.14",
       date: "2026-11-09",
       highlights: [
@@ -470,6 +505,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   es: [
+    {
+      version: "0.15.15",
+      date: "2026-11-10",
+      highlights: [
+        "Las tareas enviadas a un nuevo árbol de trabajo de un proyecto archivado ahora aparecen en la barra lateral con su proyecto. La visibilidad del archivo sigue los checkouts que una fila mantiene abiertos, así que archivar un checkout abierto sigue ocultando la fila.",
+      ],
+    },
     {
       version: "0.15.14",
       date: "2026-11-09",
@@ -564,6 +606,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   fr: [
     {
+      version: "0.15.15",
+      date: "2026-11-10",
+      highlights: [
+        "Les tâches envoyées dans un nouvel arbre de travail d'un projet archivé apparaissent désormais dans la barre latérale avec leur projet. La visibilité de l'archive suit les checkouts qu'une ligne garde ouverts ; archiver un checkout ouvert masque toujours la ligne.",
+      ],
+    },
+    {
       version: "0.15.14",
       date: "2026-11-09",
       highlights: [
@@ -657,6 +706,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   ko: [
     {
+      version: "0.15.15",
+      date: "2026-11-10",
+      highlights: [
+        "보관된 프로젝트의 새 작업 트리로 전달된 작업이 이제 프로젝트와 함께 사이드바에 표시됩니다. 보관 표시 여부는 사이드바 행이 열어 둔 체크아웃을 따르므로, 열린 체크아웃을 보관하면 해당 행은 계속 숨겨집니다.",
+      ],
+    },
+    {
       version: "0.15.14",
       date: "2026-11-09",
       highlights: [
@@ -749,6 +805,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "pt-BR": [
+    {
+      version: "0.15.15",
+      date: "2026-11-10",
+      highlights: [
+        "Tarefas enviadas para uma nova árvore de trabalho de um projeto arquivado agora aparecem na barra lateral com seu projeto. A visibilidade do arquivo segue os checkouts que uma linha mantém abertos; arquivar um checkout aberto ainda oculta a linha.",
+      ],
+    },
     {
       version: "0.15.14",
       date: "2026-11-09",
