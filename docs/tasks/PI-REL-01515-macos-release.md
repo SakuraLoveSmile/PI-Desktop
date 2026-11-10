@@ -15,7 +15,8 @@
 - Branch: `chore/20261110-PI-REL-01515-release-prep`.
 - Worktree:
   `/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop/20261110-chore-PI-REL-01515-release-prep`.
-- Preparation PR: not created yet.
+- Preparation PR: [#84](https://github.com/SakuraLoveSmile/PI-Desktop/pull/84),
+  opened 2026-11-10.
 - Release: none yet.
 - Target: remote `main`, tag `v0.15.15`, and the cloud release workflow.
 
