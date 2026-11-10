@@ -1579,8 +1579,18 @@ export function Sidebar({
       : undefined;
     try {
       closeMenus();
+      // A grouped row hides while any checkout it holds open is archived, so
+      // restore clears each archived open checkout instead of only the one the
+      // row last represented.
       if (archived) {
-        restoreProject(entry.path);
+        const restored = new Set<string>();
+        for (const path of [...entry.paths, entry.actionPath]) {
+          const key = normalizeProjectPath(path);
+          if (!key || restored.has(key) || !projectMeta[key]?.archived) continue;
+          if (!openProjectPaths.some((open) => normalizeProjectPath(open) === key)) continue;
+          restored.add(key);
+          restoreProject(path);
+        }
         return;
       }
       // Move the visible context before hiding the active project. This
@@ -1592,7 +1602,7 @@ export function Sidebar({
           await clearProject();
         }
       }
-      archiveProjectAction(entry.path);
+      archiveProjectAction(entry.actionPath);
     } catch (error) {
       reportError(error);
     }

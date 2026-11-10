@@ -60,3 +60,19 @@ must not leave the page.
   dumps every action onto the index.
 - Hide archived records behind a filter. Rejected: D133 forbids a visibility
   toggle on this destination.
+
+## Amendment (2026-11-10)
+
+Archive visibility belongs to the checkout a sidebar row represents, not to
+every checkout that shares its project memory (D643).
+
+A project whose checkouts share memory collapses into one sidebar row keyed by
+its primary checkout. Visibility now follows the checkouts that row keeps open:
+it is hidden while any of them is archived, Archive writes the checkout the row
+represents, and Restore clears every archived checkout the row holds open. A
+worktree opened later — for example a KaneoPilot dispatch into a fresh run
+directory — is visible with its task even when the primary checkout was
+archived earlier. Name, pin, fold, and manual order remain keyed by the logical
+project. This is renderer presentation only: no host, protocol, or storage
+change, and archive flags of checkouts the row does not hold open are neither
+read for visibility nor rewritten.
