@@ -263,7 +263,13 @@ may be retained while exactly one workspace supplies the visible shell context.
   state remains recognizable without opening its overflow menu.
 - **Archive** is non-destructive. Archived rows are hidden by default,
   available through Show archived, and restorable. Archiving does not cancel
-  a turn or delete a transcript.
+  a turn or delete a transcript. Archive state follows the checkout a grouped
+  row represents: checkouts that share project memory collapse into one row
+  keyed by the primary checkout, but archiving, restoring, and visibility read
+  the open checkout's own path. A worktree opened after its primary checkout
+  was archived — for example a task dispatched into a fresh run directory —
+  therefore stays visible instead of inheriting the other checkout's archive
+  state; archiving the open checkout hides the row as usual.
 - **Delete** removes a session or a project permanently and takes two clicks:
   the first arms the overflow item and relabels it (`nav.deleteTaskConfirm` /
   `project.deleteMenuConfirm`), and only the second click removes the row. The

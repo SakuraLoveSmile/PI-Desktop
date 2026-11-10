@@ -96,3 +96,33 @@ test("a shared project without its primary checkout edits only the registered wo
   assert.equal(entries[0].groupId, groups[2].id);
   assert.deepEqual(entries[0].roots, groups[2].roots);
 });
+
+test("a dispatched worktree stays visible while its shared project's primary checkout is archived", () => {
+  const dispatched = { ...sessions[1], id: "dispatched-task", projectPath: memoryProject.paths[1],
+    projectName: "Music", memoryProjectId: "music" };
+  const entries = buildSidebarMemoryProjects({ groups, openPaths: [memoryProject.paths[1]],
+    workspaces: [], sessions: [dispatched], activePath: memoryProject.paths[1],
+    projectMeta: { [memoryProject.primaryPath]: { archived: true } } });
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].meta.archived, false);
+  assert.equal(entries[0].actionPath, memoryProject.paths[1]);
+  assert.deepEqual(entries[0].sessions.map((session) => session.id), ["dispatched-task"]);
+});
+
+test("the archived checkout itself keeps hiding its own group", () => {
+  const entries = buildSidebarMemoryProjects({ groups, openPaths: [memoryProject.primaryPath],
+    workspaces: [], sessions: [], activePath: memoryProject.primaryPath,
+    projectMeta: { [memoryProject.primaryPath]: { archived: true } } });
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].actionPath, memoryProject.primaryPath);
+  assert.equal(entries[0].meta.archived, true);
+});
+
+test("archiving the checkout a shared project currently represents hides the group", () => {
+  const entries = buildSidebarMemoryProjects({ groups, openPaths: [memoryProject.paths[2]],
+    workspaces: [], sessions: [], activePath: memoryProject.paths[2],
+    projectMeta: { [memoryProject.paths[2]]: { archived: true } } });
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].actionPath, memoryProject.paths[2]);
+  assert.equal(entries[0].meta.archived, true);
+});

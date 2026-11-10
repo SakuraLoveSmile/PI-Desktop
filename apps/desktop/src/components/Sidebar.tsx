@@ -1579,8 +1579,10 @@ export function Sidebar({
       : undefined;
     try {
       closeMenus();
+      // Archive state follows the checkout the group represents, which is what
+      // its visibility reads; the group key may belong to a different checkout.
       if (archived) {
-        restoreProject(entry.path);
+        restoreProject(entry.actionPath);
         return;
       }
       // Move the visible context before hiding the active project. This
@@ -1592,7 +1594,7 @@ export function Sidebar({
           await clearProject();
         }
       }
-      archiveProjectAction(entry.path);
+      archiveProjectAction(entry.actionPath);
     } catch (error) {
       reportError(error);
     }

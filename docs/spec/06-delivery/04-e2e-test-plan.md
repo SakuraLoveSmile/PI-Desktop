@@ -4171,7 +4171,8 @@ workflow. They are not gates or promised outputs of the current Release run.
 #### E2E-048: Pin, archive, restore, and sort project/conversation rows
 
 - **Preconditions**: Two retained projects contain conversations with distinct
-  titles and created/updated timestamps; archived view is initially disabled.
+  titles and created/updated timestamps, and one of them has a second checkout
+  that shares its project memory; archived view is initially disabled.
 - **Steps**: 1) Inspect the Sessions and Projects heading actions at rest. 2)
   Hover each heading and keyboard-focus each action to confirm the controls
   reveal without moving the labels. 3) Inspect the `Sessions` toolbar and verify
@@ -4180,6 +4181,9 @@ workflow. They are not gates or promised outputs of the current Release run.
   5) Pin one project and one conversation. 6) Archive another conversation
   and project. 7) Enable Show archived and restore both. 8) Restart the app.
   9) Delete a disposable conversation through the distinct Delete action.
+  10) Archive the primary checkout of the shared-memory project, then open a
+  worktree of the same project through the picker or an external dispatch and
+  inspect its sidebar row.
 - **Expected**: Section create and sort controls are visually quiet at rest and
   reveal on toolbar hover or keyboard focus; project `+` and overflow actions
   follow the same rule without shifting labels. Sort precedes New Chat in the
@@ -4195,7 +4199,11 @@ workflow. They are not gates or promised outputs of the current Release run.
   returns them to the selected order; archiving the active row selects a visible
   non-archived fallback or creates the documented empty fallback instead of
   leaving hidden active context; pin/archive/sort choices survive restart; only
-  Delete removes the disposable durable session. A legacy `manual` preference
+  Delete removes the disposable durable session. A shared-memory project whose
+  primary checkout is archived still shows the task opened from a different
+  checkout, because the grouped row reads the archive flag of the checkout it
+  represents; archiving that open checkout hides the row and restoring it
+  returns the row. A legacy `manual` preference
   loads safely without exposing or implying a drag-reorder workflow.
 - **Specs linked**: `03-runtime/04-data-storage.md`, `04-ux/01-ui-ia.md`,
   `04-ux/08-component-spec.md`, `04-ux/09-interaction-patterns.md`

@@ -120,5 +120,25 @@ export function buildSidebarMemoryProjects(args: {
     }
     entry.sessions.push(session);
   }
-  return [...entries.values()];
+  return [...entries.values()].map((entry) => archiveStateForCheckout(entry, args.projectMeta));
+}
+
+/**
+ * Archive state belongs to the checkout a grouped entry currently represents.
+ *
+ * A shared project collapses several checkouts under one display entry keyed by
+ * its primary checkout, but only that checkout carries the user's archive flag.
+ * Borrowing it for a fresh worktree (for example a KaneoPilot dispatch into a
+ * new run directory) hid the task even though the worktree was opened and never
+ * archived. The entry keeps the primary checkout's name, pin, and fold state;
+ * only visibility follows the open checkout, and the archive/restore actions
+ * write to the same path this reads.
+ */
+function archiveStateForCheckout(
+  entry: SidebarMemoryProject,
+  projectMeta: Record<string, ProjectMeta>,
+): SidebarMemoryProject {
+  const actionKey = normalizeProjectPath(entry.actionPath);
+  const archived = actionKey ? projectMeta[actionKey]?.archived === true : false;
+  return { ...entry, meta: { ...entry.meta, archived } };
 }
