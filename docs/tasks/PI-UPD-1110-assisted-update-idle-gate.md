@@ -13,7 +13,8 @@
 - Branch: `fix/20261110-PI-UPD-1110-assisted-idle-crashpad`.
 - Worktree:
   `/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop/20261110-fix-PI-UPD-1110-assisted-idle-crashpad`.
-- PR: not created yet.
+- PR: [#85](https://github.com/SakuraLoveSmile/PI-Desktop/pull/85), opened
+  2026-11-10.
 - Target: remote `main`; a later patch release carries the fix.
 
 ## Problem statement
