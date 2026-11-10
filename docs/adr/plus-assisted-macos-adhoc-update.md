@@ -110,7 +110,9 @@ This ADR adopts that shape for PI-Desktop-Plus and states what it gives up.
    against its job, takes a per-target file lock, confirms that the installed
    app is the one the job was prepared for, and refuses to continue while any
    process still runs from inside the bundle after a bounded wait (then it
-   reopens the old app). It re-verifies the staged app, exchanges the two
+   reopens the old app). Chromium's crash reporter is exempt: it can outlive
+   the app it reports for and loads no bundle resources once running, so an
+   orphaned handler must not block the exchange (D644). It re-verifies the staged app, exchanges the two
    bundles atomically with `renamex_np(RENAME_SWAP)`, relaunches with
    `open -n`, and writes a result file. If the exchange or the relaunch fails it
    swaps back, except when the new app may already be running. It has no
