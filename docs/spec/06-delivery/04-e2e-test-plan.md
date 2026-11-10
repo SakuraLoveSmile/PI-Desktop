@@ -1003,7 +1003,8 @@ workflow. They are not gates or promised outputs of the current Release run.
   Settings -> Info -> Updates. 5) Repeat the flow with, in turn: a corrupted
   ZIP, a staged app with another bundle identifier, a staged app carrying
   `com.apple.quarantine`, a read-only or App Translocation install location, a
-  quit cancelled after the install click, and an exchange that fails.
+  quit cancelled after the install click, an exchange that fails, and an
+  orphaned `chrome_crashpad_handler` left running from the bundle.
 - **Expected**: The check reports the newer version and the download ends in
   `downloaded`; nothing is installed before the click or on an ordinary quit.
   After the click the app quits, the helper exchanges the bundles, the new
@@ -1013,7 +1014,9 @@ workflow. They are not gates or promised outputs of the current Release run.
   quarantined staged app or an ineligible location is refused with a stated
   reason (notify-and-link for the location cases); a cancelled quit writes no
   commit file and the helper does nothing; a failed exchange restores the old
-  app and reports the failure. The lane never clears `com.apple.quarantine`,
+  app and reports the failure. A crash reporter left running from the bundle
+  does not hold the idle gate, so the exchange still completes. The lane never
+  clears `com.apple.quarantine`,
   never takes a URL, hash or path from the renderer, and leaves `developer-id`
   and `unknown` builds unchanged.
 - **Specs linked**: `05-security/01-security.md`,

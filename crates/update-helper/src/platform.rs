@@ -96,12 +96,23 @@ impl Platform for SystemPlatform {
     }
 }
 
-/// Pids whose executable path lies inside `bundle`, excluding `own_pid`.
+/// Chromium's crash reporter is started from the bundle but can outlive the app
+/// it reports for, and it loads no bundle resources once running. It must not
+/// hold the idle gate that protects the in-place exchange, or an orphaned
+/// handler from an earlier launch blocks every later update.
+const CRASH_REPORTER: &str = "chrome_crashpad_handler";
+
+/// Pids whose executable path lies inside `bundle`, excluding `own_pid` and the
+/// bundle's crash reporter.
 pub fn paths_inside(bundle: &Path, processes: &[(u32, PathBuf)], own_pid: u32) -> Vec<u32> {
     let canonical = std::fs::canonicalize(bundle).unwrap_or_else(|_| bundle.to_path_buf());
     processes
         .iter()
-        .filter(|(pid, path)| *pid != own_pid && path.starts_with(&canonical))
+        .filter(|(pid, path)| {
+            *pid != own_pid
+                && path.starts_with(&canonical)
+                && path.file_name() != Some(std::ffi::OsStr::new(CRASH_REPORTER))
+        })
         .map(|(pid, _)| *pid)
         .collect()
 }
@@ -304,8 +315,33 @@ mod tests {
                 14,
                 bundle.join("Contents/Resources/bin/pi-desktop-host-core"),
             ),
+            (
+                15,
+                bundle.join(
+                    "Contents/Frameworks/Electron Framework.framework/Helpers/chrome_crashpad_handler",
+                ),
+            ),
         ];
         assert_eq!(paths_inside(&bundle, &processes, 14), vec![10, 11]);
+    }
+
+    #[test]
+    fn crash_reporter_outliving_the_app_does_not_block_the_exchange() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let bundle = std::fs::canonicalize(dir.path())
+            .expect("canonical")
+            .join("X.app");
+        std::fs::create_dir(&bundle).expect("bundle");
+        let crashpad = bundle.join(
+            "Contents/Frameworks/Electron Framework.framework/Helpers/chrome_crashpad_handler",
+        );
+        assert!(paths_inside(&bundle, &[(20, crashpad)], 99).is_empty());
+        let renderer = bundle.join("Contents/Frameworks/X Helper.app/Contents/MacOS/X Helper");
+        assert_eq!(
+            paths_inside(&bundle, &[(21, renderer)], 99),
+            vec![21],
+            "a real bundle process still holds the gate"
+        );
     }
 
     #[test]
