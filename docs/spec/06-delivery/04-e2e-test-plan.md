@@ -4201,9 +4201,9 @@ workflow. They are not gates or promised outputs of the current Release run.
   leaving hidden active context; pin/archive/sort choices survive restart; only
   Delete removes the disposable durable session. A shared-memory project whose
   primary checkout is archived still shows the task opened from a different
-  checkout, because the grouped row reads the archive flag of the checkout it
-  represents; archiving that open checkout hides the row and restoring it
-  returns the row. A legacy `manual` preference
+  checkout, because visibility follows the checkouts the row keeps open;
+  archiving any open checkout hides the row and restoring returns it. A legacy
+  `manual` preference
   loads safely without exposing or implying a drag-reorder workflow.
 - **Specs linked**: `03-runtime/04-data-storage.md`, `04-ux/01-ui-ia.md`,
   `04-ux/08-component-spec.md`, `04-ux/09-interaction-patterns.md`

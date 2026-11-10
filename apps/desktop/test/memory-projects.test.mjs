@@ -126,3 +126,13 @@ test("archiving the checkout a shared project currently represents hides the gro
   assert.equal(entries[0].actionPath, memoryProject.paths[2]);
   assert.equal(entries[0].meta.archived, true);
 });
+
+test("an archived open checkout keeps the grouped row hidden after the workspace moves on", () => {
+  const entries = buildSidebarMemoryProjects({ groups, openPaths: memoryProject.paths,
+    workspaces: [], sessions: [], activePath: memoryProject.paths[0],
+    projectMeta: { [memoryProject.paths[2]]: { archived: true } } });
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].actionPath, memoryProject.paths[0]);
+  assert.equal(entries[0].meta.archived, true,
+    "archiving an open checkout must survive the active checkout changing");
+});

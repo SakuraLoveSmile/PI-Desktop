@@ -164,7 +164,7 @@ app.whenReady().then(async () => {
       await click('[data-action="toggle-project-archive"]');
       await until(`${state}.workspace.path === '/fixture/other/checkout' && !document.querySelector('${music}')`);
       await check('archiving the current row activates the next real checkout when its memory primary is absent', `
-        ${state}.projectMeta['/fixture/music/main'].archived === true &&
+        ${state}.projectMeta['/fixture/pool/music/slot-3'].archived === true &&
         !window.settingsMemoryFixture.requests.some(request => request.channel.endsWith('/project/set') && request.input === '/fixture/absent/other-main')`);
       await click('.projects-row[title="/fixture/absent/other-main"]');
       await until(`document.querySelector('.projects-detail-task-title')?.textContent === 'Other repository task'`);

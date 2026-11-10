@@ -70,6 +70,10 @@ export function buildSidebarMemoryProjects(args: {
 }): SidebarMemoryProject[] {
   const groups = collapseMemoryProjectGroups(args.groups);
   const entries = new Map<string, SidebarMemoryProject>();
+  // Every checkout that keeps this row in the sidebar, keyed like `entries`, so
+  // archive visibility can consider the checkout a dispatch actually opened
+  // instead of only the row's remembered action path.
+  const openCheckouts = new Map<string, Set<string>>();
   const add = (path: string, name?: string, branch?: string) => {
     const normalized = normalizeProjectPath(path);
     if (!normalized) return;
@@ -89,6 +93,7 @@ export function buildSidebarMemoryProjects(args: {
         existing.branch = branch;
       }
       existing.active ||= normalized === args.activePath;
+      rememberOpenCheckout(key, normalized);
       return;
     }
     const meta = args.projectMeta[key] ?? args.projectMeta[target] ?? {};
@@ -100,6 +105,12 @@ export function buildSidebarMemoryProjects(args: {
       paths: memory && group ? memoryProjectPaths(group).filter((candidate) =>
         memoryProjectForPath(args.groups, candidate)?.memoryProject?.id === memory.id) : [path],
       memoryProject: memory });
+    rememberOpenCheckout(key, normalized);
+  };
+  const rememberOpenCheckout = (key: string, path: string) => {
+    const checkouts = openCheckouts.get(key) ?? new Set<string>();
+    checkouts.add(path);
+    openCheckouts.set(key, checkouts);
   };
   for (const path of args.openPaths) {
     const workspace = args.workspaces.find((item) => normalizeProjectPath(item.path) === normalizeProjectPath(path));
@@ -120,25 +131,19 @@ export function buildSidebarMemoryProjects(args: {
     }
     entry.sessions.push(session);
   }
-  return [...entries.values()].map((entry) => archiveStateForCheckout(entry, args.projectMeta));
-}
-
-/**
- * Archive state belongs to the checkout a grouped entry currently represents.
- *
- * A shared project collapses several checkouts under one display entry keyed by
- * its primary checkout, but only that checkout carries the user's archive flag.
- * Borrowing it for a fresh worktree (for example a KaneoPilot dispatch into a
- * new run directory) hid the task even though the worktree was opened and never
- * archived. The entry keeps the primary checkout's name, pin, and fold state;
- * only visibility follows the open checkout, and the archive/restore actions
- * write to the same path this reads.
- */
-function archiveStateForCheckout(
-  entry: SidebarMemoryProject,
-  projectMeta: Record<string, ProjectMeta>,
-): SidebarMemoryProject {
-  const actionKey = normalizeProjectPath(entry.actionPath);
-  const archived = actionKey ? projectMeta[actionKey]?.archived === true : false;
-  return { ...entry, meta: { ...entry.meta, archived } };
+  // A shared project collapses several checkouts under one entry keyed by its
+  // primary checkout; borrowing that primary's archive flag for the row hid
+  // every KaneoPilot dispatch into a fresh worktree of an archived repository,
+  // even though the app had opened the worktree. Only an archived checkout the
+  // row actually keeps open hides it. Name, pin, fold, and manual order stay
+  // keyed by the logical project.
+  return [...entries.values()].map((entry) => ({
+    ...entry,
+    meta: {
+      ...entry.meta,
+      archived: [...(openCheckouts.get(entry.key) ?? [])].some(
+        (checkout) => args.projectMeta[checkout]?.archived === true,
+      ),
+    },
+  }));
 }

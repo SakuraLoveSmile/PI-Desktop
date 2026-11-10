@@ -31,23 +31,31 @@ invisible, even though the app had just activated the worktree.
 
 ## Root cause
 
-`buildSidebarMemoryProjects` copied `projectMeta[key]` — the primary checkout's
-record — onto a row that represents a different, open checkout. Visibility used
-`entry.meta.archived`, so the archived primary hid the fresh worktree. The
-mirror defect also existed: the sidebar's Archive/Restore actions wrote
-`entry.path` (the key), while visibility read the key as well, so archiving the
-open worktree never registered.
+`buildSidebarMemoryProjects` collapsed the checkouts of a shared-memory project
+into one row keyed by the primary checkout and copied `projectMeta[key]` onto
+it, so the primary's archive flag hid rows for entirely different checkouts
+that happened to be open. The mirror defect also existed: the sidebar's
+Archive/Restore actions wrote `entry.path` (the key), so archiving the open
+worktree never registered.
+
+Visibility now follows the checkouts a row keeps open: the row is hidden while
+any of them is archived, Archive writes the checkout the row represents, and
+Restore clears every archived checkout the row holds open. This keeps an
+archived primary from hiding a dispatched worktree while making "archive the
+row" survive the active checkout changing.
 
 ## Scope
 
-1. `apps/desktop/src/lib/memory-projects.ts`: the grouped row derives its
-   archive flag from the checkout it represents (`actionPath`); name, pin,
-   fold, and order state stay keyed by the logical project.
-2. `apps/desktop/src/components/Sidebar.tsx`: Archive and Restore write the
-   same checkout path the row reads.
+1. `apps/desktop/src/lib/memory-projects.ts`: each grouped row tracks the
+   checkouts it keeps open and is hidden while any of them is archived; name,
+   pin, fold, and order state stay keyed by the logical project.
+2. `apps/desktop/src/components/Sidebar.tsx`: Archive writes the checkout the
+   row represents; Restore clears every archived checkout the row holds open.
 3. Spec and E2E updates: `04-ux/09-interaction-patterns.md` (archive bullet),
-   ADR 0294 amendment, decisions log D643, E2E-048.
-4. Regression tests in `apps/desktop/test/memory-projects.test.mjs`.
+   ADR 0294 amendment, decisions log D643, E2E-048, and their Chinese
+   counterparts.
+4. Regression tests in `apps/desktop/test/memory-projects.test.mjs`, plus the
+   `settings-memory` fixture archive assertion.
 
 Frozen: no host protocol, SQLite schema, IPC, i18n, or packaging change; the
 primary checkout's archive flag is neither cleared nor rewritten.
@@ -63,9 +71,12 @@ primary checkout's archive flag is neither cleared nor rewritten.
 
 ## Validation
 
-- `node --test apps/desktop/test/memory-projects.test.mjs`: 10/10 pass; the two
+- `node --test apps/desktop/test/memory-projects.test.mjs`: 11/11 pass; the
   new archive cases failed before the change (2026-11-10).
-- Full desktop suite (`node --test test/*.test.mjs`): 4385 tests, 4381 pass,
+- `node scripts/e2e-settings-memory.mjs`: passed. The shared-row archive step
+  previously timed out because the row reappeared once the active checkout
+  changed; the fixture now also asserts the represented checkout is archived.
+- Full desktop suite (`node --test test/*.test.mjs`): 4386 tests, 4382 pass,
   0 fail, 4 skipped.
 - `tsc -p tsconfig.json --noEmit` in `apps/desktop`: clean.
 - `scripts/check-test-quality.mjs`: pass (no new source/CSS assertions).
