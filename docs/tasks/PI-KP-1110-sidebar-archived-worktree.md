@@ -10,8 +10,9 @@
 - Branch: `fix/20261110-PI-KP-1110-sidebar-archived-worktree`.
 - Worktree:
   `/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop/20261110-fix-PI-KP-1110-sidebar-archived-worktree`.
-- PR: not created.
-- Target: remote `main` (not landed).
+- PR: [#83](https://github.com/SakuraLoveSmile/PI-Desktop/pull/83), opened
+  2026-11-10 against `main`.
+- Target: remote `main` (not landed; merge not authorized).
 
 ## Problem statement
 
