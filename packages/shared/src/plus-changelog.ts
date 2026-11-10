@@ -6,6 +6,13 @@ export const PLUS_UPSTREAM_CUTOFF = "0.15.6";
 const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   en: [
     {
+      version: "0.15.16",
+      date: "2026-11-10",
+      highlights: [
+        "Fix in-app updates that stopped at “Restart to update” when a background crash-reporting helper from an earlier launch was still running: the update helper no longer waits for that reporter before replacing the app, while other app processes still block the swap.",
+      ],
+    },
+    {
       version: "0.15.15",
       date: "2026-11-10",
       highlights: [
@@ -105,6 +112,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "zh-CN": [
+    {
+      version: "0.15.16",
+      date: "2026-11-10",
+      highlights: [
+        "修复应用内更新在「重启以更新」处失败的问题：此前从更早一次启动遗留的崩溃上报助手仍在运行时，更新助手会一直等待它；现在不再等待该助手，其他应用进程仍会阻止替换。",
+      ],
+    },
     {
       version: "0.15.15",
       date: "2026-11-10",
@@ -206,6 +220,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   "zh-TW": [
     {
+      version: "0.15.16",
+      date: "2026-11-10",
+      highlights: [
+        "修正應用程式內更新在「重新啟動以更新」處失敗的問題：先前從更早一次啟動遺留的當機回報助手仍在執行時，更新助手會一直等待它；現在不再等待該助手，其他應用程式行程仍會阻止替換。",
+      ],
+    },
+    {
       version: "0.15.15",
       date: "2026-11-10",
       highlights: [
@@ -305,6 +326,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   tr: [
+    {
+      version: "0.15.16",
+      date: "2026-11-10",
+      highlights: [
+        "Daha önceki bir açılıştan kalan arka plan çökme raporlayıcısı hâlâ çalışırken „Güncellemek için yeniden başlat“ adımında takılan uygulama içi güncellemeler düzeltildi: güncelleme yardımcısı artık bu raporlayıcıyı beklemiyor; diğer uygulama süreçleri değiştirmeyi yine engelliyor.",
+      ],
+    },
     {
       version: "0.15.15",
       date: "2026-11-10",
@@ -406,6 +434,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   de: [
     {
+      version: "0.15.16",
+      date: "2026-11-10",
+      highlights: [
+        "In-App-Updates, die bei „Zum Aktualisieren neu starten“ hängen blieben, weil ein Hintergrund-Crashmelder einer früheren Sitzung noch lief, werden repariert: Der Update-Helfer wartet nicht mehr auf diesen Melder; andere App-Prozesse blockieren den Austausch weiterhin.",
+      ],
+    },
+    {
       version: "0.15.15",
       date: "2026-11-10",
       highlights: [
@@ -505,6 +540,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   es: [
+    {
+      version: "0.15.16",
+      date: "2026-11-10",
+      highlights: [
+        "Se corrigieron las actualizaciones en la app que se detenían en «Reiniciar para actualizar» cuando seguía en ejecución un notificador de fallos de un inicio anterior: el asistente de actualización ya no espera a ese notificador; otros procesos de la app siguen bloqueando el intercambio.",
+      ],
+    },
     {
       version: "0.15.15",
       date: "2026-11-10",
@@ -606,6 +648,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   fr: [
     {
+      version: "0.15.16",
+      date: "2026-11-10",
+      highlights: [
+        "Les mises à jour dans l'application qui restaient bloquées sur « Redémarrer pour mettre à jour » parce qu'un rapporteur de plantage d'un lancement précédent tournait encore sont corrigées : l'assistant de mise à jour n'attend plus ce rapporteur ; les autres processus de l'application bloquent toujours l'échange.",
+      ],
+    },
+    {
       version: "0.15.15",
       date: "2026-11-10",
       highlights: [
@@ -706,6 +755,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   ko: [
     {
+      version: "0.15.16",
+      date: "2026-11-10",
+      highlights: [
+        "이전 실행에서 남은 백그라운드 충돌 보고 도우미가 실행 중일 때 “업데이트를 위해 재시작”에서 멈추던 앱 내 업데이트를 수정했습니다. 이제 업데이트 도우미가 해당 보고 도우미를 기다리지 않으며, 다른 앱 프로세스는 계속 교체를 차단합니다.",
+      ],
+    },
+    {
       version: "0.15.15",
       date: "2026-11-10",
       highlights: [
@@ -805,6 +861,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "pt-BR": [
+    {
+      version: "0.15.16",
+      date: "2026-11-10",
+      highlights: [
+        "Corrigidas as atualizações no aplicativo que paravam em “Reiniciar para atualizar” quando um relator de falhas de uma execução anterior ainda estava em execução: o assistente de atualização não espera mais por esse relator; outros processos do aplicativo continuam bloqueando a troca.",
+      ],
+    },
     {
       version: "0.15.15",
       date: "2026-11-10",
