@@ -3115,6 +3115,9 @@ Pi-Desktop-Plus 图标；两个表面都不会暴露库存 Electron 名称或图
   不能通过。恢复依据原 source 计算 `nightly-v1` 门禁，仅允许已审计的旧版摘要配对，
   保留 artifact 和 run-attempt 校验。验证新 attempt 时重跑整个 workflow；混用不同
   attempt 的结果不能证明完整门禁。
+- **Runner 环境准备**：共享 Ubuntu 夹具 runner 仅移除镜像列表中已知的 Azure 条目，
+  保留官方 archive/security HTTPS 条目及优先级。列表不符或任意 APT 索引错误均在
+  安装前失败。包清单与沙箱要求保持；环境准备失败不能算夹具已通过或执行完成。
 - **链接规格**：`06-delivery/06-release-runbook.md` §4.2、§5，
   `06-delivery/03-ai-development-workflow.md` §9；ADR `release-candidate-nightly-gate`。
 - **验收**：质量（发布流程）。

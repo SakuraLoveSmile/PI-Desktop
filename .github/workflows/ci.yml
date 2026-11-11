@@ -70,6 +70,7 @@ jobs:
         run: |
           node scripts/check-agent-policy.mjs
           node --test scripts/release-*.test.mjs scripts/publish-release.test.mjs scripts/require-cloud-build.test.mjs scripts/refresh-macos-release-metadata.test.mjs
+          node --test scripts/e2e/provision-linux.test.mjs
 
       - name: Check release documents and version surfaces
         if: inputs.release_document_version != ''

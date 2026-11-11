@@ -5679,6 +5679,11 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   audited legacy digest pair only, and preserves artifact/run-attempt checks.
   Re-run the whole workflow when validating a new attempt; mixed-attempt
   results cannot establish a complete gate.
+- **Runner provisioning**: The shared Ubuntu fixture runner removes only the
+  known Azure entry from the image's mirror list, retaining its official HTTPS
+  archive/security entries and priority metadata. An unexpected list or any APT
+  index error fails before installation. Package and sandbox requirements stay
+  unchanged; failed provisioning is not a passing or completed fixture result.
 - **Specs linked**: `06-delivery/06-release-runbook.md` §4.2 and §5,
   `06-delivery/03-ai-development-workflow.md` §9;
   ADR `release-candidate-nightly-gate`.

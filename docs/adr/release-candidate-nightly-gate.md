@@ -101,3 +101,66 @@ Relying on the last scheduled green run can validate a different commit and
 miss an absent schedule. Running a hand-maintained subset duplicates the
 catalog. Allowing recovery based only on an aggregate result discards the
 existing per-job evidence. None provides the requested candidate guarantee.
+
+## Addendum: restore Ubuntu fixture provisioning
+
+Status: Accepted for implementation by the user during the runner-recovery
+continuation. The accepted
+nightly gate above remains unchanged. The user confirmed this concrete recovery
+addendum under R4, including the offline-family environment check and continuation
+of the original S2 exercises. Existing branch commit/push authorization continues.
+
+### Evidence and decision
+
+Run `43047754114`, source `cd7f66571`, passed JS and Rust CI but stalled before
+any E2E suite. Its Ubuntu 24.04 image `20261101.360.1` repeatedly failed to
+resolve `azure.archive.ubuntu.com`. APT index errors remained warnings and the
+subsequent package acquisition repeated the same DNS failure.
+
+The [exact image's official configuration](https://github.com/actions/runner-images/blob/ubuntu24/20261101.360/images/ubuntu/scripts/build/configure-apt-sources.sh)
+creates `/etc/apt/apt-mirrors.txt` with Azure HTTP at priority 1, official Ubuntu
+archive HTTPS at priority 2 and official Ubuntu security HTTPS at priority 3.
+`ubuntu.sources` references that file. The
+[APT mirror contract](https://manpages.ubuntu.com/manpages/noble/man1/apt-transport-mirror.1.html)
+allows retaining priorities 2 and 3 without renumbering.
+
+1. In the existing `e2e-run.yml` provision step, remove only the known Azure
+   archive entry from this ephemeral runner's mirror list. Preserve both existing
+   official HTTPS entries, their order and priorities. Reject an unexpected
+   list rather than silently rewriting arbitrary sources. Do not rewrite
+   `ubuntu.sources`, its suites/components/architectures/Signed-By, cloud-init
+   templates, or the runner's DNS configuration.
+2. Use `sudo apt-get update --error-on=any`, the
+   [documented strict option](https://manpages.ubuntu.com/manpages/noble/man8/apt-get.8.html),
+   so a transient index error stops provisioning before package installation.
+   Keep the existing package list, signature/TLS verification, Electron sandbox,
+   timeouts, test catalog, assertions and release gates. Add no retry or warning
+   fallback. An unavailable official mirror remains a failed job.
+3. Keep this recovery local to the temporary GitHub-hosted Ubuntu VM. The user's
+   machine, running app, providers, repository package versions and signing or
+   packaging bodies are outside this change. A new runner discards the modified
+   mirror file; reverting the workflow change restores the old selection policy.
+
+### Execution and acceptance
+
+The main agent owns this atomic workflow/helper change, its focused tests and
+the shared task record. A read-only researcher verified the official image and
+APT contracts; no parallel writer is needed. An independent read-only review may
+check the actual implementation. The user confirmed implementation and validation
+of this addendum; original S2 acceptance criteria remain in force.
+
+First validate the mirror-list transformation in disposable files: the two
+official HTTPS lines and their metadata survive exactly, unexpected input is
+rejected, and an APT update error prevents install. Then use the existing manual
+`e2e-run.yml` entry with the smallest offline `voice` family on the request
+branch. Require dependency installation and its fixture to pass. This is an
+environment check and does not replace complete candidate validation.
+
+Once provisioning is proven, run S2's original full negative and clean candidate
+exercises on new pinned SHAs. Their acceptance criteria above remain unchanged.
+Retain run/SHA/job/artifact evidence in the task record. If the official HTTPS
+sources also fail DNS or transport checks, retain the failure and stop this
+recovery path without overriding DNS, fixing IP addresses or bypassing trust.
+
+Approval is not verification. Actual recovery checks, the hosted environment
+check and the full S2 exercises are recorded in the linked task record.

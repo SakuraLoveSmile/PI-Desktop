@@ -76,6 +76,7 @@ The scenarios are specified in
 |---|---|---|
 | `e2e-tool-admission.mjs` | `node scripts/e2e-tool-admission.mjs` | Isolated real-host tool admission: queued Bash burst leaves capacity for another session's Read/Write and recovers all counters |
 | `e2e-smoke.mjs` | `pnpm test:e2e` | Protocol-level E2E against host-core, plus an optional live model |
+| `e2e/provision-linux.mjs` | Shared hosted E2E runner provision step | Preserve the image's official HTTPS mirror entries, remove its Azure mirror, and stop on any APT index error before installing the unchanged fixture dependencies; local checks use `node --test scripts/e2e/provision-linux.test.mjs` |
 | `e2e-plan.mjs` | `pnpm test:e2e:plan` | Plan state, checkpoint artifact, and approval transitions |
 | `e2e-plan-ui.mjs` | `pnpm test:e2e:plan-ui` | Plan approval through the rendered UI |
 | `e2e-electron-boot.mjs` | `pnpm test:e2e:boot` | Electron boot probe |

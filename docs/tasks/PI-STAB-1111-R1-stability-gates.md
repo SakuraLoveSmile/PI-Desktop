@@ -1,7 +1,7 @@
 # PI-STAB-1111-R1 — Release gates, stability charter and UI evidence
 
 Date: 2026-11-11 (Asia/Taipei). Tier: T2 overall (S2); S3 T0; U1 T1.
-Status: 实现中. S2: 实现中 (hosted exercise blocked by runner DNS). S3: 已验收.
+Status: 实现中. S2: 实现中 (runner recovery awaiting hosted validation). S3: 已验收.
 U1: 待体验 (local native repeatability verified).
 
 ## Goal, identity and authorization
@@ -289,3 +289,39 @@ succeed. Both accepted exercises, normal candidate packaging and formal
 publication are NOT RUN. No further run was dispatched into the known blocker.
 The clean restoration commit has not been cloud-validated. No PR, merge, tag or
 release was created; both active unmerged worktrees and local evidence remain.
+
+## Runner recovery
+
+On 2026-11-11 the user asked how to restore the runner. The main agent verified
+the exact image's official APT source configuration against the recorded image
+version, and a read-only researcher independently checked mirror priority and
+strict update failure semantics. The existing S2 ADR now contains a proposed
+provisioning addendum: remove only the Azure mirror entry, preserve the two
+existing official HTTPS entries and all trust/source fields, and make any APT
+index error stop installation. It includes focused validation, one existing
+offline-family environment check, then the original full S2 exercises.
+
+The user explicitly confirmed this addendum and instructed the main agent to
+restore the runner and continue S2. Original branch commits/push and candidate
+CI authorization remain in force; no merge, tag, publication, live provider or
+paid API is authorized. The recovery starts from
+`b9128dc51af49380530bf78fec67185c76188316` in the same request worktree. The
+worktree's creation date/name remains unchanged across the midnight continuation.
+
+The main agent implemented `scripts/e2e/provision-linux.mjs` and wired the
+existing provision step to it. The exact known three-line image list is
+validated before mutation; only its Azure line is removed, retaining both
+HTTPS lines byte-for-byte. A strict index update precedes the original package
+and sandbox commands. The CLI refuses execution outside a hosted Linux runner;
+its I/O and command boundaries are tested with disposable files and fake
+privileged commands. CI runs the focused regression file alongside existing
+release-tool checks. No dependency, DNS resolver, trust field, fixture timeout,
+retry or suite classification changed. English/Chinese E2E expectations and
+script guidance are synchronized.
+
+Local validation: 6/6 focused provisioning tests and the combined 121 release,
+workflow and provisioning tests passed with no failures/skips. Targeted Biome
+lint, documentation (646 pages), locale pairs (96), scenario index and unchanged
+quality ratchet passed. Independent read-only review found no P1/P2. This does
+not prove real APT or hosted recovery; the voice environment check and full S2
+negative/clean exercises remain NOT RUN until their actual results are added.
