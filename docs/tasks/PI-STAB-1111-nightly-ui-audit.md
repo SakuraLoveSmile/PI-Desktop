@@ -1,6 +1,17 @@
 # PI-STAB-1111 — Nightly fixture diagnosis and UI baseline audit
 
-Date: 2026-11-11 (Asia/Taipei). Tier: T1. Status: 实现中.
+Date: 2026-11-11 (Asia/Taipei). Tier: T1. Status: 已验收.
+
+## User acceptance
+
+On 2026-11-11 the user explicitly closed S1 as complete and directed work to
+the next round. This is an accepted residual-risk exception: the Linux
+Electron/Viz crash remains unclassified, and the outstanding original S1
+repair/ordinary-nightly acceptance is waived for closing this package. All
+recorded failures and NOT RUN items remain factual evidence. This decision
+does not change test assertions, CI results, release gates, or the overall
+stability program's acceptance thresholds. The diagnostic branch is retained
+without a new merge or release authorization.
 
 ## Current scope and authorization
 
@@ -186,11 +197,10 @@ scheduled nightly: NOT RUN because no root-cause repair is established. Full
 workspace/Rust test gates, packaging, real providers and the running user
 application: NOT RUN; no product or runtime implementation is changed.
 
-S1 remains unresolved. A proven minimal repair must pass two consecutive
-complete ordinary goals-team/nightly runs on one final commit, followed by
-scheduled nightly evidence after authorized integration. Diagnostic runs cannot
-satisfy those two acceptance runs. The entire stability program's seven-day and
-real-model criteria are separate from this S1 package.
+S1 is complete by the user's explicit acceptance above. Its native cause remains
+unresolved; diagnostic runs do not establish a root-cause repair or satisfy the
+waived ordinary acceptance runs. The entire stability program's seven-day and
+real-model criteria remain separate from this S1 package.
 
 Keep the current worktree, unmerged branch and verified evidence for review.
 No new PR, merge or release is performed. Cleanup is deferred because these
