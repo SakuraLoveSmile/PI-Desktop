@@ -13840,6 +13840,41 @@ are withdrawn with ADR 0165.
   authorization; do not mark it exercised from fixture tests alone.
   Automation: `pnpm test:e2e:turn-get` (isolated Host and local MCP; no provider).
 
+#### E2E-MCP-goal-blocked-control
+
+- **Preconditions**: An isolated local Main MCP listener has registered Goal
+  handlers and an existing blocked Goal. Use fixture inputs only; no user
+  profile or paid provider is required for protocol checks.
+- **Steps**: 1) Authenticate and discover `pi_goal_execution_get`,
+  `pi_goal_resume` and `pi_goal_close`. 2) Read the blocked Goal and inspect
+  reasons, progress, limitations, next steps and hold version. 3) Attempt
+  named and generic resume/close without confirmation. 4) Resume with the
+  same execution/version and supplemental text. 5) Against another held
+  fixture, accept current state; read its ready report separately. 6) Attempt
+  a stale version, malformed action or missing identity.
+- **Expected**: Reads keep the Host-owned hold intact. Mutations require
+  confirmation and bind the current session/execution/version. Resume uses
+  Main's existing runtime and retains the supplement in the same Goal's new
+  turn. Acceptance preserves the original non-met verdict and unmet checks
+  with `closure=user_accepted`; it is never described as verification passed.
+  Main/Host errors remain observable, and stale writes do not create a turn
+  or close a different Goal. A timeout is not evidence of failed delivery.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` §13d,
+  `03-runtime/06-host-rpc-protocol.md`, ADR `external-goal-control-over-mcp`
+- **Acceptance**: C (sessions), Security, Quality
+- **Milestone**: M6+
+- **Status**: Authenticated MCP/registered Main IPC contracts are covered by
+  `apps/desktop/test/mcp-goal-control.test.mjs`; the existing
+  `goal-resume-main.test.mjs` covers actual Main runtime settlement, turn
+  binding, supplement persistence and rollback. The `goal-blocked-resume`
+  suite (`node scripts/e2e-suite.mjs --tier nightly --family goals-team`)
+  exercises the authenticated MCP and registered Main entry with a real Host,
+  real AgentSidecar and a loopback model fixture. It checks same-Goal resume,
+  supplement persistence, explicit partial acceptance and the trusted report
+  hash. Its new marker is `E2E-MCP-goal-blocked-control`; execution evidence is
+  recorded against the candidate. The installed Electron journey remains
+  release qualification; fixture results are not real-provider evidence.
+
 #### E2E-MCP-session-get-projects-large-compaction
 
 - **Preconditions**: Start PI-Desktop with `PI_DESKTOP_MCP_CONTROL=1`. A durable

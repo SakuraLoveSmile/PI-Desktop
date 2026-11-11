@@ -385,3 +385,5 @@ Each ADR includes:
 | worktree-project-memory-spaces | [Share durable project memory across verified worktrees](worktree-project-memory-spaces.md) | Accepted for the implementation candidate; user acceptance pending |
 
 - [Explicit Team task dispatch and queued-message age](team-task-dispatch-age.md)
+
+- [External held-Goal control over local MCP](external-goal-control-over-mcp.md)

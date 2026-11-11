@@ -10,6 +10,8 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { register } from "node:module";
+import { IPC } from "../packages/shared/dist/protocol.js";
 import { DesktopAgentRuntime } from "../packages/agent-runtime/dist/runtime.js";
 import { AgentSidecar } from "../packages/host-runtime/dist/agent-sidecar.js";
 import { HostProcess } from "../packages/host-runtime/dist/host-process.js";
@@ -17,6 +19,11 @@ import { resolveHostBinary } from "./e2e/host.mjs";
 import { resolvePlan } from "./e2e/plan.mjs";
 import { candidateIdentity } from "./e2e-suite-runtime.mjs";
 import { validateGoalReport } from "../packages/shared/dist/goal-report.js";
+
+register(new URL("../apps/desktop/test/helpers/ts-import-hooks.mjs", import.meta.url));
+const { McpControlServer } = await import("../apps/desktop/electron/main/mcp-control.ts");
+const { registerGoalReportIpc } = await import("../apps/desktop/electron/main/ipc/goal-report-ipc.ts");
+const { createGoalResumeRuntime } = await import("../apps/desktop/electron/main/runtime/goal-resume.ts");
 
 const root = await mkdtemp(join(tmpdir(), "pi-goal-blocked-resume-"));
 const workspace = join(root, "workspace"), dataDir = join(root, "data"), fixtureHome = join(root, "home");
@@ -35,7 +42,8 @@ const metReport = { verdict: "met", summary: "Verified every approved criterion 
   criteria: [{ id: "checks", text: "Verify all milestones", verdict: "met", explanation: "All five persisted milestones and the local fixture check passed." }],
   steps: items.map(item => ({ id: item.id, title: item.label, status: "completed" })),
   checks: [{ id: "fixture", command: "fixture acceptance check", result: "passed", detail: "Deterministic local fixture passed." }], limitations: [], nextSteps: [] };
-let host, sidecar, provider, baseUrl, fixture, fixtureError;
+let host, sidecar, provider, baseUrl, fixture, fixtureError, control;
+let controlCall;
 const runtimes = new Set(), notices = [], persistence = [];
 const server = createServer(async (req, res) => {
   try {
@@ -133,6 +141,72 @@ async function assertBlocked(f, code) {
   assert.ok(notifications.some(note => note.sessionId === f.session.id && note.kind === "task.failed" && note.errorCode === "GOAL_BLOCKED"));
   return state;
 }
+function sidecarLaunch(sessionId) {
+  return { sessionId, mode: "agent", executionProfile: "standard", projectPath: workspace, thinkingLevel: "off",
+    commandShell: { id: "bash", label: "Bash", dialect: "posix", available: true, isDefault: true },
+    provider: { id: provider.id, name: "Fixture", modelId: "fixture", baseUrl, apiKey: "", authKind: "none", apiStyle: "chat_completions",
+      supportsReasoning: false, supportedThinkingLevels: ["off"], modelConfig: { source: "generic", name: "Fixture", baseUrl, reasoning: false, input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 256000, maxTokens: 32000 } } };
+}
+async function startGoalControl() {
+  const handlers = new Map();
+  registerGoalReportIpc({ handle: (channel, handler) => handlers.set(channel, handler), getHost: () => host,
+    resumeBlockedGoal: input => createGoalResumeRuntime({
+      runtimeState: { host, sidecar }, activeTurns: new Map(),
+      acquireSessionOperation: async () => () => {}, waitForExecutionSettlement: async () => {},
+      registerResumedExecution() {}, emitAgentEvent() {}, onGoalResumed: async () => {},
+      resolveAgentRuntimeLaunch: async sessionId => ({ providerId: provider.id, modelId: "fixture", sidecarParams: sidecarLaunch(sessionId) }),
+      finishTurn: async () => { throw new Error("Unexpected resume rollback"); },
+      lockExecutionInterruption() {}, finishApprovedExecution: async () => { throw new Error("Unexpected resume settlement failure"); },
+    })(input),
+  });
+  control = new McpControlServer({ dataDir: join(root, "mcp"), port: 0, channels: {
+    goalExecutionGet: IPC.invoke.goalExecutionGet, goalResume: IPC.invoke.goalResume,
+    goalClose: IPC.invoke.goalClose, goalReportGet: IPC.invoke.goalReportGet,
+  }, invoke: (channel, args) => handlers.get(channel)(...args) });
+  const info = await control.start(); let session, id = 0;
+  const rpc = async (method, params = {}) => {
+    const response = await fetch(info.url, { method: "POST", headers: { Authorization: `Bearer ${info.token}`,
+      "Content-Type": "application/json", ...(session ? { "Mcp-Session-Id": session } : {}) },
+      body: JSON.stringify({ jsonrpc: "2.0", id: ++id, method, params }) });
+    session ??= response.headers.get("mcp-session-id");
+    return (await response.json()).result;
+  };
+  await rpc("initialize", { protocolVersion: "2025-06-18" });
+  const listed = await rpc("tools/list");
+  for (const name of ["pi_goal_execution_get", "pi_goal_resume", "pi_goal_close"]) assert.ok(listed.tools.some(tool => tool.name === name));
+  controlCall = async (name, args, errorCode) => {
+    const result = await rpc("tools/call", { name, arguments: args });
+    if (errorCode) { assert.equal(result.isError, true); assert.equal(result.structuredContent.error.code, errorCode); }
+    else assert.notEqual(result.isError, true, JSON.stringify(result));
+    return result.structuredContent;
+  };
+}
+async function resumeSidecarViaControl(f, hold) {
+  let timer, detach;
+  const ended = new Promise((resolve, reject) => {
+    timer = setTimeout(() => reject(new Error("MCP Goal continuation exceeded 30 seconds")), 30000);
+    detach = sidecar.onNotification((method, envelope) => {
+      if (method !== "agent.event" || envelope.sessionId !== f.session.id) return;
+      const { event } = envelope; fixture.events.push(event);
+      if (event.type === "message_end") persistence.push(host.call("session.appendMessage", {
+        sessionId: f.session.id, turnId: envelope.turnId, message: event.message,
+      }));
+      if (event.type === "error") reject(new Error(JSON.stringify(event.error)));
+      if (event.type === "agent_end") resolve();
+    });
+  });
+  try {
+    const read = await controlCall("pi_goal_execution_get", { sessionId: f.session.id, executionId: f.execution.id });
+    assert.equal(read.hold.version, hold.version); assert.equal(read.hold.state, "blocked");
+    const args = { sessionId: f.session.id, executionId: f.execution.id, expectedVersion: hold.version, message: supplement, confirm: true };
+    await controlCall("pi_goal_resume", { ...args, confirm: false }, "CONFIRMATION_REQUIRED");
+    const continued = await controlCall("pi_goal_resume", args);
+    assert.equal(continued.execution.id, f.execution.id); assert.notEqual(continued.turnId, f.turnId);
+    await ended; await Promise.all(persistence.splice(0)); assert.ifError(fixtureError);
+    return { ...f, execution: continued.execution, turnId: continued.turnId, resume: continued.resume };
+  } finally { clearTimeout(timer); detach?.(); }
+}
 async function runSidecar(f) {
   let timeout, detach;
   const ended = new Promise((resolve, reject) => {
@@ -148,12 +222,7 @@ async function runSidecar(f) {
     });
   });
   try {
-    const accepted = await sidecar.call("agent.executeApprovedPlan", { sessionId: f.session.id, turnId: f.turnId, execution: f.execution,
-      mode: "agent", executionProfile: "standard", projectPath: workspace, thinkingLevel: "off",
-      commandShell: { id: "bash", label: "Bash", dialect: "posix", available: true, isDefault: true },
-      provider: { id: provider.id, name: "Fixture", modelId: "fixture", baseUrl, apiKey: "", authKind: "none", apiStyle: "chat_completions",
-        supportsReasoning: false, supportedThinkingLevels: ["off"], modelConfig: { source: "generic", name: "Fixture", baseUrl, reasoning: false, input: ["text"],
-          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 256000, maxTokens: 32000 } },
+    const accepted = await sidecar.call("agent.executeApprovedPlan", { ...sidecarLaunch(f.session.id), turnId: f.turnId, execution: f.execution,
       ...(f.resume ? { resume: f.resume, userMessageId: f.userMessageId } : {}) });
     assert.equal(accepted.accepted, true); await ended; await Promise.all(persistence.splice(0)); assert.ifError(fixtureError);
     assert.equal(fixture.events.filter(event => event.type === "agent_end").length, 1);
@@ -197,6 +266,7 @@ try {
     await host.dispose();
   }
   await boot();
+  await startGoalControl();
   ({ provider } = await host.call("providers.create", { name: "Blocked fixture", vendorKey: "custom", authKind: "none", apiStyle: "chat_completions", baseUrl,
     defaultModelId: "fixture", models: ["fixture", "resume-fixture"].map(id => ({ id, thinkingLevels: ["off"] })) }));
 
@@ -317,7 +387,15 @@ try {
   await assert.rejects(host.call("plans.finishExecution", { executionId: partial.execution.id, status: "completed" }), error => error.message.includes("GOAL_REPORT_NOT_VERIFIED"));
   await settle(partial);
   const partialBlocked = await assertBlocked(partial, "verdict_partial"); assert.equal(partialBlocked.hold.draft.limitations[0], "User access is required.");
-  await host.call("goalExecutions.close", { sessionId: partial.session.id, executionId: partial.execution.id, expectedVersion: partialBlocked.hold.version, action: "accept" });
+  const partialIdentity = { sessionId: partial.session.id, executionId: partial.execution.id };
+  const mcpBlocked = await controlCall("pi_goal_execution_get", partialIdentity);
+  assert.deepEqual(mcpBlocked.hold.draft.limitations, ["User access is required."]);
+  await controlCall("pi_goal_close", { ...partialIdentity, expectedVersion: partialBlocked.hold.version, action: "accept", confirm: false }, "CONFIRMATION_REQUIRED");
+  await controlCall("pi_goal_close", { ...partialIdentity, expectedVersion: partialBlocked.hold.version, action: "accept", confirm: true });
+  const acceptedRead = await controlCall("pi_goal_report_get", partialIdentity);
+  assert.equal(acceptedRead.state, "ready"); assert.match(acceptedRead.report_sha256, /^[a-f0-9]{64}$/);
+  assert.equal(acceptedRead.report.verdict, "partial"); assert.equal(acceptedRead.report.closure, "user_accepted");
+  await controlCall("pi_goal_close", { ...partialIdentity, expectedVersion: partialBlocked.hold.version, action: "accept", confirm: true }, "CONFLICT");
   const accepted = (await host.call("goalReports.get", { sessionId: partial.session.id, executionId: partial.execution.id })).report;
   assert.equal(accepted.verdict, "partial"); assert.equal(accepted.closure, "user_accepted"); assert.equal(accepted.integrity.kind, "structured");
   pass("E2E-GOAL-BLOCKED-005", "D: partial remains blocked with limitations until explicit accept; partial/structured/user_accepted completion");
@@ -399,7 +477,6 @@ try {
   await runSidecar(proxied); assert.equal(fixture.requests.length, 3); await settle(proxied);
   const proxyHold = (await assertBlocked(proxied, "report_missing")).hold;
   await sidecar.dispose(); sidecar = startSidecar(); attachSidecar();
-  const proxyContinued = await resume(proxied, proxyHold, supplement);
   configureFixture((request, step) => {
     const messages = JSON.stringify(request.messages);
     assert.ok(messages.includes(supplement) && messages.includes(proxied.execution.plan.replaceAll("\n", "\\n")));
@@ -412,7 +489,8 @@ try {
     if (step === 2) return tool("SubmitGoalReport", metReport);
     return "Actual child sidecar verified every original criterion.";
   });
-  await runSidecar(proxyContinued); await settle(proxyContinued);
+  const proxyContinued = await resumeSidecarViaControl(proxied, proxyHold);
+  await settle(proxyContinued);
   const proxyReport = (await host.call("goalReports.get", { sessionId: proxied.session.id, executionId: proxied.execution.id })).report;
   assert.equal(proxyReport.executionId, proxied.execution.id); assert.equal(proxyReport.verdict, "met");
   assert.equal(proxyReport.segments.length, 2); assert.equal(proxyReport.blocks.length, 1); assert.equal(validateGoalReport(proxyReport).ok, true);
@@ -426,6 +504,7 @@ try {
   assert.equal(proxyTranscript.filter(message => message.role === "user" && message.content === supplement).length, 1);
   await sidecar.dispose(); sidecar = undefined;
   pass("E2E-GOAL-BLOCKED-010", "Real AgentSidecar child + ParentHostProxy + Runtime + native Host: blocked then same-ID resume, authorized progress get, new token, child restart/full contract replay/supplement once, met report/segments2/blocks1");
+  pass("E2E-MCP-goal-blocked-control", "Authenticated MCP -> registered Goal Main IPC -> native Host plus real AgentSidecar: same-ID resume with supplement once; explicit acceptance preserves partial/user_accepted and trusted report hash; missing confirmation and stale CAS rejected");
   // A Host exit during an active segment must hold the same execution on boot.
   const crashed = await goal("FIXTURE_HOST_CRASH");
   const issueProgress = async segment => (await host.call("goalProgress.issueToken", {
@@ -478,9 +557,10 @@ try {
   assert.equal(crashReport.execution.startedAt, crashReport.segments[0].startedAt);
   assert.equal(validateGoalReport(crashReport).ok, true);
   pass("E2E-GOAL-BLOCKED-011", "Real Host exits during initial and resumed running segments: boot blocks same ID with HOST_RESTARTED, revokes tokens/preserves progress/no completion; third segment finishes met, segments3/blocks2");
-  evidence.limitations = ["Main/IPC/renderer integration is verified separately; this harness invokes native lifecycle RPC and runtime public interface.",
+  evidence.limitations = ["Held-Goal read/accept/resume traverse registered Main IPC and authenticated MCP; renderer integration is verified separately.",
     "H follows accepted Plus v9 fail-closed compatibility; no old-binary downgrade is claimed."];
 } finally {
+  await control?.stop();
   await sidecar?.dispose();
   await Promise.allSettled([...runtimes].map(runtime => runtime.dispose())); await host?.dispose();
   server.closeAllConnections(); await new Promise(resolve => server.close(resolve));

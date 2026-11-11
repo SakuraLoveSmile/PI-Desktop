@@ -6,6 +6,13 @@ export const PLUS_UPSTREAM_CUTOFF = "0.15.6";
 const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   en: [
     {
+      version: "0.15.17",
+      date: "2026-11-12",
+      highlights: [
+        "External controllers can now show why a Goal is blocked, continue the same Goal with supplemental material, or explicitly accept the current result. Acceptance keeps unmet checks and is recorded as user-confirmed, not verified completion.",
+      ],
+    },
+    {
       version: "0.15.16",
       date: "2026-11-10",
       highlights: [
@@ -112,6 +119,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "zh-CN": [
+    {
+      version: "0.15.17",
+      date: "2026-11-12",
+      highlights: [
+        "外部调度台现在可以显示目标受阻原因，补充材料后继续同一目标，或明确接受当前结果。接受现状会保留未通过项，并记录为用户确认结束，不会冒充验证通过。",
+      ],
+    },
     {
       version: "0.15.16",
       date: "2026-11-10",
@@ -220,6 +234,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   "zh-TW": [
     {
+      version: "0.15.17",
+      date: "2026-11-12",
+      highlights: [
+        "外部調度台現在可以顯示目標受阻原因，補充資料後繼續同一目標，或明確接受目前結果。接受現況會保留未通過項目，並記錄為使用者確認結束，不會冒充驗證通過。",
+      ],
+    },
+    {
       version: "0.15.16",
       date: "2026-11-10",
       highlights: [
@@ -326,6 +347,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   tr: [
+    {
+      version: "0.15.17",
+      date: "2026-11-12",
+      highlights: [
+        "Harici denetleyiciler artık bir Hedefin neden engellendiğini gösterebilir, ek bilgilerle aynı Hedefi sürdürebilir veya mevcut sonucu açıkça kabul edebilir. Kabul, karşılanmayan kontrolleri korur ve doğrulanmış tamamlanma değil, kullanıcı onayı olarak kaydedilir.",
+      ],
+    },
     {
       version: "0.15.16",
       date: "2026-11-10",
@@ -434,6 +462,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   de: [
     {
+      version: "0.15.17",
+      date: "2026-11-12",
+      highlights: [
+        "Externe Steuerungen können jetzt anzeigen, warum ein Ziel blockiert ist, dasselbe Ziel mit ergänzendem Material fortsetzen oder das aktuelle Ergebnis ausdrücklich akzeptieren. Dabei bleiben unerfüllte Prüfungen erhalten; der Abschluss wird als vom Nutzer bestätigt und nicht als verifiziert erfasst.",
+      ],
+    },
+    {
       version: "0.15.16",
       date: "2026-11-10",
       highlights: [
@@ -540,6 +575,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   es: [
+    {
+      version: "0.15.17",
+      date: "2026-11-12",
+      highlights: [
+        "Los controladores externos ahora pueden mostrar por qué un objetivo está bloqueado, continuar el mismo objetivo con material adicional o aceptar explícitamente el resultado actual. La aceptación conserva las comprobaciones pendientes y se registra como confirmación del usuario, no como finalización verificada.",
+      ],
+    },
     {
       version: "0.15.16",
       date: "2026-11-10",
@@ -648,6 +690,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   fr: [
     {
+      version: "0.15.17",
+      date: "2026-11-12",
+      highlights: [
+        "Les contrôleurs externes peuvent désormais afficher pourquoi un objectif est bloqué, poursuivre ce même objectif avec des éléments complémentaires ou accepter explicitement le résultat actuel. Les vérifications non satisfaites sont conservées et la clôture est notée comme confirmée par l’utilisateur, et non comme vérifiée.",
+      ],
+    },
+    {
       version: "0.15.16",
       date: "2026-11-10",
       highlights: [
@@ -755,6 +804,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   ko: [
     {
+      version: "0.15.17",
+      date: "2026-11-12",
+      highlights: [
+        "외부 제어 도구에서 목표가 차단된 이유를 확인하고, 추가 자료로 같은 목표를 계속하거나 현재 결과를 명시적으로 수락할 수 있습니다. 수락해도 미충족 검사는 유지되며 검증 완료가 아닌 사용자 확인 종료로 기록됩니다.",
+      ],
+    },
+    {
       version: "0.15.16",
       date: "2026-11-10",
       highlights: [
@@ -861,6 +917,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "pt-BR": [
+    {
+      version: "0.15.17",
+      date: "2026-11-12",
+      highlights: [
+        "Controladores externos agora podem mostrar por que um objetivo está bloqueado, continuar o mesmo objetivo com material adicional ou aceitar explicitamente o resultado atual. A aceitação preserva as verificações não atendidas e é registrada como confirmação do usuário, não como conclusão verificada.",
+      ],
+    },
     {
       version: "0.15.16",
       date: "2026-11-10",
