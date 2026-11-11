@@ -106,7 +106,7 @@ test("release validates one pinned candidate before starting verification", () =
   const { metadata, verify, build } = releaseWorkflow.jobs;
   assert.equal(metadata.steps.find(step => step.id === "preflight").run, "node scripts/release-preflight.mjs");
   assert.equal(verify.needs, "metadata");
-  assert.deepEqual(build.needs, ["metadata", "verify"]);
+  assert.deepEqual(build.needs, ["metadata", "verify", "nightly"]);
   // Exact tag/version, source identity, main ancestry and signing refusal are
   // tested with real isolated Git repositories in release-preflight.test.mjs.
 });
@@ -145,7 +145,7 @@ test("release preparation overlaps independent work and avoids duplicate builds"
 test("release builds are gated on the CI checks and least-privilege permissions", () => {
   assert.deepEqual(releaseWorkflow.permissions, { contents: "read" });
   assert.equal(releaseWorkflow.jobs.verify.uses, "./.github/workflows/ci.yml");
-  assert.deepEqual(releaseWorkflow.jobs.build.needs, ["metadata", "verify"]);
+  assert.deepEqual(releaseWorkflow.jobs.build.needs, ["metadata", "verify", "nightly"]);
   assert.deepEqual(releaseWorkflow.jobs.publish.needs, ["metadata", "aggregate"]);
   assert.deepEqual(releaseWorkflow.jobs.publish.permissions, { contents: "write" });
   const runs = ciWorkflow.jobs.js.steps.map(step => step.run);

@@ -120,6 +120,7 @@ documentation screenshot publisher are unchanged.
 | Agent-policy check | PASS; workflow-spec byte budget retained |
 | Test-quality/architecture/diff checks | PASS; committed candidate `003c220ee` was rechecked against `origin/main`, including all 10 added source files; unchanged baselines |
 | Full VitePress build after the hosted dead-link repro | PASS, 29.74 s; output only in this worktree's `.artifacts/s2-release-gate/docs-build`; no dead-link exception added |
+| `node --test apps/desktop/test/ci-workflow.test.mjs` after synchronizing the approved dependency contract | PASS, 15; both exact dependency assertions now require nightly as well as metadata and shared CI; quality inventory unchanged |
 | `pnpm test:ui-tools` and explicit `pnpm run test:ui-tools` | FAILED before the test process: pnpm 12 automatic installation rejects the provisioned symlinked hoist directory. No dependency replacement completed; direct Node entry-point evidence is above |
 
 System Python lacks Pillow. The already provisioned interpreter is
@@ -233,3 +234,21 @@ VitePress build passed with its original dead-link enforcement. The corrected
 negative candidate must run as a new commit; no same-SHA rerun or retry is
 counted as green evidence. Local run/job receipts and the failed build log are
 retained in `.artifacts/s2-release-gate/`.
+
+The second candidate [43045528219](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/43045528219),
+SHA `4296c714b49e9e068090818a18e2b5adb99e7d71`, passed the full cloud build,
+typechecks, lint, policy/release/architecture/quality checks and Rust CI. Its
+Desktop unit run reported 4,372 passes, two failures and 12 existing skips.
+Both failures were exact `build.needs` assertions in
+`apps/desktop/test/ci-workflow.test.mjs` that still expected only
+`metadata, verify`. They were missed in the initial S2 synchronization; this is
+another package-introduced validation defect. The main agent cancelled the
+invalid run and retained its complete log. Neither invalid run is acceptance.
+
+Both assertions now require the exact stronger approved contract
+`metadata, verify, nightly`; no assertion was removed, loosened or skipped.
+The file's 15 tests and the unchanged 237-file / 8,120-assertion quality ratchet
+passed locally. Independent read-only review found no P1/P2 and verified that
+remaining old-contract references belong to audited legacy fixtures or
+deliberate rejection cases. A new source commit requires a fresh hosted
+negative exercise before the clean candidate.
