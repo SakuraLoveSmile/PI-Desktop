@@ -20,16 +20,81 @@ declare global {
   var expertTeamSettingsStyleProbe: (theme: "light" | "dark") => Promise<unknown>;
   var expertTeamSettingsCleanup: (() => void) | undefined;
   var expertTeamSettingsViewportProbe: () => Promise<unknown>;
+  var expertTeamSettingsWaitForViewport: (width: number) => Promise<unknown>;
+  var expertTeamSettingsPhase: string | undefined;
 }
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const assert = (value: unknown, message: string) => { if (!value) throw new Error(message); };
+let diagnosticRail: Element | null | undefined;
+function recordDiagnostic(event: string, target?: HTMLButtonElement) {
+  const currentRail = document.querySelector(".settings-nav-scroll");
+  const directory = document.querySelector<HTMLDialogElement>("#settings-directory");
+  const railState = (rail: Element | null | undefined) => ({
+    present: Boolean(rail),
+    isConnected: rail?.isConnected ?? false,
+    insideDirectory: Boolean(rail?.closest("#settings-directory")),
+  });
+  console.error("EXPERT_TEAM_SETTINGS_DIAGNOSTIC " + JSON.stringify({
+    phase: globalThis.expertTeamSettingsPhase ?? "preview",
+    event,
+    elapsedMs: performance.now(),
+    innerWidth: window.innerWidth,
+    innerHeight: window.innerHeight,
+    compactMedia: window.matchMedia("(max-width: 720px)").matches,
+    theme: document.documentElement.dataset.theme ?? null,
+    settingsTab: useAppStore.getState().settingsTab ?? null,
+    currentRail: railState(currentRail),
+    cachedRail: railState(diagnosticRail),
+    cachedRailIsCurrent: diagnosticRail ? diagnosticRail === currentRail : null,
+    directory: { present: Boolean(directory), open: directory?.open ?? false },
+    target: target ? { isConnected: target.isConnected, disabled: target.disabled } : null,
+  }));
+}
+function navigationMatchesViewport() {
+  const compact = window.matchMedia("(max-width: 720px)").matches;
+  const rail = document.querySelector(".settings-nav-scroll");
+  const directory = document.querySelector<HTMLDialogElement>("#settings-directory");
+  const trigger = document.querySelector(".settings-categories-toggle");
+  return Boolean(rail) && (compact
+    ? Boolean(directory && trigger && rail?.closest("#settings-directory") === directory)
+    : !directory && !trigger && !rail?.closest("#settings-directory"));
+}
+async function navigate(label: string, destination: "expertTeam" | "subagents") {
+  await until(navigationMatchesViewport, "Settings navigation matches current viewport");
+  if (window.matchMedia("(max-width: 720px)").matches) {
+    const trigger = document.querySelector<HTMLButtonElement>(".settings-categories-toggle");
+    assert(trigger?.isConnected, "Compact settings directory trigger must be connected");
+    recordDiagnostic("directory:open:before", trigger!);
+    await click(trigger!);
+    await until(() => document.querySelector<HTMLDialogElement>("#settings-directory")?.open === true,
+      "Compact settings directory opens through its trigger");
+    recordDiagnostic("directory:open:after", trigger!);
+  }
+  const rail = document.querySelector(".settings-nav-scroll");
+  diagnosticRail = rail;
+  assert(rail?.isConnected && rail.getClientRects().length > 0, "Current settings navigation must be visible and connected");
+  const button = findButton(rail!, label);
+  assert(button.isConnected, "Settings navigation target must be connected");
+  recordDiagnostic(`navigation:${destination}:before`, button);
+  await click(button);
+  recordDiagnostic(`navigation:${destination}:after`, button);
+}
 async function until(condition: () => boolean, label: string) {
   const deadline = performance.now() + 6000;
   while (!condition() && performance.now() < deadline) {
     await act(async () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
   }
-  assert(condition(), `Expected UI state: ${label}; tab=${useAppStore.getState().settingsTab}; surface=${document.querySelector(".settings-content")?.textContent?.slice(0, 700)}`);
+  const satisfied = condition();
+  if (!satisfied) recordDiagnostic(`wait:timeout:${label}`);
+  assert(satisfied, `Expected UI state: ${label}; tab=${useAppStore.getState().settingsTab}; surface=${document.querySelector(".settings-content")?.textContent?.slice(0, 700)}`);
 }
+globalThis.expertTeamSettingsWaitForViewport = async (width) => {
+  recordDiagnostic(`viewport:${width}:waiting`);
+  await until(() => window.innerWidth === width
+    && window.matchMedia("(max-width: 720px)").matches === (width <= 720)
+    && navigationMatchesViewport(), `Settings viewport ${width} and responsive navigation settle`);
+  recordDiagnostic(`viewport:${width}:ready`);
+};
 function findButton(parent: ParentNode, label: string): HTMLButtonElement {
   const found = [...parent.querySelectorAll<HTMLButtonElement>("button")].find((button) => button.textContent?.trim() === label);
   if (!found) throw new Error(`Missing button: ${label}`);
@@ -80,6 +145,8 @@ function textContrast(element: Element, background: string): number {
 }
 
 globalThis.expertTeamSettingsProbe = async (options = {}) => {
+  diagnosticRail = undefined;
+  recordDiagnostic("probe:start");
   const locale = options.locale ?? "zh-CN";
   const theme = options.theme ?? "dark";
   const i18n = createInstance();
@@ -183,6 +250,7 @@ globalThis.expertTeamSettingsProbe = async (options = {}) => {
     root.unmount(); container.remove(); Object.assign(api, original);
   };
   globalThis.expertTeamSettingsStyleProbe = async (nextTheme) => {
+    recordDiagnostic(`style:${nextTheme}:start`);
     stored = { ...stored, theme: nextTheme, expertTeam: {
       ...stored.expertTeam!, userDefaults: { ...stored.expertTeam!.userDefaults, researcher: { instructions: "Fixture review guidance." } },
     } };
@@ -191,7 +259,9 @@ globalThis.expertTeamSettingsProbe = async (options = {}) => {
       document.documentElement.dataset.theme = nextTheme;
     });
     const rail = document.querySelector(".settings-nav-scroll")!;
-    await click(findButton(rail, t("settings.expertTeam.title")));
+    diagnosticRail = rail;
+    recordDiagnostic(`style:${nextTheme}:rail-cached`);
+    await navigate(t("settings.expertTeam.title"), "expertTeam");
     await until(() => document.querySelectorAll(".expert-team-settings .agent-capability-row").length === 6, "six shared expert rows");
     await settleVisualTransitions();
     const content = document.querySelector<HTMLElement>(".settings-content")!;
@@ -226,7 +296,7 @@ globalThis.expertTeamSettingsProbe = async (options = {}) => {
       assert(rect.right <= card.right + 1 && rect.left >= card.left - 1, "Editor controls remain inside shared panel");
     }
     await roleAction("researcher", "cancel");
-    await click(findButton(rail, t("settings.nav.subagents")));
+    await navigate(t("settings.nav.subagents"), "subagents");
     await until(() => document.querySelector(".agent-subagents-page .agent-capability-row") !== null, "Subagents through real Settings navigation");
     await settleVisualTransitions();
     const subagents = document.querySelector(".agent-subagents-page")!;
@@ -237,8 +307,9 @@ globalThis.expertTeamSettingsProbe = async (options = {}) => {
     const labels = [...document.querySelectorAll(".settings-nav-item, .agent-capability-name, .agent-capability-badge")];
     const minimumContrast = Math.min(...labels.map((element) => textContrast(element, background)));
     assert(minimumContrast >= 3, `Shared labels must remain readable in ${nextTheme}: ${minimumContrast}`);
-    await click(findButton(rail, t("settings.expertTeam.title")));
+    await navigate(t("settings.expertTeam.title"), "expertTeam");
     await until(() => document.querySelectorAll(".expert-team-settings .agent-capability-row").length === 6, "Expert team return navigation");
+    recordDiagnostic(`style:${nextTheme}:complete`);
     return { ok: true, theme: nextTheme, viewport: window.innerWidth, minimumContrast, sharedStyles: expertStyle };
   };
   try {
@@ -246,8 +317,9 @@ globalThis.expertTeamSettingsProbe = async (options = {}) => {
     if (options.preview) return { ok: true, preview: true, locale, theme };
     assert(document.querySelectorAll('[data-testid^="expert-team-role-"]').length === 6, "Six built-in roles must match reference");
     const rail = document.querySelector(".settings-nav-scroll");
+    diagnosticRail = rail;
     assert(rail && findButton(rail, t("settings.expertTeam.title")), "Explicit expert team navigation must be reachable");
-    await click(findButton(rail!, t("settings.expertTeam.title")));
+    await navigate(t("settings.expertTeam.title"), "expertTeam");
     checks.push("production Settings navigation and six roles");
     await edit("researcher");
     await pick("researcher", "model", "Fixture Service · fixture-model");
@@ -366,6 +438,7 @@ globalThis.expertTeamSettingsProbe = async (options = {}) => {
     stored = structuredClone(initial);
     await mount();
     globalThis.expertTeamSettingsViewportProbe = async () => {
+      recordDiagnostic("viewport:start");
       stored = { ...stored, theme: "light" };
       await act(async () => {
         useAppStore.setState({ settings: structuredClone(stored) });
@@ -392,8 +465,10 @@ globalThis.expertTeamSettingsProbe = async (options = {}) => {
       await roleAction("researcher", "cancel");
       const styles = [];
       for (const nextTheme of ["light", "dark"] as const) styles.push(await globalThis.expertTeamSettingsStyleProbe(nextTheme));
+      recordDiagnostic("viewport:complete");
       return { ok: true, viewport: window.innerWidth, minimumLabelContrast: Math.min(...readability.map((item) => item.contrast)), styles };
     };
+    recordDiagnostic("probe:complete");
     return { ok: true, checks, writes: writeCount };
   } finally {
     globalThis.expertTeamSettingsCleanup = () => {

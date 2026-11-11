@@ -18067,6 +18067,15 @@ popup.
   an outstanding read, shared Subagents row/glyph/badge/action styles in both
   themes, and narrow editor containment. Host API is the
   controlled external boundary; no model or user profile is used.
+  The runner retains named probe phases and navigation before/after snapshots
+  under `.artifacts/e2e/expert-team-settings/diagnostics.json`, including
+  viewport/media, tab, current/cached rail attachment, and directory-open state.
+  After a resize it waits for the actual viewport and responsive navigation
+  structure, then reacquires the connected visible rail for each navigation.
+  Compact navigation opens the directory through its real trigger before
+  selecting a destination. The original navigation/style assertions and
+  deadlines remain in force. Diagnostic snapshots use atomic replacement;
+  unreadable snapshots, failed children and timed-out children remain failures.
 - node scripts/e2e-expert-team-config.mjs uses a real isolated SQLite/stdio Host
   and the shared schema to verify settings persistence, user/project resolution,
   route binding, proposal/confirmation/runtime context, tool denials, restart,
@@ -18914,6 +18923,14 @@ push or PR authorization.
   Host/runtime/proxy wiring, not the complete Desktop Renderer journey. Report
   actual results and remaining cross-layer coverage separately; descriptions
   and scenario registration alone do not establish a passing run.
+  For capture diagnosis, `.artifacts/e2e/goal-blocked-ui/diagnostics.jsonl`
+  records named stages, GPU feature status, GPU/renderer exits and the child
+  exit result. `probe.json` preserves completed interaction/layout checks before
+  capture. This partial probe is diagnostic evidence, not a passing result:
+  either screenshot failing still fails the suite, and the final success JSON
+  is written only after both screenshots succeed. Each run clears its previous
+  diagnostic and success files. Both diagnostic directories are inside the
+  existing CI artifact upload root; no workflow change is needed.
 - **Specs:** Runtime Goal completion, Host execution holds, storage Plus P9,
   GoalBlockedCard/Composer resume intent, remote read-only projection and
   [Goal blocked-state ADR](../../adr/goal-blocked-state.md).
