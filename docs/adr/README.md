@@ -381,9 +381,8 @@ Each ADR includes:
 | 0319 | [Offer the Advisor tool in Plan and Goal modes](0319-advisor-tool-contract-modes.md) | Accepted (D642) |
 | unattended-interaction-policy | [Host-owned unattended interaction policy](unattended-interaction-policy.md) | Accepted for implementation |
 | external-ask-answering-over-mcp | [External ask answering over local MCP](external-ask-answering-over-mcp.md) | Accepted for implementation; implementation and acceptance pending |
+| external-goal-control-over-mcp | [External held-Goal control over local MCP](external-goal-control-over-mcp.md) | Accepted for implementation |
 | worktree-memory-owner | [Resolve verified worktree memory without aliasing workspace access](worktree-memory-owner.md) | Accepted; amended by worktree-project-memory-spaces |
 | worktree-project-memory-spaces | [Share durable project memory across verified worktrees](worktree-project-memory-spaces.md) | Accepted for the implementation candidate; user acceptance pending |
 
 - [Explicit Team task dispatch and queued-message age](team-task-dispatch-age.md)
-
-- [External held-Goal control over local MCP](external-goal-control-over-mcp.md)
