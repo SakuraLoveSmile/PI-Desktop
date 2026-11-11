@@ -11,3 +11,4 @@
 | [05-change-checklist.md](05-change-checklist.md) | Practical checklist before finishing work |
 | [06-release-runbook.md](06-release-runbook.md) | Desktop release lanes, packaging, and mandatory shipped-locale changelog gate (D164/D345) |
 | [07-remote-control-rollout.md](07-remote-control-rollout.md) | Remote Agent Control rollout and acceptance |
+| [09-stability-charter.md](09-stability-charter.md) | Freeze scope, exit criteria and owner-approved exceptions |

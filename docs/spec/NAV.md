@@ -87,6 +87,7 @@
 
 - [07-test-maintenance.md](06-delivery/07-test-maintenance.md)
 - [08-scenario-index.md](06-delivery/08-scenario-index.md)
+- [09-stability-charter.md](06-delivery/09-stability-charter.md)
 
 ## 7. Plugins
 - [README.md](07-plugins/README.md)

@@ -89,6 +89,7 @@
 
 - [07-test-maintenance.md](/zh-CN/spec/06-delivery/07-test-maintenance)
 - [08-scenario-index.md](/zh-CN/spec/06-delivery/08-scenario-index)
+- [09-stability-charter.md](/zh-CN/spec/06-delivery/09-stability-charter)
 - [team-task-dispatch-scenarios.md](/zh-CN/spec/06-delivery/team-task-dispatch-scenarios)
 - [会话活动投影](/zh-CN/spec/03-runtime/session-activity-projection)
 - [上下文洞察](/zh-CN/spec/03-runtime/context-insights)
