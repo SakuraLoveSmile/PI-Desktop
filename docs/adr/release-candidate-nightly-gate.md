@@ -172,3 +172,15 @@ any further provisioning-policy change still requires a reviewed addendum.
 
 Approval is not verification. Actual recovery checks, the hosted environment
 check and the full S2 exercises are recorded in the linked task record.
+
+### Recovery observation, 2026-11-12
+
+The two hosted environment checks failed before installation. The diagnostic
+check observed failures in both the system resolver and HTTPS resolution for
+the official Ubuntu hosts, while the Microsoft DNS control succeeded. The
+[Canonical official status feed](https://status.canonical.com/rss) recorded
+`DNS - Major Outage` beginning on 2026-11-11 at 14:26 UTC. This supports an
+upstream DNS blocker; it does not establish a mirror-selector defect or justify
+rewriting `ubuntu.sources`. The recovery path stopped with its original strict
+failure retained. Resume environment validation only with new recovery evidence;
+the full candidate acceptance remains outstanding in the task record.

@@ -1,7 +1,7 @@
 # PI-STAB-1111-R1 — Release gates, stability charter and UI evidence
 
 Date: 2026-11-11 (Asia/Taipei). Tier: T2 overall (S2); S3 T0; U1 T1.
-Status: 实现中. S2: 实现中 (hosted APT acquisition blocked; diagnostic validation pending). S3: 已验收.
+Status: 实现中. S2: 实现中 (hosted Ubuntu DNS failure; recovery path stopped). S3: 已验收.
 U1: 待体验 (local native repeatability verified).
 
 ## Goal, identity and authorization
@@ -358,3 +358,57 @@ run and the complete S2 negative/clean candidates are NOT RUN at this point.
 Documentation (646 pages), locale pairs (96), scenario catalog, agent policy,
 architecture and the unchanged test-quality baseline passed for this diagnostic
 combination. Remote main still resolves to the recorded base SHA.
+
+### Hosted diagnosis result: upstream DNS blocker
+
+On 2026-11-12 (Asia/Taipei), diagnostic source
+`f43bfdb04539d2d40e6d45f8ddaa93ba2003139f` was committed, pushed and checked by
+the manual voice run [43057417999](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/43057417999).
+Attempt 1 finished `failure`, job `130650495061`. Strict APT acquisition failed
+as before; all five probes ran afterward, and the original APT error still
+failed the job:
+
+| Probe | Actual result |
+| --- | --- |
+| System resolver: `archive.ubuntu.com` | Exit 2; no address |
+| System resolver: `security.ubuntu.com` | Exit 2; no address |
+| System resolver: `packages.microsoft.com` | Exit 0; public addresses returned |
+| Official archive HTTPS index | curl exit 28; resolution timed out after 10 seconds |
+| Official security HTTPS index | curl exit 28; resolution timed out after 10 seconds |
+
+The [Canonical official status feed](https://status.canonical.com/rss), retrieved
+after the run, records `DNS - Major Outage` beginning at 2026-11-11 14:26 UTC
+(feed publication 14:30:22 UTC). Same-period reports in the official runner-image
+repository, [15296](https://github.com/actions/runner-images/issues/15296) and
+[15297](https://github.com/actions/runner-images/issues/15297), describe Ubuntu
+DNS failures across runner versions. These reports are corroborating evidence,
+not a maintainer-confirmed diagnosis of this specific VM. Together with the
+runner probes, the evidence supports an upstream DNS outage; it does not
+establish a mirror-selector defect. The retrieved feed contains no recovery
+evidence and cannot alone establish how long the incident lasts.
+
+The actual installed dependency environment is still not restored. Installation,
+Host build and fixture execution were skipped after the failed provision step:
+NOT RUN. Full S2 negative/clean exercises and candidate packaging remain
+NOT RUN; neither failed voice run satisfies them. No candidate artifact or
+publication was produced. The recovery path is stopped under the accepted ADR;
+do not rewrite sources, DNS, IPs or trust settings based on this evidence.
+When new upstream recovery evidence is available, first validate the existing
+voice environment on the intended source, then continue the original full S2
+negative/clean exercises if it passes. No blind rerun was dispatched.
+
+The run/job receipts, complete log, five diagnostic results and the fetched
+official status XML are retained under
+`.artifacts/s2-release-gate/recovery-diagnostics-voice/` (`evidence.json` links
+their identities). Independent read-only research found no confirmed
+mirror-specific defect; the APT mirror implementation redirects to the ordinary
+HTTP/HTTPS connection path. Production code, test assertions, catalog, retries,
+signature/TLS checks, signing and packaging remain unchanged by this diagnosis.
+The original Goal-blocked fixture still matches its recorded Git blob and
+SHA-256. Both hosted runs are terminal, with no further candidate in progress.
+
+This continuation changes only runner failure observability and its documented
+evidence. Local checks are listed above; hosted failure behavior was observed,
+but fixture/release acceptance is blocked. No PR, merge, tag or release was
+created. Preserve both unmerged request worktrees and their evidence until
+integration or an explicitly authorized alternative disposition.
