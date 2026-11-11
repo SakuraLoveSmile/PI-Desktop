@@ -1,0 +1,403 @@
+# Cloud-only macOS arm64 installer pipeline. Manual dispatch produces candidate artifacts.
+# Formal tags must already be merged into main and match every app version
+# surface. Both paths share CI gates and a fixed source SHA. Tags require signing
+# and notarization unless ALLOW_UNSIGNED_MACOS_RELEASE explicitly opts in to
+# personal-use unsigned releases. Every published bundle is fully verified.
+# Version preparation and tagging are documented in the release runbook.
+
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      sign_macos:
+        description: 'Sign and notarize macOS artifacts; tags require signing unless unsigned releases are explicitly enabled'
+        required: false
+        default: false
+        type: boolean
+
+# Least privilege by default; only the publish job needs to write the release.
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  metadata:
+    name: Validate source, version and signing requirements
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      source_sha: ${{ steps.preflight.outputs.source_sha }}
+      base_sha: ${{ steps.preflight.outputs.base_sha }}
+      version: ${{ steps.preflight.outputs.version }}
+      document_version: ${{ steps.preflight.outputs.document_version }}
+      channel: ${{ steps.preflight.outputs.channel }}
+      prerelease: ${{ steps.preflight.outputs.prerelease }}
+      signed_macos: ${{ steps.preflight.outputs.signed_macos }}
+      allow_unsigned_macos: ${{ steps.preflight.outputs.allow_unsigned_macos }}
+      kind: ${{ steps.preflight.outputs.kind }}
+      tag: ${{ steps.preflight.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Refresh main without changing the candidate
+        run: git fetch origin main
+      - name: Pin the release candidate
+        id: preflight
+        env:
+          SIGN_MACOS: ${{ inputs.sign_macos || false }}
+          ALLOW_UNSIGNED_MACOS_RELEASE: ${{ vars.ALLOW_UNSIGNED_MACOS_RELEASE || 'false' }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          MAC_SIGNING_IDENTITY: ${{ secrets.MAC_SIGNING_IDENTITY }}
+        run: node scripts/release-preflight.mjs
+
+  verify:
+    name: Verify candidate
+    needs: metadata
+    uses: ./.github/workflows/ci.yml
+    with:
+      source_sha: ${{ needs.metadata.outputs.source_sha }}
+      base_sha: ${{ needs.metadata.outputs.base_sha }}
+      release_document_version: ${{ needs.metadata.outputs.document_version }}
+
+  build:
+    name: Build ${{ matrix.name }}
+    needs: [metadata, verify]
+    env:
+      MACOS_SIGN_RELEASE: ${{ needs.metadata.outputs.signed_macos }}
+      RELEASE_CHANNEL: ${{ needs.metadata.outputs.channel }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS arm64
+            os: macos-15
+            arch: arm64
+            runner_arch: arm64
+            artifact: mac-arm64
+            platform: macos
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.metadata.outputs.source_sha }}
+
+      - name: Verify native runner architecture
+        # A mislabelled or emulated runner could package the arm64 Electron app
+        # with a Rust sidecar built for a different architecture.
+        if: matrix.runner_arch
+        run: |
+          set -euo pipefail
+          actual_arch="$(uname -m)"
+          expected_arch="${{ matrix.runner_arch }}"
+          if [ "$actual_arch" != "$expected_arch" ]; then
+            echo "::error::Expected $expected_arch runner, got $actual_arch."
+            exit 1
+          fi
+
+      - name: Validate bundled models.dev catalog
+        run: |
+          node --input-type=module - <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          const path = 'apps/desktop/resources/models.dev/api.json';
+          const catalog = JSON.parse(await readFile(path, 'utf8'));
+          const valid = catalog && !Array.isArray(catalog) && typeof catalog === 'object' &&
+            Object.values(catalog).some((provider) => provider && typeof provider === 'object' && provider.models);
+          if (!valid) throw new Error(`${path} contains no provider model records`);
+          console.log(`${path} is valid`);
+          NODE
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          # Match the Node that Electron 43 bundles (24.18), so the released
+          # artifacts are built against the runtime the app actually ships.
+          node-version: 24
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Prepare package inputs
+        run: |
+          set -euo pipefail
+          cargo build --release --locked -p host-core -p update-helper &
+          host_build_pid=$!
+          trap 'kill "$host_build_pid" 2>/dev/null || true' EXIT
+
+          pnpm install --frozen-lockfile
+          node apps/desktop/node_modules/electron/install.js
+          pnpm --filter '@pi-desktop/desktop^...' --fail-if-no-match build
+
+          wait "$host_build_pid"
+          trap - EXIT
+
+      - name: Test the macOS update helper
+        # The ad-hoc in-app update replaces the running app with a helper that
+        # ships in the bundle (ADR plus-assisted-macos-adhoc-update). These
+        # tests drive the real macOS tools and the helper binary this job just
+        # built, on the architecture that ships, before anything is packaged.
+        if: matrix.platform == 'macos'
+        run: |
+          set -euo pipefail
+          cargo test --locked -p update-helper
+          PI_UPDATE_HELPER_BIN="$PWD/target/release/pi-desktop-update-helper" \
+            node --test apps/desktop/test/assisted-update-macos.test.mjs
+
+      - name: Package unsigned macOS installer
+        if: matrix.platform == 'macos' && env.MACOS_SIGN_RELEASE != 'true'
+        env:
+          # Candidates and explicitly permitted personal-use unsigned releases.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: |
+          set -euo pipefail
+          # Artifact names are defined in apps/desktop/package.json: the mac
+          # pattern labels ZIPs, and the dmg target pattern labels DMGs.
+          pnpm --filter @pi-desktop/desktop run dist:mac -- --${{ matrix.arch }} -c.publish.channel="$RELEASE_CHANNEL" -c.mac.identity=-
+
+      - name: Diagnose macOS signing environment
+        # Records the runner baseline (system, codesign, identities, keychain,
+        # Xcode tools, Apple timestamp reachability) before electron-builder
+        # imports the certificate. Informational: the Developer ID identity is
+        # absent here by design and is imported from CSC_LINK during packaging.
+        if: matrix.platform == 'macos'
+        run: scripts/macos-signing-diagnostics.sh
+
+      - name: Require macOS signing and notarization secrets
+        if: matrix.platform == 'macos' && env.MACOS_SIGN_RELEASE == 'true'
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CSC_NAME: ${{ secrets.MAC_SIGNING_IDENTITY }}
+          MAC_SIGNING_IDENTITY: ${{ secrets.MAC_SIGNING_IDENTITY }}
+        run: |
+          set -euo pipefail
+          missing=()
+          [[ -n "${CSC_LINK}" ]] || missing+=(CSC_LINK)
+          [[ -n "${CSC_KEY_PASSWORD}" ]] || missing+=(CSC_KEY_PASSWORD)
+          [[ -n "${APPLE_ID}" ]] || missing+=(APPLE_ID)
+          [[ -n "${APPLE_APP_SPECIFIC_PASSWORD}" ]] || missing+=(APPLE_APP_SPECIFIC_PASSWORD)
+          [[ -n "${APPLE_TEAM_ID}" ]] || missing+=(APPLE_TEAM_ID)
+          if ((${#missing[@]} > 0)); then
+            echo "::error::Missing GitHub Actions secrets for macOS signing/notarization: ${missing[*]}"
+            echo "::error::Add them under Settings → Secrets and variables → Actions. See docs/spec/06-delivery/06-release-runbook.md."
+            exit 1
+          fi
+          [[ -n "${CSC_NAME:-}" ]] || missing+=(CSC_NAME)
+          if (( ${#missing[@]} )); then
+            echo "::error::Missing required macOS signing secrets: ${missing[*]}"
+            exit 1
+          fi
+
+      - name: Package signed and notarized macOS installer
+        if: matrix.platform == 'macos' && env.MACOS_SIGN_RELEASE == 'true'
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          # electron-builder rejects the "Developer ID Application:" prefix on
+          # identity names and resolves the certificate itself, so CSC_NAME
+          # carries the bare common name only.
+          CSC_NAME: ${{ secrets.MAC_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # electron-builder prints one "signing Pi-Desktop-Plus.app" line and then
+          # goes quiet: @electron/osx-sign walks Contents and codesigns every
+          # Mach-O serially, builder-util silently retries a failing pass up to
+          # three times, and @electron/notarize zips, uploads, and waits for
+          # Apple's queue. These two namespaces expose all three phases without
+          # leaking credentials, because both render their own command lines
+          # through a password filter. `electron-builder` itself is deliberately
+          # absent: builder-util's `executing` debug line prints every spawned
+          # command with only its own stem list redacted, and that list does not
+          # cover `security set-key-partition-list -k <p12 password>`. The
+          # watchdog redacts the secret values and any --password/-k argument on
+          # top of that.
+          DEBUG: "electron-osx-sign*,electron-notarize*"
+          # 30 minutes keeps a stuck signing/notarization phase reported by the
+          # watchdog (diagnostics + summary) inside the 60-minute job budget.
+          PI_SIGNING_TIMEOUT_SECONDS: "1800"
+          PI_SIGNING_STALL_SECONDS: "300"
+        run: |
+          set -euo pipefail
+          # Artifact names are defined in apps/desktop/package.json: the mac
+          # pattern labels ZIPs, and the dmg target pattern labels DMGs.
+          # The watchdog forwards every line unchanged and keeps the child's
+          # exit code; it adds a heartbeat while the phase is silent, dumps the
+          # active codesign target and process state when it stalls, reports
+          # per-file codesign timings, and fails the step after
+          # PI_SIGNING_TIMEOUT_SECONDS instead of waiting for the job timeout.
+          node scripts/macos-signing-watchdog.mjs \
+            --label "dist:mac-${{ matrix.arch }}" \
+            -- pnpm --filter @pi-desktop/desktop run dist:mac -- --${{ matrix.arch }} \
+              -c.publish.channel="$RELEASE_CHANNEL" \
+              -c.mac.forceCodeSigning=true \
+              -c.mac.notarize=true
+
+      - name: Analyze the packaged macOS app bundle
+        # Reports the file / Mach-O / framework / nested-bundle counts that
+        # determine how much work the signing phase had, on the exact bundle the
+        # release just produced. Diagnosis only: continue-on-error keeps a
+        # surprising bundle layout from failing a release.
+        if: matrix.platform == 'macos'
+        continue-on-error: true
+        run: node scripts/macos-bundle-inventory.mjs apps/desktop/release
+
+      - name: Notarize and staple the macOS DMG
+        if: matrix.platform == 'macos' && env.MACOS_SIGN_RELEASE == 'true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # 20 minutes bounds the second Apple wait; the packaging phase owns
+          # the first one.
+          PI_SIGNING_TIMEOUT_SECONDS: "1200"
+          PI_SIGNING_STALL_SECONDS: "300"
+        run: |
+          set -euo pipefail
+          # notarytool submit --wait blocks until Apple answers; the watchdog
+          # keeps that wait observable and bounded.
+          node scripts/macos-signing-watchdog.mjs \
+            --label "notarize-dmg-${{ matrix.arch }}" \
+            -- scripts/notarize-and-staple-macos-release-dmg.sh apps/desktop/release
+
+      - name: Refresh updater metadata after stapling the DMG
+        if: matrix.platform == 'macos' && env.MACOS_SIGN_RELEASE == 'true'
+        run: node scripts/refresh-macos-release-metadata.mjs apps/desktop/release "$RELEASE_CHANNEL"
+
+      - name: Verify signed and notarized macOS installer
+        if: matrix.platform == 'macos' && env.MACOS_SIGN_RELEASE == 'true'
+        env:
+          MAC_SIGNING_IDENTITY: ${{ secrets.MAC_SIGNING_IDENTITY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: scripts/verify-macos-release.sh apps/desktop/release
+
+      - name: Verify macOS app and archive signature integrity
+        if: matrix.platform == 'macos'
+        run: scripts/verify-macos-release.sh --integrity-only apps/desktop/release
+
+      - name: Verify macOS artifact names
+        if: matrix.platform == 'macos'
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          expected_dmg=(apps/desktop/release/Pi-Desktop-Plus-*-${{ matrix.arch }}.dmg)
+          expected_dmg_blockmap=(apps/desktop/release/Pi-Desktop-Plus-*-${{ matrix.arch }}.dmg.blockmap)
+          expected_zip=(apps/desktop/release/Pi-Desktop-Plus-*-${{ matrix.arch }}-mac.zip)
+          expected_zip_blockmap=(apps/desktop/release/Pi-Desktop-Plus-*-${{ matrix.arch }}-mac.zip.blockmap)
+          if [[ "${#expected_dmg[@]}" -ne 1 || "${#expected_dmg_blockmap[@]}" -ne 1 || "${#expected_zip[@]}" -ne 1 || "${#expected_zip_blockmap[@]}" -ne 1 ]]; then
+            echo "::error::Expected exactly one ${{ matrix.arch }} DMG, DMG blockmap, ZIP, and ZIP blockmap."
+            printf '%s\n' apps/desktop/release/* || true
+            exit 1
+          fi
+          for artifact in apps/desktop/release/Pi-Desktop-Plus-*; do
+            case "$artifact" in
+              *-${{ matrix.arch }}.dmg|*-${{ matrix.arch }}.dmg.blockmap|*-${{ matrix.arch }}-mac.zip|*-${{ matrix.arch }}-mac.zip.blockmap) ;;
+              *)
+                echo "::error::Unexpected unlabelled or wrong-architecture macOS artifact: $artifact"
+                exit 1
+                ;;
+            esac
+          done
+
+      - name: Disambiguate macOS update metadata
+        if: matrix.platform == 'macos'
+        run: mv "apps/desktop/release/${RELEASE_CHANNEL}-mac.yml" "apps/desktop/release/${RELEASE_CHANNEL}-mac-${{ matrix.arch }}.yml"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist-${{ matrix.artifact }}
+          if-no-files-found: error
+          compression-level: 0
+          path: |
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.zip
+            apps/desktop/release/*.blockmap
+            apps/desktop/release/${{ needs.metadata.outputs.channel }}-mac-${{ matrix.arch }}.yml
+
+  aggregate:
+    name: Verify macOS arm64 installer bundle
+    needs: [metadata, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.metadata.outputs.source_sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist-mac-arm64
+          path: artifacts/dist-mac-arm64
+      - name: Verify macOS arm64 artifacts, feed and checksums
+        env:
+          RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
+          SOURCE_SHA: ${{ needs.metadata.outputs.source_sha }}
+          RELEASE_CHANNEL: ${{ needs.metadata.outputs.channel }}
+          BUILD_KIND: ${{ needs.metadata.outputs.kind }}
+          MACOS_SIGN_RELEASE: ${{ needs.metadata.outputs.signed_macos }}
+          ALLOW_UNSIGNED_MACOS_RELEASE: ${{ needs.metadata.outputs.allow_unsigned_macos }}
+        run: |
+          node scripts/release-assets.mjs --input artifacts --output dist \
+            --version "$RELEASE_VERSION" --source "$SOURCE_SHA" \
+            --repository "$GITHUB_REPOSITORY" --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT" --channel "$RELEASE_CHANNEL" \
+            --kind "$BUILD_KIND" --signed-macos "$MACOS_SIGN_RELEASE" \
+            --allow-unsigned-macos "$ALLOW_UNSIGNED_MACOS_RELEASE"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-bundle-${{ needs.metadata.outputs.version }}-${{ needs.metadata.outputs.source_sha }}
+          path: dist/*
+          if-no-files-found: error
+          compression-level: 0
+
+  publish:
+    name: Publish verified GitHub Release
+    if: needs.metadata.outputs.kind == 'release'
+    needs: [metadata, aggregate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.metadata.outputs.source_sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-bundle-${{ needs.metadata.outputs.version }}-${{ needs.metadata.outputs.source_sha }}
+          path: dist
+      - name: Create draft, verify remote assets, then publish
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ALLOW_UNSIGNED_MACOS_RELEASE: ${{ needs.metadata.outputs.allow_unsigned_macos }}
+        run: node scripts/publish-release.mjs --directory dist

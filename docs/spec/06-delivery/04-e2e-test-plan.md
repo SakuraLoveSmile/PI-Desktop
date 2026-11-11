@@ -5651,6 +5651,35 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   repositories/files and a fake GitHub API. Actual cloud candidate, publication
   and clean-machine install/upgrade evidence remain separate delivery records.
 
+#### E2E-067D: Complete candidate nightly blocks release packaging
+
+- **Preconditions**: An authorized request branch with the `nightly-v1` gate
+  contract. Use manual Release dispatch with `sign_macos=false`; create no tag
+  or public Release. All suites use isolated fixtures, not live providers.
+- **Steps**: 1) On an exercise-only commit, deliberately fail one nightly-only
+  suite while preserving metadata and all existing CI gates. 2) Inspect the
+  same-SHA catalog, every family leaf and the always-running Actions summary.
+  3) Remove the deliberate failure and dispatch a clean candidate. 4) In fake
+  API fixtures, exercise publication recovery for the complete original
+  run/attempt, both supported contracts and missing/foreign gate results.
+- **Expected**: The negative run has successful metadata/CI, the intended
+  nightly failure, a failing visible summary and skipped build/aggregation/
+  publication. The clean run passes every automated catalog family on one SHA
+  before the unchanged candidate build and aggregation succeed. Missing,
+  skipped, cancelled, duplicated, foreign-SHA or foreign-run jobs cannot pass.
+  Recovery derives `nightly-v1` gates from the original source, accepts the
+  audited legacy digest pair only, and preserves artifact/run-attempt checks.
+  Re-run the whole workflow when validating a new attempt; mixed-attempt
+  results cannot establish a complete gate.
+- **Specs linked**: `06-delivery/06-release-runbook.md` §4.2 and §5,
+  `06-delivery/03-ai-development-workflow.md` §9;
+  ADR `release-candidate-nightly-gate`.
+- **Acceptance**: Quality (release process).
+- **Status**: Local workflow/summary/recovery behavior covered by
+  `release-nightly-gate.test.mjs`, `release-gate-contract.test.mjs` and
+  `release-publication-recovery.test.mjs`. Hosted positive/negative evidence
+  belongs in task `PI-STAB-1111-R1`; local tests do not replace it.
+
 #### E2E-068: Fork a conversation into an independent session
 
 - **Preconditions**: An idle project conversation has user, assistant,

@@ -6,6 +6,50 @@ import { join } from "node:path";
 import test from "node:test";
 import { inspectReleaseRecovery, recoverReleasePublication } from "./recover-release-publication.mjs";
 import { publishRelease } from "./publish-release.mjs";
+import { nightlyGateJobs } from "./release-gate-contract.mjs";
+
+const families = ["goals-team", "shell"];
+const sourceFiles = {
+  ".github/workflows/release.yml": `env:
+  PI_RELEASE_GATE_CONTRACT: nightly-v1
+jobs:
+  nightly:
+    name: Nightly candidate
+    needs: metadata
+    uses: ./.github/workflows/e2e-nightly.yml
+    with:
+      source_sha: \${{ needs.metadata.outputs.source_sha }}
+      job_prefix: Nightly candidate
+  build:
+    needs: [metadata, verify, nightly]
+`,
+  ".github/workflows/ci.yml": "name: CI\n",
+  ".github/workflows/e2e-nightly.yml": `jobs:
+  catalog:
+    name: Catalog nightly families
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: \${{ inputs.source_sha || github.sha }}
+  family:
+    name: Nightly family (\${{ matrix.family }})
+    uses: ./.github/workflows/e2e-run.yml
+    with:
+      source_sha: \${{ needs.catalog.outputs.source_sha }}
+      tier: nightly
+      family: \${{ matrix.family }}
+  summary:
+    name: Summarize nightly families
+`,
+  ".github/workflows/e2e-run.yml": "jobs:\n  fixture:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          ref: ${{ inputs.source_sha || github.sha }}\n",
+  "scripts/e2e-suite-catalog.json": JSON.stringify({ version: 1, families,
+    suites: families.map(family => ({ id: family, family, tier: "nightly" })) }),
+};
+function sourceResponse(path, content) {
+  const bytes = Buffer.from(content);
+  return { type: "file", path, name: path.split("/").at(-1), encoding: "base64", size: bytes.length,
+    content: bytes.toString("base64"), sha: createHash("sha1").update(`blob ${bytes.length}\0`).update(bytes).digest("hex") };
+}
 
 const repository = "fixture/pi-desktop";
 const sourceSha = "a".repeat(40);
@@ -32,17 +76,24 @@ function github() {
   const run = { id: Number(runId), repository: { full_name: repository }, head_repository: { full_name: repository },
     workflow_id: 789, path: ".github/workflows/release.yml", event: "push", status: "completed", conclusion: "failure",
     head_sha: sourceSha, head_branch: tag, run_attempt: 1, html_url: runUrl };
-  const jobs = [...gateNames, "Publish verified GitHub Release"].map((name, index) => ({
-    name, status: "completed", conclusion: index === 6 ? "failure" : "success", run_id: Number(runId), head_sha: sourceSha,
+  const jobs = [...gateNames, ...nightlyGateJobs(families), "Publish verified GitHub Release"].map(name => ({
+    name, status: "completed", conclusion: name === "Publish verified GitHub Release" ? "failure" : "success", run_id: Number(runId), head_sha: sourceSha,
   }));
   const artifact = { id: Number(artifactId), name: artifactName, expired: false, size_in_bytes: 100,
     digest: `sha256:${"b".repeat(64)}`, workflow_run: { id: Number(runId), head_sha: sourceSha, head_branch: tag } };
-  const remote = { run, jobs, artifacts: [artifact], calls, draft: undefined, assets: [], failFinalRead: false };
+  const remote = { run, jobs, artifacts: [artifact], calls, draft: undefined, assets: [], sources: { ...sourceFiles }, failFinalRead: false };
   remote.api = async (method, endpoint, request = {}) => {
     calls.push({ method, endpoint });
     if (method === "GET" && endpoint.endsWith("/actions/workflows/release.yml")) return { id: 789 };
     if (method === "GET" && endpoint.endsWith(`/actions/runs/${runId}`)) return run;
-    if (method === "GET" && endpoint.includes(`/runs/${runId}/jobs?`)) return { jobs };
+    if (method === "GET" && endpoint.includes(`/runs/${runId}/attempts/${run.run_attempt}/jobs?`)) return { jobs };
+    if (method === "GET" && endpoint.startsWith(`/repos/${repository}/contents/`)) {
+      const url = new URL("https://example.invalid" + endpoint);
+      assert.equal(url.searchParams.get("ref"), sourceSha, "source must be read at the original run SHA");
+      const path = url.pathname.slice(`/repos/${repository}/contents/`.length);
+      assert(Object.hasOwn(remote.sources, path), `missing pinned source: ${path}`);
+      return sourceResponse(path, remote.sources[path]);
+    }
     if (method === "GET" && endpoint.includes(`/runs/${runId}/artifacts?`)) return { artifacts: remote.artifacts };
     if (method === "GET" && endpoint.includes("/git/ref/tags/")) return { object: { type: "commit", sha: sourceSha } };
     if (method === "GET" && endpoint.includes("/compare/")) return { status: "ahead" };
@@ -104,6 +155,7 @@ test("main recovery resumes an uploaded unsigned draft from its original run wit
   const receipt = await inspectReleaseRecovery({ runId, env }, remote);
   assert.equal(receipt.artifactId, artifactId);
   assert.equal(receipt.sourceSha, sourceSha);
+  assert.equal(receipt.gateContract, "nightly-v1");
   assert.equal(await recoverReleasePublication({ directory, runId, artifactId: receipt.artifactId, env }, remote),
     "https://example.invalid/release");
   assert.equal(remote.draft.id, 42);
@@ -111,6 +163,62 @@ test("main recovery resumes an uploaded unsigned draft from its original run wit
   assert(remote.draft.body.includes("unsigned and not notarized"));
   assert.equal(remote.calls.filter(call => call.method === "POST").length, writesBefore);
   assert.equal(remote.calls.at(-1).method, "PATCH");
+});
+
+test("recovery requires every nightly family leaf, catalog and summary in the exact original attempt", async () => {
+  for (const name of nightlyGateJobs(families)) {
+    for (const conclusion of ["failure", "cancelled", "skipped", null]) {
+      const remote = github();
+      remote.jobs.find(job => job.name === name).conclusion = conclusion;
+      await assert.rejects(inspectReleaseRecovery({ runId, env }, remote), /All release gates/);
+    }
+    for (const change of [
+      jobs => jobs.splice(jobs.findIndex(job => job.name === name), 1),
+      jobs => jobs.push({ ...jobs.find(job => job.name === name) }),
+      jobs => { jobs.find(job => job.name === name).head_sha = "b".repeat(40); },
+      jobs => { jobs.find(job => job.name === name).run_id = 999; },
+    ]) {
+      const remote = github();
+      change(remote.jobs);
+      await assert.rejects(inspectReleaseRecovery({ runId, env }, remote), /All release gates/);
+      assert(remote.calls.every(call => call.method === "GET"));
+    }
+  }
+  const remote = github();
+  remote.run.run_attempt = 2;
+  const receipt = await inspectReleaseRecovery({ runId, env }, remote);
+  assert.equal(receipt.runAttempt, "2");
+  assert(remote.calls.some(call => call.endpoint === `/repos/${repository}/actions/runs/${runId}/attempts/2/jobs?per_page=100&page=1`));
+  assert(!remote.calls.some(call => call.endpoint.includes("filter=latest")));
+});
+
+test("recovery derives complete family membership from the original catalog rather than current defaults", async () => {
+  for (const originalFamilies of [[...families, "extensions"], ["shell"]]) {
+    const remote = github();
+    remote.sources["scripts/e2e-suite-catalog.json"] = JSON.stringify({ version: 1, families: originalFamilies,
+      suites: originalFamilies.map(family => ({ id: family, family, tier: "nightly" })) });
+    await assert.rejects(inspectReleaseRecovery({ runId, env }, remote), /All release gates/);
+    remote.jobs.splice(gateNames.length, nightlyGateJobs(families).length,
+      ...nightlyGateJobs(originalFamilies).map(name => ({ name, status: "completed", conclusion: "success",
+        run_id: Number(runId), head_sha: sourceSha })));
+    assert.equal((await inspectReleaseRecovery({ runId, env }, remote)).gateContract, "nightly-v1");
+  }
+});
+
+test("only the audited legacy workflow pair permits six-gate recovery", async () => {
+  const remote = github();
+  for (const name of ["release.yml", "ci.yml"]) {
+    remote.sources[`.github/workflows/${name}`] = await readFile(new URL(`./fixtures/release-gates-legacy/${name}`, import.meta.url), "utf8");
+  }
+  remote.jobs.splice(gateNames.length, nightlyGateJobs(families).length);
+  assert.equal((await inspectReleaseRecovery({ runId, env }, remote)).gateContract, "legacy-six-v1");
+  assert.equal(remote.calls.filter(call => call.endpoint.includes("/contents/")).length, 2);
+  for (const name of ["release.yml", "ci.yml"]) {
+    const original = remote.sources[`.github/workflows/${name}`];
+    remote.sources[`.github/workflows/${name}`] += "\n# changed historical source\n";
+    await assert.rejects(inspectReleaseRecovery({ runId, env }, remote), /Unknown release gate contract/);
+    remote.sources[`.github/workflows/${name}`] = original;
+  }
 });
 
 test("recovery requires main, manual dispatch, hosted runner and valid inputs before remote reads", async () => {
@@ -144,14 +252,14 @@ test("every original gate must have passed and publication alone must have faile
   for (let index = 0; index < gateNames.length; index++) {
     const remote = github();
     remote.jobs[index].conclusion = "failure";
-    await assert.rejects(inspectReleaseRecovery({ runId, env }, remote), /All six release gates/);
+    await assert.rejects(inspectReleaseRecovery({ runId, env }, remote), /All release gates/);
   }
   for (const change of [jobs => jobs.pop(), jobs => jobs.push({ ...jobs[0] }),
     jobs => { jobs[0].run_id = 999; }, jobs => { jobs[0].head_sha = "b".repeat(40); },
-    jobs => { jobs[0].status = "queued"; }, jobs => { jobs[6].conclusion = "success"; }]) {
+    jobs => { jobs[0].status = "queued"; }, jobs => { jobs.at(-1).conclusion = "success"; }]) {
     const remote = github();
     change(remote.jobs);
-    await assert.rejects(inspectReleaseRecovery({ runId, env }, remote), /All six release gates/);
+    await assert.rejects(inspectReleaseRecovery({ runId, env }, remote), /All release gates/);
   }
 });
 

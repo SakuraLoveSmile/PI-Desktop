@@ -4,6 +4,14 @@ on:
   schedule:
     - cron: '23 18 * * *'
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      source_sha:
+        type: string
+        required: true
+      job_prefix:
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -14,17 +22,36 @@ concurrency:
 
 jobs:
   catalog:
+    name: Catalog nightly families
     runs-on: ubuntu-latest
     outputs:
       families: ${{ steps.matrix.outputs.families }}
+      source_sha: ${{ steps.matrix.outputs.source_sha }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
       - uses: actions/setup-node@v7
         with:
           node-version: 24
       - id: matrix
-        run: echo "families=$(node scripts/e2e-suite.mjs --matrix)" >> "$GITHUB_OUTPUT"
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          import { nightlyCatalogFamilies } from './scripts/release-gate-contract.mjs';
+          import { loadCatalog } from './scripts/e2e-suite-runtime.mjs';
+          const source = process.env.SOURCE_SHA;
+          if (!/^[a-f0-9]{40}$/.test(source ?? '') || execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim() !== source) {
+            throw new Error('Nightly catalog requires the exact full candidate SHA');
+          }
+          const families = nightlyCatalogFamilies(await loadCatalog());
+          appendFileSync(process.env.GITHUB_OUTPUT, `source_sha=${source}\nfamilies=${JSON.stringify(families)}\n`);
+          NODE
   family:
+    name: Nightly family (${{ matrix.family }})
     needs: catalog
     strategy:
       fail-fast: false
@@ -35,3 +62,41 @@ jobs:
     with:
       tier: nightly
       family: ${{ matrix.family }}
+      source_sha: ${{ needs.catalog.outputs.source_sha }}
+
+  summary:
+    name: Summarize nightly families
+    if: always()
+    needs: [catalog, family]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Report an unavailable catalog
+        env:
+          CATALOG_RESULT: ${{ needs.catalog.result }}
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+        run: |
+          if [ "$CATALOG_RESULT" != success ]; then
+            echo "## Nightly fixture E2E failed" >> "$GITHUB_STEP_SUMMARY"
+            echo "Catalog: $CATALOG_RESULT; candidate: $SOURCE_SHA. No complete family inventory was verified." >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::Nightly catalog did not succeed; complete fixture validation is unavailable."
+            exit 1
+          fi
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.catalog.outputs.source_sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Verify every family from this exact run attempt
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ needs.catalog.outputs.source_sha }}
+          NIGHTLY_FAMILIES: ${{ needs.catalog.outputs.families }}
+          NIGHTLY_JOB_PREFIX: ${{ inputs.job_prefix || '' }}
+          CATALOG_RESULT: ${{ needs.catalog.result }}
+          FAMILY_RESULT: ${{ needs.family.result }}
+        run: node scripts/nightly-e2e-summary.mjs

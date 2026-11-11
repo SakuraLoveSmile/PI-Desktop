@@ -4,16 +4,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { githubTransport, publishRelease } from "./publish-release.mjs";
 import { parseReleaseVersion } from "./release-preflight.mjs";
-
-const requiredJobs = [
-  "Validate source, version and signing requirements",
-  "Verify candidate / JS build / typecheck / lint / architecture / test",
-  "Verify candidate / Rust host-core format / lint / test",
-  "Verify candidate / Isolated launch / message / approval / restart smoke / fixture",
-  "Build macOS arm64",
-  "Verify macOS arm64 installer bundle",
-];
-const publicationJob = "Publish verified GitHub Release";
+import { loadRecoveryGateContract, PUBLICATION_JOB } from "./release-gate-contract.mjs";
 
 function positiveId(value, label) {
   if (typeof value !== "string" || !/^[1-9]\d*$/.test(value) || !Number.isSafeInteger(Number(value))) {
@@ -25,7 +16,7 @@ function positiveId(value, label) {
 async function list(api, endpoint, key) {
   const values = [];
   for (let page = 1; page <= 10; page++) {
-    const response = await api("GET", `${endpoint}&per_page=100&page=${page}`);
+    const response = await api("GET", `${endpoint}${endpoint.includes("?") ? "&" : "?"}per_page=100&page=${page}`);
     if (!Array.isArray(response?.[key])) throw new Error(`GitHub did not return ${key}`);
     values.push(...response[key]);
     if (response[key].length < 100) return values;
@@ -58,14 +49,16 @@ export async function inspectReleaseRecovery({ runId, env }, { api }) {
   }
   if (!run.head_branch?.startsWith("v")) throw new Error("Recovery requires a version tag");
   const version = parseReleaseVersion(run.head_branch.slice(1)).version;
-  const jobs = await list(api, `${root}/runs/${id}/jobs?filter=latest`, "jobs");
-  const expectedNames = [...requiredJobs, publicationJob];
+  const contract = await loadRecoveryGateContract({ repository, sourceSha: run.head_sha }, { api });
+  const requiredJobs = contract.requiredJobs;
+  const jobs = await list(api, `${root}/runs/${id}/attempts/${run.run_attempt}/jobs`, "jobs");
+  const expectedNames = [...requiredJobs, PUBLICATION_JOB];
   if (jobs.length !== expectedNames.length || new Set(jobs.map(job => job.name)).size !== jobs.length ||
       jobs.some(job => !expectedNames.includes(job.name) || job.status !== "completed" ||
         job.run_id !== id || job.head_sha !== run.head_sha) ||
       requiredJobs.some(name => jobs.find(job => job.name === name)?.conclusion !== "success") ||
-      !["failure", "cancelled"].includes(jobs.find(job => job.name === publicationJob)?.conclusion)) {
-    throw new Error("All six release gates must pass; only publication may have failed");
+      !["failure", "cancelled"].includes(jobs.find(job => job.name === PUBLICATION_JOB)?.conclusion)) {
+    throw new Error("All release gates must pass; only publication may have failed");
   }
   const artifactName = `release-bundle-${version}-${run.head_sha}`;
   const artifacts = await list(api, `${root}/runs/${id}/artifacts?name=${encodeURIComponent(artifactName)}`, "artifacts");
@@ -81,7 +74,7 @@ export async function inspectReleaseRecovery({ runId, env }, { api }) {
   }
   return { repository, runId, runAttempt: String(run.run_attempt), sourceSha: run.head_sha,
     tag: run.head_branch, version, artifactId: String(artifact.id), artifactName,
-    allowUnsignedMacos: allowUnsigned === "true" };
+    gateContract: contract.version, allowUnsignedMacos: allowUnsigned === "true" };
 }
 
 export async function recoverReleasePublication({ directory, artifactId, ...input }, { api }) {

@@ -267,7 +267,9 @@ Follow `.github/workflows/release.yml` and the
 [release runbook](06-release-runbook.md) for a manual candidate or formal
 version tag. Manual candidates produce verified Actions artifacts only; a
 verified formal tag already contained in remote `main` can publish a GitHub
-Release after the shared gates and asset checks pass. Signing is required by
+Release after shared CI, every nightly fixture family on the same pinned SHA,
+and asset checks pass. Both lanes block packaging on incomplete nightly results;
+Actions summaries expose failures. Signing is required by
 default, `ALLOW_UNSIGNED_MACOS_RELEASE=true` opts into a personal-use unsigned
 release requiring manual download and installation, and published releases are
 immutable.

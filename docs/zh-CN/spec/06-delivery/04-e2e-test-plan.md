@@ -3095,6 +3095,28 @@ Pi-Desktop-Plus 图标；两个表面都不会暴露库存 Electron 名称或图
 - **里程碑**：M5
 - **状态**：脚本覆盖（`scripts/check-release-docs.mjs`）；手动发布演练草稿
 
+#### E2E-067D：完整候选 nightly 阻断发布打包
+
+- **先决条件**：已获授权的请求分支使用 `nightly-v1` 门禁契约。手动触发 Release，
+  设置 `sign_macos=false`，不创建标签或公开 Release。所有套件使用隔离夹具，
+  不调用真实提供方。
+- **步骤**：1) 在仅用于演练的提交上让一个 nightly-only 套件故意失败，保留
+  metadata 和所有既有 CI 门禁。2) 检查同 SHA 的目录、每个 family 叶子 job 和
+  始终运行的 Actions 摘要。3) 移除故意失败，触发正常候选。4) 在模拟 API 夹具中
+  验证原 run/attempt 的完整恢复门禁、两种受支持契约以及缺失或外来结果。
+- **预期**：阴性运行中 metadata/CI 成功，指定 nightly 套件失败，摘要可见且失败，
+  build、聚合、发布跳过。正常候选在同一 SHA 上通过目录中的全部自动化 family，
+  才执行既有候选构建和聚合。缺失、跳过、取消、重复、外来 SHA 或 run 的 job 均
+  不能通过。恢复依据原 source 计算 `nightly-v1` 门禁，仅允许已审计的旧版摘要配对，
+  保留 artifact 和 run-attempt 校验。验证新 attempt 时重跑整个 workflow；混用不同
+  attempt 的结果不能证明完整门禁。
+- **链接规格**：`06-delivery/06-release-runbook.md` §4.2、§5，
+  `06-delivery/03-ai-development-workflow.md` §9；ADR `release-candidate-nightly-gate`。
+- **验收**：质量（发布流程）。
+- **状态**：本地 workflow、摘要和恢复行为由 `release-nightly-gate.test.mjs`、
+  `release-gate-contract.test.mjs`、`release-publication-recovery.test.mjs` 覆盖。
+  Hosted 正反演练证据记录在任务 `PI-STAB-1111-R1`，本地测试不能替代。
+
 #### E2E-068：将对话分叉为独立会话
 
 - **先决条件**：空闲项目对话有用户、助理、

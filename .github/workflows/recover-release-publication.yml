@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       release_run_id:
-        description: 'Original tag Release run whose six verification gates passed and only publication failed'
+        description: 'Original tag Release run whose complete source-version gate contract passed and only publication failed'
         required: true
         type: string
 

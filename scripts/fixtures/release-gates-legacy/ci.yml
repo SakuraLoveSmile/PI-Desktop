@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      source_sha:
+        type: string
+        default: ''
+      base_sha:
+        type: string
+        default: ''
+      release_document_version:
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  js:
+    name: JS build / typecheck / lint / architecture / test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.source_sha || github.sha }}
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          # Match the Node that Electron 43 bundles (24.18), so CI type-checks
+          # and tests against the same runtime the app actually ships.
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace packages
+        run: pnpm build:js
+
+      - name: Typecheck Desktop
+        # Workspace dependency builds already run tsc; Vite does not check the app.
+        run: pnpm --filter @pi-desktop/desktop typecheck
+
+      - name: Typecheck runtime regression tests
+        run: pnpm check:runtime-tests
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Check agent policy and release tooling
+        run: |
+          node scripts/check-agent-policy.mjs
+          node --test scripts/release-*.test.mjs scripts/publish-release.test.mjs scripts/require-cloud-build.test.mjs scripts/refresh-macos-release-metadata.test.mjs
+
+      - name: Check release documents and version surfaces
+        if: inputs.release_document_version != ''
+        env:
+          RELEASE_DOCUMENT_VERSION: ${{ inputs.release_document_version }}
+        run: |
+          node scripts/check-release-docs.mjs "$RELEASE_DOCUMENT_VERSION"
+          pnpm docs:check
+
+      - name: Check architecture budgets
+        env:
+          ARCHITECTURE_BASE: ${{ inputs.base_sha || github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
+        run: node scripts/check-architecture.mjs
+
+      - name: Check test quality ratchet and generated scenario index
+        env:
+          TEST_QUALITY_BASE: ${{ inputs.base_sha || github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
+        run: |
+          node scripts/check-test-quality.mjs
+          node scripts/generate-scenario-index.mjs --check
+          node --test scripts/e2e-suite.test.mjs scripts/scenario-index.test.mjs scripts/test/*.test.mjs
+
+      - name: Unit-test the Pi patch checks
+        run: node --test scripts/pi-patch-hash.test.mjs
+
+      - name: Unit tests
+        run: pnpm -r --if-present test
+
+  e2e-smoke:
+    name: Isolated launch / message / approval / restart smoke
+    uses: ./.github/workflows/e2e-run.yml
+    with:
+      tier: smoke
+      source_sha: ${{ inputs.source_sha || github.sha }}
+
+  rust:
+    name: Rust host-core format / lint / test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --all-features
+
+      - name: Test
+        run: cargo test -p host-core -p update-helper --locked

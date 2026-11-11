@@ -1,6 +1,6 @@
 # Cloud-only macOS arm64 installer pipeline. Manual dispatch produces candidate artifacts.
 # Formal tags must already be merged into main and match every app version
-# surface. Both paths share CI gates and a fixed source SHA. Tags require signing
+# surface. Both paths share CI/full-nightly gates and a fixed source SHA. Tags require signing
 # and notarization unless ALLOW_UNSIGNED_MACOS_RELEASE explicitly opts in to
 # personal-use unsigned releases. Every published bundle is fully verified.
 # Version preparation and tagging are documented in the release runbook.
@@ -21,6 +21,9 @@ on:
 # Least privilege by default; only the publish job needs to write the release.
 permissions:
   contents: read
+
+env:
+  PI_RELEASE_GATE_CONTRACT: nightly-v1
 
 concurrency:
   group: release-${{ github.ref }}
@@ -74,9 +77,20 @@ jobs:
       base_sha: ${{ needs.metadata.outputs.base_sha }}
       release_document_version: ${{ needs.metadata.outputs.document_version }}
 
+  nightly:
+    name: Nightly candidate
+    needs: metadata
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/e2e-nightly.yml
+    with:
+      source_sha: ${{ needs.metadata.outputs.source_sha }}
+      job_prefix: Nightly candidate
+
   build:
     name: Build ${{ matrix.name }}
-    needs: [metadata, verify]
+    needs: [metadata, verify, nightly]
     env:
       MACOS_SIGN_RELEASE: ${{ needs.metadata.outputs.signed_macos }}
       RELEASE_CHANNEL: ${{ needs.metadata.outputs.channel }}

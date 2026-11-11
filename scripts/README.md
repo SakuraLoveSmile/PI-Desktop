@@ -103,8 +103,9 @@ shared changelog sources, or the check scripts change. `check:release-docs` is
 deliberately not in CI because release branches must pass it with the stable
 version explicitly supplied for a prerelease preview.
 
-`.github/workflows/release.yml` runs shared CI verification for manual
-candidates and `v*.*.*` tags. Its only packaging target is native macOS arm64 on
+`.github/workflows/release.yml` requires shared CI and every automated nightly
+family on the same pinned SHA for manual candidates and `v*.*.*` tags. Incomplete
+nightly results block packaging and appear in the Actions summary. Its only packaging target is native macOS arm64 on
 `macos-15`; the job validates runner architecture, builds the native host and
 packages the app without self-publishing. Aggregation requires the macOS arm64
 DMG, ZIP, their blockmaps and architecture feed, then emits the canonical macOS
@@ -120,14 +121,17 @@ Gatekeeper/notarization. Manual candidates may set `sign_macos: false` for
 unsigned debug artifacts. See the [release
 runbook](../docs/spec/06-delivery/06-release-runbook.md).
 
-For a tag run whose CI/build/aggregate gates passed but only publication failed,
+For a tag run whose complete source-version gate contract passed but only publication failed,
 use the main-only `recover-release-publication.yml` workflow with the original
 run ID. The metadata step validates it with `--run-id <id>` and pins the
 immutable artifact ID; publication rechecks using
 `--run-id <id> --artifact-id <id> --directory dist`, including the original
 run attempt in the manifest. It republishes through the current-main
 `scripts/recover-release-publication.mjs` path without rebuilding or replacing
-assets. See the release runbook's recovery section. Build or validation failures
+assets. It derives nightly membership from the original SHA; legacy recovery
+requires the audited release/CI digest pair. Revalidate a new attempt by running
+the whole workflow, since incomplete per-attempt inventories fail closed.
+See the release runbook's recovery section. Build or validation failures
 and mismatched drafts are not recoverable through this path.
 
 ### Provider certificate regression

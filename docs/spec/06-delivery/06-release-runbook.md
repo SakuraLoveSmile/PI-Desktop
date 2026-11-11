@@ -203,16 +203,39 @@ gh workflow run release.yml --ref main -f sign_macos=false
 
 A request branch may be selected with `--ref <request-branch>` before merge.
 The preflight pins the resolved full 40-character source SHA; every subsequent
-job checks out that same commit. Keep the run URL, source/base SHAs, every job
-conclusion and the final artifact identity with the validation record. A queued
-or dispatched run does not prove a successful build.
+job checks out that same commit. Before any macOS build starts, the candidate
+must pass both shared CI and the complete nightly fixture tier. Nightly derives
+its family list from the catalog at the pinned candidate SHA and runs every
+non-manual suite on that SHA; a scheduled green run for another revision does
+not satisfy this gate. A failed, cancelled, skipped or missing nightly result
+blocks the build, aggregation and publication. Its summary reports the source
+SHA and family results in Actions and emits an error annotation on failure.
+Keep the run URL, source/base SHAs, every job conclusion and the final artifact
+identity with the validation record. A queued or dispatched run does not prove
+a successful build. Revalidate by rerunning the entire workflow: a failed-job-only
+rerun may omit successful gates from the current attempt and is rejected.
 
 Manual dispatch defaults to `sign_macos=false`. Set it to `true` only with the
-six signing secrets configured. Both variants run the same shared CI barriers,
-the macOS arm64 build and asset aggregation. They produce
+six signing secrets configured. Both variants run the same CI and complete
+nightly barriers, the macOS arm64 build and asset aggregation. They produce
 `release-bundle-<version>-<source-sha>` in Actions only: no GitHub Release is
 created and no public updater feed is published. Unsigned artifacts are debug
 candidates and do not establish Gatekeeper/notarization qualification.
+
+The release uses the `nightly-v1` gate contract. Its recovery compatibility,
+including the only accepted legacy workflow digests, is defined in the
+[release nightly gate ADR](../../adr/release-candidate-nightly-gate.md).
+Recovery validates the complete job set and catalog from the original run's
+source SHA; it does not treat a missing nightly job as an old successful gate.
+
+The S2 negative exercise deliberately fails one nightly-only fixture while
+keeping metadata and every existing CI job green. Confirm that the affected
+nightly family fails and that build, aggregation and publication are skipped.
+Then remove the exercise-only failure and require a normal candidate to pass
+both CI and every nightly family before build. Do not land the failure fixture
+or weaken an assertion. Record run URLs, source SHAs and all job results in the
+[S2 task record](../../tasks/PI-STAB-1111-R1-stability-gates.md), which owns the
+current exercise status. Branch push and dispatch need explicit authorization.
 
 ### 4.3 Formal tag and publication
 
@@ -314,9 +337,13 @@ gh workflow run recover-release-publication.yml --ref main \
 ```
 
 Recovery accepts only a completed failed/cancelled tag-push run for this
-repository, with a canonical version tag, matching source SHA, all six required
-gates successful, a failed/cancelled publish job, and one unique, unexpired
-`release-bundle` artifact. The metadata step runs
+repository, with a canonical version tag, matching source SHA, every job in
+that run's gate contract completed with success, a failed/cancelled publish
+job, and one unique, unexpired `release-bundle` artifact. For `nightly-v1` this
+includes every nightly family computed from the original source SHA. A legacy
+run is accepted only if both release and CI workflows at its source SHA match
+the audited digest pair in the [ADR](../../adr/release-candidate-nightly-gate.md);
+unknown and incomplete contracts are rejected. The metadata step runs
 `node scripts/recover-release-publication.mjs --run-id <release_run_id>` and
 pins the unique artifact by its immutable numeric ID. The publish step downloads
 that artifact and runs

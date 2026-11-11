@@ -223,7 +223,7 @@ Conventional Commits：`type(scope): description`，仅限英文。类型：`fea
 
 安装包和发布包只在 GitHub 托管的 Actions runner 上构建，包括解包的 `pack --dir` 输出。本地 `pnpm dev`、JavaScript 构建、Rust 开发构建和针对性检查仍然可用；安装包包装脚本拒绝本地和自托管执行，`scripts/release-macos.sh` 已退役。当云端门禁失败时，不要绕过保护或回退到本地打包。
 
-手动候选或正式版本标签遵循 `.github/workflows/release.yml` 和[发布操作手册](/zh-CN/spec/06-delivery/06-release-runbook)。手动候选只产出已核实的 Actions 工件；已核实且已存在于远程 `main` 的正式标签，在共享门禁与资产检查通过后可发布 GitHub Release。签名默认必需，`ALLOW_UNSIGNED_MACOS_RELEASE=true` 选择加入需手动下载和安装的个人使用非签名发布，已发布的 release 不可变。
+手动候选或正式版本标签遵循 `.github/workflows/release.yml` 和[发布操作手册](/zh-CN/spec/06-delivery/06-release-runbook)。手动候选只产出已核实的 Actions 工件；已核实且已存在于远程 `main` 的正式标签，在共享 CI、同一固定 SHA 的全部 nightly fixture family 与资产检查通过后可发布 GitHub Release。两个通道均因 nightly 结果不完整而阻断打包，Actions 摘要显示失败。签名默认必需，`ALLOW_UNSIGNED_MACOS_RELEASE=true` 选择加入需手动下载和安装的个人使用非签名发布，已发布的 release 不可变。
 
 ---
 

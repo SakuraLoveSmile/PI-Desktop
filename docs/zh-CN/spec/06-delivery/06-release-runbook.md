@@ -152,15 +152,33 @@ gh workflow run release.yml --ref main -f sign_macos=false
 ```
 
 合并前也可使用 `--ref <request-branch>`。预检固定完整的 40 位提交 SHA，
-后续所有 job 检出相同提交。验证记录保留 run URL、source/base SHA、各 job
-结论与最终工件标识。已排队或已触发不代表构建成功。
+后续所有 job 检出相同提交。开始任何 macOS 构建前，候选提交必须通过共享 CI
+和完整 nightly fixture 层。Nightly 根据候选 SHA 上的目录生成 family 列表，
+并在该 SHA 上运行所有非 manual 套件；其他 revision 的定时绿灯不能替代这项门禁。
+nightly 失败、取消、跳过或缺少结果都会阻断构建、聚合和发布。失败摘要会在
+Actions 显示 source SHA 与各 family 结果，并生成 error annotation。
+验证记录保留 run URL、source/base SHA、各 job 结论与最终工件标识。
+已排队或已触发不代表构建成功。复验时重跑整个 workflow；仅重跑失败 job 可能
+导致当前 attempt 缺少已通过门禁，因此会被拒绝。
 
-Manual dispatch defaults to `sign_macos=false`. Set it to `true` only with the
-six signing secrets configured. Both variants run the same shared CI barriers,
-the macOS arm64 build and asset aggregation. They produce
-`release-bundle-<version>-<source-sha>` in Actions only: no GitHub Release is
-created and no public updater feed is published. Unsigned artifacts are debug
-candidates and do not establish Gatekeeper/notarization qualification.
+手动触发默认 `sign_macos=false`。仅在六个签名 Secret 均已配置时才能设为 `true`。
+两个候选通道都要通过共享 CI 和完整 nightly 门禁，然后执行 macOS arm64 构建及
+工件聚合。它们只在 Actions 生成
+`release-bundle-<version>-<source-sha>`，不会创建 GitHub Release，也不会更新公开 updater feed。
+未签名工件仅供调试，
+不能证明已通过 Gatekeeper 或公证认证。
+
+发布使用 `nightly-v1` 门禁契约。其恢复兼容规则和唯一允许的旧 workflow 摘要
+定义于[发布 nightly 门禁 ADR](/adr/release-candidate-nightly-gate)。
+恢复流程依据原始 run 的 source SHA 校验完整 job 集合和套件目录；不会因缺少
+nightly job 就把运行视为旧版成功门禁。
+
+S2 失败演练只让一个 nightly-only fixture 故意失败，同时确保 metadata 和所有既有
+CI job 全绿。确认受影响的 nightly family 失败，且 build、聚合和发布均跳过。随后
+移除仅供演练的失败条件，并要求正常候选通过 CI 和全部 nightly family 后才能构建。
+不得把失败 fixture 合入，也不得削弱断言。将 run URL、source SHA 和全部 job 结果记入
+[S2 任务记录](../../../tasks/PI-STAB-1111-R1-stability-gates.md)，演练状态以该记录为准。
+分支推送和 dispatch 需要明确授权。
 
 ### 4.3 正式标签和发布
 
@@ -237,8 +255,11 @@ gh workflow run recover-release-publication.yml --ref main \
 ```
 
 恢复流程仅接受此仓库中已完成、因失败或取消结束的标签推送运行；标签必须是规范版本标签，
-source SHA 必须一致，六项必需门禁都成功，publish job 必须失败或取消，并且必须存在唯一且未过期的
-`release-bundle` 工件。恢复作业下载该不可变工件，并在 GitHub 托管 runner 上执行
+source SHA 必须一致，该运行门禁契约中的每个 job 均已完成且成功，publish job 必须失败或取消，
+并且必须存在唯一且未过期的 `release-bundle` 工件。`nightly-v1` 还要求原始 source SHA
+目录中的每个 nightly family 全部通过。旧版运行只有在其 source SHA 对应的 release 与 CI workflow
+都匹配[ADR](/adr/release-candidate-nightly-gate)中审计过的摘要配对时才接受；未知或不完整
+契约会被拒绝。恢复作业下载该不可变工件，并在 GitHub 托管 runner 上执行
 `scripts/recover-release-publication.mjs`。元数据步骤运行
 `node scripts/recover-release-publication.mjs --run-id <release_run_id>`，并以不可变数字 ID 固定唯一工件。
 发布步骤下载该工件，并运行
