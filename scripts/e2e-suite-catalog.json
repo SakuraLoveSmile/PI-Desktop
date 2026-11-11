@@ -229,7 +229,6 @@
       "id": "goal-blocked-ui",
       "family": "goals-team",
       "script": "scripts/e2e-goal-blocked-ui.mjs",
-      "args": ["--diagnose-capture", "--capture-frame-barrier"],
       "tier": "nightly",
       "safety": "Isolated Chromium/Electron profile rendering production Goal components and hooks with fixture API. No real provider or user Desktop.",
       "scenarioIds": [

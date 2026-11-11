@@ -85,7 +85,9 @@ its screenshots do not establish a passing suite.
    retain all output and exits, atomically publish progress, clean temporary
    profiles, and fail the diagnosis if any trial fails. Children remain in the
    isolated suite's process group. Evidence declares `purpose: diagnosis` and
-   `acceptanceEvidence: false`.
+   `acceptanceEvidence: false`. The second experiment adds the independently
+   tested `scripts/e2e/capture-frame.mjs` and
+   `scripts/test/capture-frame.test.mjs` with the same ownership.
 3. Read-only analyst/researcher: historical evidence and fixed-version Electron
    behavior. Independent reviewer: actual combined changes before publishing.
 
@@ -110,8 +112,9 @@ One new distinction: trial 01 began its narrow capture at 1,764 ms with a 420px
 window while its last paint still measured 1000px. A 420px frame was observed
 before capture completed at 1,793 ms. The other five trials already had a 420px
 frame at capture start. Stale frame metadata alone does not explain the crash:
-this sample also passed. Raw artifacts, logs and hash/inventory verification are
-retained under `.artifacts/pi-stab-1111-capture-closure/first/`.
+this sample also passed. Raw artifacts and hash/inventory verification are
+retained under `.artifacts/pi-stab-1111-capture-closure/first/`; its full job log
+is `first.log` in that evidence directory's parent.
 
 Experiment 2 therefore tests frame ordering with an explicit diagnostic-only
 `--capture-frame-barrier`: one invalidate and a bounded wait for a new nonempty
@@ -119,9 +122,42 @@ frame matching content size before each original single capture. Timeout or
 destruction fails; event listeners and timers must be released. The two capture
 calls, all interaction/layout assertions, process limits and backend selection
 remain unchanged. The barrier is not enabled in ordinary runs or experiment 1.
-It is a hypothesis comparison, not an accepted repair. If the native failure is
-still absent after this second experiment, stop rather than run further samples
-or choose a speculative backend change.
+It is a hypothesis comparison, not an accepted repair.
+
+Experiment 2, [43014628389](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/43014628389),
+tested `7f860c9520a8ee4a5d98cf7c68e42fcf1d233560` against the same base. Candidate,
+build source and Host hashes agree; the candidate was clean and unchanged.
+The family failed 35/36, solely `goal-blocked-ui`. All six trials completed all
+nine interaction groups and the wide capture. All twelve barriers completed
+with a new matching, nonempty frame. No process timeout occurred.
+
+- Trials 03 and 04 failed the narrow capture with `UnknownVizError`, alongside
+  GPU `reason: crashed`, exit 133. Both had a new 420x920 frame before their
+  single narrow capture, so waiting for such a frame is not a sufficient fix.
+  Trial 03 started capture at 1,851 ms and failed at 2,640 ms; its GPU exit
+  notification arrived at 2,643 ms. Trial 04 started at 1,852 ms, reported GPU
+  exit at 2,552 ms and failed capture at 2,554 ms. Notification ordering differs;
+  do not turn the JavaScript event order into a native causal stack.
+- Trial 05 reported the same GPU exit 133 during `narrow-layout`, before the
+  narrow barrier or capture. Chromium reinitialized the GPU process (PID 6394
+  became 6466); the subsequent barrier/capture and child exit succeeded. A
+  successful trial means its assertions and captures passed, not that no GPU
+  crash occurred. Preserve this recovered crash as evidence too.
+- Trials 01, 02 and 06 completed without a reported GPU/renderer exit. Trials
+  03/04 remain failures in the atomic summary and the hosted job; no retry,
+  assertion change or skip hides them. Chromium logs report the exits but no
+  fatal call site, native stack or OOM evidence.
+
+Raw artifacts and hash/inventory verification are retained under
+`.artifacts/pi-stab-1111-capture-closure/second/`; its full job log is `second.log`
+in the parent evidence directory. The failure now has a named
+stage and matching-frame counterexample. Its native cause and whether product
+content is necessary remain unresolved. The second intervention may affect
+timing; the difference between the two rounds is not a measured crash rate.
+The two-experiment budget is exhausted. Restore ordinary catalog arguments,
+retain the optional diagnostic tools and all evidence, and stop speculative CI
+or backend changes. Further diagnosis needs a native GPU crash stack or a
+controlled content/resize reduction, not another identical green-seeking run.
 
 ## Validation and completion
 
@@ -139,10 +175,16 @@ Cancellation may leave the last atomic summary at `running`; use the outer
 suite result for its final termination. Paint observation, GPU information
 queries and logging may affect timing, so green results cannot rule out a race.
 
-Experiment 2 executable candidate has not run Electron or Linux CI yet: NOT RUN.
-Test-quality baseline remains unchanged. Full workspace/Rust tests, packaging,
-real providers and the running user application: NOT RUN; no product or runtime
-implementation is changed.
+Both diagnostic candidates ran native Electron on Linux CI, with the results
+above. After restoring ordinary parameters, the final catalog check passed
+(138 suites / 167 IDs), the ordinary goals-team inventory verified 36 entries
+without a Goal diagnostic argument, and documentation/locale/whitespace checks
+passed. Independent final review confirmed all failures remain represented and
+found no new defect. Test-quality baseline
+remains unchanged. Final ordinary same-commit acceptance and post-integration
+scheduled nightly: NOT RUN because no root-cause repair is established. Full
+workspace/Rust test gates, packaging, real providers and the running user
+application: NOT RUN; no product or runtime implementation is changed.
 
 S1 remains unresolved. A proven minimal repair must pass two consecutive
 complete ordinary goals-team/nightly runs on one final commit, followed by
@@ -150,6 +192,7 @@ scheduled nightly evidence after authorized integration. Diagnostic runs cannot
 satisfy those two acceptance runs. The entire stability program's seven-day and
 real-model criteria are separate from this S1 package.
 
-Keep the current worktree and its evidence while this investigation is active.
-Record each experiment's exact SHA, fetched base, candidate receipt and result
-before deciding the next action.
+Keep the current worktree, unmerged branch and verified evidence for review.
+No new PR, merge or release is performed. Cleanup is deferred because these
+diagnostic changes are not integrated and their local evidence is still needed.
+The primary checkout and its existing lockfile modification remain preserved.
