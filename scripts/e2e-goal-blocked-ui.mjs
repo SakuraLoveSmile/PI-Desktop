@@ -1,20 +1,47 @@
 #!/usr/bin/env node
 /** E2E-GOAL-BLOCKED-UI-001: real Goal card, Composer, store and native readers. */
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import { appendFileSync } from "node:fs";
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { cp, mkdir, mkdtemp, readFile, rm, statfs, writeFile } from "node:fs/promises";
+import { freemem, tmpdir, totalmem } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
 import { IPC } from "../packages/shared/dist/index.js";
 import { repositoryRoot, resolveElectronBinary } from "./e2e/boot.mjs";
 
 const root = repositoryRoot();
+const { values: options } = parseArgs({ options: {
+  "diagnose-capture": { type: "boolean", default: false },
+  "capture-diagnostic-trial": { type: "boolean", default: false },
+  "capture-diagnostic-dir": { type: "string" },
+} });
+const diagnosticTrial = options["capture-diagnostic-trial"];
+if (options["diagnose-capture"] || diagnosticTrial) {
+  assert(process.platform === "linux" && process.env.CI === "true", "Capture diagnosis requires an isolated Linux CI fixture");
+}
+if (options["diagnose-capture"]) {
+  // The suite owns this process group; all diagnostic descendants stay in it.
+  const group = execFileSync("ps", ["-o", "pgid=", "-p", String(process.pid)], { encoding: "utf8" }).trim();
+  assert.equal(group, String(process.pid), "Capture diagnosis must run in the isolated suite process group");
+  const terminate = () => process.kill(-process.pid, "SIGKILL");
+  process.once("SIGINT", terminate);
+  process.once("SIGTERM", terminate);
+  const { runCaptureDiagnosis } = await import("./e2e/capture-diagnosis.mjs");
+  const result = await runCaptureDiagnosis({ root, script: fileURLToPath(import.meta.url) });
+  assert(result.passed, "Capture diagnosis retained a failed trial; inspect its summary and logs");
+  process.exit(0);
+}
+assert.equal(Boolean(options["capture-diagnostic-dir"]), diagnosticTrial,
+  "A diagnostic artifact directory belongs only to a diagnostic trial");
 const { build } = createRequire(join(root, "packages/agent-runtime/package.json"))("esbuild");
 const temp = await mkdtemp(join(tmpdir(), "pi-goal-blocked-ui-"));
-const evidence = join(root, ".review-evidence");
-const diagnostics = join(root, ".artifacts/e2e/goal-blocked-ui");
+const diagnostics = diagnosticTrial ? resolve(options["capture-diagnostic-dir"]) : join(root, ".artifacts/e2e/goal-blocked-ui");
+if (diagnosticTrial) assert(diagnostics.startsWith(resolve(root, ".artifacts/e2e/goal-capture-diagnosis") + "/"),
+  "Diagnostic trial artifacts must stay in the capture diagnosis directory");
+const evidence = diagnosticTrial ? diagnostics : join(root, ".review-evidence");
 try {
   await mkdir(evidence, { recursive: true });
   await mkdir(diagnostics, { recursive: true });
@@ -22,6 +49,17 @@ try {
     await rm(join(evidence, name), { force: true });
   for (const name of ["diagnostics.jsonl", "probe.json"])
     await rm(join(diagnostics, name), { force: true });
+  if (diagnosticTrial) {
+    const sharedMemory = await statfs("/dev/shm");
+    await writeFile(join(diagnostics, "environment.json"), JSON.stringify({
+      hypothesis: "GPU/Viz exits while a valid copy request is outstanding",
+      captureOrderUnchanged: true, paintBarrier: false, retries: 0,
+      switches: ["enable-logging=file", "log-file=<trial>/chromium.log"],
+      node: process.version, totalMemoryBytes: totalmem(), freeMemoryBytes: freemem(),
+      sharedMemory: { blockSize: sharedMemory.bsize, blocks: sharedMemory.blocks,
+        freeBlocks: sharedMemory.bfree, availableBlocks: sharedMemory.bavail },
+    }, null, 2));
+  }
   await build({ entryPoints: [join(root, "scripts/e2e/goal-blocked-ui.tsx")], outfile: join(temp, "renderer.js"),
     bundle: true, platform: "browser", format: "esm", jsx: "automatic",
     define: { "process.env.NODE_ENV": '"production"', "import.meta.env.DEV": "false" },
@@ -60,9 +98,16 @@ const path = require("node:path"); const fs = require("node:fs/promises");
 const { appendFileSync } = require("node:fs");
 const IPC = ${JSON.stringify(IPC)}; const evidence = ${JSON.stringify(evidence)};
 const diagnostics = ${JSON.stringify(diagnostics)};
+const diagnosticTrial = ${JSON.stringify(diagnosticTrial)};
+if (diagnosticTrial) {
+  app.commandLine.appendSwitch("enable-logging", "file");
+  app.commandLine.appendSwitch("log-file", path.join(diagnostics, "chromium.log"));
+}
 app.setPath("userData", path.join(__dirname, "profile"));
 let win, counter = 0, fixture, calls = [], failResume = false;
 let stage = "bootstrap";
+let gpuInfoObserved = false;
+let paintCount = 0, firstPaint = null, lastPaint = null;
 const startedAt = Date.now();
 const record = (event, details = {}) => {
   const entry = { event, stage, elapsedMs: Date.now() - startedAt, ...details };
@@ -75,7 +120,34 @@ record("environment", { platform: process.platform, arch: process.arch,
   displayAvailable: Boolean(process.env.DISPLAY) });
 app.on("child-process-gone", (_event, detail) => record("child-process-gone", {
   type: detail.type, reason: detail.reason, exitCode: detail.exitCode }));
-app.on("gpu-info-update", () => record("gpu-info-update", { features: app.getGPUFeatureStatus() }));
+app.on("gpu-info-update", () => {
+  gpuInfoObserved = true;
+  record("gpu-info-update", { features: app.getGPUFeatureStatus() });
+  if (diagnosticTrial) app.getGPUInfo("basic").then((info) => {
+    const fields = ["vendorId", "deviceId", "active", "driverVendor", "driverVersion"];
+    const devices = Array.isArray(info.gpuDevice) ? info.gpuDevice.map((device) =>
+      Object.fromEntries(fields.filter((key) => key in device).map((key) => [key, device[key]]))) : [];
+    const attributes = ["glImplementationParts", "glRenderer", "glVendor", "glVersion", "displayType", "skiaBackendType"];
+    const aux = info.auxAttributes || {};
+    record("gpu-info", { devices, attributes: Object.fromEntries(attributes.filter((key) => key in aux).map((key) => [key, aux[key]])) });
+  }).catch((error) => record("gpu-info-error", { name: error.name, message: error.message }));
+});
+const captureState = () => {
+  const windowAlive = win && !win.isDestroyed();
+  const contentsAlive = windowAlive && !win.webContents.isDestroyed();
+  return {
+  bounds: windowAlive ? win.getContentBounds() : null, gpuInfoObserved,
+  // Electron only guarantees feature validity after gpu-info-update.
+  features: gpuInfoObserved ? app.getGPUFeatureStatus() : null,
+  ...(diagnosticTrial ? { paint: { count: paintCount, first: firstPaint, last: lastPaint },
+    window: { destroyed: !windowAlive, rendererDestroyed: !contentsAlive,
+      visible: windowAlive ? win.isVisible() : null, minimized: windowAlive ? win.isMinimized() : null,
+      loading: contentsAlive ? win.webContents.isLoading() : null,
+      painting: contentsAlive ? win.webContents.isPainting() : null },
+    gpuProcesses: app.getAppMetrics().filter((metric) => metric.type === "GPU")
+      .map((metric) => ({ pid: metric.pid, type: metric.type, sandboxed: metric.sandboxed })) } : {}),
+  };
+};
 const events = () => {
   win.webContents.send(IPC.event.goalExecutionChanged, { sessionId: fixture.session.id, executionId: fixture.execution.id });
   win.webContents.send(IPC.event.goalReportChanged, { sessionId: fixture.session.id, executionId: fixture.execution.id });
@@ -156,6 +228,12 @@ app.whenReady().then(async () => {
     win.webContents.on("render-process-gone", (_event, detail) => record("render-process-gone", {
       reason: detail.reason, exitCode: detail.exitCode }));
     win.webContents.on("unresponsive", () => record("renderer-unresponsive"));
+    if (diagnosticTrial) win.webContents.on("paint", (_event, dirtyRect, image) => {
+      const frame = { sequence: ++paintCount, elapsedMs: Date.now() - startedAt,
+        dirtyRect, size: image.getSize(), empty: image.isEmpty() };
+      firstPaint ??= frame;
+      lastPaint = frame;
+    });
     enterStage("load-page");
     await win.loadFile(path.join(__dirname, "index.html"));
     enterStage("wait-for-probe");
@@ -167,9 +245,9 @@ app.whenReady().then(async () => {
     result.layouts = [await win.webContents.executeJavaScript("window.goalBlockedUILayout()")];
     await fs.writeFile(path.join(diagnostics, "probe.json"), JSON.stringify(result, null, 2));
     enterStage("wide-capture");
-    record("capture-start", { bounds: win.getContentBounds(), features: app.getGPUFeatureStatus() });
+    record("capture-start", captureState());
     await fs.writeFile(path.join(evidence, "goal-blocked-ui.png"), (await win.webContents.capturePage()).toPNG());
-    record("capture-complete");
+    record("capture-complete", diagnosticTrial ? captureState() : {});
     enterStage("narrow-resize");
     win.setSize(420, 920);
     await win.webContents.executeJavaScript("new Promise((resolve, reject) => { const end = performance.now() + 5000; const check = () => { if (innerWidth === 420) resolve(); else if (performance.now() > end) reject(new Error('Resize not applied')); else requestAnimationFrame(check); }; check(); })");
@@ -177,15 +255,16 @@ app.whenReady().then(async () => {
     result.layouts.push(await win.webContents.executeJavaScript("window.goalBlockedUILayout()"));
     await fs.writeFile(path.join(diagnostics, "probe.json"), JSON.stringify(result, null, 2));
     enterStage("narrow-capture");
-    record("capture-start", { bounds: win.getContentBounds(), features: app.getGPUFeatureStatus() });
+    record("capture-start", captureState());
     await fs.writeFile(path.join(evidence, "goal-blocked-ui-narrow.png"), (await win.webContents.capturePage()).toPNG());
-    record("capture-complete");
+    record("capture-complete", diagnosticTrial ? captureState() : {});
     enterStage("save-result");
     await fs.writeFile(path.join(evidence, "goal-blocked-ui.json"), JSON.stringify(result, null, 2));
     enterStage("complete");
     console.log("GOAL_BLOCKED_UI " + JSON.stringify(result)); app.exit(0);
   } catch (error) {
-    record("failure", { name: error?.name, message: String(error?.message ?? error) });
+    record("failure", { name: error?.name, message: String(error?.message ?? error),
+      ...(diagnosticTrial ? captureState() : {}) });
     console.error(error); app.exit(1);
   }
 });
@@ -193,7 +272,11 @@ app.whenReady().then(async () => {
   const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
   const recordExit = (details) => appendFileSync(join(diagnostics, "diagnostics.jsonl"), JSON.stringify({ event: "electron-exit", ...details }) + "\n");
   const child = spawn(resolveElectronBinary(root).electronBinary, [join(temp, "main.cjs")], { env, stdio: ["ignore", "pipe", "pipe"] });
-  let output = ""; for (const stream of [child.stdout, child.stderr]) stream.on("data", (chunk) => { output += chunk; });
+  let output = "";
+  for (const [name, stream] of [["stdout", child.stdout], ["stderr", child.stderr]]) stream.on("data", (chunk) => {
+    output += chunk;
+    if (diagnosticTrial) appendFileSync(join(diagnostics, name + ".log"), chunk);
+  });
   let timedOut = false;
   const timer = setTimeout(() => { timedOut = true; child.kill("SIGKILL"); }, 60_000);
   let exit;

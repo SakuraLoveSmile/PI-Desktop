@@ -2,120 +2,133 @@
 
 Date: 2026-11-11 (Asia/Taipei). Tier: T1. Status: 实现中.
 
-## Scope and decisions
+## Current scope and authorization
 
-The user authorized S1 investigation and a parallel, read-only U0 audit from
-`main` at `6c57182920d18b163ee8b6dcc4fdcc0de0ee8471`, then authorized a
-reviewable fixture-diagnostics change and an evidence-based minimal fixture
-repair. Preserve all assertions, timeouts and test-quality budgets. Product
-changes require a separate briefing if the
-investigation reaches product code. No real provider, paid model or running
-user application is an authorized test target. S2–S7 and U1–U6 remain outside
-this implementation package. No board or roadmap changes.
+Continue S1 from landed `main` at
+`98e2288795eae251af747940515cb9e219a72447`. The user authorized closing the
+investigation with at most two Linux CI experiments, each testing a distinct,
+evidence-based hypothesis. Retain all failures. If neither experiment can
+reproduce or classify the original GPU/Viz failure, stop speculative attempts
+and report S1 unresolved. A green diagnosis is not a root-cause repair.
 
-- Branch: `fix/20261111-pi-stab-1111-nightly-ui-audit`.
-- Worktree: the central `fork-pi-desktop` root, directory
-  `20261111-fix-pi-stab-1111-nightly-ui-audit`.
-- Intended integration target: `main`; merge and release are not authorized.
-- D8 authorized publishing this dedicated baseline branch and dispatching
-  diagnostic CI. On 2026-11-11 the user explicitly authorized committing the
-  five reviewed files and proceeding with that branch's diagnostic CI.
-- Preserve the primary checkout's pre-existing `pnpm-lock.yaml` modification.
+- Branch: `fix/20261111-pi-stab-1111-capture-closure`.
+- Worktree: central `fork-pi-desktop` root, directory
+  `20261111-fix-pi-stab-1111-capture-closure`.
+- Integration target: `main`. The authorized S1 branch may be committed,
+  published and used for manual diagnostic CI. A new merge or release still
+  requires the user's explicit instruction on a reviewable result.
+- Preserve every assertion, timeout and test-quality budget. Product-code
+  findings require a briefing before implementation. No changes to frozen
+  boundaries, workflows, release policy, boards or roadmaps.
+- Real providers, paid models and the running user application are not test
+  targets. S2–S7 and U1–U6 remain outside this package. Preserve the primary
+  checkout's pre-existing `pnpm-lock.yaml` modification.
 
-## Evidence and baseline
+## Historical evidence and delivered package
 
-- Historical nightly run `42924146284`: goals-team 35/36; `goal-blocked-ui`
-  failed with GPU exit 133 and `UnknownVizError` from Electron capturePage.
-  The interaction probe runs before the failing capture. The GPU crash cause
-  remains unresolved. Both a green run and the first red run used the same
-  source revision and runner image, so recent product commits are not proven
-  to be the trigger.
-- Dedicated baseline run `42976431136`, same source: goals-team 35/36.
-  `goal-blocked-ui` passed; `expert-team-settings` failed waiting for Subagents.
-  The settings fixture caches a navigation rail across a responsive transition;
-  it does not open the compact directory. Its exact failing stage is unknown.
-- With diagnostics added and navigation unchanged, one local settings run
-  reproduced the failure at `compact:light`, 560px. Before the Subagents click,
-  the current rail was attached inside a closed directory while the cached rail
-  and target button were detached; the tab stayed `expertTeam`. The original
-  six-second assertion failed, without a retry. Preserve this evidence under
-  `.artifacts/pi-stab-1111/settings-repro/`. This is a confirmed local fixture
-  race; the historical Linux stage still needs candidate CI evidence.
-- U0 covered all 12 requested screen categories using isolated fixtures.
-  Three P2 findings: inconsistent run-state presentation, ambiguous model/off
-  wording, and missing file-error recovery guidance. Images and limitations are
-  in `.artifacts/pi-stab-1111/u0-audit-evidence.json`; no UI was changed.
-- Capture limitation: the default fixture attempted public model discovery
-  twice using a fake key; both calls failed. This violated the requested R6
-  boundary and was reported. That path was stopped. No user credentials were
-  used and logs showed no inference call. Later capture used loopback fixtures.
-- Local Team suite failed waiting for an editable Composer; recorded only.
-  Its screenshots do not establish a passing suite. Isolated profiles were
-  verified into an archive before removing task-owned temporary directories.
+- Historical run `42924146284`: goals-team 35/36; `goal-blocked-ui` failed with
+  GPU exit 133 and `UnknownVizError`. Nine interaction groups precede capture,
+  but the old log cannot distinguish wide from narrow capture failure. No
+  fatal stack or OOM evidence identifies the native cause. A green run and the
+  first red run used the same source revision and runner image; the Goal
+  runner/renderer scoped diff from that revision to the original baseline
+  `6c57182920d18b163ee8b6dcc4fdcc0de0ee8471` is empty.
+- Dedicated baseline run `42976431136`: goals-team 35/36. Goal passed;
+  `expert-team-settings` failed waiting for Subagents. An isolated local repro
+  identified the detached navigation rail at 560px in the light-theme fixture:
+  the cached target was detached and the current directory remained closed.
+- PR [#87](https://github.com/SakuraLoveSmile/PI-Desktop/pull/87), landed as
+  `98e2288795eae251af747940515cb9e219a72447`, repaired that fixture race using the
+  real compact-directory entry and added capture-failure stage/probe evidence.
+  Assertions and limits were preserved. Local Goal/settings fixtures and an
+  injected capture rejection passed their respective acceptance checks.
+- Candidate `0f8d2c9948cc5cd181e492bcaf40e303d99af691` passed complete
+  goals-team/nightly runs [42985037823](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/42985037823)
+  and [42986729654](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/42986729654),
+  both 36/36. PR integration gates passed. The candidate, synthetic merge and
+  landed commit share tree `900f6b1c1ff5fbf310fa6f9217c801f989c9a282`.
+  Post-merge CI [43004768761](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/43004768761)
+  and docs [43004768597](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/43004768597)
+  passed; landed smoke was 5/5 without skips, with a clean, unchanged candidate.
+- Those green runs did not reproduce the original GPU failure. Earlier
+  `disabled_software` snapshots did not establish that `gpu-info-update` had
+  occurred, so they are not conclusive evidence of the active rendering backend.
+  Fixed-version Electron/Chromium source defines `UnknownVizError` as a generic
+  Viz copy failure, not proof that the first frame was missing.
+- The previous worktree and local branch were safely removed after verified
+  evidence archival. The old remote branch remains. Verified evidence archive:
+  `/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop/.archives/20261111-pi-stab-1111-nightly-ui-audit`.
+  Its manifest covers 236 files; the bundle preserves the candidate and merge
+  ref, and `followup/` retains post-merge validation and cleanup records.
 
-## Current package and ownership
+## U0 read-only audit (delivered)
 
-1. Main agent: `scripts/e2e-goal-blocked-ui.mjs`; retain the interaction probe
-   before capture, log named stages and GPU/renderer exits, and retain failure
-   evidence in the existing CI artifact upload directory.
-2. Worker: `scripts/e2e-expert-team-settings.mjs` and
-   `scripts/e2e/expert-team-settings.tsx`; record runner stages, viewport/media,
-   current/cached rail attachment, directory state and navigation before/after.
-   After the diagnostic repro, wait for responsive structure, reacquire visible
-   navigation and use the real compact-directory trigger. Keep every original
-   interaction and style assertion. Atomically publish diagnostic snapshots so
-   a killed writer cannot expose a truncated file; unreadable evidence fails
-   explicitly while retaining the original child result.
-3. Main agent: task record and relevant E2E documentation. Freeze source edits
-   before candidate-identity suites; independently review the combined diff.
+All 12 requested screen categories were inspected with isolated fixture images.
+Three P2 findings remain recorded only: inconsistent run-state presentation,
+ambiguous model/off wording, and file errors without cause or recovery guidance.
+The archived `snapshot/.artifacts/pi-stab-1111/u0-audit-evidence.json` identifies
+images and limitations. No UI change was made.
 
-## Acceptance and validation
+The initial capture attempted public model discovery twice with a fake key;
+both failed. This violated R6 and was reported and stopped. No user credentials
+or inference calls were observed. Later capture used loopback fixtures. A local
+Team suite failure waiting for editable Composer was recorded without repair;
+its screenshots do not establish a passing suite.
 
-- Successful fixtures still satisfy their original assertions and final exit
-  status. Screenshot failure remains a test failure.
-- Interaction results and the last diagnostic stage survive a capture error.
-- Settings failures identify the probe invocation and navigation node state.
-- Diagnostics are available under `.artifacts/e2e/`, already uploaded by the
-  existing workflow. No workflow or release-policy changes are required.
-- Run syntax checks, relevant isolated fixture suites, test-quality/catalog
-  checks, and appropriate documentation checks on the stable combined source.
-- Goal diagnostic candidate passed its local suite, including all nine original
-  interaction groups and both captures. An isolated injected capturePage
-  rejection then verified exit 1, retained nine groups and wide-layout evidence,
-  the `wide-capture` failure stage, and absence of stale success files. This
-  validates failure evidence, not the unresolved GPU crash cause.
-- Final combined executable candidate: both `goal-blocked-ui` and
-  `expert-team-settings` passed once on macOS, Node 22.23.2 / Electron 43.6.0.
-  Both reports have `candidateUnchanged: true` and the same dirty-tree digest
-  `7c7f38daf4d16320046df1d983c29fc046d3debdda1dd0e6965c0195179efbd6`.
-  At 560px, both themes recorded connected navigation targets in an open
-  directory before the click, and `settingsTab: subagents` afterward.
-  Reports: `.artifacts/pi-stab-1111/s1-goal-candidate.json` and
-  `.artifacts/pi-stab-1111/s1-settings-candidate.json`. This task record's
-  validation summary was updated afterward; executable files did not change.
-- Passed: both runner syntax checks; `check-test-quality.mjs --base origin/main`
-  (237 files / 8,120 existing syntax-level assertions); generated scenario index
-  (138 suites / 167 IDs); agent-policy check; documentation structure and locale
-  pair checks; `git diff --check`. The test-quality baseline was unchanged.
-  Independent review's atomic-write finding was fixed and re-reviewed, with no
-  remaining findings. The fetched `origin/main` still equals the base SHA.
-- No additional unit tests: existing real-renderer E2E reproduces the navigation
-  regression, and capture-boundary fault injection checks retained failure
-  evidence. Full workspace/Rust suites and packaging: NOT RUN; no product,
-  Host, runtime or package source changed. Real providers and the running user
-  application: NOT RUN in this implementation package.
-- At candidate submission, Linux diagnosis on the new commit is NOT RUN pending
-  dispatch. Subsequent run results and downloaded diagnostics are retained under
-  `.artifacts/pi-stab-1111/`, with the current hosted summary in
-  `s1-hosted-validation.json`. S1 acceptance still requires a proven minimal fix followed by
-  two consecutive green goals-team/nightly runs on the same commit, then
-  scheduled nightly evidence. Diagnostics alone do not satisfy S1.
+## Current diagnostic package and ownership
 
-## Remaining work and resources
+1. Main agent: Goal runner, catalog diagnostic argument, task record and relevant
+   E2E specification. Keep all nine interaction groups, original two captures,
+   capture order, the 60-second native child limit and 480-second suite limit.
+2. Worker: `scripts/e2e/capture-diagnosis.mjs` and
+   `scripts/test/capture-diagnosis.test.mjs`. Run six independent cold profiles;
+   retain all output and exits, atomically publish progress, clean temporary
+   profiles, and fail the diagnosis if any trial fails. Children remain in the
+   isolated suite's process group. Evidence declares `purpose: diagnosis` and
+   `acceptanceEvidence: false`.
+3. Read-only analyst/researcher: historical evidence and fixed-version Electron
+   behavior. Independent reviewer: actual combined changes before publishing.
 
-This record accompanies the authorized fixture candidate. Publish the request
-branch and run Linux CI; use its evidence to decide the remaining GPU/capture
-repair. Keep this worktree
-and its local evidence while S1 remains unresolved. The final process check
-found no task-owned Goal/settings Electron or crashpad process. PR, merge and
-release remain outside the authorized delivery scope.
+Experiment 1 observes whether GPU/Viz exits while a copy request is outstanding.
+It preserves capture ordering without a paint barrier or backend switch. Record
+in-memory frame metadata, capture/GPU state, valid-after-update GPU information,
+shared memory, Chromium logs and full native stdout/stderr. No raw memory dump.
+A temporary catalog argument invokes this mode through the existing Linux CI
+workflow; no workflow or gate changes are part of this task. Remove the argument
+before final ordinary acceptance runs.
+
+Experiment 2 is chosen only from experiment 1's evidence and must distinguish a
+new hypothesis. A missing matching frame may justify a single repaint/barrier
+comparison; a native failure with valid frames may justify a minimal static
+window control. Neither is already a proven repair. No blind rerun or backend
+switch is an accepted substitute for a cause.
+
+## Validation and completion
+
+Passed locally on the current combined executable source: eight Node helper
+and suite-dispatcher tests; outer/helper/test syntax; generated native CJS
+syntax in both ordinary and diagnostic modes; test-quality (237 files / 8,120
+existing syntax-level assertions); agent policy; documentation structure (642
+pages) and locale pairs (95); and whitespace checks. Mechanical checks use the
+primary checkout's existing TypeScript read-only via `NODE_PATH`; no dependency
+or lockfile was changed. The diagnostic catalog argument requires regenerating
+the two existing scenario indexes; the final catalog check passes (138 suites /
+167 executable IDs). Independent review found no blocker for experiment 1.
+Cancellation may leave the last atomic summary at `running`; use the outer
+suite result for its final termination. Paint observation, GPU information
+queries and logging may affect timing, so green results cannot rule out a race.
+
+Current executable candidate has not run Electron or Linux CI yet: NOT RUN.
+Test-quality baseline remains unchanged. Full workspace/Rust tests, packaging,
+real providers and the running user application: NOT RUN; no product or runtime
+implementation is changed.
+
+S1 remains unresolved. A proven minimal repair must pass two consecutive
+complete ordinary goals-team/nightly runs on one final commit, followed by
+scheduled nightly evidence after authorized integration. Diagnostic runs cannot
+satisfy those two acceptance runs. The entire stability program's seven-day and
+real-model criteria are separate from this S1 package.
+
+Keep the current worktree and its evidence while this investigation is active.
+Record each experiment's exact SHA, fetched base, candidate receipt and result
+before deciding the next action.

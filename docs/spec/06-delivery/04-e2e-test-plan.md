@@ -18931,6 +18931,21 @@ push or PR authorization.
   is written only after both screenshots succeed. Each run clears its previous
   diagnostic and success files. Both diagnostic directories are inside the
   existing CI artifact upload root; no workflow change is needed.
+  The Linux CI-only `--diagnose-capture` mode performs six independent cold
+  profiles, retaining every trial under
+  `.artifacts/e2e/goal-capture-diagnosis/`. Its atomic `summary.json` is marked
+  `purpose: diagnosis` and `acceptanceEvidence: false`; any failed, signalled or
+  unstartable trial fails the diagnosis. This is a bounded experiment, not a
+  retry-to-pass policy. Each trial preserves all nine interaction groups, both
+  original single captures, their order and the original 60-second child limit;
+  the suite retains its existing 480-second limit. No paint barrier or GPU
+  backend switch is added. Trials record in-memory offscreen frame metadata,
+  capture/GPU process state, complete child output, Chromium logs and available
+  shared memory using isolated fixture profiles. Feature status is valid only
+  after `gpu-info-update`; an unobserved update is recorded explicitly. Raw
+  native memory dumps are not collected. The diagnostic catalog argument must
+  be removed before ordinary same-commit acceptance runs; diagnostic success
+  alone never proves that the historical GPU/Viz failure was repaired.
 - **Specs:** Runtime Goal completion, Host execution holds, storage Plus P9,
   GoalBlockedCard/Composer resume intent, remote read-only projection and
   [Goal blocked-state ADR](../../adr/goal-blocked-state.md).
