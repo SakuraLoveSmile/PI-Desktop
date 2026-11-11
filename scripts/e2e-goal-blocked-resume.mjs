@@ -394,6 +394,7 @@ try {
   await controlCall("pi_goal_close", { ...partialIdentity, expectedVersion: partialBlocked.hold.version, action: "accept", confirm: true });
   const acceptedRead = await controlCall("pi_goal_report_get", partialIdentity);
   assert.equal(acceptedRead.state, "ready"); assert.match(acceptedRead.report_sha256, /^[a-f0-9]{64}$/);
+  assert.equal(acceptedRead.report_sha256, createHash("sha256").update(await readFile(join(dataDir, "goal_reports", partial.session.id, `${partial.execution.id}.json`))).digest("hex"));
   assert.equal(acceptedRead.report.verdict, "partial"); assert.equal(acceptedRead.report.closure, "user_accepted");
   await controlCall("pi_goal_close", { ...partialIdentity, expectedVersion: partialBlocked.hold.version, action: "accept", confirm: true }, "CONFLICT");
   const accepted = (await host.call("goalReports.get", { sessionId: partial.session.id, executionId: partial.execution.id })).report;

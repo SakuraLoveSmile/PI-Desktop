@@ -2460,6 +2460,10 @@ steps, version and segment history even when `goalReport/get` is still draft.
 A hold is not a completed verification report. Read the finalized report and
 its trusted hash separately with `pi_goal_report_get` before consuming it as
 report evidence; the close result's optional `report` is only a summary.
+Named and generic MCP report reads expose Host's recomputed `reportSha256` as
+`report_sha256`, preserve the complete ready report and its contract/asset
+hashes, and omit the report body while non-ready. Plugin IPC results retain
+their original Host shape.
 
 Both named and generic mutation paths require `confirm:true` before dispatch;
 the acknowledgement is not forwarded in the IPC argument object. Main and

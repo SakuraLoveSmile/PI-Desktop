@@ -1868,6 +1868,9 @@ ISO8601/RFC3339 时刻。缺少对应行（包括跨会话的 `turnId`）会以 
 即使 `goalReport/get` 仍为草稿，可选的 `hold` 仍保留原因、进度、草稿限制、下一步、
 版本与分段历史。hold 不是已完成的验证报告。将报告用于证据前，须通过
 `pi_goal_report_get` 单独读取已定稿报告及可信哈希；close 返回的可选 `report` 只是摘要。
+命名与通用 MCP 报告读取将 Host 重新计算的 `reportSha256` 暴露为 `report_sha256`，
+保留 ready 报告的完整内容及合约/资产哈希；非 ready 状态不返回报告正文。
+插件 IPC 结果保留原始 Host 结构。
 
 命名工具和通用调用的写入路径均在分派前要求 `confirm:true`，该确认字段不转发到 IPC
 参数。Main 和 Host 保留会话/执行标识校验、预期 hold 版本 CAS、活动回合/结算检查及

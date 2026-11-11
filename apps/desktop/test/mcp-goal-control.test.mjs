@@ -6,7 +6,7 @@ import { register } from "node:module";
 import test from "node:test";
 
 register(new URL("helpers/ts-import-hooks.mjs", import.meta.url));
-const { McpControlServer } = await import("../electron/main/mcp-control.ts");
+const { McpControlServer, createMcpControlController } = await import("../electron/main/mcp-control.ts");
 const { registerGoalReportIpc } = await import("../electron/main/ipc/goal-report-ipc.ts");
 const { IPC } = await import("@pi-desktop/shared");
 
@@ -34,7 +34,7 @@ async function fixture(t, hostCall = async () => ({ execution: { id: "goal", ses
   const dataDir = mkdtempSync(join(tmpdir(), "pi-mcp-goal-"));
   const server = new McpControlServer({
     dataDir, port: 0,
-    channels: { goalExecutionGet: IPC.invoke.goalExecutionGet, goalResume: IPC.invoke.goalResume, goalClose: IPC.invoke.goalClose },
+    channels: { goalExecutionGet: IPC.invoke.goalExecutionGet, goalResume: IPC.invoke.goalResume, goalClose: IPC.invoke.goalClose, goalReportGet: IPC.invoke.goalReportGet },
     invoke: async (channel, args) => handlers.get(channel)(...args),
   });
   t.after(async () => { await server.stop(); rmSync(dataDir, { recursive: true, force: true }); });
@@ -57,14 +57,14 @@ test("Goal tools discover the existing Main controls and return the complete blo
   const f = await fixture(t);
   const tools = (await f.rpc("tools/list")).tools;
   assert.deepEqual(tools.filter(tool => tool.name.startsWith("pi_goal_")).map(tool => tool.name),
-    ["pi_goal_execution_get", "pi_goal_resume", "pi_goal_close"]);
+    ["pi_goal_execution_get", "pi_goal_resume", "pi_goal_close", "pi_goal_report_get"]);
   assert.deepEqual(tools.find(tool => tool.name === "pi_goal_close").inputSchema.required,
     ["sessionId", "executionId", "expectedVersion", "action", "confirm"]);
   assert.deepEqual(tools.find(tool => tool.name === "pi_goal_resume").inputSchema.properties.modelOverride.required,
     ["providerId", "modelId"]);
   const described = (await f.call("pi_control_describe", {})).structuredContent;
   assert.deepEqual(described.map(operation => [operation.id, operation.risk]),
-    [["goal/get", "read"], ["goal/resume", "dangerous"], ["goal/close", "dangerous"]]);
+    [["goal/get", "read"], ["goal/resume", "dangerous"], ["goal/close", "dangerous"], ["goalReport/get", "read"]]);
   const read = await f.call("pi_goal_execution_get", { sessionId: "session", executionId: "goal" });
   assert.deepEqual(read.structuredContent.hold, hold);
   await f.call("pi_goal_execution_get", { sessionId: "session" });
@@ -72,6 +72,38 @@ test("Goal tools discover the existing Main controls and return the complete blo
     { method: "goalExecutions.get", params: { sessionId: "session", executionId: "goal" } },
     { method: "goalExecutions.get", params: { sessionId: "session" } },
   ]);
+});
+
+test("accepted Goal report reads expose the trusted Host hash without leaking draft bodies", async (t) => {
+  const report = {
+    closure: "user_accepted", verdict: "partial", checks: [{ result: "failed" }],
+    proposalId: "proposal", goal: { contractHash: "b".repeat(64) },
+    assets: [{ assetId: "source", sha256: "c".repeat(64) }],
+  };
+  const trustedHash = "a".repeat(64);
+  let payload = { state: "ready", report, reportSha256: trustedHash, fileBytes: 123, maxBytes: 456, integrity: "structured", verdict: "partial" };
+  const f = await fixture(t, async (method) => {
+    assert.equal(method, "goalReports.get");
+    return payload;
+  });
+  const params = { sessionId: "session", executionId: "goal" };
+  const named = await f.call("pi_goal_report_get", params);
+  const generic = await f.call("pi_desktop_invoke", { operation: "goalReport/get", args: [params] });
+  for (const result of [named.structuredContent, generic.structuredContent.result]) {
+    assert.equal(result.report_sha256, trustedHash);
+    assert.deepEqual(result.report, report);
+    assert.equal(result.file_bytes, 123);
+    assert.equal(result.max_bytes, 456);
+    assert.equal(result.reportSha256, undefined);
+  }
+  payload = { ...payload, state: "draft" };
+  const draft = (await f.call("pi_goal_report_get", params)).structuredContent;
+  assert.equal(draft.state, "draft");
+  assert.equal(draft.report, null);
+  assert.equal(payload.report, report);
+  const controller = createMcpControlController({ channels: { goalReportGet: IPC.invoke.goalReportGet }, invoke: async () => payload });
+  const pluginRead = await controller.invoke({ operation: "goalReport/get", args: [params], source: "plugin" });
+  assert.equal(pluginRead, payload);
 });
 
 test("Goal mutations require confirmation and keep the current identity, supplement and unverified result", async (t) => {

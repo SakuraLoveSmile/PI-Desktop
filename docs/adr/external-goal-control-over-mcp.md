@@ -28,6 +28,11 @@ Consumers read a finalized report's trusted hash separately. A response loss
 is an unknown write outcome and must be reconciled through a read rather than
 blindly retried. The IPC protocol owns the precise request and response DTOs.
 
+Wire the existing report-result normalizer into both external MCP read paths:
+the trusted Host hash is exposed as `report_sha256`, ready report content and
+its nested hashes stay intact, and non-ready bodies are withheld. First-party
+plugin IPC keeps its existing Host result shape.
+
 ## Consequences
 
 A scheduler can show the real blocked condition and relay an explicit user

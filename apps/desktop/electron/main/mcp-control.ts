@@ -940,6 +940,7 @@ export function createMcpControlController(options: {
         : operation.channel === "internal:session-collaboration"
         ? await options.invokeSessionCollaboration!({ ...input, args: sanitized })
         : await options.invoke(operation.channel, sanitized);
+      if (operation.id === "goalReport/get" && input.source === "mcp") result = goalReportReadResult(result);
       if (operation.id === "agent/getStatus" && options.askTools) {
         const asks = await options.askTools.pending(String(sanitized[0] ?? ""));
         const envelope = result as { status?: Record<string, unknown> };
