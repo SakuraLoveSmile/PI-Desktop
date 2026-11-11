@@ -34,6 +34,8 @@ disagrees, so a green `check:release-docs` is a precondition, not a substitute.
 | `check-linux-host-glibc.mjs` | `node scripts/check-linux-host-glibc.mjs [bin]` | Fail a Linux host-core binary whose needed glibc is above 2.35; the current Release workflow does not build Linux packages |
 | `make-icon.py` | `python3 scripts/make-icon.py` | Derive the package PNG, the macOS tray template, and the iconset/ICNS from the canonical PNG |
 | `publish-screenshots.py` | `python3 scripts/publish-screenshots.py` | Publish documentation screenshots |
+| `ui-capture/capture.mjs` | `pnpm verify:ui:capture` | Offline production UI fixtures; see [UI evidence](ui-capture/README.md) for opt-in capture and repeatability |
+| `ui-capture/compare.mjs` | `pnpm verify:ui:compare` | Validate complete manifests and generate before/after/diff panels without publishing |
 
 ## Development
 
@@ -64,7 +66,7 @@ paths in a disposable Git fixture, without building the application.
 ## End-to-end
 
 Run relevant task-candidate E2E from the dedicated request worktree, reusing
-the provisioned host environment as required by `AGENTS.md`. `verify:ui:*`,
+the provisioned host environment as required by `AGENTS.md`. `verify:ui:capture` / `verify:ui:compare`,
 live providers, paid APIs, and the user's running desktop require explicit
 request authorization. Use isolated profiles and deterministic local fixtures.
 The scenarios are specified in

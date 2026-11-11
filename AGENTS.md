@@ -164,7 +164,8 @@ Assert behavior or stable contracts, not source text. `pnpm check:test-quality`
 freezes the per-file/per-case signature inventory; never raise or reset the
 baseline to pass a change. Mock only at real external boundaries. Run the
 narrowest authoritative gate and do not skip a gate because narrower tests
-passed. `verify:ui:*` runs only when the user explicitly asks.
+passed. `verify:ui:capture` and `verify:ui:compare` are opt-in; see
+[UI evidence](scripts/ui-capture/README.md). Run them only when the user explicitly asks.
 
 ---
 

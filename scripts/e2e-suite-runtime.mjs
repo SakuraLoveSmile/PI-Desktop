@@ -78,7 +78,7 @@ export async function runSuite(entry, { directory = root, parentEnv = process.en
 }
 
 /** Identify dirty request candidates without treating HEAD alone as the tested tree. */
-export async function candidateIdentity(directory = root) {
+export async function candidateIdentity(directory = root, { includeHost = true } = {}) {
   const { execFileSync } = await import("node:child_process");
   const { createHash } = await import("node:crypto");
   const git = args => execFileSync("git", args, { cwd: directory });
@@ -95,7 +95,7 @@ export async function candidateIdentity(directory = root) {
     else throw new Error(`Unsupported untracked candidate entry: ${path}`);
     digest.update("\0");
   }
-  const hostBinary = process.env.PI_DESKTOP_HOST_BIN ? resolve(process.env.PI_DESKTOP_HOST_BIN) : null;
+  const hostBinary = includeHost && process.env.PI_DESKTOP_HOST_BIN ? resolve(process.env.PI_DESKTOP_HOST_BIN) : null;
   const hostBinarySha256 = hostBinary ? createHash("sha256").update(await readFile(hostBinary)).digest("hex") : null;
   return { head, baseMain, hostBinary, hostBinarySha256, dirty: git(["status", "--porcelain"]).length > 0, workspaceDiffSha256: digest.digest("hex"), platform: process.platform, node: process.version };
 }

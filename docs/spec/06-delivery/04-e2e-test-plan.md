@@ -11,6 +11,14 @@ This manual entry uses the nightly tier for one family and retains its exact
 candidate/base and artifact report. A focused diagnostic run does not replace
 the complete nightly candidate validation or PR integration gates.
 
+Opt-in visual evidence uses the fixed twelve-scene
+[UI capture tool](../../../scripts/ui-capture/README.md):
+`pnpm verify:ui:capture` and `pnpm verify:ui:compare`. It renders real components
+with offline fixtures in isolated native windows. U1 repeatability requires two
+independent runs on the same source/environment and an exact pixel comparison;
+a build-only check is NOT RUN for capture. It supplements product E2E and follows
+the stability program's per-round capture authorization.
+
 ---
 
 ## 1. Goals

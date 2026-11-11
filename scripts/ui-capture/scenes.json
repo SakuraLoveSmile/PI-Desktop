@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "fixtureRevision": 1,
+  "settings": {
+    "theme": "dark",
+    "locale": "zh-CN",
+    "timezone": "UTC",
+    "now": "2026-11-11T12:00:00.000Z",
+    "viewport": { "width": 1440, "height": 1000 },
+    "deviceScaleFactor": 1,
+    "reducedMotion": true,
+    "animationTimeMs": 0,
+    "hideCaret": true
+  },
+  "scenes": [
+    { "id": "sidebar-states", "file": "sidebar-states.png" },
+    { "id": "chat-transcript", "file": "chat-transcript.png" },
+    { "id": "composer-menu", "file": "composer-menu.png" },
+    { "id": "team-panel", "file": "team-panel.png" },
+    { "id": "team-work-page", "file": "team-work-page.png" },
+    { "id": "goal-progress", "file": "goal-progress.png" },
+    { "id": "goal-report", "file": "goal-report.png" },
+    { "id": "work-panel", "file": "work-panel.png" },
+    { "id": "settings-home", "file": "settings-home.png" },
+    { "id": "model-provider-settings", "file": "model-provider-settings.png" },
+    { "id": "plugins", "file": "plugins.png" },
+    { "id": "dialog", "file": "dialog.png" }
+  ]
+}
