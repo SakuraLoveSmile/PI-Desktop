@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import { createServer } from "node:http";
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { pathToFileURL } from "node:url";
 import { dirname, join, resolve, basename } from "node:path";
@@ -16,6 +16,12 @@ const { build } = createRequire(join(root, "packages/agent-runtime/package.json"
 const evidenceDir = process.env.PI_EXPERT_SETTINGS_EVIDENCE_DIR || join(root, ".review-evidence");
 await mkdir(evidenceDir, { recursive: true });
 const evidencePath = join(evidenceDir, `expert-team-settings-${Date.now()}.png`);
+const diagnosticDir = join(root, ".artifacts/e2e/expert-team-settings");
+await mkdir(diagnosticDir, { recursive: true });
+const diagnosticPath = join(diagnosticDir, "diagnostics.json");
+const diagnosticTempPath = join(diagnosticDir, "diagnostics.json.tmp");
+await rm(diagnosticPath, { force: true });
+await rm(diagnosticTempPath, { force: true });
 const temp = await mkdtemp(join(tmpdir(), "pi-expert-team-settings-"));
 try {
   await build({ entryPoints: [join(root, "scripts/e2e/expert-team-settings.tsx")],
@@ -89,16 +95,36 @@ await globalThis.expertTeamSettingsProbe({ preview: true, locale: params.get("lo
     await writeFile(join(temp, "main.cjs"), `
 const { app, BrowserWindow } = require("electron");
 const path = require("node:path");
-const { writeFileSync } = require("node:fs");
+const { renameSync, writeFileSync } = require("node:fs");
+const diagnosticPath = ${JSON.stringify(diagnosticPath)};
+const diagnosticTempPath = ${JSON.stringify(diagnosticTempPath)};
+const diagnostics = { schemaVersion: 1, status: "running", phase: "startup", renderer: [] };
+const persistDiagnostics = () => {
+  writeFileSync(diagnosticTempPath, JSON.stringify(diagnostics, null, 2));
+  renameSync(diagnosticTempPath, diagnosticPath);
+};
+persistDiagnostics();
 app.setPath("userData", path.join(__dirname, "profile"));
 app.whenReady().then(async () => {
   const win = new BrowserWindow({ show: false, width: 1200, height: 1000,
     webPreferences: { offscreen: true, sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } });
-  win.webContents.on("console-message", (event) => console.error(event.message));
+  win.webContents.on("console-message", (event) => {
+    const prefix = "EXPERT_TEAM_SETTINGS_DIAGNOSTIC ";
+    if (event.message.startsWith(prefix)) {
+      diagnostics.renderer.push(JSON.parse(event.message.slice(prefix.length)));
+      persistDiagnostics();
+    }
+    console.error(event.message);
+  });
+  const runProbe = (phase, source) => {
+    diagnostics.phase = phase;
+    persistDiagnostics();
+    return win.webContents.executeJavaScript("globalThis.expertTeamSettingsPhase = " + JSON.stringify(phase) + "; " + source);
+  };
   try {
     await win.loadFile(path.join(__dirname, "index.html"));
     win.webContents.setZoomFactor(0.8);
-    const result = await win.webContents.executeJavaScript("globalThis.expertTeamSettingsProbe()");
+    const result = await runProbe("initial", "globalThis.expertTeamSettingsProbe()");
     result.productionCss = await win.webContents.executeJavaScript("(" + (() => {
       const hidden = document.querySelector(".expert-team-settings .settings-icon-button .sr-only");
       if (!hidden) throw new Error("Missing screen-reader-only edit label");
@@ -109,25 +135,36 @@ app.whenReady().then(async () => {
       return { srOnlyHidden: true };
     }).toString() + ")()");
     result.overviewStyles = [];
-    for (const theme of ["light", "dark"]) result.overviewStyles.push(await win.webContents.executeJavaScript("globalThis.expertTeamSettingsStyleProbe(" + JSON.stringify(theme) + ")"));
+    for (const theme of ["light", "dark"]) result.overviewStyles.push(await runProbe("overview:" + theme, "globalThis.expertTeamSettingsStyleProbe(" + JSON.stringify(theme) + ")"));
     result.overview = { viewport: await win.webContents.executeJavaScript("window.innerWidth"), zoom: win.webContents.getZoomFactor() };
     await win.webContents.executeJavaScript("new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
     const screenshot = await win.capturePage();
     writeFileSync(process.env.PI_E2E_EVIDENCE_PATH, screenshot.toPNG());
     win.webContents.setZoomFactor(1);
     win.setSize(800, 840);
-    result.narrow = await win.webContents.executeJavaScript("globalThis.expertTeamSettingsViewportProbe()");
-    await win.webContents.executeJavaScript('globalThis.expertTeamSettingsStyleProbe("light")');
+    await runProbe("resize:800", "globalThis.expertTeamSettingsWaitForViewport(800)");
+    result.narrow = await runProbe("viewport:800", "globalThis.expertTeamSettingsViewportProbe()");
+    await runProbe("narrow:light", 'globalThis.expertTeamSettingsStyleProbe("light")');
     await win.webContents.executeJavaScript("new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
     writeFileSync(process.env.PI_E2E_EVIDENCE_PATH.replace(/\\.png$/, "-narrow-light.png"), (await win.capturePage()).toPNG());
     win.setSize(560, 840);
+    await runProbe("resize:560", "globalThis.expertTeamSettingsWaitForViewport(560)");
     result.compact = [];
-    for (const theme of ["light", "dark"]) result.compact.push(await win.webContents.executeJavaScript("globalThis.expertTeamSettingsStyleProbe(" + JSON.stringify(theme) + ")"));
+    for (const theme of ["light", "dark"]) result.compact.push(await runProbe("compact:" + theme, "globalThis.expertTeamSettingsStyleProbe(" + JSON.stringify(theme) + ")"));
     writeFileSync(process.env.PI_E2E_EVIDENCE_PATH.replace(/\\.png$/, "-compact-dark.png"), (await win.capturePage()).toPNG());
     await win.webContents.executeJavaScript("globalThis.expertTeamSettingsCleanup?.()");
+    diagnostics.status = "passed";
+    diagnostics.phase = "complete";
+    persistDiagnostics();
     console.log("EXPERT_TEAM_SETTINGS " + JSON.stringify(result));
     app.exit(0);
-  } catch (error) { console.error(error); app.exit(1); }
+  } catch (error) {
+    diagnostics.status = "failed";
+    diagnostics.failure = { name: error instanceof Error ? error.name : "NonErrorRejection",
+      message: error instanceof Error ? error.message.split("; surface=")[0] : "Non-Error rejection" };
+    persistDiagnostics();
+    console.error(error); app.exit(1);
+  }
 });
 `);
     const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
@@ -135,11 +172,32 @@ app.whenReady().then(async () => {
     const child = spawn(resolveElectronBinary(root).electronBinary, [join(temp, "main.cjs")], { env, stdio: ["ignore", "pipe", "pipe"] });
     let output = "";
     for (const stream of [child.stdout, child.stderr]) stream.on("data", (chunk) => { output += chunk; });
-    const timer = setTimeout(() => child.kill("SIGKILL"), 30_000);
-    let code;
-    try { code = await new Promise((resolve, reject) => { child.once("error", reject); child.once("close", resolve); }); }
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; child.kill("SIGKILL"); }, 30_000);
+    let code, signal;
+    try { code = await new Promise((resolve, reject) => {
+      child.once("error", reject);
+      child.once("close", (exitCode, exitSignal) => { signal = exitSignal; resolve(exitCode); });
+    }); }
     finally { clearTimeout(timer); }
+    let diagnostics, diagnosticReadError;
+    try {
+      diagnostics = JSON.parse(await readFile(diagnosticPath, "utf8"));
+      assert(diagnostics?.schemaVersion === 1 && Array.isArray(diagnostics.renderer)
+        && typeof diagnostics.phase === "string" && ["running", "passed", "failed"].includes(diagnostics.status),
+      "Invalid expert-team settings diagnostic envelope");
+    } catch (error) {
+      diagnosticReadError = { name: error.name, message: error.message };
+      diagnostics = { schemaVersion: 1, status: "failed", phase: "diagnostic-read", renderer: [], diagnosticReadError };
+      console.error("EXPERT_TEAM_SETTINGS_DIAGNOSTIC_READ_ERROR " + JSON.stringify(diagnosticReadError));
+    }
+    diagnostics.child = { code, signal, timedOut };
+    if (code !== 0 || diagnosticReadError) diagnostics.status = "failed";
+    await writeFile(diagnosticTempPath, JSON.stringify(diagnostics, null, 2));
+    await rename(diagnosticTempPath, diagnosticPath);
+    console.log(`EXPERT_TEAM_SETTINGS_DIAGNOSTICS ${diagnosticPath}`);
     assert.equal(code, 0, output);
+    assert.equal(diagnosticReadError, undefined, "Diagnostic evidence could not be read; child output: " + output);
     const result = output.split(/\r?\n/).find((line) => line.startsWith("EXPERT_TEAM_SETTINGS "));
     assert(result, output);
     console.log(result);

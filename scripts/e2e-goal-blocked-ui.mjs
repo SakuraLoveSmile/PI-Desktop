@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
+import { appendFileSync } from "node:fs";
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
@@ -13,8 +14,14 @@ const root = repositoryRoot();
 const { build } = createRequire(join(root, "packages/agent-runtime/package.json"))("esbuild");
 const temp = await mkdtemp(join(tmpdir(), "pi-goal-blocked-ui-"));
 const evidence = join(root, ".review-evidence");
+const diagnostics = join(root, ".artifacts/e2e/goal-blocked-ui");
 try {
   await mkdir(evidence, { recursive: true });
+  await mkdir(diagnostics, { recursive: true });
+  for (const name of ["goal-blocked-ui.json", "goal-blocked-ui.png", "goal-blocked-ui-narrow.png"])
+    await rm(join(evidence, name), { force: true });
+  for (const name of ["diagnostics.jsonl", "probe.json"])
+    await rm(join(diagnostics, name), { force: true });
   await build({ entryPoints: [join(root, "scripts/e2e/goal-blocked-ui.tsx")], outfile: join(temp, "renderer.js"),
     bundle: true, platform: "browser", format: "esm", jsx: "automatic",
     define: { "process.env.NODE_ENV": '"production"', "import.meta.env.DEV": "false" },
@@ -50,9 +57,25 @@ contextBridge.exposeInMainWorld("piDesktop", { platform: "darwin", locale: "en-U
   await writeFile(join(temp, "main.cjs"), `
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("node:path"); const fs = require("node:fs/promises");
+const { appendFileSync } = require("node:fs");
 const IPC = ${JSON.stringify(IPC)}; const evidence = ${JSON.stringify(evidence)};
+const diagnostics = ${JSON.stringify(diagnostics)};
 app.setPath("userData", path.join(__dirname, "profile"));
 let win, counter = 0, fixture, calls = [], failResume = false;
+let stage = "bootstrap";
+const startedAt = Date.now();
+const record = (event, details = {}) => {
+  const entry = { event, stage, elapsedMs: Date.now() - startedAt, ...details };
+  appendFileSync(path.join(diagnostics, "diagnostics.jsonl"), JSON.stringify(entry) + "\\n");
+  console.error("GOAL_BLOCKED_UI_DIAGNOSTIC " + JSON.stringify(entry));
+};
+const enterStage = (next) => { stage = next; record("stage"); };
+record("environment", { platform: process.platform, arch: process.arch,
+  electron: process.versions.electron, chrome: process.versions.chrome, node: process.versions.node,
+  displayAvailable: Boolean(process.env.DISPLAY) });
+app.on("child-process-gone", (_event, detail) => record("child-process-gone", {
+  type: detail.type, reason: detail.reason, exitCode: detail.exitCode }));
+app.on("gpu-info-update", () => record("gpu-info-update", { features: app.getGPUFeatureStatus() }));
 const events = () => {
   win.webContents.send(IPC.event.goalExecutionChanged, { sessionId: fixture.session.id, executionId: fixture.execution.id });
   win.webContents.send(IPC.event.goalReportChanged, { sessionId: fixture.session.id, executionId: fixture.execution.id });
@@ -125,32 +148,62 @@ ipcMain.handle("fixture:invoke", async (_event, channel, ...args) => {
   return { ok: true, data };
 });
 app.whenReady().then(async () => {
-  win = new BrowserWindow({ show: false, width: 1000, height: 920,
-    webPreferences: { offscreen: true, preload: path.join(__dirname, "preload.cjs"), sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } });
-  win.webContents.on("console-message", (event) => console.error(event.message));
   try {
+    enterStage("create-window");
+    win = new BrowserWindow({ show: false, width: 1000, height: 920,
+      webPreferences: { offscreen: true, preload: path.join(__dirname, "preload.cjs"), sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } });
+    win.webContents.on("console-message", (event) => console.error(event.message));
+    win.webContents.on("render-process-gone", (_event, detail) => record("render-process-gone", {
+      reason: detail.reason, exitCode: detail.exitCode }));
+    win.webContents.on("unresponsive", () => record("renderer-unresponsive"));
+    enterStage("load-page");
     await win.loadFile(path.join(__dirname, "index.html"));
+    enterStage("wait-for-probe");
     await win.webContents.executeJavaScript("new Promise((resolve, reject) => { const end = performance.now() + 10000; const check = () => { if (window.goalBlockedUIProbe) resolve(); else if (performance.now() > end) reject(new Error('Renderer probe not ready')); else requestAnimationFrame(check); }; check(); })");
+    enterStage("interaction-probe");
     const result = await win.webContents.executeJavaScript("window.goalBlockedUIProbe()");
+    await fs.writeFile(path.join(diagnostics, "probe.json"), JSON.stringify(result, null, 2));
+    enterStage("wide-layout");
     result.layouts = [await win.webContents.executeJavaScript("window.goalBlockedUILayout()")];
+    await fs.writeFile(path.join(diagnostics, "probe.json"), JSON.stringify(result, null, 2));
+    enterStage("wide-capture");
+    record("capture-start", { bounds: win.getContentBounds(), features: app.getGPUFeatureStatus() });
     await fs.writeFile(path.join(evidence, "goal-blocked-ui.png"), (await win.webContents.capturePage()).toPNG());
+    record("capture-complete");
+    enterStage("narrow-resize");
     win.setSize(420, 920);
     await win.webContents.executeJavaScript("new Promise((resolve, reject) => { const end = performance.now() + 5000; const check = () => { if (innerWidth === 420) resolve(); else if (performance.now() > end) reject(new Error('Resize not applied')); else requestAnimationFrame(check); }; check(); })");
+    enterStage("narrow-layout");
     result.layouts.push(await win.webContents.executeJavaScript("window.goalBlockedUILayout()"));
+    await fs.writeFile(path.join(diagnostics, "probe.json"), JSON.stringify(result, null, 2));
+    enterStage("narrow-capture");
+    record("capture-start", { bounds: win.getContentBounds(), features: app.getGPUFeatureStatus() });
     await fs.writeFile(path.join(evidence, "goal-blocked-ui-narrow.png"), (await win.webContents.capturePage()).toPNG());
+    record("capture-complete");
+    enterStage("save-result");
     await fs.writeFile(path.join(evidence, "goal-blocked-ui.json"), JSON.stringify(result, null, 2));
+    enterStage("complete");
     console.log("GOAL_BLOCKED_UI " + JSON.stringify(result)); app.exit(0);
-  } catch (error) { console.error(error); app.exit(1); }
+  } catch (error) {
+    record("failure", { name: error?.name, message: String(error?.message ?? error) });
+    console.error(error); app.exit(1);
+  }
 });
 `);
   const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
+  const recordExit = (details) => appendFileSync(join(diagnostics, "diagnostics.jsonl"), JSON.stringify({ event: "electron-exit", ...details }) + "\n");
   const child = spawn(resolveElectronBinary(root).electronBinary, [join(temp, "main.cjs")], { env, stdio: ["ignore", "pipe", "pipe"] });
   let output = ""; for (const stream of [child.stdout, child.stderr]) stream.on("data", (chunk) => { output += chunk; });
-  const timer = setTimeout(() => child.kill("SIGKILL"), 60_000);
-  let code;
-  try { code = await new Promise((resolve, reject) => { child.once("error", reject); child.once("close", resolve); }); }
+  let timedOut = false;
+  const timer = setTimeout(() => { timedOut = true; child.kill("SIGKILL"); }, 60_000);
+  let exit;
+  try { exit = await new Promise((resolve, reject) => { child.once("error", (error) => {
+    recordExit({ error: error.message }); reject(error);
+  }); child.once("close", (code, signal) => resolve({ code, signal })); }); }
   finally { clearTimeout(timer); }
-  assert.equal(code, 0, output);
+  recordExit({ ...exit, timedOut });
+  console.log(`GOAL_BLOCKED_UI_DIAGNOSTICS ${diagnostics}`);
+  assert.equal(exit.code, 0, output);
   const result = output.split(/\r?\n/).find((line) => line.startsWith("GOAL_BLOCKED_UI "));
   assert(result, output); console.log(result);
 } finally { await rm(temp, { recursive: true, force: true }); }
