@@ -256,6 +256,9 @@ const CONTROL_OPERATION_SPECS: OperationSpec[] = [
   spec("toolResolvePermission", "tool/resolvePermission", "Resolve a pending tool permission request.", "dangerous", ["resolution"]),
   spec("askToolResolve", "agent/askTool/resolve", "Answer an Agent question.", "dangerous", ["resolution"]),
   spec("plansPending", "plans/pending", "List pending Plan or Goal approvals.", "read", ["input"]),
+  spec("goalExecutionGet", "goal/get", "Read a Goal execution and its durable blocked hold.", "read", ["params"]),
+  spec("goalResume", "goal/resume", "Continue the same blocked Goal with optional supplemental material.", "dangerous", ["params"]),
+  spec("goalClose", "goal/close", "Explicitly accept the current unverified Goal result or abandon it.", "dangerous", ["params"]),
   spec(
     "goalReportList",
     "goalReport/list",
@@ -529,6 +532,42 @@ const CORE_TOOL_SPECS = [
     },
   ),
   coreTool("pi_workspace_diff", "Read the active workspace diff.", objectSchema({}), "workspace/diff", () => []),
+  coreTool(
+    "pi_goal_execution_get",
+    "Read a Goal execution and its hold, including blocked reasons, progress and draft limitations. Read-only; does not finalize a report.",
+    objectSchema({ sessionId: stringSchema(), executionId: stringSchema() }, ["sessionId"]),
+    "goal/get",
+    (input) => [{ sessionId: input.sessionId, ...(input.executionId === undefined ? {} : { executionId: input.executionId }) }],
+  ),
+  coreTool(
+    "pi_goal_resume",
+    "Continue the same blocked Goal through the desktop runtime. Requires the current hold version and confirm=true; may invoke the execution model and incur cost. A timeout is an unknown outcome; read the Goal before retrying.",
+    objectSchema({
+      sessionId: stringSchema(), executionId: stringSchema(),
+      expectedVersion: { type: "integer", minimum: 0 },
+      message: stringSchema("Supplemental material for the same Goal."),
+      modelOverride: objectSchema({ providerId: stringSchema(), modelId: stringSchema() }, ["providerId", "modelId"]),
+      confirm: booleanSchema("Required acknowledgement for continuing the Goal."),
+    }, ["sessionId", "executionId", "expectedVersion", "confirm"]),
+    "goal/resume",
+    (input) => [{
+      sessionId: input.sessionId, executionId: input.executionId, expectedVersion: input.expectedVersion,
+      ...(input.message === undefined ? {} : { message: input.message }),
+      ...(input.modelOverride === undefined ? {} : { modelOverride: input.modelOverride }),
+    }],
+  ),
+  coreTool(
+    "pi_goal_close",
+    "Explicitly accept the current unverified Goal result or abandon it. Requires the current hold version and confirm=true. Acceptance preserves unmet checks and publishes closure=user_accepted; it does not mean verification passed.",
+    objectSchema({
+      sessionId: stringSchema(), executionId: stringSchema(),
+      expectedVersion: { type: "integer", minimum: 0 },
+      action: { type: "string", enum: ["accept", "abandon"] },
+      confirm: booleanSchema("Required acknowledgement for closing the Goal."),
+    }, ["sessionId", "executionId", "expectedVersion", "action", "confirm"]),
+    "goal/close",
+    (input) => [{ sessionId: input.sessionId, executionId: input.executionId, expectedVersion: input.expectedVersion, action: input.action }],
+  ),
   coreTool(
     "pi_fs_list",
     "List files in the active workspace.",
@@ -901,6 +940,7 @@ export function createMcpControlController(options: {
         : operation.channel === "internal:session-collaboration"
         ? await options.invokeSessionCollaboration!({ ...input, args: sanitized })
         : await options.invoke(operation.channel, sanitized);
+      if (operation.id === "goalReport/get" && input.source === "mcp") result = goalReportReadResult(result);
       if (operation.id === "agent/getStatus" && options.askTools) {
         const asks = await options.askTools.pending(String(sanitized[0] ?? ""));
         const envelope = result as { status?: Record<string, unknown> };

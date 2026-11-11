@@ -222,7 +222,8 @@
         "E2E-GOAL-BLOCKED-008",
         "E2E-GOAL-BLOCKED-009",
         "E2E-GOAL-BLOCKED-010",
-        "E2E-GOAL-BLOCKED-011"
+        "E2E-GOAL-BLOCKED-011",
+        "E2E-MCP-goal-blocked-control"
       ]
     },
     {

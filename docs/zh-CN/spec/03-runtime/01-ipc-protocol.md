@@ -1824,6 +1824,7 @@ Electron 等待主机关闭之前会停止服务，并将清单标记为非活�
 - `pi_agent_prompt`、`pi_agent_status`、`pi_turn_get`、`pi_agent_stop`、
   `pi_agent_abort`、`pi_agent_compact`
 - `pi_plans_pending`、`pi_plans_resolve`
+- `pi_goal_execution_get`、`pi_goal_resume`、`pi_goal_close`
 - `pi_workspace_diff`、`pi_fs_list`、`pi_fs_read`
 
 `pi_turn_get` 读取单个持久回合的终态，使外部调度器无需监视渲染进程即可判断结算。
@@ -1855,6 +1856,36 @@ ISO8601/RFC3339 时刻。缺少对应行（包括跨会话的 `turnId`）会以 
 端口、token、认证范围、表或写权限，且只路由到本机主机 —— 由已配对远端主机持有的
 会话不被服务，并报告 `NOT_FOUND`。
 
+新增的 Goal 控制工具暴露现有 Main Goal 处理器：
+
+| 工具 / 目录操作 | 输入 | 风险 / 结果 |
+| --- | --- | --- |
+| `pi_goal_execution_get` / `goal/get` | `{sessionId, executionId?}` | 只读；返回 `goalExecutions.get` 的 `{execution?, hold?}` |
+| `pi_goal_resume` / `goal/resume` | `{sessionId, executionId, expectedVersion, message?, modelOverride?:{providerId,modelId}, confirm:true}` | 危险；返回 Main 现有续跑运行时的 `{execution, hold, resume, turnId}` |
+| `pi_goal_close` / `goal/close` | `{sessionId, executionId, expectedVersion, action:"accept"\|"abandon", confirm:true}` | 危险；返回 `goalExecutions.close` 的 `{execution, hold, report?}` |
+
+`goal/get` 未传入 `executionId` 时选择该会话最近一个受阻 Goal。
+即使 `goalReport/get` 仍为草稿，可选的 `hold` 仍保留原因、进度、草稿限制、下一步、
+版本与分段历史。hold 不是已完成的验证报告。将报告用于证据前，须通过
+`pi_goal_report_get` 单独读取已定稿报告及可信哈希；close 返回的可选 `report` 只是摘要。
+命名与通用 MCP 报告读取将 Host 重新计算的 `reportSha256` 暴露为 `report_sha256`，
+保留 ready 报告的完整内容及合约/资产哈希；非 ready 状态不返回报告正文。
+插件 IPC 结果保留原始 Host 结构。
+
+命名工具和通用调用的写入路径均在分派前要求 `confirm:true`，该确认字段不转发到 IPC
+参数。Main 和 Host 保留会话/执行标识校验、预期 hold 版本 CAS、活动回合/结算检查及
+既有错误语义。可选续跑材料必须是字符串；模型覆盖必须包含非空的 provider 和 model
+字符串标识。Main 在 Host 领取前拒绝非法值，避免非法输入改变 hold。
+续跑调用 Main 的同一 Goal 运行时，包括保存可选补充消息、创建新回合、绑定执行和
+启动失败回滚；不能用直接调用 `goalExecutions.resume` 或普通提示词替代。
+续跑可能调用已配置的执行模型并产生费用。响应丢失代表结果未知：决定是否进行新的用户
+操作前，先读取 execution/hold，不得盲目重复写入。
+
+接受当前结果产生 `closure=user_accepted`，保留失败、受阻或未运行的检查及原始 verdict，
+不会将未满足的 Goal 升级为已验证的 `met`。放弃仍为独立操作。新增工具不改变 Goal
+状态转换、报告定稿策略、Host 存储所有权、bearer 认证、loopback 绑定或大小限制。
+旧版本不提供这些工具和目录项；调用方必须探测能力，不能把缺少操作当作接受结果。
+
 `pi_control_describe` 返回经过审查的操作目录。`pi_desktop_invoke` 接受操作 id
 和位置参数形式的 IPC 参数：
 
@@ -1870,7 +1901,7 @@ ISO8601/RFC3339 时刻。缺少对应行（包括跨会话的 `turnId`）会以 
 设置写入、插件/市场安装、窗口/OS 控制，以及仅属于渲染器的原生选择器/对话框通道
 （包括 `plugin/loadDev`）。分发前会剥离参数中的密钥形态字段。每个目录项标记为
 `read`、`write` 或 `dangerous`；通用危险操作，以及命名的删除会话、配置会话和决议
-计划工具，都要求 `confirm: true`。该标志是 Agent 确认，不是桌面用户弹窗。所有调用
+计划与 Goal 续跑/关闭工具，都要求 `confirm: true`。该标志是 Agent 确认，不是桌面用户弹窗。所有调用
 仍会经过现有 IPC 处理器的校验、主机权限、工作区边界和错误模型。文本负载和
 `structuredContent` 都有大小上限：512 KiB（`MAX_RESULT_CHARS`）。超出上限的答复不会被
 原样返回，而是替换为 `{truncated: true, reason: "MCP_RESULT_LIMIT", preview: "<JSON 前

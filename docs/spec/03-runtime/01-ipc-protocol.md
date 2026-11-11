@@ -2408,6 +2408,7 @@ The named tools cover the common Agent workflow:
 - `pi_agent_prompt`, `pi_agent_status`, `pi_turn_get`, `pi_agent_stop`,
   `pi_agent_abort`, `pi_agent_compact`
 - `pi_plans_pending`, `pi_plans_resolve`
+- `pi_goal_execution_get`, `pi_goal_resume`, `pi_goal_close`
 - `pi_asks_pending`, `pi_asks_resolve` (execution ask relay; implementation pending)
 - `pi_workspace_diff`, `pi_fs_list`, `pi_fs_read`
 
@@ -2444,6 +2445,47 @@ cross-session `turnId`, fails with code `NOT_FOUND` (`isError: true` plus
 credential material, adds no port, token, auth scope, table, or write
 permission, and is routed to the local host only — a session owned by a paired
 remote host is not served and reports `NOT_FOUND`.
+
+The additive Goal control tools expose the existing Main Goal handlers:
+
+| Tool / catalog operation | Input | Risk / result |
+| --- | --- | --- |
+| `pi_goal_execution_get` / `goal/get` | `{sessionId, executionId?}` | Read-only; `{execution?, hold?}` from `goalExecutions.get` |
+| `pi_goal_resume` / `goal/resume` | `{sessionId, executionId, expectedVersion, message?, modelOverride?:{providerId,modelId}, confirm:true}` | Dangerous; `{execution, hold, resume, turnId}` from Main's existing resume runtime |
+| `pi_goal_close` / `goal/close` | `{sessionId, executionId, expectedVersion, action:"accept"\|"abandon", confirm:true}` | Dangerous; `{execution, hold, report?}` from `goalExecutions.close` |
+
+`goal/get` without `executionId` selects the session's latest blocked Goal.
+The optional `hold` retains its reasons, progress, draft limitations and next
+steps, version and segment history even when `goalReport/get` is still draft.
+A hold is not a completed verification report. Read the finalized report and
+its trusted hash separately with `pi_goal_report_get` before consuming it as
+report evidence; the close result's optional `report` is only a summary.
+Named and generic MCP report reads expose Host's recomputed `reportSha256` as
+`report_sha256`, preserve the complete ready report and its contract/asset
+hashes, and omit the report body while non-ready. Plugin IPC results retain
+their original Host shape.
+
+Both named and generic mutation paths require `confirm:true` before dispatch;
+the acknowledgement is not forwarded in the IPC argument object. Main and
+Host retain session/execution validation, the expected hold-version CAS, active
+turn/settlement checks and existing error semantics. Optional resume material
+must be a string; a model override must include nonblank string provider and
+model identifiers. Main rejects invalid values before the Host claim, so
+malformed inputs cannot alter the hold. Resume invokes Main's
+same-Goal runtime, including persistence of an optional supplemental message,
+new-turn creation, execution binding and launch-failure rollback; it must not
+be replaced by a direct `goalExecutions.resume` call or an ordinary prompt.
+It may call the configured execution model and incur cost. A lost response is
+an unknown outcome: read the execution/hold before deciding whether a new
+user action is appropriate; do not blindly repeat a write.
+
+Accepting current state produces `closure=user_accepted`, retaining failed,
+blocked or unrun checks and the original verdict. It does not upgrade an
+unmet Goal to verified `met`. Abandonment remains a separate action. These
+additive tools do not change Goal transitions, report finalization policy,
+Host-owned storage, bearer authentication, loopback binding or size limits.
+Older installations omit the tools and catalog entries; consumers must
+feature-detect them and must not treat a missing operation as acceptance.
 
 `pi_control_describe` returns the reviewed operation catalog. `pi_desktop_invoke`
 accepts an operation id and positional IPC arguments:
@@ -2494,8 +2536,8 @@ renderer-only native picker/dialog channels (including `plugin/loadDev`) are
 not exposed. Secret-shaped argument fields are stripped before IPC dispatch.
 Each catalog entry is tagged `read`, `write`, or `dangerous`; dangerous
 generic operations and the named session-delete, session-configure, and
-plan-resolution tools require `confirm: true`. That flag is an agent
-acknowledgement, not a desktop user prompt. All calls still pass through the
+plan-resolution and Goal resume/close tools require `confirm: true`. That flag
+is an agent acknowledgement, not a desktop user prompt. All calls still pass through the
 existing IPC handler validation, host permissions, workspace boundaries, and
 error model. Both the text payload and `structuredContent` are size-bounded to
 512 KiB (`MAX_RESULT_CHARS`). A larger answer is not returned verbatim: it is

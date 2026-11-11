@@ -42,6 +42,10 @@ Local-first · Model-agnostic · Plugin-powered · macOS / Windows / Linux
 
 > **Current release line: 0.15.x (Early Preview).**
 
+Version 0.15.17 lets external controllers inspect blocked Goal reasons, continue
+the same Goal with supplemental material, or explicitly accept its current
+unverified result while retaining unmet checks.
+
 Version 0.15.14 lets unsigned macOS builds update in place: with automatic
 updates turned on, the app downloads the release from GitHub, checks its
 SHA-512 and size, and installs it when you click Restart to update, keeping one
