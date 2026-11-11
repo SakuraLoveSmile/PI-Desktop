@@ -7,7 +7,7 @@ import { appendFileSync } from "node:fs";
 import { cp, mkdir, mkdtemp, readFile, rm, statfs, writeFile } from "node:fs/promises";
 import { freemem, tmpdir, totalmem } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import { IPC } from "../packages/shared/dist/index.js";
 import { repositoryRoot, resolveElectronBinary } from "./e2e/boot.mjs";
@@ -17,8 +17,12 @@ const { values: options } = parseArgs({ options: {
   "diagnose-capture": { type: "boolean", default: false },
   "capture-diagnostic-trial": { type: "boolean", default: false },
   "capture-diagnostic-dir": { type: "string" },
+  "capture-frame-barrier": { type: "boolean", default: false },
 } });
 const diagnosticTrial = options["capture-diagnostic-trial"];
+const diagnosticFrameBarrier = options["capture-frame-barrier"];
+assert(!diagnosticFrameBarrier || diagnosticTrial || options["diagnose-capture"],
+  "Frame barrier is only available in a capture diagnosis");
 if (options["diagnose-capture"] || diagnosticTrial) {
   assert(process.platform === "linux" && process.env.CI === "true", "Capture diagnosis requires an isolated Linux CI fixture");
 }
@@ -30,7 +34,8 @@ if (options["diagnose-capture"]) {
   process.once("SIGINT", terminate);
   process.once("SIGTERM", terminate);
   const { runCaptureDiagnosis } = await import("./e2e/capture-diagnosis.mjs");
-  const result = await runCaptureDiagnosis({ root, script: fileURLToPath(import.meta.url) });
+  const result = await runCaptureDiagnosis({ root, script: fileURLToPath(import.meta.url),
+    frameBarrier: diagnosticFrameBarrier });
   assert(result.passed, "Capture diagnosis retained a failed trial; inspect its summary and logs");
   process.exit(0);
 }
@@ -52,8 +57,9 @@ try {
   if (diagnosticTrial) {
     const sharedMemory = await statfs("/dev/shm");
     await writeFile(join(diagnostics, "environment.json"), JSON.stringify({
-      hypothesis: "GPU/Viz exits while a valid copy request is outstanding",
-      captureOrderUnchanged: true, paintBarrier: false, retries: 0,
+      hypothesis: diagnosticFrameBarrier ? "A copy may begin before a matching resized frame is available" :
+        "GPU/Viz exits while a valid copy request is outstanding",
+      captureOrderUnchanged: true, paintBarrier: diagnosticFrameBarrier, retries: 0,
       switches: ["enable-logging=file", "log-file=<trial>/chromium.log"],
       node: process.version, totalMemoryBytes: totalmem(), freeMemoryBytes: freemem(),
       sharedMemory: { blockSize: sharedMemory.bsize, blocks: sharedMemory.blocks,
@@ -99,6 +105,7 @@ const { appendFileSync } = require("node:fs");
 const IPC = ${JSON.stringify(IPC)}; const evidence = ${JSON.stringify(evidence)};
 const diagnostics = ${JSON.stringify(diagnostics)};
 const diagnosticTrial = ${JSON.stringify(diagnosticTrial)};
+const diagnosticFrameBarrier = ${JSON.stringify(diagnosticFrameBarrier)};
 if (diagnosticTrial) {
   app.commandLine.appendSwitch("enable-logging", "file");
   app.commandLine.appendSwitch("log-file", path.join(diagnostics, "chromium.log"));
@@ -147,6 +154,14 @@ const captureState = () => {
     gpuProcesses: app.getAppMetrics().filter((metric) => metric.type === "GPU")
       .map((metric) => ({ pid: metric.pid, type: metric.type, sandboxed: metric.sandboxed })) } : {}),
   };
+};
+let captureFrameAfterRepaint;
+const prepareCaptureFrame = async (viewport) => {
+  if (!diagnosticFrameBarrier) return;
+  enterStage(viewport + "-frame-barrier");
+  record("frame-barrier-start", captureState());
+  const frame = await captureFrameAfterRepaint(win.webContents, win.getContentBounds());
+  record("frame-barrier-complete", { ...captureState(), frame });
 };
 const events = () => {
   win.webContents.send(IPC.event.goalExecutionChanged, { sessionId: fixture.session.id, executionId: fixture.execution.id });
@@ -221,6 +236,7 @@ ipcMain.handle("fixture:invoke", async (_event, channel, ...args) => {
 });
 app.whenReady().then(async () => {
   try {
+    if (diagnosticFrameBarrier) ({ captureFrameAfterRepaint } = await import(${JSON.stringify(pathToFileURL(join(root, "scripts/e2e/capture-frame.mjs")).href)}));
     enterStage("create-window");
     win = new BrowserWindow({ show: false, width: 1000, height: 920,
       webPreferences: { offscreen: true, preload: path.join(__dirname, "preload.cjs"), sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } });
@@ -244,6 +260,7 @@ app.whenReady().then(async () => {
     enterStage("wide-layout");
     result.layouts = [await win.webContents.executeJavaScript("window.goalBlockedUILayout()")];
     await fs.writeFile(path.join(diagnostics, "probe.json"), JSON.stringify(result, null, 2));
+    if (diagnosticFrameBarrier) await prepareCaptureFrame("wide");
     enterStage("wide-capture");
     record("capture-start", captureState());
     await fs.writeFile(path.join(evidence, "goal-blocked-ui.png"), (await win.webContents.capturePage()).toPNG());
@@ -254,6 +271,7 @@ app.whenReady().then(async () => {
     enterStage("narrow-layout");
     result.layouts.push(await win.webContents.executeJavaScript("window.goalBlockedUILayout()"));
     await fs.writeFile(path.join(diagnostics, "probe.json"), JSON.stringify(result, null, 2));
+    if (diagnosticFrameBarrier) await prepareCaptureFrame("narrow");
     enterStage("narrow-capture");
     record("capture-start", captureState());
     await fs.writeFile(path.join(evidence, "goal-blocked-ui-narrow.png"), (await win.webContents.capturePage()).toPNG());

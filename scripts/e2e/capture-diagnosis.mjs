@@ -6,10 +6,11 @@ import { join, resolve } from "node:path";
 import { fixtureEnvironment } from "../e2e-suite-runtime.mjs";
 
 /** Run independent cold profiles for diagnosis, never as retry-to-pass evidence. */
-export async function runCaptureDiagnosis({ root, script, attempts = 6 }) {
+export async function runCaptureDiagnosis({ root, script, attempts = 6, frameBarrier = false }) {
   if (!Number.isInteger(attempts) || attempts < 1 || attempts > 6) {
     throw new Error("Capture diagnosis requires between one and six attempts");
   }
+  if (typeof frameBarrier !== "boolean") throw new Error("Capture frame barrier must be explicitly boolean");
   const directory = resolve(root, ".artifacts/e2e/goal-capture-diagnosis");
   const scriptPath = resolve(root, script);
   await rm(directory, { recursive: true, force: true });
@@ -17,7 +18,7 @@ export async function runCaptureDiagnosis({ root, script, attempts = 6 }) {
   const summaryPath = join(directory, "summary.json");
   const summary = {
     schemaVersion: 1, purpose: "diagnosis", acceptanceEvidence: false,
-    attempts, status: "running", startedAt: new Date().toISOString(), passed: false, trials: [],
+    attempts, frameBarrier, status: "running", startedAt: new Date().toISOString(), passed: false, trials: [],
   };
   const persist = async () => {
     await writeFile(summaryPath + ".tmp", JSON.stringify(summary, null, 2) + "\n");
@@ -52,7 +53,8 @@ export async function runCaptureDiagnosis({ root, script, attempts = 6 }) {
         let child;
         let spawnError;
         try {
-          child = spawn(process.execPath, [scriptPath, "--capture-diagnostic-trial", "--capture-diagnostic-dir", diagnosticDir], {
+          child = spawn(process.execPath, [scriptPath, "--capture-diagnostic-trial", "--capture-diagnostic-dir", diagnosticDir,
+            ...(frameBarrier ? ["--capture-frame-barrier"] : [])], {
             cwd: root, env, stdio: ["ignore", "pipe", "pipe"], detached: false,
           });
         } catch (error) {

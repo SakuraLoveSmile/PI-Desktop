@@ -18938,14 +18938,24 @@ push or PR authorization.
   unstartable trial fails the diagnosis. This is a bounded experiment, not a
   retry-to-pass policy. Each trial preserves all nine interaction groups, both
   original single captures, their order and the original 60-second child limit;
-  the suite retains its existing 480-second limit. No paint barrier or GPU
-  backend switch is added. Trials record in-memory offscreen frame metadata,
+  the suite retains its existing 480-second limit. The first experiment adds no
+  paint barrier or GPU backend switch. Trials record in-memory frame metadata,
   capture/GPU process state, complete child output, Chromium logs and available
   shared memory using isolated fixture profiles. Feature status is valid only
   after `gpu-info-update`; an unobserved update is recorded explicitly. Raw
   native memory dumps are not collected. The diagnostic catalog argument must
   be removed before ordinary same-commit acceptance runs; diagnostic success
   alone never proves that the historical GPU/Viz failure was repaired.
+  A second diagnostic experiment may explicitly add `--capture-frame-barrier`
+  when first-round evidence shows a stale resized frame. Before each original
+  capture, request one `invalidate()` and wait at most five seconds for a new,
+  nonempty offscreen frame matching the current content size. Timeout or
+  destruction fails the trial; listeners and the timer are always released.
+  Record barrier start/completion separately. Preserve every original assertion,
+  the single capture call at each size, process limits and backend selection.
+  Ordinary runs and the first diagnostic mode never wait on this barrier. This
+  comparison establishes frame ordering only; successful captures cannot prove
+  the historical GPU crash was caused or repaired by that ordering.
 - **Specs:** Runtime Goal completion, Host execution holds, storage Plus P9,
   GoalBlockedCard/Composer resume intent, remote read-only projection and
   [Goal blocked-state ADR](../../adr/goal-blocked-state.md).

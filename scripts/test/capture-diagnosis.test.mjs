@@ -20,6 +20,7 @@ import { parseArgs } from "node:util";
 const { values } = parseArgs({ options: {
   "capture-diagnostic-trial": { type: "boolean" },
   "capture-diagnostic-dir": { type: "string" },
+  "capture-frame-barrier": { type: "boolean" },
 } });
 if (!values["capture-diagnostic-trial"]) throw new Error("Expected diagnostic trial flag");
 const directory = values["capture-diagnostic-dir"];
@@ -85,6 +86,15 @@ test("marks a successful diagnosis complete while keeping it separate from accep
   assert.equal(summary.trials[0].passed, true);
   assert.equal(summary.trials[0].code, 0);
   assert.equal(summary.trials[0].signal, null);
+  assert.equal(summary.frameBarrier, false);
+});
+
+test("forwards an explicitly requested frame barrier only as diagnostic evidence", async t => {
+  const { root, script } = await fixture(t, childSetup + 'if (!values["capture-frame-barrier"]) throw new Error("Missing frame barrier");');
+  const summary = await runCaptureDiagnosis({ root, script, attempts: 1, frameBarrier: true });
+  assert.equal(summary.passed, true);
+  assert.equal(summary.frameBarrier, true);
+  assert.equal(summary.acceptanceEvidence, false);
 });
 
 test("preserves a signalled child as a failed trial", async t => {

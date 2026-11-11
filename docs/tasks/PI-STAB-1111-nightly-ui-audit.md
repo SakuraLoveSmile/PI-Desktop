@@ -97,28 +97,49 @@ A temporary catalog argument invokes this mode through the existing Linux CI
 workflow; no workflow or gate changes are part of this task. Remove the argument
 before final ordinary acceptance runs.
 
-Experiment 2 is chosen only from experiment 1's evidence and must distinguish a
-new hypothesis. A missing matching frame may justify a single repaint/barrier
-comparison; a native failure with valid frames may justify a minimal static
-window control. Neither is already a proven repair. No blind rerun or backend
-switch is an accepted substitute for a cause.
+Experiment 1, [43011758246](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/43011758246),
+tested `a87463f6058a3ac1828af4e944f2b3ce735b8543` against the current base.
+Candidate/build source and Host hashes agree; the candidate was clean and
+unchanged. The full family passed 36/36. All six cold trials retained nine
+interaction groups and two captures, exited zero without timeout and recorded
+no GPU/renderer exit. GPU information was observed after its update event and
+reported software compositing, with a live GPU process. These are passing
+diagnostic samples; the native crash was not reproduced.
+
+One new distinction: trial 01 began its narrow capture at 1,764 ms with a 420px
+window while its last paint still measured 1000px. A 420px frame was observed
+before capture completed at 1,793 ms. The other five trials already had a 420px
+frame at capture start. Stale frame metadata alone does not explain the crash:
+this sample also passed. Raw artifacts, logs and hash/inventory verification are
+retained under `.artifacts/pi-stab-1111-capture-closure/first/`.
+
+Experiment 2 therefore tests frame ordering with an explicit diagnostic-only
+`--capture-frame-barrier`: one invalidate and a bounded wait for a new nonempty
+frame matching content size before each original single capture. Timeout or
+destruction fails; event listeners and timers must be released. The two capture
+calls, all interaction/layout assertions, process limits and backend selection
+remain unchanged. The barrier is not enabled in ordinary runs or experiment 1.
+It is a hypothesis comparison, not an accepted repair. If the native failure is
+still absent after this second experiment, stop rather than run further samples
+or choose a speculative backend change.
 
 ## Validation and completion
 
-Passed locally on the current combined executable source: eight Node helper
+Passed locally on the second combined executable source: 17 Node helper
 and suite-dispatcher tests; outer/helper/test syntax; generated native CJS
-syntax in both ordinary and diagnostic modes; test-quality (237 files / 8,120
+syntax in ordinary and both diagnostic modes; test-quality (237 files / 8,120
 existing syntax-level assertions); agent policy; documentation structure (642
 pages) and locale pairs (95); and whitespace checks. Mechanical checks use the
 primary checkout's existing TypeScript read-only via `NODE_PATH`; no dependency
 or lockfile was changed. The diagnostic catalog argument requires regenerating
 the two existing scenario indexes; the final catalog check passes (138 suites /
-167 executable IDs). Independent review found no blocker for experiment 1.
+167 executable IDs). Independent review found no blocker for either diagnostic
+experiment and separately passed all eight frame-helper tests and syntax checks.
 Cancellation may leave the last atomic summary at `running`; use the outer
 suite result for its final termination. Paint observation, GPU information
 queries and logging may affect timing, so green results cannot rule out a race.
 
-Current executable candidate has not run Electron or Linux CI yet: NOT RUN.
+Experiment 2 executable candidate has not run Electron or Linux CI yet: NOT RUN.
 Test-quality baseline remains unchanged. Full workspace/Rust tests, packaging,
 real providers and the running user application: NOT RUN; no product or runtime
 implementation is changed.
