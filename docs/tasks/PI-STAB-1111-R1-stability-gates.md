@@ -1,7 +1,7 @@
 # PI-STAB-1111-R1 — Release gates, stability charter and UI evidence
 
 Date: 2026-11-11 (Asia/Taipei). Tier: T2 overall (S2); S3 T0; U1 T1.
-Status: 实现中. S2: 实现中 (hosted exercise pending). S3: 已验收.
+Status: 实现中. S2: 实现中 (hosted exercise blocked by runner DNS). S3: 已验收.
 U1: 待体验 (local native repeatability verified).
 
 ## Goal, identity and authorization
@@ -14,8 +14,9 @@ branch commit `cc5c74e1b` as documentation only. Its optional diagnostic code
 was not copied. Closing S1 neither proves the GPU/Viz root cause nor waives a
 release gate or the global stability thresholds.
 
-- Base/HEAD: `98e2288795eae251af747940515cb9e219a72447`; a fresh `git fetch origin
-  main` on this round still resolved `origin/main` to that SHA.
+- Base/native-capture HEAD: `98e2288795eae251af747940515cb9e219a72447`; a fresh
+  `git fetch origin main` on this round still resolved `origin/main` to that SHA.
+  Subsequent candidate commit/run identities are recorded below.
 - Branch: `chore/20261111-pi-stab-1111-r1-stability-gates`.
 - Worktree: central `fork-pi-desktop` root, directory
   `20261111-chore-pi-stab-1111-r1-stability-gates`. Integration target: `main`.
@@ -121,6 +122,7 @@ documentation screenshot publisher are unchanged.
 | Test-quality/architecture/diff checks | PASS; committed candidate `003c220ee` was rechecked against `origin/main`, including all 10 added source files; unchanged baselines |
 | Full VitePress build after the hosted dead-link repro | PASS, 29.74 s; output only in this worktree's `.artifacts/s2-release-gate/docs-build`; no dead-link exception added |
 | `node --test apps/desktop/test/ci-workflow.test.mjs` after synchronizing the approved dependency contract | PASS, 15; both exact dependency assertions now require nightly as well as metadata and shared CI; quality inventory unchanged |
+| Combined release-tool and Desktop workflow tests after restoring the exercise entry point | PASS, 115 tests, zero failures/skips; `.artifacts/s2-release-gate/clean-unit-tests.tap` |
 | `pnpm test:ui-tools` and explicit `pnpm run test:ui-tools` | FAILED before the test process: pnpm 12 automatic installation rejects the provisioned symlinked hoist directory. No dependency replacement completed; direct Node entry-point evidence is above |
 
 System Python lacks Pillow. The already provisioned interpreter is
@@ -167,9 +169,10 @@ Both manifest SHA-256 values are
 Root inspected the contact sheet and the full production-surface images;
 no blank or wrong-scene capture was accepted. Normal scrollable content and
 existing title ellipses remain baseline behavior. The twelve comparison panels
-are the review entry point. This result-record update follows the measured
-source snapshot; only this result record and the linked-dependency invocation
-notes were updated afterward. No executable/configuration file changed.
+are the review entry point. At the time this native result was recorded, only
+this record and the linked-dependency invocation notes had changed afterward.
+The subsequent hosted corrections and candidate SHAs are listed below. These
+images remain evidence for the measured local snapshot, not a new-HEAD capture.
 
 The user found the contact sheet too small to review. Existing original PNGs
 were cropped without resizing into `acceptance-readable/` for Team, Goal and
@@ -192,11 +195,10 @@ the root's actual native runs or pixel comparison.
 - U1 local repeatability is verified and ready for user review. This proves
   renderer fixture evidence on this macOS environment, not Host integration,
   Linux capture behavior or cross-machine pixel identity.
-- S2 hosted negative and clean candidate exercises: authorized; execution is in
-  progress, with no result claimed yet. The negative candidate adds an explicit
-  failure only at the entry of nightly-only `goal-blocked-ui`; all original
-  assertions, catalog classifications and old CI gates remain. A following
-  normal commit removes that exercise line before the clean candidate. Always specify fork repository
+- S2 hosted negative and clean candidate exercises: authorized but blocked by
+  runner DNS; no valid negative or positive result is claimed. The temporary
+  failure was removed and the script verified byte-for-byte against the original.
+  All assertions, catalog classifications and old CI gates remain. Always specify fork repository
   `SakuraLoveSmile/PI-Desktop` in GitHub CLI calls; the CLI's default points to
   upstream and must not be used as fork evidence.
 - Native sandbox-extension diagnostics and existing dependency `use client`
@@ -211,10 +213,9 @@ the root's actual native runs or pixel comparison.
 - Real-provider benchmarks, product Host integration, installer/clean-machine
   validation, release publication and global seven-day/three-round acceptance:
   NOT RUN. Renderer-only evidence does not substitute for them.
-- Prior to this continuation, no commit or remote operation had occurred in
-  this round. Record the authorized candidate commits and run identities below
-  as they execute. Keep this active worktree and its evidence; post-integration
-  cleanup remains mandatory once authorized integration and checks complete.
+- Authorized branch commits, pushes and manual candidate runs are recorded
+  below. Keep this active worktree and its evidence; post-integration cleanup
+  remains mandatory once authorized integration and checks complete.
 
 ## Hosted exercise progress
 
@@ -252,3 +253,39 @@ passed locally. Independent read-only review found no P1/P2 and verified that
 remaining old-contract references belong to audited legacy fixtures or
 deliberate rejection cases. A new source commit requires a fresh hosted
 negative exercise before the clean candidate.
+
+The latest candidate [43047754114](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/43047754114),
+SHA `cd7f6657109fc3840489e3fbd6f955b3d23c6a65`, passed metadata, catalog,
+the complete shared JS CI job and the Rust CI job. Desktop reported 4,374
+passes, zero failures and the same 12 existing skips. Its smoke and first three
+nightly jobs never left Linux dependency provisioning. The downloaded Goal job
+log repeatedly reports `Temporary failure resolving 'azure.archive.ubuntu.com'`
+during both APT index and package acquisition. The main agent cancelled this
+run after the repeated preparation stall; it finished `cancelled` on attempt 1.
+Its always-running nightly summary failed on incomplete/cancelled coverage.
+This is observable fail-closed behavior, not the required deliberate-suite
+negative acceptance. No fixture result or candidate package was produced.
+
+Under R8, the unexpected runner networking problem is recorded without changing
+runner provisioning, DNS, dependencies, timeouts, retries or catalog coverage.
+The run's identity/jobs and complete Goal/JS logs are retained under
+`.artifacts/s2-release-gate/runner-dns-blocker/`. Public DNS resolution and the
+GitHub status page were readable at the observation time; neither establishes
+DNS health inside these runners. Do not attribute this blocker to the unresolved
+S1 GPU defect: no E2E suite started.
+
+The branch's following ordinary restoration commit removes the temporary
+negative line. The restored script matches original Git blob
+`5c3afeb8b4003d62edff857663a83ad0bab06fa3` and SHA-256
+`a1b238783bdce626134e0446ffb08c19d108f01b9e9c39a8a8ad946c276babe7`.
+The final local combination passed 115 release/workflow tests, syntax and
+scenario checks. No history was rewritten and no intentionally failing entry
+is left at the branch tip.
+
+S2 remains 实现中. First restore the hosted fixture environment, then obtain
+a new deliberate nightly-only failure with every old CI gate and other suite
+green, followed by a clean full-nightly candidate whose cloud build/aggregation
+succeed. Both accepted exercises, normal candidate packaging and formal
+publication are NOT RUN. No further run was dispatched into the known blocker.
+The clean restoration commit has not been cloud-validated. No PR, merge, tag or
+release was created; both active unmerged worktrees and local evidence remain.
