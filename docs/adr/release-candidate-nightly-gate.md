@@ -162,5 +162,13 @@ Retain run/SHA/job/artifact evidence in the task record. If the official HTTPS
 sources also fail DNS or transport checks, retain the failure and stop this
 recovery path without overriding DNS, fixing IP addresses or bypassing trust.
 
+On a strict index-update failure, bounded read-only diagnostics may compare
+the system resolver for the two official hosts and a public control host with
+HTTPS requests to the official signed index URLs. They do not retry APT, install
+software, change sources or DNS, or unlock the fixture. Keep the original APT
+failure even if the probes succeed or diagnostics themselves fail. This evidence
+distinguishes a system-network failure from an APT-specific acquisition failure;
+any further provisioning-policy change still requires a reviewed addendum.
+
 Approval is not verification. Actual recovery checks, the hosted environment
 check and the full S2 exercises are recorded in the linked task record.

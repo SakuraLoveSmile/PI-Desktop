@@ -5684,6 +5684,9 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   archive/security entries and priority metadata. An unexpected list or any APT
   index error fails before installation. Package and sandbox requirements stay
   unchanged; failed provisioning is not a passing or completed fixture result.
+  A failed index update records bounded public system-DNS/HTTPS diagnostics
+  without retrying APT or changing configuration; the original error still fails
+  the job, regardless of probe results.
 - **Specs linked**: `06-delivery/06-release-runbook.md` §4.2 and §5,
   `06-delivery/03-ai-development-workflow.md` §9;
   ADR `release-candidate-nightly-gate`.

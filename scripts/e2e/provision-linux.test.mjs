@@ -5,20 +5,21 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { officialUbuntuMirrors, provisionLinux } from "./provision-linux.mjs";
+import { diagnoseUbuntuNetwork, officialUbuntuMirrors, provisionLinux } from "./provision-linux.mjs";
 
 const azure = "http://azure.archive.ubuntu.com/ubuntu/\tpriority:1\n";
 const archive = "https://archive.ubuntu.com/ubuntu/\tpriority:2\n";
 const security = "https://security.ubuntu.com/ubuntu/\tpriority:3\n";
 const source = azure + archive + security;
 
-async function fixture(t, { input = source, failCommand } = {}) {
+async function fixture(t, { input = source, failCommand, failDiagnostics = false } = {}) {
   const directory = await mkdtemp(join(tmpdir(), "pi-e2e-provision-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const path = join(directory, "apt-mirrors.txt");
   await writeFile(path, input);
   const commands = [];
   const reports = [];
+  let diagnosticCalls = 0;
   const boundary = {
     readMirrors: () => readFile(path, "utf8"),
     writeMirrors: text => writeFile(path, text),
@@ -27,8 +28,13 @@ async function fixture(t, { input = source, failCommand } = {}) {
       if (args[1] === failCommand) throw new Error(`Controlled ${failCommand} failure`);
     },
     report: text => reports.push(text),
+    diagnose: async () => {
+      diagnosticCalls++;
+      if (failDiagnostics) throw new Error("Controlled diagnostics failure");
+    },
   };
-  return { path, commands, reports, run: () => provisionLinux(boundary) };
+  return { path, commands, reports, run: () => provisionLinux(boundary),
+    diagnosticCalls: () => diagnosticCalls };
 }
 
 test("removes only the Azure mirror while preserving HTTPS bytes and priorities", () => {
@@ -61,6 +67,7 @@ test("strict index update precedes the unchanged packages and Electron sandbox c
     { command: "sudo", args: ["sysctl", "-w", "kernel.apparmor_restrict_unprivileged_userns=0"] },
   ]);
   assert.deepEqual(current.reports, [`Ubuntu fixture mirrors:\n${archive + security}`]);
+  assert.equal(current.diagnosticCalls(), 0);
 });
 
 test("index acquisition failure stops before package installation", async t => {
@@ -68,6 +75,44 @@ test("index acquisition failure stops before package installation", async t => {
   await assert.rejects(current.run(), /Controlled update failure/);
   assert.equal(await readFile(current.path, "utf8"), archive + security);
   assert.deepEqual(current.commands, [{ command: "sudo", args: ["apt-get", "update", "--error-on=any"] }]);
+  assert.equal(current.diagnosticCalls(), 1);
+});
+
+test("diagnostic failure is visible and preserves the original index error", async t => {
+  const current = await fixture(t, { failCommand: "update", failDiagnostics: true });
+  await assert.rejects(current.run(), /Controlled update failure/);
+  assert.equal(current.commands.length, 1);
+  assert.equal(current.diagnosticCalls(), 1);
+  assert(current.reports.includes("Ubuntu network diagnostics failed: Controlled diagnostics failure"));
+});
+
+test("network diagnostics collect public DNS and HTTPS evidence without a privileged command", async () => {
+  const calls = [];
+  const reports = [];
+  await diagnoseUbuntuNetwork({
+    probe: async (command, args) => {
+      calls.push({ command, args });
+      return { code: command === "getent" ? 2 : 6, stdout: "", stderr: "Controlled resolution failure" };
+    },
+    report: text => reports.push(text),
+  });
+  assert.deepEqual(calls.filter(call => call.command === "getent").map(call => call.args), [
+    ["ahostsv4", "archive.ubuntu.com"], ["ahostsv4", "security.ubuntu.com"],
+    ["ahostsv4", "packages.microsoft.com"],
+  ]);
+  const requests = calls.filter(call => call.command === "curl");
+  assert.deepEqual(requests.map(call => call.args.at(-1)), [
+    "https://archive.ubuntu.com/ubuntu/dists/noble/InRelease",
+    "https://security.ubuntu.com/ubuntu/dists/noble/InRelease",
+  ]);
+  for (const { args } of requests) {
+    assert(args.includes("--fail"));
+    assert.equal(args.includes("--insecure"), false);
+    assert.equal(args.includes("--retry"), false);
+  }
+  assert.equal(calls.every(call => ["getent", "curl"].includes(call.command)), true);
+  assert.equal(reports.length, 5);
+  assert(reports.every(line => line.includes("Controlled resolution failure")));
 });
 
 test("package installation failure stops before sandbox configuration", async t => {

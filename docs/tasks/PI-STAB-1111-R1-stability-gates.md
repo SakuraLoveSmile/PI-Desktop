@@ -1,7 +1,7 @@
 # PI-STAB-1111-R1 — Release gates, stability charter and UI evidence
 
 Date: 2026-11-11 (Asia/Taipei). Tier: T2 overall (S2); S3 T0; U1 T1.
-Status: 实现中. S2: 实现中 (runner recovery awaiting hosted validation). S3: 已验收.
+Status: 实现中. S2: 实现中 (hosted APT acquisition blocked; diagnostic validation pending). S3: 已验收.
 U1: 待体验 (local native repeatability verified).
 
 ## Goal, identity and authorization
@@ -325,3 +325,36 @@ lint, documentation (646 pages), locale pairs (96), scenario index and unchanged
 quality ratchet passed. Independent read-only review found no P1/P2. This does
 not prove real APT or hosted recovery; the voice environment check and full S2
 negative/clean exercises remain NOT RUN until their actual results are added.
+
+### Official-mirror environment result and diagnostic continuation
+
+The recovery implementation was committed and pushed as
+`7adb1301e9673b202a2cb69215f2e13ecf4f3d50`. The existing manual voice-family
+environment check [43054850758](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/43054850758)
+finished `failure` on attempt 1, job `130641441749`. Its log confirms the Azure
+entry was removed and APT read the remaining 93-byte HTTPS mirror list.
+The Microsoft package source downloaded successfully, while all four Ubuntu
+index requests ended with `Temporary failure resolving 'archive.ubuntu.com'`.
+The strict update stopped provisioning before install, Host build or fixture
+execution. No E2E result or candidate artifact was produced. Run/job identities
+and the full log are retained in `.artifacts/s2-release-gate/recovery-voice/`.
+The recovery is not verified and this is not S2 negative acceptance.
+
+The accepted addendum's stop condition remains: do not override DNS, fix IPs,
+bypass trust or start a full candidate in the known blocked environment. APT's
+message alone does not establish failure of the system resolver. The next
+evidence-only candidate adds five bounded read-only probes after an index
+failure: `getent ahostsv4` for the two official hosts and the working Microsoft
+control, plus TLS-verified HTTPS GETs of the two official index URLs with the
+body discarded. No APT retry or configuration change occurs; the original error
+is rethrown even when diagnostics succeed or fail. One new voice-family run
+collects this additional evidence; it cannot convert an APT failure into success.
+
+The diagnostic combination passed 123/123 release, workflow and provisioning
+tests, zero failures/skips, and targeted Biome lint. Independent read-only review
+found no new P1/P2 and verified the failure, privilege and bounded-probe behavior.
+Local mocks do not prove hosted DNS, HTTPS or APT behavior. The new diagnostic
+run and the complete S2 negative/clean candidates are NOT RUN at this point.
+Documentation (646 pages), locale pairs (96), scenario catalog, agent policy,
+architecture and the unchanged test-quality baseline passed for this diagnostic
+combination. Remote main still resolves to the recorded base SHA.

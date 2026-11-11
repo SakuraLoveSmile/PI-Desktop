@@ -3118,6 +3118,8 @@ Pi-Desktop-Plus 图标；两个表面都不会暴露库存 Electron 名称或图
 - **Runner 环境准备**：共享 Ubuntu 夹具 runner 仅移除镜像列表中已知的 Azure 条目，
   保留官方 archive/security HTTPS 条目及优先级。列表不符或任意 APT 索引错误均在
   安装前失败。包清单与沙箱要求保持；环境准备失败不能算夹具已通过或执行完成。
+  索引更新失败后记录有时限的公共域名系统解析和 HTTPS 诊断，不重试 APT、不改
+  配置；无论探测结果如何，原错误仍使 job 失败。
 - **链接规格**：`06-delivery/06-release-runbook.md` §4.2、§5，
   `06-delivery/03-ai-development-workflow.md` §9；ADR `release-candidate-nightly-gate`。
 - **验收**：质量（发布流程）。
