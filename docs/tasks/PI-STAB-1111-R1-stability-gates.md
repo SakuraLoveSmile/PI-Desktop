@@ -118,7 +118,8 @@ documentation screenshot publisher are unchanged.
 | `node docs/scripts/check-locales.mjs` | PASS, 96 English/Chinese specification pairs |
 | `node scripts/generate-scenario-index.mjs --check` | PASS, 138 suites / 167 executable IDs |
 | Agent-policy check | PASS; workflow-spec byte budget retained |
-| Test-quality/architecture/diff checks | PASS on final local combination, with all new source/tests included in the index; unchanged baselines; added-file limitation below |
+| Test-quality/architecture/diff checks | PASS; committed candidate `003c220ee` was rechecked against `origin/main`, including all 10 added source files; unchanged baselines |
+| Full VitePress build after the hosted dead-link repro | PASS, 29.74 s; output only in this worktree's `.artifacts/s2-release-gate/docs-build`; no dead-link exception added |
 | `pnpm test:ui-tools` and explicit `pnpm run test:ui-tools` | FAILED before the test process: pnpm 12 automatic installation rejects the provisioned symlinked hoist directory. No dependency replacement completed; direct Node entry-point evidence is above |
 
 System Python lacks Pillow. The already provisioned interpreter is
@@ -203,10 +204,9 @@ the root's actual native runs or pixel comparison.
   shared hoist symlink; direct Node invocations of the same package-script code
   are documented and were used for actual acceptance. Do not install or replace
   the shared dependency environment to hide this limitation.
-- Architecture's added-file accounting uses committed `base...HEAD` and reports
-  zero before commit; the two new TS/TSX entries were separately checked at
-  239/194 lines (both below 800). Rerun its committed-file gate after an
-  authorized commit. Record this tooling limit without a plan-out repair.
+- Architecture's added-file accounting uses committed `base...HEAD`. After the
+  authorized implementation commits, its gate passed against `origin/main`
+  with 10 added source files included; no baseline or allowance changed.
 - Real-provider benchmarks, product Host integration, installer/clean-machine
   validation, release publication and global seven-day/three-round acceptance:
   NOT RUN. Renderer-only evidence does not substitute for them.
@@ -214,3 +214,22 @@ the root's actual native runs or pixel comparison.
   this round. Record the authorized candidate commits and run identities below
   as they execute. Keep this active worktree and its evidence; post-integration
   cleanup remains mandatory once authorized integration and checks complete.
+
+## Hosted exercise progress
+
+The authorized branch contains implementation commits `7633cb5b7` (S2),
+`289fedc05` (S3) and `003c220ee` (U1), followed by the deliberate negative
+entry-point commit `5dc45d109a8f0e2d7eeb2e09817bd9077e9d9ca4`.
+The first manual candidate [43044445998](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/43044445998)
+failed before the intended negative test: its old JS CI build found two U1
+documentation links outside VitePress's site root. Rust CI passed. This is a
+defect introduced by this package, not an accepted negative-exercise result.
+The main agent retained the log and requested cancellation of the invalid run
+to avoid spending runners on the same build failure.
+
+The English/Chinese E2E introductions now reference the repository instructions
+as a literal file path, rather than an invalid site route. The full local
+VitePress build passed with its original dead-link enforcement. The corrected
+negative candidate must run as a new commit; no same-SHA rerun or retry is
+counted as green evidence. Local run/job receipts and the failed build log are
+retained in `.artifacts/s2-release-gate/`.

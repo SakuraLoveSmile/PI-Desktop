@@ -1,6 +1,6 @@
 # 04. E2E 测试 Plan
 
-可选视觉取证使用固定十二场景的[UI 取图工具](../../../../scripts/ui-capture/README.md)：
+可选视觉取证使用固定十二场景的 UI 取图工具（仓库说明：`scripts/ui-capture/README.md`）：
 `pnpm verify:ui:capture` 和 `pnpm verify:ui:compare`。它在独立原生窗口中以离线夹具渲染真实组件。
 U1 要求同一源码和环境独立跑两次并逐像素一致；仅构建时，取图仍为 NOT RUN。
 它补充产品 E2E，并遵守稳定计划每轮单独授权取图的规则。
