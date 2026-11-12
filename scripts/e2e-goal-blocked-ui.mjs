@@ -10,8 +10,6 @@ import { basename, dirname, join, resolve } from "node:path";
 import { IPC } from "../packages/shared/dist/index.js";
 import { repositoryRoot, resolveElectronBinary } from "./e2e/boot.mjs";
 
-throw new Error("PI-STAB-1111-R1 deliberate nightly-only release gate exercise");
-
 const root = repositoryRoot();
 const { build } = createRequire(join(root, "packages/agent-runtime/package.json"))("esbuild");
 const temp = await mkdtemp(join(tmpdir(), "pi-goal-blocked-ui-"));

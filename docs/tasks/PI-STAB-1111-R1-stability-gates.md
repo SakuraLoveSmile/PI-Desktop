@@ -1,7 +1,7 @@
 # PI-STAB-1111-R1 — Release gates, stability charter and UI evidence
 
 Date: 2026-11-11 (Asia/Taipei). Tier: T2 overall (S2); S3 T0; U1 T1.
-Status: 实现中. S2: 实现中 (diagnostic family passed; full negative/clean acceptance pending). S3: 已验收.
+Status: 实现中. S2: 实现中 (Provider shutdown reproduced; fixture correction and full negative/clean acceptance pending). S3: 已验收.
 U1: 待体验 (local native repeatability verified).
 
 ## Goal, identity and authorization
@@ -195,9 +195,10 @@ the root's actual native runs or pixel comparison.
 - U1 local repeatability is verified and ready for user review. This proves
   renderer fixture evidence on this macOS environment, not Host integration,
   Linux capture behavior or cross-machine pixel identity.
-- S2 hosted negative and clean candidate exercises: authorized but blocked by
-  runner DNS; no valid negative or positive result is claimed. The temporary
-  failure was removed and the script verified byte-for-byte against the original.
+- S2 hosted negative and clean candidate exercises: authorized; runner DNS is
+  restored, but the Provider fixture shutdown failed again in the full negative
+  run. No valid negative or positive result is claimed. The temporary Goal
+  failure is removed in the restoration described below.
   All assertions, catalog classifications and old CI gates remain. Always specify fork repository
   `SakuraLoveSmile/PI-Desktop` in GitHub CLI calls; the CLI's default points to
   upstream and must not be used as fork evidence.
@@ -210,9 +211,10 @@ the root's actual native runs or pixel comparison.
 - Architecture's added-file accounting uses committed `base...HEAD`. After the
   authorized implementation commits, its gate passed against `origin/main`
   with 10 added source files included; no baseline or allowance changed.
-- Real-provider benchmarks, product Host integration, installer/clean-machine
-  validation, release publication and global seven-day/three-round acceptance:
-  NOT RUN. Renderer-only evidence does not substitute for them.
+- Real-provider benchmarks, clean-machine installer validation, formal release
+  publication and global seven-day/three-round acceptance: NOT RUN.
+  U1 renderer-only evidence does not substitute for Host integration; S2's
+  isolated hosted Host/IPC fixture results are recorded separately below.
 - Authorized branch commits, pushes and manual candidate runs are recorded
   below. Keep this active worktree and its evidence; post-integration cleanup
   remains mandatory once authorized integration and checks complete.
@@ -637,3 +639,44 @@ automated suite to succeed, the intended nightly failure and summary to fail,
 and build/aggregation to remain unstarted. Remove the temporary line with an
 ordinary byte-verified restoration commit before the clean full candidate.
 No test retry, exclusion, weakened assertion or baseline change is introduced.
+
+### Diagnostic negative: shutdown failure reproduced
+
+The full negative candidate [43159433831](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/43159433831),
+source `fbdca8c1e2bd7d5faf43ae4cea3d5088a5e7510c`, attempt 1, reproduced
+`provider-order` in settings-storage job `130988535484`. The run is allowed to
+complete its full family inventory; this extra failure already prevents its
+acceptance as the required single-failure negative exercise. All original JS,
+Rust and smoke CI gates passed. Final family and gate conclusions are pending.
+
+Settings artifact `13917508201`, digest
+`sha256:66d574300e47f126497c958da77f19b8277e74504c029b1b3f2710a9a3491466`,
+was downloaded and checked: exact source/base main, `candidateUnchanged=true`,
+13/14 passed, only `provider-order` failed in 60,881 ms, outer `timedOut=false`,
+no unexpected skips. Its unchanged internal 60-second watchdog sent SIGKILL.
+
+New lifecycle evidence reaches `host-signal-end` at 911 ms (`SIGTERM` sent),
+then `host-exit-wait-start` with the original 3,000 ms budget. No child exit or
+wait-end event follows. At 55,030 ms the parent observer reports Electron PID
+5753 as `Sl / poll_s`, and Host PID 5789 as `Z` (zombie). The Host has exited
+but its Electron parent has not reaped it; this excludes a Host refusing SIGTERM
+and an already-entered reader-close wait. It does not by itself identify every
+Electron/Node scheduling race. Full logs, report and run identities remain in
+`.artifacts/s2-release-gate/provider-diagnostic-negative/`.
+
+Independent version-specific source review supports a bounded fixture hypothesis:
+Electron 43.6.0 wraps callback/global timers with `activateUvLoop`, which also
+registers a Node callback scope; Node 24.20.0 promises timers insert internal
+timeouts directly. Native timer-start interrupts are conditional and are not
+equivalent to that callback scope. The next isolated differential retains the
+promises timer and explicitly activates the loop before fixture stop, solely as
+a temporary diagnostic. A supported correction would use Electron's normal
+global callback timer for the same waits, without private APIs, extra heartbeat,
+retry, longer timeout or assertion change. Root-cause validation is pending;
+no product code is changed.
+
+Before that diagnostic, the temporary Goal failure is removed by an ordinary
+commit and checked against original blob
+`5c3afeb8b4003d62edff857663a83ad0bab06fa3` and SHA-256
+`a1b238783bdce626134e0446ffb08c19d108f01b9e9c39a8a8ad946c276babe7`.
+The original candidate continues against its immutable source SHA.
