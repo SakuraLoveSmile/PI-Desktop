@@ -1,7 +1,7 @@
 # PI-STAB-1111-R1 — Release gates, stability charter and UI evidence
 
 Date: 2026-11-11 (Asia/Taipei). Tier: T2 overall (S2); S3 T0; U1 T1.
-Status: 实现中. S2: 实现中 (hosted Ubuntu DNS failure; recovery path stopped). S3: 已验收.
+Status: 实现中. S2: 实现中 (upstream DNS recovered; current-main environment validation pending). S3: 已验收.
 U1: 待体验 (local native repeatability verified).
 
 ## Goal, identity and authorization
@@ -412,3 +412,38 @@ evidence. Local checks are listed above; hosted failure behavior was observed,
 but fixture/release acceptance is blocked. No PR, merge, tag or release was
 created. Preserve both unmerged request worktrees and their evidence until
 integration or an explicitly authorized alternative disposition.
+
+### Upstream recovery and current-main continuation
+
+At 2026-11-12 12:08 Asia/Taipei, the main agent checked the official status feed
+again. It now records `DNS - Operational` at 2026-11-11 17:19:50 UTC
+(2026-11-12 01:19:50 Asia/Taipei). The runner-images issue
+[15297](https://github.com/actions/runner-images/issues/15297) is closed with a
+comment reporting mitigation. This is new upstream recovery evidence, not a
+claim that the fixture VM has passed. The fetched official XML and recovery
+receipt are retained in `.artifacts/s2-release-gate/upstream-recovered-voice/`.
+The user asked for the next step; existing implementation, branch commit/push
+and manual-candidate authorization continues to apply.
+
+Remote main advanced to `9574c37017a68a5dddfd4e59b149780a7bbf67cd` while the
+environment was blocked. The main agent fetched and merged it into this
+dedicated request branch without rewriting history; all three overlapping files
+merged automatically, with no conflict or manual product change. The new main
+adds Goal MCP control, v0.15.17 and one scenario ID; no dependency change is
+needed. Preserve its code, tests and updated catalog, as well as this request's
+release-gate and UI-tool changes. The primary checkout's pre-existing lockfile
+edit remains untouched.
+
+The combined tree passed 123/123 release/workflow/provisioning tests with no
+failures/skips, the unchanged quality baseline, policy and current scenario
+index (138 suites / 168 executable IDs). Fresh hosted validation is still
+required: first the existing voice environment check on the refreshed candidate,
+then the original deliberate nightly-only failure and clean full-nightly
+candidate. No DNS/source/trust override or additional recovery strategy was
+introduced. The prior failed runs remain failures and are not reused as passing
+acceptance.
+
+Independent read-only review found no P1/P2 in the combined S2 contract. Its
+actual catalog/contract evaluation retained 10 families, 133 automated suites
+and 18 unique required gates; source/attempt propagation and the audited legacy
+digests remain intact. The new MCP scenario is included in goals-team nightly.

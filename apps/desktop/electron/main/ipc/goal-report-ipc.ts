@@ -23,6 +23,12 @@ export function registerGoalReportIpc({
   handle(IPC.invoke.goalResume, async (params: ResumeBlockedGoalInput) => {
     if (!resumeBlockedGoal) throw new Error("Goal resume unavailable");
     if (!params?.sessionId?.trim() || !params.executionId?.trim() || !Number.isSafeInteger(params.expectedVersion)) throw new Error("Goal resume identity and version required");
+    if (params.message !== undefined && typeof params.message !== "string") throw new Error("Goal resume message must be a string");
+    if (params.modelOverride !== undefined && (
+      !params.modelOverride || typeof params.modelOverride !== "object" || Array.isArray(params.modelOverride) ||
+      typeof params.modelOverride.providerId !== "string" || !params.modelOverride.providerId.trim() ||
+      typeof params.modelOverride.modelId !== "string" || !params.modelOverride.modelId.trim()
+    )) throw new Error("Goal resume model override requires provider and model identifiers");
     return resumeBlockedGoal(params);
   });
   handle(IPC.invoke.goalClose, async (params: { sessionId: string; executionId: string; expectedVersion: number; action: "accept" | "abandon" }) => {
