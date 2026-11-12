@@ -647,7 +647,7 @@ source `fbdca8c1e2bd7d5faf43ae4cea3d5088a5e7510c`, attempt 1, reproduced
 `provider-order` in settings-storage job `130988535484`. The run is allowed to
 complete its full family inventory; this extra failure already prevents its
 acceptance as the required single-failure negative exercise. All original JS,
-Rust and smoke CI gates passed. Final family and gate conclusions are pending.
+Rust and smoke CI gates passed. Final family and gate conclusions follow below.
 
 Settings artifact `13917508201`, digest
 `sha256:66d574300e47f126497c958da77f19b8277e74504c029b1b3f2710a9a3491466`,
@@ -689,3 +689,67 @@ family on hosted Linux. This private Electron call is diagnostic-only and must
 be removed before the supported callback-timer candidate or any final delivery.
 The full negative run remains pinned to its original source; the differential
 does not repair or replace its failed evidence.
+
+The explicit-wake diagnostic source is
+`a139ad28d5609cf8ace0592ca5f10af7633892a6`, hosted run
+[43161654134](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/43161654134),
+attempt 1. It passed the existing settings-storage family 14/14, job
+`130994052787`, artifact `13918506609`, digest
+`sha256:a149a3aa30df4ab3d31a7fabffa98cc1e439a74ab2f7d0de1fc7c0ba5d63a261`.
+The supported candidate removes that private call and wrapper entirely.
+`Host` instead builds its existing delay Promise with a dynamically resolved
+`globalThis.setTimeout`, allowing Electron's normal embedder wrapper to run.
+SIGTERM/SIGKILL, two 3,000 ms waits, the 60-second parent watchdog, assertions,
+sorting, persistence and product code are unchanged. Provider stages retain
+runtime version metadata so the actual hosted binary can be identified.
+
+Two behavior regressions in `scripts/test/host-fixture.test.mjs` control only
+the embedded global timer and external child boundary. They verify normal exit
+without SIGKILL, both exact timeout budgets, TERM then KILL on missing exit,
+reader cleanup and the existing visible failure if the child still has not
+exited. Both fail against the original promises-timer helper at the timer
+boundary and pass after the candidate correction. The before/after TAP records
+are in `.artifacts/s2-release-gate/provider-timer-differential/`; the before TAP
+uses the test's initial filename. Its first invocation failed on absent shared
+build output, not the intended baseline; that log is retained separately.
+Only this worktree's shared package was then compiled with the provisioned
+TypeScript executable, with no installation, Electron or Host launch.
+
+The new test was moved into the existing CI `scripts/test/*.test.mjs` glob;
+an independent review identified the initial root-level placement as a P2
+coverage gap. No workflow, suite catalog, retry, baseline or assertion was
+altered to accommodate it. The final existing CI script-runner group passed
+27/27, including both new regressions. Source/generated-template syntax,
+targeted lint, unchanged quality baseline, current scenario index, 647 docs,
+96 locale pairs and whitespace checks passed. Independent final review closed
+the test-discovery issue and found no remaining P1/P2. The actual supported
+callback-timer hosted replay is still required before acceptance.
+
+The completed diagnostic negative has all ten family reports and 131/133 suites
+passed: exactly `goal-blocked-ui` and `provider-order` failed. All reports match
+the immutable source and base main, `candidateUnchanged=true`; there are no
+outer timeouts or unexpected skips. Existing catalog-declared live/environment
+exclusions are unchanged and are not counted as their own acceptance evidence.
+Eight families passed, goals-team and settings-storage failed, and always-summary
+job `130995907959` failed. Build `130995985085`, aggregate `130995985958` and
+manual publication `130995985786` are genuinely skipped with zero steps.
+The gate blocked build, but this remains an unaccepted negative exercise because
+the extra Provider failure was not intentional. All ten downloaded reports,
+artifact digests, job identities and the independent inventory audit are retained
+in its `evidence.json`.
+
+The explicit-wake differential independently matches its exact source/base and
+has no timeout, exclusion or skip. Runtime metadata confirms Electron 43.6.0
+and Node 24.20.0. Stop began at 848 ms; child exit, wait-end, reader cleanup and
+`host-stopped` completed at 854 ms; the new Host was ready at 867 ms, renderer
+reload at 918 ms, and the final probe reported restart/persistence true. Together
+with the zombie failure and versioned source, this supports the fixture wake
+mechanism. A single differential pass is not proof that every scheduling race
+is gone; retain the full candidate gates and the normal supported-timer replay.
+
+A fresh `git fetch origin main` still resolves to
+`9574c37017a68a5dddfd4e59b149780a7bbf67cd`, already an ancestor. Commit and push
+the supported timer correction, then use one fixed-SHA settings-storage replay
+before resuming S2's complete deliberate-negative and normal candidates. No
+temporary private Electron call or deliberate Goal failure remains in this
+supported source. No merge, tag, publication or running-app operation occurred.

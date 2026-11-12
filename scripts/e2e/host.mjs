@@ -3,12 +3,15 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { setTimeout as delay } from "node:timers/promises";
 
 import { readNdjsonLines } from "../../packages/shared/dist/ndjson.js";
 import { assert, shortJson } from "./assert.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
+
+// Electron wraps its global timer to wake Node after a Chromium callback.
+// Promise timers bypass that embedder wrapper.
+const delay = (ms) => new Promise((resolveDelay) => globalThis.setTimeout(resolveDelay, ms));
 
 export function hostBinaryCandidates() {
   const names =
