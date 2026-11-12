@@ -1,7 +1,7 @@
 # PI-STAB-1111-R1 — Release gates, stability charter and UI evidence
 
 Date: 2026-11-11 (Asia/Taipei). Tier: T2 overall (S2); S3 T0; U1 T1.
-Status: 实现中. S2: 实现中 (supported fixture correction passed; full negative/clean acceptance pending). S3: 已验收.
+Status: 实现中. S2: 实现中 (full negative accepted; clean candidate pending). S3: 已验收.
 U1: 待体验 (local native repeatability verified).
 
 ## Goal, identity and authorization
@@ -197,8 +197,8 @@ the root's actual native runs or pixel comparison.
   Linux capture behavior or cross-machine pixel identity.
 - S2 hosted negative and clean candidate exercises: authorized; runner DNS is
   restored and the Provider fixture correction passed targeted hosted replay.
-  No valid full negative or positive result is claimed yet. Temporary Goal
-  failures are removed between exercises as recorded below.
+  The full negative is accepted as recorded below; the clean candidate remains
+  pending. Temporary Goal failures are removed between exercises.
   All assertions, catalog classifications and old CI gates remain. Always specify fork repository
   `SakuraLoveSmile/PI-Desktop` in GitHub CLI calls; the CLI's default points to
   upstream and must not be used as fork evidence.
@@ -791,3 +791,43 @@ assertions, waits and retries. Require metadata, old CI and every other automate
 suite to pass, with the intended family and summary failed and build/aggregate
 skipped. Save all ten reports before restoring the exact original Goal bytes
 with an ordinary commit. Only then dispatch the clean full candidate.
+
+### Complete negative gate accepted
+
+The full negative [43163796274](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/43163796274)
+completed as `failure` on source `cd5f8e4f2eef4bb0d2ccd00fa29090cf2775d3f9`,
+attempt 1, base main `9574c37017a68a5dddfd4e59b149780a7bbf67cd`.
+All ten family reports were downloaded and independently audited against that
+source's exact catalog: 132/133 automatic suites passed, only the deliberate
+`goal-blocked-ui` failed. Every report has the expected head/base and
+`candidateUnchanged=true`, no outer timeout or unexpected skip. Existing
+catalog-declared manual/live/environment exclusions remain unchanged.
+
+Metadata `131000843352`, JS `131000922046`, Rust `131000921993`, original smoke
+`131000922253` and catalog `131000922055` all passed. The new graceful-exit and
+escalation-budget regressions were confirmed in the actual JS CI log, not only
+the local command. Nine nightly families passed, including settings-storage.
+Goals-team `131000979365` has 35/36 passed and exactly the approved entry-error
+marker. Always-summary `131009624641` failed specifically on that family.
+Build `131009688287`, aggregate `131009688651` and manual publication
+`131009689497` are skipped with zero steps. Publication is skipped by manual
+policy in either lane; build and aggregation prove the blocking behavior.
+
+The independent audit checks all nineteen exact job names/conclusions (eighteen
+gates plus manual publication), complete suite coverage and original run/attempt
+identity. Artifact IDs/digests, report hashes, job inventory, JS and Goal logs
+and the real summary error are retained in
+`.artifacts/s2-release-gate/global-timer-negative/`, especially
+`release-gate-evidence.json`. This is the required accepted negative exercise;
+the earlier extra-failure/cancelled runs remain unaccepted historical evidence.
+
+The following ordinary restoration removes only the temporary Goal throw and
+updates this record. The script is checked against original Git blob
+`5c3afeb8b4003d62edff857663a83ad0bab06fa3` and SHA-256
+`a1b238783bdce626134e0446ffb08c19d108f01b9e9c39a8a8ad946c276babe7`;
+all executable content then matches supported source `f2061ea2d`.
+The fresh main fetch is still `9574c3701` and already an ancestor. Dispatch the
+normal full candidate on the restored SHA with `sign_macos=false`, requiring
+all old CI, ten nightly families, summary, native macOS arm64 build and bundle
+aggregation to pass. No tag, GitHub Release, updater publication or running-app
+operation is authorized by this candidate exercise.
