@@ -1,7 +1,7 @@
 # PI-STAB-1111-R1 — Release gates, stability charter and UI evidence
 
 Date: 2026-11-11 (Asia/Taipei). Tier: T2 overall (S2); S3 T0; U1 T1.
-Status: 实现中. S2: 实现中 (full negative accepted; clean candidate pending). S3: 已验收.
+Status: 实现中. S2: 实现中 (full negative accepted; clean candidate failed Provider shutdown). S3: 已验收.
 U1: 待体验 (local native repeatability verified).
 
 ## Goal, identity and authorization
@@ -197,8 +197,9 @@ the root's actual native runs or pixel comparison.
   Linux capture behavior or cross-machine pixel identity.
 - S2 hosted negative and clean candidate exercises: authorized; runner DNS is
   restored and the Provider fixture correction passed targeted hosted replay.
-  The full negative is accepted as recorded below; the clean candidate remains
-  pending. Temporary Goal failures are removed between exercises.
+  The full negative is accepted as recorded below; the clean candidate failed
+  Provider shutdown, so the global-timer attempt is not an accepted fix.
+  Temporary Goal failures are removed between exercises.
   All assertions, catalog classifications and old CI gates remain. Always specify fork repository
   `SakuraLoveSmile/PI-Desktop` in GitHub CLI calls; the CLI's default points to
   upstream and must not be used as fork evidence.
@@ -831,3 +832,77 @@ normal full candidate on the restored SHA with `sign_macos=false`, requiring
 all old CI, ten nightly families, summary, native macOS arm64 build and bundle
 aggregation to pass. No tag, GitHub Release, updater publication or running-app
 operation is authorized by this candidate exercise.
+
+### Clean candidate disproved the timer-only correction
+
+Restoration source `5687f0de619ae5720ac0d881c892978840562a52` was pushed and
+dispatched as normal candidate
+[43166962228](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/43166962228),
+attempt 1. Metadata and every original CI gate passed. The full Goal family,
+including the restored real `goal-blocked-ui`, also passed. The full run is
+retained to finish its remaining families; it is already ineligible as a clean
+acceptance because settings-storage job `131012413215` failed.
+
+The downloaded settings report independently matches the exact SHA and base
+main, with `candidateUnchanged=true`, 13/14 passed, only `provider-order` failed
+in 61,033 ms, no outer timeout or unexpected skip. At 963 ms SIGTERM returned
+true, followed by the original 3,000 ms wait-start. At 55,016 ms the parent
+observed Electron PID 5924 as `Sl / poll_s` and Host PID 5959 as `Z`; the original
+60-second watchdog then killed Electron. The trace contains no child-exit or
+wait-end event. Full logs and the report are in
+`.artifacts/s2-release-gate/global-timer-positive/`.
+
+This counterexample disproves the sufficiency of the global-timer change. Its
+prior targeted and complete-negative passes remain real results, but they do
+not establish a root-cause fix. The timer replacement remains an unaccepted
+attempt during diagnosis, not a delivered solution. No new candidate is blindly
+retriggered on the same code. The accepted negative still demonstrates the
+release gate; positive acceptance and packaging remain unsatisfied.
+
+Independent source review does not support assuming an ordinary dynamic ESM
+import creates a separate global realm. Under the existing user-authorized
+two-fixture scope, add non-scheduling identity checks between the CJS main and
+ESM helper, and record the actual existing timer's construction, registration,
+callback, resolution and race continuation. Compare only reference booleans and
+safe timer metadata; never serialize globals or function bodies. Expand the
+existing 55-second owned-process observation to thread state/wchan, retaining
+its two-second command bound and a bounded output buffer. Preserve both three-
+second deadlines, sixty-second watchdog, signals, assertions and catalog.
+No extra heartbeat, retry, polling loop, private-API fix or product change.
+
+The fixture worker exclusively owns the same two source files, root owns this
+record, tests and pinned CI evidence, and independent analysis/review remains
+read-only. Evidence must precede another correction. A product or frozen-boundary
+change still returns to the user before implementation.
+
+The complete normal run finished `failure`, with all ten reports retained and
+independently checked: 132/133 passed, exactly `provider-order` failed, all nine
+other families passed, no outer timeout or unexpected skip. Metadata, original
+CI and catalog passed. Summary `131020320146` failed on settings-storage;
+build `131020386798`, aggregate `131020386503` and manual publication
+`131020387718` are skipped with zero steps. Installer packaging is NOT RUN.
+`blocked-candidate-evidence.json` explicitly records `candidateAccepted=false`;
+this normal failure is not counted as the planned negative or a green candidate.
+
+The next diagnostic source passes CJS reference snapshots through one optional
+internal fixture argument. The helper emits only reference-equality booleans,
+function names, Timeout counts and `hasRef()` metadata. It adds synchronous
+before/after construction, registration, original callback and resolve-return
+stages around the same existing Promise and timer. An `after-resolve` stage
+only means the resolver returned; `exit-wait-end` is required to show the race
+and await resumed. No additional Promise, timer, scheduler, heartbeat or retry
+was introduced. `ps -L` observes only the same owned live PIDs at 55 seconds;
+the command still has a two-second limit, with 16 KiB bounded output to fit
+thread rows. Observer cancellation and late-result suppression are unchanged.
+
+The root's final existing CI script-runner group passed 28/28. The added test
+uses a controlled timer replacement to prove the identity snapshot detects an
+actual change and the trace remains JSON-serializable without an injected
+synthetic private marker. It starts no process. The two existing graceful-exit
+and escalation/deadline regressions remain unchanged. Source/generated-template
+syntax, targeted Host-helper lint, unchanged quality baseline, current scenario
+index, 647 docs, 96 locale pairs and whitespace checks passed. Independent
+review found no P1/P2 in the implementation or additional regression.
+Actual diagnostic Electron/Host/ps execution on this new source is NOT RUN
+until the following pinned hosted settings-storage check. There is no product,
+IPC/RPC, database, dependency, packaging or signing change.

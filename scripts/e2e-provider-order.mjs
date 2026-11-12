@@ -40,6 +40,10 @@ try {
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("node:path");
 const { registerProviderIpc } = require("./provider-ipc.cjs");
+const diagnosticReferences = {
+  globalThis, Promise, setTimeout: globalThis.setTimeout,
+  nodeSetTimeout: require("node:timers").setTimeout,
+};
 app.setPath("userData", path.join(__dirname, "profile"));
 app.whenReady().then(async () => {
   const { Host } = await import(${JSON.stringify(pathToFileURL(join(root, "scripts/e2e/host.mjs")).href)});
@@ -51,7 +55,7 @@ app.whenReady().then(async () => {
     name, elapsedMs: Date.now() - startedAt, ...detail,
   }));
   const host = new Host(${JSON.stringify(binary)}, path.join(__dirname, "data"),
-    (name, detail) => stage("host-" + name, detail));
+    (name, detail) => stage("host-" + name, detail), diagnosticReferences);
   try {
     await host.start();
     stage("host-ready", { electron: process.versions.electron, node: process.versions.node });
@@ -172,8 +176,8 @@ app.whenReady().then(async () => {
     const hostExited = spawned && stages.slice(spawnedIndex + 1).some(stage =>
       stage.pid === spawned.pid && ["host-child-exit", "host-child-close"].includes(stage.name));
     const pids = [child.pid, hostExited ? undefined : spawned?.pid].filter(pid => Number.isInteger(pid) && pid > 0);
-    observationChild = execFile("ps", ["-o", "pid=,ppid=,stat=,wchan=,comm=", "-p", pids.join(",")],
-      { timeout: 2_000, maxBuffer: 4_096 }, (error, stdout, stderr) => {
+    observationChild = execFile("ps", ["-L", "-o", "pid=,tid=,ppid=,stat=,wchan=,comm=", "-p", pids.join(",")],
+      { timeout: 2_000, maxBuffer: 16_384 }, (error, stdout, stderr) => {
         observationChild = undefined;
         if (observerClosed || child.exitCode !== null || child.signalCode !== null) return;
         console.log("PROVIDER_ORDER_PARENT " + JSON.stringify({

@@ -2,6 +2,8 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import timers from "node:timers";
+import * as timerNamespace from "node:timers";
 import { fileURLToPath } from "node:url";
 
 import { readNdjsonLines } from "../../packages/shared/dist/ndjson.js";
@@ -9,9 +11,55 @@ import { assert, shortJson } from "./assert.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
 
-// Electron wraps its global timer to wake Node after a Chromium callback.
-// Promise timers bypass that embedder wrapper.
-const delay = (ms) => new Promise((resolveDelay) => globalThis.setTimeout(resolveDelay, ms));
+function timerReferenceEvidence(references) {
+  return {
+    marker: "fixture-host-global-delay-observation-v1",
+    sameGlobal: references.globalThis === globalThis,
+    samePromise: references.Promise === Promise,
+    cjsPromiseUnchanged: references.globalThis.Promise === references.Promise,
+    cjsGlobalTimerUnchanged: references.globalThis.setTimeout === references.setTimeout,
+    cjsGlobalTimerMatchesEsmGlobal: references.setTimeout === globalThis.setTimeout,
+    cjsNodeTimerMatchesEsmGlobal: references.nodeSetTimeout === globalThis.setTimeout,
+    cjsNodeTimerMatchesEsmDefault: references.nodeSetTimeout === timers.setTimeout,
+    cjsNodeTimerMatchesEsmNamespace: references.nodeSetTimeout === timerNamespace.setTimeout,
+    cjsTimersMatch: references.setTimeout === references.nodeSetTimeout,
+    esmDefaultTimerMatchesGlobal: timers.setTimeout === globalThis.setTimeout,
+    esmNamespaceTimerMatchesGlobal: timerNamespace.setTimeout === globalThis.setTimeout,
+    esmTimersMatch: timers.setTimeout === timerNamespace.setTimeout,
+    names: {
+      cjsGlobal: references.setTimeout.name,
+      cjsNode: references.nodeSetTimeout.name,
+      esmGlobal: globalThis.setTimeout.name,
+      esmDefault: timers.setTimeout.name,
+      esmNamespace: timerNamespace.setTimeout.name,
+    },
+  };
+}
+
+// Observe the existing global-timer wait without introducing another scheduler.
+const delay = (ms, lifecycle, detail, references) => {
+  lifecycle("delay-before-constructor", {
+    ...detail, ...(references ? { timerReferences: timerReferenceEvidence(references) } : {}),
+  });
+  const waiting = new Promise((resolveDelay) => {
+    lifecycle("delay-before-register", {
+      ...detail,
+      timeoutResources: references ? process.getActiveResourcesInfo().filter(type => type === "Timeout").length : undefined,
+    });
+    const timer = globalThis.setTimeout(() => {
+      lifecycle("delay-timer-fired", detail);
+      resolveDelay();
+      lifecycle("delay-after-resolve", detail);
+    }, ms);
+    lifecycle("delay-after-register", {
+      ...detail, timerKind: typeof timer,
+      timerHasRef: typeof timer?.hasRef === "function" ? timer.hasRef() : null,
+      timeoutResources: references ? process.getActiveResourcesInfo().filter(type => type === "Timeout").length : undefined,
+    });
+  });
+  lifecycle("delay-after-constructor", detail);
+  return waiting;
+};
 
 export function hostBinaryCandidates() {
   const names =
@@ -64,10 +112,11 @@ function failPending(pending, error) {
 }
 
 export class Host {
-  constructor(binary, dataDir, lifecycle = () => {}) {
+  constructor(binary, dataDir, lifecycle = () => {}, diagnosticReferences) {
     this.binary = binary;
     this.dataDir = dataDir;
     this.lifecycle = lifecycle;
+    this.diagnosticReferences = diagnosticReferences;
     this.child = null;
     this.stdoutReader = null;
     this.pending = new Map();
@@ -208,8 +257,10 @@ export class Host {
       this.lifecycle("signal-error", { pid: child.pid, signal: "SIGTERM", errorName: error.name, code: error.code });
     }
     this.lifecycle("signal-end", { pid: child.pid, signal: "SIGTERM", sent: termSent });
-    this.lifecycle("exit-wait-start", { pid: child.pid, signal: "SIGTERM", budgetMs: 3_000 });
-    await Promise.race([this.exitPromise, delay(3_000)]);
+    const termWait = { pid: child.pid, signal: "SIGTERM", budgetMs: 3_000 };
+    this.lifecycle("exit-wait-start", termWait);
+    await Promise.race([this.exitPromise, delay(3_000,
+      (name, detail) => this.lifecycle(name, detail), termWait, this.diagnosticReferences)]);
     this.lifecycle("exit-wait-end", { pid: child.pid, signal: "SIGTERM", exited: this.exited });
     if (!this.exited) {
       this.lifecycle("signal-start", { pid: child.pid, signal: "SIGKILL" });
@@ -221,8 +272,10 @@ export class Host {
         this.lifecycle("signal-error", { pid: child.pid, signal: "SIGKILL", errorName: error.name, code: error.code });
       }
       this.lifecycle("signal-end", { pid: child.pid, signal: "SIGKILL", sent: killSent });
-      this.lifecycle("exit-wait-start", { pid: child.pid, signal: "SIGKILL", budgetMs: 3_000 });
-      await Promise.race([this.exitPromise, delay(3_000)]);
+      const killWait = { pid: child.pid, signal: "SIGKILL", budgetMs: 3_000 };
+      this.lifecycle("exit-wait-start", killWait);
+      await Promise.race([this.exitPromise, delay(3_000,
+        (name, detail) => this.lifecycle(name, detail), killWait, this.diagnosticReferences)]);
       this.lifecycle("exit-wait-end", { pid: child.pid, signal: "SIGKILL", exited: this.exited });
     }
     this.lifecycle("reader-close-start", { pid: child.pid, readerPresent: Boolean(this.stdoutReader) });
