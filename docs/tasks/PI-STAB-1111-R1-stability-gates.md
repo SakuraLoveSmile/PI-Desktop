@@ -998,3 +998,58 @@ Independent final-delta review confirmed the P2 early-success hole is closed
 in code with no new P1/P2. Runtime completeness is still NOT RUN on this
 corrected source until its following pinned hosted control; the prior
 incomplete run remains rejected.
+
+While that immutable hosted control runs, prepare the next original-fixture
+baseline without executing it: remove the temporary production adapter, retain
+the explicit lifetime/completion safeguard, and add a Linux controlled RPC peer
+that installs its TERM-ignore handler before handshake. Start it only after the
+original Rust restart and before the existing renderer reload. After the real
+persistence probe returns, stop this peer directly from the renderer-Promise
+continuation. Require the original three-second timer to actually fire, then
+the original SIGKILL fallback, a real SIGKILL child-exit and complete cleanup.
+This adds coverage for the unexercised deadline branch, not a retry, heartbeat,
+longer timeout or a Node-callback fix. The original first Rust stop and every
+business/performance assertion retain their existing order. Both transports
+must finish cleanup before the parent accepts one final result. Execution and
+interpretation wait for the corrected production-control evidence; this
+preparation does not count either experiment as passed.
+
+The corrected production control
+[43175234725](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/43175234725)
+completed on `3f2e6f700369b5e9cb9ae8d871a234f4e0ea8a70`, attempt 1. Root audited
+its exact source/base, complete catalog, 14/14 results and one final control.
+Both distinct generations have `stopSucceeded=true` and actual public exit
+events `{code:0, signal:null, intentional:true}`. The first dispose begins at
+852 ms and exits at 861 ms; the final one begins at 937 ms and exits/returns at
+942 ms. Both exit/return stages and the unique final completion are present.
+All original UI, 200-card work-count and restart/persistence probes pass.
+Full logs, artifacts/digests, generic report audit and the additional
+`complete-control-evidence.json` are retained in
+`.artifacts/s2-release-gate/production-control-complete/`.
+
+This is accepted evidence only for production EOF shutdown in this isolated
+context. No production failure was observed in this run; it does not establish
+the original SIGTERM fixture's root cause or accept S2's clean full candidate.
+The production adapter is now removed for the original-contract deadline
+baseline, retaining the demonstrated lifetime/completion guard and the old
+two-by-three-second shutdown policy. No identical-code full candidate retry is
+justified solely by the production control passing.
+
+The original-contract baseline is implemented solely in the Provider fixture.
+Both locales of its existing E2E scenario now describe the final-cleanup and
+Linux forced-deadline assertions. A single pure host-run validator is reused in
+Main and parent, requiring real normal / SIGTERM exit; mere existence of an exit
+cannot hide a late crash. The peer validator is likewise shared through the
+generated fixture, requiring ordered events for the same actual PID. There is
+no product or shared Host-helper implementation change in this step.
+
+Root ran the generated peer independently as a disposable Node child: NDJSON
+handshake, TERM ignore and actual KILL exit passed without Electron or Rust.
+Root also ran the actual host-run validator against the retained clean two-run
+trace and verified rejection of four changed traces: nonzero exit, SIGSEGV,
+missing exit and incomplete cleanup. Source/generated Main/peer syntax passed;
+the existing runner/test group passed 28/28, and quality baseline, scenario
+index, docs and whitespace checks passed. Independent review's late-crash P2
+was corrected in the shared validator, with no remaining P1/P2. These local
+results do not establish Electron deadline scheduling; the following pinned
+settings-storage run is the required original-contract runtime baseline.

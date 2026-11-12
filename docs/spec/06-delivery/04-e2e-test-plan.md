@@ -16387,6 +16387,15 @@ read at press time, and move/release/cancel/unmount paths must clear transient
 transforms and queued frames. Release before the scheduled frame must still save
 the latest destination. These assertions measure work counts, not device FPS.
 
+The fixture owns shutdown through final cleanup, including after its last window
+closes. A successful UI probe or zero Electron exit alone is insufficient: both
+real Host processes must report normal or intentional SIGTERM exit and completed
+cleanup. On Linux, an additional isolated RPC peer ignores SIGTERM before its
+handshake. After the renderer persistence probe, the original three-second wait
+must actually expire, escalate to SIGKILL and observe real peer exit and cleanup.
+The two shutdown budgets and outer watchdog remain unchanged. This POSIX
+regression is explicitly NOT RUN elsewhere; the original UI/restart checks remain.
+
 ### E2E-CHROME-window-controls-survive-work-panel
 
 - **Preconditions:** A built desktop and matching host-core binary; isolated
