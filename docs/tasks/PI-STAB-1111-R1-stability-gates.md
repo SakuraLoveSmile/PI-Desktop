@@ -547,3 +547,61 @@ baseline, 647 documentation pages, 96 locale pairs and diff whitespace. Source
 comparison confirms all tracked content outside this task record is identical
 to refreshed candidate `b8782fce8f5822f14d934d84331e91d02c7d5d39`. Its 123 local
 tests are documented above; the failed hosted result is retained separately.
+
+### Authorized Provider fixture diagnosis
+
+On the following continuation the user explicitly authorized the recorded
+fixture diagnosis and minimum fixture fix. This is the requested R8 scope
+extension, limited to `scripts/e2e-provider-order.mjs` and
+`scripts/e2e/host.mjs`, relevant verification and this shared task record.
+Product-code changes still require a briefing first. Existing branch
+commit/push and isolated hosted validation authorization remains in force;
+there is no new PR, merge, tag, release, paid-provider or running-app permission.
+This fixture package is T1 within the overall T2 request.
+
+The implementation worker exclusively owns the two fixture files. The main
+agent owns documentation, integration, checks and pinned hosted runs. A
+read-only analyst checks lifecycle hypotheses independently, and a read-only
+reviewer verifies the actual diagnostic diff before hosted validation. No
+concurrent writers share a file.
+
+First add evidence without changing the stop policy: optional fixture lifecycle
+reporting around the existing signals, exit waits, child exit/close/error and
+reader cleanup, routed through the Provider probe's existing stage format.
+The outer Linux probe may observe only its owned Electron/Host PIDs with a
+bounded asynchronous process-status query before the unchanged watchdog.
+Do not collect full command lines, environments, credentials or user processes.
+Preserve the existing 60-second Electron watchdog, two three-second cleanup
+waits, all assertions, catalog coverage, retries and quality baseline.
+
+Run the existing settings-storage family once on a new pinned diagnostic SHA
+containing current main. Use the observed stop phases to support or reject
+specific causes; an unreproduced failure is not proof of a fix. Apply only a
+confirmed fixture correction, then revalidate the affected behavior before
+resuming S2's full negative and clean candidates. Any required product change
+returns to the user with evidence instead of expanding this package silently.
+
+The read-only lifecycle check found no hidden EOF/drain wait in the NDJSON
+reader: its close method synchronously clears buffers and its own listeners.
+The fixture waits for child `exit`, not `close`, so an inherited stdout pipe
+alone cannot establish this failure's cause. Version-specific research also
+found that Electron 43.6.0 does not wrap the promises timer in its JavaScript
+`activateUvLoop` adapter, but its native libuv timer-start interrupt mechanism
+is enabled. That difference alone does not justify replacing timers or changing
+the stop policy. Actual stage/event evidence remains the next discriminator.
+
+Initial local checks passed: six isolated runner/scenario tests, both fixture
+source syntax checks, the evaluated generated Electron-main template's syntax,
+targeted Host-helper Biome lint, the unchanged quality baseline and scenario
+catalog. These checks did not start Electron, the Rust Host or a real provider;
+hosted lifecycle evidence is still NOT RUN for the new diagnostic source.
+
+Final diagnostic review found no remaining P1/P2. The process observer now
+excludes exited Electron/Host PIDs, terminates its in-flight child on fixture
+close and suppresses late callbacks. The main agent independently evaluated the
+actual parent-observer body against injected process/timer boundaries: exited
+Host exclusion, owned PID selection, in-flight cleanup, late callback suppression,
+exited Electron exclusion and visible diagnostic errors all passed without
+starting a process. The original watchdog, wait budgets and outcome assertions
+remain unchanged. These are observability and ownership checks, not a claimed
+Provider shutdown fix or a substitute for the hosted family run.

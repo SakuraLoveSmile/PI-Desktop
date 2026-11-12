@@ -61,9 +61,10 @@ function failPending(pending, error) {
 }
 
 export class Host {
-  constructor(binary, dataDir) {
+  constructor(binary, dataDir, lifecycle = () => {}) {
     this.binary = binary;
     this.dataDir = dataDir;
+    this.lifecycle = lifecycle;
     this.child = null;
     this.stdoutReader = null;
     this.pending = new Map();
@@ -85,9 +86,11 @@ export class Host {
       env: { ...process.env, PI_DESKTOP_DATA_DIR: this.dataDir },
     });
     this.child = child;
+    this.lifecycle("child-spawned", { pid: child.pid });
     this.exitPromise = new Promise((resolveExit) => {
       child.once("exit", (code, signal) => {
         this.exited = true;
+        this.lifecycle("child-exit", { pid: child.pid, code, signal });
         const suffix = this.stderr.trim()
           ? " stderr=" + this.stderr.trim().slice(-500)
           : "";
@@ -101,7 +104,11 @@ export class Host {
       });
     });
     child.on("error", (error) => {
+      this.lifecycle("child-error", { pid: child.pid, errorName: error.name, code: error.code });
       failPending(this.pending, error);
+    });
+    child.once("close", (code, signal) => {
+      this.lifecycle("child-close", { pid: child.pid, code, signal });
     });
     child.stderr.on("data", (chunk) => {
       this.stderr += String(chunk);
@@ -182,26 +189,46 @@ export class Host {
 
   async stop() {
     const child = this.child;
-    if (!child) return;
+    this.lifecycle("stop-begin", { pid: child?.pid, exited: this.exited, pendingCount: this.pending.size });
+    if (!child) {
+      this.lifecycle("stop-complete", { childPresent: false });
+      return;
+    }
     failPending(this.pending, new Error("host stopped by harness"));
+    this.lifecycle("stop-pending-failed", { pid: child.pid, pendingCount: this.pending.size });
+    this.lifecycle("signal-start", { pid: child.pid, signal: "SIGTERM" });
+    let termSent = null;
     try {
-      child.kill();
-    } catch {
+      termSent = child.kill();
+    } catch (error) {
       // The exit event below is the authoritative cleanup signal.
+      this.lifecycle("signal-error", { pid: child.pid, signal: "SIGTERM", errorName: error.name, code: error.code });
     }
+    this.lifecycle("signal-end", { pid: child.pid, signal: "SIGTERM", sent: termSent });
+    this.lifecycle("exit-wait-start", { pid: child.pid, signal: "SIGTERM", budgetMs: 3_000 });
     await Promise.race([this.exitPromise, delay(3_000)]);
+    this.lifecycle("exit-wait-end", { pid: child.pid, signal: "SIGTERM", exited: this.exited });
     if (!this.exited) {
+      this.lifecycle("signal-start", { pid: child.pid, signal: "SIGKILL" });
+      let killSent = null;
       try {
-        child.kill("SIGKILL");
-      } catch {
+        killSent = child.kill("SIGKILL");
+      } catch (error) {
         // Best effort on platforms without SIGKILL semantics.
+        this.lifecycle("signal-error", { pid: child.pid, signal: "SIGKILL", errorName: error.name, code: error.code });
       }
+      this.lifecycle("signal-end", { pid: child.pid, signal: "SIGKILL", sent: killSent });
+      this.lifecycle("exit-wait-start", { pid: child.pid, signal: "SIGKILL", budgetMs: 3_000 });
       await Promise.race([this.exitPromise, delay(3_000)]);
+      this.lifecycle("exit-wait-end", { pid: child.pid, signal: "SIGKILL", exited: this.exited });
     }
+    this.lifecycle("reader-close-start", { pid: child.pid, readerPresent: Boolean(this.stdoutReader) });
     this.stdoutReader?.close();
+    this.lifecycle("reader-close-end", { pid: child.pid });
     this.stdoutReader = null;
     this.child = null;
     if (!this.exited) throw new Error("host did not exit during cleanup");
+    this.lifecycle("stop-complete", { pid: child.pid, exited: this.exited });
   }
 
   async restart(protocolVersion = 11) {

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** Provider drag/drop through the settings UI, production IPC and an isolated Rust host. */
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -44,13 +44,14 @@ app.setPath("userData", path.join(__dirname, "profile"));
 app.whenReady().then(async () => {
   const { Host } = await import(${JSON.stringify(pathToFileURL(join(root, "scripts/e2e/host.mjs")).href)});
   const { IPC } = await import(${JSON.stringify(pathToFileURL(join(root, "packages/shared/dist/protocol.js")).href)});
-  const host = new Host(${JSON.stringify(binary)}, path.join(__dirname, "data"));
   let window;
   let failure;
   const startedAt = Date.now();
   const stage = (name, detail = {}) => console.error("PROVIDER_ORDER_STAGE " + JSON.stringify({
     name, elapsedMs: Date.now() - startedAt, ...detail,
   }));
+  const host = new Host(${JSON.stringify(binary)}, path.join(__dirname, "data"),
+    (name, detail) => stage("host-" + name, detail));
   try {
     await host.start();
     stage("host-ready");
@@ -154,16 +155,59 @@ app.whenReady().then(async () => {
   const env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
   const child = spawn(electronBinary, [join(temp, "main.cjs")], { env, stdio: ["ignore", "pipe", "pipe"] });
+  const spawnedAt = Date.now();
   let output = "";
   for (const stream of [child.stdout, child.stderr]) stream.on("data", (data) => { output += data; });
-  const timer = setTimeout(() => child.kill("SIGKILL"), 60_000);
+  const recordedStages = () => output.split(/\r?\n/).filter(line => line.startsWith("PROVIDER_ORDER_STAGE ")).map(line => {
+    try { return JSON.parse(line.slice("PROVIDER_ORDER_STAGE ".length)); }
+    catch { return { name: "unparsed-stage" }; }
+  });
+  let observationChild;
+  let observerClosed = false;
+  const observationTimer = process.platform === "linux" ? setTimeout(() => {
+    if (observerClosed || child.exitCode !== null || child.signalCode !== null) return;
+    const stages = recordedStages();
+    const spawnedIndex = stages.findLastIndex(stage => stage.name === "host-child-spawned");
+    const spawned = stages[spawnedIndex];
+    const hostExited = spawned && stages.slice(spawnedIndex + 1).some(stage =>
+      stage.pid === spawned.pid && ["host-child-exit", "host-child-close"].includes(stage.name));
+    const pids = [child.pid, hostExited ? undefined : spawned?.pid].filter(pid => Number.isInteger(pid) && pid > 0);
+    observationChild = execFile("ps", ["-o", "pid=,ppid=,stat=,wchan=,comm=", "-p", pids.join(",")],
+      { timeout: 2_000, maxBuffer: 4_096 }, (error, stdout, stderr) => {
+        observationChild = undefined;
+        if (observerClosed || child.exitCode !== null || child.signalCode !== null) return;
+        console.log("PROVIDER_ORDER_PARENT " + JSON.stringify({
+          name: "process-observation", elapsedMs: Date.now() - spawnedAt,
+          pids, lastStage: stages.at(-1)?.name, code: error?.code ?? 0,
+          signal: error?.signal, stdout: stdout.trim(), stderr: stderr.trim(),
+        }));
+      });
+  }, 55_000) : undefined;
+  const timer = setTimeout(() => {
+    console.log("PROVIDER_ORDER_PARENT " + JSON.stringify({
+      name: "watchdog", elapsedMs: Date.now() - spawnedAt, pid: child.pid,
+      lastStage: recordedStages().at(-1)?.name,
+    }));
+    child.kill("SIGKILL");
+  }, 60_000);
   let code, signal;
   try {
     ({ code, signal } = await new Promise((resolve, reject) => {
       child.once("error", reject);
       child.once("close", (code, signal) => resolve({ code, signal }));
     }));
-  } finally { clearTimeout(timer); }
+  } finally {
+    observerClosed = true;
+    clearTimeout(timer);
+    clearTimeout(observationTimer);
+    try { observationChild?.kill("SIGKILL"); }
+    catch (error) {
+      console.log("PROVIDER_ORDER_PARENT " + JSON.stringify({
+        name: "process-observation-cleanup-error", errorName: error.name, code: error.code,
+      }));
+    }
+    observationChild = undefined;
+  }
   const stages = output.split(/\r?\n/).filter(line => line.startsWith("PROVIDER_ORDER_STAGE "));
   for (const stage of stages) console.log(stage);
   const line = output.split(/\r?\n/).find((line) => line.startsWith("PROVIDER_ORDER_PROBE "));
