@@ -680,3 +680,12 @@ commit and checked against original blob
 `5c3afeb8b4003d62edff857663a83ad0bab06fa3` and SHA-256
 `a1b238783bdce626134e0446ffb08c19d108f01b9e9c39a8a8ad946c276babe7`.
 The original candidate continues against its immutable source SHA.
+
+The following temporary differential candidate changes only the two Provider
+fixture stop call sites to activate the embedded Node loop immediately before
+the unchanged `Host.stop()`. It records Electron/Node versions, retains promises
+timers and both 3,000 ms budgets, and runs the existing isolated settings-storage
+family on hosted Linux. This private Electron call is diagnostic-only and must
+be removed before the supported callback-timer candidate or any final delivery.
+The full negative run remains pinned to its original source; the differential
+does not repair or replace its failed evidence.

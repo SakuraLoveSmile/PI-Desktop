@@ -52,6 +52,11 @@ app.whenReady().then(async () => {
   }));
   const host = new Host(${JSON.stringify(binary)}, path.join(__dirname, "data"),
     (name, detail) => stage("host-" + name, detail));
+  const stopWithWakeDiagnostic = () => {
+    stage("diagnostic-activate-node-loop", { electron: process.versions.electron, node: process.versions.node });
+    process.activateUvLoop();
+    return host.stop();
+  };
   try {
     await host.start();
     stage("host-ready");
@@ -133,7 +138,7 @@ app.whenReady().then(async () => {
     const performance = await window.webContents.executeJavaScript("globalThis.cardReorderPerformance()");
     stage("performance-complete", { performance });
     stage("host-stop-start", { pid: host.child?.pid, pendingMethods: [...host.pending.values()].map(entry => entry.method) });
-    await host.stop();
+    await stopWithWakeDiagnostic();
     stage("host-stopped");
     await host.start();
     stage("host-restarted", { pid: host.child?.pid });
@@ -147,7 +152,7 @@ app.whenReady().then(async () => {
     console.error("PROVIDER_ORDER_PROBE " + JSON.stringify({ ok: false, error: String(error) }));
   } finally {
     window?.destroy();
-    await host.stop();
+    await stopWithWakeDiagnostic();
     app.exit(failure ? 1 : 0);
   }
 });
