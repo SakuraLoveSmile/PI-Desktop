@@ -1,7 +1,7 @@
 # PI-STAB-1111-R1 — Release gates, stability charter and UI evidence
 
 Date: 2026-11-11 (Asia/Taipei). Tier: T2 overall (S2); S3 T0; U1 T1.
-Status: 实现中. S2: 实现中 (upstream DNS recovered; current-main environment validation pending). S3: 已验收.
+Status: 实现中. S2: 实现中 (hosted environment verified; deliberate negative exercise pending). S3: 已验收.
 U1: 待体验 (local native repeatability verified).
 
 ## Goal, identity and authorization
@@ -447,3 +447,28 @@ Independent read-only review found no P1/P2 in the combined S2 contract. Its
 actual catalog/contract evaluation retained 10 families, 133 automated suites
 and 18 unique required gates; source/attempt propagation and the audited legacy
 digests remain intact. The new MCP scenario is included in goals-team nightly.
+
+### Hosted environment restored; deliberate negative candidate
+
+The refreshed environment check [43153190763](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/43153190763)
+passed on source `b8782fce8f5822f14d934d84331e91d02c7d5d39`, attempt 1,
+job `130966983028`. Provisioning, dependency installation, the candidate Host /
+Desktop build, sidecar and voice fixture all succeeded. Artifact `13914916006`
+(`e2e-nightly-voice`) was downloaded and its report independently checked:
+1/1 suite passed, `candidateUnchanged=true`, the exact source SHA and base main
+`9574c37017a68a5dddfd4e59b149780a7bbf67cd` matched, with no timeout or unexpected
+skip. Receipts, complete log and artifact remain in the recovered-voice evidence
+directory. This establishes the hosted environment prerequisite, not the full
+S2 positive or negative acceptance.
+
+The next ordinary branch commit introduces the approved deliberate failure only
+in the nightly-only `goal-blocked-ui` entry point, immediately after its imports
+and before temporary resources or Electron are created. Its catalog remains
+unchanged. The manual Release candidate must retain successful metadata and all
+old CI jobs, fail only the intended nightly suite/family, then block the nightly
+summary: the always-running summary must fail, while build and aggregation are
+skipped. Manual publication is skipped in both exercise
+lanes and cannot itself prove the gate. After this run, remove the deliberate
+line with an ordinary commit and verify the script against its original blob
+and SHA-256 before running the clean candidate. No retry, catalog exclusion,
+assertion reduction or test-quality baseline change is permitted.
