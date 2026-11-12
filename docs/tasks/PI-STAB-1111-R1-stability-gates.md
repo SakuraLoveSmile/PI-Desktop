@@ -1,7 +1,7 @@
 # PI-STAB-1111-R1 — Release gates, stability charter and UI evidence
 
 Date: 2026-11-11 (Asia/Taipei). Tier: T2 overall (S2); S3 T0; U1 T1.
-Status: 实现中. S2: 实现中 (Provider shutdown reproduced; fixture correction and full negative/clean acceptance pending). S3: 已验收.
+Status: 实现中. S2: 实现中 (supported fixture correction passed; full negative/clean acceptance pending). S3: 已验收.
 U1: 待体验 (local native repeatability verified).
 
 ## Goal, identity and authorization
@@ -196,9 +196,9 @@ the root's actual native runs or pixel comparison.
   renderer fixture evidence on this macOS environment, not Host integration,
   Linux capture behavior or cross-machine pixel identity.
 - S2 hosted negative and clean candidate exercises: authorized; runner DNS is
-  restored, but the Provider fixture shutdown failed again in the full negative
-  run. No valid negative or positive result is claimed. The temporary Goal
-  failure is removed in the restoration described below.
+  restored and the Provider fixture correction passed targeted hosted replay.
+  No valid full negative or positive result is claimed yet. Temporary Goal
+  failures are removed between exercises as recorded below.
   All assertions, catalog classifications and old CI gates remain. Always specify fork repository
   `SakuraLoveSmile/PI-Desktop` in GitHub CLI calls; the CLI's default points to
   upstream and must not be used as fork evidence.
@@ -747,9 +747,47 @@ with the zombie failure and versioned source, this supports the fixture wake
 mechanism. A single differential pass is not proof that every scheduling race
 is gone; retain the full candidate gates and the normal supported-timer replay.
 
+The reviewed version-specific sources are
+[Electron timer wrapping](https://github.com/electron/electron/blob/v43.6.0/lib/common/init.ts#L47-L60),
+[Node callback-scope activation](https://github.com/electron/electron/blob/v43.6.0/shell/common/api/electron_bindings.cc#L92-L112),
+[promise timer insertion](https://github.com/nodejs/node/blob/v24.20.0/lib/timers/promises.js#L53-L81)
+and [conditional native timer scheduling](https://github.com/nodejs/node/blob/v24.20.0/lib/internal/timers.js#L432-L443).
+
 A fresh `git fetch origin main` still resolves to
 `9574c37017a68a5dddfd4e59b149780a7bbf67cd`, already an ancestor. Commit and push
 the supported timer correction, then use one fixed-SHA settings-storage replay
 before resuming S2's complete deliberate-negative and normal candidates. No
 temporary private Electron call or deliberate Goal failure remains in this
 supported source. No merge, tag, publication or running-app operation occurred.
+
+### Supported fixture correction passed; full exercise resumed
+
+Supported source `f2061ea2df148d4e23d050034c90d2644879471b` passed
+[43162752158](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/43162752158),
+attempt 1, settings-storage job `130997525504`, 14/14 suites. Artifact
+`13918503639`, digest
+`sha256:a895cd9d2b7024da649b167447148ab5c2b6bec72c78ac4d1a622eecdbe77c4a`,
+was downloaded and independently checked: exact source/base main,
+`candidateUnchanged=true`, no timeout, exclusion or skip. All receipts and the
+complete fixture log are in `.artifacts/s2-release-gate/provider-global-timer/`.
+
+Actual versions remain Electron 43.6.0 / Node 24.20.0. Stop began at 969 ms;
+SIGTERM returned at 970 ms; exit, original wait completion, reader cleanup and
+`host-stopped` completed at 974 ms. The new Host was ready at 992 ms, renderer
+reload at 1,059 ms, and every sorting/model/persistence probe passed with
+`restart=true`. Final Host cleanup also completed at 1,078 ms. No 55-second
+observer or 60-second watchdog fired. No private activation call remains.
+
+The observed failure, isolated activation differential and supported timer
+replay support the fixture-only correction. This does not claim to fix every
+Electron scheduling race or the unresolved S1 GPU root cause. The existing full
+nightly release gate stays mandatory. Main-agent architecture checks also passed
+on the committed source, including all 13 added TS/TSX files; the primary
+checkout still has only its original 25-line lockfile deletion.
+
+Resume the authorized complete negative candidate by adding only the same
+nightly-only Goal entry throw, before resource creation. Preserve all catalogs,
+assertions, waits and retries. Require metadata, old CI and every other automated
+suite to pass, with the intended family and summary failed and build/aggregate
+skipped. Save all ten reports before restoring the exact original Goal bytes
+with an ordinary commit. Only then dispatch the clean full candidate.
