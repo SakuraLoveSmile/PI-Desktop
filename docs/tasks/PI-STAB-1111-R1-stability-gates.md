@@ -1,7 +1,7 @@
 # PI-STAB-1111-R1 — Release gates, stability charter and UI evidence
 
 Date: 2026-11-11 (Asia/Taipei). Tier: T2 overall (S2); S3 T0; U1 T1.
-Status: 实现中. S2: 实现中 (hosted environment verified; Provider fixture shutdown blocker). S3: 已验收.
+Status: 实现中. S2: 实现中 (diagnostic family passed; full negative/clean acceptance pending). S3: 已验收.
 U1: 待体验 (local native repeatability verified).
 
 ## Goal, identity and authorization
@@ -605,3 +605,35 @@ exited Electron exclusion and visible diagnostic errors all passed without
 starting a process. The original watchdog, wait budgets and outcome assertions
 remain unchanged. These are observability and ownership checks, not a claimed
 Provider shutdown fix or a substitute for the hosted family run.
+
+### Provider diagnostic result and resumed S2 exercise
+
+Diagnostic source `023b9bbb28a5dcef2081c078669ba938a8adc680` was committed,
+pushed and validated by [43158438407](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/43158438407),
+attempt 1, job `130983738890`. Settings-storage passed 14/14 suites. Artifact
+`13917386326` was downloaded and independently checked against that exact SHA
+and current base main `9574c37017a68a5dddfd4e59b149780a7bbf67cd`:
+`candidateUnchanged=true`, all suites passed, no unexpected skips or timeouts.
+The complete log, report and identities remain in
+`.artifacts/s2-release-gate/provider-shutdown-diagnostics/`.
+
+The Provider trace completed the old missing path: stop began at 913 ms,
+SIGTERM returned at 914 ms, child exit/close and reader cleanup completed at
+917 ms, and the outer `host-stopped` followed at 918 ms. The new Host was ready
+at 931 ms, renderer reload completed and the persistence probe reported
+`restart=true`. Final cleanup also completed. The 55-second observer and
+60-second watchdog did not trigger; their failure-only path remains covered by
+isolated boundary verification, not actual ps execution in this successful run.
+
+The old hang was not reproduced, and no underlying cause or root-cause fix is
+claimed. Only the reviewed lifecycle diagnostics have been added; no speculative
+timer, signal or product change was made. Retain that uncertainty as a stability
+risk while continuing the original S2 acceptance on current code. This full
+family pass satisfies the immediate prerequisite, not the complete release gate.
+
+The following ordinary exercise commit again adds only the approved temporary
+nightly-only Goal failure. Require all original CI gates and every other
+automated suite to succeed, the intended nightly failure and summary to fail,
+and build/aggregation to remain unstarted. Remove the temporary line with an
+ordinary byte-verified restoration commit before the clean full candidate.
+No test retry, exclusion, weakened assertion or baseline change is introduced.
