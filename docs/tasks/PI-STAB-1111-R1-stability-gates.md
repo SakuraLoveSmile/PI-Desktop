@@ -960,3 +960,41 @@ Independent read-only review of the final diff found no P1/P2. Only the
 Provider fixture and this record change; the original Host helper and all
 product, workflow, catalog, assertion-budget and test-baseline files remain at
 their prior source. The fetched `origin/main` is still the recorded ancestor.
+
+The production control ran as
+[43173793701](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/43173793701),
+source `84b8f1e8bb053a219f0ee308b69488d34371d512`, attempt 1. The catalog audit
+matches the immutable source/base and reports 14/14. However, root's independent
+full-log audit rejects the complete shutdown control: only the first generation
+has an actual clean intentional exit (dispose 923 ms, exit/return 937 ms).
+The second generation handshakes at 950 ms, reload/persistence probes pass,
+then its final dispose starts at 1,027 ms with no exit, dispose-returned or
+control-complete record before Electron returns code zero. A catalog-green run
+is insufficient evidence for this additional control. Its explicit
+`incomplete-control-evidence.json` records `controlAccepted=false`.
+
+The fixture destroys the final window before awaiting cleanup and has no
+`window-all-closed` handler; Electron's default quit can overtake the asynchronous
+cleanup. The outer assertion previously accepted an early successful UI probe
+plus exit code zero without checking the final cleanup marker. Correct only
+this fixture lifetime and diagnostic completion condition: keep Main alive
+until its explicit exit, and require exactly two distinct, successfully stopped
+generations with clean intentional exit evidence in a final control record.
+Retain the original business probes, watchdog and production policy; do not
+count the earlier incomplete control or change product code. The worker owns
+only this fixture correction, root owns the record/checks/pinned follow-up and
+the independent reviewer checks its actual final delta. The forced-TERM branch
+experiment waits until this control has trustworthy completion evidence.
+
+The correction registers `window-all-closed` before readiness, matching the
+installed Electron API's documented ownership rule. Main emits one final
+`PROVIDER_ORDER_CONTROL` only after cleanup; the parent validates that record
+after actual process close in addition to the existing probe/exit assertions.
+Root executed this exact parent validator against the retained incomplete
+control log and confirmed it rejects the missing completion, providing a
+failing regression baseline without launching an application. Outer/generated
+syntax, unchanged quality baseline, docs and whitespace checks passed.
+Independent final-delta review confirmed the P2 early-success hole is closed
+in code with no new P1/P2. Runtime completeness is still NOT RUN on this
+corrected source until its following pinned hosted control; the prior
+incomplete run remains rejected.

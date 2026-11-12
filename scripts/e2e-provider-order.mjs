@@ -46,6 +46,8 @@ const assert = require("node:assert/strict");
 const path = require("node:path");
 const { registerProviderIpc } = require("./provider-ipc.cjs");
 app.setPath("userData", path.join(__dirname, "profile"));
+// Keep the fixture alive until both Host generations have completed cleanup.
+app.on("window-all-closed", () => {});
 app.whenReady().then(async () => {
   const { HostProcess } = await import("./production-host.mjs");
   const { IPC } = await import(${JSON.stringify(pathToFileURL(join(root, "packages/shared/dist/protocol.js")).href)});
@@ -199,9 +201,11 @@ app.whenReady().then(async () => {
       failure ||= error;
       stage("host-cleanup-failed", { error: String(error) });
     }
-    stage("host-control-complete", { generations: generations.map(record => ({
+    console.log("PROVIDER_ORDER_CONTROL " + JSON.stringify({ diagnostic, ok: !failure,
+      error: failure ? String(failure) : undefined,
+      generations: generations.map(record => ({
       generation: record.instance.generation, exit: record.exit, stopSucceeded: record.stopSucceeded,
-    })) });
+    })) }));
     app.exit(failure ? 1 : 0);
   }
 });
@@ -265,4 +269,23 @@ app.whenReady().then(async () => {
   console.log(line);
   assert.equal(code, 0, output.slice(-6000));
   assert.equal(JSON.parse(line.slice("PROVIDER_ORDER_PROBE ".length)).ok, true);
+  const controlLines = output.split(/\r?\n/).filter(line => line.startsWith("PROVIDER_ORDER_CONTROL "));
+  assert.equal(controlLines.length, 1, `expected one completed shutdown control: ${output.slice(-6000)}`);
+  console.log(controlLines[0]);
+  const control = JSON.parse(controlLines[0].slice("PROVIDER_ORDER_CONTROL ".length));
+  assert.equal(control.diagnostic, "production-dispose-control");
+  assert.equal(control.ok, true, control.error);
+  assert(Array.isArray(control.generations), "control must report Host generations");
+  assert.equal(control.generations.length, 2, "control must complete both Host generations");
+  for (const record of control.generations) {
+    assert.equal(typeof record.generation, "string");
+    assert(record.generation.length > 0, "control must identify each Host generation");
+    assert.equal(record.stopSucceeded, true, "each Host generation must complete disposal");
+    assert(record.exit, "each Host generation must have an observed onExit event");
+    assert.equal(record.exit.code, 0);
+    assert.equal(record.exit.signal, null);
+    assert.equal(record.exit.intentional, true);
+  }
+  assert.notEqual(control.generations[0].generation, control.generations[1].generation,
+    "control must report two different Host generations");
 } finally { await rm(temp, { recursive: true, force: true }); }
