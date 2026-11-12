@@ -1,8 +1,58 @@
 # PI-STAB-1111-R1 — Release gates, stability charter and UI evidence
 
 Date: 2026-11-11 (Asia/Taipei). Tier: T2 overall (S2); S3 T0; U1 T1.
-Status: 实现中. S2: 实现中 (full negative accepted; clean candidate failed Provider shutdown). S3: 已验收.
+Status: 待体验. S2: 待体验 (required hosted negative and positive exercises passed). S3: 已验收.
 U1: 待体验 (local native repeatability verified).
+
+## Current delivery outcome — 2026-11-12
+
+S2 implementation and its required hosted exercises are complete; owner
+acceptance is pending. Release candidates now require the original CI and every
+automated nightly family on one SHA before packaging. Nightly failures have an
+Actions summary/error signal, and publication recovery validates the original
+source-version gate contract without discarding existing provenance safeguards.
+
+- Negative [43163796274](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/43163796274),
+  source `cd5f8e4f2eef4bb0d2ccd00fa29090cf2775d3f9`, attempt 1: original CI green,
+  exactly the deliberate nightly-only failure, build and aggregation blocked.
+- Positive [43178138475](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/43178138475),
+  source `d79d089cccbadbd8a4cdedcadca952a2825f31d2`, attempt 1: all 18 gates green,
+  ten complete family reports with 133/133 automatic suites, macOS arm64 unsigned
+  candidate build, app/ZIP/DMG integrity checks and five-asset aggregation passed.
+  Publication is skipped with zero steps by the manual-candidate policy.
+
+Main S2 files are the release/nightly/E2E/recovery workflows,
+`scripts/nightly-e2e-summary.mjs`, `scripts/release-gate-contract.mjs`,
+`scripts/recover-release-publication.mjs`, their tests, delivery specs/runbooks
+and the approved ADR. The authorized Provider investigation changes only the
+two fixture sources plus regression tests/scenario documentation: fixture exit
+now waits for real final cleanup, the parent rejects incomplete/crashed Host
+results, and a Linux peer exercises the unchanged three-second TERM deadline,
+KILL fallback and actual exit. The original UI/performance/restart assertions,
+test-quality baseline and catalog exclusions remain intact. No product code,
+dependency, signing or packaging implementation changed in that investigation.
+
+Current checks include the hosted CI and full candidate above, 28 local runner
+tests, generated fixture syntax, disposable peer lifecycle, retained-log cleanup
+regressions, test-quality/scenario/docs/locale checks and independent review.
+Exact source, run, artifact identities and per-check evidence are recorded below.
+
+Residual risk: the earlier intermittent Electron/Host stall was not reproduced
+and its native root cause remains unknown. The demonstrated early-exit false
+success is fixed; its correction is not evidence that the native stall is fixed.
+NOT RUN: Developer ID signing/notarization, formal publication/recovery,
+installer launch or installation, real-provider/manual/live scenarios, the
+user's running app, seven-day stability/use criteria and three real-model rounds.
+The new POSIX peer regression is NOT RUN outside Linux. Existing manual/live/
+environment exclusions remain as declared by the source catalog.
+
+The dedicated branch is retained for owner review and integration; PR, merge,
+tag and formal release remain outside current authorization. No worktree was
+removed: this request is unmerged and its ignored evidence must be preserved.
+The primary checkout still has only its original 25-line lockfile deletion.
+Hosted executable verification is bound to `d79d089cc`; the final delivery
+receipt changes only this task record. Detailed history below retains each
+source's actual results, including rejected runs and unsuccessful hypotheses.
 
 ## Goal, identity and authorization
 
@@ -1053,3 +1103,91 @@ index, docs and whitespace checks passed. Independent review's late-crash P2
 was corrected in the shared validator, with no remaining P1/P2. These local
 results do not establish Electron deadline scheduling; the following pinned
 settings-storage run is the required original-contract runtime baseline.
+
+The original-contract baseline
+[43177069126](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/43177069126)
+completed on `d79d089cccbadbd8a4cdedcadca952a2825f31d2`, attempt 1. Root audited
+the immutable SHA/base, unchanged candidate, complete catalog and 14/14 results,
+with no outer timeout or unexpected skip. The original first Host stop begins
+at 843 ms and observes SIGTERM exit/completion at 847 ms. The controlled peer's
+TERM wait starts at 946 ms, its actual original timer fires at 3,946 ms with the
+peer still alive, then SIGKILL produces actual exit and cleanup at 3,949 ms.
+The final real Host exits by SIGTERM and completes cleanup at 3,952 ms.
+One final cleanup record confirms both real Host runs plus the reclaimed peer;
+all original UI, 200-card and restart/persistence assertions remain green.
+
+Logs, exact catalog report/artifact identities and the separately validated
+`complete-cleanup-evidence.json` are under
+`.artifacts/s2-release-gate/forced-term-baseline/`. The evidence explicitly
+records `originalHangRootCauseResolved=false`: this verifies the deadline and
+cleanup branches but does not establish the earlier intermittent native stall's
+root cause. No private API, callback-boundary workaround or product change was
+introduced. The new lifecycle/completion fixes address the demonstrated fixture
+false-success defect; no broader root-cause claim is made.
+
+The S2 workflow/recovery implementation is byte-identical to the accepted full
+negative exercise. The Goal fixture still matches original blob
+`5c3afeb8b4003d62edff857663a83ad0bab06fa3` and its recorded SHA-256. A fresh fetch
+still has main `9574c3701` as an ancestor. Continue the authorized clean full
+candidate on this strengthened original-contract source as
+[43178138475](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/43178138475),
+SHA `d79d089cccbadbd8a4cdedcadca952a2825f31d2`, with `sign_macos=false`.
+It was already dispatched before the conversation interruption; resume observing
+that same run/attempt, without triggering a duplicate. Full positive acceptance
+and candidate packaging remain NOT RUN until its gates and build finish.
+
+### Complete positive gate and candidate artifact accepted
+
+The same normal run completed `success`. Root independently audited all ten
+reports against source `d79d089cccbadbd8a4cdedcadca952a2825f31d2` and base
+`9574c37017a68a5dddfd4e59b149780a7bbf67cd`: 133/133 automatic suites passed,
+every candidate is clean and unchanged, and there is no outer timeout or
+unexpected skip. Existing catalog exclusions remain unchanged. The strict
+release audit requires nineteen exact job identities/conclusions: eighteen
+successful gates plus the manual publication job skipped with zero steps.
+Metadata, original JS/Rust/smoke, catalog, every family and nightly summary passed.
+Build `131057034796` and aggregation `131059493618` both passed; publication
+`131059615927` did not execute. A final fresh main fetch still resolves to the
+recorded ancestor, so the candidate does not trail main at delivery.
+
+The actual JS log confirms the three Host-helper regressions executed and
+passed in its 28-test runner group. The Provider log independently repeats the
+complete original-contract cleanup proof: first main Host stops at 817 ms and
+exits/completes at 820 ms; the peer's timer fires after exactly 3,000 ms, KILL
+produces actual exit two milliseconds later, and the final main Host completes
+at 3,909 ms. One unique cleanup record verifies both main Host processes and the
+peer, with no errors. `provider-cleanup-evidence.json` records that acceptance
+while explicitly retaining `originalHangRootCauseResolved=false`.
+
+The macOS job uses `sign_macos=false`; signed/notarized packaging steps are
+skipped, and unsigned packaging plus every required integrity/name/upload check
+passed. Its real log verifies app/ZIP/DMG resource and executable integrity,
+including Host and update helper, without a notarization assessment. Aggregation
+prints `Verified 5 assets for 0.15.17 (candidate)`. Source/run-bound artifact
+metadata is retained for both artifacts:
+
+| Artifact | ID | SHA-256 digest |
+| --- | --- | --- |
+| Native `dist-mac-arm64` | `13926422525` | `946cef18e12b0fb9951f0ed6ad60ddebc3d8634a3f924f956c9d2c1f79bace64` |
+| [Verified candidate bundle](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/43178138475/artifacts/13927325117) | `13927325117` | `263a390c4ba8f5415b64a540740b641f0802658cc71e46e8d718ecd7609cb65d` |
+
+All reports, artifact metadata/digests, full job inventory, actual JS/Provider/
+macOS/aggregation logs and strict audit results are retained under
+`.artifacts/s2-release-gate/strict-cleanup-positive/`, especially
+`release-gate-evidence.json`. The accepted negative remains under
+`global-timer-negative/`; its workflow/recovery implementation is byte-identical
+to this candidate. The original Goal fixture blob/hash remains restored.
+Local read-only observation reconnected after transient API transport EOFs;
+no CI job or workflow attempt was rerun to obtain this result.
+
+S2 moves to 待体验, preserving owner acceptance as a separate decision. This
+closes the required implementation/hosted gate exercise, not the program's
+seven-day/real-model thresholds or the native-stall investigation. The primary
+lockfile edit and unmerged S1 worktree remain preserved. Keep this unmerged
+request's worktree and evidence for review; merge/PR/release were not performed.
+
+Final independent review rechecked both original run attempts, report/catalog
+hashes, complete job inventories, artifact provenance/digests, actual runner and
+Provider logs, and macOS integrity/aggregation evidence. It found no P1/P2 and
+confirmed S2 may move to 待体验 with the stated native-root-cause and NOT RUN
+limitations. Owner acceptance remains pending.
