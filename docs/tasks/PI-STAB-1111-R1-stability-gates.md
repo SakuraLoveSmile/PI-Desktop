@@ -1,7 +1,7 @@
 # PI-STAB-1111-R1 — Release gates, stability charter and UI evidence
 
 Date: 2026-11-11 (Asia/Taipei). Tier: T2 overall (S2); S3 T0; U1 T1.
-Status: 实现中. S2: 实现中 (hosted environment verified; deliberate negative exercise pending). S3: 已验收.
+Status: 实现中. S2: 实现中 (hosted environment verified; Provider fixture shutdown blocker). S3: 已验收.
 U1: 待体验 (local native repeatability verified).
 
 ## Goal, identity and authorization
@@ -472,3 +472,78 @@ lanes and cannot itself prove the gate. After this run, remove the deliberate
 line with an ordinary commit and verify the script against its original blob
 and SHA-256 before running the clean candidate. No retry, catalog exclusion,
 assertion reduction or test-quality baseline change is permitted.
+
+### Negative exercise blocked by Provider fixture shutdown
+
+The deliberate candidate [43153816675](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/43153816675),
+source `756f7d6331a15431854b9eae26e7d6d5fc46b389`, attempt 1, passed metadata,
+catalog, the complete shared JS and Rust CI jobs, and the old smoke E2E.
+Composer, transcript and extensions nightly families passed. The intended
+`goal-blocked-ui` error was observed in the goals-team log at entry line 13.
+However, settings-storage also failed, making this an invalid negative exercise.
+
+Job `130970570757` and artifact `13916000485`
+(`e2e-nightly-settings-storage`) establish 13/14 suites passed and only
+`provider-order` failed. The downloaded report matches the exact source and
+base-main SHA, with `candidateUnchanged=true`, no skips or exclusions. The failed
+suite returned code 1 after 60,900 ms; outer `timedOut=false`. Its inner Electron
+process reached the existing 60-second watchdog and was killed with SIGKILL:
+
+- `interactions-complete`: 897 ms.
+- `performance-complete`: 910 ms; all 200-card performance metrics were reported.
+- Last phase: `host-stop-start`: 910 ms, no pending RPC methods.
+- No `host-stopped` or final probe result before the watchdog; the missing-result
+  assertion failed at `scripts/e2e-provider-order.mjs:170`.
+
+The main agent requested cancellation after retaining this unexpected failure.
+The run finished `cancelled` on attempt 1; goals-team, runtime-provider and
+sessions were cancelled, and later families did not start. The always-running
+summary correctly failed on the incomplete/failed family inventory. The build,
+aggregate and publication placeholders are `cancelled` with zero steps, not
+successful or accepted skipped-gate evidence. Packaging/publication are NOT RUN.
+This cancelled run is neither the required single-failure negative acceptance
+nor a clean candidate. The clean full-nightly candidate remains NOT RUN.
+
+Complete settings, goals-team, summary, JS, metadata and catalog logs, exact
+run/job/artifact identities and the downloaded settings report are retained in
+`.artifacts/s2-release-gate/recovered-negative/`; `evidence.json` marks the
+exercise unaccepted. No new run was dispatched into this blocker.
+
+An independent read-only analyst confirmed the stop call belongs to the fixture
+`Host` in `scripts/e2e/host.mjs`, not production `HostProcess.stop()`. Its two
+existing three-second waits should terminate or fail under normal event-loop
+scheduling; they do not alone explain the 60-second silence. A stalled Electron
+loop, process-exit delivery or reader cleanup remains unproven. DBus and bundle
+warnings also appear in passing suites and are not established causes. Product
+sorting, model persistence, data loss and the unresolved S1 GPU root cause cannot
+be inferred from this failure.
+
+Both fixture files match `origin/main` and the old `98e228879` baseline. The
+historical commit `1ea5168665799da5f7c3941ca65712002265acc1` (2026-10-24) already
+records a Linux run completing interactions/performance but reaching the
+watchdog before a restart result. This is a recurring symptom, not proof of an
+identical root cause or a defect introduced by the S2 changes.
+
+The temporary Goal failure is removed in an ordinary restoration commit. The
+script again matches original Git blob `5c3afeb8b4003d62edff857663a83ad0bab06fa3`
+and SHA-256 `a1b238783bdce626134e0446ffb08c19d108f01b9e9c39a8a8ad946c276babe7`.
+No assertion, timeout, retry, catalog classification, baseline or product code
+was changed to address the Provider failure. The restored executable tree is
+the locally validated refreshed candidate; no passing hosted result is claimed
+for the restoration commit.
+
+Under the user's R8 (record out-of-plan findings; do not fix them incidentally),
+Provider work is recorded only. The proposed next package, not yet authorized,
+is bounded fixture diagnosis in `scripts/e2e-provider-order.mjs` and
+`scripts/e2e/host.mjs`: record kill/exit/close, the existing wait boundaries and
+reader shutdown, keeping the existing watchdog and all assertions, then use one
+isolated settings-storage run to distinguish the failure paths. A minimal
+fixture fix may follow only after its root cause is supported and scope is
+authorized; product-code changes require a separate briefing. No implementation
+of that proposal, new Electron launch or further CI run occurred.
+
+Restoration checks passed: Node syntax, scenario catalog, the unchanged quality
+baseline, 647 documentation pages, 96 locale pairs and diff whitespace. Source
+comparison confirms all tracked content outside this task record is identical
+to refreshed candidate `b8782fce8f5822f14d934d84331e91d02c7d5d39`. Its 123 local
+tests are documented above; the failed hosted result is retained separately.
