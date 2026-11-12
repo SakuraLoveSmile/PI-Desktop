@@ -906,3 +906,57 @@ review found no P1/P2 in the implementation or additional regression.
 Actual diagnostic Electron/Host/ps execution on this new source is NOT RUN
 until the following pinned hosted settings-storage check. There is no product,
 IPC/RPC, database, dependency, packaging or signing change.
+
+### Timer-phase observations and production shutdown control
+
+Diagnostic source `f3a36b6aee027aface0f4f5b567c257d9598b146` ran twice:
+[43170818827](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/43170818827)
+and [43172091820](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/43172091820),
+each attempt 1. Both settings-storage reports independently match that source,
+base `9574c37017a68a5dddfd4e59b149780a7bbf67cd`, the exact immutable catalog and
+an unchanged clean candidate. Both passed 14/14 with no outer timeout or
+unexpected skip. Evidence, full logs, artifact identities/digests and report
+hashes are in `.artifacts/s2-release-gate/provider-timer-phases/` and
+`provider-timer-phases-replay/`.
+
+Both use Electron 43.6.0 / Node 24.20.0. All CJS/ESM global, Promise and callback
+timer reference comparisons were true. Each existing deadline registered a
+referenced Timeout. Actual child exit won the first race in 4 ms (838 ms and
+876 ms respectively); neither run exercised the three-second callback or
+55-second process observation. These are unreproduced diagnostic passes, not
+evidence that the earlier shutdown defect is fixed. No further identical-code
+replay is scheduled merely to obtain green results.
+
+Under the authorized fixture investigation, the next temporary control uses
+the real `HostProcess` public API in the same CJS-to-ESM and renderer-Promise
+context. Only the Provider fixture changes: bundle its production transport,
+use `handshake`, `call`, `onExit` and `dispose`, and preserve all original UI,
+200-card, reload, persistence and outer-watchdog assertions. A clean intentional
+`onExit` is required; `dispose` returning alone cannot count as process exit.
+No private product fields, production source changes, new timer, callback
+boundary, retry or polling loop. The existing bounded 55-second OS observation
+may inspect only Electron and its direct children.
+
+This control deliberately exercises the production EOF / eight-second grace /
+one-second force-kill path. It does not replace or validate the original fixture's
+SIGTERM / three-second / three-second contract. It is diagnostic only, must not
+land as a stealth deadline change, and cannot satisfy the original positive S2
+candidate acceptance. A production-path failure requires a product-risk report
+before implementation. The fixture worker owns only the Provider script; root
+owns this record, combined checks and the pinned hosted control. Root will
+review the actual diff before committing this temporary experiment.
+
+The implemented control retains each generation's exit record and stop Promise,
+requires the previous generation's successful exit before replacement, and
+asserts a distinct public generation after restart. Finally reuses the same
+stop Promise, preserves failures and emits every generation's result before
+exiting. Root built the transport bundle without constructing a Host; bundle,
+outer script and generated CJS syntax passed. All three existing Host-helper
+tests passed, as did the unchanged test-quality inventory, current scenario
+index, 647 documentation pages and whitespace checks. These local checks do not
+prove runtime shutdown; hosted execution of this control remains NOT RUN until
+the following pinned run.
+Independent read-only review of the final diff found no P1/P2. Only the
+Provider fixture and this record change; the original Host helper and all
+product, workflow, catalog, assertion-budget and test-baseline files remain at
+their prior source. The fetched `origin/main` is still the recorded ancestor.

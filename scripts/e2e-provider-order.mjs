@@ -34,28 +34,69 @@ try {
     outfile: join(temp, "provider-ipc.cjs"), bundle: true, platform: "node", format: "cjs",
     external: ["electron"],
   });
+  await build({
+    entryPoints: [join(root, "packages/host-runtime/src/host-process.ts")],
+    outfile: join(temp, "production-host.mjs"), bundle: true, platform: "node", format: "esm",
+  });
   await writeFile(join(temp, "tokens.css"), (await readFile(join(root, "apps/desktop/src/styles/tokens.css"), "utf8")).replace(/@theme(?: inline)?/g, ":root"));
   await writeFile(join(temp, "index.html"), `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'"><link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="renderer.css"><body><script src="renderer.js"></script>`);
   await writeFile(join(temp, "main.cjs"), `
 const { app, BrowserWindow, ipcMain } = require("electron");
+const assert = require("node:assert/strict");
 const path = require("node:path");
 const { registerProviderIpc } = require("./provider-ipc.cjs");
-const diagnosticReferences = {
-  globalThis, Promise, setTimeout: globalThis.setTimeout,
-  nodeSetTimeout: require("node:timers").setTimeout,
-};
 app.setPath("userData", path.join(__dirname, "profile"));
 app.whenReady().then(async () => {
-  const { Host } = await import(${JSON.stringify(pathToFileURL(join(root, "scripts/e2e/host.mjs")).href)});
+  const { HostProcess } = await import("./production-host.mjs");
   const { IPC } = await import(${JSON.stringify(pathToFileURL(join(root, "packages/shared/dist/protocol.js")).href)});
   let window;
   let failure;
   const startedAt = Date.now();
+  const diagnostic = "production-dispose-control";
   const stage = (name, detail = {}) => console.error("PROVIDER_ORDER_STAGE " + JSON.stringify({
-    name, elapsedMs: Date.now() - startedAt, ...detail,
+    name, diagnostic, elapsedMs: Date.now() - startedAt, ...detail,
   }));
-  const host = new Host(${JSON.stringify(binary)}, path.join(__dirname, "data"),
-    (name, detail) => stage("host-" + name, detail), diagnosticReferences);
+  stage("transport-control", {
+    source: "packages/host-runtime/src/host-process.ts",
+    shutdownPolicy: "production EOF grace 8000ms, then SIGKILL grace 1000ms; diagnostic control only",
+  });
+  const generations = [];
+  let current;
+  const host = {
+    get generation() { return current?.instance.generation; },
+    async start() {
+      if (current) assert.equal(current.stopSucceeded, true, "previous generation must exit cleanly before restart");
+      const instance = new HostProcess({
+        binaryPath: ${JSON.stringify(binary)}, dataDir: path.join(__dirname, "data"),
+        onStderr: text => console.error(text),
+      });
+      const record = { instance, exit: undefined, stopPromise: undefined, stopSucceeded: false };
+      instance.onExit(info => {
+        record.exit = { ...info };
+        stage("host-exit", { generation: instance.generation, ...info });
+      });
+      current = record;
+      generations.push(record);
+      stage("host-created", { generation: instance.generation });
+      await instance.handshake();
+    },
+    call(...args) { return current.instance.call(...args); },
+    async stop() {
+      if (!current) return;
+      const record = current;
+      if (!record.stopPromise) record.stopPromise = (async () => {
+        stage("host-dispose-start", { generation: record.instance.generation });
+        await record.instance.dispose();
+        stage("host-dispose-returned", { generation: record.instance.generation, exit: record.exit });
+        assert(record.exit, "dispose returned without an observed onExit event");
+        assert.equal(record.exit.code, 0, "host must exit with code 0");
+        assert.equal(record.exit.signal, null, "host must exit without a signal");
+        assert.equal(record.exit.intentional, true, "host exit must be intentional");
+        record.stopSucceeded = true;
+      })();
+      await record.stopPromise;
+    },
+  };
   try {
     await host.start();
     stage("host-ready", { electron: process.versions.electron, node: process.versions.node });
@@ -136,22 +177,31 @@ app.whenReady().then(async () => {
     stage("interactions-complete");
     const performance = await window.webContents.executeJavaScript("globalThis.cardReorderPerformance()");
     stage("performance-complete", { performance });
-    stage("host-stop-start", { pid: host.child?.pid, pendingMethods: [...host.pending.values()].map(entry => entry.method) });
+    const previousGeneration = host.generation;
+    stage("host-stop-start", { generation: previousGeneration });
     await host.stop();
     stage("host-stopped");
     await host.start();
-    stage("host-restarted", { pid: host.child?.pid });
+    assert.notEqual(host.generation, previousGeneration, "restart must create a new Host generation");
+    stage("host-restarted", { generation: host.generation });
     stage("renderer-reload-start");
     await window.loadFile(path.join(__dirname, "index.html"));
     stage("restarted");
     const restart = await window.webContents.executeJavaScript("globalThis.providerOrderProbe(true)");
-    console.log("PROVIDER_ORDER_PROBE " + JSON.stringify({ ...interactions, restart: restart.ok, performance, surface }));
+    console.log("PROVIDER_ORDER_PROBE " + JSON.stringify({ diagnostic, ...interactions, restart: restart.ok, performance, surface }));
   } catch (error) {
     failure = error;
-    console.error("PROVIDER_ORDER_PROBE " + JSON.stringify({ ok: false, error: String(error) }));
+    console.error("PROVIDER_ORDER_PROBE " + JSON.stringify({ diagnostic, ok: false, error: String(error) }));
   } finally {
     window?.destroy();
-    await host.stop();
+    try { await host.stop(); }
+    catch (error) {
+      failure ||= error;
+      stage("host-cleanup-failed", { error: String(error) });
+    }
+    stage("host-control-complete", { generations: generations.map(record => ({
+      generation: record.instance.generation, exit: record.exit, stopSucceeded: record.stopSucceeded,
+    })) });
     app.exit(failure ? 1 : 0);
   }
 });
@@ -171,18 +221,14 @@ app.whenReady().then(async () => {
   const observationTimer = process.platform === "linux" ? setTimeout(() => {
     if (observerClosed || child.exitCode !== null || child.signalCode !== null) return;
     const stages = recordedStages();
-    const spawnedIndex = stages.findLastIndex(stage => stage.name === "host-child-spawned");
-    const spawned = stages[spawnedIndex];
-    const hostExited = spawned && stages.slice(spawnedIndex + 1).some(stage =>
-      stage.pid === spawned.pid && ["host-child-exit", "host-child-close"].includes(stage.name));
-    const pids = [child.pid, hostExited ? undefined : spawned?.pid].filter(pid => Number.isInteger(pid) && pid > 0);
-    observationChild = execFile("ps", ["-L", "-o", "pid=,tid=,ppid=,stat=,wchan=,comm=", "-p", pids.join(",")],
+    observationChild = execFile("ps", ["-L", "-o", "pid=,tid=,ppid=,stat=,wchan=,comm=", "-p", String(child.pid), "--ppid", String(child.pid)],
       { timeout: 2_000, maxBuffer: 16_384 }, (error, stdout, stderr) => {
         observationChild = undefined;
         if (observerClosed || child.exitCode !== null || child.signalCode !== null) return;
         console.log("PROVIDER_ORDER_PARENT " + JSON.stringify({
           name: "process-observation", elapsedMs: Date.now() - spawnedAt,
-          pids, lastStage: stages.at(-1)?.name, code: error?.code ?? 0,
+          diagnostic: "production-dispose-control", electronPid: child.pid,
+          scope: "Electron and its direct OS children", lastStage: stages.at(-1)?.name, code: error?.code ?? 0,
           signal: error?.signal, stdout: stdout.trim(), stderr: stderr.trim(),
         }));
       });
