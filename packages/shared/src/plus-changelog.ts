@@ -6,6 +6,14 @@ export const PLUS_UPSTREAM_CUTOFF = "0.15.6";
 const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   en: [
     {
+      version: "0.15.18",
+      date: "2026-11-14",
+      highlights: [
+        "The Goal report now opens on a short first screen with only the Result (verdict, up to three key figures and what the Host verified) and the Next steps. The summary, execution record, evidence and limitations moved into one collapsed Full report, which also lists every metric. Small text is darker in the light theme.",
+        "The report now shows active working time instead of the span from start to finish, so time spent waiting for you is no longer included; the Full report lists the total and the waiting time separately. A file reference that the Host does not check now reads “not checked by the host” instead of showing the warning used for a missing record.",
+      ],
+    },
+    {
       version: "0.15.17",
       date: "2026-11-12",
       highlights: [
@@ -119,6 +127,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "zh-CN": [
+    {
+      version: "0.15.18",
+      date: "2026-11-14",
+      highlights: [
+        "目标报告现在首屏只显示“结果”（判定、最多三项关键数字，以及 Host 核验了什么）和“下一步”。摘要、执行记录、证据与限制收进了默认折叠的“完整报告”，其中也列出全部指标；浅色主题下的小字更深。",
+        "报告现在显示实际工作时间，而不是从开始到结束的跨度，等待你的时间不再计入；“完整报告”里会分别列出总时长和等待时间。Host 不核验的文件引用现在显示“主机不核验”，不再沿用缺失记录的警告。",
+      ],
+    },
     {
       version: "0.15.17",
       date: "2026-11-12",
@@ -234,6 +250,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   "zh-TW": [
     {
+      version: "0.15.18",
+      date: "2026-11-14",
+      highlights: [
+        "目標報告現在首屏只顯示「結果」（判定、最多三項關鍵數字，以及 Host 核驗了什麼）和「下一步」。摘要、執行記錄、證據與限制收進預設摺疊的「完整報告」，其中也列出全部指標；淺色主題下的小字更深。",
+        "報告現在顯示實際工作時間，而不是從開始到結束的跨度，等待你的時間不再計入；「完整報告」會分別列出總時間與等待時間。Host 不核驗的檔案引用現在顯示「主機不核驗」，不再沿用遺失記錄的警告。",
+      ],
+    },
+    {
       version: "0.15.17",
       date: "2026-11-12",
       highlights: [
@@ -347,6 +371,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   tr: [
+    {
+      version: "0.15.18",
+      date: "2026-11-14",
+      highlights: [
+        "Hedef raporu artık yalnızca “Sonuç” (karar, en fazla üç temel rakam ve Host’un neyi doğruladığı) ile “Sonraki adımlar” gösteren kısa bir ilk ekranla açılıyor. Özet, çalıştırma kaydı, kanıtlar ve sınırlamalar, tüm metrikleri de listeleyen ve kapalı gelen tek bir “Tam rapor” bölümüne taşındı. Açık temada küçük metinler daha koyu.",
+        "Rapor artık başlangıçtan bitişe geçen süre yerine etkin çalışma süresini gösteriyor; sizi beklerken geçen süre dahil edilmiyor ve “Tam rapor” toplam ve bekleme süresini ayrı ayrı listeliyor. Host tarafından denetlenmeyen bir dosya başvurusu da eksik bir kayıt için verilen uyarı yerine “ana makine tarafından denetlenmez” olarak gösteriliyor.",
+      ],
+    },
     {
       version: "0.15.17",
       date: "2026-11-12",
@@ -462,6 +494,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   de: [
     {
+      version: "0.15.18",
+      date: "2026-11-14",
+      highlights: [
+        "Der Zielbericht öffnet sich jetzt mit einer kurzen ersten Ansicht, die nur „Ergebnis“ (Bewertung, bis zu drei Kennzahlen und was der Host geprüft hat) und „Nächste Schritte“ zeigt. Zusammenfassung, Ausführungsprotokoll, Belege und Einschränkungen stehen in einem eingeklappten Bereich „Vollständiger Bericht“, der auch alle Kennzahlen auflistet. Kleiner Text ist im hellen Design dunkler.",
+        "Der Bericht zeigt jetzt die aktive Arbeitszeit statt der Spanne vom Start bis zum Ende, sodass Wartezeit auf Sie nicht mehr eingerechnet wird; „Vollständiger Bericht“ führt Gesamt- und Wartezeit getrennt auf. Ein Dateiverweis, den der Host nicht prüft, lautet jetzt „vom Host nicht geprüft“, statt die Warnung für einen fehlenden Eintrag zu zeigen.",
+      ],
+    },
+    {
       version: "0.15.17",
       date: "2026-11-12",
       highlights: [
@@ -575,6 +615,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   es: [
+    {
+      version: "0.15.18",
+      date: "2026-11-14",
+      highlights: [
+        "El informe del objetivo ahora se abre con una primera pantalla breve que solo muestra “Resultado” (veredicto, hasta tres cifras clave y lo que el Host verificó) y “Próximos pasos”. El resumen, el registro de ejecución, las evidencias y las limitaciones pasaron a una sección plegada, “Informe completo”, que también lista todas las métricas. El texto pequeño es más oscuro en el tema claro.",
+        "El informe ahora muestra el tiempo de trabajo activo en lugar del lapso entre el inicio y el final, de modo que la espera de una respuesta del usuario ya no se cuenta; “Informe completo” indica por separado el total y la espera. Una referencia de archivo que el Host no comprueba ahora dice “no verificada por el host” en lugar de mostrar la advertencia de un registro ausente.",
+      ],
+    },
     {
       version: "0.15.17",
       date: "2026-11-12",
@@ -690,6 +738,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   fr: [
     {
+      version: "0.15.18",
+      date: "2026-11-14",
+      highlights: [
+        "Le rapport d’objectif s’ouvre désormais sur un court premier écran qui montre seulement « Résultat » (verdict, jusqu’à trois chiffres clés et ce que l’hôte a vérifié) et « Étapes suivantes ». Le résumé, le journal d’exécution, les preuves et les limites sont regroupés dans une section repliée, « Rapport complet », qui liste aussi toutes les métriques. Le petit texte est plus foncé dans le thème clair.",
+        "Le rapport affiche maintenant le temps de travail actif plutôt que l’intervalle entre le début et la fin : l’attente d’une réponse de l’utilisateur n’est plus comptée, et « Rapport complet » indique séparément la durée totale et l’attente. Une référence de fichier que l’hôte ne vérifie pas indique désormais « non vérifiée par l’hôte » au lieu de l’avertissement d’un enregistrement manquant.",
+      ],
+    },
+    {
       version: "0.15.17",
       date: "2026-11-12",
       highlights: [
@@ -804,6 +860,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   ko: [
     {
+      version: "0.15.18",
+      date: "2026-11-14",
+      highlights: [
+        "목표 보고서는 이제 “결과”(판정, 최대 세 가지 핵심 수치, Host가 확인한 내용)와 “다음 단계”만 보이는 짧은 첫 화면으로 열립니다. 요약, 실행 기록, 증거, 제한 사항은 기본으로 접힌 “전체 보고서”에 모였고, 모든 지표도 여기에서 볼 수 있습니다. 밝은 테마의 작은 글씨는 더 진해졌습니다.",
+        "보고서는 이제 시작부터 끝까지의 경과 시간 대신 실제 작업 시간을 보여 주므로 사용자를 기다린 시간은 포함되지 않으며, “전체 보고서”에는 전체 시간과 대기 시간이 따로 표시됩니다. Host가 확인하지 않는 파일 참조는 누락된 기록에 쓰는 경고 대신 “호스트가 확인하지 않음”으로 표시됩니다.",
+      ],
+    },
+    {
       version: "0.15.17",
       date: "2026-11-12",
       highlights: [
@@ -917,6 +981,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "pt-BR": [
+    {
+      version: "0.15.18",
+      date: "2026-11-14",
+      highlights: [
+        "O relatório de meta agora abre em uma primeira tela curta, só com “Resultado” (veredicto, até três números-chave e o que o Host verificou) e “Próximos passos”. O resumo, o registro de execução, as evidências e as limitações foram para uma seção recolhida, “Relatório completo”, que também lista todas as métricas. O texto pequeno ficou mais escuro no tema claro.",
+        "O relatório agora mostra o tempo de trabalho ativo em vez do intervalo entre o início e o fim, então a espera por uma resposta do usuário não é mais contada; o “Relatório completo” lista o total e a espera separadamente. Uma referência de arquivo que o Host não verifica agora diz “não verificada pelo host”, em vez de mostrar o aviso de um registro ausente.",
+      ],
+    },
     {
       version: "0.15.17",
       date: "2026-11-12",

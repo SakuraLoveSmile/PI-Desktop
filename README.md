@@ -42,6 +42,11 @@ Local-first · Model-agnostic · Plugin-powered · macOS / Windows / Linux
 
 > **Current release line: 0.15.x (Early Preview).**
 
+Version 0.15.18 makes the Goal report easier to read at a glance: it opens on the
+Result and the Next steps, keeps the summary, execution record, evidence and
+limitations in one collapsed Full report, and shows active working time instead
+of the span from start to finish.
+
 Version 0.15.17 lets external controllers inspect blocked Goal reasons, continue
 the same Goal with supplemental material, or explicitly accept its current
 unverified result while retaining unmet checks.
