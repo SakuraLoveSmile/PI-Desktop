@@ -22,7 +22,8 @@ test("blocked card exposes progress, unfinished owners, limitations and all thre
   try {
     const { GoalBlockedCard } = await server.ssrLoadModule("/src/components/GoalBlockedCard.tsx");
     const { BlockedGoalResumeChip } = await server.ssrLoadModule("/src/features/chat/composer/BlockedGoalResumeChip.tsx");
-    const { GoalReportHeader, GoalReportMetadata } = await server.ssrLoadModule("/src/components/workpanel/goal-report/GoalReportHeader.tsx");
+    const { GoalReportHeader } = await server.ssrLoadModule("/src/components/workpanel/goal-report/GoalReportHeader.tsx");
+    const { GoalReportExecutionRecord, GoalReportMetadata } = await server.ssrLoadModule("/src/components/workpanel/goal-report/GoalReportRecord.tsx");
     for (const locale of ["en", "zh-CN", "zh-TW"]) {
       const i18n = createInstance(); await i18n.init({ lng: locale, resources: { [locale]: { translation: catalogs[locale] } } });
       const render = (Component, props) => renderToStaticMarkup(createElement(I18nextProvider, { i18n }, createElement(Component, props)));
@@ -41,8 +42,10 @@ test("blocked card exposes progress, unfinished owners, limitations and all thre
       const accepted = render(GoalReportHeader, { report });
       assert.ok(accepted.includes(i18n.t("goal.blocked.userAccepted")));
       assert.ok(!accepted.includes(i18n.t("goalReport.view.fallbackNotice")));
-      assert.ok(accepted.indexOf(i18n.t("goal.blocked.timelineStarted")) < accepted.indexOf(i18n.t("goal.blocked.timelineBlocked")));
-      assert.ok(accepted.indexOf(i18n.t("goal.blocked.timelineBlocked")) < accepted.indexOf(i18n.t("goal.blocked.timelineResumed")));
+      // The started -> blocked -> resumed record lives in the report's details fold, not in the header.
+      const record = render(GoalReportExecutionRecord, { report });
+      const [started, blocked, resumed] = ["timelineStarted", "timelineBlocked", "timelineResumed"].map((key) => record.indexOf(i18n.t(`goal.blocked.${key}`)));
+      assert.ok(started >= 0 && started < blocked && blocked < resumed, `${locale}: ${started}/${blocked}/${resumed}`);
       const metadata = render(GoalReportMetadata, { report });
       assert.ok(metadata.includes(i18n.t("goal.blocked.userAccepted")));
       assert.ok(!metadata.includes(i18n.t("goalReport.view.fallback")));

@@ -3113,7 +3113,44 @@ export const ptBR = {
         checkDisposition: { executed: "Executado", not_run: "Não executado", blocked: "Bloqueado" },
         fileChange: { created: "Criado", modified: "Modificado", deleted: "Excluído", referenced: "Referenciado" },
         fileAttribution: { direct: "Direta", subagent: "Subagente", declared: "Declarada" },
-        evidenceKind: { tool_call: "Chamada de ferramenta", tool_result: "Resultado da ferramenta", message: "Mensagem", file: "Arquivo", subagent: "Subagente" }
+        evidenceKind: { tool_call: "Chamada de ferramenta", tool_result: "Resultado da ferramenta", message: "Mensagem", file: "Arquivo", subagent: "Subagente" },
+        result: {
+            title: "Resultado",
+            selfReported: "Declarado pelo próprio modelo",
+            line: {
+                checks: "Verificações {{passed}}/{{total}} aprovadas",
+                notRun: "Não executadas: {{n}}",
+                hostVerified: "Host confirmou {{passed}}/{{total}}",
+                hostNotObserved: "O host não observou as verificações",
+                hostConflict: "O host discorda em {{n}}",
+                criteria: "Critérios {{met}}/{{total}} atendidos (declarado)",
+                active: "Ativo {{duration}}",
+                blocks: "Bloqueado {{n}}×, depois continuou",
+                blocksStopped: "Bloqueado {{n}}×",
+            },
+        },
+        next: {
+            title: "Próximos passos",
+            count_one: "1 sugestão",
+            count_other: "{{count}} sugestões",
+            more: "Mostrar mais {{n}}",
+            fewer: "Mostrar menos",
+            limitationsHint_one: "1 limitação conhecida está no relatório completo",
+            limitationsHint_other: "{{count}} limitações conhecidas estão no relatório completo",
+        },
+        fold: {
+            full: "Relatório completo",
+            sectionCount_one: "1 seção",
+            sectionCount_other: "{{count}} seções",
+            changes: "Alterações e verificação",
+            limitsAndNext: "Limitações conhecidas e sugestões",
+            details: "Detalhes",
+            metaChanges: "Verificações {{checks}} · Arquivos {{files}}",
+            metaCriteria: "{{met}}/{{total}} atendidos",
+            metaDetails: "Etapas {{steps}} · Evidências {{evidence}}",
+            timing: "Total {{span}} · ativo {{active}} · espera {{wait}}",
+        },
+        evidenceFileUntracked: "Referência de arquivo · não verificada pelo host"
     }
 },
 } satisfies EnglishCatalog;

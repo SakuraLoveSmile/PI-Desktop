@@ -1,16 +1,18 @@
 import { useTranslation } from "react-i18next";
 import type { GoalReport } from "@pi-desktop/shared";
+import { checkContradicts, evidenceDisplay } from "../../../lib/goal-report-digest";
 import { Badge } from "../../ui";
 import { IconTriangleAlert } from "../../icons";
-import { EvidenceRefs, ReportSection } from "./report-primitives";
+import { EvidenceRefs } from "./report-primitives";
 
-export function GoalReportVerification({ report }: { report: GoalReport }) {
+export function GoalReportChecks({ report }: { report: GoalReport }) {
   const { t } = useTranslation();
-  if (!report.checks?.length && !report.evidences?.length && !report.criteria?.length) return null;
+  const checks = report.checks ?? [];
+  if (!checks.length) return null;
   const observations = new Map((report.checkObservations ?? []).map((observation) => [observation.checkId, observation]));
-  const resolutions = new Map((report.evidenceResolution ?? []).map((resolution) => [resolution.evidenceId, resolution]));
-  return <ReportSection title={t("goalReport.view.checks")} testId="goal-report-evidence">
-    {report.checks?.length > 0 && <div className="goal-report-table-wrap" tabIndex={0} role="region" aria-label={t("goalReport.view.checks")}>
+  return <div className="goal-report-sub-block" data-testid="goal-report-checks">
+    <h3 className="goal-report-subtitle-heading">{t("goalReport.view.checks")}</h3>
+    <div className="goal-report-table-wrap" tabIndex={0} role="region" aria-label={t("goalReport.view.checks")}>
       <table className="goal-report-table goal-report-checks-table">
         <thead><tr>
           <th scope="col">{t("goalReport.view.checkLabel")}</th>
@@ -19,10 +21,9 @@ export function GoalReportVerification({ report }: { report: GoalReport }) {
           <th scope="col">{t("goalReport.view.checkHostResult")}</th>
           <th scope="col">{t("goalReport.view.checkDetail")}</th>
         </tr></thead>
-        <tbody>{report.checks.map((check, index) => {
+        <tbody>{checks.map((check, index) => {
           const observation = observations.get(check.id);
-          const contradiction = observation && check.result !== "inconclusive" &&
-            observation.result !== "inconclusive" && check.result !== observation.result;
+          const contradiction = checkContradicts(check, observation);
           return <tr key={check.id || index} className={`goal-report-check-row ${contradiction ? "is-contradiction" : ""}`}>
             <th scope="row">{check.label || check.command}</th>
             <td><code className="goal-report-check-command">{check.command}</code><EvidenceRefs refs={check.evidenceRefs} /></td>
@@ -49,43 +50,55 @@ export function GoalReportVerification({ report }: { report: GoalReport }) {
           </tr>;
         })}</tbody>
       </table>
-    </div>}
+    </div>
+  </div>;
+}
 
-    {report.criteria?.length > 0 && <div className="goal-report-sub-block" data-testid="goal-report-criteria">
-      <h3 className="goal-report-subtitle-heading">{t("goalReport.view.criteria")}</h3>
-      <ul className="goal-report-criteria-list">{report.criteria.map((criterion, index) =>
-        <li key={criterion.id || index} className={`goal-report-criterion-row verdict-${criterion.verdict}`}>
-          <div className="goal-report-criterion-head">
-            <Badge className={`goal-report-criterion-verdict verdict-${criterion.verdict}`}>
-              {t(`goalReport.view.criterionVerdict.${criterion.verdict}`)}
-            </Badge>
-            <span className="goal-report-criterion-text">{criterion.text}</span>
-          </div>
-          {criterion.contractRef && <code>{criterion.contractRef}</code>}
-          {criterion.explanation && <p className="goal-report-criterion-explanation">{criterion.explanation}</p>}
-          <EvidenceRefs refs={criterion.evidenceRefs} />
-        </li>)}</ul>
-    </div>}
+export function GoalReportCriteria({ report }: { report: GoalReport }) {
+  const { t } = useTranslation();
+  const criteria = report.criteria ?? [];
+  if (!criteria.length) return null;
+  return <div className="goal-report-sub-block" data-testid="goal-report-criteria">
+    <h3 className="goal-report-subtitle-heading">{t("goalReport.view.criteria")}</h3>
+    <ul className="goal-report-criteria-list">{criteria.map((criterion, index) =>
+      <li key={criterion.id || index} className={`goal-report-criterion-row verdict-${criterion.verdict}`}>
+        <div className="goal-report-criterion-head">
+          <Badge className={`goal-report-criterion-verdict verdict-${criterion.verdict}`}>
+            {t(`goalReport.view.criterionVerdict.${criterion.verdict}`)}
+          </Badge>
+          <span className="goal-report-criterion-text">{criterion.text}</span>
+        </div>
+        {criterion.contractRef && <code>{criterion.contractRef}</code>}
+        {criterion.explanation && <p className="goal-report-criterion-explanation">{criterion.explanation}</p>}
+        <EvidenceRefs refs={criterion.evidenceRefs} />
+      </li>)}</ul>
+  </div>;
+}
 
-    {report.evidences?.length > 0 && <div className="goal-report-sub-block">
-      <h3 className="goal-report-subtitle-heading">{t("goalReport.view.evidences")}</h3>
-      <div className="goal-report-evidences-list">{report.evidences.map((evidence, index) => {
-        const resolution = resolutions.get(evidence.id);
-        // Missing Host resolution is not proof that an owning record exists.
-        const state = resolution?.state ?? "unknown";
-        const label = state === "recorded" ? "evidenceRecorded" : state === "unresolved" ? "evidenceUnresolved" : "evidenceResolutionUnknown";
-        return <article key={evidence.id || index} className={`goal-report-evidence-card res-${state}`} data-resolution={state}>
-          <div className="goal-report-evidence-head">
-            <Badge className="goal-report-ref-chip">#{evidence.id}</Badge>
-            <span className="goal-report-evidence-kind">{t(`goalReport.view.evidenceKind.${evidence.kind}`)}</span>
-            <code>{evidence.refId}</code>
-            <Badge className={`goal-report-evidence-res-badge res-${state}`}>{t(`goalReport.view.${label}`)}</Badge>
-          </div>
-          <p className="goal-report-evidence-summary">{evidence.summary}</p>
-          {evidence.detail && <p className="goal-report-evidence-detail">{evidence.detail}</p>}
-          {resolution?.detail && <p className="goal-report-evidence-res-detail">{resolution.detail}</p>}
-        </article>;
-      })}</div>
-    </div>}
-  </ReportSection>;
+export function GoalReportEvidences({ report }: { report: GoalReport }) {
+  const { t } = useTranslation();
+  const evidences = report.evidences ?? [];
+  if (!evidences.length) return null;
+  const resolutions = new Map((report.evidenceResolution ?? []).map((resolution) => [resolution.evidenceId, resolution]));
+  return <div className="goal-report-sub-block" data-testid="goal-report-evidences">
+    <h3 className="goal-report-subtitle-heading">{t("goalReport.view.evidences")}</h3>
+    <div className="goal-report-evidences-list">{evidences.map((evidence, index) => {
+      const resolution = resolutions.get(evidence.id);
+      // Missing Host resolution is not proof that an owning record exists.
+      const { state, untracked } = evidenceDisplay(evidence, resolution);
+      const tone = untracked ? "untracked" : state;
+      const label = untracked ? "evidenceFileUntracked" : state === "recorded" ? "evidenceRecorded" : state === "unresolved" ? "evidenceUnresolved" : "evidenceResolutionUnknown";
+      return <article key={evidence.id || index} className={`goal-report-evidence-card res-${tone}`} data-resolution={state}>
+        <div className="goal-report-evidence-head">
+          <Badge className="goal-report-ref-chip">#{evidence.id}</Badge>
+          <span className="goal-report-evidence-kind">{t(`goalReport.view.evidenceKind.${evidence.kind}`)}</span>
+          <code>{evidence.refId}</code>
+          <Badge className={`goal-report-evidence-res-badge res-${tone}`}>{t(`goalReport.view.${label}`)}</Badge>
+        </div>
+        <p className="goal-report-evidence-summary">{evidence.summary}</p>
+        {evidence.detail && <p className="goal-report-evidence-detail">{evidence.detail}</p>}
+        {resolution?.detail && <p className="goal-report-evidence-res-detail">{resolution.detail}</p>}
+      </article>;
+    })}</div>
+  </div>;
 }

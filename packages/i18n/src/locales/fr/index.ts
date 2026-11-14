@@ -3156,7 +3156,44 @@ sklm: {
         checkDisposition: { executed: "Exécuté", not_run: "Non exécuté", blocked: "Bloqué" },
         fileChange: { created: "Créé", modified: "Modifié", deleted: "Supprimé", referenced: "Référencé" },
         fileAttribution: { direct: "Directe", subagent: "Sous-agent", declared: "Déclarée" },
-        evidenceKind: { tool_call: "Appel d’outil", tool_result: "Résultat d’outil", message: "Message", file: "Fichier", subagent: "Sous-agent" }
+        evidenceKind: { tool_call: "Appel d’outil", tool_result: "Résultat d’outil", message: "Message", file: "Fichier", subagent: "Sous-agent" },
+        result: {
+            title: "Résultat",
+            selfReported: "Déclaré par le modèle",
+            line: {
+                checks: "Vérifications {{passed}}/{{total}} réussies",
+                notRun: "Non exécutées : {{n}}",
+                hostVerified: "Vérifié par l’hôte {{passed}}/{{total}}",
+                hostNotObserved: "L’hôte n’a pas observé les vérifications",
+                hostConflict: "L’hôte diverge sur {{n}}",
+                criteria: "Critères {{met}}/{{total}} atteints (déclaré)",
+                active: "Actif {{duration}}",
+                blocks: "Bloqué {{n}} fois, puis repris",
+                blocksStopped: "Bloqué {{n}} fois",
+            },
+        },
+        next: {
+            title: "Étapes suivantes",
+            count_one: "1 suggestion",
+            count_other: "{{count}} suggestions",
+            more: "Afficher {{n}} de plus",
+            fewer: "Afficher moins",
+            limitationsHint_one: "1 limite connue figure dans le rapport complet",
+            limitationsHint_other: "{{count}} limites connues figurent dans le rapport complet",
+        },
+        fold: {
+            full: "Rapport complet",
+            sectionCount_one: "1 section",
+            sectionCount_other: "{{count}} sections",
+            changes: "Modifications et vérification",
+            limitsAndNext: "Limites connues et suggestions",
+            details: "Détails",
+            metaChanges: "Vérifications {{checks}} · Fichiers {{files}}",
+            metaCriteria: "{{met}}/{{total}} atteints",
+            metaDetails: "Étapes {{steps}} · Preuves {{evidence}}",
+            timing: "Total {{span}} · actif {{active}} · attente {{wait}}",
+        },
+        evidenceFileUntracked: "Référence de fichier · non vérifiée par l’hôte"
     }
 },
 } satisfies EnglishCatalog;

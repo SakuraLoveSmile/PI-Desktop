@@ -3196,7 +3196,44 @@ importConfirm: "가져온 확장은 에이전트 프로세스 안에서 에이�
         checkDisposition: { executed: "실행됨", not_run: "실행되지 않음", blocked: "차단됨" },
         fileChange: { created: "생성됨", modified: "수정됨", deleted: "삭제됨", referenced: "참조됨" },
         fileAttribution: { direct: "직접 변경", subagent: "하위 에이전트", declared: "선언됨" },
-        evidenceKind: { tool_call: "도구 호출", tool_result: "도구 결과", message: "메시지", file: "파일", subagent: "하위 에이전트" }
+        evidenceKind: { tool_call: "도구 호출", tool_result: "도구 결과", message: "메시지", file: "파일", subagent: "하위 에이전트" },
+        result: {
+            title: "결과",
+            selfReported: "모델 자체 보고",
+            line: {
+                checks: "검증 {{passed}}/{{total}} 통과",
+                notRun: "미실행 {{n}}건",
+                hostVerified: "호스트 확인 {{passed}}/{{total}}",
+                hostNotObserved: "호스트가 검증을 관찰하지 못함",
+                hostConflict: "호스트와 불일치 {{n}}건",
+                criteria: "기준 {{met}}/{{total}} 충족 (자체 보고)",
+                active: "활성 {{duration}}",
+                blocks: "{{n}}회 차단 후 계속",
+                blocksStopped: "{{n}}회 차단",
+            },
+        },
+        next: {
+            title: "다음 단계",
+            count_one: "제안 1건",
+            count_other: "제안 {{count}}건",
+            more: "{{n}}건 더 보기",
+            fewer: "간단히 보기",
+            limitationsHint_one: "알려진 제한 사항 1건은 전체 보고서에 있습니다",
+            limitationsHint_other: "알려진 제한 사항 {{count}}건은 전체 보고서에 있습니다",
+        },
+        fold: {
+            full: "전체 보고서",
+            sectionCount_one: "섹션 1개",
+            sectionCount_other: "섹션 {{count}}개",
+            changes: "변경 및 검증",
+            limitsAndNext: "알려진 제한 사항 및 제안",
+            details: "세부 정보",
+            metaChanges: "검증 {{checks}} · 파일 {{files}}",
+            metaCriteria: "{{met}}/{{total}} 충족",
+            metaDetails: "단계 {{steps}} · 증거 {{evidence}}",
+            timing: "전체 {{span}} · 활성 {{active}} · 대기 {{wait}}",
+        },
+        evidenceFileUntracked: "파일 참조 · 호스트가 확인하지 않음"
     }
 },
 } satisfies EnglishCatalog;

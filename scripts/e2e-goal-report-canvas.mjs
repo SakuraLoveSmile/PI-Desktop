@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Real GoalReportTab/Chromium user path and Canvas reference style coverage. */
+/** Real GoalReportTab/Chromium user path: two-block first screen, folded full report, light/dark contrast. */
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { spawn } from "node:child_process";
@@ -63,7 +63,7 @@ app.whenReady().then(async () => {
     await window.webContents.executeJavaScript("new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
     const screenshot = await window.capturePage();
     writeFileSync(process.env.PI_E2E_EVIDENCE_PATH, screenshot.toPNG());
-    await window.webContents.executeJavaScript("document.querySelector('[data-testid=goal-report-files]').scrollIntoView(); new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
+    await window.webContents.executeJavaScript("globalThis.goalReportCanvasSetFolds(true).then(() => { document.querySelector('[data-testid=goal-report-files]').scrollIntoView(); return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); })");
     writeFileSync(process.env.PI_E2E_EVIDENCE_PATH.replace(/\\.png$/, "-details.png"), (await window.capturePage()).toPNG());
     await window.webContents.executeJavaScript("globalThis.goalReportCanvasSetWidth(782, 'light')");
     writeFileSync(process.env.PI_E2E_EVIDENCE_PATH.replace(/\\.png$/, "-light.png"), (await window.capturePage()).toPNG());

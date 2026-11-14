@@ -2808,9 +2808,10 @@ changed files, limitations, and next steps. New automatic completion requires
 structured `met`; a non-`met` result is displayed only after explicit acceptance.
 `closure = user_accepted` shows User accepted closure (unverified), preserving
 the report verdict without presenting it as Agent-verified. Optional segments
-and blocks form a blocked/resumed timeline and preserve the first segment's
-start time. Historical fallback reports identify missing or incomplete evidence
-and do not present unknown checks as passed or offer reopening.
+and blocks form a blocked/resumed timeline in the details fold, preserve the
+first segment's start time, and define the active duration. Historical fallback
+reports identify missing or incomplete evidence and do not present unknown
+checks as passed or offer reopening.
 
 The Work Panel distinguishes loading, pending persistence, ready, failed,
 unavailable, and disconnected reads. Failures use localized generic text and
@@ -2822,13 +2823,45 @@ Historical report files and execution records are retained; they are not rewritt
 
 ### Canvas report presentation
 
-The ready Goal report uses the supplied Canvas reference as a scoped reading
-surface: a centered 960px document, 16px title, 18px section headings, 14px body,
-all metrics visible in a responsive grid, vertical step timeline, compact
-semantic file/check tables, full uncropped screenshots, and conclusion/limits
-callouts. Order is header/metrics, summary, steps, files, verification, gallery,
-and conclusion/limitations/next steps. Narrow tables scroll inside their frame.
-Dark report colors follow the reference; light mode uses existing theme tokens.
+The ready Goal report is a scoped reading surface, a centered document up to
+960px wide. Its first screen holds two blocks and one fold; everything else is
+behind the fold.
+
+The header shows the Goal title (`h1`, 16px) and the delivery context; a
+fallback or `user_accepted` report adds its notice there. **Result** shows the
+verdict, with a muted "self-reported by the model" note for structured reports,
+an interrupted chip for interrupted executions, the report's `conclusion` when it
+carries one, the first three metrics, and one muted line that puts Host-backed
+facts first: checks passed of the checks that ran (checks not run or blocked are
+counted separately), checks the Host verified or did not observe, conflicts with
+the Host, criteria met (marked self-reported), active time, blocks and, only when
+there are no next steps, a pointer to the known limitations. Metric values stay
+on one line on the first screen and keep their full text in the fold; the label
+sits above the value on a narrow panel and beside it from a 600px panel.
+**Next steps** shows the first three `nextSteps` (two lines each, a click shows
+the whole step), reveals the rest on demand, and points at the known limitations
+that remain in the full report; it is omitted when the model suggested nothing.
+
+Duration is active time: the sum of the execution segments, where an open last
+segment ends at completion. The wall-clock span also contains every wait for the
+user, so it appears only as the total in the execution record, next to the wait.
+Without segments the span is the duration, and without a `turn` timing source no
+duration is shown.
+
+**Full report** is one native disclosure, closed by default, with a nested fold
+per topic in this order: outcome overview, changes and verification (file and
+check tables that scroll inside their frame), acceptance criteria, all metrics
+(including the first three), known limitations and next steps (complete lists),
+details (execution record, key steps, evidence, report state and contract path)
+and the screenshot gallery (full, uncropped images). A topic with no content has
+no fold. The folds keep their content in the document, so find-in-page reaches it.
+
+An unresolved evidence reference of kind `file` is shown neutrally as a file
+reference the Host does not check, because the Host resolves references against
+session history and never resolves file paths; every other unresolved reference
+keeps its warning, and a missing resolution stays unknown. The light theme uses
+darker status inks than the app status colors so small report text keeps at least
+4.5:1 contrast on tinted surfaces; dark report colors follow the reference.
 
 Rendering consumes durable Host report schema v1/v2, without executing
 supplied JSX. Existing v1 report files are read without rewriting them. Model claims and Host observations remain
@@ -2841,6 +2874,9 @@ interrupted status, unavailable images, and retry remain explicit.
 - The transcript card is a labeled region; its open action has a localized
   accessible name.
 - The report tab exposes headings and evidence in reading order.
+- The first screen uses labeled Result and Next steps regions; the full report uses
+  native disclosure elements, and each next-step row is a button that exposes
+  `aria-expanded`.
 - Retry uses the shared Button primitive, is disabled while the request is in
   flight, and keeps readable foreground contrast in both themes.
 

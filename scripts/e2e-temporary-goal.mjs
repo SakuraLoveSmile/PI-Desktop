@@ -271,7 +271,11 @@ try {
   const reportSummary = reportList.reports?.find(item => item.executionId === reportCard.executionId);
   assert.equal(reportSummary?.status, 'ready', 'Host must list the report as ready');
   await evaluate(`document.querySelector('[data-testid="goal-report-card-open-btn"]').click()`);
-  await waitFor(() => evaluate(`!!document.querySelector('[data-testid="work-panel"] [role="tabpanel"]') && document.querySelector('[data-testid="work-panel"]')?.innerText.includes('Created goal-result.txt')`), 30000, 'Goal report Work Panel');
+  await waitFor(() => evaluate(`!!document.querySelector('[data-testid="work-panel"] [role="tabpanel"]') && !!document.querySelector('[data-testid="work-panel"] [data-testid="goal-report-result"]')`), 30000, 'Goal report Work Panel first screen');
+  // The first screen is the result and the next steps; the summary sits in the closed full-report fold, so open it as a reader does.
+  await evaluate(`document.querySelector('[data-testid="goal-report-full"] > summary').click()`);
+  await evaluate(`document.querySelector('[data-testid="goal-report-fold-summary"] > summary').click()`);
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="work-panel"]')?.innerText.includes('Created goal-result.txt')`), 30000, 'Goal report summary inside the opened folds');
   const reportScreenshotPath = join(root, 'goal-report.png');
   const reportScreenshot = await send('Page.captureScreenshot', { format: 'png' });
   writeFileSync(reportScreenshotPath, Buffer.from(reportScreenshot.data, 'base64'));

@@ -16978,8 +16978,9 @@ renderer's durable transcript reads. No real model or provider is contacted.
   fixture, read/list through a viewer connection, verify another session cannot
   reveal the report, and call Retry through a controller connection.
 - **Expected:** Host returns one durable `ready` report for the same Goal and
-  execution. The transcript card opens the matching report; the report shows
-  its conclusion, execution status, evidence and limitations. A criterion is
+  execution. The transcript card opens the matching report. Its first screen
+  shows the result and the next steps; one closed full-report fold holds the
+  summary, execution record, evidence and limitations. A criterion is
   presented as met only when the structured report and durable evidence support
   it. Automatic completion requires structured `met`, completed existing Goal
   progress and settled current Team work. Historical fallback reports retain
@@ -18051,15 +18052,21 @@ a fresh expert roster review and integrate a real approved expert contribution.
 Run `node scripts/e2e-goal-report-canvas.mjs` from the request worktree. This
 isolated Electron renderer uses the production GoalReportTab and controlled
 Host API responses, never a live provider or user profile. It covers loading to
-ready, all metrics at 1040/782/320px in dark/light themes, reading order, semantic
-timeline and tables, missing evidence resolution, complete screenshot aspect
-ratio and preview, changed-report fallback/contradiction, failed read and retry.
-The probe saves a native screenshot for reference comparison. Fixture values
-are visual examples and must not be presented as real task verification.
+ready, the two-block first screen at 1040/782/320px in dark/light themes (three
+metrics, label-and-value rows only on a wide panel, one-line values, the full-report
+fold inside the first screen at narrow width), active time versus the wall-clock
+span and the explained wait, next-step clamp, click-to-open and reveal on demand,
+closed-by-default folds with native toggling and reading order, semantic timeline
+and tables, missing evidence resolution and the neutral unresolved file reference,
+complete screenshot aspect ratio and preview, 4.5:1 status-ink contrast, changed-report
+fallback/contradiction on the first screen, failed read and retry. The probe saves
+native screenshots (first screen, opened folds, light theme) for comparison. Fixture
+values are visual examples and must not be presented as real task verification.
 
 Complement with `node --test apps/desktop/test/goal-report-canvas-rendering.test.mjs
-apps/desktop/test/goal-report-presentation.test.mjs` for optional v1 data, empty
-states, execution timing, gallery states, and Host-derived metric tones.
+apps/desktop/test/goal-report-digest.test.mjs apps/desktop/test/goal-report-presentation.test.mjs`
+for optional v1 data, empty states, active duration, gallery states, Host-derived
+metric tones, the host line and the next-step states.
 
 ### Goal and session progress source clarity
 

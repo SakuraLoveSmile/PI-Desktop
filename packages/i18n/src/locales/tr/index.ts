@@ -3186,7 +3186,44 @@ importConfirm: "İçe aktarılan uzantılar ajan sürecinde, ajanın kendi araç
         checkDisposition: { executed: "Yürütüldü", not_run: "Çalıştırılmadı", blocked: "Engellendi" },
         fileChange: { created: "Oluşturuldu", modified: "Değiştirildi", deleted: "Silindi", referenced: "Başvuruldu" },
         fileAttribution: { direct: "Doğrudan", subagent: "Alt aracı", declared: "Beyan edildi" },
-        evidenceKind: { tool_call: "Araç çağrısı", tool_result: "Araç sonucu", message: "Mesaj", file: "Dosya", subagent: "Alt aracı" }
+        evidenceKind: { tool_call: "Araç çağrısı", tool_result: "Araç sonucu", message: "Mesaj", file: "Dosya", subagent: "Alt aracı" },
+        result: {
+            title: "Sonuç",
+            selfReported: "Modelin kendi beyanı",
+            line: {
+                checks: "Kontroller {{passed}}/{{total}} geçti",
+                notRun: "{{n}} çalıştırılmadı",
+                hostVerified: "Ana makine doğruladı {{passed}}/{{total}}",
+                hostNotObserved: "Ana makine kontrolleri gözlemlemedi",
+                hostConflict: "Ana makine {{n}} noktada aynı fikirde değil",
+                criteria: "Ölçütler {{met}}/{{total}} karşılandı (kendi beyanı)",
+                active: "Etkin {{duration}}",
+                blocks: "{{n}} kez engellendi, sonra devam etti",
+                blocksStopped: "{{n}} kez engellendi",
+            },
+        },
+        next: {
+            title: "Sonraki adımlar",
+            count_one: "1 öneri",
+            count_other: "{{count}} öneri",
+            more: "{{n}} tane daha göster",
+            fewer: "Daha az göster",
+            limitationsHint_one: "1 bilinen sınırlama tam raporda",
+            limitationsHint_other: "{{count}} bilinen sınırlama tam raporda",
+        },
+        fold: {
+            full: "Tam rapor",
+            sectionCount_one: "1 bölüm",
+            sectionCount_other: "{{count}} bölüm",
+            changes: "Değişiklikler ve doğrulama",
+            limitsAndNext: "Bilinen sınırlamalar ve öneriler",
+            details: "Ayrıntılar",
+            metaChanges: "Kontroller {{checks}} · Dosyalar {{files}}",
+            metaCriteria: "{{met}}/{{total}} karşılandı",
+            metaDetails: "Adımlar {{steps}} · Kanıtlar {{evidence}}",
+            timing: "Toplam {{span}} · etkin {{active}} · bekleme {{wait}}",
+        },
+        evidenceFileUntracked: "Dosya başvurusu · ana makine tarafından denetlenmez"
     }
 },
 } satisfies EnglishCatalog;
