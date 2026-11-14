@@ -2514,23 +2514,7 @@ as a conversation:
   canvas belong only to that Task group. The parent turn itself stays
   transparent while streaming — no whole-turn tile wrapping thinking, tools, or
   answer fragments (D323). The card keeps 16px inset from its
-  tile edge so the graph and any leftover rows do not sit on the border.- Runs are rebuilt from the message list on every render, so group memoization
-  compares them by row identity and length rather than by object identity —
-  otherwise a streaming delegate would freeze at its first row.
-- Every `Task` call in an activity group becomes one full-width delegation card
-  rather than a compact tool row, a lone delegation included (D265). The
-  default presentation uses transparent avatar rows showing name, task, state
-  and measured elapsed time. Clicking a row opens its read-only details; no panorama entry is shown.
-- **The card contains only those `Task` calls** (D319). Consecutive `Task`
-  starts stay in one topology group so a fan-out still reads as one card.
-  Parent thinking, workspace tools (`Read`/`Grep`/`Bash`/…), and lifecycle rows
-  (`TaskWait`/`TaskList`/`TaskStop`) are a separate processing group — before
-  the card, after it, or both — so the parent's own work is not painted as
-  subagent work. The tile, the “Subagent working” header, and the topology
-  canvas belong only to that Task group. The parent turn itself stays
-  transparent while streaming — no whole-turn tile wrapping thinking, tools, or
-  answer fragments (D323). The card keeps 16px inset from its
-  tile edge so the graph and any leftover rows do not sit on the border.
+  tile edge so the graph and any leftover rows do not sit on the border. The task rows keep it too: the row list is inset 8px and each row pads 8px, so an avatar sits on the same 16px column as the header and the hover wash clears the rounded corner (PI-UI-1114).
 - A delegate's terminal Task snapshot updates its topology node, settled count,
   elapsed time, and open detail dock immediately, even while siblings or the
   parent remain active. A completed delegate is green and stops spinning.

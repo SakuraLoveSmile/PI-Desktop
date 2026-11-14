@@ -243,7 +243,14 @@
   --ds-text-primary: #1a1c1f;
   --ds-text-secondary: color-mix(in oklab, #1a1c1f 74%, transparent);
   --ds-text-muted: #5d5d5d;
-  --ds-text-faint: #afafaf;
+  /*
+    gray-300 (#afafaf) lands at 2.2:1 on white and 2.0:1 on the sidebar, under even the
+    3:1 floor for UI text, and about seventy declarations paint real content (meta lines,
+    counts, hints) with this tier. #858585 stays the quietest step while clearing 3:1 on
+    every light surface (3.7 white, 3.3 sidebar, 3.2 inset), the same footing the dark
+    tier already has (3.4-3.6).
+  */
+  --ds-text-faint: #858585;
   --ds-border-default: color-mix(in oklab, #1a1c1f 8%, transparent);
   --ds-border-subtle: color-mix(in oklab, #1a1c1f 5%, transparent);
   --ds-border-strong: color-mix(in oklab, #1a1c1f 12%, transparent);

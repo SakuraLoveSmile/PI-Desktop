@@ -820,14 +820,15 @@
   gap: 8px;
   padding: 6px 8px;
   border-radius: var(--radius-md);
-  background: var(--ds-bg-subtle);
+  background: var(--ds-field-inset-bg);
   border: 1px solid var(--ds-border-subtle);
   margin-bottom: 6px;
   flex-shrink: 0;
 }
 
 .composer-plus-search:focus-within {
-  border-color: var(--ds-border-focus);
+  background: var(--ds-field-inset-focus-bg);
+  border-color: var(--ds-border-strong);
 }
 
 .composer-plus-search-icon {
@@ -938,7 +939,7 @@
 .composer-footer-menu-check { margin-left: auto; }
 .composer-footer-menu-divider, .composer-footer-divider { height: 1px; margin: 8px 2px; background: var(--ds-border-default); }
 .composer-footer-heading { padding: 4px 10px 8px; color: var(--ds-text-muted); font-size: var(--text-xs); }
-.composer-footer-menu-empty, .composer-footer-hint, .composer-footer-error { margin: 0; padding: 8px 10px; font-size: var(--text-xs); line-height: 1.5; overflow-wrap: anywhere; color: var(--ds-text-muted); }
+.composer-footer-menu-empty, .composer-footer-hint, .composer-footer-error { margin: 0; padding: 8px 10px; font-size: var(--text-xs); line-height: var(--leading-relaxed); overflow-wrap: anywhere; color: var(--ds-text-muted); }
 .composer-footer-error { color: var(--ds-error); }
 .composer-footer-form { display: flex; flex-direction: column; gap: 12px; padding: 4px; }
 .composer-footer-back { align-self: flex-start; gap: 6px; }

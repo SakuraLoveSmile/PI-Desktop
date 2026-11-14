@@ -11,7 +11,13 @@
  *    style-surface-tokens.mjs).
  *  - CSS: font-size / font-weight / line-height / letter-spacing /
  *    border-radius values must be var(...) based (token definitions on
- *    `--custom-property` lines are exempt).
+ *    `--custom-property` lines are exempt). Declarations that share a line with
+ *    their selector (`.x { font-weight: 600; }`) are read too.
+ *  - CSS: every `var(--name)` must name a custom property that a stylesheet
+ *    declares or the renderer sets at run time; an undefined name silently
+ *    drops the declaration (see style-token-integrity.mjs).
+ *  - tokens.css: the quiet text tiers keep their contrast floor on every
+ *    surface in both themes (see style-token-contrast.mjs).
  *  - TSX: arbitrary-value utilities text-[...], rounded-[...], leading-[...],
  *    tracking-[...], font-[...] are forbidden.
  */
@@ -19,6 +25,12 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { findLiteralSurfaceColors } from "./style-surface-tokens.mjs";
+import { findLowContrastTextTiers } from "./style-token-contrast.mjs";
+import {
+  collectDefinedProperties,
+  findInlineTypographyLiterals,
+  findUndefinedProperties,
+} from "./style-token-integrity.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const srcDir = join(root, "apps/desktop/src");
@@ -27,13 +39,20 @@ const CSS_PROPS = /^\s*(font-size|font-weight|line-height|letter-spacing|border-
 const TSX_ARBITRARY = /\b(?:text|rounded|leading|tracking|font)-\[[^\]]+\]/g;
 const ALLOWED_BARE = new Set(["0", "!important", "inherit", "initial", "unset", "normal", "none"]);
 
-function walk(dir) {
+function walk(dir, pattern = /\.(css|tsx)$/) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
     const p = join(dir, e.name);
-    if (e.isDirectory()) return walk(p);
-    return /\.(css|tsx)$/.test(e.name) ? [p] : [];
+    if (e.isDirectory()) return walk(p, pattern);
+    return pattern.test(e.name) ? [p] : [];
   });
 }
+
+// Custom properties are defined by stylesheets and set at run time by the
+// renderer's TS/TSX (`style={{ "--stagger": n }}`), so both are read.
+const definedProperties = collectDefinedProperties({
+  css: walk(srcDir, /\.css$/).map((file) => readFileSync(file, "utf8")),
+  scripts: walk(srcDir, /\.tsx?$/).map((file) => readFileSync(file, "utf8")),
+});
 
 function stripVars(value) {
   let prev;
@@ -52,6 +71,14 @@ for (const file of walk(srcDir)) {
   if (file.endsWith(".css")) {
     for (const violation of findLiteralSurfaceColors(source)) {
       violations.push(`${rel}:${violation.line} raw ${violation.property} value "${violation.value}" — use a surface token`);
+    }
+    for (const violation of findUndefinedProperties(source, definedProperties)) {
+      violations.push(
+        `${rel}:${violation.line} undefined custom property ${violation.name}${violation.hasFallback ? " (its fallback paints in every theme)" : ""} — use a token from styles/tokens.css`,
+      );
+    }
+    for (const violation of findInlineTypographyLiterals(source)) {
+      violations.push(`${rel}:${violation.line} raw ${violation.property} value "${violation.value}" — use a token var`);
     }
   }
   const lines = source.split("\n");
@@ -79,6 +106,10 @@ for (const file of walk(srcDir)) {
       }
     }
   });
+}
+
+for (const violation of findLowContrastTextTiers(readFileSync(join(srcDir, "styles/tokens.css"), "utf8"))) {
+  violations.push(`apps/desktop/src/styles/tokens.css ${violation.message}`);
 }
 
 if (violations.length) {

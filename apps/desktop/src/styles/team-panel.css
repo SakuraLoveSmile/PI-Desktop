@@ -28,7 +28,7 @@
   align-items: center;
   gap: 8px;
   font-size: var(--text-base);
-  font-weight: var(--font-semibold);
+  font-weight: var(--font-weight-semibold);
   color: var(--ds-text-primary);
 }
 
@@ -50,23 +50,23 @@
 
 .team-status-badge {
   font-size: var(--text-xs);
-  font-weight: var(--font-medium);
+  font-weight: var(--font-weight-medium);
   padding: 2px 8px;
   border-radius: var(--radius-full);
   letter-spacing: var(--tracking-wide);
 }
 
 .team-status-paused {
-  background: color-mix(in oklab, var(--ds-amber, #f59e0b) 15%, transparent);
-  color: var(--ds-amber, #d97706);
-  border: 1px solid color-mix(in oklab, var(--ds-amber, #f59e0b) 40%, transparent);
+  background: color-mix(in oklab, var(--ds-warning) 15%, transparent);
+  color: var(--ds-warning);
+  border: 1px solid color-mix(in oklab, var(--ds-warning) 40%, transparent);
 }
 
 .team-status-active,
 .team-status-completed {
-  background: color-mix(in oklab, var(--ds-emerald, #10b981) 15%, transparent);
-  color: var(--ds-emerald, #059669);
-  border: 1px solid color-mix(in oklab, var(--ds-emerald, #10b981) 40%, transparent);
+  background: color-mix(in oklab, var(--ds-success) 15%, transparent);
+  color: var(--ds-success);
+  border: 1px solid color-mix(in oklab, var(--ds-success) 40%, transparent);
 }
 
 .team-status-idle {
@@ -84,7 +84,7 @@
 .team-resume-btn {
   padding: 3px 10px;
   font-size: var(--text-xs);
-  font-weight: var(--font-medium);
+  font-weight: var(--font-weight-medium);
   border-radius: var(--radius-md);
   background: var(--ds-accent);
   color: var(--ds-bg-primary);
@@ -108,8 +108,8 @@
   gap: 6px;
   padding: 10px 12px;
   border-radius: var(--radius-md);
-  background: color-mix(in oklab, var(--ds-amber, #f59e0b) 12%, transparent);
-  border: 1px solid color-mix(in oklab, var(--ds-amber, #f59e0b) 35%, transparent);
+  background: color-mix(in oklab, var(--ds-warning) 12%, transparent);
+  border: 1px solid color-mix(in oklab, var(--ds-warning) 35%, transparent);
   color: var(--ds-text-primary);
   flex-shrink: 0;
 }
@@ -119,8 +119,8 @@
   align-items: center;
   gap: 6px;
   font-size: var(--text-xs-plus);
-  font-weight: var(--font-medium);
-  color: var(--ds-amber, #d97706);
+  font-weight: var(--font-weight-medium);
+  color: var(--ds-warning);
 }
 
 .team-warning-item {
@@ -139,7 +139,7 @@
   align-items: center;
   justify-content: space-between;
   font-size: var(--text-sm);
-  font-weight: var(--font-medium);
+  font-weight: var(--font-weight-medium);
   color: var(--ds-text-secondary);
 }
 
@@ -171,7 +171,7 @@
 
 .team-member-card:hover,
 .team-task-card:hover {
-  border-color: var(--ds-border-hover);
+  border-color: var(--ds-border-strong);
 }
 
 .team-card-top {
@@ -183,7 +183,7 @@
 
 .team-card-title {
   font-size: var(--text-sm);
-  font-weight: var(--font-medium);
+  font-weight: var(--font-weight-medium);
   color: var(--ds-text-primary);
   min-width: 0;
   overflow: hidden;
@@ -224,7 +224,7 @@
 
 .team-phase-completed,
 .team-task-status-completed {
-  color: var(--ds-emerald, #10b981);
+  color: var(--ds-success);
   background: color-mix(in oklab, #10b981 15%, transparent);
 }
 
@@ -241,13 +241,13 @@
 }
 
 .team-task-readiness-ready {
-  color: var(--ds-emerald, #10b981);
+  color: var(--ds-success);
   background: color-mix(in oklab, #10b981 15%, transparent);
 }
 
 .team-task-readiness-blocked {
-  color: var(--ds-amber, #d97706);
-  background: color-mix(in oklab, var(--ds-amber, #f59e0b) 15%, transparent);
+  color: var(--ds-warning);
+  background: color-mix(in oklab, var(--ds-warning) 15%, transparent);
 }
 
 .team-card-desc {
@@ -294,7 +294,7 @@
 .team-open-session-btn:hover {
   background: var(--ds-bg-elevated-primary);
   color: var(--ds-text-primary);
-  border-color: var(--ds-border-hover);
+  border-color: var(--ds-border-strong);
 }
 
 .team-empty-state {
@@ -330,7 +330,7 @@
 
 .team-clickable-card:hover {
   background: var(--ds-bg-hover);
-  border-color: var(--ds-border-hover);
+  border-color: var(--ds-border-strong);
 }
 
 .team-detail-view {
@@ -360,7 +360,7 @@
 
 .team-detail-name {
   font-size: var(--text-base);
-  font-weight: var(--font-semibold);
+  font-weight: var(--font-weight-semibold);
   color: var(--ds-text-primary);
 }
 
@@ -370,7 +370,7 @@
   flex-direction: column;
   gap: 8px;
   padding: 12px;
-  background: var(--ds-bg-sunken);
+  background: var(--ds-tile);
   border: 1px solid var(--ds-border-subtle);
   border-radius: var(--radius-md);
 }
@@ -397,7 +397,7 @@
 .team-detail-field-label {
   font-size: var(--text-xs);
   color: var(--ds-text-muted);
-  font-weight: var(--font-medium);
+  font-weight: var(--font-weight-medium);
 }
 
 .team-detail-field-value {
@@ -443,7 +443,7 @@
   flex-direction: column;
   gap: 12px;
   padding: 14px;
-  background: color-mix(in oklab, var(--ds-accent) 6%, var(--ds-bg-sunken));
+  background: color-mix(in oklab, var(--ds-accent) 6%, var(--ds-tile));
   border: 1px solid color-mix(in oklab, var(--ds-accent) 30%, var(--ds-border-subtle));
   border-radius: var(--radius-lg);
 }
@@ -461,13 +461,13 @@
   align-items: center;
   gap: 8px;
   font-size: var(--text-sm);
-  font-weight: var(--font-semibold);
+  font-weight: var(--font-weight-semibold);
   color: var(--ds-text-primary);
 }
 
 .team-review-status-badge {
   font-size: var(--text-xs);
-  font-weight: var(--font-medium);
+  font-weight: var(--font-weight-medium);
   padding: 2px 8px;
   border-radius: var(--radius-full);
   text-transform: uppercase;
@@ -475,22 +475,22 @@
 }
 
 .team-review-status-badge.status-pending {
-  background: color-mix(in oklab, var(--ds-amber, #f59e0b) 15%, transparent);
-  color: var(--ds-amber, #d97706);
-  border: 1px solid color-mix(in oklab, var(--ds-amber, #f59e0b) 40%, transparent);
+  background: color-mix(in oklab, var(--ds-warning) 15%, transparent);
+  color: var(--ds-warning);
+  border: 1px solid color-mix(in oklab, var(--ds-warning) 40%, transparent);
 }
 
 .team-review-status-badge.status-confirmed {
-  background: color-mix(in oklab, var(--ds-emerald, #10b981) 15%, transparent);
-  color: var(--ds-emerald, #059669);
-  border: 1px solid color-mix(in oklab, var(--ds-emerald, #10b981) 40%, transparent);
+  background: color-mix(in oklab, var(--ds-success) 15%, transparent);
+  color: var(--ds-success);
+  border: 1px solid color-mix(in oklab, var(--ds-success) 40%, transparent);
 }
 
 .team-review-status-badge.status-cancelled,
 .team-review-status-badge.status-interrupted {
-  background: color-mix(in oklab, var(--ds-rose, #f43f5e) 15%, transparent);
-  color: var(--ds-rose, #e11d48);
-  border: 1px solid color-mix(in oklab, var(--ds-rose, #f43f5e) 40%, transparent);
+  background: color-mix(in oklab, var(--ds-error) 15%, transparent);
+  color: var(--ds-error);
+  border: 1px solid color-mix(in oklab, var(--ds-error) 40%, transparent);
 }
 
 .team-review-saving-tag {
@@ -510,14 +510,14 @@
   flex-direction: column;
   gap: 4px;
   padding: 8px 10px;
-  background: var(--ds-bg-sunken);
+  background: var(--ds-tile);
   border: 1px solid var(--ds-border-subtle);
   border-radius: var(--radius-md);
 }
 
 .team-launch-review-reason-label {
   font-size: var(--text-xs);
-  font-weight: var(--font-medium);
+  font-weight: var(--font-weight-medium);
   color: var(--ds-text-secondary);
 }
 
@@ -533,10 +533,10 @@
   align-items: center;
   gap: 6px;
   padding: 8px 10px;
-  background: color-mix(in oklab, var(--ds-rose, #f43f5e) 12%, transparent);
-  border: 1px solid color-mix(in oklab, var(--ds-rose, #f43f5e) 30%, transparent);
+  background: color-mix(in oklab, var(--ds-error) 12%, transparent);
+  border: 1px solid color-mix(in oklab, var(--ds-error) 30%, transparent);
   border-radius: var(--radius-md);
-  color: var(--ds-rose, #e11d48);
+  color: var(--ds-error);
   font-size: var(--text-xs);
 }
 
@@ -551,7 +551,7 @@
   align-items: center;
   justify-content: space-between;
   font-size: var(--text-xs-plus);
-  font-weight: var(--font-medium);
+  font-weight: var(--font-weight-medium);
   color: var(--ds-text-secondary);
 }
 
@@ -568,7 +568,7 @@
   justify-content: space-between;
   gap: 12px;
   padding: 10px 12px;
-  background: var(--ds-bg-sunken);
+  background: var(--ds-tile);
   border: 1px solid var(--ds-border-subtle);
   border-radius: var(--radius-md);
 }
@@ -583,7 +583,7 @@
 
 .team-launch-review-member-name {
   font-size: var(--text-sm);
-  font-weight: var(--font-medium);
+  font-weight: var(--font-weight-medium);
   color: var(--ds-text-primary);
 }
 
@@ -599,8 +599,8 @@
 }
 
 .team-badge-new {
-  background: color-mix(in oklab, var(--ds-emerald, #10b981) 15%, transparent);
-  color: var(--ds-emerald, #059669);
+  background: color-mix(in oklab, var(--ds-success) 15%, transparent);
+  color: var(--ds-success);
 }
 
 .team-launch-review-member-desc {

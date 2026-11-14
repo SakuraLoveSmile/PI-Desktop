@@ -3541,13 +3541,24 @@ IPC 请求无法关闭。
   - 输入框壳在其输入框获得焦点时绘制中性焦点环与光晕，文件拖经其上时绘制强调色拖放轮廓，
     空闲时不显示轮廓。上下文用量仪表的数值与填充以 `--ds-danger` 绘制，该令牌在两种
     配色中分别解析为错误红色。
+  - 次要文字保持可读：在两种配色下，faint 层级（元信息行、计数、提示、空状态）在主表面、
+    侧边栏、次级表面和内嵌表面上不低于 3:1，muted 层级不低于 4.5:1。浅色配色的 faint
+    层级为 `#858585`，不再是 2.2:1 的 `#afafaf`（PI-UI-1114）。
+  - 委派任务行落在卡片的 16px 列上（列表内缩 8px，每行内距 8px），悬停底色不压到圆角。
+    同一网格行的 Marketplace 卡片共用一个页脚高度，无论卡片是否带按钮，版本行都对齐。
+    Team 面板和 Goal 报告的色调（状态色、瓷砖、标签字重）都通过已定义的令牌解析，不会有
+    声明静默回退到初始值。
 - **链接规格**：`04-ux/07-ui-design-system.md`、`04-ux/08-component-spec.md`
 - **接受**：D148
 - **里程碑**：M5
 - **状态详细信息**：`pnpm test:e2e:theme-surfaces` 使用真实 Chromium、生产 CSS
   和确定性 DOM 夹具覆盖上述普通表面、焦点状态、输入框壳的焦点与拖放提示、上下文用量
   仪表的 `--ds-danger` 绘制及内置配色恢复，不覆盖插件安装/生命周期。分支执行不能替代
-  合并后 E2E；本场景其余表面仍需人工检查。
+  合并后 E2E；本场景其余表面（含委派任务行、Marketplace 卡片页脚与 Team 面板）仍需在截图装置上人工检查。
+  次要文字的对比度下限（`scripts/style-token-contrast.mjs`）与样式令牌完整性（无未定义的
+  `var()`、单行规则无原始字体值；`scripts/style-token-integrity.mjs`）由 `pnpm lint` 强制，并由
+  `apps/desktop/test/text-tier-contrast.test.mjs` 与 `apps/desktop/test/style-token-integrity.test.mjs`
+  中的夹具固定，二者都不需要 Electron。
 
 #### E2E-079：面向用户的英文和中文目录副本
 

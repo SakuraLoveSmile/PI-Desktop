@@ -6420,6 +6420,16 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
     focus, paints the accent drop outline while a file is dragged over it, and shows
     no outline at idle. The critical context-usage meter paints its value and fill
     with `--ds-danger`, which resolves to the error red in each palette.
+  - Quiet text stays legible: the faint tier (meta lines, counts, hints, empty
+    states) clears 3:1 and the muted tier 4.5:1 on the primary, sidebar,
+    secondary and inset surfaces in both palettes. In the light palette the faint
+    tier is `#858585`, no longer the 2.2:1 `#afafaf` (PI-UI-1114).
+  - Delegation task rows sit on the card's 16px column (list inset 8px, rows
+    padded 8px) and the hover wash clears the rounded corner. Marketplace cards
+    in one grid row share one footer height, so version lines align whether or not
+    a card carries a button. Team panel and Goal report tones (status colours,
+    tiles, label weights) resolve through defined tokens, so no declaration falls
+    back silently to its initial value.
 - **Specs linked**: `04-ux/07-ui-design-system.md`, `04-ux/08-component-spec.md`
 - **Acceptance**: D148
 - **Milestone**: M5
@@ -6427,9 +6437,14 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   focus states, the composer focus, idle and file-drop cues, the critical usage
   meter's `--ds-danger` paint, and built-in restoration with real Chromium,
   production CSS, and deterministic DOM fixtures; plugin installation/lifecycle is
-  not covered.
+  not covered. The quiet-tier contrast floor (`scripts/style-token-contrast.mjs`) and stylesheet
+  token integrity (no undefined `var()`, no raw typography on one-line rules;
+  `scripts/style-token-integrity.mjs`) are enforced by `pnpm lint` and pinned by
+  fixtures in `apps/desktop/test/text-tier-contrast.test.mjs` and
+  `apps/desktop/test/style-token-integrity.test.mjs`; neither needs Electron.
   Branch runs do not replace post-integration E2E. Other surfaces in this
-  scenario retain manual visual checks.
+  scenario, including the delegation rows, Marketplace card footers and Team
+  panel, retain manual visual checks on the capture rig.
 
 #### E2E-079: User-facing catalog copy in English and Chinese
 
