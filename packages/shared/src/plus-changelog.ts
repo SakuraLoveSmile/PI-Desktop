@@ -6,6 +6,14 @@ export const PLUS_UPSTREAM_CUTOFF = "0.15.6";
 const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   en: [
     {
+      version: "0.15.19",
+      date: "2026-11-15",
+      highlights: [
+        "Interface polish: the Team panel’s status labels and task detail cards, the Goal report card in chat and the plugin theme cards now show the weights, accent colours and borders they were designed with, and quiet meta text in the light theme is easier to read.",
+        "Subagent task rows now sit inside their card instead of touching its edge, and plugin market cards line up their footers.",
+      ],
+    },
+    {
       version: "0.15.18",
       date: "2026-11-14",
       highlights: [
@@ -127,6 +135,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "zh-CN": [
+    {
+      version: "0.15.19",
+      date: "2026-11-15",
+      highlights: [
+        "界面打磨：团队面板的状态标签和任务详情卡、聊天里的目标报告卡片以及插件主题卡片，现在按设计显示字重、强调色和边框；浅色主题下的次要说明文字更易阅读。",
+        "子智能体任务行现在位于卡片内侧，不再贴着卡片边缘；插件市场的卡片页脚现在对齐。",
+      ],
+    },
     {
       version: "0.15.18",
       date: "2026-11-14",
@@ -250,6 +266,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   "zh-TW": [
     {
+      version: "0.15.19",
+      date: "2026-11-15",
+      highlights: [
+        "介面打磨：團隊面板的狀態標籤與任務詳情卡、聊天中的目標報告卡片，以及外掛主題卡片，現在會依設計顯示字重、強調色與邊框；淺色主題下的次要說明文字更易閱讀。",
+        "子智慧體的任務列現在位於卡片內側，不再貼著卡片邊緣；外掛市場的卡片頁尾現在對齊。",
+      ],
+    },
+    {
       version: "0.15.18",
       date: "2026-11-14",
       highlights: [
@@ -371,6 +395,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   tr: [
+    {
+      version: "0.15.19",
+      date: "2026-11-15",
+      highlights: [
+        "Arayüz cilası: Ekip panelindeki durum etiketleri ve görev ayrıntı kartları, sohbetteki Hedef Raporu kartı ve eklenti tema kartları artık tasarlandıkları yazı kalınlıklarını, vurgu renklerini ve kenarlıkları gösteriyor; açık temada ikincil açıklama metinleri de daha okunaklı.",
+        "Alt ajan görev satırları artık kartın kenarına yapışmak yerine kartın içinde duruyor; eklenti mağazasındaki kartların alt bölümleri de hizalanıyor.",
+      ],
+    },
     {
       version: "0.15.18",
       date: "2026-11-14",
@@ -494,6 +526,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   de: [
     {
+      version: "0.15.19",
+      date: "2026-11-15",
+      highlights: [
+        "Oberflächenpflege: Statusbezeichnungen und Aufgaben-Detailkarten im Team-Panel, die Zielbericht-Karte im Chat und die Design-Karten der Erweiterungen zeigen jetzt die vorgesehenen Schriftstärken, Akzentfarben und Rahmen; zurückhaltender Begleittext ist im hellen Design besser lesbar.",
+        "Aufgabenzeilen von Subagenten sitzen jetzt innerhalb ihrer Karte, statt deren Rand zu berühren; die Fußbereiche der Karten im Marktplatz sind jetzt auf einer Linie.",
+      ],
+    },
+    {
       version: "0.15.18",
       date: "2026-11-14",
       highlights: [
@@ -615,6 +655,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   es: [
+    {
+      version: "0.15.19",
+      date: "2026-11-15",
+      highlights: [
+        "Mejoras de interfaz: las etiquetas de estado y las tarjetas de detalle de tareas del panel de Equipo, la tarjeta del informe de meta en el chat y las tarjetas de tema de las extensiones ahora muestran los grosores, los colores de énfasis y los bordes con los que se diseñaron; el texto secundario discreto es más legible en el tema claro.",
+        "Las filas de tareas de los subagentes ahora quedan dentro de su tarjeta en lugar de tocar el borde, y los pies de las tarjetas del Marketplace ahora se alinean.",
+      ],
+    },
     {
       version: "0.15.18",
       date: "2026-11-14",
@@ -738,6 +786,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   fr: [
     {
+      version: "0.15.19",
+      date: "2026-11-15",
+      highlights: [
+        "Finitions de l’interface : les étiquettes d’état et les cartes de détail des tâches du panneau Équipe, la carte du rapport d’objectif dans le chat et les cartes de thème des extensions affichent désormais les graisses, les couleurs d’accent et les bordures prévues ; le texte secondaire discret est plus lisible dans le thème clair.",
+        "Les lignes de tâches des sous-agents se placent désormais à l’intérieur de leur carte au lieu d’en toucher le bord, et les pieds des cartes du Marketplace sont alignés.",
+      ],
+    },
+    {
       version: "0.15.18",
       date: "2026-11-14",
       highlights: [
@@ -860,6 +916,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   ko: [
     {
+      version: "0.15.19",
+      date: "2026-11-15",
+      highlights: [
+        "인터페이스 다듬기: 팀 패널의 상태 라벨과 작업 상세 카드, 채팅의 목표 보고서 카드, 확장 기능의 테마 카드가 이제 설계된 글자 굵기, 강조 색상, 테두리로 표시됩니다. 밝은 테마의 보조 설명 텍스트도 더 읽기 쉬워졌습니다.",
+        "서브에이전트 작업 행이 이제 카드 가장자리에 붙지 않고 카드 안쪽에 놓이며, 마켓플레이스 카드의 하단 영역이 나란히 정렬됩니다.",
+      ],
+    },
+    {
       version: "0.15.18",
       date: "2026-11-14",
       highlights: [
@@ -981,6 +1045,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "pt-BR": [
+    {
+      version: "0.15.19",
+      date: "2026-11-15",
+      highlights: [
+        "Refinamentos da interface: os rótulos de status e os cartões de detalhe de tarefas do painel Equipe, o cartão do relatório da meta no chat e os cartões de tema das extensões agora mostram os pesos de fonte, as cores de destaque e as bordas previstos no design; o texto secundário discreto está mais legível no tema claro.",
+        "As linhas de tarefas dos subagentes agora ficam dentro do cartão, em vez de encostar na borda, e os rodapés dos cartões do Marketplace ficam alinhados.",
+      ],
+    },
     {
       version: "0.15.18",
       date: "2026-11-14",

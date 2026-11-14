@@ -42,6 +42,12 @@ Local-first · Model-agnostic · Plugin-powered · macOS / Windows / Linux
 
 > **Current release line: 0.15.x (Early Preview).**
 
+Version 0.15.19 polishes the interface: the Team panel's status labels and task
+detail cards, the Goal report card in chat and the plugin theme cards now render
+the weights, accent colours and borders they were designed with, quiet text in
+the light theme is easier to read, and a new lint guard keeps the design tokens
+from drifting again.
+
 Version 0.15.18 makes the Goal report easier to read at a glance: it opens on the
 Result and the Next steps, keeps the summary, execution record, evidence and
 limitations in one collapsed Full report, and shows active working time instead
