@@ -3161,7 +3161,44 @@ sklm: {
         checkDisposition: { executed: "Ausgeführt", not_run: "Nicht ausgeführt", blocked: "Blockiert" },
         fileChange: { created: "Erstellt", modified: "Geändert", deleted: "Gelöscht", referenced: "Referenziert" },
         fileAttribution: { direct: "Direkt", subagent: "Subagent", declared: "Angegeben" },
-        evidenceKind: { tool_call: "Tool-Aufruf", tool_result: "Tool-Ergebnis", message: "Nachricht", file: "Datei", subagent: "Subagent" }
+        evidenceKind: { tool_call: "Tool-Aufruf", tool_result: "Tool-Ergebnis", message: "Nachricht", file: "Datei", subagent: "Subagent" },
+        result: {
+            title: "Ergebnis",
+            selfReported: "Vom Modell selbst angegeben",
+            line: {
+                checks: "Prüfungen {{passed}}/{{total}} bestanden",
+                notRun: "{{n}} nicht ausgeführt",
+                hostVerified: "Host bestätigt {{passed}}/{{total}}",
+                hostNotObserved: "Host hat die Prüfungen nicht beobachtet",
+                hostConflict: "Host widerspricht bei {{n}}",
+                criteria: "Kriterien {{met}}/{{total}} erfüllt (selbst angegeben)",
+                active: "Aktiv {{duration}}",
+                blocks: "{{n}}× blockiert, danach fortgesetzt",
+                blocksStopped: "{{n}}× blockiert",
+            },
+        },
+        next: {
+            title: "Nächste Schritte",
+            count_one: "1 Vorschlag",
+            count_other: "{{count}} Vorschläge",
+            more: "{{n}} weitere anzeigen",
+            fewer: "Weniger anzeigen",
+            limitationsHint_one: "1 bekannte Einschränkung steht im vollständigen Bericht",
+            limitationsHint_other: "{{count}} bekannte Einschränkungen stehen im vollständigen Bericht",
+        },
+        fold: {
+            full: "Vollständiger Bericht",
+            sectionCount_one: "1 Abschnitt",
+            sectionCount_other: "{{count}} Abschnitte",
+            changes: "Änderungen und Prüfung",
+            limitsAndNext: "Bekannte Einschränkungen und Vorschläge",
+            details: "Details",
+            metaChanges: "Prüfungen {{checks}} · Dateien {{files}}",
+            metaCriteria: "{{met}}/{{total}} erfüllt",
+            metaDetails: "Schritte {{steps}} · Nachweise {{evidence}}",
+            timing: "Gesamt {{span}} · aktiv {{active}} · Wartezeit {{wait}}",
+        },
+        evidenceFileUntracked: "Dateiverweis · vom Host nicht geprüft"
     }
 },
 } satisfies EnglishCatalog;

@@ -3260,7 +3260,44 @@ sklm: {
         checkDisposition: { executed: "已執行", not_run: "未執行", blocked: "受阻" },
         fileChange: { created: "新增", modified: "修改", deleted: "刪除", referenced: "引用" },
         fileAttribution: { direct: "直接修改", subagent: "子代理修改", declared: "聲明" },
-        evidenceKind: { tool_call: "工具呼叫", tool_result: "工具結果", message: "訊息", file: "檔案", subagent: "子代理" }
+        evidenceKind: { tool_call: "工具呼叫", tool_result: "工具結果", message: "訊息", file: "檔案", subagent: "子代理" },
+        result: {
+            title: "結果",
+            selfReported: "模型自述",
+            line: {
+                checks: "檢查 {{passed}}/{{total}} 通過",
+                notRun: "{{n}} 項未執行",
+                hostVerified: "主機核驗 {{passed}}/{{total}}",
+                hostNotObserved: "主機未觀測到檢查",
+                hostConflict: "{{n}} 項與主機不一致",
+                criteria: "準則 {{met}}/{{total}} 達成（自述）",
+                active: "活躍 {{duration}}",
+                blocks: "受阻 {{n}} 次後繼續",
+                blocksStopped: "受阻 {{n}} 次",
+            },
+        },
+        next: {
+            title: "下一步",
+            count_one: "1 則建議",
+            count_other: "{{count}} 則建議",
+            more: "另有 {{n}} 則",
+            fewer: "收合",
+            limitationsHint_one: "已知限制 1 項，在完整報告中",
+            limitationsHint_other: "已知限制 {{count}} 項，在完整報告中",
+        },
+        fold: {
+            full: "完整報告",
+            sectionCount_one: "1 個部分",
+            sectionCount_other: "{{count}} 個部分",
+            changes: "變更與驗證",
+            limitsAndNext: "已知限制與後續建議",
+            details: "明細",
+            metaChanges: "{{checks}} 項檢查 · {{files}} 個檔案",
+            metaCriteria: "{{met}}/{{total}} 自述達成",
+            metaDetails: "步驟 {{steps}} · 證據 {{evidence}}",
+            timing: "共 {{span}} · 活躍 {{active}} · 等待 {{wait}}",
+        },
+        evidenceFileUntracked: "檔案引用 · 主機不核驗"
     }
 },
 } satisfies EnglishCatalog;

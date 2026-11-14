@@ -1,80 +1,23 @@
 import { useTranslation } from "react-i18next";
-import type { GoalReport, GoalReportMetric } from "@pi-desktop/shared";
-import { Badge } from "../../ui";
+import type { GoalReport } from "@pi-desktop/shared";
 import { IconInfo } from "../../icons";
-import { EvidenceRefs, VerdictIcon, verdictLabels } from "./report-primitives";
+import { EvidenceRefs } from "./report-primitives";
 
-function metricTone(metric: GoalReportMetric, report: GoalReport): "neutral" | "success" | "error" {
-  const refs = new Set(metric.evidenceRefs ?? []);
-  const observations = (report.checkObservations ?? []).filter((observation) =>
-    observation.evidenceIds.some((id) => refs.has(id)));
-  if (observations.some((observation) => observation.result === "failed")) return "error";
-  const recordedRefs = new Set((report.evidenceResolution ?? [])
-    .filter((resolution) => resolution.state === "recorded")
-    .map((resolution) => resolution.evidenceId));
-  if ([...refs].some((ref) => !recordedRefs.has(ref))) return "neutral";
-  return observations.length > 0 && observations.every((observation) => observation.result === "passed")
-    ? "success" : "neutral";
-}
-
+/** Title, delivery context and the notice that a report was not agent-verified. */
 export function GoalReportHeader({ report }: { report: GoalReport }) {
   const { t } = useTranslation();
   const context = report.deliveryContext;
-  const subtitle = [report.goal.title, context?.sourceLabel, context?.targetVersion, context?.revisionLabel]
-    .filter(Boolean).join(" · ");
-  const events = [
-    ...(report.segments ?? []).map((segment, index) => ({ at: segment.startedAt, label: t(index ? "goal.blocked.timelineResumed" : "goal.blocked.timelineStarted"), key: `segment:${segment.turnId}` })),
-    ...(report.blocks ?? []).map((block, index) => ({ at: block.at, label: t("goal.blocked.timelineBlocked"), key: `block:${index}` })),
-  ].sort((left, right) => left.at - right.at);
+  const subtitle = [context?.sourceLabel, context?.targetVersion, context?.revisionLabel].filter(Boolean).join(" · ");
+  const userAccepted = report.closure === "user_accepted";
   return <header className="goal-report-header-section" data-testid="goal-report-header">
-    <h1 className="goal-report-title">{t("goalReport.view.deliveryTitle")}</h1>
+    <h1 className="goal-report-title">{report.goal.title || t("goalReport.view.deliveryTitle")}</h1>
     {subtitle && <p className="goal-report-subtitle">{subtitle}</p>}
     <EvidenceRefs refs={context?.evidenceRefs} />
-    {(report.metrics?.length ?? 0) > 0 && <div className="goal-report-metrics-grid" data-testid="goal-report-metrics">
-      {report.metrics.map((metric, index) => <div key={index} className="goal-report-metric" data-tone={metricTone(metric, report)}>
-        <span className="goal-report-metric-label">{metric.label}</span>
-        <span className="goal-report-metric-value">{metric.value}</span>
-        {metric.source && <span className="goal-report-metric-source">{metric.source}</span>}
-      </div>)}
-    </div>}
-    {(report.integrity.kind === "fallback" || report.closure === "user_accepted") && <div className="goal-report-notice-box fallback" data-testid={report.closure === "user_accepted" ? "goal-report-user-accepted-notice" : "goal-report-fallback-notice"}>
+    {(report.integrity.kind === "fallback" || userAccepted) && <div className="goal-report-notice-box fallback" data-testid={userAccepted ? "goal-report-user-accepted-notice" : "goal-report-fallback-notice"}>
       <IconInfo size={16} />
-      <div><strong>{t(report.closure === "user_accepted" ? "goal.blocked.userAccepted" : "goalReport.view.fallbackNotice")}</strong>
+      <div><strong>{t(userAccepted ? "goal.blocked.userAccepted" : "goalReport.view.fallbackNotice")}</strong>
         {report.integrity.truncationNotice && <p>{report.integrity.truncationNotice}</p>}
       </div>
     </div>}
-    {events.length > 0 && <section aria-label={t("goal.blocked.timeline")} data-testid="goal-report-execution-timeline">
-      <h2>{t("goal.blocked.timeline")}</h2>
-      <ol className="goal-report-steps-list">{events.map((event) => <li className="goal-report-step-item" key={event.key}>
-        <span className="goal-report-step-track" aria-hidden><span className="goal-report-step-dot" /></span>
-        <div className="goal-report-step-content"><strong>{event.label}</strong>{" · "}
-          <time dateTime={new Date(event.at).toISOString()}>{new Date(event.at).toLocaleString()}</time></div>
-      </li>)}</ol>
-    </section>}
   </header>;
-}
-
-export function GoalReportMetadata({ report }: { report: GoalReport }) {
-  const { t } = useTranslation();
-  const durationSec = report.execution.completedAt && report.execution.startedAt
-    ? Math.max(0, Math.round((report.execution.completedAt - report.execution.startedAt) / 1000)) : null;
-  return <footer className="goal-report-metadata">
-    <div className="goal-report-badges">
-      <Badge className={`goal-report-badge verdict-${report.verdict}`}>
-        <VerdictIcon verdict={report.verdict} />{t(verdictLabels[report.verdict])}
-      </Badge>
-      <Badge className={`goal-report-badge status-${report.execution.status}`}>
-        {t(report.execution.status === "completed" ? "goalReport.view.statusCompleted" : "goalReport.view.statusInterrupted")}
-      </Badge>
-      <Badge className={`goal-report-badge integrity-${report.integrity.kind}`}>
-        {t(report.closure === "user_accepted" ? "goal.blocked.userAccepted" : report.integrity.kind === "fallback" ? "goalReport.view.fallback" : "goalReport.view.structured")}
-      </Badge>
-      {durationSec !== null && report.execution.timingSource === "turn" && <Badge className="goal-report-badge time">
-        {durationSec >= 60 ? `${Math.floor(durationSec / 60)}m ${durationSec % 60}s` : `${durationSec}s`}
-      </Badge>}
-    </div>
-    {report.goal.contractPath && <div className="goal-report-contract-link">
-      <span>{t("goalReport.view.contract")}</span><code>{report.goal.contractPath}</code>
-    </div>}
-  </footer>;
 }

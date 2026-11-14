@@ -3521,7 +3521,44 @@ sklm: {
         checkDisposition: { executed: "已执行", not_run: "未运行", blocked: "受阻" },
         fileChange: { created: "新建", modified: "修改", deleted: "删除", referenced: "引用" },
         fileAttribution: { direct: "直接修改", subagent: "子代理修改", declared: "声明" },
-        evidenceKind: { tool_call: "工具调用", tool_result: "工具结果", message: "消息", file: "文件", subagent: "子代理" }
+        evidenceKind: { tool_call: "工具调用", tool_result: "工具结果", message: "消息", file: "文件", subagent: "子代理" },
+        result: {
+            title: "结果",
+            selfReported: "模型自述",
+            line: {
+                checks: "检查 {{passed}}/{{total}} 通过",
+                notRun: "{{n}} 项未运行",
+                hostVerified: "主机核验 {{passed}}/{{total}}",
+                hostNotObserved: "主机未观测到检查",
+                hostConflict: "{{n}} 项与主机不一致",
+                criteria: "准则 {{met}}/{{total}} 达成（自述）",
+                active: "活跃 {{duration}}",
+                blocks: "受阻 {{n}} 次后继续",
+                blocksStopped: "受阻 {{n}} 次",
+            },
+        },
+        next: {
+            title: "下一步",
+            count_one: "1 条建议",
+            count_other: "{{count}} 条建议",
+            more: "另有 {{n}} 条",
+            fewer: "收起",
+            limitationsHint_one: "已知限制 1 条，在完整报告里",
+            limitationsHint_other: "已知限制 {{count}} 条，在完整报告里",
+        },
+        fold: {
+            full: "完整报告",
+            sectionCount_one: "1 个部分",
+            sectionCount_other: "{{count}} 个部分",
+            changes: "改动与验证",
+            limitsAndNext: "已知限制与后续建议",
+            details: "明细",
+            metaChanges: "{{checks}} 项检查 · {{files}} 个文件",
+            metaCriteria: "{{met}}/{{total}} 自述达成",
+            metaDetails: "步骤 {{steps}} · 证据 {{evidence}}",
+            timing: "共 {{span}} · 活跃 {{active}} · 等待 {{wait}}",
+        },
+        evidenceFileUntracked: "文件引用 · 主机不核验"
     }
 },
 } satisfies EnglishCatalog;

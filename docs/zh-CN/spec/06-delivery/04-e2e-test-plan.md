@@ -9380,7 +9380,8 @@ the latest destination. These assertions measure work counts, not device FPS.
   在远端 Host 夹具中，由 viewer 连接读取和列出报告，确认其他会话无法探测到报告，
   再由 controller 连接调用 Retry。
 - **预期：** Host 为同一 Goal 和 execution 返回唯一且持久的 `ready` 报告。转录卡片打开
-  对应报告；报告展示结论、执行状态、证据和限制。只有结构化报告与持久证据都支持时，
+  对应报告；首屏展示结果与后续步骤，默认折叠的完整报告区包含摘要、执行记录、证据和限制。
+  只有结构化报告与持久证据都支持时，
   才能将验收条件显示为已达成。后备报告必须标明未知或缺失的证据。
 - **恢复与失败：** 重启后仍可读取就绪报告。无效草稿或持久化失败不得发布过期或误导性
   的就绪报告。报告到达 `ready` 或 `failed` 后，迟到的草稿提交会被拒绝，报告文件与记录不变。
@@ -9801,15 +9802,21 @@ the latest destination. These assertions measure work counts, not device FPS.
 Run `node scripts/e2e-goal-report-canvas.mjs` from the request worktree. This
 isolated Electron renderer uses the production GoalReportTab and controlled
 Host API responses, never a live provider or user profile. It covers loading to
-ready, all metrics at 1040/782/320px in dark/light themes, reading order, semantic
-timeline and tables, missing evidence resolution, complete screenshot aspect
-ratio and preview, changed-report fallback/contradiction, failed read and retry.
-The probe saves a native screenshot for reference comparison. Fixture values
-are visual examples and must not be presented as real task verification.
+ready, the two-block first screen at 1040/782/320px in dark/light themes (three
+metrics, label-and-value rows only on a wide panel, one-line values, the full-report
+fold inside the first screen at narrow width), active time versus the wall-clock
+span and the explained wait, next-step clamp, click-to-open and reveal on demand,
+closed-by-default folds with native toggling and reading order, semantic timeline
+and tables, missing evidence resolution and the neutral unresolved file reference,
+complete screenshot aspect ratio and preview, 4.5:1 status-ink contrast, changed-report
+fallback/contradiction on the first screen, failed read and retry. The probe saves
+native screenshots (first screen, opened folds, light theme) for comparison. Fixture
+values are visual examples and must not be presented as real task verification.
 
 Complement with `node --test apps/desktop/test/goal-report-canvas-rendering.test.mjs
-apps/desktop/test/goal-report-presentation.test.mjs` for optional v1 data, empty
-states, execution timing, gallery states, and Host-derived metric tones.
+apps/desktop/test/goal-report-digest.test.mjs apps/desktop/test/goal-report-presentation.test.mjs`
+for optional v1 data, empty states, active duration, gallery states, Host-derived
+metric tones, the host line and the next-step states.
 
 ### Goal and session progress source clarity
 

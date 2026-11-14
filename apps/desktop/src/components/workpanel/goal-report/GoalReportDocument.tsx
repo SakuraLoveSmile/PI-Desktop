@@ -1,27 +1,24 @@
 import { useTranslation } from "react-i18next";
 import type { GoalReport } from "@pi-desktop/shared";
-import { Markdown } from "../../Markdown";
-import { GoalReportGallery, type GoalReportGalleryProps } from "./GoalReportGallery";
-import { GoalReportHeader, GoalReportMetadata } from "./GoalReportHeader";
-import { GoalReportConclusion, GoalReportFiles, GoalReportTimeline } from "./GoalReportSections";
-import { GoalReportVerification } from "./GoalReportVerification";
-import { ReportSection } from "./report-primitives";
+import type { GoalReportGalleryProps } from "./GoalReportGallery";
+import { GoalReportFullReport } from "./GoalReportFullReport";
+import { GoalReportHeader } from "./GoalReportHeader";
+import { GoalReportNextSteps } from "./GoalReportNextSteps";
+import { GoalReportResult } from "./GoalReportResult";
 
 type Props = Omit<GoalReportGalleryProps, "screenshots"> & { report: GoalReport };
 
-/** Stateless document presentation; the tab owns reads, assets and preview lifetime. */
+/**
+ * Stateless document presentation; the tab owns reads, assets and preview lifetime.
+ * The first screen is the title, the result and the next steps; the rest is one fold.
+ * The keyed blocks keep their own open/expanded state from leaking across reports.
+ */
 export function GoalReportDocument({ report, ...galleryProps }: Props) {
   const { t } = useTranslation();
-  return <article className="goal-report-body-cap">
+  return <article className="goal-report-body-cap" aria-label={t("goalReport.view.deliveryTitle")}>
     <GoalReportHeader report={report} />
-    <ReportSection title={t("goalReport.view.summary")} testId="goal-report-summary">
-      <div className="goal-report-prose"><Markdown source={report.summary || ""} /></div>
-    </ReportSection>
-    <GoalReportTimeline steps={report.steps ?? []} />
-    <GoalReportFiles files={report.files ?? []} />
-    <GoalReportVerification report={report} />
-    <GoalReportGallery screenshots={report.screenshots ?? []} {...galleryProps} />
-    <GoalReportConclusion report={report} />
-    <GoalReportMetadata report={report} />
+    <GoalReportResult report={report} />
+    <GoalReportNextSteps key={`next:${report.reportId}`} report={report} />
+    <GoalReportFullReport key={`full:${report.reportId}`} report={report} {...galleryProps} />
   </article>;
 }
