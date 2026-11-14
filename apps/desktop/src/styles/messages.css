@@ -1067,7 +1067,7 @@
   margin: 12px 0 8px;
   border-radius: var(--radius-md);
   background: var(--ds-tile);
-  border: 1px solid color-mix(in oklab, var(--ds-border) 60%, transparent);
+  border: 1px solid var(--ds-border-subtle);
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
@@ -2404,6 +2404,12 @@
 
 .subagent-tasks-card { display: flex; flex-direction: column; gap: 4px; margin: 6px 0; min-width: 0; }
 .subagent-tasks-list { display: flex; flex-direction: column; gap: 2px; }
+/* The delegation card pads its header and tool rows 16px from the card edge, but the
+   task rows were flush to it: each avatar touched the card and the hover wash ran into
+   the rounded corner. Inset the list 8px and pad each row 8px so the avatar sits on the
+   header's 16px column while the wash still clears the edge. */
+.tool-activity-group.has-subagents .subagent-tasks-card { margin: 4px 8px 8px; }
+.tool-activity-group.has-subagents .subagent-tasks-card .subagent-activity-row { padding: 5px 8px; }
 .subagent-activity-row { display: flex; align-items: center; width: 100%; min-width: 0; min-height: 38px; gap: 10px; padding: 5px 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ds-text-secondary); text-align: left; cursor: pointer; }
 .subagent-activity-row:hover { background: var(--ds-bg-hover); }
 .subagent-activity-row:focus-visible { outline: 2px solid var(--ds-focus); outline-offset: 2px; }
@@ -3607,14 +3613,14 @@
 }
 
 .hosted-search-source-host {
-  color: var(--ds-text-tertiary);
+  color: var(--ds-text-muted);
   flex: none;
 }
 
 .hosted-search-more {
   display: inline-block;
   margin-top: 4px;
-  color: var(--ds-text-tertiary);
+  color: var(--ds-text-muted);
   font-size: var(--text-sm);
 }
 

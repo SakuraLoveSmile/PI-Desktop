@@ -122,7 +122,7 @@
 .goal-report-metric[data-tone="error"] .goal-report-metric-value { color: var(--ds-report-error); }
 .goal-report-metric-source {
   color: var(--ds-report-muted);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-mono);
   font-size: var(--report-text-xs);
   line-height: var(--report-leading-xs);
 }
@@ -134,7 +134,7 @@
   background: var(--ds-report-neutral-bg);
   border-radius: var(--report-radius-code);
   font-size: var(--report-code-size);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-mono);
   overflow-wrap: anywhere;
   white-space: normal;
 }
@@ -421,7 +421,7 @@
 .goal-report-error-icon { color: var(--ds-error); }
 .goal-report-error-title { font-size: var(--text-base); font-weight: var(--font-weight-semibold); margin: 0; }
 .goal-report-error-detail { font-size: var(--text-sm); color: var(--ds-text-muted); margin: 0; }
-.goal-report-error-code { color: var(--ds-text-muted); font-family: var(--font-family-mono); font-size: var(--text-2xs); }
+.goal-report-error-code { color: var(--ds-text-muted); font-family: var(--font-mono); font-size: var(--text-2xs); }
 .goal-report-image-modal-overlay { position: fixed; inset: 0; z-index: 9999; background: var(--ds-modal-veil); display: flex; align-items: center; justify-content: center; padding: 24px; }
 .goal-report-image-modal-dialog { max-width: 90vw; max-height: 90vh; display: flex; flex-direction: column; border-radius: var(--radius-lg); background: var(--ds-bg-primary); border: 1px solid var(--ds-border-default); overflow: hidden; box-shadow: var(--shadow-xl); }
 .goal-report-image-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--ds-border-default); font-size: var(--text-sm); font-weight: var(--font-weight-medium); }

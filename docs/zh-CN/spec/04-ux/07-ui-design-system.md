@@ -178,13 +178,15 @@ PI-Desktop 的行为类似于桌面应用程序 shell，因此意外拖动
 | `--color-text-primary` | `#1a1c1f` | 机身+品牌 |
 | `--color-text-secondary` | `color-mix(#1a1c1f 70%, transparent)` | 导航项目、筹码、话题标题 |
 | `--color-text-muted` | `#5d5d5d`（灰色-500） | 部分标签 |
-| `--color-text-faint` | `#afafaf`（灰色-300） | 占位符 |
+| `--color-text-faint` | `#858585` | 占位符、元信息行、计数、提示 |
 | `--color-border-default` | `color-mix(#1a1c1f 8%, transparent)` | 默认边框 |
 | `--color-border-subtle` | `color-mix(#1a1c1f 5%, transparent)` | 侧边栏边缘/分隔线 |
 | `--color-accent` | `#1a1c1f` | 主要强调、CTA、页脚徽章（中性墨水） |
 | `--color-success`/警告/错误 | 绿色-500 / 橙色-500 / 红色-500 | 状态 |
 
 **不变：**切勿在 `data-theme="light"` 下使用原始 `gray-0` (`#fff`) 绘制镀铬文本。使用 `--ds-text-primary` / `--ds-text-secondary`。
+
+**对比度下限（PI-UI-1114）：**两个次要文字层级承载真实内容（元信息行、计数、提示、空状态），因此在两个主题下，它们落到的每一种底色上都必须保持可读：`--ds-text-muted` 至少 4.5:1，`--ds-text-faint` 至少 3:1，底色包括主表面、侧边栏、次级表面和内嵌表面。浅色主题的 faint 层级原为 `#afafaf`（白底 2.19:1，侧边栏 1.98:1），现为 `#858585`（白底 3.69:1，侧边栏 3.33:1，内嵌表面 3.15:1）。深色主题约 3.4:1 到 3.6:1。`scripts/style-token-contrast.mjs` 由 `pnpm lint` 通过 `scripts/check-style-tokens.mjs` 运行，从 `styles/tokens.css` 计算对比度（带透明度的令牌会先合成到底色上），所以调整令牌或其底色都以比值为准；读不懂的令牌语法会被报告而不是放行。`apps/desktop/test/text-tier-contrast.test.mjs` 用夹具固定这条规则。
 
 共享按钮的表面和墨迹必须使用语义主题标记：
 主要操作将 `--ds-accent` 与 `--ds-bg-primary` 配对，而次要操作
@@ -334,7 +336,9 @@ UI 字体栈可从设置 → 基础 → 外观中由用户覆盖（ADR 0083）�
 
 ### 5. 2 类型规模
 
-所有字体大小均来自 `styles/tokens.css` 的 `@theme` 块中定义的 `--text-*` 渐变（首先由 `styles/globals.css` 导入，现在只是一个导入序列 — 请参阅 D170）。 `font-size`、`font-weight`、`line-height` 和 `letter-spacing` 的原始 px 文字在组件 CSS 和 TSX 任意实用程序（`text-[13px]` 等）中**禁止** — 由 `scripts/check-style-tokens.mjs` 强制执行（在 `pnpm lint` 中运行）。 `-plus` 后缀标记是 Codex 命名大小之间的半步。
+所有字体大小均来自 `styles/tokens.css` 的 `@theme` 块中定义的 `--text-*` 渐变（首先由 `styles/globals.css` 导入，现在只是一个导入序列 — 请参阅 D170）。 `font-size`、`font-weight`、`line-height` 和 `letter-spacing` 的原始 px 文字在组件 CSS 和 TSX 任意实用程序（`text-[13px]` 等）中**禁止** — 由 `scripts/check-style-tokens.mjs` 强制执行（在 `pnpm lint` 中运行），它同样会检查与选择器写在同一行的声明（`.x { font-weight: 600; }`）。 `-plus` 后缀标记是 Codex 命名大小之间的半步。
+
+**约定（PI-UI-1114）：**渲染器样式表中的每个 `var(--name)` 都必须指向样式表声明过、或渲染器在运行时设置过（TS/TSX 中的 `"--name"` 字符串）的自定义属性。未定义的名称会解析为保证无效的值：`border` 退化为无边框，`font-weight` 继承，填充什么也不画；写了回退值也不对，因为回退值会在每个主题下生效。`scripts/check-style-tokens.mjs` 会让未定义的名称失败，无论有没有回退值。唯一的豁免是 `scripts/style-token-integrity.mjs` 中带理由记录的精确名称（Tailwind 默认主题变量 `--leading-snug`、`--tracking-wider`、`--shadow-sm`、`--shadow-xl`，以及可选的 `--ds-main-pane-min-width` 布局钩子）；前缀规则会掩盖这条守卫要抓的拼写错误。
 
 | 代币 | 尺寸 | 用途 |
 |---|---|---|
@@ -1010,6 +1014,7 @@ Linux 保留淡入淡出和滑动退出。
 | 半径 | 半径-lg |
 | 背景 | `--ds-tile` |
 | 悬停（互动） | bg-tertiary，无阴影变化 |
+| 卡片行的页脚 | 同一网格行的卡片共用一个高度，因此可能带按钮（安装、启用）的页脚会预留按钮所在的一行；只有版本行的卡片与相邻卡片落在同一基线上（PI-UI-1114） |
 
 ### 11. 4 对话框/模态
 

@@ -206,13 +206,15 @@ Neutral gray scale only — no blue-slate surfaces. Chrome components must consu
 | `--color-text-primary` | `#1a1c1f` | Body + brand |
 | `--color-text-secondary` | `color-mix(#1a1c1f 70%, transparent)` | Nav items, chips, thread titles |
 | `--color-text-muted` | `#5d5d5d` (gray-500) | Section labels |
-| `--color-text-faint` | `#afafaf` (gray-300) | Placeholder |
+| `--color-text-faint` | `#858585` | Placeholder, meta lines, counts, hints |
 | `--color-border-default` | `color-mix(#1a1c1f 8%, transparent)` | Default borders |
 | `--color-border-subtle` | `color-mix(#1a1c1f 5%, transparent)` | Sidebar edge / dividers |
 | `--color-accent` | `#1a1c1f` | Primary accent, CTA, footer badge (neutral ink) |
 | `--color-success` / warning / error | green-500 / orange-500 / red-500 | Status |
 
 **Invariant:** never paint chrome text with raw `gray-0` (`#fff`) under `data-theme="light"`. Use `--ds-text-primary` / `--ds-text-secondary`.
+
+**Contrast floor (PI-UI-1114):** the two quiet text tiers carry real content (meta lines, counts, hints, empty states), so each stays legible on every surface it lands on, in both themes: `--ds-text-muted` at least 4.5:1 and `--ds-text-faint` at least 3:1 against the primary, sidebar, secondary and inset surfaces. The light faint tier was `#afafaf` (2.19:1 on white, 1.98:1 on the sidebar); it is now `#858585` (3.69:1 on white, 3.33:1 on the sidebar, 3.15:1 on the inset surface). The dark tier measures 3.4:1 to 3.6:1. `scripts/style-token-contrast.mjs`, run by `pnpm lint` through `scripts/check-style-tokens.mjs`, computes the ratios from `styles/tokens.css`, compositing alpha tokens over the surface, so retuning a token or the surface under it is judged by the ratio; a token syntax it cannot read is reported rather than passed. `apps/desktop/test/text-tier-contrast.test.mjs` pins the rule with fixtures.
 
 Shared buttons must use semantic theme tokens for both their surface and ink:
 primary actions pair `--ds-accent` with `--ds-bg-primary`, while secondary
@@ -370,7 +372,9 @@ zoom remains independent. The UI never asks for a px value.
 
 ### 5.2 Type scale
 
-All font sizes come from the `--text-*` ramp defined in the `@theme` block of `styles/tokens.css` (imported first by `styles/globals.css`, which is now only an import sequence — see D170). Raw px literals for `font-size`, `font-weight`, `line-height`, and `letter-spacing` are **forbidden** in component CSS and TSX arbitrary utilities (`text-[13px]` etc.) — enforced by `scripts/check-style-tokens.mjs` (runs in `pnpm lint`). `-plus` suffixed tokens are the Codex half-steps between named sizes.
+All font sizes come from the `--text-*` ramp defined in the `@theme` block of `styles/tokens.css` (imported first by `styles/globals.css`, which is now only an import sequence — see D170). Raw px literals for `font-size`, `font-weight`, `line-height`, and `letter-spacing` are **forbidden** in component CSS and TSX arbitrary utilities (`text-[13px]` etc.) — enforced by `scripts/check-style-tokens.mjs` (runs in `pnpm lint`), which also reads declarations that share a line with their selector (`.x { font-weight: 600; }`). `-plus` suffixed tokens are the Codex half-steps between named sizes.
+
+**Convention (PI-UI-1114):** every `var(--name)` in a renderer stylesheet names a custom property that a stylesheet declares or the renderer sets at run time (a `"--name"` string in TS/TSX). An undefined name resolves to the guaranteed-invalid value, so `border` collapses to none, `font-weight` inherits and a fill paints nothing; a fallback does not make it right, because it then paints in every theme. `scripts/check-style-tokens.mjs` fails an undefined name, with or without a fallback. The only exemptions are exact names recorded with a reason in `scripts/style-token-integrity.mjs` (the Tailwind default theme variables `--leading-snug`, `--tracking-wider`, `--shadow-sm`, `--shadow-xl`, and the optional `--ds-main-pane-min-width` layout hook); a prefix rule would hide the typo class this guard exists for.
 
 | Token | Size | Usage |
 |---|---|---|
@@ -1168,6 +1172,7 @@ padding that under the global `border-box` would leave a 12px content box for a
 | Radius | radius-lg |
 | Background | `--ds-tile` |
 | Hover (interactive) | bg-tertiary, no shadow change |
+| Footer in a row of cards | Cards in one grid row share a height, so a footer that may carry a button (install, enable) reserves that button's row; a card whose footer holds only a version line lands on the same baseline as its neighbours (PI-UI-1114) |
 
 ### 11.4 Dialog / modal
 

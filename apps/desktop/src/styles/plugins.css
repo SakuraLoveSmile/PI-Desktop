@@ -1102,6 +1102,11 @@
   justify-content: space-between;
   gap: 10px;
   padding: 2px 14px 12px;
+  /* A footer that carries a button is taller than one that carries only a version
+     line, and the cards in a row share one height, so the version text sat at a
+     different baseline from card to card. Reserve the button's row (2 + 12 padding,
+     14 button padding, one `.btn` line) so every footer lands on the same line. */
+  min-height: calc(28px + var(--text-md) * var(--leading-body));
 }
 
 .plugins-card-state {
