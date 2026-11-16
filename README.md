@@ -42,6 +42,12 @@ Local-first · Model-agnostic · Plugin-powered · macOS / Windows / Linux
 
 > **Current release line: 0.15.x (Early Preview).**
 
+Version 0.15.20 makes the shell read as one continuous surface: the transcript
+no longer reserves an invisible band under every message for hover actions, the
+composer's workspace strip becomes the header band of a single card, Settings
+groups each section's rows into one card with quiet dividers, and the home start
+checklist is a soft filled plate instead of an outline.
+
 Version 0.15.19 polishes the interface: the Team panel's status labels and task
 detail cards, the Goal report card in chat and the plugin theme cards now render
 the weights, accent colours and borders they were designed with, quiet text in
