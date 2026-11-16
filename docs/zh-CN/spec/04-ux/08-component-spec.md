@@ -354,7 +354,7 @@ Collapsed (48px):
 | 会话已完成 | 未选择该行时呈绿色复选标记 |
 | 会话失败 | 未选择该行时，红色圆圈警告标记 |
 | 行悬停 | 项目标题与所有会话行共享整行 `--ds-bg-hover` 背景、圆角和过渡；会话选中背景优先 |
-| 当前工作区 | 项目标题通过圆点标记当前工作区，不绘制持久选中背景；顶栏跟随该工作区，输入框上方的工作区条显示项目、位置和分支（运行时折叠为分支），输入卡本身不公开工作区身份 |
+| 当前工作区 | 项目标题通过圆点标记当前工作区，不绘制持久选中背景；顶栏跟随该工作区，输入框上方的工作区条显示项目、位置和分支（运行时折叠为分支），并自 PI-UI-1117 起作为与输入壳同一张卡的头部带（同宽、色调台阶、内描边），输入卡本身不公开工作区身份 |
 | 导航选中 | 仅聊天页当前会话使用 `--ds-bg-active`，包括置顶和独立会话；折叠分组不会把选中态转交给标题。没有选中会话或离开聊天页时，没有选中的会话行 |
 | 键盘焦点 | 焦点控件保留可见轮廓；项目标题按钮保持透明，独立操作按钮保留自己的悬停反馈 |
 | 崩溃的项目 | 标题保持可见；儿童对话被隐藏 |
@@ -3486,3 +3486,30 @@ supersedes the old v1-only rendering description above.
 
 
 Final lifecycle and evidence scope: Continuation supports text and ordinary file references. Image/plugin attachments preserve the complete draft and show a localized hint to use ordinary send after dismissing the chip; they are not discarded or sent as partial guidance.
+
+## PI-UI-1117 — 可见表面一轮（2026-11-16）
+
+仅渲染层样式；交互、契约与 i18n 均不变。本块取代下述旧描述。
+
+- **记录节奏。** 悬停操作条不再占用布局高度：`.message-actions` 绝对定位在
+  `.message-col` 底部，绘制进下一行的前导 padding（`.message-row` padding
+  `12px 0`、助手行顶部 padding `12px`、`overflow-clip-margin: 16px`、操作带
+  24px）。操作条仍默认隐藏、悬停/聚焦时显现；变化在于整段记录读作连续流，
+  而不是被 26px 不可见带隔开的孤岛：24px 操作带恰好落入行间 24px 间隙。
+  只有相邻行共享该间隙：一轮的最后一行保留流内操作带，因为其后是运行时状态条
+  或决策卡（transcript-status E2E 钉住该 52px 等待间隙）。
+- **输入卡。** `.composer-top-strip` 是输入卡的头部带，而非塞在卡下的更窄
+  标签页：与卡同宽（`margin: 0 0 -12px`）、
+  `color-mix(in oklab, var(--ds-bg-composer) 96%, var(--ds-text-primary))`
+  色调台阶、顶与两侧用内描边绘制而不增加几何，且
+  `.composer-stack:has(> .composer-top-strip) > .composer-shell` 清除顶边
+  描边与顶部圆角，使两个面读作同一张卡。
+- **设置分组卡。** 子元素仅为 `.settings-row` 的 `.settings-panel` 保留单块
+  `--ds-tile` 底板；行平铺其内（`padding: 12px 16px`，自身无填充与圆角），
+  相邻行以内嵌 `--ds-border-subtle` 发丝线分隔；首末行承载底板
+  `--radius-lg` 圆角。仅就这些面板取代 D296 的每行一板节奏（插件索引保留
+  D296）。发丝线分隔的是同一张卡内部的行，因此 D297 对页面级表面的无描边
+  规则仍然成立。
+- **新手清单。** `.home-onboarding-checklist` 清除描边色并以 `--ds-tile`
+  填充，几何保持不变：卡是色调底板，而不是与页面同色填充上的一圈轮廓
+  （D297、§6.4）。

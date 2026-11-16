@@ -24,7 +24,7 @@
 }
 
 .message-row.assistant {
-  padding-top: 6px;
+  padding-top: 12px;
   padding-bottom: 14px;
 }
 
@@ -968,6 +968,10 @@
 .home-onboarding-checklist {
   margin-top: 0;
   max-width: 100%;
+  /* A card is a tonal plate, not an outline on a fill identical to the page
+     (D297): clear the stroke colour so the box keeps its geometry. */
+  border-color: transparent;
+  background: var(--ds-tile);
 }
 
 @media (max-height: 760px) {

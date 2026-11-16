@@ -1457,3 +1457,38 @@ margin. Editors scroll their body while keeping title and actions reachable.
   individual tiles. No per-kind scan card, no tinted group band, no second
   copy of the settings row scaffold
 - Light destination cards use white elevated plates (not flat gray fills)
+
+## PI-UI-1117 — visible surface pass (2026-11-16)
+
+Renderer styles only; no interaction, contract or i18n change. This block
+supersedes the descriptions quoted below.
+
+- **Transcript rhythm.** The hover action toolbar no longer reserves layout
+  height: `.message-actions` is absolutely positioned at the foot of
+  `.message-col` and paints into the next row's leading padding
+  (`.message-row` padding `12px 0`, assistant top padding `12px`,
+  `overflow-clip-margin: 16px`, action band 24px). The toolbar is still hidden
+  by default and revealed on hover/focus; what changes is that a transcript
+  reads as one continuous flow instead of turns separated by a 26px invisible
+  band: the 24px band now fits exactly in the 24px gap between rows. Only
+  consecutive rows share that gap: the last row of a turn keeps its band in
+  flow, because the runtime status lane or a decision card follows it (the
+  transcript-status E2E pins that 52px wait gap).
+- **Composer card.** `.composer-top-strip` is the header band of the input
+  card, not a narrower tab tucked under it: full shell width
+  (`margin: 0 0 -12px`), a `color-mix(in oklab, var(--ds-bg-composer) 96%,
+  var(--ds-text-primary))` tonal step, inset hairline paint on its top and
+  sides so it adds no geometry of its own, and
+  `.composer-stack:has(> .composer-top-strip) > .composer-shell` clears its
+  top stroke and top radius so the two surfaces read as one card.
+- **Settings grouped cards.** A `.settings-panel` whose children are only
+  `.settings-row` keeps a single `--ds-tile` plate; rows sit flat inside it
+  (`padding: 12px 16px`, no fill or radius of their own) and consecutive rows
+  are divided by an inset `--ds-border-subtle` hairline; the first and last
+  row carry the plate's `--radius-lg` corners. This supersedes D296's
+  row-per-tile rhythm for these panels only (the plugins index keeps D296).
+  The hairline partitions rows inside one card, so D297's stroke-free rule
+  for page-level surfaces still holds.
+- **Onboarding checklist.** `.home-onboarding-checklist` clears its stroke
+  colour and fills with `--ds-tile` while keeping its geometry: a card is a
+  tonal plate, not an outline on a fill identical to the page (D297, §6.4).
