@@ -1073,19 +1073,30 @@
 .composer-workspace-item svg { flex-shrink: 0; }
 .composer-workspace-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* Workspace strip above the input card: a tab that tucks under the card. Idle
-   it lists project, location and branch; during a run it folds to the branch. */
+/* Workspace strip above the input card: the header band of one continuous
+   card, not a narrower tab behind it. Idle it lists project, location and
+   branch; during a run it folds to the branch. The outline is inset paint so
+   the strip adds no geometry of its own over the shell. */
 .composer-top-strip {
   display: flex;
   min-width: 0;
   align-items: center;
   gap: 8px;
-  margin: 0 16px -12px;
+  margin: 0 0 -12px;
   padding: 8px 14px 18px;
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  background: var(--ds-bg-elevated);
+  background: color-mix(in oklab, var(--ds-bg-composer) 96%, var(--ds-text-primary));
+  box-shadow:
+    inset 0 1px 0 var(--ds-border-subtle),
+    inset 1px 0 0 var(--ds-border-subtle),
+    inset -1px 0 0 var(--ds-border-subtle);
   color: var(--ds-text-muted);
   font-size: var(--text-xs);
+}
+
+.composer-stack:has(> .composer-top-strip) > .composer-shell {
+  border-top-color: transparent;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
 
 .composer-top-strip-toggle {

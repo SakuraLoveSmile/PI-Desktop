@@ -498,18 +498,37 @@
 }
 
 /*
-  Panels that are only a stack of rows dissolve into the page: each row becomes
-  its own tile and the gap between tiles replaces the hairline that used to
-  divide them (same rhythm as the plugins index, D296). Panels with mixed
-  content (editors, form grids) stay one tile.
+  Panels that are only a stack of rows read as one grouped card: the panel
+  keeps a single tile plate and the rows sit flat inside it, divided by inset
+  hairlines (supersedes D296's row-per-tile rhythm, which read as a wall of
+  identical bars). Panels with mixed content (editors, form grids) stay one
+  tile as before.
 */
 .settings-panel:has(> .settings-row),
 .settings-panel.shortcut-map,
 .settings-panel.agent-capability-panel,
 .settings-panel.model-provider-panel:has(> .model-provider-list) {
-  gap: 6px;
-  background: transparent;
+  gap: 0;
+  background: var(--ds-tile);
   overflow: visible;
+}
+
+.settings-panel:has(> .settings-row) > :where(.settings-row) {
+  padding: 12px 16px;
+  border-radius: 0;
+  background: transparent;
+}
+
+.settings-panel:has(> .settings-row) > :where(.settings-row) + :where(.settings-row) {
+  border-top: 1px solid var(--ds-border-subtle);
+}
+
+.settings-panel:has(> .settings-row) > .settings-row:first-child {
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.settings-panel:has(> .settings-row) > .settings-row:last-child {
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
 
 .settings-panel-actions {

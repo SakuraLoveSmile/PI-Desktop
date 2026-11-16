@@ -15,10 +15,11 @@
      the deliberate bleed of the disclosure row chrome: the activity header
      pulls its hover fill 3px past the column edge and a run row's head 4px, so
      the icon can sit on the text's alignment line while the fill keeps its
-     padding, and the focus ring reaches 3.5px beyond its own box. 8px covers
-     the widest of them. .tool-activity-group clips the same chrome and carries
-     the same margin. */
-  overflow-clip-margin: 8px;
+     padding, and the focus ring reaches 3.5px beyond its own box. 16px covers
+     the widest of them, including the hover action band, which paints into the
+     next row's leading padding instead of reserving layout height.
+     .tool-activity-group clips the same chrome and carries the same margin. */
+  overflow-clip-margin: 16px;
 }
 
 .message-row.user {
@@ -26,6 +27,7 @@
 }
 
 .message-col {
+  position: relative;
   display: flex;
   min-width: 0;
   width: 100%;
@@ -1359,20 +1361,33 @@
   }
 }
 
-/* Hover actions under a message: quiet icon chips, WorkBuddy/Codex density. */
+/* Hover actions under a message: quiet icon chips, WorkBuddy/Codex density.
+   The band paints into the gap between rows rather than reserving 26px of
+   layout under every bubble, so a transcript reads as one continuous flow. */
 .message-actions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 2px;
   min-height: 24px;
-  padding-top: 2px;
   opacity: 0;
   transition: opacity var(--motion-duration-fast) var(--motion-ease-out);
 }
 
 .message-row.user .message-actions {
   justify-content: flex-end;
+}
+
+/* The last row of a turn keeps its band in flow: what follows it is real
+   content (the runtime status lane, a decision card) or the transcript floor,
+   not another row's leading padding. */
+.message-row:not(:has(+ .message-row)) .message-actions {
+  position: static;
+  padding-top: 2px;
 }
 
 .message-row:hover .message-actions,
