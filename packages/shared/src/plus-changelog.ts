@@ -6,6 +6,14 @@ export const PLUS_UPSTREAM_CUTOFF = "0.15.6";
 const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   en: [
     {
+      version: "0.15.20",
+      date: "2026-11-16",
+      highlights: [
+        "The conversation reads as one continuous flow: the invisible band under every message that reserved room for hover actions is gone, and those actions now appear in the gap between messages.",
+        "The composer is one card with the workspace strip as its header band; Settings groups each section's rows into a single card with quiet dividers, and the home start checklist is a soft filled plate instead of an outline.",
+      ],
+    },
+    {
       version: "0.15.19",
       date: "2026-11-15",
       highlights: [
@@ -135,6 +143,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "zh-CN": [
+    {
+      version: "0.15.20",
+      date: "2026-11-16",
+      highlights: [
+        "对话现在读作连续的整体：每条消息下方为悬停操作预留空间的隐形条已去掉，这些操作改为出现在消息之间的间隙里。",
+        "输入框成为一张卡片，工作区条是它的头部带；设置把每节的行收进同一张卡片并以安静的分隔线区隔；首页的开始使用清单改为柔和的实底底板，不再是一圈轮廓。",
+      ],
+    },
     {
       version: "0.15.19",
       date: "2026-11-15",
@@ -266,6 +282,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   "zh-TW": [
     {
+      version: "0.15.20",
+      date: "2026-11-16",
+      highlights: [
+        "對話現在讀作連續的整體：每則訊息下方為懸停操作預留空間的隱形條已去掉，這些操作改為出現在訊息之間的間隙裡。",
+        "輸入框成為一張卡片，工作區條是它的頭部帶；設定把每節的列收進同一張卡片並以安靜的分隔線區隔；首頁的開始使用清單改為柔和的實底底板，不再是一圈輪廓。",
+      ],
+    },
+    {
       version: "0.15.19",
       date: "2026-11-15",
       highlights: [
@@ -395,6 +419,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   tr: [
+    {
+      version: "0.15.20",
+      date: "2026-11-16",
+      highlights: [
+        "Konuşma artık kesintisiz bir akış olarak okunuyor: her iletinin altında yüzen eylemler için yer ayıran görünmez şerit kaldırıldı; bu eylemler artık iletiler arasındaki boşlukta görünüyor.",
+        "Besteci tek bir kart: çalışma alanı şeridi onun başlık bandı; Ayarlar her bölümün satırlarını sessiz ayraçlarla tek bir kartta topluyor ve başlangıç kontrol listesi bir anahat yerine yumuşak dolgulu bir plaka.",
+      ],
+    },
     {
       version: "0.15.19",
       date: "2026-11-15",
@@ -526,6 +558,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   de: [
     {
+      version: "0.15.20",
+      date: "2026-11-16",
+      highlights: [
+        "Der Verlauf liest sich als zusammenhängender Fluss: Der unsichtbare Streifen unter jeder Nachricht, der Platz für Hover-Aktionen reservierte, ist weg; diese Aktionen erscheinen jetzt im Zwischenraum zwischen den Nachrichten.",
+        "Der Composer ist eine Karte mit dem Workspace-Streifen als Kopfband; die Einstellungen fassen die Zeilen jedes Abschnitts in einer Karte mit ruhigen Trennlinien zusammen, und die Start-Checkliste ist eine sanft gefüllte Fläche statt eines Umrisses.",
+      ],
+    },
+    {
       version: "0.15.19",
       date: "2026-11-15",
       highlights: [
@@ -655,6 +695,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   es: [
+    {
+      version: "0.15.20",
+      date: "2026-11-16",
+      highlights: [
+        "La conversación se lee como un flujo continuo: desaparece la banda invisible bajo cada mensaje que reservaba espacio para las acciones al pasar el cursor; esas acciones aparecen ahora en el hueco entre mensajes.",
+        "El composer es una sola tarjeta con la franja del espacio de trabajo como banda de cabecera; Ajustes agrupa las filas de cada sección en una tarjeta con divisores discretos, y la lista de inicio es una placa rellena suave en lugar de un contorno.",
+      ],
+    },
     {
       version: "0.15.19",
       date: "2026-11-15",
@@ -786,6 +834,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   fr: [
     {
+      version: "0.15.20",
+      date: "2026-11-16",
+      highlights: [
+        "La conversation se lit comme un flux continu : la bande invisible sous chaque message qui réservait la place des actions au survol a disparu ; ces actions apparaissent désormais dans l'espace entre les messages.",
+        "Le compositeur est une seule carte avec la bande d'espace de travail comme bandeau d'en-tête ; les Réglages regroupent les lignes de chaque section dans une carte aux séparateurs discrets, et la liste de démarrage est un plateau rempli doux plutôt qu'un contour.",
+      ],
+    },
+    {
       version: "0.15.19",
       date: "2026-11-15",
       highlights: [
@@ -916,6 +972,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   ko: [
     {
+      version: "0.15.20",
+      date: "2026-11-16",
+      highlights: [
+        "대화가 하나의 연속된 흐름으로 읽힙니다: 각 메시지 아래에서 호버 동작을 위해 공간을 예약하던 보이지 않는 띠가 사라졌고, 해당 동작은 이제 메시지 사이 여백에 나타납니다.",
+        "컴포저는 작업 영역 스트립을 헤더 밴드로 갖는 하나의 카드입니다; 설정은 각 섹션의 행을 조용한 구분선이 있는 하나의 카드로 묶고, 홈 시작 체크리스트는 윤곽선 대신 부드럽게 채워진 플레이트입니다.",
+      ],
+    },
+    {
       version: "0.15.19",
       date: "2026-11-15",
       highlights: [
@@ -1045,6 +1109,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "pt-BR": [
+    {
+      version: "0.15.20",
+      date: "2026-11-16",
+      highlights: [
+        "A conversa lê-se como um fluxo contínuo: a faixa invisível sob cada mensagem que reservava espaço para as ações ao passar o cursor foi removida; essas ações agora aparecem no espaço entre as mensagens.",
+        "O composer é um único cartão com a faixa do espaço de trabalho como banda de cabeçalho; as Configurações agrupam as linhas de cada seção em um cartão com divisores discretos, e a lista de início é uma placa preenchida suave em vez de um contorno.",
+      ],
+    },
     {
       version: "0.15.19",
       date: "2026-11-15",
