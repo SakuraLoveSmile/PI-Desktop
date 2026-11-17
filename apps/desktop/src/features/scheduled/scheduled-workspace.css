@@ -138,7 +138,7 @@
 .scheduled-task-live {
   display: inline-flex;
   flex: 0 0 auto;
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
   animation: scheduled-live-pulse 1.6s var(--motion-ease-standard) infinite;
 }
 
@@ -188,11 +188,11 @@
 }
 
 .scheduled-task-last.is-completed {
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
 }
 
 .scheduled-task-last.is-error {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .scheduled-task-last.is-empty {
@@ -269,15 +269,15 @@
 }
 
 .scheduled-fact-run.is-completed {
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
 }
 
 .scheduled-fact-run.is-error {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .scheduled-fact-run.is-running {
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
 }
 
 /* ---- instruction --------------------------------------------------------- */
@@ -370,15 +370,15 @@
 }
 
 .scheduled-run-glyph.is-completed {
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
 }
 
 .scheduled-run-glyph.is-error {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .scheduled-run-glyph.is-running {
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
 }
 
 .scheduled-run-body {
@@ -497,7 +497,7 @@
 }
 
 .scheduled-message-text[data-status="error"] {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .scheduled-transcript-more {

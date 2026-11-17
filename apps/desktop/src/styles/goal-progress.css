@@ -41,7 +41,7 @@
 }
 
 .goal-progress-completed-num {
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
   font-weight: var(--font-weight-strong);
 }
 
@@ -110,7 +110,7 @@
 
 .goal-progress-badge[data-state="queued"] {
   background: color-mix(in oklab, var(--ds-warning) 15%, transparent);
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
 }
 
 .goal-progress-bar-title {

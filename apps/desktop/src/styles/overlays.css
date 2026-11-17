@@ -541,13 +541,13 @@
   color: var(--ds-info);
 }
 .toast.success .toast-icon {
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
 }
 .toast.warning .toast-icon {
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
 }
 .toast.error .toast-icon {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .toast-message {
@@ -763,7 +763,7 @@
   border: 1px solid color-mix(in oklab, var(--ds-error) 30%, transparent);
   border-radius: var(--radius-md-plus);
   background: var(--ds-bg-secondary);
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
   font-size: var(--text-md);
   box-shadow: var(--ds-shadow-composer);
   pointer-events: auto;

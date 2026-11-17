@@ -695,7 +695,7 @@
 
 .projects-menu button.danger,
 .projects-menu button.danger > svg {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .projects-menu button.danger:hover {
@@ -835,7 +835,7 @@
   align-items: flex-start;
   gap: 8px;
   margin: 0;
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
   font-size: var(--text-sm);
   line-height: var(--leading-body);
 }
@@ -854,7 +854,7 @@
   align-items: flex-start;
   gap: 8px;
   margin: 0;
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
   font-size: var(--text-sm);
   line-height: var(--leading-body);
 }

@@ -330,7 +330,7 @@
 
 .plugins-row.broken .plugins-glyph {
   background: color-mix(in oklab, var(--ds-error) 14%, transparent);
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .plugins-row-copy {
@@ -387,7 +387,7 @@
    broken until the user fixes it, so the message is state, not an announcement. */
 .plugins-row-error {
   margin: 0;
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
   font-size: var(--text-sm);
   line-height: var(--leading-body);
   overflow-wrap: anywhere;
@@ -410,7 +410,7 @@
 
 .plugins-tag.is-update {
   background: color-mix(in oklab, var(--ds-success) 16%, transparent);
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
 }
 
 /* Capabilities, services and permissions are deliberately disclosed on demand. */
@@ -520,7 +520,7 @@
 
 .plugins-perm-chip.risk-high {
   background: color-mix(in oklab, var(--ds-warning) 14%, transparent);
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
 }
 
 .plugins-perm-chip.risk-low,
@@ -587,7 +587,7 @@
 }
 
 .plugins-service-chip.is-failed {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
   background: color-mix(in oklab, var(--ds-error) 12%, transparent);
 }
 
@@ -725,7 +725,7 @@
 
 .plugins-menu button.danger,
 .plugins-menu button.danger > svg {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .plugins-menu button.danger:hover {
@@ -875,7 +875,7 @@
 
 .plugins-settings-error {
   margin: 10px 18px 0;
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
   font-size: var(--text-xs);
   line-height: var(--leading-body);
 }
@@ -1065,7 +1065,7 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
 }
 
 .plugins-card-meta {
@@ -1122,7 +1122,7 @@
   align-items: center;
   gap: 4px;
   flex: 0 0 auto;
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
   font-size: var(--text-sm);
   font-weight: var(--font-weight-medium);
 }
@@ -1457,7 +1457,7 @@
   display: inline-flex;
   flex: 0 0 auto;
   margin-top: 1px;
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
 }
 
 .plugins-callout-title {
@@ -1510,11 +1510,11 @@
 }
 
 .plugins-perm-list > li.risk-high .plugins-perm-risk {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .plugins-perm-list > li.risk-medium .plugins-perm-risk {
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
 }
 
 .plugins-perm-copy {
@@ -1612,13 +1612,13 @@
    visible for discovery, marked so the missing download reads as a state
    rather than an empty size and checksum. */
 .plugins-version-pending {
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
 }
 
 /* A version the distribution side withdrew. It stays selectable so its reason
    can be read, but it reads as removed rather than merely unavailable. */
 .plugins-version-withdrawn {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .plugins-version.withdrawn .plugins-version-top strong {
@@ -1783,7 +1783,7 @@
   flex: 0 0 auto;
   border-radius: var(--radius-full);
   background: color-mix(in oklab, var(--ds-warning) 14%, transparent);
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
 }
 
 .plugins-modal-title {
@@ -1847,11 +1847,11 @@
 }
 
 .plugins-risk-group.risk-high .plugins-risk-head {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .plugins-risk-group.risk-medium .plugins-risk-head {
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
 }
 
 .plugins-risk-count {
@@ -1901,12 +1901,12 @@
 
 .plugins-modal-icon.is-success {
   background: color-mix(in oklab, var(--ds-success) 14%, transparent);
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
 }
 
 .plugins-modal-icon.is-error {
   background: color-mix(in oklab, var(--ds-error) 14%, transparent);
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .plugins-install-phase {
@@ -1980,7 +1980,7 @@
 }
 
 .plugins-install-outcome.is-success {
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
 }
 
 .plugins-install-failure {
@@ -1992,7 +1992,7 @@
 .plugins-install-error {
   margin: 0;
   overflow-wrap: anywhere;
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
   font-size: var(--text-sm-plus);
   line-height: var(--leading-body);
 }

@@ -1401,7 +1401,7 @@
       ]
     },
     "apps/desktop/test/composer-usage-footer.test.mjs": {
-      "assertions": 22,
+      "assertions": 21,
       "cases": 5,
       "signatures": [
         "05b0188b4f3dc58f3a47",
@@ -1424,8 +1424,7 @@
         "c306a1591a0a2dee3dbb",
         "ce3cdba6eeb0bcb76d47",
         "daa5c6d7520a72802a2c",
-        "dceda51790f4c6912ca8",
-        "ddb75aba5c49dc825f2c"
+        "dceda51790f4c6912ca8"
       ]
     },
     "apps/desktop/test/composer-workspace-context.test.mjs": {
@@ -3753,7 +3752,7 @@
       ]
     },
     "apps/desktop/test/plugin-install-dialog.test.mjs": {
-      "assertions": 52,
+      "assertions": 50,
       "cases": 9,
       "signatures": [
         "0516a574b769f41709d6",
@@ -3765,10 +3764,8 @@
         "1a3119309f4086afebef",
         "225a4edf2a830d359a6e",
         "26c50595b59cf885df8b",
-        "277b7aaa21d943f6f9cb",
         "27f5a3fc3ccd7259cff9",
         "346679fe02129222a8e9",
-        "34b8d16aafc04ae16795",
         "39d3ca362f3597ebcfdb",
         "4131bdd6e3f80ebd1151",
         "472d285543181af3230c",

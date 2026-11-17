@@ -762,11 +762,11 @@ async function verifyStalePanoramaRetry(sendCdp, evaluate) {
 
 async function assertTeamSuccessGlyph(evaluate, selector, label) {
   const colors = await evaluate(`(() => {
-    const probe=document.createElement('span'); probe.style.color='var(--ds-success)'; document.body.append(probe);
+    const probe=document.createElement('span'); probe.style.color='var(--ds-success-ink)'; document.body.append(probe);
     try { return { expected:getComputedStyle(probe).color, actual:document.querySelector(${JSON.stringify(selector)}) ? getComputedStyle(document.querySelector(${JSON.stringify(selector)})).color : null }; }
     finally { probe.remove(); }
   })()`);
-  assert.equal(colors.actual, colors.expected, `${label} completed glyph uses the success token`);
+  assert.equal(colors.actual, colors.expected, `${label} completed glyph uses the success ink token`);
 }
 
 async function verifyTeamHeaderHitAreas(evaluate, testId) {

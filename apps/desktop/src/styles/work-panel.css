@@ -549,7 +549,7 @@
   line-height: var(--leading-none);
 }
 .work-panel-overview-file-glyph.is-markup {
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
 }
 
 .work-panel-overview-subagent-row {
@@ -1083,11 +1083,11 @@
 }
 
 .work-panel-launcher-row[data-work-panel-launcher-item="pi.file-manager/manager"] .work-panel-launcher-icon {
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
 }
 
 .work-panel-launcher-row[data-work-panel-launcher-item="review"] .work-panel-launcher-icon {
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
 }
 
 .work-panel-launcher-label {
@@ -1157,11 +1157,11 @@
 }
 
 .diff-count-add {
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
 }
 
 .diff-count-del {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 /* Hunks are set apart by a gap; each opens with its own tinted header line. */
@@ -1199,7 +1199,7 @@
 }
 
 .diff-line.add .diff-line-sign {
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
 }
 
 .diff-line.del {
@@ -1207,7 +1207,7 @@
 }
 
 .diff-line.del .diff-line-sign {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .diff-line.hunk {

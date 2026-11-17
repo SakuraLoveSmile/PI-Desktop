@@ -101,7 +101,7 @@
 .scheduled-execution-toolbar {
   width: 100%;
 }
-.scheduled-permission-warning { color: var(--ds-warning); }
+.scheduled-permission-warning { color: var(--ds-warning-ink); }
 .scheduled-weekday-trigger { max-width: min(300px, 100%); }
 .scheduled-weekday-menu { min-width: 132px; }
 .scheduled-weekday-option { min-height: 38px; }

@@ -12,6 +12,16 @@
  * Floors: `--ds-text-muted` at least 4.5:1, `--ds-text-faint` at least 3:1,
  * against the primary, sidebar, secondary and inset surfaces.
  *
+ * Status ink (PI-UI-1115): the light status colours are under 4.5:1 as text (green
+ * 3.36:1 and orange 3.79:1 on white, 2.4:1 to 3.7:1 on a 15% chip of their own
+ * colour), so status text and glyphs paint with `--ds-success-ink`,
+ * `--ds-warning-ink` and `--ds-error-ink` while fills, dots, borders and tints keep
+ * the base colours. Each ink has to clear 4.5:1 on the four surfaces and on a 15%
+ * chip of its base colour over each of them (`findLowContrastStatusInk`), and a
+ * `color:` declaration may not name a base status token
+ * (`findBaseStatusTextColors`). Stylesheet chips run 6% to 16%; the light inks
+ * keep 4.5:1 across that range, and 15% is the modelled tint.
+ *
  * Known boundary: this reads the opaque base surfaces. The sidebar can be
  * translucent glass over the desktop (vibrancy), so its contrast there is
  * approximate; a custom `--ds-bg-sidebar` image or tint is a theme the guard
@@ -24,6 +34,21 @@ export const TIER_FLOORS = new Map([
   ["--ds-text-faint", 3],
 ]);
 export const SURFACE_TOKENS = ["--ds-bg-primary", "--ds-bg-sidebar", "--ds-bg-secondary", "--ds-bg-inset"];
+/** Status ink token -> the base token whose hue it darkens and whose tint forms its chip. */
+export const STATUS_INK = new Map([
+  ["--ds-success-ink", "--ds-success"],
+  ["--ds-warning-ink", "--ds-warning"],
+  ["--ds-error-ink", "--ds-error"],
+]);
+export const STATUS_INK_FLOOR = 4.5;
+export const STATUS_CHIP_ALPHA = 0.15;
+/** Base status tokens that must not paint text, with the ink to use instead. */
+const BASE_STATUS_TOKENS = new Map([
+  ["--ds-success", "--ds-success-ink"],
+  ["--ds-warning", "--ds-warning-ink"],
+  ["--ds-error", "--ds-error-ink"],
+  ["--ds-danger", "--ds-error-ink"],
+]);
 
 const THEME_ROOT = /^:root(?:\[data-theme=["'](dark|light)["']\])?$/;
 
@@ -99,9 +124,19 @@ function luminance(rgb) {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
+/** The colour a token resolves to in a theme (`dark` or `light`), as `{ rgb, alpha }`. */
+export function resolveToken(tokensCss, theme, token) {
+  return resolve(`var(${token})`, themeScopes(tokensCss)[theme]);
+}
+
+/** `color` (alpha composited over the opaque `surface`) as an opaque colour. */
+export function composite(color, surface) {
+  return { rgb: color.rgb.map((channel, i) => surface.rgb[i] + color.alpha * (channel - surface.rgb[i])), alpha: 1 };
+}
+
 /** WCAG contrast of `ink` (alpha composited over `surface`) against `surface`. */
 export function contrastRatio(ink, surface) {
-  const over = ink.rgb.map((channel, i) => surface.rgb[i] + ink.alpha * (channel - surface.rgb[i]));
+  const over = composite(ink, surface).rgb;
   const [hi, lo] = [luminance(over), luminance(surface.rgb)].sort((a, b) => b - a);
   return (hi + 0.05) / (lo + 0.05);
 }
@@ -142,6 +177,82 @@ export function findLowContrastTextTiers(tokensCss) {
           });
         }
       }
+    }
+  }
+  return violations;
+}
+
+/**
+ * Report status ink tokens that fall under 4.5:1 as text on a surface or on a chip of
+ * their own base colour, and any token the resolver cannot evaluate. The chip is the
+ * base colour at 15% over the surface, composited the way the compositor does it.
+ * @param {string} tokensCss contents of styles/tokens.css
+ * @param {{ chipAlpha?: number }} [options] tint alpha of the modelled chip, 15% by default
+ * @returns {Array<{theme: string, tier: string, surface: string, ground: "text" | "chip", ratio: number | null, floor: number, message: string}>}
+ */
+export function findLowContrastStatusInk(tokensCss, { chipAlpha = STATUS_CHIP_ALPHA } = {}) {
+  const scopes = themeScopes(tokensCss);
+  const violations = [];
+  for (const theme of ["dark", "light"]) {
+    const scope = scopes[theme];
+    for (const [ink, base] of STATUS_INK) {
+      for (const surface of SURFACE_TOKENS) {
+        for (const ground of ["text", "chip"]) {
+          const where = ground === "chip" ? `a ${Math.round(chipAlpha * 100)}% ${base} chip over ${surface}` : surface;
+          try {
+            const surfaceColor = resolve(`var(${surface})`, scope);
+            const tint = resolve(`var(${base})`, scope);
+            const paper =
+              ground === "chip"
+                ? composite({ rgb: tint.rgb, alpha: tint.alpha * chipAlpha }, surfaceColor)
+                : surfaceColor;
+            const ratio = contrastRatio(resolve(`var(${ink})`, scope), paper);
+            if (ratio < STATUS_INK_FLOOR) {
+              violations.push({
+                theme,
+                tier: ink,
+                surface,
+                ground,
+                ratio,
+                floor: STATUS_INK_FLOOR,
+                message: `${theme} ${ink} on ${where} is ${ratio.toFixed(2)}:1, below ${STATUS_INK_FLOOR}:1 — darken the ink or retune its base colour`,
+              });
+            }
+          } catch (error) {
+            violations.push({
+              theme,
+              tier: ink,
+              surface,
+              ground,
+              ratio: null,
+              floor: STATUS_INK_FLOOR,
+              message: `${theme} ${ink} on ${where} cannot be evaluated (${error.message}) — teach scripts/style-token-contrast.mjs the new token syntax`,
+            });
+          }
+        }
+      }
+    }
+  }
+  return violations;
+}
+
+/**
+ * Report `color:` declarations that name a base status token. Text and glyphs take the
+ * ink tokens; the base colours stay for fills, dots, borders and tint mixes. A
+ * `color-mix()` that blends a base token into text is the same declaration.
+ * @param {string} css contents of a stylesheet
+ * @returns {Array<{line: number, token: string, ink: string, message: string}>}
+ */
+export function findBaseStatusTextColors(css) {
+  // Blank out comments but keep their newlines, so an offset still gives the right line.
+  const text = css.replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\n]/g, " "));
+  const violations = [];
+  for (const declaration of text.matchAll(/(?<![-\w])color\s*:\s*([^;{}]+)/g)) {
+    const line = text.slice(0, declaration.index).split("\n").length;
+    for (const reference of declaration[1].matchAll(/var\(\s*(--ds-(?:success|warning|error|danger))\s*[,)]/g)) {
+      const token = reference[1];
+      const ink = BASE_STATUS_TOKENS.get(token);
+      violations.push({ line, token, ink, message: `color uses ${token}, under 4.5:1 as light-theme text — use ${ink}` });
     }
   }
   return violations;

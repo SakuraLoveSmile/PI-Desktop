@@ -29,8 +29,8 @@
 }
 .team-dispatch-status { flex: none; color: var(--ds-text-muted); font-size: var(--text-md); }
 .team-dispatch-card[data-state="in_progress"] .team-dispatch-status { color: var(--ds-text-secondary); }
-.team-dispatch-card[data-state="completed"] .team-dispatch-status { color: var(--ds-success); }
-.team-dispatch-card[data-state="failed"] .team-dispatch-status { color: var(--ds-error); }
+.team-dispatch-card[data-state="completed"] .team-dispatch-status { color: var(--ds-success-ink); }
+.team-dispatch-card[data-state="failed"] .team-dispatch-status { color: var(--ds-error-ink); }
 .team-dispatch-connector {
   flex: none;
   align-self: flex-start;

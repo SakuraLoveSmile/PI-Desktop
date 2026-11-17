@@ -77,6 +77,17 @@ const customColors = {
   "--ds-prose-kbd-fg": "#a1b2c3",
   "--ds-tile-deep": "#586166",
 };
+// Production classes that paint status text or a status chip, each with the ink it
+// has to use (PI-UI-1115). Plugin chips tint with the status token, Team panel
+// chips with their own hex, glyphs sit on a 14% tint of their status.
+const STATUS_INK_FIXTURES = [
+  [".plugins-perm-chip.risk-high", "--ds-warning-ink"],
+  [".team-task-status-failed", "--ds-error-ink"],
+  [".team-task-status-completed", "--ds-success-ink"],
+  [".ext-row-glyph.is-ready", "--ds-success-ink"],
+  [".settings-inline-error", "--ds-error-ink"],
+  [".plugins-installed-mark", "--ds-success-ink"],
+];
 const canvas = document.createElement("canvas");
 canvas.width = canvas.height = 1;
 const context = canvas.getContext("2d", { willReadFrequently: true });
@@ -110,6 +121,31 @@ function sample(selector) {
     inkRgba: rgba(style.color),
   };
 }
+// WCAG 2.x contrast between sRGB colours. `paperBehind` composites an element's own
+// background and each translucent ancestor's down to the first opaque layer.
+function channelLuminance(value) {
+  const c = value / 255;
+  return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+}
+function luminanceOf([r, g, b]) {
+  return 0.2126 * channelLuminance(r) + 0.7152 * channelLuminance(g) + 0.0722 * channelLuminance(b);
+}
+function contrastOf(ink, paper) {
+  const [hi, lo] = [luminanceOf(ink), luminanceOf(paper)].sort((a, b) => b - a);
+  return (hi + 0.05) / (lo + 0.05);
+}
+function paperBehind(element) {
+  const layers = [];
+  for (let node = element; node; node = node.parentElement) {
+    const layer = rgba(getComputedStyle(node).backgroundColor);
+    layers.push(layer);
+    if (layer[3] === 255) break;
+  }
+  return layers.reduceRight(
+    (under, [r, g, b, a]) => [r, g, b].map((channel, i) => channel * (a / 255) + under[i] * (1 - a / 255)),
+    [255, 255, 255],
+  );
+}
 globalThis.themeSurfacesProbe = async (theme, custom) => {
   document.documentElement.dataset.theme = theme;
   document.querySelector("#custom-theme")?.remove();
@@ -136,7 +172,8 @@ globalThis.themeSurfacesProbe = async (theme, custom) => {
   }
   // Composer cues: the focus ring and the file-drop outline must paint over the
   // per-theme shell rules, the idle shell must show no outline, and the critical
-  // usage meter must paint with --ds-danger, which has to exist in both palettes.
+  // usage meter must paint its value with --ds-error-ink and its fill with
+  // --ds-danger, both of which have to exist in both palettes.
   const shell = document.querySelector(".composer-shell");
   const composerInput = shell.querySelector(".composer-input");
   const idle = getComputedStyle(shell);
@@ -160,19 +197,48 @@ globalThis.themeSurfacesProbe = async (theme, custom) => {
   await settle();
   const critical = document.querySelector(".composer-usage-context[data-level='critical']");
   const dangerProbe = document.createElement("span");
-  dangerProbe.style.color = "var(--ds-danger)";
   document.querySelector(".fixture-controls").append(dangerProbe);
-  const expectedDanger = getComputedStyle(dangerProbe).color;
+  const resolveColor = (token) => {
+    dangerProbe.style.color = `var(${token})`;
+    return getComputedStyle(dangerProbe).color;
+  };
+  const expectedDanger = resolveColor("--ds-danger");
+  const expectedInk = resolveColor("--ds-error-ink");
   dangerProbe.remove();
   cues.danger = {
     defined: getComputedStyle(document.documentElement).getPropertyValue("--ds-danger").trim(),
+    inkDefined: getComputedStyle(document.documentElement).getPropertyValue("--ds-error-ink").trim(),
     expected: expectedDanger,
+    expectedInk,
     value: getComputedStyle(critical.querySelector(".composer-usage-value")).color,
     fill: getComputedStyle(critical.querySelector(".composer-usage-context-fill")).backgroundColor,
   };
   if (!cues.danger.defined) failures.push("--ds-danger is not defined");
-  if (cues.danger.value !== expectedDanger) failures.push("critical usage value ignores --ds-danger");
+  if (!cues.danger.inkDefined) failures.push("--ds-error-ink is not defined");
+  if (cues.danger.value !== expectedInk) failures.push("critical usage value ignores --ds-error-ink");
   if (cues.danger.fill !== expectedDanger) failures.push("critical usage fill ignores --ds-danger");
+  // Status ink (PI-UI-1115): production chips and status text paint with the -ink
+  // tokens and keep 4.5:1 on their own tint, on the primary and the inset surface.
+  // A contributed theme repaints those surfaces, so only the built-in palettes
+  // are checked.
+  const statusInk = [];
+  if (!custom) {
+    const swatch = document.createElement("span");
+    document.querySelector(".fixture-status").append(swatch);
+    for (const surface of ["primary", "inset"]) {
+      for (const [selector, token] of STATUS_INK_FIXTURES) {
+        const element = document.querySelector(`.fixture-status[data-surface="${surface}"] ${selector}`);
+        swatch.style.color = `var(${token})`;
+        const ink = rgba(getComputedStyle(element).color);
+        const expected = rgba(getComputedStyle(swatch).color);
+        const ratio = contrastOf(ink, paperBehind(element));
+        statusInk.push({ surface, selector, token, ink, expected, ratio: Number(ratio.toFixed(2)) });
+        if (String(ink) !== String(expected)) failures.push(`${selector} on ${surface} ignores ${token}`);
+        if (ratio < 4.5) failures.push(`${selector} on ${surface} is ${ratio.toFixed(2)}:1, under 4.5:1`);
+      }
+    }
+    swatch.remove();
+  }
   if (custom) {
     for (const [id, [, token, channel = "bg"]] of Object.entries(surfaces)) {
       if (channel === "pinned") continue;
@@ -190,7 +256,7 @@ globalThis.themeSurfacesProbe = async (theme, custom) => {
       if (value.shadow !== (DEFAULT_SHADOWS[theme][id] ?? "none")) failures.push(`${id} changed built-in shadow`);
     }
   }
-  return { ok: failures.length === 0, theme, custom, values, cues, failures,
+  return { ok: failures.length === 0, theme, custom, values, cues, statusInk, failures,
     elevatedToken: getComputedStyle(document.documentElement).getPropertyValue("--ds-bg-elevated-primary").trim(),
     elevatedRgba: rgba(getComputedStyle(document.documentElement).getPropertyValue("--ds-bg-elevated-primary").trim()) };
 };

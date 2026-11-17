@@ -22,9 +22,9 @@
 }
 .team-work-tab-status { display: inline-flex; flex: none; align-items: center; gap: 4px; color: var(--ds-text-primary); font-size: var(--text-md); }
 .team-work-tab-status > svg { color: var(--ds-text-muted); }
-.team-work-tab-status[data-phase="completed"] > svg { color: var(--ds-success); }
-.team-work-tab-status[data-phase="failed"] > svg { color: var(--ds-error); }
-.team-work-tab-status[data-phase="paused"] > svg { color: var(--ds-warning); }
+.team-work-tab-status[data-phase="completed"] > svg { color: var(--ds-success-ink); }
+.team-work-tab-status[data-phase="failed"] > svg { color: var(--ds-error-ink); }
+.team-work-tab-status[data-phase="paused"] > svg { color: var(--ds-warning-ink); }
 .team-work-tab-connector {
   flex: none;
   align-self: flex-start;

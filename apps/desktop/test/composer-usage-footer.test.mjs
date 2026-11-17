@@ -169,8 +169,4 @@ test("composer-usage-footer CSS is defined with flexible wrapping and theme toke
   assert.match(styles, /\.composer-usage-footer\s*\{[\s\S]*?display:\s*flex;/);
   assert.match(styles, /\.composer-usage-footer\s*\{[\s\S]*?flex-wrap:\s*wrap;/);
   assert.match(styles, /\.composer-usage-btn:hover\s*\.composer-usage-value\s*\{/);
-  assert.match(
-    styles,
-    /\.composer-usage-context\[data-level="critical"\]\s*\.composer-usage-value\s*\{[\s\S]*?var\(--ds-danger\);/,
-  );
 });

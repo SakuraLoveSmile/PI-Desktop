@@ -164,7 +164,7 @@ html[data-surface="plugin-launcher"] #root {
   min-width: 0;
   margin-left: auto;
   overflow: hidden;
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
   font-weight: var(--font-weight-medium);
   text-overflow: ellipsis;
   white-space: nowrap;

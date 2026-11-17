@@ -3,7 +3,7 @@
    to a hardcoded literal that no contributed theme could reach. */
 
 .voice-active {
-  color: var(--ds-error) !important;
+  color: var(--ds-error-ink) !important;
 }
 
 .voice-mic-active {
@@ -107,7 +107,7 @@
 }
 
 .voice-error {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 /* ---- Voice settings: wider control column ---- */
@@ -249,7 +249,7 @@
 }
 
 .live-voice-call-actions .live-voice-end {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .live-voice-call-actions .live-voice-muted {
@@ -258,7 +258,7 @@
 }
 
 .live-voice-call-actions .live-voice-resume {
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
 }
 
 .live-voice-feedback {
@@ -317,7 +317,7 @@
 }
 
 .live-voice-decision-title {
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
   font-size: var(--text-sm);
 }
 
@@ -341,7 +341,7 @@
 }
 
 .live-voice-error {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
   font-size: var(--text-sm);
 }
 

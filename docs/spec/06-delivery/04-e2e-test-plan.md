@@ -6418,12 +6418,18 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
     Shiki theme by design. This batch does not change plugin APIs.
   - The composer shell paints its neutral focus ring and glow while its input has
     focus, paints the accent drop outline while a file is dragged over it, and shows
-    no outline at idle. The critical context-usage meter paints its value and fill
-    with `--ds-danger`, which resolves to the error red in each palette.
+    no outline at idle. The critical context-usage meter paints its value with
+    `--ds-error-ink` and its fill with `--ds-danger`; both exist in each palette.
   - Quiet text stays legible: the faint tier (meta lines, counts, hints, empty
     states) clears 3:1 and the muted tier 4.5:1 on the primary, sidebar,
     secondary and inset surfaces in both palettes. In the light palette the faint
     tier is `#858585`, no longer the 2.2:1 `#afafaf` (PI-UI-1114).
+  - Status text stays legible: production chips and status text paint with the
+    `--ds-*-ink` tokens and clear 4.5:1 on their own tint on the primary and inset
+    surfaces in both palettes (plugin risk chips, Team panel status chips, the
+    extension glyph, the installed mark and inline settings errors). In the light
+    palette the inks are `#006c2b`, `#a03c05` and `#ad2421`; in the dark palette they
+    alias the base colours (PI-UI-1115).
   - Delegation task rows sit on the card's 16px column (list inset 8px, rows
     padded 8px) and the hover wash clears the rounded corner. Marketplace cards
     in one grid row share one footer height, so version lines align whether or not
@@ -6435,7 +6441,8 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 - **Milestone**: M5
 - **Status detail**: `pnpm test:e2e:theme-surfaces` exercises these ordinary fills,
   focus states, the composer focus, idle and file-drop cues, the critical usage
-  meter's `--ds-danger` paint, and built-in restoration with real Chromium,
+  meter's `--ds-error-ink` value and `--ds-danger` fill paint, production status chips
+  against the 4.5:1 ink floor, and built-in restoration with real Chromium,
   production CSS, and deterministic DOM fixtures; plugin installation/lifecycle is
   not covered. The quiet-tier contrast floor (`scripts/style-token-contrast.mjs`) and stylesheet
   token integrity (no undefined `var()`, no raw typography on one-line rules;

@@ -240,19 +240,19 @@
 }
 
 .agent-panorama-status-badge.status-running {
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
 }
 
 .agent-panorama-status-badge.status-completed {
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
 }
 
 .agent-panorama-status-badge.status-failed {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .agent-panorama-status-badge.status-paused {
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
 }
 
 .agent-panorama-status-badge.status-idle,
@@ -328,9 +328,9 @@
 }
 
 .agent-panorama-status-badge.status-running svg { color: var(--ds-text-muted); }
-.agent-panorama-status-badge.status-completed svg { color: var(--ds-success); }
-.agent-panorama-status-badge.status-failed svg { color: var(--ds-error); }
-.agent-panorama-status-badge.status-paused svg { color: var(--ds-warning); }
+.agent-panorama-status-badge.status-completed svg { color: var(--ds-success-ink); }
+.agent-panorama-status-badge.status-failed svg { color: var(--ds-error-ink); }
+.agent-panorama-status-badge.status-paused svg { color: var(--ds-warning-ink); }
 .agent-panorama-status-badge.status-idle svg,
 .agent-panorama-status-badge.status-todo svg,
 .agent-panorama-status-badge.status-blocked svg { color: var(--ds-text-muted); }
