@@ -598,7 +598,7 @@ floating layers where an edge is an elevation cue rather than a partition.
 | Scrim / veil | `--ds-scrim` (dark ~45% black, light ~28% `#1a1c1f`, D148), `--ds-modal-veil` (dark 78% `--ds-bg-primary`, light ~32% `#1a1c1f`) | The dialog scrim and the plugin permission backdrop |
 | Tool output | `--ds-tool-row-bg` (light 2% `#1a1c1f`, dark `--ds-tile`) | Tool result and error output blocks in the transcript |
 | Disabled send chip | `--ds-send-disabled-bg`, `--ds-send-disabled-fg` (light `#8e8e90` / `#ffffff`; dark 18% text mix / 70% `--gray-900`) | The composer's disabled send button |
-| Composer placeholder | `--ds-placeholder-ink` (light `#4a4c4f`, dark 42% white) | Input and placeholder ink in both composer states |
+| Composer placeholder | `--ds-placeholder-ink` (light `#6b6d70`, dark 50% white) | Input and placeholder ink in both composer states. The ink is fully opaque in the token (light 5.19:1, dark 5.04:1 on the elevated plate); the fade-in animation must land on `opacity: 1` so no element opacity multiplies it a second time |
 
 Main and settings navigation share the same material, not just matching colors.
 The legacy `--ds-settings-rail-bg` remains readable with the shared built-in
@@ -849,7 +849,9 @@ model):
   column when the viewport is tall
 - The content order is **hero → optional onboarding checklist**. Task entry
   starts directly in the bottom composer; no starter prompt grid or contextual
-  quick-action row is rendered (D204/D206).
+  quick-action row is rendered (D204/D206). The checklist is a `--ds-tile` plate
+  with no outline (D297); its stroke colour is cleared rather than removed, so the
+  plate keeps its geometry.
 - Short windows (`max-height ≤ 760px`) top-align the stack and keep every
   content block reachable by scrolling; the bottom composer remains visible
   and never covers the checklist
@@ -875,7 +877,8 @@ model):
   placeholder remains visible; it auto-grows to seven visual lines and
   scrolls internally from line eight onward
 - Home and thread-docked prompt rows stay free of leading brand icons so the
-  draft aligns directly with the input gutter. Light placeholder ~`#525355`
+  draft aligns directly with the input gutter. Light placeholder `--ds-placeholder-ink`
+  `#6b6d70`, dark 50% white — quiet hint ink that still clears 4.5:1
 - Disabled send is a **solid gray chip** (`#8e8e90` light, white arrow), not
   opacity-only fade
 - Floating composer plates use one solid semantic surface with no internal
@@ -1338,6 +1341,15 @@ margin. Editors scroll their body while keeping title and actions reachable.
 | Active/pressed | accent bg, text inverted | text-primary (inverted) | — | pointer | — |
 | Disabled | bg-secondary | text-muted | border-subtle | not-allowed | — |
 | Loading | same as default + spinner | text-secondary | — | wait | spinner 1s rotate |
+
+Disabled controls dim, but a disabled control that reports state instead of
+offering an action keeps its ink. The shared `opacity: 0.5` table rule is for
+actions that will become available again; applying it to a status read-out
+(an empty context meter, for example) halves an already-quiet tier below the
+4.5:1 floor. Those controls stay at full alpha and take one quiet tier
+(`--ds-text-muted`) for the whole read-out, so the unavailable state lives in
+the content and the dimming never becomes its only signal. They keep the
+disabled row's `not-allowed` cursor, because the control still does not act.
 
 ### 12.2 Semantic states
 

@@ -138,7 +138,9 @@
   --ds-tool-row-bg: var(--ds-tile);
   --ds-send-disabled-bg: color-mix(in oklab, var(--ds-text-primary) 18%, transparent);
   --ds-send-disabled-fg: color-mix(in oklab, var(--gray-900) 70%, transparent);
-  --ds-placeholder-ink: color-mix(in oklab, var(--gray-0) 42%, transparent);
+  /* Opaque 50% white: the placeholder ink composites to ~5:1 on the elevated
+     plate now that the composer no longer multiplies it by an element opacity. */
+  --ds-placeholder-ink: color-mix(in oklab, var(--gray-0) 50%, transparent);
   --ds-success: #40c977;
   --ds-warning: #ff8549;
   --ds-error: #ff6764;
@@ -284,7 +286,7 @@
   --ds-tool-row-bg: color-mix(in oklab, #1a1c1f 2%, transparent);
   --ds-send-disabled-bg: #8e8e90; /* gold disabled send chip */
   --ds-send-disabled-fg: #ffffff;
-  --ds-placeholder-ink: #4a4c4f;
+  --ds-placeholder-ink: #6b6d70;
   --ds-field-inset-focus-bg: #ffffff;
   /* Off knob stays white on the pale track; on knob keeps white on near-black. */
   --ds-switch-track-off: color-mix(in oklab, #1a1c1f 10%, transparent);

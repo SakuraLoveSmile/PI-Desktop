@@ -3307,7 +3307,12 @@ reasoning-level control.
   usage stays in the existing footer beside its meter. Its visible label names
   the leading figure's direction: `chat.usageContextRemainingLabel` (Remaining)
   or `chat.usageContextUsedLabel` (Used), following the context usage display
-  setting. The unavailable placeholder keeps `chat.usageContextLabel` (Context). The chip shows Bot, the
+  setting. The unavailable placeholder keeps `chat.usageContextLabel` (Context)
+  and reports a missing reading rather than an inactive action, so its label
+  and its dash keep full-alpha `--ds-text-muted` ink (light 6.58:1, dark
+  5.56:1) instead of the shared half-opacity disabled dimming, which left them
+  at 2.22-2.34:1. A live meter stays one ink step louder (secondary label,
+  primary value). The chip shows Bot, the
   current model name, and the
   current canonical reasoning level value separated by `·`; `off` shows the
   localized Off label. The canonical value is rendered as-is (`low`, `high`, `xhigh`,
@@ -4966,8 +4971,12 @@ available. Missing preferences retain Detailed.
 ### 13.4 Session activity rail
 
 The accepted right rail groups Plan, Subagents, Background processes, Outputs,
-Sources without a framed card. Group headers are muted and
-independently expandable; Overview agents show an accessible state glyph,
+Sources without a stroked frame (D297). Group headers use primary ink at medium
+weight so they read apart from the muted empty-state copy beneath them, and each
+carries its record count in a tonal chip (`--ds-tile-deep`). A group that is open
+and holds rows sits on a `--ds-tile` plate; the nested Ended group, empty groups
+and folded groups stay flat. Groups are independently expandable; Overview agents
+show an accessible state glyph,
 while transcript agents retain their avatar. Command rows show a small terminal tile, and long labels have a
 full tooltip. Outputs/Sources start folded, other activity groups start open,
 and the suggestion list opens explicitly. Each group displays its record count

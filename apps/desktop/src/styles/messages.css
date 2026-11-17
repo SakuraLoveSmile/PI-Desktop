@@ -3523,9 +3523,14 @@
   color: var(--ds-text-muted);
 }
 
+/* The tool count reports real turn content, not a hint, so it belongs in the muted
+   tier the design system keeps at or above 4.5:1 for small text. On the faint tier it
+   measured 3.59:1 dark and 3.69:1 light against the transcript, making the row's
+   quietest word its hardest to read. Muted, not secondary: 5.10-6.58:1 on every
+   transcript surface while the label still leads the row. */
 .turn-process > .tool-activity-header > .tool-activity-count {
   font-size: var(--text-xs);
-  color: var(--ds-text-faint);
+  color: var(--ds-text-muted);
 }
 
 .turn-process.open > .tool-activity-header > .tool-activity-caret,
