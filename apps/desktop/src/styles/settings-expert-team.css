@@ -13,7 +13,7 @@
 .expert-team-role-editor .ext-field-label-row { flex-wrap: wrap; }
 .expert-team-editor-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .expert-team-error,
-.expert-team-load-error { color: var(--ds-error); margin: 0; }
+.expert-team-load-error { color: var(--ds-error-ink); margin: 0; }
 .expert-team-load-error { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 @media (max-width: 640px) {
   .expert-team-model-fields { grid-template-columns: minmax(0, 1fr); }

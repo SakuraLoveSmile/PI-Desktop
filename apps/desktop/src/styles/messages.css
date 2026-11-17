@@ -496,7 +496,7 @@
 
 .run-activity-indicator[data-phase="retrying"],
 .run-activity-indicator[data-phase="recovering"] {
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
 }
 
 .run-activity-indicator[data-phase="retrying"] .working-indicator-mark > span,
@@ -940,7 +940,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
   font-size: var(--text-xs-plus);
 }
 
@@ -1018,7 +1018,7 @@
 }
 
 .turn-outcome-card.failed .turn-outcome-icon {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .turn-outcome-copy {
@@ -1103,15 +1103,15 @@
 }
 
 .goal-report-card.verdict-met .goal-report-card-icon {
-  color: var(--ds-success, #22c55e);
+  color: var(--ds-success-ink);
 }
 
 .goal-report-card.verdict-partial .goal-report-card-icon {
-  color: var(--ds-warning, #f59e0b);
+  color: var(--ds-warning-ink);
 }
 
 .goal-report-card.verdict-blocked .goal-report-card-icon {
-  color: var(--ds-error, #ef4444);
+  color: var(--ds-error-ink);
 }
 
 .goal-report-card-titles {
@@ -1146,17 +1146,17 @@
 
 .goal-report-card-verdict-badge.verdict-met {
   background: color-mix(in oklab, var(--ds-success, #22c55e) 15%, transparent);
-  color: var(--ds-success, #22c55e);
+  color: var(--ds-success-ink);
 }
 
 .goal-report-card-verdict-badge.verdict-partial {
   background: color-mix(in oklab, var(--ds-warning, #f59e0b) 15%, transparent);
-  color: var(--ds-warning, #f59e0b);
+  color: var(--ds-warning-ink);
 }
 
 .goal-report-card-verdict-badge.verdict-blocked {
   background: color-mix(in oklab, var(--ds-error, #ef4444) 15%, transparent);
-  color: var(--ds-error, #ef4444);
+  color: var(--ds-error-ink);
 }
 
 .goal-report-card-verdict-badge.verdict-unknown {
@@ -1182,7 +1182,7 @@
   padding: 1px 6px;
   border-radius: var(--radius-sm);
   background: color-mix(in oklab, var(--ds-warning, #f59e0b) 12%, transparent);
-  color: var(--ds-warning, #f59e0b);
+  color: var(--ds-warning-ink);
 }
 
 .goal-report-card-time {
@@ -1223,7 +1223,7 @@
 }
 
 .goal-blocked-card .goal-report-card-icon {
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
 }
 
 .goal-report-card-open-btn {
@@ -1299,12 +1299,12 @@
 
 .permission-risk.risk-high {
   background: color-mix(in oklab, var(--ds-error) 14%, transparent);
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .permission-risk.risk-medium {
   background: color-mix(in oklab, var(--ds-warning) 14%, transparent);
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
 }
 
 .permission-card-prompt {
@@ -1452,7 +1452,7 @@
 
 .copy-btn.danger:hover {
   background: color-mix(in oklab, var(--ds-error) 10%, transparent);
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 /* Message toolbars stay glyphs-only: the label rides in a hover/focus tooltip
@@ -1503,11 +1503,11 @@
 }
 
 .context-inspector[data-level="warning"] {
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
 }
 
 .context-inspector[data-level="critical"] {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .context-inspector-trigger {
@@ -2087,7 +2087,7 @@
 .message-error-icon {
   display: inline-flex;
   flex: 0 0 auto;
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .message-error-copy {
@@ -2109,7 +2109,7 @@
   border-radius: var(--radius-full);
   background: color-mix(in oklab, var(--ds-error) 8%, transparent);
   padding: 2px 6px;
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
   font-size: var(--text-2xs);
   line-height: var(--leading-compact);
 }
@@ -2843,7 +2843,7 @@
 }
 
 .tool-row-head-copy.copied {
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
 }
 
 .tool-row-caret.is-toggle {
@@ -2875,7 +2875,7 @@
 }
 
 .tool-row-state.is-error {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .tool-row-state-dot {
@@ -3013,7 +3013,7 @@
 }
 
 .tool-row-status.error {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .tool-spinner {
@@ -3191,7 +3191,7 @@
 
 .tool-chip.is-error {
   background: color-mix(in oklab, var(--ds-error) 12%, transparent);
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .tool-block + .tool-block {
@@ -3242,7 +3242,7 @@
 
 .tool-row-content.is-error {
   background: color-mix(in oklab, var(--ds-error) 7%, transparent);
-  color: color-mix(in oklab, var(--ds-error) 72%, var(--ds-text-primary));
+  color: color-mix(in oklab, var(--ds-error-ink) 72%, var(--ds-text-primary));
 }
 
 /*
@@ -3435,7 +3435,7 @@
 
 .tool-note.is-error {
   background: color-mix(in oklab, var(--ds-error) 7%, transparent);
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .tool-note-text {
@@ -3581,7 +3581,7 @@
   gap: 4px;
   flex: none;
   font-size: var(--text-xs-plus);
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 /* Provider-hosted web search round. The row reuses the tool-row idiom; only

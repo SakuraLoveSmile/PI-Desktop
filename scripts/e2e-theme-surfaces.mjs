@@ -1,8 +1,12 @@
 #!/usr/bin/env node
-/** Real Chromium cascade regression for token-driven chrome surfaces (E2E-078). */
+/**
+ * Real Chromium cascade regression for token-driven chrome surfaces (E2E-078). It
+ * also holds production status chips and status text to the 4.5:1 ink floor in both
+ * palettes (PI-UI-1115).
+ */
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,13 +25,21 @@ try {
   const appHtml = await readFile(join(renderer, "index.html"), "utf8");
   const css = [...appHtml.matchAll(/href="([^" ]+\.css)"/g)].map((match) => match[1]);
   assert(css.length, "Build the app with pnpm build:js before running this check");
+  // The Team panel's chips ship in the lazily loaded work-panel stylesheet, which
+  // index.html does not link; load it too so the status chips paint as in the app.
+  for (const name of (await readdir(join(renderer, "assets"))).filter((file) => file.endsWith(".css"))) {
+    if ((await readFile(join(renderer, "assets", name), "utf8")).includes(".team-task-status-failed")) css.push(`./assets/${name}`);
+  }
   await cp(join(renderer, "assets"), join(temp, "assets"), { recursive: true });
-  await writeFile(join(temp, "index.html"), `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:"><title>Theme surface regression</title>${css.map((path) => `<link rel="stylesheet" href="${path}">`).join("")}<style>body { padding: 32px; display: flex; gap: 32px; align-items: flex-start; } .fixture-controls { width: 420px; display: grid; gap: 24px; } .fixture-prose { width: 420px; display: grid; gap: 12px; } .settings-shell-full { width: 275px; height: 340px; } .settings-toggle { margin: 20px; } /* Fixed/absolute app layers stay in flow here so they do not cover other fixtures. Only position changes, never paint. */ .fixture-controls .overlay, .fixture-controls .plugins-modal-backdrop, .fixture-controls .composer-dock-docked { position: static; inset: auto; padding: 12px; animation: none; }</style><body>
+  // Real classes that paint status text and chips; the probe reads them on two surfaces.
+  const statusChips = `<span class="plugins-perm-chip risk-high">network</span><span class="team-badge team-task-status-failed">failed</span><span class="team-badge team-task-status-completed">completed</span><span class="ext-row-glyph is-ready">ok</span><div class="settings-inline-error">Could not save</div><span class="plugins-installed-mark">Installed</span>`;
+  await writeFile(join(temp, "index.html"), `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:"><title>Theme surface regression</title>${css.map((path) => `<link rel="stylesheet" href="${path}">`).join("")}<style>body { padding: 32px; display: flex; gap: 32px; align-items: flex-start; } .fixture-controls { width: 420px; display: grid; gap: 24px; } .fixture-prose { width: 420px; display: grid; gap: 12px; } .settings-shell-full { width: 275px; height: 340px; } .settings-toggle { margin: 20px; } /* Fixed/absolute app layers stay in flow here so they do not cover other fixtures. Only position changes, never paint. */ .fixture-controls .overlay, .fixture-controls .plugins-modal-backdrop, .fixture-controls .composer-dock-docked { position: static; inset: auto; padding: 12px; animation: none; } .fixture-status { width: 220px; display: grid; gap: 8px; padding: 12px; justify-items: start; } .fixture-status[data-surface="primary"] { background: var(--ds-bg-primary); } .fixture-status[data-surface="inset"] { background: var(--ds-bg-inset); }</style><body>
     <section class="settings-shell-full"><nav class="settings-nav sidebar-surface"><div class="settings-nav-top"><input class="settings-search" placeholder="Search settings"></div><div class="settings-nav-scroll"><button class="settings-nav-item active">General</button><button class="settings-nav-item">Appearance</button><button class="settings-toggle on" aria-label="Enabled"><span class="settings-toggle-thumb"></span></button></div></nav></section>
     <section class="fixture-controls"><div class="composer-shell"><textarea class="composer-input" aria-label="Composer surface input">Composer surface</textarea></div><div class="composer-usage-context" data-level="critical"><span class="composer-usage-context-track"><span class="composer-usage-context-fill"></span></span><span class="composer-usage-value">92%</span></div><div class="composer-dock composer-dock-docked">Transparent composer dock</div><div class="thread-scroll">Transcript scroller</div><input class="plugins-search" placeholder="Search plugins"><div class="agent-capability-search-wrap"><input class="agent-capability-search" placeholder="Search capabilities"></div><div class="overlay">Dialog scrim</div><div class="plugins-modal-backdrop">Permission veil</div></section>
     <section class="fixture-controls"><div class="composer-stack"><section class="asktool-card"><div class="asktool-card-header"><span class="asktool-card-title">Question</span></div><button class="asktool-option">Blue</button><button class="asktool-option selected">Green</button><input class="asktool-custom-input" placeholder="Other" aria-label="Other"></section></div></section>
     <section class="fixture-prose"><div class="prose-chat"><p>Answer prose with a <kbd>K</kbd> keycap and an <code>inline chip</code>.</p></div><div class="thinking-prose"><code>thinking code</code></div><div class="code-block-head">Code card head band</div><div class="mermaid-block-body">Mermaid canvas</div><button class="send-btn" disabled>Send</button></section>
     <section class="fixture-tools"><div class="tool-row-content">Tool output</div><div class="tool-block is-plain"><div class="tool-row-content">Plain tool output</div></div><div class="tool-row-content is-error">Error tool output</div></section>
+    <section class="fixture-status" data-surface="primary">${statusChips}</section><section class="fixture-status" data-surface="inset">${statusChips}</section>
     <script src="renderer.js"></script>`);
   await writeFile(
     join(temp, "main.cjs"),

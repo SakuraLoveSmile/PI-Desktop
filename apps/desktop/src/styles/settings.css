@@ -604,7 +604,7 @@
 }
 
 .settings-config-sync-message.error {
-  color: var(--ds-danger);
+  color: var(--ds-error-ink);
 }
 
 .settings-storage-path,
@@ -621,7 +621,7 @@
 }
 
 .settings-storage-message.error {
-  color: var(--ds-danger);
+  color: var(--ds-error-ink);
 }
 
 .settings-storage-confirmation {
@@ -751,7 +751,7 @@
 }
 
 .settings-config-sync-sensitive {
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
 }
 
 .settings-config-sync-warning {
@@ -759,7 +759,7 @@
   padding: 10px 12px;
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--ds-warning) 12%, transparent);
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
   font-size: var(--text-sm);
 }
 
@@ -1205,7 +1205,7 @@
 
 .shortcut-error {
   margin-top: 3px;
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
   font-size: var(--text-xs-plus);
   line-height: var(--leading-body);
 }
@@ -2208,17 +2208,17 @@
 */
 .agent-capability-glyph.is-ready {
   background: color-mix(in oklab, var(--ds-success) 14%, transparent);
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
 }
 
 .agent-capability-glyph.is-connecting {
   background: color-mix(in oklab, var(--ds-warning) 14%, transparent);
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
 }
 
 .agent-capability-glyph.is-failed {
   background: color-mix(in oklab, var(--ds-error) 14%, transparent);
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 /* A tinted glyph must not survive the row being switched off. */
@@ -2229,15 +2229,15 @@
 
 /* Hover must not repaint a tint the row being off has just taken away. */
 .agent-capability-row:not(.is-off):hover .agent-capability-glyph.is-ready {
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
 }
 
 .agent-capability-row:not(.is-off):hover .agent-capability-glyph.is-failed {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .agent-capability-row:not(.is-off):hover .agent-capability-glyph.is-connecting {
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
 }
 
 .agent-capability-copy {
@@ -2303,12 +2303,12 @@
 
 .agent-capability-badge.is-ready {
   background: color-mix(in oklab, var(--ds-success) 13%, transparent);
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
 }
 
 .agent-capability-badge.is-connecting {
   background: color-mix(in oklab, var(--ds-warning) 13%, transparent);
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
 }
 
 .agent-capability-badge.is-connecting .agent-capability-status-dot {
@@ -2317,7 +2317,7 @@
 
 .agent-capability-badge.is-failed {
   background: color-mix(in oklab, var(--ds-error) 13%, transparent);
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .agent-capability-description {
@@ -2482,7 +2482,7 @@
 }
 
 .agent-capability-menu button.danger {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .agent-capability-menu button.danger:hover:not(:disabled),
@@ -2794,7 +2794,7 @@
   padding: 10px 12px;
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--ds-warning) 12%, transparent);
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
   font-size: var(--text-sm);
 }
 
@@ -2863,7 +2863,7 @@
 }
 
 .agent-extension-diagnostic.is-error .agent-extension-diagnostic-kind {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .agent-extension-diagnostic-kind {
@@ -3181,7 +3181,7 @@
 
 .mcpm-badge.is-verified {
   background: color-mix(in oklab, var(--ds-success) 13%, transparent);
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
 }
 
 .mcpm-cmd {
@@ -3332,7 +3332,7 @@
 }
 
 .mcpm-status.is-error {
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
 }
 
 .mcpm-badge.is-remote {
@@ -3689,7 +3689,7 @@
 
 .sklm-badge.is-verified {
   background: color-mix(in oklab, var(--ds-success) 13%, transparent);
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
 }
 
 .sklm-cmd {
@@ -3788,7 +3788,7 @@
 
 /* A failed preview must read as an error, not as a muted side note. */
 .sklm-note.is-error {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .sklm-note-label {
@@ -3845,7 +3845,7 @@
 }
 
 .sklm-status.is-error {
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
 }
 
 .sklm-badge.is-remote {
@@ -4074,7 +4074,7 @@
   line-height: var(--leading-body);
 }
 .pi-skill-discovery-error {
-  color: var(--ds-danger);
+  color: var(--ds-error-ink);
   overflow-wrap: anywhere;
 }
 .pi-skill-discovery-error p {
@@ -4141,8 +4141,8 @@
 .settings-empty-copy > p { margin: 4px 0 0; color: var(--ds-text-muted); font-size: var(--text-sm); line-height: var(--leading-body); }
 .settings-empty-action { flex: 0 0 auto; }
 .settings-save-feedback { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: -12px 0 20px; font-size: var(--text-sm); color: var(--ds-text-secondary); }
-.settings-save-feedback.is-failed { color: var(--ds-danger); }
-.settings-save-feedback.is-refreshFailed { color: var(--ds-warning); }
+.settings-save-feedback.is-failed { color: var(--ds-error-ink); }
+.settings-save-feedback.is-refreshFailed { color: var(--ds-warning-ink); }
 .settings-technical-details { display: grid; gap: 4px; font-size: var(--text-sm); color: var(--ds-text-muted); }
 .settings-technical-details summary { cursor: pointer; margin: 6px 0; }
 .settings-technical-details span { display: block; overflow-wrap: anywhere; }
@@ -4176,7 +4176,7 @@
   .settings-card-heading-row { flex-wrap: wrap; gap: 8px; }
 }
 
-.settings-inline-error { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; color: var(--ds-danger); font-size: var(--text-sm); padding: 12px 14px; overflow-wrap: anywhere; }
+.settings-inline-error { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; color: var(--ds-error-ink); font-size: var(--text-sm); padding: 12px 14px; overflow-wrap: anywhere; }
 .settings-save-status { color: var(--ds-text-muted); font-size: var(--text-sm); }
 .expert-team-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
 .expert-team-project-picker { min-width: 0; width: min(100%, 360px); }

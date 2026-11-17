@@ -1011,11 +1011,11 @@
 }
 
 .composer-usage-context[data-level="warning"] .composer-usage-value {
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
 }
 
 .composer-usage-context[data-level="critical"] .composer-usage-value {
-  color: var(--ds-danger);
+  color: var(--ds-error-ink);
 }
 
 .composer-usage-context {

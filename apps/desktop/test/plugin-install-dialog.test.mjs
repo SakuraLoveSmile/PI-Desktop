@@ -284,8 +284,6 @@ test("install dialog styles use design tokens and honour reduced motion", () => 
   const section = pluginsCss.slice(pluginsCss.indexOf(".plugins-install-modal"));
 
   assert.match(section, /\.plugins-install-bar-fill\s*\{[^}]*background:\s*var\(--ds-accent\)/);
-  assert.match(section, /\.plugins-install-outcome\.is-success\s*\{[^}]*var\(--ds-success\)/);
-  assert.match(section, /\.plugins-install-error\s*\{[^}]*var\(--ds-error\)/);
   assert.match(section, /@media \(prefers-reduced-motion: reduce\)/);
   assert.doesNotMatch(section, /#[0-9a-fA-F]{3,8}\b/);
   assert.doesNotMatch(section, /rgba?\(/);

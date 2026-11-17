@@ -183,10 +183,13 @@ PI-Desktop 的行为类似于桌面应用程序 shell，因此意外拖动
 | `--color-border-subtle` | `color-mix(#1a1c1f 5%, transparent)` | 侧边栏边缘/分隔线 |
 | `--color-accent` | `#1a1c1f` | 主要强调、CTA、页脚徽章（中性墨水） |
 | `--color-success`/警告/错误 | 绿色-500 / 橙色-500 / 红色-500 | 状态 |
+| `--color-success-ink`/警告/错误 | `#006c2b` / `#a03c05` / `#ad2421` | 状态文字与图标（上面的基础色保留给填充、圆点、边框） |
 
 **不变：**切勿在 `data-theme="light"` 下使用原始 `gray-0` (`#fff`) 绘制镀铬文本。使用 `--ds-text-primary` / `--ds-text-secondary`。
 
 **对比度下限（PI-UI-1114）：**两个次要文字层级承载真实内容（元信息行、计数、提示、空状态），因此在两个主题下，它们落到的每一种底色上都必须保持可读：`--ds-text-muted` 至少 4.5:1，`--ds-text-faint` 至少 3:1，底色包括主表面、侧边栏、次级表面和内嵌表面。浅色主题的 faint 层级原为 `#afafaf`（白底 2.19:1，侧边栏 1.98:1），现为 `#858585`（白底 3.69:1，侧边栏 3.33:1，内嵌表面 3.15:1）。深色主题约 3.4:1 到 3.6:1。`scripts/style-token-contrast.mjs` 由 `pnpm lint` 通过 `scripts/check-style-tokens.mjs` 运行，从 `styles/tokens.css` 计算对比度（带透明度的令牌会先合成到底色上），所以调整令牌或其底色都以比值为准；读不懂的令牌语法会被报告而不是放行。`apps/desktop/test/text-tier-contrast.test.mjs` 用夹具固定这条规则。
+
+**状态墨色（PI-UI-1115）：**浅色主题的状态色是填充色，不是文字色：`--ds-success` 在白底上只有 3.36:1，`--ds-warning` 为 3.79:1，三个基础色落在自身 15% 色块上时只有 2.45:1 到 3.65:1，都低于 4.5:1 的文字下限。因此状态文字和图标改用 `--ds-success-ink`、`--ds-warning-ink` 和 `--ds-error-ink`。浅色主题中它们是同色相加深后的 `#006c2b`、`#a03c05` 和 `#ad2421`：在四种底色上落在自身 15% 色块时至少 4.75:1，在样式表使用的 16% 色块上不低于 4.68:1；深色主题中它们是基础色的别名，所以深色主题的绘制与之前完全一致。`color:` 声明从不直接引用 `--ds-success`、`--ds-warning`、`--ds-error` 或 `--ds-danger`；填充、圆点、边框、导轨和色块仍用基础色，`--ds-danger` 继续作为上下文用量仪表（临界）的填充，而危险文字使用 `--ds-error-ink`。`scripts/style-token-contrast.mjs` 在两个主题下按四种底色和基础色 15% 色块检查每个墨色（`findLowContrastStatusInk`），并标记任何引用基础令牌的 `color:`（`findBaseStatusTextColors`），二者都由 `pnpm lint` 运行；`apps/desktop/test/text-tier-contrast.test.mjs` 用夹具固定它们，`scripts/e2e-theme-surfaces.mjs` 在真实 Chromium 中测量生产环境的状态色块（E2E-078）。带白色文字的实心状态填充不在此规则范围内。
 
 共享按钮的表面和墨迹必须使用语义主题标记：
 主要操作将 `--ds-accent` 与 `--ds-bg-primary` 配对，而次要操作

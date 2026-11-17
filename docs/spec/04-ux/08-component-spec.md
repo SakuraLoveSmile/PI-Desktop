@@ -2908,7 +2908,7 @@ item checklist.
 
 - **Goal Capsule:** Rendered centrally stacked directly above the Composer input shell.
   Height 30–32px with 10px border radius, containing an SVG circular ring progress indicator
-  and count label (e.g. `3/5`) styled in `--ds-success` / `--color-goal`.
+  and count label (e.g. `3/5`) styled in `--ds-success-ink` / `--color-goal`.
 - **Collapsible Goal Bar:** Presents active execution status, single-line truncated goal title,
   and expand/collapse toggle. When expanded, reveals the full goal description and live item checklist
   with a maximum 144px internal scroll area. Folding preference is remembered per session.

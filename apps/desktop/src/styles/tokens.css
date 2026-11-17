@@ -142,7 +142,12 @@
   --ds-success: #40c977;
   --ds-warning: #ff8549;
   --ds-error: #ff6764;
-  /* Critical usage and danger text reuse the error red in each palette. */
+  /* Status text and glyphs paint with the -ink tokens; fills, dots, borders and tints
+     keep the base colours. Dark: the base colours already clear 4.5:1, so ink = base. */
+  --ds-success-ink: var(--ds-success);
+  --ds-warning-ink: var(--ds-warning);
+  --ds-error-ink: var(--ds-error);
+  /* The critical usage fill reuses the error red in each palette; danger text uses --ds-error-ink. */
   --ds-danger: var(--ds-error);
   --ds-info: var(--gray-300);
   --ds-purple: #c27aff;
@@ -290,6 +295,11 @@
   --ds-success: #00a240;
   --ds-warning: #e25507;
   --ds-error: #e02e2a;
+  /* Light ink: the same hues darkened until text clears 4.5:1 on every surface and on a
+     15% chip of its own colour (PI-UI-1115, checked by scripts/style-token-contrast.mjs). */
+  --ds-success-ink: #006c2b;
+  --ds-warning-ink: #a03c05;
+  --ds-error-ink: #ad2421;
   --ds-danger: var(--ds-error);
   --ds-info: #5d5d5d;
   --ds-purple: #7c3aed;

@@ -394,7 +394,7 @@
 
 .project-create-folder-remove:hover:not(:disabled) {
   background: color-mix(in oklab, var(--ds-error) 13%, transparent);
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .project-create-add-folder {

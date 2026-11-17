@@ -370,11 +370,11 @@
 }
 
 .thread-item-status.completed {
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
 }
 
 .thread-item-status.failed {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .thread-item-status.completed svg {
@@ -553,7 +553,7 @@
 }
 
 .sidebar-row-menu button.danger {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 /* An armed delete item names its second click, so the swap stays obvious. */
@@ -846,11 +846,11 @@
 }
 
 .sidebar-session-hover-card-status[data-status="failed"] {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .sidebar-session-hover-card-status[data-status="waiting_permission"] {
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
 }
 
 .sidebar-session-hover-card-section {
@@ -928,7 +928,7 @@
   flex: 0 0 auto;
   align-items: center;
   gap: 4px;
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
   font-size: var(--text-xs);
   font-weight: var(--font-weight-medium);
   line-height: var(--leading-tight);

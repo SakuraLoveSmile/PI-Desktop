@@ -203,15 +203,15 @@
 }
 .badge-success {
   background: color-mix(in oklab, var(--ds-success) 16%, transparent);
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
 }
 .badge-error {
   background: color-mix(in oklab, var(--ds-error) 16%, transparent);
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 .badge-warning {
   background: color-mix(in oklab, var(--ds-warning) 16%, transparent);
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
 }
 
 #pi-desktop-overlays {
@@ -308,7 +308,7 @@
 }
 
 .context-menu-item.danger {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .context-menu-item.danger:hover,

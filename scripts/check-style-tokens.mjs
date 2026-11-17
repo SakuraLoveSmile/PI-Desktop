@@ -18,6 +18,11 @@
  *    drops the declaration (see style-token-integrity.mjs).
  *  - tokens.css: the quiet text tiers keep their contrast floor on every
  *    surface in both themes (see style-token-contrast.mjs).
+ *  - tokens.css: the status ink tokens (`--ds-*-ink`) clear 4.5:1 as text on every
+ *    surface and on a 15% chip of their own base colour, in both themes.
+ *  - CSS: a `color:` declaration never names a base status token
+ *    (`--ds-success`, `--ds-warning`, `--ds-error`, `--ds-danger`); text and glyphs
+ *    take the matching `--ds-*-ink` token, fills, dots and borders keep the base.
  *  - TSX: arbitrary-value utilities text-[...], rounded-[...], leading-[...],
  *    tracking-[...], font-[...] are forbidden.
  */
@@ -25,7 +30,11 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { findLiteralSurfaceColors } from "./style-surface-tokens.mjs";
-import { findLowContrastTextTiers } from "./style-token-contrast.mjs";
+import {
+  findBaseStatusTextColors,
+  findLowContrastStatusInk,
+  findLowContrastTextTiers,
+} from "./style-token-contrast.mjs";
 import {
   collectDefinedProperties,
   findInlineTypographyLiterals,
@@ -80,6 +89,9 @@ for (const file of walk(srcDir)) {
     for (const violation of findInlineTypographyLiterals(source)) {
       violations.push(`${rel}:${violation.line} raw ${violation.property} value "${violation.value}" — use a token var`);
     }
+    for (const violation of findBaseStatusTextColors(source)) {
+      violations.push(`${rel}:${violation.line} ${violation.message}`);
+    }
   }
   const lines = source.split("\n");
   // `@font-face` descriptors describe the font file (weight ranges, etc.),
@@ -108,7 +120,8 @@ for (const file of walk(srcDir)) {
   });
 }
 
-for (const violation of findLowContrastTextTiers(readFileSync(join(srcDir, "styles/tokens.css"), "utf8"))) {
+const tokensCss = readFileSync(join(srcDir, "styles/tokens.css"), "utf8");
+for (const violation of [...findLowContrastTextTiers(tokensCss), ...findLowContrastStatusInk(tokensCss)]) {
   violations.push(`apps/desktop/src/styles/tokens.css ${violation.message}`);
 }
 

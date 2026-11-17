@@ -147,7 +147,7 @@
 }
 
 .provider-setup-field-error {
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
   font-size: var(--text-xs);
   line-height: var(--leading-relaxed);
   overflow-wrap: anywhere;
@@ -545,7 +545,7 @@
 
 .provider-setup-header-error {
   margin: 0;
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
   font-size: var(--text-2xs);
   line-height: var(--leading-relaxed);
 }
@@ -715,7 +715,7 @@
 .provider-models-placeholder.is-error {
   flex-direction: column;
   gap: 6px;
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
   overflow-wrap: anywhere;
 }
 
@@ -1862,7 +1862,7 @@
 .provider-setup-actions { display: flex; flex-wrap: wrap; flex: 0 0 auto; justify-content: flex-end; gap: 8px; padding: 8px 0 0; }
 .provider-setup-head { flex: 0 0 auto; }
 .provider-connection-feedback, .provider-setup-error, .provider-models-error { margin: 0; font-size: var(--text-sm); overflow-wrap: anywhere; }
-.provider-setup-error, .provider-models-error, .provider-connection-feedback.is-error { color: var(--ds-danger); }
+.provider-setup-error, .provider-models-error, .provider-connection-feedback.is-error { color: var(--ds-error-ink); }
 .provider-models-error { padding: 10px 12px; }
 @media (max-width: 720px) {
   .provider-setup-panes { grid-template-columns: minmax(0, 1fr); }

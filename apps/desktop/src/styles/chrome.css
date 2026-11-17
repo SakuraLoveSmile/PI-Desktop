@@ -1009,11 +1009,11 @@
   align-items: center;
   justify-content: center;
   margin-top: 1px;
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
 }
 
 .notification-kind-icon.failed {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
 }
 
 .notification-copy {

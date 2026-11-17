@@ -58,14 +58,14 @@
 
 .team-status-paused {
   background: color-mix(in oklab, var(--ds-warning) 15%, transparent);
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
   border: 1px solid color-mix(in oklab, var(--ds-warning) 40%, transparent);
 }
 
 .team-status-active,
 .team-status-completed {
   background: color-mix(in oklab, var(--ds-success) 15%, transparent);
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
   border: 1px solid color-mix(in oklab, var(--ds-success) 40%, transparent);
 }
 
@@ -76,7 +76,7 @@
 }
 
 .team-status-failed {
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
   background: var(--ds-bg-hover);
   border: 1px solid var(--ds-border-subtle);
 }
@@ -120,7 +120,7 @@
   gap: 6px;
   font-size: var(--text-xs-plus);
   font-weight: var(--font-weight-medium);
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
 }
 
 .team-warning-item {
@@ -224,13 +224,13 @@
 
 .team-phase-completed,
 .team-task-status-completed {
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
   background: color-mix(in oklab, #10b981 15%, transparent);
 }
 
 .team-phase-failed,
 .team-task-status-failed {
-  color: var(--ds-danger, #ef4444);
+  color: var(--ds-error-ink);
   background: color-mix(in oklab, #ef4444 15%, transparent);
 }
 
@@ -241,12 +241,12 @@
 }
 
 .team-task-readiness-ready {
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
   background: color-mix(in oklab, #10b981 15%, transparent);
 }
 
 .team-task-readiness-blocked {
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
   background: color-mix(in oklab, var(--ds-warning) 15%, transparent);
 }
 
@@ -275,7 +275,7 @@
 
 .team-card-error {
   font-size: var(--text-xs);
-  color: var(--ds-danger, #ef4444);
+  color: var(--ds-error-ink);
   margin-top: 2px;
 }
 
@@ -319,7 +319,7 @@
 }
 
 .team-error-state {
-  color: var(--ds-danger, #ef4444);
+  color: var(--ds-error-ink);
 }
 
 .team-clickable-card {
@@ -476,20 +476,20 @@
 
 .team-review-status-badge.status-pending {
   background: color-mix(in oklab, var(--ds-warning) 15%, transparent);
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
   border: 1px solid color-mix(in oklab, var(--ds-warning) 40%, transparent);
 }
 
 .team-review-status-badge.status-confirmed {
   background: color-mix(in oklab, var(--ds-success) 15%, transparent);
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
   border: 1px solid color-mix(in oklab, var(--ds-success) 40%, transparent);
 }
 
 .team-review-status-badge.status-cancelled,
 .team-review-status-badge.status-interrupted {
   background: color-mix(in oklab, var(--ds-error) 15%, transparent);
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
   border: 1px solid color-mix(in oklab, var(--ds-error) 40%, transparent);
 }
 
@@ -536,7 +536,7 @@
   background: color-mix(in oklab, var(--ds-error) 12%, transparent);
   border: 1px solid color-mix(in oklab, var(--ds-error) 30%, transparent);
   border-radius: var(--radius-md);
-  color: var(--ds-error);
+  color: var(--ds-error-ink);
   font-size: var(--text-xs);
 }
 
@@ -600,7 +600,7 @@
 
 .team-badge-new {
   background: color-mix(in oklab, var(--ds-success) 15%, transparent);
-  color: var(--ds-success);
+  color: var(--ds-success-ink);
 }
 
 .team-launch-review-member-desc {
@@ -679,8 +679,8 @@
 
 .team-task-glyph { display: inline-flex; flex: none; align-items: center; justify-content: center; color: var(--ds-text-muted); }
 .team-task-glyph[data-state="in_progress"] { color: var(--ds-text-primary); }
-.team-task-glyph[data-state="completed"] { color: var(--ds-success); }
-.team-task-glyph[data-state="failed"] { color: var(--ds-error); }
+.team-task-glyph[data-state="completed"] { color: var(--ds-success-ink); }
+.team-task-glyph[data-state="failed"] { color: var(--ds-error-ink); }
 .team-progress { display: flex; flex-direction: column; }
 .team-progress-header { display: flex; align-items: center; gap: 8px; min-height: 48px; }
 .team-progress-title {
@@ -782,10 +782,10 @@
   line-height: var(--leading-none);
 }
 
-.team-task-state-completed { color: var(--ds-success); }
+.team-task-state-completed { color: var(--ds-success-ink); }
 .team-task-state-in_progress { color: var(--ds-accent); }
-.team-task-state-blocked { color: var(--ds-warning); }
-.team-task-state-failed { color: var(--ds-error); }
+.team-task-state-blocked { color: var(--ds-warning-ink); }
+.team-task-state-failed { color: var(--ds-error-ink); }
 
 .team-task-spinner { animation: team-task-spin 1.2s linear infinite; }
 
@@ -936,10 +936,10 @@
   min-width: 0;
 }
 
-.team-panorama-status-icon { display: inline-flex; color: var(--ds-success); }
+.team-panorama-status-icon { display: inline-flex; color: var(--ds-success-ink); }
 .team-panorama-person-running .team-panorama-status-icon { color: var(--ds-accent); }
-.team-panorama-person-failed .team-panorama-status-icon { color: var(--ds-error); }
-.team-panorama-person-paused .team-panorama-status-icon { color: var(--ds-warning); }
+.team-panorama-person-failed .team-panorama-status-icon { color: var(--ds-error-ink); }
+.team-panorama-person-paused .team-panorama-status-icon { color: var(--ds-warning-ink); }
 
 @media (max-width: 560px) {
   .team-board-row {
