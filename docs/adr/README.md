@@ -384,5 +384,6 @@ Each ADR includes:
 | external-goal-control-over-mcp | [External held-Goal control over local MCP](external-goal-control-over-mcp.md) | Accepted for implementation |
 | worktree-memory-owner | [Resolve verified worktree memory without aliasing workspace access](worktree-memory-owner.md) | Accepted; amended by worktree-project-memory-spaces |
 | worktree-project-memory-spaces | [Share durable project memory across verified worktrees](worktree-project-memory-spaces.md) | Accepted for the implementation candidate; user acceptance pending |
+| session-usage-totals-owner | [Host owns session-cumulative usage totals](session-usage-totals-owner.md) | Accepted for the implementation candidate |
 
 - [Explicit Team task dispatch and queued-message age](team-task-dispatch-age.md)

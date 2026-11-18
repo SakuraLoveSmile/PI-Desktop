@@ -10374,15 +10374,9 @@ mod tests {
         let data_dir = tempfile::tempdir().unwrap();
         let mut app_state = AppState::open(data_dir.path()).unwrap();
         app_state.handshook = true;
-        let session = sessions::create_session(
-            &app_state.db,
-            None,
-            Some("agent".into()),
-            None,
-            None,
-            None,
-        )
-        .unwrap();
+        let session =
+            sessions::create_session(&app_state.db, None, Some("agent".into()), None, None, None)
+                .unwrap();
         let turn = sessions::begin_turn(&app_state.db, &session.id, None, None).unwrap();
         let state = Arc::new(Mutex::new(app_state));
         let (tx, _rx) = mpsc::unbounded_channel();
@@ -10431,11 +10425,9 @@ mod tests {
         assert_eq!(totals["cacheReadTokens"], json!(900));
         assert_eq!(totals["totalTokens"], json!(1020));
 
-        assert!(
-            handle_request(state, "session.usageTotals", json!({}), tx)
-                .await
-                .is_err()
-        );
+        assert!(handle_request(state, "session.usageTotals", json!({}), tx)
+            .await
+            .is_err());
     }
 
     #[tokio::test]
