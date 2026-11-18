@@ -211,12 +211,12 @@ globalThis.themeSurfacesProbe = async (theme, custom) => {
     expected: expectedDanger,
     expectedInk,
     value: getComputedStyle(critical.querySelector(".composer-usage-value")).color,
-    fill: getComputedStyle(critical.querySelector(".composer-usage-context-fill")).backgroundColor,
+    arc: getComputedStyle(critical.querySelector(".context-inspector-ring-progress")).stroke,
   };
   if (!cues.danger.defined) failures.push("--ds-danger is not defined");
   if (!cues.danger.inkDefined) failures.push("--ds-error-ink is not defined");
   if (cues.danger.value !== expectedInk) failures.push("critical usage value ignores --ds-error-ink");
-  if (cues.danger.fill !== expectedDanger) failures.push("critical usage fill ignores --ds-danger");
+  if (cues.danger.arc !== expectedInk) failures.push("critical usage ring ignores --ds-error-ink");
   // Status ink (PI-UI-1115): production chips and status text paint with the -ink
   // tokens and keep 4.5:1 on their own tint, on the primary and the inset surface.
   // A contributed theme repaints those surfaces, so only the built-in palettes

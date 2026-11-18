@@ -79,8 +79,6 @@ test("ComposerUsageFooter consolidates all statistics in the context inspector",
 });
 
 test("footer context meter fills the same used/remaining figure as its percentage", () => {
-  assert.match(inspectorSource, /composer-usage-context-track[\s\S]*?role="progressbar"[\s\S]*?aria-valuenow=\{display.percent\}/);
-  assert.match(inspectorSource, /composer-usage-context-fill[\s\S]*?display.ratio \* 100/);
   assert.match(inspectorSource, /context-inspector-occupancy-fill[\s\S]*?context.usedRatio \* 100/);
   assert.match(inspectorSource, /ContextCompactionAction[\s\S]*?sessionId=\{openedSessionId.current\}/);
   assert.match(compactionSource, /useAppStore.getState\(\)[\s\S]*?canCompactContext\(state, sessionId, hasUsage\)[\s\S]*?state.compactContext\(\)/);

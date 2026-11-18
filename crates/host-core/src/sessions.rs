@@ -17,6 +17,7 @@ mod model_system;
 mod usage;
 pub(crate) use usage::operations as physical_usage_operations;
 pub use usage::record_usage;
+pub use usage::session_usage_totals;
 
 pub const MODES: [&str; 3] = ["plan", "goal", "agent"];
 

@@ -8076,16 +8076,17 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 
 - **前提条件**：一个 Agent 会话已完成至少一个报告了令牌用量的回合。可打开设置 → 全局 AI → 默认项。
 - **步骤**：
-  1. 确认输入框工具栏上下文环显示剩余容量（环近乎满圆，百分比 ≈ 剩余 %，tooltip 与 aria-label 使用剩余词汇）。
-  2. 打开设置 → 全局 AI → 默认项，将上下文用量显示分段控件从「剩余」切到「已用」。
-  3. 回到聊天，检查上下文环：圆弧按 `usedRatio` 填充（低占用时近乎空环），百分比显示 ≈ 已用 %，弹层标题显示已用令牌 + 百分比，tooltip/aria-label 使用已用容量词汇。
-  4. 确认警告/临界颜色仍按剩余容量判定：剩余 > 25 % 时环保持中性色，即使已用 % 较高。
-  5. 切回「剩余」，确认恢复原始显示。
-- **预期**：显示模式一致翻转圆弧、百分比、令牌数、标题、tooltip 与 aria-label。两种模式下颜色阈值始终基于剩余容量。新配置文件的默认值为「剩余」。
-- **链接规格**：`04-ux/06-settings-ia.md`、`04-ux/08-component-spec.md`、ADR 0223、`08-meta/decisions-log.md`（D398）
+  1. 新配置文件下确认输入框下方读数条居中排三组：会话轮/步加最新一轮速度、会话累计 tokens 加累计缓存命中率、上下文环。低占用时圆弧近乎空环，百分比 ≈ 已用 %，标签为「已用」（`chat.usageContextUsedLabel`），tooltip 与 aria-label 使用已用词汇。累计数字与 `session.usageTotals` 一致，而不是已加载转录页求和；重开长会话后数字不得变小。
+  2. 打开设置 → 全局 AI → 默认项，将上下文用量显示分段控件从「已用」切到「剩余」。
+  3. 回到聊天，检查上下文环：圆弧按 `remainingRatio` 填充（低占用时近乎满圆），百分比显示 ≈ 剩余 %，标签为「剩余」（`chat.usageContextRemainingLabel`），浮层标题为「上下文剩余 N%」，tooltip/aria-label 使用剩余容量词汇。
+  4. 确认警告/临界墨色仍按剩余容量判定：剩余 > 25 % 时环保持中性色，即使已用 % 较高。
+  5. 打开浮层，确认头部为标题加「~已用 / 窗口」，分段条填充总长等于已用比例，三行图例（系统提示词、工具定义、对话消息）各自印出估算值。没有诊断数据的会话回退为单色填充条，浮层其余区块保持不变。
+  6. 切回「已用」，确认恢复默认显示。
+- **预期**：显示模式一致翻转圆弧、百分比、令牌数、标题、标签、tooltip 与 aria-label。两种模式下颜色阈值始终基于剩余容量。新配置文件的默认值为「已用」；默认值变更前显式保存的「剩余」选择保留。宿主不可用时累计两组显示破折号，而不是残缺总量。
+- **链接规格**：`04-ux/06-settings-ia.md`、`04-ux/08-component-spec.md`、ADR 0223、`08-meta/decisions-log.md`（D398）、`docs/adr/session-usage-totals-owner.md`
 - **验收**：C（会话与流式）、Quality（偏好）
 - **里程碑**：M5
-- **状态**：单元测试覆盖（`context-usage.test.mjs`、`settings-general.test.mjs`）；完整场景为草稿
+- **状态**：单元测试覆盖（`context-usage.test.mjs`、`settings-general.test.mjs`、`context-composition.test.mjs`、`plugin-composer-slots.test.mjs`、host-core `sessions::usage`）；完整场景为草稿
 
 #### E2E-253：项目组支持拖拽和键盘手动排序
 

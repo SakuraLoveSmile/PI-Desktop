@@ -577,6 +577,10 @@ function normalizePlansChangedEvent(value: unknown): PlanningStateEvent {
 }
 
 export const api = {
+  getSessionUsageTotals: (sessionId: string) =>
+    invoke<import("@pi-desktop/shared").SessionUsageTotals>(
+      IPC.invoke.sessionUsageTotals, { sessionId },
+    ),
   getContextInsights: (sessionId: string, options?: { includeContent?: boolean; requestId?: string }) =>
     invoke<import("@pi-desktop/shared").ContextInsightsSnapshot>(
       IPC.invoke.contextInsightsGet, { sessionId, ...options },

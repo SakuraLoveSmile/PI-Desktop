@@ -5,6 +5,7 @@ export * from "./rpc-error.js";
 export * from "./certificate-errors.js";
 export * from "./types.js";
 export { contextOccupancyTokens } from "./message-usage.js";
+export * from "./session-usage.js";
 export * from "./transcript-truncation.js";
 export * from "./keyboard-shortcuts.js";
 export * from "./changelog.js";

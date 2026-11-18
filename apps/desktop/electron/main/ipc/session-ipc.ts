@@ -3,6 +3,7 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 import { mkdirSync } from "node:fs";
 import {
   emptyContextInsights,
+  emptySessionUsageTotals,
   ErrorCodes,
   IPC,
   modelConfigImportKey,
@@ -260,6 +261,17 @@ export function registerSessionIpc({
     if (input.sessionId.startsWith("native-pi:")) return emptyContextInsights(input.sessionId);
     await persistenceOutbox.flush(() => host);
     return host.call("contextInsights.get", input);
+  });
+  handle(IPC.invoke.sessionUsageTotals, async (input: { sessionId?: unknown }) => {
+    if (!host) throw new Error("host unavailable");
+    if (!input || typeof input.sessionId !== "string" || !input.sessionId.trim() || input.sessionId.length > 256) {
+      throw Object.assign(new Error("Invalid session usage input"), { errorCode: ErrorCodes.INVALID_ARGUMENT });
+    }
+    if (input.sessionId.startsWith("native-pi:")) return emptySessionUsageTotals();
+    // Queued usage must land before the read, or the strip would report a total
+    // that is one flush behind the transcript it sits under.
+    await persistenceOutbox.flush(() => host);
+    return host.call("session.usageTotals", input);
   });
   handle(
     IPC.invoke.sessionGet,

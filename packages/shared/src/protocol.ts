@@ -153,6 +153,7 @@ export const IPC = {
     modelConfigImportScan: "pi-desktop/modelConfig/importScan",
     modelConfigImportRun: "pi-desktop/modelConfig/importRun",
     sessionReplaceMessages: "pi-desktop/session/replaceMessages",
+    sessionUsageTotals: "pi-desktop/session/usageTotals",
     sessionSaveRevision: "pi-desktop/session/saveRevision",
     sessionListRevisions: "pi-desktop/session/listRevisions",
     sessionActivateRevision: "pi-desktop/session/activateRevision",

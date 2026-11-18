@@ -164,25 +164,25 @@
   flex-shrink: 0;
 }
 .context-insights [data-category="system"] {
-  background: var(--ds-text-muted);
+  background: var(--ds-viz-system);
 }
 .context-insights [data-category="tools"] {
-  background: color-mix(in oklab, var(--ds-accent) 65%, var(--ds-text-primary));
+  background: var(--ds-viz-tools);
 }
 .context-insights [data-category="user"] {
-  background: var(--ds-accent);
+  background: var(--ds-viz-user);
 }
 .context-insights [data-category="injected"] {
-  background: color-mix(in oklab, var(--ds-accent) 60%, var(--ds-text-secondary));
+  background: var(--ds-viz-injected);
 }
 .context-insights [data-category="skill"] {
-  background: var(--ds-text-secondary);
+  background: var(--ds-viz-skill);
 }
 .context-insights [data-category="assistant"] {
-  background: color-mix(in oklab, var(--ds-accent) 55%, var(--ds-bg-elevated));
+  background: var(--ds-viz-assistant);
 }
 .context-insights [data-category="toolResult"] {
-  background: color-mix(in oklab, var(--ds-accent) 30%, var(--ds-text-muted));
+  background: var(--ds-viz-tool-result);
 }
 .ci-chart-scroll {
   overflow-x: auto;

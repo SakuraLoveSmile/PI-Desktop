@@ -15058,31 +15058,43 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Preconditions**: An Agent session has completed at least one turn that
   reported token usage. Settings → AI → Defaults is reachable.
 - **Steps**:
-  1. On a fresh profile, confirm the composer footer context track shows used
-     capacity by default (track nearly empty at low occupancy, percentage ≈
-     used %, footer label reads Used (`chat.usageContextUsedLabel`),
-     tooltip and aria-label use used vocabulary).
+  1. On a fresh profile, confirm the composer read-out strip shows three centered
+     groups: session rounds/steps with the newest turn's speed, session-cumulative
+     tokens with the cumulative cache hit rate, and the context ring. The ring
+     arc is nearly empty at low occupancy, the percentage ≈ used %, the label
+     reads Used (`chat.usageContextUsedLabel`), and tooltip/aria-label use used
+     vocabulary. Cumulative figures match `session.usageTotals`, not the loaded
+     transcript page; reopen a long session and confirm they do not shrink.
   2. Open Settings → AI → Defaults and switch the Context usage display
      segmented control from Used to Remaining.
-  3. Return to the chat and inspect the context meter: the track now
-     fills by `remainingRatio` (nearly full at low occupancy), the percentage
-     shows ≈ remaining %, the footer label reads Remaining
-     (`chat.usageContextRemainingLabel`), the popover heading shows remaining tokens +
-     percentage, and the tooltip/aria-label use remaining-capacity vocabulary.
-  4. Confirm warning/critical track colors still follow remaining capacity:
-     at remaining > 25 % the track stays neutral even when used % is high.
-  5. Switch back to Used and confirm the default display returns.
-- **Expected**: The display mode flips the track fill, percentage, token
-  count, heading, footer label, tooltip, and aria-label consistently. Color thresholds
+  3. Return to the chat and inspect the context meter: the ring now fills by
+     `remainingRatio` (nearly full at low occupancy), the percentage shows ≈
+     remaining %, the label reads Remaining (`chat.usageContextRemainingLabel`),
+     the popover headline reads `Context left N%`, and the tooltip/aria-label use
+     remaining-capacity vocabulary.
+  4. Confirm warning/critical ring ink still follows remaining capacity: at
+     remaining > 25 % the ring stays neutral even when used % is high.
+  5. Open the popover and confirm the header pairs the headline with
+     `~used / window`, the segmented bar's filled length equals the used ratio,
+     and the three legend rows (system prompt, tool definitions, conversation)
+     print their own estimates. In a session without diagnostics the bar falls
+     back to a single fill and the popover keeps every other block.
+  6. Switch back to Used and confirm the default display returns.
+- **Expected**: The display mode flips the ring arc, percentage, token
+  count, headline, label, tooltip, and aria-label consistently. Color thresholds
   remain based on remaining capacity in both modes. The default for a
   fresh profile is Used; an explicit Remaining choice saved before the
-  default changed is kept.
+  default changed is kept. An unavailable host renders em dashes for the
+  cumulative groups instead of a partial total.
 - **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/08-component-spec.md`,
-  ADR 0223, `08-meta/decisions-log.md` (D398)
+  ADR 0223, `08-meta/decisions-log.md` (D398),
+  `docs/adr/session-usage-totals-owner.md`
 - **Acceptance**: C (conversation & stream), Quality (preference)
 - **Milestone**: M5
 - **Status**: Unit-covered (`context-usage.test.mjs`,
-  `settings-general.test.mjs`); full scenario Draft
+  `settings-general.test.mjs`, `context-composition.test.mjs`,
+  `plugin-composer-slots.test.mjs`, host-core `sessions::usage` tests);
+  full scenario Draft
 
 #### E2E-251: Custom dropdowns float without changing page layout
 
