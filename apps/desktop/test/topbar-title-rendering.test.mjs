@@ -31,7 +31,7 @@ test("topbar preserves complete titles for width-based clipping and tooltips", a
       for (const sidebarCollapsed of [false, true]) {
         const html = renderToStaticMarkup(createElement(I18nextProvider, { i18n },
           createElement(ConversationTopbar, {
-            sidebarCollapsed, workPanelOpen: false,
+            sidebarCollapsed,
             onToggleSidebar() {}, onNewTask() {}, onOpenSearch() {},
           }),
         ));
