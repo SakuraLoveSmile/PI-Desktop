@@ -6,6 +6,14 @@ export const PLUS_UPSTREAM_CUTOFF = "0.15.6";
 const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   en: [
     {
+      version: "0.15.21",
+      date: "2026-11-18",
+      highlights: [
+        "The read-out strip below the composer is rebuilt as three centered groups: session rounds and steps beside the latest tokens-per-second, cumulative session tokens with the prompt-cache hit rate, and a ring context meter that keeps its Used/Remaining label and percentage.",
+        "Clicking the context meter opens a segmented occupancy bar with a three-row legend for the system prompt, tool definitions and conversation messages; the provider, tools, dashboard and compaction controls are unchanged.",
+      ],
+    },
+    {
       version: "0.15.20",
       date: "2026-11-16",
       highlights: [
@@ -143,6 +151,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "zh-CN": [
+    {
+      version: "0.15.21",
+      date: "2026-11-18",
+      highlights: [
+        "输入框下方的读数条重构为三组居中读数：会话轮数与步数旁是最新的每秒 token 数，会话累计 token 与提示缓存命中率，以及保留已用/剩余标签和百分比的环形上下文计量。",
+        "点击上下文计量会打开分段占用条，并附系统提示词、工具定义、对话消息三行图例；提供商、工具、仪表盘与压缩控件保持不变。",
+      ],
+    },
     {
       version: "0.15.20",
       date: "2026-11-16",
@@ -282,6 +298,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   "zh-TW": [
     {
+      version: "0.15.21",
+      date: "2026-11-18",
+      highlights: [
+        "輸入框下方的讀數條重構為三組置中讀數：會話輪數與步數旁是最新的每秒 token 數，會話累計 token 與提示快取命中率，以及保留已用/剩餘標籤和百分比的環形上下文計量。",
+        "點擊上下文計量會開啟分段占用條，並附系統提示詞、工具定義、對話訊息三列圖例；提供商、工具、儀表板與壓縮控制項保持不變。",
+      ],
+    },
+    {
       version: "0.15.20",
       date: "2026-11-16",
       highlights: [
@@ -419,6 +443,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   tr: [
+    {
+      version: "0.15.21",
+      date: "2026-11-18",
+      highlights: [
+        "Bestecinin altındaki okuma şeridi üç ortalanmış grup olarak yeniden kuruldu: en son saniye başına token sayısının yanında oturum turları ve adımları, istem önbellek isabet oranıyla kümülatif oturum tokenları ve Kullanılan/Kalan etiketi ile yüzdesini koruyan halka bağlam ölçeri.",
+        "Bağlam ölçerine tıklamak, sistem istemi, araç tanımları ve konuşma iletileri için üç satırlık bir göstergeyle bölümlenmiş bir doluluk çubuğu açar; sağlayıcı, araçlar, gösterge paneli ve sıkıştırma kontrolleri değişmedi.",
+      ],
+    },
     {
       version: "0.15.20",
       date: "2026-11-16",
@@ -558,6 +590,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   de: [
     {
+      version: "0.15.21",
+      date: "2026-11-18",
+      highlights: [
+        "Der Auslesestreifen unter dem Composer ist als drei zentrierte Gruppen neu aufgebaut: Sitzungsrunden und -schritte neben der neuesten Token-pro-Sekunde-Zahl, kumulative Sitzungs-Token mit der Prompt-Cache-Trefferquote und ein Ring-Kontextmesser, der seine Beschriftung Verwendet/Verbleibend und die Prozentzahl behält.",
+        "Ein Klick auf den Kontextmesser öffnet einen segmentierten Belegungsbalken mit einer dreizeiligen Legende für System-Prompt, Werkzeugdefinitionen und Konversationsnachrichten; die Anbieter-, Werkzeug-, Dashboard- und Komprimierungssteuerelemente bleiben unverändert.",
+      ],
+    },
+    {
       version: "0.15.20",
       date: "2026-11-16",
       highlights: [
@@ -695,6 +735,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   es: [
+    {
+      version: "0.15.21",
+      date: "2026-11-18",
+      highlights: [
+        "La franja de lectura bajo el composer se reconstruye como tres grupos centrados: rondas y pasos de la sesión junto a los últimos tokens por segundo, tokens acumulados de la sesión con la tasa de aciertos de la caché de prompts, y un medidor de contexto en anillo que conserva su etiqueta Usado/Restante y el porcentaje.",
+        "Al hacer clic en el medidor de contexto se abre una barra de ocupación segmentada con una leyenda de tres filas para el prompt del sistema, las definiciones de herramientas y los mensajes de la conversación; los controles de proveedor, herramientas, panel y compactación no cambian.",
+      ],
+    },
     {
       version: "0.15.20",
       date: "2026-11-16",
@@ -834,6 +882,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   fr: [
     {
+      version: "0.15.21",
+      date: "2026-11-18",
+      highlights: [
+        "La bande de lecture sous le compositeur est reconstruite en trois groupes centrés : les tours et étapes de la session à côté des derniers tokens par seconde, les tokens cumulés de la session avec le taux de réussite du cache de prompts, et un mesureur de contexte en anneau qui conserve son libellé Utilisé/Restant et le pourcentage.",
+        "Cliquer sur le mesureur de contexte ouvre une barre d'occupation segmentée avec une légende de trois lignes pour le prompt système, les définitions d'outils et les messages de la conversation ; les contrôles de fournisseur, d'outils, de tableau de bord et de compactage restent inchangés.",
+      ],
+    },
+    {
       version: "0.15.20",
       date: "2026-11-16",
       highlights: [
@@ -972,6 +1028,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   ko: [
     {
+      version: "0.15.21",
+      date: "2026-11-18",
+      highlights: [
+        "컴포저 아래 읽기 스트립이 세 개의 가운데 정렬 그룹으로 재구성되었습니다: 최신 초당 토큰 수 옆에 세션 라운드와 단계, 프롬프트 캐시 적중률과 누적 세션 토큰, 그리고 사용됨/남음 레이블과 백분율을 유지하는 링 컨텍스트 미터입니다.",
+        "컨텍스트 미터를 클릭하면 시스템 프롬프트, 도구 정의, 대화 메시지에 대한 세 행 범례가 있는 분할 점유 막대가 열립니다; 제공자, 도구, 대시보드 및 압축 컨트롤은 변경되지 않았습니다.",
+      ],
+    },
+    {
       version: "0.15.20",
       date: "2026-11-16",
       highlights: [
@@ -1109,6 +1173,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "pt-BR": [
+    {
+      version: "0.15.21",
+      date: "2026-11-18",
+      highlights: [
+        "A faixa de leitura abaixo do composer é reconstruída como três grupos centralizados: rodadas e etapas da sessão ao lado dos últimos tokens por segundo, tokens acumulados da sessão com a taxa de acertos do cache de prompts, e um medidor de contexto em anel que mantém seu rótulo Usado/Restante e a porcentagem.",
+        "Clicar no medidor de contexto abre uma barra de ocupação segmentada com uma legenda de três linhas para o prompt do sistema, as definições de ferramentas e as mensagens da conversa; os controles de provedor, ferramentas, painel e compactação permanecem inalterados.",
+      ],
+    },
     {
       version: "0.15.20",
       date: "2026-11-16",

@@ -42,6 +42,12 @@ Local-first · Model-agnostic · Plugin-powered · macOS / Windows / Linux
 
 > **Current release line: 0.15.x (Early Preview).**
 
+Version 0.15.21 rebuilds the composer's read-out strip as three centered groups:
+session rounds and steps beside the latest tokens-per-second, cumulative session
+tokens with the cache-hit rate, and a ring context meter with its Used/Remaining
+label and percentage. The context popover gains a segmented occupancy bar and a
+three-row legend for the system prompt, tool definitions and conversation messages.
+
 Version 0.15.20 makes the shell read as one continuous surface: the transcript
 no longer reserves an invisible band under every message for hover actions, the
 composer's workspace strip becomes the header band of a single card, Settings
