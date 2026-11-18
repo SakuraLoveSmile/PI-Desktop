@@ -197,6 +197,16 @@ All color references in components use **semantic token names**, never raw hex v
 
 Neutral gray scale only — no blue-slate surfaces. Chrome components must consume semantic `--ds-*` tokens so light ink stays dark on `#f3f3f3` / `#ffffff`.
 
+**Chrome is monochrome; data visualization is chromatic.** Surfaces, controls,
+borders and focus rings keep the neutral accent contract above. Charts and
+composition bars instead paint from the `--ds-viz-*` ramp (`system`, `tools`,
+`messages`, `user`, `injected`, `skill`, `assistant`, `tool-result`), defined once
+per theme in `tokens.css` and shared by the composer context popover and the
+context-insights categories so a category keeps one hue everywhere. The hues also
+differ in luminance, so segments stay separable without relying on color alone;
+legend rows carry direct labels and values for the same reason. Status text still
+uses the `--ds-*-ink` tokens, never a raw viz hue.
+
 | Token | Hex / value | Usage |
 |---|---|---|
 | `--color-bg-primary` | `#ffffff` | Main surface |
@@ -1138,6 +1148,13 @@ header-height background behind the excluded lane without covering its controls.
 ## 11. Component foundations
 
 These are **token-level foundations** for common primitives. Detailed component specs are in [08-component-spec.md](08-component-spec.md).
+
+The composer usage strip (PI-UI-1118) deliberately adds **no new shared
+primitive**: its read-out groups are feature-local spans in
+`features/chat/composer/ComposerUsageStats.tsx`, the meter reuses the existing
+inspector ring, and every interactive element stays on `TooltipButton`/`Button`.
+A pattern earns a `components/ui.tsx` primitive only at three or more usages;
+this one currently has a single consumer.
 
 ### 11.1 Button
 

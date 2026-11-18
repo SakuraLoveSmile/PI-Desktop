@@ -169,6 +169,13 @@ PI-Desktop 的行为类似于桌面应用程序 shell，因此意外拖动
 
 仅中性灰度 - 无蓝石板表面。 Chrome 组件必须使用语义 `--ds-*` 标记，以便浅色墨水在 `#f3f3f3` / `#ffffff` 上保持深色。
 
+**Chrome 单色，数据可视化彩色。** 表面、控件、边框与聚焦环沿用上面的中性 accent 契约；
+图表与占用分段条改用 `--ds-viz-*` 色族（`system`、`tools`、`messages`、`user`、`injected`、
+`skill`、`assistant`、`tool-result`），在 `tokens.css` 中按主题各定义一次，由输入框上下文浮层与
+上下文洞察分类共用，使同一分类在任何位置保持同一色相。这些色相在亮度上也彼此区分，
+因此不依赖颜色本身也能分辨分段；图例行同时给出直接标签与数值。状态文字仍使用 `--ds-*-ink`，
+不得直接使用 viz 原色。
+
 | 代币 | 十六进制/值 | 用途 |
 |---|---|---|
 | `--color-bg-primary` | `#ffffff` | 主表面 |
@@ -982,6 +989,11 @@ Linux 保留淡入淡出和滑动退出。
 ## 11. 组件基础
 
 这些是通用原语的**令牌级基础**。详细的组件规格位于 [08-component-spec.md](/zh-CN/spec/04-ux/08-component-spec)。
+
+输入框用量读数条（PI-UI-1118）**不新增共享原语**：读数组是
+`features/chat/composer/ComposerUsageStats.tsx` 内的特性局部 span，量表复用既有
+检查器环形，所有交互元素仍走 `TooltipButton`/`Button`。同一模式出现三处及以上才
+进入 `components/ui.tsx`；当前仅一处消费。
 
 ### 11. 1 按钮
 

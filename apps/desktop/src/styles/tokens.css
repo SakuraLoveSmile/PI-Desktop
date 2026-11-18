@@ -155,6 +155,18 @@
   --ds-purple: #c27aff;
   --ds-goal: #2dd4bf;
   --ds-goal-soft: color-mix(in oklab, var(--ds-goal) 15%, transparent);
+  /* Data visualization is chromatic while chrome stays monochrome. The usage
+   * composition bar and the context-insights categories share this one ramp, so
+   * a category keeps its hue everywhere; the hues also differ in luminance so
+   * the segments stay separable without relying on color alone. */
+  --ds-viz-system: #8b8f98;
+  --ds-viz-tools: var(--ds-purple);
+  --ds-viz-messages: #4c8dff;
+  --ds-viz-user: var(--ds-goal);
+  --ds-viz-injected: #f5a524;
+  --ds-viz-skill: #ff6fae;
+  --ds-viz-assistant: #7dd3fc;
+  --ds-viz-tool-result: var(--ds-success);
   --ds-shadow-dialog: 0 16px 48px rgba(0, 0, 0, 0.55);
   --ds-shadow-model-menu: var(--ds-shadow-dialog);
   /* Codex --elevation-prominent (same stroke+lift in dark and light) */
@@ -305,6 +317,14 @@
   --ds-danger: var(--ds-error);
   --ds-info: #5d5d5d;
   --ds-purple: #7c3aed;
+  --ds-viz-system: #6b7280;
+  --ds-viz-tools: var(--ds-purple);
+  --ds-viz-messages: #1d4ed8;
+  --ds-viz-user: #0f766e;
+  --ds-viz-injected: #a16207;
+  --ds-viz-skill: #be185d;
+  --ds-viz-assistant: #0369a1;
+  --ds-viz-tool-result: var(--ds-success-ink);
   --ds-goal: #0d9488;
   --ds-goal-soft: color-mix(in oklab, var(--ds-goal) 12%, transparent);
   --ds-shadow-dialog: 0 16px 48px rgba(0, 0, 0, 0.12);

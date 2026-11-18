@@ -961,7 +961,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px 16px;
+  gap: 6px 20px;
   padding: 6px 4px 0;
   font-size: var(--text-xs);
   color: var(--ds-text-muted);
@@ -1018,32 +1018,53 @@
   color: var(--ds-error-ink);
 }
 
-.composer-usage-context {
-  margin-left: auto;
+.composer-usage-stat {
+  gap: 5px;
 }
 
-.composer-usage-context-track {
-  display: block;
-  width: 72px;
-  height: 5px;
-  flex: 0 0 72px;
-  overflow: hidden;
-  border-radius: var(--radius-2xs);
-  background: var(--ds-bg-hover);
+.composer-usage-glyph {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 13px;
+  fill: none;
+  stroke: var(--ds-text-muted);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-.composer-usage-context-fill {
-  display: block;
-  height: 100%;
-  background: var(--ds-text-muted);
+.composer-usage-sep {
+  color: var(--ds-text-muted);
 }
 
-.composer-usage-context[data-level="warning"] .composer-usage-context-fill {
-  background: var(--ds-warning);
+.composer-usage-stat[data-unavailable="true"] .composer-usage-value,
+.composer-usage-stat[data-unavailable="true"] .composer-usage-label {
+  color: var(--ds-text-muted);
 }
 
-.composer-usage-context[data-level="critical"] .composer-usage-context-fill {
-  background: var(--ds-danger);
+/* The meter is a ring so the third group reads as a gauge beside two numeric
+ * groups; its arc inherits the capacity ink, text keeps the -ink tokens. */
+.composer-usage-context-meter {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ds-text-primary);
+}
+
+.composer-usage-context-meter .context-inspector-ring {
+  width: 18px;
+  height: 18px;
+}
+
+.composer-usage-context-meter .context-inspector-ring-progress {
+  stroke-width: 3;
+}
+
+.composer-usage-context[data-level="warning"] .composer-usage-context-meter {
+  color: var(--ds-warning-ink);
+}
+
+.composer-usage-context[data-level="critical"] .composer-usage-context-meter {
+  color: var(--ds-error-ink);
 }
 
 /* The unavailable placeholder reports "no meter reading yet"; it is not an
@@ -1124,4 +1145,22 @@
 .composer-top-strip-toggle:hover,
 .composer-top-strip-toggle:focus-visible {
   color: var(--ds-text-primary);
+}
+
+/* The read-out strip simplifies before it wraps: glyphs go first, then the step
+ * detail, while the context meter stays readable at every composer width. */
+@container composer-stack (max-width: 560px) {
+  .composer-usage-footer {
+    gap: 6px 12px;
+  }
+
+  .composer-usage-glyph {
+    display: none;
+  }
+}
+
+@container composer-stack (max-width: 450px) {
+  .composer-usage-stat-detail {
+    display: none;
+  }
 }

@@ -3722,6 +3722,15 @@ async fn handle_request_inner(
                 .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
             Ok(json!({ "ok": recorded }))
         }
+        "session.usageTotals" => {
+            let session_id = params
+                .get("sessionId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let st = state.lock().await;
+            sessions::session_usage_totals(&st.db, session_id)
+                .map_err(|e| rpc_err(1002, e.to_string(), "INTERNAL"))
+        }
         "session.endTurn" => {
             let turn_id = params
                 .get("turnId")
@@ -10358,6 +10367,75 @@ mod tests {
         drop(st);
         let st = state.lock().await;
         sessions::end_turn(&st.db, &first, "aborted", None, None, false).unwrap();
+    }
+
+    #[tokio::test]
+    async fn usage_totals_rpc_reports_session_rounds_steps_and_tokens() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let session = sessions::create_session(
+            &app_state.db,
+            None,
+            Some("agent".into()),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        let turn = sessions::begin_turn(&app_state.db, &session.id, None, None).unwrap();
+        let state = Arc::new(Mutex::new(app_state));
+        let (tx, _rx) = mpsc::unbounded_channel();
+
+        let empty = handle_request(
+            state.clone(),
+            "session.usageTotals",
+            json!({ "sessionId": session.id }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(empty["rounds"], json!(1));
+        assert_eq!(empty["steps"], json!(0));
+        assert_eq!(empty["totalTokens"], json!(0));
+
+        let usage = json!({
+            "operationId": "op-1",
+            "usageOrigin": "pi",
+            "inputTokens": 100,
+            "outputTokens": 20,
+            "cacheReadTokens": 900,
+            "totalTokens": 1020,
+            "costStatus": "unknown"
+        });
+        handle_request(
+            state.clone(),
+            "session.recordUsage",
+            json!({ "sessionId": session.id, "turnId": turn, "usage": usage }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+
+        let totals = handle_request(
+            state.clone(),
+            "session.usageTotals",
+            json!({ "sessionId": session.id }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(totals["rounds"], json!(1));
+        assert_eq!(totals["steps"], json!(1));
+        assert_eq!(totals["inputTokens"], json!(100));
+        assert_eq!(totals["cacheReadTokens"], json!(900));
+        assert_eq!(totals["totalTokens"], json!(1020));
+
+        assert!(
+            handle_request(state, "session.usageTotals", json!({}), tx)
+                .await
+                .is_err()
+        );
     }
 
     #[tokio::test]

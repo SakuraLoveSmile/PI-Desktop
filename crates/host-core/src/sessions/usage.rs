@@ -214,6 +214,56 @@ pub fn record_usage(db: &Database, session_id: &str, turn_id: &str, usage: &Valu
     Ok(true)
 }
 
+/// Session-wide cumulative accounting for the composer read-out. The renderer
+/// only holds the newest transcript page, so a client-side sum would silently
+/// under-report a reopened long session. Each turn's top-level counts are
+/// already deduplicated by `merge_usage` (ledger plus legacy residual), and a
+/// physical request belongs to exactly one turn, so turns sum without double
+/// counting. Steps count physical requests, not turns.
+pub fn session_usage_totals(db: &Database, session_id: &str) -> Result<Value> {
+    let mut stmt = db.conn().prepare_cached(
+        "SELECT usage_json FROM turns WHERE session_id = ?1 ORDER BY started_at ASC",
+    )?;
+    let rows = stmt.query_map(params![session_id], |row| row.get::<_, Option<String>>(0))?;
+    let mut rounds = 0_i64;
+    let mut steps = 0_i64;
+    let mut totals = [0_i64; 6];
+    for row in rows {
+        rounds += 1;
+        let Some(raw) = row? else { continue };
+        let Ok(usage) = serde_json::from_str::<Value>(&raw) else {
+            continue;
+        };
+        let billed = TOKENS.iter().any(|key| count(&usage, key) > 0);
+        let records = operations(&usage);
+        if records.is_empty() {
+            if billed {
+                steps += 1;
+            }
+        } else {
+            steps += i64::try_from(records.len()).unwrap_or(i64::MAX);
+        }
+        if !billed {
+            continue;
+        }
+        for (index, key) in TOKENS.iter().enumerate() {
+            let value = if *key == "totalTokens" && count(&usage, key) == 0 {
+                count(&usage, "inputTokens").saturating_add(count(&usage, "outputTokens"))
+            } else {
+                count(&usage, key)
+            };
+            totals[index] = totals[index].saturating_add(value);
+        }
+    }
+    let mut result = Map::new();
+    result.insert("rounds".into(), json!(rounds));
+    result.insert("steps".into(), json!(steps));
+    for (index, key) in TOKENS.iter().enumerate() {
+        result.insert((*key).into(), json!(totals[index]));
+    }
+    Ok(Value::Object(result))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -291,6 +341,73 @@ mod tests {
         assert_eq!(stored["totalTokens"], 30);
         assert_eq!(stored["cost"]["total"], 0.3);
         assert_eq!(stored["operations"].as_array().unwrap().len(), 2);
+        drop(db);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn session_totals_sum_turns_and_count_physical_requests() {
+        let dir = std::env::temp_dir().join(format!("pi-usage-totals-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = Database::open(&dir.join("test.sqlite")).unwrap();
+        let session = super::super::create_session(&db, None, None, None, None, None).unwrap();
+
+        let empty = session_usage_totals(&db, &session.id).unwrap();
+        assert_eq!(empty["rounds"], 0);
+        assert_eq!(empty["steps"], 0);
+        assert_eq!(empty["totalTokens"], 0);
+
+        let first = super::super::begin_turn(&db, &session.id, None, None).unwrap();
+        let child = operation("child", true);
+        record_usage(&db, &session.id, &first, &child).unwrap();
+        record_usage(&db, &session.id, &first, &operation("sibling", false)).unwrap();
+        // A replayed snapshot completes the same request; it is not another step.
+        record_usage(&db, &session.id, &first, &child).unwrap();
+        super::super::end_turn(&db, &first, "completed", None, None, false).unwrap();
+
+        let second = super::super::begin_turn(&db, &session.id, None, None).unwrap();
+        record_usage(&db, &session.id, &second, &operation("third", true)).unwrap();
+
+        let totals = session_usage_totals(&db, &session.id).unwrap();
+        assert_eq!(totals["rounds"], 2);
+        assert_eq!(totals["steps"], 3);
+        assert_eq!(totals["inputTokens"], 36);
+        assert_eq!(totals["outputTokens"], 9);
+        assert_eq!(totals["totalTokens"], 45);
+
+        let other = super::super::create_session(&db, None, None, None, None, None).unwrap();
+        assert_eq!(session_usage_totals(&db, &other.id).unwrap()["rounds"], 0);
+        drop(db);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn session_totals_keep_legacy_rows_and_unbilled_rounds() {
+        let dir = std::env::temp_dir().join(format!("pi-usage-legacy-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = Database::open(&dir.join("test.sqlite")).unwrap();
+        let session = super::super::create_session(&db, None, None, None, None, None).unwrap();
+
+        let legacy = super::super::begin_turn(&db, &session.id, None, None).unwrap();
+        db.conn()
+            .execute(
+                "UPDATE turns SET usage_json = ?1 WHERE id = ?2",
+                params![
+                    json!({"inputTokens": 100, "outputTokens": 20}).to_string(),
+                    legacy
+                ],
+            )
+            .unwrap();
+        super::super::end_turn(&db, &legacy, "completed", None, None, false).unwrap();
+        // A round that never reached the provider still counts as a round.
+        let idle = super::super::begin_turn(&db, &session.id, None, None).unwrap();
+        super::super::end_turn(&db, &idle, "completed", None, None, false).unwrap();
+
+        let totals = session_usage_totals(&db, &session.id).unwrap();
+        assert_eq!(totals["rounds"], 2);
+        assert_eq!(totals["steps"], 1);
+        assert_eq!(totals["inputTokens"], 100);
+        assert_eq!(totals["totalTokens"], 120);
         drop(db);
         std::fs::remove_dir_all(dir).unwrap();
     }

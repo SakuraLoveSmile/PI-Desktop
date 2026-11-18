@@ -289,13 +289,14 @@ export async function sessionActivityIntegrationProbe() {
     await until(()=>meter()?.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')==='11','context progress did not use real parent-message usage');
     check(Boolean(meter()?.textContent?.includes('11%')),'context percentage and progress bar agree');
     check(meter()?.querySelector('.composer-usage-label')?.textContent === i18n.t('chat.usageContextUsedLabel'), 'context footer defaults to Used without an explicit preference');
-    const track=meter()!.querySelector('.composer-usage-context-track')!.getBoundingClientRect();const fill=meter()!.querySelector('.composer-usage-context-fill')!.getBoundingClientRect();
-    check(Math.abs(fill.width/track.width-28544/262144)<.01,'bar width uses reported tokens over configured context window');
+    const circumference=2*Math.PI*9;const arcOffset=Number(meter()!.querySelector('.context-inspector-ring-progress')!.getAttribute('stroke-dashoffset'));
+    check(Math.abs((1-arcOffset/circumference)-28544/262144)<.01,'ring arc uses reported tokens over configured context window');
     const meterBounds=meter()!.getBoundingClientRect();const composerBounds=host.querySelector('.composer-shell')!.getBoundingClientRect();
-    check(Math.abs(meterBounds.left+meterBounds.width/2-composerBounds.left-composerBounds.width/2)<=1&&meterBounds.top>=composerBounds.bottom,'context meter is centered below the input');
+    const usageStrip=host.querySelector('.composer-usage-footer')!.getBoundingClientRect();
+    check(Math.abs(usageStrip.left+usageStrip.width/2-composerBounds.left-composerBounds.width/2)<=1&&meterBounds.top>=composerBounds.bottom,'usage strip is centered below the input');
     click(meter());await until(()=>Boolean(document.querySelector('.context-inspector-popover.is-open')),'context details did not open');
     const contextPanel=document.querySelector<HTMLElement>('.context-inspector-popover')!;
-    check(!host.querySelector('.composer-usage-speed,.composer-usage-total,.composer-usage-cache'),'metrics live only inside the context popup');
+    check(host.querySelectorAll('.composer-usage-stat').length===2&&Boolean(host.querySelector('.composer-usage-context')),'the strip carries two cumulative groups beside the context meter');
     check(strip()?.dataset.expanded==='false'&&workspaceContext()?.textContent?.includes('main')&&!workspaceContext()?.textContent?.includes('PI-Desktop')&&!workspaceContext()?.textContent?.includes('本地'),'context popup leaves the running workspace strip folded to its branch');
     check(Boolean(contextPanel.textContent?.includes('生成速度'))&&Boolean(contextPanel.textContent?.includes('本轮合计')),'context popup retains speed and turn statistics');
     check(Boolean(contextPanel.querySelector('[role="progressbar"][aria-valuenow="11"]')),'context panel displays total occupancy');

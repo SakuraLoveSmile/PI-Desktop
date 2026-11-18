@@ -7,6 +7,9 @@ import {
   useState,
 } from "react";
 import { readContextInsightsPreferences } from "../features/context-insights/preferences";
+import { composeBreakdown } from "../features/context-insights/composition";
+import { useLatestComposition } from "../features/context-insights/use-latest-composition";
+import { ContextCompositionSection } from "../features/chat/composer/ContextCompositionSection";
 import { openContextInsightsDialog } from "../features/context-entry/dialog-state";
 import { portalToBody } from "../lib/portal-visibility";
 import { useTranslation } from "react-i18next";
@@ -79,6 +82,13 @@ export function ContextUsageInspector({
     resolveContextUsageDisplay(state.settings?.contextUsageDisplay),
   );
   const display = contextUsageView(context, usageDisplay);
+  const compositionRequest = useLatestComposition(
+    sessionId ?? undefined,
+    open && variant === "footer",
+  );
+  const composition = compositionRequest
+    ? composeBreakdown(compositionRequest, context.usedRatio)
+    : undefined;
   // Context occupancy and provider usage describe the last request. The
   // footer retains the full turn total formerly shown beside the composer.
   const turnTotal = variant === "footer" ? usageTokenTotal(turnUsage) : contextOccupancyTokens(usage);
@@ -190,6 +200,7 @@ export function ContextUsageInspector({
     return () => window.cancelAnimationFrame(frame);
   }, [
     compaction,
+    composition?.totalEstimate,
     context.usedTokens,
     contextWindow,
     open,
@@ -280,50 +291,80 @@ export function ContextUsageInspector({
           : undefined
       }
     >
-      <div className="context-inspector-heading">
-        <strong className="context-inspector-heading-value">
-          {display.display === "used"
-            ? t("chat.usageContextSpent", {
-                count: formatCompactTokenCount(display.tokens),
-              })
-            : t("chat.usageContextLeft", {
-                count: formatCompactTokenCount(display.tokens),
-              })}
-        </strong>
-        <strong className="context-inspector-heading-percent">
-          {display.percent}%
-        </strong>
-      </div>
-      <div className="context-inspector-window">
-        <span>{t("chat.usageContextWindow")}</span>
-        <strong>
-          {t("chat.usageContextTokens", {
-            used: formatCompactTokenCount(context.usedTokens),
-            window: formatCompactTokenCount(contextWindow),
-          })}
-        </strong>
-        <span className="context-inspector-window-percent">
-          {context.usedPercent}%
-        </span>
-      </div>
       {variant === "footer" ? (
-        <span
-          className="context-inspector-occupancy-track"
-          role="progressbar"
-          aria-label={t("chat.usageContextAria", {
-            percent: context.usedPercent,
-            count: formatCompactTokenCount(context.usedTokens),
-            state: t("chat.usageContextAriaUsed"),
-          })}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={context.usedPercent}
-        >
-          <span
-            className="context-inspector-occupancy-fill"
-            style={{ width: `${context.usedRatio * 100}%` }}
+        <div className="context-inspector-heading">
+          <strong className="context-inspector-heading-value">
+            {t(
+              display.display === "used"
+                ? "chat.usageContextHeadlineUsed"
+                : "chat.usageContextHeadlineRemaining",
+              { percent: display.percent },
+            )}
+          </strong>
+          <strong className="context-inspector-heading-capacity">
+            ~{formatCompactTokenCount(context.usedTokens)} / {formatCompactTokenCount(contextWindow)}
+          </strong>
+        </div>
+      ) : (
+        <div className="context-inspector-heading">
+          <strong className="context-inspector-heading-value">
+            {display.display === "used"
+              ? t("chat.usageContextSpent", {
+                  count: formatCompactTokenCount(display.tokens),
+                })
+              : t("chat.usageContextLeft", {
+                  count: formatCompactTokenCount(display.tokens),
+                })}
+          </strong>
+          <strong className="context-inspector-heading-percent">
+            {display.percent}%
+          </strong>
+        </div>
+      )}
+      {variant === "footer" ? null : (
+        <div className="context-inspector-window">
+          <span>{t("chat.usageContextWindow")}</span>
+          <strong>
+            {t("chat.usageContextTokens", {
+              used: formatCompactTokenCount(context.usedTokens),
+              window: formatCompactTokenCount(contextWindow),
+            })}
+          </strong>
+          <span className="context-inspector-window-percent">
+            {context.usedPercent}%
+          </span>
+        </div>
+      )}
+      {variant === "footer" ? (
+        composition ? (
+          <ContextCompositionSection
+            composition={composition}
+            usedPercent={context.usedPercent}
+            meterLabel={t("chat.usageContextAria", {
+              percent: context.usedPercent,
+              count: formatCompactTokenCount(context.usedTokens),
+              state: t("chat.usageContextAriaUsed"),
+            })}
           />
-        </span>
+        ) : (
+          <span
+            className="context-inspector-occupancy-track"
+            role="progressbar"
+            aria-label={t("chat.usageContextAria", {
+              percent: context.usedPercent,
+              count: formatCompactTokenCount(context.usedTokens),
+              state: t("chat.usageContextAriaUsed"),
+            })}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={context.usedPercent}
+          >
+            <span
+              className="context-inspector-occupancy-fill"
+              style={{ width: `${context.usedRatio * 100}%` }}
+            />
+          </span>
+        )
       ) : null}
       <div className="context-inspector-kpis">
         <div>
@@ -437,20 +478,34 @@ export function ContextUsageInspector({
           aria-controls={open ? panelId : undefined}
           onClick={toggleInspector}
         >
-          <span className="composer-usage-label">{t(contextUsageLabelKey(display.display))}</span>
           <span
-            className="composer-usage-context-track"
+            className="composer-usage-context-meter"
             role="progressbar"
             aria-label={t("chat.usageContextAria", ariaArguments)}
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={display.percent}
           >
-            <span
-              className="composer-usage-context-fill"
-              style={{ width: `${display.ratio * 100}%` }}
-            />
+            <svg className="context-inspector-ring" viewBox="0 0 24 24" aria-hidden="true">
+              <circle
+                className="context-inspector-ring-track"
+                cx="12"
+                cy="12"
+                r={CONTEXT_RING_RADIUS}
+              />
+              <circle
+                className="context-inspector-ring-progress"
+                cx="12"
+                cy="12"
+                r={CONTEXT_RING_RADIUS}
+                strokeDasharray={CONTEXT_RING_CIRCUMFERENCE}
+                strokeDashoffset={
+                  CONTEXT_RING_CIRCUMFERENCE * (1 - display.ratio)
+                }
+              />
+            </svg>
           </span>
+          <span className="composer-usage-label">{t(contextUsageLabelKey(display.display))}</span>
           <span className="composer-usage-value">
             {display.percent}%
           </span>

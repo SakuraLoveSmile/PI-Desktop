@@ -114,9 +114,13 @@ test("context footer names the bar's direction by default, and the unavailable s
   const unknown = ssr.render(createElement(ContextUsagePlaceholder));
   assert.match(used, /<span class="composer-usage-label">Used<\/span>/);
   assert.match(unknown, /<span class="composer-usage-label">Context<\/span>/);
-  for (const html of [used, unknown]) {
-    assert.match(html, /composer-usage-context-track/);
-  }
+  assert.match(used, /composer-usage-context-meter/);
+  assert.match(unknown, /composer-usage-context-meter/);
+  // The ring arc must carry the same figure the percentage prints.
+  const circumference = 2 * Math.PI * 9;
+  const offset = Number(used.match(/stroke-dashoffset="([\d.]+)"/)[1]);
+  assert.ok(Math.abs(offset - circumference * (1 - 1_200 / 200_000)) < 1e-6);
+  assert.match(used, /aria-valuenow="1"/);
   assert.match(used, /aria-haspopup="dialog"/);
   assert.match(unknown, /disabled=""/);
 });

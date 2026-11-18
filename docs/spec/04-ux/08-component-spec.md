@@ -3250,7 +3250,7 @@ reasoning-level control.
 | input (two empty lines, grows through seven visible lines)        |
 | placeholder: welcome → command/file hint → keyboard hint          |
 | [+] [Agent/Expert Team ▾] [Plan/Goal] [plugin] [model · reasoning ▾] [enhance] [Live] [↑/⏹] |
-| context usage footer (Remaining or Used label and meter, when available)                                  |
+| usage strip: rounds/steps · tok/s | session tokens · cache hit | ring + Used/Remaining % |
 +----------------------------------------------------------+
 ```
 
@@ -5183,7 +5183,7 @@ viewport restoration remain intact.
 
 ### Composer metadata and compact agent rows
 
-The workspace strip above the input card shows the current session's project, local/remote host, and known local Git branch; during a run it folds to the branch. Unavailable project/branch metadata is omitted; remote sessions never borrow a local branch. A detached HEAD is named by its short commit (`Detached HEAD · abc1234`), and `No branch` appears only when neither a branch nor a commit is known. Model menus list all models without a search field. Generation speed, full-turn token totals, cache metrics and context details are available from the bottom-right context meter. Subagent entries use transparent gradient-avatar rows with name, task, localized status and measured elapsed time; clicking a row opens read-only details, with no panorama entry. Validate model keyboard selection, workspace metadata, context details and agent navigation in the isolated composer/transcript fixtures, including narrow layouts.
+The workspace strip above the input card shows the current session's project, local/remote host, and known local Git branch; during a run it folds to the branch. Unavailable project/branch metadata is omitted; remote sessions never borrow a local branch. A detached HEAD is named by its short commit (`Detached HEAD · abc1234`), and `No branch` appears only when neither a branch nor a commit is known. Model menus list all models without a search field. The strip below the input card carries three centered groups: session rounds and steps beside the newest turn's generation speed, session-cumulative tokens beside the cumulative prompt-cache hit rate, and the context ring with its Used/Remaining label and percentage. Rounds, steps, tokens and cache hit are session totals aggregated by the host from the turn ledger (`session.usageTotals`); the renderer never sums them from the loaded transcript page, and an unavailable host renders an em dash rather than a partial total. The ring keeps describing the newest request and honors the display preference. Clicking it opens the context popover: the header reads `Context used N%` with `~used / window`, then a segmented occupancy bar and a fixed three-row legend (system prompt, tool definitions, conversation) whose shares are scaled onto the provider-reported occupancy while each row prints its own estimate; without diagnostics the bar falls back to a single fill. Turn totals, generation speed, provider detail, tool summary, the dashboard entry and compaction controls remain in that popover. Subagent entries use transparent gradient-avatar rows with name, task, localized status and measured elapsed time; clicking a row opens read-only details, with no panorama entry. Validate model keyboard selection, workspace metadata, context details and agent navigation in the isolated composer/transcript fixtures, including narrow layouts.
 
 ### Recorded outputs, delegate details and project Skill suggestions
 
