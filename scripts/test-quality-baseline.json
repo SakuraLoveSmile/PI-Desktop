@@ -648,14 +648,13 @@
       ]
     },
     "apps/desktop/test/chat-file-reveal-menu.test.mjs": {
-      "assertions": 25,
+      "assertions": 23,
       "cases": 3,
       "signatures": [
         "152a5dbb62bb60b8c09f",
         "1c0afd47f82a184807d2",
         "2f3e7e9dbfd27246108e",
         "37eb54fa3bdf13b63124",
-        "3b58d8dd8be441653da3",
         "4a67ce6a52eae039620a",
         "520cb58230256390959e",
         "53bdf6503aa824510487",
@@ -672,7 +671,6 @@
         "c2bb56160fd289b56be4",
         "c6b8d62b88a7d03b0c65",
         "d529d7e2d0eab3f9bce3",
-        "d66d45cbad7643597c8a",
         "e52dccd513f2c7f0f8ba",
         "f28c0e7cd45f1e46538d",
         "fb630109e72e0c2cf688"

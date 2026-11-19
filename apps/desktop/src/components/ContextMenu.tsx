@@ -30,7 +30,8 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
-import { portalToBody } from "../lib/portal-visibility";
+import { createPortal } from "react-dom";
+import { portalToBody, visiblePortalContent } from "../lib/portal-visibility";
 import {
   placeContextMenu,
   type ContextMenuPlacement,
@@ -185,9 +186,15 @@ export function useContextMenu() {
 export function ContextMenu({
   state,
   onClose,
+  container,
 }: {
   state: ContextMenuState | null;
   onClose: () => void;
+  /**
+   * Portal target. Defaults to `<body>`; a modal `<dialog>` must pass itself,
+   * because content outside the top layer is inert while the dialog is open.
+   */
+  container?: HTMLElement | null;
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [placement, setPlacement] = useState<ContextMenuPlacement | null>(null);
@@ -297,7 +304,8 @@ export function ContextMenu({
 
   if (!state || typeof document === "undefined") return null;
 
-  return portalToBody(
+  return portalToContainer(
+    container,
     <div
       ref={menuRef}
       className={`context-menu${placement ? " is-open" : ""}`}
@@ -343,4 +351,8 @@ export function ContextMenu({
       ))}
     </div>,
   );
+}
+
+function portalToContainer(container: HTMLElement | null | undefined, node: ReactNode) {
+  return container ? createPortal(visiblePortalContent(node), container) : portalToBody(node);
 }

@@ -367,11 +367,10 @@ test("every transcript surface that names a file opens that item", () => {
   // to that surface; `./` and `../` keep the markdown base beside the path.
   assert.match(markdown, /openFileMenu\(event, \{ path: text \?\? target\.path, baseDir \}\)/);
   assert.match(markdown, /openFileMenu\(event, \{ path: ref, baseDir \}\)/);
-  assert.match(markdown, /openFileMenu\(event, \{ path: localRef, baseDir \}\)/);
   assert.match(markdown, /onContextMenu=\{onLocalContextMenu\}/);
-  // A local image that cannot be shown inline keeps a chip, and both carry the
-  // menu only when the reference actually resolved to a file.
-  assert.match(markdown, /const onLocalContextMenu =\s*localRef && openFileMenu/);
+  // The local-image menu now also offers copy/download of the picture itself;
+  // its condition and items are covered by the image-clipboard,
+  // image-download-name and generated-image-context-menu behavior tests.
 });
 
 test("a URL never reaches the reveal", () => {
