@@ -9220,7 +9220,7 @@
       ]
     },
     "apps/desktop/test/work-panel.test.mjs": {
-      "assertions": 290,
+      "assertions": 289,
       "cases": 24,
       "signatures": [
         "00b826c4fb39b45c58f4",
@@ -9338,7 +9338,6 @@
         "6751a35b7ade53016b71",
         "6898b3743f92d60f5ced",
         "69f9ee696290cbadfe50",
-        "6b5d09676dc551bf5623",
         "6c352a89bd1160416cd2",
         "6d47f5c9d1d836ecfd80",
         "6ec393f99d1338cc59f4",
