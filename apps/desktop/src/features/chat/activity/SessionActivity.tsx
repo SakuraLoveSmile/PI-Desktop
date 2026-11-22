@@ -11,13 +11,20 @@ import { mergeActivitySubagents } from "../../../stores/runtime/session-activity
 import { useTeamSnapshot } from "../../../hooks/useTeamSnapshot";
 import { localTeamSessionId } from "../../../lib/team-presentation";
 import { resolvePlanArtifactPath } from "../../../lib/plan-artifact";
-import { browserPluginTab, fileWorkPanelTab, goalReportWorkPanelTab, subagentWorkPanelTab, teamWorkPanelTab } from "../../../lib/work-panel-tabs";
+import { browserPluginTab, fileWorkPanelTab, goalReportWorkPanelTab, subagentWorkPanelTab, teamWorkPanelTab, toolWorkPanelTab } from "../../../lib/work-panel-tabs";
+import { openContextInsights } from "../../context-entry/open-context-insights";
 import { activityPlans, activityResources, activitySubagents } from "./session-activity-model";
 import { SessionActivityRail, type ActivityRailItem } from "./SessionActivityRail";
 import { BackgroundProcessDetails } from "./BackgroundProcessDetails";
 import { SessionSkillSuggestions } from "./SessionSkillSuggestions";
+import { sessionSkillSuggestions } from "./session-skill-suggestions";
 import { useBackgroundProcessList } from "./use-background-process-list";
+import { useActivityServerStop } from "./use-activity-server-stop";
+import { backgroundProcessName } from "./activity-rail-presentation";
 import { GoalActivityRow } from "./GoalActivityRow";
+import { activityMcpReferences, type McpReconnectTarget } from "./activity-mcp-rows";
+import { useActivityMcpServers } from "./use-activity-mcp-servers";
+import { useActivityWorkspace } from "./use-activity-workspace";
 
 const EMPTY_HISTORY: PlanProposal[] = [];
 const EMPTY_PERMISSIONS: NonNullable<ReturnType<typeof useAppStore.getState>["pendingPermissions"][string]> = [];
@@ -40,6 +47,10 @@ export function SessionActivity({ sessionId, messages, visible, rangeLimited }: 
   const teamId = localTeamSessionId(session);
   const team = useTeamSnapshot(teamId, { enabled: visible && supported && Boolean(teamId) });
   const processes = useBackgroundProcessList(sessionId, visible && supported);
+  const serverStop = useActivityServerStop(sessionId, processes.refresh, (id) => {
+    const command = processes.processes.find((process) => process.id === id)?.command;
+    showToast(t("panel.activity.server.stopFailed", { name: command ? backgroundProcessName(command) : id }), { variant: "error" });
+  });
   const [selectedProcess, setSelectedProcess] = useState<string | null>(null);
   const [reportStates, setReportStates] = useState<Record<string, GoalActivityReportState>>({});
   const onReportStateChange = useCallback((executionId: string, reportState: GoalActivityReportState) => {
@@ -50,6 +61,16 @@ export function SessionActivity({ sessionId, messages, visible, rangeLimited }: 
   const aggregate = useSessionActivity(sessionId, visible && supported);
   const loadedResources = useMemo(() => activityResources(messages), [messages]);
   const resources = aggregate.snapshot ?? loadedResources;
+  const workspace = useActivityWorkspace({ sessionId, visible, supported });
+  const mcpTools = resources.references.mcp;
+  const mcpServers = useActivityMcpServers(session?.projectPath ?? undefined, visible && supported && mcpTools.length > 0, mcpTools.map((tool) => tool.label).join("\n"));
+  // The row spins and settles by itself, so only a server that still cannot be reached is said aloud, as the Extensions page does.
+  const reconnectMcp = (target: McpReconnectTarget) => {
+    void mcpServers.reconnect(target).then((status) => {
+      if (status?.state !== "failed") return;
+      showToast(`${target.label}: ${status.authRequired ? t("extensions.mcp.authRequired") : status.message?.trim() || t("extensions.mcp.testFailed")}`, { variant: "error" });
+    }, (error: unknown) => showToast(`${target.label}: ${error instanceof Error ? error.message : String(error)}`, { variant: "error" }));
+  };
   const loadedSubagents = useMemo(() => activitySubagents(messages, running), [messages, running]);
   const subagents = useMemo(() => aggregate.snapshot
     ? mergeActivitySubagents(aggregate.snapshot.subagents, loadedSubagents) : loadedSubagents,
@@ -79,6 +100,10 @@ export function SessionActivity({ sessionId, messages, visible, rangeLimited }: 
       ...(onOpen ? { onOpen } : {}),
     };
   });
+  // A Goal is a run the person asked for, a plan is something to approve or follow: the rail lists them as two sections.
+  const isGoalProposal = (proposal: PlanProposal) => (proposal.executionKind ?? proposal.kind) === "goal";
+  const goalRows = planRows.filter((_, index) => isGoalProposal(plans[index]));
+  const planOnlyRows = planRows.filter((_, index) => !isGoalProposal(plans[index]));
   const agents: ActivityRailItem[] = subagents.map((agent) => ({
     id: agent.delegationId, label: agent.agentName || t("chat.subagentUnnamed"), detail: agent.task,
     status: agent.status, statusLabel: t(`panel.activity.status.${agent.status}`),
@@ -120,9 +145,11 @@ export function SessionActivity({ sessionId, messages, visible, rangeLimited }: 
   const distinctOutputs = [...outputByPath.values()].map((item) => ({ ...item,
     ...(item.path && !item.onCopyPath ? { onCopyPath: copyPath(item.path) } : {}),
   }));
+  const recordedSuggestions = useMemo(() => sessionSkillSuggestions(messages).suggestions, [messages]);
   const skillReferences = [
     ...resources.references.skills.map((item) => ({ id: `skill:${item.id}`, label: item.label, kind: "skill" as const })),
-    ...resources.references.mcp.map((item) => ({ id: `mcp:${item.id}`, label: item.label, kind: "mcp" as const })),
+    // Servers fold their tools into one row each, so the rows wait for the first read instead of showing tool names and then changing.
+    ...(mcpServers.settled ? activityMcpReferences(mcpTools, mcpServers.servers, mcpServers.statuses) : []),
   ];
   const sources: ActivityRailItem[] = [
     ...resources.websites.map((item) => ({ ...item, id: item.id, label: item.domain, detail: [item.label, item.url].join(" · "), onOpen: () => open(sessionId, browserPluginTab(item.url)) })),
@@ -143,29 +170,34 @@ export function SessionActivity({ sessionId, messages, visible, rangeLimited }: 
     id: "pending-approvals", label: t("panel.activity.attentionApprovals", { count: permissions.length }), group: "approvals",
     onOpen: () => revealApproval(".permission-card"),
   });
-  if (pending?.status === "pending") attentionItems.push({ id: `approval:${pending.id}`, label: t("panel.activity.attentionPlanApproval", { title: pending.title }), group: "plans", itemId: pending.id, onOpen: () => revealApproval(".plan-approval-bar") });
+  if (pending?.status === "pending") attentionItems.push({ id: `approval:${pending.id}`, label: t("panel.activity.attentionPlanApproval", { title: pending.title }), group: isGoalProposal(pending) ? "goals" : "plans", itemId: pending.id, onOpen: () => revealApproval(".plan-approval-bar") });
   for (const proposal of plans) {
     const state = reportStates[`${sessionId}:${proposal.executionId}`];
     if (proposal.executionId && (state === "failed" || state === "fallback" || state === "blocked")) attentionItems.push({
       id: `report:${proposal.executionId}`, label: t(state === "blocked" ? "goal.blocked.activityTitle" : state === "failed" ? "panel.activity.attentionReportFailed" : "panel.activity.attentionReportFallback", { title: proposal.title }),
-      group: "plans", itemId: proposal.id,
+      group: "goals", itemId: proposal.id,
       onOpen: () => { if (state === "blocked") revealApproval('[data-testid="goal-blocked-card"]');
         else if (proposal.executionId) open(sessionId, goalReportWorkPanelTab(proposal.executionId, proposal.title)); },
     });
   }
-  return <SessionActivityRail sessionId={sessionId} visible={visible} plans={planRows} agents={agents} teamMembers={teamMembers} attentionItems={attentionItems}
-    plansAttentionReady={plans.every((proposal) => (proposal.executionKind ?? proposal.kind) !== "goal" || !proposal.executionId
+  return <SessionActivityRail sessionId={sessionId} visible={visible} plans={planOnlyRows} goals={goalRows} agents={agents} teamMembers={teamMembers} attentionItems={attentionItems}
+    goalsAttentionReady={plans.every((proposal) => (proposal.executionKind ?? proposal.kind) !== "goal" || !proposal.executionId
       || reportStates[`${sessionId}:${proposal.executionId}`] !== undefined)}
     outputs={distinctOutputs} sources={sources} processes={processes.processes} processesLoading={processes.loading}
-    processesError={processes.error} onRefreshProcesses={processes.refresh} onOpenProcess={setSelectedProcess}
+    processesError={processes.error} onRefreshProcesses={processes.refresh} onOpenProcess={setSelectedProcess} selectedProcessId={selectedProcess}
     showTeamMembers={Boolean(teamId)} teamNotice={team.error ? <div role="alert" className="session-activity-error">
       <p>{t("team.staleData")}: {team.error}</p><Button variant="ghost" size="sm" onClick={() => void team.refresh()}>{t("panel.activity.retry")}</Button>
     </div> : team.loading && !team.snapshot ? <p role="status" className="session-activity-empty">{t("panel.activity.loading")}</p> : undefined}
     agentsNotice={aggregateNotice} resourcesNotice={aggregateNotice}
+    pendingNotices={{ activity: Boolean(aggregate.loading && !aggregate.error && !aggregate.snapshot?.limited), team: Boolean(team.loading && !team.snapshot && !team.error) }}
+    suggestionsHaveRows={resources.references.skills.length > 0 || mcpTools.length > 0 || recordedSuggestions.length > 0}
+    environment={workspace.environment} contextUsage={workspace.context} changes={workspace.changes}
+    onOpenServerAddress={(url) => open(sessionId, browserPluginTab(url))} onStopServer={(id) => void serverStop.stop(id)} stoppingServers={serverStop.stopping}
+    onOpenContext={() => openContextInsights(sessionId, open)} onOpenReview={() => open(sessionId, toolWorkPanelTab("review"))}
     supported={supported} rangeLimited={rangeLimited} groupsRangeLimited={!aggregate.snapshot && rangeLimited} hasMoreBefore={transcript.hasMoreBefore} historyLoading={transcript.loading}
     onLoadEarlier={() => { if (visible && useAppStore.getState().activeSessionId === sessionId) void useAppStore.getState().loadTranscriptPage(sessionId, "before"); }}
     onReturnToLatest={transcript.historical || transcript.hasMoreAfter ? () => useAppStore.getState().returnToLatestTranscript(sessionId) : undefined}
     processDetails={selectedProcess ? <BackgroundProcessDetails key={selectedProcess} sessionId={sessionId} id={selectedProcess}
       visible={visible} onClose={() => setSelectedProcess(null)} /> : null}
-    suggestions={<SessionSkillSuggestions sessionId={sessionId} messages={messages} references={skillReferences} visible={visible} supported={supported} rangeLimited={rangeLimited} />} />;
+    suggestions={<SessionSkillSuggestions sessionId={sessionId} messages={messages} references={skillReferences} onReconnectMcp={reconnectMcp} visible={visible} supported={supported} rangeLimited={rangeLimited} />} />;
 }

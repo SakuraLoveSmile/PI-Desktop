@@ -119,8 +119,24 @@ pub fn list_view(st: &AppState, session: &str) -> Result<Vec<BackgroundProcessSu
         if let Some(pending) = st.pending_background_finalizations.get(&process.id) {
             *process = pending.process.clone();
         }
+        process.address = live_address(st, process);
     }
     Ok(processes)
+}
+
+/// An address belongs to a process that is still running; a finished one serves nothing and keeps none.
+fn live_address(st: &AppState, process: &BackgroundProcessSummary) -> Option<String> {
+    if !matches!(process.status.as_str(), "running" | "stopping") {
+        return None;
+    }
+    let output = st.background_outputs.get(&process.id)?;
+    match output.lock() {
+        Ok(output) => output.address().map(str::to_string),
+        Err(error) => {
+            tracing::error!(%error, "background output lock poisoned");
+            None
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -139,6 +155,9 @@ pub struct BackgroundProcessSummary {
     pub ended_at: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub exit_code: Option<i32>,
+    /// Where the process announced a local server (`http(s)://host:port`). Present only while it is active; never stored.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub address: Option<String>,
 }
 fn row(r: &rusqlite::Row<'_>) -> rusqlite::Result<BackgroundProcessSummary> {
     Ok(BackgroundProcessSummary {
@@ -152,6 +171,7 @@ fn row(r: &rusqlite::Row<'_>) -> rusqlite::Result<BackgroundProcessSummary> {
         started_at: r.get(6)?,
         ended_at: r.get(7)?,
         exit_code: r.get(8)?,
+        address: None,
     })
 }
 pub fn recover(db: &Database) -> Result<()> {
@@ -236,6 +256,7 @@ pub struct BackgroundOutput {
     stderr: String,
     stdout_truncated: bool,
     stderr_truncated: bool,
+    address: crate::background_address::AddressDetector,
     session: String,
     id: String,
     revision: u64,
@@ -253,6 +274,7 @@ impl BackgroundOutput {
             stderr: String::new(),
             stdout_truncated: false,
             stderr_truncated: false,
+            address: Default::default(),
             session,
             id,
             revision: 0,
@@ -274,6 +296,10 @@ impl BackgroundOutput {
     }
     pub(crate) fn finish_service_stop(&mut self, escalated: bool) {
         self.service_stop_escalated = Some(escalated);
+    }
+    /// The first local server address the process printed; it lives only as long as this output owner.
+    pub(crate) fn address(&self) -> Option<&str> {
+        self.address.address()
     }
     pub fn push(&mut self, stderr: bool, chunk: &str) {
         let (text, truncated) = if stderr {
@@ -300,8 +326,14 @@ impl BackgroundOutput {
             text.push_str(&chunk[..end]);
             *truncated |= end < chunk.len();
         }
+        let found = self.address.feed(stderr, chunk).is_some();
         self.dirty = true;
-        self.flush_due();
+        if found {
+            // The first address is a state change to show now, not at the next throttle tick.
+            self.changed();
+        } else {
+            self.flush_due();
+        }
     }
     pub fn changed(&mut self) {
         self.revision = self.revision.saturating_add(1);
@@ -418,6 +450,7 @@ pub async fn start(
         started_at: chrono::Utc::now().to_rfc3339(),
         ended_at: None,
         exit_code: None,
+        address: None,
     };
     let transaction = st.db.conn.unchecked_transaction()?;
     transaction.execute("INSERT INTO background_processes(id,session_id,tool_call_id,command,cwd,status,started_at) VALUES(?1,?2,?3,?4,?5,?6,?7)",params![summary.id,summary.session_id,summary.tool_call_id,summary.command,summary.cwd,summary.status,summary.started_at])?;
@@ -645,5 +678,27 @@ mod tests {
         output.last_changed = Instant::now() - Duration::from_millis(250);
         output.flush_due();
         assert!(rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn background_output_reports_the_first_address_at_once_and_keeps_it() {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let mut output = BackgroundOutput::new("session".into(), "process".into(), tx);
+        // An unelapsed throttle window holds an ordinary chunk back.
+        output.last_changed = Instant::now() + Duration::from_secs(1);
+        output.push(false, "starting up\n");
+        assert!(rx.try_recv().is_err());
+        assert_eq!(output.address(), None);
+
+        output.push(true, "Local: http://127.0.0.1:5173/\n");
+        let event: Value = serde_json::from_str(&rx.try_recv().unwrap()).unwrap();
+        assert_eq!(event["method"], "backgroundProcesses.changed");
+        assert_eq!(event["params"]["revision"], 1);
+        assert_eq!(output.address(), Some("http://127.0.0.1:5173"));
+        assert_eq!(output.fields()["stderr"], "Local: http://127.0.0.1:5173/\n");
+
+        output.push(false, "Local: http://localhost:9000/\n");
+        assert_eq!(output.address(), Some("http://127.0.0.1:5173"));
+        assert!(rx.try_recv().is_err(), "a later URL is not a new state");
     }
 }

@@ -1373,6 +1373,22 @@ slot 只允许一次替换；原审查、会话、任务和日志保留，任务
 
 Bash backgroundKind、owner/caps/TTL 及原 backgroundProcesses list/read/launch 的可选字段遵循[显式服务](/zh-CN/spec/03-runtime/team-managed-services)。changed 仍仅身份失效提示；读取/停止仍限 session。Plus P7 保存显式 ownership，旧进程不推断为服务。不扩大 shell budget/FIFO、批准执行权限或协议版本。
 
+### 后台进程行上的本地服务地址
+
+`backgroundProcesses.list` 可以给处于 `running` 或 `stopping`、且 Host 持有的输出缓冲仍在的
+`BackgroundProcessSummary` 增加一个可选、仅限运行期的 `address`。它是进程在 stdout 或 stderr
+打印的第一个本地网页地址的来源，形如 `http://host:port` 或 `https://host:port`：主机为 `localhost`、
+`127.x.y.z` 回环地址或 `[::1]`，且端口明确（`0.0.0.0` 与 `[::]` 记为 `localhost`）。路径、查询、片段与凭据
+一律丢弃，形似的主机、其他协议或没有端口的 URL 永远不是地址。ANSI 序列和同一输出流两次读取之间拆开的 URL
+都能处理；第一个匹配优先且不再变化。
+
+Host 从不可信的进程输出推出该值，且只与内存中的输出缓冲一起保留：从不存储，也不会出现在 `read`、`stop`、
+终态行或已存储的行上，Host 重启后消失，因此没有迁移。完成第一次匹配的那次读取会立刻发出一次
+`backgroundProcesses.changed`，不等待 250 ms 节流；该事件仍然只含身份。没有地址只表示没有见到地址，
+该字段不说明服务器是否健康或可达，也不授予任何东西：渲染器在把它变成链接之前会重新校验精确的来源。
+它是可选的增量字段，协议 11 不变，使用方忽略即可。理由见
+[ADR session-activity-server-address](../../../adr/session-activity-server-address.md)。
+
 ### 团队诊断与进度提示（WP7）
 
 strategy、presentation.role、displayName 参数错误说明合法值/范围；路由/过期范围/未批准派遣拒绝保持原 code 和条件，增加可操作 nextStep。runtime 的 completedMembersWithOpenTasks 和 completedMemberOpenTaskNextStep 仅由既有名单/任务投影派生，不授权限或结算任务。

@@ -22,7 +22,7 @@ globalThis.sessionActivityHistoryProbe = async (session) => {
   await i18n.init({ lng: "en", resources: { en: { translation: en } }, interpolation: { escapeValue: false } });
   const initial = useAppStore.getState();
   const host = document.createElement("div");
-  host.style.cssText = "width:340px;height:850px;overflow:auto;background:var(--ds-bg-primary)";
+  host.style.cssText = "box-sizing:border-box;width:340px;height:850px;padding:8px 16px 16px;overflow:auto;background:var(--ds-bg-primary)";
   document.body.append(host);
   const errors: unknown[] = [];
   const root = createRoot(host, { onUncaughtError: (error) => errors.push(error) });
@@ -51,14 +51,17 @@ globalThis.sessionActivityHistoryProbe = async (session) => {
     flushSync(() => button.click());
   };
   try {
-    await until(() => host.querySelector('[data-activity-group="outputs"] .session-activity-group-count')?.textContent === "66", "complete paginated Host outputs load");
+    // Outputs are listed under Artifacts with no heading of their own, so the full total shows on the Show all control.
+    await until(() => host.querySelector('[data-activity-group="outputs"] .session-activity-show-all')?.textContent?.includes("(66)") === true, "complete paginated Host outputs load");
     check(host.querySelector('[data-activity-group="agents"] .session-activity-group-count')?.textContent === "1", "old Task remains in the overview");
     check(host.querySelector('[data-activity-group="sources"] .session-activity-group-count')?.textContent === "1", "old hosted-search source remains in the overview");
     check(host.textContent?.includes("Historical reviewer"), "Task identity is rendered from Host history");
-    const delegateStatus = host.querySelector('.subagent-activity-status')?.textContent?.trim();
+    // A finished delegate shows a check, so its status is the check's accessible name.
+    const delegateStatusNode = host.querySelector('.subagent-activity-status');
+    const delegateStatus = delegateStatusNode?.querySelector('[role="img"]')?.getAttribute('aria-label') ?? delegateStatusNode?.textContent?.trim();
     if (delegateStatus !== i18n.t("panel.activity.status.completed")) throw new Error(`persisted Task terminal settlement renders ${delegateStatus ?? "no status"}, expected completed`);
     checks.push("persisted Task terminal settlement renders completed");
-    click('[data-activity-group="outputs"] .session-activity-disclosure');
+    check(!host.querySelector('[data-activity-group="outputs"] .session-activity-disclosure'), "outputs are listed without a fold of their own");
     click('[data-activity-group="sources"] .session-activity-disclosure');
     click('[data-activity-group="outputs"] .session-activity-show-all');
     await frame();

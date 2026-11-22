@@ -18331,7 +18331,49 @@ prove account/region eligibility or call a real model.
   then stop/persist the job and verify moving succeeds. Test
   Host EOF, graceful app dispose and forced loss with owned child/grandchild
   markers, then restart. Keep a detail panel open during Host recovery. Open
-  the activity work-panel fallback at a narrow chat width.
+  the activity work-panel fallback at a narrow chat width. Review the rail's
+  sections in their default order (Goal, Plan, Live status, Artifacts, Skills &
+  MCP): one hairline between neighbours, none above the first section or inside a
+  group, a Goal listed only under Goal, empty groups and sections left out (a
+  rail with nothing at all keeps Live status with one hint line), outputs listed
+  directly under Artifacts, Sources folded, one-line rows with a spinner, check or
+  word at the far edge, and tail actions that appear on hover and keyboard focus.
+  Reorder sections with a pointer drag and with Arrow Up/Arrow Down on a focused
+  grip, cancel a drag with Escape, switch sessions and confirm the order holds,
+  then use Reset order and confirm the default order, no saved entry and focus on
+  the first grip. Repeat at the real 264px pane (16px side padding) with enlarged
+  text in both themes. Review the workspace sections between Live status and
+  Skills & MCP: Environment shows the project's name over its shortened path and,
+  in a git checkout, the branch (a folder outside git has no section, and a switch
+  between sessions never shows another project's branch); Context shows the newest
+  request's used share, `~used / window`, the system/tools/messages bar with its
+  legend and the free space, using the composer inspector's numbers and its
+  used/remaining framing, and Details opens the dashboard; Changes shows the
+  Review tab's count and +added −removed lines and Review opens that tab; each MCP
+  server the session used is one row whose state reads Connected, a spinner while
+  connecting, Sign-in needed, Idle or, for a failed server, Reconnect in the
+  failure word's place (click it: the row spins and offers nothing until the Host
+  answers, a second click in the same tick starts nothing, a server that connects
+  says so in its row, a request the Host could not take and a server that is
+  still down each say why once in an error toast that names the server, and an
+  answer that arrives after switching to another project never reaches that
+  project's rows), while skills carry no state.
+  Review Servers: start two background commands that print a local web address
+  (a dev server printing `Local: http://localhost:5173/` and a Team service
+  printing `http://127.0.0.1:8080`) and one that prints none. The section sits
+  right under Live status with one row per server (glyph, name without the port,
+  the address in muted text, a stop square) while the silent command stays in Live
+  status; a printed address that is not a loopback origin with an explicit port
+  (a LAN or look-alike host, another scheme, no port) lists nothing. Click the
+  name (the details show the output under the server's rows, and no empty Live
+  status section appears for a servers-only session), the address (the work panel's browser opens
+  at the server's origin) and Stop (the row spins and offers no second stop until
+  the Host answers, one stop request reaches the Host, a stop the Host cannot take
+  says so once in an error toast that names the server, and an answer that
+  arrives after the pane closed reaches nothing); after the stop the row leaves
+  Servers for Live status's ended processes. A section order saved before Servers
+  existed places it right after Live status.
+  Fold every foldable section and read the summaries.
 - **Expected:** Original display preference/default and chronological reading
   remain intact. The rail does not overlap chat/composer and yields to the work
   panel. Hidden panes do not read another owner; async navigation/read/stop never
@@ -18339,17 +18381,39 @@ prove account/region eligibility or call a real model.
   reads/writes and never enter transcripts or forks. Every active process stays manageable; explicit stop reaches the runner
   despite storage refusal, permit release follows actual tree exit, and storage
   failure retains observable terminal output pending repair. Startup marks
-  unfinished jobs interrupted without re-execution or stale-PID control.
-- **Specs:** 04-ux/08-component-spec §13.3-13.4, 04-ux/06-settings-ia,
+  unfinished jobs interrupted without re-execution or stale-PID control. The
+  section order is a per-device renderer preference: it never reaches the Host,
+  applies to every session's rail, survives a remount, is cleared by Reset order,
+  and a cancelled drag saves nothing. Grips, hairlines, headings and rows stay
+  inside the 264px pane at enlarged text. The workspace sections are read-only
+  mirrors: usage, changes and servers are still managed in the composer, the Review
+  tab and the Extensions page; their numbers equal those places'; a git, usage or
+  server read that belongs to another session or project never shows; MCP states
+  differ by word as well as colour; Reconnect is the one action they offer on a
+  tool server, reuses the Extensions page's test call, runs once per server and
+  project at a time and settles on the Host's answer; Details and Review open the
+  existing dashboard and tab. A server is a process whose live Host row carries an
+  `address` that the Host derived from the process's own output: it is never stored
+  (none on `read`, `stop`, ended or restored rows, none after a Host restart), the
+  renderer re-validates the exact loopback origin, and Servers lists the process
+  once while Live status does not.
+- **Specs:** 04-ux/08-component-spec §13.3-13.4, 04-ux/07-ui-design-system §6.4
+  (D645, D646, D647), 04-ux/06-settings-ia,
   03-runtime/03-tools-and-permissions, 03-runtime/04-data-storage §7.1,
-  03-runtime/06-host-rpc-protocol; ADR session-activity-rail-and-managed-background-processes.
+  03-runtime/06-host-rpc-protocol; ADR session-activity-rail-and-managed-background-processes,
+  session-activity-server-address.
 - **Acceptance:** C / E / Quality / Security.
 - **Milestone:** M6+.
 - **Automation:** `test:e2e:transcript` (real React/Chromium shell and interaction
-  fixtures), `node scripts/e2e-goal-team-renderer-ui.mjs` (shared Goal reader,
+  fixtures, including the rail's section order, hairline and reorder probe and the
+  workspace-sections probe for Environment, Context, Changes and MCP states and the
+  servers probe for the Servers section's placement, rows, address and stop),
+  `node scripts/e2e-goal-team-renderer-ui.mjs` (shared Goal reader,
   report/artifact navigation and native layout), `test:e2e:session-activity`
   (real isolated production Host), focused
-  note/process/permission/migration and Runtime contract tests.
+  note/process/permission/migration and Runtime contract tests, and the `host-core`
+  background-process tests (the address detector's grammar, the list overlay and the
+  live-only rule).
 - **Status:** Local candidate verification; Windows process-tree acceptance
   remains separate. No user profile or real model provider is a test fixture.
 

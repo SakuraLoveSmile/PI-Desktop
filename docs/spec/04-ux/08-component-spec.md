@@ -4972,24 +4972,43 @@ available. Missing preferences retain Detailed.
 
 ### 13.4 Session activity rail
 
-The accepted right rail groups Plan, Subagents, Background processes, Outputs,
-Sources without a stroked frame (D297). Group headers use primary ink at medium
-weight so they read apart from the muted empty-state copy beneath them, and each
-carries its record count in a tonal chip (`--ds-tile-deep`). A group that is open
-and holds rows sits on a `--ds-tile` plate; the nested Ended group, empty groups
-and folded groups stay flat. Groups are independently expandable; Overview agents
-show an accessible state glyph,
-while transcript agents retain their avatar. Command rows show a small terminal tile, and long labels have a
-full tooltip. Outputs/Sources start folded, other activity groups start open,
-and the suggestion list opens explicitly. Each group displays its record count
-and active/failure/timeout summary. Disclosure choices persist per session and
-group across session switches and renderer reloads. A newly active or failed
-record/status transition opens its group; an explicit collapse stays respected
-until a new attention event.
+The accepted right rail is a stack of sections (Goal, Plan, Live status, Servers,
+Environment, Context, Artifacts, Skills & MCP, Changes) drawn without a stroked
+frame (D297) apart from the one hairline between sections (D645). It follows the
+approved canvas. A section
+heading is primary ink at regular weight and reads title, chevron and, once
+folded, a quiet summary (running, failed and timed-out counts, or the number of
+artifacts); a nested group's heading (Subagents, Team members, Background
+processes, Sources) is the smaller medium-weight secondary heading and reads
+title, count, chevron. Every heading is one whole-row toggle that takes
+`--ds-bg-hover`. Groups sit on the page layer: no `--ds-tile` plate and no chip.
+A row is one line (34px): a 16px muted glyph, the label, then a quiet status at
+the far edge. The status is a spinner while the work runs, a check once it is
+done, a coloured word only for a state that needs attention (failed, timed out,
+degraded) and a quiet word for the rest; its accessible name always carries the
+state. Command rows show a terminal glyph, and long labels have a full tooltip.
+Write counts, last-change times and citation counts are not printed on the row;
+they stay in its tooltip and accessible name. Row actions (open, locate, copy
+path, details) overlay the row's trailing edge on hover or keyboard focus and
+reserve no width. Transcript agents retain their avatar.
 
-Overview agent rows show identity and an unprefixed status badge on the first
-line, with a truncated task summary and elapsed time on the second. Transcript
-agent rows retain their existing presentation. Background titles use literal
+An empty group or section is left out. Goal, Plan, Live status, Servers, Artifacts
+and Skills & MCP each appear only when they hold rows or a notice that has something
+to say (a notice that only says data is still loading never opens an empty
+group); a rail with nothing else to list keeps Live status with one hint line
+(the workspace sections below do not count as content for it, a server does). Outputs
+are listed directly under Artifacts, Sources fold by default, every other group
+starts open, and the suggestion list opens explicitly. A folded section shows its
+summary. Disclosure choices persist per session and group across session
+switches and renderer reloads. A newly active or failed record/status transition
+opens its group; an explicit collapse stays respected until a new attention
+event. Each section that lists transcript-derived rows (Live status, Artifacts)
+states the loaded message range with its load-earlier and return-to-latest actions
+while only part of the transcript is loaded.
+
+Overview agent rows show the name over a truncated task summary, with the status
+(unprefixed) and elapsed time at the far edge. Transcript agent rows retain their
+existing presentation. Background titles use literal
 script/tool names and recognized ports, never shell execution; tooltips preserve
 the full command. Terminal processes are grouped under Ended N with a Clear
 action. Clear only hides those records for the renderer lifetime, including
@@ -4997,8 +5016,10 @@ session switches; Host history/logs and running jobs are unchanged. Reload
 restores the recorded history. Tool timeout uses warning/clock styling distinct
 from failed/error styling.
 
-Goal plan rows show the authoritative completed/total count, execution state and
-report state (pending, generating, blocked, ready, fallback, failed or unavailable).
+Goal plan rows show the authoritative completed/total count with a progress bar,
+the report state (pending, generating, blocked, ready, fallback, failed or
+unavailable) and, only when the execution needs a word (pending, failed, blocked,
+interrupted), its state; a Goal that simply runs shows no state word.
 Overview and the Composer Goal capsule share one session/execution-scoped Host
 reader. A blocked row shows Goal title · Goal blocked with semantic warning
 styling and opens its held state. Missing counts are unavailable, not fabricated zeroes; historical fallback reports
@@ -5030,12 +5051,45 @@ jobs. Host restart/focus refreshes open details and cannot let an old stop
 response overwrite interrupted state. Starting a job is an approved Bash call
 with `run_in_background: true`; there is no bypassing manual launch path.
 
+Servers (D647) lists the background processes that announced a local web address.
+A process that is running or stopping and whose Host row carries `address` (the
+loopback origin the Host read from its output, see the
+[address contract](../03-runtime/06-host-rpc-protocol.md)) is a server whatever
+its kind, an ordinary command or a Team service: it is listed once, here, and not
+under Live status. A process that announced no address stays in Live status, and a
+server that ended is listed with Live status's ended processes. The renderer
+re-checks the origin (`http` or `https`, host `localhost`, `127.x.y.z` or `[::1]`,
+an explicit port) and treats anything else as no address, so a forged or
+malformed value never becomes a link. A row is one line (34px): the server glyph,
+the name (the script or tool name without the port the address already shows; the
+full command and working directory are in its tooltip), the address in muted 12px
+text (`localhost:3000`) and, at the far edge, a stop square without a stroke (24px
+by 28px and flush with the row's edge like the grip, a 10px square glyph with 2px
+corners in the text colour, `--ds-bg-active` under the pointer). The name opens the
+process details described above, which show under the server rows (those of any other
+process stay under Background processes, so opening a server's details never adds an
+empty Live status section); the address opens the page in the work panel's
+browser tab, the same destination Sources use, at the server's own origin; Stop
+calls the existing background-process stop that the details use. One stop per
+process runs at a time: from the click until the Host answers, or its status reads
+stopping, the square is replaced by the stopping spinner and a second click does
+nothing; a rejected stop gives the square back and says so once in an error toast
+naming the server; an answer that arrives after the pane closed reaches nothing.
+Without handlers a read-only rail shows the address as text and draws no stop.
+Folded, the section shows how many servers are running. The address exists only
+while the process runs and is never stored, so an ended, interrupted or restored
+row has none.
+
 Quick Notes is not exposed in the activity rail or narrow work-panel fallback.
 Its editor and renderer draft lifecycle have been removed; retained Host data
 and storage contracts preserve previously saved notes without loading or saving
-them from the current interface. Self-evolution headers use the same flat text
-and disclosure arrow as the other groups, including hover/focus. The suggestion count is a compact rectangular action
-opening an anchored suggestion dialog.
+them from the current interface. The Skills & MCP heading is a section heading
+like the others, including hover/focus. Its suggestion action is a borderless text
+action (sparkle glyph and the suggestion count, or the extract label while there
+are none) opening an anchored suggestion dialog; the section stays so that action
+stays reachable, but it alone does not count as content for the empty-rail hint.
+With nothing to list it shows no hint paragraph of its own (the dialog keeps its
+empty state).
 The Overview starts with Needs attention when the owning session has pending
 permission/plan approvals, failed activities, timed-out processes or failed/
 fallback Goal reports or blocked Goal holds. `task.failed` notifications carrying
@@ -5048,9 +5102,81 @@ Report entries open the owning Goal report without stealing focus back from the
 report destination. Target focus follows actual nested disclosure DOM updates,
 not a guessed delay.
 
-Live status (plans, delegated agents, team members and processes) is separated
-from artifacts (outputs and sources). Team members use a distinct group with
-recorded role labels; its loading/error state is not mixed into delegated agents.
+The rail is a stack of sections separated by one 0.5px hairline (D645): Goal,
+Plan, Live status (delegated agents, team members and processes), Servers,
+Environment, Context, Artifacts (outputs and sources), Skills & MCP and Changes. A recorded
+Goal is listed only under Goal and a plan only under Plan; a section or group
+without rows is left out and a rail with nothing else to show keeps Live status
+with one hint line. Team members use a distinct
+group with recorded role labels; its loading/error state is not mixed into
+delegated agents.
+
+The workspace sections show, read-only, what the composer, the Review tab and the
+Extensions page already know (D646); changing any of it stays where it was. Each
+appears only when its data exists, and only the visible pane reads it:
+
+- Environment: the session's project (its name over a path shortened to the last
+  two folders, the full path in the tooltip) and below it the git branch. Both
+  come from the Host-owned git snapshot that the composer's workspace menu reads
+  (`useComposerWorkspaceGit`). A snapshot of another project is dropped, so a
+  session or project switch never shows another project's branch, and a branch
+  switched from the composer's menu is read again. A session without a project,
+  or a folder outside git, has no Environment section. Folded, it shows the
+  project's name.
+- Context: the newest usage-bearing request, derived by the composer inspector's
+  own functions and framed by the same used/remaining preference
+  (`settings.contextUsageDisplay`): the headline (label and percentage, warning
+  at 25% or less remaining and critical at 10% or less, the one rule the
+  composer's footer shares), `~used / window`, one bar split into system, tools
+  and messages by the newest request's breakdown (a single used segment until the
+  breakdown is known) and a legend row for each part and for the free space. The
+  breakdown is subscribed to only while the section is open and the pane is
+  visible. A Details link opens the context dashboard by the same placement rule
+  as the composer inspector's dashboard link (dialog or work-panel tab). The rail
+  never manages usage: compaction and the display preference stay in the
+  composer. Folded, it shows the label and percentage.
+- Changes: the number of recorded changes and the added and removed lines that
+  the Review tab lists, summarised by the same functions, with a Review link that
+  opens that tab. The heading cannot fold, and the section is left out while
+  nothing is recorded.
+- Skills & MCP: every MCP server whose tools the session recorded is one row (in
+  the order its tools were first used) carrying its live state at the far edge: a
+  quiet Connected when ready, a spinner while connecting (the list is read again
+  every two seconds, at most twenty times, until none is connecting), a
+  warning-coloured Sign-in needed when an HTTP server asks for authorization and
+  sends no `Authorization` header of its own, a failure word in the failure
+  colour, and a quiet Idle otherwise; the tooltip adds the server's message. A tool
+  whose server is no longer configured, or any tool while the server list cannot
+  be read, keeps a row of its own without a state, and skills carry none. Server
+  rows wait for the first read so a raw tool name never flashes before it folds
+  into its server. A failed server that is not waiting for a sign-in, and so one
+  a retry could help, offers Reconnect in the failure word's place: a borderless
+  warning-coloured word whose accessible name carries the server and the failure
+  ("Reconnect Kaneo (connection failed)"; the failure also stays in the tooltip).
+  It calls the existing `testMcpServer` that the Extensions page's Test connection
+  uses, at the server's own level and, for a project server, its project: a forced
+  handshake that rebuilds the workspace's user-MCP runtime, not a plain retry. The
+  row reads as connecting (a spinner, nothing to click) until the Host answers and
+  then takes the answer as its state; one request per server and project runs at a
+  time, so a second click is ignored; an answer that arrives after the pane left
+  that project, or closed, is dropped; and a server that is still down, or a
+  request the Host could not take, says so once in an error toast that names the
+  server, in the Extensions page's own wording. A server that needs sign-in is not
+  offered Reconnect: signing in stays on the Extensions page.
+
+Each section heading ends in a drag grip. Dragging it with a pointer, or pressing
+Arrow Up/Arrow Down on the focused grip, moves the section; Escape, a cancelled
+pointer or losing the window restores the order the drag started from. The moved
+section's grip keeps focus and a polite live region announces its name and
+position. While the order differs from the default, Reset order restores it and
+returns focus to the first grip. The order is one per-device renderer preference
+(`localStorage` key `pi-desktop:activity-section-order:v1`) shared by every
+session's rail: unknown or repeated ids are dropped, a section the saved order
+does not know lands after its default predecessor, and a section that is not
+currently shown keeps its slot. A storage that cannot be read or written leaves
+the order in force for the running window and logs only the error name. No Host,
+IPC or protocol state is involved.
+
 Each recorded-activity group uses full Host totals after all revision-consistent
 summary pages have loaded. The complete projection is read only while visible,
 refreshes after canonical writes and Host restart, and preserves a known full
@@ -5060,22 +5186,26 @@ fallback uses Only loaded messages, Load earlier and Return to latest notices.
 A Host summary limit has a separate notice and is not presented as repairable
 by loading earlier renderer messages.
 
-Successful Write/Edit records for the same literal path form one output with a
-write count, latest recorded change time/message, and directory grouping. Exact
+Successful Write/Edit records for the same literal path form one output, grouped
+by directory; its tooltip and accessible name carry the write count and the
+latest recorded change time/message. Exact
 literal paths are preserved without guessing filesystem aliases or case rules.
 Additions/deletions appear only when every operation has a matching, complete
 Host ReviewChange; binary/truncated, unknown or legacy replacement snippets do
 not produce fabricated line totals. Attachments/artifacts sharing a displayed
 path do not duplicate its row. Open, locate in transcript and copy path are
 independent sibling actions with project/session-owned navigation. Sources are
-grouped by safe HTTP(S) hostname and show captured citation occurrences across
-the complete canonical transcript; the first safe URL remains the opening
-destination. Loaded-window fallback states preserve the previous evidence rules.
+grouped by safe HTTP(S) hostname; the tooltip and accessible name carry the
+captured citation occurrences across the complete canonical transcript, and the
+first safe URL remains the opening destination. Loaded-window fallback states preserve the previous evidence rules.
 
 Activity lists initially display five records and provide Show all/Show less.
 Expanding for an attention target does not prevent a subsequent manual collapse.
-Tail actions appear on hover or keyboard focus and remain visible on coarse
-pointers. Empty states explain which recorded actions populate each group.
+Tail actions overlay the row on hover or keyboard focus, and whenever one of
+them holds focus, and remain visible on coarse pointers. Empty groups are left
+out rather than explaining themselves; only a rail with nothing at all keeps one
+hint line saying that subagents and background processes appear in Live status
+as they make progress.
 Skill suggestions remain manually generated, show their recorded task-evidence reason as
 Why recommended (older suggestions explicitly mark a missing reason), and expose one-click Ignore beside the inline name. Ignore
 persists only the existing source-specific renderer preference and keeps failures
@@ -5197,7 +5327,9 @@ Acceptance covers file names/navigation, delegate prompt/group disclosure and ab
 
 ### Skills and MCP sidebar with suggestion dialog
 
-The sidebar uses a flat Skills & MCP heading and a title-only icon list of recorded Skill/MCP references plus pending suggestions. References are removed from the separate Sources list; web sources remain there. Same-kind/name references are deduplicated, and a pending same-name Skill uses one row. The pending count is a compact rectangular action opening an opaque, viewport-bounded anchored dialog headed Self-evolution suggestions. Rows show a name and a two-line description; hover, keyboard focus and touch reveal Create/Ignore actions. Create opens the existing project Skill review editor before saving. Ignore hides only that recorded suggestion in the sidebar/count/dialog.
+The sidebar uses a flat Skills & MCP heading and a title-only icon list of recorded Skill/MCP references plus pending suggestions. References are removed from the separate Sources list; web sources remain there. Same-kind/name references are deduplicated, and a pending same-name Skill uses one row. The pending count is a compact rectangular action opening an opaque, viewport-bounded anchored dialog headed Self-evolution suggestions. Rows show a name and a two-line description; hover, keyboard focus and touch reveal Create/Ignore actions. Create opens the existing project Skill review editor before saving. Ignore hides only that recorded suggestion in the sidebar/count/dialog. The
+sidebar folds an MCP server's tools into one row that carries the server's
+connection state (D646).
 
 Ignore preferences are renderer-owned UI preferences under an independent version-1 key, identified by owning session, source message, name and content fingerprint. They survive remount/reload, do not alter task messages or Skill files, and keep only the latest 200 identities. A regenerated source or revised content is independent. Invalid/unavailable storage is visible and failed writes do not remove a row. Escape/outside pointer closes the dialog; Escape returns focus to its count; changing sessions closes it without opening another owner's editor.
 

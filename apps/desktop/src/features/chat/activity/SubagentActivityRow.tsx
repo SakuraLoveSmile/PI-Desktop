@@ -1,9 +1,9 @@
 import { useTranslation } from "react-i18next";
 import type { SubagentTiming } from "../../../lib/subagent-topology";
-import { Badge, Tooltip, TooltipButton } from "../../../components/ui";
+import { Tooltip, TooltipButton } from "../../../components/ui";
+import { IconBot } from "../../../components/icons";
 import { subagentAvatarVariant, subagentElapsed, subagentRowText } from "./subagent-row-presentation";
-import { ActivityStatus } from "./ActivityStatus";
-import { activityStatusTone } from "./activity-rail-presentation";
+import { ActivityRowStatus } from "./ActivityRowStatus";
 
 export function SubagentActivityRow({ id, name, task, status, statusLabel, timing, now, className = "", onOpen, presentation = "inline", roleLabel }: {
   id: string; name: string; task?: string; status?: string; statusLabel?: string;
@@ -14,27 +14,28 @@ export function SubagentActivityRow({ id, name, task, status, statusLabel, timin
   const elapsed = subagentElapsed(status, timing, now);
   const statusText = statusLabel ? presentation === "overview" ? statusLabel : `${t("chat.subagentAgent")} ${statusLabel}` : undefined;
   const title = subagentRowText(name, task, statusText, elapsed);
-  const content = <>
-    {presentation === "overview" ? <span className="session-activity-agent-glyph" aria-hidden><ActivityStatus status={status ?? "unknown"} label="" compact /></span>
-      : <span className="subagent-activity-avatar" data-variant={subagentAvatarVariant(id)} aria-hidden />}
-    {presentation === "overview" ? <span className="subagent-activity-overview-copy">
+  // The rail's overview row reads: icon, name over task, then the status (a spinner while it runs) and the elapsed time.
+  const content = presentation === "overview" ? <>
+    <span className="session-activity-agent-glyph" aria-hidden><IconBot size={16} /></span>
+    <span className="subagent-activity-overview-copy">
       <span className="subagent-activity-overview-main">
         <span className="subagent-activity-name">{name}</span>
-        {roleLabel && <Badge className="subagent-activity-role">{roleLabel}</Badge>}
-        {status && statusText && <Badge tone={activityStatusTone(status)} className="subagent-activity-status">
-          <ActivityStatus status={status} label={statusText} />
-        </Badge>}
+        {roleLabel && <span className="subagent-activity-role">{roleLabel}</span>}
       </span>
-      {(task || elapsed) && <span className="subagent-activity-overview-detail">
+      {task && <span className="subagent-activity-overview-detail">
         <span className="subagent-activity-task">{task}</span>
-        {elapsed && <span className="subagent-activity-elapsed">{elapsed}</span>}
       </span>}
-    </span> : <span className="subagent-activity-text">
+    </span>
+    {status && statusText && <ActivityRowStatus status={status} label={statusText} className="subagent-activity-status" />}
+    {elapsed && <span className="subagent-activity-elapsed">{elapsed}</span>}
+  </> : <>
+    <span className="subagent-activity-avatar" data-variant={subagentAvatarVariant(id)} aria-hidden />
+    <span className="subagent-activity-text">
       <span className="subagent-activity-name">{name}</span>
       {task && <> · <span className="subagent-activity-task">{task}</span></>}
       {statusText && <> · <span className="subagent-activity-status">{statusText}</span></>}
       {elapsed && <> <span className="subagent-activity-elapsed">{elapsed}</span></>}
-    </span>}
+    </span>
   </>;
   const classes = `subagent-activity-row ${className} status-${status ?? "unknown"}`;
   // The title reads as a sentence, so its tooltip wraps inside the viewport instead of running past it.

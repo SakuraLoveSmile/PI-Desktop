@@ -267,6 +267,70 @@ async fn background_blocks_project_move_after_turn_ends_until_stopped() {
 
 #[cfg(not(windows))]
 #[tokio::test]
+async fn background_server_address_is_live_only_and_reaches_the_list_and_its_event() {
+    let mut f = Fixture::new("auto");
+    // An ordinary command, not a Team service: the address is what makes it a server.
+    let start = f
+        .start(
+            "serve",
+            "printf 'Local: http://localhost:5173/?token=secret\\n'; sleep 30",
+            60000,
+        )
+        .await;
+    let id = start["content"]["backgroundProcessId"].as_str().unwrap();
+    let row = |list: &Value| {
+        list["processes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|process| process["id"] == id)
+            .cloned()
+            .unwrap()
+    };
+    let listed = tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            let list = f
+                .call("backgroundProcesses.list", json!({"sessionId":f.session}))
+                .await
+                .unwrap();
+            let process = row(&list);
+            if process.get("address").is_some() {
+                return process;
+            }
+            f.rx.recv().await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(listed["address"], "http://localhost:5173");
+    assert_eq!(listed["status"], "running");
+    assert!(listed.get("backgroundKind").is_none());
+    // Only the list carries it: the detail read and the stored row do not.
+    assert!(f.read(id).await["process"].get("address").is_none());
+    assert!(jobs::get(&f.state.lock().await.db, &f.session, id)
+        .unwrap()
+        .unwrap()
+        .address
+        .is_none());
+
+    f.call(
+        "backgroundProcesses.stop",
+        json!({"sessionId":f.session,"id":id}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(f.terminal(id).await["process"]["status"], "stopped");
+    let list = f
+        .call("backgroundProcesses.list", json!({"sessionId":f.session}))
+        .await
+        .unwrap();
+    let ended = row(&list);
+    assert_eq!(ended["status"], "stopped");
+    assert!(ended.get("address").is_none(), "{ended}");
+}
+
+#[cfg(not(windows))]
+#[tokio::test]
 async fn background_stop_is_session_scoped_idempotent_and_blocks_deletion() {
     let mut f = Fixture::new("auto");
     let start = f.start("stop", "printf started; sleep 30", 60000).await;

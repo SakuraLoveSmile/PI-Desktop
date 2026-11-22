@@ -189,6 +189,16 @@ export function contextUsageView(
       };
 }
 
+export type ContextCapacityLevel = "comfortable" | "warning" | "critical";
+
+/**
+ * How tight the window is, from the share still free. The composer's footer and popover and the activity rail's
+ * Context section all colour by this one rule, so a warning means the same thing everywhere.
+ */
+export function contextCapacityLevel(remainingPercent: number): ContextCapacityLevel {
+  return remainingPercent <= 10 ? "critical" : remainingPercent <= 25 ? "warning" : "comfortable";
+}
+
 function serializedLength(value: unknown): number {
   if (typeof value === "string") return value.length;
   try {
@@ -366,7 +376,7 @@ export type ComposerUsageFooterMetrics = {
     percent: number;
     tokens: number;
     remainingPercent: number;
-    level: "comfortable" | "warning" | "critical";
+    level: ContextCapacityLevel;
   };
 };
 
@@ -396,12 +406,7 @@ export function resolveComposerUsageFooterMetrics({
   const context = calculateContextUsage(usage, contextWindow);
   const displayMode = resolveContextUsageDisplay(contextUsageDisplay);
   const view = contextUsageView(context, displayMode);
-  const level =
-    context.remainingPercent <= 10
-      ? "critical"
-      : context.remainingPercent <= 25
-        ? "warning"
-        : "comfortable";
+  const level = contextCapacityLevel(context.remainingPercent);
 
   return {
     outputSpeed: rate !== undefined ? { rate, estimated: responseOutputEstimated } : undefined,

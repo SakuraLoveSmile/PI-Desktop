@@ -592,6 +592,26 @@ In-flow surfaces draw no strokes (D297). Structure inside a page comes from
 three tonal layers plus spacing, and the border tokens are reserved for
 floating layers where an edge is an elevation cue rather than a partition.
 
+One in-flow exception (D645): the session activity rail separates its sections
+(Goal, Plan, Live status, Servers, Environment, Context, Artifacts, Skills & MCP,
+Changes) with a 0.5px
+`--ds-border-default` hairline between neighbours. It is never drawn above the
+first section and never around or inside a group, row, heading or the attention
+block. The rail's groups sit on the page layer rather than on `--ds-tile` plates,
+and a group heading is a whole-row toggle that takes `--ds-bg-hover` on hover.
+Its rows are one line (34px) with a 16px muted glyph and a quiet far-edge status
+(a spinner while running, a check when done, a word only when it needs attention;
+a row's own action, Reconnect on a failed MCP server, takes that word's place as a
+borderless `--ds-warning-ink` word 28px tall in 12px type with 6px corners, tinted
+with 12% `--ds-warning` only under the pointer); the whole row, with its overlaid
+actions, takes `--ds-bg-hover` on hover or
+keyboard focus. The Context section's bar and legend use the data-visualization
+tokens `--ds-viz-system`, `--ds-viz-tools` and `--ds-viz-messages`, like the
+composer's inspector (D646). A server row (D647) ends in the same kind of borderless
+control: the address in 12px `--ds-text-muted` text, then a stop square 24px by 28px
+and flush with the row's edge like the grip, holding a 10px square glyph with 2px
+corners in `--ds-text-primary` and tinted with `--ds-bg-active` only under the pointer.
+
 | Layer | Token | Use |
 |---|---|---|
 | Page | `--ds-bg-primary` | The route or dialog body itself |

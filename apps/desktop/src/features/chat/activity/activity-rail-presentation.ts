@@ -70,12 +70,13 @@ function commandSegments(command: string): string[][] {
 
 function basename(value: string): string { return value.split(/[\\/]/).filter(Boolean).at(-1) ?? value; }
 
-export function backgroundProcessTitle(command: string): string {
+/** The short title of a command and the port its own arguments name. */
+function describeBackgroundCommand(command: string): { name: string; port?: number } {
   const segments = commandSegments(command);
   const words = [...(segments.find((segment) => !["cd", "export", "set"].includes(segment[0])) ?? segments[0] ?? [])];
   while (words[0] === "env" || /^[A-Za-z_][\w]*=/.test(words[0] ?? "")) words.shift();
   const executable = basename(words[0] ?? "");
-  if (!executable) return command.trim();
+  if (!executable) return { name: command.trim() };
   const args = words.slice(1);
   let title = executable;
   if (/^(?:node|python\d?(?:\.\d+)?|bash|sh|zsh|tsx|ts-node|ruby|perl|deno|bun)(?:\.exe)?$/.test(executable)) {
@@ -92,7 +93,17 @@ export function backgroundProcessTitle(command: string): string {
   const portArg = tokens.find((token) => /^(?:--port=|PORT=)\d+$/.test(token))?.split("=").at(-1)
     ?? tokens.find((_, index) => ["--port", "-p"].includes(tokens[index - 1]) && /^\d+$/.test(tokens[index]));
   const port = Number(portArg);
-  return title + (portArg && port > 0 && port <= 65535 ? ` · :${port}` : "");
+  return { name: title, ...(portArg && port > 0 && port <= 65535 ? { port } : {}) };
+}
+
+export function backgroundProcessTitle(command: string): string {
+  const { name, port } = describeBackgroundCommand(command);
+  return port ? `${name} · :${port}` : name;
+}
+
+/** The title without its port, for a row that shows the address beside it. */
+export function backgroundProcessName(command: string): string {
+  return describeBackgroundCommand(command).name;
 }
 
 

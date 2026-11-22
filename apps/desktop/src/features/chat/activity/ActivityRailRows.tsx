@@ -1,8 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { IconCopy, IconExternal, IconFileText, IconLink, IconListChecks, IconSearch, IconInfo } from "../../../components/icons";
+import { IconCopy, IconExternal, IconFileText, IconGlobe, IconListChecks, IconSearch, IconInfo } from "../../../components/icons";
 import { Button, Tooltip, TooltipButton } from "../../../components/ui";
-import { ActivityStatus } from "./ActivityStatus";
+import { ActivityRowStatus } from "./ActivityRowStatus";
 import { SubagentActivityRow } from "./SubagentActivityRow";
 import { activityVisibleItems, activityOutputGroups } from "./activity-rail-presentation";
 import type { ActivityRailItem } from "./activity-rail-types";
@@ -57,29 +57,27 @@ export function ActivityRailRow({ item, kind, now }: { item: ActivityRailItem; k
   </div>;
   const outputPath = item.path ?? item.label;
   const outputName = kind === "output" ? outputPath.split(/[\\/]/).filter(Boolean).at(-1) ?? item.label : item.label;
-  const fileKind = /\.mdx?$/i.test(outputName) ? "markdown" : /\.txt$/i.test(outputName) ? "text" : "file";
+  const isMarkdown = /\.mdx?$/i.test(outputName);
   const changedDate = item.lastChangedAt ? new Date(item.lastChangedAt) : undefined;
   const changedTime = changedDate && Number.isFinite(changedDate.getTime()) ? changedDate.toLocaleString(i18n.language) : undefined;
   const metadata = [item.changeCount !== undefined && t("panel.activity.writeCount", { count: item.changeCount }),
     item.sourceCount !== undefined && t("panel.activity.sourceCount", { count: item.sourceCount }),
     changedTime && t("panel.activity.lastChanged", { time: changedTime })].filter(Boolean).join(" · ");
+  // The write count and last-change time stay in the row's tooltip and accessible name; the row itself is one line.
   const title = [kind === "output" ? outputPath : item.label, item.detail, item.statusLabel, metadata].filter(Boolean).join(" · ");
   const content = <>
-    <span className={`session-activity-icon${kind === "output" ? " session-activity-file-icon" : ""}`} data-file-kind={kind === "output" ? fileKind : undefined} aria-hidden>
-      {kind === "plan" ? <IconListChecks size={15} /> : kind === "source" ? <IconLink size={15} />
-        : fileKind === "markdown" ? <svg className="session-activity-markdown-mark" viewBox="0 0 20 20" aria-hidden><rect x="2" y="2" width="16" height="16" rx="2" fill="currentColor" /><path d="M5 12V7l2.5 3L10 7v5M14 7v6m-2-2 2 2 2-2" fill="none" stroke="var(--ds-bg-primary)" strokeWidth="1.5" strokeLinejoin="round" /></svg> : <IconFileText size={15} />}
+    <span className="session-activity-icon" aria-hidden>
+      {kind === "plan" ? <IconListChecks size={16} /> : kind === "source" ? <IconGlobe size={16} />
+        : isMarkdown ? <svg className="session-activity-markdown-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden><rect x="2.5" y="5" width="19" height="14" rx="2.5" /><path d="M6.5 15V9l2.5 3 2.5-3v6M16 9v6m-2.5-2.5 2.5 2.5 2.5-2.5" /></svg> : <IconFileText size={16} />}
     </span>
-    <span className="session-activity-row-copy">
-      <span className="session-activity-label">{outputName}{kind === "plan" && item.detail ? ` · ${item.detail}` : ""}</span>
-      {metadata && <span className="session-activity-row-metadata">{metadata}</span>}
-      {(item.addedLines !== undefined || item.removedLines !== undefined) && <span className="session-activity-line-changes">
-        {item.addedLines !== undefined && <span className="session-activity-lines-added">+{item.addedLines}</span>}
-        {item.removedLines !== undefined && <span className="session-activity-lines-removed">−{item.removedLines}</span>}
-      </span>}
-    </span>
-    {kind !== "output" && item.status && item.statusLabel && <ActivityStatus status={item.status} label={item.statusLabel} compact />}
+    <span className="session-activity-label">{outputName}{kind === "plan" && item.detail ? ` · ${item.detail}` : ""}</span>
+    {(item.addedLines || item.removedLines) ? <span className="session-activity-line-changes">
+      {item.addedLines ? <span className="session-activity-lines-added">+{item.addedLines}</span> : null}
+      {item.removedLines ? <span className="session-activity-lines-removed">−{item.removedLines}</span> : null}
+    </span> : null}
+    {kind !== "output" && item.status && item.statusLabel && <ActivityRowStatus status={item.status} label={item.statusLabel} />}
   </>;
-  const classes = `session-activity-row${kind === "output" ? " session-activity-output" : ""}`;
+  const classes = `session-activity-row${kind === "output" ? " session-activity-output" : kind === "source" ? " session-activity-source" : ""}`;
   return <div className="session-activity-row-shell">
     {item.onOpen ? <TooltipButton type="button" className={classes} tooltip={title} onClick={item.onOpen} data-activity-id={item.id}>{content}</TooltipButton>
       : <Tooltip label={title} className={`${classes} session-activity-readonly`}>{content}</Tooltip>}

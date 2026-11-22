@@ -20,6 +20,7 @@ Each ADR includes:
 
 | ID | Title | Status |
 |---|---|---|
+| session-activity-server-address | [Local server address from live background process output](session-activity-server-address.md) | Accepted for implementation |
 | plus-assisted-macos-adhoc-update | [Assisted in-place update for ad-hoc macOS builds](plus-assisted-macos-adhoc-update.md) | Implemented candidate (amends 0022 / 0289) |
 | goal-required-verification-commands | [Approval-bound Goal verification commands](goal-required-verification-commands.md) | Accepted for implementation |
 | goal-blocked-state | [Goal blocked state and same-execution continuation](goal-blocked-state.md) | Accepted for implementation |

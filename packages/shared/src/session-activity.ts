@@ -40,6 +40,11 @@ export type BackgroundProcessSummary = {
   stopMode?: BackgroundServiceStopMode;
   /** Reported only when a service has reached a stopping terminal outcome. */
   serviceStopEscalated?: boolean;
+  /**
+   * Where the process announced a local server, as `http(s)://host:port` with a loopback host (`0.0.0.0` reads as
+   * `localhost`). The Host detects it from live output and sends it only while the process is active; it is never stored.
+   */
+  address?: string;
 };
 
 export type BackgroundProcessDetail = {

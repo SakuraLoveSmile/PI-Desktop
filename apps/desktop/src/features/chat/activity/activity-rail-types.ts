@@ -23,10 +23,16 @@ export type ActivityRailItem = {
   roleLabel?: string;
 };
 
+/** The project a session runs in and its git branch. A project outside git has no environment to show. */
+export type ActivityEnvironment = { name: string; path: string; branch: string | null };
+
+/** The recorded changes the Review tab lists, as counts. */
+export type ActivityChanges = { count: number; additions: number; deletions: number };
+
 export type ActivityAttentionItem = {
   id: string;
   label: string;
-  group: "plans" | "agents" | "team-members" | "processes" | "approvals";
+  group: "goals" | "plans" | "agents" | "team-members" | "processes" | "approvals";
   itemId?: string;
   onOpen?: () => void;
 };

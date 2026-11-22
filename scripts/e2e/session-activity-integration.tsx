@@ -318,9 +318,11 @@ export async function sessionActivityIntegrationProbe() {
     const suggestions=[{"name": "verify-dart-package-api", "description": "写代码前核实 Dart/Flutter 包真实 API 的流程，保留可查证的调用证据。", "reason": "该任务已记录真实包 API 与调用证据，可供同项目后续修改复用。", "body": "# API evidence\n\nVerify package API names against installed source and primary documentation before changing call sites."}, {"name": "mutation-check-harness", "description": "用可复现的隔离流程对关键断言做变异检查，确认测试能够发现错误。", "body": "# Regression evidence\n\nUse isolated fixtures and verify that a focused regression assertion fails on the known faulty behavior."}, {"name": "pubdev-dependency-triage", "description": "规划 Flutter 项目前先核查候选包的版本、平台支持与依赖边界。", "body": "# Dependency checks\n\nRecord selected package version and supported platforms from primary documentation before committing to a dependency."}, {"name": "flutter-sdk-bootstrap-macos", "description": "在已有 Flutter 安装的开发机上，为单个项目确认并记录实际工具链。", "body": "# Toolchain evidence\n\nInspect the existing toolchain and project requirements. Reuse compatible dependencies and keep test profiles isolated."}];
     const suggestionMessage=msg('activity-suggestions','assistant','```skill-suggestions\n'+JSON.stringify(suggestions)+'\n```',{status:'complete'});
     set({isRunning:false,runningSessions:{},messages:usageMessages});
+    check(Boolean(skillArea())&&!skillArea()!.querySelector('.session-skill-reference,.session-skill-suggestions-body,.session-activity-empty'),'Skills & MCP with nothing to list is its heading and the suggest action only');
     click(skillArea()?.querySelector('.session-skill-suggestions-count'));
     const generationButton=()=>document.querySelector<HTMLButtonElement>('.session-skill-suggestions-popover .session-skill-suggestions-generate');
-    const openSuggestions=async()=>{const trigger=skillArea()?.querySelector('.session-skill-suggestions-count');if(trigger?.getAttribute('aria-expanded')!=='true')click(trigger);await until(()=>Boolean(document.querySelector('.session-skill-suggestions-popover.is-open')),'suggestions flyout did not open');};
+    // The workspace sections sit above Skills & MCP, so a full rail runs past the window. A person scrolls to the control first, and the anchored flyout closes by design once its trigger is outside the viewport.
+    const openSuggestions=async()=>{const trigger=skillArea()?.querySelector('.session-skill-suggestions-count');trigger?.scrollIntoView({block:'center'});if(trigger?.getAttribute('aria-expanded')!=='true')click(trigger);await until(()=>Boolean(document.querySelector('.session-skill-suggestions-popover.is-open')),'suggestions flyout did not open');};
     let resolveGeneration:(value:{accepted:boolean;turnId:string})=>void=()=>{};
     api.prompt=async request=>{calls.push(`suggest:${request.sessionId}:${request.content.includes('skill-suggestions')}`);return new Promise(resolve=>{resolveGeneration=resolve;});};
     click(generationButton());await until(()=>calls.includes('suggest:activity-a:true'),'suggestions did not use the real send workflow');
@@ -370,6 +372,8 @@ export async function sessionActivityIntegrationProbe() {
     check(skillArea()?.querySelectorAll('.session-skill-reference').length===3,'ignored suggestion stays hidden after remount');
     const referenceMessages=[...skillMessages,msg('recorded-skill','user','Reference fixture',{skillMentions:[{id:'recorded-preview-skill'}]}),msg('recorded-mcp','tool','OK',{toolName:'mcp_preview_lookup',toolStatus:'success'})];
     set({messages:referenceMessages});
+    // A server's rows fold from one read of the configured servers. This fixture has no Host, so the read fails and the recorded tool name stands in as soon as it settles.
+    await until(()=>Boolean(skillArea()?.textContent?.includes('mcp_preview_lookup')),'recorded MCP reference did not render');
     check(skillArea()?.textContent?.includes('recorded-preview-skill')&&skillArea()?.textContent?.includes('mcp_preview_lookup'),'recorded Skill and MCP references share the sidebar section');
     const previewSkillMessages=[{...suggestionMessage,id:'activity-preview-suggestions'},...outputMessages,...usageMessages];
     set({messages:previewSkillMessages,retainedTranscripts:{'activity-a':previewSkillMessages,'activity-b':second},isRunning:true,runningSessions:{'activity-a':true}});
@@ -406,14 +410,12 @@ export async function sessionActivityIntegrationProbe() {
       set({isRunning:!skillScene&&!footerScene,runningSessions:{'activity-a':!skillScene&&!footerScene}});
       const skillToggle=skillArea()?.querySelector('.session-skill-suggestions-toggle');
       if(skillToggle?.getAttribute('aria-expanded')==='false')click(skillToggle);
-      const outputToggle=[...(rail()?.querySelectorAll('button')??[])].find(button=>button.querySelector('.session-activity-group-title')?.textContent==='产出');
-      if(scene!=='outputs'&&outputToggle?.getAttribute('aria-expanded')==='true')click(outputToggle);
       const railScroll=rail()?.closest('.session-activity-scroll');if(railScroll instanceof HTMLElement)railScroll.scrollTop=0;
 
       if(scene==='profile'){click(profile());await until(()=>Boolean(document.querySelector('.composer-profile-menu.is-open')),'Preview profile missing');}
       if(scene==='context'){click(meter());await until(()=>Boolean(document.querySelector('.context-inspector-popover.is-open')),'Preview context details missing');}
       if(scene==='models'){click(host.querySelector('.composer-model-thinking-chip'));await until(()=>document.querySelectorAll('.composer-model-option').length===2,'Preview models missing');}
-      if(scene==='outputs'){click([...rail()!.querySelectorAll('button')].find(button=>button.querySelector('.session-activity-group-title')?.textContent==='产出'));await until(()=>Boolean(rail()?.querySelector('.session-activity-output')),'outputs missing');const output=rail()!.querySelector('.session-activity-output')!;check(output.textContent?.includes('0001-deadline-based-timer.md')&&!output.textContent?.includes('/isolated/'),'output shows basename only');}
+      if(scene==='outputs'){const artifactsToggle=[...rail()!.querySelectorAll('button')].find(button=>button.querySelector('.session-activity-group-title')?.textContent==='产物');if(artifactsToggle?.getAttribute('aria-expanded')!=='true')click(artifactsToggle);await until(()=>Boolean(rail()?.querySelector('.session-activity-output')),'outputs missing');const output=rail()!.querySelector('.session-activity-output')!;check(output.textContent?.includes('0001-deadline-based-timer.md')&&!output.textContent?.includes('/isolated/'),'output shows basename only');}
       if(scene==='skills')await openSuggestions();
       if(footerScene)await footerFixture.scene(footerProbe,scene);
       if(skillScene){const count=skillArea()?.querySelector('.session-skill-suggestions-count');check(count instanceof HTMLButtonElement&&count.getAttribute('aria-haspopup')==='dialog','suggestion count is an accessible popup action');}
@@ -482,9 +484,9 @@ export async function sessionActivityIntegrationProbe() {
     set({ ...reading.actions });
     set({ sessionHistory: { "activity-a": { messageStart: 100, hasMoreBefore: true } } });
     await until(() => Boolean(rail()?.querySelector('.session-activity-range-notice button:not([disabled])')), 'Scoped earlier-history action missing');
-    const outputsHeading = () => rail()?.querySelector('[data-activity-group="outputs"] .session-activity-disclosure');
-    if (outputsHeading()?.getAttribute('aria-expanded') !== 'true') click(outputsHeading());
-    click(rail()?.querySelector('[data-activity-group="outputs"] .session-activity-range-notice button:not([disabled])'));
+    const artifactsHeading = () => rail()?.querySelector('[data-activity-group="artifacts"] .session-activity-disclosure');
+    if (artifactsHeading()?.getAttribute('aria-expanded') !== 'true') click(artifactsHeading());
+    click(rail()?.querySelector('[data-activity-group="artifacts"] .session-activity-range-notice button:not([disabled])'));
     await until(() => Boolean(rail()?.querySelector('[data-activity-id="change:history/earlier.txt"]')), 'Loading earlier did not add recorded output');
     check(calls.includes('history:activity-a:100'), 'earlier-history uses bounded session read cursor');
     const earlierRow = () => rail()?.querySelector('[data-activity-item-id="change:history/earlier.txt"]');
@@ -517,31 +519,35 @@ export async function sessionActivityIntegrationProbe() {
       items: Array.from({ length: 8 }, (_, index) => ({ id: `T${index + 1}`, label: `Task ${index + 1}`, status: index < 5 ? "completed" : "pending" })) } });
     api.getGoalReport = async () => ({ state: "ready", report: { sessionId: "activity-a", executionId: "overview-goal", integrity: { kind: "fallback" } } } as Awaited<ReturnType<typeof api.getGoalReport>>);
     api.onGoalProgressChanged = () => () => {};
-    let reportListener: Parameters<typeof api.onGoalReportChanged>[0] | undefined;
+    // Every Goal row subscribes on its own, as the real API allows; a rail may list several Goals.
+    const reportListeners = new Set<Parameters<typeof api.onGoalReportChanged>[0]>();
+    const publishReport = (event: Parameters<Parameters<typeof api.onGoalReportChanged>[0]>[0]) => { for (const listener of [...reportListeners]) listener(event); };
     let reportFailed = false;
     const fallbackRead = api.getGoalReport;
     api.getGoalReport = async params => reportFailed ? { state: "failed", report: null, detail: "Isolated publication failure" } : fallbackRead(params);
-    api.onGoalReportChanged = listener => { reportListener = listener; return () => { reportListener = undefined; }; };
+    api.onGoalReportChanged = listener => { reportListeners.add(listener); return () => { reportListeners.delete(listener); }; };
     set({ planHistory: { "activity-a": [goalPlan] } });
     await until(() => rail()?.querySelector('.session-activity-goal-progress')?.textContent === '5/8', 'Overview authoritative Goal count missing');
     check(rail()?.querySelector('.session-activity-goal-report')?.textContent === i18n.t('panel.activity.goal.reportFallback'), 'Overview fallback status missing');
-    const planHeading = () => rail()?.querySelector('[data-activity-group="plans"] .session-activity-disclosure');
-    if (planHeading()?.getAttribute('aria-expanded') === 'true') click(planHeading());
+    // A Goal is listed in its own section: the Plan group stays absent while there is no plan to show.
+    check(rail()?.querySelector('[data-activity-group="goals"] .session-activity-goal-progress')?.textContent === '5/8' && !rail()?.querySelector('[data-activity-group="plans"]'), 'Overview lists the Goal under its own section without an empty Plan group');
+    const goalsHeading = () => rail()?.querySelector('[data-activity-group="goals"] .session-activity-disclosure');
+    if (goalsHeading()?.getAttribute('aria-expanded') === 'true') click(goalsHeading());
     reportFailed = true;
-    reportListener?.({ sessionId: "activity-a", executionId: "overview-goal", proposalId: plan.id, reportId: "overview-report", status: "failed" });
-    await until(() => planHeading()?.getAttribute('aria-expanded') === 'true', 'New Goal publication failure did not expand plans');
+    publishReport({ sessionId: "activity-a", executionId: "overview-goal", proposalId: plan.id, reportId: "overview-report", status: "failed" });
+    await until(() => goalsHeading()?.getAttribute('aria-expanded') === 'true', 'New Goal publication failure did not expand the Goal section');
     check(rail()?.querySelector('.session-activity-goal-report')?.textContent === i18n.t('panel.activity.goal.reportFailed'), 'Goal failure remains observable');
-    click(planHeading());
+    click(goalsHeading());
     set({ activeSessionId: "activity-b", retainedSessionIds: ["activity-b", "activity-a"], messages: second });
     await until(() => rail()?.getAttribute('data-session-id') === 'activity-b', 'Failed Goal hide did not switch');
     set({ activeSessionId: "activity-a", retainedSessionIds: ["activity-a", "activity-b"], messages: previewSkillMessages });
     await until(() => rail()?.querySelector('.session-activity-goal-report')?.textContent === i18n.t('panel.activity.goal.reportFailed'), 'Failed Goal snapshot did not return');
-    check(planHeading()?.getAttribute('aria-expanded') === 'false', 'Unchanged Goal failure preserves manual collapse after hide/show');
+    check(goalsHeading()?.getAttribute('aria-expanded') === 'false', 'Unchanged Goal failure preserves manual collapse after hide/show');
     set({ activeSessionId: "activity-b", retainedSessionIds: ["activity-b"], messages: second });
     await until(() => rail()?.getAttribute('data-session-id') === 'activity-b', 'Failed Goal remount switch missing');
     set({ activeSessionId: "activity-a", retainedSessionIds: ["activity-a", "activity-b"], messages: previewSkillMessages });
     await until(() => rail()?.querySelector('.session-activity-goal-report')?.textContent === i18n.t('panel.activity.goal.reportFailed'), 'Failed Goal remount read missing');
-    check(planHeading()?.getAttribute('aria-expanded') === 'false', 'Persisted collapsed Goal failure survives owner remount before report read');
+    check(goalsHeading()?.getAttribute('aria-expanded') === 'false', 'Persisted collapsed Goal failure survives owner remount before report read');
     const readableReport = api.getGoalReport;
     let reportUnavailable = true;
     api.getGoalReport = async params => { if (reportUnavailable) throw new Error("Isolated report read error"); return readableReport(params); };
@@ -549,14 +555,16 @@ export async function sessionActivityIntegrationProbe() {
     await until(() => rail()?.getAttribute('data-session-id') === 'activity-b', 'Unavailable Goal remount switch missing');
     set({ activeSessionId: "activity-a", retainedSessionIds: ["activity-a", "activity-b"], messages: previewSkillMessages });
     await until(() => rail()?.querySelector('.session-activity-goal-report')?.textContent === i18n.t('panel.activity.goal.reportUnavailable'), 'Report read error was hidden');
-    check(planHeading()?.getAttribute('aria-expanded') === 'false', 'Unavailable report preserves known collapsed attention');
+    check(goalsHeading()?.getAttribute('aria-expanded') === 'false', 'Unavailable report preserves known collapsed attention');
+    set({ planHistory: { "activity-a": [goalPlan, { ...goalPlan, id: "new-running-goal", executionId: "new-running-goal-execution", executionState: "running" }] } });
+    await until(() => goalsHeading()?.getAttribute('aria-expanded') === 'true', 'Unknown historical report blocked new running Goal attention');
     set({ planHistory: { "activity-a": [goalPlan, { ...plan, id: "new-running-plan", executionState: "running" }] } });
-    await until(() => planHeading()?.getAttribute('aria-expanded') === 'true', 'Unknown historical report blocked new running plan attention');
+    await until(() => Boolean(rail()?.querySelector('[data-activity-group="plans"] [data-activity-item-id="new-running-plan"]')) && !rail()?.querySelector('[data-activity-group="goals"] [data-activity-item-id="new-running-plan"]'), 'A running plan was not listed in the Plan section');
     reportUnavailable = false;
     api.getGoalReport = readableReport;
     set({ planHistory: { "activity-a": [goalPlan] } });
     reportFailed = false;
-    reportListener?.({ sessionId: "activity-a", executionId: "overview-goal", proposalId: plan.id, reportId: "overview-report", status: "ready" });
+    publishReport({ sessionId: "activity-a", executionId: "overview-goal", proposalId: plan.id, reportId: "overview-report", status: "ready" });
     await until(() => rail()?.querySelector('.session-activity-goal-report')?.textContent === i18n.t('panel.activity.goal.reportFallback'), 'Fallback preview did not recover');
     const inlineGoal: PlanProposal = { ...goalPlan, id: 'inline-goal-plan', executionId: 'inline-goal-execution', executionState: 'running' };
     const readProgressBeforeInline = api.getGoalProgress;
@@ -615,7 +623,7 @@ export async function sessionActivityIntegrationProbe() {
     api.getGoalProgress = readProgressBeforeInline;
     api.getGoalReport = readReportBeforeInline;
     api.onGoalProgressChanged = () => () => {};
-    for (const group of ["plans", "agents", "processes"]) {
+    for (const group of ["goals", "plans", "live", "agents", "processes", "artifacts"]) {
       const heading = rail()?.querySelector(`[data-activity-group="${group}"] .session-activity-disclosure`);
       if (heading?.getAttribute('aria-expanded') === 'false') click(heading);
     }
@@ -634,16 +642,16 @@ export async function sessionActivityIntegrationProbe() {
     const sourceHeading = rail()?.querySelector('[data-activity-group="sources"] .session-activity-disclosure');
     if (sourceHeading?.getAttribute('aria-expanded') === 'false') click(sourceHeading);
     const sourceRow = rail()?.querySelector('[data-activity-id="https://docs.example.org/first"]');
-    check(sourceRow?.textContent?.includes("docs.example.org") && sourceRow?.textContent?.includes(i18n.t("panel.activity.sourceCount", { count: 2 })), 'source domains consume loaded citation counts in production Overview');
+    check(sourceRow?.textContent?.includes("docs.example.org") && sourceRow?.getAttribute('aria-label')?.includes(i18n.t("panel.activity.sourceCount", { count: 2 })), 'source domains consume loaded citation counts in production Overview');
     click(sourceRow);
     const browserTab = useAppStore.getState().workPanelTabs.find(tab => tab.id === useAppStore.getState().activeWorkPanelTabId);
     check(browserTab?.location === "https://docs.example.org/first" && useAppStore.getState().activeSessionId === "activity-a", 'source opens first safe URL in owning session work panel');
     set({ workPanelOpen: false });
     await until(() => Boolean(rail()), 'source navigation did not return the rail');
-    const outputHeading = rail()?.querySelector('[data-activity-group="outputs"] .session-activity-disclosure');
-    if (outputHeading?.getAttribute('aria-expanded') === 'false') click(outputHeading);
+    const artifactsSection = rail()?.querySelector('[data-activity-group="artifacts"] .session-activity-disclosure');
+    if (artifactsSection?.getAttribute('aria-expanded') === 'false') click(artifactsSection);
     const changedRow = rail()?.querySelector('[data-activity-item-id="change:/isolated/music/docs/0001-deadline-based-timer.md"]');
-    check(changedRow?.textContent?.includes(i18n.t("panel.activity.writeCount", { count: 2 })) && changedRow?.querySelector('.session-activity-line-changes')?.textContent === "+3−1", 'merged output displays complete Host review evidence');
+    check(changedRow?.querySelector('[data-activity-id]')?.getAttribute('aria-label')?.includes(i18n.t("panel.activity.writeCount", { count: 2 })) && changedRow?.querySelector('.session-activity-line-changes')?.textContent === "+3−1", 'merged output displays complete Host review evidence');
     input('');
     set({ isRunning: true, runningSessions: { 'activity-a': true } });
     host.style.width = '498px';

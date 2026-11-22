@@ -9,6 +9,7 @@ import {
   contextUsageView,
   estimateResponseOutputTokens,
   estimateToolTokenUsage,
+  contextCapacityLevel,
   contextUsageLabelKey,
   resolveContextUsageDisplay,
   resolveContextWindow,
@@ -78,6 +79,19 @@ test("footer metrics lead with the used figure when the preference is absent", (
   assert.equal(metrics.context.tokens, 950);
   assert.equal(metrics.context.remainingPercent, 5);
   assert.equal(metrics.context.level, "critical");
+});
+
+test("the capacity level follows the share still free: warning from a quarter, critical from a tenth", () => {
+  assert.deepEqual([100, 26].map(contextCapacityLevel), ["comfortable", "comfortable"]);
+  assert.deepEqual([25, 11].map(contextCapacityLevel), ["warning", "warning"]);
+  assert.deepEqual([10, 0].map(contextCapacityLevel), ["critical", "critical"]);
+  const metrics = resolveComposerUsageFooterMetrics({
+    usage: { inputTokens: 780, outputTokens: 0, totalTokens: 780 },
+    turnUsage: { inputTokens: 780, outputTokens: 0, totalTokens: 780 },
+    contextWindow: 1000,
+  });
+  assert.equal(metrics.context.level, contextCapacityLevel(metrics.context.remainingPercent), "the footer colours by the same rule");
+  assert.equal(metrics.context.level, "warning");
 });
 
 test("context window prefers the selected model catalog over provider fallback", () => {
