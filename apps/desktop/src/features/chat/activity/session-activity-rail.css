@@ -1,89 +1,185 @@
+/* The activity rail follows the approved canvas: plain 16px glyphs, one-line rows, a heading that is one whole-row
+   toggle, and status as a spinner or a word. Rows, groups and cards draw no strokes (D297); the one hairline between
+   sections lives in session-activity-sections.css (D645). */
 .session-activity-rail {
   min-width: 0;
   padding: 8px 0 16px;
   color: var(--ds-text-secondary);
   font-size: var(--text-md);
 }
-.session-activity-group { margin-bottom: 20px; }
-/* A group that is open and holds rows sits on a `--ds-tile` plate (no stroke, D297). The plate
-   is paint only: the spread shadow grows the box visually without changing layout or the
-   scrollable overflow, so the text column stays aligned with the flat groups and the rail
-   stays within its width. Top-level only: the ended-processes group nests inside processes
-   and must not become a plate within a plate. */
-.session-activity-rail > .session-activity-group:has(.session-activity-row, .session-activity-goal-row) {
-  border-radius: var(--radius-2xs); background: var(--ds-tile); box-shadow: 0 0 0 8px var(--ds-tile);
-}
-.session-activity-heading { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.session-activity-rail[hidden] { display: none; }
+
+/* Headings: a section heading is label, chevron, a quiet summary once folded, then the grip. A nested group's heading
+   is the smaller sub-heading: label, count, chevron. */
+.session-activity-group { min-width: 0; }
+.session-activity-heading { display: flex; align-items: center; gap: 6px; height: 32px; }
+.session-activity-group[data-variant="sub"] > .session-activity-heading { height: 28px; margin: 6px -8px 0; }
+.session-activity-group-body > .session-activity-group[data-variant="sub"]:first-child > .session-activity-heading { margin-top: 0; }
+.session-activity-group-body { min-width: 0; }
+.session-activity-group[data-variant="section"] > .session-activity-group-body { margin-top: 2px; }
+.session-activity-group-body[hidden] { display: none; }
 .session-activity-disclosure.btn {
-  min-width: 0; min-height: 28px; padding: 0; display: flex; align-items: center;
-  gap: 6px; border: 0; border-radius: var(--radius-3xs); background: transparent;
-  color: var(--ds-text-primary); font-size: var(--text-md); font-weight: var(--font-weight-medium);
+  flex: 1; min-width: 0; height: 32px; min-height: 0; margin-left: -8px; padding: 0 8px; display: flex; align-items: center;
+  justify-content: flex-start; gap: 6px; border: 0; border-radius: var(--radius-2xs); background: transparent;
+  color: var(--ds-text-primary); font-size: var(--text-md); font-weight: var(--font-weight-normal); line-height: var(--leading-none); text-align: left;
 }
-.session-activity-disclosure.btn:hover { color: var(--ds-text-primary); background: transparent; }
-/* The nested Ended group is a sub-heading: it stays quiet under its parent. */
+.session-activity-disclosure.btn:hover:not(:disabled) { color: var(--ds-text-primary); background: var(--ds-bg-hover); }
+.session-activity-disclosure.btn:active:not(:disabled) { background: var(--ds-bg-active); }
+.session-activity-group[data-variant="sub"] .session-activity-disclosure.btn {
+  height: 28px; margin-left: 0; font-size: var(--text-sm); font-weight: var(--font-weight-medium); color: var(--ds-text-secondary);
+}
+.session-activity-group[data-variant="sub"] .session-activity-disclosure.btn:hover:not(:disabled) { color: var(--ds-text-secondary); }
+/* The nested Ended group stays quieter than its parent. */
 .session-activity-group[data-activity-group="ended-processes"] .session-activity-disclosure.btn { color: var(--ds-text-muted); }
-.session-activity-group[data-activity-group="ended-processes"] .session-activity-disclosure.btn:hover { color: var(--ds-text-primary); }
-.session-activity-group-title { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-/* The count is a tonal chip, so a group title reads as a heading with a quantity. */
+.session-activity-group-title { flex: 0 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .session-activity-group-count {
-  flex: none; min-width: 18px; padding: 1px 6px; border-radius: var(--radius-full);
-  background: var(--ds-tile-deep); color: var(--ds-text-secondary); font-size: var(--text-2xs);
-  font-weight: var(--font-weight-medium); line-height: var(--leading-normal); text-align: center;
-  font-variant-numeric: tabular-nums;
+  flex: none; color: var(--ds-text-muted); font-size: var(--text-2xs);
+  font-weight: var(--font-weight-normal); font-variant-numeric: tabular-nums;
+}
+/* What a folded section still says: how many run, fail or time out, or how many it holds. */
+.session-activity-heading-summary {
+  flex: 0 1 auto; min-width: 0; margin-left: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--ds-text-muted); font-size: var(--text-sm); font-weight: var(--font-weight-normal); font-variant-numeric: tabular-nums;
 }
 .session-activity-disclosure > svg {
   flex: none; color: var(--ds-text-muted);
   transition: transform var(--motion-duration-fast) var(--motion-ease-out), color var(--motion-duration-fast) var(--motion-ease-out);
 }
-.session-activity-disclosure:hover > svg { color: var(--ds-text-primary); }
-.session-activity-group-summary { margin: -4px 0 8px; font-size: var(--text-2xs); color: var(--ds-text-muted); overflow-wrap: anywhere; }
-.session-activity-group[data-activity-group="ended-processes"] { margin: 8px 0 0; }
+.session-activity-disclosure:hover > svg { color: var(--ds-text-secondary); }
+.session-activity-disclosure[aria-expanded="false"] > svg { transform: rotate(-90deg); }
 .session-activity-clear-ended.btn { flex: none; margin-left: auto; padding: 2px 4px; min-height: 24px; color: var(--ds-text-muted); font-size: var(--text-2xs); }
-.session-activity-disclosure[aria-expanded="false"] svg { transform: rotate(-90deg); }
-.session-activity-group-body[hidden] { display: none; }
-.session-activity-row {
-  display: flex; width: 100%; min-width: 0; min-height: 38px; align-items: center; gap: 9px;
-  padding: 5px 0; border: 0; border-radius: var(--radius-3xs); background: transparent;
-  color: var(--ds-text-secondary); font: inherit; text-align: left;
+
+/* Rows: one line (34px, as the canvas renders it), 16px muted glyph, label, then a quiet meta or status at the far edge.
+   The shell carries the hover so the tail actions share it; the row's own hover is switched off. */
+.session-activity-row-shell { --tail-width: 0px; position: relative; display: flex; align-items: center; min-width: 0; margin: 0 -8px; border-radius: var(--radius-2xs); }
+.session-activity-row-shell:is(:hover, :has(:focus-visible), :has(> .session-activity-tail-actions:focus-within)) { background: var(--ds-bg-hover); }
+.session-activity-row-shell > .session-activity-row { flex: 1; }
+.session-activity-rail .session-activity-row {
+  display: flex; width: 100%; min-width: 0; min-height: 34px; align-items: center; gap: 10px;
+  padding: 3px 8px; border: 0; border-radius: var(--radius-2xs); background: transparent;
+  color: var(--ds-text-primary); font: inherit; text-align: left;
 }
-button.session-activity-row:hover { color: var(--ds-text-primary); background: var(--ds-bg-hover); }
-.session-activity-row:focus-visible, .session-activity-action:focus-visible {
-  outline: 2px solid var(--ds-accent); outline-offset: 2px;
-}
+.session-activity-rail .session-activity-row:hover { background: transparent; color: var(--ds-text-primary); }
+.session-activity-row:focus-visible, .session-activity-action:focus-visible, .session-activity-goal-title-action:focus-visible,
+.session-activity-goal-report-action:focus-visible { outline: 2px solid var(--ds-accent); outline-offset: 2px; }
 .session-activity-label { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.session-activity-icon {
-  display: grid; place-items: center; flex: none; width: 28px; height: 28px;
-  border-radius: var(--radius-2xs); background: var(--ds-bg-tertiary);
+.session-activity-icon, .session-activity-agent-glyph {
+  display: grid; place-items: center; flex: none; width: 16px; height: 16px; color: var(--ds-text-muted);
 }
-.session-activity-output {
-  min-height: 38px;
-  margin-bottom: 10px;
-  gap: 10px;
-}
-.session-activity-output .session-activity-icon {
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius-2xs);
-}
-.session-activity-file-icon[data-file-kind="markdown"] { color: var(--ds-accent); }
-.session-activity-file-icon[data-file-kind="text"], .session-activity-file-icon[data-file-kind="file"] { color: var(--ds-text-muted); }
+.session-activity-markdown-mark { width: 16px; height: 16px; }
 .session-activity-command { font-family: var(--font-mono); font-size: var(--text-sm); }
-.session-activity-status { flex: none; display: inline-flex; align-items: center; gap: 4px; color: var(--ds-text-muted); font-size: var(--text-2xs); }
+.session-activity-source { padding-left: 34px; }
+.session-activity-source .session-activity-label { color: var(--ds-text-secondary); }
+.session-activity-line-changes { display: flex; flex: none; gap: 4px; color: var(--ds-text-muted); font-size: var(--text-2xs); font-variant-numeric: tabular-nums; }
+.session-activity-lines-added { color: var(--ds-success-ink); }
+.session-activity-lines-removed { color: var(--ds-error-ink); }
+.session-activity-directory { overflow: hidden; margin: 6px 0 2px; white-space: nowrap; text-overflow: ellipsis; color: var(--ds-text-muted); font-size: var(--text-2xs); }
+
+/* Status: a spinner while the work runs, a check once it is done, a coloured word when it needs attention, a quiet
+   word otherwise. A failure or timeout reads at the row's own size, the way the canvas draws it. */
+.session-activity-status { flex: none; display: inline-flex; align-items: center; gap: 4px; color: var(--ds-text-muted); font-size: var(--text-2xs); font-variant-numeric: tabular-nums; }
 .session-activity-status > svg, .session-activity-status-dot { color: var(--ds-success-ink); }
 .session-activity-status[data-tone="error"] > svg { color: var(--ds-error-ink); }
 .session-activity-status[data-tone="warning"] { color: var(--ds-warning-ink); }
 .session-activity-status[data-tone="warning"] > svg { color: var(--ds-warning-ink); }
 .session-activity-status[data-tone="muted"] > svg { color: var(--ds-text-muted); }
+.session-activity-status[data-state="active"] { color: var(--ds-text-primary); }
+.session-activity-status[data-state="attention"] { font-size: var(--text-md); }
+.session-activity-status[data-state="attention"][data-tone="error"] { color: var(--ds-error-ink); }
+.session-activity-status[data-state="attention"][data-tone="warning"] { color: var(--ds-warning-ink); }
 .session-activity-status-dot { display: block; width: 6px; height: 6px; border-radius: var(--radius-full); background: currentColor; }
-.session-activity-process .session-activity-status-dot { width: 10px; height: 10px; background: transparent; border: 1px solid currentColor; border-right-color: transparent; animation: session-process-spin 1s linear infinite; }
-.session-activity-action { display: grid; place-items: center; flex: none; width: 24px; height: 24px; margin-left: auto; padding: 0; border: 0; border-radius: var(--radius-3xs); background: transparent; color: var(--ds-text-muted); }
-.session-activity-action:hover { color: var(--ds-text-primary); background: var(--ds-bg-hover); }
-.session-activity-action:disabled { opacity: .45; }
+.session-activity-spinner {
+  display: inline-block; flex: none; width: 11px; height: 11px; border: 1px solid currentColor; border-right-color: transparent;
+  border-radius: var(--radius-full); animation: session-process-spin 1s linear infinite;
+}
+@keyframes session-process-spin { to { transform: rotate(360deg); } }
+/* A row's own action (Reconnect) stands where the status word would: a word in the warning colour with no frame,
+   tinted only under the pointer, as the canvas draws its quick action. */
+.session-activity-row-action.btn {
+  flex: none; display: inline-flex; align-items: center; gap: 4px; height: 28px; min-height: 0; padding: 0 8px;
+  border: 0; border-radius: var(--radius-2xs); background: transparent; color: var(--ds-warning-ink);
+  font-size: var(--text-sm); font-weight: var(--font-weight-normal); line-height: var(--leading-none); white-space: nowrap;
+}
+.session-activity-row-action.btn:hover:not(:disabled) { background: color-mix(in srgb, var(--ds-warning) 12%, transparent); color: var(--ds-warning-ink); }
+
+/* Agents: the name over its task, then the status and the elapsed time. */
+.session-activity-agent .subagent-activity-overview-copy { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+.session-activity-agent .subagent-activity-overview-main,
+.session-activity-agent .subagent-activity-overview-detail { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.session-activity-agent .subagent-activity-name,
+.session-activity-agent .subagent-activity-task { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.session-activity-agent .subagent-activity-name { font-size: var(--text-md); color: var(--ds-text-primary); }
+.session-activity-agent .subagent-activity-task { font-size: var(--text-2xs); color: var(--ds-text-muted); }
+.session-activity-agent .subagent-activity-elapsed { flex: none; font-size: var(--text-2xs); font-variant-numeric: tabular-nums; }
+.session-activity-agent .subagent-activity-role.badge { flex: none; max-width: 30%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-2xs); padding: 1px 4px; }
+
+/* Goals: the target row, then a thin progress bar beside the report chip. */
+.session-activity-goal-row { min-width: 0; }
+.session-activity-goal-main {
+  display: flex; align-items: center; min-width: 0; min-height: 34px; gap: 10px; margin: 0 -8px; padding: 3px 8px;
+  border-radius: var(--radius-2xs); color: var(--ds-text-primary);
+}
+.session-activity-goal-main:hover { background: var(--ds-bg-hover); }
+.session-activity-goal-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.session-activity-goal-title-action, .session-activity-goal-report-action {
+  border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--radius-3xs);
+}
+.session-activity-goal-title-action { padding: 0; }
+.session-activity-goal-report-action { display: inline-flex; max-width: 100%; min-width: 0; padding: 0; }
+.session-activity-goal-title-action:hover, .session-activity-goal-report-action:hover { color: var(--ds-text-primary); background: transparent; }
+.session-activity-goal-done { flex: none; color: var(--ds-success-ink); }
+.session-activity-goal-progress { flex: none; color: var(--ds-text-muted); font-size: var(--text-2xs); font-variant-numeric: tabular-nums; }
+.session-activity-goal-meta { display: flex; align-items: center; gap: 8px; min-width: 0; margin: 0 0 6px 26px; font-size: var(--text-2xs); }
+.session-activity-goal-bar { flex: 1; min-width: 0; height: 3px; border-radius: var(--radius-3xs); background: var(--ds-bg-hover); overflow: hidden; }
+.session-activity-goal-bar > i { display: block; height: 100%; background: var(--ds-text-secondary); }
+.session-activity-goal-bar[data-state="done"] > i { background: var(--ds-success-ink); }
+.session-activity-goal-bar[data-state="bad"] > i { background: var(--ds-error-ink); }
+.session-activity-goal-report.badge { min-width: 0; max-width: 100%; overflow-wrap: anywhere; padding: 0 6px; font-size: var(--text-2xs); }
+
+/* Attention: one warm block above the sections; its items are plain links. */
+.session-activity-attention {
+  display: flex; flex-direction: column; gap: 2px; margin: 0 0 16px; padding: 8px 10px; border-radius: var(--radius-xs);
+  background: color-mix(in oklab, var(--ds-warning) 12%, transparent);
+}
+.session-activity-attention-title { display: flex; align-items: center; gap: 6px; color: var(--ds-warning-ink); font-size: var(--text-sm); font-weight: var(--font-weight-medium); }
+.session-activity-attention-title > span:last-child { color: var(--ds-text-muted); font-size: var(--text-2xs); font-weight: var(--font-weight-normal); font-variant-numeric: tabular-nums; }
+.session-activity-attention-link.btn {
+  display: block; width: 100%; min-width: 0; min-height: 0; padding: 2px 0 2px 22px; border: 0; border-radius: var(--radius-3xs); background: transparent;
+  color: var(--ds-text-primary); font-size: var(--text-sm); text-align: left; white-space: normal; overflow-wrap: anywhere;
+}
+.session-activity-attention-link.btn:hover:not(:disabled) { background: transparent; text-decoration: underline; }
+
+/* Notices, empty lines and errors. */
 .session-activity-empty, .session-activity-notice { margin: 5px 0; color: var(--ds-text-muted); font-size: var(--text-sm); line-height: var(--leading-body); }
 .session-activity-notice { margin-bottom: 12px; }
 .session-activity-error { font-size: var(--text-sm); color: var(--ds-error-ink); overflow-wrap: anywhere; }
 .session-activity-error p { margin: 5px 0; }
-.session-process-detail { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--ds-border-subtle); }
+.session-activity-range-notice { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 4px 0 8px; color: var(--ds-text-muted); font-size: var(--text-2xs); }
+.session-activity-range-notice .btn, .session-activity-show-all.btn { min-height: 24px; padding: 2px 4px; color: var(--ds-text-muted); font-size: var(--text-2xs); }
+.session-activity-item[hidden] { display: none; }
+.session-activity-item:focus-visible, .session-activity-group:focus-visible { outline: 2px solid var(--ds-accent); outline-offset: 2px; }
+
+/* A row's actions sit over its far edge, so the label keeps the whole row at rest. While they show, the row leaves
+   room for them instead of running text underneath. */
+.session-activity-action { display: grid; place-items: center; flex: none; width: 24px; height: 24px; margin-left: auto; padding: 0; border: 0; border-radius: var(--radius-3xs); background: transparent; color: var(--ds-text-muted); }
+.session-activity-action:hover { color: var(--ds-text-primary); background: var(--ds-bg-hover); }
+.session-activity-action:disabled { opacity: .45; }
+.session-activity-tail-actions { position: absolute; top: 50%; right: 4px; display: flex; gap: 2px; transform: translateY(-50%); opacity: 0; }
+.session-activity-tail-actions .session-activity-action { margin-left: 0; }
+.session-activity-row-shell:has(> .session-activity-tail-actions > :first-child) { --tail-width: 24px; }
+.session-activity-row-shell:has(> .session-activity-tail-actions > :nth-child(2)) { --tail-width: 50px; }
+.session-activity-row-shell:has(> .session-activity-tail-actions > :nth-child(3)) { --tail-width: 76px; }
+/* The actions show on hover, on keyboard focus anywhere in the row, and whenever one of them holds focus (whatever moved it
+   there): a focused control is never left invisible. The label makes room only while they show. */
+.session-activity-row-shell:is(:hover, :has(:focus-visible), :has(> .session-activity-tail-actions:focus-within)) > .session-activity-tail-actions { opacity: 1; }
+.session-activity-row-shell:is(:hover, :has(:focus-visible), :has(> .session-activity-tail-actions:focus-within)) > .session-activity-row { padding-right: calc(12px + var(--tail-width)); }
+@media (hover: none), (pointer: coarse) {
+  .session-activity-tail-actions { opacity: 1; }
+  .session-activity-row-shell > .session-activity-row { padding-right: calc(12px + var(--tail-width)); }
+}
+
+/* Background process details open under the list. */
+.session-process-detail { margin-top: 12px; }
 .session-process-detail-heading { display: flex; align-items: center; }
 .session-process-detail-actions { display: flex; gap: 2px; margin-left: auto; }
 .session-process-metadata { margin: 10px 0; font-size: var(--text-sm); }
@@ -93,16 +189,6 @@ button.session-activity-row:hover { color: var(--ds-text-primary); background: v
 .session-process-stop { margin-bottom: 10px; gap: 5px; }
 .session-process-stream { margin: 10px 0; }
 .session-process-stream pre { max-height: 160px; overflow: auto; margin: 5px 0; padding: 8px; border-radius: var(--radius-2xs); background: var(--ds-bg-inset); font: var(--text-sm)/var(--leading-body) var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
-@keyframes session-process-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) {
-  .session-activity-process .session-activity-status-dot { animation: none; }
-  /* The caret's transition lives on the svg, which the shared .btn collapse does not reach. */
-  .session-activity-disclosure > svg { transition: none; }
-}
-
-.session-activity-rail[hidden] {
-  display: none;
-}
 
 .activity-overview-tab {
   min-height: 0;
@@ -110,55 +196,8 @@ button.session-activity-row:hover { color: var(--ds-text-primary); background: v
   padding: 12px 16px;
 }
 
-.session-activity-markdown-mark { width: 16px; height: 16px; color: var(--ds-accent); }
-
-.session-activity-agent .subagent-activity-overview-copy { display: flex; flex: 1; flex-direction: column; gap: 3px; min-width: 0; }
-.session-activity-agent .subagent-activity-overview-main,
-.session-activity-agent .subagent-activity-overview-detail { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.session-activity-agent .subagent-activity-name,
-.session-activity-agent .subagent-activity-task { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.session-activity-agent .subagent-activity-name { font-size: var(--text-sm); }
-.session-activity-agent .subagent-activity-task { font-size: var(--text-2xs); color: var(--ds-text-muted); }
-.session-activity-agent .subagent-activity-status.badge { flex: none; padding: 1px 4px; min-height: 0; font-size: var(--text-2xs); }
-.session-activity-agent .subagent-activity-elapsed { flex: none; font-size: var(--text-2xs); }
-
-.session-activity-goal-row { min-width: 0; margin: 5px 0 9px; }
-.session-activity-goal-main { display: flex; align-items: center; width: 100%; min-width: 0; gap: 7px; }
-.session-activity-goal-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.session-activity-goal-title-action,
-.session-activity-goal-report-action { border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--radius-3xs); }
-.session-activity-goal-title-action { padding: 5px 0; }
-.session-activity-goal-report-action { display: inline-flex; max-width: 100%; min-width: 0; padding: 0; }
-.session-activity-goal-title-action:hover,
-.session-activity-goal-report-action:hover { color: var(--ds-text-primary); background: var(--ds-bg-hover); }
-.session-activity-goal-title-action:focus-visible,
-.session-activity-goal-report-action:focus-visible { outline: 2px solid var(--ds-accent); outline-offset: 2px; }
-.session-activity-goal-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; min-width: 0; padding-left: 35px; font-size: var(--text-2xs); }
-.session-activity-goal-progress { flex: none; color: var(--ds-text-secondary); font-variant-numeric: tabular-nums; }
-.session-activity-goal-report.badge { min-width: 0; max-width: 100%; overflow-wrap: anywhere; padding: 1px 4px; font-size: var(--text-2xs); }
-.session-activity-goal-meta .session-activity-action { margin-left: auto; }
-
-.session-activity-section-label { margin: 8px 0 14px; color: var(--ds-text-muted); font-size: var(--text-2xs); font-weight: var(--font-weight-medium); }
-.session-activity-artifacts-label { padding-top: 12px; border-top: 1px solid var(--ds-border-subtle); }
-.session-activity-attention { margin-bottom: 16px; padding: 8px; border: 1px solid var(--ds-border-subtle); border-radius: var(--radius-2xs); background: var(--ds-bg-tertiary); }
-.session-activity-attention-title { display: flex; align-items: center; gap: 6px; color: var(--ds-warning-ink); font-size: var(--text-sm); }
-.session-activity-attention-link.btn { display: block; width: 100%; min-width: 0; min-height: 28px; padding: 4px 0; text-align: left; white-space: normal; overflow-wrap: anywhere; font-size: var(--text-2xs); }
-.session-activity-range-notice { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 4px 0 8px; color: var(--ds-text-muted); font-size: var(--text-2xs); }
-.session-activity-range-notice .btn, .session-activity-show-all.btn { min-height: 24px; padding: 2px 4px; color: var(--ds-text-muted); font-size: var(--text-2xs); }
-.session-activity-row-shell { display: flex; align-items: center; min-width: 0; }
-.session-activity-row-shell > .session-activity-row { flex: 1; }
-.session-activity-tail-actions { display: flex; flex: none; gap: 2px; opacity: 0; }
-.session-activity-tail-actions .session-activity-action { margin-left: 0; }
-.session-activity-row-shell:hover .session-activity-tail-actions,
-.session-activity-row-shell:focus-within .session-activity-tail-actions { opacity: 1; }
-.session-activity-row-copy { display: flex; flex: 1; flex-direction: column; min-width: 0; gap: 3px; }
-.session-activity-row-metadata { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--ds-text-muted); font-size: var(--text-2xs); }
-.session-activity-line-changes { display: flex; gap: 6px; font-size: var(--text-2xs); font-variant-numeric: tabular-nums; }
-.session-activity-lines-added { color: var(--ds-success-ink); }
-.session-activity-lines-removed { color: var(--ds-error-ink); }
-.session-activity-directory { overflow: hidden; margin: 8px 0 4px; white-space: nowrap; text-overflow: ellipsis; color: var(--ds-text-muted); font-size: var(--text-2xs); }
-.session-activity-agent-glyph { display: grid; place-items: center; flex: none; width: 20px; }
-.session-activity-agent .subagent-activity-role.badge { flex: none; max-width: 30%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-2xs); padding: 1px 4px; }
-.session-activity-item[hidden] { display: none; }
-.session-activity-item:focus-visible, .session-activity-group:focus-visible { outline: 2px solid var(--ds-accent); outline-offset: 2px; }
-@media (hover: none), (pointer: coarse) { .session-activity-tail-actions { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .session-activity-spinner { animation: none; }
+  /* The caret's transition lives on the svg, which the shared .btn collapse does not reach. */
+  .session-activity-disclosure > svg { transition: none; }
+}

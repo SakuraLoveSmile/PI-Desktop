@@ -1,0 +1,54 @@
+/* The workspace sections (environment, context, changes) use the rail's own headings and one-line rows; only what they
+   add is here. Like every rail surface they draw no strokes (D297). */
+
+/* A link in a section heading (Details, Review): borderless, a word and a small chevron, highlighted only on hover. */
+.session-activity-heading-link.btn {
+  flex: none; display: inline-flex; align-items: center; gap: 4px; height: 32px; min-height: 0; padding: 0 8px;
+  border: 0; border-radius: var(--radius-2xs); background: transparent; color: var(--ds-text-secondary);
+  font-size: var(--text-md); font-weight: var(--font-weight-normal); line-height: var(--leading-none); white-space: nowrap;
+}
+.session-activity-heading-link.btn > svg { flex: none; color: var(--ds-text-muted); }
+.session-activity-heading-link.btn:hover:not(:disabled) { background: var(--ds-bg-hover); color: var(--ds-text-primary); }
+.session-activity-heading-link.btn:hover:not(:disabled) > svg { color: var(--ds-text-secondary); }
+
+/* A heading that cannot fold (Changes): the label and its summary, laid out like the disclosure heading beside it. */
+.session-activity-static-title {
+  flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; height: 32px; margin-left: -8px; padding: 0 8px;
+  color: var(--ds-text-primary); font-size: var(--text-md); line-height: var(--leading-none);
+}
+.session-activity-changes-summary { margin-left: 2px; }
+.session-activity-heading-summary [data-tone="warning"] { color: var(--ds-warning-ink); }
+.session-activity-heading-summary [data-tone="critical"] { color: var(--ds-error-ink); }
+
+/* Environment: the folder's name over its path. */
+.session-activity-two { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+.session-activity-two > .session-activity-label { flex: none; }
+.session-activity-caption { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--ds-text-muted); font-size: var(--text-2xs); }
+
+/* Context: the headline (one step above the rows, as on the approved canvas), one bar split by what fills the window,
+   and a legend row per part. */
+.session-activity-context-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 4px;
+  color: var(--ds-text-primary); font-size: var(--text-base); font-variant-numeric: tabular-nums;
+}
+.session-activity-context-head [data-tone="warning"] { color: var(--ds-warning-ink); }
+.session-activity-context-head [data-tone="critical"] { color: var(--ds-error-ink); }
+.session-activity-context-tokens { flex: none; color: var(--ds-text-muted); font-size: var(--text-2xs); }
+.session-activity-context-bar {
+  display: flex; gap: 1px; height: 6px; margin: 8px 0 10px; overflow: hidden;
+  border-radius: var(--radius-full); background: var(--ds-bg-hover);
+}
+.session-activity-context-bar > i { display: block; height: 100%; min-width: 2px; }
+.session-activity-context-bar > i[data-bucket="used"] { background: var(--ds-text-muted); }
+.session-activity-context-bar > i[data-bucket="system"], .session-activity-context-swatch[data-bucket="system"] { background: var(--ds-viz-system); }
+.session-activity-context-bar > i[data-bucket="tools"], .session-activity-context-swatch[data-bucket="tools"] { background: var(--ds-viz-tools); }
+.session-activity-context-bar > i[data-bucket="messages"], .session-activity-context-swatch[data-bucket="messages"] { background: var(--ds-viz-messages); }
+.session-activity-context-legend { margin: 0; padding: 0; list-style: none; }
+.session-activity-context-legend > li { display: flex; align-items: center; gap: 8px; min-height: 22px; }
+.session-activity-context-swatch { flex: none; display: block; width: 8px; height: 8px; border-radius: var(--radius-3xs); }
+.session-activity-context-swatch[data-bucket="free"] { box-sizing: border-box; border: 1px solid var(--ds-text-muted); background: transparent; }
+.session-activity-dim { color: var(--ds-text-secondary); }
+.session-activity-context-value, .session-activity-context-share {
+  flex: none; color: var(--ds-text-muted); font-size: var(--text-2xs); font-variant-numeric: tabular-nums;
+}
+.session-activity-context-share { width: 44px; text-align: right; }

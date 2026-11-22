@@ -2,6 +2,7 @@ mod activation;
 mod agent_capabilities;
 mod artifacts;
 mod audit;
+mod background_address;
 mod background_processes;
 mod background_services;
 mod config_sync;

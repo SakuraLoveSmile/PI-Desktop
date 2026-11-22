@@ -6,11 +6,10 @@ import {
   useRef,
   useState,
 } from "react";
-import { readContextInsightsPreferences } from "../features/context-insights/preferences";
 import { composeBreakdown } from "../features/context-insights/composition";
 import { useLatestComposition } from "../features/context-insights/use-latest-composition";
 import { ContextCompositionSection } from "../features/chat/composer/ContextCompositionSection";
-import { openContextInsightsDialog } from "../features/context-entry/dialog-state";
+import { openContextInsights } from "../features/context-entry/open-context-insights";
 import { portalToBody } from "../lib/portal-visibility";
 import { useTranslation } from "react-i18next";
 import {
@@ -26,6 +25,7 @@ import {
   calculateCacheRate,
   calculateContextUsage,
   calculateTokenRate,
+  contextCapacityLevel,
   contextOccupancyTokens,
   usageTokenTotal,
   contextUsageView,
@@ -105,12 +105,7 @@ export function ContextUsageInspector({
     (total, row) => total + row.totalTokens,
     0,
   );
-  const level =
-    context.remainingPercent <= 10
-      ? "critical"
-      : context.remainingPercent <= 25
-        ? "warning"
-        : "comfortable";
+  const level = contextCapacityLevel(context.remainingPercent);
   // One accessible sentence serves both display modes: the localized `state`
   // phrase carries "remaining"/"used", so the key stays literal for the
   // tooltip contract while `percent`/`count` stay numeric.
@@ -437,8 +432,7 @@ export function ContextUsageInspector({
       <Button onClick={() => {
         const store = useAppStore.getState();
         if (store.activeSessionId) {
-          if (readContextInsightsPreferences().placement === "modal") openContextInsightsDialog(store.activeSessionId);
-          else store.openWorkPanelTabForSession(store.activeSessionId, { id: "context", kind: "context" });
+          openContextInsights(store.activeSessionId, store.openWorkPanelTabForSession);
           closeInspector();
         }
       }}>{t("contextInsights.openDashboard")}</Button>

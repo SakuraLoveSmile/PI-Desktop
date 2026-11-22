@@ -1,0 +1,36 @@
+/* The activity rail's sections: a hairline between neighbours (D645, the one stroke the rail draws), a grip
+   on each section heading, and the reorder feedback. Rows, cards and groups stay stroke-free (D297). */
+/* A plain block, not a flex column: the last row's bottom margin then merges with the next section's top margin. */
+.session-activity-sections { position: relative; min-width: 0; }
+.session-activity-section { min-width: 0; }
+.session-activity-section + .session-activity-section {
+  margin-top: 10px; padding-top: 10px; border-top: 0.5px solid var(--ds-border-default);
+}
+
+.session-activity-grip {
+  display: grid; place-items: center; flex: none; width: 24px; height: 28px; margin: 0 -8px 0 0; padding: 0;
+  border: 0; border-radius: var(--radius-2xs); background: transparent; color: var(--ds-text-muted);
+  cursor: grab; touch-action: none;
+  transition: background var(--motion-duration-fast) var(--motion-ease-out), color var(--motion-duration-fast) var(--motion-ease-out);
+}
+.session-activity-grip:hover { color: var(--ds-text-secondary); background: var(--ds-bg-hover); }
+.session-activity-grip:focus-visible { outline: 2px solid var(--ds-accent); outline-offset: 2px; }
+
+.session-activity-sections[data-dragging="true"] { cursor: grabbing; user-select: none; }
+.session-activity-sections[data-dragging="true"] .session-activity-grip { cursor: grabbing; }
+.session-activity-section[data-dragging="true"] { position: relative; }
+.session-activity-section[data-dragging="true"]::before {
+  content: ""; position: absolute; inset: -6px -8px; border-radius: var(--radius-xs);
+  background: var(--ds-bg-hover); pointer-events: none;
+}
+.session-activity-section[data-dragging="true"] > * { position: relative; }
+
+.session-activity-sections-reset.btn {
+  min-height: 24px; margin-top: 12px; padding: 2px 4px;
+  color: var(--ds-text-muted); font-size: var(--text-2xs);
+}
+.session-activity-sections-status {
+  position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
+@media (prefers-reduced-motion: reduce) { .session-activity-grip { transition: none; } }

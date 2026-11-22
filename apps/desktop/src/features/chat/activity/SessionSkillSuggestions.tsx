@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { UiMessage } from "@pi-desktop/shared";
-import { IconChevronDown, IconEyeOff, IconWrench } from "../../../components/icons";
+import { IconChevronDown, IconEyeOff, IconPlug, IconSparkles, IconWrench } from "../../../components/icons";
 import { Button, TooltipButton } from "../../../components/ui";
 import { AnchoredMenu } from "../../../components/settings/AnchoredMenu";
 import { SkillEditorSheet, skillDraftError, type SkillDraft } from "../../../components/settings/SkillEditorSheet";
@@ -9,6 +9,9 @@ import { api } from "../../../lib/api";
 import { useAppStore } from "../../../stores/app-store";
 import { SESSION_SKILL_SUGGESTIONS_PROMPT, sessionSkillSuggestions, skillSuggestionProject, type SessionSkillSuggestion } from "./session-skill-suggestions";
 import { ignoreSkillSuggestion, isSkillSuggestionIgnored, readIgnoredSkillSuggestions, skillSuggestionIdentity, type IgnoredSkillSuggestion } from "./skill-suggestion-preferences";
+import { ActivityMcpStatus, mcpReferenceTitle } from "./ActivityMcpStatus";
+import { ActivitySectionGrip } from "./ActivitySectionGrip";
+import type { ActivityReference, McpReconnectTarget } from "./activity-mcp-rows";
 import { useActivityDisclosure } from "./use-activity-disclosure";
 import "./session-skill-suggestions.css";
 
@@ -18,14 +21,28 @@ export type SessionSkillSuggestionsProps = {
   visible: boolean;
   supported: boolean;
   rangeLimited?: boolean;
-  references?: { id: string; label: string; kind?: "skill" | "mcp"; onOpen?: () => void }[];
+  references?: ActivityReference[];
+  /** Reconnect to a failed server; without it a failed row only says so. */
+  onReconnectMcp?: (target: McpReconnectTarget) => void;
 };
+
+/**
+ * A reference row's icon and name, then (for an MCP server) how it is doing. The reconnect action is a button, so only
+ * a row that is not itself a button gets it.
+ */
+function referenceContent(reference: ActivityReference, onReconnect?: (target: McpReconnectTarget) => void) {
+  return <>
+    <span className="session-skill-reference-icon">{reference.kind === "mcp" ? <IconPlug size={16} aria-hidden /> : <IconWrench size={16} aria-hidden />}</span>
+    <span className="session-skill-reference-name">{reference.label}</span>
+    {reference.mcp && <ActivityMcpStatus mcp={reference.mcp} name={reference.label} onReconnect={onReconnect} />}
+  </>;
+}
 
 export function SessionSkillSuggestions(props: SessionSkillSuggestionsProps) {
   return <SessionSkillSuggestionsContent key={props.sessionId} {...props} />;
 }
 
-function SessionSkillSuggestionsContent({ sessionId, messages, visible, supported, rangeLimited = false, references = [] }: SessionSkillSuggestionsProps) {
+function SessionSkillSuggestionsContent({ sessionId, messages, visible, supported, rangeLimited = false, references = [], onReconnectMcp }: SessionSkillSuggestionsProps) {
   const { t } = useTranslation();
   const bodyId = useId();
   const disclosure = useActivityDisclosure(sessionId, "skills", true, [], false);
@@ -138,17 +155,19 @@ function SessionSkillSuggestionsContent({ sessionId, messages, visible, supporte
   };
 
   return <section className="session-skill-suggestions" hidden={!visible}>
-    <div className="session-skill-suggestions-heading">
-      <Button variant="ghost" className="session-skill-suggestions-toggle" aria-expanded={disclosure.open} aria-controls={bodyId}
+    <div className="session-activity-heading session-skill-suggestions-heading">
+      <Button variant="ghost" className="session-activity-disclosure session-skill-suggestions-toggle" aria-expanded={disclosure.open} aria-controls={bodyId}
         onClick={disclosure.toggle}>
-        <span>{t("panel.activity.skills.sectionTitle")}</span><IconChevronDown size={13} aria-hidden />
+        <span className="session-activity-group-title">{t("panel.activity.skills.sectionTitle")}</span><IconChevronDown size={14} aria-hidden />
+        {!disclosure.open && inlineItems.length > 0 && <span className="session-activity-heading-summary">{inlineItems.length}</span>}
       </Button>
       <AnchoredMenu open={open && visible} onClose={() => setOpen(false)} align="end" role="dialog"
         className="session-skill-suggestions-menu" menuClassName="session-skill-suggestions-popover"
         label={t("panel.activity.skills.title")} restoreFocus={visible && !editor}
         trigger={(ref) => <Button ref={ref} variant="ghost" className="session-skill-suggestions-count"
           aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-          {suggestions.length ? t("panel.activity.skills.count", { count: suggestions.length }) : t("panel.activity.skills.generate")}
+          <IconSparkles size={14} aria-hidden />
+          {suggestions.length ? t("panel.activity.skills.count", { count: suggestions.length }) : t("panel.activity.skills.extract")}
         </Button>}>
         <h3 className="session-skill-suggestions-popover-title" tabIndex={-1}>{t("panel.activity.skills.title")}</h3>
         {!projectPath && <p className="session-activity-notice">{t("panel.activity.skills.unavailable")}</p>}
@@ -182,14 +201,16 @@ function SessionSkillSuggestionsContent({ sessionId, messages, visible, supporte
         <Button size="sm" className="session-skill-suggestions-generate" disabled={!projectPath || generating || saving}
           onClick={() => { void generate(); }}>{t("panel.activity.skills.generate")}</Button>
       </AnchoredMenu>
+      <ActivitySectionGrip />
     </div>
-    {disclosure.open && <div id={bodyId} className="session-skill-suggestions-body">
-      {inlineItems.length ? <>
+    {/* With nothing to list the section is its heading and the suggest action: an empty group says nothing of its own. */}
+    {disclosure.open && (inlineItems.length > 0 || (preferences.failed && !open)) && <div id={bodyId} className="session-skill-suggestions-body">
+      {inlineItems.length > 0 && <>
         <ul className="session-skill-references">
           {visibleInlineItems.map((item) => <li key={item.id} className="session-skill-reference-row">
             {item.kind === "suggestion" ? <>
               <Button variant="ghost" className="session-skill-reference" title={item.suggestion.name} onClick={() => setOpen(true)}>
-                <span className="session-skill-reference-icon"><IconWrench size={17} aria-hidden /></span>
+                <span className="session-skill-reference-icon"><IconWrench size={16} aria-hidden /></span>
                 <span className="session-skill-reference-name">{item.suggestion.name}</span>
               </Button>
               <TooltipButton type="button" className="btn btn-ghost icon-btn icon-btn-square session-skill-reference-ignore" tooltip={t("panel.activity.skills.ignore")}
@@ -201,20 +222,16 @@ function SessionSkillSuggestionsContent({ sessionId, messages, visible, supporte
                     section?.querySelector<HTMLElement>(".session-skill-suggestions-toggle");
                   if (ignore(item.suggestion)) nextFocus?.focus();
                 }}><IconEyeOff size={14} aria-hidden /></TooltipButton>
-            </> : item.reference.onOpen ? <Button variant="ghost" className="session-skill-reference" title={item.reference.label} onClick={item.reference.onOpen}>
-              <span className="session-skill-reference-icon"><IconWrench size={17} aria-hidden /></span>
-              <span className="session-skill-reference-name">{item.reference.label}</span>
-            </Button> : <div className="session-skill-reference" title={item.reference.label}>
-              <span className="session-skill-reference-icon"><IconWrench size={17} aria-hidden /></span>
-              <span className="session-skill-reference-name">{item.reference.label}</span>
-            </div>}
+            </> : item.reference.onOpen ? <Button variant="ghost" className="session-skill-reference" title={mcpReferenceTitle(item.reference.label, item.reference.mcp, t)}
+              onClick={item.reference.onOpen}>{referenceContent(item.reference)}</Button>
+              : <div className="session-skill-reference" title={mcpReferenceTitle(item.reference.label, item.reference.mcp, t)}>{referenceContent(item.reference, onReconnectMcp)}</div>}
           </li>)}
         </ul>
         {inlineItems.length > 5 && <Button variant="ghost" className="session-skill-references-toggle" aria-expanded={showAllReferences}
           onClick={() => setShowAllReferences((value) => !value)}>
           {showAllReferences ? t("panel.activity.skills.showLess") : t("panel.activity.skills.showAll", { count: inlineItems.length })}
         </Button>}
-      </> : <p className="session-activity-empty">{t("panel.activity.skills.empty")}</p>}
+      </>}
       {preferences.failed && !open && <p role="alert" className="session-activity-error">{t("panel.activity.skills.preferencesFailed")}</p>}
     </div>}
     {visible && editor && editor.projectPath === projectPath && <SkillEditorSheet draft={editor.draft}

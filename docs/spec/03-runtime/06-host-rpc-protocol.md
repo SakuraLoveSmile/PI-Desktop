@@ -2025,7 +2025,9 @@ errorMessage and persistenceError. `stop({sessionId,id})` returns `{process}` an
 is idempotent for settled jobs. Cross-session IDs cannot read or stop another
 owner. `backgroundProcesses.changed({sessionId,id,revision})` invalidates visible
 reads; no command output is broadcast with the event. Explicit stopping remains
-effective if its state write fails, while the storage error is reported.
+effective if its state write fails, while the storage error is reported. A `list`
+row may also carry the live-only `address` described under Local server address
+on background process rows.
 
 Output notifications include a trailing flush within the existing 250 ms
   throttle, so output followed by silence remains visible before termination.
@@ -2289,6 +2291,29 @@ backgroundProcesses list/read/launch projections follow [managed services](team-
 read/stop remain session scoped. Plus P7 stores explicit ownership; older process
 rows do not become services. No shell-budget/FIFO, approved-execution authority
 or protocol-version expansion is introduced.
+
+### Local server address on background process rows
+
+`backgroundProcesses.list` may add an optional, live-only `address` to a
+`BackgroundProcessSummary` that is `running` or `stopping` and whose Host-owned
+output buffer still exists. It is the origin, `http://host:port` or
+`https://host:port`, of the first local web address the process printed on stdout
+or stderr: host `localhost`, a `127.x.y.z` loopback address or `[::1]`, with an
+explicit port (`0.0.0.0` and `[::]` are reported as `localhost`). Path, query,
+fragment and credentials are dropped, and a look-alike host, another scheme or a
+URL without a port is never an address. ANSI sequences, and a URL split across
+two reads of one stream, are handled; the first match wins and never changes.
+
+The Host derives the value from untrusted process output and keeps it only with
+the in-memory output buffer: it is never stored, never present on `read`, `stop`,
+a terminal row or a stored row, and absent after a Host restart, so there is no
+migration. The read that completes the first match emits one
+`backgroundProcesses.changed` at once instead of waiting for the 250 ms throttle;
+the event stays identity-only. Absence means no address was seen. The field says
+nothing about whether the server is healthy or reachable and grants nothing: the
+renderer re-validates the exact origin before it becomes a link. It is additive
+and optional, so protocol 11 is unchanged and consumers may ignore it. Rationale:
+[ADR session-activity-server-address](../../adr/session-activity-server-address.md).
 
 ### Team diagnostics and progress hints (WP7)
 

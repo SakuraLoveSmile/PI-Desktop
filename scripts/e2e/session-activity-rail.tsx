@@ -5,6 +5,8 @@ import { I18nextProvider } from "react-i18next";
 import { en } from "@pi-desktop/i18n";
 import type { BackgroundProcessDetail, BackgroundProcessesChanged, BackgroundProcessSummary, HostStatusEvent } from "@pi-desktop/shared";
 import { SessionActivityRail, type SessionActivityRailProps } from "../../apps/desktop/src/features/chat/activity/SessionActivityRail";
+import { ActivitySectionGrip } from "../../apps/desktop/src/features/chat/activity/ActivitySectionGrip";
+import { activitySectionOrderStore } from "../../apps/desktop/src/features/chat/activity/use-activity-section-order";
 import { BackgroundProcessDetails } from "../../apps/desktop/src/features/chat/activity/BackgroundProcessDetails";
 import { api } from "../../apps/desktop/src/lib/api";
 
@@ -20,12 +22,14 @@ export async function sessionActivityRailProbe(capture?: (stage: "service-list" 
   const i18n = createInstance();
   await i18n.init({ lng: "en", interpolation: { escapeValue: false }, resources: { en: { translation: en } } });
   const host = document.createElement("div");
-  host.style.cssText = "position:fixed;top:40px;right:40px;width:248px;max-height:90vh;overflow:auto;background:var(--color-bg-primary);z-index:1000;";
+  // The real pane: 264px wide with 16px side padding, which the rows' −8px margins reach into.
+  host.style.cssText = "position:fixed;top:40px;right:40px;width:264px;box-sizing:border-box;padding:8px 16px 16px;max-height:90vh;overflow:auto;background:var(--color-bg-primary);z-index:1000;";
   document.body.append(host);
   const root = createRoot(host);
   const initialTheme = document.documentElement.getAttribute("data-theme");
   const initialScale = document.documentElement.style.getPropertyValue("--font-scale");
-  const original = { read: api.readBackgroundProcess, stop: api.stopBackgroundProcess, subscribe: api.onBackgroundProcessesChanged, hostStatus: api.onHostStatus };
+  const original = { read: api.readBackgroundProcess, stop: api.stopBackgroundProcess, subscribe: api.onBackgroundProcessesChanged, hostStatus: api.onHostStatus,
+    insights: api.getContextInsights, agentEvent: api.onAgentEvent, insightsChanged: api.onContextInsightsChanged };
   const reads: Array<{ sessionId: string; id: string; task: ReturnType<typeof deferred<BackgroundProcessDetail>> }> = [];
   const stops: Array<{ sessionId: string; id: string; task: ReturnType<typeof deferred<{ process: BackgroundProcessSummary }>> }> = [];
   const listeners = new Set<(event: BackgroundProcessesChanged) => void>();
@@ -38,6 +42,11 @@ export async function sessionActivityRailProbe(capture?: (stage: "service-list" 
   };
   api.onBackgroundProcessesChanged = (listener) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
   api.onHostStatus = (listener) => { hostListeners.add(listener); return () => { hostListeners.delete(listener); }; };
+  // The Context section reads the newest request's breakdown while it is open; this fixture has none.
+  api.getContextInsights = async (sessionId) => ({ version: 1, sessionId, requests: [], events: [], updatedAt: 1,
+    retention: { maxRequests: 40, maxEvents: 160, maxContentChars: 120000, maxTotalContentChars: 1200000, droppedRequests: 0, droppedEvents: 0 } });
+  api.onAgentEvent = () => () => {};
+  api.onContextInsightsChanged = () => () => {};
   const checks: string[] = [];
   const check = (value: unknown, label: string) => { if (!value) throw new Error(label); checks.push(label); };
   const click = (element: Element | null) => { if (!(element instanceof HTMLElement)) throw new Error("Missing fixture control"); flushSync(() => element.click()); };
@@ -64,36 +73,120 @@ export async function sessionActivityRailProbe(capture?: (stage: "service-list" 
     const renderRail = (props = railProps) => flushSync(() => root.render(<I18nextProvider i18n={i18n}><SessionActivityRail {...props} /></I18nextProvider>));
     renderRail();
     const groups = [...host.querySelectorAll<HTMLButtonElement>(".session-activity-disclosure")];
-    check(groups.map((item) => item.getAttribute("aria-expanded")).join() === "true,true,true,false,false", "plan, agents, processes open; outputs and sources folded");
+    const disclosureState = groups.map((item) => `${item.closest("[data-activity-group]")?.getAttribute("data-activity-group")}:${item.getAttribute("aria-expanded")}`).join();
+    check(disclosureState === "plans:true,live:true,agents:true,processes:true,artifacts:true,sources:false",
+      disclosureState === "plans:true,live:true,agents:true,processes:true,artifacts:true,sources:false"
+        ? "sections and their groups start open and only the sources fold" : `disclosure defaults read ${disclosureState}`);
+    check(Boolean(host.querySelector('[data-activity-group="artifacts"] [data-activity-id="output"]')) && !host.querySelector('[data-activity-group="outputs"] .session-activity-disclosure'),
+      "outputs are listed directly under Artifacts, with no fold of their own");
+    check(!host.querySelector('[data-activity-group="team-members"]') && !host.querySelector(".session-activity-empty"), "groups without rows are left out");
     check(host.querySelectorAll("[data-process-id]").length === 1, "rail shows only the explicit session's processes");
     check(Boolean(host.querySelector(".subagent-activity-overview-main")) && Boolean(host.querySelector(".subagent-activity-overview-detail")), "Overview separates agent identity/status from task/timing");
-    check(host.querySelector(".subagent-activity-status")?.textContent?.trim() === "Running", "Overview status has no repeated Agent prefix");
+    // A running agent shows a spinner, so its status is the spinner's accessible name; a finished one writes the word.
+    const agentStatus = host.querySelector(".subagent-activity-status");
+    check((agentStatus?.querySelector('[role="img"]')?.getAttribute("aria-label") ?? agentStatus?.textContent?.trim()) === "Running", "Overview status has no repeated Agent prefix");
     check(host.querySelector('[data-process-id="p1"] .session-activity-command')?.textContent === "long-background-command.js", "Process uses a readable script title");
     check(host.querySelector('[data-activity-group="agents"] .session-activity-group-count')?.textContent === "1", "Group displays its count");
-    check(host.querySelector('[data-process-id="p1"]')?.textContent?.includes(i18n.t("panel.activity.status.starting")), "accepted process starts truthfully without completed label");
+    check(host.querySelector('[data-process-id="p1"] .session-activity-status[data-state="active"] [role="img"]')?.getAttribute("aria-label") === i18n.t("panel.activity.status.starting")
+      && !host.querySelector('[data-process-id="p1"] .session-activity-status[data-state="done"]'), "accepted process starts truthfully without completed label");
     for (const theme of ["dark", "light"]) {
       document.documentElement.setAttribute("data-theme", theme);
       document.documentElement.style.setProperty("--font-scale", "1.4");
       await paint();
-      check(host.scrollWidth <= host.clientWidth, `${theme}: 248px rail remains within bounds at enlarged font scale`);
+      check(host.scrollWidth <= host.clientWidth, `${theme}: the 264px pane keeps the rail within bounds at enlarged font scale`);
     }
     document.documentElement.style.setProperty("--font-scale", "1");
     click(host.querySelector('[data-activity-id="agent"]')); click(host.querySelector('[data-process-id="p1"]'));
-    click(groups[3]); click(host.querySelector('[data-activity-id="output"]')); click(groups[4]);
+    click(host.querySelector('[data-activity-id="output"]')); click(groups[5]);
     check(opened.join() === "agent,p1,output", "representative path opens agent, process and output from rail");
     check(host.querySelector(".session-activity-readonly")?.tagName === "SPAN", "readonly source is not a fake navigation action");
     check(!host.querySelector(".session-quick-notes"), "quick notes are absent from activity groups");
     renderRail({ ...railProps, supported: false });
     check(!host.querySelector('[data-process-id]') && !host.querySelector('[data-activity-group="processes"] .session-activity-action'), "unsupported host exposes no process controls");
-    renderRail({ ...railProps, sessionId: "s2", plans: [], agents: [], outputs: [], sources: [], processes: [], processesError: "List unavailable" });
-    check(host.querySelectorAll('.session-activity-disclosure[aria-expanded="false"]').length === 2, "new session restores disclosure defaults");
+    renderRail({ ...railProps, sessionId: "s2", plans: [], agents: [], processes: [], processesError: "List unavailable" });
+    check(host.querySelectorAll('.session-activity-disclosure[aria-expanded="false"]').length === 1
+      && host.querySelector('[data-activity-group="sources"] .session-activity-disclosure')?.getAttribute("aria-expanded") === "false", "new session restores disclosure defaults");
+    check(!host.querySelector('[data-activity-group="plans"]') && !host.querySelector('[data-activity-group="agents"]'), "a plan or agent group with no rows is left out");
     check(host.textContent?.includes("List unavailable") && Boolean(host.querySelector('[role="alert"]')), "list error is observable");
     click(host.querySelector('[role="alert"] button')); check(opened.at(-1) === "refresh", "list error has explicit retry");
+    renderRail({ ...railProps, sessionId: "bare", plans: [], agents: [], outputs: [], sources: [], processes: [] });
+    check(host.querySelectorAll("[data-activity-section]").length === 1 && host.querySelector("[data-activity-section]")?.getAttribute("data-activity-section") === "live"
+      && host.querySelector(".session-activity-empty")?.textContent === i18n.t("panel.activity.emptyLive") && !host.querySelector("[data-activity-group] [data-activity-group]"),
+      "a rail with nothing to show keeps one hint line and no empty groups");
+
+    // Sections: default order, hairlines, grips, keyboard and pointer reordering, cancel, persistence and reset.
+    const orderKey = "pi-desktop:activity-section-order:v1";
+    const savedOrder = () => { try { return localStorage.getItem(orderKey); } catch { return null; } };
+    const sectionIds = () => [...host.querySelectorAll<HTMLElement>("[data-activity-section]")].map((element) => element.dataset.activitySection).join();
+    const sectionGrip = (id: string) => host.querySelector<HTMLButtonElement>(`[data-activity-section-grip="${id}"]`);
+    // The saved order is complete: this rail has no server, and the hidden Servers section keeps its default slot (fourth)
+    // while the visible ones move around it.
+    const saved = (visible: string) => { const ids = visible.split(","); ids.splice(3, 0, "server"); return JSON.stringify(ids); };
+    const sectionBox = (id: string) => host.querySelector<HTMLElement>(`[data-activity-section="${id}"]`)!.getBoundingClientRect();
+    const usage = { inputTokens: 38_000, outputTokens: 2_000, totalTokens: 40_000 };
+    const orderProps: SessionActivityRailProps = { ...railProps, goals: [{ id: "goal", label: "Ship importer", status: "running", statusLabel: "Running" }],
+      environment: { name: "PI-Desktop", path: "/Users/dev/Code/PI-Desktop", branch: "main" },
+      contextUsage: { usage, turnUsage: usage, contextWindow: 200_000, tools: [], responseOutputEstimated: false },
+      changes: { count: 3, additions: 115, deletions: 22 }, onOpenContext: () => opened.push("context"), onOpenReview: () => opened.push("review"),
+      suggestions: <section className="session-skill-suggestions"><div className="session-skill-suggestions-heading"><span>Skills</span><ActivitySectionGrip /></div></section> };
+    const press = (id: string, key: string, altKey = false) => { sectionGrip(id)!.dispatchEvent(new KeyboardEvent("keydown", { key, altKey, bubbles: true, cancelable: true })); };
+    const pointer = (type: "pointerdown" | "pointermove" | "pointerup", target: EventTarget, clientY: number) =>
+      target.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, button: 0, pointerId: 1, isPrimary: true, clientX: 8, clientY }));
+    const sceneTheme = document.documentElement.getAttribute("data-theme");
+    activitySectionOrderStore.reset();
+    renderRail({ ...orderProps, sessionId: "order-a" }); await paint();
+    check(sectionIds() === "goals,plans,live,environment,context,artifacts,skills,changes" && !host.querySelector(".session-activity-sections-reset"), "sections start in the default order without a reset control");
+    check(host.querySelectorAll("[data-activity-section-grip]").length === 8, "every section carries exactly one grip");
+    // The reset gives every box a solid border style, so a stroke is told by its width: 0.5px snaps to 1px on a 1x display.
+    const hairlines = [...host.querySelectorAll<HTMLElement>("[data-activity-section]")].map((section) => getComputedStyle(section).borderTopWidth).join();
+    const hairlinesOk = /^0px(,(0\.5|1)px){7}$/.test(hairlines);
+    check(hairlinesOk, hairlinesOk ? "a hairline separates neighbouring sections and nothing sits above the first" : `section hairline widths read ${hairlines}`);
+    const strokes = [...host.querySelectorAll<HTMLElement>(".session-activity-group, .session-activity-row-shell, .session-activity-disclosure")].filter((element) => {
+      const style = getComputedStyle(element); return parseFloat(style.borderTopWidth) > 0 || parseFloat(style.borderBottomWidth) > 0;
+    }).map((element) => element.className);
+    check(strokes.length === 0, strokes.length === 0 ? "groups, rows and headings draw no strokes of their own" : `strokes remain on ${strokes.join(" | ")}`);
+    sectionGrip("live")!.focus();
+    press("live", "ArrowUp"); await paint();
+    const moved = "goals,live,plans,environment,context,artifacts,skills,changes";
+    check(sectionIds() === moved, "ArrowUp on a grip moves its section up one place");
+    check(document.activeElement === sectionGrip("live"), "the moved section's grip keeps keyboard focus");
+    check(savedOrder() === saved(moved), "a chosen order is saved on this device");
+    check(host.querySelector(".session-activity-sections-status")?.textContent === i18n.t("panel.activity.sections.moved", { name: i18n.t("panel.activity.liveStatus"), position: 2, count: 8 }),
+      "the move is announced with its name and position");
+    check(Boolean(host.querySelector(".session-activity-sections-reset")), "a changed order offers a reset");
+    press("goals", "ArrowUp"); press("changes", "ArrowDown"); press("goals", "ArrowDown", true); await paint();
+    check(sectionIds() === moved, "edges and modified arrow keys leave the order alone");
+    renderRail({ ...orderProps, sessionId: "order-b" }); await paint();
+    check(sectionIds() === moved, "a chosen order applies to every session's rail");
+    const grab = sectionGrip("goals")!.getBoundingClientRect();
+    pointer("pointerdown", sectionGrip("goals")!, grab.top + grab.height / 2); await paint();
+    pointer("pointermove", window, sectionBox("skills").top + 2); await paint();
+    check(host.querySelector('[data-activity-section="goals"]')?.getAttribute("data-dragging") === "true" && sectionIds() === "live,plans,environment,context,artifacts,goals,skills,changes",
+      "dragging a grip moves its section live and marks it");
+    pointer("pointerup", window, 0); await paint();
+    const dragged = "live,plans,environment,context,artifacts,goals,skills,changes";
+    check(sectionIds() === dragged && !host.querySelector('[data-dragging="true"]') && savedOrder() === saved(dragged), "releasing the grip keeps the new order and saves it");
+    const lift = sectionGrip("skills")!.getBoundingClientRect();
+    pointer("pointerdown", sectionGrip("skills")!, lift.top + lift.height / 2); await paint();
+    pointer("pointermove", window, sectionBox("live").top - 2); await paint();
+    check(sectionIds() === "skills,live,plans,environment,context,artifacts,goals,changes", "dragging above the first section moves it to the top");
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })); await paint();
+    check(sectionIds() === dragged && !host.querySelector('[data-dragging="true"]') && savedOrder() === saved(dragged), "Escape puts the original order back and saves nothing");
+    click(host.querySelector(".session-activity-sections-reset")); await paint();
+    check(sectionIds() === "goals,plans,live,environment,context,artifacts,skills,changes" && savedOrder() === null && !host.querySelector(".session-activity-sections-reset") && document.activeElement === sectionGrip("goals"),
+      "Reset order restores the default, clears the saved choice and returns focus to the first grip");
+    for (const theme of ["dark", "light"]) {
+      document.documentElement.setAttribute("data-theme", theme);
+      document.documentElement.style.setProperty("--font-scale", "1.4"); await paint();
+      check(host.scrollWidth <= host.clientWidth, `${theme}: sections, grips and hairlines fit the 264px pane at enlarged font scale`);
+    }
+    document.documentElement.style.setProperty("--font-scale", "1");
+    if (sceneTheme === null) document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme", sceneTheme);
 
 
     renderRail();
-    const outputsDisclosure = host.querySelector('[data-activity-group="outputs"] .session-activity-disclosure');
-    check(outputsDisclosure?.getAttribute("aria-expanded") === "true", "Returning to a session retains disclosure preference");
+    const sourcesDisclosure = host.querySelector('[data-activity-group="sources"] .session-activity-disclosure');
+    check(sourcesDisclosure?.getAttribute("aria-expanded") === "true", "Returning to a session retains disclosure preference");
     click(host.querySelector('[data-activity-group="agents"] .session-activity-disclosure'));
     renderRail({ ...railProps, agents: [...railProps.agents, { id: "new-failure", label: "checker", status: "failed", statusLabel: "Failed" }] });
     check(host.querySelector('[data-activity-group="agents"] .session-activity-disclosure')?.getAttribute("aria-expanded") === "true", "New failure expands a manually collapsed group");
@@ -140,14 +233,15 @@ export async function sessionActivityRailProbe(capture?: (stage: "service-list" 
     check(groupHeading("agents")?.getAttribute('aria-expanded') === 'false', "attention reveal does not reopen on returning to unchanged session");
     click(groupHeading("agents"));
     check(host.querySelectorAll('[data-activity-group="agents"] [data-activity-item-id]').length === 7, "show-all choice survives a session switch");
-    click(groupHeading("outputs")); click(groupHeading("sources"));
-    check(host.querySelectorAll('.session-activity-range-notice').length === 3, "each transcript-derived group states its loaded range");
+    click(groupHeading("sources"));
+    check(host.querySelectorAll('.session-activity-range-notice').length === 2
+      && ["live", "artifacts"].every((section) => host.querySelector(`[data-activity-group="${section}"] .session-activity-range-notice`)), "each section of transcript-derived rows states its loaded range");
     click(host.querySelector('.session-activity-range-notice button')); check(opened.at(-1) === "load-earlier", "loaded-range action reaches the supplied history loader");
     click([...host.querySelectorAll('.session-activity-range-notice button')].find((element) => element.textContent === i18n.t("panel.activity.returnToLatest")));
     check(opened.at(-1) === "return-latest", "historical range retains return-to-latest action");
-    check(host.querySelector('.session-activity-directory')?.textContent === "src" && host.querySelector('.session-activity-row-metadata')?.textContent?.includes("2 writes"), "outputs show directory and merged write evidence");
+    check(host.querySelector('.session-activity-directory')?.textContent === "src" && host.querySelector('[data-activity-id="merged-output"]')?.getAttribute("aria-label")?.includes("2 writes"), "outputs show directory and keep merged write evidence in the row's name");
     check(host.querySelector('.session-activity-line-changes')?.textContent === "+3−1", "known output line changes remain distinct");
-    check(host.querySelector('[data-activity-group="sources"]')?.textContent?.includes("3 references"), "domain source displays citation occurrences");
+    check(host.querySelector('[data-activity-id="domain"]')?.getAttribute("aria-label")?.includes("3 references"), "domain source keeps citation occurrences in the row's name");
     const outputActions = [...host.querySelectorAll('[data-activity-item-id="merged-output"] .session-activity-tail-actions button')];
     for (const action of outputActions) click(action);
     check(opened.slice(-3).join() === "open-output,locate-output,copy-output", "output tail actions reach open, locate and copy without nesting");
@@ -161,7 +255,7 @@ export async function sessionActivityRailProbe(capture?: (stage: "service-list" 
     for (const theme of ["dark", "light"]) {
       document.documentElement.setAttribute("data-theme", theme);
       document.documentElement.style.setProperty("--font-scale", "1.4"); await paint();
-      check(host.scrollWidth <= host.clientWidth, `${theme}: attention, metadata and tail actions fit 248px at enlarged font scale`);
+      check(host.scrollWidth <= host.clientWidth, `${theme}: attention, row status and tail actions fit the 264px pane at enlarged font scale`);
       const copyAction = host.querySelector<HTMLElement>('[data-activity-item-id="merged-output"] .session-activity-tail-actions button:last-child');
       copyAction?.focus(); await paint();
       check(copyAction && getComputedStyle(copyAction.parentElement!).opacity === "1", `${theme}: tail actions are visible for keyboard focus`);
@@ -257,12 +351,15 @@ export async function sessionActivityRailProbe(capture?: (stage: "service-list" 
     await capture?.("service-terminal");
     return { ok: true, checks };
   } finally {
+    // The order is a renderer-wide device preference: no scene leaves its choice behind for the next probe.
+    activitySectionOrderStore.reset();
     flushSync(() => root.unmount()); host.remove();
     if (initialTheme === null) document.documentElement.removeAttribute("data-theme");
     else document.documentElement.setAttribute("data-theme", initialTheme);
     if (initialScale) document.documentElement.style.setProperty("--font-scale", initialScale);
     else document.documentElement.style.removeProperty("--font-scale");
     api.readBackgroundProcess = original.read; api.stopBackgroundProcess = original.stop; api.onBackgroundProcessesChanged = original.subscribe; api.onHostStatus = original.hostStatus;
+    api.getContextInsights = original.insights; api.onAgentEvent = original.agentEvent; api.onContextInsightsChanged = original.insightsChanged;
     if (listeners.size || hostListeners.size) throw new Error("Process subscription leaked after unmount");
   }
 }

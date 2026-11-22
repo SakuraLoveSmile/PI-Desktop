@@ -162,6 +162,14 @@ app.whenReady().then(async () => {
     console.error("TRANSCRIPT_STAGE activity-rail");
     result.activityRail = await window.webContents.executeJavaScript("globalThis.sessionActivityRailProbe()");
     result.ok = result.ok && result.activityRail.ok;
+    console.error("TRANSCRIPT_STAGE activity-workspace");
+    result.activityWorkspace = await window.webContents.executeJavaScript("globalThis.sessionActivityWorkspaceProbe()");
+    if (!result.activityWorkspace.ok) throw new Error(result.activityWorkspace.error);
+    result.ok = result.ok && result.activityWorkspace.ok;
+    console.error("TRANSCRIPT_STAGE activity-servers");
+    result.activityServers = await window.webContents.executeJavaScript("globalThis.sessionActivityServersProbe()");
+    if (!result.activityServers.ok) throw new Error(result.activityServers.error);
+    result.ok = result.ok && result.activityServers.ok;
     console.error("TRANSCRIPT_STAGE readability");
     const readability = await window.webContents.executeJavaScript("globalThis.transcriptReadabilityProbe()");
     result.readability = readability;
@@ -180,13 +188,13 @@ app.whenReady().then(async () => {
     if (process.env.PI_SESSION_ACTIVITY_LIGHT_SCREENSHOT) {
       const theme = await window.webContents.executeJavaScript("document.documentElement.getAttribute('data-theme')");
       await window.webContents.executeJavaScript("document.documentElement.setAttribute('data-theme', 'light'); new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
-      await window.webContents.executeJavaScript("Promise.all(document.getAnimations().filter(animation => animation.effect?.getComputedTiming().iterations !== Infinity).map(animation => animation.finished))");
+      await window.webContents.executeJavaScript("Promise.allSettled(document.getAnimations().filter(animation => animation.effect?.getComputedTiming().iterations !== Infinity).map(animation => animation.finished)).then(() => undefined)");
       await require("node:fs/promises").writeFile(process.env.PI_SESSION_ACTIVITY_LIGHT_SCREENSHOT, (await window.webContents.capturePage()).toPNG());
       await window.webContents.executeJavaScript(theme === null ? "document.documentElement.removeAttribute('data-theme')" : "document.documentElement.setAttribute('data-theme', " + JSON.stringify(theme) + ")");
     }
     if (process.env.PI_SESSION_ACTIVITY_ARTIFACTS_SCREENSHOT) {
       await window.webContents.executeJavaScript("(() => { const rail = document.querySelector('.session-pane[data-visible=true] .session-activity-rail'); const scroll = rail?.closest('.session-activity-scroll, .session-pane-activity'); if (scroll) scroll.scrollTop = scroll.scrollHeight; })(); new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
-      await window.webContents.executeJavaScript("Promise.all(document.getAnimations().filter(animation => animation.effect?.getComputedTiming().iterations !== Infinity).map(animation => animation.finished))");
+      await window.webContents.executeJavaScript("Promise.allSettled(document.getAnimations().filter(animation => animation.effect?.getComputedTiming().iterations !== Infinity).map(animation => animation.finished)).then(() => undefined)");
       await require("node:fs/promises").writeFile(process.env.PI_SESSION_ACTIVITY_ARTIFACTS_SCREENSHOT, (await window.webContents.capturePage()).toPNG());
     }
     if (process.env.PI_COMPOSER_SCREENSHOT_DIR) {
@@ -198,8 +206,9 @@ app.whenReady().then(async () => {
         if (scene === "skills") {
           const point = await window.webContents.executeJavaScript("(() => { const rect = document.querySelector('.session-pane[data-visible=true] .session-skill-suggestions-toggle').getBoundingClientRect(); return { x: Math.round(rect.x + rect.width / 2), y: Math.round(rect.y + rect.height / 2) }; })()");
           window.webContents.sendInputEvent({ type: "mouseMove", ...point });
-          const flatHeading = await window.webContents.executeJavaScript("new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => { const style = getComputedStyle(document.querySelector('.session-pane[data-visible=true] .session-skill-suggestions-toggle')); resolve(style.backgroundColor === 'rgba(0, 0, 0, 0)' && style.borderRadius === '0px'); })))");
-          if (!flatHeading) throw new Error("Suggestion header retains a capsule on hover");
+          // The heading is one whole-row toggle: hover washes the row from its left bleed to the count control, not just the label.
+          const wholeRowHover = await window.webContents.executeJavaScript("new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => { const pane = document.querySelector('.session-pane[data-visible=true]'); const toggle = pane.querySelector('.session-skill-suggestions-toggle'); const style = getComputedStyle(toggle); const box = toggle.getBoundingClientRect(); const row = toggle.closest('.session-activity-heading').getBoundingClientRect(); const count = pane.querySelector('.session-skill-suggestions-count').getBoundingClientRect(); resolve(style.backgroundColor !== 'rgba(0, 0, 0, 0)' && box.left <= row.left - 7 && count.left - box.right <= 8); })))");
+          if (!wholeRowHover) throw new Error("Suggestion header does not highlight as one whole row on hover");
         }
         await fs.writeFile(path.join(process.env.PI_COMPOSER_SCREENSHOT_DIR, "composer-" + scene + ".png"), (await window.webContents.capturePage()).toPNG());
       }
