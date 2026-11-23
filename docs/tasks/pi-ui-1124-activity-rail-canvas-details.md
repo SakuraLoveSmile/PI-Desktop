@@ -1,11 +1,11 @@
 # PI-UI-1124: activity rail canvas details
 
-Status: 待体验 (built and verified locally; one commit on the request branch, pushed, pull request open against `main`). Project: `fork-pi-desktop`. Created: 2026-11-23 (Asia/Taipei).
+Status: 待体验 (built and verified locally; one commit on the request branch, pushed and merged as PR #102, merge commit `5c3745c09`, and shipped in v0.15.22). Project: `fork-pi-desktop`. Created: 2026-11-23 (Asia/Taipei).
 Tier: T1 (renderer-only visible change; no IPC, Host, protocol or storage change). D650 amends D645 and D646.
 Baseline: `ed162b47daafe75a4ef3c0f4f0e9075942ebb251` (`main` after PR 101).
 Branch: `fix/20261123-pi-ui-1124-activity-rail-canvas-details`.
 Worktree: `/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop/20261123-fix-pi-ui-1124-activity-rail-canvas-details`.
-The commit, the push and the pull request were authorized by the user on 2026-11-23 (「提交 推送并开 pr」). Merge and release wait for the user's explicit word, and 已验收 is the user's.
+The commit, the push and the pull request were authorized by the user on 2026-11-23 (「提交 推送并开 pr」). The merge and the release followed on the user's word 「合并吧 推送新版本」 the same day: merged as [PR #102](https://github.com/SakuraLoveSmile/PI-Desktop/pull/102) (merge commit `5c3745c09`) and shipped in v0.15.22 ([PI-REL-01522](PI-REL-01522-macos-release.md)). Merge and release are tracked separately from acceptance; 已验收 is the user's.
 
 ## Request and source
 

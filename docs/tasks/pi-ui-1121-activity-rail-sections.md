@@ -1,11 +1,11 @@
 # PI-UI-1121: activity rail sections, one hairline and a chosen order
 
-Status: 待体验 (Batches A, A2, B, the Reconnect follow-up and C built and verified locally on the request branch; committed there as one commit at the user's word on 2026-11-22; not pushed). Project: `fork-pi-desktop`. Created: 2026-11-21 (Asia/Taipei).
+Status: 待体验 (Batches A, A2, B, the Reconnect follow-up and C built and verified locally on the request branch; committed there as one commit at the user's word on 2026-11-22; pushed and merged as PR #101, merge commit `ed162b47d`, and shipped in v0.15.22). Project: `fork-pi-desktop`. Created: 2026-11-21 (Asia/Taipei).
 Tier: T1 for Batches A, A2, B and Reconnect (renderer-only visible change; no IPC, Host, protocol or storage-schema change); **T2 for Batch C**, which adds an optional Host protocol field derived from untrusted process output (ADR `session-activity-server-address`, D647). D645 amends the D297 stroke rule for this one surface; D646 (Batch B) records the rail as a read-only mirror of the composer's context entry; D647 (Batch C) records the Servers section and the address contract.
 Baseline: `3a709f373721ac86f13f5ca020c29606bd9e23e0` (`main` after PR 100).
 Branch: `feat/20261121-pi-ui-1121-activity-rail-sections`.
 Worktree: `/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop/20261121-feat-pi-ui-1121-activity-rail-sections`.
-Push, merge and release wait for the user's explicit word.
+Pushed, opened as [PR #101](https://github.com/SakuraLoveSmile/PI-Desktop/pull/101) and merged on 2026-11-22 (merge commit `ed162b47d`), then shipped in v0.15.22 ([PI-REL-01522](PI-REL-01522-macos-release.md)). Merge and release are tracked separately from acceptance; 已验收 is the user's.
 
 ## Request and source
 
