@@ -6,6 +6,14 @@ export const PLUS_UPSTREAM_CUTOFF = "0.15.6";
 const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   en: [
     {
+      version: "0.15.23",
+      date: "2026-11-23",
+      highlights: [
+        "The unread badge on the notification bell is now a dot on the bell’s upper-right corner. It follows the font size set in Appearance and has room for two-digit counts and 99+. The bell is cut away around the dot instead of being ringed in the sidebar colour, so no dark ring shows on the translucent sidebar or on the hover highlight.",
+        "In the activity panel, a Goal’s progress bar and report badge now sit a little lower, so the hover highlight of the Goal row no longer touches them.",
+      ],
+    },
+    {
       version: "0.15.22",
       date: "2026-11-23",
       highlights: [
@@ -160,6 +168,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "zh-CN": [
+    {
+      version: "0.15.23",
+      date: "2026-11-23",
+      highlights: [
+        "通知铃铛上的未读标记现在是铃铛右上角的一个圆点，随“外观”里设置的字号缩放，两位数和 99+ 也有足够的留白。圆点周围的铃铛被镂空，不再套一圈侧栏颜色的描边，因此在半透明侧栏和悬停高亮上都不会出现深色环。",
+        "活动面板里，目标下方的进度条和报告徽章整体下移了一点，目标行的悬停高亮不再碰到它们。",
+      ],
+    },
     {
       version: "0.15.22",
       date: "2026-11-23",
@@ -316,6 +332,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   "zh-TW": [
     {
+      version: "0.15.23",
+      date: "2026-11-23",
+      highlights: [
+        "The unread badge on the notification bell is now a dot on the bell’s upper-right corner. It follows the font size set in Appearance and has room for two-digit counts and 99+. The bell is cut away around the dot instead of being ringed in the sidebar colour, so no dark ring shows on the translucent sidebar or on the hover highlight.",
+        "In the activity panel, a Goal’s progress bar and report badge now sit a little lower, so the hover highlight of the Goal row no longer touches them.",
+      ],
+    },
+    {
       version: "0.15.22",
       date: "2026-11-23",
       highlights: [
@@ -470,6 +494,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   tr: [
+    {
+      version: "0.15.23",
+      date: "2026-11-23",
+      highlights: [
+        "The unread badge on the notification bell is now a dot on the bell’s upper-right corner. It follows the font size set in Appearance and has room for two-digit counts and 99+. The bell is cut away around the dot instead of being ringed in the sidebar colour, so no dark ring shows on the translucent sidebar or on the hover highlight.",
+        "In the activity panel, a Goal’s progress bar and report badge now sit a little lower, so the hover highlight of the Goal row no longer touches them.",
+      ],
+    },
     {
       version: "0.15.22",
       date: "2026-11-23",
@@ -626,6 +658,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   de: [
     {
+      version: "0.15.23",
+      date: "2026-11-23",
+      highlights: [
+        "The unread badge on the notification bell is now a dot on the bell’s upper-right corner. It follows the font size set in Appearance and has room for two-digit counts and 99+. The bell is cut away around the dot instead of being ringed in the sidebar colour, so no dark ring shows on the translucent sidebar or on the hover highlight.",
+        "In the activity panel, a Goal’s progress bar and report badge now sit a little lower, so the hover highlight of the Goal row no longer touches them.",
+      ],
+    },
+    {
       version: "0.15.22",
       date: "2026-11-23",
       highlights: [
@@ -780,6 +820,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   es: [
+    {
+      version: "0.15.23",
+      date: "2026-11-23",
+      highlights: [
+        "The unread badge on the notification bell is now a dot on the bell’s upper-right corner. It follows the font size set in Appearance and has room for two-digit counts and 99+. The bell is cut away around the dot instead of being ringed in the sidebar colour, so no dark ring shows on the translucent sidebar or on the hover highlight.",
+        "In the activity panel, a Goal’s progress bar and report badge now sit a little lower, so the hover highlight of the Goal row no longer touches them.",
+      ],
+    },
     {
       version: "0.15.22",
       date: "2026-11-23",
@@ -936,6 +984,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   fr: [
     {
+      version: "0.15.23",
+      date: "2026-11-23",
+      highlights: [
+        "The unread badge on the notification bell is now a dot on the bell’s upper-right corner. It follows the font size set in Appearance and has room for two-digit counts and 99+. The bell is cut away around the dot instead of being ringed in the sidebar colour, so no dark ring shows on the translucent sidebar or on the hover highlight.",
+        "In the activity panel, a Goal’s progress bar and report badge now sit a little lower, so the hover highlight of the Goal row no longer touches them.",
+      ],
+    },
+    {
       version: "0.15.22",
       date: "2026-11-23",
       highlights: [
@@ -1091,6 +1147,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   ko: [
     {
+      version: "0.15.23",
+      date: "2026-11-23",
+      highlights: [
+        "The unread badge on the notification bell is now a dot on the bell’s upper-right corner. It follows the font size set in Appearance and has room for two-digit counts and 99+. The bell is cut away around the dot instead of being ringed in the sidebar colour, so no dark ring shows on the translucent sidebar or on the hover highlight.",
+        "In the activity panel, a Goal’s progress bar and report badge now sit a little lower, so the hover highlight of the Goal row no longer touches them.",
+      ],
+    },
+    {
       version: "0.15.22",
       date: "2026-11-23",
       highlights: [
@@ -1245,6 +1309,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "pt-BR": [
+    {
+      version: "0.15.23",
+      date: "2026-11-23",
+      highlights: [
+        "The unread badge on the notification bell is now a dot on the bell’s upper-right corner. It follows the font size set in Appearance and has room for two-digit counts and 99+. The bell is cut away around the dot instead of being ringed in the sidebar colour, so no dark ring shows on the translucent sidebar or on the hover highlight.",
+        "In the activity panel, a Goal’s progress bar and report badge now sit a little lower, so the hover highlight of the Goal row no longer touches them.",
+      ],
+    },
     {
       version: "0.15.22",
       date: "2026-11-23",

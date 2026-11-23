@@ -745,7 +745,7 @@ account, subscription, or collaboration backend.
 | User glyph | `30px` circular local-user glyph; decorative when the text label names the control |
 | Identity copy | Primary `Custom`; secondary `Local profile` or localized `本地配置`; two lines truncate independently |
 | Chevron | Trailing disclosure indicator; reflects the menu's open state without motion when reduced motion is requested |
-| Notification shortcut | Separate `32px` square Bell target with unread badge; opens the durable inbox above and to the right of the footer |
+| Notification shortcut | Separate `32px` square Bell target with unread badge, a dot on the bell's upper-right shoulder that follows the Appearance font scale and is set off by a cut-out in the bell rather than a ring, so it reads on the glass sidebar and on the hover tile; opens the durable inbox above and to the right of the footer |
 | Profile menu | `280px` wide, bottom anchored `8px` above the footer; opaque elevated surface |
 | Identity header | Repeats the glyph and two-line local identity; non-interactive |
 | Menu actions | Divider, then Settings, Logs, and Theme in that order; Theme retains its current-value metadata |
@@ -5022,7 +5022,9 @@ from failed/error styling.
 Goal plan rows show the authoritative completed/total count with a progress bar,
 the report state (pending, generating, blocked, ready, fallback, failed or
 unavailable) and, only when the execution needs a word (pending, failed, blocked,
-interrupted), its state; a Goal that simply runs shows no state word.
+interrupted), its state; a Goal that simply runs shows no state word. The bar
+and the report badge sit 6px below the row, so the row's hover tile never
+touches the badge.
 Overview and the Composer Goal capsule share one session/execution-scoped Host
 reader. A blocked row shows Goal title · Goal blocked with semantic warning
 styling and opens its held state. Missing counts are unavailable, not fabricated zeroes; historical fallback reports

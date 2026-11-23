@@ -113,7 +113,8 @@
 .session-activity-agent .subagent-activity-elapsed { flex: none; font-size: var(--text-2xs); font-variant-numeric: tabular-nums; }
 .session-activity-agent .subagent-activity-role.badge { flex: none; max-width: 30%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-2xs); padding: 1px 4px; }
 
-/* Goals: the target row, then a thin progress bar beside the report chip. */
+/* Goals: the target row, then a thin progress bar beside the report chip. The strip sits 6px below the row, so the
+   row's hover tile never touches the chip (and the chip's focus ring clears it). */
 .session-activity-goal-row { min-width: 0; }
 .session-activity-goal-main {
   display: flex; align-items: center; min-width: 0; min-height: 34px; gap: 10px; margin: 0 -8px; padding: 3px 8px;
@@ -129,7 +130,7 @@
 .session-activity-goal-title-action:hover, .session-activity-goal-report-action:hover { color: var(--ds-text-primary); background: transparent; }
 .session-activity-goal-done { flex: none; color: var(--ds-success-ink); }
 .session-activity-goal-progress { flex: none; color: var(--ds-text-muted); font-size: var(--text-2xs); font-variant-numeric: tabular-nums; }
-.session-activity-goal-meta { display: flex; align-items: center; gap: 8px; min-width: 0; margin: 0 0 6px 26px; font-size: var(--text-2xs); }
+.session-activity-goal-meta { display: flex; align-items: center; gap: 8px; min-width: 0; margin: 6px 0 6px 26px; font-size: var(--text-2xs); }
 .session-activity-goal-bar { flex: 1; min-width: 0; height: 3px; border-radius: var(--radius-3xs); background: var(--ds-bg-hover); overflow: hidden; }
 .session-activity-goal-bar > i { display: block; height: 100%; background: var(--ds-text-secondary); }
 .session-activity-goal-bar[data-state="done"] > i { background: var(--ds-success-ink); }

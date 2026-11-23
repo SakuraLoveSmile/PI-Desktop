@@ -832,6 +832,20 @@
 }
 
 .notification-trigger {
+  /*
+   * Unread badge geometry, read by the badge and by the cut-out it leaves in the bell. The bell scales with the
+   * Appearance font scale (D343) while the 32px target does not, so the dot follows --font-scale too. At the
+   * default scale it is a 14px dot on the bell's upper-right shoulder: its box starts 9px right of the bell's
+   * left edge and 6px above its top. --badge-edge is the furthest it may reach, the target's right edge plus the
+   * sidebar's 8px padding less a pixel, so a wide label is never clipped by the sidebar.
+   */
+  --bell-size: calc(14px * var(--font-scale));
+  --bell-inset: calc((32px - var(--bell-size)) / 2);
+  --badge-size: calc(14px * var(--font-scale));
+  --badge-left: calc(var(--bell-inset) + 9px * var(--font-scale));
+  --badge-top: calc(var(--bell-inset) - 6px * var(--font-scale));
+  --badge-gap: 1px;
+  --badge-edge: 39px;
   position: relative;
   width: 32px;
   height: 32px;
@@ -839,20 +853,39 @@
 
 .notification-badge {
   position: absolute;
-  top: -5px;
-  right: -6px;
+  top: var(--badge-top);
+  left: var(--badge-left);
   display: inline-flex;
-  min-width: 16px;
-  height: 16px;
+  min-width: var(--badge-size);
+  height: var(--badge-size);
+  padding: 0 calc(3px * var(--font-scale));
   align-items: center;
   justify-content: center;
-  border: 2px solid var(--ds-bg-sidebar);
   border-radius: var(--radius-full);
   background: var(--ds-error);
   color: var(--ds-bg-primary);
   font-size: var(--text-3xs);
   font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
   line-height: var(--leading-none);
+  /* A label too wide for its place slides back inside --badge-edge; 100% is the badge's own width. */
+  translate: min(0px, calc(var(--badge-edge) - var(--badge-left) - 100%)) 0;
+}
+
+/*
+ * The badge is set off from the bell by cutting the bell away around it, not by a ring in the sidebar colour:
+ * on macOS the sidebar is native glass and the target gains a hover tile, so no flat colour matches what is
+ * behind the bell, while a hole shows whatever is there in every theme and state. The hole follows the badge's
+ * left cap, the only part that can meet the bell; a wider label grows to the right. Only a label that has to slide
+ * back (99+, or two digits at a large font scale) outruns its hole, and then it simply overlaps the bell.
+ */
+.notification-trigger:has(.notification-badge) > svg {
+  mask-image: radial-gradient(
+    circle at calc(var(--badge-left) + var(--badge-size) / 2 - var(--bell-inset))
+      calc(var(--badge-top) + var(--badge-size) / 2 - var(--bell-inset)),
+    transparent calc(var(--badge-size) / 2 + var(--badge-gap) - 0.25px),
+    #000 calc(var(--badge-size) / 2 + var(--badge-gap) + 0.25px)
+  );
 }
 
 .notification-popover {
