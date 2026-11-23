@@ -4978,7 +4978,8 @@ frame (D297) apart from the one hairline between sections (D645). It follows the
 approved canvas. A section
 heading is primary ink at regular weight and reads title, chevron and, once
 folded, a quiet summary (running, failed and timed-out counts, or the number of
-artifacts); a nested group's heading (Subagents, Team members, Background
+artifacts; a Goal or Plan section that holds one item says that item's own word
+instead, D650); a nested group's heading (Subagents, Team members, Background
 processes, Sources) is the smaller medium-weight secondary heading and reads
 title, count, chevron. Every heading is one whole-row toggle that takes
 `--ds-bg-hover`. Groups sit on the page layer: no `--ds-tile` plate and no chip.
@@ -5007,8 +5008,10 @@ states the loaded message range with its load-earlier and return-to-latest actio
 while only part of the transcript is loaded.
 
 Overview agent rows show the name over a truncated task summary, with the status
-(unprefixed) and elapsed time at the far edge. Transcript agent rows retain their
-existing presentation. Background titles use literal
+(unprefixed) and the elapsed time as a clock at the far edge (`02:14`, or `1:02:14`
+from an hour on, D650); the tooltip and the accessible name keep the spoken
+duration (`2m 14s`). Transcript agent rows retain their existing presentation,
+duration included. Background titles use literal
 script/tool names and recognized ports, never shell execution; tooltips preserve
 the full command. Terminal processes are grouped under Ended N with a Clear
 action. Clear only hides those records for the renderer lifetime, including
@@ -5111,12 +5114,25 @@ with one hint line. Team members use a distinct
 group with recorded role labels; its loading/error state is not mixed into
 delegated agents.
 
+Folded, a Goal section that holds exactly one Goal says that Goal's state after its
+chevron (D650): the failed-report word in the failure colour, Completed in the
+success colour once every step is done or the execution has settled as completed,
+otherwise `done/total` steps. A Plan section that holds exactly one plan says that
+plan's status. With several items, or while a Goal's steps are not yet known, the
+heading keeps its running, failed and timed-out counts. The Goal row and its folded
+heading read one shared rule, so they never disagree.
+
 The workspace sections show, read-only, what the composer, the Review tab and the
 Extensions page already know (D646); changing any of it stays where it was. Each
 appears only when its data exists, and only the visible pane reads it:
 
-- Environment: the session's project (its name over a path shortened to the last
-  two folders, the full path in the tooltip) and below it the git branch. Both
+- Environment: the session's project (its name over its path, the full path in the
+  tooltip) and below it the git branch. A path under the person's home folder is
+  written from `~` and keeps its last two folders (`~/Code/PI-Desktop`,
+  `~/…/Work/PI-Desktop`); any other path is shortened to its last two folders
+  (`…/apps/PI-Desktop`). Home is recognised by layout (`/Users/<name>`,
+  `/home/<name>`, `<drive>:\Users\<name>`, never a shared folder such as Shared or
+  Public) because the renderer has no home-directory API (D650). Project and branch
   come from the Host-owned git snapshot that the composer's workspace menu reads
   (`useComposerWorkspaceGit`). A snapshot of another project is dropped, so a
   session or project switch never shows another project's branch, and a branch
@@ -5127,17 +5143,24 @@ appears only when its data exists, and only the visible pane reads it:
   own functions and framed by the same used/remaining preference
   (`settings.contextUsageDisplay`): the headline (label and percentage, warning
   at 25% or less remaining and critical at 10% or less, the one rule the
-  composer's footer shares), `~used / window`, one bar split into system, tools
+  composer's footer shares; in the used framing the label is the rail's own Used,
+  已使用 in Simplified Chinese, and the remaining framing keeps the composer's
+  word, D650), `~used / window`, one bar split into system, tools
   and messages by the newest request's breakdown (a single used segment until the
-  breakdown is known) and a legend row for each part and for the free space. The
+  breakdown is known) and a legend row for each part and for the free space, each
+  led by an 8px square swatch with a 2px corner (`--radius-4xs`). Chinese locales
+  write token counts in 万 (萬 in Traditional Chinese) with at most one decimal
+  (`~4万 / 20万`, `1.2万`) and counts under ten thousand in full; every other
+  locale keeps the composer's K/M form (D650). The
   breakdown is subscribed to only while the section is open and the pane is
   visible. A Details link opens the context dashboard by the same placement rule
   as the composer inspector's dashboard link (dialog or work-panel tab). The rail
   never manages usage: compaction and the display preference stay in the
   composer. Folded, it shows the label and percentage.
 - Changes: the number of recorded changes and the added and removed lines that
-  the Review tab lists, summarised by the same functions, with a Review link that
-  opens that tab. The heading cannot fold, and the section is left out while
+  the Review tab lists, summarised by the same functions, with a link that opens
+  that tab and reads Review (审查 in Simplified Chinese and 審查 in Traditional
+  Chinese, where the tab keeps its own name, D650). The heading cannot fold, and the section is left out while
   nothing is recorded.
 - Skills & MCP: every MCP server whose tools the session recorded is one row (in
   the order its tools were first used) carrying its live state at the far edge: a

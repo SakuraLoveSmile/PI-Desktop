@@ -18313,7 +18313,8 @@ prove account/region eligibility or call a real model.
   output; use per-group Load earlier through the actual bounded history service
   and return to latest. Inspect recommendation rationale, inline Ignore and its
   remount persistence, plus five-row Show all/Show less for references.
-  Verify two-line agent identity/task/timing and unprefixed status badges. Check
+  Verify two-line agent identity/task/timing (the elapsed time as a clock such as
+  `02:14` while its tooltip says `2m 14s`) and unprefixed status badges. Check
   readable script titles and full-command tooltips, per-group counts/status,
   and timeout warning distinct from failure. Collapse a group, switch sessions
   and return; retain its choice, then introduce a new failure and verify expansion.
@@ -18343,13 +18344,16 @@ prove account/region eligibility or call a real model.
   then use Reset order and confirm the default order, no saved entry and focus on
   the first grip. Repeat at the real 264px pane (16px side padding) with enlarged
   text in both themes. Review the workspace sections between Live status and
-  Skills & MCP: Environment shows the project's name over its shortened path and,
+  Skills & MCP: Environment shows the project's name over its path (written from
+  `~` under the home folder, shortened to the last two folders) and,
   in a git checkout, the branch (a folder outside git has no section, and a switch
   between sessions never shows another project's branch); Context shows the newest
   request's used share, `~used / window`, the system/tools/messages bar with its
   legend and the free space, using the composer inspector's numbers and its
-  used/remaining framing, and Details opens the dashboard; Changes shows the
-  Review tab's count and +added −removed lines and Review opens that tab; each MCP
+  used/remaining framing (in Chinese the headline reads 已使用 and the counts are
+  written in 万), and Details opens the dashboard; Changes shows the
+  Review tab's count and +added −removed lines and Review opens that tab (审查 in
+  Chinese); each MCP
   server the session used is one row whose state reads Connected, a spinner while
   connecting, Sign-in needed, Idle or, for a failed server, Reconnect in the
   failure word's place (click it: the row spins and offers nothing until the Host
@@ -18373,7 +18377,10 @@ prove account/region eligibility or call a real model.
   arrives after the pane closed reaches nothing); after the stop the row leaves
   Servers for Live status's ended processes. A section order saved before Servers
   existed places it right after Live status.
-  Fold every foldable section and read the summaries.
+  Fold every foldable section and read the summaries: a Goal section that holds one
+  Goal says its state (a failed report, Completed, or `done/total` steps) and a Plan
+  section that holds one plan says its status, while a section with several items
+  keeps its counts.
 - **Expected:** Original display preference/default and chronological reading
   remain intact. The rail does not overlap chat/composer and yields to the work
   panel. Hidden panes do not read another owner; async navigation/read/stop never
@@ -18396,9 +18403,13 @@ prove account/region eligibility or call a real model.
   `address` that the Host derived from the process's own output: it is never stored
   (none on `read`, `stop`, ended or restored rows, none after a Host restart), the
   renderer re-validates the exact loopback origin, and Servers lists the process
-  once while Live status does not.
-- **Specs:** 04-ux/08-component-spec §13.3-13.4, 04-ux/07-ui-design-system §6.4
-  (D645, D646, D647), 04-ux/06-settings-ia,
+  once while Live status does not. The rail's details follow the approved canvas
+  (D650): the Environment path starts at `~` under the home folder, an overview
+  agent row's clock and its tooltip's spoken duration come from the same runtime
+  while transcript rows keep the spoken form, legend swatches are 8px squares with
+  a 2px corner, and a folded one-item Goal or Plan heading agrees with its row.
+- **Specs:** 04-ux/08-component-spec §13.3-13.4, 04-ux/07-ui-design-system §6.2, §6.4
+  (D645, D646, D647, D650), 04-ux/06-settings-ia,
   03-runtime/03-tools-and-permissions, 03-runtime/04-data-storage §7.1,
   03-runtime/06-host-rpc-protocol; ADR session-activity-rail-and-managed-background-processes,
   session-activity-server-address.

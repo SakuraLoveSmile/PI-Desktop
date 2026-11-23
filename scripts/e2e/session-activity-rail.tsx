@@ -82,6 +82,7 @@ export async function sessionActivityRailProbe(capture?: (stage: "service-list" 
     check(!host.querySelector('[data-activity-group="team-members"]') && !host.querySelector(".session-activity-empty"), "groups without rows are left out");
     check(host.querySelectorAll("[data-process-id]").length === 1, "rail shows only the explicit session's processes");
     check(Boolean(host.querySelector(".subagent-activity-overview-main")) && Boolean(host.querySelector(".subagent-activity-overview-detail")), "Overview separates agent identity/status from task/timing");
+    check(/^00:[2-3]\d$/.test(host.querySelector(".subagent-activity-elapsed")?.textContent ?? ""), "a running agent started 20 seconds ago shows its elapsed time as a clock");
     // A running agent shows a spinner, so its status is the spinner's accessible name; a finished one writes the word.
     const agentStatus = host.querySelector(".subagent-activity-status");
     check((agentStatus?.querySelector('[role="img"]')?.getAttribute("aria-label") ?? agentStatus?.textContent?.trim()) === "Running", "Overview status has no repeated Agent prefix");

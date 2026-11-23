@@ -14,6 +14,8 @@ export type ActivityRailItem = {
   onLocate?: () => void;
   onCopyPath?: () => void;
   content?: ReactNode;
+  /** A goal row's say in the Goal section's folded heading while it is the only goal; `fallback` is the heading's default counts. */
+  foldedSummary?: (fallback: string) => ReactNode;
   groupLabel?: string;
   changeCount?: number;
   addedLines?: number;

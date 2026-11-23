@@ -16,8 +16,11 @@ export function ActivityRailGroup({ sessionId, group, label, items = [], initial
   keepMounted?: boolean; preserveAttention?: boolean; reveal?: ActivityReveal;
   /** Groups nested inside this one: revealing any of them opens this one too. */
   revealAlso?: readonly string[];
-  /** What a collapsed section heading says after its chevron; defaults to the running / failed / timed-out counts. */
-  collapsedSummary?: ReactNode;
+  /**
+   * What a collapsed section heading says after its chevron; defaults to the running / failed / timed-out counts. A function
+   * receives those default counts, so a summary that cannot say anything yet can fall back to them.
+   */
+  collapsedSummary?: ReactNode | ((fallback: string) => ReactNode);
   /** The group is a whole section: its heading carries the section's drag handle and is the larger heading. */
   sectionHeading?: boolean;
 }) {
@@ -31,9 +34,10 @@ export function ActivityRailGroup({ sessionId, group, label, items = [], initial
       || (group === "ended-processes" && reveal.group === "processes" && items.some((item) => item.id === reveal.itemId))) expand();
   }, [reveal, group, revealAlso, expand, items]);
   const summary = activityGroupSummary(items);
-  const summaryText = collapsedSummary ?? [summary.running && t("panel.activity.groupRunning", { count: summary.running }),
+  const countsText = [summary.running && t("panel.activity.groupRunning", { count: summary.running }),
     summary.failed && t("panel.activity.groupFailed", { count: summary.failed }),
     summary.timedOut && t("panel.activity.groupTimedOut", { count: summary.timedOut })].filter(Boolean).join(" · ");
+  const summaryText = typeof collapsedSummary === "function" ? collapsedSummary(countsText) : collapsedSummary ?? countsText;
   const id = useId();
   return <section className="session-activity-group" data-activity-group={group} data-variant={sectionHeading ? "section" : "sub"} tabIndex={-1}>
     <div className="session-activity-heading">

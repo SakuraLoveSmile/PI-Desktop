@@ -1,8 +1,16 @@
 import type { ContextInsightsRequest, ContextUsageDisplay, MessageUsage } from "@pi-desktop/shared";
-import { calculateContextUsage, contextCapacityLevel, contextUsageView, type ContextCapacityLevel } from "../../../lib/context-usage";
+import { calculateContextUsage, contextCapacityLevel, contextUsageLabelKey, contextUsageView, type ContextCapacityLevel } from "../../../lib/context-usage";
 import { composeBreakdown, type ContextBucket } from "../../context-insights/composition";
 
 const BUCKETS: readonly ContextBucket[] = ["system", "tools", "messages"];
+
+/**
+ * The headline's label. The rail reads 已使用 as the approved canvas does where the composer says 已用; the remaining
+ * framing keeps the composer's own word, so a person who chose it still reads what the percentage counts.
+ */
+export function activityContextLabelKey(display: ContextUsageDisplay): "panel.activity.contextUsed" | ReturnType<typeof contextUsageLabelKey> {
+  return display === "used" ? "panel.activity.contextUsed" : contextUsageLabelKey(display);
+}
 
 export type ActivityContextView = {
   display: ContextUsageDisplay;

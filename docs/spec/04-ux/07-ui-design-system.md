@@ -471,6 +471,7 @@ of a desktop coding tool:
 
 | Token | Value | Usage |
 |---|---|---|
+| `--radius-4xs` | 2px | Keys and swatches smaller than 10px, where 4px would turn a square into a dot (D650) |
 | `--radius-3xs` | 4px | Inline code |
 | `--radius-2xs` | 6px | Small inline chips |
 | `--radius-xs` | 8px | Compact buttons, copy buttons |

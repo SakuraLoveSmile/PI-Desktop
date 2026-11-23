@@ -20,7 +20,10 @@ after(() => server.close());
 const activity = (name) => server.ssrLoadModule(`/src/features/chat/activity/${name}`);
 const { catalogs } = await server.ssrLoadModule("@pi-desktop/i18n");
 const { activityMcpReferences, mcpNeedsAuth, withReconnecting, withStatus } = await activity("activity-mcp-rows.ts");
-const { activityContextView } = await activity("activity-context-view.ts");
+const { activityContextView, activityContextLabelKey } = await activity("activity-context-view.ts");
+const { formatActivityTokens } = await activity("activity-token-format.ts");
+const { goalRowFacts, goalFoldedSummaryKind } = await activity("goal-row-facts.ts");
+const { GoalFoldedSummary } = await activity("GoalFoldedSummary.tsx");
 const { shortProjectPath, projectFolderName } = await activity("activity-workspace-view.ts");
 const { ActivityMcpStatus, mcpStatusMark, mcpReferenceTitle } = await activity("ActivityMcpStatus.tsx");
 const { ActivityContextMeter } = await activity("ActivityContextSection.tsx");
@@ -28,15 +31,26 @@ const { SessionActivityRail } = await activity("SessionActivityRail.tsx");
 const { SessionSkillSuggestions } = await activity("SessionSkillSuggestions.tsx");
 const { activitySectionOrderStore } = await activity("use-activity-section-order.ts");
 const { openContextInsights } = await server.ssrLoadModule("/src/features/context-entry/open-context-insights.ts");
+const { contextUsageLabelKey } = await server.ssrLoadModule("/src/lib/context-usage.ts");
 const i18n = createInstance();
 await i18n.init({ lng: "en", resources: { en: { translation: catalogs.en } } });
+const zh = createInstance();
+await zh.init({ lng: "zh-CN", resources: { "zh-CN": { translation: catalogs["zh-CN"] } } });
 
 afterEach(() => activitySectionOrderStore.reset());
 
 const withI18n = (element) => renderToStaticMarkup(createElement(I18nextProvider, { i18n }, element));
+const withChinese = (element) => renderToStaticMarkup(createElement(I18nextProvider, { i18n: zh }, element));
 const baseProps = { sessionId: "a", visible: true, plans: [], goals: [], agents: [], outputs: [], sources: [], processes: [],
   processesLoading: false, onRefreshProcesses() {}, onOpenProcess() {}, supported: true };
 const render = (props) => withI18n(createElement(SessionActivityRail, { ...baseProps, ...props }));
+const renderChinese = (props) => withChinese(createElement(SessionActivityRail, { ...baseProps, ...props }));
+/** Renders with the named groups folded, as a person leaves them; `attention` is what they had already seen in each. */
+const withFolded = (groups, work) => {
+  const folded = Object.fromEntries(groups.map(([group, attention = []]) => [`pi-desktop:activity-disclosure:v1:a:${group}`, JSON.stringify({ open: false, attention })]));
+  globalThis.localStorage = { getItem: (name) => folded[name] ?? null, setItem() {} };
+  try { return work(); } finally { delete globalThis.localStorage; }
+};
 const sections = (markup) => markup.split('data-activity-section="').slice(1).map((chunk) => ({ id: chunk.slice(0, chunk.indexOf('"')), markup: chunk }));
 const ids = (markup) => sections(markup).map((candidate) => candidate.id);
 const section = (markup, id) => sections(markup).find((candidate) => candidate.id === id)?.markup ?? "";
@@ -259,11 +273,23 @@ test("the context meter shows each part of the window with its share, and a sing
   assert.ok(tight.includes('data-tone="critical"') && !meter.includes("data-tone="));
 });
 
-test("a project path is shortened to its last two folders, whichever separator it uses", () => {
-  assert.equal(shortProjectPath("/Users/dev/Code/PI-Desktop"), "…/Code/PI-Desktop");
-  assert.equal(shortProjectPath("C:\\Users\\dev\\Code\\PI-Desktop"), "…\\Code\\PI-Desktop");
-  assert.equal(shortProjectPath("/Users/dev"), "/Users/dev");
+test("a project path under a person's home starts at ~ and keeps its last two folders, whichever separator it uses", () => {
+  assert.equal(shortProjectPath("/Users/dev/Code/PI-Desktop"), "~/Code/PI-Desktop");
+  assert.equal(shortProjectPath("/Users/dev/Code/Work/PI-Desktop"), "~/…/Work/PI-Desktop");
+  assert.equal(shortProjectPath("/home/dev/work"), "~/work");
+  assert.equal(shortProjectPath("C:\\Users\\dev\\Code\\PI-Desktop"), "~\\Code\\PI-Desktop");
+  assert.equal(shortProjectPath("D:/Users/dev/Code/Work/App"), "~/…/Work/App");
+  assert.equal(shortProjectPath("/Users/dev"), "~");
+  assert.equal(shortProjectPath("/Users/dev/"), "~");
+});
+
+test("a project path outside a home folder is only shortened, and a shared Users folder is not mistaken for a home", () => {
+  assert.equal(shortProjectPath("/srv/apps/PI-Desktop"), "…/apps/PI-Desktop");
   assert.equal(shortProjectPath("/PI-Desktop"), "/PI-Desktop");
+  assert.equal(shortProjectPath("/opt/PI-Desktop"), "/opt/PI-Desktop");
+  assert.equal(shortProjectPath("/Users"), "/Users");
+  assert.equal(shortProjectPath("/Users/Shared/Code/PI-Desktop"), "…/Code/PI-Desktop");
+  assert.equal(shortProjectPath("C:\\Users\\Public\\Code\\PI-Desktop"), "…\\Code\\PI-Desktop");
   assert.equal(projectFolderName("/Users/dev/Code/PI-Desktop/"), "PI-Desktop");
   assert.equal(projectFolderName("C:\\Users\\dev"), "dev");
   assert.equal(projectFolderName("/"), "/");
@@ -296,7 +322,7 @@ test("workspace sections do not stand in for live content: a session with only a
 test("the environment section names the project, shortens its path and shows the branch", () => {
   const body = section(render({ environment }), "environment");
   assert.ok(body.includes('data-activity-group="environment"') && body.includes('data-variant="section"'));
-  assert.ok(body.includes("Environment") && body.includes("PI-Desktop") && body.includes("…/Code/PI-Desktop"));
+  assert.ok(body.includes("Environment") && body.includes("PI-Desktop") && body.includes("~/Code/PI-Desktop"));
   assert.ok(body.includes("feat/activity-rail") && body.includes('aria-label="Branch"'));
   assert.ok(body.includes('aria-expanded="true"'));
 });
@@ -316,6 +342,49 @@ test("a folded environment section keeps the project's name beside its heading",
   } finally { delete globalThis.localStorage; }
 });
 
+test("a folded section that holds one plan or goal says that item's own word, and with several it keeps its counts", () => {
+  const summary = (markup, id) => /<span class="session-activity-heading-summary">(.*?)<\/span>/.exec(section(markup, id))?.[1];
+  const failedPlan = { id: "plan-2", label: "Second plan", status: "failed", statusLabel: "Failed" };
+  const failedGoal = { id: "goal-2", label: "Second goal", status: "failed", statusLabel: "Failed" };
+  const one = withFolded([["plans"], ["goals", ["goal-1:running"]]], () => render({ plans: [plan],
+    goals: [{ ...goal, foldedSummary: (fallback) => createElement("b", null, `${fallback}!`) }] }));
+  assert.equal(summary(one, "plans"), "Approved");
+  assert.equal(summary(one, "goals"), "<b>1 running!</b>", "a summary that has nothing of its own to say is handed the heading's counts");
+  const several = withFolded([["plans", ["plan-2:failed"]], ["goals", ["goal-1:running", "goal-2:failed"]]], () => render({ plans: [plan, failedPlan],
+    goals: [{ ...goal, foldedSummary: () => createElement("b", null, "never") }, failedGoal] }));
+  assert.equal(summary(several, "plans"), "1 failed");
+  assert.equal(summary(several, "goals"), "1 running · 1 failed", "one goal's word never stands for several");
+  const unworded = withFolded([["plans", ["plan-3:running"]]], () => render({ plans: [{ id: "plan-3", label: "Plan", status: "running" }] }));
+  assert.equal(summary(unworded, "plans"), "1 running", "a plan with no status word keeps the counts");
+});
+
+const steps = (...statuses) => ({ items: statuses.map((status) => ({ status })) });
+const goalFacts = (state, proposal = {}) => goalRowFacts({ progress: null, reportState: "none", reportError: null, ...state }, { status: "approved", ...proposal });
+
+test("a folded Goal heading reports a failed report first, then a finished goal, then how many steps are done", () => {
+  assert.equal(goalFoldedSummaryKind(goalFacts({ reportState: "failed", progress: steps("completed", "completed") })), "failed");
+  assert.equal(goalFoldedSummaryKind(goalFacts({ progress: steps("completed", "completed") })), "done");
+  assert.equal(goalFoldedSummaryKind(goalFacts({}, { executionState: "completed" })), "done", "a goal the Host settled is done before its steps are read");
+  const partial = goalFacts({ progress: steps("completed", "in_progress", "pending") }, { executionState: "running" });
+  assert.deepEqual([goalFoldedSummaryKind(partial), partial.completed, partial.total], ["steps", 1, 3]);
+  assert.equal(goalFoldedSummaryKind(goalFacts({}, { executionState: "running" })), "unknown", "nothing is said before the steps are known");
+});
+
+test("the Goal row and its folded heading read one report state: an unreadable report is unavailable, a failed or blocked one is not hidden by it", () => {
+  assert.equal(goalFacts({ reportError: "boom" }).reportState, "unavailable");
+  assert.equal(goalFacts({ reportError: "boom", reportState: "failed" }).reportState, "failed");
+  const blocked = goalFacts({ reportError: "boom", reportState: "blocked" });
+  assert.deepEqual([blocked.reportState, blocked.status], ["blocked", "degraded"]);
+  assert.equal(goalFacts({ reportState: "ready" }, { executionState: "running" }).status, "running");
+});
+
+test("the folded Goal summary says Completed in the success colour for a finished goal and otherwise hands back the heading's counts", () => {
+  const proposal = (executionState) => ({ id: "plan-1", sessionId: "a", title: "Goal", status: "approved", executionId: "exec-1", executionState });
+  const folded = (executionState) => withI18n(createElement(GoalFoldedSummary, { sessionId: "a", proposal: proposal(executionState), visible: false, fallback: "1 running" }));
+  assert.equal(folded("completed"), '<span data-tone="success">Completed</span>');
+  assert.equal(folded("running"), "1 running");
+});
+
 test("the context section folds like the others and says its figure after the chevron, with a link to the dashboard", () => {
   const open = section(render({ contextUsage, onOpenContext() {} }), "context");
   assert.ok(open.includes("Context") && open.includes("Used 20%") && open.includes("~40K / 200K"));
@@ -330,6 +399,29 @@ test("the context section folds like the others and says its figure after the ch
   } finally { delete globalThis.localStorage; }
 });
 
+test("token counts in the rail are written in 万 for Chinese and 萬 for Traditional Chinese, in full below ten thousand, and in K elsewhere", () => {
+  assert.equal(formatActivityTokens(0, "zh-CN"), "0");
+  assert.equal(formatActivityTokens(9_999, "zh-CN"), "9,999");
+  assert.equal(formatActivityTokens(10_000, "zh-CN"), "1万");
+  assert.equal(formatActivityTokens(12_345, "zh-CN"), "1.2万");
+  assert.equal(formatActivityTokens(200_000, "zh-CN"), "20万");
+  assert.equal(formatActivityTokens(1_250_000, "zh-CN"), "125万");
+  for (const language of ["zh-TW", "zh-HK", "zh-Hant"]) assert.equal(formatActivityTokens(200_000, language), "20萬", language);
+  for (const language of ["en", "de", "ko", "pt-BR"]) assert.equal(formatActivityTokens(200_000, language), "200K", language);
+});
+
+test("Chinese reads the rail's context under the 已使用 headline in 万, while the composer keeps the label it already had", () => {
+  const detailed = activityContextView(usage(40_000), 200_000, "used",
+    request([entry("system", 4_000), entry("tools", 4_000), entry("user", 12_000)]));
+  const meter = withChinese(createElement(ActivityContextMeter, { view: detailed }));
+  assert.ok(meter.includes("已使用 20%") && meter.includes("~4万 / 20万"));
+  assert.ok(meter.includes("~4,000") && meter.includes("~1.2万") && meter.includes("16万"), "the legend and the free space use the same units");
+  assert.equal(activityContextLabelKey("used"), "panel.activity.contextUsed");
+  assert.equal(activityContextLabelKey("remaining"), contextUsageLabelKey("remaining"), "the other framing is still the composer's own word");
+  const folded = withFolded([["context"]], () => section(renderChinese({ contextUsage: { ...contextUsage, usage: usage(190_000) } }), "context"));
+  assert.ok(folded.includes('<span data-tone="critical">已使用 95%</span>'));
+});
+
 test("the changes section is one heading with the recorded totals and a link to the Review tab", () => {
   const body = section(render({ changes, onOpenReview() {} }), "changes");
   assert.ok(body.includes('data-activity-group="changes"') && body.includes('data-variant="section"'));
@@ -338,6 +430,11 @@ test("the changes section is one heading with the recorded totals and a link to 
   assert.ok(body.includes('aria-label="Review · 3 recorded changes · +159 −45"') && body.includes(">Review<"));
   assert.ok(!section(render({ changes }), "changes").includes(">Review<"), "no link without a way to open the tab");
   assert.ok(section(render({ changes: { count: 1, additions: 2, deletions: 0 }, onOpenReview() {} }), "changes").includes("1 recorded change ·"));
+});
+
+test("the rail's link to the Review tab is worded 审查 in Chinese, as the canvas draws it", () => {
+  const body = section(renderChinese({ changes, onOpenReview() {} }), "changes");
+  assert.ok(body.includes(">审查<") && body.includes('aria-label="审查 · '));
 });
 
 test("each workspace section has one grip that names it", () => {
