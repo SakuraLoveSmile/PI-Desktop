@@ -19,8 +19,8 @@ export function ActivityChangesSection({ changes, onReview }: { changes: Activit
         </span>
       </span>
       {onReview && <TooltipButton type="button" className="btn btn-ghost session-activity-heading-link" tooltip={detail}
-        ariaLabel={`${t("panel.tabs.review")} · ${detail}`} onClick={onReview}>
-        {t("panel.tabs.review")}<IconChevronRight size={14} aria-hidden />
+        ariaLabel={`${t("panel.activity.reviewLink")} · ${detail}`} onClick={onReview}>
+        {t("panel.activity.reviewLink")}<IconChevronRight size={14} aria-hidden />
       </TooltipButton>}
       <ActivitySectionGrip />
     </div>

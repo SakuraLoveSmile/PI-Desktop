@@ -3,7 +3,7 @@ import { register } from 'node:module';
 import test from 'node:test';
 register(new URL('./helpers/ts-import-hooks.mjs', import.meta.url));
 const { activityPlans, activityResources, activitySubagents } = await import('../src/features/chat/activity/session-activity-model.ts');
-const { subagentAvatarVariant, subagentElapsed, subagentTimingIsLive, subagentRowText } = await import('../src/features/chat/activity/subagent-row-presentation.ts');
+const { formatElapsedClock, subagentAvatarVariant, subagentElapsed, subagentTimingIsLive, subagentRowText } = await import('../src/features/chat/activity/subagent-row-presentation.ts');
 const msg = (id,role,content,extra={}) => ({id,role,content,createdAt:'2026-10-09T00:00:00Z',...extra});
 
 test('activity plans remain session owned and deduplicate installed checkpoints', () => {
@@ -81,6 +81,26 @@ test('terminal subagent statuses remain distinct and never invent an elapsed end
   assert.equal(subagentElapsed('running',undefined,90000),undefined);
   assert.equal(subagentElapsed('completed',{completedAt:50000},90000),undefined);
   assert.equal(subagentElapsed('completed',{startedAt:1000,completedAt:0},90000),undefined);
+});
+
+test('the rail clock reads minutes and seconds, adds hours only from an hour on, and never shows a broken time', () => {
+  assert.equal(formatElapsedClock(0),'00:00');
+  assert.equal(formatElapsedClock(9.9),'00:09');
+  assert.equal(formatElapsedClock(134),'02:14');
+  assert.equal(formatElapsedClock(600),'10:00');
+  assert.equal(formatElapsedClock(3599),'59:59');
+  assert.equal(formatElapsedClock(3734),'1:02:14');
+  assert.equal(formatElapsedClock(-5),'00:00');
+  assert.equal(formatElapsedClock(Number.NaN),'00:00');
+});
+
+test('a subagent has the spoken duration for tooltips and the clock for the rail, both from the same runtime and the same real end', () => {
+  assert.equal(subagentElapsed('running',{startedAt:1000},135000),'2m 14s');
+  assert.equal(subagentElapsed('running',{startedAt:1000},135000,'clock'),'02:14');
+  assert.equal(subagentElapsed('completed',{startedAt:1000,completedAt:56000},500000,'clock'),'00:55');
+  assert.equal(subagentElapsed('completed',{startedAt:1000},90000,'clock'),undefined);
+  assert.equal(subagentElapsed('running',undefined,90000,'clock'),undefined);
+  assert.equal(subagentElapsed('completed',{startedAt:1000,completedAt:0},90000,'clock'),undefined);
 });
 
 test('inline subagent text keeps real names and task details with deterministic decorative avatars', () => {

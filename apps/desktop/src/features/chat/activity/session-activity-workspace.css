@@ -19,6 +19,7 @@
 .session-activity-changes-summary { margin-left: 2px; }
 .session-activity-heading-summary [data-tone="warning"] { color: var(--ds-warning-ink); }
 .session-activity-heading-summary [data-tone="critical"] { color: var(--ds-error-ink); }
+.session-activity-heading-summary [data-tone="success"] { color: var(--ds-success-ink); }
 
 /* Environment: the folder's name over its path. */
 .session-activity-two { display: flex; flex: 1; flex-direction: column; min-width: 0; }
@@ -45,7 +46,7 @@
 .session-activity-context-bar > i[data-bucket="messages"], .session-activity-context-swatch[data-bucket="messages"] { background: var(--ds-viz-messages); }
 .session-activity-context-legend { margin: 0; padding: 0; list-style: none; }
 .session-activity-context-legend > li { display: flex; align-items: center; gap: 8px; min-height: 22px; }
-.session-activity-context-swatch { flex: none; display: block; width: 8px; height: 8px; border-radius: var(--radius-3xs); }
+.session-activity-context-swatch { flex: none; display: block; width: 8px; height: 8px; border-radius: var(--radius-4xs); }
 .session-activity-context-swatch[data-bucket="free"] { box-sizing: border-box; border: 1px solid var(--ds-text-muted); background: transparent; }
 .session-activity-dim { color: var(--ds-text-secondary); }
 .session-activity-context-value, .session-activity-context-share {

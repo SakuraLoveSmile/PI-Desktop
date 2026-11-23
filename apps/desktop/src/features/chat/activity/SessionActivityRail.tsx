@@ -50,6 +50,8 @@ const LIVE_GROUPS = ["agents", "team-members", "processes", "ended-processes"] a
 const ARTIFACT_GROUPS = ["outputs", "sources"] as const;
 const groupItem = (group: string) => (item: { id: string; status?: string; attentionStatus?: string }) =>
   ({ id: `${group}:${item.id}`, status: item.status, attentionStatus: item.attentionStatus });
+/** A section that holds exactly one item says that item's own word once it is folded; with several it keeps its counts. */
+const onlyItem = (items: readonly ActivityRailItem[]) => items.length === 1 ? items[0] : undefined;
 
 export function SessionActivityRail(props: SessionActivityRailProps) {
   return <SessionActivityRailContent key={props.sessionId} {...props} />;
@@ -154,9 +156,11 @@ function SessionActivityRailContent({ sessionId, visible, agentsNotice, resource
   });
   const sections: ActivityRailSectionSpec[] = [];
   if (show.goals) sections.push({ id: "goals", node: <ActivityRailGroup sessionId={sessionId} group="goals" reveal={reveal} keepMounted sectionHeading
-    trackAttention={visible} preserveAttention={!goalsAttentionReady} label={t("panel.activity.goals")} items={goals}>{rows(goals, "plan", "goals")}</ActivityRailGroup> });
+    trackAttention={visible} preserveAttention={!goalsAttentionReady} label={t("panel.activity.goals")} items={goals}
+    collapsedSummary={onlyItem(goals)?.foldedSummary}>{rows(goals, "plan", "goals")}</ActivityRailGroup> });
   if (show.plans) sections.push({ id: "plans", node: <ActivityRailGroup sessionId={sessionId} group="plans" reveal={reveal} keepMounted sectionHeading
-    trackAttention={visible} label={t("panel.activity.plans")} items={plans}>{rows(plans, "plan", "plans")}</ActivityRailGroup> });
+    trackAttention={visible} label={t("panel.activity.plans")} items={plans}
+    collapsedSummary={onlyItem(plans)?.statusLabel}>{rows(plans, "plan", "plans")}</ActivityRailGroup> });
   if (show.live) sections.push({ id: "live", node: <ActivityRailGroup sessionId={sessionId} group="live" reveal={reveal} revealAlso={LIVE_GROUPS} sectionHeading
     trackAttention={visible && !processesLoading && !processesError} label={t("panel.activity.liveStatus")}
     items={[...agents.map(groupItem("agents")), ...teamMembers.map(groupItem("team-members")), ...sessionProcesses.map(groupItem("processes"))]}>

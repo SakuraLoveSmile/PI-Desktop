@@ -378,8 +378,10 @@
     Apple-inspired fixed-radius ladder for dense desktop UI. Compact controls
     remain rounded rectangles; capsules and circles use the explicit shape
     tokens below. The regular two-pixel rhythm keeps adjacent levels legible
-    and makes concentric nesting predictable.
+    and makes concentric nesting predictable. The 2px step is only for keys
+    and swatches smaller than 10px, where 4px would turn a square into a dot.
   */
+  --radius-4xs: 2px;
   --radius-3xs: 4px;
   --radius-2xs: 6px;
   --radius-xs: 8px;

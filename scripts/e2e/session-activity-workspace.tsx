@@ -224,8 +224,8 @@ export async function sessionActivityWorkspaceProbe() {
     check(sectionIds(PROJECTS.a.id) === "environment,context,artifacts,skills,changes",
       `the sections follow the canvas order (read ${sectionIds(PROJECTS.a.id)})`);
     const environment = section(PROJECTS.a.id, "environment")!;
-    check(text(environment).includes("Environment") && text(environment).includes("Project A") && text(environment).includes("…/Code/project-a"),
-      "environment names the project and shortens its path to the last two folders");
+    check(text(environment).includes("Environment") && text(environment).includes("Project A") && text(environment).includes("~/Code/project-a"),
+      "environment names the project and writes its path from ~, shortened to the last two folders");
     check(environment.querySelector('[aria-label="Branch"]') !== null && text(environment).includes("feat/activity-rail"), "environment shows the git branch");
     check(!gitRequests.includes(PROJECTS.b.path) && !gitRequests.includes(PROJECTS.plain.path), "panes that are not shown read no git state");
 
@@ -236,6 +236,10 @@ export async function sessionActivityWorkspaceProbe() {
     const cells = (item: Element) => [...item.children].filter((child) => child.tagName === "SPAN").map((child) => text(child)).join(" ");
     check([...context.querySelectorAll(".session-activity-context-legend > li")].map(cells).join("|")
       === "System prompt ~4K 4.0%|Tool definitions ~4K 4.0%|Conversation ~12K 12.0%|Free space 160K 80.0%", "the legend lists each part of the window with its share and the free space");
+    const swatch = context.querySelector<HTMLElement>('.session-activity-context-swatch[data-bucket="system"]')!;
+    const swatchBox = swatch.getBoundingClientRect();
+    check(swatchBox.width === 8 && swatchBox.height === 8 && getComputedStyle(swatch).borderTopLeftRadius === "2px",
+      "each legend swatch is an 8px square with a 2px corner, not a dot");
     const bar = context.querySelector<HTMLElement>(".session-activity-context-bar")!;
     const segments = [...bar.children].map((child) => child.getBoundingClientRect().width);
     check(segments.length === 3 && Math.abs(segments.reduce((total, width) => total + width, 0) - bar.getBoundingClientRect().width * 0.2) < 1.5,

@@ -12,6 +12,8 @@ export function SubagentActivityRow({ id, name, task, status, statusLabel, timin
 }) {
   const { t } = useTranslation();
   const elapsed = subagentElapsed(status, timing, now);
+  // The rail's overview row prints the compact clock; the tooltip and accessible name keep the spoken duration.
+  const clock = presentation === "overview" ? subagentElapsed(status, timing, now, "clock") : undefined;
   const statusText = statusLabel ? presentation === "overview" ? statusLabel : `${t("chat.subagentAgent")} ${statusLabel}` : undefined;
   const title = subagentRowText(name, task, statusText, elapsed);
   // The rail's overview row reads: icon, name over task, then the status (a spinner while it runs) and the elapsed time.
@@ -27,7 +29,7 @@ export function SubagentActivityRow({ id, name, task, status, statusLabel, timin
       </span>}
     </span>
     {status && statusText && <ActivityRowStatus status={status} label={statusText} className="subagent-activity-status" />}
-    {elapsed && <span className="subagent-activity-elapsed">{elapsed}</span>}
+    {clock && <span className="subagent-activity-elapsed">{clock}</span>}
   </> : <>
     <span className="subagent-activity-avatar" data-variant={subagentAvatarVariant(id)} aria-hidden />
     <span className="subagent-activity-text">

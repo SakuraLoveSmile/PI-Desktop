@@ -108,3 +108,20 @@ test("production overview rows expose concise status, task, elapsed and custom G
   assert.ok(rail.includes("5/8 · Report degraded"));
   assert.ok(!rail.includes("panel.activity.refresh"));
 });
+
+test("the overview agent row prints its elapsed time as a clock while its accessible name and the inline row keep the spoken duration", async () => {
+  const { catalogs } = await server.ssrLoadModule("@pi-desktop/i18n");
+  const i18n = createInstance();
+  await i18n.init({ lng: "en", resources: { en: { translation: catalogs.en } } });
+  const render = (element) => renderToStaticMarkup(createElement(I18nextProvider, { i18n }, element));
+  const { SubagentActivityRow } = await server.ssrLoadModule("/src/features/chat/activity/SubagentActivityRow.tsx");
+  const props = { id: "reviewer", name: "Reviewer", task: "Check", status: "completed", statusLabel: "Completed",
+    timing: { startedAt: 1000, completedAt: 135000 }, now: 200000, onOpen: () => {} };
+  const overview = render(createElement(SubagentActivityRow, { ...props, presentation: "overview" }));
+  assert.ok(overview.includes('<span class="subagent-activity-elapsed">02:14</span>'));
+  assert.ok(overview.includes('aria-label="Reviewer · Check · Completed 2m 14s"'), "the accessible name still says the duration aloud");
+  const inline = render(createElement(SubagentActivityRow, props));
+  assert.ok(inline.includes('<span class="subagent-activity-elapsed">2m 14s</span>') && !inline.includes("02:14"));
+  const waiting = render(createElement(SubagentActivityRow, { ...props, presentation: "overview", status: "running", timing: undefined }));
+  assert.ok(!waiting.includes("subagent-activity-elapsed"), "a row without a start prints no clock");
+});

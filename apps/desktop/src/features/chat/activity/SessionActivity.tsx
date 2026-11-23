@@ -22,6 +22,7 @@ import { useBackgroundProcessList } from "./use-background-process-list";
 import { useActivityServerStop } from "./use-activity-server-stop";
 import { backgroundProcessName } from "./activity-rail-presentation";
 import { GoalActivityRow } from "./GoalActivityRow";
+import { GoalFoldedSummary } from "./GoalFoldedSummary";
 import { activityMcpReferences, type McpReconnectTarget } from "./activity-mcp-rows";
 import { useActivityMcpServers } from "./use-activity-mcp-servers";
 import { useActivityWorkspace } from "./use-activity-workspace";
@@ -96,6 +97,7 @@ export function SessionActivity({ sessionId, messages, visible, rangeLimited }: 
       statusLabel: t(`panel.overview.status.${proposal.executionState ?? proposal.status}`),
       ...((proposal.executionKind ?? proposal.kind) === "goal" && proposal.executionId ? {
         content: <GoalActivityRow sessionId={sessionId} proposal={proposal} visible={visible && supported} onOpenArtifact={onOpen} onReportStateChange={onReportStateChange} />,
+        foldedSummary: (fallback: string) => <GoalFoldedSummary sessionId={sessionId} proposal={proposal} visible={visible && supported} fallback={fallback} />,
       } : {}),
       ...(onOpen ? { onOpen } : {}),
     };
@@ -139,7 +141,7 @@ export function SessionActivity({ sessionId, messages, visible, rangeLimited }: 
       ...(path ? { onOpen: () => open(sessionId, fileWorkPanelTab(path)) } : {}),
     };
   });
-  outputRows.push(...planRows.filter((item) => item.onOpen).map(({ content: _content, attentionStatus: _attentionStatus, ...item }) => ({ ...item, path: plans.find((plan) => plan.id === item.id)?.artifact?.relativePath })));
+  outputRows.push(...planRows.filter((item) => item.onOpen).map(({ content: _content, foldedSummary: _foldedSummary, attentionStatus: _attentionStatus, ...item }) => ({ ...item, path: plans.find((plan) => plan.id === item.id)?.artifact?.relativePath })));
   const outputByPath = new Map<string, ActivityRailItem>();
   for (const item of outputRows) if (!outputByPath.has(item.path ?? item.id)) outputByPath.set(item.path ?? item.id, item);
   const distinctOutputs = [...outputByPath.values()].map((item) => ({ ...item,
