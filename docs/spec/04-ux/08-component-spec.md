@@ -745,7 +745,7 @@ account, subscription, or collaboration backend.
 | User glyph | `30px` circular local-user glyph; decorative when the text label names the control |
 | Identity copy | Primary `Custom`; secondary `Local profile` or localized `本地配置`; two lines truncate independently |
 | Chevron | Trailing disclosure indicator; reflects the menu's open state without motion when reduced motion is requested |
-| Notification shortcut | Separate `32px` square Bell target with unread badge; opens the durable inbox above and to the right of the footer |
+| Notification shortcut | Separate `32px` square Bell target with unread badge, a dot on the bell's upper-right shoulder that follows the Appearance font scale and is set off by a cut-out in the bell rather than a ring, so it reads on the glass sidebar and on the hover tile; opens the durable inbox above and to the right of the footer |
 | Profile menu | `280px` wide, bottom anchored `8px` above the footer; opaque elevated surface |
 | Identity header | Repeats the glyph and two-line local identity; non-interactive |
 | Menu actions | Divider, then Settings, Logs, and Theme in that order; Theme retains its current-value metadata |

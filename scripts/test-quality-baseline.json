@@ -2882,7 +2882,7 @@
       ]
     },
     "apps/desktop/test/notification-center.test.mjs": {
-      "assertions": 43,
+      "assertions": 42,
       "cases": 5,
       "signatures": [
         "076e85c00a6f309dddc6",
@@ -2900,7 +2900,6 @@
         "5ce377e14821583eddf1",
         "64a2df3f78efb3ce1d45",
         "74ebe0052239dfaf981e",
-        "857402072dddb7c59134",
         "8611506cd1ff94c60caa",
         "86e60ce1f1af8823210f",
         "8ced016a57cf85419d63",
