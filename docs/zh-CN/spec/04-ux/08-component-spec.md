@@ -3312,7 +3312,7 @@ Overview 子智能体行第一行显示名称，第二行显示单行截断任�
 
 Goal 计划行显示权威完成/总数与进度条、报告状态（pending、generating、ready、fallback、
 failed、unavailable），仅当执行需要一个词（pending、failed、blocked、interrupted）时才显示执行状态；
-正在运行的 Goal 不写状态词。概要和 Composer Goal 胶囊共享按会话/执行绑定的 Host 读取器。
+正在运行的 Goal 不写状态词。进度条与报告徽章位于该行下方 6px 处，该行的悬停底不会碰到徽章。概要和 Composer Goal 胶囊共享按会话/执行绑定的 Host 读取器。
 未知数量标不可用，不伪造零；保底报告明确降级。标题打开已有 Goal 产物，报告徽章打开该执行
 在所属会话中的报告。迟到/跨会话响应和旧 progress revision 不能覆盖当前值。
 最后一个可见使用者离开后解除订阅，Host 重启/聚焦刷新。Plans 折叠仍保留 Goal 观察者，

@@ -5022,7 +5022,9 @@ from failed/error styling.
 Goal plan rows show the authoritative completed/total count with a progress bar,
 the report state (pending, generating, blocked, ready, fallback, failed or
 unavailable) and, only when the execution needs a word (pending, failed, blocked,
-interrupted), its state; a Goal that simply runs shows no state word.
+interrupted), its state; a Goal that simply runs shows no state word. The bar
+and the report badge sit 6px below the row, so the row's hover tile never
+touches the badge.
 Overview and the Composer Goal capsule share one session/execution-scoped Host
 reader. A blocked row shows Goal title · Goal blocked with semantic warning
 styling and opens its held state. Missing counts are unavailable, not fabricated zeroes; historical fallback reports
