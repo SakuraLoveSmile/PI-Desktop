@@ -6,6 +6,15 @@ export const PLUS_UPSTREAM_CUTOFF = "0.15.6";
 const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   en: [
     {
+      version: "0.15.22",
+      date: "2026-11-23",
+      highlights: [
+        "The activity panel beside the conversation is rebuilt as a stack of sections separated by a single hairline. Drag a section’s grip, or press Arrow Up/Down on it, to reorder them; the order is remembered on this device.",
+        "A new Servers section lists the local servers running in the session with their address and Open and Stop actions. A failed MCP server row offers Reconnect, Environment shows the project path from ~, subagent rows show a running clock, and a folded Goal or Plan heading shows its status.",
+        "Right-click an image in a reply to copy it or download it; the generated-image viewer also has a copy button and Cmd/Ctrl+C. The conversation title bar’s actions no longer collide with the side-panel toggle while the panel opens or closes.",
+      ],
+    },
+    {
       version: "0.15.21",
       date: "2026-11-18",
       highlights: [
@@ -151,6 +160,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "zh-CN": [
+    {
+      version: "0.15.22",
+      date: "2026-11-23",
+      highlights: [
+        "对话旁的活动面板重构为由单条细分割线隔开的一组分区。拖动分区的把手，或在把手上按上/下方向键即可调整顺序，顺序会记在本机。",
+        "新增“服务器”分区，列出会话中运行的本地服务器及其地址，并提供打开和停止操作；失败的 MCP 服务器行可重新连接；“环境”显示以 ~ 开头的项目路径，子智能体行以时钟显示运行时间，折叠的目标或计划标题会显示其状态。",
+        "在回复里的图片上右键即可复制或下载；生成图片查看器也新增了复制按钮和 Cmd/Ctrl+C。对话标题栏的操作在侧边面板展开或收起时不再与面板开关重叠。",
+      ],
+    },
     {
       version: "0.15.21",
       date: "2026-11-18",
@@ -298,6 +316,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   "zh-TW": [
     {
+      version: "0.15.22",
+      date: "2026-11-23",
+      highlights: [
+        "The activity panel beside the conversation is rebuilt as a stack of sections separated by a single hairline. Drag a section’s grip, or press Arrow Up/Down on it, to reorder them; the order is remembered on this device.",
+        "A new Servers section lists the local servers running in the session with their address and Open and Stop actions. A failed MCP server row offers Reconnect, Environment shows the project path from ~, subagent rows show a running clock, and a folded Goal or Plan heading shows its status.",
+        "Right-click an image in a reply to copy it or download it; the generated-image viewer also has a copy button and Cmd/Ctrl+C. The conversation title bar’s actions no longer collide with the side-panel toggle while the panel opens or closes.",
+      ],
+    },
+    {
       version: "0.15.21",
       date: "2026-11-18",
       highlights: [
@@ -443,6 +470,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   tr: [
+    {
+      version: "0.15.22",
+      date: "2026-11-23",
+      highlights: [
+        "The activity panel beside the conversation is rebuilt as a stack of sections separated by a single hairline. Drag a section’s grip, or press Arrow Up/Down on it, to reorder them; the order is remembered on this device.",
+        "A new Servers section lists the local servers running in the session with their address and Open and Stop actions. A failed MCP server row offers Reconnect, Environment shows the project path from ~, subagent rows show a running clock, and a folded Goal or Plan heading shows its status.",
+        "Right-click an image in a reply to copy it or download it; the generated-image viewer also has a copy button and Cmd/Ctrl+C. The conversation title bar’s actions no longer collide with the side-panel toggle while the panel opens or closes.",
+      ],
+    },
     {
       version: "0.15.21",
       date: "2026-11-18",
@@ -590,6 +626,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   de: [
     {
+      version: "0.15.22",
+      date: "2026-11-23",
+      highlights: [
+        "The activity panel beside the conversation is rebuilt as a stack of sections separated by a single hairline. Drag a section’s grip, or press Arrow Up/Down on it, to reorder them; the order is remembered on this device.",
+        "A new Servers section lists the local servers running in the session with their address and Open and Stop actions. A failed MCP server row offers Reconnect, Environment shows the project path from ~, subagent rows show a running clock, and a folded Goal or Plan heading shows its status.",
+        "Right-click an image in a reply to copy it or download it; the generated-image viewer also has a copy button and Cmd/Ctrl+C. The conversation title bar’s actions no longer collide with the side-panel toggle while the panel opens or closes.",
+      ],
+    },
+    {
       version: "0.15.21",
       date: "2026-11-18",
       highlights: [
@@ -735,6 +780,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   es: [
+    {
+      version: "0.15.22",
+      date: "2026-11-23",
+      highlights: [
+        "The activity panel beside the conversation is rebuilt as a stack of sections separated by a single hairline. Drag a section’s grip, or press Arrow Up/Down on it, to reorder them; the order is remembered on this device.",
+        "A new Servers section lists the local servers running in the session with their address and Open and Stop actions. A failed MCP server row offers Reconnect, Environment shows the project path from ~, subagent rows show a running clock, and a folded Goal or Plan heading shows its status.",
+        "Right-click an image in a reply to copy it or download it; the generated-image viewer also has a copy button and Cmd/Ctrl+C. The conversation title bar’s actions no longer collide with the side-panel toggle while the panel opens or closes.",
+      ],
+    },
     {
       version: "0.15.21",
       date: "2026-11-18",
@@ -882,6 +936,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   fr: [
     {
+      version: "0.15.22",
+      date: "2026-11-23",
+      highlights: [
+        "The activity panel beside the conversation is rebuilt as a stack of sections separated by a single hairline. Drag a section’s grip, or press Arrow Up/Down on it, to reorder them; the order is remembered on this device.",
+        "A new Servers section lists the local servers running in the session with their address and Open and Stop actions. A failed MCP server row offers Reconnect, Environment shows the project path from ~, subagent rows show a running clock, and a folded Goal or Plan heading shows its status.",
+        "Right-click an image in a reply to copy it or download it; the generated-image viewer also has a copy button and Cmd/Ctrl+C. The conversation title bar’s actions no longer collide with the side-panel toggle while the panel opens or closes.",
+      ],
+    },
+    {
       version: "0.15.21",
       date: "2026-11-18",
       highlights: [
@@ -1028,6 +1091,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   ko: [
     {
+      version: "0.15.22",
+      date: "2026-11-23",
+      highlights: [
+        "The activity panel beside the conversation is rebuilt as a stack of sections separated by a single hairline. Drag a section’s grip, or press Arrow Up/Down on it, to reorder them; the order is remembered on this device.",
+        "A new Servers section lists the local servers running in the session with their address and Open and Stop actions. A failed MCP server row offers Reconnect, Environment shows the project path from ~, subagent rows show a running clock, and a folded Goal or Plan heading shows its status.",
+        "Right-click an image in a reply to copy it or download it; the generated-image viewer also has a copy button and Cmd/Ctrl+C. The conversation title bar’s actions no longer collide with the side-panel toggle while the panel opens or closes.",
+      ],
+    },
+    {
       version: "0.15.21",
       date: "2026-11-18",
       highlights: [
@@ -1173,6 +1245,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "pt-BR": [
+    {
+      version: "0.15.22",
+      date: "2026-11-23",
+      highlights: [
+        "The activity panel beside the conversation is rebuilt as a stack of sections separated by a single hairline. Drag a section’s grip, or press Arrow Up/Down on it, to reorder them; the order is remembered on this device.",
+        "A new Servers section lists the local servers running in the session with their address and Open and Stop actions. A failed MCP server row offers Reconnect, Environment shows the project path from ~, subagent rows show a running clock, and a folded Goal or Plan heading shows its status.",
+        "Right-click an image in a reply to copy it or download it; the generated-image viewer also has a copy button and Cmd/Ctrl+C. The conversation title bar’s actions no longer collide with the side-panel toggle while the panel opens or closes.",
+      ],
+    },
     {
       version: "0.15.21",
       date: "2026-11-18",
