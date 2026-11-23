@@ -42,6 +42,11 @@ Local-first · Model-agnostic · Plugin-powered · macOS / Windows / Linux
 
 > **Current release line: 0.15.x (Early Preview).**
 
+Version 0.15.22 rebuilds the activity panel beside the conversation as a stack of
+sections you can drag into your own order, adds a Servers section for the local
+servers running in the session, and lets you copy or download images from replies.
+The conversation title bar's actions also stay clear of the side-panel toggle.
+
 Version 0.15.21 rebuilds the composer's read-out strip as three centered groups:
 session rounds and steps beside the latest tokens-per-second, cumulative session
 tokens with the cache-hit rate, and a ring context meter with its Used/Remaining

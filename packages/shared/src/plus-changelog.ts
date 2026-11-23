@@ -6,6 +6,15 @@ export const PLUS_UPSTREAM_CUTOFF = "0.15.6";
 const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   en: [
     {
+      version: "0.15.22",
+      date: "2026-11-23",
+      highlights: [
+        "The activity panel beside the conversation is rebuilt as a stack of sections separated by a single hairline. Drag a section’s grip, or press Arrow Up/Down on it, to reorder them; the order is remembered on this device.",
+        "A new Servers section lists the local servers running in the session with their address and Open and Stop actions. A failed MCP server row offers Reconnect, Environment shows the project path from ~, subagent rows show a running clock, and a folded Goal or Plan heading shows its status.",
+        "Right-click an image in a reply to copy it or download it; the generated-image viewer also has a copy button and Cmd/Ctrl+C. The conversation title bar’s actions no longer collide with the side-panel toggle while the panel opens or closes.",
+      ],
+    },
+    {
       version: "0.15.21",
       date: "2026-11-18",
       highlights: [
@@ -151,6 +160,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "zh-CN": [
+    {
+      version: "0.15.22",
+      date: "2026-11-23",
+      highlights: [
+        "对话旁的活动面板重构为由单条细分割线隔开的一组分区。拖动分区的把手，或在把手上按上/下方向键即可调整顺序，顺序会记在本机。",
+        "新增“服务器”分区，列出会话中运行的本地服务器及其地址，并提供打开和停止操作；失败的 MCP 服务器行可重新连接；“环境”显示以 ~ 开头的项目路径，子智能体行以时钟显示运行时间，折叠的目标或计划标题会显示其状态。",
+        "在回复里的图片上右键即可复制或下载；生成图片查看器也新增了复制按钮和 Cmd/Ctrl+C。对话标题栏的操作在侧边面板展开或收起时不再与面板开关重叠。",
+      ],
+    },
     {
       version: "0.15.21",
       date: "2026-11-18",
@@ -298,6 +316,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   "zh-TW": [
     {
+      version: "0.15.22",
+      date: "2026-11-23",
+      highlights: [
+        "對話旁的活動面板重構為由單條細分隔線隔開的一組區段。拖曳區段的把手，或在把手上按上/下方向鍵即可調整順序，順序會記在本機。",
+        "新增「伺服器」區段，列出此對話中執行的本機伺服器及其位址，並提供開啟和停止操作；失敗的 MCP 伺服器列可重新連線；「環境」顯示以 ~ 開頭的專案路徑，子智慧體列以時鐘顯示執行時間，摺疊的目標或計畫標題會顯示其狀態。",
+        "在回覆中的圖片上按右鍵即可複製或下載；產生圖片檢視器也新增了複製按鈕和 Cmd/Ctrl+C。對話標題列的操作在側邊面板展開或收合時不再與面板開關重疊。",
+      ],
+    },
+    {
       version: "0.15.21",
       date: "2026-11-18",
       highlights: [
@@ -443,6 +470,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   tr: [
+    {
+      version: "0.15.22",
+      date: "2026-11-23",
+      highlights: [
+        "Konuşmanın yanındaki etkinlik paneli, tek bir ince çizgiyle ayrılmış bölümlerden oluşan bir yığın olarak yeniden yapıldı. Bir bölümün tutamacını sürükleyin ya da üzerindeyken Yukarı/Aşağı ok tuşlarına basın; sıralama bu cihazda hatırlanır.",
+        "Yeni Sunucular bölümü, oturumda çalışan yerel sunucuları adresleriyle birlikte listeler ve Aç ile Durdur eylemlerini sunar. Başarısız bir MCP sunucusu satırı Yeniden bağlan seçeneği sunar, Ortam proje yolunu ~ ile başlatarak gösterir, alt ajan satırları çalışan bir saat gösterir ve katlanmış bir Hedef veya Plan başlığı durumunu belirtir.",
+        "Yanıttaki bir görsele sağ tıklayarak kopyalayabilir veya indirebilirsiniz; oluşturulan görsel görüntüleyicisinde de bir kopyala düğmesi ve Cmd/Ctrl+C bulunur. Konuşma başlık çubuğundaki eylemler, yan panel açılırken ya da kapanırken artık panel düğmesiyle çakışmaz.",
+      ],
+    },
     {
       version: "0.15.21",
       date: "2026-11-18",
@@ -590,6 +626,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   de: [
     {
+      version: "0.15.22",
+      date: "2026-11-23",
+      highlights: [
+        "Das Aktivitätspanel neben der Unterhaltung ist als Stapel von Abschnitten neu aufgebaut, getrennt durch eine einzelne feine Linie. Ziehen Sie den Griff eines Abschnitts oder drücken Sie darauf die Pfeiltasten nach oben/unten, um die Reihenfolge zu ändern; sie wird auf diesem Gerät gespeichert.",
+        "Ein neuer Abschnitt „Server“ listet die in der Sitzung laufenden lokalen Server mit ihrer Adresse sowie den Aktionen Öffnen und Stoppen. Eine fehlgeschlagene MCP-Server-Zeile bietet „Erneut verbinden“, „Umgebung“ zeigt den Projektpfad ab ~, Subagenten-Zeilen zeigen eine laufende Uhr, und eine eingeklappte Ziel- oder Plan-Überschrift zeigt ihren Status.",
+        "Per Rechtsklick auf ein Bild in einer Antwort lässt es sich kopieren oder herunterladen; der Viewer für erzeugte Bilder hat zudem eine Kopieren-Schaltfläche und Cmd/Strg+C. Die Aktionen der Titelleiste der Unterhaltung kollidieren nicht mehr mit dem Seitenleisten-Schalter, während sich die Leiste öffnet oder schließt.",
+      ],
+    },
+    {
       version: "0.15.21",
       date: "2026-11-18",
       highlights: [
@@ -735,6 +780,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   es: [
+    {
+      version: "0.15.22",
+      date: "2026-11-23",
+      highlights: [
+        "El panel de actividad junto a la conversación se reconstruye como una pila de secciones separadas por una única línea fina. Arrastra el asa de una sección, o pulsa las flechas arriba/abajo sobre ella, para reordenarlas; el orden se recuerda en este dispositivo.",
+        "Una nueva sección Servidores muestra los servidores locales en ejecución en la sesión con su dirección y las acciones Abrir y Detener. Una fila de servidor MCP con fallo ofrece Reconectar, Entorno muestra la ruta del proyecto desde ~, las filas de subagentes muestran un reloj en marcha y el encabezado plegado de un Objetivo o Plan muestra su estado.",
+        "Haz clic derecho en una imagen de una respuesta para copiarla o descargarla; el visor de imágenes generadas también tiene un botón de copiar y Cmd/Ctrl+C. Las acciones de la barra de título de la conversación ya no chocan con el botón del panel lateral mientras el panel se abre o se cierra.",
+      ],
+    },
     {
       version: "0.15.21",
       date: "2026-11-18",
@@ -882,6 +936,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   fr: [
     {
+      version: "0.15.22",
+      date: "2026-11-23",
+      highlights: [
+        "Le panneau d’activité à côté de la conversation est reconstruit en une pile de sections séparées par un seul filet. Faites glisser la poignée d’une section, ou appuyez sur Flèche haut/bas dessus, pour les réordonner ; l’ordre est mémorisé sur cet appareil.",
+        "Une nouvelle section Serveurs liste les serveurs locaux en cours d’exécution dans la session avec leur adresse et les actions Ouvrir et Arrêter. Une ligne de serveur MCP en échec propose Reconnecter, Environnement affiche le chemin du projet à partir de ~, les lignes de sous-agents affichent une horloge en cours et l’en-tête replié d’un Objectif ou d’un Plan indique son état.",
+        "Faites un clic droit sur une image d’une réponse pour la copier ou la télécharger ; la visionneuse d’images générées a aussi un bouton de copie et Cmd/Ctrl+C. Les actions de la barre de titre de la conversation ne chevauchent plus la bascule du panneau latéral pendant l’ouverture ou la fermeture du panneau.",
+      ],
+    },
+    {
       version: "0.15.21",
       date: "2026-11-18",
       highlights: [
@@ -1028,6 +1091,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   ko: [
     {
+      version: "0.15.22",
+      date: "2026-11-23",
+      highlights: [
+        "대화 옆의 활동 패널이 가는 구분선 하나로 나뉜 섹션 묶음으로 다시 만들어졌습니다. 섹션의 손잡이를 끌거나 손잡이에서 위/아래 화살표 키를 눌러 순서를 바꿀 수 있으며, 순서는 이 기기에 저장됩니다.",
+        "새 서버 섹션은 세션에서 실행 중인 로컬 서버를 주소와 함께 보여 주고 열기와 중지 동작을 제공합니다. 실패한 MCP 서버 행에는 다시 연결이 표시되고, 환경은 프로젝트 경로를 ~부터 보여 주며, 하위 에이전트 행은 실행 시간을 시계로 보여 주고, 접힌 목표 또는 계획 제목은 상태를 표시합니다.",
+        "답변의 이미지를 마우스 오른쪽 버튼으로 눌러 복사하거나 다운로드할 수 있으며, 생성 이미지 뷰어에도 복사 버튼과 Cmd/Ctrl+C가 추가되었습니다. 대화 제목 표시줄의 동작이 패널이 열리거나 닫히는 동안 측면 패널 토글과 더 이상 겹치지 않습니다.",
+      ],
+    },
+    {
       version: "0.15.21",
       date: "2026-11-18",
       highlights: [
@@ -1173,6 +1245,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "pt-BR": [
+    {
+      version: "0.15.22",
+      date: "2026-11-23",
+      highlights: [
+        "O painel de atividade ao lado da conversa foi reconstruído como uma pilha de seções separadas por uma única linha fina. Arraste a alça de uma seção, ou pressione as setas para cima/baixo nela, para reordenar; a ordem fica salva neste dispositivo.",
+        "Uma nova seção Servidores lista os servidores locais em execução na sessão com seu endereço e as ações Abrir e Parar. Uma linha de servidor MCP com falha oferece Reconectar, Ambiente mostra o caminho do projeto a partir de ~, as linhas de subagentes mostram um relógio em andamento e o título recolhido de uma Meta ou Plano mostra seu estado.",
+        "Clique com o botão direito em uma imagem de uma resposta para copiá-la ou baixá-la; o visualizador de imagens geradas também tem um botão de copiar e Cmd/Ctrl+C. As ações da barra de título da conversa não colidem mais com o botão do painel lateral enquanto o painel abre ou fecha.",
+      ],
+    },
     {
       version: "0.15.21",
       date: "2026-11-18",
