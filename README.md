@@ -42,6 +42,11 @@ Local-first · Model-agnostic · Plugin-powered · macOS / Windows / Linux
 
 > **Current release line: 0.15.x (Early Preview).**
 
+Version 0.15.23 refines two small things: the unread badge on the notification bell is
+now a dot on the bell's upper-right corner that follows your font size, and the progress
+bar and report badge under a Goal in the activity panel sit a little lower, so the row's
+hover highlight no longer touches them.
+
 Version 0.15.22 rebuilds the activity panel beside the conversation as a stack of
 sections you can drag into your own order, adds a Servers section for the local
 servers running in the session, and lets you copy or download images from replies.

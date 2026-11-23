@@ -34,39 +34,41 @@ describe("Plus changelog overlay", () => {
     // accepting the runtime's Plus-only fallback as a complete catalog.
     expect(cutoffIndex).toBeGreaterThanOrEqual(0);
     const catalog = withPlusEntries(locale, upstream);
-    expect(catalog[0]?.version).toBe("0.15.22");
+    expect(catalog[0]?.version).toBe("0.15.23");
     expect(catalog[0]?.date).toBe("2026-11-23");
-    expect(catalog[1]?.version).toBe("0.15.21");
-    expect(catalog[1]?.date).toBe("2026-11-18");
-    expect(catalog[2]?.version).toBe("0.15.20");
-    expect(catalog[2]?.date).toBe("2026-11-16");
-    expect(catalog[3]?.version).toBe("0.15.19");
-    expect(catalog[3]?.date).toBe("2026-11-15");
-    expect(catalog[4]?.version).toBe("0.15.18");
-    expect(catalog[4]?.date).toBe("2026-11-14");
-    expect(catalog[5]?.version).toBe("0.15.17");
-    expect(catalog[5]?.date).toBe("2026-11-12");
-    expect(catalog[6]?.version).toBe("0.15.16");
-    expect(catalog[6]?.date).toBe("2026-11-10");
-    expect(catalog[7]?.version).toBe("0.15.15");
+    expect(catalog[1]?.version).toBe("0.15.22");
+    expect(catalog[1]?.date).toBe("2026-11-23");
+    expect(catalog[2]?.version).toBe("0.15.21");
+    expect(catalog[2]?.date).toBe("2026-11-18");
+    expect(catalog[3]?.version).toBe("0.15.20");
+    expect(catalog[3]?.date).toBe("2026-11-16");
+    expect(catalog[4]?.version).toBe("0.15.19");
+    expect(catalog[4]?.date).toBe("2026-11-15");
+    expect(catalog[5]?.version).toBe("0.15.18");
+    expect(catalog[5]?.date).toBe("2026-11-14");
+    expect(catalog[6]?.version).toBe("0.15.17");
+    expect(catalog[6]?.date).toBe("2026-11-12");
+    expect(catalog[7]?.version).toBe("0.15.16");
     expect(catalog[7]?.date).toBe("2026-11-10");
-    expect(catalog[8]?.version).toBe("0.15.14");
-    expect(catalog[8]?.date).toBe("2026-11-09");
-    expect(catalog[9]?.version).toBe("0.15.13");
-    expect(catalog[9]?.date).toBe("2026-11-08");
-    expect(catalog[10]?.version).toBe("0.15.12");
-    expect(catalog[10]?.date).toBe("2026-11-02");
-    expect(catalog[11]?.version).toBe("0.15.11");
-    expect(catalog[11]?.date).toBe("2026-11-01");
-    expect(catalog[12]?.version).toBe("0.15.10");
-    expect(catalog[12]?.date).toBe("2026-10-25");
-    expect(catalog[13]?.version).toBe("0.15.9");
-    expect(catalog[14]?.version).toBe("0.15.8");
-    expect(catalog[15]?.version).toBe("0.15.7");
-    expect(catalog[16]).toBe(upstream[cutoffIndex]);
-    expect(catalog.slice(16)).toEqual(upstream.slice(cutoffIndex));
+    expect(catalog[8]?.version).toBe("0.15.15");
+    expect(catalog[8]?.date).toBe("2026-11-10");
+    expect(catalog[9]?.version).toBe("0.15.14");
+    expect(catalog[9]?.date).toBe("2026-11-09");
+    expect(catalog[10]?.version).toBe("0.15.13");
+    expect(catalog[10]?.date).toBe("2026-11-08");
+    expect(catalog[11]?.version).toBe("0.15.12");
+    expect(catalog[11]?.date).toBe("2026-11-02");
+    expect(catalog[12]?.version).toBe("0.15.11");
+    expect(catalog[12]?.date).toBe("2026-11-01");
+    expect(catalog[13]?.version).toBe("0.15.10");
+    expect(catalog[13]?.date).toBe("2026-10-25");
+    expect(catalog[14]?.version).toBe("0.15.9");
+    expect(catalog[15]?.version).toBe("0.15.8");
+    expect(catalog[16]?.version).toBe("0.15.7");
+    expect(catalog[17]).toBe(upstream[cutoffIndex]);
+    expect(catalog.slice(17)).toEqual(upstream.slice(cutoffIndex));
     const visibleVersions = catalog.map((entry) => entry.version);
-    const plusVersions = new Set(catalog.slice(0, 16).map((entry) => entry.version));
+    const plusVersions = new Set(catalog.slice(0, 17).map((entry) => entry.version));
     for (const entry of upstream.slice(0, cutoffIndex)) {
       // Plus 0.15.9 shares an upstream version string but must use Plus notes.
       expect(catalog).not.toContain(entry);
@@ -102,7 +104,7 @@ describe("Plus changelog overlay", () => {
     ];
     const before = structuredClone(upstream);
     expect(withPlusEntries("en", upstream).map((entry) => entry.version)).toEqual([
-      "0.15.22", "0.15.21", "0.15.20", "0.15.19", "0.15.18", "0.15.17", "0.15.16", "0.15.15", "0.15.14", "0.15.13", "0.15.12", "0.15.11", "0.15.10", "0.15.9", "0.15.8", "0.15.7", PLUS_UPSTREAM_CUTOFF, "9.0.0",
+      "0.15.23", "0.15.22", "0.15.21", "0.15.20", "0.15.19", "0.15.18", "0.15.17", "0.15.16", "0.15.15", "0.15.14", "0.15.13", "0.15.12", "0.15.11", "0.15.10", "0.15.9", "0.15.8", "0.15.7", PLUS_UPSTREAM_CUTOFF, "9.0.0",
     ]);
     expect(upstream).toEqual(before);
   });
@@ -114,9 +116,9 @@ describe("Plus changelog overlay", () => {
     ];
     const catalog = withPlusEntries("en", upstream);
     expect(catalog.map((entry) => entry.version)).toEqual([
-      "0.15.22", "0.15.21", "0.15.20", "0.15.19", "0.15.18", "0.15.17", "0.15.16", "0.15.15", "0.15.14", "0.15.13", "0.15.12", "0.15.11", "0.15.10", "0.15.9", "0.15.8", "0.15.7", PLUS_UPSTREAM_CUTOFF, "0.15.5",
+      "0.15.23", "0.15.22", "0.15.21", "0.15.20", "0.15.19", "0.15.18", "0.15.17", "0.15.16", "0.15.15", "0.15.14", "0.15.13", "0.15.12", "0.15.11", "0.15.10", "0.15.9", "0.15.8", "0.15.7", PLUS_UPSTREAM_CUTOFF, "0.15.5",
     ]);
-    expect(catalog[16]).toBe(upstream[0]);
+    expect(catalog[17]).toBe(upstream[0]);
   });
 
   it("isolates cached results by upstream array and locale", () => {
@@ -134,8 +136,8 @@ describe("Plus changelog overlay", () => {
   it("shows only Plus entries when the upstream cutoff is missing", () => {
     const upstream: ChangelogEntry[] = [{ version: "0.16.1", highlights: ["New upstream release"] }];
     const catalog = withPlusEntries("en", upstream);
-    expect(catalog.map((entry) => entry.version)).toEqual(["0.15.22", "0.15.21", "0.15.20", "0.15.19", "0.15.18", "0.15.17", "0.15.16", "0.15.15", "0.15.14", "0.15.13", "0.15.12", "0.15.11", "0.15.10", "0.15.9", "0.15.8", "0.15.7"]);
+    expect(catalog.map((entry) => entry.version)).toEqual(["0.15.23", "0.15.22", "0.15.21", "0.15.20", "0.15.19", "0.15.18", "0.15.17", "0.15.16", "0.15.15", "0.15.14", "0.15.13", "0.15.12", "0.15.11", "0.15.10", "0.15.9", "0.15.8", "0.15.7"]);
     expect(withPlusEntries("en", upstream)).toBe(catalog);
-    expect(withPlusEntries("en", []).map((entry) => entry.version)).toEqual(["0.15.22", "0.15.21", "0.15.20", "0.15.19", "0.15.18", "0.15.17", "0.15.16", "0.15.15", "0.15.14", "0.15.13", "0.15.12", "0.15.11", "0.15.10", "0.15.9", "0.15.8", "0.15.7"]);
+    expect(withPlusEntries("en", []).map((entry) => entry.version)).toEqual(["0.15.23", "0.15.22", "0.15.21", "0.15.20", "0.15.19", "0.15.18", "0.15.17", "0.15.16", "0.15.15", "0.15.14", "0.15.13", "0.15.12", "0.15.11", "0.15.10", "0.15.9", "0.15.8", "0.15.7"]);
   });
 });
