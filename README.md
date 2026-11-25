@@ -42,6 +42,11 @@ Local-first · Model-agnostic · Plugin-powered · macOS / Windows / Linux
 
 > **Current release line: 0.15.x (Early Preview).**
 
+Version 0.15.24 gives the controls around the input box one look: the + menu, the agent
+menu and the model menu share one style, the project, location and branch menus above the
+box use one row layout and say why a menu cannot be used, the usage read-out moved into
+the strip above the box, and Send and Stop are round buttons.
+
 Version 0.15.23 refines two small things: the unread badge on the notification bell is
 now a dot on the bell's upper-right corner that follows your font size, and the progress
 bar and report badge under a Goal in the activity panel sit a little lower, so the row's

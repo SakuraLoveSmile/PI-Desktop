@@ -15,11 +15,13 @@ import { useTranslation } from "react-i18next";
 import {
   formatCompactTokenCount,
   type MessageUsage,
+  type SessionUsageTotals,
   type UiMessage,
 } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
 import { Button, TooltipButton } from "./ui";
 import { ContextCompactionAction } from "./ContextCompactionAction";
+import { ComposerUsageStats, sessionTokensAria } from "../features/chat/composer/ComposerUsageStats";
 import {
   aggregateToolTokenUsage,
   calculateCacheRate,
@@ -40,6 +42,16 @@ import {
 const CONTEXT_RING_RADIUS = 9;
 const CONTEXT_RING_CIRCUMFERENCE = 2 * Math.PI * CONTEXT_RING_RADIUS;
 
+/** One provider-usage figure: a muted name and its value, laid out by the popover grid. */
+function UsageCell({ label, value, title }: { label: string; value: string; title?: string }) {
+  return (
+    <span className="context-inspector-usage-cell" title={title}>
+      <span className="context-inspector-usage-name">{label}</span>{" "}
+      <span className="context-inspector-usage-figure">{value}</span>
+    </span>
+  );
+}
+
 export function ContextUsageInspector({
   usage,
   turnUsage,
@@ -49,6 +61,7 @@ export function ContextUsageInspector({
   responseOutputTokens,
   responseOutputEstimated = false,
   variant = "ring",
+  sessionTotals,
 }: {
   usage: MessageUsage;
   turnUsage: MessageUsage;
@@ -58,6 +71,8 @@ export function ContextUsageInspector({
   responseOutputTokens?: number;
   responseOutputEstimated?: boolean;
   variant?: "ring" | "footer";
+  /** Footer only: whole-session totals, shown beside the meter and in the popover. */
+  sessionTotals?: SessionUsageTotals;
 }) {
   const { t } = useTranslation();
   const panelId = useId();
@@ -117,6 +132,10 @@ export function ContextUsageInspector({
         ? t("chat.usageContextAriaUsed")
         : t("chat.usageContextAriaRemaining"),
   };
+  // The strip trigger prints the session total beside the percentage; its name
+  // stays the context sentence and a hidden note carries the total, since a
+  // label overrides the visible text.
+  const sessionNoteId = `${panelId}-session`;
 
   const closeInspector = useCallback(() => {
     setOpen(false);
@@ -276,6 +295,7 @@ export function ContextUsageInspector({
       id={panelId}
       role="dialog"
       aria-label={t("chat.usageContextLabel")}
+      data-variant={variant}
       style={
         popoverPosition
           ? {
@@ -382,37 +402,30 @@ export function ContextUsageInspector({
           </strong>
         </div>
       </div>
+      {variant === "footer" ? <ComposerUsageStats totals={sessionTotals} /> : null}
       <div className="context-inspector-summary">
         <div className="context-inspector-summary-row">
           <strong>{t("chat.usageProviderUsage")}</strong>
-          <span className="context-inspector-summary-values">
-            <span>
-              {t("chat.usageInput")} {formatCompactTokenCount(usage.inputTokens)}
-            </span>
-            <span>
-              {t("chat.usageOutput")} {formatCompactTokenCount(usage.outputTokens)}
-            </span>
+          <span className="context-inspector-summary-values context-inspector-usage-grid">
+            <UsageCell label={t("chat.usageInput")} value={formatCompactTokenCount(usage.inputTokens)} />
+            <UsageCell label={t("chat.usageOutput")} value={formatCompactTokenCount(usage.outputTokens)} />
             {usage.cacheReadTokens !== undefined ? (
-              <span>
-                {t("chat.usageCacheRead")} {formatCompactTokenCount(usage.cacheReadTokens)}
-              </span>
+              <UsageCell label={t("chat.usageCacheRead")} value={formatCompactTokenCount(usage.cacheReadTokens)} />
             ) : null}
             {cacheRate !== undefined ? (
-              <span>
-                {t("chat.usageCacheRate")} {cacheRate}%
-              </span>
+              <UsageCell label={t("chat.usageCacheRate")} value={`${cacheRate}%`} />
             ) : variant === "footer" ? (
-              <span>{t("chat.usageCacheRateUnavailableLabel")}</span>
+              <UsageCell
+                label={t("chat.usageCacheRate")}
+                value={t("chat.usageThroughputUnavailable")}
+                title={t("chat.usageCacheRateUnavailableLabel")}
+              />
             ) : null}
             {usage.cacheWriteTokens !== undefined ? (
-              <span>
-                {t("chat.usageCacheWrite")} {formatCompactTokenCount(usage.cacheWriteTokens)}
-              </span>
+              <UsageCell label={t("chat.usageCacheWrite")} value={formatCompactTokenCount(usage.cacheWriteTokens)} />
             ) : null}
             {usage.reasoningTokens !== undefined ? (
-              <span>
-                {t("chat.usageReasoning")} {formatCompactTokenCount(usage.reasoningTokens)}
-              </span>
+              <UsageCell label={t("chat.usageReasoning")} value={formatCompactTokenCount(usage.reasoningTokens)} />
             ) : null}
           </span>
         </div>
@@ -429,13 +442,6 @@ export function ContextUsageInspector({
           </span>
         </div>
       </div>
-      <Button onClick={() => {
-        const store = useAppStore.getState();
-        if (store.activeSessionId) {
-          openContextInsights(store.activeSessionId, store.openWorkPanelTabForSession);
-          closeInspector();
-        }
-      }}>{t("contextInsights.openDashboard")}</Button>
       {compaction ? (
         <div className="context-inspector-compaction">
           <span>
@@ -444,13 +450,22 @@ export function ContextUsageInspector({
           <strong title={compaction.summarized && !compaction.fallback && compaction.summary?.trim() ? compaction.summary : undefined}>~{formatCompactTokenCount(compaction.summaryTokens)}</strong>
         </div>
       ) : null}
-      {variant === "footer" ? (
-        <ContextCompactionAction
-          sessionId={openedSessionId.current}
-          hasUsage={context.usedTokens > 0}
-          onStarted={closeInspector}
-        />
-      ) : null}
+      <div className="context-inspector-actions">
+        <Button onClick={() => {
+          const store = useAppStore.getState();
+          if (store.activeSessionId) {
+            openContextInsights(store.activeSessionId, store.openWorkPanelTabForSession);
+            closeInspector();
+          }
+        }}>{t("contextInsights.openDashboard")}</Button>
+        {variant === "footer" ? (
+          <ContextCompactionAction
+            sessionId={openedSessionId.current}
+            hasUsage={context.usedTokens > 0}
+            onStarted={closeInspector}
+          />
+        ) : null}
+      </div>
     </div>
   ) : null;
 
@@ -467,6 +482,7 @@ export function ContextUsageInspector({
           className="composer-usage-btn composer-usage-context-btn"
           tooltip={t("chat.usageContextAria", ariaArguments)}
           ariaLabel={t("chat.usageContextAria", ariaArguments)}
+          aria-describedby={sessionTotals ? sessionNoteId : undefined}
           aria-haspopup="dialog"
           aria-expanded={open}
           aria-controls={open ? panelId : undefined}
@@ -503,7 +519,20 @@ export function ContextUsageInspector({
           <span className="composer-usage-value">
             {display.percent}%
           </span>
+          {sessionTotals ? (
+            <>
+              <span className="composer-usage-sep" aria-hidden="true">·</span>
+              <span className="composer-usage-session">
+                {t("chat.usageSessionTokens", { count: formatCompactTokenCount(sessionTotals.totalTokens) })}
+              </span>
+            </>
+          ) : null}
         </TooltipButton>
+        {sessionTotals ? (
+          <span id={sessionNoteId} hidden>
+            {sessionTokensAria(t, sessionTotals)}
+          </span>
+        ) : null}
         {popover && typeof document !== "undefined"
           ? portalToBody(popover)
           : null}

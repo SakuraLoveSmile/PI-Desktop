@@ -33,8 +33,8 @@ function PickerFixture() {
     <div className="composer-stack"><div className="composer-shell">
       <div className="composer-toolbar"><div className="composer-left">
         <ComposerPlusMenu
-          t={t} mode={mode} executionProfile={profile} open={plusOpen}
-          setOpen={setPlusOpen} onSelectMode={setMode} onSelectProfile={setProfile}
+          t={t} mode={mode} open={plusOpen}
+          setOpen={setPlusOpen} onSelectMode={setMode}
           onPickAndAttach={() => {}} onInsertReference={() => {}} onInsertCommand={() => {}}
           onCloseOtherMenus={() => setProfileOpen(false)}
         />

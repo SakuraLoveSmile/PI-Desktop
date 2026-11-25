@@ -18,7 +18,7 @@ import { parseProbe, probed, propsProbe, slotMounts, slotSsr } from "./helpers/s
 // Live Voice's idle entry is conditional on the feature setting and therefore
 // is not a permanent host slot in this disabled-by-default fixture. Plus
 // keeps the execution profile on the left row and the model picker before
-// the prompt actions on the right. Context remains in the usage footer.
+// the prompt actions on the right. Context sits in the workspace strip.
 const HOST_LEFT = ["chat.addFiles", "chat.profileAgent · chat.profileAgentDesc"];
 const HOST_RIGHT = ["chat.model: Model. chat.reasoningLevel: Off", "chat.enhancePrompt", "chat.send"];
 

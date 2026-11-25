@@ -145,27 +145,10 @@ export function ComposerToolbar({
         <ComposerPlusMenu
           t={t}
           mode={mode}
-          executionProfile={executionProfile}
           disabled={controlsBlocked || pasting}
           controlsBlocked={controlsBlocked}
           open={plusOpen}
           setOpen={setPlusOpen}
-          onSelectProfile={async (profile) => {
-            try {
-              await configureActiveSession({
-                mode,
-                providerId,
-                modelId,
-                thinkingLevel,
-                permissionMode: sessionPermissionMode,
-                executionProfile: profile,
-              });
-            } catch (error) {
-              showToast(error instanceof Error ? error.message : String(error), {
-                variant: "error",
-              });
-            }
-          }}
           onSelectMode={selectMode}
           onPickAndAttach={pickAndAttach}
           onInsertReference={onInsertReference}

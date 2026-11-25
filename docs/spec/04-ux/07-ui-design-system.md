@@ -478,9 +478,9 @@ of a desktop coding tool:
 | `--radius-sm` | 10px | Standard buttons, inputs, menu items, tool rows, kbd |
 | `--radius-md` | 12px | Menus and compact cards |
 | `--radius-md-plus` | 14px | Cards and code blocks |
-| `--radius-lg` | 16px | Panels and settings cards |
+| `--radius-lg` | 16px | Panels, settings cards and the composer shell |
 | `--radius-lg-plus` | 18px | Large panels and dialogs |
-| `--radius-xl` | 20px | Message bubbles and the composer |
+| `--radius-xl` | 20px | Message bubbles and the message editor |
 | `--radius-2xl` | 24px | Composer-adjacent prominent surfaces |
 | `--radius-full` | 9999px | Pills, badges, scroll thumbs |
 | `--radius-round` | 50% | Circular buttons, avatars, dots |
@@ -889,7 +889,8 @@ model):
 - The home composer is a bottom-reserved sibling of the scroller. Thread mode
   keeps its absolute bottom dock and reserves its measured height without a
   full-width fade veil
-- Composer radius uses Codex `radius-3xl-base` (**20px** / `1.25rem`)
+- The composer shell uses `--radius-lg` (**16px**); the in-transcript message
+  editor keeps `--ds-composer-radius` (20px, `--radius-xl`)
 - Empty-home composer height is content-driven: a one-line draft renders the
   compact shell, grows with the draft through seven visible rows, and then
   keeps the shell stable while the textarea scrolls internally
@@ -964,26 +965,21 @@ The composer renders only controls connected to the active pi session:
 
 - Agent / Plan / Goal updates the durable session mode and changes the next pi
   toolset. Plan and Goal are contract states of the same Agent.
-- The model trigger shows only the active model ID. Its menu selects a
-  configured provider/default-model pair for the active session and links to
-  Agent.
+- The model menu selects a configured provider/default-model pair for the
+  active session and links to Agent.
 - The right toolbar exposes one combined model × reasoning trigger immediately
   before the standalone prompt-enhancement Sparkles action and Send/Abort. The
   trigger shows a Bot icon, the current model, and reasoning level; `off` omits
-  the level text. Its single `role="menu"`
-  popover opens above the trigger at `bottom: calc(100% + 8px)` and starts with
-  exactly two current-value entries. When the menu lists more than one
-  level (`omit` plus the binding's enabled canonical levels), a drag slider
-  sits directly beneath the Reasoning level entry; slider and tick commits
-  apply without leaving the root. Tick labels are not tab stops — the range
-  input is the accessible control. Each entry replaces
-  the menu contents in-place with a back row and its submenu. The Model
-  submenu contains search plus sticky provider groups. Each model row begins
-  at one tab stop beneath its provider heading, making the provider → model
-  hierarchy legible without altering the model label. The Reasoning submenu
-  lists `omit` then the enabled levels as radio rows with a selected-row
-  check; selecting from the list returns to the root without dismissing the
-  popover.
+  the level text. Its single `role="menu"` popover opens above the trigger at
+  `bottom: calc(100% + 8px)` and lists the configured models directly, grouped
+  under sticky provider headings, with no search field and no submenu. Each
+  model row is one line (name, context window, capability icons, current-row
+  check). When the menu lists more than one level (`omit` plus the binding's
+  enabled canonical levels), a drag slider sits beneath the list under a title
+  that names the control and shows the current level; slider and tick commits
+  apply without leaving the menu. Tick labels are not tab stops — the range
+  input is the accessible control. The menu shares the Add menu's and the
+  execution-profile menu's skin (component spec §11.3, D652).
 - While the active session is running, the draft and runtime controls stay
   editable as next-turn choices; only Send is disabled. Host configuration
   remains pinned for the in-flight turn and the latest queued choice is
@@ -1170,12 +1166,13 @@ header-height background behind the excluded lane without covering its controls.
 
 These are **token-level foundations** for common primitives. Detailed component specs are in [08-component-spec.md](08-component-spec.md).
 
-The composer usage strip (PI-UI-1118) deliberately adds **no new shared
-primitive**: its read-out groups are feature-local spans in
-`features/chat/composer/ComposerUsageStats.tsx`, the meter reuses the existing
-inspector ring, and every interactive element stays on `TooltipButton`/`Button`.
-A pattern earns a `components/ui.tsx` primitive only at three or more usages;
-this one currently has a single consumer.
+The composer usage entry (PI-UI-1118, moved into the workspace strip by
+PI-UI-1126) deliberately adds **no new shared primitive**: its session read-outs
+are feature-local spans in `features/chat/composer/ComposerUsageStats.tsx`,
+rendered inside the usage popover; the meter reuses the existing inspector ring,
+and every interactive element stays on `TooltipButton`/`Button`. A pattern earns
+a `components/ui.tsx` primitive only at three or more usages; this one currently
+has a single consumer.
 
 ### 11.1 Button
 

@@ -1896,31 +1896,40 @@ Single message render — either user (plaintext) or assistant (markdown streami
   contentful fragment so existing durable transcript semantics remain intact
   (D157).
 - Assistant meta: optional model badge under the answer. The compact
-  context inspector lives at the right edge of the footer below the input,
-  and always mirrors the
+  context inspector lives at the right end of the workspace strip above the
+  input (D652; it sat in a footer below the input before) and always mirrors the
   newest assistant turn that reported usage (D347). Occupancy, remaining
   capacity, used/window counts, turn total, and provider
   input/output/cache/reasoning/hit-rate are that turn's newest usage-bearing
   assistant message (the last model request), using
   `input + output + reasoning + cacheRead + cacheWrite` (D355). They are not
   the sum of every model call in the visual tool-loop. Before usage exists,
-  the footer shows a disabled neutral track and `—`, with a localized unavailable
-  accessible name; it never fabricates 0% or 100%. The trigger shows a small
-  horizontal progress track beside the percentage, omitting the redundant
-  `Context` label; the leading figure (track fill, percentage, token label,
-  popover heading, tooltip, and
+  the entry shows a disabled neutral ring, the `Context` label and `—`, with a
+  localized unavailable accessible name; it never fabricates 0% or 100%. The
+  trigger is a quiet button in the strip's trigger styling: the ring, a visible
+  direction label (`Used` or `Remaining`), the percentage and, once the host
+  reports session totals, a `·` and the session token total (`148K tok`). The
+  label hides at the 450px floor and the separator with the session total at
+  560px; the accessible name stays the context sentence and the session total is
+  announced as its description. The leading figure (ring fill, percentage, token
+  label, popover heading, tooltip, and
   `aria-label`) follows `settings.contextUsageDisplay` — `"used"`
-  (default) or `"remaining"` — so the footer track fills by `usedRatio` or
+  (default) or `"remaining"` — so the ring fills by `usedRatio` or
   `remainingRatio` accordingly. Other consumers of the existing ring variant retain
   their previous rendering. Low capacity changes the semantic color based
   on remaining capacity (remaining ≤ 25 % warning, ≤ 10 % critical)
   regardless of display mode, without making color the only signal.
   Clicking the trigger (or activating it from the keyboard) toggles a
-  non-modal panel whose heading follows the same display-mode figure,
-  followed by used/window counts and two
-  unboxed turn/speed summary values. Model usage is compressed into one
-  inline summary row that retains exact last-request
-  input/output/cache/reasoning values
+  non-modal panel whose heading follows the same display-mode figure beside the
+  `~used / window` counts, then a used-capacity bar (segmented with a three-row
+  legend when diagnostics exist, a single fill otherwise) and two unboxed
+  summary values side by side: the last turn's token total and its generation
+  speed. A labelled Session block follows with two read-outs of host-ledger
+  totals (`session.usageTotals`): rounds and steps, then tokens and cache hit
+  rate. An unavailable host, or a session without cache reads, shows an em dash
+  rather than a partial or zero value, and the speed is not repeated there.
+  Model usage is compressed into one two-column grid that retains exact
+  last-request input/output/cache/reasoning values
   and the provider-reported cache hit rate when available. Tool usage is
   compressed into one aggregate row showing tool types, calls, and estimated
   tokens; per-tool rows, share bars, source badges, and the explanatory
@@ -1928,16 +1937,17 @@ Single message render — either user (plaintext) or assistant (markdown streami
   the heading share one muted-label / tabular-value rhythm separated by
   spacing; the popover keeps its floating-layer edge and draws no inner
   section rules (D297). Generation speed is a completed-turn value in tokens
-  per second and is not updated while a response is streaming. The
-  footer popover also shows a used-capacity progress bar and Compact context
-  action. It does not invent System prompt or Skill percentages: the accounting
+  per second and is not updated while a response is streaming. The Open
+  dashboard and Compact context actions sit side by side at the foot of the
+  popover and stack when a localized label does not fit. It does not invent
+  System prompt or Skill percentages: the accounting
   contract only supplies actual provider and aggregate tool statistics. Compact
   context delegates to the existing store workflow and is enabled only for the
   same idle editable Desktop session that opened the panel, with collected usage
   and no pending permission, question or plan approval. Native, remote, read-only
   and Team-member sessions cannot use it. The click synchronously rechecks all
   gates, closes the panel after starting, and a session switch dismisses stale
-  footer details. The
+  popover details. The
   context-window total uses the same effective model window as the agent
   sidecar: a published models.dev `limit.context` replaces a legacy 128k
   generic binding seed, while a non-default per-model Advanced value remains
@@ -3248,11 +3258,11 @@ reasoning-level control.
 
 ```text
 +----------------------------------------------------------+
+| workspace strip: [project] [location] [branch]   [ring Used 24% · 148K tok] |
 | queued prompts, attachments and approval controls (when present) |
 | input (two empty lines, grows through seven visible lines)        |
 | placeholder: welcome → command/file hint → keyboard hint          |
 | [+] [Agent/Expert Team ▾] [Plan/Goal] [plugin] [model · reasoning ▾] [enhance] [Live] [↑/⏹] |
-| usage strip: rounds/steps · tok/s | session tokens · cache hit | ring + Used/Remaining % |
 +----------------------------------------------------------+
 ```
 
@@ -3260,8 +3270,11 @@ reasoning-level control.
 
 - Height: two input lines before draft growth, through seven visible lines,
   then the editor scrolls internally
-- Workspace context: no project, Local, or branch rail is rendered or
-  reserved above the shell in either home or thread-docked mode (D095)
+- Workspace context: the strip joining the top of the card carries the project,
+  location and branch menus while idle and folds to the branch during a run, in
+  both home and thread-docked modes. It replaces the passive rail that D095
+  removed (these menus are interactive) and closes on the context-usage entry at
+  its right end (D652).
 - Background: one solid semantic composer surface; no internal gradient,
   background image, or decorative wash
 - Elevation: `radius-lg` (16px), a restrained soft shadow and a neutral 1px
@@ -3287,7 +3300,9 @@ reasoning-level control.
   in-flight turn actually projects `planning`.
 - While Plan is the committed mode, the Plan chip carries a close control
   (`chat.exitPlanMode`) that returns to Agent through the same switch as the +
-  menu's Plan toggle. The control is disabled while a plan is being drafted or
+  menu's Plan toggle. The two read as one pill with a single quiet tint behind
+  them (D652); each part stays its own button and a hover fills only its half.
+  The control is disabled while a plan is being drafted or
   awaits approval (the host refuses a mode change then with
   `PLAN_CONFIGURATION_BLOCKED`) and while controls are blocked; the + menu's
   Plan switch has no planning or approval guard. Exiting does not delete plan
@@ -3305,8 +3320,11 @@ reasoning-level control.
   retain their side and order, followed by the combined model × reasoning-level
   chip, prompt enhancement, Live voice and the single Stop/Send slot. The model
   chip remains one button and its anchored menu remains tied to that button.
-  Send and Stop use the same neutral 32px rounded-square footprint. Context
-  usage stays in the existing footer beside its meter. Its visible label names
+  Send and Stop use the same neutral 32px circle (D652), set 8px after the
+  quiet controls before them, which sit 2px apart; the message editor's text Send
+  button keeps its own pill. Context
+  usage sits at the right end of the workspace strip beside its meter (D652).
+  Its visible label names
   the leading figure's direction: `chat.usageContextRemainingLabel` (Remaining)
   or `chat.usageContextUsedLabel` (Used), following the context usage display
   setting. The unavailable placeholder keeps `chat.usageContextLabel` (Context)
@@ -3330,18 +3348,26 @@ reasoning-level control.
   560px it hides the reasoning level label, at 480px it tightens the model label
   cap, and at the 450px floor it becomes a 32px icon-only trigger. The trigger's
   menu and accessible name retain the complete model/reasoning selection. The
-  context inspector hides its percentage at the floor and the enhancement
+  usage entry drops its session total at 560px and its direction label at the
+  floor, keeping the ring and percentage, and the enhancement
   loading state becomes icon-only, preserving the action hit targets without
   clipping or overlapping toolbar content. Home and thread-docked composers
   use the same responsive rules. With plugin composer controls mounted below
   720px, the model trigger uses that same 32px icon-only variant early, retaining
   its complete accessible name and menu while reserving room for plugin actions.
 - The combined chip opens the complete model list directly above itself, without search,
-  provider-labelled rows, the current model's reasoning slider and a Model
-  configurations action. There is no Default/Custom tab or intermediate root
-  menu. Each row uses a 32px neutral icon, one model name, and a second line
-  of actual provider, context-window and capability metadata. No synthetic
-  preset routing, pricing or unsupported capabilities are inferred. The popup
+  under provider group headings, with the current model's reasoning slider and
+  a Model configurations action. There is no Default/Custom tab or
+  intermediate root menu. Each row is one 32px line: the model name (the
+  configured alias when set, the complete wire ID otherwise; a long name
+  wraps rather than hiding the part that tells two models apart), the real
+  context window as a right-aligned figure, capability icons, and a fixed slot
+  that holds the check on the current row. The actual provider is the group
+  heading, so a row never repeats it, and the row's title is the wire ID. No
+  synthetic preset routing, pricing or unsupported capabilities are inferred.
+  The list is at most 240px tall; while it continues below the fold its last
+  rows fade out. The reasoning slider sits under a title row that names the
+  control and shows the current level (D652). The popup
   is `min(348px, 100vw - 24px)` and uses existing anchored-menu focus, Escape,
   viewport-clamping and keyboard selection behavior. Model configurations
   opens the existing Settings model page in the chat Composer; it creates no
@@ -3355,11 +3381,30 @@ reasoning-level control.
   Clicking a task or the activity-rail agent opens `SubagentTranscriptTab`:
   task, thinking, tools and replies reuse the existing read-only rendering.
   The card's panorama entry remains available. Detailed mode is unchanged.
-- Execution-profile options have a 6px vertical gap. Agent and Expert Team
+- Execution-profile options are two-line rows (name over description, 44px)
+  with a 2px gap and a check on the current profile. Agent and Expert Team
   still change only the existing `standard`/`team` profile, retaining their
-  descriptions, Team parallel-call notice and switching gates. The menu does
-  not offer a synthetic agent or team roster. Ordinary delegate definitions
-  remain managed in the existing subagent settings page.
+  descriptions and switching gates. The Team parallel-call warning line was
+  removed because the Team description already says what the profile does
+  (D652). The menu does not offer a synthetic agent or team roster. Ordinary
+  delegate definitions remain managed in the existing subagent settings page.
+- The Add menu, the execution-profile menu and the model menu share one skin
+  (D652): the standard opaque elevated surface with a default hairline,
+  `--radius-lg` and the dialog shadow; 32px rows (44px with a description
+  line) with `--radius-sm` hover tiles; muted lead icons that turn primary on
+  hover; one quiet group-title voice; and the current row marked by a check
+  and a medium-weight name rather than a fill. A list that continues below
+  its fold (the Add menu's rows and the model list) fades its last 22px into
+  the menu surface while it can still scroll down; a list that fits, or one
+  scrolled to its end, has no fade, and keyboard scrolling leaves the target
+  row clear of it. The Add menu lists actions
+  only: Add files; workspace files and folders, shown only while a search
+  matches them (the `@` autocomplete is the browsing entry), each with its
+  folder after the name; plugin commands, commands and skills with their
+  description after the name on the same line; and the Plan and Goal
+  switches. The execution profile is not offered there; it has its own chip
+  and menu. The permission menu and the slash and `@` autocomplete keep their
+  own rows.
 - Width: Home and thread-docked composers share one `24px` horizontal gutter
   and a `768px` maximum content envelope. The left-edge conversation minimap
   is absolutely positioned outside that envelope, so its appearance or
@@ -3405,7 +3450,7 @@ reasoning-level control.
 ### 11.3a Overview session checklist
 
 - A non-empty session checklist appears as the first section in the Work Panel
-  Overview scroll area. The Composer footer has no session checklist trigger.
+  Overview scroll area. The Composer has no session checklist trigger.
 - The header names the Session checklist and its completed/total count. A shared
   Button disclosure starts expanded and exposes `aria-expanded`. The ordered
   inline list includes every task with its full wrapped title, and the localized
@@ -5145,7 +5190,7 @@ appears only when its data exists, and only the visible pane reads it:
   own functions and framed by the same used/remaining preference
   (`settings.contextUsageDisplay`): the headline (label and percentage, warning
   at 25% or less remaining and critical at 10% or less, the one rule the
-  composer's footer shares; in the used framing the label is the rail's own Used,
+  composer's usage entry shares; in the used framing the label is the rail's own Used,
   已使用 in Simplified Chinese, and the remaining framing keeps the composer's
   word, D650), `~used / window`, one bar split into system, tools
   and messages by the newest request's breakdown (a single used segment until the
@@ -5340,7 +5385,7 @@ viewport restoration remain intact.
 
 ### Composer metadata and compact agent rows
 
-The workspace strip above the input card shows the current session's project, local/remote host, and known local Git branch; during a run it folds to the branch. Unavailable project/branch metadata is omitted; remote sessions never borrow a local branch. A detached HEAD is named by its short commit (`Detached HEAD · abc1234`), and `No branch` appears only when neither a branch nor a commit is known. Model menus list all models without a search field. The strip below the input card carries three centered groups: session rounds and steps beside the newest turn's generation speed, session-cumulative tokens beside the cumulative prompt-cache hit rate, and the context ring with its Used/Remaining label and percentage. Rounds, steps, tokens and cache hit are session totals aggregated by the host from the turn ledger (`session.usageTotals`); the renderer never sums them from the loaded transcript page, and an unavailable host renders an em dash rather than a partial total. The ring keeps describing the newest request and honors the display preference. Clicking it opens the context popover: the header reads `Context used N%` with `~used / window`, then a segmented occupancy bar and a fixed three-row legend (system prompt, tool definitions, conversation) whose shares are scaled onto the provider-reported occupancy while each row prints its own estimate; without diagnostics the bar falls back to a single fill. Turn totals, generation speed, provider detail, tool summary, the dashboard entry and compaction controls remain in that popover. Subagent entries use transparent gradient-avatar rows with name, task, localized status and measured elapsed time; clicking a row opens read-only details, with no panorama entry. Validate model keyboard selection, workspace metadata, context details and agent navigation in the isolated composer/transcript fixtures, including narrow layouts.
+The workspace strip above the input card shows the current session's project, local/remote host, and known local Git branch; during a run it folds to the branch. Unavailable project/branch metadata is omitted; remote sessions never borrow a local branch. A detached HEAD is named by its short commit (`Detached HEAD · abc1234`), and `No branch` appears only when neither a branch nor a commit is known. Model menus list all models without a search field. The usage entry closes the workspace strip at its right end: the context ring with its Used/Remaining label and percentage, then the session token total after a `·` once the host reports it. Rounds, steps, tokens and cache hit are session totals aggregated by the host from the turn ledger (`session.usageTotals`); the renderer never sums them from the loaded transcript page, and an unavailable host renders an em dash rather than a partial total. The ring keeps describing the newest request and honors the display preference. Clicking the entry opens the context popover: the header reads `Context used N%` with `~used / window`, then a segmented occupancy bar and a fixed three-row legend (system prompt, tool definitions, conversation) whose shares are scaled onto the provider-reported occupancy while each row prints its own estimate; without diagnostics the bar falls back to a single fill. The turn total and generation speed sit side by side, followed by a labelled Session block (rounds · steps, then tokens · cache hit); provider detail, tool summary, and the dashboard entry and compaction controls, side by side, remain in that popover. Subagent entries use transparent gradient-avatar rows with name, task, localized status and measured elapsed time; clicking a row opens read-only details, with no panorama entry. Validate model keyboard selection, workspace metadata, context details and agent navigation in the isolated composer/transcript fixtures, including narrow layouts.
 
 ### Recorded outputs, delegate details and project Skill suggestions
 
@@ -5383,6 +5428,23 @@ uncommitted HEADs and stale checkout identities block branch changes. Errors are
 visible in the menu. Operation results cannot navigate or overwrite metadata in a
 different owning session. Arrow keys, Enter and Escape preserve text editing,
 focus return and narrow viewport reachability.
+
+The three menus share one row language (PI-UI-1126, D652). A trigger ends in a
+chevron that turns over while its menu is open. While a task runs in the project,
+the location and branch triggers show a lock in its place, and their menus open
+with a banner that says why nothing can be used, instead of greying the rows out
+without a reason; a running task takes the banner before a dirty checkout does,
+and a branch held by another checkout carries an *In use* tag only while the list
+could otherwise change. Rows are 32px, or 44px with a second line. A project row
+is its name over the folder that holds it, with the home folder written `~` and
+the path clipped at its start so the folder next to the project stays visible; a
+project at the filesystem root has no second line, and the row's accessible name
+is the project. The Local and Worktree rows each carry a one-line description. The
+current row carries a check and a medium-weight name, never a fill; hover and
+keyboard highlight are the only fill, and an inert row reads as unavailable by
+ink, not by half opacity. The new-worktree and new-branch views have a back arrow
+with the view's title, a labelled field with its hint always visible, and one
+compact, right-aligned primary action.
 
 Nested projects retain their relative subdirectory when entering another checkout
 or returning to Local. If the corresponding directory is unavailable, navigation

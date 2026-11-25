@@ -6,6 +6,15 @@ export const PLUS_UPSTREAM_CUTOFF = "0.15.6";
 const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   en: [
     {
+      version: "0.15.24",
+      date: "2026-11-25",
+      highlights: [
+        "The + menu, the agent menu and the model menu under the input box now share one style. The + menu lists actions only (files show up while you search), every agent mode has a short description, and the model list has one line per model under its provider.",
+        "The project, location and branch menus above the input box use one row layout: a chevron on each button (a lock while a task is running), the project’s folder as a subtitle, and a note that says why a menu cannot be used.",
+        "The usage read-out moved to the right end of the strip above the input box and the footer under the box is gone. Its popover has a Session block and a two-column model-usage table. Send and Stop are now round buttons, and the Plan mode chip and its close button form one pill.",
+      ],
+    },
+    {
       version: "0.15.23",
       date: "2026-11-23",
       highlights: [
@@ -168,6 +177,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "zh-CN": [
+    {
+      version: "0.15.24",
+      date: "2026-11-25",
+      highlights: [
+        "输入框下方的“+”菜单、智能体菜单和模型菜单统一了样式：“+”菜单只列出操作（搜索时才会出现文件），每种智能体模式都带一行说明，模型列表在服务商标题下一行一个模型。",
+        "输入框上方的项目、位置和分支菜单使用同一种行样式：按钮带箭头（任务运行时显示锁），项目的文件夹显示为副标题，菜单不可用时会写明原因。",
+        "用量读数移到了输入框上方条的最右端，下方的页脚已去掉；点开的面板新增“会话”区块和两列的模型用量表。发送和停止按钮改为圆形，规划模式标签与它的关闭按钮合成一个整体。",
+      ],
+    },
     {
       version: "0.15.23",
       date: "2026-11-23",
@@ -332,6 +350,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   "zh-TW": [
     {
+      version: "0.15.24",
+      date: "2026-11-25",
+      highlights: [
+        "The + menu, the agent menu and the model menu under the input box now share one style. The + menu lists actions only (files show up while you search), every agent mode has a short description, and the model list has one line per model under its provider.",
+        "The project, location and branch menus above the input box use one row layout: a chevron on each button (a lock while a task is running), the project’s folder as a subtitle, and a note that says why a menu cannot be used.",
+        "The usage read-out moved to the right end of the strip above the input box and the footer under the box is gone. Its popover has a Session block and a two-column model-usage table. Send and Stop are now round buttons, and the Plan mode chip and its close button form one pill.",
+      ],
+    },
+    {
       version: "0.15.23",
       date: "2026-11-23",
       highlights: [
@@ -494,6 +521,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   tr: [
+    {
+      version: "0.15.24",
+      date: "2026-11-25",
+      highlights: [
+        "The + menu, the agent menu and the model menu under the input box now share one style. The + menu lists actions only (files show up while you search), every agent mode has a short description, and the model list has one line per model under its provider.",
+        "The project, location and branch menus above the input box use one row layout: a chevron on each button (a lock while a task is running), the project’s folder as a subtitle, and a note that says why a menu cannot be used.",
+        "The usage read-out moved to the right end of the strip above the input box and the footer under the box is gone. Its popover has a Session block and a two-column model-usage table. Send and Stop are now round buttons, and the Plan mode chip and its close button form one pill.",
+      ],
+    },
     {
       version: "0.15.23",
       date: "2026-11-23",
@@ -658,6 +694,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   de: [
     {
+      version: "0.15.24",
+      date: "2026-11-25",
+      highlights: [
+        "The + menu, the agent menu and the model menu under the input box now share one style. The + menu lists actions only (files show up while you search), every agent mode has a short description, and the model list has one line per model under its provider.",
+        "The project, location and branch menus above the input box use one row layout: a chevron on each button (a lock while a task is running), the project’s folder as a subtitle, and a note that says why a menu cannot be used.",
+        "The usage read-out moved to the right end of the strip above the input box and the footer under the box is gone. Its popover has a Session block and a two-column model-usage table. Send and Stop are now round buttons, and the Plan mode chip and its close button form one pill.",
+      ],
+    },
+    {
       version: "0.15.23",
       date: "2026-11-23",
       highlights: [
@@ -820,6 +865,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   es: [
+    {
+      version: "0.15.24",
+      date: "2026-11-25",
+      highlights: [
+        "The + menu, the agent menu and the model menu under the input box now share one style. The + menu lists actions only (files show up while you search), every agent mode has a short description, and the model list has one line per model under its provider.",
+        "The project, location and branch menus above the input box use one row layout: a chevron on each button (a lock while a task is running), the project’s folder as a subtitle, and a note that says why a menu cannot be used.",
+        "The usage read-out moved to the right end of the strip above the input box and the footer under the box is gone. Its popover has a Session block and a two-column model-usage table. Send and Stop are now round buttons, and the Plan mode chip and its close button form one pill.",
+      ],
+    },
     {
       version: "0.15.23",
       date: "2026-11-23",
@@ -984,6 +1038,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   fr: [
     {
+      version: "0.15.24",
+      date: "2026-11-25",
+      highlights: [
+        "The + menu, the agent menu and the model menu under the input box now share one style. The + menu lists actions only (files show up while you search), every agent mode has a short description, and the model list has one line per model under its provider.",
+        "The project, location and branch menus above the input box use one row layout: a chevron on each button (a lock while a task is running), the project’s folder as a subtitle, and a note that says why a menu cannot be used.",
+        "The usage read-out moved to the right end of the strip above the input box and the footer under the box is gone. Its popover has a Session block and a two-column model-usage table. Send and Stop are now round buttons, and the Plan mode chip and its close button form one pill.",
+      ],
+    },
+    {
       version: "0.15.23",
       date: "2026-11-23",
       highlights: [
@@ -1147,6 +1210,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   ko: [
     {
+      version: "0.15.24",
+      date: "2026-11-25",
+      highlights: [
+        "The + menu, the agent menu and the model menu under the input box now share one style. The + menu lists actions only (files show up while you search), every agent mode has a short description, and the model list has one line per model under its provider.",
+        "The project, location and branch menus above the input box use one row layout: a chevron on each button (a lock while a task is running), the project’s folder as a subtitle, and a note that says why a menu cannot be used.",
+        "The usage read-out moved to the right end of the strip above the input box and the footer under the box is gone. Its popover has a Session block and a two-column model-usage table. Send and Stop are now round buttons, and the Plan mode chip and its close button form one pill.",
+      ],
+    },
+    {
       version: "0.15.23",
       date: "2026-11-23",
       highlights: [
@@ -1309,6 +1381,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "pt-BR": [
+    {
+      version: "0.15.24",
+      date: "2026-11-25",
+      highlights: [
+        "The + menu, the agent menu and the model menu under the input box now share one style. The + menu lists actions only (files show up while you search), every agent mode has a short description, and the model list has one line per model under its provider.",
+        "The project, location and branch menus above the input box use one row layout: a chevron on each button (a lock while a task is running), the project’s folder as a subtitle, and a note that says why a menu cannot be used.",
+        "The usage read-out moved to the right end of the strip above the input box and the footer under the box is gone. Its popover has a Session block and a two-column model-usage table. Send and Stop are now round buttons, and the Plan mode chip and its close button form one pill.",
+      ],
+    },
     {
       version: "0.15.23",
       date: "2026-11-23",

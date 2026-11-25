@@ -3,14 +3,8 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import ts from "typescript";
 import * as jsxRuntime from "react/jsx-runtime";
-import { loadStyles } from "./helpers/styles.mjs";
 
-const styles = await loadStyles();
-const [composerSource, footerSource, inspectorSource, compactionSource] = await Promise.all([
-  readFile(
-    new URL("../src/components/Composer.tsx", import.meta.url),
-    "utf8",
-  ),
+const [footerSource, inspectorSource, compactionSource] = await Promise.all([
   readFile(
     new URL("../src/features/chat/composer/ComposerUsageFooter.tsx", import.meta.url),
     "utf8",
@@ -55,18 +49,6 @@ const idleSessionState = () => ({
   pendingAsks: {},
   pendingPlans: {},
   planCheckpoints: {},
-});
-
-test("Composer mounts ComposerUsageFooter directly under composer-shell", () => {
-  assert.match(
-    composerSource,
-    /<ComposerUsageFooter\s+\{\.\.\.composerContextUsage\}\s*\/>/,
-  );
-  // Ensure it is placed outside/after the composer-shell div
-  const shellIndex = composerSource.indexOf("className={`composer-shell");
-  const footerIndex = composerSource.indexOf("<ComposerUsageFooter");
-  assert.ok(shellIndex > 0, "composer-shell exists");
-  assert.ok(footerIndex > shellIndex, "footer is rendered after composer-shell");
 });
 
 test("ComposerUsageFooter consolidates all statistics in the context inspector", () => {
@@ -161,10 +143,4 @@ test("the compaction button rechecks session state before starting the existing 
   assert.equal(closed, true);
   button.props.onClick();
   assert.deepEqual(compacted, ["session-1"], "a second click cannot start a duplicate run");
-});
-
-test("composer-usage-footer CSS is defined with flexible wrapping and theme tokens", () => {
-  assert.match(styles, /\.composer-usage-footer\s*\{[\s\S]*?display:\s*flex;/);
-  assert.match(styles, /\.composer-usage-footer\s*\{[\s\S]*?flex-wrap:\s*wrap;/);
-  assert.match(styles, /\.composer-usage-btn:hover\s*\.composer-usage-value\s*\{/);
 });

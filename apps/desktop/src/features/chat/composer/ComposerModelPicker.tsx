@@ -102,13 +102,21 @@ export function ComposerModelPicker({
         selectedProviderId={selectedProviderId} selectedModelId={selectedModelId}
       />
       {thinkingMenuLevels.length > 1 ? (
-        <ThinkingLevelSlider
-          key={`${selectedProviderId}:${selectedModelId}:${thinkingMenuLevels.join("|")}`}
-          levels={thinkingMenuLevels}
-          level={thinkingLevel}
-          label={t("chat.reasoningLevel")}
-          commit={commitThinkingLevel}
-        />
+        <>
+          <div className="composer-menu-separator" />
+          {/* The slider's own label is the range input's; this title names it and shows the level. */}
+          <div className="composer-model-thinking-title" aria-hidden="true">
+            <span>{t("chat.reasoningLevel")}</span>
+            <b>{thinkingLabel}</b>
+          </div>
+          <ThinkingLevelSlider
+            key={`${selectedProviderId}:${selectedModelId}:${thinkingMenuLevels.join("|")}`}
+            levels={thinkingMenuLevels}
+            level={thinkingLevel}
+            label={t("chat.reasoningLevel")}
+            commit={commitThinkingLevel}
+          />
+        </>
       ) : null}
       {onOpenModelSettings ? (
         <>

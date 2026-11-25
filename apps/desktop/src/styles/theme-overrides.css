@@ -258,27 +258,40 @@
   gap: 4px;
 }
 
+/* Plan and its close control read as one pill: a single tint behind both parts,
+   each still its own button, so a hover fills one half (PI-UI-1126, D652). The
+   `!important`s answer the chip's own and the theme ink rules above. */
 .composer-contract-group {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 0;
   min-width: 0;
   flex: 0 0 auto;
+  border-radius: var(--radius-full);
+  background: var(--ds-tile-hover);
 }
 
-.composer-contract-exit {
+.composer-contract-group .composer-contract-chip {
+  border-radius: var(--radius-full) 0 0 var(--radius-full) !important;
+}
+
+.composer-toolbar .composer-contract-group .composer-contract-exit {
   width: 20px;
   min-width: 20px;
-  height: 20px;
+  height: 28px;
   flex: 0 0 20px;
   padding: 0;
-  border-radius: var(--radius-full);
-  color: var(--ds-text-muted);
+  border-radius: 0 var(--radius-full) var(--radius-full) 0;
+  color: var(--ds-text-muted) !important;
 }
 
-.composer-contract-exit:hover:not(:disabled) {
-  color: var(--ds-text-primary);
-  background: var(--ds-bg-hover);
+.composer-contract-group .composer-contract-chip:hover:not(:disabled) {
+  background: var(--ds-bg-active) !important;
+}
+
+.composer-toolbar .composer-contract-group .composer-contract-exit:hover:not(:disabled) {
+  color: var(--ds-text-primary) !important;
+  background: var(--ds-bg-active);
 }
 
 .composer-mode-chip-label {

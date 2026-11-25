@@ -1,10 +1,26 @@
 # ADR 0184: Dock the context usage inspector in the composer toolbar
 
-- Status: Accepted (amended by D355 / ADR 0193)
+- Status: Accepted (amended by D355 / ADR 0193 and D652)
 - Date: 2026-09-08
 - Deciders: PI-Desktop renderer and UX maintainers
 - Amends: D103, D184, D244, ADR 0047, ADR 0103
-- Related: D347, D355, E2E-060d, US-UI-61
+- Related: D347, D355, D652, E2E-060d, US-UI-61
+
+## Strip amendment (2026-11-24)
+
+PI-UI-1126 (D652) moves the same entry once more, from the footer under the input
+to the right end of the workspace strip above it, and removes the footer. The
+accounting snapshot, the used/remaining preference, the provider/tool totals and
+the unavailable state (a disabled neutral ring and an em dash, never a fabricated
+value) keep their meaning. The trigger becomes a quiet button in the strip's
+trigger styling: the ring, a visible direction label, the percentage and, once the
+Host reports session totals, the session token total, with the total and then the
+label dropping out at the narrow floors. The popover keeps its heading,
+used-capacity bar and guarded Compact context action, and gains a Session block of
+Host-ledger totals (`session.usageTotals`) and a two-column model-usage grid; an
+unavailable Host or a session without cache reads shows an em dash rather than a
+partial value. This supersedes the footer placement below. See Component Spec §11
+and E2E-060d / E2E-250 for the current presentation.
 
 ## Footer presentation amendment (2026-10-10)
 

@@ -243,15 +243,10 @@
 /* Menu groups are separated by a breath of space, not a rule (D297). */
 .composer-menu-separator {
   height: 1px;
-  margin: 2px 8px;
+  margin: 6px 4px;
   background: var(--ds-border-subtle);
 }
 
-
-.composer-model-thinking-menu .composer-plus-item {
-  min-height: 56px;
-  padding: 10px 12px;
-}
 
 /* Reasoning slider (issue #417): the model list carries the slider itself, so a
    level is one drag instead of opening a list of levels.
@@ -509,27 +504,27 @@
 .composer-model-thinking-menu .composer-model-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
 }
 
 .composer-model-list {
-  max-height: 280px;
+  max-height: 240px;
   overflow-y: auto;
 }
 
+/* A quiet group title in the menu skin's one voice: small, muted, never
+   upper-cased, so the heading reads as a label for the rows under it. */
 .composer-model-group-label {
   position: sticky;
   top: 0;
   z-index: 1;
-  padding: 6px 8px 2px;
+  padding: 6px 10px 4px;
   background: color-mix(in oklab, var(--ds-bg-elevated-opaque) 82%, transparent);
   backdrop-filter: saturate(1.6) blur(40px);
   -webkit-backdrop-filter: saturate(1.6) blur(40px);
   color: var(--ds-text-muted);
-  font-size: var(--text-xs-plus);
-  font-weight: var(--font-weight-strong);
-  letter-spacing: var(--tracking-wide);
-  text-transform: uppercase;
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-normal);
 }
 
 .composer-model-thinking-menu .composer-model-group-label {
@@ -544,27 +539,12 @@
   }
 }
 
-:lang(zh-CN) .composer-model-group-label {
-  letter-spacing: var(--tracking-normal);
-  text-transform: none;
-}
-
-/* Model rows share the provider heading's compact inset. Normal-weight option
-   text stays distinct from the stronger provider heading. */
+/* Model rows are one line: the name, then the real context window and
+   capability markers, then a slot for the current-row check. The provider is
+   the group heading above, so the row does not repeat it. */
 .composer-model-group .composer-model-option {
-  padding-left: 8px;
   font-size: var(--text-sm);
   font-weight: var(--font-weight-normal);
-}
-
-/* Model names and real provider/capability metadata occupy separate lines. */
-.composer-model-option-main {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px 8px;
 }
 
 /*
@@ -596,26 +576,42 @@
 .composer-model-option-meta {
   display: flex;
   flex: 0 0 auto;
-  max-width: 100%;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
+  margin-left: auto;
 }
 
 /* Capability markers are icons, not words: a row carries up to two of them, and
    the spelled-out labels were the widest thing in it. The accessible name stays
-   the translated label, so nothing is lost to a screen reader. */
-.composer-model-option-badge {
+   the translated label, so nothing is lost to a screen reader. The two figures
+   keep fixed columns so every row's context window and markers line up. The
+   `.composer-model-option` prefix outranks the shared `.composer-plus-item
+   span { min-width: 0 }`, which would otherwise collapse both columns. */
+.composer-model-option .composer-model-option-badges {
+  display: inline-flex;
+  min-width: 28px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.composer-model-option .composer-model-option-badge {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
   color: var(--ds-text-faint);
 }
 
-.composer-model-option-ctx {
+.composer-model-option .composer-model-option-badge svg {
+  color: var(--ds-text-faint);
+}
+
+.composer-model-option .composer-model-option-ctx {
+  min-width: 32px;
   color: var(--ds-text-faint);
   font-size: var(--text-2xs);
   font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
 .composer-plus-item.active {
@@ -636,40 +632,15 @@
   background: var(--ds-bg-active);
 }
 
-.composer-model-check {
-  flex: 0 0 auto;
-  color: var(--ds-accent) !important;
-}
-
-
-
-
-
-.composer-model-option-icon {
-  display: inline-flex;
-  width: 32px;
-  height: 32px;
-  flex: 0 0 32px;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--ds-border-subtle);
-  border-radius: var(--radius-md);
-  color: var(--ds-text-muted);
-}
-
-.composer-model-option-provider {
-  min-width: 0;
-  overflow-wrap: anywhere;
-  color: var(--ds-text-muted);
-  font-size: var(--text-xs);
-}
-
 .composer-model-settings.btn {
   width: 100%;
+  min-height: 32px;
   justify-content: flex-start;
-  gap: 8px;
-  padding: 10px 12px;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
   color: var(--ds-text-secondary);
+  font-size: var(--text-sm);
 }
 
 
@@ -816,12 +787,13 @@
 
 .composer-plus-search {
   display: flex;
+  min-height: 32px;
   align-items: center;
   gap: 8px;
-  padding: 6px 8px;
-  border-radius: var(--radius-md);
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
   background: var(--ds-field-inset-bg);
-  border: 1px solid var(--ds-border-subtle);
+  border: 1px solid transparent;
   margin-bottom: 6px;
   flex-shrink: 0;
 }
@@ -842,7 +814,7 @@
   background: transparent;
   border: none;
   outline: none;
-  font-size: var(--text-md);
+  font-size: var(--text-sm);
   color: var(--ds-text-primary);
 }
 
@@ -860,11 +832,9 @@
 
 .composer-plus-group-title {
   font-size: var(--text-xs);
-  font-weight: var(--font-weight-semibold);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
+  font-weight: var(--font-weight-normal);
   color: var(--ds-text-muted);
-  padding: 6px 8px 2px;
+  padding: 6px 10px 4px;
 }
 
 .composer-plus-item {
@@ -895,61 +865,135 @@
 .composer-plus-separator {
   height: 1px;
   background: var(--ds-border-subtle);
-  margin: 6px 0;
+  margin: 6px 4px;
   flex-shrink: 0;
 }
 
+/* Plan and Goal read as two more rows of the menu, switch at the right. */
 .composer-plus-modes {
-  padding: 4px 8px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
   flex-shrink: 0;
 }
 
 .composer-plus-toggle-row {
   display: flex;
+  min-height: 32px;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
 }
 
 .composer-plus-toggle-label {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: var(--text-md);
-  font-weight: var(--font-weight-medium);
+  gap: 10px;
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-normal);
   color: var(--ds-text-primary);
 }
 
-/* Footer menus share the composer's opaque, neutral popover surface. */
+.composer-plus-toggle-label svg {
+  color: var(--ds-text-muted);
+}
+
+/*
+  Workspace strip menus (project, location, branch): the same opaque surface and
+  row language as the toolbar menus (PI-UI-1126, D652). Rows are 32px, 44px with a
+  second line; the lead icon is quiet until the row is under the pointer; the
+  current row carries a check and a heavier name, never a fill, and hover is the
+  only fill. Class names are shared by the three menus (strip-menu-parts.tsx).
+*/
 .composer-footer-project, .composer-footer-anchor { min-width: 0; }
 .composer-footer-trigger { padding: 4px 6px; border-radius: var(--radius-sm); max-width: 180px; color: var(--ds-text-muted); background: transparent; border: 0; font-size: inherit; }
 .composer-footer-trigger:hover, .composer-footer-trigger.active { color: var(--ds-text-primary); background: var(--ds-bg-hover); }
-.composer-footer-menu { width: 290px; max-width: calc(100vw - 16px); max-height: min(460px, calc(100vh - 24px)); overflow-y: auto; padding: 8px; background: var(--ds-bg-elevated-opaque); color: var(--ds-text-primary); border: 1px solid var(--ds-border-default); border-radius: var(--radius-lg); box-shadow: var(--ds-shadow-dialog); }
-.composer-footer-menu-search, .composer-footer-search { display: flex; align-items: center; gap: 8px; margin: 2px 4px 8px; color: var(--ds-text-muted); }
-.composer-footer-menu-search input, .composer-footer-search input { flex: 1; min-width: 0; }
-.composer-footer-menu-list, .composer-footer-list { max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
-.composer-footer-menu-item, .composer-footer-item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 36px; padding: 8px 10px; justify-content: flex-start; border-radius: var(--radius-sm); text-align: left; font-size: var(--text-sm); font-weight: var(--font-weight-normal); }
-.composer-footer-menu-item.is-active, .composer-footer-menu-item.is-current, .composer-footer-item[aria-checked="true"] { background: var(--ds-bg-hover); }
-.composer-footer-menu-name, .composer-footer-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The chevron says "menu"; it turns over while the menu is open. A lock stands in
+   for it while a running task holds the menu's actions. */
+.composer-footer-chevron, .composer-footer-lock {
+  margin-left: -1px;
+  opacity: 0.55;
+  transition:
+    opacity var(--motion-duration-fast) var(--motion-ease-out),
+    transform var(--motion-duration-fast) var(--motion-ease-out);
+}
+.composer-footer-lock { opacity: 0.7; }
+.composer-footer-trigger.active .composer-footer-chevron { opacity: 0.8; transform: rotate(180deg); }
+
+.composer-footer-menu { width: 290px; max-width: calc(100vw - 16px); max-height: min(460px, calc(100vh - 24px)); overflow-y: auto; padding: 6px; background: var(--ds-bg-elevated-opaque); color: var(--ds-text-primary); border: 1px solid var(--ds-border-default); border-radius: var(--radius-lg); box-shadow: var(--ds-shadow-dialog); }
+.composer-footer-location-menu { width: 240px; }
+.composer-footer-worktree-menu { width: 310px; }
+
+/* Search: the icon sits inside the field. */
+.composer-footer-search { position: relative; margin: 0 0 6px; color: var(--ds-text-muted); }
+.composer-footer-search > svg { position: absolute; top: 50%; left: 10px; transform: translateY(-50%); pointer-events: none; }
+.composer-footer-menu .composer-footer-search .field-input { min-height: 32px; padding: 6px 10px 6px 30px; font-size: var(--text-sm); }
+
+.composer-footer-list { display: flex; max-height: 240px; flex-direction: column; gap: 2px; overflow-y: auto; }
 .composer-footer-row-tooltip { display: block; width: 100%; }
-.composer-footer-menu-item svg, .composer-footer-item svg { flex-shrink: 0; }
-.composer-footer-menu-check { margin-left: auto; }
-.composer-footer-menu-divider, .composer-footer-divider { height: 1px; margin: 8px 2px; background: var(--ds-border-default); }
-.composer-footer-heading { padding: 4px 10px 8px; color: var(--ds-text-muted); font-size: var(--text-xs); }
-.composer-footer-menu-empty, .composer-footer-hint, .composer-footer-error { margin: 0; padding: 8px 10px; font-size: var(--text-xs); line-height: var(--leading-relaxed); overflow-wrap: anywhere; color: var(--ds-text-muted); }
+
+.composer-footer-menu .composer-footer-item {
+  display: flex;
+  width: 100%;
+  min-height: 32px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--leading-compact);
+  text-align: left;
+}
+.composer-footer-menu .composer-footer-item.is-action { color: var(--ds-text-secondary); }
+.composer-footer-menu .composer-footer-item.is-two-line { min-height: 44px; padding-block: 5px; }
+.composer-footer-menu .composer-footer-item:is(:hover, :focus-visible, .is-active):not(:disabled) { background: var(--ds-bg-hover); color: var(--ds-text-primary); }
+/* An inert row reads as unavailable by ink, not by half opacity; the current row stays plain. */
+.composer-footer-menu .composer-footer-item:disabled { opacity: 1; color: var(--ds-text-muted); }
+.composer-footer-menu .composer-footer-item[aria-checked="true"]:disabled { color: var(--ds-text-primary); }
+.composer-footer-lead { flex: none; color: var(--ds-text-muted); }
+.composer-footer-item:is(:hover, :focus-visible, .is-active):not(:disabled) .composer-footer-lead { color: var(--ds-text-primary); }
+.composer-footer-item:disabled .composer-footer-lead { opacity: 0.7; }
+
+.composer-footer-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.composer-footer-item:is([aria-checked="true"], .is-current) .composer-footer-label { font-weight: var(--font-weight-medium); }
+.composer-footer-text { display: flex; min-width: 0; flex: 1; flex-direction: column; }
+.composer-footer-line { display: flex; min-width: 0; align-items: center; gap: 10px; }
+.composer-footer-sub { overflow: hidden; color: var(--ds-text-muted); font-size: var(--text-xs); line-height: var(--leading-normal); text-overflow: ellipsis; white-space: nowrap; }
+/* A path is clipped at its start, so the folder next to the project stays visible. */
+.composer-footer-sub.is-path { direction: rtl; text-align: left; }
+.composer-footer-tag { flex: none; margin-left: auto; color: var(--ds-text-muted); font-size: var(--text-xs); white-space: nowrap; }
+.composer-footer-check { flex: none; margin-left: auto; color: var(--ds-text-primary); }
+
+.composer-footer-divider { height: 1px; margin: 6px 4px; background: var(--ds-border-default); }
+.composer-footer-heading { padding: 6px 10px 4px; color: var(--ds-text-muted); font-size: var(--text-xs); }
+.composer-footer-hint, .composer-footer-error { margin: 0; padding: 8px 10px; font-size: var(--text-xs); line-height: var(--leading-relaxed); overflow-wrap: anywhere; color: var(--ds-text-muted); }
 .composer-footer-error { color: var(--ds-error-ink); }
-.composer-footer-form { display: flex; flex-direction: column; gap: 12px; padding: 4px; }
-.composer-footer-back { align-self: flex-start; gap: 6px; }
-.composer-footer-submit { width: 100%; }
+
+/* Why the rows are inert, in the menu itself. */
+.composer-footer-banner { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 6px; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--ds-tile-hover); color: var(--ds-text-secondary); font-size: var(--text-xs); line-height: var(--leading-relaxed); }
+.composer-footer-banner svg { flex: none; margin-top: 2px; color: var(--ds-text-muted); }
+
+/* Sub-views: back arrow and title, then a labelled field and one compact action. */
+.composer-footer-header { display: flex; align-items: center; gap: 4px; margin: 0 0 6px; }
+.composer-footer-menu .composer-footer-back { display: inline-grid; width: 24px; height: 24px; padding: 0; place-items: center; border-radius: var(--radius-xs); color: var(--ds-text-secondary); }
+.composer-footer-title { color: var(--ds-text-primary); font-size: var(--text-sm); font-weight: var(--font-weight-medium); }
+.composer-footer-form { display: flex; flex-direction: column; }
+.composer-footer-field { display: flex; flex-direction: column; }
+.composer-footer-field-label { margin: 8px 10px 4px; color: var(--ds-text-muted); font-size: var(--text-xs); }
+.composer-footer-menu .composer-footer-field .field-input { width: auto; min-height: 32px; margin: 0 4px; padding: 6px 10px; font-size: var(--text-sm); }
+.composer-footer-field-hint { margin: 6px 10px 0; color: var(--ds-text-muted); font-size: var(--text-xs); line-height: var(--leading-relaxed); }
+.composer-footer-actions { display: flex; justify-content: flex-end; margin: 10px 4px 2px; }
+.composer-footer-menu .composer-footer-submit { width: auto; min-height: 28px; padding: 0 14px; border-radius: var(--radius-xs); font-size: var(--text-sm); font-weight: var(--font-weight-medium); }
 @media (max-width: 600px) {
   .composer-workspace-context { gap: 6px; }
   .composer-footer-trigger { max-width: 100px; padding-inline: 3px; }
 }
 
-.composer-footer-location-menu { width: 200px; }
-.composer-footer-worktree-menu { width: 310px; }
 .composer-footer-menu { position: fixed; z-index: 40; margin: 0; visibility: hidden; opacity: 0; pointer-events: none; }
 .composer-footer-menu.is-open { visibility: visible; opacity: 1; pointer-events: auto; }
