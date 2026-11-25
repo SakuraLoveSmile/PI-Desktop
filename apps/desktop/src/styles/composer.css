@@ -484,7 +484,7 @@
 .composer-right {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
   flex: 0 0 auto;
   margin-left: auto;
@@ -590,6 +590,19 @@
 .send-btn:active:not(:disabled),
 .stop-btn:active:not(:disabled) {
   transform: scale(0.94);
+}
+
+/* Send and Stop share one slot and one shape: a circle, set 8px apart from the
+   quiet controls before it (PI-UI-1126, D652). `.send-btn` is also the message
+   editor's text button, which keeps its pill, so the shape is scoped here. */
+.composer-toolbar .send-btn,
+.composer-toolbar .stop-btn {
+  border-radius: var(--radius-full);
+}
+
+.composer-right .send-btn,
+.composer-right .stop-btn {
+  margin-left: 8px;
 }
 
 .nav-item {

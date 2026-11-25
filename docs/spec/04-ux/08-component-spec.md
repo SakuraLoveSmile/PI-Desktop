@@ -3300,7 +3300,9 @@ reasoning-level control.
   in-flight turn actually projects `planning`.
 - While Plan is the committed mode, the Plan chip carries a close control
   (`chat.exitPlanMode`) that returns to Agent through the same switch as the +
-  menu's Plan toggle. The control is disabled while a plan is being drafted or
+  menu's Plan toggle. The two read as one pill with a single quiet tint behind
+  them (D652); each part stays its own button and a hover fills only its half.
+  The control is disabled while a plan is being drafted or
   awaits approval (the host refuses a mode change then with
   `PLAN_CONFIGURATION_BLOCKED`) and while controls are blocked; the + menu's
   Plan switch has no planning or approval guard. Exiting does not delete plan
@@ -3318,7 +3320,9 @@ reasoning-level control.
   retain their side and order, followed by the combined model × reasoning-level
   chip, prompt enhancement, Live voice and the single Stop/Send slot. The model
   chip remains one button and its anchored menu remains tied to that button.
-  Send and Stop use the same neutral 32px rounded-square footprint. Context
+  Send and Stop use the same neutral 32px circle (D652), set 8px after the
+  quiet controls before them, which sit 2px apart; the message editor's text Send
+  button keeps its own pill. Context
   usage sits at the right end of the workspace strip beside its meter (D652).
   Its visible label names
   the leading figure's direction: `chat.usageContextRemainingLabel` (Remaining)
