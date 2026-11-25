@@ -43,7 +43,7 @@ function ComposerWorkspaceControls({ t, running, path, name, sessionId, remote, 
   const strip = syncTopStripState(stored, running);
   if (strip !== stored) setStored(strip);
   const expanded = topStripExpanded(strip);
-  const common = { ...controller, disabled: disabled || projectRunning };
+  const common = { ...controller, disabled: disabled || projectRunning, locked: projectRunning };
   return <div className="composer-top-strip" data-expanded={expanded ? "true" : "false"}>
     <div className="composer-workspace-context">
       {expanded ? <ComposerProjectMenu path={path} name={name} disabled={disabled} /> : null}

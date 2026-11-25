@@ -18491,6 +18491,10 @@ from registry metadata, return to Local, and verify each new session's execution
 path and original checkout changes. A result arriving after a session switch must
 not navigate or replace the new session's branch. Check Escape/focus return,
 keyboard selection, opaque surfaces and narrow footer geometry in the real renderer.
+Cover the shared row language (PI-UI-1126, D652): a project row's folder line, the
+Local/Worktree descriptions, the check on the current row, the *In use* tag on a
+branch held by another checkout, and, while a task runs, the lock on the location
+and branch triggers with the banner that outranks the dirty-checkout text.
 RPC tests execute native Git against temporary repositories; renderer interaction
 fixtures mock only the external Host/session API edge and use the real store and
 components. They do not establish SSH server connectivity or a packaged release.

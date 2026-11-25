@@ -59,6 +59,7 @@ import {
   Lightbulb,
   Link,
   ListChecks,
+  Lock,
   LogOut,
   Loader,
   Map as MapIcon,
@@ -259,6 +260,7 @@ export const IconHook = icon(Webhook);
 export const IconWorkflow = icon(Workflow);
 export const IconLightbulb = icon(Lightbulb);
 export const IconLink = icon(Link);
+export const IconLock = icon(Lock);
 export const IconPalette = icon(Palette);
 export const IconPerson = icon(Smile);
 export const IconInfo = icon(Info);

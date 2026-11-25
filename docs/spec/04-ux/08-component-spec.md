@@ -5425,6 +5425,23 @@ visible in the menu. Operation results cannot navigate or overwrite metadata in 
 different owning session. Arrow keys, Enter and Escape preserve text editing,
 focus return and narrow viewport reachability.
 
+The three menus share one row language (PI-UI-1126, D652). A trigger ends in a
+chevron that turns over while its menu is open. While a task runs in the project,
+the location and branch triggers show a lock in its place, and their menus open
+with a banner that says why nothing can be used, instead of greying the rows out
+without a reason; a running task takes the banner before a dirty checkout does,
+and a branch held by another checkout carries an *In use* tag only while the list
+could otherwise change. Rows are 32px, or 44px with a second line. A project row
+is its name over the folder that holds it, with the home folder written `~` and
+the path clipped at its start so the folder next to the project stays visible; a
+project at the filesystem root has no second line, and the row's accessible name
+is the project. The Local and Worktree rows each carry a one-line description. The
+current row carries a check and a medium-weight name, never a fill; hover and
+keyboard highlight are the only fill, and an inert row reads as unavailable by
+ink, not by half opacity. The new-worktree and new-branch views have a back arrow
+with the view's title, a labelled field with its hint always visible, and one
+compact, right-aligned primary action.
+
 Nested projects retain their relative subdirectory when entering another checkout
 or returning to Local. If the corresponding directory is unavailable, navigation
 reports failure and keeps the original session; it does not widen the execution

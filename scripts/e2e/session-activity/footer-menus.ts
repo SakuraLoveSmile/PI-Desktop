@@ -109,7 +109,8 @@ export function installFooterMenuFixture(t: TFunction) {
   const key = (target: EventTarget, value: string) => flushSync(() => target.dispatchEvent(new KeyboardEvent("keydown", { key: value, bubbles: true })));
   const trigger = (host: HTMLElement, index: number) => host.querySelectorAll<HTMLButtonElement>(".composer-footer-trigger")[index];
   const menu = (kind: string) => document.querySelector<HTMLElement>(`.composer-${kind}-menu.is-open`);
-  const find = (root: Element | null | undefined, text: string) => [...(root?.querySelectorAll<HTMLButtonElement>("button") ?? [])].find(item => item.textContent?.trim() === text);
+  // A row names itself in its label; its description, parent folder and reason tag are separate text.
+  const find = (root: Element | null | undefined, text: string) => [...(root?.querySelectorAll<HTMLButtonElement>("button") ?? [])].find(item => (item.querySelector(".composer-footer-label") ?? item).textContent?.trim() === text);
   const close = () => key(window, "Escape");
   async function open(probe: Probe, index: number, kind: string) {
     // Session navigation remounts the controls; let their ownership effects settle.
@@ -129,6 +130,7 @@ export function installFooterMenuFixture(t: TFunction) {
       let popup = await open(probe, 2, "footer-branch");
       check(find(popup, "main")?.getAttribute("aria-checked") === "true", "footer branch identifies current checkout");
       check(find(popup, "occupied")?.disabled, "footer disables a branch occupied by another worktree");
+      check(find(popup, "occupied")?.textContent?.includes(t("chat.workspaceMenu.branchOccupied")), "an occupied branch row says why it is unavailable");
       input(popup.querySelector("input"), "feature");
       check(popup.querySelectorAll('[role="menuitemradio"]').length === 1, "branch search filters local branches");
       key(popup.querySelector("input")!, "ArrowDown");

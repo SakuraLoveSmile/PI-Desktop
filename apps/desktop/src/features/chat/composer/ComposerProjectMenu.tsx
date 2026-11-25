@@ -9,21 +9,116 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  IconCheck,
   IconFolder,
   IconFolderOpen,
   IconPlus,
-  IconSearch,
   IconTerminal,
 } from "../../../components/icons";
 import { AnchoredMenu } from "../../../components/settings/AnchoredMenu";
-import { Button, cx, Input, TooltipButton } from "../../../components/ui";
+import { Button, cx, TooltipButton } from "../../../components/ui";
 import {
   filterSwitcherProjects,
   listSwitcherProjects,
   normalizeProjectPath,
+  type SwitcherProject,
 } from "../../../lib/sidebar-preferences";
 import { useAppStore } from "../../../stores/app-store";
+import {
+  projectParentLabel,
+  StripMenuSearch,
+  StripRowBody,
+  StripTriggerTail,
+} from "./strip-menu-parts";
+
+export type ComposerProjectMenuBodyProps = {
+  projects: readonly Pick<SwitcherProject, "key" | "name" | "path">[];
+  activeKey: string | null;
+  highlight: number;
+  query: string;
+  listId: string;
+  /** Rows and actions are inert while a switch runs or the session is not local. */
+  disabled: boolean;
+  rowRef: (index: number, node: HTMLButtonElement | null) => void;
+  onQuery: (value: string) => void;
+  onHighlight: (index: number) => void;
+  onSelect: (path: string | null) => void;
+  onNewWorkspace: () => void;
+  onConnectSsh: () => void;
+};
+
+/** The project menu's contents: search, one row per project, and the workspace actions. */
+export function ComposerProjectMenuBody({
+  projects, activeKey, highlight, query, listId, disabled,
+  rowRef, onQuery, onHighlight, onSelect, onNewWorkspace, onConnectSsh,
+}: ComposerProjectMenuBodyProps) {
+  const { t } = useTranslation();
+  return <>
+    <StripMenuSearch
+      value={query}
+      placeholder={t("chat.workspaceMenu.projectSearch")}
+      aria-label={t("chat.workspaceMenu.projectSearch")}
+      aria-controls={listId}
+      autoComplete="off"
+      onChange={(event) => onQuery(event.target.value)}
+    />
+    <div className="composer-footer-list" id={listId} role="none">
+      {projects.length === 0 ? (
+        <div className="composer-footer-hint" role="status">
+          {t("chat.workspaceMenu.noProjects")}
+        </div>
+      ) : projects.map((project, index) => {
+        const current = project.key === activeKey;
+        const parent = projectParentLabel(project.path);
+        return (
+          <TooltipButton
+            key={project.key}
+            ref={(node) => rowRef(index, node)}
+            type="button"
+            role="menuitemradio"
+            aria-checked={current}
+            tooltip={project.path}
+            ariaLabel={project.name}
+            className={cx("composer-footer-item",
+              parent && "is-two-line",
+              current && "is-current",
+              highlight === index && "is-active")}
+            disabled={disabled}
+            onFocus={() => onHighlight(index)}
+            onMouseEnter={() => onHighlight(index)}
+            onClick={() => onSelect(project.path)}
+          >
+            <StripRowBody
+              icon={<IconFolder size={15} className="composer-footer-lead" aria-hidden />}
+              name={project.name}
+              sub={parent}
+              path
+              current={current}
+            />
+          </TooltipButton>
+        );
+      })}
+    </div>
+    <div className="composer-footer-divider" aria-hidden />
+    <Button variant="ghost" type="button" role="menuitem"
+      className="composer-footer-item is-action" disabled={disabled}
+      onClick={onNewWorkspace}>
+      <IconPlus size={15} className="composer-footer-lead" aria-hidden />
+      <span className="composer-footer-label">{t("chat.workspaceMenu.newWorkspace")}</span>
+    </Button>
+    <Button variant="ghost" type="button" role="menuitem"
+      className="composer-footer-item is-action" disabled={disabled}
+      onClick={onConnectSsh}>
+      <IconTerminal size={15} className="composer-footer-lead" aria-hidden />
+      <span className="composer-footer-label">{t("chat.workspaceMenu.connectSsh")}</span>
+    </Button>
+    <Button variant="ghost" type="button" role="menuitem"
+      className="composer-footer-item is-action" disabled={disabled}
+      onClick={() => onSelect(null)}>
+      <IconFolder size={15} className="composer-footer-lead" aria-hidden />
+      <span className="composer-footer-label">{t("chat.workspaceMenu.noWorkspace")}</span>
+    </Button>
+  </>;
+}
 
 export function ComposerProjectMenu({
   path,
@@ -121,6 +216,17 @@ export function ComposerProjectMenu({
     void runAction(() => newSession({ projectPath: nextPath }));
   };
 
+  const connectSsh = () => {
+    if (blocked || busyRef.current) return;
+    const current = useAppStore.getState();
+    if (current.activeSessionId !== activeSessionId || current.sessions.some(
+      (session) => session.id === current.activeSessionId && session.source === "remote",
+    )) return;
+    close();
+    setSettingsTab("remoteHosts");
+    setPage("settings");
+  };
+
   const onMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.nativeEvent.isComposing || visible.length === 0) return;
     const fromSearch = event.target instanceof HTMLInputElement;
@@ -157,7 +263,7 @@ export function ComposerProjectMenu({
         <TooltipButton
           ref={ref}
           type="button"
-          className="composer-workspace-item composer-footer-trigger"
+          className={cx("composer-workspace-item composer-footer-trigger", open && !blocked && "active")}
           tooltip={path || label}
           ariaLabel={`${t("project.switchProject")}: ${label}`}
           aria-haspopup="menu"
@@ -171,76 +277,24 @@ export function ComposerProjectMenu({
         >
           <IconFolderOpen size={14} aria-hidden />
           <span>{label}</span>
+          <StripTriggerTail />
         </TooltipButton>
       )}
     >
-      <div className="composer-footer-menu-search">
-        <IconSearch size={16} aria-hidden />
-        <Input
-          value={query}
-          placeholder={t("chat.workspaceMenu.projectSearch")}
-          aria-label={t("chat.workspaceMenu.projectSearch")}
-          aria-controls={listId}
-          autoComplete="off"
-          onChange={(event) => setQuery(event.target.value)}
-        />
-      </div>
-      <div className="composer-footer-menu-list" id={listId} role="none">
-        {visible.length === 0 ? (
-          <div className="composer-footer-menu-empty" role="status">
-            {t("chat.workspaceMenu.noProjects")}
-          </div>
-        ) : visible.map((project, index) => (
-          <TooltipButton
-            key={project.key}
-            ref={(node) => { rowRefs.current[index] = node; }}
-            type="button"
-            role="menuitemradio"
-            aria-checked={project.key === activeKey}
-            tooltip={project.path}
-            ariaLabel={project.name}
-            className={cx("composer-footer-menu-item",
-              project.key === activeKey && "is-current",
-              highlight === index && "is-active")}
-            disabled={busy || blocked}
-            onFocus={() => setHighlight(index)}
-            onMouseEnter={() => setHighlight(index)}
-            onClick={() => selectProject(project.path)}
-          >
-            <IconFolder size={16} aria-hidden />
-            <span className="composer-footer-menu-name">{project.name}</span>
-            {project.key === activeKey && <IconCheck size={16} className="composer-footer-menu-check" aria-hidden />}
-          </TooltipButton>
-        ))}
-      </div>
-      <div className="composer-footer-menu-divider" aria-hidden />
-      <Button variant="ghost" type="button" role="menuitem"
-        className="composer-footer-menu-item" disabled={busy || blocked}
-        onClick={() => void runAction(openProject)}>
-        <IconPlus size={16} aria-hidden />
-        <span>{t("chat.workspaceMenu.newWorkspace")}</span>
-      </Button>
-      <Button variant="ghost" type="button" role="menuitem"
-        className="composer-footer-menu-item" disabled={busy || blocked}
-        onClick={() => {
-          if (blocked || busyRef.current) return;
-          const current = useAppStore.getState();
-          if (current.activeSessionId !== activeSessionId || current.sessions.some(
-            (session) => session.id === current.activeSessionId && session.source === "remote",
-          )) return;
-          close();
-          setSettingsTab("remoteHosts");
-          setPage("settings");
-        }}>
-        <IconTerminal size={16} aria-hidden />
-        <span>{t("chat.workspaceMenu.connectSsh")}</span>
-      </Button>
-      <Button variant="ghost" type="button" role="menuitem"
-        className="composer-footer-menu-item" disabled={busy || blocked}
-        onClick={() => selectProject(null)}>
-        <IconFolder size={16} aria-hidden />
-        <span>{t("chat.workspaceMenu.noWorkspace")}</span>
-      </Button>
+      <ComposerProjectMenuBody
+        projects={visible}
+        activeKey={activeKey}
+        highlight={highlight}
+        query={query}
+        listId={listId}
+        disabled={busy || blocked}
+        rowRef={(index, node) => { rowRefs.current[index] = node; }}
+        onQuery={setQuery}
+        onHighlight={setHighlight}
+        onSelect={selectProject}
+        onNewWorkspace={() => void runAction(openProject)}
+        onConnectSsh={connectSsh}
+      />
     </AnchoredMenu>
   );
 }
