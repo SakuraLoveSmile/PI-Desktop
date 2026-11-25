@@ -1,12 +1,12 @@
 # PI-UI-1126: composer controls redesign
 
-Status: 待体验 (built and verified locally in the request worktree, with one user-approved Electron E2E round on 2026-11-25; committed on the request branch as five commits at the user's word on 2026-11-25; not pushed). Project: `fork-pi-desktop`. Created: 2026-11-24 (Asia/Taipei).
+Status: 待体验 (built and verified locally in the request worktree; committed on the request branch as five commits at the user's word on 2026-11-25; task-candidate E2E passed 18 of 18 on `73e09e406` over the current `origin/main`; not pushed). Project: `fork-pi-desktop`. Created: 2026-11-24 (Asia/Taipei).
 Tier: T1 (renderer-only visible change; no IPC, Host, protocol or storage change; the nine locale files gain and lose keys). D652 amends D347 / ADR 0184.
 Baseline: `f6f7642d41b801f027e1b0aed2e1a54df98c8a67` (`main` after PR 104, v0.15.23).
 Branch: `feat/20261124-pi-ui-1126-composer-controls-redesign`.
 Worktree: `/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop/20261124-feat-pi-ui-1126-composer-controls-redesign`.
 Ids: PI-UI-1126 and D652 are provisional. D648, D649 and D651 belong to work that is not on `main` yet; renumber on the rebase if one of them lands first.
-The user's 「开始执行」 authorized building here and 「提交」 (2026-11-25) the local commits. Push, pull request, merge and release wait for the user's explicit word, and 已验收 is the user's.
+The user's 「开始执行」 authorized building here, 「提交」 (2026-11-25) the local commits and 「刷新并重跑」 (2026-11-25) the refresh against `origin/main` and the candidate E2E rerun. Push, pull request, merge and release wait for the user's explicit word, and 已验收 is the user's.
 
 ## Request and source
 
@@ -63,21 +63,26 @@ Run in the worktree on 2026-11-24 and again on 2026-11-25 after the E2E fixes (n
 - Electron E2E, one round the user approved on 2026-11-25 (「跑 E2E」). Every suite ran from this worktree on the final `apps/desktop/out` build, with a throwaway Electron profile and Host data directory and loopback fixtures only (no real provider, no user data), and with the primary checkout's debug Host binary. All 18 pass: `composer-mode-menus`, `composer-model-selection`, `composer-autocomplete`, `composer-paste`, `composer-input-history`, `composer-ime-stack`, `ime-escape`, `permission-card-layout`, `asktool-card`, `composer-thinking-layout` (30 checks), `plus-curated`, `context-insights` (34 of 34), `plan-ui`, `composer-queue-send-now-abort`, `theme-surfaces --dock-mask-only`, `layout` (three-column, 197 of 197), `scheduled`, and `transcript` (`e2e-transcript-render`, 600 checks, which holds the activity-integration stage and the strip-menu harness).
 - The round found two problems in this change, both fixed here: the integration harness still pinned the old 5.5px row gap (now 2px, in `session-activity-integration.tsx`), and the first build's scroll-timeline fade stalled that harness's wait for every animation (see Differences; the fade was replaced and the suites were run on the replacement).
 - The replacement fade, on the production stylesheets in headless Chrome with real frames: on at the top and the middle of an overflowing Add menu and model list, off at the end and when the list fits; at device pixel ratios 1, 1.5 and 2, with fractional row heights, it adds nothing to the scroll extent and is off at the true end of the list; dark and light frames show no seam against the menu surface.
+- Task-candidate validation (workflow steps 6 to 8), 2026-11-25, after the user's 「刷新并重跑」:
+  - Task candidate: `73e09e406`, the five commits on this branch (its tree is the one validated above). Base main: `f6f7642d4`, which is `origin/main` after `git fetch origin main`. The branch is 0 commits behind and `node scripts/check-pr-base-main.mjs` passes, so the refresh was a no-op: no rebase, no conflicts, no history rewritten.
+  - E2E suites: the same 18 as above, run one after another. Result: 18 of 18 exit 0 with the same counts as the first round (`composer-thinking-layout` 30 checks, `context-insights` 34 of 34, `layout` 197 of 197, `transcript` 600 checks).
+  - Environment: macOS 27.2.1 arm64, Node 22.23.2, Electron 43.6.0, rustc 1.98.0; throwaway Electron profiles and Host data directories, loopback fixtures only, no real provider; run from the sandboxed shell through the spawn hook that disarms the macOS reopen-windows prompt. Rebuilt for this run: `apps/desktop/out` from this HEAD (`electron-vite build`) and the Host from this HEAD (`cargo build --offline --locked -p host-core --bin pi-desktop-host-core`, debug, 65317288 bytes, in the worktree's own git-ignored `target/`, whose dependency cache was cloned read-only from the primary checkout). None of the nine `packages/*/dist` folders was older than its sources. The first round used the primary's debug Host of 2026-11-21, so this run also covers the `address` field of PR 101.
+  - Local checks repeated on the same HEAD: desktop `tsc --noEmit` clean; desktop tests 4560, 4556 pass, 0 fail, 4 skipped; style tokens, test-quality, docs locales (95 pairs), docs (658 pages), scenario index (138 suites, 168 executable ids) and agent-policy pass.
 
 ## Not run
 
 - `test:e2e:session-activity`: it drives the Host and the agent runner without the renderer, and this change touches neither. The rest of the E2E catalog outside the families listed under Validation, including the smoke and nightly tiers as a whole.
-- A Host built from this baseline: the Host-dependent suites above ran against the primary checkout's debug binary of 2026-11-21, which predates the optional `address` field of PR 101. No Rust file changed here, but a Host contract change since that build is not exercised.
+- Hosted candidate validation on the exact SHA of the pull request (it needs a push, which waits for the user's word).
 - The real app used by hand: hover, focus rings, IME composition and a keyboard walkthrough of the new menus. The harnesses mount the Composer and its menus in the real renderer; nobody has driven the dev or installed app.
 - A real-app capture in light and dark; Windows and Linux.
 
 ## Remaining work
 
-- The user's word on pushing and opening the pull request. Before that, refresh against the latest `origin/main` and run the task-candidate E2E again (workflow steps 6 to 8): the round above ran on the baseline plus these changes, so it is exploratory evidence until then.
+- The user's word on pushing and opening the pull request. Workflow steps 6 to 8 are done against `origin/main` = `f6f7642d4`; if `origin/main` moves before the push, fetch, rebase and rerun the candidate E2E (a result against an older base stays evidence but does not prove the new candidate).
 - The changelog entry, assumed to travel with the release-prep commit as for v0.15.23.
 - A look at the real app by the user (hover, focus, IME, both themes) before 已验收.
 - Pre-existing drift reported but not touched: D089 and the design system §8.0 say the empty draft shows one visible line (28px), while `.composer-dock .composer-input` is `min-height: 2lh`. It needs a decision, not a doc edit.
 
 ## Runtime resources
 
-None running: no dev server, no Electron process, no browser pane. Scratch files (render rig, stage snapshots) live in the session scratchpad only.
+None running: no dev server, no Electron process, no browser pane. Scratch files (render rig, stage snapshots, E2E logs) live in the session scratchpad only. Build outputs inside this worktree, all git-ignored: `apps/desktop/out`, the `packages/*/dist` folders and `target/` (the Host debug build, up to 2.7 GB logical size and mostly copy-on-write clones of the primary checkout's cache); removing the worktree drops them.
