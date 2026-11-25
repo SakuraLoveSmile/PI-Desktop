@@ -149,11 +149,21 @@ globalThis.composerModelSelectionProbe = async () => {
   assert(!document.querySelector(".composer-menu-entry, .composer-menu-back"), "no model submenu navigation remains");
   assert(element('[title="model-a"]').getAttribute("aria-checked") === "true", "current model is selected");
   assert(element('[title="model-b"] .composer-model-label').textContent === "Focused B", "configured aliases remain visible");
-  assert(element(".composer-model-option-provider").textContent?.trim() === "Fixture provider", "model metadata uses the actual provider");
+  assert(element(".composer-model-group-label").textContent?.trim() === "Fixture provider", "the actual provider is the group heading");
+  assert(!document.querySelector(".composer-model-option-provider, .composer-model-option-icon"), "a row repeats neither the provider nor an icon tile");
   assert(element(".composer-model-option-ctx").textContent === "32K", "context window uses real metadata");
   assert(element(".composer-model-option-badge").getAttribute("aria-label") === i18n.t("chat.modelBadgeReasoning"), "capability icon is accessible");
-  assert(getComputedStyle(element(".composer-model-option-main")).flexDirection === "column", "built styling places metadata below the name");
-  assert(element(".composer-model-option-icon").getBoundingClientRect().width === 32, "built styling reserves the approved icon size");
+  const optionRows = [...document.querySelectorAll<HTMLElement>(".composer-model-option")];
+  assert(optionRows.every((row) => Math.round(row.getBoundingClientRect().height) === 32), "built styling keeps a model row on one 32px line");
+  const checkSlots = [...document.querySelectorAll<HTMLElement>(".composer-model-option .composer-menu-check-slot")]
+    .map((slot) => slot.getBoundingClientRect());
+  assert(checkSlots.length === 2 && checkSlots.every((slot) => slot.width === 15 && slot.left === checkSlots[0].left), "the check slot keeps its width and column on every row");
+  const reasoningTitle = element(".composer-model-thinking-title");
+  assert(
+    reasoningTitle.querySelector("span")?.textContent === i18n.t("chat.reasoningLevel")
+      && reasoningTitle.querySelector("b")?.textContent?.trim() === element(".selected-thinking-level").textContent?.trim(),
+    "the reasoning title names the control and shows the current level",
+  );
   key(element('[title="model-a"]'), "ArrowDown");
   assert(element('[title="model-b"]').classList.contains("kb-active"), "ArrowDown selects next model");
   assert(document.activeElement === document.querySelector('[title="model-b"]'), "ArrowDown moves model focus");

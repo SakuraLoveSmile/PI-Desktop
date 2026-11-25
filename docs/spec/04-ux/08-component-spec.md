@@ -3337,11 +3337,18 @@ reasoning-level control.
   720px, the model trigger uses that same 32px icon-only variant early, retaining
   its complete accessible name and menu while reserving room for plugin actions.
 - The combined chip opens the complete model list directly above itself, without search,
-  provider-labelled rows, the current model's reasoning slider and a Model
-  configurations action. There is no Default/Custom tab or intermediate root
-  menu. Each row uses a 32px neutral icon, one model name, and a second line
-  of actual provider, context-window and capability metadata. No synthetic
-  preset routing, pricing or unsupported capabilities are inferred. The popup
+  under provider group headings, with the current model's reasoning slider and
+  a Model configurations action. There is no Default/Custom tab or
+  intermediate root menu. Each row is one 32px line: the model name (the
+  configured alias when set, the complete wire ID otherwise; a long name
+  wraps rather than hiding the part that tells two models apart), the real
+  context window as a right-aligned figure, capability icons, and a fixed slot
+  that holds the check on the current row. The actual provider is the group
+  heading, so a row never repeats it, and the row's title is the wire ID. No
+  synthetic preset routing, pricing or unsupported capabilities are inferred.
+  The list is at most 240px tall; while it continues below the fold its last
+  rows fade out. The reasoning slider sits under a title row that names the
+  control and shows the current level (D652). The popup
   is `min(348px, 100vw - 24px)` and uses existing anchored-menu focus, Escape,
   viewport-clamping and keyboard selection behavior. Model configurations
   opens the existing Settings model page in the chat Composer; it creates no
@@ -3355,11 +3362,30 @@ reasoning-level control.
   Clicking a task or the activity-rail agent opens `SubagentTranscriptTab`:
   task, thinking, tools and replies reuse the existing read-only rendering.
   The card's panorama entry remains available. Detailed mode is unchanged.
-- Execution-profile options have a 6px vertical gap. Agent and Expert Team
+- Execution-profile options are two-line rows (name over description, 44px)
+  with a 2px gap and a check on the current profile. Agent and Expert Team
   still change only the existing `standard`/`team` profile, retaining their
-  descriptions, Team parallel-call notice and switching gates. The menu does
-  not offer a synthetic agent or team roster. Ordinary delegate definitions
-  remain managed in the existing subagent settings page.
+  descriptions and switching gates. The Team parallel-call warning line was
+  removed because the Team description already says what the profile does
+  (D652). The menu does not offer a synthetic agent or team roster. Ordinary
+  delegate definitions remain managed in the existing subagent settings page.
+- The Add menu, the execution-profile menu and the model menu share one skin
+  (D652): the standard opaque elevated surface with a default hairline,
+  `--radius-lg` and the dialog shadow; 32px rows (44px with a description
+  line) with `--radius-sm` hover tiles; muted lead icons that turn primary on
+  hover; one quiet group-title voice; and the current row marked by a check
+  and a medium-weight name rather than a fill. A list that continues below
+  its fold (the Add menu's rows and the model list) fades its last 22px into
+  the menu surface while it can still scroll down; a list that fits, or one
+  scrolled to its end, has no fade, and keyboard scrolling leaves the target
+  row clear of it. The Add menu lists actions
+  only: Add files; workspace files and folders, shown only while a search
+  matches them (the `@` autocomplete is the browsing entry), each with its
+  folder after the name; plugin commands, commands and skills with their
+  description after the name on the same line; and the Plan and Goal
+  switches. The execution profile is not offered there; it has its own chip
+  and menu. The permission menu and the slash and `@` autocomplete keep their
+  own rows.
 - Width: Home and thread-docked composers share one `24px` horizontal gutter
   and a `768px` maximum content envelope. The left-edge conversation minimap
   is absolutely positioned outside that envelope, so its appearance or

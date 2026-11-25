@@ -1,0 +1,202 @@
+/*
+  Composer menu skin (PI-UI-1126, D652): one surface, row, title and
+  current-item language for the Add, execution-profile and model menus. Rows are
+  32px (44px with a description line); the current row is marked by a check and
+  a heavier name, never a fill, and hover is the only fill.
+
+  Scoped to these three menus on purpose: the permission menu and the slash / @
+  autocomplete share the `.composer-plus-item` class but keep their own look.
+  The workspace strip menus join the same language in their own rules.
+*/
+
+/* Surface. The :root prefix outranks the light-theme model-menu shadow. */
+:root .composer-plus-menu,
+:root .composer-profile-menu,
+:root .composer-model-menu.composer-model-thinking-menu {
+  padding: 6px;
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--radius-lg);
+  background: var(--ds-bg-elevated-opaque);
+  box-shadow: var(--ds-shadow-dialog);
+}
+
+:root .composer-profile-menu {
+  width: min(280px, calc(100vw - 24px));
+  gap: 2px;
+}
+
+/* Rows */
+:is(.composer-plus-menu, .composer-profile-menu, .composer-model-thinking-menu) .composer-plus-item {
+  min-height: 32px;
+  padding: 6px 10px;
+  gap: 10px;
+  border-radius: var(--radius-sm);
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--leading-compact);
+}
+
+:is(.composer-plus-menu, .composer-profile-menu, .composer-model-thinking-menu) .composer-plus-item.is-two-line {
+  min-height: 44px;
+  padding-block: 5px;
+}
+
+:is(.composer-plus-menu, .composer-profile-menu, .composer-model-thinking-menu)
+  .composer-plus-item:is(:hover, :focus-visible, .kb-active) {
+  background: var(--ds-bg-hover);
+}
+
+/* The current row carries a check and a heavier name, not a fill. */
+:is(.composer-plus-menu, .composer-profile-menu, .composer-model-thinking-menu) .composer-plus-item.active {
+  background: transparent;
+}
+
+:is(.composer-plus-menu, .composer-profile-menu, .composer-model-thinking-menu)
+  .composer-plus-item.active:is(:hover, :focus-visible, .kb-active) {
+  background: var(--ds-bg-hover);
+}
+
+:is(.composer-plus-menu, .composer-profile-menu, .composer-model-thinking-menu)
+  .composer-plus-item.active :is(.composer-plus-item-name, .composer-model-label) {
+  font-weight: var(--font-weight-medium);
+}
+
+/* Lead icon: quiet until the row is the one under the pointer. */
+:is(.composer-plus-menu, .composer-profile-menu, .composer-model-thinking-menu)
+  .composer-plus-item .composer-item-icon {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  color: var(--ds-text-muted);
+}
+
+:is(.composer-plus-menu, .composer-profile-menu, .composer-model-thinking-menu)
+  .composer-plus-item:is(:hover, :focus-visible, .kb-active) .composer-item-icon {
+  color: var(--ds-text-primary);
+}
+
+/* A name with its description on the same line, or stacked in a two-line row. */
+.composer-plus-item-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 64%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-plus-item-desc {
+  flex: 1 1 0;
+  min-width: 0;
+  margin-left: 2px;
+  overflow: hidden;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-plus-item-text {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+.composer-plus-item-text > .composer-plus-item-name {
+  max-width: none;
+}
+
+.composer-plus-item-text > .composer-plus-item-desc {
+  flex: none;
+  margin-left: 0;
+}
+
+/* The current-row check; the model list keeps a fixed slot so figures line up.
+   The `.composer-plus-item` prefix outranks the row's own `svg` colour. */
+.composer-plus-item .composer-menu-check {
+  flex: none;
+  margin-left: auto;
+  color: var(--ds-text-primary);
+}
+
+.composer-menu-check-slot .composer-menu-check {
+  margin-left: 0;
+}
+
+.composer-menu-check-slot {
+  display: inline-flex;
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+
+/* Reasoning level: a title with the current value above the slider. */
+.composer-model-thinking-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 4px 10px 6px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs);
+}
+
+.composer-model-thinking-title > b {
+  color: var(--ds-text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.composer-model-thinking-menu .composer-thinking-slider {
+  padding-inline: 10px;
+}
+
+/*
+  A list that continues below its fold fades its last rows into the menu
+  surface, so it never ends mid-row without a hint. The fade is a sticky layer
+  at the foot of the scroller; a scroll-state container query shows it only
+  while the list can still scroll down, so a list that fits, or one scrolled to
+  its end, has none. It is deliberately not a scroll-timeline animation: that
+  leaves `Animation.finished` pending for as long as the list is not scrolled
+  to its end, which stalls any code that waits for every animation to settle.
+*/
+.composer-plus-content,
+.composer-model-thinking-menu .composer-model-list {
+  --composer-menu-fade-height: 22px;
+  container: composer-menu-scroll / scroll-state;
+  /* Keyboard and focus scrolling leave the target row clear of the fade. */
+  scroll-padding-bottom: var(--composer-menu-fade-height);
+}
+
+/* The Add menu's rows are a flex column with a 2px gap, which the layer's
+   overlap has to include so that it adds no height to the list. */
+.composer-plus-content {
+  --composer-menu-fade-lead: 2px;
+}
+
+:is(.composer-plus-content, .composer-model-thinking-menu .composer-model-list)::after {
+  content: "";
+  display: block;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  flex: none;
+  height: var(--composer-menu-fade-height);
+  margin-top: calc(-1 * (var(--composer-menu-fade-height) + var(--composer-menu-fade-lead, 0px)));
+  background: linear-gradient(transparent, var(--ds-bg-elevated-opaque));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+@container composer-menu-scroll scroll-state(scrollable: bottom) {
+  :is(.composer-plus-content, .composer-model-thinking-menu .composer-model-list)::after {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.composer-plus-content, .composer-model-thinking-menu .composer-model-list)::after {
+    transition: none;
+  }
+}

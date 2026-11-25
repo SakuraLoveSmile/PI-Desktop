@@ -277,7 +277,6 @@ export const zhTW = {
     profileAgentDesc: "單智能體標準執行",
     profileTeam: "專家團",
     profileTeamDesc: "多智能體自主協作團隊，擁有共享任務看板",
-    profileTeamNotice: "可能發起多個並行模型調用",
     profileBlockedByRunningTeammate: "有團隊成員正在運行或初始化，暫無法切回單智能體",
     contractNone: "常規",
     contractNoneDesc: "無前置方案審批，直接對話執行",

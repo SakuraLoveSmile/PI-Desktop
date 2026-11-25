@@ -2629,14 +2629,16 @@ workflow. They are not gates or promised outputs of the current Release run.
 - **Preconditions**: Chat route active; provider configured with two reasoning
   models whose binding defaults differ.
 - **Steps**: 1) Click the Composer-left model × reasoning chip. 2) Confirm the
-  menu opens upward directly to the searchable model list, with no Default/Custom
-  tabs. 3) Select a different provider/model. 4) Confirm its default thinking
+  menu opens upward directly to the model list, with no search field and no
+  Default/Custom tabs. 3) Select a different provider/model. 4) Confirm its default thinking
   level, choose another supported level, then reselect the same model. 5) Use
   Model configurations in the popup to open the existing Settings model page.
 - **Expected**: The trigger uses a Bot icon while retaining the current model
-  and reasoning labels. The popup shows the model list immediately. Each row has
-  a neutral icon, one display name and actual provider, context and capability
-  metadata. It lists enabled runnable providers and only their saved bindings. Cached or freshly discovered models may supply display names and
+  and reasoning labels. The popup shows the model list immediately. Each row is
+  one 32px line: one display name, the context window as a right-aligned figure
+  and capability icons, with the current row's check in a fixed slot; the
+  actual provider is the group heading above its rows, never repeated on a
+  row. It lists enabled runnable providers and only their saved bindings. Cached or freshly discovered models may supply display names and
   metadata for those bindings, but unconfigured discovery results are absent;
   configured IDs remain available when discovery is unavailable. The slider
   lists the selected model's supported levels. Selecting a different model
@@ -2675,8 +2677,9 @@ workflow. They are not gates or promised outputs of the current Release run.
   and each selection updates its trigger. The execution-profile labels
   `智能体` and `专家团` remain fully visible at desktop and narrow composer widths.
   Home and thread-docked composers match, with two-line empty input, a neutral
-  outline and unseparated toolbar. Profile menu options have at least 6px vertical
-  separation; switching profiles preserves model, reasoning and permission.
+  outline and unseparated toolbar. Profile menu options are two-line rows (name over
+  description) at least 2px apart, with no warning line under Expert Team;
+  switching profiles preserves model, reasoning and permission.
   The task-progress card and activity rail both open the existing read-only
   subagent transcript tab, while the composer stays in the reading region.
 - **Specs linked**: `04-ux/08-component-spec.md` (§11)

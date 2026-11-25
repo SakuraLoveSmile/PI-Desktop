@@ -238,7 +238,7 @@ try {
   await click(await evaluate(`document.querySelector('.scheduled-execution-toolbar .composer-model-thinking-chip').getAttribute('aria-label')`), 'button[aria-haspopup]', true);
   await waitFor(() => evaluate(`!!document.querySelector('.composer-model-menu.is-open .composer-model-list') && document.activeElement?.matches('.composer-model-option')`), 5000, "direct model list with keyboard focus");
   const modelRows = await evaluate(`[...document.querySelectorAll('.composer-model-option')].map(e => ({
-    model: e.title, provider: e.querySelector('.composer-model-option-provider')?.textContent.trim(),
+    model: e.title, provider: e.closest('.composer-model-group')?.getAttribute('aria-label'),
     focused: e === document.activeElement
   }))`);
   const alternateIndex = modelRows.findIndex(row => row.model === "fixture-alt" && row.provider === "Scheduled alternate model");
@@ -248,9 +248,9 @@ try {
     await key("ArrowDown", 40);
   }
   assert.equal(await evaluate(`document.activeElement?.title`), "fixture-alt", "keyboard navigation reaches the requested model");
-  assert.equal(await evaluate(`document.activeElement?.querySelector('.composer-model-option-provider')?.textContent.trim()`), "Scheduled alternate model", "keyboard navigation retains provider identity");
+  assert.equal(await evaluate(`document.activeElement?.closest('.composer-model-group')?.getAttribute('aria-label')`), "Scheduled alternate model", "keyboard navigation retains provider identity");
   await key("Enter", 13);
-  await waitFor(() => evaluate(`document.querySelector('.composer-model-option[aria-checked="true"]')?.querySelector('.composer-model-option-provider')?.textContent.trim() === 'Scheduled alternate model'`), 5000, "task model selection remains on the direct list");
+  await waitFor(() => evaluate(`document.querySelector('.composer-model-option[aria-checked="true"]')?.closest('.composer-model-group')?.getAttribute('aria-label') === 'Scheduled alternate model'`), 5000, "task model selection remains on the direct list");
   // Reasoning remains on the same surface as the directly visible model list.
   await click("high", ".composer-thinking-tick");
   await waitFor(() => evaluate(`document.querySelector('.composer-thinking-range')?.getAttribute('aria-valuetext') === 'high'`), 5000, "reasoning slider at high");

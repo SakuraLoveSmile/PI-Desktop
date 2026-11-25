@@ -275,7 +275,6 @@ export const de = {
     "profileAgentDesc": "Standardmäßige Einzelagent-Ausführung",
     "profileTeam": "Expertenteam",
     "profileTeamDesc": "Autonomes Multi-Agenten-Team mit geteiltem Aufgabenboard",
-    "profileTeamNotice": "Kann mehrere parallele Modellanfragen auslösen",
     "profileBlockedByRunningTeammate": "Umschalten auf Einzelagent nicht möglich, solange Teammitglieder aktiv sind",
     "contractNone": "Keiner",
     "contractNoneDesc": "Direkte Unterhaltungsausführung ohne Vertragsprüfung",

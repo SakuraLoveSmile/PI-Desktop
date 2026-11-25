@@ -274,7 +274,6 @@ export const ptBR = {
     profileAgentDesc: "Execução padrão de agente único",
     profileTeam: "Equipe de especialistas",
     profileTeamDesc: "Equipe multiagente autônoma com quadro de tarefas compartilhado",
-    profileTeamNotice: "Pode disparar várias solicitações de modelo em paralelo",
     profileBlockedByRunningTeammate: "Não é possível alternar para agente único enquanto os membros da equipe estiverem ativos",
     contractNone: "Nenhum",
     contractNoneDesc: "Execução conversacional direta sem aprovação de contrato",

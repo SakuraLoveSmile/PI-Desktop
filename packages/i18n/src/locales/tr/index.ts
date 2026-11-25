@@ -284,7 +284,6 @@ export const tr = {
     profileAgentDesc: "Standart tek ajan yürütme",
     profileTeam: "Uzman Ekip",
     profileTeamDesc: "Paylaşılan görev panolu otonom çoklu ajan ekibi",
-    profileTeamNotice: "Birden fazla paralel model isteği çağırabilir",
     profileBlockedByRunningTeammate: "Ekip üyeleri etkinken tek ajana geçilemez",
     contractNone: "Yok",
     contractNoneDesc: "Sözleşme onayı olmadan doğrudan konuşma yürütmesi",

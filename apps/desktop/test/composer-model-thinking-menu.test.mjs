@@ -117,34 +117,11 @@ test("the combined chip and menu meet the compact accessible visual contract", (
   assert.match(stylesSource, /@media \(prefers-reduced-motion: reduce\)/);
 });
 
-test("model options share the compact provider heading inset", () => {
-  assert.match(composerSource, /composer-plus-item composer-model-option/);
-  assert.match(
-    stylesSource,
-    /\.composer-model-group \.composer-model-option\s*\{[\s\S]*?padding-left:\s*8px/,
-  );
-});
-
 test("model groups use the account-aware display name", () => {
   assert.match(composerSource, /providerDisplayName: providerDisplayName\(candidate\)/);
 
   assert.match(composerSource, /aria-label=\{group\.providerDisplayName\}/);
   assert.match(composerSource, /\{group\.providerDisplayName\}/);
-});
-
-test("provider headings establish a stronger type level than model rows", () => {
-  assert.match(
-    stylesSource,
-    /\.composer-model-group-label\s*\{[^}]*font-size:\s*var\(--text-xs-plus\)[^}]*font-weight:\s*var\(--font-weight-strong\)/,
-  );
-  assert.match(
-    stylesSource,
-    /\.composer-model-group \.composer-model-option\s*\{[^}]*font-size:\s*var\(--text-sm\)[^}]*font-weight:\s*var\(--font-weight-normal\)/,
-  );
-  assert.match(
-    stylesSource,
-    /:lang\(zh-CN\) \.composer-model-group-label\s*\{[\s\S]*?text-transform:\s*none/,
-  );
 });
 
 test("Composer preserves aliases but never shows a catalog friendly name for an unaliased model", async () => {
@@ -162,15 +139,6 @@ test("reasoning projection uses the selected exact catalog row and binding", asy
   const source = await readComposerModule("model.ts");
   assert.match(source, /sameComposerModelId\(candidate\.modelId, modelId\)/);
   assert.match(source, /sameComposerModelId\(candidate\.id, modelId\)/);
-});
-
-test("model options use an icon and actual provider metadata below the name", () => {
-  assert.match(listSource, /className="composer-model-option-icon" aria-hidden="true"/);
-  assert.match(listSource, /badges\.includes\("reasoning"\)/);
-  assert.match(listSource, /className="composer-model-option-provider"/);
-  assert.match(listSource, /formatTokenCount\(model\.contextWindow\)/);
-  assert.match(stylesSource, /\.composer-model-option-main\s*\{[^}]*flex-direction:\s*column;/);
-  assert.match(stylesSource, /\.composer-model-label\s*\{[^}]*overflow-wrap:\s*anywhere;[^}]*white-space:\s*normal;/);
 });
 
 test("model management is caller opt-in and chat opens the real settings route", async () => {
@@ -206,5 +174,4 @@ test("model menu uses a solid surface and separated options", () => {
   assert.match(block, /background:\s*var\(--ds-bg-elevated-opaque\);/);
   assert.doesNotMatch(block, /transparent/);
   assert.match(block, /backdrop-filter:\s*none;/);
-  assert.match(stylesSource, /\.composer-model-thinking-menu \.composer-model-group \{[^}]*gap:\s*6px;/);
 });

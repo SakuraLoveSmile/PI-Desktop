@@ -275,7 +275,6 @@ export const es = {
     "profileAgentDesc": "Ejecución estándar de un solo agente",
     "profileTeam": "Equipo de expertos",
     "profileTeamDesc": "Equipo multiagente autónomo con tablero de tareas compartido",
-    "profileTeamNotice": "Puede invocar múltiples solicitudes de modelo en paralelo",
     "profileBlockedByRunningTeammate": "No se puede cambiar a un solo agente mientras los miembros del equipo estén activos",
     "contractNone": "Ninguno",
     "contractNoneDesc": "Ejecución conversacional directa sin validación de contrato",

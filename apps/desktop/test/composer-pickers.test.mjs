@@ -12,15 +12,8 @@ test("contract indicator remains available for planning and hides during Goal ex
   assert.equal(isComposerContractVisible("plan", true), true);
 });
 
-const [profilePickerSource, contractPickerSource, toolbarSource, composerSource, sessionSliceSource] =
+const [contractPickerSource, toolbarSource, composerSource, sessionSliceSource] =
   await Promise.all([
-    readFile(
-      new URL(
-        "../src/features/chat/composer/ComposerExecutionProfilePicker.tsx",
-        import.meta.url,
-      ),
-      "utf8",
-    ),
     readFile(
       new URL(
         "../src/features/chat/composer/ComposerContractPicker.tsx",
@@ -44,17 +37,6 @@ const [profilePickerSource, contractPickerSource, toolbarSource, composerSource,
       "utf8",
     ),
   ]);
-
-test("ComposerExecutionProfilePicker renders two distinct options with notice", () => {
-  assert.match(profilePickerSource, /chat\.profileAgent/);
-  assert.match(profilePickerSource, /chat\.profileAgentDesc/);
-  assert.match(profilePickerSource, /chat\.profileTeam/);
-  assert.match(profilePickerSource, /chat\.profileTeamDesc/);
-  assert.match(profilePickerSource, /chat\.profileTeamNotice/);
-  assert.match(profilePickerSource, /role="menuitemradio"/);
-  assert.match(profilePickerSource, /canSwitchToStandard/);
-  assert.match(profilePickerSource, /IconUsers/);
-});
 
 test("ComposerContractPicker renders compact indicator for active mode", () => {
   assert.match(contractPickerSource, /settings\.modePlan/);

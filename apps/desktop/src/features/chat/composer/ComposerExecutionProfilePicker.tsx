@@ -23,6 +23,69 @@ export type ComposerExecutionProfilePickerProps = {
   onCloseOtherMenus?: () => void;
 };
 
+export type ComposerExecutionProfileOptionsProps = {
+  t: TFunction;
+  executionProfile: ExecutionProfile;
+  controlsBlocked: boolean;
+  canSwitchToStandard: boolean;
+  onChoose: (profile: ExecutionProfile) => void;
+};
+
+/**
+ * The two profile rows, each a name over its description with a check on the
+ * current one. A running team may not be switched back to standard while a
+ * teammate is mid-run, so that row stays disabled until it can be.
+ */
+export function ComposerExecutionProfileOptions({
+  t,
+  executionProfile,
+  controlsBlocked,
+  canSwitchToStandard,
+  onChoose,
+}: ComposerExecutionProfileOptionsProps) {
+  const rows = [
+    {
+      profile: "standard",
+      Icon: IconUser,
+      name: t("chat.profileAgent"),
+      description: t("chat.profileAgentDesc"),
+      disabled: controlsBlocked || (!canSwitchToStandard && executionProfile === "team"),
+    },
+    {
+      profile: "team",
+      Icon: IconUsers,
+      name: t("chat.profileTeam"),
+      description: t("chat.profileTeamDesc"),
+      disabled: controlsBlocked,
+    },
+  ] as const;
+  return (
+    <>
+      {rows.map(({ profile, Icon, name, description, disabled }) => {
+        const active = executionProfile === profile;
+        return (
+          <button
+            key={profile}
+            type="button"
+            role="menuitemradio"
+            aria-checked={active}
+            disabled={disabled}
+            className={`composer-plus-item is-two-line ${active ? "active" : ""}`}
+            onClick={() => onChoose(profile)}
+          >
+            <Icon size={15} className="composer-item-icon" />
+            <span className="composer-plus-item-text">
+              <span className="composer-plus-item-name">{name}</span>
+              <span className="composer-plus-item-desc">{description}</span>
+            </span>
+            {active ? <IconCheck size={15} className="composer-menu-check" /> : null}
+          </button>
+        );
+      })}
+    </>
+  );
+}
+
 export function ComposerExecutionProfilePicker({
   t,
   executionProfile,
@@ -74,54 +137,16 @@ export function ComposerExecutionProfilePicker({
         </TooltipButton>
       )}
     >
-      <button
-        type="button"
-        role="menuitemradio"
-        aria-checked={executionProfile === "standard"}
-        disabled={controlsBlocked || (!canSwitchToStandard && isTeam)}
-        className={`composer-plus-item ${executionProfile === "standard" ? "active" : ""}`}
-        onClick={async () => {
+      <ComposerExecutionProfileOptions
+        t={t}
+        executionProfile={executionProfile}
+        controlsBlocked={controlsBlocked}
+        canSwitchToStandard={canSwitchToStandard}
+        onChoose={async (profile) => {
           setOpen(false);
-          if (executionProfile !== "standard") {
-            await onSelectProfile("standard");
-          }
+          if (profile !== executionProfile) await onSelectProfile(profile);
         }}
-      >
-        <IconUser size={14} className="composer-item-icon" />
-        <div className="flex-1 text-left min-w-0">
-          <div className="font-medium text-sm">{t("chat.profileAgent")}</div>
-          <div className="text-xs text-muted truncate">
-            {t("chat.profileAgentDesc")}
-          </div>
-        </div>
-        {executionProfile === "standard" ? <IconCheck size={13} /> : null}
-      </button>
-
-      <button
-        type="button"
-        role="menuitemradio"
-        aria-checked={executionProfile === "team"}
-        disabled={controlsBlocked}
-        className={`composer-plus-item ${executionProfile === "team" ? "active" : ""}`}
-        onClick={async () => {
-          setOpen(false);
-          if (executionProfile !== "team") {
-            await onSelectProfile("team");
-          }
-        }}
-      >
-        <IconUsers size={14} className="composer-item-icon" />
-        <div className="flex-1 text-left min-w-0">
-          <div className="font-medium text-sm">{t("chat.profileTeam")}</div>
-          <div className="text-xs text-muted truncate">
-            {t("chat.profileTeamDesc")}
-          </div>
-          <div className="text-xs text-amber-500/80 truncate">
-            {t("chat.profileTeamNotice")}
-          </div>
-        </div>
-        {executionProfile === "team" ? <IconCheck size={13} /> : null}
-      </button>
+      />
     </AnchoredMenu>
   );
 }

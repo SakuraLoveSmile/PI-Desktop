@@ -442,7 +442,6 @@ export const en = {
     profileAgentDesc: "Standard single-agent execution",
     profileTeam: "Expert Team",
     profileTeamDesc: "Autonomous multi-agent team with shared task board",
-    profileTeamNotice: "May invoke multiple parallel model requests",
     profileBlockedByRunningTeammate: "Cannot switch to single agent while teammates are active",
     contractNone: "None",
     contractNoneDesc: "Direct conversational execution without contract gating",

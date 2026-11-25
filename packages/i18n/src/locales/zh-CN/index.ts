@@ -437,7 +437,6 @@ export const zhCN = {
     profileAgentDesc: "单智能体标准执行",
     profileTeam: "专家团",
     profileTeamDesc: "多智能体自主协作团队，拥有共享任务看板",
-    profileTeamNotice: "可能发起多个并行模型调用",
     profileBlockedByRunningTeammate: "有团队成员正在运行或初始化，暂无法切回单智能体",
     contractNone: "常规",
     contractNoneDesc: "无前置方案审批，直接对话执行",

@@ -284,7 +284,6 @@ export const ko = {
     profileAgentDesc: "표준 단일 에이전트 실행",
     profileTeam: "전문가 팀",
     profileTeamDesc: "공유 작업 보드를 갖춘 자율 다중 에이전트 팀",
-    profileTeamNotice: "여러 병렬 모델 요청을 호출할 수 있습니다",
     profileBlockedByRunningTeammate: "팀원이 활성 상태인 동안에는 단일 에이전트로 전환할 수 없습니다",
     contractNone: "없음",
     contractNoneDesc: "계약 승인 없는 직접 대화 실행",

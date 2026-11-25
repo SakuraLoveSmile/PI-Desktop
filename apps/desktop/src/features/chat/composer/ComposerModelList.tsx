@@ -1,7 +1,7 @@
 import { formatTokenCount, type ModelInfo, type ProviderPublic } from "@pi-desktop/shared";
 import type { TFunction } from "i18next";
 import type { RefObject } from "react";
-import { IconBot, IconCheck, IconEye, IconSparkles } from "../../../components/icons";
+import { IconCheck, IconEye, IconSparkles } from "../../../components/icons";
 import { Button } from "../../../components/ui";
 import {
   composerModelBadges,
@@ -71,35 +71,24 @@ export function ComposerModelList({
                             onMouseMove={() => setModelHighlight(index)}
                             onClick={() => void selectModel(group.provider, model.modelId)}
                           >
-                            <span className="composer-model-option-icon" aria-hidden="true">
-                              {badges.includes("reasoning") ? (
-                                <IconSparkles size={18} />
-                              ) : (
-                                <IconBot size={18} />
-                              )}
+                            {/*
+                              One label per row, never both: the name the user
+                              set wins over the catalog's, and an alias carries
+                              its own tone so which one is on screen stays
+                              visible. The wire id remains the row's title, so
+                              identity is still one hover away. The provider is
+                              the group heading above, so a row never repeats it.
+                            */}
+                            <span
+                              className={`composer-model-label ${alias ? "is-alias" : ""}`}
+                            >
+                              {alias || optionDisplayName}
                             </span>
-                            <span className="composer-model-option-main">
-                              {/*
-                                One label per row, never both: the name the user
-                                set wins over the catalog's, and an alias carries
-                                its own tone so which one is on screen stays
-                                visible. The wire id remains the row's title, so
-                                identity is still one hover away.
-                              */}
-                              <span
-                                className={`composer-model-label ${alias ? "is-alias" : ""}`}
-                              >
-                                {alias || optionDisplayName}
+                            <span className="composer-model-option-meta">
+                              <span className="composer-model-option-ctx">
+                                {model.contextWindow ? formatTokenCount(model.contextWindow) : ""}
                               </span>
-                              <span className="composer-model-option-meta">
-                                <span className="composer-model-option-provider">
-                                  {group.providerDisplayName}
-                                </span>
-                                {model.contextWindow ? (
-                                  <span className="composer-model-option-ctx">
-                                    {formatTokenCount(model.contextWindow)}
-                                  </span>
-                                ) : null}
+                              <span className="composer-model-option-badges">
                                 {badges.map((badge) => {
                                   const badgeLabel = t(
                                     badge === "reasoning"
@@ -124,7 +113,10 @@ export function ComposerModelList({
                                 })}
                               </span>
                             </span>
-                            {active ? <IconCheck size={14} className="composer-model-check" aria-hidden="true" /> : null}
+                            {/* A fixed slot keeps the figures in line whether or not the row is current. */}
+                            <span className="composer-menu-check-slot" aria-hidden="true">
+                              {active ? <IconCheck size={15} className="composer-menu-check" /> : null}
+                            </span>
                           </Button>
                         );
                       })}
