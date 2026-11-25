@@ -511,9 +511,10 @@ the complete nightly candidate validation or PR integration gates.
 
 ### E2E-SCHEDULED-desktop-automation-lifecycle
 
-- **Additional coverage:** Shared model/reasoning root menu, searchable model submenu,
-  keyboard model selection, selecting and reopening `high`, unchanged application
-  defaults, and the saved thinking level on the executed session.
+- **Additional coverage:** The shared model/reasoning popover (a direct model list
+  under provider headings, the reasoning slider beneath it), keyboard model
+  selection, selecting and reopening `high`, unchanged application defaults, and
+  the saved thinking level on the executed session.
 
 
 - **Preconditions:** Isolated desktop profile, built task candidate, local SSE
@@ -10025,13 +10026,15 @@ This test plan spec is accepted when:
   reasoning menu.
 - Expect the top bar to show only the task title and window actions. The
   Composer-right model × reasoning chip shows provider A/model A and the current
-  reasoning level. Its menu starts with only Model and Reasoning level entries;
-  Model opens the searchable provider-group list and Reasoning level opens the
-  capability-filtered radio list in the same popover.
-- In the searchable provider-group list, expect each provider heading to
-  read as the visual parent: its `--text-md` treatment is stronger than the
-  indented model rows' normal-weight `--text-sm` treatment. In zh-CN, headings
-  must not force uppercase or wide Latin tracking.
+  reasoning level. Its single popover lists the configured models directly
+  under provider headings, with no root menu, no search field and no submenu,
+  and puts the reasoning slider beneath the list under a title that names the
+  control and shows the current level (D652).
+- Expect each provider heading to read as a quiet group title (`--text-xs`,
+  muted, normal weight, never forced uppercase or tracked in any locale) above
+  one-line model rows at `--text-sm`: the model name, the real context window,
+  capability icons and a fixed slot for the current row's check. A row repeats
+  neither the provider nor an icon tile.
 - Select provider B/model B, send a prompt, and expect the main-to-sidecar
   `agent.prompt` payload and pi runtime to use B for that session.
 - Switch away and back; expect B and its clamped reasoning level to remain

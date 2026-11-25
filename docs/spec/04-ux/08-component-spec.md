@@ -3450,7 +3450,7 @@ reasoning-level control.
 ### 11.3a Overview session checklist
 
 - A non-empty session checklist appears as the first section in the Work Panel
-  Overview scroll area. The Composer footer has no session checklist trigger.
+  Overview scroll area. The Composer has no session checklist trigger.
 - The header names the Session checklist and its completed/total count. A shared
   Button disclosure starts expanded and exposes `aria-expanded`. The ordered
   inline list includes every task with its full wrapped title, and the localized
@@ -5190,7 +5190,7 @@ appears only when its data exists, and only the visible pane reads it:
   own functions and framed by the same used/remaining preference
   (`settings.contextUsageDisplay`): the headline (label and percentage, warning
   at 25% or less remaining and critical at 10% or less, the one rule the
-  composer's footer shares; in the used framing the label is the rail's own Used,
+  composer's usage entry shares; in the used framing the label is the rail's own Used,
   已使用 in Simplified Chinese, and the remaining framing keeps the composer's
   word, D650), `~used / window`, one bar split into system, tools
   and messages by the newest request's breakdown (a single used segment until the

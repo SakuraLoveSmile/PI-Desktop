@@ -2238,7 +2238,7 @@ MainChat 底部的输入区域，用于撰写和发送提示。支持多行输�
 ### 11.3a Overview session checklist
 
 - A non-empty session checklist appears as the first section in the Work Panel
-  Overview scroll area. The Composer footer has no session checklist trigger.
+  Overview scroll area. The Composer has no session checklist trigger.
 - The header names the Session checklist and its completed/total count. A shared
   Button disclosure starts expanded and exposes `aria-expanded`. The ordered
   inline list includes every task with full wrapped text and localized status;
@@ -3394,7 +3394,7 @@ Team 成员、进程）、服务器、环境、上下文、产物（产出、来
   “环境”分区。折叠后显示项目名称。
 - 上下文：最新一次带用量的请求，由输入框检查器自己的函数推导，并按同一个“已用/剩余”偏好
   （`settings.contextUsageDisplay`）呈现：标题（标签与百分比，剩余 25% 及以下为警告、10% 及
-  以下为严重，与输入框页脚共用这一条规则；“已用”框架下标签是活动栏自己的“已使用”，“剩余”框架
+  以下为严重，与输入框的用量入口共用这一条规则；“已用”框架下标签是活动栏自己的“已使用”，“剩余”框架
   沿用输入框的用词，D650）、`~已用 / 窗口`、按最新请求的构成拆成系统、工具、
   消息的一条进度条（构成未知前是单段“已用”），以及每一部分和可用空间各一行图例，每行以 8px 方形
   色块（2px 圆角，`--radius-4xs`）开头。中文区域的 token 数以“万”（繁体中文为“萬”）为单位、至多

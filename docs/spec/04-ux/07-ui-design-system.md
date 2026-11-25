@@ -478,9 +478,9 @@ of a desktop coding tool:
 | `--radius-sm` | 10px | Standard buttons, inputs, menu items, tool rows, kbd |
 | `--radius-md` | 12px | Menus and compact cards |
 | `--radius-md-plus` | 14px | Cards and code blocks |
-| `--radius-lg` | 16px | Panels and settings cards |
+| `--radius-lg` | 16px | Panels, settings cards and the composer shell |
 | `--radius-lg-plus` | 18px | Large panels and dialogs |
-| `--radius-xl` | 20px | Message bubbles and the composer |
+| `--radius-xl` | 20px | Message bubbles and the message editor |
 | `--radius-2xl` | 24px | Composer-adjacent prominent surfaces |
 | `--radius-full` | 9999px | Pills, badges, scroll thumbs |
 | `--radius-round` | 50% | Circular buttons, avatars, dots |
@@ -889,7 +889,8 @@ model):
 - The home composer is a bottom-reserved sibling of the scroller. Thread mode
   keeps its absolute bottom dock and reserves its measured height without a
   full-width fade veil
-- Composer radius uses Codex `radius-3xl-base` (**20px** / `1.25rem`)
+- The composer shell uses `--radius-lg` (**16px**); the in-transcript message
+  editor keeps `--ds-composer-radius` (20px, `--radius-xl`)
 - Empty-home composer height is content-driven: a one-line draft renders the
   compact shell, grows with the draft through seven visible rows, and then
   keeps the shell stable while the textarea scrolls internally
@@ -964,9 +965,8 @@ The composer renders only controls connected to the active pi session:
 
 - Agent / Plan / Goal updates the durable session mode and changes the next pi
   toolset. Plan and Goal are contract states of the same Agent.
-- The model trigger shows only the active model ID. Its menu selects a
-  configured provider/default-model pair for the active session and links to
-  Agent.
+- The model menu selects a configured provider/default-model pair for the
+  active session and links to Agent.
 - The right toolbar exposes one combined model × reasoning trigger immediately
   before the standalone prompt-enhancement Sparkles action and Send/Abort. The
   trigger shows a Bot icon, the current model, and reasoning level; `off` omits
