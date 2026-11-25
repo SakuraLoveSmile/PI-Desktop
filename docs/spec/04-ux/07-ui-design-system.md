@@ -1166,12 +1166,13 @@ header-height background behind the excluded lane without covering its controls.
 
 These are **token-level foundations** for common primitives. Detailed component specs are in [08-component-spec.md](08-component-spec.md).
 
-The composer usage strip (PI-UI-1118) deliberately adds **no new shared
-primitive**: its read-out groups are feature-local spans in
-`features/chat/composer/ComposerUsageStats.tsx`, the meter reuses the existing
-inspector ring, and every interactive element stays on `TooltipButton`/`Button`.
-A pattern earns a `components/ui.tsx` primitive only at three or more usages;
-this one currently has a single consumer.
+The composer usage entry (PI-UI-1118, moved into the workspace strip by
+PI-UI-1126) deliberately adds **no new shared primitive**: its session read-outs
+are feature-local spans in `features/chat/composer/ComposerUsageStats.tsx`,
+rendered inside the usage popover; the meter reuses the existing inspector ring,
+and every interactive element stays on `TooltipButton`/`Button`. A pattern earns
+a `components/ui.tsx` primitive only at three or more usages; this one currently
+has a single consumer.
 
 ### 11.1 Button
 

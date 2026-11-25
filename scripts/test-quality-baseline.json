@@ -1379,13 +1379,10 @@
       ]
     },
     "apps/desktop/test/composer-usage-footer.test.mjs": {
-      "assertions": 19,
-      "cases": 5,
+      "assertions": 15,
+      "cases": 3,
       "signatures": [
         "05b0188b4f3dc58f3a47",
-        "182f09be80702eee4c1b",
-        "1fcdf96a47b8a83b371c",
-        "375f813a6eceafe36e43",
         "3e8b083e7bc0363703dc",
         "46ff2542b84c6bffe8fb",
         "4938450c3329f84d4969",
@@ -1399,7 +1396,6 @@
         "880f2b9909c36a693d5c",
         "c306a1591a0a2dee3dbb",
         "ce3cdba6eeb0bcb76d47",
-        "daa5c6d7520a72802a2c",
         "dceda51790f4c6912ca8"
       ]
     },

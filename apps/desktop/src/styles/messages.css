@@ -1843,6 +1843,115 @@
   font-weight: var(--font-weight-medium);
 }
 
+/*
+  Usage popover in the workspace strip (D652). The turn figures and the model
+  usage share one two-column rhythm, the session totals get their own labelled
+  block, and the two actions sit side by side. The ring variant keeps its old
+  single-column layout.
+*/
+.context-inspector-label {
+  display: block;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs);
+}
+
+.context-inspector-popover[data-variant="footer"] .context-inspector-kpis {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 20px;
+}
+
+.context-inspector-session {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 14px;
+}
+
+.context-inspector-session-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.context-inspector-session-row > b {
+  color: var(--ds-text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.context-inspector-session-row[data-unavailable="true"] > b {
+  color: var(--ds-text-muted);
+}
+
+.context-inspector-session-glyph {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 13px;
+  fill: none;
+  stroke: var(--ds-text-muted);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.context-inspector-popover[data-variant="footer"]
+  .context-inspector-summary-row:has(> .context-inspector-usage-grid) {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+}
+
+.context-inspector-popover[data-variant="footer"] .context-inspector-usage-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 20px;
+  justify-content: stretch;
+  text-align: left;
+}
+
+.context-inspector-popover[data-variant="footer"] .context-inspector-usage-cell {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.context-inspector-popover[data-variant="footer"] .context-inspector-usage-name {
+  color: var(--ds-text-muted);
+}
+
+.context-inspector-popover[data-variant="footer"] .context-inspector-usage-figure {
+  color: var(--ds-text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+/* Two equal halves while both labels fit on one line; a label that does not
+   fit takes the whole row, so a long translation stacks instead of wrapping. */
+.context-inspector-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.context-inspector-actions > .btn {
+  flex: 1 1 calc(50% - 4px);
+  min-width: max-content;
+  justify-content: center;
+  text-align: center;
+}
+
+.context-inspector-actions .context-inspector-compact-action.btn {
+  width: auto;
+  margin-top: 0;
+}
+
 /* One transcript row per compaction: a quiet centred label the eye can skip.
  * The flanking pseudo-elements only centre it — no rule is drawn (D297). */
 .transcript-compaction-row {

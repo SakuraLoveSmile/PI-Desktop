@@ -228,7 +228,7 @@ export async function sessionActivityIntegrationProbe() {
     await Promise.all(document.querySelector('.composer-profile-menu')!.getAnimations().map(animation=>animation.finished));
     const profileRows=[...document.querySelectorAll('.composer-profile-menu [role="menuitemradio"]')];
     const optionRect=profileRows[0].getBoundingClientRect();check(profileRows[0].contains(document.elementFromPoint(optionRect.left+optionRect.width/2,optionRect.top+optionRect.height/2)),'profile menu is above the chat and pointer reachable');
-    check(profileRows.length===2&&profileRows[1].getBoundingClientRect().top-profileRows[0].getBoundingClientRect().bottom>=5.5,'agent and team rows have at least six pixel gap');
+    check(profileRows.length===2&&Math.abs(profileRows[1].getBoundingClientRect().top-profileRows[0].getBoundingClientRect().bottom-2)<0.5,'agent and team rows sit two pixels apart');
     click(profileRows[1]);await until(()=>profile()?.getAttribute('data-profile')==='team','Team profile did not switch');
     const selected=()=>useAppStore.getState().sessions.find(item=>item.id==='activity-a')!;
     check(selected().mode==='agent'&&selected().permissionMode==='auto'&&selected().modelId==='qwen3.8-max','profile switch preserves mode permission and model');
@@ -251,7 +251,7 @@ export async function sessionActivityIntegrationProbe() {
     click(host.querySelector('.composer-model-thinking-chip'));await until(()=>document.querySelectorAll('.composer-model-option').length===2,'Direct model list did not load');
     check(!document.querySelector('.composer-model-tab'),'model list has no default or custom tabs');
     const modelOptions=[...document.querySelectorAll('.composer-model-option')];
-    check(modelOptions[1].getBoundingClientRect().top-modelOptions[0].getBoundingClientRect().bottom>=5.5,'model rows have at least six pixel gap');
+    check(Math.abs(modelOptions[1].getBoundingClientRect().top-modelOptions[0].getBoundingClientRect().bottom-2)<0.5,'model rows of one provider sit two pixels apart');
     const modelSurface=getComputedStyle(document.querySelector('.composer-model-thinking-menu')!);
     check(!modelSurface.backgroundColor.startsWith('rgba(')&&!modelSurface.backgroundColor.includes('/'),'model popup surface is opaque and hides the draft');
 
@@ -292,11 +292,13 @@ export async function sessionActivityIntegrationProbe() {
     const circumference=2*Math.PI*9;const arcOffset=Number(meter()!.querySelector('.context-inspector-ring-progress')!.getAttribute('stroke-dashoffset'));
     check(Math.abs((1-arcOffset/circumference)-28544/262144)<.01,'ring arc uses reported tokens over configured context window');
     const meterBounds=meter()!.getBoundingClientRect();const composerBounds=host.querySelector('.composer-shell')!.getBoundingClientRect();
-    const usageStrip=host.querySelector('.composer-usage-footer')!.getBoundingClientRect();
-    check(Math.abs(usageStrip.left+usageStrip.width/2-composerBounds.left-composerBounds.width/2)<=1&&meterBounds.top>=composerBounds.bottom,'usage strip is centered below the input');
+    const stripBounds=strip()!.getBoundingClientRect();const stripInset=parseFloat(getComputedStyle(strip()!).paddingRight);
+    check(meter()!.closest('.composer-top-strip')===strip()&&meterBounds.bottom<=composerBounds.top+1&&Math.abs(meterBounds.right-(stripBounds.right-stripInset))<=1,'usage entry closes the workspace strip above the input, at its right end');
+    check(!host.querySelector('.composer-usage-footer')&&!host.querySelector('.composer-bottom-footer'),'no usage footer remains under the input');
     click(meter());await until(()=>Boolean(document.querySelector('.context-inspector-popover.is-open')),'context details did not open');
     const contextPanel=document.querySelector<HTMLElement>('.context-inspector-popover')!;
-    check(host.querySelectorAll('.composer-usage-stat').length===2&&Boolean(host.querySelector('.composer-usage-context')),'the strip carries two cumulative groups beside the context meter');
+    check(contextPanel.querySelectorAll('.context-inspector-session-row').length===2&&contextPanel.querySelector('.context-inspector-session .context-inspector-label')?.textContent===i18n.t('chat.usageSessionLabel'),'the popup carries the labelled session block with its two cumulative rows');
+    check(contextPanel.querySelectorAll('.context-inspector-actions > .btn').length===2,'the popup groups its dashboard and compaction actions');
     check(strip()?.dataset.expanded==='false'&&workspaceContext()?.textContent?.includes('main')&&!workspaceContext()?.textContent?.includes('PI-Desktop')&&!workspaceContext()?.textContent?.includes('本地'),'context popup leaves the running workspace strip folded to its branch');
     check(Boolean(contextPanel.textContent?.includes('生成速度'))&&Boolean(contextPanel.textContent?.includes('本轮合计')),'context popup retains speed and turn statistics');
     check(Boolean(contextPanel.querySelector('[role="progressbar"][aria-valuenow="11"]')),'context panel displays total occupancy');

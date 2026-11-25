@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { IconChevronDown, IconChevronUp } from "../../../components/icons";
 import { TooltipButton } from "../../../components/ui";
 import { normalizeProjectPath } from "../../../lib/sidebar-session-groups";
@@ -15,8 +15,11 @@ import {
 } from "./composer-top-strip-state";
 import { useComposerWorkspaceGit } from "./hooks/useComposerWorkspaceGit";
 
-/** Workspace strip above the input card: project, location and branch while idle, the branch alone during a run. */
-export function ComposerWorkspaceContext({ t, running }: { t: TFunction; running: boolean }) {
+/**
+ * Workspace strip above the input card: project, location and branch while idle,
+ * the branch alone during a run. The context-usage entry sits at its right end.
+ */
+export function ComposerWorkspaceContext({ t, running, usage }: { t: TFunction; running: boolean; usage?: ReactNode }) {
   const sessionId = useAppStore(s => s.activeSessionId);
   const session = useAppStore(s => s.sessions.find(item => item.id === s.activeSessionId));
   const workspace = useAppStore(s => s.workspace);
@@ -27,11 +30,11 @@ export function ComposerWorkspaceContext({ t, running }: { t: TFunction; running
   const project = !remote && path ? [workspace, ...projects].find(item => item && normalizeProjectPath(item.path) === normalizeProjectPath(path)) : undefined;
   const name = session?.projectName || project?.name || path?.replace(/[\\/]$/, "").split(/[\\/]/).at(-1);
   // Remount scoped menus and requests when their session/directory owner changes.
-  return <ComposerWorkspaceControls key={`${sessionId ?? "home"}:${path ?? ""}`} t={t} running={running} path={path} name={name} sessionId={sessionId} remote={remote} disabled={disabled} />;
+  return <ComposerWorkspaceControls key={`${sessionId ?? "home"}:${path ?? ""}`} t={t} running={running} path={path} name={name} sessionId={sessionId} remote={remote} disabled={disabled} usage={usage} />;
 }
 
-function ComposerWorkspaceControls({ t, running, path, name, sessionId, remote, disabled }: {
-  t: TFunction; running: boolean; path?: string | null; name?: string | null; sessionId: string | undefined; remote: boolean; disabled: boolean;
+function ComposerWorkspaceControls({ t, running, path, name, sessionId, remote, disabled, usage }: {
+  t: TFunction; running: boolean; path?: string | null; name?: string | null; sessionId: string | undefined; remote: boolean; disabled: boolean; usage?: ReactNode;
 }) {
   const controller = useComposerWorkspaceGit(path, sessionId, disabled);
   // Menus lock while any session in this project runs, which is wider than this strip's run.
@@ -45,16 +48,19 @@ function ComposerWorkspaceControls({ t, running, path, name, sessionId, remote, 
     <div className="composer-workspace-context">
       {expanded ? <ComposerProjectMenu path={path} name={name} disabled={disabled} /> : null}
       {expanded ? <ComposerLocationMenu {...common} remote={remote} /> : null}
-      {path && !remote && <ComposerBranchMenu {...common} />}
+      <div className="composer-workspace-branch">
+        {path && !remote && <ComposerBranchMenu {...common} />}
+        {running ? <TooltipButton
+          type="button"
+          className="composer-top-strip-toggle"
+          aria-expanded={expanded}
+          tooltip={expanded ? t("chat.topStripCollapse") : t("chat.topStripExpand")}
+          onClick={() => setStored(toggleTopStrip(strip))}
+        >
+          {expanded ? <IconChevronUp size={14} aria-hidden /> : <IconChevronDown size={14} aria-hidden />}
+        </TooltipButton> : null}
+      </div>
     </div>
-    {running ? <TooltipButton
-      type="button"
-      className="composer-top-strip-toggle"
-      aria-expanded={expanded}
-      tooltip={expanded ? t("chat.topStripCollapse") : t("chat.topStripExpand")}
-      onClick={() => setStored(toggleTopStrip(strip))}
-    >
-      {expanded ? <IconChevronUp size={14} aria-hidden /> : <IconChevronDown size={14} aria-hidden />}
-    </TooltipButton> : null}
+    {usage}
   </div>;
 }

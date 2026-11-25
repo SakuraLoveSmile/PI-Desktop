@@ -1003,9 +1003,9 @@ Linux 保留淡入淡出和滑动退出。
 
 这些是通用原语的**令牌级基础**。详细的组件规格位于 [08-component-spec.md](/zh-CN/spec/04-ux/08-component-spec)。
 
-输入框用量读数条（PI-UI-1118）**不新增共享原语**：读数组是
-`features/chat/composer/ComposerUsageStats.tsx` 内的特性局部 span，量表复用既有
-检查器环形，所有交互元素仍走 `TooltipButton`/`Button`。同一模式出现三处及以上才
+输入框用量入口（PI-UI-1118，由 PI-UI-1126 移入工作区条）**不新增共享原语**：会话读数是
+`features/chat/composer/ComposerUsageStats.tsx` 内的特性局部 span，渲染在用量浮层里；
+量表复用既有检查器环形，所有交互元素仍走 `TooltipButton`/`Button`。同一模式出现三处及以上才
 进入 `components/ui.tsx`；当前仅一处消费。
 
 ### 11. 1 按钮

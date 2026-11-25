@@ -2672,7 +2672,9 @@ workflow. They are not gates or promised outputs of the current Release run.
   model × reasoning trigger is a 32px icon-only control. The full selection is
   still available through the trigger's menu, tooltip, and accessible name.
   Mode and permission labels remain single-line and ellipsized, the context
-  ring and action controls retain usable hit targets, and the single Send/Stop
+  ring and action controls retain usable hit targets (the strip's usage entry
+  drops its session total at 560px and its direction label at 450px, keeping
+  the ring and percentage), and the single Send/Stop
   slot remains reachable. Both mode menus are visible and pointer-accessible,
   and each selection updates its trigger. The execution-profile labels
   `智能体` and `专家团` remain fully visible at desktop and narrow composer widths.
@@ -5038,12 +5040,12 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   selected model has a published 1m-class context window, while its provider
   binding still contains the legacy 128k generic seed.
 - **Steps**: 1) Open the session. 2) Confirm the completed turn shows a model
-  badge and no context inspector under the answer. 3) Hover the composer
-  footer meter trigger, confirm the panel stays closed, then click it.
-  4) Inspect the remaining-token-plus-percentage heading, used/window counts,
-  unboxed turn/speed values, one inline provider-usage summary, and one
-  aggregate tool-usage summary, with no doubled heading rule and no inner
-  section hairlines. 5) Scroll the transcript and resize the window while the
+  badge and no context inspector under the answer. 3) Hover the usage entry at
+  the right end of the workspace strip, confirm the panel stays closed, then
+  click it. 4) Inspect the heading with its percentage, used/window counts,
+  the unboxed turn-total and speed values side by side, the labelled Session
+  block, the two-column provider-usage grid, and one aggregate tool-usage
+  summary, with no doubled heading rule and no inner section hairlines. 5) Scroll the transcript and resize the window while the
   panel is open. Toggle and resize the sidebar and work panel while the panel
   remains open. 6) Move the pointer away from the panel, then dismiss it by
   clicking the trigger again, clicking outside it, and pressing Escape from
@@ -5057,17 +5059,19 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   awaiting approval, or viewing a read-only session; the action is disabled.
   Switch sessions with the popup open and confirm it closes.
 - **Expected**: Model badge appears under completed assistant answers when a
-  model id exists. The compact Context inspector appears in the composer
-  footer at its right edge, and always mirrors the newest usage-bearing
-  assistant turn. The trigger shows a horizontal progress bar plus the
-  configured used/remaining percentage (no Context label) and low-space
-  warning/error states; click or keyboard activation toggles the same compact
+  model id exists. The compact Context inspector appears at the right end of
+  the workspace strip, and always mirrors the newest usage-bearing
+  assistant turn. The trigger shows the ring, the Used/Remaining label, the
+  configured percentage and, once session totals exist, the session token
+  total, with low-space warning/error states; click or keyboard activation
+  toggles the same compact
   summary while pointer hover alone never opens or closes it. An open panel
   survives the pointer leaving it and closes on a second trigger activation,
   an outside click, or Escape, which returns focus to the trigger. Provider
   values remain exact, tool values remain visibly approximate through the `~`
-  aggregate total. An additional used-occupancy bar and Compact context action
-  appear in the footer popup; no invented System/Skill shares or per-tool source
+  aggregate total. A used-occupancy bar, the Session block and the side-by-side
+  Open dashboard and Compact context actions appear in the popup; no invented
+  System/Skill shares or per-tool source
   list is rendered. Missing usage remains `—`, rather than a made-up percentage. Occupancy, turn total, and
   provider cache/input/output/reasoning/hit-rate are the last usage-bearing
   assistant message, not the summed tool-loop, so cache read stays on the
@@ -10568,13 +10572,14 @@ This test plan spec is accepted when:
 
 ### US-UI-61 Assistant context summary + retry (D103, D184, D244, D347)
 - Complete an assistant turn that reports usage.
-- Expect a model badge under the answer and the compact Context inspector in
-  the composer toolbar, left of the model picker. The trigger shows the
-  context ring and percentage in the configured figure (used capacity by
-  default; see E2E-250); clicking it (or activating it from the keyboard)
-  shows the matching tokens plus percentage, used/window counts,
-  two unboxed turn/speed values, one inline exact provider-usage summary, and
-  one aggregate tool-usage summary with types, calls, and approximate tokens.
+- Expect a model badge under the answer and the compact Context inspector at
+  the right end of the workspace strip above the input. The trigger shows the
+  context ring, label and percentage in the configured figure (used capacity by
+  default; see E2E-250) and the session token total; clicking it (or activating
+  it from the keyboard) shows the matching tokens plus percentage, used/window
+  counts, two unboxed turn/speed values, the Session block, one exact
+  provider-usage grid, and one aggregate tool-usage summary with types, calls,
+  and approximate tokens.
   Per-tool rows, bars, badges, explanatory estimate copy, and inner section
   hairlines are not shown.
 - Hovering the trigger changes nothing; the open panel closes on a second
@@ -15065,13 +15070,15 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Preconditions**: An Agent session has completed at least one turn that
   reported token usage. Settings → AI → Defaults is reachable.
 - **Steps**:
-  1. On a fresh profile, confirm the composer read-out strip shows three centered
-     groups: session rounds/steps with the newest turn's speed, session-cumulative
-     tokens with the cumulative cache hit rate, and the context ring. The ring
+  1. On a fresh profile, confirm the usage entry at the right end of the
+     workspace strip shows the context ring, the label, the percentage and the
+     session token total after a `·`. The ring
      arc is nearly empty at low occupancy, the percentage ≈ used %, the label
      reads Used (`chat.usageContextUsedLabel`), and tooltip/aria-label use used
-     vocabulary. Cumulative figures match `session.usageTotals`, not the loaded
-     transcript page; reopen a long session and confirm they do not shrink.
+     vocabulary. Open the popover and read the Session block: rounds, steps,
+     tokens and cache hit rate. Cumulative figures match `session.usageTotals`,
+     not the loaded transcript page; reopen a long session and confirm they do
+     not shrink.
   2. Open Settings → AI → Defaults and switch the Context usage display
      segmented control from Used to Remaining.
   3. Return to the chat and inspect the context meter: the ring now fills by
@@ -15091,8 +15098,8 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   count, headline, label, tooltip, and aria-label consistently. Color thresholds
   remain based on remaining capacity in both modes. The default for a
   fresh profile is Used; an explicit Remaining choice saved before the
-  default changed is kept. An unavailable host renders em dashes for the
-  cumulative groups instead of a partial total.
+  default changed is kept. An unavailable host renders em dashes in the Session
+  block, and no session total in the trigger, instead of a partial total.
 - **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/08-component-spec.md`,
   ADR 0223, `08-meta/decisions-log.md` (D398),
   `docs/adr/session-usage-totals-owner.md`
@@ -18433,7 +18440,7 @@ prove account/region eligibility or call a real model.
 
 ### Composer metadata and compact agent rows
 
-The workspace strip above the input card shows the current session's project, local/remote host, and known local Git branch; during a run it folds to the branch. Unavailable project/branch metadata is omitted; remote sessions never borrow a local branch. A detached HEAD is named by its short commit (`Detached HEAD · abc1234`), and `No branch` appears only when neither a branch nor a commit is known. Model menus list all models without a search field. Generation speed, full-turn token totals, cache metrics and context details are available from the bottom-right context meter. Subagent entries use transparent gradient-avatar rows with name, task, localized status and measured elapsed time; clicking a row opens read-only details, with no panorama entry. Validate model keyboard selection, workspace metadata, context details and agent navigation in the isolated composer/transcript fixtures, including narrow layouts.
+The workspace strip above the input card shows the current session's project, local/remote host, and known local Git branch; during a run it folds to the branch. Unavailable project/branch metadata is omitted; remote sessions never borrow a local branch. A detached HEAD is named by its short commit (`Detached HEAD · abc1234`), and `No branch` appears only when neither a branch nor a commit is known. Model menus list all models without a search field. Generation speed, full-turn token totals, cache metrics and context details are available from the context meter at the right end of the workspace strip. Subagent entries use transparent gradient-avatar rows with name, task, localized status and measured elapsed time; clicking a row opens read-only details, with no panorama entry. Validate model keyboard selection, workspace metadata, context details and agent navigation in the isolated composer/transcript fixtures, including narrow layouts.
 
 ### E2E-COMPOSER-toolbar-footer
 
@@ -18445,7 +18452,7 @@ The workspace strip above the input card shows the current session's project, lo
   usable by keyboard. Compare the left and right plugin control slots before
   and after opening it. Switch between Goal planning and approved Goal execution;
   also inspect Plan mode. Check the Send and running-empty Stop controls, the
-  context meter footer, and the shared model picker in ScheduledEditor.
+  context meter in the workspace strip, and the shared model picker in ScheduledEditor.
 - **Expected:** The combined model × reasoning control sits on the right as one
   button, with the existing anchored menu and plugin slot sides/order preserved.
   The Goal contract picker remains during planning and is hidden during Goal

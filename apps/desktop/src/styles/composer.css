@@ -956,28 +956,22 @@
   background: var(--ds-tile-hover);
 }
 
-/* Composer usage statistics footer (T4) */
-.composer-usage-footer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 20px;
-  padding: 6px 4px 0;
-  font-size: var(--text-xs);
-  color: var(--ds-text-muted);
-  user-select: none;
-}
-
+/* The context entry closes the workspace strip on the right (D652): a ring, the
+ * percentage and the session token total. It reads as one more strip control,
+ * so it shares the strip menus' hover fill; the breakdown lives in its popover. */
 .composer-usage-item {
   display: inline-flex;
+  flex: none;
   align-items: center;
   gap: 6px;
   min-width: 0;
   white-space: nowrap;
+  user-select: none;
 }
 
-.composer-usage-label {
-  color: var(--ds-text-secondary);
+.composer-usage-label,
+.composer-usage-sep {
+  color: var(--ds-text-muted);
 }
 
 .composer-usage-value {
@@ -985,24 +979,29 @@
   font-variant-numeric: tabular-nums;
 }
 
+.composer-usage-session {
+  color: var(--ds-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
 .composer-usage-btn {
-  background: transparent;
-  border: 0;
-  padding: 0;
-  margin: 0;
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  margin: 0;
+  padding: 4px 6px;
+  border: 0;
   border-radius: var(--radius-sm);
-  transition: color var(--motion-duration-fast) var(--motion-ease-out);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: background var(--motion-duration-fast) var(--motion-ease-out);
 }
 
-.composer-usage-btn:hover .composer-usage-label,
-.composer-usage-btn:hover .composer-usage-value {
-  color: var(--ds-accent);
+.composer-usage-btn:enabled:hover,
+.composer-usage-context[data-open="true"] .composer-usage-btn {
+  background: var(--ds-bg-hover);
 }
 
 .composer-usage-btn:focus-visible {
@@ -1018,32 +1017,8 @@
   color: var(--ds-error-ink);
 }
 
-.composer-usage-stat {
-  gap: 5px;
-}
-
-.composer-usage-glyph {
-  width: 13px;
-  height: 13px;
-  flex: 0 0 13px;
-  fill: none;
-  stroke: var(--ds-text-muted);
-  stroke-width: 1.4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.composer-usage-sep {
-  color: var(--ds-text-muted);
-}
-
-.composer-usage-stat[data-unavailable="true"] .composer-usage-value,
-.composer-usage-stat[data-unavailable="true"] .composer-usage-label {
-  color: var(--ds-text-muted);
-}
-
-/* The meter is a ring so the third group reads as a gauge beside two numeric
- * groups; its arc inherits the capacity ink, text keeps the -ink tokens. */
+/* The meter is a ring so the entry reads as a gauge; its arc inherits the
+ * capacity ink, text keeps the -ink tokens. */
 .composer-usage-context-meter {
   display: inline-flex;
   align-items: center;
@@ -1051,8 +1026,8 @@
 }
 
 .composer-usage-context-meter .context-inspector-ring {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
 }
 
 .composer-usage-context-meter .context-inspector-ring-progress {
@@ -1073,7 +1048,7 @@
  * disabled control, which put the label at 2.30:1 (light) and 3.23:1 (dark)
  * and the dash below 2.4:1 in both themes. Keep the full-alpha ink and carry
  * the state in one quiet tier instead, so the empty meter reads one step below
- * a live one (label secondary + value primary) rather than half-lit. */
+ * a live one (label muted + value primary) rather than half-lit. */
 .composer-usage-context[data-unavailable="true"] .composer-usage-btn:disabled {
   opacity: 1;
 }
@@ -1081,24 +1056,6 @@
 .composer-usage-context[data-unavailable="true"] .composer-usage-label,
 .composer-usage-context[data-unavailable="true"] .composer-usage-value {
   color: var(--ds-text-muted);
-}
-
-.composer-bottom-footer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 6px 16px;
-}
-
-.composer-bottom-footer:empty {
-  display: none;
-}
-
-.composer-bottom-footer .composer-usage-footer {
-  width: auto;
-  margin: 0;
-  min-width: 0;
 }
 
 .composer-workspace-context { display: flex; flex: 1; min-width: 0; align-items: center; gap: 16px; color: var(--ds-text-muted); font-size: var(--text-xs); }
@@ -1132,6 +1089,18 @@
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
 
+/* The branch and, during a run, the fold toggle read as one control. */
+.composer-workspace-branch {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 2px;
+}
+
+.composer-workspace-branch:empty {
+  display: none;
+}
+
 .composer-top-strip-toggle {
   display: inline-grid;
   flex: 0 0 auto;
@@ -1147,20 +1116,18 @@
   color: var(--ds-text-primary);
 }
 
-/* The read-out strip simplifies before it wraps: glyphs go first, then the step
- * detail, while the context meter stays readable at every composer width. */
+/* The context entry simplifies before the strip crowds: the session total goes
+ * first, then the "Used" label, so the ring and percentage stay readable at
+ * every composer width. */
 @container composer-stack (max-width: 560px) {
-  .composer-usage-footer {
-    gap: 6px 12px;
-  }
-
-  .composer-usage-glyph {
+  .composer-usage-sep,
+  .composer-usage-session {
     display: none;
   }
 }
 
 @container composer-stack (max-width: 450px) {
-  .composer-usage-stat-detail {
+  .composer-usage-label {
     display: none;
   }
 }

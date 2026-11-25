@@ -644,7 +644,8 @@ export function Composer({
           dismissDroppedDirectories={dismissDroppedDirectories}
         />
         <ComposerImageAttachments controller={draft.imagePreview} onRemove={draft.removeImage} disabled={inputBlocked} />
-        <ComposerWorkspaceContext t={t} running={runActive} />
+        <ComposerWorkspaceContext t={t} running={runActive}
+          usage={composerContextUsage ? <ComposerUsageFooter {...composerContextUsage} /> : <ContextUsagePlaceholder />} />
         <div
           ref={composerShellRef}
           className={`composer-shell${inputBlocked ? " is-gated" : ""}${
@@ -742,11 +743,6 @@ export function Composer({
             workSessionId={activeSessionId ?? undefined}
             workSessionLabel={activeSessionSummary?.title}
           />
-        </div>
-        <div className="composer-bottom-footer">
-          {composerContextUsage ? (
-            <ComposerUsageFooter {...composerContextUsage} />
-          ) : <ContextUsagePlaceholder />}
         </div>
       </div>
     </div>
