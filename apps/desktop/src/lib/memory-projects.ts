@@ -125,7 +125,12 @@ export function buildSidebarMemoryProjects(args: {
       ? item.memoryProject?.id === memoryId
       : item.paths.some((candidate) => normalizeProjectPath(candidate) === path));
     if (!entry) continue;
-    if (!entry.meta.name && !memoryProjectForPath(groups, session.projectPath!)?.memoryProject &&
+    // A row that carries a shared memory identity is named by the Host-verified
+    // project, so one task's stored project name never renames it. A task whose
+    // checkout was pruned no longer resolves through `groups`, and adopting that
+    // task's name ("plan" for a planning worktree) used to rewrite the whole row.
+    if (!entry.meta.name && !entry.memoryProject &&
+        !memoryProjectForPath(groups, session.projectPath!)?.memoryProject &&
         entry.name === entry.path.split(/[\\/]/).filter(Boolean).at(-1)) {
       entry.name = sessionProjectDisplayName(session);
     }
