@@ -257,6 +257,8 @@ pub struct BackgroundOutput {
     stdout_truncated: bool,
     stderr_truncated: bool,
     address: crate::background_address::AddressDetector,
+    /// Present only for a command the Host may keep running once it announces a local server.
+    adoption: Option<tools::server_adoption::ServerAdoption>,
     session: String,
     id: String,
     revision: u64,
@@ -275,6 +277,7 @@ impl BackgroundOutput {
             stdout_truncated: false,
             stderr_truncated: false,
             address: Default::default(),
+            adoption: None,
             session,
             id,
             revision: 0,
@@ -300,6 +303,26 @@ impl BackgroundOutput {
     /// The first local server address the process printed; it lives only as long as this output owner.
     pub(crate) fn address(&self) -> Option<&str> {
         self.address.address()
+    }
+    pub(crate) fn arm_adoption(&mut self, adoption: tools::server_adoption::ServerAdoption) {
+        self.adoption = Some(adoption);
+    }
+    /// True while the command could still be adopted as a server.
+    pub(crate) fn adoption_pending(&self) -> bool {
+        self.adoption
+            .as_ref()
+            .is_some_and(|adoption| adoption.pending())
+    }
+    /// The execution loop's question after output: has the command announced an address and is a slot free?
+    pub(crate) fn adopt_server(&mut self) -> Option<tools::server_adoption::Adoption> {
+        let announced = self.address.address().is_some();
+        self.adoption.as_mut()?.poll(announced)
+    }
+    pub(crate) fn adoption_outcome(&self) -> tools::server_adoption::AdoptionOutcome {
+        self.adoption.as_ref().map_or(
+            tools::server_adoption::AdoptionOutcome::NotAdopted,
+            |adoption| adoption.outcome(),
+        )
     }
     pub fn push(&mut self, stderr: bool, chunk: &str) {
         let (text, truncated) = if stderr {
@@ -460,11 +483,15 @@ pub async fn start(
     transaction.commit()?;
     let mut summary = summary;
     summary.service = crate::background_services::metadata(&st.db, &summary.id)?;
-    let output = Arc::new(StdMutex::new(BackgroundOutput::new(
-        session.clone(),
-        summary.id.clone(),
-        tx,
-    )));
+    let mut owner = BackgroundOutput::new(session.clone(), summary.id.clone(), tx);
+    if job.timeout_is_default && job.service_scope.is_none() {
+        // A command that kept the default may be kept running once it announces a local server.
+        owner.arm_adoption(tools::server_adoption::ServerAdoption::new(
+            st.server_adoption.clone(),
+            session.clone(),
+        ));
+    }
+    let output = Arc::new(StdMutex::new(owner));
     job.options.output_tx = None;
     job.options.background_output = Some(output.clone());
     st.background_jobs.retain(|_, task| !task.is_finished());
@@ -507,8 +534,16 @@ pub async fn start(
             },
         )
         .await;
+        let adoption = match output.lock() {
+            Ok(output) => output.adoption_outcome(),
+            Err(error) => {
+                tracing::error!(%error, "background output lock poisoned");
+                tools::server_adoption::AdoptionOutcome::NotAdopted
+            }
+        };
         if job.service_scope.is_none() {
             annotate_timeout(&mut result, timeout_ms, timeout_is_default);
+            tools::server_adoption::annotate_outcome(&mut result, adoption);
         }
         let mut st = task_state.lock().await;
         if let Some(service) = &mut terminal_summary.service {
@@ -583,11 +618,15 @@ pub async fn start(
                 Err(error) => tracing::error!(%error,"background output lock poisoned"),
             }
         }
+        let mut terminal_audit = json!({"id":id,"toolCallId":call,"status":status,"durationMs":started.elapsed().as_millis() as u64,"at":now_ms()});
+        if let Some(label) = adoption.audit_label() {
+            terminal_audit["serverAdoption"] = json!(label);
+        }
         let _ = crate::audit::append(
             &st.db,
             "background_process_terminal",
             Some(&session),
-            json!({"id":id,"toolCallId":call,"status":status,"durationMs":started.elapsed().as_millis() as u64,"at":now_ms()}),
+            terminal_audit,
         );
         st.clear_bash_cancellation(&session, &call);
         drop(st);

@@ -1,3 +1,5 @@
+#[cfg(test)]
+mod background_adoption_tests;
 mod background_processes_rpc;
 #[cfg(test)]
 mod background_processes_tests;

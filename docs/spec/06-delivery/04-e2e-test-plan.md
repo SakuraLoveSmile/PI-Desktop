@@ -18586,15 +18586,24 @@ loopback provider). No live session, profile or real model is accessed.
   waiting. Repeat with normal exit and with no timeout override (60 seconds).
   Inspect the returned scoped terminal detail and reread the stored result.
   Complete a launch before the first wait, then complete a known running job
-  between two waits; each terminal outcome is delivered once.
+  between two waits; each terminal outcome is delivered once. Start a command
+  without a timeout override that prints a local server address next to a
+  silent one, let the 60-second default pass, then list and stop it (D648).
 - **Expected:** Timeout reports the exact explicit/default limit and tells the
   model to pass timeout in seconds (1–21,600). Default remains 60 seconds.
   Exit/timeout wakes the existing wait through production HostProcess and
   AgentSidecar transports; live output does not finish it. No mailbox insertion,
   real model call, process mutation capability or cross-session read is added.
   Old terminal messages remain readable without fabricated default metadata.
+  The command that printed a local server address is still running after the
+  default, listed with that address, and stops on request; the silent command
+  ends at 60 seconds.
 - **Coverage:** `scripts/e2e-background-bash-limit.mjs`; Rust background RPC,
-  runtime schema/payload, Team wait lifecycle and launch-bound proxy regressions.
+  runtime schema/payload, Team wait lifecycle and launch-bound proxy regressions;
+  `crates/host-core/src/rpc/background_adoption_tests.rs` (real shells and a
+  shortened default: adoption, no address, explicit timeout, late address,
+  session and Host caps, slot freed before the deadline, foreground) and the
+  ledger unit tests in `crates/host-core/src/tools/server_adoption.rs`.
 - **Status:** Run on the recorded task candidate; Windows execution remains
   subject to platform acceptance.
 

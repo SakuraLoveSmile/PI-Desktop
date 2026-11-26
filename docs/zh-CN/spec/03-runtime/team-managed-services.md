@@ -4,7 +4,7 @@
 
 ## 启动与权限
 
-Bash 新增可选 `backgroundKind:"command"|"service"`。缺省及旧值仍为 command，默认 60 秒及有限 timeout 覆盖不变。service 必须 `run_in_background:true`，禁止同时传 `timeout`/`timeoutMs`；固定 Host TTL 为 21,600,000 ms（6 小时）。正文、stdout 或后续 PID 声明不能把普通命令升级为服务或认领进程。
+Bash 新增可选 `backgroundKind:"command"|"service"`。缺省及旧值仍为 command，默认 60 秒及有限 timeout 覆盖不变。service 必须 `run_in_background:true`，禁止同时传 `timeout`/`timeoutMs`；固定 Host TTL 为 21,600,000 ms（6 小时）。正文、stdout 或后续 PID 声明不能把普通命令升级为服务或认领进程。独立的服务器生命周期规则（D648）只会延长一个打印了本地服务器地址的普通后台命令的截止时间；该命令不会成为服务，也不获得团队归属、停止原因、`backgroundKind` 或服务上限。
 
 服务 owner 必须是当前已确认 Agent 团队/运行中的 Lead 或批准成员，且处于精确运行中 Agent 回合。研究成员、暂停/hard pause、被替换成员、过期路由和超出权限上限都拒绝。普通 Bash、工作区、shell、权限和模式门禁仍适用；批准/额度等待后，Host 在插入进程的同一锁下重验捕获范围。
 
@@ -30,6 +30,6 @@ list/read/launch 可选增加 `backgroundKind:"service"`、`teamSessionId`、`te
 
 ## 验收
 
-`E2E-TEAM-managed-service-lifecycle` 用隔离 production Host/runtime 与真实本地 child/grandchild：service 超过 60 秒仍活，普通命令约 60 秒超时；覆盖原 permit 与新 caps、手动/hard 暂停、owner cancel/end/delete/workspace、Goal end、受控时钟 TTL、TERM escalation/tree exit、输出拒写、重复清理、重启零重放。分开记录平台结果，Unix 不能证明 Windows JobObject/tree 行为。组件与原生候选截图检查本地化 metadata；不将用户 profile、生产服务或付费 provider 作为默认夹具。
+`E2E-TEAM-managed-service-lifecycle` 用隔离 production Host/runtime 与真实本地 child/grandchild：service 超过 60 秒仍活，未打印本地服务器地址的普通命令约 60 秒超时；覆盖原 permit 与新 caps、手动/hard 暂停、owner cancel/end/delete/workspace、Goal end、受控时钟 TTL、TERM escalation/tree exit、输出拒写、重复清理、重启零重放。分开记录平台结果，Unix 不能证明 Windows JobObject/tree 行为。组件与原生候选截图检查本地化 metadata；不将用户 profile、生产服务或付费 provider 作为默认夹具。
 
 新服务将 `stopMode` 写入既有 KV namespace `background-service-stop-mode-v1`，与 process/ownership 行同一事务。历史缺失仍省略 `stopMode`，重开不从当前操作系统推断停止机制。

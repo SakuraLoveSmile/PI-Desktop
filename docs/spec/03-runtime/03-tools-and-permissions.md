@@ -735,8 +735,9 @@ background launch returns a backgroundProcessId and starting/current lifecycle
 status, without fabricating exitCode zero. The command's outcome belongs to the
 session activity registry, not this launch receipt. The renderer can read/stop
 only the explicitly named local session resource. Ordinary background commands retain the
-same default and maximum command timeout, do not bypass approvals, and cannot
-turn arbitrary `command &` invocations into managed processes.
+same default and maximum command timeout (the one exception is the server
+lifetime rule below), do not bypass approvals, and cannot turn arbitrary
+`command &` invocations into managed processes.
 
 Existing Plus P7 service history remains readable through the activity registry.
 Explicit `backgroundKind: "service"` now uses the separate current Agent Team
@@ -773,6 +774,40 @@ The read is protected by the trusted launch binding and process/session owner
 checks. Errors remain visible; cancellation, deadline or a replaced turn never
 consumes a late outcome, so a later wait can receive it. Team inbox delivery,
 permission/admission limits and process cancellation rules are unchanged.
+
+### Background server lifetime (2026-11-22)
+
+The 60-second default has one exception, decided by D648 and ADR
+background-server-adoption. A background `Bash` command launched without a model
+`timeout`, that is not a Team service, is adopted by the Host the first time the
+local-address detector (D647) reports an address for it. Adoption moves its
+deadline to 21,600 seconds (`MAX_BASH_TIMEOUT_MS`) from that moment, once. The
+Host asks right after each processed output chunk and once more when the
+deadline fires, so an address printed in the same turn as the deadline wins; an
+address printed after the default deadline is too late, and the command is
+stopped as before. A foreground command, a command with an explicit `timeout` of
+any value and a Team service are never adopted, and a command that prints no
+address keeps the 60-second default.
+
+Adoption holds one slot of a Host ledger: at most 2 adopted servers per session
+and 2 per Host. The slot is taken at adoption and returned by an RAII grant owned
+by the execution loop, so exit, stop, timeout, abort and a dropped task all
+return it, and only after the process tree is gone. With no free slot the
+command is not adopted: it keeps its deadline, the check repeats on later output
+and at the deadline, and the end message adds that the session or the Host
+already keeps that many servers. The shell permit stays held for the whole run,
+as for every background command, so an adopted server counts against the shell
+budget and the session's in-flight limit; Team service caps are separate and
+unchanged. Adoption adds no approval path, tool parameter or Host method: the
+approval is the Bash call's own, which never depended on the timeout.
+
+A server stopped by its extended lifetime reports `timeoutMs` 21,600,000,
+`timeoutIsDefault: false` and an `errorMessage` naming the server limit. The
+default and explicit messages above are unchanged, and no field is added to the
+result envelope. The terminal audit row of the process gains `serverAdoption`
+(`adopted` or `cap_reached`) when it applies. The `run_in_background`
+description gains one sentence stating the rule and keeps its default
+60-second sentence.
 
 ### Explicit Team services (WP14)
 

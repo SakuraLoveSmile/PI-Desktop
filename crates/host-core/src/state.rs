@@ -61,6 +61,8 @@ pub struct AppState {
     pub tool_budget: ToolBudget,
     pub background_jobs: crate::background_processes::JobRegistry,
     pub background_outputs: crate::background_processes::OutputRegistry,
+    /// Slots for background commands the Host keeps running once they announce a local server.
+    pub server_adoption: std::sync::Arc<crate::tools::server_adoption::AdoptionLedger>,
     pub pending_background_finalizations: crate::background_processes::FinalizationRegistry,
     /// (session_id, tool_call_id) -> cancellation signal for an active Bash
     /// process. The signal is removed by the execution owner in all outcomes.
@@ -153,6 +155,7 @@ impl AppState {
             tool_budget: ToolBudget::new(),
             background_jobs: HashMap::new(),
             background_outputs: HashMap::new(),
+            server_adoption: Default::default(),
             pending_background_finalizations: HashMap::new(),
             active_bash_cancellations: HashMap::new(),
             pending_permissions: HashMap::new(),

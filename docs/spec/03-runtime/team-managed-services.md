@@ -6,7 +6,10 @@ Bash adds optional `backgroundKind:"command"|"service"`. Missing/legacy values
 remain `command`: default 60 seconds and bounded `timeout` overrides are unchanged.
 A service requires `run_in_background:true` and rejects any `timeout`/`timeoutMs`;
 its fixed Host-owned TTL is 21,600,000 ms (6 hours). It cannot promote an existing
-command or adopt a PID based on prose, stdout or later claims.
+command or adopt a PID based on prose, stdout or later claims. The separate
+server-lifetime rule (D648) only moves the deadline of an ordinary background
+command that printed a local server address; that command does not become a
+service and gains no Team ownership, stop reason, `backgroundKind` or service cap.
 
 The owner must be an authenticated current Agent Team Lead or approved member in
 an exact running Agent turn and confirmed current Team/run. Research members,
@@ -76,7 +79,8 @@ command timeout, successful exit or graceful Windows termination.
 
 `E2E-TEAM-managed-service-lifecycle` uses isolated production Host/runtime and real local
 child/grandchild processes. Keep a service alive past 60 seconds; verify an ordinary
-command still times out around 60 seconds. Verify caps with existing permits,
+command that prints no local server address still times out around 60 seconds.
+Verify caps with existing permits,
 manual/hard pause, owner cancel/end/delete/workspace change, Goal end, TTL under a
 controlled domain clock, TERM escalation/tree exit, output-storage refusal,
 repeated cleanup and restart with zero replay. Record platform results separately:
