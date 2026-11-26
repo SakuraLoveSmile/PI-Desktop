@@ -136,3 +136,23 @@ test("an archived open checkout keeps the grouped row hidden after the workspace
   assert.equal(entries[0].meta.archived, true,
     "archiving an open checkout must survive the active checkout changing");
 });
+
+test("a shared project keeps its host-verified name when a removed checkout's task carries a worktree name", () => {
+  const shared = { id: "media", name: "MediaPlayer", primaryPath: "/repos/MediaPlayer",
+    paths: ["/repos/MediaPlayer", "/worktrees/MediaPlayer/run"] };
+  const sharedGroups = shared.paths.map((path, index) => ({ id: `media-group-${index}`,
+    name: index ? "run" : "MediaPlayer", primaryPath: path,
+    roots: [{ path, name: "checkout", position: 0 }], memoryProject: shared,
+    pinned: false, createdAt: 1, updatedAt: 1, lastOpenedAt: 1 }));
+  // The planning checkout was pruned, so no group resolves its path any more; the
+  // task still remembers the shared memory identity and the name it ran under.
+  const planned = { ...sessions[0], id: "planned-task", title: "kanpilot plan abc",
+    projectPath: "/worktrees/MediaPlayer/plan", projectName: "plan", memoryProjectId: shared.id };
+  const entries = buildSidebarMemoryProjects({ groups: sharedGroups, openPaths: [shared.primaryPath],
+    workspaces: [], sessions: [planned], activePath: shared.primaryPath, projectMeta: {} });
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].path, shared.primaryPath);
+  assert.equal(entries[0].name, "MediaPlayer",
+    "one removed checkout's stored project name must not rename the shared row");
+  assert.deepEqual(entries[0].sessions.map((session) => session.id), ["planned-task"]);
+});

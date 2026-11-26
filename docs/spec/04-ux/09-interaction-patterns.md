@@ -221,6 +221,13 @@ without consuming the full sidebar. The following `Projects` section heading
 exposes the project picker above retained project groups. Several project groups
 may be retained while exactly one workspace supplies the visible shell context.
 
+A row that collapses several checkouts of one project memory identity carries
+the Host-verified project name (or that project's saved rename), not the folder
+name or worktree name its conversations ran under. Only a row without a memory
+identity — one checkout standing on its own — may adopt the project name a
+conversation persists for it, so a task dispatched into a `plan` worktree cannot
+rename the whole project row.
+
 #### Project tab lifecycle
 
 1. **Open** — selecting a project from Settings → Project archive or the picker adds its
