@@ -292,6 +292,14 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   label names that figure; the default is used. The threshold controls when a text-only paste becomes a
   temporary session-scratch file; it defaults to 600 characters and accepts
   integer values from 1 through 1,000,000.
+- **Session summary** is a switch beside the other conversation toggles (the
+  Conversation and display card). It persists as `AppSettings.autoSummarizeSessions`;
+  absent means on. It keeps the activity rail's pinned summary up to date when a
+  turn ends. Off stops the automatic and the manual refresh and hides the card;
+  a stored summary is kept and shows again when it is switched back on (D649). The
+  description says that a bounded excerpt of the recent conversation is sent to
+  the session's own model and may incur usage. It is a per-device preference and
+  is not part of portable configuration sync.
 - **Prompt enhancement** is a card controlling the Composer's Enhance prompt
   action (ADR 0121). It carries a `Use a custom template` switch and the settings
   icon button the subagent rows use for editing, which opens an editor sheet

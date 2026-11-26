@@ -613,6 +613,18 @@ control: the address in 12px `--ds-text-muted` text, then a stop square 24px by 
 and flush with the row's edge like the grip, holding a 10px square glyph with 2px
 corners in `--ds-text-primary` and tinted with `--ds-bg-active` only under the pointer.
 
+The rail's pinned session summary (D649) is the one plate it keeps, and it draws no
+stroke: a card above the first section on `--ds-bg-hover` with 8px corners
+(`--radius-xs`), 10px 12px 8px padding and 20px of space below it. Its head is a
+24px line: a 16px `--ds-text-secondary` sparkle, the update time in 11px
+`--font-mono` `--ds-text-muted` (local `YYYY-MM-DD HH:mm`) and a borderless 24px by
+28px refresh control flush with the card's padding (a 14px `--ds-text-muted` glyph,
+`--ds-bg-active` under the pointer, a spinner while it runs). The paragraph is 13px
+`--ds-text-primary` at the chat line height (`--leading-chat`), clamped to four
+lines; Expand and Collapse is a 28px borderless ghost button in 12px
+`--ds-text-secondary`, drawn only while the text is cut off or open. Type sizes
+follow the font scale; spacing and the controls' hit areas stay in pixels.
+
 | Layer | Token | Use |
 |---|---|---|
 | Page | `--ds-bg-primary` | The route or dialog body itself |

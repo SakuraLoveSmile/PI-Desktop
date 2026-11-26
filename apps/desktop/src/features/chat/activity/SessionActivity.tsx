@@ -26,6 +26,7 @@ import { GoalFoldedSummary } from "./GoalFoldedSummary";
 import { activityMcpReferences, type McpReconnectTarget } from "./activity-mcp-rows";
 import { useActivityMcpServers } from "./use-activity-mcp-servers";
 import { useActivityWorkspace } from "./use-activity-workspace";
+import { useSessionSummary } from "./use-session-summary";
 
 const EMPTY_HISTORY: PlanProposal[] = [];
 const EMPTY_PERMISSIONS: NonNullable<ReturnType<typeof useAppStore.getState>["pendingPermissions"][string]> = [];
@@ -63,6 +64,9 @@ export function SessionActivity({ sessionId, messages, visible, rangeLimited }: 
   const loadedResources = useMemo(() => activityResources(messages), [messages]);
   const resources = aggregate.snapshot ?? loadedResources;
   const workspace = useActivityWorkspace({ sessionId, visible, supported });
+  // A Team member's activity is read through its Team, and it has no summary of its own.
+  const summary = useSessionSummary({ sessionId, visible, supported: supported && session?.team?.role !== "member", running,
+    onRefreshFailed: () => showToast(t("panel.activity.summary.refreshFailed"), { variant: "error" }) });
   const mcpTools = resources.references.mcp;
   const mcpServers = useActivityMcpServers(session?.projectPath ?? undefined, visible && supported && mcpTools.length > 0, mcpTools.map((tool) => tool.label).join("\n"));
   // The row spins and settles by itself, so only a server that still cannot be reached is said aloud, as the Extensions page does.
@@ -193,7 +197,7 @@ export function SessionActivity({ sessionId, messages, visible, rangeLimited }: 
     agentsNotice={aggregateNotice} resourcesNotice={aggregateNotice}
     pendingNotices={{ activity: Boolean(aggregate.loading && !aggregate.error && !aggregate.snapshot?.limited), team: Boolean(team.loading && !team.snapshot && !team.error) }}
     suggestionsHaveRows={resources.references.skills.length > 0 || mcpTools.length > 0 || recordedSuggestions.length > 0}
-    environment={workspace.environment} contextUsage={workspace.context} changes={workspace.changes}
+    environment={workspace.environment} contextUsage={workspace.context} changes={workspace.changes} summary={summary}
     onOpenServerAddress={(url) => open(sessionId, browserPluginTab(url))} onStopServer={(id) => void serverStop.stop(id)} stoppingServers={serverStop.stopping}
     onOpenContext={() => openContextInsights(sessionId, open)} onOpenReview={() => open(sessionId, toolWorkPanelTab("review"))}
     supported={supported} rangeLimited={rangeLimited} groupsRangeLimited={!aggregate.snapshot && rangeLimited} hasMoreBefore={transcript.hasMoreBefore} historyLoading={transcript.loading}

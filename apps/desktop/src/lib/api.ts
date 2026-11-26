@@ -3,6 +3,8 @@ import type {
   GoalExecutionChangedEvent,
   GitWorkspaceRequest, GitWorkspaceMutation, GitWorkspaceSnapshot, GitWorktree,
   SessionQuickNote,
+  SessionSummaryRefreshResult,
+  SessionSummaryState,
   SessionActivityPage,
   SessionActivityChanged,
   BackgroundProcessSummary,
@@ -426,6 +428,7 @@ export function validateSettingsWrite<T extends Partial<AppSettings>>(settings: 
     chatContentMaxWidth?: unknown;
     infiniteProviderRetry?: unknown;
     autoGenerateSessionTitles?: unknown;
+    autoSummarizeSessions?: unknown;
     smoothStreaming?: unknown;
     updatePreference?: unknown;
     lastNotifiedUpdateVersion?: unknown;
@@ -478,6 +481,14 @@ export function validateSettingsWrite<T extends Partial<AppSettings>>(settings: 
     typeof value.autoGenerateSessionTitles !== "boolean"
   ) {
     throw Object.assign(new Error("autoGenerateSessionTitles is invalid"), {
+      errorCode: "INVALID_PARAMS",
+    });
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(value, "autoSummarizeSessions") &&
+    typeof value.autoSummarizeSessions !== "boolean"
+  ) {
+    throw Object.assign(new Error("autoSummarizeSessions is invalid"), {
       errorCode: "INVALID_PARAMS",
     });
   }
@@ -666,6 +677,12 @@ export const api = {
     invoke<{ note: SessionQuickNote }>(IPC.invoke.sessionNotesGet, { sessionId }),
   saveSessionQuickNote: (sessionId: string, content: string, expectedRevision: number) =>
     invoke<{ note: SessionQuickNote }>(IPC.invoke.sessionNotesSet, { sessionId, content, expectedRevision }),
+  /** The stored model-written summary of a local session; reading never calls a model. */
+  getSessionSummary: (sessionId: string) =>
+    invoke<SessionSummaryState>(IPC.invoke.sessionSummaryGet, { sessionId }),
+  /** Asks for a new summary. Main reads the transcript and decides whether it is time; `force` is the refresh control. */
+  refreshSessionSummary: (sessionId: string, force: boolean) =>
+    invoke<SessionSummaryRefreshResult>(IPC.invoke.sessionSummaryRefresh, force ? { sessionId, force: true } : { sessionId }),
   listBackgroundProcesses: (sessionId: string) =>
     invoke<{ processes: BackgroundProcessSummary[] }>(IPC.invoke.backgroundProcessesList, { sessionId }),
   readBackgroundProcess: (sessionId: string, id: string) =>

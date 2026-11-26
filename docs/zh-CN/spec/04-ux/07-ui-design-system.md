@@ -542,6 +542,14 @@ shadow-lg:  0 8px 24px rgba(0,0,0,0.12)
 12px `--ds-text-muted` 的地址，其后是 24px × 28px、与拖柄一样贴齐行边的停止方块，内含文字色 `--ds-text-primary`、
 10px、圆角 2px 的方块图形，仅在指针下取 `--ds-bg-active` 着底。
 
+活动栏固定的会话总结（D649）是它保留的唯一底板，并且不画描边：位于第一个分区之上的卡片，底色
+`--ds-bg-hover`，圆角 8px（`--radius-xs`），内边距 10px 12px 8px，下方留 20px。它的头部是 24px 高的一行：
+16px 的 `--ds-text-secondary` 星花图标、11px `--font-mono` `--ds-text-muted` 的更新时间（本地
+`YYYY-MM-DD HH:mm`），以及一个无边框、24px × 28px、与卡片内边距齐平的刷新控件（14px `--ds-text-muted` 图标，
+指针下 `--ds-bg-active`，运行时为转圈）。正文是 13px `--ds-text-primary`，行高取聊天行高（`--leading-chat`），
+限制为四行；“展开/收起”是 28px 高、无边框的 ghost 按钮，12px `--ds-text-secondary`，仅在文字被截断或已展开时绘制。
+字号随字体缩放；间距与控件的点击区域保持像素值。
+
 | 层 | 标记 | 用途 |
 |---|---|---|
 | 页面 | `--ds-bg-primary` | 路由或对话框主体本身 |

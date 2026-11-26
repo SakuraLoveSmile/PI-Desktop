@@ -1757,6 +1757,8 @@ sklm: {
     infiniteProviderRetryDesc: "网络或临时服务故障会一直重试直到成功。仍可随时停止，但开启后可能持续消耗 API 用量。",
     autoGenerateSessionTitles: "自动会话标题",
     autoGenerateSessionTitlesDesc: "在首轮对话完成后自动生成简短的会话标题。会将首轮提示词与回答的简短摘要发送给所选模型，可能会消耗用量。",
+    autoSummarizeSessions: "会话总结",
+    autoSummarizeSessionsDesc: "在活动概览顶部固定一段会话总结，并在每轮对话结束后更新。会将最近对话的有限摘录发送给该会话所用的模型，可能会消耗用量。",
     smoothStreaming: "平滑流式显示",
     smoothStreamingDesc: "将流式文本逐字释放，产生打字机效果。系统开启“减少动态效果”时自动禁用。",
     preventScreenSleep: "阻止屏幕休眠",
@@ -2534,6 +2536,7 @@ sklm: {
       mcp: { idle: "空闲", authNeeded: "需要授权", reconnect: "重新连接", reconnectNamed: "重新连接 {{name}}（连接失败）" },
       servers: "服务器",
       server: { stop: "停止 {{name}}", open: "打开 {{address}}", stopFailed: "无法停止 {{name}}。" },
+      summary: { title: "会话总结", updated: "更新于 {{time}}", refresh: "重新生成会话总结", expand: "展开", collapse: "收起", refreshFailed: "无法更新会话总结。" },
       goals: "目标",
       sections: {
         grip: "移动分区：{{name}}",

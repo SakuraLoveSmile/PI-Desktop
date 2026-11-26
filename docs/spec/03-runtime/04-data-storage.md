@@ -2123,6 +2123,24 @@ Host loss cannot preserve this unwritten snapshot. P5 does not advance the
 shared PRAGMA user_version. Current executable shared migration ownership is
 `crates/host-core/src/db.rs`; older shared-v19 examples above are historical.
 
+### Session summary record
+
+The model-written summary behind the activity rail's pinned card is not a table.
+The Host `session-summary-v1` KV namespace holds one record per local session id,
+`{version, text, revision, basedOnMessageCount, updatedAt}`, with `text` at most
+2,000 bytes of UTF-8. A write is a compare-and-set on `revision` inside one
+immediate transaction that also checks the session is live, so a late result
+cannot recreate a record for a deleted or trashed session; `basedOnMessageCount`
+is the session's message counter when the text was written, and the read side
+derives `behind` and `diverged` from it. The record is derived text: it is not
+transcript or model input, is not searched or exported and is not copied into a
+fork, and an unreadable record or one with a newer `version` reads as absent and
+is replaced by the next write. `kv` has no foreign key to `sessions`, so
+`delete_session`, `delete_session_with_team_cleanup` and the plugin session delete
+(trash and purge alike) name the namespace and remove the row with the session; a
+test fails if one of them leaves it. No schema, `user_version` or migration
+change.
+
 ## Team dispatch metadata (WP10)
 
 The optional Host-owned `team-dispatch-metadata-v1` KV record is keyed by mailbox

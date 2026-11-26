@@ -1790,6 +1790,8 @@ sklm: {
     infiniteProviderRetryDesc: "Keep retrying network and transient provider failures until the request succeeds. You can still stop the turn; API usage may continue while enabled.",
     autoGenerateSessionTitles: "Automatic short titles",
     autoGenerateSessionTitlesDesc: "Automatically summarize the conversation into a short title after the first turn. Sends a bounded excerpt of the first prompt and reply to the selected model and may incur usage.",
+    autoSummarizeSessions: "Session summary",
+    autoSummarizeSessionsDesc: "Pins a short summary of the conversation at the top of the activity overview and updates it when a turn ends. Sends a bounded excerpt of the recent conversation to the session's own model and may incur usage.",
     smoothStreaming: "Smooth streaming",
     smoothStreamingDesc: "Release streamed text character by character for a typewriter effect. Automatically disabled when the system prefers reduced motion.",
     preventScreenSleep: "Prevent screen sleep",
@@ -2591,6 +2593,7 @@ sklm: {
       mcp: { idle: "Idle", authNeeded: "Sign-in needed", reconnect: "Reconnect", reconnectNamed: "Reconnect {{name}} (connection failed)" },
       servers: "Servers",
       server: { stop: "Stop {{name}}", open: "Open {{address}}", stopFailed: "Could not stop {{name}}." },
+      summary: { title: "Session summary", updated: "Updated {{time}}", refresh: "Regenerate session summary", expand: "Expand", collapse: "Collapse", refreshFailed: "Could not update the session summary." },
       goals: "Goal",
       sections: {
         grip: "Move section: {{name}}",

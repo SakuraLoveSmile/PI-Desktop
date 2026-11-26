@@ -1551,6 +1551,8 @@ sklm: {
     "infiniteProviderRetryDesc": "Netzwerk- und vorübergehende Anbieterfehler werden bis zum Erfolg wiederholt. Du kannst den Lauf weiterhin stoppen; der API-Verbrauch kann fortlaufen.",
     "autoGenerateSessionTitles": "Automatische Sitzungstitel",
     "autoGenerateSessionTitlesDesc": "Fasst das Gespräch nach der ersten Runde automatisch in einem kurzen Titel zusammen. Sendet einen begrenzten Auszug an das ausgewählte Modell; kann Guthaben verbrauchen.",
+    "autoSummarizeSessions": "Sitzungszusammenfassung",
+    "autoSummarizeSessionsDesc": "Zeigt oben in der Aktivitätsübersicht eine kurze Zusammenfassung des Gesprächs und aktualisiert sie, wenn eine Runde endet. Sendet einen begrenzten Auszug des letzten Gesprächs an das Modell der Sitzung und kann Nutzung verursachen.",
     "smoothStreaming": "Sanftes Streaming",
     "smoothStreamingDesc": "Gibt gestreamten Text zeichenweise aus, um einen Schreibmaschineneffekt zu erzeugen. Wird automatisch deaktiviert, wenn das System reduzierte Bewegung bevorzugt.",
     "preventScreenSleep": "Bildschirmsperre verhindern",
@@ -2284,6 +2286,7 @@ sklm: {
       mcp: { idle: "Inaktiv", authNeeded: "Anmeldung nötig", reconnect: "Erneut verbinden", reconnectNamed: "{{name}} erneut verbinden (Verbindung fehlgeschlagen)" },
       servers: "Server",
       server: { stop: "{{name}} beenden", open: "{{address}} öffnen", stopFailed: "{{name}} konnte nicht beendet werden." },
+      summary: { title: "Sitzungszusammenfassung", updated: "Aktualisiert {{time}}", refresh: "Sitzungszusammenfassung neu erstellen", expand: "Erweitern", collapse: "Einklappen", refreshFailed: "Die Sitzungszusammenfassung konnte nicht aktualisiert werden." },
       goals: "Ziel",
       sections: {
         grip: "Bereich verschieben: {{name}}",

@@ -1559,6 +1559,8 @@ sklm: {
     infiniteProviderRetryDesc: "네트워크 및 일시적인 제공자 오류가 성공할 때까지 계속 재시도됩니다. 언제든 중지할 수 있지만 API 사용량이 계속 발생할 수 있습니다.",
     autoGenerateSessionTitles: "자동 세션 제목",
     autoGenerateSessionTitlesDesc: "첫 번째 턴 이후 대화를 짧은 제목으로 자동 요약합니다. 첫 프롬프트와 응답의 일부를 선택한 모델로 전송하며 사용량이 발생할 수 있습니다.",
+    autoSummarizeSessions: "세션 요약",
+    autoSummarizeSessionsDesc: "활동 개요 상단에 대화의 짧은 요약을 고정하고 턴이 끝날 때 갱신합니다. 최근 대화의 제한된 발췌를 해당 세션의 모델로 보내며 사용량이 발생할 수 있습니다.",
     smoothStreaming: "부드러운 스트리밍",
     smoothStreamingDesc: "스트리밍 텍스트를 한 글자씩 타자기 효과로 표시합니다. 시스템에서 동작 줄이기를 선호하면 자동으로 비활성화됩니다.",
     preventScreenSleep: "화면 절전 방지",
@@ -2297,6 +2299,7 @@ sklm: {
       mcp: { idle: "대기", authNeeded: "로그인 필요", reconnect: "다시 연결", reconnectNamed: "{{name}} 다시 연결 (연결 실패)" },
       servers: "서버",
       server: { stop: "{{name}} 중지", open: "{{address}} 열기", stopFailed: "{{name}}을(를) 중지하지 못했습니다." },
+      summary: { title: "세션 요약", updated: "{{time}}에 업데이트됨", refresh: "세션 요약 다시 생성", expand: "펼치기", collapse: "접기", refreshFailed: "세션 요약을 업데이트하지 못했습니다." },
       goals: "목표",
       sections: {
         grip: "섹션 이동: {{name}}",

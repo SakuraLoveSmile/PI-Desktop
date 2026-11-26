@@ -1549,6 +1549,8 @@ sklm: {
     "infiniteProviderRetryDesc": "Reintenta los errores de red y temporales hasta que la solicitud tenga éxito. Puedes detener el turno; el uso de la API puede continuar.",
     "autoGenerateSessionTitles": "Títulos de sesión automáticos",
     "autoGenerateSessionTitlesDesc": "Resume automáticamente la conversación en un título breve después del primer turno. Envía un fragmento limitado al modelo seleccionado y puede incurrir en uso.",
+    "autoSummarizeSessions": "Resumen de la sesión",
+    "autoSummarizeSessionsDesc": "Mantiene fijado en la parte superior de la vista de actividad un resumen breve de la conversación y lo actualiza cuando termina un turno. Envía un extracto limitado de la conversación reciente al modelo de la propia sesión y puede consumir uso.",
     "smoothStreaming": "Transmisión suave",
     "smoothStreamingDesc": "Libera el texto transmitido carácter por carácter para un efecto de máquina de escribir. Se desactiva automáticamente cuando el sistema prefiere movimiento reducido.",
     "preventScreenSleep": "Evitar suspensión de pantalla",
@@ -2282,6 +2284,7 @@ sklm: {
       mcp: { idle: "Inactivo", authNeeded: "Requiere acceso", reconnect: "Reconectar", reconnectNamed: "Reconectar {{name}} (falló la conexión)" },
       servers: "Servidores",
       server: { stop: "Detener {{name}}", open: "Abrir {{address}}", stopFailed: "No se pudo detener {{name}}." },
+      summary: { title: "Resumen de la sesión", updated: "Actualizado {{time}}", refresh: "Regenerar el resumen de la sesión", expand: "Ampliar", collapse: "Contraer", refreshFailed: "No se pudo actualizar el resumen de la sesión." },
       goals: "Objetivo",
       sections: {
         grip: "Mover sección: {{name}}",

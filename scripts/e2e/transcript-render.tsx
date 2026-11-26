@@ -2,6 +2,7 @@ import { sessionActivityRailProbe } from "./session-activity-rail";
 import { sessionActivityIntegrationProbe } from "./session-activity-integration";
 import { sessionActivityWorkspaceProbe } from "./session-activity-workspace";
 import { sessionActivityServersProbe } from "./session-activity-servers";
+import { sessionActivitySummaryProbe } from "./session-activity-summary";
 import { transcriptReadabilityProbe } from "./transcript-readability";
 import { transcriptLongHistoryProbe as runLongHistoryProbe } from "./transcript-long-history";
 import { transcriptEditProbe } from "./transcript-edit";
@@ -33,6 +34,7 @@ declare global {
   var sessionActivityIntegrationProbe: typeof sessionActivityIntegrationProbe;
   var sessionActivityWorkspaceProbe: typeof sessionActivityWorkspaceProbe;
   var sessionActivityServersProbe: typeof sessionActivityServersProbe;
+  var sessionActivitySummaryProbe: typeof sessionActivitySummaryProbe;
   var cleanupSessionActivityIntegrationProbe: () => void;
   var cleanupReadabilityProbe: () => void;
   var transcriptReadabilityProbe: typeof transcriptReadabilityProbe;
@@ -50,6 +52,7 @@ globalThis.sessionActivityRailProbe = sessionActivityRailProbe;
 globalThis.sessionActivityIntegrationProbe = sessionActivityIntegrationProbe;
 globalThis.sessionActivityWorkspaceProbe = sessionActivityWorkspaceProbe;
 globalThis.sessionActivityServersProbe = sessionActivityServersProbe;
+globalThis.sessionActivitySummaryProbe = sessionActivitySummaryProbe;
 
 function assert(value: unknown, message: string): asserts value {
   if (!value) throw new Error(message);

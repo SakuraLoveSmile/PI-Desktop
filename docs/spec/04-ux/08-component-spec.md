@@ -5253,6 +5253,38 @@ currently shown keeps its slot. A storage that cannot be read or written leaves
 the order in force for the running window and logs only the error name. No Host,
 IPC or protocol state is involved.
 
+The pinned session summary (D649) is the one thing above the sections, and it is
+not a section: the first child of the rail, above the Needs attention block, with
+no grip, no place in the saved section order, no heading to fold and no hairline
+of its own. It is a plate (`--ds-bg-hover`, no stroke) holding, on one line, a
+sparkle glyph, "Updated YYYY-MM-DD HH:mm" (local time, a `<time>` element carrying
+the ISO stamp) and a refresh control, and below that the paragraph the model
+wrote, as a text node, clamped to four lines. Expand and Collapse is drawn only
+while the text is cut off or open; it is a button that carries `aria-expanded`
+and controls the paragraph, and the measurement follows resizes of the pane. The
+refresh control, named "Regenerate session summary", forces an update: while one
+runs it shows a spinner, the card is `aria-busy`, and the control stays
+focusable but inert (`aria-disabled`) so pressing it never drops keyboard focus.
+
+The card exists only while there is a summary to show. It is absent for a
+session with no summary yet (the first is written after the next turn ends and
+appears when it is ready, with no placeholder), for a summary the session was
+rewound past, for a Team member, native or remote session, with an older Host,
+and while the Session summary setting is off (a stored summary is kept). Only a
+visible rail pane reads or asks. It reads the stored summary when it becomes
+visible and asks for a new one when a turn of the shown session ends (`running`
+going from true to false), the Host reports at least two messages since the
+stored summary and the last attempt is over a minute old. Opening or switching
+to a session never calls a model. An answer for another session, a closed pane or
+a setting that has since been switched off reaches nothing; a lower revision
+never replaces a newer one (another window may have written first, and its note
+is what shows); and one request per session runs at a time, so a second press or
+turn end joins it. A failed refresh the person asked for says so once in an
+error toast; an automatic one stays quiet and keeps the previous text. The text
+is model output and is never rendered as HTML or Markdown. The model, the input
+budget, the limits and the storage are in
+[ADR session-activity-session-summary](../../adr/session-activity-session-summary.md).
+
 Each recorded-activity group uses full Host totals after all revision-consistent
 summary pages have loaded. The complete projection is read only while visible,
 refreshes after canonical writes and Host restart, and preserves a known full

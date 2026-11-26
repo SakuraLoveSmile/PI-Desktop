@@ -2325,6 +2325,35 @@ renderer re-validates the exact origin before it becomes a link. It is additive
 and optional, so protocol 11 is unchanged and consumers may ignore it. Rationale:
 [ADR session-activity-server-address](../../adr/session-activity-server-address.md).
 
+### Session summary RPCs
+
+Local Desktop sessions add two additive methods for the activity rail's pinned
+summary. `sessionSummary.get({sessionId})` returns `{summary, messageCount}`:
+`messageCount` is the session's message counter and `summary` is `null` or
+`{sessionId, text, revision, basedOnMessageCount, updatedAt, behind, diverged}`,
+where `behind` counts the messages added since `basedOnMessageCount` and
+`diverged` is true when the transcript is now shorter than that basis (a rewind).
+`sessionSummary.set({sessionId, text, basedOnMessageCount, expectedRevision})` is
+a compare-and-set that returns `{summary}`: `expectedRevision` is the revision the
+writer read (0 when it read none), and the Host stores the trimmed text, advances
+the revision and stamps `updatedAt`. A stale `expectedRevision` is
+`SUMMARY_CONFLICT` (code 1008) whose `data` carries `currentRevision`, `summary`
+and `messageCount`. `text` must be non-blank, free of NUL and at most 2,000 bytes
+of UTF-8 (`LIMIT_EXCEEDED` above that); `basedOnMessageCount` and
+`expectedRevision` are non-negative integers and the basis may not exceed the
+transcript, otherwise `INVALID_ARGUMENT`. A missing or trashed session is
+`NOT_FOUND`, and a `native-pi:` or `remote:` id is `SESSION_SUMMARY_UNSUPPORTED`.
+
+The record lives in the `kv` namespace `session-summary-v1` ([Data
+storage](04-data-storage.md)). It is never part of `session.get`, search, an
+export or a fork, and an older Host answers `METHOD_NOT_FOUND`, which a client
+reads as "no summary support". The Host never calls a model: Electron main reads
+the transcript through `session.get`, asks the agent runtime for the text and
+calls `set`, and the renderer reaches the Host only through the
+`pi-desktop/sessionSummary/get` and `pi-desktop/sessionSummary/refresh` IPC
+channels. The methods are additive, so protocol 11 is unchanged. Rationale:
+[ADR session-activity-session-summary](../../adr/session-activity-session-summary.md).
+
 ### Team diagnostics and progress hints (WP7)
 
 Malformed strategy, presentation.role and displayName errors name their allowed

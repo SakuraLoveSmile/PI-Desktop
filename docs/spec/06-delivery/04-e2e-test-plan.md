@@ -18395,6 +18395,24 @@ prove account/region eligibility or call a real model.
   arrives after the pane closed reaches nothing); after the stop the row leaves
   Servers for Live status's ended processes. A section order saved before Servers
   existed places it right after Live status.
+  Review the pinned session summary with a fake one-shot provider (never a real
+  model): a session with no summary shows no card and no placeholder; finish a
+  turn with the pane visible and the card appears above Needs attention with the
+  local date and the model's paragraph; finish another at once and no second call
+  is made inside a minute; open another session, and keep the pane hidden through a
+  turn, and nothing is asked. Press the refresh control: the spinner shows, a
+  second press starts nothing, keyboard focus stays on the control, and the run
+  skips the new-message threshold and the interval. Fail a call: the previous text
+  stays, the control's failure says so once in an error toast and a turn-end failure
+  says nothing. Rewind the session past the summary and the card leaves; switch
+  Settings, Session summary off (the card goes, no refresh runs, the stored note
+  stays) and on again (the card returns). A text longer than four lines shows
+  Expand and Collapse, and a short one shows neither. Repeat at the real 264px pane
+  with enlarged text in both themes: no stroke, one tint above the pane, no grip,
+  no place in the saved section order. Against a real isolated Host, read an empty
+  summary, write one, count what arrives after it, lose a compare-and-set, be
+  refused (blank, oversize, native or remote id, missing session), restart, fork
+  and delete.
   Fold every foldable section and read the summaries: a Goal section that holds one
   Goal says its state (a failed report, Completed, or `done/total` steps) and a Plan
   section that holds one plan says its status, while a section with several items
@@ -18427,22 +18445,39 @@ prove account/region eligibility or call a real model.
   while transcript rows keep the spoken form, legend swatches are 8px squares with
   a 2px corner, and a folded one-item Goal or Plan heading agrees with its row.
 - **Specs:** 04-ux/08-component-spec §13.3-13.4, 04-ux/07-ui-design-system §6.2, §6.4
-  (D645, D646, D647, D650), 04-ux/06-settings-ia,
+  (D645, D646, D647, D649, D650), 04-ux/06-settings-ia,
+  once while Live status does not. The pinned summary is a derived note: the
+  renderer supplies no text, it never enters the transcript, search, an export or a
+  fork, and it is shown only as text. A model is asked only at a turn end of a
+  visible pane (at most once a minute per session, one request at a time) or by the
+  control, never because a session was opened; an answer for another session, a
+  closed pane or a switched-off setting reaches nothing, and a lower revision never
+  replaces a newer one. The Host keeps at most 2,000 bytes with a compare-and-set
+  and removes the record with its session; an older Host leaves the rail without a
+  card.
+- **Specs:** 04-ux/08-component-spec §13.3-13.4, 04-ux/07-ui-design-system §6.4
+  (D645, D646, D647, D649), 04-ux/06-settings-ia,
   03-runtime/03-tools-and-permissions, 03-runtime/04-data-storage §7.1,
-  03-runtime/06-host-rpc-protocol; ADR session-activity-rail-and-managed-background-processes,
-  session-activity-server-address.
+  03-runtime/06-host-rpc-protocol, 03-runtime/08-error-codes; ADR
+  session-activity-rail-and-managed-background-processes,
+  session-activity-server-address, session-activity-session-summary.
 - **Acceptance:** C / E / Quality / Security.
 - **Milestone:** M6+.
 - **Automation:** `test:e2e:transcript` (real React/Chromium shell and interaction
   fixtures, including the rail's section order, hairline and reorder probe and the
   workspace-sections probe for Environment, Context, Changes and MCP states and the
-  servers probe for the Servers section's placement, rows, address and stop),
+  servers probe for the Servers section's placement, rows, address and stop, and
+  the session summary probe for the card's anatomy, four-line clamp, Expand and
+  Collapse, refresh control and the controller's turn-end, hidden-pane, stale-answer
+  and setting rules),
   `node scripts/e2e-goal-team-renderer-ui.mjs` (shared Goal reader,
   report/artifact navigation and native layout), `test:e2e:session-activity`
-  (real isolated production Host), focused
-  note/process/permission/migration and Runtime contract tests, and the `host-core`
+  (real isolated production Host, including `E2E-ACTIVITY-SUMMARY`), focused
+  note/process/permission/migration and Runtime contract tests, the `host-core`
   background-process tests (the address detector's grammar, the list overlay and the
-  live-only rule).
+  live-only rule), and the session summary tests (the Host record and its three
+  delete paths, the runtime prompt builder and output cleaner, the main process
+  refresh rules, the controller and the card).
 - **Status:** Local candidate verification; Windows process-tree acceptance
   remains separate. No user profile or real model provider is a test fixture.
 

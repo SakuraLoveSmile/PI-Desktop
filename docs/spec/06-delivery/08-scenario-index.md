@@ -193,11 +193,12 @@ IDs come from executable result/test calls and annotated dynamic suites. Documen
 | E2E-117-responsive | [scripts/e2e-plan-ui.mjs:1628](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plan-ui.mjs#L1628) |
 | E2E-117-zh-CN | [scripts/e2e-plan-ui.mjs:1789](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-plan-ui.mjs#L1789) |
 | E2E-166 | [scripts/e2e-subagent-models.mjs:351](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-subagent-models.mjs#L351) |
-| E2E-ACTIVITY-APP-EXIT | [scripts/e2e-session-activity.mjs:286](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-session-activity.mjs#L286) |
-| E2E-ACTIVITY-CRASH | [scripts/e2e-session-activity.mjs:301](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-session-activity.mjs#L301) |
-| E2E-ACTIVITY-EOF | [scripts/e2e-session-activity.mjs:269](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-session-activity.mjs#L269) |
+| E2E-ACTIVITY-APP-EXIT | [scripts/e2e-session-activity.mjs:327](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-session-activity.mjs#L327) |
+| E2E-ACTIVITY-CRASH | [scripts/e2e-session-activity.mjs:342](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-session-activity.mjs#L342) |
+| E2E-ACTIVITY-EOF | [scripts/e2e-session-activity.mjs:310](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-session-activity.mjs#L310) |
 | E2E-ACTIVITY-NOTES | [scripts/e2e-session-activity.mjs:224](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-session-activity.mjs#L224) |
-| E2E-ACTIVITY-PROCESSES | [scripts/e2e-session-activity.mjs:258](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-session-activity.mjs#L258) |
+| E2E-ACTIVITY-PROCESSES | [scripts/e2e-session-activity.mjs:299](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-session-activity.mjs#L299) |
+| E2E-ACTIVITY-SUMMARY | [scripts/e2e-session-activity.mjs:265](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-session-activity.mjs#L265) |
 | E2E-ADVISOR-clear-row-returns-to-off | [scripts/e2e-advisor.mjs:615](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-advisor.mjs#L615) |
 | E2E-ADVISOR-off-until-a-model-is-picked | [scripts/e2e-advisor.mjs:614](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-advisor.mjs#L614) |
 | E2E-ADVISOR-stale-pin-keeps-the-session-running | [scripts/e2e-advisor.mjs:616](https://github.com/SakuraLoveSmile/PI-Desktop/blob/main/scripts/e2e-advisor.mjs#L616) |

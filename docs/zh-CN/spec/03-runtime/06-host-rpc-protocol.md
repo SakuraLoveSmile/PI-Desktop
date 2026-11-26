@@ -1396,6 +1396,27 @@ Host 从不可信的进程输出推出该值，且只与内存中的输出缓冲
 它是可选的增量字段，协议 11 不变，使用方忽略即可。理由见
 [ADR session-activity-server-address](../../../adr/session-activity-server-address.md)。
 
+### 会话总结 RPC
+
+本地 Desktop 会话为活动栏固定的总结新增两个增量方法。`sessionSummary.get({sessionId})` 返回
+`{summary, messageCount}`：`messageCount` 是会话的消息计数器，`summary` 为 `null` 或
+`{sessionId, text, revision, basedOnMessageCount, updatedAt, behind, diverged}`，其中 `behind` 是自
+`basedOnMessageCount` 以来新增的消息数，`diverged` 为 true 表示转录现在比该基准更短（发生了回退）。
+`sessionSummary.set({sessionId, text, basedOnMessageCount, expectedRevision})` 是比较并替换，返回
+`{summary}`：`expectedRevision` 是写入方读到的 revision（没读到则为 0），Host 保存去除首尾空白后的文本、
+递增 revision 并写入 `updatedAt`。`expectedRevision` 过期时返回 `SUMMARY_CONFLICT`（code 1008），其 `data`
+带有 `currentRevision`、`summary` 与 `messageCount`。`text` 必须非空白、不含 NUL、至多 2,000 字节 UTF-8
+（超出为 `LIMIT_EXCEEDED`）；`basedOnMessageCount` 与 `expectedRevision` 是非负整数，且基准不得超过转录，
+否则为 `INVALID_ARGUMENT`。会话不存在或已进回收站为 `NOT_FOUND`，`native-pi:` 或 `remote:` 会话 id 为
+`SESSION_SUMMARY_UNSUPPORTED`。
+
+该记录存放在 `kv` 命名空间 `session-summary-v1`（见[数据存储](/zh-CN/spec/03-runtime/04-data-storage)）。它从不
+出现在 `session.get`、搜索、导出或 fork 里；旧版 Host 返回 `METHOD_NOT_FOUND`，客户端据此视为“不支持总结”。
+Host 从不调用模型：Electron 主进程通过 `session.get` 读取转录，向智能体运行时要文本，再调用 `set`；渲染器
+只通过 `pi-desktop/sessionSummary/get` 与 `pi-desktop/sessionSummary/refresh` 两个 IPC 通道接触它。这些方法
+是增量的，协议 11 不变。理由见
+[ADR session-activity-session-summary](../../../adr/session-activity-session-summary.md)。
+
 ### 团队诊断与进度提示（WP7）
 
 strategy、presentation.role、displayName 参数错误说明合法值/范围；路由/过期范围/未批准派遣拒绝保持原 code 和条件，增加可操作 nextStep。runtime 的 completedMembersWithOpenTasks 和 completedMemberOpenTaskNextStep 仅由既有名单/任务投影派生，不授权限或结算任务。

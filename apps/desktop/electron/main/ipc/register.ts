@@ -1,5 +1,6 @@
 import { registerWorkspaceGitIpc } from "./workspace-git-ipc.js";
 import { registerSessionActivityIpc } from "./session-activity-ipc.js";
+import { registerSessionSummaryIpc } from "./session-summary-ipc.js";
 import { registerGoalReportIpc } from "./goal-report-ipc.js";
 import { registerGoalProgressIpc } from "./goal-progress-ipc.js";
 import { join } from "node:path";
@@ -276,6 +277,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
   });
   registerGoalReportIpc({ handle, getHost, resumeBlockedGoal });
   registerSessionActivityIpc({ handle, getHost });
+  registerSessionSummaryIpc({ handle, getHost, logger, vendorOAuth, resolveAgentRuntimeLaunch });
   registerWorkspaceGitIpc({ handle, getHost });
   registerGoalProgressIpc({ handle, getHost });
   registerTeamIpc({

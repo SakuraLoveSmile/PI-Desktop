@@ -34,6 +34,7 @@ mod session_activity;
 mod session_collaboration;
 mod session_notes;
 mod session_search;
+mod session_summary;
 mod sessions;
 mod state;
 mod team;

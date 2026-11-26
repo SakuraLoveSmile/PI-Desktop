@@ -15,9 +15,10 @@ import { ActivityRailSections, type ActivityRailSectionSpec } from "./ActivityRa
 import { ActivityChangesSection } from "./ActivityChangesSection";
 import { ActivityContextSection } from "./ActivityContextSection";
 import { ActivityEnvironmentSection } from "./ActivityEnvironmentSection";
+import { ActivitySummaryCard } from "./ActivitySummaryCard";
 import { activityRailVisibility } from "./activity-rail-visibility";
 import type { LatestTurnContextInspector } from "../../../lib/latest-turn-context";
-import type { ActivityAttentionItem, ActivityChanges, ActivityEnvironment, ActivityRailItem } from "./activity-rail-types";
+import type { ActivityAttentionItem, ActivityChanges, ActivityEnvironment, ActivityRailItem, ActivitySummary } from "./activity-rail-types";
 import "./session-activity-rail.css";
 
 export { ActivityStatus } from "./ActivityStatus";
@@ -41,6 +42,8 @@ export type SessionActivityRailProps = {
   /** What the rail mirrors of the workspace; each section shows only when its data is given. */
   environment?: ActivityEnvironment; contextUsage?: LatestTurnContextInspector; changes?: ActivityChanges;
   onOpenContext?: () => void; onOpenReview?: () => void;
+  /** The model-written session summary, pinned above everything else; there is no card without one. */
+  summary?: ActivitySummary;
   /** Servers have their own section: what an address click opens, how a stop is asked for and which stops are under way. */
   onOpenServerAddress?: (url: string) => void; onStopServer?: (id: string) => void; stoppingServers?: ReadonlySet<string>;
 };
@@ -66,7 +69,7 @@ function SessionActivityRailContent({ sessionId, visible, agentsNotice, resource
   rangeLimited = false, groupsRangeLimited = rangeLimited, supported = true, goalsAttentionReady = true,
   attentionItems = [], teamMembers = [], onLoadEarlier, onReturnToLatest, historyLoading = false, hasMoreBefore = false,
   pendingNotices = {}, suggestionsHaveRows = true, environment, contextUsage, changes, onOpenContext, onOpenReview,
-  onOpenServerAddress, onStopServer, stoppingServers = NO_STOPS }: SessionActivityRailProps) {
+  onOpenServerAddress, onStopServer, stoppingServers = NO_STOPS, summary }: SessionActivityRailProps) {
   const { t } = useTranslation();
   const rail = useRef<HTMLElement>(null);
   const [reveal, setReveal] = useState<ActivityReveal>();
@@ -201,6 +204,7 @@ function SessionActivityRailContent({ sessionId, visible, agentsNotice, resource
   if (show.skills) sections.push({ id: "skills", node: suggestions });
   if (changes) sections.push({ id: "changes", node: <ActivityChangesSection changes={changes} onReview={onOpenReview} /> });
   return <aside ref={rail} hidden={!visible} inert={!visible} className="session-activity-rail" data-session-id={sessionId} aria-label={t("panel.activity.title")}>
+    {summary && <ActivitySummaryCard summary={summary} />}
     {issues.length > 0 && <section className="session-activity-attention" aria-label={t("panel.activity.needsAttention")}>
       <div className="session-activity-attention-title"><IconCircleAlert size={14} aria-hidden /><span>{t("panel.activity.needsAttention")}</span><span>{issues.length}</span></div>
       <ActivityLimitedList sessionId={sessionId} group="attention" items={issues} renderItem={(item) =>
