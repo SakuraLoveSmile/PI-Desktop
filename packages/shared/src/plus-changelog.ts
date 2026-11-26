@@ -6,6 +6,13 @@ export const PLUS_UPSTREAM_CUTOFF = "0.15.6";
 const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   en: [
     {
+      version: "0.15.25",
+      date: "2026-11-26",
+      highlights: [
+        "A task that is still running in a project whose older checkouts were archived now keeps its place in the sidebar instead of disappearing from it.",
+      ],
+    },
+    {
       version: "0.15.24",
       date: "2026-11-25",
       highlights: [
@@ -177,6 +184,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "zh-CN": [
+    {
+      version: "0.15.25",
+      date: "2026-11-26",
+      highlights: [
+        "当项目里较早的工作区副本已被归档时，仍在其中运行的任务不会再从侧边栏消失，而是继续留在原来的项目行里。",
+      ],
+    },
     {
       version: "0.15.24",
       date: "2026-11-25",
@@ -350,6 +364,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   "zh-TW": [
     {
+      version: "0.15.25",
+      date: "2026-11-26",
+      highlights: [
+        "當專案中較早的工作區副本已被封存時，仍在其中執行的任務不會再從側邊欄消失，而是留在原本的專案列裡。",
+      ],
+    },
+    {
       version: "0.15.24",
       date: "2026-11-25",
       highlights: [
@@ -521,6 +542,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   tr: [
+    {
+      version: "0.15.25",
+      date: "2026-11-26",
+      highlights: [
+        "Eski çalışma kopyaları arşivlenmiş bir projede hâlâ çalışan görev artık kenar çubuğundan kaybolmuyor, yerini koruyor.",
+      ],
+    },
     {
       version: "0.15.24",
       date: "2026-11-25",
@@ -694,6 +722,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   de: [
     {
+      version: "0.15.25",
+      date: "2026-11-26",
+      highlights: [
+        "Läuft eine Aufgabe in einem Projekt weiter, dessen ältere Arbeitskopien archiviert sind, behält sie jetzt ihren Platz in der Seitenleiste, statt daraus zu verschwinden.",
+      ],
+    },
+    {
       version: "0.15.24",
       date: "2026-11-25",
       highlights: [
@@ -865,6 +900,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   es: [
+    {
+      version: "0.15.25",
+      date: "2026-11-26",
+      highlights: [
+        "Una tarea que sigue en marcha en un proyecto cuyas copias de trabajo anteriores están archivadas conserva su sitio en la barra lateral en lugar de desaparecer.",
+      ],
+    },
     {
       version: "0.15.24",
       date: "2026-11-25",
@@ -1038,6 +1080,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   fr: [
     {
+      version: "0.15.25",
+      date: "2026-11-26",
+      highlights: [
+        "Une tâche qui continue dans un projet dont d’anciennes copies de travail sont archivées garde désormais sa place dans la barre latérale au lieu d’en disparaître.",
+      ],
+    },
+    {
       version: "0.15.24",
       date: "2026-11-25",
       highlights: [
@@ -1210,6 +1259,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   ko: [
     {
+      version: "0.15.25",
+      date: "2026-11-26",
+      highlights: [
+        "이전 작업 사본이 보관된 프로젝트에서 계속 실행 중인 작업이 이제 사이드바에서 사라지지 않고 원래 자리를 지킵니다.",
+      ],
+    },
+    {
       version: "0.15.24",
       date: "2026-11-25",
       highlights: [
@@ -1381,6 +1437,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "pt-BR": [
+    {
+      version: "0.15.25",
+      date: "2026-11-26",
+      highlights: [
+        "Uma tarefa que continua rodando em um projeto cujas cópias de trabalho antigas foram arquivadas mantém o seu lugar na barra lateral em vez de sumir.",
+      ],
+    },
     {
       version: "0.15.24",
       date: "2026-11-25",
