@@ -1490,9 +1490,13 @@ Renderer： `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/s
   行；内联代码只有柔和的灰色色调、无边框；表格去掉单元格边框，
   改用 `--ds-tile-deep` 表头与 `--ds-tile` 斑马行；桌子包裹
   在 `.table-wrap`（圆壳、标题行、偶数行洗、悬停洗）。
-  包装层与表格铺满转录列宽；单元格文字可换行
-  （`overflow-wrap: anywhere`），多列或长 token 不会撑出横向滚动条。
-  `overflow-x: auto` 仅作为无法断开内容的回退。
+  wrap 铺满转录列宽；表格自身用 `max-content` 加 100% 地板，并按单元格设地板
+  （`th` 7rem、`td` 5rem、`td` 上限 26rem）：短表仍铺满列宽，宽表在圆角 wrap 内
+  横向滚动，并在仍藏有内容的一侧渐隐。单元格文字只在空格处折行
+  （`overflow-wrap: break-word`）；行内代码绝不在 token 内部断开
+  （`overflow-wrap: normal`），折行后的片段保留完整圆角。数字正文列（每个有值
+  单元格都是纯数字）右对齐，使用 tabular-nums 次级色；显式 GFM `:---` / `---:`
+  对齐优先于这条自动规则。
   显示数学位于一个微妙的插入板上。思考散文重复使用相同的内容
   text-sm-plus / 辅助颜色的层次结构。
 - **浅色主题**：安静的表面 - 链接使用柔和的下划线墨水
@@ -1510,17 +1514,18 @@ Renderer： `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/s
 
 #### Markdown table actions
 
-Every rendered Markdown table has its own compact toolbar: Copy as Markdown,
-Download as CSV, and Expand table. Copy preserves inline Markdown and column
+Every rendered Markdown table carries a 32px head strip in the code-block
+header language: a muted lowercase label on the left and Copy as Markdown,
+Download as CSV, and Expand table on the right. Copy preserves inline Markdown and column
 alignment and produces a standalone table even inside a quote or list. CSV
 contains the displayed cell text, UTF-8 with BOM, quoted fields, and CRLF rows;
 quotes and cell line breaks are escaped, and formula-leading nonnumeric cells
 are exported as text. Clipboard failures produce an error toast.
 
 The expanded view uses a modal dialog with the existing theme tokens, a scrollable
-table and opaque sticky headers, and copy/download controls. Columns retain
-readable minimum widths; narrow previews scroll horizontally instead of crushing
-short labels. It follows streamed rows,
+table and opaque sticky headers, and copy/download controls in its header
+beside Close. Columns retain readable minimum widths; narrow previews scroll
+horizontally instead of crushing short labels. It follows streamed rows,
 contains keyboard focus, closes with Escape or Close, and restores focus to its
 trigger. Native work-panel surfaces remain hidden while the modal is open.
 Tables retain their existing inline layout and link/file actions. No editing,

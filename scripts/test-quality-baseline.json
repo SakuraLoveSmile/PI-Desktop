@@ -2347,7 +2347,7 @@
       ]
     },
     "apps/desktop/test/markdown-prose-style.test.mjs": {
-      "assertions": 45,
+      "assertions": 43,
       "cases": 5,
       "signatures": [
         "026d5ea8f9e1d81acf82",
@@ -2371,9 +2371,7 @@
         "6c684f51f8d682a84625",
         "6d0a1cb51a5206ae1088",
         "7c90f0afb836cf5fb301",
-        "84252084c3e7402d2f44",
         "87073366f14899fdd5dc",
-        "986773ed3ba02173c1db",
         "99c0e595c80026801cc2",
         "9a7b965bd092f5e0d9ab",
         "a412449ec7aeb42ddf7c",

@@ -2141,10 +2141,15 @@ Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shi
   rows; inline code gets a soft gray tint and no border; tables drop cell
   borders for a `--ds-tile-deep` header and zebra `--ds-tile` rows and wrap
   in `.table-wrap` (rounded shell, header row, even-row wash, hover wash).
-  The wrap and table fill the transcript width; cell text wraps
-  (`overflow-wrap: anywhere`) so many columns or long tokens do not force a
-  horizontal scrollbar. `overflow-x: auto` remains only for unbreakable
-  content.
+  The wrap fills the transcript width; the table itself uses `max-content` with
+  a 100% floor plus per-cell floors (`th` 7rem, `td` 5rem, `td` cap 26rem), so a
+  short table still fills the column and a wide one scrolls horizontally inside
+  the rounded wrap, fading the edge that still hides content. Cell text breaks
+  at spaces (`overflow-wrap: break-word`); inline code never breaks inside a
+  token (`overflow-wrap: normal`) and wrapped fragments keep their chip radius.
+  Numeric body columns (every filled cell is a bare number) align right with
+  tabular numerals in secondary ink; explicit GFM `:---` / `---:` alignment wins
+  over that automatic rule.
   Display math sits in a subtle inset plate. Thinking prose reuses the same
   hierarchy at text-sm-plus / secondary color.
 - **Light theme**: paper-quiet surfaces — links use soft underlined ink
@@ -2204,17 +2209,18 @@ Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shi
 
 #### Markdown table actions
 
-Every rendered Markdown table has its own compact toolbar: Copy as Markdown,
-Download as CSV, and Expand table. Copy preserves inline Markdown and column
+Every rendered Markdown table carries a 32px head strip in the code-block
+header language: a muted lowercase label on the left and Copy as Markdown,
+Download as CSV, and Expand table on the right. Copy preserves inline Markdown and column
 alignment and produces a standalone table even inside a quote or list. CSV
 contains the displayed cell text, UTF-8 with BOM, quoted fields, and CRLF rows;
 quotes and cell line breaks are escaped, and formula-leading nonnumeric cells
 are exported as text. Clipboard failures produce an error toast.
 
 The expanded view uses a modal dialog with the existing theme tokens, a scrollable
-table and opaque sticky headers, and copy/download controls. Columns retain
-readable minimum widths; narrow previews scroll horizontally instead of crushing
-short labels. It follows streamed rows,
+table and opaque sticky headers, and copy/download controls in its header
+beside Close. Columns retain readable minimum widths; narrow previews scroll
+horizontally instead of crushing short labels. It follows streamed rows,
 contains keyboard focus, closes with Escape or Close, and restores focus to its
 trigger. Native work-panel surfaces remain hidden while the modal is open.
 Tables retain their existing inline layout and link/file actions. No editing,

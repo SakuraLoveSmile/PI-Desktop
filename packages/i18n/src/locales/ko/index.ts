@@ -293,6 +293,7 @@ export const ko = {
     exitPlanMode: "계획 모드 종료",
     executionProfile: "실행 프로필",
     tableActions: "표 작업",
+    tableLabel: "표",
     copyTableMarkdown: "표를 Markdown으로 복사",
     exportTableCsv: "표를 CSV로 다운로드",
     tablePreview: "표 확대",

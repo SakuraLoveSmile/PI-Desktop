@@ -293,6 +293,7 @@ export const tr = {
     exitPlanMode: "Plan modundan çık",
     executionProfile: "Yürütme profili",
     tableActions: "Tablo işlemleri",
+    tableLabel: "Tablo",
     copyTableMarkdown: "Tabloyu Markdown olarak kopyala",
     exportTableCsv: "Tabloyu CSV olarak indir",
     tablePreview: "Tabloyu büyüt",

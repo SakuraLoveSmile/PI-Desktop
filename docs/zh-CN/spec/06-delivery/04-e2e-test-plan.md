@@ -2612,8 +2612,9 @@ Markdown 源码，不是 `text/html` 负载；对禁用行内 HTML 的外部编�
   内联代码、块引用规则和代码卡的对比。
 - **预期**：答案散文使用 `.prose-chat` 层次结构（h1–h6 斜坡，
   带重音的块引用、细线边框内联代码、zebra/hover 表
-  shell，带有等宽语言标签的插入代码卡）。宽 GFM 表格留在转录列宽内：
-  表头与单元格换行，而不是横向溢出。思考散文留下来
+  shell，带有等宽语言标签的插入代码卡）。内联表格保留可读的列宽地板：
+  短表头（如 `exitCode`）保持单行，行内代码不在 token 内部断开，数字列右对齐，
+  宽于转录的表格在圆角 wrap 内横向滚动并带边缘渐隐，而不是把列压扁。思考散文留下来
   secondary/smaller 并且不会合并到答案中。两个主题都保留
   可读对比度；复制仍然复制原始栅栏文本。
 - **链接规格**：`04-ux/07-ui-design-system.md`，
@@ -9294,8 +9295,13 @@ the latest destination. These assertions measure work counts, not device FPS.
   work-panel surfaces, and returns focus on dismissal. Narrow previews keep short
   headers on one line and scroll horizontally; sticky headers fully cover the
   rows behind them. Failed copies report an
-  error, not success. Existing table wrapping remains intact.
-- **Automated coverage**: `node --test apps/desktop/test/markdown-table.test.mjs`
+  error, not success. Inline tables keep readable column floors: a short header
+  such as `exitCode` stays on one line, inline code never breaks inside a token,
+  numeric columns align right, and a table wider than the transcript scrolls
+  inside its rounded wrap with an edge fade instead of crushing columns.
+- **Automated coverage**: `node --test apps/desktop/test/markdown-table.test.mjs`,
+  `node --test apps/desktop/test/markdown-table-kinds.test.mjs`,
+  `node --test apps/desktop/test/table-overflow.test.mjs`
   and `node scripts/test-markdown-table.mjs` after building the desktop. The
   latter mounts the production Markdown component in an isolated Electron
   window and exercises real clipboard/download boundaries. It does not call a

@@ -446,6 +446,7 @@ export const zhCN = {
     exitPlanMode: "退出规划模式",
     executionProfile: "执行方式",
     tableActions: "表格操作",
+    tableLabel: "表格",
     copyTableMarkdown: "复制表格为 Markdown",
     exportTableCsv: "下载表格为 CSV",
     tablePreview: "放大表格",

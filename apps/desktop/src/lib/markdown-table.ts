@@ -35,6 +35,36 @@ function cellText(node: TableNode): string {
   return (node.children ?? []).map(cellText).join("");
 }
 
+export type TableCellKind = "number" | "text";
+
+const NUMBER_CELL = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
+
+/**
+ * Classifies body columns so numeric ones (exit codes, counts) align and use
+ * tabular numerals. A column is numeric only when every filled body cell is a
+ * bare number; mixed or empty columns stay text.
+ */
+export function tableColumnKinds(node: TableNode): TableCellKind[] {
+  const cells = rowsOf(node).map((row) =>
+    (row.children ?? []).filter((cell) => cell.tagName === "th" || cell.tagName === "td"),
+  );
+  const width = cells.reduce((max, row) => Math.max(max, row.length), 0);
+  if (!width || cells.length < 2) return [];
+  const kinds: TableCellKind[] = [];
+  for (let column = 0; column < width; column += 1) {
+    let filled = 0;
+    let numeric = 0;
+    for (const row of cells.slice(1)) {
+      const text = row[column] ? cellText(row[column]).trim() : "";
+      if (!text) continue;
+      filled += 1;
+      if (NUMBER_CELL.test(text)) numeric += 1;
+    }
+    kinds.push(filled > 0 && numeric === filled ? "number" : "text");
+  }
+  return kinds;
+}
+
 function csvCell(value: string): string {
   // Spreadsheet applications may execute formula-leading values even in quotes.
   const numeric = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(value);

@@ -1,4 +1,6 @@
 import {
+  Children,
+  cloneElement,
   createContext,
   Fragment,
   isValidElement,
@@ -13,6 +15,7 @@ import {
   useSyncExternalStore,
   type CSSProperties,
   type ComponentProps,
+  type ReactElement,
   type RefObject,
   type ReactNode,
 } from "react";
@@ -42,7 +45,8 @@ import {
 import { TooltipButton } from "./ui";
 import { ContextMenu, useContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { MarkdownTable } from "./MarkdownTable";
-import { markdownTableData } from "../lib/markdown-table";
+import { markdownTableData, tableColumnKinds, type TableCellKind } from "../lib/markdown-table";
+import { useTableOverflow } from "../lib/table-overflow";
 import { PluginBlockRenderer } from "./PluginBlockRenderer";
 import { blockRendererCandidate } from "../lib/block-renderer";
 import { useSlotEntryForKey } from "../plugins/renderer-slots/use-slots";
@@ -803,22 +807,53 @@ function downloadMarkdownImage(dataUrl: string, reference: string) {
   link.click();
 }
 
+const TableColumnKinds = createContext<readonly TableCellKind[] | null>(null);
+
 function Table({
   node,
   children,
   ...rest
 }: ComponentProps<"table"> & { node?: Parameters<typeof markdownTableData>[0] }) {
   const { originalRaw } = useContext(MarkdownBlockContext);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  useTableOverflow(wrapRef);
   const data = useMemo(
     () => node ? markdownTableData(node, originalRaw) : null,
     [node, originalRaw],
   );
+  const kinds = useMemo(() => node ? tableColumnKinds(node) : [], [node]);
   const table = (
-    <div className="table-wrap">
+    <div className="table-wrap" ref={wrapRef}>
       <table {...rest}>{children}</table>
     </div>
   );
-  return data ? <MarkdownTable {...data}>{table}</MarkdownTable> : table;
+  return (
+    <TableColumnKinds.Provider value={kinds.length ? kinds : null}>
+      {data ? <MarkdownTable {...data}>{table}</MarkdownTable> : table}
+    </TableColumnKinds.Provider>
+  );
+}
+
+/** Tags each cell with its column kind so numeric columns align in CSS. */
+function TableRow({
+  node: _node,
+  children,
+  ...rest
+}: ComponentProps<"tr"> & { node?: unknown }) {
+  const kinds = useContext(TableColumnKinds);
+  if (!kinds) return <tr {...rest}>{children}</tr>;
+  let column = 0;
+  return (
+    <tr {...rest}>
+      {Children.map(children, (child) =>
+        isValidElement(child)
+          ? cloneElement(child as ReactElement<Record<string, unknown>>, {
+              "data-kind": kinds[column++] ?? undefined,
+            })
+          : child,
+      )}
+    </tr>
+  );
 }
 
 /** Inline audio player for audio URLs in markdown. */
@@ -857,6 +892,7 @@ const markdownComponents: Components = {
   audio: AudioBlock,
   video: VideoBlock,
   table: Table,
+  tr: TableRow,
 };
 
 // The grammar the block splitter parses with, plus the renderer-only rewrite

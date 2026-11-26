@@ -1,7 +1,7 @@
 /** Real Markdown/React in isolated Electron; clipboard and downloads use Chromium. */
 import { createRequire } from "node:module";
 import { spawn } from "node:child_process";
-import { mkdtemp, readFile, writeFile, cp } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, writeFile, cp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { repositoryRoot, resolveElectronBinary } from "./e2e/boot.mjs";
@@ -21,8 +21,16 @@ const csp = appHtml.match(/<meta[^>]+http-equiv="Content-Security-Policy"[^>]*>/
 if (!csp) throw new Error("Desktop renderer Content-Security-Policy is missing");
 const styles = [...appHtml.matchAll(/href="([^" ]+\.css)"/g)].map((match) => match[1]);
 if (!styles.length) throw new Error("Build the Desktop renderer before running the table test");
+// The Markdown surface is a lazy renderer chunk, so index.html does not link its
+// stylesheet. The fixture mounts that component, so link it here or the preview
+// assertions below would measure an unstyled dialog.
+const chunkStyles = (await readdir(join(renderer, "assets")))
+  .filter((name) => /^Markdown-.*\.css$/.test(name))
+  .map((name) => `./assets/${name}`);
+if (!chunkStyles.length) throw new Error("Desktop renderer has no Markdown stylesheet; build the Desktop renderer");
+const linkedStyles = [...styles, ...chunkStyles];
 await cp(join(renderer, "assets"), join(temp, "assets"), { recursive: true });
-await writeFile(join(temp, "index.html"), `<!doctype html><html><head><meta charset="utf-8">${csp}${styles.map((path) => `<link rel="stylesheet" href="${path}">`).join("")}</head><body><div id="root"></div><script type="module" src="./fixture.js"></script></body></html>`);
+await writeFile(join(temp, "index.html"), `<!doctype html><html><head><meta charset="utf-8">${csp}${linkedStyles.map((path) => `<link rel="stylesheet" href="${path}">`).join("")}</head><body><div id="root"></div><script type="module" src="./fixture.js"></script></body></html>`);
 const env = { ...process.env, PI_TABLE_TEST_DIR: temp };
 delete env.ELECTRON_RUN_AS_NODE;
 const electron = process.env.PI_TABLE_ELECTRON ?? resolveElectronBinary(root).electronBinary;

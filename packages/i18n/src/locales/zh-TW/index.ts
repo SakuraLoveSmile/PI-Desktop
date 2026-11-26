@@ -286,6 +286,7 @@ export const zhTW = {
     exitPlanMode: "退出規劃模式",
     executionProfile: "執行方式",
     tableActions: "表格操作",
+    tableLabel: "表格",
     copyTableMarkdown: "複製表格為 Markdown",
     exportTableCsv: "下載表格為 CSV",
     tablePreview: "放大表格",
