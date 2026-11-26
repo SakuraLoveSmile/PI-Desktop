@@ -270,7 +270,12 @@ may be retained while exactly one workspace supplies the visible shell context.
   archived. A worktree opened after its primary checkout was archived — for
   example a task dispatched into a fresh run directory — therefore stays
   visible instead of inheriting another checkout's archive state, while
-  archiving any open checkout of the row hides it as usual.
+  archiving any open checkout of the row hides it as usual. The row that holds
+  the conversation currently displayed is exempt from that hiding: a task
+  dispatched into a fresh checkout keeps running next to older archived
+  checkouts of the same project, and hiding its row would drop a live task from
+  the sidebar. The exempt row keeps its archived presentation, so its Restore
+  action still clears the archived checkouts it holds.
 - **Delete** removes a session or a project permanently and takes two clicks:
   the first arms the overflow item and relabels it (`nav.deleteTaskConfirm` /
   `project.deleteMenuConfirm`), and only the second click removes the row. The

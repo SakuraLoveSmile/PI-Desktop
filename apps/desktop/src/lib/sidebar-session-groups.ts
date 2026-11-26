@@ -253,6 +253,57 @@ export function groupSidebarSessionsByTime(sessions: SessionSummary[], now = new
 }
 
 /**
+ * Whether a sidebar project row owns the checkout a conversation runs in.
+ *
+ * A grouped row holds every checkout of one shared project, and it reports
+ * itself archived as soon as any of those checkouts is archived. Comparing the
+ * conversation's own project path against the row's checkouts is what keeps
+ * that archive state from hiding the row the conversation is displayed in.
+ */
+export function sidebarRowHoldsProjectPath(
+  row: { actionPath: string; paths: readonly string[] },
+  projectPath?: string | null,
+): boolean {
+  const key = normalizeProjectPath(projectPath);
+  if (!key) return false;
+  return [row.actionPath, ...row.paths].some(
+    (candidate) => normalizeProjectPath(candidate) === key,
+  );
+}
+
+/**
+ * Project rows the sidebar renders. Archived rows stay hidden unless Show
+ * archived is on, except the row that owns the conversation on screen: a task
+ * dispatched into a fresh checkout of a project whose other checkouts were
+ * archived keeps running there, and hiding its row would drop the task from the
+ * sidebar while the transcript is open.
+ */
+export function visibleSidebarProjects<
+  T extends {
+    actionPath: string;
+    paths: readonly string[];
+    meta: { archived?: boolean };
+    sessions?: readonly { id: string }[];
+  },
+>(
+  entries: readonly T[],
+  options: {
+    showArchived: boolean;
+    displayedProjectPath?: string | null;
+    displayedSessionId?: string | null;
+  },
+): T[] {
+  return entries.filter((entry) =>
+    options.showArchived
+    || !entry.meta.archived
+    || sidebarRowHoldsProjectPath(entry, options.displayedProjectPath)
+    || (options.displayedSessionId
+      ? (entry.sessions ?? []).some((session) => session.id === options.displayedSessionId)
+      : false),
+  );
+}
+
+/**
  * The row a quick archive/restore should hand focus to.
  *
  * `renderedIds` is the rendered order with hidden rows already removed, so the
