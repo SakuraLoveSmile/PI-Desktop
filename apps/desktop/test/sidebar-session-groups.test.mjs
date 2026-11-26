@@ -14,6 +14,8 @@ import {
   sortSidebarSessionGroups,
   visibleSidebarSessionGroups,
   sessionMatchesProject,
+  sidebarRowHoldsProjectPath,
+  visibleSidebarProjects,
 } from "../src/lib/sidebar-session-groups.ts";
 
 function session(overrides) {
@@ -251,4 +253,65 @@ test("grouped member labels spend row width on role and display name without rep
   assert.equal(teamMemberRowTitle({ ...member, title: 'My review notes' }, 'Researcher Alex'), 'My review notes');
   assert.equal(teamMemberRowTitle(member), 'Teammate: researcher');
   assert.equal(teamMemberRowTitle({ ...member, team: { role: 'lead' } }, 'Lead Alex'), 'Teammate: researcher');
+});
+
+function projectRow(overrides = {}) {
+  return {
+    actionPath: "/work/run",
+    paths: ["/work/run"],
+    meta: {},
+    ...overrides,
+  };
+}
+
+test("an archived row keeps the conversation on screen reachable", () => {
+  const running = projectRow({
+    actionPath: "/work/media-run",
+    paths: ["/work/media-run", "/work/media-old"],
+    meta: { archived: true },
+  });
+  const idle = projectRow({ actionPath: "/work/music", paths: ["/work/music"], meta: { archived: true } });
+  const live = projectRow({ actionPath: "/work/other", paths: ["/work/other"] });
+  const rows = [live, running, idle];
+
+  assert.deepEqual(
+    visibleSidebarProjects(rows, { showArchived: false, displayedProjectPath: "/work/media-run/" })
+      .map((row) => row.actionPath),
+    ["/work/other", "/work/media-run"],
+  );
+  assert.deepEqual(
+    visibleSidebarProjects(rows, { showArchived: false, displayedProjectPath: undefined })
+      .map((row) => row.actionPath),
+    ["/work/other"],
+  );
+  assert.equal(visibleSidebarProjects(rows, { showArchived: true }).length, 3);
+});
+
+test("a row that already lists the displayed conversation stays visible", () => {
+  const archived = projectRow({
+    actionPath: "/work/media",
+    paths: ["/work/media"],
+    meta: { archived: true },
+    sessions: [{ id: "running-task" }],
+  });
+  const other = projectRow({ actionPath: "/work/other", meta: { archived: true } });
+
+  assert.deepEqual(
+    visibleSidebarProjects([archived, other], {
+      showArchived: false,
+      displayedProjectPath: "/work/elsewhere",
+      displayedSessionId: "running-task",
+    }).map((row) => row.actionPath),
+    ["/work/media"],
+  );
+});
+
+test("a row holds the conversation only when it owns that checkout", () => {
+  const running = projectRow({ actionPath: "/work/media-run", paths: ["/work/media-run", "/work/media-old"] });
+
+  assert.equal(sidebarRowHoldsProjectPath(running, "/work/media-old"), true);
+  assert.equal(sidebarRowHoldsProjectPath(running, "/work/media-run/"), true);
+  assert.equal(sidebarRowHoldsProjectPath(running, "/work/music"), false);
+  assert.equal(sidebarRowHoldsProjectPath(running, undefined), false);
+  assert.equal(sidebarRowHoldsProjectPath({ actionPath: "/work/run", paths: [] }, "/work/run"), true);
 });

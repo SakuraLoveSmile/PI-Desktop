@@ -36,6 +36,7 @@ import {
   sidebarSessionGroupIds,
   sortSidebarSessionGroups,
   teamMemberRowTitle,
+  visibleSidebarProjects,
   visibleSidebarSessionGroups,
 } from "../lib/sidebar-session-groups";
 import { listableSessions } from "../lib/session-origin";
@@ -720,10 +721,16 @@ export function Sidebar({
   const { groups: memoryGroups, refresh: refreshMemoryGroups } = useProjectMemoryGroups(
     JSON.stringify([openProjectPaths, workspace?.path, selectedSessionId, sessions.map((session) => session.id)]),
   );
+  const displayedSessionProjectPath = useMemo(() => {
+    const displayed = sessions.find((session) => session.id === selectedSessionId);
+    return normalizeProjectPath(displayed?.projectPath);
+  }, [sessions, selectedSessionId]);
   const projectEntries = useMemo(() => {
-    const result = buildSidebarMemoryProjects({ groups: memoryGroups, openPaths: openProjectPaths,
-      workspaces: openProjects, workspace, sessions: filtered, projectMeta, activePath: activeProjectPath }).filter(
-      (entry) => showArchived || !entry.meta.archived,
+    const result = visibleSidebarProjects(
+      buildSidebarMemoryProjects({ groups: memoryGroups, openPaths: openProjectPaths,
+        workspaces: openProjects, workspace, sessions: filtered, projectMeta, activePath: activeProjectPath }),
+      { showArchived, displayedProjectPath: displayedSessionProjectPath,
+        displayedSessionId: selectedSessionId },
     );
     for (const entry of result) entry.sessions.sort(compareSessions);
     result.sort((a, b) => {
@@ -770,6 +777,7 @@ export function Sidebar({
     activeProjectPath,
     projectMeta,
     showArchived,
+    displayedSessionProjectPath,
     displayProjectSort,
     sessionMeta,
     compareSessions,
