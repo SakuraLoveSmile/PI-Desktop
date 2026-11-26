@@ -6,6 +6,13 @@ export const PLUS_UPSTREAM_CUTOFF = "0.15.6";
 const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   en: [
     {
+      version: "0.15.26",
+      date: "2026-11-26",
+      highlights: [
+        "A project row that groups several worktrees of one project now keeps the project's own name instead of being renamed after the worktree one task ran in.",
+      ],
+    },
+    {
       version: "0.15.25",
       date: "2026-11-26",
       highlights: [
@@ -184,6 +191,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "zh-CN": [
+    {
+      version: "0.15.26",
+      date: "2026-11-26",
+      highlights: [
+        "把同一项目的多个工作区副本合并成一行的项目行，现在始终显示项目自己的名称，不会再被某个任务运行过的工作区名称覆盖。",
+      ],
+    },
     {
       version: "0.15.25",
       date: "2026-11-26",
@@ -364,6 +378,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   "zh-TW": [
     {
+      version: "0.15.26",
+      date: "2026-11-26",
+      highlights: [
+        "把同一專案的多個工作區副本合併成一列的專案列，現在一律顯示專案自己的名稱，不會再被某個任務執行過的工作區名稱覆蓋。",
+      ],
+    },
+    {
       version: "0.15.25",
       date: "2026-11-26",
       highlights: [
@@ -542,6 +563,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   tr: [
+    {
+      version: "0.15.26",
+      date: "2026-11-26",
+      highlights: [
+        "A project row that groups several worktrees of one project now keeps the project's own name instead of being renamed after the worktree one task ran in.",
+      ],
+    },
     {
       version: "0.15.25",
       date: "2026-11-26",
@@ -722,6 +750,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   de: [
     {
+      version: "0.15.26",
+      date: "2026-11-26",
+      highlights: [
+        "A project row that groups several worktrees of one project now keeps the project's own name instead of being renamed after the worktree one task ran in.",
+      ],
+    },
+    {
       version: "0.15.25",
       date: "2026-11-26",
       highlights: [
@@ -900,6 +935,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   es: [
+    {
+      version: "0.15.26",
+      date: "2026-11-26",
+      highlights: [
+        "A project row that groups several worktrees of one project now keeps the project's own name instead of being renamed after the worktree one task ran in.",
+      ],
+    },
     {
       version: "0.15.25",
       date: "2026-11-26",
@@ -1080,6 +1122,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   fr: [
     {
+      version: "0.15.26",
+      date: "2026-11-26",
+      highlights: [
+        "A project row that groups several worktrees of one project now keeps the project's own name instead of being renamed after the worktree one task ran in.",
+      ],
+    },
+    {
       version: "0.15.25",
       date: "2026-11-26",
       highlights: [
@@ -1259,6 +1308,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   ko: [
     {
+      version: "0.15.26",
+      date: "2026-11-26",
+      highlights: [
+        "A project row that groups several worktrees of one project now keeps the project's own name instead of being renamed after the worktree one task ran in.",
+      ],
+    },
+    {
       version: "0.15.25",
       date: "2026-11-26",
       highlights: [
@@ -1437,6 +1493,13 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "pt-BR": [
+    {
+      version: "0.15.26",
+      date: "2026-11-26",
+      highlights: [
+        "A project row that groups several worktrees of one project now keeps the project's own name instead of being renamed after the worktree one task ran in.",
+      ],
+    },
     {
       version: "0.15.25",
       date: "2026-11-26",
