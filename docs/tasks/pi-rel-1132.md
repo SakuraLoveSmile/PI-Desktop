@@ -1,6 +1,6 @@
 # PI-REL-1132: prepare release 0.15.27
 
-Status: 待体验 (preparation is complete and verified on the request branch; merge, tag and publication need the user's word). Project: `fork-pi-desktop`. Created: 2026-11-27, Asia/Taipei.
+Status: 已验收 (prepared, merged, tagged and published as `0.15.27`; the user confirmed the release outcome on 2026-11-27). Project: `fork-pi-desktop`. Created: 2026-11-27, Asia/Taipei.
 Tier: T2 (release surfaces). Baseline: `a202fbf3b` (`origin/main`, merge of #113).
 Branch: `chore/20261127-pi-rel-1132-plus-0-15-27`.
 Worktree: `/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop/20261127-chore-pi-rel-1132-plus-0-15-27`.
@@ -26,16 +26,25 @@ The `README.md` and `README.zh-CN.md` release line already reads `0.15.x`, so no
 - `packages/shared` vitest: 56 files, 671 tests, all pass (changelog and Plus overlay catalogs included).
 - `tsc -b packages/shared`: clean. Biome: 150 files, no fixes.
 
-## Not run
+## Published
 
-- Installer, signing and publication: only GitHub-hosted Actions runners build those, and they need the tag this record does not push.
+- Preparation pull request: #114 merged into `main` as `08d6694fa` at 2026-11-27 06:56:10Z after its five cloud checks passed.
+- Tag: `v0.15.27` (annotated) created on that commit by `node scripts/release.mjs 0.15.27 --tag`, pushed alone; `git rev-list -n 1 v0.15.27` resolves to `08d6694fa`.
+- Release workflow run [45955118617](https://github.com/SakuraLoveSmile/PI-Desktop/actions/runs/45955118617): all seven jobs green — version/signing gate, Rust host-core, JS build·typecheck·lint·architecture·test, isolated smoke, Build macOS arm64, Verify installer bundle, Publish verified GitHub Release.
+- Release: [v0.15.27](https://github.com/SakuraLoveSmile/PI-Desktop/releases/tag/v0.15.27), published 2026-11-27 07:08:48Z, not a draft and not a pre-release. Assets: `Pi-Desktop-Plus-0.15.27-arm64.dmg` (139,034,416 bytes, `fc674a78…`), its blockmap, `…-arm64-mac.zip` (136,579,604 bytes, `01d9990e…`), its blockmap, `latest-mac.yml`, `release-manifest.json` and `SHA256SUMS`. Every digest in `SHA256SUMS` matched the asset digest GitHub reports.
+- Signing lane: personal-use ad-hoc. The workflow selects `-c.mac.identity=-` because `ALLOW_UNSIGNED_MACOS_RELEASE=true` (four of the six signing secrets are absent), so the bundle carries a complete ad-hoc seal with no Developer ID and no notarization. The first install stays a manual download that Gatekeeper asks to open; later updates arrive through the assisted in-app lane.
+- Follow-up on this record: branch `docs/20261127-pi-rel-1132-release-record` (worktree `…/20261127-docs-pi-rel-1132-release-record`) over `08d6694fa`.
+
+## Remaining decisions
+
+- A signed and notarized release needs the four missing signing secrets configured first; the tag for that release must use a new version, because `v0.15.27` is published.
+- The `README.md` release line stays `0.15.x`; nothing else claims the previous version.
+
+## Not run originally
+
+- Installer, signing and publication were left to the cloud lane; this record's preparation did not build, tag or publish.
 - The desktop unit suite and Electron E2E: this diff changes version strings, changelog data and the two changelog tests; cloud checks repeat them on the pull request.
 
-## Next steps (each needs the user's word)
-
-1. Merge the preparation pull request after its cloud checks pass.
-2. On the merged commit, `node scripts/release.mjs 0.15.27 --tag`, then push only `v0.15.27`.
-3. Let the release workflow build, sign and publish; record its run id here afterwards.
 
 ## Risks
 
