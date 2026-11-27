@@ -261,7 +261,9 @@ app.whenReady().then(async () => {
       output += data;
       if (preview) process.stdout.write(data);
     });
-  const timeout = preview ? undefined : setTimeout(() => child.kill("SIGKILL"), 45_000);
+  // Every rail, composer and delegation scenario runs in one renderer, and the candidate now also walks the four
+  // placement widths; the guard is a hang detector, not a performance budget, so it leaves headroom.
+  const timeout = preview ? undefined : setTimeout(() => child.kill("SIGKILL"), 120_000);
   let code;
   try {
     code = await new Promise((resolve, reject) => {

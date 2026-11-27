@@ -141,12 +141,12 @@ export async function sessionActivityIntegrationProbe() {
     host.style.width='1100px';set({workPanelOpen:false});await until(()=>Boolean(rail()),'Wide rail did not return');
     // 6.3: placement follows the width the chat surface actually measures, not the host (which also holds the panel).
     const placedAt = async (target: number, panelOpen: boolean) => {
-      set({ workPanelOpen: panelOpen });
+      set({ workPanelOpen: panelOpen, workPanelWidth: 414 });
       const chat = () => host.querySelector<HTMLElement>('.chat-surface')!;
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        const current = chat().clientWidth;
-        if (Math.abs(current - target) <= 4) break;
-        host.style.width = `${Math.max(360, host.clientWidth + target - current)}px`;
+      // Two bounded passes: the panel's own width is clamped by its layout, so the host is nudged by the difference
+      // between what the chat measured and the width this case is about.
+      for (let pass = 0; pass < 2; pass += 1) {
+        host.style.width = `${Math.max(360, host.clientWidth + target - chat().clientWidth)}px`;
         await until(() => chat().clientWidth > 0, "measured chat width");
       }
       const measured = chat().clientWidth;
