@@ -283,6 +283,7 @@ export const ptBR = {
     exitPlanMode: "Sair do modo Plano",
     executionProfile: "Perfil de execução",
     tableActions: "Ações da tabela",
+    tableLabel: "Tabela",
     copyTableMarkdown: "Copiar tabela como Markdown",
     exportTableCsv: "Baixar tabela como CSV",
     tablePreview: "Expandir tabela",

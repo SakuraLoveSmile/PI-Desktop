@@ -451,6 +451,7 @@ export const en = {
     exitPlanMode: "Exit Plan mode",
     executionProfile: "Execution profile",
     tableActions: "Table actions",
+    tableLabel: "Table",
     copyTableMarkdown: "Copy table as Markdown",
     exportTableCsv: "Download table as CSV",
     tablePreview: "Expand table",

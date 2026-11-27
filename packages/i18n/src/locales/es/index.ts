@@ -284,6 +284,7 @@ export const es = {
     "exitPlanMode": "Salir del modo Plan",
     "executionProfile": "Perfil de ejecución",
     "tableActions": "Acciones de tabla",
+    "tableLabel": "Tabla",
     "copyTableMarkdown": "Copiar tabla como Markdown",
     "exportTableCsv": "Descargar tabla como CSV",
     "tablePreview": "Ampliar tabla",

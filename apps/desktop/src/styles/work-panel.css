@@ -1472,6 +1472,14 @@
   border-radius: var(--radius-xs);
 }
 
+.file-viewer-markdown .markdown-table-head {
+  border-radius: var(--radius-xs) var(--radius-xs) 0 0;
+}
+
+.file-viewer-markdown .markdown-table > .table-wrap {
+  border-radius: 0 0 var(--radius-xs) var(--radius-xs);
+}
+
 .file-viewer-markdown th,
 .file-viewer-markdown td {
   padding: 7px 10px;

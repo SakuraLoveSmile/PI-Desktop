@@ -6,7 +6,8 @@ import { IconClose, IconCopy, IconDownload, IconPanelMaximize } from "./icons";
 import { portalOverlay, TooltipButton } from "./ui";
 import "../styles/markdown-table.css";
 
-function TablePreview({ children, onClose }: {
+function TablePreview({ actions, children, onClose }: {
+  actions?: ReactNode;
   children: ReactNode;
   onClose: () => void;
 }) {
@@ -63,15 +64,18 @@ function TablePreview({ children, onClose }: {
       >
         <header className="markdown-table-preview-head">
           <span>{t("chat.tablePreview")}</span>
-          <TooltipButton
-            ref={closeRef}
-            type="button"
-            className="icon-btn"
-            tooltip={t("chat.closeTablePreview")}
-            onClick={onClose}
-          >
-            <IconClose size={16} />
-          </TooltipButton>
+          <div className="markdown-table-preview-tools">
+            {actions}
+            <TooltipButton
+              ref={closeRef}
+              type="button"
+              className="icon-btn"
+              tooltip={t("chat.closeTablePreview")}
+              onClick={onClose}
+            >
+              <IconClose size={16} />
+            </TooltipButton>
+          </div>
         </header>
         <div className="markdown-table-preview-body prose-chat">{children}</div>
       </div>
@@ -147,11 +151,13 @@ export function MarkdownTable({ children, markdown, csv }: {
   );
   return (
     <div className="markdown-table">
-      {toolbar()}
+      <div className="markdown-table-head">
+        <span className="markdown-table-label">{t("chat.tableLabel")}</span>
+        {toolbar()}
+      </div>
       {children}
       {preview ? (
-        <TablePreview onClose={() => setPreview(false)}>
-          {toolbar(true)}
+        <TablePreview actions={toolbar(true)} onClose={() => setPreview(false)}>
           {children}
         </TablePreview>
       ) : null}

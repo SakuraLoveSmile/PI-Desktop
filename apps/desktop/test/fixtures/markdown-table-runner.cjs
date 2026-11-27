@@ -76,7 +76,27 @@ app.whenReady().then(async () => {
   check("copy feedback is visible above the preview", await evaluate('(() => { const toast = [...document.querySelectorAll(".toast")].at(-1); const r = toast.getBoundingClientRect(); return document.elementsFromPoint(r.x + r.width / 2, r.y + r.height / 2).some(el => el === toast || el.closest(".toast") === toast); })()'));
   await click('button[aria-label="Close table preview"]');
   await wait('!document.querySelector("[role=dialog]")');
-  await evaluate('window.tableFixture.render("| Product | Notes |\\n| --- | --- |\\n" + Array.from({length: 40}, (_, i) => `| Item ${i + 1} | A longer description to check wrapping 中文 |`).join("\\n"))');
+  const longTable = "| Product | Notes |\n| --- | --- |\n" + Array.from({ length: 40 }, (_, i) => `| Item ${i + 1} | A longer description to check wrapping 中文 |`).join("\n");
+  await evaluate(`window.tableFixture.render(${JSON.stringify(longTable)})`);
+  // Inline readability: floors keep short headers on one line, numeric columns
+  // align, code never breaks inside a token, and overflow publishes an edge.
+  const wide = "| Command | exitCode | Summary |\n| --- | --- | --- |\n| `flutter analyze --no-pub lib/pages/update/update_entry.dart` | 0 | contract met |\n| `flutter pub get --offline --enforce-lockfile` | 0 | dependencies resolved |";
+  win.setContentSize(820, 620);
+  await evaluate(`window.tableFixture.render(${JSON.stringify(wide)}, "en", "dark")`);
+  await wait('document.querySelectorAll(".markdown-table").length === 1 && Boolean(document.querySelector(".table-wrap"))');
+  check("table head strip carries a label and its actions", await evaluate('(() => { const head = document.querySelector(".markdown-table-head"); return Boolean(head) && head.textContent.trim().toLowerCase().startsWith("table") && head.querySelectorAll("button").length === 3; })()'));
+  check("short headers stay on one line", await evaluate('(() => { const exit = [...document.querySelectorAll(".table-wrap th")].find((cell) => cell.textContent.trim() === "exitCode"); if (!exit) return false; const range = document.createRange(); range.selectNodeContents(exit); const line = parseFloat(getComputedStyle(exit).lineHeight); return range.getClientRects().length === 1 && exit.getBoundingClientRect().height < line + 24; })()'));
+  check("numeric columns align like numbers", await evaluate('(() => { const cell = document.querySelector(".table-wrap td[data-kind=\\"number\\"]"); if (!cell) return false; const style = getComputedStyle(cell); return style.textAlign === "right" && style.fontVariantNumeric.includes("tabular-nums"); })()'));
+  check("inline code wraps at spaces, not inside tokens", await evaluate('(() => { const code = document.querySelector(".table-wrap td code"); if (!code) return false; const style = getComputedStyle(code); return style.overflowWrap === "normal" && (style.boxDecorationBreak === "clone" || style.webkitBoxDecorationBreak === "clone"); })()'));
+  await evaluate('Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => {}))).then(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))');
+  writeFileSync(join(dir, "inline-wide.png"), (await win.webContents.capturePage()).toPNG());
+  win.setContentSize(360, 500);
+  await wait('innerWidth === 360');
+  await evaluate(`window.tableFixture.render(${JSON.stringify(wide)}, "en", "dark")`);
+  await wait('document.querySelector(".table-wrap")?.dataset.overflow === "end"');
+  check("a wide inline table scrolls with an edge fade", await evaluate('(() => { const wrap = document.querySelector(".table-wrap"); const style = getComputedStyle(wrap); return wrap.scrollWidth > wrap.clientWidth && (style.maskImage || style.webkitMaskImage || "").includes("gradient"); })()'));
+  // The theme loop below previews the fixture source; hand it the long table back.
+  await evaluate(`window.tableFixture.render(${JSON.stringify(longTable)})`);
   for (const theme of ["light", "dark"]) {
     win.setContentSize(360, 500);
     await evaluate(`window.tableFixture.render(window.tableFixture.source, "zh-CN", ${JSON.stringify(theme)})`);

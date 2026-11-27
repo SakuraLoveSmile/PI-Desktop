@@ -16890,8 +16890,13 @@ the latest destination. These assertions measure work counts, not device FPS.
   work-panel surfaces, and returns focus on dismissal. Narrow previews keep short
   headers on one line and scroll horizontally; sticky headers fully cover the
   rows behind them. Failed copies report an
-  error, not success. Existing table wrapping remains intact.
-- **Automated coverage**: `node --test apps/desktop/test/markdown-table.test.mjs`
+  error, not success. Inline tables keep readable column floors: a short header
+  such as `exitCode` stays on one line, inline code never breaks inside a token,
+  numeric columns align right, and a table wider than the transcript scrolls
+  inside its rounded wrap with an edge fade instead of crushing columns.
+- **Automated coverage**: `node --test apps/desktop/test/markdown-table.test.mjs`,
+  `node --test apps/desktop/test/markdown-table-kinds.test.mjs`,
+  `node --test apps/desktop/test/table-overflow.test.mjs`
   and `node scripts/test-markdown-table.mjs` after building the desktop. The
   latter mounts the production Markdown component in an isolated Electron
   window and exercises real clipboard/download boundaries. It does not call a
