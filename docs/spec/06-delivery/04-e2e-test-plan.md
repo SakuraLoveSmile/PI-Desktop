@@ -15528,9 +15528,9 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   on the frame it reached and settles back on the open height without
   overshooting, and the empty group folds its empty state the same way. Under
   reduced motion both endpoints are kept and the travel is dropped. The pinned
-  list holds eight rows inside `min(233px, 30vh)` and scrolls to its remaining
-  rows, and the standalone list keeps its flex column and 146px budget. The group
-  indent, ordering, and workspace state are unchanged.
+  list shows every pin and the session section shows five rows plus its
+  load-more row inside the sidebar's one scroll region, so neither section caps
+  its own height. The group indent, ordering, and workspace state are unchanged.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md` §6.1 and
   §13, `04-ux/08-component-spec.md` §6.2, `08-meta/decisions-log.md`
   (2026-09-16, sidebar list rhythm and project-group fold)
@@ -15554,15 +15554,26 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   Exercise the window-blur handler, drop-target styling, project action hover
   and keyboard Tab/Shift+Tab focus. Fold and reopen the selected conversation's
   group. Select pinned and standalone conversations. Open Settings and return.
-  Enable reduced motion and inspect both row transition durations.
+  Measure the row grid against the sidebar body's left edge: the status column,
+  the title and time-group columns, the project icon and name. Measure a
+  resting row and the same row hovered. Probe a running status element for its
+  spin animation and arc color. Enable reduced motion and inspect both row
+  transition durations.
 - **Expected**: Project and conversation hover backgrounds, radii and transitions
   match. The title button stays transparent. Only a conversation uses selected
   fill, which wins over hover; workspace identity remains a separate dot with
   no persistent header fill. Folding never promotes the project to selected.
-  Pinned and standalone rows use the same selected surface. Session titles
-  across ordinary, team lead, running/error/selected, and pinned/native sessions
-  maintain unified horizontal start coordinates (`rect.left`, within 1px), with
-  trailing pin and native badges placed after the title. Keyboard focus
+  Pinned and standalone rows use the same selected surface. Relative to the
+  sidebar body's left border, session rows centre the status on x=24 (x=40 for
+  a project row, x=56 for a team member) and start the title at x=40 (56 and 72
+  at those levels, within 1px); a project header centres its pin or folder on
+  x=24 with the name at x=40; a project time-group header starts on the row
+  title column; trailing pin and native badges stay after the title. A resting
+  row keeps at most 8px of right padding with its controls at opacity 0; a
+  hovered row takes at least 50px and its title never reaches under the
+  controls. A selected row renders no status glyph and paints `--ds-bg-active`;
+  a running status element spins a ring whose open arc uses
+  `--ds-text-primary`. Keyboard focus
   retains an outline, action buttons retain local feedback, drop-target paint
   wins over hover, and blur releases hover without clearing selection. Settings
   replaces sidebar navigation, and returning restores conversation and workspace
@@ -15577,6 +15588,41 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   computed-style assertions. Window blur/focus events and the drop-target class
   are injected for those styling checks; this is not a native focus/drag test.
   Unit coverage: `sidebar-navigation.test.mjs`, `sidebar-pinned-rendering.test.mjs`.
+  The grid and control-room checks read `getBoundingClientRect()` and
+  `getComputedStyle`; the running-ring probe mounts a status element inside a
+  real row because the seeded suite starts no live turn.
+
+#### E2E-LAYOUT-sidebar-nav-and-scroll
+
+- **Preconditions**: Built desktop with an isolated host and profile; host-seeded
+  sessions so the list below the destinations is populated; a window wide enough
+  for the three-column layout.
+- **Steps**: Read the five `.sidebar-nav-row` rows and their geometry; hover New
+  task; count every `data-nav` inside `.sidebar`; read the sidebar's vertical
+  scrollers and both section caps; expand the session section through its
+  load-more row; fold a project, probe its activity hint and hover the header;
+  right-click the empty space below the projects; click Scheduled and read
+  `aria-current`; return to chat.
+- **Expected**: Exactly five destinations in the order New task, Search,
+  Scheduled, Extensions, Context insights, each 28px tall with its icon centred
+  on x=24 and its label at x=40 relative to the sidebar body's left border. Only
+  the first two rows carry a shortcut hint: opacity 0 at rest, 1 while the row is
+  hovered. Each `data-nav` value appears once inside the sidebar now that the
+  footer is not a second home for the destinations, and no update pill renders
+  while no update is ready. The sidebar body has exactly one vertical scroller
+  (`.sidebar-scroll`): the pinned body and the session body report
+  `max-height: none`, every seeded pin is fully inside, and the session section
+  shows five rows plus a load-more row that expands it to all seven. A folded
+  project's hint shows the neutral spinning ring (or, with its permission
+  variant, the purple dot) and hides while the header is hovered. Right-clicking
+  the empty space below the projects opens the project section menu. Clicking
+  Scheduled makes it the only destination with `aria-current="page"`.
+- **Specs linked**: `04-ux/08-component-spec.md` §3.2, §3.5, §3.6, §3.10
+- **Acceptance**: C, D, Quality
+- **Milestone**: Post-M6 desktop shell maintenance
+- **Status**: Automated via `pnpm test:e2e:layout` →
+  `scripts/e2e/sidebar-nav-and-scroll.mjs`, with rendered component coverage in
+  `sidebar-nav-render.test.mjs` and `sidebar-footer-render.test.mjs`.
 
 #### E2E-LAYOUT-sidebar-settings
 

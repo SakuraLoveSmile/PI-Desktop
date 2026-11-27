@@ -261,18 +261,21 @@ Light-surface polish (D148):
 
 ### 4.5 Sidebar task status semantics
 
-Compact task rows reserve one `12px` leading status slot. State is never
+Compact task rows share one 16px icon column: a 28px row pitch, 8px row
+padding and an 8px gap put a title at x=40, a project row at 56 and a team
+member at 72, with the 12px status box centred on that column. State is never
 communicated by color alone, and each status consumes an existing semantic
 token rather than introducing a decorative palette:
 
 | State | Semantic color | Shape / motion | Meaning |
 |---|---|---|---|
-| Selected | neutral accent | static outlined ring | current conversation |
-| In progress | warning orange | filled dot; two breathing cycles, then steady | agent is producing or executing |
+| Selected | neutral accent, row surface | no glyph | current conversation |
+| In progress | neutral ink | 10px ring spinning in 0.8s; static under reduced motion | agent is producing or executing |
 | Completed | success green | check mark | latest unread task turn completed |
 | Failed | error red | circled alert mark | latest unread task turn failed |
 
-Precedence is `in progress → selected → completed/failed`. Starting another
+Precedence is `in progress → selected → completed/failed`; the selected state is
+a row surface, so it renders no status glyph. Starting another
 turn clears the prior terminal outcome; abort clears the live indicator without
 creating a failure. Opening a conversation acknowledges its unread terminal
 outcome: the terminal mark clears immediately and the matching durable task
@@ -283,11 +286,11 @@ session switch; other sessions remain unread. Outcomes already marked read
 never produce a terminal mark. Marking the row read, marking all rows read, or
 clearing the inbox also dismisses any matching task-native banner; a late event
 for that durable id cannot restore the mark, row, or banner. Reduced-motion mode
-disables the breathing animation while retaining its orange fill and localized
-accessible name. Running dots in task rows and related-session hover cards
-animate for two 1.6-second cycles when mounted or entering the running state,
-then remain steady until the status changes. They must not continuously
-submit frames while the rest of the window is idle.
+disables the spin while retaining the ring and its localized accessible name.
+Running dots in related-session hover cards still animate for two 1.6-second
+cycles when mounted or entering the running state, then remain steady until
+the status changes. They must not continuously submit frames while the rest of
+the window is idle.
 
 ### 4.6 Tailwind CSS variable stub
 

@@ -126,40 +126,29 @@
   background: transparent;
 }
 
-/* Build chip: quiet by default, accented only when an update is actionable. */
-.footer-build {
+/* An actionable update is the footer's only chip: the pill appears when a
+   version is ready, and Settings › About keeps the version and the manual check. */
+.sidebar-update-pill {
   display: inline-flex;
-  min-width: 0;
+  height: 24px;
   margin-left: auto;
   align-items: center;
   gap: 6px;
-  border-radius: var(--radius-sm);
-  padding: 5px 8px;
-  color: var(--ds-text-muted);
+  border-radius: var(--radius-full);
+  padding: 0 9px;
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
   font-size: var(--text-sm);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: var(--tracking-normal);
-  line-height: var(--leading-none);
+  white-space: nowrap;
   transition: background var(--motion-duration-fast) var(--motion-ease-out),
     color var(--motion-duration-fast) var(--motion-ease-out);
 }
 
-.footer-build:hover {
-  background: var(--ds-bg-hover);
-  color: var(--ds-text-secondary);
+.sidebar-update-pill:hover {
+  background: var(--ds-bg-active);
 }
 
-.footer-build-version {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.footer-build.has-update {
-  color: var(--ds-text-primary);
-}
-
-.footer-build-dot {
+.sidebar-update-pill-dot {
   width: 5px;
   height: 5px;
   flex: 0 0 auto;

@@ -1,0 +1,79 @@
+/*
+  Sidebar destinations above the list: New task, Search, Scheduled,
+  Extensions and Context insights. They share the session rows' icon column.
+*/
+
+.sidebar-nav {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 1px;
+  /* The same 8px inset the scroll body gives its rows, so the icon column and
+     the row fills line up with the lists below. */
+  padding: 2px 8px 0;
+}
+
+.sidebar-nav-row {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  color: var(--ds-text-secondary);
+  font-size: var(--text-md);
+  text-align: left;
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+/* A 16px slot centres the 15px glyph on x=24 and starts the label at x=40. */
+.sidebar-nav-icon {
+  display: inline-flex;
+  width: 16px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-nav-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-nav-row:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.sidebar-nav-row[aria-current="page"] {
+  background: var(--ds-bg-active);
+  color: var(--ds-text-primary);
+}
+
+/* The hint is an affordance, not a second permanent column. */
+.sidebar-nav-shortcut {
+  margin-left: auto;
+  color: var(--ds-text-faint);
+  font-size: var(--text-2xs);
+  opacity: 0;
+  transition: opacity var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.sidebar-nav-row:hover .sidebar-nav-shortcut,
+.sidebar-nav-row:focus-visible .sidebar-nav-shortcut {
+  opacity: 1;
+}
+
+/* A blurred window keeps :hover latched, so the destination row returns to
+   its resting paint and hides the hint again. */
+.sidebar[data-window-blur="true"] .sidebar-nav-row:hover:not([aria-current="page"]) {
+  background: transparent;
+  color: var(--ds-text-secondary);
+}
+
+.sidebar[data-window-blur="true"] .sidebar-nav-row:hover .sidebar-nav-shortcut {
+  opacity: 0;
+}

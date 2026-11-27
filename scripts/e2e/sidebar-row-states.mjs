@@ -145,6 +145,128 @@ export async function checkSidebarRowStates({ cdp, check, waitFor, seed }) {
       JSON.stringify({ titleDelta, ...titleStarts }),
     );
 
+    const geometry = await cdp.evaluate(`(() => {
+      const body = document.querySelector('.sidebar-body');
+      if (!body) throw new Error('Missing sidebar body');
+      const base = body.getBoundingClientRect().left;
+      const offset = (element) => element.getBoundingClientRect().left - base;
+      const center = (element) => {
+        const box = element.getBoundingClientRect();
+        return box.left + box.width / 2 - base;
+      };
+      const probeStatus = (rowElement) => {
+        const marker = document.createElement('span');
+        marker.className = 'thread-item-status';
+        rowElement.prepend(marker);
+        const measured = center(marker);
+        marker.remove();
+        return measured;
+      };
+      const standaloneRow = document.querySelector(${JSON.stringify(row('e2e-state-standalone'))});
+      const nestedRow = document.querySelector(${JSON.stringify(row(seed.alphaSessionIds[0]))});
+      const projectGroup = document.querySelector(${JSON.stringify(group(seed.paths.alpha))});
+      if (!standaloneRow || !nestedRow || !projectGroup) throw new Error('Missing grid geometry target');
+      const titleButton = projectGroup.querySelector('.project-toggle');
+      const nameSpan = titleButton?.querySelector('span:not([class])');
+      const timeHeader = projectGroup.querySelector('.sidebar-time-group-header');
+      if (!titleButton || !nameSpan || !timeHeader) throw new Error('Missing project geometry target');
+      return {
+        standalone: {
+          status: probeStatus(standaloneRow),
+          title: offset(standaloneRow.querySelector('.thread-item-title')),
+        },
+        nested: {
+          status: probeStatus(nestedRow),
+          title: offset(nestedRow.querySelector('.thread-item-title')),
+        },
+        header: {
+          icon: center(titleButton.querySelector('.sidebar-project-icon')),
+          name: offset(nameSpan),
+        },
+        timeHeaderStart:
+          timeHeader.getBoundingClientRect().left +
+          parseFloat(getComputedStyle(timeHeader).paddingLeft) - base,
+        resting: {
+          actions: getComputedStyle(standaloneRow.querySelector('.sidebar-row-actions')).opacity,
+          paddingRight: parseFloat(
+            getComputedStyle(standaloneRow.querySelector('.thread-item-main')).paddingRight,
+          ),
+        },
+      };
+    })()`);
+    check(
+      Math.abs(geometry.standalone.status - 24) <= 1 &&
+        Math.abs(geometry.standalone.title - 40) <= 1 &&
+        Math.abs(geometry.nested.status - 40) <= 1 &&
+        Math.abs(geometry.nested.title - 56) <= 1,
+      'session rows centre the status on the icon column and start the title on the 40/56 columns',
+      JSON.stringify(geometry),
+    );
+    check(
+      Math.abs(geometry.header.icon - 24) <= 1 && Math.abs(geometry.header.name - 40) <= 1,
+      'project headers centre their icon on x=24 and start the name at x=40',
+      JSON.stringify(geometry.header),
+    );
+    check(
+      Math.abs(geometry.timeHeaderStart - 56) <= 1,
+      'project time-group headers start on the row title column',
+      JSON.stringify({ timeHeaderStart: geometry.timeHeaderStart }),
+    );
+    check(
+      geometry.resting.actions === '0' && geometry.resting.paddingRight <= 8,
+      'a resting row reserves no room for its controls',
+      JSON.stringify(geometry.resting),
+    );
+    await hover(`${row('e2e-state-standalone')} .thread-item-main`);
+    const yielding = await cdp.evaluate(`(() => {
+      const body = document.querySelector('.sidebar-body');
+      const rowElement = document.querySelector(${JSON.stringify(row('e2e-state-standalone'))});
+      const main = rowElement.querySelector('.thread-item-main');
+      const title = rowElement.querySelector('.thread-item-title');
+      const actions = rowElement.querySelector('.sidebar-row-actions');
+      const base = body.getBoundingClientRect().left;
+      return {
+        actions: getComputedStyle(actions).opacity,
+        paddingRight: parseFloat(getComputedStyle(main).paddingRight),
+        titleRight: title.getBoundingClientRect().right - base,
+        actionsLeft: actions.getBoundingClientRect().left - base,
+      };
+    })()`);
+    check(
+      yielding.actions === '1' && yielding.paddingRight >= 50 &&
+        yielding.titleRight <= yielding.actionsLeft + 0.5,
+      'a hovered row makes room for its controls without the title running under them',
+      JSON.stringify(yielding),
+    );
+    await move(600, 120);
+    const statusProbe = await cdp.evaluate(`(() => {
+      const rowElement = document.querySelector(${JSON.stringify(row('e2e-state-standalone'))});
+      const marker = document.createElement('span');
+      marker.className = 'thread-item-status running';
+      rowElement.prepend(marker);
+      const ring = getComputedStyle(marker, '::before');
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--ds-text-primary)';
+      document.body.appendChild(probe);
+      const primary = getComputedStyle(probe).color;
+      probe.remove();
+      const measured = {
+        animationName: ring.animationName,
+        borderTopColor: ring.borderTopColor,
+        borderTopWidth: parseFloat(ring.borderTopWidth),
+        primary,
+      };
+      marker.remove();
+      return measured;
+    })()`);
+    check(
+      statusProbe.animationName !== 'none' &&
+        statusProbe.borderTopColor === statusProbe.primary &&
+        Math.abs(statusProbe.borderTopWidth - 1.5) <= 0.01,
+      'a running row spins a neutral ring whose open arc uses the primary ink',
+      JSON.stringify(statusProbe),
+    );
+
     await cdp.evaluate("window.dispatchEvent(new Event('focus'))");
     for (const theme of ["dark", "light"]) {
       await cdp.evaluate(`document.documentElement.dataset.theme = ${JSON.stringify(theme)}`);
@@ -164,6 +286,25 @@ export async function checkSidebarRowStates({ cdp, check, waitFor, seed }) {
         JSON.stringify({ selected: selectedTitleLeft, nested: titleStarts.nested }),
       );
       const selectedRest = await paint(row(id));
+      const selectedStatus = await cdp.evaluate(`(() => {
+        const rowElement = document.querySelector(${JSON.stringify(row(id))});
+        const probe = document.createElement('span');
+        probe.style.background = 'var(--ds-bg-active)';
+        document.body.appendChild(probe);
+        const active = getComputedStyle(probe).backgroundColor;
+        probe.remove();
+        return {
+          selectedRing: Boolean(rowElement.querySelector('.thread-item-status.selected')),
+          statuses: rowElement.querySelectorAll('.thread-item-status').length,
+          background: getComputedStyle(rowElement).backgroundColor,
+          active,
+        };
+      })()`);
+      check(
+        !selectedStatus.selectedRing && selectedStatus.background === selectedStatus.active,
+        `${theme} a selected row draws its selection surface and no status ring`,
+        JSON.stringify(selectedStatus),
+      );
       const groupRest = await paint(header(seed.paths.alpha));
       const context = await paint(group(seed.paths.alpha));
       check(

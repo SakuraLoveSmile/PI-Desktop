@@ -296,7 +296,7 @@
       ]
     },
     "apps/desktop/test/app-store-sidebar.test.mjs": {
-      "assertions": 48,
+      "assertions": 47,
       "cases": 8,
       "signatures": [
         "00525714aa5ad46e146d",
@@ -340,7 +340,6 @@
         "bccd6d616c8bc4f30955",
         "cb3f1693d6181777bbd9",
         "cc2dde128c5601e6935e",
-        "d07a96e29cd7cde34c8e",
         "e8224eb7cde08a4983f6",
         "ed4f6ebbbc7d2d5aee18",
         "f16f87a07880f70869a0",
@@ -2904,12 +2903,11 @@
       ]
     },
     "apps/desktop/test/notification-contract.test.mjs": {
-      "assertions": 99,
+      "assertions": 98,
       "cases": 11,
       "signatures": [
         "003ef64d1bce67ead1ac",
         "0650599b2180a65424b7",
-        "083928f53b54cedcb028",
         "09af7b94842462e538d3",
         "0a172851fd3be03eac00",
         "0a7ce3a7db8b5430334f",
@@ -6923,48 +6921,30 @@
       ]
     },
     "apps/desktop/test/sidebar-footer.test.mjs": {
-      "assertions": 35,
-      "cases": 5,
+      "assertions": 17,
+      "cases": 4,
       "signatures": [
         "00cf2e3aafd0625e5036",
-        "011ca1a8917fb3745716",
         "014d87a98e20fe52fb86",
         "0840f726139eb3705811",
-        "0fa0e7aa82877a515ac4",
-        "112c2a2ea26dc1d1fb9b",
         "130936c9269a059c92d1",
-        "1dd135fde5d4cb4a4569",
-        "593b008d617fa914348f",
-        "5a82623707a55f3ce262",
         "5b4c7003ca4933c7ed55",
         "5db1a22f7919f179ac9f",
-        "611e5e0c935e8bc0d381",
         "6a2f7b3d27e0d585044a",
         "6d995af98df8ed3542ec",
         "7242794fb65e245c8288",
-        "7256b551c0ecfabfbeb3",
         "819eef0dcc2fd69fc3c8",
         "81f04e718ca193e90edf",
         "8bce23d7ed918ecafd26",
         "8d28572a8afa248628a1",
-        "8da1a508e87096a9e4d4",
         "8e4856341ac330be7136",
-        "91406bec5cfaca8a483a",
         "9b23262cf8c73d379e1d",
         "a801c8afb06ce1b1137e",
-        "ad4aa15701824c5b1106",
-        "c2be1b9584bfde00d475",
-        "cdc15c277b2ae98efdf8",
-        "d29f0cd4b39e4c90dfe2",
-        "e1fbda1c09f2a98389cc",
-        "eff02ef39cbcdd721859",
-        "f784d83d0059052ffcc8",
-        "f8eff8c102927ee5ffac",
         "ffa1665616a707bd3f87"
       ]
     },
     "apps/desktop/test/sidebar-navigation.test.mjs": {
-      "assertions": 155,
+      "assertions": 152,
       "cases": 21,
       "signatures": [
         "0748b039194b94501964",
@@ -6985,7 +6965,6 @@
         "1e0bb7bf01a7c3ccc059",
         "2263f9941005ef4927d8",
         "2273695a4df20dd438da",
-        "238d7ef9c95e93053e1a",
         "2428b728db73dbc51472",
         "24acff07813329ee0b10",
         "273cd766bb88bafcbee9",
@@ -6998,7 +6977,6 @@
         "3774ff52d00a5d490eb2",
         "3c4ca47290805a66d320",
         "3d30caa9d096c171ab68",
-        "3d596ea6e0d9128817db",
         "3dbcfdf7d88296898370",
         "41f068ca152e06622066",
         "43a3dfebcfe20e9859bb",
@@ -7079,7 +7057,6 @@
         "aefaff25abf49c2525c1",
         "b0ee70c574273b50f5af",
         "b31f2ea6f3892bfd1414",
-        "b37a5603c48ee98aa66c",
         "b3ca43520bf1dee3bf4c",
         "b50c3c960c751a93d005",
         "b668f563ef6703d7b21a",
@@ -7211,15 +7188,13 @@
       ]
     },
     "apps/desktop/test/sidebar-session-status.test.mjs": {
-      "assertions": 13,
+      "assertions": 11,
       "cases": 2,
       "signatures": [
-        "01913e148ba9d4f538d3",
         "0b8352f1a3d4a7973327",
         "2def0d9c3d888dcec70f",
         "46f89982b7f3b7eee4cc",
         "89d9d6359b11b03cfa54",
-        "8cd69199218b710617a2",
         "8e8ef0acff0e8228b4c7",
         "bfd07582d2f12842936f",
         "c90ae55d8c5d043e7e50",

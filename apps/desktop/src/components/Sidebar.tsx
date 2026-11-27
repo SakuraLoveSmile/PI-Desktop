@@ -1,4 +1,3 @@
-import { IconClock } from "./icons";
 import {
   useCallback,
   useEffect,
@@ -12,9 +11,14 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { TooltipButton, cx } from "./ui";
+import { SidebarFooter } from "../features/sidebar/SidebarFooter";
+import { SidebarNav } from "../features/sidebar/SidebarNav";
+import { capSidebarEntries } from "../features/sidebar/sidebar-list-cap";
 
 /** Default number of most-recent sessions shown per project group before the rest fold. */
 const MAX_VISIBLE_SESSIONS = 10;
+/** Default number of standalone session rows before the section shows load-more. */
+const MAX_VISIBLE_STANDALONE_SESSIONS = 5;
 import { portalToBody } from "../lib/portal-visibility";
 import { buildSidebarMemoryProjects, type SidebarMemoryProject } from "../lib/memory-projects";
 import { useProjectMemoryGroups } from "./useProjectMemoryGroups";
@@ -37,7 +41,6 @@ import {
   sortSidebarSessionGroups,
   teamMemberRowTitle,
   visibleSidebarProjects,
-  visibleSidebarSessionGroups,
 } from "../lib/sidebar-session-groups";
 import { listableSessions } from "../lib/session-origin";
 import {
@@ -51,6 +54,7 @@ import {
   sameProjectReorderBucket,
 } from "../lib/sidebar-project-reorder";
 import {
+  collapsedProjectStatus,
   sidebarSessionStatus,
   type SidebarSessionStatus,
 } from "../lib/sidebar-session-status";
@@ -73,7 +77,6 @@ import {
   sidebarResetWidth,
 } from "../lib/sidebar-resize";
 import { BrandLogo } from "./BrandLogo";
-import { NotificationCenter } from "./NotificationCenter";
 import { ProjectEditDialog } from "./ProjectEditDialog";
 import { useArmedDelete } from "../hooks/use-armed-delete";
 import { ProjectDeleteDialog } from "./ProjectDeleteDialog";
@@ -83,21 +86,19 @@ import {
   IconArchive,
   IconArchiveRestore,
   IconArrowUpDown,
-  IconPlug,
   IconBranch,
   IconCheck,
   IconChevronDown,
   IconCopy,
   IconCircleAlert,
   IconNewSession,
-  IconMap,
   IconFolder,
+  IconFolderOpen,
   IconMore,
   IconNewProject,
   IconPin,
   IconPencil,
   IconSidebar,
-  IconSettings,
   IconStar,
   IconTrash,
   IconX,
@@ -214,6 +215,10 @@ export function Sidebar({
   onResizeCollapse,
   className,
   onAnimationEnd,
+  onNewTask,
+  onOpenSearch,
+  newTaskShortcut = "",
+  searchShortcut = "",
 }: {
   onToggleSidebar: () => void;
   sidebarToggleShortcut: string;
@@ -224,6 +229,10 @@ export function Sidebar({
   onResizeCollapse: () => void;
   className?: string;
   onAnimationEnd?: ReactAnimationEventHandler<HTMLElement>;
+  onNewTask?: () => void;
+  onOpenSearch?: () => void;
+  newTaskShortcut?: string;
+  searchShortcut?: string;
 }) {
   const { t } = useTranslation();
   const sessions = useAppStore((s) => s.sessions);
@@ -302,6 +311,9 @@ export function Sidebar({
     keepVisible: keepSessionHoverCardVisible,
   } = useSessionHoverCard();
   const [expandedProjectSessions, setExpandedProjectSessions] = useState<Record<string, boolean>>({});
+  // The session section shows five top-level rows; the rest wait in memory only,
+  // so a restart returns the list to its short form (like a project group).
+  const [standaloneExpanded, setStandaloneExpanded] = useState(false);
   const lastRevealedTeamChildRef = useRef<string | null>(null);
   const [draggingSessionId, setDraggingSessionId] = useState<string | null>(null);
   const [dropProjectKey, setDropProjectKey] = useState<string | null>(null);
@@ -500,6 +512,12 @@ export function Sidebar({
     if (restoreFocus && trigger) requestAnimationFrame(() => trigger.focus());
   }, []);
 
+  // One scroll region serves the pins, the session list and the projects, so a
+  // scroll closes whichever row or section menu was open.
+  const onSidebarScroll = () => {
+    if (sessionMenu || projectMenu || sectionMenu || sortOpen) closeMenus(false);
+  };
+
   const placeMenu = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     setMenuPosition({
@@ -589,23 +607,18 @@ export function Sidebar({
     requestAnimationFrame(() => menuFirstItemRef.current?.focus());
   }, [sessionMenu, projectMenu, sectionMenu, sortOpen]);
 
-  // Footer utility bar: settings / plugins / notifications + build chip.
-
-  // An update only earns the accent dot once it is actionable — a pending
-  // check or a failed one keeps the chip quiet.
+  // An update earns the footer pill only once it is ready to install; a pending
+  // or failed check leaves the footer to Settings and notifications, and
+  // Settings › About owns the manual check.
   const updateReady =
     update?.status === "available" || update?.status === "downloaded";
-  const appVersion = update?.currentVersion || version?.version || "";
-  const buildLabel = updateReady
-    ? `v${update?.availableVersion ?? appVersion}`
-    : update?.status === "checking"
-      ? t("updates.checking")
-      : appVersion
-        ? `v${appVersion}`
-        : t("nav.buildUnknown");
-  const buildTitle = updateReady
-    ? t("updates.available", { version: update?.availableVersion ?? "" })
-    : t("nav.checkForUpdates");
+  const updateVersion = update?.availableVersion ?? version?.version ?? "";
+
+  // The pill routes to the Settings row that can act on the update.
+  const onUpdateClick = () => {
+    setSettingsAnchor("updates.title");
+    setSettingsTab("about");
+  };
 
   const onMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
@@ -1878,7 +1891,8 @@ export function Sidebar({
           );
         }}
       >
-        {status ? renderSessionStatus(status) : null}
+        {/* Selection is its own surface now; a selected row draws no status. */}
+        {status && status !== "selected" ? renderSessionStatus(status) : null}
         <button
           type="button"
           className="thread-item-main"
@@ -2019,6 +2033,16 @@ export function Sidebar({
     const collapsedProject = entry.meta.collapsed ?? projectCollapsed[entry.key] ?? false;
     const projectId = projectDomId(entry.key);
     const isMenuOpen = projectMenu === entry.key;
+    // A folded group still says what its hidden rows are doing: a pending
+    // approval, or work in progress. Every unarchived session counts, including
+    // the rows a limit hides and the members a folded team holds.
+    const projectActivity = collapsedProject
+      ? collapsedProjectStatus(
+          entry.sessions.map((session) => session.id),
+          (sessionId) => runningSessions[sessionId] === true,
+          (sessionId) => (pendingPermissions[sessionId]?.length ?? 0) > 0,
+        )
+      : null;
 
     const sessionsExpanded = expandedProjectSessions[entry.key] ?? false;
     const historyGroups = sortSidebarSessionGroups(
@@ -2029,10 +2053,10 @@ export function Sidebar({
       compareSessions,
       displaySessionSort === "recent",
     );
-    const { visible: visibleGroups, hiddenCount } = visibleSidebarSessionGroups(
+    const { visible: visibleGroups, hiddenCount } = capSidebarEntries(
       historyGroups,
-      sessionsExpanded,
       MAX_VISIBLE_SESSIONS,
+      sessionsExpanded,
     );
 
     const renderTimeGroupedSessions = (groups: typeof visibleGroups) => {
@@ -2157,16 +2181,18 @@ export function Sidebar({
               size={13}
               className={`sidebar-disclosure-icon ${collapsedProject ? "collapsed" : ""}`}
             />
-            {entry.meta.pinned ? (
-              <IconStar
-                size={13}
-                fill="currentColor"
-                className="sidebar-project-pin"
-                aria-hidden
-              />
-            ) : (
-              <IconFolder size={13} aria-hidden />
-            )}
+            <span className="sidebar-project-icon" aria-hidden>
+              {entry.meta.pinned ? (
+                <IconStar
+                  size={13}
+                  fill="currentColor"
+                  className="sidebar-project-pin"
+                  aria-hidden
+                />
+              ) : (
+                collapsedProject ? <IconFolder size={13} aria-hidden /> : <IconFolderOpen size={13} aria-hidden />
+              )}
+            </span>
             <span>{entry.name}</span>
             {entry.active ? <span className="sidebar-project-active-dot" aria-label={t("project.active", { defaultValue: "Active" })} /> : null}
           </TooltipButton>
@@ -2175,6 +2201,14 @@ export function Sidebar({
             {". "}
             {t("project.reorder", { name: entry.name, defaultValue: "Reorder {{name}}" })}
           </span>
+          {projectActivity ? (
+            <span
+              className="sidebar-project-hint"
+              data-hint={projectActivity}
+              role="img"
+              aria-label={projectActivity === "running" ? t("nav.sessionRunning") : t("nav.sessionPermission")}
+            />
+          ) : null}
           <div className="sidebar-menu-wrap">
             <TooltipButton
               type="button"
@@ -2567,240 +2601,209 @@ export function Sidebar({
         </div>
       </div>
 
-      <div className="sidebar-body no-drag">
+      <SidebarNav
+        page={page}
+        setPage={setPage}
+        canNavBack={canNavBack}
+        navBack={navBack}
+        onNewTask={onNewTask}
+        onOpenSearch={onOpenSearch}
+        newTaskShortcut={newTaskShortcut}
+        searchShortcut={searchShortcut}
+      />
 
-        {pinnedSessions.length > 0 ? (
+      <div className="sidebar-body no-drag">
+        <div className="sidebar-scroll" onScroll={onSidebarScroll}>
+          {pinnedSessions.length > 0 ? (
+            <section
+              className="sidebar-pinned-sessions"
+              aria-labelledby="sidebar-pinned-label"
+              data-sidebar-session-section="pinned"
+            >
+              <div className="sidebar-list-toolbar sidebar-list-toolbar-secondary">
+                <span id="sidebar-pinned-label" className="sidebar-list-label">
+                  {t("nav.pinnedSessions")}
+                </span>
+              </div>
+              <div className="sidebar-session-group-body pinned">
+                {pinnedSessionGroups.map((group) => renderSidebarSessionGroup(group, { global: true }))}
+              </div>
+            </section>
+          ) : null}
+
           <section
-            className="sidebar-pinned-sessions"
-            aria-labelledby="sidebar-pinned-label"
-            data-sidebar-session-section="pinned"
+            className="sidebar-standalone-sessions"
+            aria-labelledby="sidebar-standalone-sessions-label"
+            data-sidebar-session-section="temporary"
           >
-            <div className="sidebar-list-toolbar sidebar-list-toolbar-secondary">
-              <span id="sidebar-pinned-label" className="sidebar-list-label">
-                {t("nav.pinnedSessions")}
+            <div
+              className="sidebar-list-toolbar sidebar-list-toolbar-secondary"
+              data-sidebar-section="sessions"
+              onContextMenu={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                openSectionMenu("sessions", event.clientX, event.clientY);
+              }}
+              onPointerDown={(event) => {
+                // Keep native drag/text selection from eating the secondary click path.
+                if (event.button === 2) event.preventDefault();
+              }}
+            >
+              <span id="sidebar-standalone-sessions-label" className="sidebar-list-label">
+                {t("nav.sessions", { defaultValue: "Sessions" })}
               </span>
+              <div className="sidebar-toolbar-actions">
+                <div className="sidebar-menu-wrap">
+                  <TooltipButton
+                    type="button"
+                    className={`sidebar-toolbar-button ${sortOpen ? "active" : ""}`}
+                    data-action="session-sort"
+                    ariaLabel={t("nav.sortSessions", { defaultValue: "Sort sessions" })}
+                    tooltip={t("nav.sortSessions", { defaultValue: "Sort sessions" })}
+                    aria-haspopup="menu"
+                    aria-expanded={sortOpen}
+                    onClick={(event) => {
+                      if (sortOpen) {
+                        closeMenus();
+                        return;
+                      }
+                      placeMenu(event);
+                      menuTriggerRef.current = event.currentTarget;
+                      setSessionMenu(null);
+                      setProjectMenu(null);
+                      setSectionMenu(null);
+                      setSortOpen(true);
+                    }}
+                  >
+                    <IconArrowUpDown size={14} />
+                  </TooltipButton>
+                </div>
+                <TooltipButton
+                  type="button"
+                  className="sidebar-toolbar-button"
+                  data-action="new-standalone-session"
+                  tooltip={t("nav.newTemporarySession")}
+                  ariaLabel={t("nav.newTemporarySession")}
+                  onClick={() => void createSession({ projectPath: null })}
+                >
+                  <IconNewSession size={14} />
+                </TooltipButton>
+              </div>
             </div>
-            <div className="sidebar-session-group-body pinned" onScroll={() => closeMenus(false)}>
-              {pinnedSessionGroups.map((group) => renderSidebarSessionGroup(group, { global: true }))}
+            <div
+              className="sidebar-session-group-body standalone"
+              onContextMenu={(event) => {
+                if ((event.target as Element).closest?.("[data-sidebar-session-row]")) return;
+                event.preventDefault();
+                event.stopPropagation();
+                openSectionMenu("sessions", event.clientX, event.clientY);
+              }}
+            >
+              {temporarySessionHistory.length > 0 ? (
+                (() => {
+                  // Five top-level rows, one team group counting as one; the rest
+                  // wait behind the load-more row and live only in this window.
+                  const { visible, hiddenCount } = capSidebarEntries(
+                    sortSidebarSessionGroups(
+                      partitionPinnedSidebarSessionGroups(
+                        groupTeamSessions(temporarySessions),
+                        directPinnedSessionIds,
+                      ).history,
+                      compareSessions,
+                      displaySessionSort === "recent",
+                    ),
+                    MAX_VISIBLE_STANDALONE_SESSIONS,
+                    standaloneExpanded,
+                  );
+                  return (
+                    <>
+                      {visible.map((group) =>
+                        renderSidebarSessionGroup(group, { temporary: true, hidePinnedMembers: true }))}
+                      {hiddenCount > 0 ? (
+                        <button
+                          type="button"
+                          className="sidebar-load-more"
+                          onClick={() => setStandaloneExpanded(true)}
+                        >
+                          {t("nav.loadMoreCount", { count: hiddenCount })}
+                        </button>
+                      ) : null}
+                    </>
+                  );
+                })()
+              ) : temporarySessions.length === 0 ? (
+                <div className="sidebar-session-empty">{t("nav.noTemporarySessions")}</div>
+              ) : null}
             </div>
           </section>
-        ) : null}
 
-        <section
-          className="sidebar-standalone-sessions"
-          aria-labelledby="sidebar-standalone-sessions-label"
-          data-sidebar-session-section="temporary"
-        >
           <div
-            className="sidebar-list-toolbar sidebar-list-toolbar-secondary"
-            data-sidebar-section="sessions"
+            className="sidebar-list-toolbar"
+            data-sidebar-section="projects"
             onContextMenu={(event) => {
               event.preventDefault();
               event.stopPropagation();
-              openSectionMenu("sessions", event.clientX, event.clientY);
+              openSectionMenu("projects", event.clientX, event.clientY);
             }}
             onPointerDown={(event) => {
-              // Keep native drag/text selection from eating the secondary click path.
               if (event.button === 2) event.preventDefault();
             }}
           >
-            <span id="sidebar-standalone-sessions-label" className="sidebar-list-label">
-              {t("nav.sessions", { defaultValue: "Sessions" })}
-            </span>
-            <div className="sidebar-toolbar-actions">
-              <div className="sidebar-menu-wrap">
-                <TooltipButton
-                  type="button"
-                  className={`sidebar-toolbar-button ${sortOpen ? "active" : ""}`}
-                  data-action="session-sort"
-                  ariaLabel={t("nav.sortSessions", { defaultValue: "Sort sessions" })}
-                  tooltip={t("nav.sortSessions", { defaultValue: "Sort sessions" })}
-                  aria-haspopup="menu"
-                  aria-expanded={sortOpen}
-                  onClick={(event) => {
-                    if (sortOpen) {
-                      closeMenus();
-                      return;
-                    }
-                    placeMenu(event);
-                    menuTriggerRef.current = event.currentTarget;
-                    setSessionMenu(null);
-                    setProjectMenu(null);
-                    setSectionMenu(null);
-                    setSortOpen(true);
-                  }}
-                >
-                  <IconArrowUpDown size={14} />
-                </TooltipButton>
-              </div>
-              <TooltipButton
-                type="button"
-                className="sidebar-toolbar-button"
-                data-action="new-standalone-session"
-                tooltip={t("nav.newTemporarySession")}
-                ariaLabel={t("nav.newTemporarySession")}
-                onClick={() => void createSession({ projectPath: null })}
-              >
-                <IconNewSession size={14} />
-              </TooltipButton>
-            </div>
+            <span className="sidebar-list-label">{t("nav.projects")}</span>
+            <TooltipButton
+              type="button"
+              className="sidebar-toolbar-button"
+              data-action="new-project"
+              tooltip={t("nav.newProject")}
+              ariaLabel={t("nav.newProject")}
+              onClick={() => void openProjectPicker()}
+            >
+              <IconNewProject size={14} />
+            </TooltipButton>
           </div>
+
           <div
-            className="sidebar-session-group-body standalone"
-            onScroll={() => {
-              if (sessionMenu || projectMenu || sectionMenu || sortOpen) closeMenus(false);
-            }}
+            className={`sidebar-session-groups ${projectsDropActive ? "is-drop-target" : ""}`}
             onContextMenu={(event) => {
-              if ((event.target as Element).closest?.("[data-sidebar-session-row]")) return;
-              event.preventDefault();
-              event.stopPropagation();
-              openSectionMenu("sessions", event.clientX, event.clientY);
-            }}
-          >
-            {temporarySessionHistory.length > 0 ? (
-              sortSidebarSessionGroups(
-                partitionPinnedSidebarSessionGroups(
-                  groupTeamSessions(temporarySessions),
-                  directPinnedSessionIds,
-                ).history,
-                compareSessions,
-                displaySessionSort === "recent",
-              ).map((group) => renderSidebarSessionGroup(group, { temporary: true, hidePinnedMembers: true }))
-            ) : temporarySessions.length === 0 ? (
-              <div className="sidebar-session-empty">{t("nav.noTemporarySessions")}</div>
-            ) : null}
-          </div>
-        </section>
-
-        <div
-          className="sidebar-list-toolbar"
-          data-sidebar-section="projects"
-          onContextMenu={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            openSectionMenu("projects", event.clientX, event.clientY);
-          }}
-          onPointerDown={(event) => {
-            if (event.button === 2) event.preventDefault();
-          }}
-        >
-          <span className="sidebar-list-label">{t("nav.projects")}</span>
-          <TooltipButton
-            type="button"
-            className="sidebar-toolbar-button"
-            data-action="new-project"
-            tooltip={t("nav.newProject")}
-            ariaLabel={t("nav.newProject")}
-            onClick={() => void openProjectPicker()}
-          >
-            <IconNewProject size={14} />
-          </TooltipButton>
-        </div>
-
-        <div
-          className={`sidebar-session-groups min-h-0 flex-1 overflow-auto px-0.5 ${projectsDropActive ? "is-drop-target" : ""}`}
-          onScroll={() => {
-            if (sessionMenu || projectMenu || sectionMenu || sortOpen) closeMenus(false);
-          }}
-          onContextMenu={(event) => {
-            if (
-              (event.target as Element).closest?.(
-                "[data-sidebar-session-row], [data-sidebar-project-group]",
-              )
-            ) {
-              return;
-            }
-            event.preventDefault();
-            event.stopPropagation();
-            openSectionMenu("projects", event.clientX, event.clientY);
-          }}
-          onDragEnter={(event) => {
-            if (hasComposerFileDrag(event.dataTransfer)) event.preventDefault();
-          }}
-          onDragOver={onProjectsAreaDragOver}
-          onDragLeave={onProjectsAreaDragLeave}
-          onDrop={onProjectsAreaDrop}
-        >
-          {projectEntries.length > 0 ? projectEntries.map(renderProjectGroup) : (
-            <section className="sidebar-session-group" aria-labelledby="sidebar-project-group-label">
-              <div className="sidebar-session-group-header">
-                <button type="button" id="sidebar-project-group-label" className="sidebar-session-group-title" onClick={() => void openProjectPicker()}>
-                  <IconFolder size={13} />
-                  <span>{t("project.open")}</span>
-                </button>
-              </div>
-            </section>
-          )}
-        </div>
-
-        <div className="sidebar-footer no-drag">
-          <div className="footer-actions">
-            <TooltipButton
-              type="button"
-              className={`footer-action ${page === "settings" ? "active" : ""}`}
-              data-nav="settings"
-              tooltip={t("nav.settings")}
-              ariaLabel={t("nav.settings")}
-              onClick={() => setPage("settings")}
-              aria-pressed={page === "settings"}
-            >
-              <IconSettings size={14} aria-hidden />
-            </TooltipButton>
-            <TooltipButton
-              type="button"
-              className={`footer-action ${page === "plugins" ? "active" : ""}`}
-              data-nav="plugins"
-              tooltip={t("nav.plugins")}
-              ariaLabel={t("nav.plugins")}
-              onClick={() => page === "plugins"
-                ? (canNavBack() ? navBack() : setPage("chat"))
-                : setPage("plugins")}
-              aria-pressed={page === "plugins"}
-            >
-              <IconPlug size={14} aria-hidden />
-            </TooltipButton>
-            <TooltipButton
-              type="button"
-              className={`footer-action ${page === "scheduled" ? "active" : ""}`}
-              data-nav="scheduled"
-              tooltip={t("scheduled.title")}
-              ariaLabel={t("scheduled.title")}
-              onClick={() => setPage("scheduled")}
-              aria-pressed={page === "scheduled"}
-            >
-              <IconClock size={14} aria-hidden />
-            </TooltipButton>
-            <TooltipButton type="button" className={`footer-action ${page === "contextInsights" ? "active" : ""}`}
-              data-nav="context-insights" tooltip={t("contextInsights.title")} ariaLabel={t("contextInsights.title")}
-              onClick={() => setPage("contextInsights")} aria-pressed={page === "contextInsights"}>
-              <IconMap size={14} aria-hidden />
-            </TooltipButton>
-            <NotificationCenter onBeforeOpen={() => closeMenus(false)} />
-          </div>
-
-          <TooltipButton
-            type="button"
-            className={`footer-build ${updateReady ? "has-update" : ""}`}
-            data-nav="build"
-            tooltip={buildTitle}
-            ariaLabel={buildTitle}
-            onClick={() => {
-              if (updateReady) {
-                setSettingsAnchor("updates.title");
-                setSettingsTab("about");
+              if (
+                (event.target as Element).closest?.(
+                  "[data-sidebar-session-row], [data-sidebar-project-group]",
+                )
+              ) {
                 return;
               }
-              void (async () => {
-                try {
-                  await api.updatesCheck();
-                } catch { /* ignore */ }
-              })();
+              event.preventDefault();
+              event.stopPropagation();
+              openSectionMenu("projects", event.clientX, event.clientY);
             }}
+            onDragEnter={(event) => {
+              if (hasComposerFileDrag(event.dataTransfer)) event.preventDefault();
+            }}
+            onDragOver={onProjectsAreaDragOver}
+            onDragLeave={onProjectsAreaDragLeave}
+            onDrop={onProjectsAreaDrop}
           >
-            <span className="footer-build-version">{buildLabel}</span>
-            {updateReady ? <span className="footer-build-dot" aria-hidden /> : null}
-          </TooltipButton>
+            {projectEntries.length > 0 ? projectEntries.map(renderProjectGroup) : (
+              <section className="sidebar-session-group" aria-labelledby="sidebar-project-group-label">
+                <div className="sidebar-session-group-header">
+                  <button type="button" id="sidebar-project-group-label" className="sidebar-session-group-title" onClick={() => void openProjectPicker()}>
+                    <IconFolder size={13} />
+                    <span>{t("project.open")}</span>
+                  </button>
+                </div>
+              </section>
+            )}
+          </div>
         </div>
+
+        <SidebarFooter
+          page={page}
+          setPage={setPage}
+          updateReady={updateReady}
+          updateVersion={updateVersion}
+          onUpdateClick={onUpdateClick}
+          onBeforeNotificationsOpen={() => closeMenus(false)}
+        />
       </div>
       {renderFloatingMenu()}
       {sessionHoverCard ? (

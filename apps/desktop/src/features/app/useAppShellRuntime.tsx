@@ -931,32 +931,21 @@ export function useAppShellRuntime() {
   ) : null;
 
   const shortcutPlatform = platform as ShortcutPlatform;
-  const toggleSidebarShortcut = KEYBOARD_SHORTCUTS.find(
-    (shortcut) => shortcut.id === "toggleSidebar",
-  );
-  const sidebarToggleShortcut = toggleSidebarShortcut
-    ? keybindingDisplayParts(
-        resolveKeybinding(
-          toggleSidebarShortcut,
-          settings?.keybindings,
+  // One label rule for every shortcut the shell displays: the user's resolved
+  // binding, joined the way that platform writes chords.
+  const shortcutLabel = (id: string): string => {
+    const definition = KEYBOARD_SHORTCUTS.find((shortcut) => shortcut.id === id);
+    return definition
+      ? keybindingDisplayParts(
+          resolveKeybinding(definition, settings?.keybindings, shortcutPlatform),
           shortcutPlatform,
-        ),
-        shortcutPlatform,
-      ).join(shortcutPlatform === "darwin" ? "" : "+")
-    : "";
-  const toggleWorkPanelShortcutDefinition = KEYBOARD_SHORTCUTS.find(
-    (shortcut) => shortcut.id === "openWorkPanel",
-  );
-  const workPanelToggleShortcut = toggleWorkPanelShortcutDefinition
-    ? keybindingDisplayParts(
-        resolveKeybinding(
-          toggleWorkPanelShortcutDefinition,
-          settings?.keybindings,
-          shortcutPlatform,
-        ),
-        shortcutPlatform,
-      ).join(shortcutPlatform === "darwin" ? "" : "+")
-    : "";
+        ).join(shortcutPlatform === "darwin" ? "" : "+")
+      : "";
+  };
+  const sidebarToggleShortcut = shortcutLabel("toggleSidebar");
+  const workPanelToggleShortcut = shortcutLabel("openWorkPanel");
+  const newTaskShortcut = shortcutLabel("newTask");
+  const searchShortcut = shortcutLabel("openSearch");
   const workPanelToggleLabel = t("nav.toggleWorkPanel");
   const workPanelToggleTooltip = workPanelToggleShortcut
     ? `${workPanelToggleLabel} ${workPanelToggleShortcut}`
@@ -1012,6 +1001,8 @@ export function useAppShellRuntime() {
     retryStartup,
     startupRetrying,
     sidebarToggleShortcut,
+    newTaskShortcut,
+    searchShortcut,
     workPanelToggleTooltip,
   };
 }

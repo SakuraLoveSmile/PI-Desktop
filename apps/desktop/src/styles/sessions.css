@@ -336,19 +336,23 @@
   justify-content: center;
   color: var(--ds-text-muted);
   position: absolute;
-  left: 4px;
+  /* The row's 16px icon column: 8px row padding, 2px into the 12px status box. */
+  left: calc(10px + var(--sidebar-level, 0) * 16px + var(--sidebar-team-indent, 0px));
   top: 50%;
   transform: translateY(-50%);
+  transition: opacity var(--motion-duration-fast) var(--motion-ease-out);
 }
 
 .thread-item-status.running::before {
-  width: 7px;
-  height: 7px;
+  /* A neutral ring is the one "work is happening" glyph; a colored dot stays
+     reserved for the states a person must act on or read. */
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid color-mix(in oklab, var(--ds-text-secondary) 30%, transparent);
+  border-top-color: var(--ds-text-primary);
   border-radius: var(--radius-full);
-  background: var(--ds-warning);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ds-warning) 15%, transparent);
   content: "";
-  animation: sidebar-status-breathe 1.6s ease-in-out 2;
+  animation: sidebar-status-spin 0.8s linear infinite;
 }
 
 .thread-item-status.permission::before {
@@ -359,14 +363,6 @@
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--ds-purple) 15%, transparent);
   content: "";
   animation: sidebar-status-pulse-purple 1.2s ease-in-out infinite;
-}
-
-.thread-item-status.selected::before {
-  width: 9px;
-  height: 9px;
-  border: 1.5px solid var(--ds-accent);
-  border-radius: var(--radius-full);
-  content: "";
 }
 
 .thread-item-status.completed {
@@ -394,6 +390,12 @@
   50% {
     opacity: 0.68;
     transform: scale(0.78);
+  }
+}
+
+@keyframes sidebar-status-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
@@ -441,6 +443,18 @@
  * the session title. */
 .sidebar-row-actions {
   gap: 2px;
+  opacity: 0;
+  transition: opacity var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+/* The row controls float over the row's right end instead of holding width, so
+   a resting title owns the whole column and only the hovered row makes room. */
+.thread-item > .sidebar-row-actions {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  z-index: 1;
+  transform: translateY(-50%);
 }
 
 .thread-item-more {
@@ -458,6 +472,12 @@
     opacity var(--motion-duration-fast) var(--motion-ease-out),
     background var(--motion-duration-fast) var(--motion-ease-out),
     color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.thread-item:hover > .sidebar-row-actions,
+.thread-item:focus-within > .sidebar-row-actions,
+.thread-item > .sidebar-row-actions:has(.thread-item-more[aria-expanded="true"]) {
+  opacity: 1;
 }
 
 .thread-item:hover .thread-item-more,
@@ -484,11 +504,45 @@
 /* Without hover there is nothing to reveal the row controls with, so a no-hover
  * pointer gets them visible and tappable outright. */
 @media (hover: none) {
+  .sidebar-row-actions,
   .sidebar-row-actions .thread-item-more,
   .sidebar-menu-wrap .thread-item-more,
   .sidebar-session-group-add {
     opacity: 1;
     pointer-events: auto;
+  }
+}
+
+/* Making room for the row controls: the title keeps 58px of right padding and
+   the quiet trailing context drops out, so nothing runs under the controls. */
+.thread-item:hover .thread-item-main,
+.thread-item:focus-within .thread-item-main,
+.thread-item:has(.thread-item-more[aria-expanded="true"]) .thread-item-main {
+  padding-right: 58px;
+}
+
+.thread-item:hover .thread-item-context,
+.thread-item:hover .thread-item-project,
+.thread-item:hover .thread-item-source,
+.thread-item:focus-within .thread-item-context,
+.thread-item:focus-within .thread-item-project,
+.thread-item:focus-within .thread-item-source,
+.thread-item:has(.thread-item-more[aria-expanded="true"]) .thread-item-context,
+.thread-item:has(.thread-item-more[aria-expanded="true"]) .thread-item-project,
+.thread-item:has(.thread-item-more[aria-expanded="true"]) .thread-item-source {
+  display: none;
+}
+
+/* A row always yields on a pointer without hover, where the controls are always
+   visible. */
+@media (hover: none) {
+  .thread-item .thread-item-main {
+    padding-right: 58px;
+  }
+  .thread-item .thread-item-context,
+  .thread-item .thread-item-project,
+  .thread-item .thread-item-source {
+    display: none;
   }
 }
 
@@ -662,9 +716,10 @@
   align-items: center;
   justify-content: space-between;
   min-height: 24px;
-  /* The label opens a section, so its own top padding carries the 8px
-     section-to-section gap; the list below it supplies the 2px back. */
-  padding: 8px 4px 0;
+  /* The label opens a section, so its own top padding carries the 10px
+     section-to-section gap; the list below it supplies the 2px back. The 8px
+     inset starts the label on the same 16px column as the row icons. */
+  padding: 10px 8px 0;
   border-radius: var(--radius-sm);
 }
 
@@ -720,11 +775,6 @@
 .sidebar-toolbar-button:focus-visible {
   background: var(--ds-bg-hover);
   color: var(--ds-text-primary);
-}
-
-.sidebar-list-toolbar-secondary {
-  padding-right: 2px;
-  padding-left: 2px;
 }
 
 .sidebar-toolbar-actions {
@@ -1048,13 +1098,31 @@
   min-width: 0;
 }
 
+/* A project's chevron hovers over its icon slot: the folder (or pin) shows at
+   rest, the arrow takes its place while the row is hovered or focused. */
 .sidebar-disclosure-icon {
-  flex: 0 0 auto;
-  transition: transform var(--motion-duration-fast) var(--motion-ease-out);
+  position: absolute;
+  top: 50%;
+  left: 7.5px;
+  opacity: 0;
+  transform: translateY(-50%);
+  transition:
+    opacity var(--motion-duration-fast) var(--motion-ease-out),
+    transform var(--motion-duration-fast) var(--motion-ease-out);
 }
 
 .sidebar-disclosure-icon.collapsed {
-  transform: rotate(-90deg);
+  transform: translateY(-50%) rotate(-90deg);
+}
+
+.sidebar-session-group-header:hover .sidebar-disclosure-icon,
+.project-toggle:focus-visible .sidebar-disclosure-icon {
+  opacity: 1;
+}
+
+.sidebar-session-group-header:hover .sidebar-project-icon,
+.project-toggle:focus-visible .sidebar-project-icon {
+  opacity: 0;
 }
 
 .sidebar-session-group-header:hover .sidebar-session-group-add,
@@ -1075,11 +1143,44 @@
 
 /* A blurred window keeps :hover latched on the row or header under the cursor,
  * so the hover reveals collapse back to their resting, pointer-inert state. */
+.sidebar[data-window-blur="true"] .thread-item:hover > .sidebar-row-actions:not(:has(.thread-item-more[aria-expanded="true"])),
 .sidebar[data-window-blur="true"] .thread-item:hover .thread-item-more:not([aria-expanded="true"]),
 .sidebar[data-window-blur="true"] .sidebar-session-group-header:hover .thread-item-more:not([aria-expanded="true"]),
 .sidebar[data-window-blur="true"] .sidebar-session-group-header:hover .sidebar-session-group-add {
   opacity: 0;
   pointer-events: none;
+}
+
+/* The same release covers the room a hover made: a blurred row returns to its
+   resting padding and keeps its trailing context. An open row menu is still a
+   real action surface, so it keeps the room. */
+.sidebar[data-window-blur="true"] .thread-item:hover:not(:has(.thread-item-more[aria-expanded="true"])) .thread-item-main {
+  padding-right: 8px;
+}
+
+.sidebar[data-window-blur="true"] .thread-item:hover:not(:has(.thread-item-more[aria-expanded="true"])):is(:hover) .thread-item-context,
+.sidebar[data-window-blur="true"] .thread-item:hover:not(:has(.thread-item-more[aria-expanded="true"])):is(:hover) .thread-item-project,
+.sidebar[data-window-blur="true"] .thread-item:hover:not(:has(.thread-item-more[aria-expanded="true"])):is(:hover) .thread-item-source {
+  display: inline;
+}
+
+/* A team lead's hover swap is a hover reveal too. */
+.sidebar[data-window-blur="true"] .sidebar-team-session-lead:has(.thread-item-status):hover .sidebar-team-session-toggle {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sidebar[data-window-blur="true"] .sidebar-team-session-lead:has(.thread-item-status):hover .thread-item-status {
+  opacity: 1;
+}
+
+/* The project arrow is also a hover reveal. */
+.sidebar[data-window-blur="true"] .sidebar-session-group-header:hover .sidebar-disclosure-icon {
+  opacity: 0;
+}
+
+.sidebar[data-window-blur="true"] .sidebar-session-group-header:hover .sidebar-project-icon {
+  opacity: 1;
 }
 
 /* An open menu trigger stays visible; its wrapper is inert while blurred. */

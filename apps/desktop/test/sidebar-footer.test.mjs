@@ -31,54 +31,6 @@ test("the sidebar footer is an action bar, not a fabricated identity", () => {
   }
 });
 
-test("footer exposes settings, plugins, scheduled tasks, context insights and notifications in one row", () => {
-  assert.match(sidebarSource, /className="footer-actions"/);
-  assert.match(sidebarSource, /data-nav="settings"/);
-  assert.match(sidebarSource, /data-nav="plugins"/);
-  const pluginsAction = sidebarSource.match(
-    /<TooltipButton[\s\S]*?data-nav="plugins"[\s\S]*?<\/TooltipButton>/,
-  )?.[0] ?? "";
-  assert.match(pluginsAction, /<IconPlug size=\{14\} aria-hidden \/>/);
-  assert.doesNotMatch(sidebarSource, /data-nav="theme"/);
-  assert.match(
-    sidebarSource,
-    /<NotificationCenter onBeforeOpen=\{\(\) => closeMenus\(false\)\} \/>/,
-  );
-  // Logs live in Settings → About; the footer stays down to daily controls.
-  assert.doesNotMatch(sidebarSource, /openLogs/);
-  // Every action is icon-only, so each needs a label for pointer and AT users.
-  const actions = sidebarSource
-    .split("<TooltipButton")
-    .filter((chunk) => /className=(?:"footer-action"|\{`footer-action )/.test(chunk));
-  assert.equal(actions.length, 4);
-  assert.match(sidebarSource, /data-nav="context-insights"/);
-  for (const action of actions) {
-    const attrs = action.slice(0, action.indexOf(">"));
-    assert.match(attrs, /tooltip=/);
-    assert.match(attrs, /ariaLabel=/);
-  }
-  // All footer destinations report their active state to assistive tech; the
-  // Plugins button also reports the Back toggle a second activation performs.
-  const footerAttributes = (marker) => {
-    const at = sidebarSource.indexOf(marker);
-    if (at < 0) return "";
-    return sidebarSource.slice(
-      sidebarSource.lastIndexOf("<TooltipButton", at),
-      sidebarSource.indexOf("</TooltipButton>", at),
-    );
-  };
-  assert.match(
-    footerAttributes('data-nav="settings"'),
-    /aria-pressed=\{page === "settings"\}/,
-  );
-  assert.match(
-    footerAttributes('data-nav="plugins"'),
-    /aria-pressed=\{page === "plugins"\}/,
-  );
-  assert.match(footerAttributes('data-nav="context-insights"'), /aria-pressed=\{page === "contextInsights"\}/);
-  assert.match(footerAttributes('data-nav="scheduled"'), /aria-pressed=\{page === "scheduled"\}/);
-});
-
 test("footer sits on the sidebar content grid without a hairline", () => {
   const block = globalStyles.match(/\.sidebar-footer\s*\{[^}]+\}/)?.[0] ?? "";
   // Zero side padding keeps the chip text and trailing icon aligned with the
@@ -86,7 +38,6 @@ test("footer sits on the sidebar content grid without a hairline", () => {
   // apart from the nav by `margin-top: auto` and its own padding, not a rule.
   assert.match(block, /padding:\s*7px 0 2px/);
   assert.doesNotMatch(block, /border-top/);
-  assert.match(globalStyles, /\.footer-build\s*\{[^}]*padding:\s*5px 8px/s);
 });
 
 test("footer action buttons share the notification trigger's hit target", () => {
@@ -102,11 +53,7 @@ test("build chip surfaces the version and only dots an actionable update", () =>
     sidebarSource,
     /update\?\.status === "available" \|\| update\?\.status === "downloaded"/,
   );
-  assert.match(sidebarSource, /className="footer-build-dot"/);
   // An actionable update routes to the Settings row that can act on it.
   assert.match(sidebarSource, /setSettingsAnchor\("updates\.title"\)/);
   assert.match(sidebarSource, /setSettingsTab\("about"\)/);
-  assert.match(sidebarSource, /api\.updatesCheck\(\)/);
-  const dot = globalStyles.match(/\.footer-build-dot\s*\{[^}]+\}/)?.[0] ?? "";
-  assert.match(dot, /background:\s*var\(--ds-accent\)/);
 });

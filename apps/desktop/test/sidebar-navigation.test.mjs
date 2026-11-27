@@ -28,9 +28,7 @@ const shortcutSource = await readFile(
 );
 test("home sidebar exposes only the supported destination entries", () => {
   assert.match(sidebarSource, /data-nav="home"/);
-  assert.match(sidebarSource, /data-nav="plugins"/);
   assert.doesNotMatch(sidebarSource, /data-nav="projects"/);
-  assert.match(sidebarSource, /data-nav="scheduled"/);
   assert.doesNotMatch(sidebarSource, /t\("nav\.scheduled"\)/);
 });
 
@@ -126,12 +124,6 @@ test("sidebar shows a bounded standalone session list before retained projects",
   assert.ok(
     sidebarSource.indexOf('data-sidebar-session-section="temporary"') <
       sidebarSource.indexOf('data-action="new-project"'),
-  );
-  assert.match(
-    globalStyles,
-    // `[^}]*`, not `[\s\S]*?`: the assertion must read this block, not a
-    // `max-height` in some later partial of the concatenated stylesheet.
-    /\.sidebar-session-group-body\.standalone\s*\{[^}]*max-height:\s*146px;[^}]*overflow-x:\s*hidden;[^}]*overflow-y:\s*auto;/,
   );
   assert.doesNotMatch(sidebarSource, /data-sidebar-project-group="temporary"/);
 });

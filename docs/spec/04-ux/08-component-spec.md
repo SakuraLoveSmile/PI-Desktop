@@ -380,6 +380,11 @@ Expanded (~275px, D034/D070):
 +---------------------------+
 | [lights]             [◧] |  macOS
 | [π] PI-Desktop       [◧] |  Windows/Linux
+| [✎] New task             |
+| [⌕] Search               |
+| [◷] Scheduled            |
+| [⧉] Extensions           |
+| [⌖] Context insights     |
 | PINNED                   |
 |   • Pinned task  project-A|
 | SESSIONS         [msg+][↕]|
@@ -389,7 +394,7 @@ Expanded (~275px, D034/D070):
 |   • Project session      |
 | project-B      [>] [+] … |
 |                           |
-| [⚙][plug][bell]          [version]|
+| [⚙][bell]        [update]|
 +---------------------------+
 
 Collapsed (48px):
@@ -401,6 +406,22 @@ Collapsed (48px):
 | [⚙][plug][☾][bell] |
 +----+
 ```
+
+Every list row shares one grid: a 28px pitch, 8px row padding, a 16px icon (or
+status) column and an 8px gap. Section labels start at x=16, a row title at
+x=40, a project row one 16px step in (56) and a team member two (72);
+time-group headers and the load-more row start on their own rows' title column.
+A project header keeps its pin or its folder (open for an expanded group,
+closed for a folded one) in the icon column and swaps it for the disclosure
+arrow while the header is hovered or the title is keyboard-focused. A session
+row's quick-archive and menu controls float over its right end and reserve no
+width until the row is hovered, keyboard-focused or its menu is open, so a
+resting title owns the full column.
+
+Above the list, five destination rows sit outside the scroller: New task and
+Search run the two shell actions, and Scheduled, Extensions and Context insights
+are the faces the footer used to carry. The footer below the list keeps Settings
+and the notification inbox, and shows one pill only while an update is ready.
 
 ### 3.3 Typography
 
@@ -428,12 +449,12 @@ visually distinct from list content.
 | Expanded | Full session titles visible |
 | Sidebar width | 240–520px (default 275px); drag below 160px collapses |
 | Collapsed | Icon rail — hover shows tooltip with session title |
-| Active session | Accent-blue outlined status ring plus active row background |
+| Active session | The row's `--ds-bg-active` surface alone; a selected row draws no status glyph |
 | Selecting session | Destination row receives the active treatment immediately while transcript/workspace resolution continues |
-| Session in progress | Orange breathing dot; static under reduced motion |
+| Session in progress | Neutral 10px ring spinning in 0.8s; static under reduced motion. The warning dot is no longer used here |
 | Session completed | Green check mark from the latest unread task notification when the row is not selected |
 | Session failed | Red circled alert mark from the latest unread task notification when the row is not selected |
-| Hover row | Project headers and all conversation rows share one full-row `--ds-bg-hover` surface, radius and transition; selected conversation fill takes precedence |
+| Hover row | Project headers and all conversation rows share one full-row `--ds-bg-hover` surface, radius and transition; selected conversation fill takes precedence. A hovered or focused row adds 58px of right padding for its floating controls and hides its quiet trailing context; window blur restores the resting row |
 | Current workspace | Project header shows the workspace dot, never a persistent selection fill; topbar follows that workspace; the workspace strip above the input card shows project, location, and branch (folded to the branch during a run) as the header band of the same card as the input shell (PI-UI-1117), and the input card itself exposes no workspace identity |
 | Navigation selection | Only the selected conversation on the chat page uses `--ds-bg-active`, including pinned and standalone rows; folding its group never transfers selection to the header. No conversation or a non-chat page means no selected conversation row |
 | Keyboard focus | The focused control keeps its visible outline; the project title stays transparent and independent action buttons retain their own hover feedback |
@@ -503,8 +524,9 @@ visually distinct from list content.
   right-aligned; clicking the chip checks for updates or opens the available
   release in Settings
 - Click Collapse sidebar at the right of the header row to collapse the sidebar.
-  Global search opens from the conversation topbar, shortcuts, and application
-  menu; the expanded sidebar header does not host a search control
+  Global search opens from the sidebar's Search destination, the conversation
+  topbar, shortcuts, and the application menu; the expanded sidebar header
+  itself hosts no search control
 - Drag the expanded sidebar's right edge to adjust its width. The main pane
   reflows continuously, the press position remains anchored, and the final
   width is saved on release. Focus the edge handle and use ArrowLeft/Right,
@@ -586,8 +608,9 @@ visually distinct from list content.
   Projects, independent of date buckets, project collapse, retained tabs, and
   each project's ten-row history limit. Each pin shows its project display
   name (full path on hover), or Temporary space for a path-less conversation.
-  The section is omitted when empty and scrolls within `min(233px, 30vh)` when
-  needed. Its rows reuse normal selection, status, hover, and overflow actions.
+  The section is omitted when empty and never scrolls on its own: the sidebar
+  has one scroll region, so every pin stays visible. Its rows reuse normal
+  selection, status, hover, and overflow actions.
 - Pinning moves the existing row into that section; unpinning returns it to
   normal project or temporary history, subject to existing folding and closed
   tab visibility. Keyboard focus follows the relocated row's overflow control,
@@ -620,9 +643,14 @@ visually distinct from list content.
   collapsed main titlebar retains an Expand sidebar icon; the work-panel
   toggle stays viewport-fixed in the window's top-right corner on every
   non-Settings route
-- Click the local profile trigger: open or close the identity menu containing
-  Settings, Logs, and Theme
+- Click a destination above the list: New task runs the topbar's New task,
+  Search opens the global search, Scheduled and Context insights switch page,
+  and Extensions toggles its own page with history (Back, or chat without it)
+- Hover or keyboard-focus New task or Search: its shortcut hint appears; the
+  three page destinations carry no hint
 - Click the footer bell: open or close the durable notification inbox
+- Click the footer update pill: open Settings › About at the update row. The
+  pill exists only while an update is available or downloaded
 
 ### 3.6 Accessibility
 
@@ -642,8 +670,10 @@ visually distinct from list content.
   ArrowUp/ArrowDown keyboard reordering; there is no separate grip control
 - Collapsed state: each icon has `aria-label` with session title
 - Keyboard: arrow keys navigate session list
-- Footer Settings, Plugins, and notification controls expose localized
-  accessible names and visible focus treatment
+- Sidebar destinations expose `aria-current="page"` while their own page is
+  shown, and each row is a real button with a localized name
+- Footer Settings and notification controls expose localized accessible names
+  and visible focus treatment; the update pill is a text button, not an icon
 - The profile trigger exposes `aria-haspopup="menu"` and its expanded state;
   the menu has a stable accessible relationship to the trigger
 - The notification trigger has a localized accessible name containing the
@@ -730,25 +760,21 @@ controls.
 | Project memory | row-menu editor reads and saves a compact list of titled or untitled memory cards for the exact project path; cards can be added, edited, and removed, the context is available in later chats, and it is never a higher-priority instruction |
 | Session list | exact-path matches only; no basename grouping |
 | Active group | exactly one group reflects the selected host workspace |
-| Task state | In-progress, selected, completed, and failed indicators update by session without replacing the visible transcript; precedence is in-progress, selected, then terminal outcome |
+| Project icon slot | A pinned project shows its pin, any other shows the folder (open when the group is expanded, closed when it is folded); the disclosure arrow overlays the slot while the header is hovered or the title is keyboard-focused and points left when the group is folded |
+| Folded activity hint | A folded group reports what it hides beside its actions: the neutral running ring while any child works, or the purple pending-approval dot while any child waits, with a localized accessible name. The hint hides while the header is hovered or focused so the row's own controls take its place, and returns when the window blurs. An expanded group never shows it |
+| Task state | In-progress, completed, and failed indicators update by session without replacing the visible transcript; precedence is in-progress, selected, then terminal outcome, and the selected state paints the row surface instead of drawing a glyph |
 
-### 3.10 Local profile footer contract
+### 3.10 Sidebar footer contract
 
-The expanded sidebar ends with a WorkBuddy-inspired local identity cluster.
-It borrows the compact avatar-and-actions grammar without implying a cloud
-account, subscription, or collaboration backend.
+The expanded sidebar ends with one quiet action bar: the two daily controls
+that are not lists, plus one transient chip while an update is ready.
 
 | Element | Contract |
 |---|---|
-| Footer band | `58px` high, transparent, no top separator; remains outside the scrollable project/session region |
-| Profile trigger | `44px` high, flexible width, rounded hover target; opens the profile menu |
-| User glyph | `30px` circular local-user glyph; decorative when the text label names the control |
-| Identity copy | Primary `Custom`; secondary `Local profile` or localized `本地配置`; two lines truncate independently |
-| Chevron | Trailing disclosure indicator; reflects the menu's open state without motion when reduced motion is requested |
+| Footer band | transparent band with `padding: 7px 0 2px` and no top separator, set apart by `margin-top: auto`; it remains outside the scrolling list (D297) |
+| Settings | `32px` square icon action with a localized accessible name, `aria-pressed` while Settings is shown, and the active surface while it is open |
 | Notification shortcut | Separate `32px` square Bell target with unread badge, a dot on the bell's upper-right shoulder that follows the Appearance font scale and is set off by a cut-out in the bell rather than a ring, so it reads on the glass sidebar and on the hover tile; opens the durable inbox above and to the right of the footer |
-| Profile menu | `280px` wide, bottom anchored `8px` above the footer; opaque elevated surface |
-| Identity header | Repeats the glyph and two-line local identity; non-interactive |
-| Menu actions | Divider, then Settings, Logs, and Theme in that order; Theme retains its current-value metadata |
+| Update pill | Only while an update is `available` or `downloaded`: a `24px` pill with a `5px` accent dot and `v{{version}}` text in the primary ink; activating it opens Settings › About at the update row. No version text, no checking state and no manual check live in the footer — Settings › About owns them |
 
 ---
 
@@ -1482,15 +1508,15 @@ near-zero duration. A folded group keeps its rows mounted, `aria-hidden`, and
   local view controls rather than host queries.
 - Temporary means **not bound to a project**, not ephemeral storage; these
   sessions survive restart.
-- The standalone Sessions body is a 146px window over five compact 28px rows,
-  their 1px row gaps, and the 2px label inset; it
-  scrolls internally when more rows exist. The Projects list uses the remaining
-  sidebar height and scrolls independently; neither region scrolls the footer
-  or primary navigation. Both list scrollbars use the same global 6px,
-  trackless, transparent-at-rest rule as the conversation and work-panel
-  scrollbars; the semantic-ink thumb appears when its list is hovered, focused,
-  or scrolling and remains visible while dragging, so the independent regions
-  stay available without becoming persistent visual rails.
+- The sidebar has one scroll region: the pinned section, the session section,
+  the Projects heading and the project list move together, while the
+  destinations above and the footer below stay fixed. The session section shows
+  five top-level rows and one load-more row, the project list takes the rest of
+  the scrolled height, and the empty space below the last project still belongs
+  to the project section. Every pinned row is shown without a cap. The one
+  scroller uses the same global 6px, trackless, transparent-at-rest rule as the
+  conversation and work-panel scrollbars; the semantic-ink thumb appears when it
+  is hovered, focused, or scrolling and remains visible while dragging.
 
 ---
 

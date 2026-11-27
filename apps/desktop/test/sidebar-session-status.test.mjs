@@ -107,8 +107,6 @@ test("renders semantic, shape-distinct sidebar status indicators", () => {
 
   assert.match(sidebar, /sessionSelected[\s\S]*sessionCompleted[\s\S]*sessionFailed/);
   assert.match(sidebar, /IconCheck[\s\S]*IconCircleAlert/);
-  assert.match(styles, /thread-item-status\.running::before[\s\S]*--ds-warning/);
-  assert.match(styles, /thread-item-status\.selected::before[\s\S]*--ds-accent/);
   assert.match(styles, /thread-item-status\.completed[\s\S]*--ds-success/);
   assert.match(styles, /thread-item-status\.failed[\s\S]*--ds-error/);
   assert.match(
