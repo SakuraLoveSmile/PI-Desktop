@@ -1,6 +1,6 @@
 # PI-UI-1129: sidebar restyle
 
-Status: 待体验 (built and verified locally in the request worktree; four commits are on the request branch at the user's word on 2026-11-27, this record is the fifth; task-candidate E2E passed 215 of 215 on `02a6cf268` over `27dc6b45a`; not pushed). Project: `fork-pi-desktop`. Created: 2026-11-27 (Asia/Taipei).
+Status: 已验收 (accepted by the user on 2026-11-27 after a seeded local walkthrough of the real sidebar; five commits on the request branch; task-candidate E2E passed 215 of 215 on `02a6cf268` over `27dc6b45a`; not pushed at acceptance time). Project: `fork-pi-desktop`. Created: 2026-11-27 (Asia/Taipei).
 Tier: T1 (renderer-only visible change; no IPC, Host, protocol, storage or shared-type change; the nine locale files gain two navigation keys). D654 amends D297 and the two 2026-09-16 sidebar entries.
 Baseline: `27dc6b45a8c5b5dcb2ea321deed845af378a3f25` (`origin/main`, v0.15.26 plus three merged pull requests after the handoff block's `786179c99`; the block's line anchors still resolved by symbol).
 Branch: `feat/20261127-pi-ui-1129-sidebar-restyle`.
