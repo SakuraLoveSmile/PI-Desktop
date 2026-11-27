@@ -139,6 +139,7 @@ export const de = {
     "pinnedSessions": "Angeheftet",
     "home": "Startseite",
     "newTask": "Neue Aufgabe",
+    "updateReady": "v{{version}} available",
     "newProject": "Neues Projekt",
     "projects": "Projekte",
     "plugins": "Erweiterungen",

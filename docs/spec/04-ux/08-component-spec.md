@@ -380,6 +380,11 @@ Expanded (~275px, D034/D070):
 +---------------------------+
 | [lights]             [◧] |  macOS
 | [π] PI-Desktop       [◧] |  Windows/Linux
+| [✎] New task             |
+| [⌕] Search               |
+| [◷] Scheduled            |
+| [⧉] Extensions           |
+| [⌖] Context insights     |
 | PINNED                   |
 |   • Pinned task  project-A|
 | SESSIONS         [msg+][↕]|
@@ -389,7 +394,7 @@ Expanded (~275px, D034/D070):
 |   • Project session      |
 | project-B      [>] [+] … |
 |                           |
-| [⚙][plug][bell]          [version]|
+| [⚙][bell]        [update]|
 +---------------------------+
 
 Collapsed (48px):
@@ -412,6 +417,11 @@ arrow while the header is hovered or the title is keyboard-focused. A session
 row's quick-archive and menu controls float over its right end and reserve no
 width until the row is hovered, keyboard-focused or its menu is open, so a
 resting title owns the full column.
+
+Above the list, five destination rows sit outside the scroller: New task and
+Search run the two shell actions, and Scheduled, Extensions and Context insights
+are the faces the footer used to carry. The footer below the list keeps Settings
+and the notification inbox, and shows one pill only while an update is ready.
 
 ### 3.3 Typography
 
@@ -514,8 +524,9 @@ visually distinct from list content.
   right-aligned; clicking the chip checks for updates or opens the available
   release in Settings
 - Click Collapse sidebar at the right of the header row to collapse the sidebar.
-  Global search opens from the conversation topbar, shortcuts, and application
-  menu; the expanded sidebar header does not host a search control
+  Global search opens from the sidebar's Search destination, the conversation
+  topbar, shortcuts, and the application menu; the expanded sidebar header
+  itself hosts no search control
 - Drag the expanded sidebar's right edge to adjust its width. The main pane
   reflows continuously, the press position remains anchored, and the final
   width is saved on release. Focus the edge handle and use ArrowLeft/Right,
@@ -631,9 +642,14 @@ visually distinct from list content.
   collapsed main titlebar retains an Expand sidebar icon; the work-panel
   toggle stays viewport-fixed in the window's top-right corner on every
   non-Settings route
-- Click the local profile trigger: open or close the identity menu containing
-  Settings, Logs, and Theme
+- Click a destination above the list: New task runs the topbar's New task,
+  Search opens the global search, Scheduled and Context insights switch page,
+  and Extensions toggles its own page with history (Back, or chat without it)
+- Hover or keyboard-focus New task or Search: its shortcut hint appears; the
+  three page destinations carry no hint
 - Click the footer bell: open or close the durable notification inbox
+- Click the footer update pill: open Settings › About at the update row. The
+  pill exists only while an update is available or downloaded
 
 ### 3.6 Accessibility
 
@@ -653,8 +669,10 @@ visually distinct from list content.
   ArrowUp/ArrowDown keyboard reordering; there is no separate grip control
 - Collapsed state: each icon has `aria-label` with session title
 - Keyboard: arrow keys navigate session list
-- Footer Settings, Plugins, and notification controls expose localized
-  accessible names and visible focus treatment
+- Sidebar destinations expose `aria-current="page"` while their own page is
+  shown, and each row is a real button with a localized name
+- Footer Settings and notification controls expose localized accessible names
+  and visible focus treatment; the update pill is a text button, not an icon
 - The profile trigger exposes `aria-haspopup="menu"` and its expanded state;
   the menu has a stable accessible relationship to the trigger
 - The notification trigger has a localized accessible name containing the
@@ -744,23 +762,17 @@ controls.
 | Project icon slot | A pinned project shows its pin, any other shows the folder (open when the group is expanded, closed when it is folded); the disclosure arrow overlays the slot while the header is hovered or the title is keyboard-focused and points left when the group is folded |
 | Task state | In-progress, completed, and failed indicators update by session without replacing the visible transcript; precedence is in-progress, selected, then terminal outcome, and the selected state paints the row surface instead of drawing a glyph |
 
-### 3.10 Local profile footer contract
+### 3.10 Sidebar footer contract
 
-The expanded sidebar ends with a WorkBuddy-inspired local identity cluster.
-It borrows the compact avatar-and-actions grammar without implying a cloud
-account, subscription, or collaboration backend.
+The expanded sidebar ends with one quiet action bar: the two daily controls
+that are not lists, plus one transient chip while an update is ready.
 
 | Element | Contract |
 |---|---|
-| Footer band | `58px` high, transparent, no top separator; remains outside the scrollable project/session region |
-| Profile trigger | `44px` high, flexible width, rounded hover target; opens the profile menu |
-| User glyph | `30px` circular local-user glyph; decorative when the text label names the control |
-| Identity copy | Primary `Custom`; secondary `Local profile` or localized `本地配置`; two lines truncate independently |
-| Chevron | Trailing disclosure indicator; reflects the menu's open state without motion when reduced motion is requested |
+| Footer band | transparent band with `padding: 7px 0 2px` and no top separator, set apart by `margin-top: auto`; it remains outside the scrolling list (D297) |
+| Settings | `32px` square icon action with a localized accessible name, `aria-pressed` while Settings is shown, and the active surface while it is open |
 | Notification shortcut | Separate `32px` square Bell target with unread badge, a dot on the bell's upper-right shoulder that follows the Appearance font scale and is set off by a cut-out in the bell rather than a ring, so it reads on the glass sidebar and on the hover tile; opens the durable inbox above and to the right of the footer |
-| Profile menu | `280px` wide, bottom anchored `8px` above the footer; opaque elevated surface |
-| Identity header | Repeats the glyph and two-line local identity; non-interactive |
-| Menu actions | Divider, then Settings, Logs, and Theme in that order; Theme retains its current-value metadata |
+| Update pill | Only while an update is `available` or `downloaded`: a `24px` pill with a `5px` accent dot and `v{{version}}` text in the primary ink; activating it opens Settings › About at the update row. No version text, no checking state and no manual check live in the footer — Settings › About owns them |
 
 ---
 

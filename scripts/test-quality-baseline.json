@@ -296,7 +296,7 @@
       ]
     },
     "apps/desktop/test/app-store-sidebar.test.mjs": {
-      "assertions": 48,
+      "assertions": 47,
       "cases": 8,
       "signatures": [
         "00525714aa5ad46e146d",
@@ -340,7 +340,6 @@
         "bccd6d616c8bc4f30955",
         "cb3f1693d6181777bbd9",
         "cc2dde128c5601e6935e",
-        "d07a96e29cd7cde34c8e",
         "e8224eb7cde08a4983f6",
         "ed4f6ebbbc7d2d5aee18",
         "f16f87a07880f70869a0",
@@ -6922,7 +6921,7 @@
       ]
     },
     "apps/desktop/test/sidebar-footer.test.mjs": {
-      "assertions": 21,
+      "assertions": 17,
       "cases": 4,
       "signatures": [
         "00cf2e3aafd0625e5036",
@@ -6934,17 +6933,13 @@
         "6a2f7b3d27e0d585044a",
         "6d995af98df8ed3542ec",
         "7242794fb65e245c8288",
-        "7256b551c0ecfabfbeb3",
         "819eef0dcc2fd69fc3c8",
         "81f04e718ca193e90edf",
         "8bce23d7ed918ecafd26",
         "8d28572a8afa248628a1",
-        "8da1a508e87096a9e4d4",
         "8e4856341ac330be7136",
         "9b23262cf8c73d379e1d",
         "a801c8afb06ce1b1137e",
-        "c2be1b9584bfde00d475",
-        "cdc15c277b2ae98efdf8",
         "ffa1665616a707bd3f87"
       ]
     },

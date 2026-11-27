@@ -8315,6 +8315,16 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
   网格与让位检查读取 `getBoundingClientRect()` 与 `getComputedStyle`；运行中圆环
   的探针在真实行内挂一个状态元素，因为种子套件不启动真实回合。
 
+#### E2E-LAYOUT-sidebar-nav-and-scroll
+
+- **前提条件**：构建后的桌面应用、隔离宿主与 profile；宿主预置会话，使入口行下方的列表非空；窗口宽度足以呈现三栏布局。
+- **步骤**：读取五个 `.sidebar-nav-row` 及其几何；悬停「新建任务」；统计 `.sidebar` 内所有 `data-nav`；点击「定时任务」并读取 `aria-current`；返回聊天页。
+- **预期**：恰好五个入口，顺序为新建任务、搜索、定时任务、扩展、上下文洞察；每行高 28px，图标中心在 x=24、文字左边在 x=40（相对侧栏主体左边框）。只有前两行带快捷键提示，静止时透明度 0，悬停该行时为 1。底栏不再是入口的第二个家，因此 `.sidebar` 内每个 `data-nav` 只出现一次；没有可用更新时不渲染更新胶囊。点击「定时任务」后，只有它带 `aria-current="page"`。
+- **链接规格**：`04-ux/08-component-spec.md` §3.2、§3.5、§3.6、§3.10
+- **验收**：C、D、品质
+- **里程碑**：Post-M6 desktop shell maintenance
+- **状态**：经 `pnpm test:e2e:layout` 调用 `scripts/e2e/sidebar-nav-and-scroll.mjs` 自动验证；渲染层覆盖见 `sidebar-nav-render.test.mjs` 与 `sidebar-footer-render.test.mjs`。
+
 #### E2E-LAYOUT-sidebar-settings
 
 - **前提条件**：构建后的桌面应用、隔离宿主与 profile，聊天侧栏可见。

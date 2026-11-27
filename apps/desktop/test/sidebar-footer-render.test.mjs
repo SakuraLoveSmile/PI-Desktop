@@ -11,7 +11,7 @@ import { createServer } from "vite";
 const buttons = (html) => [...html.matchAll(/<button\b[^>]*>/g)].map((match) => match[0]);
 const attribute = (tag, name) => tag.match(new RegExp(`${name}="([^"]*)"`))?.[1] ?? null;
 
-test("the sidebar footer renders its four destinations, the build chip and notifications", async () => {
+test("the sidebar footer keeps settings and notifications and shows a pill only for a ready update", async () => {
   const server = await createServer({
     root: fileURLToPath(new URL("..", import.meta.url)),
     configFile: false,
@@ -41,12 +41,9 @@ test("the sidebar footer renders its four destinations, the build chip and notif
           createElement(SidebarFooter, {
             page: "chat",
             setPage() {},
-            canNavBack: () => false,
-            navBack() {},
             updateReady: false,
-            buildLabel: "v1.2.3",
-            buildTitle: "Check for updates",
-            onBuildClick() {},
+            updateVersion: "1.2.3",
+            onUpdateClick() {},
             onBeforeNotificationsOpen() {},
             ...props,
           }),
@@ -54,24 +51,21 @@ test("the sidebar footer renders its four destinations, the build chip and notif
       );
     const html = render();
     const actions = buttons(html).filter((tag) => attribute(tag, "class")?.startsWith("footer-action"));
-    assert.deepEqual(
-      actions.map((tag) => attribute(tag, "data-nav")),
-      ["settings", "plugins", "scheduled", "context-insights"],
-    );
-    for (const action of actions) {
-      assert.ok(attribute(action, "aria-label"), "every icon-only action needs a label");
-      assert.equal(attribute(action, "aria-pressed"), "false");
-    }
+    assert.deepEqual(actions.map((tag) => attribute(tag, "data-nav")), ["settings"]);
+    assert.ok(attribute(actions[0], "aria-label"), "the icon-only action needs a label");
+    assert.equal(attribute(actions[0], "aria-pressed"), "false");
     assert.ok(html.includes("footer-notification"), "notifications stay in the footer");
-    assert.ok(html.includes("v1.2.3"));
-    assert.ok(!html.includes("footer-build-dot"));
+    assert.ok(!html.includes("sidebar-update-pill"), "no pill without a ready update");
 
     const settingsActive = render({ page: "settings" });
     const settingsAction = buttons(settingsActive).find((tag) => attribute(tag, "data-nav") === "settings");
     assert.equal(attribute(settingsAction ?? "", "aria-pressed"), "true");
 
     const updating = render({ updateReady: true });
-    assert.ok(updating.includes("footer-build-dot"));
+    const pill = buttons(updating).find((tag) => attribute(tag, "data-nav") === "build");
+    assert.ok(pill, "a ready update renders the pill");
+    assert.ok(pill.includes("sidebar-update-pill-dot") || updating.includes("sidebar-update-pill-dot"));
+    assert.ok(updating.includes("v1.2.3 available"), "the pill names the version");
   } finally {
     await server.close();
   }

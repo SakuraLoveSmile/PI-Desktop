@@ -26,6 +26,7 @@ import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 
 import { Host } from "./e2e/host.mjs";
+import { checkSidebarNavAndScroll } from "./e2e/sidebar-nav-and-scroll.mjs";
 import { checkSidebarRowStates } from "./e2e/sidebar-row-states.mjs";
 import { checkSidebarSettings } from "./e2e/sidebar-settings.mjs";
 
@@ -1940,6 +1941,7 @@ async function main() {
     );
 
     await checkSidebarRowStates({ cdp: recoveryCdp, check, waitFor, seed: sidebarSeed });
+    await checkSidebarNavAndScroll({ cdp: recoveryCdp, check, waitFor });
 
     const failed = results.filter((entry) => !entry.ok);
     console.log(

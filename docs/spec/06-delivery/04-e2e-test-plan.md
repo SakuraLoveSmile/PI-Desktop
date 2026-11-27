@@ -15592,6 +15592,29 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   `getComputedStyle`; the running-ring probe mounts a status element inside a
   real row because the seeded suite starts no live turn.
 
+#### E2E-LAYOUT-sidebar-nav-and-scroll
+
+- **Preconditions**: Built desktop with an isolated host and profile; host-seeded
+  sessions so the list below the destinations is populated; a window wide enough
+  for the three-column layout.
+- **Steps**: Read the five `.sidebar-nav-row` rows and their geometry; hover New
+  task; count every `data-nav` inside `.sidebar`; click Scheduled and read
+  `aria-current`; return to chat.
+- **Expected**: Exactly five destinations in the order New task, Search,
+  Scheduled, Extensions, Context insights, each 28px tall with its icon centred
+  on x=24 and its label at x=40 relative to the sidebar body's left border. Only
+  the first two rows carry a shortcut hint: opacity 0 at rest, 1 while the row is
+  hovered. Each `data-nav` value appears once inside the sidebar now that the
+  footer is not a second home for the destinations, and no update pill renders
+  while no update is ready. Clicking Scheduled makes it the only destination
+  with `aria-current="page"`.
+- **Specs linked**: `04-ux/08-component-spec.md` §3.2, §3.5, §3.6, §3.10
+- **Acceptance**: C, D, Quality
+- **Milestone**: Post-M6 desktop shell maintenance
+- **Status**: Automated via `pnpm test:e2e:layout` →
+  `scripts/e2e/sidebar-nav-and-scroll.mjs`, with rendered component coverage in
+  `sidebar-nav-render.test.mjs` and `sidebar-footer-render.test.mjs`.
+
 #### E2E-LAYOUT-sidebar-settings
 
 - **Preconditions**: Built desktop, isolated host/profile, visible chat sidebar.

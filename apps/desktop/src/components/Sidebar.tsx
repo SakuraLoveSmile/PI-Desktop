@@ -12,6 +12,7 @@ import {
 } from "react";
 import { TooltipButton, cx } from "./ui";
 import { SidebarFooter } from "../features/sidebar/SidebarFooter";
+import { SidebarNav } from "../features/sidebar/SidebarNav";
 import { capSidebarEntries } from "../features/sidebar/sidebar-list-cap";
 
 /** Default number of most-recent sessions shown per project group before the rest fold. */
@@ -211,6 +212,10 @@ export function Sidebar({
   onResizeCollapse,
   className,
   onAnimationEnd,
+  onNewTask,
+  onOpenSearch,
+  newTaskShortcut = "",
+  searchShortcut = "",
 }: {
   onToggleSidebar: () => void;
   sidebarToggleShortcut: string;
@@ -221,6 +226,10 @@ export function Sidebar({
   onResizeCollapse: () => void;
   className?: string;
   onAnimationEnd?: ReactAnimationEventHandler<HTMLElement>;
+  onNewTask?: () => void;
+  onOpenSearch?: () => void;
+  newTaskShortcut?: string;
+  searchShortcut?: string;
 }) {
   const { t } = useTranslation();
   const sessions = useAppStore((s) => s.sessions);
@@ -586,37 +595,17 @@ export function Sidebar({
     requestAnimationFrame(() => menuFirstItemRef.current?.focus());
   }, [sessionMenu, projectMenu, sectionMenu, sortOpen]);
 
-  // Footer utility bar: settings / plugins / notifications + build chip.
-
-  // An update only earns the accent dot once it is actionable — a pending
-  // check or a failed one keeps the chip quiet.
+  // An update earns the footer pill only once it is ready to install; a pending
+  // or failed check leaves the footer to Settings and notifications, and
+  // Settings › About owns the manual check.
   const updateReady =
     update?.status === "available" || update?.status === "downloaded";
-  const appVersion = update?.currentVersion || version?.version || "";
-  const buildLabel = updateReady
-    ? `v${update?.availableVersion ?? appVersion}`
-    : update?.status === "checking"
-      ? t("updates.checking")
-      : appVersion
-        ? `v${appVersion}`
-        : t("nav.buildUnknown");
-  const buildTitle = updateReady
-    ? t("updates.available", { version: update?.availableVersion ?? "" })
-    : t("nav.checkForUpdates");
+  const updateVersion = update?.availableVersion ?? version?.version ?? "";
 
-  // An actionable update routes to the Settings row that can act on it; any
-  // other click asks the Host for a fresh check.
-  const onBuildClick = () => {
-    if (updateReady) {
-      setSettingsAnchor("updates.title");
-      setSettingsTab("about");
-      return;
-    }
-    void (async () => {
-      try {
-        await api.updatesCheck();
-      } catch { /* ignore */ }
-    })();
+  // The pill routes to the Settings row that can act on the update.
+  const onUpdateClick = () => {
+    setSettingsAnchor("updates.title");
+    setSettingsTab("about");
   };
 
   const onMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -2582,6 +2571,17 @@ export function Sidebar({
         </div>
       </div>
 
+      <SidebarNav
+        page={page}
+        setPage={setPage}
+        canNavBack={canNavBack}
+        navBack={navBack}
+        onNewTask={onNewTask}
+        onOpenSearch={onOpenSearch}
+        newTaskShortcut={newTaskShortcut}
+        searchShortcut={searchShortcut}
+      />
+
       <div className="sidebar-body no-drag">
 
         {pinnedSessions.length > 0 ? (
@@ -2751,12 +2751,9 @@ export function Sidebar({
         <SidebarFooter
           page={page}
           setPage={setPage}
-          canNavBack={canNavBack}
-          navBack={navBack}
           updateReady={updateReady}
-          buildLabel={buildLabel}
-          buildTitle={buildTitle}
-          onBuildClick={onBuildClick}
+          updateVersion={updateVersion}
+          onUpdateClick={onUpdateClick}
           onBeforeNotificationsOpen={() => closeMenus(false)}
         />
       </div>

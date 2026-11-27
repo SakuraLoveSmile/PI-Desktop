@@ -148,6 +148,7 @@ export const ko = {
     "pinnedSessions": "고정됨",
     home: "홈",
     newTask: "새 작업",
+    updateReady: "v{{version}} available",
     newProject: "새 프로젝트",
     projects: "프로젝트",
     plugins: "확장 기능",

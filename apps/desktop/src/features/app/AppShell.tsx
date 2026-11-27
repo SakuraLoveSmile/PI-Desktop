@@ -95,6 +95,8 @@ export function AppShell() {
     retryStartup,
     startupRetrying,
     sidebarToggleShortcut,
+    newTaskShortcut,
+    searchShortcut,
     workPanelToggleTooltip,
     workPanelWidth,
   } = useAppShellRuntime();
@@ -156,6 +158,10 @@ export function AppShell() {
                 onWidthChange={handleSidebarWidthChange}
                 onWidthCommit={handleSidebarWidthCommit}
                 onResizeCollapse={handleSidebarResizeCollapse}
+                onNewTask={() => void runMenuCommand("newTask")}
+                onOpenSearch={() => setSearchOpen(true)}
+                newTaskShortcut={newTaskShortcut}
+                searchShortcut={searchShortcut}
               />
             ) : null}
 

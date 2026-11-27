@@ -944,6 +944,8 @@ export function useAppShellRuntime() {
   };
   const sidebarToggleShortcut = shortcutLabel("toggleSidebar");
   const workPanelToggleShortcut = shortcutLabel("openWorkPanel");
+  const newTaskShortcut = shortcutLabel("newTask");
+  const searchShortcut = shortcutLabel("openSearch");
   const workPanelToggleLabel = t("nav.toggleWorkPanel");
   const workPanelToggleTooltip = workPanelToggleShortcut
     ? `${workPanelToggleLabel} ${workPanelToggleShortcut}`
@@ -999,6 +1001,8 @@ export function useAppShellRuntime() {
     retryStartup,
     startupRetrying,
     sidebarToggleShortcut,
+    newTaskShortcut,
+    searchShortcut,
     workPanelToggleTooltip,
   };
 }

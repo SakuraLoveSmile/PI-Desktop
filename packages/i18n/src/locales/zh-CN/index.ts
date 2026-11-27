@@ -301,6 +301,7 @@ export const zhCN = {
     pinnedSessions: "置顶",
     home: "首页",
     newTask: "新建任务",
+    updateReady: "可更新到 v{{version}}",
     newProject: "新建项目",
     projects: "项目",
     plugins: "扩展",

@@ -306,6 +306,7 @@ export const en = {
     "pinnedSessions": "Pinned",
     home: "Home",
     newTask: "New task",
+    updateReady: "v{{version}} available",
     newProject: "New project",
     projects: "Projects",
     plugins: "Extensions",

@@ -10,8 +10,8 @@ const { usePluginBrowseState } = await import("../src/features/plugins/browse-st
 
 // Execute the actual footer handler against the real history slice. Native
 // rendering and retained composer behavior are covered by the manual UI journey.
-const source = ts.createSourceFile("SidebarFooter.tsx",
-  readFileSync(new URL("../src/features/sidebar/SidebarFooter.tsx", import.meta.url), "utf8"),
+const source = ts.createSourceFile("SidebarNav.tsx",
+  readFileSync(new URL("../src/features/sidebar/SidebarNav.tsx", import.meta.url), "utf8"),
   ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const handlers = [];
 function visit(node) {

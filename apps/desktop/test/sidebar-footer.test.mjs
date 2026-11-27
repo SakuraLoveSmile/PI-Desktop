@@ -38,7 +38,6 @@ test("footer sits on the sidebar content grid without a hairline", () => {
   // apart from the nav by `margin-top: auto` and its own padding, not a rule.
   assert.match(block, /padding:\s*7px 0 2px/);
   assert.doesNotMatch(block, /border-top/);
-  assert.match(globalStyles, /\.footer-build\s*\{[^}]*padding:\s*5px 8px/s);
 });
 
 test("footer action buttons share the notification trigger's hit target", () => {
@@ -57,7 +56,4 @@ test("build chip surfaces the version and only dots an actionable update", () =>
   // An actionable update routes to the Settings row that can act on it.
   assert.match(sidebarSource, /setSettingsAnchor\("updates\.title"\)/);
   assert.match(sidebarSource, /setSettingsTab\("about"\)/);
-  assert.match(sidebarSource, /api\.updatesCheck\(\)/);
-  const dot = globalStyles.match(/\.footer-build-dot\s*\{[^}]+\}/)?.[0] ?? "";
-  assert.match(dot, /background:\s*var\(--ds-accent\)/);
 });

@@ -101,6 +101,7 @@ import {
   Smile,
   Sparkles,
   Square,
+  SquarePen,
   Star,
   Sun,
   Target,
@@ -191,6 +192,7 @@ export const IconGlobe = icon(Globe2);
 export const IconBranch = icon(GitFork);
 export const IconTerminal = icon(Terminal);
 export const IconPencil = icon(PencilLine);
+export const IconSquarePen = icon(SquarePen);
 export const IconWrench = icon(Wrench);
 export const IconPullRequest = icon(GitPullRequestArrow);
 export const IconClock = icon(Clock);

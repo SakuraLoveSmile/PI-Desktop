@@ -141,6 +141,7 @@ export const zhTW = {
     pinnedSessions: "釘選",
     home: "首頁",
     newTask: "新建任務",
+    updateReady: "v{{version}} available",
     newProject: "新建專案",
     projects: "專案",
     plugins: "擴充套件",

@@ -138,6 +138,7 @@ export const ptBR = {
     pinnedSessions: "Fixadas",
     home: "Início",
     newTask: "Nova tarefa",
+    updateReady: "v{{version}} available",
     newProject: "Novo projeto",
     projects: "Projetos",
     plugins: "Extensões",

@@ -148,6 +148,7 @@ export const tr = {
     "pinnedSessions": "Sabitlenmiş",
     home: "Ana sayfa",
     newTask: "Yeni görev",
+    updateReady: "v{{version}} available",
     newProject: "Yeni proje",
     projects: "Projeler",
     plugins: "Uzantılar",

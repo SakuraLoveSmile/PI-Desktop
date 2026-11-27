@@ -139,6 +139,7 @@ export const fr = {
     "pinnedSessions": "Épinglées",
     "home": "Accueil",
     "newTask": "Nouvelle tâche",
+    "updateReady": "v{{version}} available",
     "newProject": "Nouveau projet",
     "projects": "Projets",
     "plugins": "Extensions",
