@@ -1,6 +1,6 @@
 # PI-TEST-1131: two Electron suites and the session-summary side call
 
-Status: 待体验 (fixed and verified locally in the request worktree; committed on the request branch at the user's word on 2026-11-27; both suites pass on this HEAD over `27dc6b45a`; not pushed). Project: `fork-pi-desktop`. Created: 2026-11-27 (Asia/Taipei).
+Status: 已验收 (accepted by the user on 2026-11-27; committed on the request branch; both suites pass on this HEAD over `27dc6b45a`; not pushed at acceptance time). Project: `fork-pi-desktop`. Created: 2026-11-27 (Asia/Taipei).
 Tier: T1 (test infrastructure only; no product, IPC, Host, protocol, storage or i18n change).
 Baseline: `27dc6b45a8c5b5dcb2ea321deed845af378a3f25` (`origin/main`).
 Branch: `chore/20261127-pi-test-1131-e2e-side-calls`.
