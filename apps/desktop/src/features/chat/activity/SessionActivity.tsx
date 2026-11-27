@@ -11,10 +11,12 @@ import { mergeActivitySubagents } from "../../../stores/runtime/session-activity
 import { useTeamSnapshot } from "../../../hooks/useTeamSnapshot";
 import { localTeamSessionId } from "../../../lib/team-presentation";
 import { resolvePlanArtifactPath } from "../../../lib/plan-artifact";
-import { browserPluginTab, fileWorkPanelTab, goalReportWorkPanelTab, subagentWorkPanelTab, teamWorkPanelTab, toolWorkPanelTab } from "../../../lib/work-panel-tabs";
+import { browserPluginTab, fileWorkPanelTab, goalReportWorkPanelTab, panoramaWorkPanelTab, subagentWorkPanelTab, teamWorkPanelTab, toolWorkPanelTab } from "../../../lib/work-panel-tabs";
 import { openContextInsights } from "../../context-entry/open-context-insights";
 import { activityPlans, activityResources, activitySubagents } from "./session-activity-model";
 import { SessionActivityRail, type ActivityRailItem } from "./SessionActivityRail";
+import { ActivityTeamTasksSection } from "./ActivityTeamTasksSection";
+import { ActivityTodosSection } from "./ActivityTodosSection";
 import { BackgroundProcessDetails } from "./BackgroundProcessDetails";
 import { SessionSkillSuggestions } from "./SessionSkillSuggestions";
 import { sessionSkillSuggestions } from "./session-skill-suggestions";
@@ -48,6 +50,9 @@ export function SessionActivity({ sessionId, messages, visible, rangeLimited }: 
   const supported = Boolean(session && (session.source ?? "desktop") === "desktop" && !sessionId.startsWith("remote:") && !sessionId.startsWith("native-pi:"));
   const teamId = localTeamSessionId(session);
   const team = useTeamSnapshot(teamId, { enabled: visible && supported && Boolean(teamId) });
+  // The checklist and the board summary each decide their own rows; only their counts are needed here.
+  const todoCount = useAppStore((state) => state.sessionTodos[sessionId]?.todos.length ?? 0);
+  const teamTaskCount = team.snapshot ? team.snapshot.tasks.filter((task) => !task.deleted).length : 0;
   const processes = useBackgroundProcessList(sessionId, visible && supported);
   const serverStop = useActivityServerStop(sessionId, processes.refresh, (id) => {
     const command = processes.processes.find((process) => process.id === id)?.command;
@@ -125,6 +130,10 @@ export function SessionActivity({ sessionId, messages, visible, rangeLimited }: 
       onOpen: () => open(sessionId, teamWorkPanelTab(teamId, { kind: "member", memberSessionId: member.memberSessionId })),
     });
   }
+  // A Team reads its own panorama; any other session opens the sub-agent panorama tab, as the Overview page did.
+  const openPanorama = () => open(sessionId, teamId
+    ? teamWorkPanelTab(teamId, { kind: "panorama" })
+    : panoramaWorkPanelTab());
   const locate = (messageId: string) => () => {
     if (visible && useAppStore.getState().activeSessionId === sessionId) {
       void useAppStore.getState().navigateTranscript({ sessionId, messageId, query: "" });
@@ -197,6 +206,10 @@ export function SessionActivity({ sessionId, messages, visible, rangeLimited }: 
     agentsNotice={aggregateNotice} resourcesNotice={aggregateNotice}
     pendingNotices={{ activity: Boolean(aggregate.loading && !aggregate.error && !aggregate.snapshot?.limited), team: Boolean(team.loading && !team.snapshot && !team.error) }}
     suggestionsHaveRows={resources.references.skills.length > 0 || mcpTools.length > 0 || recordedSuggestions.length > 0}
+    todos={{ count: todoCount, node: <ActivityTodosSection sessionId={sessionId} visible={visible} /> }}
+    teamTasks={teamId ? { count: teamTaskCount,
+      node: <ActivityTeamTasksSection sessionId={sessionId} teamSessionId={teamId} visible={visible} /> } : undefined}
+    onOpenPanorama={subagents.length > 0 ? openPanorama : undefined}
     environment={workspace.environment} contextUsage={workspace.context} changes={workspace.changes} summary={summary}
     onOpenServerAddress={(url) => open(sessionId, browserPluginTab(url))} onStopServer={(id) => void serverStop.stop(id)} stoppingServers={serverStop.stopping}
     onOpenContext={() => openContextInsights(sessionId, open)} onOpenReview={() => open(sessionId, toolWorkPanelTab("review"))}

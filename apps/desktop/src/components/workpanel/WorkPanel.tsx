@@ -55,6 +55,7 @@ import { TeamWorkPanelSurface } from "./team/TeamWorkPanelSurface";
 import { teamTabIcon, teamTabLabel } from "./team/team-work-panel-tab";
 import { ContextInsightsDashboard } from "../../features/context-insights/ContextInsightsDashboard";
 import { OverviewTab } from "./OverviewTab";
+import { SubagentPanorama } from "./SubagentPanorama";
 import {
   MAIN_PANE_MIN_WIDTH,
   WORK_PANEL_COMPACT_MIN_WIDTH,
@@ -75,6 +76,7 @@ const TAB_ICONS = {
   subagent: IconBot,
   goalReport: IconCheckCheck,
   team: IconUsers,
+  panorama: IconMap,
 } as const;
 
 type WorkPanelResizeState = {
@@ -132,6 +134,7 @@ function tabLabel(
   if (tab.kind === "subagent") return tab.label ?? t("panel.tabs.subagent");
   if (tab.kind === "goalReport") return tab.label ?? t("panel.tabs.goalReport");
   if (tab.kind === "team") return teamTabLabel(tab, t);
+  if (tab.kind === "panorama") return t("team.panoramaTitle");
   if (tab.kind !== "file") return t(`panel.tabs.${tab.kind}`);
   const path = tab.resource ?? "";
   return path.split("/").filter(Boolean).pop() || t("panel.tabs.file");
@@ -979,6 +982,17 @@ export function WorkPanel({
               aria-labelledby={`work-panel-tab-${activeTab.id}`}
             >
               <OverviewTab />
+            </div>
+          )}
+          {activeTab?.kind === "panorama" && activeSessionId && (
+            <div
+              key={activeTab.id}
+              id={`work-panel-surface-${activeTab.id}`}
+              className="work-panel-tabpane"
+              role="tabpanel"
+              aria-labelledby={`work-panel-tab-${activeTab.id}`}
+            >
+              <SubagentPanorama sessionId={activeSessionId} />
             </div>
           )}
           {activeTab?.kind === "subagent" && (

@@ -5049,7 +5049,7 @@ available. Missing preferences retain Detailed.
 
 ### 13.4 Session activity rail
 
-The accepted right rail is a stack of sections (Goal, Plan, Live status, Servers,
+The accepted right rail is a stack of sections (Goal, Plan, Todos, Team tasks, Live status, Servers,
 Environment, Context, Artifacts, Skills & MCP, Changes) drawn without a stroked
 frame (D297) apart from the one hairline between sections (D645). It follows the
 approved canvas. A section
@@ -5070,7 +5070,26 @@ they stay in its tooltip and accessible name. Row actions (open, locate, copy
 path, details) overlay the row's trailing edge on hover or keyboard focus and
 reserve no width. Transcript agents retain their avatar.
 
-An empty group or section is left out. Goal, Plan, Live status, Servers, Artifacts
+Todos and Team tasks are sections of their own between Plan and Live status. Todos
+lists every todo the session recorded, one line each, and never truncates the
+list: a finished row draws a check, the row in progress a spinner, a dropped row a
+slash and anything else a circle, and the row's title and hidden text name the
+state. Its heading carries the count that leaves cancelled work out (Todos 3/5).
+Team tasks is a Team session's board summary: the heading carries the same count,
+a Board action opens the board, and the body shows a 4px completion bar with the
+count, then at most six rows chosen by the board's own rule (failed, in progress,
+waiting, pending, completed, cancelled; ties keep board order). A row draws the
+state glyph (work in progress spins), the numbered task, the state word and the
+owning role's word, never an avatar, and opens that task. A saved section order
+keeps both where the person put them; an order that never saw them puts them right
+after Plan.
+
+A session with sub-agents carries View panorama at the trailing edge of its
+sub-agents heading: a Team session opens the Team's panorama, and any other
+session opens a sub-agent panorama tab, which draws the session at the root with
+each delegation below it. The entry is absent when the session delegated nothing.
+
+An empty group or section is left out. Goal, Plan, Todos, Team tasks, Live status, Servers, Artifacts
 and Skills & MCP each appear only when they hold rows or a notice that has something
 to say (a notice that only says data is still loading never opens an empty
 group); a rail with nothing else to list keeps Live status with one hint line

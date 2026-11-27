@@ -2303,6 +2303,11 @@ sklm: {
       server: { stop: "{{name}} 중지", open: "{{address}} 열기", stopFailed: "{{name}}을(를) 중지하지 못했습니다." },
       summary: { title: "세션 요약", updated: "{{time}}에 업데이트됨", refresh: "세션 요약 다시 생성", expand: "펼치기", collapse: "접기", refreshFailed: "세션 요약을 업데이트하지 못했습니다." },
       goals: "목표",
+      todos: "Todos {{completed}}/{{total}}",
+      todosLabel: "Todos",
+      teamTasks: "Team tasks {{completed}}/{{total}}",
+      teamTasksLabel: "Team tasks",
+      teamTasksBoard: "Board",
       sections: {
         grip: "섹션 이동: {{name}}",
         gripTooltip: "끌어서 순서를 바꾸거나 ↑ ↓ 키를 누르세요",

@@ -2540,6 +2540,11 @@ sklm: {
       server: { stop: "停止 {{name}}", open: "打开 {{address}}", stopFailed: "无法停止 {{name}}。" },
       summary: { title: "会话总结", updated: "更新于 {{time}}", refresh: "重新生成会话总结", expand: "展开", collapse: "收起", refreshFailed: "无法更新会话总结。" },
       goals: "目标",
+      todos: "待办 {{completed}}/{{total}}",
+      todosLabel: "待办",
+      teamTasks: "团队任务 {{completed}}/{{total}}",
+      teamTasksLabel: "团队任务",
+      teamTasksBoard: "看板",
       sections: {
         grip: "移动分区：{{name}}",
         gripTooltip: "拖动调整顺序，或按 ↑ ↓",

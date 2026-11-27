@@ -196,9 +196,14 @@ test("a row's status spins while it runs, shows a check once done and is written
 });
 
 test("the rail's visibility follows the content: notices count, loading hints and skill rows do not decide a section", () => {
-  const none = { goals: 0, plans: 0, agents: 0, teamMembers: 0, processes: 0, outputs: 0, sources: 0, processesNotice: false, teamNotice: false,
+  const none = { goals: 0, plans: 0, todos: 0, teamTasks: 0, agents: 0, teamMembers: 0, processes: 0, outputs: 0, sources: 0, processesNotice: false, teamNotice: false,
     agentsNotice: false, resourcesNotice: false, rangeNotice: false, suggestions: false, suggestionsHaveRows: false };
-  assert.deepEqual(activityRailVisibility(none), { goals: false, plans: false, live: true, artifacts: false, skills: false, team: false, processes: false, emptyHint: true });
+  assert.deepEqual(activityRailVisibility(none), { goals: false, plans: false, todos: false, teamTasks: false, live: true, artifacts: false,
+    skills: false, team: false, processes: false, emptyHint: true });
+  const todosOnly = activityRailVisibility({ ...none, todos: 3 });
+  assert.deepEqual([todosOnly.todos, todosOnly.live, todosOnly.emptyHint], [true, false, false]);
+  const boardOnly = activityRailVisibility({ ...none, teamTasks: 2 });
+  assert.deepEqual([boardOnly.teamTasks, boardOnly.live, boardOnly.emptyHint], [true, false, false]);
   const withTeam = activityRailVisibility({ ...none, teamMembers: 2 });
   assert.deepEqual([withTeam.live, withTeam.team, withTeam.processes, withTeam.emptyHint], [true, true, false, false]);
   const processNotice = activityRailVisibility({ ...none, processesNotice: true });

@@ -2288,6 +2288,11 @@ sklm: {
       server: { stop: "Detener {{name}}", open: "Abrir {{address}}", stopFailed: "No se pudo detener {{name}}." },
       summary: { title: "Resumen de la sesión", updated: "Actualizado {{time}}", refresh: "Regenerar el resumen de la sesión", expand: "Ampliar", collapse: "Contraer", refreshFailed: "No se pudo actualizar el resumen de la sesión." },
       goals: "Objetivo",
+      todos: "Todos {{completed}}/{{total}}",
+      todosLabel: "Todos",
+      teamTasks: "Team tasks {{completed}}/{{total}}",
+      teamTasksLabel: "Team tasks",
+      teamTasksBoard: "Board",
       sections: {
         grip: "Mover sección: {{name}}",
         gripTooltip: "Arrastra para reordenar o pulsa ↑ ↓",

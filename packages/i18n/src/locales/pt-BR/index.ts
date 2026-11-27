@@ -2239,6 +2239,11 @@ export const ptBR = {
       server: { stop: "Parar {{name}}", open: "Abrir {{address}}", stopFailed: "Não foi possível parar {{name}}." },
       summary: { title: "Resumo da sessão", updated: "Atualizado em {{time}}", refresh: "Gerar o resumo da sessão novamente", expand: "Expandir", collapse: "Recolher", refreshFailed: "Não foi possível atualizar o resumo da sessão." },
       goals: "Meta",
+      todos: "Todos {{completed}}/{{total}}",
+      todosLabel: "Todos",
+      teamTasks: "Team tasks {{completed}}/{{total}}",
+      teamTasksLabel: "Team tasks",
+      teamTasksBoard: "Board",
       sections: {
         grip: "Mover seção: {{name}}",
         gripTooltip: "Arraste para reordenar ou pressione ↑ ↓",

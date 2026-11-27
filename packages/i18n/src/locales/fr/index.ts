@@ -2287,6 +2287,11 @@ sklm: {
       server: { stop: "Arrêter {{name}}", open: "Ouvrir {{address}}", stopFailed: "Impossible d'arrêter {{name}}." },
       summary: { title: "Résumé de la session", updated: "Mis à jour {{time}}", refresh: "Régénérer le résumé de la session", expand: "Développer", collapse: "Réduire", refreshFailed: "Impossible de mettre à jour le résumé de la session." },
       goals: "Objectif",
+      todos: "Todos {{completed}}/{{total}}",
+      todosLabel: "Todos",
+      teamTasks: "Team tasks {{completed}}/{{total}}",
+      teamTasksLabel: "Team tasks",
+      teamTasksBoard: "Board",
       sections: {
         grip: "Déplacer la section : {{name}}",
         gripTooltip: "Faites glisser pour réorganiser, ou appuyez sur ↑ ↓",

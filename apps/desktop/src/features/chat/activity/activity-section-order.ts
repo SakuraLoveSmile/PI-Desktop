@@ -1,10 +1,12 @@
 /** The activity rail's sections in their default order. A new section joins this tuple where it should sit by default. */
-export const ACTIVITY_SECTION_IDS = ["goals", "plans", "live", "server", "environment", "context", "artifacts", "skills", "changes"] as const;
+export const ACTIVITY_SECTION_IDS = ["goals", "plans", "todos", "teamTasks", "live", "server", "environment", "context", "artifacts", "skills", "changes"] as const;
 export type ActivitySectionId = (typeof ACTIVITY_SECTION_IDS)[number];
 
 export const ACTIVITY_SECTION_LABEL_KEYS: Record<ActivitySectionId, string> = {
   goals: "panel.activity.goals",
   plans: "panel.activity.plans",
+  todos: "panel.activity.todosLabel",
+  teamTasks: "panel.activity.teamTasksLabel",
   live: "panel.activity.liveStatus",
   server: "panel.activity.servers",
   environment: "panel.activity.environment",

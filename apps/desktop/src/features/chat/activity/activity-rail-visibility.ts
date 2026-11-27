@@ -1,6 +1,8 @@
 /** What the rail has to show, as counts and flags; the notices are the ones that matter (a "still loading" hint is not one). */
 export type ActivityRailContent = {
   goals: number; plans: number; agents: number; teamMembers: number; processes: number; outputs: number; sources: number;
+  /** The session checklist and the Team board summary each open a section of their own. */
+  todos: number; teamTasks: number;
   /** Running processes that announced a local address; the Servers section lists them apart from the processes. */
   servers: number;
   /** An unsupported host, a failed process list or an open process detail: shown in place of process rows. */
@@ -17,7 +19,7 @@ export type ActivityRailContent = {
 };
 
 export type ActivityRailVisibility = {
-  goals: boolean; plans: boolean; live: boolean; artifacts: boolean; skills: boolean;
+  goals: boolean; plans: boolean; todos: boolean; teamTasks: boolean; live: boolean; artifacts: boolean; skills: boolean;
   team: boolean; processes: boolean;
   /** Nothing to show anywhere: the live section stays, with one line saying what will appear in it. */
   emptyHint: boolean;
@@ -29,9 +31,11 @@ export function activityRailVisibility(content: ActivityRailContent): ActivityRa
   const processes = content.processes > 0 || content.processesNotice;
   const live = content.agents > 0 || team || processes || content.agentsNotice || content.rangeNotice;
   const artifacts = content.outputs > 0 || content.sources > 0 || content.resourcesNotice;
-  const anything = content.goals > 0 || content.plans > 0 || content.servers > 0 || live || artifacts || (content.suggestions && content.suggestionsHaveRows);
+  const anything = content.goals > 0 || content.plans > 0 || content.todos > 0 || content.teamTasks > 0
+    || content.servers > 0 || live || artifacts || (content.suggestions && content.suggestionsHaveRows);
   return {
-    goals: content.goals > 0, plans: content.plans > 0, live: live || !anything, artifacts, skills: content.suggestions,
+    goals: content.goals > 0, plans: content.plans > 0, todos: content.todos > 0, teamTasks: content.teamTasks > 0,
+    live: live || !anything, artifacts, skills: content.suggestions,
     team, processes, emptyHint: !anything,
   };
 }

@@ -2366,6 +2366,11 @@ sklm: {
       server: { stop: "停止 {{name}}", open: "開啟 {{address}}", stopFailed: "無法停止 {{name}}。" },
       summary: { title: "會話總結", updated: "更新於 {{time}}", refresh: "重新產生會話總結", expand: "展開", collapse: "收合", refreshFailed: "無法更新會話總結。" },
       goals: "目標",
+      todos: "Todos {{completed}}/{{total}}",
+      todosLabel: "Todos",
+      teamTasks: "Team tasks {{completed}}/{{total}}",
+      teamTasksLabel: "Team tasks",
+      teamTasksBoard: "Board",
       sections: {
         grip: "移動區塊：{{name}}",
         gripTooltip: "拖曳調整順序，或按 ↑ ↓",

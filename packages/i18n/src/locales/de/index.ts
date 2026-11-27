@@ -2290,6 +2290,11 @@ sklm: {
       server: { stop: "{{name}} beenden", open: "{{address}} öffnen", stopFailed: "{{name}} konnte nicht beendet werden." },
       summary: { title: "Sitzungszusammenfassung", updated: "Aktualisiert {{time}}", refresh: "Sitzungszusammenfassung neu erstellen", expand: "Erweitern", collapse: "Einklappen", refreshFailed: "Die Sitzungszusammenfassung konnte nicht aktualisiert werden." },
       goals: "Ziel",
+      todos: "Todos {{completed}}/{{total}}",
+      todosLabel: "Todos",
+      teamTasks: "Team tasks {{completed}}/{{total}}",
+      teamTasksLabel: "Team tasks",
+      teamTasksBoard: "Board",
       sections: {
         grip: "Bereich verschieben: {{name}}",
         gripTooltip: "Zum Umsortieren ziehen oder ↑ ↓ drücken",

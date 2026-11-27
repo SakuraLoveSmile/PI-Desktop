@@ -2293,6 +2293,11 @@ sklm: {
       server: { stop: "{{name}} durdur", open: "{{address}} adresini aç", stopFailed: "{{name}} durdurulamadı." },
       summary: { title: "Oturum özeti", updated: "Güncellendi: {{time}}", refresh: "Oturum özetini yeniden oluştur", expand: "Genişlet", collapse: "Daralt", refreshFailed: "Oturum özeti güncellenemedi." },
       goals: "Hedef",
+      todos: "Todos {{completed}}/{{total}}",
+      todosLabel: "Todos",
+      teamTasks: "Team tasks {{completed}}/{{total}}",
+      teamTasksLabel: "Team tasks",
+      teamTasksBoard: "Board",
       sections: {
         grip: "Bölümü taşı: {{name}}",
         gripTooltip: "Sıralamak için sürükleyin veya ↑ ↓ tuşlarına basın",

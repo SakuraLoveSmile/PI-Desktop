@@ -7,7 +7,8 @@ export type WorkPanelTabKind =
   | "plugin"
   | "subagent"
   | "goalReport"
-  | "team";
+  | "team"
+  | "panorama";
 
 export type TeamWorkPanelTarget = {
   kind: "aggregate" | "board" | "panorama" | "task" | "member";
@@ -73,6 +74,14 @@ export function emptyWorkPanelContext(): WorkPanelContext {
 /** The session-scoped summary shown before resource and tool tabs. */
 export function overviewWorkPanelTab(resource?: string): WorkPanelTab {
   return { id: "overview", kind: "overview", ...(resource ? { resource } : {}) };
+}
+
+/**
+ * The session's sub-agent panorama as its own tab: one picture of what the session delegated, opened from the
+ * activity rail once the rail can no longer sit beside the chat.
+ */
+export function panoramaWorkPanelTab(): WorkPanelTab {
+  return { id: "panorama", kind: "panorama" };
 }
 
 export function switchWorkPanelContextState(
@@ -282,7 +291,7 @@ export function isKnownWorkPanelTab(tab: WorkPanelTab): boolean {
     (tab.kind === "context" || tab.kind === "overview" || tab.kind === "new" || tab.kind === "review" ||
       tab.kind === "file" || tab.kind === "plugin" ||
       tab.kind === "subagent" || tab.kind === "goalReport" ||
-      tab.kind === "team")
+      tab.kind === "team" || tab.kind === "panorama")
   );
 }
 
