@@ -76,6 +76,8 @@ function existingExpertProposal(reason) {
     presentation: { role: "researcher", displayName: "Alex" },
   }] };
 }
+/** Session-summary side calls (D649) that should not happen in this suite. */
+const summaryCalls = [];
 const providerServer = createServer(async (req, res) => {
   try {
     let bodyText = "";
@@ -114,6 +116,20 @@ const providerServer = createServer(async (req, res) => {
     const titleSystemPrompt = messages.find((message) => message.role === "system")?.content;
     const isTitleRequest = typeof titleSystemPrompt === "string" &&
       titleSystemPrompt.includes("descriptive session title summarizing the conversation");
+    // D649's summary one-shot wraps the transcript in <conversation> and carries
+    // no tools. Seeding autoSummarizeSessions: false keeps it out of this
+    // journey; if it still arrives, answer it here and let the assertion at the
+    // end of the journey name the cause instead of a Team branch misreading it.
+    const summaryRequest = typeof titleSystemPrompt === "string" &&
+      titleSystemPrompt.includes("status note shown at the top of a coding session");
+    if (summaryRequest) {
+      summaryCalls.push({ tools: (request.tools ?? []).length });
+      const base = { id: "chatcmpl-summary", object: "chat.completion.chunk", created: 1, model: request.model };
+      res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
+      res.write(`data: ${JSON.stringify({ ...base, choices: [{ index: 0, delta: { role: "assistant", content: "Fixture status note." }, finish_reason: null }] })}\n\n`);
+      res.end("data: [DONE]\n\n");
+      return;
+    }
     if (!isTitleRequest && toolNames.includes("declare_team_strategy")) {
       for (const name of ["Task", "TaskWait", "TaskList", "TaskStop", "SessionTask"]) {
         assert.equal(toolNames.includes(name), false, `Team exposed ${name}`);
@@ -1107,6 +1123,10 @@ try {
     defaultModelId: "team-fixture",
     defaultMode: "agent",
     defaultPermissionMode: "auto",
+    // The session-activity summary (D649) is a second, tool-free model call on
+    // the session's own provider; this journey is about Team orchestration, so
+    // it runs with that feature off and asserts below that no such call appears.
+    autoSummarizeSessions: false,
   });
   const { session: lead } = await host.call("session.create", {
     title: "New Task",
@@ -1739,6 +1759,8 @@ try {
   assert.equal(titleRequests.length, 3, "renderer reload must not duplicate title requests");
   console.log("PASS Chinese Team presentation: compact progress and identities survive renderer reload without another title request");
   if (process.env.PI_E2E_TEAM_CORE_ONLY !== "1") await verifyLongTeamProgress(sendCdp, evaluate, invoke, lead.id);
+  assert.equal(summaryCalls.length, 0,
+    `the journey must run with autoSummarizeSessions: false; saw ${JSON.stringify(summaryCalls)}`);
   }
 } catch (error) {
   if (socket?.readyState === 1 && lastSendCdp) {

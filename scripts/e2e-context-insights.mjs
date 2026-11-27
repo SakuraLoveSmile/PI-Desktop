@@ -59,6 +59,8 @@ async function freePort() {
 
 async function readFixtureServer(stubPort) {
   const requests = [];
+  /** D649 summary side calls: recorded so the journey can assert it saw none. */
+  const summaryRequests = [];
   let release;
   const gate = new Promise((done) => { release = done; });
   const server = createServer(async (req, res) => {
@@ -69,6 +71,21 @@ async function readFixtureServer(stubPort) {
         res.writeHead(404); res.end("{}"); return;
       }
       const payload = JSON.parse(raw);
+      const systemPrompt = String(
+        (payload.messages ?? []).find((message) => message.role === "system")?.content ?? "",
+      );
+      if (systemPrompt.includes("status note shown at the top of a coding session")) {
+        // The activity summary is a tool-free one-shot; this journey seeds
+        // autoSummarizeSessions: false, so it must not reach the provider. If it
+        // does, answer it plainly and let the check below name the regression
+        // rather than counting it as an agent step.
+        summaryRequests.push({ tools: (payload.tools ?? []).length });
+        const base = { id: "chatcmpl-context-summary", object: "chat.completion.chunk", created: 1, model: payload.model };
+        res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
+        res.write(`data: ${JSON.stringify({ ...base, choices: [{ index: 0, delta: { role: "assistant", content: "Fixture status note." }, finish_reason: null }] })}\n\n`);
+        res.end("data: [DONE]\n\n");
+        return;
+      }
       requests.push(payload);
       const lastUser = payload.messages.findLastIndex((message) => message.role === "user");
       const readDone = payload.messages.slice(lastUser + 1).some((message) => message.role === "tool");
@@ -91,7 +108,7 @@ async function readFixtureServer(stubPort) {
     } catch (error) { res.writeHead(500); res.end(JSON.stringify({ error: { message: error.message } })); }
   });
   await new Promise((done, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", done); });
-  return { port: server.address().port, requests, release, close: () => new Promise((done) => { release(); server.close(done); }) };
+  return { port: server.address().port, requests, summaryRequests, release, close: () => new Promise((done) => { release(); server.close(done); }) };
 }
 
 async function seed(hostBin) {
@@ -105,7 +122,16 @@ async function seed(hostBin) {
       apiStyle: "chat_completions", authKind: "api_key", secretValue: "sk-context-fixture-only",
       models: [{ id: "context-stub", contextWindow: 128000, maxTokens: 4096, thinkingLevels: ["off"] }], defaultModelId: "context-stub",
     });
-    await host.call("settings.set", { language: "en", defaultProviderId: provider.provider?.id ?? provider.id, defaultModelId: "context-stub", defaultMode: "agent", autoGenerateTitle: false });
+    await host.call("settings.set", {
+    language: "en",
+    defaultProviderId: provider.provider?.id ?? provider.id,
+    defaultModelId: "context-stub",
+    defaultMode: "agent",
+    autoGenerateTitle: false,
+    // This journey counts agent requests one by one; D649's summary one-shot
+    // would add a provider call that is not an agent step.
+    autoSummarizeSessions: false,
+  });
   } finally { await host.stop(); }
 }
 
@@ -285,6 +311,11 @@ async function run() {
   durable = await until(async () => { const value = await snapshot(); return value.requests.length === 2 && value.requests.every((request) => request.status === "completed" && request.usage) && value; }, "settled requests persisted");
   const last = durable.requests.at(-1);
   check("Read user path records two completed provider requests", fixture.requests.length === 2 && durable.requests.map((request) => request.step).join(",") === "1,2");
+  check(
+    "the journey runs without a session-summary side call",
+    fixture.summaryRequests.length === 0,
+    `autoSummarizeSessions is seeded off; saw ${JSON.stringify(fixture.summaryRequests)}`,
+  );
   check("captured provider payload matches the actual dispatched messages and schemas", durable.requests.every((request, index) => {
     if (request.captureSource !== "provider-payload" || !request.providerPayload || request.providerPayload.truncated) return false;
     const captured = JSON.parse(request.providerPayload.content);
