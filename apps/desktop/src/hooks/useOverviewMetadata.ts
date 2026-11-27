@@ -155,12 +155,15 @@ export function createOverviewMetadataController(
   return { start, refresh, dispose };
 }
 
-/** Refresh canonical totals without replacing a paginated transcript. */
-export function useOverviewMetadata(sessionId: string | null | undefined) {
+/**
+ * Refresh canonical totals without replacing a paginated transcript. Only a summary that is actually on screen reads
+ * metadata, so a retained pane whose rail is hidden neither polls nor reports an error.
+ */
+export function useOverviewMetadata(sessionId: string | null | undefined, enabled = true) {
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     setError(null);
-    if (!sessionId) return;
+    if (!sessionId || !enabled) return;
     const controller = createOverviewMetadataController(sessionId, {
       getSession: api.getSession,
       getCurrentSession: () => useAppStore.getState().sessions.find((session) => session.id === sessionId),
@@ -188,6 +191,6 @@ export function useOverviewMetadata(sessionId: string | null | undefined) {
       onError: setError,
     });
     return controller.start();
-  }, [sessionId]);
+  }, [sessionId, enabled]);
   return { error };
 }

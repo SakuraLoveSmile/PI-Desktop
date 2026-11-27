@@ -165,7 +165,10 @@ export async function sessionActivitySummaryProbe() {
     // --- The card: first in the rail, above Needs attention, the canvas's look ----------------------------------------------
     const plate = card()!;
     const attention = rail()!.querySelector(".session-activity-attention")!;
-    check(rail()!.firstElementChild === plate && Boolean(plate.compareDocumentPosition(attention) & Node.DOCUMENT_POSITION_FOLLOWING), "the card is the first child of the rail, above Needs attention");
+    // The stale-metadata notice may sit above the card, but nothing else does: the card leads everything the rail
+    // renders after it, and the summary is never below Needs attention or the sections.
+    const plateIndex = [...rail()!.children].indexOf(plate);
+    check(plateIndex === 0 || [...rail()!.children].slice(0, plateIndex).every((node) => node.getAttribute("role") === "status"), "the card leads the rail, above Needs attention and the sections");
     check(plate.closest("[data-activity-section]") === null && plate.querySelector(".session-activity-grip") === null, "the card is pinned: no section, no grip");
     check(plate.getAttribute("aria-label") === "Session summary" && refreshButton()?.getAttribute("aria-label") === "Regenerate session summary", "the card and its control are named");
     const look = getComputedStyle(plate);

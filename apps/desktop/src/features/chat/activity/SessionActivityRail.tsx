@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { BackgroundProcessSummary } from "@pi-desktop/shared";
-import { IconCircleAlert, IconInfo, IconRefresh, IconTerminal } from "../../../components/icons";
+import { IconArrowUpRight, IconCircleAlert, IconInfo, IconRefresh, IconTerminal } from "../../../components/icons";
 import { Button, TooltipButton } from "../../../components/ui";
 import { subagentTimingIsLive } from "./subagent-row-presentation";
 import { useSubagentClock } from "./use-subagent-clock";
@@ -44,6 +44,13 @@ export type SessionActivityRailProps = {
   onOpenContext?: () => void; onOpenReview?: () => void;
   /** The model-written session summary, pinned above everything else; there is no card without one. */
   summary?: ActivitySummary;
+  /** The session checklist and the Team board summary; each count decides whether its section shows at all. */
+  todos?: { count: number; node: ReactNode };
+  teamTasks?: { count: number; node: ReactNode };
+  /** This session's sub-agent panorama, offered from the sub-agent heading whenever there are sub-agents. */
+  onOpenPanorama?: () => void;
+  /** One line at the top when the canonical session metadata could not be re-read. */
+  metadataNotice?: string;
   /** Servers have their own section: what an address click opens, how a stop is asked for and which stops are under way. */
   onOpenServerAddress?: (url: string) => void; onStopServer?: (id: string) => void; stoppingServers?: ReadonlySet<string>;
 };
@@ -69,7 +76,7 @@ function SessionActivityRailContent({ sessionId, visible, agentsNotice, resource
   rangeLimited = false, groupsRangeLimited = rangeLimited, supported = true, goalsAttentionReady = true,
   attentionItems = [], teamMembers = [], onLoadEarlier, onReturnToLatest, historyLoading = false, hasMoreBefore = false,
   pendingNotices = {}, suggestionsHaveRows = true, environment, contextUsage, changes, onOpenContext, onOpenReview,
-  onOpenServerAddress, onStopServer, stoppingServers = NO_STOPS, summary }: SessionActivityRailProps) {
+  onOpenServerAddress, onStopServer, stoppingServers = NO_STOPS, summary, todos, teamTasks, onOpenPanorama, metadataNotice }: SessionActivityRailProps) {
   const { t } = useTranslation();
   const rail = useRef<HTMLElement>(null);
   const [reveal, setReveal] = useState<ActivityReveal>();
@@ -151,7 +158,8 @@ function SessionActivityRailContent({ sessionId, visible, agentsNotice, resource
   // An empty group or section is left out; a notice that only says "still loading" never opens one.
   const shown = (notice: ReactNode, pending?: boolean) => Boolean(notice) && !pending;
   const show = activityRailVisibility({
-    goals: goals.length, plans: plans.length, agents: agents.length, teamMembers: teamMembers.length, processes: sessionProcesses.length, servers: servers.length,
+    goals: goals.length, plans: plans.length, todos: todos?.count ?? 0, teamTasks: teamTasks?.count ?? 0,
+    agents: agents.length, teamMembers: teamMembers.length, processes: sessionProcesses.length, servers: servers.length,
     outputs: outputs.length, sources: sources.length,
     processesNotice: !supported || Boolean(processesError) || Boolean(liveProcessDetails), teamNotice: shown(teamNotice, pendingNotices.team),
     agentsNotice: shown(agentsNotice, pendingNotices.activity), resourcesNotice: shown(resourcesNotice, pendingNotices.activity),
@@ -164,12 +172,17 @@ function SessionActivityRailContent({ sessionId, visible, agentsNotice, resource
   if (show.plans) sections.push({ id: "plans", node: <ActivityRailGroup sessionId={sessionId} group="plans" reveal={reveal} keepMounted sectionHeading
     trackAttention={visible} label={t("panel.activity.plans")} items={plans}
     collapsedSummary={onlyItem(plans)?.statusLabel}>{rows(plans, "plan", "plans")}</ActivityRailGroup> });
+  if (show.todos && todos) sections.push({ id: "todos", node: todos.node });
+  if (show.teamTasks && teamTasks) sections.push({ id: "teamTasks", node: teamTasks.node });
   if (show.live) sections.push({ id: "live", node: <ActivityRailGroup sessionId={sessionId} group="live" reveal={reveal} revealAlso={LIVE_GROUPS} sectionHeading
     trackAttention={visible && !processesLoading && !processesError} label={t("panel.activity.liveStatus")}
     items={[...agents.map(groupItem("agents")), ...teamMembers.map(groupItem("team-members")), ...sessionProcesses.map(groupItem("processes"))]}>
     {show.emptyHint ? <p className="session-activity-empty">{t("panel.activity.emptyLive")}</p> : <>
       {rangeNotice}{agentsNotice}
-      {agents.length > 0 && <ActivityRailGroup sessionId={sessionId} group="agents" reveal={reveal} trackAttention={visible} label={t("panel.activity.subagents")} items={agents}>
+      {agents.length > 0 && <ActivityRailGroup sessionId={sessionId} group="agents" reveal={reveal} trackAttention={visible} label={t("panel.activity.subagents")} items={agents}
+        action={onOpenPanorama && <Button variant="ghost" size="sm" className="session-activity-panorama" onClick={onOpenPanorama}>
+          <span>{t("team.viewPanorama")}</span><IconArrowUpRight size={14} aria-hidden />
+        </Button>}>
         {rows(agents, "agent", "agents")}</ActivityRailGroup>}
       {show.team && <ActivityRailGroup sessionId={sessionId} group="team-members" reveal={reveal} trackAttention={visible && !teamNotice} label={t("panel.activity.teamMembers")} items={teamMembers}>
         {teamNotice}{teamMembers.length > 0 && rows(teamMembers, "agent", "team-members")}</ActivityRailGroup>}
@@ -203,7 +216,8 @@ function SessionActivityRailContent({ sessionId, visible, agentsNotice, resource
   </ActivityRailGroup> });
   if (show.skills) sections.push({ id: "skills", node: suggestions });
   if (changes) sections.push({ id: "changes", node: <ActivityChangesSection changes={changes} onReview={onOpenReview} /> });
-  return <aside ref={rail} hidden={!visible} inert={!visible} className="session-activity-rail" data-session-id={sessionId} aria-label={t("panel.activity.title")}>
+  return <aside ref={rail} hidden={!visible} inert={!visible} className="session-activity-rail" data-session-id={sessionId} aria-label={t("panel.tabs.activity")}>
+    {metadataNotice && <p className="session-activity-metadata-status" role="status">{metadataNotice}</p>}
     {summary && <ActivitySummaryCard summary={summary} />}
     {issues.length > 0 && <section className="session-activity-attention" aria-label={t("panel.activity.needsAttention")}>
       <div className="session-activity-attention-title"><IconCircleAlert size={14} aria-hidden /><span>{t("panel.activity.needsAttention")}</span><span>{issues.length}</span></div>

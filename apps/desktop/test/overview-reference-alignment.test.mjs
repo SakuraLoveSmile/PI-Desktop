@@ -2,10 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { createServer } from "vite";
-import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
-import { createInstance } from "i18next";
-import { I18nextProvider } from "react-i18next";
 
 async function withModules(run) {
   const server = await createServer({ root: fileURLToPath(new URL("..", import.meta.url)), configFile: false,
@@ -58,7 +54,7 @@ test("dependency layout tiers tasks by real predecessors and keeps every card an
   assert.ok(malformed.children.every((node) => Number.isFinite(node.x) && Number.isFinite(node.y)));
 }));
 
-test("Overview resources expose recorded facts without promoting attempts, claims or attachments to changes", async () => withModules(async (load) => {
+test("recorded resources expose facts without promoting attempts, claims or attachments to changes", async () => withModules(async (load) => {
   const { recordedOverviewResources } = await load("overview-recorded-resources.ts");
   const tool = (name, args, extra = {}) => ({ role: "tool", toolName: name, toolArgs: args, toolStatus: "success", ...extra });
   const resources = recordedOverviewResources([
@@ -74,100 +70,18 @@ test("Overview resources expose recorded facts without promoting attempts, claim
   assert.deepEqual(resources.attachments.map((item) => item.path), ["uploads/image.png"]);
   assert.deepEqual(resources.references.skills.map((item) => item.label), ["canvas", "review"]);
   assert.deepEqual(resources.references.mcp.map((item) => item.label), ["mcp_browser_screenshot"]);
-  assert.deepEqual(resources.references.memory, []);
 }));
 
-test("Overview file rows lead with the file name and keep the folder as their detail", async () => withModules(async (load) => {
-  const { overviewRowText } = await load("overview-recorded-resources.ts");
-  assert.deepEqual(overviewRowText({ label: "apps/desktop/src/lib/webdav-probe.ts" }),
-    { label: "webdav-probe.ts", detail: "apps/desktop/src/lib" });
-  assert.deepEqual(overviewRowText({ label: "README.md" }), { label: "README.md" });
-  assert.deepEqual(overviewRowText({ label: "src\\win\\a.ts" }), { label: "a.ts", detail: "src\\win" });
-  assert.deepEqual(overviewRowText({ label: "/rooted.ts" }), { label: "/rooted.ts" });
-  assert.deepEqual(overviewRowText({ label: "src/folder/" }), { label: "src/folder/" });
-  assert.deepEqual(overviewRowText({ label: "docs/plan.md", detail: "Expert team plan" }),
-    { label: "docs/plan.md", detail: "Expert team plan" });
-}));
-
-test("Overview subagent rows localize one outcome and give badge and panorama the same tone", async () => withModules(async (load) => {
-  const { overviewSubagentBadgeClass, overviewSubagentLabelKey, overviewSubagentTone } = await load("overview-subagent-status.ts");
-  assert.equal(overviewSubagentLabelKey("timed_out"), "panel.activity.status.timed_out");
+test("a delegation outcome reads as one tone in the panorama and the rail", async () => withModules(async (load) => {
+  const { overviewSubagentTone } = await load("overview-subagent-status.ts");
   const outcomes = ["running", "completed", "stopped", "aborted", "timed_out", "failed", "denied"];
   assert.deepEqual(outcomes.map((status) => overviewSubagentTone(status)),
     ["running", "completed", "paused", "paused", "paused", "failed", "failed"]);
-  assert.deepEqual(["running", "completed", "paused", "failed"].map((tone) => overviewSubagentBadgeClass(tone)),
-    ["team-phase-running", "team-phase-completed", "team-phase-idle", "team-phase-failed"]);
 }));
-
-test("Overview renders a finished subagent with its localized badge label, not the raw status", async () => {
-  const server = await createServer({ root: fileURLToPath(new URL("..", import.meta.url)), configFile: false,
-    server: { middlewareMode: true, hmr: false, ws: false }, esbuild: { jsx: "automatic" }, appType: "custom",
-    optimizeDeps: { noDiscovery: true, include: [] } });
-  try {
-    const { OverviewTab } = await server.ssrLoadModule("/src/components/workpanel/OverviewTab.tsx");
-    const { useAppStore } = await server.ssrLoadModule("/src/stores/app-store.ts");
-    const { catalogs } = await server.ssrLoadModule(fileURLToPath(new URL("../../../packages/i18n/src/index.ts", import.meta.url)));
-    const i18n = createInstance();
-    await i18n.init({ lng: "en", resources: { en: { translation: catalogs.en } } });
-    const sessionId = "overview-subagent-session";
-    Object.assign(useAppStore.getInitialState(), {
-      activeSessionId: sessionId,
-      sessions: [{ id: sessionId, title: "Subagents", source: "desktop", executionProfile: "default", providerId: "command",
-        modelId: "model", mode: "chat", messageCount: 2, projectPath: "/project" }],
-      providers: [{ id: "command", name: "command" }],
-      messages: [{ id: "delegate", role: "tool", toolName: "Task", toolCallId: "call-delegate", toolStatus: "success",
-        toolArgs: { agent: "researcher", task: "Check the range probe" } }],
-    });
-    const html = renderToStaticMarkup(createElement(I18nextProvider, { i18n }, createElement(OverviewTab)));
-    assert.ok(html.includes(">Completed</span>"), "the badge shows the localized outcome label");
-    assert.equal(html.includes(">completed</span>"), false, "the raw status must not reach the badge");
-  } finally {
-    await server.close();
-  }
-});
-
 // Recorded edits for the count and link assertions; a review payload is attached only when the test passes one.
 const recordedEdit = (id, path, review) => ({ id, role: "tool", toolName: "Edit", toolStatus: "success", toolCallId: `${id}-call`,
   toolArgs: { path }, toolResult: { details: { root: "workspace", ...(review ? { review: { version: 1, snapshotId: "snapshot",
     messageId: id, path, operation: "edit", status: "modified", state: "active", reversible: true, hunks: [], ...review } } : {}) } } });
-
-async function renderOverviewFor(messages) {
-  const server = await createServer({ root: fileURLToPath(new URL("..", import.meta.url)), configFile: false,
-    server: { middlewareMode: true, hmr: false, ws: false }, esbuild: { jsx: "automatic" }, appType: "custom",
-    optimizeDeps: { noDiscovery: true, include: [] } });
-  try {
-    const { OverviewTab } = await server.ssrLoadModule("/src/components/workpanel/OverviewTab.tsx");
-    const { useAppStore } = await server.ssrLoadModule("/src/stores/app-store.ts");
-    const { catalogs } = await server.ssrLoadModule(fileURLToPath(new URL("../../../packages/i18n/src/index.ts", import.meta.url)));
-    const i18n = createInstance();
-    await i18n.init({ lng: "en", resources: { en: { translation: catalogs.en } } });
-    const sessionId = "overview-recorded-session";
-    Object.assign(useAppStore.getInitialState(), {
-      activeSessionId: sessionId,
-      sessions: [{ id: sessionId, title: "Recorded edits", source: "desktop", executionProfile: "default", providerId: "command",
-        modelId: "model", mode: "chat", messageCount: messages.length, projectPath: "/project" }],
-      providers: [{ id: "command", name: "command" }],
-      messages,
-    });
-    return renderToStaticMarkup(createElement(I18nextProvider, { i18n }, createElement(OverviewTab)));
-  } finally {
-    await server.close();
-  }
-}
-
-test("Overview file glyphs follow the recorded extension and line counts stay exact-only", async () => withModules(async (load) => {
-  const { overviewFileGlyph, overviewLineCounts } = await load("overview-file-meta.ts");
-  assert.deepEqual(overviewFileGlyph("apps/index.html"), { text: "<>", tone: "markup" });
-  assert.deepEqual(overviewFileGlyph("style.CSS"), { text: "#", tone: "plain" });
-  assert.deepEqual(overviewFileGlyph("src/script.mjs"), { text: "JS", tone: "plain" });
-  assert.deepEqual(overviewFileGlyph("src/view.tsx"), { text: "TS", tone: "plain" });
-  assert.equal(overviewFileGlyph("notes.md"), null);
-  assert.equal(overviewFileGlyph("docs/README"), null);
-  assert.deepEqual(overviewLineCounts({ addedLines: 3, removedLines: 1 }), { added: 3, removed: 1 });
-  assert.equal(overviewLineCounts({ addedLines: 0, removedLines: 0 }), null);
-  assert.equal(overviewLineCounts({ addedLines: 3 }), null);
-  assert.equal(overviewLineCounts(undefined), null);
-}));
 
 test("recorded edits total only when every edit carries exact counts", async () => withModules(async (load) => {
   const { activityChangedFiles } = await load("/src/features/chat/activity/session-activity-resources.ts");
@@ -179,29 +93,3 @@ test("recorded edits total only when every edit carries exact counts", async () 
   assert.equal(inexact.addedLines, undefined);
   assert.equal(inexact.removedLines, undefined);
 }));
-
-test("Overview shows exact recorded totals and offers the review link only when the review tab has entries", async () => {
-  const exact = await renderOverviewFor([recordedEdit("e1", "src/a.ts", { additions: 3, deletions: 1 }),
-    recordedEdit("e2", "src/a.ts", { additions: 2, deletions: 0 })]);
-  assert.ok(exact.includes(">+5</span>"), "two exact edits show their summed additions");
-  assert.ok(exact.includes(">−1</span>"), "and their summed deletions");
-  assert.ok(exact.includes("View all changes"), "the review link is offered when the review tab has entries");
-  const mixed = await renderOverviewFor([recordedEdit("e1", "src/a.ts", { additions: 3, deletions: 1 }),
-    recordedEdit("e2", "src/a.ts")]);
-  assert.equal(mixed.includes("diff-count-add"), false, "one inexact edit hides the total rather than showing a partial one");
-  assert.ok(mixed.includes("View all changes"));
-  const legacy = await renderOverviewFor([recordedEdit("e1", "src/a.ts")]);
-  assert.equal(legacy.includes("View all changes"), false, "a file without review payloads gets no link to an empty tab");
-  assert.ok(legacy.includes("a.ts"), "the recorded file still lists");
-});
-
-test("Overview omits a zero line-count side instead of rendering +0 or −0", async () => {
-  const html = await renderOverviewFor([recordedEdit("e1", "src/b.ts", { additions: 4, deletions: 0 })]);
-  assert.ok(html.includes(">+4</span>"), "the non-zero addition still shows");
-  assert.equal(html.includes("diff-count-del"), false, "a zero deletion side is not rendered");
-});
-
-test("Overview marks non-team sessions with the plain chrome class", async () => {
-  const html = await renderOverviewFor([]);
-  assert.ok(html.includes('class="work-panel-overview work-panel-overview-plain"'));
-});

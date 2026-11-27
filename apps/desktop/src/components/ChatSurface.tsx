@@ -1,5 +1,7 @@
-import { overviewWorkPanelTab } from "../lib/work-panel-tabs";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { activityWorkPanelTab } from "../lib/work-panel-tabs";
+import { activityPlacement } from "../features/chat/activity/activity-placement";
+import { useActivityPlacementStore } from "../features/chat/activity/activity-placement-store";
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   messageHasTranscriptContent,
@@ -64,7 +66,6 @@ export const ChatSurface = memo(function ChatSurface({
     observer.observe(surface);
     return () => observer.disconnect();
   }, []);
-  const activityVisible = visible && !workPanelOpen && surfaceWidth >= 820;
   const activeSessionId = useAppStore((state) => state.activeSessionId);
   const selectingSessionId = useAppStore((state) => state.selectingSessionId);
   const retainedSessionIds = useAppStore((state) => state.retainedSessionIds);
@@ -145,6 +146,27 @@ export const ChatSurface = memo(function ChatSurface({
   // not take over just because the destination projection is still empty.
   const showEmptyState =
     !hasTranscript && (!visibleSessionId || visibleSessionId === activeSessionId);
+  // Only the chat width decides where the summary sits; the rail lives inside the chat surface, so moving it into the
+  // work panel never changes the width it was measured against.
+  const placement = activityPlacement({
+    visible,
+    hasSession: Boolean(visibleSessionId) && !showEmptyState,
+    panelOpen: workPanelOpen,
+    surfaceWidth,
+  });
+  const activityVisible = placement === "inline";
+  const reportPlacement = useActivityPlacementStore((state) => state.report);
+  const releasePlacement = useActivityPlacementStore((state) => state.release);
+  // The work panel follows the last surface that was actually on screen. A hidden retained surface releases only its
+  // own claim, so it never reports over the session the person is looking at.
+  useLayoutEffect(() => {
+    if (!visibleSessionId) return;
+    if (placement === "none") releasePlacement(visibleSessionId);
+    else reportPlacement(visibleSessionId, placement, visible);
+  }, [placement, reportPlacement, releasePlacement, visible, visibleSessionId]);
+  useLayoutEffect(() => () => {
+    if (visibleSessionId) releasePlacement(visibleSessionId);
+  }, [releasePlacement, visibleSessionId]);
   const vendorModelMissing = vendorAccountOmitsSessionModel(
     activeSession,
     providers,
@@ -165,7 +187,8 @@ export const ChatSurface = memo(function ChatSurface({
     <div
       className={`chat-surface route-surface${sessionSwitching ? " session-switching" : ""}`}
       ref={surfaceRef}
-      data-activity-visible={activityVisible && !showEmptyState ? "true" : "false"}
+      data-activity-visible={activityVisible ? "true" : "false"}
+      data-activity-placement={placement}
       aria-busy={sessionSwitching}
     >
       {sessionSwitching ? (
@@ -175,10 +198,10 @@ export const ChatSurface = memo(function ChatSurface({
       ) : null}
       <div className="chat-session-main">
       <ConversationWidthHandles />
-      {!showEmptyState && !activityVisible && !workPanelOpen && visibleSessionId ? (
+      {placement === "button" && visibleSessionId ? (
         <Button variant="ghost" size="sm" className="session-activity-access" disabled={sessionSwitching}
-          onClick={() => openWorkPanelTabForSession(visibleSessionId, overviewWorkPanelTab("activity"))}>
-          {t("panel.activity.title")}
+          onClick={() => openWorkPanelTabForSession(visibleSessionId, activityWorkPanelTab())}>
+          {t("panel.tabs.activity")}
         </Button>
       ) : null}
       {showEmptyState ? (

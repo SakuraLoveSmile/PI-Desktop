@@ -2290,6 +2290,11 @@ sklm: {
       server: { stop: "{{name}} beenden", open: "{{address}} öffnen", stopFailed: "{{name}} konnte nicht beendet werden." },
       summary: { title: "Sitzungszusammenfassung", updated: "Aktualisiert {{time}}", refresh: "Sitzungszusammenfassung neu erstellen", expand: "Erweitern", collapse: "Einklappen", refreshFailed: "Die Sitzungszusammenfassung konnte nicht aktualisiert werden." },
       goals: "Ziel",
+      todos: "Todos {{completed}}/{{total}}",
+      todosLabel: "Todos",
+      teamTasks: "Team tasks {{completed}}/{{total}}",
+      teamTasksLabel: "Team tasks",
+      teamTasksBoard: "Board",
       sections: {
         grip: "Bereich verschieben: {{name}}",
         gripTooltip: "Zum Umsortieren ziehen oder ↑ ↓ drücken",
@@ -2333,7 +2338,7 @@ sklm: {
         openReport: "Zielbericht öffnen",
         progressUnavailable: "Fortschritt nicht verfügbar",
       },
-      "title": "Aktivitätsübersicht", "plans": "Plan", "subagents": "Subagenten", "processes": "Hintergrundprozesse", "sources": "Quellen",
+      "plans": "Plan", "subagents": "Subagenten", "processes": "Hintergrundprozesse", "sources": "Quellen",
       "empty": "Keine Einträge in diesem Bereich", "rangeLimited": "Angezeigt werden Einträge aus dem geladenen Gesprächsbereich", "unsupported": "Nur für lokale Desktop-Sitzungen verfügbar",
       "loading": "Wird geladen…", "retry": "Erneut versuchen", "refresh": "Aktualisieren", "openProcess": "Prozess anzeigen", "closeProcess": "Prozessdetails schließen", "stopProcess": "Prozess stoppen",
       "command": "Befehl", "cwd": "Arbeitsverzeichnis", "stdout": "Standardausgabe", "stderr": "Standardfehler", "outputTruncated": "Ausgabe gekürzt",
@@ -2360,7 +2365,7 @@ sklm: {
     },
     "closeTab": "Schließen {{name}}",
     "tabs": {
-      "overview": "Übersicht",
+      "activity": "Activity",
       "team": "Team",
       "review": "Überprüfen",
       "browser": "Browser",
@@ -2370,10 +2375,8 @@ sklm: {
       goalReport: "Zielbericht",
     },
     overview: {
-      specs: "Spezifikationen", changedFiles: "Geänderte Dateien", viewAllChanges: "Alle Änderungen anzeigen", attachments: "Anhänge", skills: "Skills", memory: "Erinnerungen", mcp: "MCP",
-      noRecordedSkills: "Keine Skills in dieser Sitzung aufgezeichnet", noRecordedMemory: "Keine Erinnerungen in dieser Sitzung aufgezeichnet", noRecordedMcp: "Keine MCP-Nutzung in dieser Sitzung aufgezeichnet",
-      recordedChangesNote: "Angezeigt werden nur erfolgreich aufgezeichnete Änderungen der aktuell geladenen Sitzung; dies ist keine vollständige Git-Änderungsliste.",
-      noSession: "Keine Sitzung ausgewählt", untitled: "Unbenannte Sitzung", project: "Projekt", model: "Modell", modeLabel: "Modus", messages: "Nachrichten", notAvailable: "Nicht verfügbar", progress: "Fortschritt", statusLabel: "Aktueller Status", noPlans: "Keine Planaktivität in dieser Sitzung", artifacts: "Artefakte", noArtifacts: "Keine Artefakte in dieser Sitzung", references: "Referenzen", noReferences: "Keine expliziten Dateireferenzen", mode: { chat: "Chat", plan: "Plan", goal: "Ziel" }, subagents: "Subagents", noSubagents: "No subagents delegated in this session", teamSection: "Expert Team", status: { idle: "Inaktiv", running: "Läuft", planning: "Planung", awaiting_approval: "Wartet auf Genehmigung", pending: "Ausstehend", approved: "Genehmigt", rejected: "Abgelehnt", expired: "Abgelaufen", interrupted: "Unterbrochen", queued: "Warteschlange", completed: "Abgeschlossen", failed: "Fehlgeschlagen" }
+      noSubagents: "No subagents delegated in this session",
+      status: { idle: "Inaktiv", running: "Läuft", planning: "Planung", awaiting_approval: "Wartet auf Genehmigung", pending: "Ausstehend", approved: "Genehmigt", rejected: "Abgelehnt", expired: "Abgelaufen", interrupted: "Unterbrochen", queued: "Warteschlange", completed: "Abgeschlossen", failed: "Fehlgeschlagen" },
     },
     "pluginView": {
       "failed": "Diese Ansicht konnte nicht geladen werden. Laden Sie das Plugin neu und versuchen Sie es erneut."

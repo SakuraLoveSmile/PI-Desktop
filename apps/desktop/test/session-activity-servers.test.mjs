@@ -92,7 +92,7 @@ test("the server's name drops the port the address already shows, and the row ti
 test("servers get their own section right after Live, and a saved order that never saw it keeps its place around it", () => {
   assert.equal(ACTIVITY_SECTION_IDS[ACTIVITY_SECTION_IDS.indexOf("live") + 1], "server");
   const before = ["environment", "goals", "plans", "live", "context", "artifacts", "skills", "changes"];
-  assert.deepEqual(mergeActivitySectionOrder(before), ["environment", "goals", "plans", "live", "server", "context", "artifacts", "skills", "changes"]);
+  assert.deepEqual(mergeActivitySectionOrder(before), ["environment", "goals", "plans", "todos", "teamTasks", "live", "server", "context", "artifacts", "skills", "changes"]);
   const markup = render({ agents: [{ id: "explore", label: "explore", status: "running", statusLabel: "Running" }],
     processes: [proc("dev", "pnpm dev --port 3000", { address: "http://localhost:3000" })] });
   assert.deepEqual(ids(markup), ["live", "server"]);

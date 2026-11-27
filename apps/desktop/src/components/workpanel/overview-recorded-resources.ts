@@ -1,7 +1,7 @@
 import type { UiMessage } from "@pi-desktop/shared";
 
 export type RecordedResource = { id: string; label: string; path?: string };
-export type OverviewReferences = { skills: RecordedResource[]; memory: RecordedResource[]; mcp: RecordedResource[] };
+export type OverviewReferences = { skills: RecordedResource[]; mcp: RecordedResource[] };
 
 function argumentString(args: unknown, names: string[]): string | undefined {
   if (!args || typeof args !== "object" || Array.isArray(args)) return undefined;
@@ -41,13 +41,5 @@ export function recordedOverviewResources(messages: UiMessage[]): {
     }
   }
   return { changedFiles: [...files.values()], attachments: [...attachments.values()],
-    references: { skills: [...skills.values()], memory: [], mcp: [...mcp.values()] } };
-}
-
-/** File rows lead with the file name; an item that already carries a detail keeps it. */
-export function overviewRowText(item: { label: string; detail?: string }): { label: string; detail?: string } {
-  if (item.detail) return { label: item.label, detail: item.detail };
-  const separator = Math.max(item.label.lastIndexOf("/"), item.label.lastIndexOf("\\"));
-  if (separator <= 0 || separator === item.label.length - 1) return { label: item.label };
-  return { label: item.label.slice(separator + 1), detail: item.label.slice(0, separator) };
+    references: { skills: [...skills.values()], mcp: [...mcp.values()] } };
 }

@@ -42,7 +42,7 @@ async function harness() {
     esbuild: { jsx: "automatic" }, appType: "custom",
     optimizeDeps: { noDiscovery: true, include: [] },
   });
-  const { SessionTodoChecklist } = await server.ssrLoadModule("/src/components/workpanel/SessionTodoChecklist.tsx");
+  const { ActivityTodosSection } = await server.ssrLoadModule("/src/features/chat/activity/ActivityTodosSection.tsx");
   const { useAppStore } = await server.ssrLoadModule("/src/stores/app-store.ts");
   const { catalogs } = await server.ssrLoadModule(
     fileURLToPath(new URL("../../../packages/i18n/src/index.ts", import.meta.url)),
@@ -56,7 +56,7 @@ async function harness() {
   const render = (sessionId) => {
     effects.length = 0;
     Object.assign(useAppStore.getInitialState(), { sessionTodos: useAppStore.getState().sessionTodos });
-    const html = renderToStaticMarkup(createElement(I18nextProvider, { i18n }, createElement(SessionTodoChecklist, { sessionId })));
+    const html = renderToStaticMarkup(createElement(I18nextProvider, { i18n }, createElement(ActivityTodosSection, { sessionId, visible: true })));
     mounted = effects.map((effect, index) => {
       const old = mounted[index];
       if (old && effect.deps.every((dep, i) => Object.is(dep, old.deps[i]))) return old;
@@ -90,7 +90,7 @@ const snapshot = (sessionId, revision, content = "Recovered work") => ({
   todos: [{ content, status: "pending", priority: "medium" }],
 });
 
-test("SessionTodoChecklist recovers a failed first read when the host returns without a session switch", async (t) => {
+test("ActivityTodosSection recovers a failed first read when the host returns without a session switch", async (t) => {
   const diagnostics = t.mock.method(console, "error", () => undefined);
   const recoveryErrors = () => diagnostics.mock.calls.filter(call => call.arguments[0] === "Session checklist recovery failed");
   const h = await harness();
@@ -104,21 +104,21 @@ test("SessionTodoChecklist recovers a failed first read when the host returns wi
     h.emit(IPC.event.hostStatus, { ok: true, component: "host" });
     await h.settle();
     assert.deepEqual(h.reads, ["session-a", "session-a"]);
-    assert.match(h.render("session-a"), />Session checklist 0\/1</);
+    assert.match(h.render("session-a"), />Todos 0\/1</);
     assert.equal(h.store.getState().sessionTodos["session-a"].todos[0].content, "Recovered work");
   } finally { await h.close(); }
 });
 
-test("SessionTodoChecklist re-reads cached sessions on activation and restart without snapshot-driven requests", async () => {
+test("ActivityTodosSection re-reads cached sessions on activation and restart without snapshot-driven requests", async () => {
   const h = await harness();
   try {
     h.store.getState().applyTodosChanged(snapshot("session-a", 1, "Cached work"));
     let revision = 2;
     h.setRead(async (id) => snapshot(id, revision++, "Current host work"));
-    assert.match(h.render("session-a"), />Session checklist 0\/1</);
+    assert.match(h.render("session-a"), />Todos 0\/1</);
     assert.equal(h.store.getState().sessionTodos["session-a"].todos[0].content, "Cached work");
     await h.settle();
-    assert.match(h.render("session-a"), />Session checklist 0\/1</);
+    assert.match(h.render("session-a"), />Todos 0\/1</);
     assert.equal(h.store.getState().sessionTodos["session-a"].todos[0].content, "Current host work");
     assert.deepEqual(h.reads, ["session-a"]);
     h.render("session-b");
@@ -135,7 +135,7 @@ test("SessionTodoChecklist re-reads cached sessions on activation and restart wi
   } finally { await h.close(); }
 });
 
-test("SessionTodoChecklist keeps newer events and drops old-host and switched-session reads", async () => {
+test("ActivityTodosSection keeps newer events and drops old-host and switched-session reads", async () => {
   const h = await harness();
   const pending = [];
   h.setRead((id) => new Promise((resolve) => pending.push({ id, resolve })));
@@ -153,7 +153,7 @@ test("SessionTodoChecklist keeps newer events and drops old-host and switched-se
     h.emit(IPC.event.todosChanged, snapshot("session-a", 4, "New push"));
     pending[2].resolve(snapshot("session-a", 3, "Stale read"));
     await h.settle();
-    assert.match(h.render("session-a"), />Session checklist 0\/1</);
+    assert.match(h.render("session-a"), />Todos 0\/1</);
     assert.equal(h.store.getState().sessionTodos["session-a"].todos[0].content, "New push");
     h.render("session-b");
     h.render("session-a");
@@ -170,7 +170,7 @@ test("SessionTodoChecklist keeps newer events and drops old-host and switched-se
   } finally { await h.close(); }
 });
 
-test("SessionTodoChecklist never reads the local host for remote or native sessions", async () => {
+test("ActivityTodosSection never reads the local host for remote or native sessions", async () => {
   const h = await harness();
   try {
     h.render("remote:server:session-a");
@@ -182,7 +182,7 @@ test("SessionTodoChecklist never reads the local host for remote or native sessi
   } finally { await h.close(); }
 });
 
-test("SessionTodoChecklist rejects a mismatched snapshot and ignores pending work after unmount", async (t) => {
+test("ActivityTodosSection rejects a mismatched snapshot and ignores pending work after unmount", async (t) => {
   const diagnostics = t.mock.method(console, "error", () => undefined);
   const recoveryErrors = () => diagnostics.mock.calls.filter(call => call.arguments[0] === "Session checklist recovery failed");
   const h = await harness();

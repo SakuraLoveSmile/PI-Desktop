@@ -7433,6 +7433,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   knows only Raspberry Pi CPU parts for Linux arm64. Speech-to-text and the
   rest of the app have no architecture-specific dependency. See ADR 0318,
   issue #1281, and E2E-192a.
+| D654 | One session summary, placed by width | **The activity rail is the session's only summary. The work panel's Overview page, its message count, its memory row and its renderer-built artifact/skill/MCP inventory are removed; the checklist, the Team task summary and the panorama entry move into the rail. Only the chat surface width places the summary, and the 264px rail counts inside it: at 820px or wider the rail sits beside the transcript whether or not the panel is open; below that, with the panel closed, one Activity button opens the panel on the Activity tab; with the panel open the rail is that tab. The tab is fixed, first, unclosable and unmovable while docked, hidden from the panel at 820px or wider, and a fallback tab or the launcher page takes over when it was active. The canonical SessionSummary refresh moves with the summary and runs only while it is on screen, showing one stale-data status line. Sections join the saved order after Plan; nothing is persisted about tabs. Renderer only: no IPC, Host, protocol or storage change. See E2E-TEAM-live-overview-board-panorama-and-coexistence and E2E-CHAT-session-activity.** | Two summaries of one session drifted apart, and the Overview page duplicated what the rail already knew. |
 
 ## 2026-10-03 — User MCP tools keep the normal approval path (D640)
 
@@ -7456,6 +7457,22 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   row and explain that `new_string` is read only when `ops` is absent.
 - No tag-chain, permission, persistence or retry-budget change; anchored Edit
   still performs its existing version and provenance checks.
+
+## 2026-11-27 — One session summary, placed by width (D654)
+
+- The activity rail is the one session summary. The Overview page, its message
+  count, its always-empty memory row and the renderer's own artifact/skill/MCP
+  inventory are gone; the session checklist, the Team task summary and the
+  panorama entry live in the rail's sections, and the pinned summary card stays
+  at the top. The canonical SessionSummary refresh moves with the summary and
+  reads only while the rail is on screen.
+- Placement follows the chat surface width, 264px rail included: inline at 820px
+  or wider regardless of the panel, the Activity tab of the work panel when the
+  panel is open below that, and one Activity button that opens that tab when it
+  is closed. The rail lives inside the chat surface, so no hysteresis is needed.
+- The Activity tab is fixed and first while docked, hidden from the panel at
+  820px or wider, and the saved section order gains the two new sections right
+  after Plan. No tab state, protocol, IPC or storage changes.
 
 ## 2026-10-20 — Context usage defaults to used (D398 amendment)
 

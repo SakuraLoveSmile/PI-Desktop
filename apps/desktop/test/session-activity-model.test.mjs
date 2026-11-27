@@ -39,7 +39,6 @@ test('only recorded successful writes and safe captured sources become resources
   ]);
   assert.deepEqual(resources.changedFiles.map(x=>x.path),['real.md']);
   assert.deepEqual(resources.websites,[{id:'https://docs.example.org/start',label:'Docs',url:'https://docs.example.org/start',domain:'docs.example.org',sourceCount:1}]);
-  assert.deepEqual(resources.references.memory,[]);
 });
 
 test('a background start receipt is not a successful command exit', async()=>{

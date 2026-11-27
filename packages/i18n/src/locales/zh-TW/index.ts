@@ -2366,6 +2366,11 @@ sklm: {
       server: { stop: "停止 {{name}}", open: "開啟 {{address}}", stopFailed: "無法停止 {{name}}。" },
       summary: { title: "會話總結", updated: "更新於 {{time}}", refresh: "重新產生會話總結", expand: "展開", collapse: "收合", refreshFailed: "無法更新會話總結。" },
       goals: "目標",
+      todos: "Todos {{completed}}/{{total}}",
+      todosLabel: "Todos",
+      teamTasks: "Team tasks {{completed}}/{{total}}",
+      teamTasksLabel: "Team tasks",
+      teamTasksBoard: "Board",
       sections: {
         grip: "移動區塊：{{name}}",
         gripTooltip: "拖曳調整順序，或按 ↑ ↓",
@@ -2409,7 +2414,7 @@ sklm: {
         openReport: "開啟目標報告",
         progressUnavailable: "進度暫不可用",
       },
-      title: "活動概覽", plans: "計畫", subagents: "子智慧體", processes: "背景程序", sources: "來源",
+      plans: "計畫", subagents: "子智慧體", processes: "背景程序", sources: "來源",
       empty: "此範圍內沒有記錄", rangeLimited: "僅顯示目前已載入對話範圍內的記錄", unsupported: "僅支援本機桌面工作階段",
       loading: "載入中…", retry: "重試", refresh: "重新整理", openProcess: "檢視程序", closeProcess: "關閉程序詳細資料", stopProcess: "停止程序",
       command: "命令", cwd: "工作目錄", stdout: "標準輸出", stderr: "標準錯誤", outputTruncated: "輸出已截斷",
@@ -2435,7 +2440,7 @@ sklm: {
     },
     closeTab: "關閉{{name}}",
     tabs: {
-      overview: "概要",
+      activity: "Activity",
       team: "團隊",
       review: "審閱",
       browser: "瀏覽器",
@@ -2444,7 +2449,10 @@ sklm: {
       subagent: "子智慧體",
       goalReport: "目標報告",
     },
-    overview: { specs: "規格", changedFiles: "變更檔案", viewAllChanges: "查看所有變更", attachments: "附件", skills: "技能", memory: "記憶", mcp: "MCP", noRecordedSkills: "目前對話沒有記錄技能", noRecordedMemory: "目前對話沒有記錄記憶", noRecordedMcp: "目前對話沒有記錄 MCP 使用情況", recordedChangesNote: "僅顯示目前已載入對話中成功記錄的變更，並非完整的 Git 變更清單。", noSession: "尚未選擇工作階段", untitled: "未命名工作階段", project: "專案", model: "模型", modeLabel: "模式", messages: "訊息", notAvailable: "暫無", progress: "進度", statusLabel: "目前狀態", noPlans: "此工作階段沒有計畫活動", artifacts: "產物", noArtifacts: "此工作階段沒有產物", references: "參照", noReferences: "沒有明確的檔案參照", mode: { chat: "對話", plan: "方案", goal: "目標" }, subagents: "子智慧體", noSubagents: "此工作階段尚未委派子智慧體", teamSection: "專家團", status: { idle: "閒置", running: "執行中", planning: "規劃中", awaiting_approval: "等待核准", pending: "待處理", approved: "已核准", rejected: "已拒絕", expired: "已過期", interrupted: "已中斷", queued: "排隊中", completed: "已完成", failed: "失敗" } },
+    overview: {
+      noSubagents: "此工作階段尚未委派子智慧體",
+      status: { idle: "閒置", running: "執行中", planning: "規劃中", awaiting_approval: "等待核准", pending: "待處理", approved: "已核准", rejected: "已拒絕", expired: "已過期", interrupted: "已中斷", queued: "排隊中", completed: "已完成", failed: "失敗" },
+    },
     pluginView: {
       failed: "無法載入該檢視。請重新載入外掛後重試。",
     },

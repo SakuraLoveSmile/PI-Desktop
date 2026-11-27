@@ -3222,8 +3222,9 @@ ID, and each explicit target navigation increments `teamNavigationSeq`.
 
 The tab hover title equals its display label for every Team surface; it does
 not expose the Team session ID. Task/member labels are captured at open time,
-with the existing generic Team label when unavailable. The Overview tab uses
-a map icon; all other tab chrome and ordinary subagent behavior stay unchanged.
+with the existing generic Team label when unavailable. The Activity tab uses the
+activity icon, the sub-agent panorama tab the map icon, and the Team panorama keeps
+its team icon; all other tab chrome and ordinary subagent behavior stay unchanged.
 Tabs remain in memory and require no persisted-data migration.
 
 A dispatch card, Overview progress row, aggregate progress row or panorama child
@@ -5006,16 +5007,30 @@ instructions, memory and OAuth dialogs retain their existing bounded layouts.
 
 ## 13. Plan workflow additions
 
-### 13.1 Session Overview tab
+### 13.1 Session summary dock tab
 
-The session-scoped Work Panel starts with an `Overview` tab when opened for a
-session. Its header reads the current `SessionSummary` (title, project, model,
-mode, timestamps, and message count). Collapsible `Progress`, `Artifacts`, and
-`References` sections use only current renderer/Host state: planning and run
-status, immutable Plan/Goal artifacts, and explicit message attachments or
-file references. Missing data uses a short empty state. Artifact rows open the
-existing trusted Markdown/file preview; the tab never invents progress,
-memory, terminal output, or historical facts.
+The session summary is one surface in two places (D654). While the chat surface
+is at least 820px wide it is the inline activity rail; below that width it is the
+work panel's first tab, `Activity`. The dock tab renders the same rail component
+as the inline pane, so the two placements cannot drift, and it has no back link of
+its own: the pinned summary card, its refresh path, the sections and their saved
+order are identical in both places. The tab is fixed while docked — it cannot be
+closed, moved or renamed — and the strip keeps it first. At 820px or wider the
+panel hides it even while open, so the summary never appears twice; when it was
+the active tab the panel falls back to the tab after it, and to the launcher page
+when there is none. Closing the last detail tab leaves the panel open on the
+summary (docked) or on the launcher page (not docked).
+
+The rail also refreshes the canonical `SessionSummary` (title, Team relation) only
+while it is on screen — inline, or docked with the Activity tab active — from
+agent events, session and plan changes, Host restart, window focus and a timer; a
+failed read keeps the last known values and shows one stale-data status line at
+the top of the rail. There is no separate Overview page, no message count, no
+memory row, and no renderer-side inventory of artifacts, skills or MCP: the rail's
+own sections list those from recorded activity. The rail also does not restate an
+approved execution's pending-roster wait: the Goal capsule above the composer and
+the Goal card in the transcript carry that state, so the summary keeps the
+running word instead of showing two summaries of the same wait.
 
 ### AskTool rich question layout
 
@@ -5049,7 +5064,7 @@ available. Missing preferences retain Detailed.
 
 ### 13.4 Session activity rail
 
-The accepted right rail is a stack of sections (Goal, Plan, Live status, Servers,
+The accepted right rail is a stack of sections (Goal, Plan, Todos, Team tasks, Live status, Servers,
 Environment, Context, Artifacts, Skills & MCP, Changes) drawn without a stroked
 frame (D297) apart from the one hairline between sections (D645). It follows the
 approved canvas. A section
@@ -5070,7 +5085,26 @@ they stay in its tooltip and accessible name. Row actions (open, locate, copy
 path, details) overlay the row's trailing edge on hover or keyboard focus and
 reserve no width. Transcript agents retain their avatar.
 
-An empty group or section is left out. Goal, Plan, Live status, Servers, Artifacts
+Todos and Team tasks are sections of their own between Plan and Live status. Todos
+lists every todo the session recorded, one line each, and never truncates the
+list: a finished row draws a check, the row in progress a spinner, a dropped row a
+slash and anything else a circle, and the row's title and hidden text name the
+state. Its heading carries the count that leaves cancelled work out (Todos 3/5).
+Team tasks is a Team session's board summary: the heading carries the same count,
+a Board action opens the board, and the body shows a 4px completion bar with the
+count, then at most six rows chosen by the board's own rule (failed, in progress,
+waiting, pending, completed, cancelled; ties keep board order). A row draws the
+state glyph (work in progress spins), the numbered task, the state word and the
+owning role's word, never an avatar, and opens that task. A saved section order
+keeps both where the person put them; an order that never saw them puts them right
+after Plan.
+
+A session with sub-agents carries View panorama at the trailing edge of its
+sub-agents heading: a Team session opens the Team's panorama, and any other
+session opens a sub-agent panorama tab, which draws the session at the root with
+each delegation below it. The entry is absent when the session delegated nothing.
+
+An empty group or section is left out. Goal, Plan, Todos, Team tasks, Live status, Servers, Artifacts
 and Skills & MCP each appear only when they hold rows or a notice that has something
 to say (a notice that only says data is still loading never opens an empty
 group); a rail with nothing else to list keeps Live status with one hint line
@@ -5114,11 +5148,16 @@ failure can reopen the group. Hidden/uninitialized readers do not erase known
 attention state; the same recorded failure after remount does not undo a manual
 collapse. A ready completed report hides the capsule but remains in Overview.
 
-The rail reserves 264px when the actual chat surface is at least 820px wide and
-the work panel is closed. It never overlays the transcript or composer. Narrow
-surfaces expose an activity entry in the existing work panel; normal Overview
-also links to it. There is no extra width reservation when that panel is open.
-The titlebar reading inset remains after the display switch is removed.
+Only the actual chat surface width places the summary, and the 264px rail counts
+inside it (D654). At 820px or wider the rail sits beside the transcript whether or
+not the work panel is open; below that width, with the panel closed, the chat shows
+one Activity button that opens the panel on the Activity tab, and with the panel
+open the rail is that tab. The rail lives inside the chat surface, so moving it
+never changes the width it was measured against and no hysteresis is needed. A
+chat with no session, or a route that is not on screen, shows none of the three.
+It never overlays the transcript or composer, and there is no extra width
+reservation when the panel is open. The titlebar reading inset remains after the
+display switch is removed.
 
 Plans retain their existing shared projection. Recorded delegations, successful
 Write/Edit records, attachments and captured HTTP(S) sources use the Host's
@@ -5364,7 +5403,7 @@ launch audits are history, not user consent.
 
 A current active local Team Lead in Agent mode or an active approved Plan/Goal
 execution with a new nonempty pending user-confirmed execution roster automatically opens the existing aggregate Team panel, even
-when Overview, a file, panorama or a closed work panel was selected. Automatic
+when the Activity tab, a file, panorama or a closed work panel was selected. Automatic
 planning audits never display launch approval controls. Unrelated snapshot updates
 do not repeatedly steal focus; background, member, unapproved Plan/Goal research
 and nonlocal sessions cannot open another session's panel. The displayed contract

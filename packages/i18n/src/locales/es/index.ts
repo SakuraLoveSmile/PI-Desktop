@@ -2288,6 +2288,11 @@ sklm: {
       server: { stop: "Detener {{name}}", open: "Abrir {{address}}", stopFailed: "No se pudo detener {{name}}." },
       summary: { title: "Resumen de la sesión", updated: "Actualizado {{time}}", refresh: "Regenerar el resumen de la sesión", expand: "Ampliar", collapse: "Contraer", refreshFailed: "No se pudo actualizar el resumen de la sesión." },
       goals: "Objetivo",
+      todos: "Todos {{completed}}/{{total}}",
+      todosLabel: "Todos",
+      teamTasks: "Team tasks {{completed}}/{{total}}",
+      teamTasksLabel: "Team tasks",
+      teamTasksBoard: "Board",
       sections: {
         grip: "Mover sección: {{name}}",
         gripTooltip: "Arrastra para reordenar o pulsa ↑ ↓",
@@ -2331,7 +2336,7 @@ sklm: {
         openReport: "Abrir informe del objetivo",
         progressUnavailable: "Progreso no disponible",
       },
-      "title": "Resumen de actividad", "plans": "Plan", "subagents": "Subagentes", "processes": "Procesos en segundo plano", "sources": "Fuentes",
+      "plans": "Plan", "subagents": "Subagentes", "processes": "Procesos en segundo plano", "sources": "Fuentes",
       "empty": "No hay registros en este intervalo", "rangeLimited": "Se muestran los registros del intervalo de conversación cargado", "unsupported": "Disponible solo en sesiones locales de escritorio",
       "loading": "Cargando…", "retry": "Reintentar", "refresh": "Actualizar", "openProcess": "Ver proceso", "closeProcess": "Cerrar detalles del proceso", "stopProcess": "Detener proceso",
       "command": "Comando", "cwd": "Directorio de trabajo", "stdout": "Salida estándar", "stderr": "Error estándar", "outputTruncated": "Salida truncada",
@@ -2358,7 +2363,7 @@ sklm: {
     },
     "closeTab": "Cerrar {{name}}",
     "tabs": {
-      "overview": "Resumen",
+      "activity": "Activity",
       "team": "Equipo",
       "review": "Revisar",
       "browser": "Navegador",
@@ -2368,10 +2373,8 @@ sklm: {
       goalReport: "Informe de meta",
     },
     overview: {
-      specs: "Especificaciones", changedFiles: "Archivos modificados", viewAllChanges: "Ver todos los cambios", attachments: "Adjuntos", skills: "Habilidades", memory: "Memoria", mcp: "MCP",
-      noRecordedSkills: "No hay habilidades registradas en esta conversación", noRecordedMemory: "No hay memoria registrada en esta conversación", noRecordedMcp: "No hay uso de MCP registrado en esta conversación",
-      recordedChangesNote: "Solo se muestran los cambios registrados correctamente en la conversación cargada actualmente; no es una lista completa de cambios de Git.",
-      noSession: "No hay sesión seleccionada", untitled: "Sesión sin título", project: "Proyecto", model: "Modelo", modeLabel: "Modo", messages: "Mensajes", notAvailable: "No disponible", progress: "Progreso", statusLabel: "Estado actual", noPlans: "No hay actividad de planes en esta sesión", artifacts: "Artefactos", noArtifacts: "No hay artefactos en esta sesión", references: "Referencias", noReferences: "No hay referencias de archivos explícitas", mode: { chat: "Chat", plan: "Plan", goal: "Objetivo" }, subagents: "Subagents", noSubagents: "No subagents delegated in this session", teamSection: "Expert Team", status: { idle: "Inactivo", running: "En ejecución", planning: "Planificando", awaiting_approval: "Esperando aprobación", pending: "Pendiente", approved: "Aprobado", rejected: "Rechazado", expired: "Caducado", interrupted: "Interrumpido", queued: "En cola", completed: "Completado", failed: "Fallido" }
+      noSubagents: "No subagents delegated in this session",
+      status: { idle: "Inactivo", running: "En ejecución", planning: "Planificando", awaiting_approval: "Esperando aprobación", pending: "Pendiente", approved: "Aprobado", rejected: "Rechazado", expired: "Caducado", interrupted: "Interrumpido", queued: "En cola", completed: "Completado", failed: "Fallido" },
     },
     "pluginView": {
       "failed": "Esta vista no se pudo cargar. Vuelva a cargar el complemento e inténtelo de nuevo."

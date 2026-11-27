@@ -218,6 +218,16 @@ app.whenReady().then(async () => {
       }
       await window.webContents.executeJavaScript("globalThis.composerDesignScene('default')");
     }
+    if (process.env.PI_ACTIVITY_SCREENSHOT_DIR) {
+      const fs = require("node:fs/promises");
+      await fs.mkdir(process.env.PI_ACTIVITY_SCREENSHOT_DIR, { recursive: true });
+      for (const scene of ["inline-dark", "inline-light", "docked-dark", "docked-light", "button-dark", "button-light"]) {
+        const sceneResult = await window.webContents.executeJavaScript("globalThis.activityPlacementScene(" + JSON.stringify(scene) + ").then(() => ({ ok: true })).catch(error => ({ ok: false, error: error?.stack ?? String(error) }))");
+        if (!sceneResult.ok) throw new Error("Activity screenshot scene " + scene + ": " + sceneResult.error);
+        await fs.writeFile(path.join(process.env.PI_ACTIVITY_SCREENSHOT_DIR, "activity-" + scene + ".png"), (await window.webContents.capturePage()).toPNG());
+      }
+      await window.webContents.executeJavaScript("globalThis.activityPlacementScene('inline-dark')");
+    }
     if (process.env.PI_COMPOSER_PREVIEW !== "1") {
       await window.webContents.executeJavaScript("globalThis.cleanupSessionActivityIntegrationProbe()");
     }
@@ -251,7 +261,9 @@ app.whenReady().then(async () => {
       output += data;
       if (preview) process.stdout.write(data);
     });
-  const timeout = preview ? undefined : setTimeout(() => child.kill("SIGKILL"), 45_000);
+  // Every rail, composer and delegation scenario runs in one renderer, and the candidate now also walks the four
+  // placement widths; the guard is a hang detector, not a performance budget, so it leaves headroom.
+  const timeout = preview ? undefined : setTimeout(() => child.kill("SIGKILL"), 120_000);
   let code;
   try {
     code = await new Promise((resolve, reject) => {

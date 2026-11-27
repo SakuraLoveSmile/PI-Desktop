@@ -17,7 +17,7 @@ const { ACTIVITY_SECTION_IDS, applyVisibleActivitySectionOrder, dragActivitySect
   mergeActivitySectionOrder, stepActivitySection } = await server.ssrLoadModule("/src/features/chat/activity/activity-section-order.ts");
 const { createActivitySectionOrderStore } = await server.ssrLoadModule("/src/features/chat/activity/use-activity-section-order.ts");
 
-const DEFAULT = ["goals", "plans", "live", "server", "environment", "context", "artifacts", "skills", "changes"];
+const DEFAULT = ["goals", "plans", "todos", "teamTasks", "live", "server", "environment", "context", "artifacts", "skills", "changes"];
 const STORAGE_KEY = "pi-desktop:activity-section-order:v1";
 
 const fakeStorage = (initial = {}) => {
@@ -45,33 +45,33 @@ test("a section the stored order never saw lands right after its nearest default
   // "live" sits after "plans" by default, "server" and the workspace sections follow it, so a release that adds them keeps
   // the rest of the chosen order intact; "changes" follows "skills".
   assert.deepEqual(mergeActivitySectionOrder(["artifacts", "goals", "plans", "skills"]),
-    ["artifacts", "goals", "plans", "live", "server", "environment", "context", "skills", "changes"]);
+    ["artifacts", "goals", "plans", "todos", "teamTasks", "live", "server", "environment", "context", "skills", "changes"]);
   // The first default section has no predecessor and goes first.
   assert.deepEqual(mergeActivitySectionOrder(["plans", "live", "environment", "context", "artifacts", "skills", "changes"]), DEFAULT);
 });
 
 test("an order saved before the workspace sections existed keeps its sequence and gains them beside their default neighbours", () => {
   assert.deepEqual(mergeActivitySectionOrder(["live", "goals", "plans", "artifacts", "skills"]),
-    ["live", "server", "environment", "context", "goals", "plans", "artifacts", "skills", "changes"]);
+    ["live", "server", "environment", "context", "goals", "plans", "todos", "teamTasks", "artifacts", "skills", "changes"]);
   assert.deepEqual(mergeActivitySectionOrder(["goals", "plans", "live", "artifacts", "skills"]), DEFAULT);
 });
 
 test("an order saved before Servers existed gains it right after live status wherever live status was moved", () => {
   assert.deepEqual(mergeActivitySectionOrder(["environment", "goals", "plans", "live", "context", "artifacts", "skills", "changes"]),
-    ["environment", "goals", "plans", "live", "server", "context", "artifacts", "skills", "changes"]);
+    ["environment", "goals", "plans", "todos", "teamTasks", "live", "server", "context", "artifacts", "skills", "changes"]);
   assert.deepEqual(mergeActivitySectionOrder(["live", "changes", "skills", "artifacts", "context", "environment", "plans", "goals"]),
-    ["live", "server", "changes", "skills", "artifacts", "context", "environment", "plans", "goals"]);
+    ["live", "server", "changes", "skills", "artifacts", "context", "environment", "plans", "todos", "teamTasks", "goals"]);
 });
 
 test("unknown and repeated ids are dropped while the first occurrence keeps its place", () => {
   const merged = mergeActivitySectionOrder(["live", "bogus", "live", 42, "goals"]);
-  assert.deepEqual(merged, ["live", "server", "environment", "context", "artifacts", "skills", "changes", "goals", "plans"]);
+  assert.deepEqual(merged, ["live", "server", "environment", "context", "artifacts", "skills", "changes", "goals", "plans", "todos", "teamTasks"]);
   assert.deepEqual([...merged].sort(), [...DEFAULT].sort());
 });
 
 test("a new visible order is written into the visible sections' own slots and hidden sections keep theirs", () => {
   assert.deepEqual(applyVisibleActivitySectionOrder(DEFAULT, ["skills", "plans", "live"]),
-    ["goals", "skills", "plans", "server", "environment", "context", "artifacts", "live", "changes"]);
+    ["goals", "skills", "todos", "teamTasks", "plans", "server", "environment", "context", "artifacts", "live", "changes"]);
   assert.deepEqual(applyVisibleActivitySectionOrder(DEFAULT, DEFAULT), DEFAULT);
   const full = ["live", "goals", "plans", "server", "environment", "context", "artifacts", "skills", "changes"];
   assert.deepEqual(applyVisibleActivitySectionOrder(full, ["plans", "live"]),
@@ -88,9 +88,9 @@ test("a visible order that does not match the stored sections changes nothing", 
 
 test("keyboard steps swap one neighbour, stop at the edges and never change the input", () => {
   const input = Object.freeze([...DEFAULT]);
-  assert.deepEqual(stepActivitySection(input, "live", -1), ["goals", "live", "plans", "server", "environment", "context", "artifacts", "skills", "changes"]);
-  assert.deepEqual(stepActivitySection(input, "live", 1), ["goals", "plans", "server", "live", "environment", "context", "artifacts", "skills", "changes"]);
-  assert.deepEqual(stepActivitySection(input, "skills", 1), ["goals", "plans", "live", "server", "environment", "context", "artifacts", "changes", "skills"]);
+  assert.deepEqual(stepActivitySection(input, "live", -1), ["goals", "plans", "todos", "live", "teamTasks", "server", "environment", "context", "artifacts", "skills", "changes"]);
+  assert.deepEqual(stepActivitySection(input, "live", 1), ["goals", "plans", "todos", "teamTasks", "server", "live", "environment", "context", "artifacts", "skills", "changes"]);
+  assert.deepEqual(stepActivitySection(input, "skills", 1), ["goals", "plans", "todos", "teamTasks", "live", "server", "environment", "context", "artifacts", "changes", "skills"]);
   assert.equal(stepActivitySection(input, "goals", -1), null);
   assert.equal(stepActivitySection(input, "changes", 1), null);
   assert.equal(stepActivitySection(input, "bogus", 1), null);
@@ -110,7 +110,7 @@ test("dragging lands the section before the first other section whose midpoint i
 test("the store reads a saved order, merges it with the default and persists changes once", () => {
   const storage = fakeStorage({ [STORAGE_KEY]: JSON.stringify(["live", "goals", "plans", "artifacts", "skills"]) });
   const store = createActivitySectionOrderStore(() => storage);
-  assert.deepEqual([...store.get()], ["live", "server", "environment", "context", "goals", "plans", "artifacts", "skills", "changes"]);
+  assert.deepEqual([...store.get()], ["live", "server", "environment", "context", "goals", "plans", "todos", "teamTasks", "artifacts", "skills", "changes"]);
   let notified = 0;
   const unsubscribe = store.subscribe(() => { notified += 1; });
   const chosen = ["plans", "live", "goals", "server", "environment", "context", "artifacts", "skills", "changes"];

@@ -1,13 +1,14 @@
 export type WorkPanelTabKind =
   | "context"
-  | "overview"
+  | "activity"
   | "new"
   | "review"
   | "file"
   | "plugin"
   | "subagent"
   | "goalReport"
-  | "team";
+  | "team"
+  | "panorama";
 
 export type TeamWorkPanelTarget = {
   kind: "aggregate" | "board" | "panorama" | "task" | "member";
@@ -70,9 +71,22 @@ export function emptyWorkPanelContext(): WorkPanelContext {
   return { open: false, tabs: [], activeTabId: null, fileRequest: null };
 }
 
-/** The session-scoped summary shown before resource and tool tabs. */
-export function overviewWorkPanelTab(resource?: string): WorkPanelTab {
-  return { id: "overview", kind: "overview", ...(resource ? { resource } : {}) };
+/**
+ * The one session summary. It is the panel's first tab while the chat is too narrow for the rail, and it is not part of
+ * the panel at all once the rail fits beside the chat (see workPanelDisplayTabs).
+ */
+export const ACTIVITY_WORK_PANEL_TAB_ID = "activity";
+
+export function activityWorkPanelTab(): WorkPanelTab {
+  return { id: ACTIVITY_WORK_PANEL_TAB_ID, kind: "activity" };
+}
+
+/**
+ * The session's sub-agent panorama as its own tab: one picture of what the session delegated, opened from the
+ * activity rail once the rail can no longer sit beside the chat.
+ */
+export function panoramaWorkPanelTab(): WorkPanelTab {
+  return { id: "panorama", kind: "panorama" };
 }
 
 export function switchWorkPanelContextState(
@@ -279,11 +293,37 @@ export function parsePluginViewRef(
 export function isKnownWorkPanelTab(tab: WorkPanelTab): boolean {
   return (
     Boolean(tab) &&
-    (tab.kind === "context" || tab.kind === "overview" || tab.kind === "new" || tab.kind === "review" ||
+    (tab.kind === "context" || tab.kind === "activity" || tab.kind === "new" || tab.kind === "review" ||
       tab.kind === "file" || tab.kind === "plugin" ||
       tab.kind === "subagent" || tab.kind === "goalReport" ||
-      tab.kind === "team")
+      tab.kind === "team" || tab.kind === "panorama")
   );
+}
+
+/**
+ * What the tab strip shows, and which tab is really on screen. Docked, the summary is the first tab and the only fixed
+ * one: a stored summary tab moves to the front instead of appearing twice. Not docked, the summary is not one of the
+ * panel's tabs at all, so a stored tab for it is hidden; when it was the active tab the panel falls back to the tab
+ * after it, and to the empty page when there is none.
+ */
+export function workPanelDisplayTabs(
+  tabs: readonly WorkPanelTab[],
+  activeTabId: string | null,
+  options: { hasSession: boolean; docked: boolean },
+): { displayTabs: WorkPanelTab[]; activeTab: WorkPanelTab | null } {
+  const storedActivity = tabs.find((tab) => tab.kind === "activity");
+  const details = tabs.filter((tab) => tab.kind !== "activity");
+  if (!options.hasSession) return { displayTabs: details, activeTab: details.find((tab) => tab.id === activeTabId) ?? null };
+  if (options.docked) {
+    const displayTabs = [storedActivity ?? activityWorkPanelTab(), ...details];
+    return { displayTabs, activeTab: displayTabs.find((tab) => tab.id === activeTabId) ?? displayTabs[0] ?? null };
+  }
+  if (activeTabId === ACTIVITY_WORK_PANEL_TAB_ID) {
+    const index = tabs.findIndex((tab) => tab.id === ACTIVITY_WORK_PANEL_TAB_ID);
+    const next = index >= 0 ? tabs.slice(index + 1).find((tab) => tab.kind !== "activity") : undefined;
+    return { displayTabs: details, activeTab: next ?? null };
+  }
+  return { displayTabs: details, activeTab: details.find((tab) => tab.id === activeTabId) ?? details[0] ?? null };
 }
 
 export function sanitizeWorkPanelTabsState(

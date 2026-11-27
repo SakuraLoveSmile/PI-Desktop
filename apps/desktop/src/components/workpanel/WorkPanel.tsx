@@ -20,7 +20,8 @@ import {
   isKnownWorkPanelTab,
   parsePluginViewRef,
   pluginWorkPanelTab,
-  overviewWorkPanelTab,
+  activityWorkPanelTab,
+  workPanelDisplayTabs,
   subagentTabDisplayLabels,
   teamWorkPanelTab,
   toolWorkPanelTab,
@@ -33,6 +34,7 @@ import { Button, cx } from "../ui";
 import { TooltipButton } from "../ui";
 import type { IconProps } from "../icons";
 import {
+  IconActivity,
   IconBot,
   IconCheckCheck,
   IconClose,
@@ -54,7 +56,9 @@ import { GoalReportTab } from "./GoalReportTab";
 import { TeamWorkPanelSurface } from "./team/TeamWorkPanelSurface";
 import { teamTabIcon, teamTabLabel } from "./team/team-work-panel-tab";
 import { ContextInsightsDashboard } from "../../features/context-insights/ContextInsightsDashboard";
-import { OverviewTab } from "./OverviewTab";
+import { SubagentPanorama } from "./SubagentPanorama";
+import { ActivityDockTab } from "../../features/chat/activity/ActivityDockTab";
+import { useActivityPlacementStore } from "../../features/chat/activity/activity-placement-store";
 import {
   MAIN_PANE_MIN_WIDTH,
   WORK_PANEL_COMPACT_MIN_WIDTH,
@@ -67,7 +71,7 @@ import {
 
 const TAB_ICONS = {
   context: IconMap,
-  overview: IconMap,
+  activity: IconActivity,
   new: IconPlus,
   review: IconDiff,
   file: IconFileText,
@@ -75,6 +79,7 @@ const TAB_ICONS = {
   subagent: IconBot,
   goalReport: IconCheckCheck,
   team: IconUsers,
+  panorama: IconMap,
 } as const;
 
 type WorkPanelResizeState = {
@@ -132,6 +137,7 @@ function tabLabel(
   if (tab.kind === "subagent") return tab.label ?? t("panel.tabs.subagent");
   if (tab.kind === "goalReport") return tab.label ?? t("panel.tabs.goalReport");
   if (tab.kind === "team") return teamTabLabel(tab, t);
+  if (tab.kind === "panorama") return t("team.panoramaTitle");
   if (tab.kind !== "file") return t(`panel.tabs.${tab.kind}`);
   const path = tab.resource ?? "";
   return path.split("/").filter(Boolean).pop() || t("panel.tabs.file");
@@ -227,11 +233,14 @@ export function WorkPanel({
   const tabs = rawTabs.filter(isKnownWorkPanelTab);
   const activeTabId = useAppStore((s) => s.activeWorkPanelTabId);
   const activeSessionId = useAppStore((s) => s.activeSessionId);
-  // Overview is a fixed session surface. Keeping it in the rendered list
-  // avoids mutating persisted tab state while making it first for every session.
-  const displayTabs = activeSessionId
-    ? [overviewWorkPanelTab(), ...tabs.filter((tab) => tab.kind !== "overview")]
-    : tabs;
+  // The session summary is a fixed surface only while the chat is too narrow for the rail. Keeping it in the rendered
+  // list instead of the stored tabs avoids mutating saved state; see workPanelDisplayTabs for the not-docked case.
+  const activityDocked = useActivityPlacementStore((s) => s.placement === "docked");
+  const { displayTabs, activeTab: effectiveTab } = workPanelDisplayTabs(tabs, activeTabId, {
+    hasSession: Boolean(activeSessionId),
+    docked: activityDocked,
+  });
+  const selectedTabId = effectiveTab?.id ?? null;
   const sessions = useAppStore((s) => s.sessions);
   const selectSession = useAppStore((s) => s.selectSession);
   const pluginViews = useAppStore((s) => s.pluginViews);
@@ -243,9 +252,7 @@ export function WorkPanel({
   const openNewWorkPanelTab = useAppStore((s) => s.openNewWorkPanelTab);
   const replaceWorkPanelTab = useAppStore((s) => s.replaceWorkPanelTab);
   const setWidth = useAppStore((s) => s.setWorkPanelWidth);
-  const activeTab =
-    displayTabs.find((tab) => tab.id === activeTabId) ??
-    (activeSessionId ? displayTabs[0] ?? null : null);
+  const activeTab = effectiveTab;
   const activeSession = sessions.find((s) => s.id === activeSessionId);
   const activeTeamId = localTeamSessionId(activeSession);
   const tools = workPanelTools(
@@ -336,12 +343,12 @@ export function WorkPanel({
   }, [exiting]);
 
   useLayoutEffect(() => {
-    if (!activeTabId) return;
-    tabButtonRefs.current[activeTabId]?.scrollIntoView({
+    if (!selectedTabId) return;
+    tabButtonRefs.current[selectedTabId]?.scrollIntoView({
       block: "nearest",
       inline: "nearest",
     });
-  }, [activeTabId, tabs.length]);
+  }, [selectedTabId, tabs.length]);
 
   const finishTabReorder = useCallback(() => {
     const state = tabReorderState.current;
@@ -626,12 +633,15 @@ export function WorkPanel({
   );
   const onTabKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLButtonElement>, tabId: string) => {
-      const navigationTabs = tabId === "overview" ? displayTabs : tabs;
+      const navigationTabs = displayTabs;
       const index = navigationTabs.findIndex((tab) => tab.id === tabId);
       if (index < 0) return;
-      if (tabId === "overview" && (event.key === "Delete" || event.key === "Backspace")) {
-        event.preventDefault();
-        return;
+      // The summary is a fixed surface, not a closable or movable tab.
+      if (tabId === activityWorkPanelTab().id) {
+        if (event.key === "Delete" || event.key === "Backspace") {
+          event.preventDefault();
+          return;
+        }
       }
       if (event.key === "Delete" || event.key === "Backspace") {
         event.preventDefault();
@@ -642,7 +652,7 @@ export function WorkPanel({
         event.preventDefault();
         const target = navigationTabs[index + (event.key === "ArrowLeft" ? -1 : 1)];
         if (!target) return;
-        if (tabId !== "overview") reorderTab(tabId, target.id, event.key === "ArrowRight");
+        if (tabId !== activityWorkPanelTab().id) reorderTab(tabId, target.id, event.key === "ArrowRight");
         return;
       }
       if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
@@ -657,11 +667,11 @@ export function WorkPanel({
               : (index + 1) % navigationTabs.length;
       const nextTab = navigationTabs[nextIndex];
       if (!nextTab) return;
-      if (nextTab.kind === "overview") openWorkPanelTab(overviewWorkPanelTab());
+      if (nextTab.kind === "activity") openWorkPanelTab(activityWorkPanelTab());
       else activateTab(nextTab.id);
       requestAnimationFrame(() => tabButtonRefs.current[nextTab.id]?.focus());
     },
-    [activateTab, closeTabAndFocus, displayTabs, openWorkPanelTab, reorderTab, tabs],
+    [activateTab, closeTabAndFocus, displayTabs, openWorkPanelTab, reorderTab],
   );
 
   const onTabStripWheel = (event: React.WheelEvent<HTMLDivElement>) => {
@@ -868,7 +878,7 @@ export function WorkPanel({
                     tab.kind === "subagent"
                       ? (subagentLabelById.get(tab.id) ?? t("panel.tabs.subagent"))
                       : tabLabel(tab, t, pluginViews);
-                  const selected = tab.id === activeTabId;
+                  const selected = tab.id === selectedTabId;
                   const Icon =
                     tab.kind === "plugin"
                       ? pluginViewIcon(
@@ -902,17 +912,17 @@ export function WorkPanel({
                         className="work-panel-tab-button"
                         title={tab.kind === "subagent" || tab.kind === "team" ? label : tab.resource ?? label}
                         onPointerDown={(event) => {
-                          if (tab.kind !== "overview") beginTabReorder(event, tab.id);
+                          if (tab.kind !== "activity") beginTabReorder(event, tab.id);
                         }}
                         onDragStart={(event) => event.preventDefault()}
                         onClick={() =>
-                          tab.kind === "overview"
-                            ? openWorkPanelTab(overviewWorkPanelTab())
+                          tab.kind === "activity"
+                            ? openWorkPanelTab(activityWorkPanelTab())
                             : activateTab(tab.id)
                         }
                         onAuxClick={(event) => {
                           if (event.button !== 1) return;
-                          if (tab.kind === "overview") return;
+                          if (tab.kind === "activity") return;
                           event.preventDefault();
                           closeTabAndFocus(tab.id);
                         }}
@@ -921,7 +931,7 @@ export function WorkPanel({
                         <Icon size={14} />
                         <span className="work-panel-tab-label">{label}</span>
                       </button>
-                      {tab.kind !== "overview" && <button
+                      {tab.kind !== "activity" && <button
                         type="button"
                         className="work-panel-tab-close"
                         aria-label={t("panel.closeTab", { name: label })}
@@ -970,7 +980,7 @@ export function WorkPanel({
               <ContextInsightsDashboard sessionId={activeSessionId} compact />
             </div>
           )}
-          {activeTab?.kind === "overview" && (
+          {activeTab?.kind === "activity" && activeSessionId && (
             <div
               key={activeTab.id}
               id={`work-panel-surface-${activeTab.id}`}
@@ -978,7 +988,18 @@ export function WorkPanel({
               role="tabpanel"
               aria-labelledby={`work-panel-tab-${activeTab.id}`}
             >
-              <OverviewTab />
+              <ActivityDockTab sessionId={activeSessionId} />
+            </div>
+          )}
+          {activeTab?.kind === "panorama" && activeSessionId && (
+            <div
+              key={activeTab.id}
+              id={`work-panel-surface-${activeTab.id}`}
+              className="work-panel-tabpane"
+              role="tabpanel"
+              aria-labelledby={`work-panel-tab-${activeTab.id}`}
+            >
+              <SubagentPanorama sessionId={activeSessionId} />
             </div>
           )}
           {activeTab?.kind === "subagent" && (

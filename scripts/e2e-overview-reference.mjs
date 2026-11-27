@@ -63,7 +63,7 @@ app.whenReady().then(async () => {
     await window.webContents.executeJavaScript("new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
     const screenshot = await window.capturePage();
     writeFileSync(process.env.PI_E2E_EVIDENCE_PATH, screenshot.toPNG());
-    await window.webContents.executeJavaScript("document.querySelector('.work-panel-overview-scroll').scrollTop = document.querySelector('.work-panel-overview-scroll').scrollHeight");
+    await window.webContents.executeJavaScript("(() => { const rail = document.querySelector('.activity-dock-tab'); if (rail) rail.scrollTop = rail.scrollHeight; })()");
     await window.webContents.executeJavaScript("new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
     writeFileSync(process.env.PI_E2E_EVIDENCE_PATH.replace('.png', '-resources.png'), (await window.capturePage()).toPNG());
     await window.webContents.executeJavaScript("globalThis.overviewReferenceShow('panorama')");

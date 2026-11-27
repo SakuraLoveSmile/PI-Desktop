@@ -525,9 +525,9 @@ export function createPlanningFixture(projectPath) {
       await waitActionExpert(false);
       await waitFor(async () => (await invoke("plansPending", { sessionId: planLead.id })).plans.some((item) => item.title === "Retry Team Research"), "retry expert-backed proposal");
       await waitFor(() => evaluate(`!!document.querySelector('[data-testid="plan-approval-bar"][data-status="pending"] .plan-approval-approve-main')`), "retry pending card");
-      await waitFor(() => evaluate(`!!document.querySelector('[data-work-panel-tab-id="overview"] .work-panel-tab-button')`), "Overview tab before Plan approval");
-      await evaluate(`document.querySelector('[data-work-panel-tab-id="overview"] .work-panel-tab-button').click()`);
-      await waitFor(() => evaluate(`document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id') === 'overview'`), "Overview active before execution approval");
+      await waitFor(() => evaluate(`!!document.querySelector('[data-work-panel-tab-id="activity"] .work-panel-tab-button')`), "Overview tab before Plan approval");
+      await evaluate(`document.querySelector('[data-work-panel-tab-id="activity"] .work-panel-tab-button').click()`);
+      await waitFor(() => evaluate(`document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id') === 'activity'`), "Overview active before execution approval");
       assert.equal(await evaluate(`!!document.querySelector('[data-testid="team-launch-review"]')`), false, "Plan research left launch review visible in Overview");
       executionCallBase = calls.length;
       actionResultEntered = false;
@@ -610,7 +610,7 @@ export function createPlanningFixture(projectPath) {
       await prompt("TP_INBOX_WAIT_LEAD: keep waiting for expert reports without voluntarily ending the turn or submitting a plan.");
       await waitFor(() => inboxLeadEntered && inboxWorkerEntered, "busy Lead and read-only researcher held at explicit sync points");
       await context.activateOverviewTab(sendCdp, evaluate);
-      const progress = '[data-testid="overview-team-progress"] section.team-progress';
+      const progress = '[data-activity-group="teamTasks"]';
       await waitFor(() => evaluate(`document.querySelector('${progress}')?.dataset.total === '1' && document.querySelector('${progress}')?.dataset.completed === '0'`), "mounted Overview shows assigned pending research");
       releaseInboxWorker();
       const queued = await waitFor(async () => {
