@@ -562,6 +562,9 @@ transcript 保留稳定错误码、传输 errno 和原始 details，但使用本
 |---|---|---|
 | `NOTE_CONFLICT` | yes | Quick Note revision 改变；保留草稿，保存前重新加载 |
 | `SESSION_NOTES_UNSUPPORTED` | no | 原生或远程会话不提供 Quick Notes |
+| `SUMMARY_CONFLICT` | yes | 会话总结的 revision 已改变；错误数据带有当前记录，调用方显示它而不是覆盖 |
+| `SESSION_SUMMARY_UNSUPPORTED` | no | 原生、远程或 Team 成员会话没有会话总结 |
+| `SESSION_SUMMARY_EMPTY` | yes | 模型写出的会话总结清理后没有可用文字；保留上一版总结 |
 | `BACKGROUND_PROCESS_NOT_FOUND` | no | 托管进程不属于请求的会话 |
 | `BACKGROUND_PROCESS_START_FAILED` | yes | 已授权后台执行器无法启动 |
 | `BACKGROUND_PROCESS_PERSISTENCE_FAILED` | yes | 托管进程状态无法存储；修复存储后重试 |

@@ -1547,6 +1547,17 @@ Host 启动将未完成记录标 interrupted；持久化 PID 不授权进程控�
 P5 不推进共享 PRAGMA user_version。当前可执行共享迁移由
 `crates/host-core/src/db.rs` 拥有；上文旧共享 v19 示例是历史记录。
 
+### 会话总结记录
+
+活动栏固定卡片背后由模型写出的总结不是一张表。Host 的 `session-summary-v1` KV 命名空间为每个本地会话 id
+保存一条记录，`{version, text, revision, basedOnMessageCount, updatedAt}`，其中 `text` 至多 2,000 字节 UTF-8。
+写入是在同一个立即事务里按 `revision` 做比较并替换，同时检查会话仍然存在，因此迟到的结果无法为已删除或
+进了回收站的会话重新建出记录；`basedOnMessageCount` 是写入文本时会话的消息计数器，读取侧据此推出 `behind`
+与 `diverged`。该记录是衍生文本：不是转录或模型输入，不被搜索或导出，也不复制进 fork；无法读取的记录或
+`version` 更新的记录读作不存在，由下一次写入替换。`kv` 与 `sessions` 之间没有外键，所以
+`delete_session`、`delete_session_with_team_cleanup` 和插件会话删除（回收与彻底删除都一样）都点名该命名空间，
+随会话一起删除这一行；任何一条路径漏掉它，测试就会失败。不改变架构、`user_version`，也没有迁移。
+
 ## Plus 团队可靠性迁移 P6/P7
 
 独立 Plus migration track 在 P6 增加 team_ordinary_inbox，在 P7 增加 background_service_ownership；不改 upstream schema。P6 是 prepared/persisted/ACKed 认证输入 journal，不是重复正文存储或协作 turn 唯一约束变更；P7 仅标记显式新服务，旧后台行仍是普通 command。升级/重启不自动启动 provider 或进程。JSONL-first 切点与 service stop/recovery 分别见[普通 inbox](/zh-CN/spec/03-runtime/team-ordinary-inbox)和[显式服务](/zh-CN/spec/03-runtime/team-managed-services)。

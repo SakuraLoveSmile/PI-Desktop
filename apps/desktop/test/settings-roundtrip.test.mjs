@@ -34,3 +34,25 @@ test("invalid retry writes stay rejected at both boundaries", () => {
     assert.throws(() => main.validateSettingsWrite(settings), /infiniteProviderRetry is invalid/);
   }
 });
+
+test("the session summary setting stays absent until chosen and only booleans are written", () => {
+  const previousWindow = globalThis.window;
+  globalThis.window = { piDesktop: { platform: "win32" } };
+  try {
+    // Absent means on: loading and saving unrelated preferences must not write a choice nobody made.
+    const received = structuredClone(main.normalizeSettings({ defaultMode: "agent", theme: "light" }));
+    const displayed = renderer.normalizeSettings(received);
+    assert.equal(Object.hasOwn(displayed, "autoSummarizeSessions"), false);
+    assert.equal(Object.hasOwn(renderer.validateSettingsWrite(displayed), "autoSummarizeSessions"), false);
+    for (const value of [true, false]) {
+      const outgoing = renderer.validateSettingsWrite({ autoSummarizeSessions: value });
+      assert.equal(main.validateSettingsWrite(structuredClone(outgoing)).autoSummarizeSessions, value);
+    }
+    for (const value of [undefined, null, "yes", 0, {}]) {
+      assert.throws(() => renderer.validateSettingsWrite({ autoSummarizeSessions: value }), /autoSummarizeSessions is invalid/);
+    }
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  }
+});

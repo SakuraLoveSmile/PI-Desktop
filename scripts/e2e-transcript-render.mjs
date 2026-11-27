@@ -170,6 +170,10 @@ app.whenReady().then(async () => {
     result.activityServers = await window.webContents.executeJavaScript("globalThis.sessionActivityServersProbe()");
     if (!result.activityServers.ok) throw new Error(result.activityServers.error);
     result.ok = result.ok && result.activityServers.ok;
+    console.error("TRANSCRIPT_STAGE activity-summary");
+    result.activitySummary = await window.webContents.executeJavaScript("globalThis.sessionActivitySummaryProbe()");
+    if (!result.activitySummary.ok) throw new Error(result.activitySummary.error);
+    result.ok = result.ok && result.activitySummary.ok;
     console.error("TRANSCRIPT_STAGE readability");
     const readability = await window.webContents.executeJavaScript("globalThis.transcriptReadabilityProbe()");
     result.readability = readability;

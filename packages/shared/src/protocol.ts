@@ -136,6 +136,8 @@ export const IPC = {
     sessionActivityGet: "pi-desktop/sessionActivity/get",
     sessionNotesGet: "pi-desktop/sessionNotes/get",
     sessionNotesSet: "pi-desktop/sessionNotes/set",
+    sessionSummaryGet: "pi-desktop/sessionSummary/get",
+    sessionSummaryRefresh: "pi-desktop/sessionSummary/refresh",
     backgroundProcessesList: "pi-desktop/backgroundProcesses/list",
     backgroundProcessesRead: "pi-desktop/backgroundProcesses/read",
     backgroundProcessesStop: "pi-desktop/backgroundProcesses/stop",

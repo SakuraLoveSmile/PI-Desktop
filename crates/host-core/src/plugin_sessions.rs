@@ -1167,8 +1167,12 @@ pub fn delete(db: &Database, plugin_id: &str, params_value: &Value) -> Result<Va
         )?;
     }
     tx.execute(
-        "DELETE FROM kv WHERE ns=?1 AND key=?2",
-        params![crate::context_insights::NAMESPACE, session_id],
+        "DELETE FROM kv WHERE ns IN (?1, ?2) AND key=?3",
+        params![
+            crate::context_insights::NAMESPACE,
+            crate::session_summary::NAMESPACE,
+            session_id
+        ],
     )?;
     tx.commit()?;
     if mode == "purge" {
@@ -1494,6 +1498,33 @@ mod tests {
                 .kv_get(crate::context_insights::NAMESPACE, &id)
                 .unwrap()
                 .is_some());
+        }
+    }
+
+    #[test]
+    fn plugin_session_trash_and_purge_drop_the_derived_records() {
+        for mode in ["trash", "purge"] {
+            let (_dir, db) = db();
+            let mut input = item("derived-records", "2026-01-01T00:00:01Z");
+            input["source"] = json!("legacy");
+            let id = import(&db, "plugin.one", &input).unwrap()["sessionId"]
+                .as_str()
+                .unwrap()
+                .to_string();
+            for namespace in [
+                crate::context_insights::NAMESPACE,
+                crate::session_summary::NAMESPACE,
+            ] {
+                db.kv_set(namespace, &id, &json!({"derived": "record"}))
+                    .unwrap();
+            }
+            delete(&db, "plugin.one", &json!({"sessionId": id, "mode": mode})).unwrap();
+            for namespace in [
+                crate::context_insights::NAMESPACE,
+                crate::session_summary::NAMESPACE,
+            ] {
+                assert!(db.kv_get(namespace, &id).unwrap().is_none(), "{mode}");
+            }
         }
     }
 }

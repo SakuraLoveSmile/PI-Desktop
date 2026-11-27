@@ -22,6 +22,7 @@ mod scheduled_rpc;
 mod scheduled_tools;
 mod session_activity_rpc;
 mod session_notes_rpc;
+mod session_summary_rpc;
 #[cfg(test)]
 mod storage_compatibility_tests;
 #[cfg(test)]
@@ -1167,6 +1168,15 @@ fn validate_settings_value(value: &Value) -> Result<(), JsonRpcError> {
             return Err(rpc_err(
                 1002,
                 "autoGenerateSessionTitles must be a boolean",
+                "INVALID_PARAMS",
+            ));
+        }
+    }
+    if let Some(auto_summary) = object.get("autoSummarizeSessions") {
+        if !auto_summary.is_boolean() {
+            return Err(rpc_err(
+                1002,
+                "autoSummarizeSessions must be a boolean",
                 "INVALID_PARAMS",
             ));
         }
@@ -4441,6 +4451,9 @@ async fn handle_request_inner(
         }
         method if method.starts_with("sessionNotes.") => {
             session_notes_rpc::handle(state.clone(), method, &params).await
+        }
+        method if method.starts_with("sessionSummary.") => {
+            session_summary_rpc::handle(state.clone(), method, &params).await
         }
         "tools.list" => {
             let mut definitions = tools::builtin_tool_defs();
@@ -8562,6 +8575,30 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(title_settings["autoGenerateSessionTitles"], false);
+
+        handle_request(
+            state.clone(),
+            "settings.set",
+            json!({ "autoSummarizeSessions": false }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        let summary_settings = handle_request(state.clone(), "settings.get", json!({}), tx.clone())
+            .await
+            .unwrap();
+        assert_eq!(summary_settings["autoSummarizeSessions"], false);
+        // Independent of the title toggle, which stays as it was set above.
+        assert_eq!(summary_settings["autoGenerateSessionTitles"], false);
+        let invalid_summary = handle_request(
+            state.clone(),
+            "settings.set",
+            json!({ "autoSummarizeSessions": "yes" }),
+            tx.clone(),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(invalid_summary.data.unwrap()["errorCode"], "INVALID_PARAMS");
 
         handle_request(
             state.clone(),

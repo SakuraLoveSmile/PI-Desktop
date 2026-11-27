@@ -477,6 +477,21 @@ export function SettingsPage() {
                   />
                 </SettingsRow>
                 <SettingsRow
+                  title={t("settings.autoSummarizeSessions")}
+                  description={t("settings.autoSummarizeSessionsDesc")}
+                >
+                  <SettingsToggle
+                    checked={settings.autoSummarizeSessions !== false}
+                    label={t("settings.autoSummarizeSessions")}
+                    onChange={() =>
+                      void savePreference({
+                        autoSummarizeSessions:
+                          !(settings.autoSummarizeSessions !== false),
+                      })
+                    }
+                  />
+                </SettingsRow>
+                <SettingsRow
                   title={t("settings.smoothStreaming")}
                   description={t("settings.smoothStreamingDesc")}
                 >

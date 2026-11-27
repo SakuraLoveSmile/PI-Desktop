@@ -54,6 +54,12 @@ export type AppSettings = {
    * Absent and true enable automatic summarization; false disables it.
    */
   autoGenerateSessionTitles?: boolean;
+  /**
+   * Keep the model-written session summary card in the activity rail up to date.
+   * Absent and true enable it; false stops automatic and manual refreshes and
+   * hides the card (a stored summary is kept).
+   */
+  autoSummarizeSessions?: boolean;
   /** Prevent idle system sleep while this desktop app runs; off when absent. */
   keepAwakeWhileRunning?: boolean;
   /** Configured command shell for the agent Bash protocol tool. */

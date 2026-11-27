@@ -621,6 +621,9 @@ remain idempotent. Cancelled roster waits interrupt execution, not complete it.
 |---|---|---|
 | `NOTE_CONFLICT` | yes | Quick Note revision changed; preserve draft and reload before saving |
 | `SESSION_NOTES_UNSUPPORTED` | no | Native or remote session does not expose Quick Notes |
+| `SUMMARY_CONFLICT` | yes | Session summary revision changed; the error data carries the current record, which the caller shows instead of overwriting |
+| `SESSION_SUMMARY_UNSUPPORTED` | no | Native, remote or Team member session does not have a session summary |
+| `SESSION_SUMMARY_EMPTY` | yes | The model's session summary had no usable text after cleaning; the previous summary stays |
 | `BACKGROUND_PROCESS_NOT_FOUND` | no | Managed process does not belong to the requested session |
 | `BACKGROUND_PROCESS_START_FAILED` | yes | Authorized background runner could not start |
 | `BACKGROUND_PROCESS_PERSISTENCE_FAILED` | yes | Managed process state could not be stored; restore storage and retry |

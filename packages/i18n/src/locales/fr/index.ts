@@ -1548,6 +1548,8 @@ sklm: {
     "infiniteProviderRetryDesc": "Réessaie les erreurs réseau et temporaires jusqu’à la réussite. Vous pouvez toujours arrêter le tour ; la consommation d’API peut continuer.",
     "autoGenerateSessionTitles": "Titres de session automatiques",
     "autoGenerateSessionTitlesDesc": "Résume automatiquement la conversation en un titre court après le premier tour. Envoie un extrait limité au modèle sélectionné et peut entraîner une consommation.",
+    "autoSummarizeSessions": "Résumé de la session",
+    "autoSummarizeSessionsDesc": "Épingle en haut de l'aperçu de l'activité un court résumé de la conversation et le met à jour à la fin de chaque tour. Envoie un extrait limité de la conversation récente au modèle de la session et peut consommer de l'usage.",
     "smoothStreaming": "Streaming fluide",
     "smoothStreamingDesc": "Libère le texte diffusé caractère par caractère pour un effet machine à écrire. Automatiquement désactivé lorsque le système préfère un mouvement réduit.",
     "preventScreenSleep": "Empêcher la mise en veille",
@@ -2281,6 +2283,7 @@ sklm: {
       mcp: { idle: "Inactif", authNeeded: "Connexion requise", reconnect: "Reconnecter", reconnectNamed: "Reconnecter {{name}} (échec de la connexion)" },
       servers: "Serveurs",
       server: { stop: "Arrêter {{name}}", open: "Ouvrir {{address}}", stopFailed: "Impossible d'arrêter {{name}}." },
+      summary: { title: "Résumé de la session", updated: "Mis à jour {{time}}", refresh: "Régénérer le résumé de la session", expand: "Développer", collapse: "Réduire", refreshFailed: "Impossible de mettre à jour le résumé de la session." },
       goals: "Objectif",
       sections: {
         grip: "Déplacer la section : {{name}}",

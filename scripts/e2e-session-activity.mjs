@@ -223,6 +223,47 @@ try {
   await unchanged(host, session, transcript, note, sentinel);
   record("E2E-ACTIVITY-NOTES", "exact UTF-8/whitespace, CAS conflict, restart, unchanged transcript/project");
 
+  // The pinned session summary: the Host stores the paragraph Electron Main writes and never calls a model itself.
+  const summarized = await createSession(host, workspace, "Session summary E2E");
+  const summaryParams = { sessionId: summarized.id };
+  const append = (id, role, text) => host.call("session.appendMessage", {
+    sessionId: summarized.id,
+    message: { id, role, content: text, createdAt: "2026-11-22T00:00:00.000Z", status: "complete" },
+  });
+  await append("summary-1", "user", "Plan the importer");
+  await append("summary-2", "assistant", "Start with the CSV reader.");
+  assert.deepEqual(await host.call("sessionSummary.get", summaryParams), { summary: null, messageCount: 2 });
+  const summaryText = "  Planning the importer; the CSV reader comes first 中🙂\n";
+  const { summary } = await host.call("sessionSummary.set", { ...summaryParams, text: summaryText, basedOnMessageCount: 2, expectedRevision: 0 });
+  assert.equal(summary.text, summaryText.trim());
+  assert.deepEqual([summary.revision, summary.basedOnMessageCount, summary.behind, summary.diverged], [1, 2, 0, false]);
+  await append("summary-3", "user", "Now the writer");
+  await append("summary-4", "assistant", "Writer sketched.");
+  const behind = await host.call("sessionSummary.get", summaryParams);
+  assert.equal(behind.messageCount, 4);
+  assert.deepEqual([behind.summary.text, behind.summary.revision, behind.summary.behind], [summary.text, 1, 2]);
+  await assert.rejects(host.call("sessionSummary.set", { ...summaryParams, text: "stale", basedOnMessageCount: 4, expectedRevision: 0 }), (error) => {
+    assert.equal(error.errorCode, "SUMMARY_CONFLICT");
+    assert.equal(error.rpc.data.currentRevision, 1);
+    assert.equal(error.rpc.data.summary.text, summary.text);
+    return true;
+  });
+  await rpcError(host, "sessionSummary.set", { ...summaryParams, text: "   ", basedOnMessageCount: 4, expectedRevision: 1 }, "INVALID_ARGUMENT");
+  await rpcError(host, "sessionSummary.set", { ...summaryParams, text: "x".repeat(2001), basedOnMessageCount: 4, expectedRevision: 1 }, "LIMIT_EXCEEDED");
+  for (const id of ["native-pi:fixture", "remote:fixture"]) {
+    await rpcError(host, "sessionSummary.get", { sessionId: id }, "SESSION_SUMMARY_UNSUPPORTED");
+  }
+  await rpcError(host, "sessionSummary.get", { sessionId: "missing-session" }, "NOT_FOUND");
+  await reopen(host);
+  assert.deepEqual((await host.call("sessionSummary.get", summaryParams)).summary, behind.summary);
+  const forked = (await host.call("session.fork", { sessionId: summarized.id, title: "Session summary fork" })).session;
+  assert.equal((await host.call("sessionSummary.get", { sessionId: forked.id })).summary, null, "a fork starts without its source's summary");
+  await host.call("session.delete", { id: summarized.id });
+  await rpcError(host, "sessionSummary.get", summaryParams, "NOT_FOUND");
+  await rpcError(host, "sessionSummary.set", { ...summaryParams, text: "late", basedOnMessageCount: 4, expectedRevision: 1 }, "NOT_FOUND");
+  await unchanged(host, session, transcript, note, sentinel);
+  record("E2E-ACTIVITY-SUMMARY", "empty read, exact trimmed UTF-8 write, behind count, CAS conflict, size/blank/unsupported refusals, restart, fork, delete, unchanged transcript/project");
+
   if (process.platform === "win32") {
     console.log("LIMITATION Windows production runner/process-tree lifecycle is not covered by this POSIX ps harness.");
   } else {

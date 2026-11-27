@@ -1549,6 +1549,8 @@ sklm: {
     infiniteProviderRetryDesc: "Ağ ve geçici sağlayıcı hataları istek başarılı olana kadar yeniden denenir. Çalışmayı yine durdurabilirsiniz; açıkken API kullanımı sürebilir.",
     autoGenerateSessionTitles: "Otomatik oturum başlıkları",
     autoGenerateSessionTitlesDesc: "İlk turdan sonra konuşmayı otomatik olarak kısa bir başlıkla özetler. İlk istemin ve yanıtın sınırlı bir özetini seçilen modele gönderir ve kullanım oluşturabilir.",
+    autoSummarizeSessions: "Oturum özeti",
+    autoSummarizeSessionsDesc: "Etkinlik genel bakışının üstüne konuşmanın kısa bir özetini sabitler ve bir tur bittiğinde günceller. Son konuşmadan sınırlı bir alıntıyı oturumun kendi modeline gönderir ve kullanım doğurabilir.",
     smoothStreaming: "Düzgün akış",
     smoothStreamingDesc: "Akan metni daktilo efekti için karakter karakter gösterir. Sistem hareket azaltmayı tercih ettiğinde otomatik devre dışı kalır.",
     preventScreenSleep: "Ekran uykusunu engelle",
@@ -2287,6 +2289,7 @@ sklm: {
       mcp: { idle: "Boşta", authNeeded: "Giriş gerekli", reconnect: "Yeniden bağlan", reconnectNamed: "{{name}} sunucusuna yeniden bağlan (bağlantı başarısız)" },
       servers: "Sunucular",
       server: { stop: "{{name}} durdur", open: "{{address}} adresini aç", stopFailed: "{{name}} durdurulamadı." },
+      summary: { title: "Oturum özeti", updated: "Güncellendi: {{time}}", refresh: "Oturum özetini yeniden oluştur", expand: "Genişlet", collapse: "Daralt", refreshFailed: "Oturum özeti güncellenemedi." },
       goals: "Hedef",
       sections: {
         grip: "Bölümü taşı: {{name}}",

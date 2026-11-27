@@ -1514,6 +1514,8 @@ export const ptBR = {
     infiniteProviderRetryDesc: "Continua tentando indefinidamente em caso de falhas temporárias de rede ou do provedor. Ainda é possível interromper a rodada; enquanto esta opção estiver ativada, o consumo e os custos da API podem continuar.",
     autoGenerateSessionTitles: "Títulos automáticos de sessão",
     autoGenerateSessionTitlesDesc: "Resume a conversa automaticamente em um título curto após a primeira rodada. Envia um trecho limitado ao modelo selecionado e pode gerar consumo.",
+    autoSummarizeSessions: "Resumo da sessão",
+    autoSummarizeSessionsDesc: "Mantém fixado no topo da visão geral da atividade um resumo curto da conversa e o atualiza quando uma rodada termina. Envia um trecho limitado da conversa recente ao modelo da própria sessão e pode consumir uso.",
     smoothStreaming: "Exibição gradual",
     smoothStreamingDesc: "Exibe o texto recebido caractere por caractere, criando um efeito de máquina de escrever. É desativada automaticamente quando o sistema está configurado para reduzir animações.",
     preventScreenSleep: "Impedir suspensão da tela",
@@ -2233,6 +2235,7 @@ export const ptBR = {
       mcp: { idle: "Inativo", authNeeded: "Login necessário", reconnect: "Reconectar", reconnectNamed: "Reconectar {{name}} (falha na conexão)" },
       servers: "Servidores",
       server: { stop: "Parar {{name}}", open: "Abrir {{address}}", stopFailed: "Não foi possível parar {{name}}." },
+      summary: { title: "Resumo da sessão", updated: "Atualizado em {{time}}", refresh: "Gerar o resumo da sessão novamente", expand: "Expandir", collapse: "Recolher", refreshFailed: "Não foi possível atualizar o resumo da sessão." },
       goals: "Meta",
       sections: {
         grip: "Mover seção: {{name}}",

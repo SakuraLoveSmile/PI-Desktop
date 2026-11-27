@@ -31,6 +31,9 @@ export type ActivityEnvironment = { name: string; path: string; branch: string |
 /** The recorded changes the Review tab lists, as counts. */
 export type ActivityChanges = { count: number; additions: number; deletions: number };
 
+/** The pinned session summary: the model-written paragraph, when it was written and the one control the card offers. */
+export type ActivitySummary = { text: string; updatedAt: string; refreshing: boolean; onRefresh: () => void };
+
 export type ActivityAttentionItem = {
   id: string;
   label: string;
