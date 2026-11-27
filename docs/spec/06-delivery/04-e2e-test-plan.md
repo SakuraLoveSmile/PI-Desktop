@@ -15554,15 +15554,26 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   Exercise the window-blur handler, drop-target styling, project action hover
   and keyboard Tab/Shift+Tab focus. Fold and reopen the selected conversation's
   group. Select pinned and standalone conversations. Open Settings and return.
-  Enable reduced motion and inspect both row transition durations.
+  Measure the row grid against the sidebar body's left edge: the status column,
+  the title and time-group columns, the project icon and name. Measure a
+  resting row and the same row hovered. Probe a running status element for its
+  spin animation and arc color. Enable reduced motion and inspect both row
+  transition durations.
 - **Expected**: Project and conversation hover backgrounds, radii and transitions
   match. The title button stays transparent. Only a conversation uses selected
   fill, which wins over hover; workspace identity remains a separate dot with
   no persistent header fill. Folding never promotes the project to selected.
-  Pinned and standalone rows use the same selected surface. Session titles
-  across ordinary, team lead, running/error/selected, and pinned/native sessions
-  maintain unified horizontal start coordinates (`rect.left`, within 1px), with
-  trailing pin and native badges placed after the title. Keyboard focus
+  Pinned and standalone rows use the same selected surface. Relative to the
+  sidebar body's left border, session rows centre the status on x=24 (x=40 for
+  a project row, x=56 for a team member) and start the title at x=40 (56 and 72
+  at those levels, within 1px); a project header centres its pin or folder on
+  x=24 with the name at x=40; a project time-group header starts on the row
+  title column; trailing pin and native badges stay after the title. A resting
+  row keeps at most 8px of right padding with its controls at opacity 0; a
+  hovered row takes at least 50px and its title never reaches under the
+  controls. A selected row renders no status glyph and paints `--ds-bg-active`;
+  a running status element spins a ring whose open arc uses
+  `--ds-text-primary`. Keyboard focus
   retains an outline, action buttons retain local feedback, drop-target paint
   wins over hover, and blur releases hover without clearing selection. Settings
   replaces sidebar navigation, and returning restores conversation and workspace
@@ -15577,6 +15588,9 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   computed-style assertions. Window blur/focus events and the drop-target class
   are injected for those styling checks; this is not a native focus/drag test.
   Unit coverage: `sidebar-navigation.test.mjs`, `sidebar-pinned-rendering.test.mjs`.
+  The grid and control-room checks read `getBoundingClientRect()` and
+  `getComputedStyle`; the running-ring probe mounts a status element inside a
+  real row because the seeded suite starts no live turn.
 
 #### E2E-LAYOUT-sidebar-settings
 

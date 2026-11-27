@@ -19,7 +19,7 @@
   align-items: center;
   gap: 2px;
   overflow: hidden;
-  padding: 0 2px 0 0;
+  padding: 0;
 }
 
 .thread-item-main {
@@ -27,8 +27,10 @@
   min-width: 0;
   flex: 1;
   align-items: center;
-  gap: 5px;
-  padding: 5px 6px 5px 38px;
+  gap: 8px;
+  /* One icon column for every row kind: 8px row padding, a 16px icon slot and
+     an 8px gap put the title at x=40 (56 inside a project, 72 in a team list). */
+  padding: 5px 8px 5px calc(32px + var(--sidebar-level, 0) * 16px + var(--sidebar-team-indent, 0px));
   text-align: left;
   color: inherit;
 }
@@ -133,11 +135,12 @@
   background: color-mix(in oklab, var(--ds-accent) 12%, transparent);
 }
 .sidebar-session-group-title {
+  position: relative;
   display: flex;
   min-width: 0;
   flex: 1;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
   border-radius: var(--radius-sm);
   padding: 5px 6px;
   background: transparent;
@@ -157,6 +160,18 @@
 .sidebar-session-group-title svg {
   flex: 0 0 auto;
   color: var(--ds-text-muted);
+}
+
+/* The title keeps a fixed 16px icon slot so the project name starts on the same
+   column as every other row and the hover arrow has a place to sit. */
+.sidebar-project-icon {
+  display: inline-flex;
+  width: 16px;
+  height: 13px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  transition: opacity var(--motion-duration-fast) var(--motion-ease-out);
 }
 
 .sidebar-session-group-title span {
@@ -203,9 +218,10 @@
   /* A one-row grid: the fold is a real fraction of the measured content, and
      `opacity` stays 1 — the rows are clipped, never faded. */
   display: grid;
+  /* A project's rows sit one level deeper: every row and its status column
+     move 16px; the fold itself never changes width. */
+  --sidebar-level: 1;
   grid-template-rows: 1fr;
-  margin-left: 13px;
-  padding-left: 9px;
   transition: grid-template-rows var(--motion-duration-normal) var(--motion-ease-out);
 }
 
@@ -238,7 +254,7 @@
 }
 
 .sidebar-time-group-header {
-  padding: 4px 6px 4px 20px;
+  padding: 4px 8px 4px calc(32px + var(--sidebar-level, 0) * 16px + var(--sidebar-team-indent, 0px));
   color: var(--ds-text-muted);
   font-size: var(--text-2xs);
   font-weight: var(--font-weight-medium);
@@ -253,7 +269,7 @@
   display: flex;
   width: 100%;
   align-items: center;
-  padding: 4px 6px 4px 20px;
+  padding: 4px 8px 4px calc(32px + var(--sidebar-level, 0) * 16px + var(--sidebar-team-indent, 0px));
   border-radius: var(--radius-sm);
   color: var(--ds-text-muted);
   font-size: var(--text-xs-plus);
@@ -275,7 +291,7 @@
   overflow-y: auto;
   overscroll-behavior-y: contain;
   /* 2px below the section label, matching every label-to-content pair. */
-  padding: 2px 2px 0;
+  padding: 2px 0 0;
 }
 
 .sidebar-standalone-sessions {
@@ -303,7 +319,7 @@
   overflow-y: auto;
   overscroll-behavior-y: contain;
   /* 2px below the section label, matching every label-to-content pair. */
-  padding: 2px 2px 0;
+  padding: 2px 0 0;
 }
 
 .sidebar-pinned-sessions .thread-item-title {
@@ -344,7 +360,8 @@
 .sidebar-team-session-toggle {
   position: absolute;
   top: 3px;
-  left: 17px;
+  /* Centre the 18px control on the row's icon column. */
+  left: calc(7px + var(--sidebar-level, 0) * 16px + var(--sidebar-team-indent, 0px));
   z-index: 1;
   display: inline-flex;
   width: 18px;
@@ -355,13 +372,28 @@
   color: var(--ds-text-muted);
   transform: rotate(-90deg);
   transition:
+    opacity var(--motion-duration-fast) var(--motion-ease-out),
     background var(--motion-duration-fast) var(--motion-ease-out),
     color var(--motion-duration-fast) var(--motion-ease-out),
     transform var(--motion-duration-fast) var(--motion-ease-out);
 }
 
-.sidebar-team-session-lead .thread-item-main {
-  padding-left: 38px;
+/* A lead row that shows its own status keeps one glyph at rest: the status.
+   Hovering or focusing the row swaps in the collapse control. */
+.sidebar-team-session-lead:has(.thread-item-status) .sidebar-team-session-toggle {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sidebar-team-session-lead:has(.thread-item-status):hover .sidebar-team-session-toggle,
+.sidebar-team-session-lead:has(.thread-item-status):focus-within .sidebar-team-session-toggle {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sidebar-team-session-lead:has(.thread-item-status):hover .thread-item-status,
+.sidebar-team-session-lead:has(.thread-item-status):focus-within .thread-item-status {
+  opacity: 0;
 }
 
 .sidebar-team-session-group[data-expanded="true"] .sidebar-team-session-toggle {
@@ -380,9 +412,10 @@
 
 .sidebar-team-session-members {
   display: grid;
+  /* Members read as children of the lead by one more 16px step, never by a
+     second margin: the row formula owns the indent. */
+  --sidebar-team-indent: 16px;
   grid-template-rows: 1fr;
-  margin-left: 13px;
-  padding-left: 9px;
   transition: grid-template-rows var(--motion-duration-normal) var(--motion-ease-out);
 }
 

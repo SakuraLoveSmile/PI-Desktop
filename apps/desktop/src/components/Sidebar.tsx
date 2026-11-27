@@ -89,6 +89,7 @@ import {
   IconCircleAlert,
   IconNewSession,
   IconFolder,
+  IconFolderOpen,
   IconMore,
   IconNewProject,
   IconPin,
@@ -1889,7 +1890,8 @@ export function Sidebar({
           );
         }}
       >
-        {status ? renderSessionStatus(status) : null}
+        {/* Selection is its own surface now; a selected row draws no status. */}
+        {status && status !== "selected" ? renderSessionStatus(status) : null}
         <button
           type="button"
           className="thread-item-main"
@@ -2168,16 +2170,18 @@ export function Sidebar({
               size={13}
               className={`sidebar-disclosure-icon ${collapsedProject ? "collapsed" : ""}`}
             />
-            {entry.meta.pinned ? (
-              <IconStar
-                size={13}
-                fill="currentColor"
-                className="sidebar-project-pin"
-                aria-hidden
-              />
-            ) : (
-              <IconFolder size={13} aria-hidden />
-            )}
+            <span className="sidebar-project-icon" aria-hidden>
+              {entry.meta.pinned ? (
+                <IconStar
+                  size={13}
+                  fill="currentColor"
+                  className="sidebar-project-pin"
+                  aria-hidden
+                />
+              ) : (
+                collapsedProject ? <IconFolder size={13} aria-hidden /> : <IconFolderOpen size={13} aria-hidden />
+              )}
+            </span>
             <span>{entry.name}</span>
             {entry.active ? <span className="sidebar-project-active-dot" aria-label={t("project.active", { defaultValue: "Active" })} /> : null}
           </TooltipButton>
@@ -2709,7 +2713,7 @@ export function Sidebar({
         </div>
 
         <div
-          className={`sidebar-session-groups min-h-0 flex-1 overflow-auto px-0.5 ${projectsDropActive ? "is-drop-target" : ""}`}
+          className={`sidebar-session-groups min-h-0 flex-1 overflow-auto ${projectsDropActive ? "is-drop-target" : ""}`}
           onScroll={() => {
             if (sessionMenu || projectMenu || sectionMenu || sortOpen) closeMenus(false);
           }}

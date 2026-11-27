@@ -7194,15 +7194,13 @@
       ]
     },
     "apps/desktop/test/sidebar-session-status.test.mjs": {
-      "assertions": 13,
+      "assertions": 11,
       "cases": 2,
       "signatures": [
-        "01913e148ba9d4f538d3",
         "0b8352f1a3d4a7973327",
         "2def0d9c3d888dcec70f",
         "46f89982b7f3b7eee4cc",
         "89d9d6359b11b03cfa54",
-        "8cd69199218b710617a2",
         "8e8ef0acff0e8228b4c7",
         "bfd07582d2f12842936f",
         "c90ae55d8c5d043e7e50",

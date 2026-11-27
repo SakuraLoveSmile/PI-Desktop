@@ -402,6 +402,17 @@ Collapsed (48px):
 +----+
 ```
 
+Every list row shares one grid: a 28px pitch, 8px row padding, a 16px icon (or
+status) column and an 8px gap. Section labels start at x=16, a row title at
+x=40, a project row one 16px step in (56) and a team member two (72);
+time-group headers and the load-more row start on their own rows' title column.
+A project header keeps its pin or its folder (open for an expanded group,
+closed for a folded one) in the icon column and swaps it for the disclosure
+arrow while the header is hovered or the title is keyboard-focused. A session
+row's quick-archive and menu controls float over its right end and reserve no
+width until the row is hovered, keyboard-focused or its menu is open, so a
+resting title owns the full column.
+
 ### 3.3 Typography
 
 Primary left-rail chrome stays body-sized so destinations remain readable next
@@ -428,12 +439,12 @@ visually distinct from list content.
 | Expanded | Full session titles visible |
 | Sidebar width | 240–520px (default 275px); drag below 160px collapses |
 | Collapsed | Icon rail — hover shows tooltip with session title |
-| Active session | Accent-blue outlined status ring plus active row background |
+| Active session | The row's `--ds-bg-active` surface alone; a selected row draws no status glyph |
 | Selecting session | Destination row receives the active treatment immediately while transcript/workspace resolution continues |
-| Session in progress | Orange breathing dot; static under reduced motion |
+| Session in progress | Neutral 10px ring spinning in 0.8s; static under reduced motion. The warning dot is no longer used here |
 | Session completed | Green check mark from the latest unread task notification when the row is not selected |
 | Session failed | Red circled alert mark from the latest unread task notification when the row is not selected |
-| Hover row | Project headers and all conversation rows share one full-row `--ds-bg-hover` surface, radius and transition; selected conversation fill takes precedence |
+| Hover row | Project headers and all conversation rows share one full-row `--ds-bg-hover` surface, radius and transition; selected conversation fill takes precedence. A hovered or focused row adds 58px of right padding for its floating controls and hides its quiet trailing context; window blur restores the resting row |
 | Current workspace | Project header shows the workspace dot, never a persistent selection fill; topbar follows that workspace; the workspace strip above the input card shows project, location, and branch (folded to the branch during a run) as the header band of the same card as the input shell (PI-UI-1117), and the input card itself exposes no workspace identity |
 | Navigation selection | Only the selected conversation on the chat page uses `--ds-bg-active`, including pinned and standalone rows; folding its group never transfers selection to the header. No conversation or a non-chat page means no selected conversation row |
 | Keyboard focus | The focused control keeps its visible outline; the project title stays transparent and independent action buttons retain their own hover feedback |
@@ -730,7 +741,8 @@ controls.
 | Project memory | row-menu editor reads and saves a compact list of titled or untitled memory cards for the exact project path; cards can be added, edited, and removed, the context is available in later chats, and it is never a higher-priority instruction |
 | Session list | exact-path matches only; no basename grouping |
 | Active group | exactly one group reflects the selected host workspace |
-| Task state | In-progress, selected, completed, and failed indicators update by session without replacing the visible transcript; precedence is in-progress, selected, then terminal outcome |
+| Project icon slot | A pinned project shows its pin, any other shows the folder (open when the group is expanded, closed when it is folded); the disclosure arrow overlays the slot while the header is hovered or the title is keyboard-focused and points left when the group is folded |
+| Task state | In-progress, completed, and failed indicators update by session without replacing the visible transcript; precedence is in-progress, selected, then terminal outcome, and the selected state paints the row surface instead of drawing a glyph |
 
 ### 3.10 Local profile footer contract
 
