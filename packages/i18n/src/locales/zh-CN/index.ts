@@ -334,6 +334,7 @@ export const zhCN = {
     sessionActions: "会话操作",
     renameTask: "重命名任务",
     sessionRunning: "进行中",
+    sessionPermission: "等待授权",
     sessionSelected: "已选中",
     sessionCompleted: "已完成",
     sessionFailed: "未完成",

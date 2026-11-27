@@ -172,6 +172,7 @@ export const de = {
     "sessionActions": "Sitzungsaktionen",
     "renameTask": "Aufgabe umbenennen",
     "sessionRunning": "In Arbeit",
+    "sessionPermission": "Permission required",
     "sessionSelected": "Ausgewählt",
     "sessionCompleted": "Fertig",
     "sessionFailed": "Benötigt Aufmerksamkeit",

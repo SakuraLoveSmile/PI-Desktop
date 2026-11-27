@@ -174,6 +174,7 @@ export const zhTW = {
     sessionActions: "會話操作",
     renameTask: "重新命名任務",
     sessionRunning: "進行中",
+    sessionPermission: "Permission required",
     sessionSelected: "已選中",
     sessionCompleted: "已完成",
     sessionFailed: "未完成",

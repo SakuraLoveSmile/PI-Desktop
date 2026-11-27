@@ -608,8 +608,9 @@ visually distinct from list content.
   Projects, independent of date buckets, project collapse, retained tabs, and
   each project's ten-row history limit. Each pin shows its project display
   name (full path on hover), or Temporary space for a path-less conversation.
-  The section is omitted when empty and scrolls within `min(233px, 30vh)` when
-  needed. Its rows reuse normal selection, status, hover, and overflow actions.
+  The section is omitted when empty and never scrolls on its own: the sidebar
+  has one scroll region, so every pin stays visible. Its rows reuse normal
+  selection, status, hover, and overflow actions.
 - Pinning moves the existing row into that section; unpinning returns it to
   normal project or temporary history, subject to existing folding and closed
   tab visibility. Keyboard focus follows the relocated row's overflow control,
@@ -760,6 +761,7 @@ controls.
 | Session list | exact-path matches only; no basename grouping |
 | Active group | exactly one group reflects the selected host workspace |
 | Project icon slot | A pinned project shows its pin, any other shows the folder (open when the group is expanded, closed when it is folded); the disclosure arrow overlays the slot while the header is hovered or the title is keyboard-focused and points left when the group is folded |
+| Folded activity hint | A folded group reports what it hides beside its actions: the neutral running ring while any child works, or the purple pending-approval dot while any child waits, with a localized accessible name. The hint hides while the header is hovered or focused so the row's own controls take its place, and returns when the window blurs. An expanded group never shows it |
 | Task state | In-progress, completed, and failed indicators update by session without replacing the visible transcript; precedence is in-progress, selected, then terminal outcome, and the selected state paints the row surface instead of drawing a glyph |
 
 ### 3.10 Sidebar footer contract
@@ -1506,15 +1508,15 @@ near-zero duration. A folded group keeps its rows mounted, `aria-hidden`, and
   local view controls rather than host queries.
 - Temporary means **not bound to a project**, not ephemeral storage; these
   sessions survive restart.
-- The standalone Sessions body is a 146px window over five compact 28px rows,
-  their 1px row gaps, and the 2px label inset; it
-  scrolls internally when more rows exist. The Projects list uses the remaining
-  sidebar height and scrolls independently; neither region scrolls the footer
-  or primary navigation. Both list scrollbars use the same global 6px,
-  trackless, transparent-at-rest rule as the conversation and work-panel
-  scrollbars; the semantic-ink thumb appears when its list is hovered, focused,
-  or scrolling and remains visible while dragging, so the independent regions
-  stay available without becoming persistent visual rails.
+- The sidebar has one scroll region: the pinned section, the session section,
+  the Projects heading and the project list move together, while the
+  destinations above and the footer below stay fixed. The session section shows
+  five top-level rows and one load-more row, the project list takes the rest of
+  the scrolled height, and the empty space below the last project still belongs
+  to the project section. Every pinned row is shown without a cap. The one
+  scroller uses the same global 6px, trackless, transparent-at-rest rule as the
+  conversation and work-panel scrollbars; the semantic-ink thumb appears when it
+  is hovered, focused, or scrolling and remains visible while dragging.
 
 ---
 

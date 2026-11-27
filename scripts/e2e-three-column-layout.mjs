@@ -107,6 +107,12 @@ async function seedSidebarProjects(hostBinary, dataDir, tempDirs) {
     ["alpha older", dayStart - 20 * 86400_000],
   ];
   const betaRows = [["beta today", Date.now() - 60_000]];
+  // Six path-less rows beside the standalone probe row: seven in total, so the
+  // session section shows five and keeps the rest behind one load-more row.
+  const standaloneRows = Array.from({ length: 6 }, (_, index) => [
+    `standalone ${index + 1}`,
+    Date.now() - 90_000 - index * 1_000,
+  ]);
   // Ten rows, so the Pinned section's eight-row budget has to scroll.
   const deltaRows = Array.from({ length: 10 }, (_, index) => [
     `delta pinned ${index}`,
@@ -146,6 +152,9 @@ async function seedSidebarProjects(hostBinary, dataDir, tempDirs) {
     }
     await importRow("e2e-fold-beta-0", betaRows[0][0], beta, betaRows[0][1]);
     await importRow("e2e-state-standalone", "standalone state probe", null, Date.now());
+    for (const [index, [title, updatedMs]] of standaloneRows.entries()) {
+      await importRow(`e2e-standalone-${index}`, title, null, updatedMs);
+    }
     const pinnedSessionIds = [];
     for (const [index, [title, updatedMs]] of deltaRows.entries()) {
       const id = `e2e-fold-delta-${index}`;
@@ -1638,67 +1647,6 @@ async function main() {
       }),
     );
 
-    const listBudgets = await cdp.evaluate(`(() => {
-      const measure = (body) => {
-        if (!body) return null;
-        const rows = [...body.querySelectorAll("[data-sidebar-session-row]")];
-        const box = body.getBoundingClientRect();
-        return {
-          display: getComputedStyle(body).display,
-          maxHeight: parseFloat(getComputedStyle(body).maxHeight),
-          clientHeight: body.clientHeight,
-          scrollHeight: body.scrollHeight,
-          rows: rows.length,
-          rowsInside:
-            rows.filter((row) => row.getBoundingClientRect().bottom <= box.bottom + 0.5)
-              .length,
-        };
-      };
-      const pinned = measure(document.querySelector(".sidebar-session-group-body.pinned"));
-      return {
-        standalone: measure(document.querySelector(".sidebar-session-group-body.standalone")),
-        pinned,
-        // The renderer's budgets are min(233px, 30vh) and a flat 146px.
-        pinnedBudget: Math.min(233, window.innerHeight * 0.3),
-      };
-    })()`);
-    check(
-      listBudgets.standalone?.display === "flex" &&
-        listBudgets.standalone?.maxHeight === 146,
-      "the standalone list keeps its flex column and 146px budget",
-      JSON.stringify(listBudgets.standalone),
-    );
-    check(
-      listBudgets.pinned?.display === "flex" &&
-        listBudgets.pinned.rows === sidebarSeed.pinnedSessionIds.length &&
-        Math.abs(listBudgets.pinned.clientHeight - listBudgets.pinnedBudget) <= 1 &&
-        listBudgets.pinned.scrollHeight > listBudgets.pinned.clientHeight &&
-        listBudgets.pinned.rowsInside === 8,
-      "the seeded pinned list holds eight rows inside its 233px budget and scrolls the rest",
-      JSON.stringify({ pinned: listBudgets.pinned, budget: listBudgets.pinnedBudget }),
-    );
-    const pinnedScrolled = await cdp.evaluate(`(() => {
-      const body = document.querySelector(".sidebar-session-group-body.pinned");
-      if (!body) return null;
-      body.scrollTop = body.scrollHeight;
-      const rows = [...body.querySelectorAll("[data-sidebar-session-row]")];
-      const box = body.getBoundingClientRect();
-      const last = rows[rows.length - 1];
-      return {
-        scrollTop: body.scrollTop,
-        lastRowFullyInside:
-          last.getBoundingClientRect().bottom <= box.bottom + 0.5 &&
-          last.getBoundingClientRect().top >= box.top - 0.5,
-      };
-    })()`);
-    check(
-      pinnedScrolled !== null &&
-        pinnedScrolled.scrollTop > 0 &&
-        pinnedScrolled.lastRowFullyInside === true,
-      "the pinned list scrolls to its last row inside the budget",
-      JSON.stringify(pinnedScrolled),
-    );
-
     const { frames: collapsedFrames, trace: collapseTrace } = await sampleFold(
       sidebarSeed.paths.alpha,
       40,
@@ -1941,7 +1889,7 @@ async function main() {
     );
 
     await checkSidebarRowStates({ cdp: recoveryCdp, check, waitFor, seed: sidebarSeed });
-    await checkSidebarNavAndScroll({ cdp: recoveryCdp, check, waitFor });
+    await checkSidebarNavAndScroll({ cdp: recoveryCdp, check, waitFor, seed: sidebarSeed });
 
     const failed = results.filter((entry) => !entry.ok);
     console.log(

@@ -198,11 +198,11 @@ destination, chat as the home surface, tools and permissions inline.
   toolbar places sorting before new-session creation. Both headings keep quiet
   glyph actions and also accept a right-click create menu on the heading or empty
   list chrome so section creation stays discoverable
-  without extra chrome. Its list shows at most five compact rows (146px) before
-  scrolling internally, so standalone work stays visible without displacing
-  project navigation. The following `Projects` heading exposes the
-  folder-picker action; retained project groups use the remaining height and
-  scroll independently.
+  without extra chrome. Its list shows at most five top-level rows and folds the
+  rest behind one load-more row, so standalone work stays visible without
+  displacing project navigation. The following `Projects` heading exposes the
+  folder-picker action; the project list takes the rest of the sidebar's single
+  scroll region together with the sections above it.
 - **Identity**: each project group is keyed by a host-owned logical group id;
   each root path remains canonical and is never inferred from an ambiguous
   folder basename. Legacy single-folder projects are compatibility groups.

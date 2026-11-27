@@ -172,6 +172,7 @@ export const fr = {
     "sessionActions": "Actions de session",
     "renameTask": "Renommer la tâche",
     "sessionRunning": "En cours d'exécution",
+    "sessionPermission": "Permission required",
     "sessionSelected": "Sélectionné",
     "sessionCompleted": "Terminé",
     "sessionFailed": "Nécessite une attention particulière",

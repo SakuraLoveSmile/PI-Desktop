@@ -6944,7 +6944,7 @@
       ]
     },
     "apps/desktop/test/sidebar-navigation.test.mjs": {
-      "assertions": 153,
+      "assertions": 152,
       "cases": 21,
       "signatures": [
         "0748b039194b94501964",
@@ -6965,7 +6965,6 @@
         "1e0bb7bf01a7c3ccc059",
         "2263f9941005ef4927d8",
         "2273695a4df20dd438da",
-        "238d7ef9c95e93053e1a",
         "2428b728db73dbc51472",
         "24acff07813329ee0b10",
         "273cd766bb88bafcbee9",

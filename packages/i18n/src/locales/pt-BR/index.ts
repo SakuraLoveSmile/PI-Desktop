@@ -171,6 +171,7 @@ export const ptBR = {
     sessionActions: "Ações da sessão",
     renameTask: "Renomear tarefa",
     sessionRunning: "Trabalhando",
+    sessionPermission: "Permission required",
     sessionSelected: "Selecionada",
     sessionCompleted: "Concluída",
     sessionFailed: "Requer atenção",

@@ -339,6 +339,7 @@ export const en = {
     sessionActions: "Session actions",
     renameTask: "Rename task",
     sessionRunning: "Working",
+    sessionPermission: "Permission required",
     sessionSelected: "Selected",
     sessionCompleted: "Done",
     sessionFailed: "Needs attention",

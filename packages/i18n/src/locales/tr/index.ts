@@ -181,6 +181,7 @@ export const tr = {
     sessionActions: "Oturum eylemleri",
     renameTask: "Görevi yeniden adlandır",
     sessionRunning: "Çalışıyor",
+    sessionPermission: "Permission required",
     sessionSelected: "Seçili",
     sessionCompleted: "Bitti",
     sessionFailed: "İlgi gerekiyor",

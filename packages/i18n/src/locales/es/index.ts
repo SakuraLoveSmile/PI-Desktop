@@ -172,6 +172,7 @@ export const es = {
     "sessionActions": "Acciones de sesión",
     "renameTask": "Cambiar nombre de tarea",
     "sessionRunning": "Trabajando",
+    "sessionPermission": "Permission required",
     "sessionSelected": "Seleccionado",
     "sessionCompleted": "Listo",
     "sessionFailed": "Necesita atención",

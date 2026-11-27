@@ -181,6 +181,7 @@ export const ko = {
     sessionActions: "세션 작업",
     renameTask: "작업 이름 바꾸기",
     sessionRunning: "작업 중",
+    sessionPermission: "Permission required",
     sessionSelected: "선택됨",
     sessionCompleted: "완료",
     sessionFailed: "확인 필요",

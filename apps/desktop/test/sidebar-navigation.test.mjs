@@ -125,12 +125,6 @@ test("sidebar shows a bounded standalone session list before retained projects",
     sidebarSource.indexOf('data-sidebar-session-section="temporary"') <
       sidebarSource.indexOf('data-action="new-project"'),
   );
-  assert.match(
-    globalStyles,
-    // `[^}]*`, not `[\s\S]*?`: the assertion must read this block, not a
-    // `max-height` in some later partial of the concatenated stylesheet.
-    /\.sidebar-session-group-body\.standalone\s*\{[^}]*max-height:\s*146px;[^}]*overflow-x:\s*hidden;[^}]*overflow-y:\s*auto;/,
-  );
   assert.doesNotMatch(sidebarSource, /data-sidebar-project-group="temporary"/);
 });
 
