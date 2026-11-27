@@ -10018,12 +10018,18 @@ options retain pressed states and switching behavior.
   不调用模型的本地 provider 夹具。
 - **步骤：** 建立已批准团队与成功的专家参与；等待期间运行显式 1 秒的后台命令，
   再验证正常退出和缺省 60 秒超时。检查等待结果与持久化详情；覆盖首次等待
-  前与两次等待之间结束的进程，每个终态仅交付一次。
+  前与两次等待之间结束的进程，每个终态仅交付一次。再与一个静默命令并排启动一个
+  不传 `timeout`、打印本地服务器地址的命令，等 60 秒默认时限过去后列出并停止它（D648）。
 - **预期：** 超时准确说明默认/显式限制并提示 `timeout` 秒数（1–21,600）。
   退出和超时经真实 HostProcess/AgentSidecar 唤醒已有等待，运行中输出不结束等待。
   不插入邮箱、不调用真实模型、不授予进程修改或跨会话读取。旧消息不补造默认来源。
+  打印了本地服务器地址的命令在默认时限后仍在运行，列表显示其地址，按请求停止；
+  静默命令在 60 秒结束。
 - **覆盖：** `scripts/e2e-background-bash-limit.mjs`，Rust 后台 RPC、运行时
-  schema/载荷、团队等待生命周期与启动绑定代理回归。
+  schema/载荷、团队等待生命周期与启动绑定代理回归；
+  `crates/host-core/src/rpc/background_adoption_tests.rs`（真实 shell 与缩短的默认
+  时限：收养、无地址、显式 timeout、地址过晚、会话与宿主上限、截止前名额释放、前台）
+  以及 `crates/host-core/src/tools/server_adoption.rs` 中的账本单元测试。
 - **状态：** 记录候选执行结果；Windows 仍需平台验收。
 
 ### E2E-TEAM-write-scope-warning

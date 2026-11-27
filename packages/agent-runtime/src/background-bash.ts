@@ -1,6 +1,6 @@
 /** Keep the Host's default provenance for background launches; foreground payloads stay unchanged. */
 export const backgroundBashDescription =
-  "Start a Host-managed background process and return its ID immediately. It remains visible in the session activity panel until stopped or completed. Ordinary commands keep the timeout: default 60 seconds; pass timeout in seconds (1-21600) for long runs. Explicit backgroundKind: service uses the Team-owned six-hour lifetime instead; do not pass timeout.";
+  "Start a Host-managed background process and return its ID immediately. It remains visible in the session activity panel until stopped or completed. Ordinary commands keep the timeout: default 60 seconds; pass timeout in seconds (1-21600) for long runs. A command without timeout that prints a local server URL (http://localhost:PORT, 127.0.0.1 or [::1]) within that default stays running for up to six hours, for at most two such servers per session; pass timeout only to choose another limit. Explicit backgroundKind: service uses the Team-owned six-hour lifetime instead; do not pass timeout.";
 
 export const backgroundKindDescription =
   "Optional process kind; defaults to command. Use service only for a tracked service in the current confirmed Team Agent run, with run_in_background: true and no timeout. Services retain shell capacity, expire after six hours, and stop on any Team pause or owner/run end. No automatic restart.";

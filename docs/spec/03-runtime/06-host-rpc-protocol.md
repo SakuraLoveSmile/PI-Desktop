@@ -2122,6 +2122,16 @@ each wait reconciles their unconsumed IDs to avoid missing terminal events
 between waits. Disposal revokes the in-memory tracker. Historical listing and
 restart replay are not granted by this read capability.
 
+Background server lifetime (2026-11-22, D648): no RPC, event or payload field is
+added and the protocol version is unchanged. A background `Bash` launched
+without `timeout` that prints a local server address within the default is
+kept running for up to 21,600 seconds from that moment. If the extended limit
+ends it, the `TOOL_TIMEOUT` result reports `timeoutMs` 21,600,000,
+`timeoutIsDefault: false` and an `errorMessage` naming the server limit. When no
+adoption slot is free the default message gains a sentence naming the session or
+Host cap. Explicit `timeout` values, foreground calls and Team services keep
+their existing semantics, and the terminal audit row gains `serverAdoption`.
+
 
 ### Team advisory write scopes and send-time HEAD
 

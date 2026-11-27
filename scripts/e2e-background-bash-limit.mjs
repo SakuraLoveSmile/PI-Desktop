@@ -155,6 +155,8 @@ try {
   assert.equal(between.backgroundProcess.process.id, betweenId);
   assert.equal(between.backgroundProcess.process.status, "completed");
 
+  // No timeout and a local server address on stdout: the Host adopts it, so it must outlive the default below.
+  const serverId = await launch(nodeScript("process.stdout.write('Local: http://localhost:5173/\\n');setInterval(()=>{},1000)"));
   const defaultId = await launch(sleeping);
   let defaultDetail;
   const deadline = Date.now() + 75000;
@@ -168,7 +170,13 @@ try {
   const reopened = await host.call("backgroundProcesses.read", { sessionId: session.id, id: defaultId });
   assert.equal(reopened.errorMessage, defaultDetail.errorMessage);
   assert.ok(reopened.errorMessage.includes("timeout in seconds"));
-  console.log("PASS E2E-RUNTIME-background-bash-timeout-is-visible - explicit/default limit, active wait wake and launch/between-wait gap recovery through production sidecar proxy");
+  const { processes } = await host.call("backgroundProcesses.list", { sessionId: session.id });
+  const server = processes.find(process => process.id === serverId);
+  assert.equal(server?.status, "running");
+  assert.equal(server.address, "http://localhost:5173");
+  await host.call("backgroundProcesses.stop", { sessionId: session.id, id: serverId });
+  assert.equal((await terminal(serverId)).process.status, "stopped");
+  console.log("PASS E2E-RUNTIME-background-bash-timeout-is-visible - explicit/default limit, a server adopted past the default, active wait wake and launch/between-wait gap recovery through production sidecar proxy");
   console.log(`Candidate Host: ${fileURLToPath(new URL("../", import.meta.url))} | ${host.binaryPath}`);
 } finally {
   await sidecar?.dispose();

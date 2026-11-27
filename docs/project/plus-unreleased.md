@@ -356,3 +356,12 @@ Validate count-to-dialog, keyboard/hover actions, project review/save, Ignore/co
   muted with dashed dividers, changed files show language glyphs, exact `+N` /
   `−N` counts and a link to the Review tab, and references use underline tabs.
   Expert Team task rows and their solid dividers are unchanged.
+
+- A background command that prints a local server address, such as
+  `http://localhost:5173`, is no longer stopped by the 60-second default. When a
+  background `Bash` command launched without a timeout prints its first loopback
+  address, the Host keeps it running for up to six hours from that moment, for at
+  most two such servers per session and two per Host; a further one keeps the
+  60-second default and its end message says why. Commands that print no
+  address, commands with an explicit timeout, foreground commands and Team
+  services behave as before.

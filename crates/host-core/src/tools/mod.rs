@@ -23,6 +23,7 @@ pub mod hashline;
 pub mod ignore_rules;
 #[cfg(unix)]
 mod residual;
+pub(crate) mod server_adoption;
 mod service_control;
 pub mod shell;
 #[cfg(test)]
@@ -2329,6 +2330,8 @@ struct OutputNotifier {
     dropped_bytes: u64,
     dropped_lines: u64,
     last_emit: Instant,
+    /// The command may still be adopted as a server; false once it is adopted or when it never could be.
+    adoptable: bool,
 }
 
 impl OutputNotifier {
@@ -2345,7 +2348,29 @@ impl OutputNotifier {
             dropped_bytes: 0,
             dropped_lines: 0,
             last_emit: Instant::now(),
+            adoptable: options
+                .background_output
+                .as_ref()
+                .is_some_and(|output| output.lock().is_ok_and(|output| output.adoption_pending())),
         }
+    }
+
+    /// Asks whether the command has just announced a local server and a slot is free to keep it
+    /// running. It answers yes once; after that, and for a command that cannot be adopted, it costs nothing.
+    fn adopt_server(&mut self) -> Option<server_adoption::Adoption> {
+        if !self.adoptable {
+            return None;
+        }
+        let output = self.background_output.as_ref()?;
+        let adoption = match output.lock() {
+            Ok(mut output) => output.adopt_server(),
+            Err(error) => {
+                tracing::error!(%error, "background output lock poisoned");
+                None
+            }
+        };
+        self.adoptable = adoption.is_none();
+        adoption
     }
 
     fn push(&mut self, stream: OutputStream, chunk: String) {
@@ -2769,6 +2794,8 @@ async fn tool_bash(
     let mut notifier = OutputNotifier::new(&options);
     let mut output_tick = tokio::time::interval(OUTPUT_NOTIFICATION_INTERVAL);
     let mut output_closed = false;
+    // The slot an adopted server holds; this function returns after its process tree is gone.
+    let mut _adopted_slot = None;
 
     let stop = loop {
         tokio::select! {
@@ -2777,7 +2804,12 @@ async fn tool_bash(
             }
             chunk = output_rx.recv(), if !output_closed => {
                 match chunk {
-                    Some(chunk) => process_output_chunk(chunk, &mut stdout, &mut stderr, &mut notifier),
+                    Some(chunk) => {
+                        process_output_chunk(chunk, &mut stdout, &mut stderr, &mut notifier);
+                        if let Some(adoption) = notifier.adopt_server() {
+                            _adopted_slot = Some(adoption.apply(timeout_future.as_mut()));
+                        }
+                    }
                     None => output_closed = true,
                 }
             }
@@ -2785,6 +2817,11 @@ async fn tool_bash(
                 notifier.flush_due();
             }
             _ = &mut timeout_future => {
+                // A server that announced itself in the same turn as its deadline is kept, not stopped.
+                if let Some(adoption) = notifier.adopt_server() {
+                    _adopted_slot = Some(adoption.apply(timeout_future.as_mut()));
+                    continue;
+                }
                 match service_control::stop_or_kill(&options, service_control::Runner { pid, ownership: &mut ownership, control: &mut control, wait_task: &mut wait_task }, service_control::Output { rx: &mut output_rx, closed: &mut output_closed, stdout: &mut stdout, stderr: &mut stderr, notifier: &mut notifier }).await {
                     Ok(()) => break BashStop::TimedOut,
                     Err(error) => break BashStop::LifecycleFailed(error),

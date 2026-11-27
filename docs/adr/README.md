@@ -386,5 +386,6 @@ Each ADR includes:
 | worktree-memory-owner | [Resolve verified worktree memory without aliasing workspace access](worktree-memory-owner.md) | Accepted; amended by worktree-project-memory-spaces |
 | worktree-project-memory-spaces | [Share durable project memory across verified worktrees](worktree-project-memory-spaces.md) | Accepted for the implementation candidate; user acceptance pending |
 | session-usage-totals-owner | [Host owns session-cumulative usage totals](session-usage-totals-owner.md) | Accepted for the implementation candidate |
+| background-server-adoption | [Background commands that start a local server keep running](background-server-adoption.md) | Accepted for implementation |
 
 - [Explicit Team task dispatch and queued-message age](team-task-dispatch-age.md)
