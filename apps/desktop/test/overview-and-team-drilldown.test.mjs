@@ -14,7 +14,6 @@ const [overviewSource, teamPanelSource, memberTranscriptSource, englishLocaleSou
 
 test("OverviewTab shares live Team progress and opens precise board destinations", () => {
   assert.match(overviewSource, /session\?\.executionProfile === "team"/);
-  assert.match(overviewSource, /useTeamSnapshot\(teamSessionId\)/);
   assert.doesNotMatch(overviewSource, /api\.getTeamRoster|api\.getTeamBoard/);
   assert.match(overviewSource, /TeamTaskProgress/);
   assert.match(overviewSource, /kind: "task", taskId/);

@@ -1,7 +1,8 @@
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { SessionTodo, TodoStatus } from "@pi-desktop/shared";
+import type { TodoStatus } from "@pi-desktop/shared";
 import { useSessionTodosRecovery } from "../../features/chat/todos/useSessionTodosRecovery";
+import { todoRailProgress, todoRailRows, type TodoRailRow } from "../../features/chat/todos/todo-rail-rows";
 import { useAppStore } from "../../stores/app-store";
 import { Button } from "../ui";
 import { IconChevronDown, IconCircle, IconCircleCheck, IconCircleSlash } from "../icons";
@@ -15,9 +16,8 @@ export function SessionTodoChecklist({ sessionId }: { sessionId: string }) {
   useSessionTodosRecovery(sessionId);
   if (!snapshot || snapshot.todos.length === 0) return null;
 
-  const completed = snapshot.todos.filter((todo) => todo.status === "completed").length;
-  const cancelled = snapshot.todos.filter((todo) => todo.status === "cancelled").length;
-  const total = snapshot.todos.length - cancelled;
+  const { completed, total } = todoRailProgress(snapshot.todos);
+  const rows = todoRailRows(snapshot.todos);
   const progressLabel = total === 0
     ? t("chat.todo.status.cancelled")
     : t("chat.todo.progressSummary", { completed, total });
@@ -56,8 +56,8 @@ export function SessionTodoChecklist({ sessionId }: { sessionId: string }) {
           className="work-panel-overview-section-body session-todo-checklist-list"
           aria-label={progressLabel}
         >
-          {snapshot.todos.map((todo, index) => (
-            <TodoRow key={`${index}:${todo.content}`} todo={todo} />
+          {rows.map((row) => (
+            <TodoRow key={row.key} row={row} />
           ))}
         </ol>
       )}
@@ -65,16 +65,16 @@ export function SessionTodoChecklist({ sessionId }: { sessionId: string }) {
   );
 }
 
-function TodoRow({ todo }: { todo: SessionTodo }) {
+function TodoRow({ row }: { row: TodoRailRow }) {
   const { t } = useTranslation();
-  const label = t(`chat.todo.status.${todo.status}`);
+  const label = t(row.statusLabelKey);
   return (
-    <li className={`session-todo-checklist-row session-todo-checklist-row-${todo.status}`} title={label}>
+    <li className={`session-todo-checklist-row session-todo-checklist-row-${row.status}`} title={label}>
       <span className="session-todo-checklist-symbol" aria-hidden>
-        <TodoSymbol status={todo.status} />
+        <TodoSymbol status={row.status} />
       </span>
       <span className="session-todo-checklist-copy">
-        <span className="session-todo-checklist-content">{todo.content}</span>
+        <span className="session-todo-checklist-content">{row.content}</span>
         {/* Visually hidden: the status stays in the DOM for assistive tech; the row shows the glyph and the title. */}
         <span className="session-todo-checklist-status">{label}</span>
       </span>

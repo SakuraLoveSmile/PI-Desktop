@@ -5,14 +5,13 @@ import { useTranslation } from "react-i18next";
 import type { PlanProposal } from "@pi-desktop/shared";
 import { useAppStore } from "../../stores/app-store";
 import { IconArrowUpRight, IconChevronDown, IconChevronRight, IconBot, IconFileText, IconInfo, IconLightbulb, IconListChecks, IconPlug, IconWorkflow } from "../icons";
-import { AgentPanorama, type PanoramaNode } from "./AgentPanorama";
+import { SubagentPanorama } from "./SubagentPanorama";
 import { fileWorkPanelTab, teamWorkPanelTab, overviewWorkPanelTab, toolWorkPanelTab } from "../../lib/work-panel-tabs";
 import { resolvePlanArtifactPath } from "../../lib/plan-artifact";
-import { useTeamSnapshot } from "../../hooks/useTeamSnapshot";
+import { useTeamTaskSummary } from "../../hooks/useTeamTaskSummary";
 import { usePendingTeamExecutionReview } from "../../hooks/useTeamExecutionReview";
 import { useOverviewMetadata } from "../../hooks/useOverviewMetadata";
-import { getPanoramaViewport, savePanoramaViewport } from "../../lib/panorama-memory";
-import { localizedTeamSnapshotError, buildTeamTaskRows, localTeamSessionId, selectOverviewTaskRows } from "../../lib/team-presentation";
+import { localizedTeamSnapshotError, localTeamSessionId } from "../../lib/team-presentation";
 import { TeamTaskProgress } from "./team/TeamTaskProgress";
 import { Button } from "../ui";
 import { isActivePlanExecution } from "../../lib/plan-mode-state";
@@ -128,12 +127,9 @@ function OverviewContent() {
 
   const isTeam = session?.executionProfile === "team";
   const teamSessionId = localTeamSessionId(session);
-  const { snapshot: teamData, loading: teamLoading, error: teamError, refresh: refreshTeam } = useTeamSnapshot(teamSessionId);
+  const team = useTeamTaskSummary(teamSessionId);
   const { error: metadataError } = useOverviewMetadata(activeSessionId);
   const [teamExpanded, setTeamExpanded] = useState<Record<string, boolean>>({});
-  const teamRows = useMemo(() => teamData
-    ? buildTeamTaskRows(teamData.tasks, teamData.members, teamData.readiness, teamData.paused)
-    : [], [teamData]);
   const openTeamTarget = (target: { kind: "aggregate" | "board" | "panorama" | "task"; taskId?: string }, label?: string) => {
     if (activeSessionId && teamSessionId) {
       openWorkPanelTabForSession(activeSessionId, teamWorkPanelTab(teamSessionId, target, label));
@@ -145,39 +141,11 @@ function OverviewContent() {
   [messages, running, t]);
 
   if (viewMode === "panorama" && session && !isTeam) {
-    const rootNode: PanoramaNode = {
-      id: session.id,
-      name: session.title || t("chat.subagentCoordinator"),
-      task: t("chat.subagentCoordinating", { count: subagents.length }),
-      status: running ? "running" : outcome ?? "idle",
-      avatarIcon: "target",
-      isRoot: true,
-    };
-
-    const childNodes: PanoramaNode[] = subagents.map((sub) => ({
-      id: sub.delegationId,
-      name: sub.agentName,
-      task: sub.task || undefined,
-      status: overviewSubagentTone(sub.status),
-      avatarIcon: "bot",
-    }));
-
     return (
-      <AgentPanorama
-        title={session.title ? `${session.title} - ${t("team.panoramaTitle")}` : t("team.panoramaTitle")}
-        rootNode={rootNode}
-        childNodes={childNodes}
-        viewportScopeKey={`subagents:${session.source ?? "desktop"}:${session.id}`}
-        savedViewport={getPanoramaViewport(`subagents:${session.source ?? "desktop"}:${session.id}`)}
-        onViewportSave={savePanoramaViewport}
+      <SubagentPanorama
+        sessionId={session.id}
         onBack={() => setViewMode("overview")}
-        onSelectNode={(id) => {
-          const sub = subagents.find((s) => s.delegationId === id);
-          if (sub) {
-            openSubagentTab(sub.delegationId, sub.agentName);
-          }
-        }}
-        emptyMessage={t("panel.overview.noSubagents")}
+        onSelectNode={(delegationId, agentName) => openSubagentTab(delegationId, agentName)}
       />
     );
   }
@@ -253,21 +221,21 @@ function OverviewContent() {
         <SessionTodoChecklist key={session.id} sessionId={session.id} />
         {isTeam && teamSessionId && (
           <section className="work-panel-overview-section work-panel-overview-team-progress" data-testid="overview-team-progress">
-            {teamError && <div className="team-error-banner" role="status">
-              <span>{t("team.staleData")}: {localizedTeamSnapshotError(teamError, t)}</span>
-              <Button size="sm" onClick={() => void refreshTeam()}>{t("team.retry")}</Button>
+            {team.error && <div className="team-error-banner" role="status">
+              <span>{t("team.staleData")}: {localizedTeamSnapshotError(team.error, t)}</span>
+              <Button size="sm" onClick={() => void team.refresh()}>{t("team.retry")}</Button>
             </div>}
-            {teamData ? <TeamTaskProgress
-              rows={selectOverviewTaskRows(teamRows, 6)}
+            {team.snapshot ? <TeamTaskProgress
+              rows={team.visibleRows}
               extra={progressContent}
-              completed={teamData.tasks.filter((task) => !task.deleted && task.status === "completed").length}
-              total={teamData.tasks.filter((task) => !task.deleted).length}
+              completed={team.completed}
+              total={team.total}
               expanded={teamExpanded[teamSessionId] ?? true}
               onToggle={() => setTeamExpanded((state) => ({ ...state, [teamSessionId]: !(state[teamSessionId] ?? true) }))}
               onOpenTask={(taskId, subject) => openTeamTarget({ kind: "task", taskId }, subject)}
               onOpenPanorama={() => openTeamTarget({ kind: "panorama" })}
               onOpenBoard={() => openTeamTarget({ kind: "board" })}
-            /> : !teamError && teamLoading ? <p className="work-panel-overview-empty-copy" role="status">{t("common.loading")}</p> : null}
+            /> : !team.error && team.loading ? <p className="work-panel-overview-empty-copy" role="status">{t("common.loading")}</p> : null}
           </section>
         )}
 

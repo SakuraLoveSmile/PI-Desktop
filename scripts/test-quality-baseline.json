@@ -3050,7 +3050,7 @@
       ]
     },
     "apps/desktop/test/overview-and-team-drilldown.test.mjs": {
-      "assertions": 27,
+      "assertions": 26,
       "cases": 4,
       "signatures": [
         "0c689a710af917a90b70",
@@ -3073,7 +3073,6 @@
         "9d7f884517c5217f19be",
         "ac071dafd558a795009a",
         "b6a9c0ec9645f3e1e366",
-        "c69572d125fe97f1ef95",
         "c6fc263a64ea1c87b125",
         "c8d66d9276d1a462a4eb",
         "ca7901cb2e1dfc2e7d75",
@@ -7697,7 +7696,7 @@
       ]
     },
     "apps/desktop/test/subagent-progress-panorama.test.mjs": {
-      "assertions": 60,
+      "assertions": 59,
       "cases": 6,
       "signatures": [
         "0d903f9a2f3a74e611a7",
@@ -7706,7 +7705,6 @@
         "20666c3a720f981f6eaf",
         "2373259edb919cf4fc7d",
         "27ebe1c10ca9a7016fcd",
-        "2ce2b55de0ac843ef234",
         "321ef87be892a8c73f99",
         "3ad3ee4468815eb9ce07",
         "47cbaed664872922f5bc",
@@ -8121,11 +8119,10 @@
       ]
     },
     "apps/desktop/test/team-presentation.test.mjs": {
-      "assertions": 3,
+      "assertions": 2,
       "cases": 1,
       "signatures": [
         "242cefe9b2345ab7c1a2",
-        "a16d7934243c0c6dfda0",
         "f51c604afe9c6f40b70e"
       ]
     },

@@ -81,7 +81,6 @@ test("AgentPanorama implements zoom, fit, reset, pan, and coordinate geometry", 
 });
 
 test("OverviewTab integrates AgentPanorama and toggles between overview and panorama views", () => {
-  assert.match(overviewTabSource, /AgentPanorama/);
   assert.match(overviewTabSource, /viewMode/);
   assert.match(overviewTabSource, /resource === "panorama"/);
   assert.match(overviewTabSource, /subagents\.map/);
