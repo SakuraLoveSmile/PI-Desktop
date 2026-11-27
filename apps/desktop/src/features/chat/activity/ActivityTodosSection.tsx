@@ -17,7 +17,8 @@ export function ActivityTodosSection({ sessionId, visible }: { sessionId: string
   const todos = snapshot?.todos ?? [];
   if (todos.length === 0) return null;
   const { completed, total } = todoRailProgress(todos);
-  const label = t("panel.activity.todos", { completed, total });
+  // Cancelled work leaves the count, so an all-cancelled list names the section instead of printing 0/0.
+  const label = total === 0 ? t("panel.activity.todosLabel") : t("panel.activity.todos", { completed, total });
   return <ActivityRailGroup sessionId={sessionId} group="todos" sectionHeading trackAttention={visible} label={label}>
     <ol className="session-activity-todos" aria-label={label}>
       {todoRailRows(todos).map((row) => <li key={row.key} className="session-activity-todo" data-todo-status={row.status}

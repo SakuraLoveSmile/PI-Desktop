@@ -92,8 +92,8 @@ export function createApprovedGoalFixture(projectPath) {
       await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-launch-review-confirm-btn"]:not(:disabled)')`), "expert review automatically revealed for Goal execution");
       await waitFor(() => evaluate(`document.querySelector('[data-testid="team-review-waiting-indicator"]')?.innerText.includes('Waiting for team confirmation')`), "transcript explains staffing wait");
       await waitFor(() => evaluate(`document.querySelector('[data-testid="goal-progress-bar"] [role="status"]')?.textContent === 'Waiting for team confirmation'`), "Goal capsule explains staffing wait instead of preparing");
-      await evaluate(`document.querySelector('[data-work-panel-tab-id="overview"] .work-panel-tab-button').click()`);
-      await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-tab"] .work-panel-overview-status strong')?.innerText === 'Waiting for team confirmation'`), "Overview explains staffing wait");
+      // The staffing wait is owned by the Goal capsule and the Goal card in the transcript; the activity summary does
+      // not restate it (D654), so this step only opens the review from the capsule below.
       await evaluate(`document.querySelector('[data-testid="team-review-waiting-indicator"] button').click()`);
       await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-launch-review-confirm-btn"]:not(:disabled)')`), "transcript action reopens expert review");
       assert.equal((await invoke("agentGetStatus", goal.id)).status.currentTurnId, originalTurn);

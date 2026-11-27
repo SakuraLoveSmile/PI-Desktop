@@ -49,6 +49,8 @@ export type SessionActivityRailProps = {
   teamTasks?: { count: number; node: ReactNode };
   /** This session's sub-agent panorama, offered from the sub-agent heading whenever there are sub-agents. */
   onOpenPanorama?: () => void;
+  /** One line at the top when the canonical session metadata could not be re-read. */
+  metadataNotice?: string;
   /** Servers have their own section: what an address click opens, how a stop is asked for and which stops are under way. */
   onOpenServerAddress?: (url: string) => void; onStopServer?: (id: string) => void; stoppingServers?: ReadonlySet<string>;
 };
@@ -74,7 +76,7 @@ function SessionActivityRailContent({ sessionId, visible, agentsNotice, resource
   rangeLimited = false, groupsRangeLimited = rangeLimited, supported = true, goalsAttentionReady = true,
   attentionItems = [], teamMembers = [], onLoadEarlier, onReturnToLatest, historyLoading = false, hasMoreBefore = false,
   pendingNotices = {}, suggestionsHaveRows = true, environment, contextUsage, changes, onOpenContext, onOpenReview,
-  onOpenServerAddress, onStopServer, stoppingServers = NO_STOPS, summary, todos, teamTasks, onOpenPanorama }: SessionActivityRailProps) {
+  onOpenServerAddress, onStopServer, stoppingServers = NO_STOPS, summary, todos, teamTasks, onOpenPanorama, metadataNotice }: SessionActivityRailProps) {
   const { t } = useTranslation();
   const rail = useRef<HTMLElement>(null);
   const [reveal, setReveal] = useState<ActivityReveal>();
@@ -214,7 +216,8 @@ function SessionActivityRailContent({ sessionId, visible, agentsNotice, resource
   </ActivityRailGroup> });
   if (show.skills) sections.push({ id: "skills", node: suggestions });
   if (changes) sections.push({ id: "changes", node: <ActivityChangesSection changes={changes} onReview={onOpenReview} /> });
-  return <aside ref={rail} hidden={!visible} inert={!visible} className="session-activity-rail" data-session-id={sessionId} aria-label={t("panel.activity.title")}>
+  return <aside ref={rail} hidden={!visible} inert={!visible} className="session-activity-rail" data-session-id={sessionId} aria-label={t("panel.tabs.activity")}>
+    {metadataNotice && <p className="session-activity-metadata-status" role="status">{metadataNotice}</p>}
     {summary && <ActivitySummaryCard summary={summary} />}
     {issues.length > 0 && <section className="session-activity-attention" aria-label={t("panel.activity.needsAttention")}>
       <div className="session-activity-attention-title"><IconCircleAlert size={14} aria-hidden /><span>{t("panel.activity.needsAttention")}</span><span>{issues.length}</span></div>

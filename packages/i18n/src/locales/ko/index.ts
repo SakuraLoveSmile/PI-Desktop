@@ -2351,7 +2351,7 @@ sklm: {
         openReport: "목표 보고서 열기",
         progressUnavailable: "진행 상황을 사용할 수 없음",
       },
-      title: "활동 개요", plans: "계획", subagents: "하위 에이전트", processes: "백그라운드 프로세스", sources: "출처",
+      plans: "계획", subagents: "하위 에이전트", processes: "백그라운드 프로세스", sources: "출처",
       empty: "이 범위에 기록이 없습니다", rangeLimited: "불러온 대화 범위의 기록을 표시합니다", unsupported: "로컬 데스크톱 세션에서만 사용할 수 있습니다",
       loading: "불러오는 중…", retry: "다시 시도", refresh: "새로고침", openProcess: "프로세스 보기", closeProcess: "프로세스 세부 정보 닫기", stopProcess: "프로세스 중지",
       command: "명령", cwd: "작업 디렉터리", stdout: "표준 출력", stderr: "표준 오류", outputTruncated: "출력이 잘렸습니다",
@@ -2378,7 +2378,7 @@ sklm: {
     },
     closeTab: "{{name}} 닫기",
     tabs: {
-      overview: "개요",
+      activity: "Activity",
       team: "팀",
       review: "검토",
       browser: "브라우저",
@@ -2388,10 +2388,8 @@ sklm: {
       goalReport: "목표 보고서",
     },
     overview: {
-      specs: "사양", changedFiles: "변경된 파일", viewAllChanges: "모든 변경 사항 보기", attachments: "첨부 파일", skills: "스킬", memory: "메모리", mcp: "MCP",
-      noRecordedSkills: "현재 대화에 기록된 스킬이 없습니다", noRecordedMemory: "현재 대화에 기록된 메모리가 없습니다", noRecordedMcp: "현재 대화에 기록된 MCP 사용 내역이 없습니다",
-      recordedChangesNote: "현재 불러온 대화에 성공적으로 기록된 변경 사항만 표시합니다. 전체 Git 변경 목록은 아닙니다.",
-      noSession: "선택한 세션이 없습니다", untitled: "제목 없는 세션", project: "프로젝트", model: "모델", modeLabel: "모드", messages: "메시지", notAvailable: "없음", progress: "진행 상황", statusLabel: "현재 상태", noPlans: "이 세션에 계획 활동이 없습니다", artifacts: "산출물", noArtifacts: "이 세션에 산출물이 없습니다", references: "참조", noReferences: "명시적인 파일 참조가 없습니다", mode: { chat: "채팅", plan: "계획", goal: "목표" }, subagents: "Subagents", noSubagents: "No subagents delegated in this session", teamSection: "Expert Team", status: { idle: "대기", running: "실행 중", planning: "계획 중", awaiting_approval: "승인 대기", pending: "대기 중", approved: "승인됨", rejected: "거부됨", expired: "만료됨", interrupted: "중단됨", queued: "대기열", completed: "완료됨", failed: "실패" }
+      noSubagents: "No subagents delegated in this session",
+      status: { idle: "대기", running: "실행 중", planning: "계획 중", awaiting_approval: "승인 대기", pending: "대기 중", approved: "승인됨", rejected: "거부됨", expired: "만료됨", interrupted: "중단됨", queued: "대기열", completed: "완료됨", failed: "실패" },
     },
     pluginView: {
       failed: "이 화면을 불러올 수 없습니다. 플러그인을 새로 고친 후 다시 시도하세요.",

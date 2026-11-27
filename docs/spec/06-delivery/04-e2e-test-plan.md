@@ -17538,12 +17538,12 @@ current CAS revision. Legacy descriptions and reviews without presentation are r
   2. Verify confirmed members keep their routing handles and receive the proposed display identities. Start controlled member turns and update task state independently. Let the Lead become idle while a member remains running; verify the Lead stays idle with a waiting label and the member shows its Host phase.
   3. Start one approved Plan/Goal execution and capture the fake title-summary request. Replay the same execution event and reload the renderer. Verify one request total, no member title request, and that a manual rename or newer execution wins over a delayed title result.
   4. Queue eight ordinary Composer prompts. Fold and expand the queue, then execute an existing row action. Verify the mailbox and Composer queue remain separate and disclosure does not send or remove work by itself.
-  5. From Overview, measure the 48px progress/header chrome and 68px task rows at 100% font scale. Check solid subtle-border separators and one right chevron per summary. Verify six visible task rows and the View all path for a seventh task. Collapse/reopen the whole progress section; verify visible rows and extra status/activity disappear and return. Confirm Team status/proposals stay inside progress, while a standard session retains its separate Progress disclosure. Open a progress row in its own task tab without changing the selected Lead or replacing the aggregate tab; re-click the row and verify its existing tab activates. Select the aggregate tab to return. Open the compact board, filter and search, enter task detail, then return with filter/query/scroll preserved. Confirm cancelled tasks remain reachable through All and completed tasks never display as blocked.
+  5. From the activity rail (inline, or its Activity tab when docked), measure the 48px progress/header chrome and 68px task rows at 100% font scale. Check solid subtle-border separators and one right chevron per summary. Verify six visible task rows and the View all path for a seventh task. Collapse/reopen the whole progress section; verify visible rows and extra status/activity disappear and return. Confirm Team status/proposals stay inside progress, while a standard session retains its separate Progress disclosure. Open a progress row in its own task tab without changing the selected Lead or replacing the aggregate tab; re-click the row and verify its existing tab activates. Select the aggregate tab to return. Open the compact board, filter and search, enter task detail, then return with filter/query/scroll preserved. Confirm cancelled tasks remain reachable through All and completed tasks never display as blocked.
   6. Open the separate Team panorama tab and verify its localized label/tooltip. Check 276×86px nodes and 32px avatars. Exercise long English, Chinese and unbroken identity/task text on root and child nodes: each stays within its card with single-line ellipsis, while full hover text remains available. Then zoom to 80%, pan, and deliver a controlled Team revision with new member objects/status. Verify the transform and subsequent drag remain continuous. Open a child focus task or member in its own tab, then select the retained panorama tab and verify its viewport survives. Explicit Fit and Reset still work.
   7. Expand the Lead sidebar group, select a member, collapse/reopen and reload. Verify one visible Lead group plus the real member sessions, stable identities, individual actions, and unchanged session IDs/transcripts.
   8. Open a standard Agent session and run its ordinary Task delegate path. Compare its history/counts with the Team sessions and board. Switch back, pause, queue Team mail, reload, and Resume; verify held mail is delivered once and standard delegates remain separate.
 - **Expected**: Local Desktop surfaces render the same current Team revision, including review/decision. Only confirmed strategy data dispatches. Member activity comes from Host turns, not task status. Navigation and display identity remain stable without selecting another main session. Standard subagents, Team members, Composer prompts and Team mail remain distinct. Title or UI failure does not change execution success.
-- **Automation**: `node scripts/e2e-team.mjs` covers approved title, review, queue, snapshot, board, five members, Overview geometry/group/progress disclosures, independent Team target tabs, ordinary Task coexistence, controlled refresh/drag, narrow/font-scaled layout and Chinese reload; `node scripts/e2e-team-review-ui.mjs` covers proposal edit/confirm/cancel; run `pnpm test:e2e:subagent-models` and `pnpm test:e2e:subagents` for profile isolation. Run native Electron at supported panel widths and record fixture/profile identity. The HTML preview and source-regex checks do not substitute for this user path.
+- **Automation**: `node scripts/e2e-team.mjs` covers approved title, review, queue, snapshot, board, five members, activity rail geometry/group/progress disclosures, independent Team target tabs, ordinary Task coexistence, controlled refresh/drag, narrow/font-scaled layout and Chinese reload; `node scripts/e2e-team-review-ui.mjs` covers proposal edit/confirm/cancel; run `pnpm test:e2e:subagent-models` and `pnpm test:e2e:subagents` for profile isolation. Run native Electron at supported panel widths and record fixture/profile identity. The HTML preview and source-regex checks do not substitute for this user path.
 
 ### E2E-TEAM-panorama-and-member-tabs
 
@@ -18206,7 +18206,7 @@ model stream is deterministic and no real provider or user profile is accessed.
 Task rows scroll with Overview; the Composer has no Session checklist mounting or
 popup.
 
-### Expert Team configuration and Overview reference alignment
+### Expert Team configuration and activity rail reference alignment
 
 - node scripts/e2e-expert-team-settings.mjs mounts the production SettingsPage:
   new navigation, all six roles, provider/model/thinking/tools/instructions,
@@ -18229,20 +18229,15 @@ popup.
   route binding, proposal/confirmation/runtime context, tool denials, restart,
   invalid setting atomicity, CAS conflicts and unrelated preferences. No
   provider endpoint is called.
-- node scripts/e2e-overview-reference.mjs mounts production Overview and Team
-  panorama with a controlled Team snapshot. It verifies live updates, numbered
-  task navigation, Spec/file links, reference tabs, task dependency cards/edges,
-  repeated owners, collapse, zoom/fit and narrow light layout. Native captures
-  compare the actual candidate to the supplied reference.
-  Overview layout also exercises long titles, project paths and model names at
-  320/360/570px in both themes: metadata values retain positive visible width,
-  and header/resources/references introduce no horizontal overflow. Titles clamp
-  to two lines with the full title in a tooltip; changed-file and attachment rows
-  stay on one line (file name, muted folder, a language glyph, and `+N`/`−N`
-  counts only when every recorded edit to that path has exact counts) with the full
-  path in the row tooltip. Reference tabs are underline tabs that keep their pressed
-  states and switching path. The changed-files heading links to the Review tab only
-  when that tab has entries.
+- node scripts/e2e-overview-reference.mjs mounts the production activity rail and
+  Team panorama with a controlled Team snapshot. It verifies live updates, the six
+  bounded task rows with their numbered labels, task/board/panorama navigation,
+  the plan artifact link, owner role words, section collapse, the session
+  checklist, task dependency cards/edges, repeated owners, zoom/fit and narrow
+  light layout. Native captures compare the actual candidate to the supplied
+  reference. Rail layout also exercises long titles and paths at 320/360/570px in
+  both themes: no horizontal overflow, and changed-file rows keep their exact
+  `+N`/`−N` counts only when every recorded edit to that path has exact counts.
 - node --test apps/desktop/test/settings-ipc-partial-write.test.mjs protects
   full committed Main network/menu/developer policy after partial writes and
   guarantees no side effects on rejected configuration. Host/runtime/component

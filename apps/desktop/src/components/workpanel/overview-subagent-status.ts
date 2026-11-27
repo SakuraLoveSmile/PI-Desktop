@@ -1,6 +1,6 @@
 import type { SubagentOutcome } from "../../lib/subagent-topology";
 
-/** One tone for the Overview badge and the panorama node, so an outcome reads the same in both. */
+/** The one tone a delegation outcome reads as: the panorama node and the rail row agree on it. */
 export type OverviewSubagentTone = "running" | "completed" | "paused" | "failed";
 
 export function overviewSubagentTone(status: SubagentOutcome): OverviewSubagentTone {
@@ -16,14 +16,4 @@ export function overviewSubagentTone(status: SubagentOutcome): OverviewSubagentT
     default:
       return "failed";
   }
-}
-
-/** The team phase palette has no paused entry, so paused rows borrow the neutral idle tone. */
-export function overviewSubagentBadgeClass(tone: OverviewSubagentTone): string {
-  return `team-phase-${tone === "paused" ? "idle" : tone}`;
-}
-
-/** Same catalog keys the Activity rail uses, so both surfaces show one label per outcome. */
-export function overviewSubagentLabelKey(status: SubagentOutcome): string {
-  return `panel.activity.status.${status}`;
 }

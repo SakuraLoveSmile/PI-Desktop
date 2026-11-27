@@ -7,7 +7,6 @@ const [
   subagentRowSource,
   agentPanoramaSource,
   viewportSource,
-  overviewTabSource,
   teamPanelSource,
   teamPanoramaSource,
   messagesCssSource,
@@ -20,7 +19,6 @@ const [
   readFile(new URL("../src/features/chat/activity/SubagentActivityRow.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/components/workpanel/AgentPanorama.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/components/workpanel/agent-panorama-viewport.ts", import.meta.url), "utf8"),
-  readFile(new URL("../src/components/workpanel/OverviewTab.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/components/workpanel/TeamPanel.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/components/workpanel/team/TeamPanoramaTab.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/styles/messages.css", import.meta.url), "utf8"),
@@ -78,13 +76,6 @@ test("AgentPanorama implements zoom, fit, reset, pan, and coordinate geometry", 
   assert.match(agentPanoramaSource, /onBack/);
   assert.match(agentPanoramaSource, /onSelectNode/);
   assert.match(agentPanoramaSource, /is-panning/);
-});
-
-test("OverviewTab integrates AgentPanorama and toggles between overview and panorama views", () => {
-  assert.match(overviewTabSource, /viewMode/);
-  assert.match(overviewTabSource, /resource === "panorama"/);
-  assert.match(overviewTabSource, /subagents\.map/);
-  assert.match(overviewTabSource, /openSubagentTab/);
 });
 
 test("Team panorama owns the canvas separately from the aggregate panel", () => {

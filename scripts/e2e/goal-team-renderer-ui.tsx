@@ -5,7 +5,7 @@ import { createInstance } from "i18next";
 import { I18nextProvider } from "react-i18next";
 import type { GoalProgressChangedEvent, GoalProgressSnapshot, GoalReportChangedEvent, GoalReportSummary, PlanProposal, TeamSnapshot, UiMessage } from "@pi-desktop/shared";
 import { catalogs } from "@pi-desktop/i18n";
-import { SessionTodoChecklist } from "../../apps/desktop/src/components/workpanel/SessionTodoChecklist";
+import { ActivityTodosSection } from "../../apps/desktop/src/features/chat/activity/ActivityTodosSection";
 import { GoalProgressBar } from "../../apps/desktop/src/features/chat/composer/GoalProgressBar";
 import { TeamDispatchCardsGroup } from "../../apps/desktop/src/features/chat/transcript/TeamDispatchCard";
 import { api } from "../../apps/desktop/src/lib/api";
@@ -483,16 +483,18 @@ globalThis.goalTeamRendererUiProbe = async () => {
       createElement("div", { className: "composer-stack", style: { maxWidth: 760, margin: "24px auto", padding: 16 } },
         createElement(GoalProgressBar, { sessionId: "screenshot-session", proposal: { ...screenshotProposal, sessionId: "screenshot-session", title: "WebDAV 音频过滤（界面验证示例）" } }),
         createElement("div", { className: "composer-shell", style: { minHeight: 100, padding: 16 } }, "Composer"),
-        createElement("aside", { className: "work-panel-overview" }, createElement(SessionTodoChecklist, { sessionId: "screenshot-session" })),
+        createElement("aside", { className: "session-activity-rail" }, createElement(ActivityTodosSection, { sessionId: "screenshot-session", visible: true })),
       ))); });
-    await until(() => !!container.querySelector(".session-todo-checklist-header"), "independent session checklist recovers beside Goal progress");
-    assert(container.querySelector(".session-todo-checklist-header")?.textContent?.includes("Session checklist 0/4"), "session count must explicitly identify its scope");
+    const todoDisclosure = () => container.querySelector<HTMLButtonElement>('[data-activity-group="todos"] .session-activity-disclosure');
+    const todoList = () => container.querySelector('[data-activity-group="todos"] .session-activity-group-body');
+    await until(() => !!todoDisclosure(), "independent session checklist recovers beside Goal progress");
+    assert(todoDisclosure()?.textContent?.includes("Todos 0/4"), "session count must explicitly identify its scope");
     assert(container.querySelector(".goal-progress-bar-header")?.textContent?.includes("Goal progress"), "both progress sources retain distinct labels");
-    assert(container.querySelectorAll(".session-todo-checklist-row").length === 4, "Overview session tasks do not merge with Goal tasks");
-    await act(async () => container.querySelector<HTMLButtonElement>(".session-todo-checklist-header")!.click());
-    assert(!container.querySelector(".session-todo-checklist-list"), "Overview session list collapses independently");
-    await act(async () => container.querySelector<HTMLButtonElement>(".session-todo-checklist-header")!.click());
-    assert(container.querySelectorAll(".session-todo-checklist-row").length === 4, "Overview session list reopens independently");
+    assert(container.querySelectorAll(".session-activity-todo").length === 4, "session tasks do not merge with Goal tasks");
+    await act(async () => todoDisclosure()!.click());
+    assert(todoList()?.hasAttribute("hidden"), "session list collapses independently");
+    await act(async () => todoDisclosure()!.click());
+    assert(!todoList()?.hasAttribute("hidden") && container.querySelectorAll(".session-activity-todo").length === 4, "session list reopens independently");
     for (const theme of ["light", "dark"]) for (const width of [320, 760]) {
       document.documentElement.setAttribute("data-theme", theme);
       container.style.width = `${width}px`;

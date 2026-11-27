@@ -2335,7 +2335,7 @@ sklm: {
         openReport: "Ouvrir le rapport de l’objectif",
         progressUnavailable: "Progression indisponible",
       },
-      "title": "Aperçu de l’activité", "plans": "Plan", "subagents": "Sous-agents", "processes": "Processus en arrière-plan", "sources": "Sources",
+      "plans": "Plan", "subagents": "Sous-agents", "processes": "Processus en arrière-plan", "sources": "Sources",
       "empty": "Aucun élément dans cette plage", "rangeLimited": "Affichage des éléments de la plage de conversation chargée", "unsupported": "Disponible uniquement pour les sessions locales sur ordinateur",
       "loading": "Chargement…", "retry": "Réessayer", "refresh": "Actualiser", "openProcess": "Voir le processus", "closeProcess": "Fermer les détails du processus", "stopProcess": "Arrêter le processus",
       "command": "Commande", "cwd": "Répertoire de travail", "stdout": "Sortie standard", "stderr": "Erreur standard", "outputTruncated": "Sortie tronquée",
@@ -2362,7 +2362,7 @@ sklm: {
     },
     "closeTab": "Fermer {{name}}",
     "tabs": {
-      "overview": "Vue d'ensemble",
+      "activity": "Activity",
       "team": "Équipe",
       "review": "Réviser",
       "browser": "Navigateur",
@@ -2372,10 +2372,8 @@ sklm: {
       goalReport: "Rapport d’objectif",
     },
     overview: {
-      specs: "Spécifications", changedFiles: "Fichiers modifiés", viewAllChanges: "Voir toutes les modifications", attachments: "Pièces jointes", skills: "Compétences", memory: "Mémoire", mcp: "MCP",
-      noRecordedSkills: "Aucune compétence enregistrée dans cette conversation", noRecordedMemory: "Aucune mémoire enregistrée dans cette conversation", noRecordedMcp: "Aucune utilisation de MCP enregistrée dans cette conversation",
-      recordedChangesNote: "Seules les modifications enregistrées avec succès dans la conversation actuellement chargée sont affichées ; ceci ne constitue pas une liste complète des changements Git.",
-      noSession: "Aucune session sélectionnée", untitled: "Session sans titre", project: "Projet", model: "Modèle", modeLabel: "Mode", messages: "Messages", notAvailable: "Indisponible", progress: "Progression", statusLabel: "État actuel", noPlans: "Aucune activité de plan dans cette session", artifacts: "Artefacts", noArtifacts: "Aucun artefact dans cette session", references: "Références", noReferences: "Aucune référence de fichier explicite", mode: { chat: "Chat", plan: "Plan", goal: "Objectif" }, subagents: "Subagents", noSubagents: "No subagents delegated in this session", teamSection: "Expert Team", status: { idle: "Inactif", running: "En cours", planning: "Planification", awaiting_approval: "En attente d'approbation", pending: "En attente", approved: "Approuvé", rejected: "Rejeté", expired: "Expiré", interrupted: "Interrompu", queued: "En file", completed: "Terminé", failed: "Échec" }
+      noSubagents: "No subagents delegated in this session",
+      status: { idle: "Inactif", running: "En cours", planning: "Planification", awaiting_approval: "En attente d'approbation", pending: "En attente", approved: "Approuvé", rejected: "Rejeté", expired: "Expiré", interrupted: "Interrompu", queued: "En file", completed: "Terminé", failed: "Échec" },
     },
     "pluginView": {
       "failed": "Cette vue n'a pas pu être chargée. Rechargez le plugin et réessayez."

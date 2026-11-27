@@ -7,7 +7,7 @@ import { I18nextProvider } from "react-i18next";
 import { createServer } from "vite";
 import { fileURLToPath } from "node:url";
 
-test("SessionTodoChecklist renders the complete inline checklist expanded in the Overview", async () => {
+test("the activity rail lists the complete session checklist without truncating it", async () => {
   const server = await createServer({
     root: fileURLToPath(new URL("..", import.meta.url)),
     configFile: false,
@@ -17,7 +17,7 @@ test("SessionTodoChecklist renders the complete inline checklist expanded in the
     optimizeDeps: { noDiscovery: true, include: [] },
   });
   try {
-    const { SessionTodoChecklist } = await server.ssrLoadModule("/src/components/workpanel/SessionTodoChecklist.tsx");
+    const { ActivityTodosSection } = await server.ssrLoadModule("/src/features/chat/activity/ActivityTodosSection.tsx");
     const { useAppStore } = await server.ssrLoadModule("/src/stores/app-store.ts");
     const { catalogs } = await server.ssrLoadModule(
       fileURLToPath(new URL("../../../packages/i18n/src/index.ts", import.meta.url)),
@@ -29,7 +29,7 @@ test("SessionTodoChecklist renders the complete inline checklist expanded in the
         createElement(
           I18nextProvider,
           { i18n },
-          createElement(SessionTodoChecklist, { sessionId }),
+          createElement(ActivityTodosSection, { sessionId, visible: true }),
         ),
       );
 
@@ -52,18 +52,19 @@ test("SessionTodoChecklist renders the complete inline checklist expanded in the
       },
     });
     const html = render();
-    assert.match(html, /aria-expanded="true"/);
-    assert.doesNotMatch(html, /aria-haspopup|role="dialog"/);
-    assert.match(html, /<ol[^>]*session-todo-checklist-list/);
+    assert.match(html, /data-activity-group="todos"/);
+    assert.match(html, /<ol[^>]*session-activity-todos/);
     assert.equal((html.match(/<li /g) ?? []).length, 12);
+    assert.match(html, />Todos 1\/12</);
+    assert.match(html, /data-todo-status="completed"/);
+    assert.match(html, /data-todo-status="in_progress"/);
+    assert.match(html, /session-activity-spinner/);
     assert.match(html, />Completed</);
     assert.match(html, />In progress</);
     assert.match(html, />Pending</);
-    assert.match(html, />Session checklist 1\/12</);
-    assert.match(html, /title="1\/12 · Current: second"/);
     assert.match(html, /extra-0/);
     assert.match(html, /extra-9/);
-    assert.doesNotMatch(html, /more items/);
+    assert.doesNotMatch(html, /session-activity-show-all/);
     assert.equal(render("session-other"), "");
     assert.equal(render("remote:server:session-todo-test"), "");
     assert.equal(render("native-pi:session-todo-test"), "");
@@ -81,9 +82,8 @@ test("SessionTodoChecklist renders the complete inline checklist expanded in the
         },
       },
     });
-    assert.match(render(), />Session checklist 1\/1</);
-    assert.match(render(), /title="1\/1 completed"/);
-    assert.match(render(), /session-todo-checklist-row-completed/);
+    assert.match(render(), />Todos 1\/1</);
+    assert.match(render(), /data-todo-status="cancelled"/);
     assert.match(render(), />Cancelled</);
 
     Object.assign(useAppStore.getInitialState(), {
@@ -98,7 +98,7 @@ test("SessionTodoChecklist renders the complete inline checklist expanded in the
         },
       },
     });
-    assert.match(render(), /Cancelled/);
+    assert.match(render(), />Cancelled</);
     assert.doesNotMatch(render(), /0\/0/);
 
     await i18n.changeLanguage("zh-CN");
@@ -111,7 +111,7 @@ test("SessionTodoChecklist renders the complete inline checklist expanded in the
         },
       },
     });
-    assert.match(render(), />会话清单 0\/1</);
+    assert.match(render(), />待办 0\/1</);
 
     Object.assign(useAppStore.getInitialState(), { sessionTodos: {} });
     assert.equal(render(), "");
@@ -126,16 +126,4 @@ test("SessionTodoChecklist renders the complete inline checklist expanded in the
   } finally {
     await server.close();
   }
-});
-
-test("SessionTodoChecklist uses Overview scrolling and removes the composer footer entry", async () => {
-  const { readFile } = await import("node:fs/promises");
-  const css = await readFile(new URL("../src/styles/work-panel.css", import.meta.url), "utf8");
-  const composer = await readFile(new URL("../src/components/Composer.tsx", import.meta.url), "utf8");
-  const overview = await readFile(new URL("../src/components/workpanel/OverviewTab.tsx", import.meta.url), "utf8");
-  assert.match(css, /\.session-todo-checklist-header:active:not\(:disabled\)\s*\{[\s\S]*?transform:\s*none;/);
-  assert.match(css, /\.session-todo-checklist-copy\s*\{[\s\S]*?overflow-wrap:\s*anywhere;/);
-  assert.doesNotMatch(css.match(/\.session-todo-checklist-list\s*\{[^}]*\}/)?.[0] ?? "", /max-height|overflow/);
-  assert.doesNotMatch(composer, /TodoDock|SessionTodoChecklist/);
-  assert.match(overview, /<div className="work-panel-overview-scroll">\s*<Button[^>]*onClick=\{\(\) => openWorkPanelTabForSession\(session\.id, overviewWorkPanelTab\("activity"\)\)\}[\s\S]*?<\/Button>\s*<SessionTodoChecklist key=\{session.id\} sessionId=\{session.id\}/);
 });

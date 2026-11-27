@@ -92,9 +92,7 @@ test("Team progress presents numbered tasks, state labels and extra activity in 
     assert.doesNotMatch(html, /team-progress-count/);
     assert.match(render(false), /class="team-progress-body" hidden=""/);
     assert.equal(rows[0].owner.paused, true);
-    const overview = await readFile(new URL("../src/components/workpanel/OverviewTab.tsx", import.meta.url), "utf8");
-    assert.match(overview, /extra=\{progressContent\}/);
-    assert.match(overview, /!isTeam && \(/);
+
   } finally {
     await server.close();
   }

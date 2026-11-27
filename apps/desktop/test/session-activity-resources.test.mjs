@@ -91,12 +91,12 @@ test('source domains use the first safe URL and count citation occurrences in lo
   assert.equal(activityResources([]).websites.length, 0);
 });
 
-test('resource aggregation preserves recorded attachments, skills, MCP and empty memory semantics', () => {
+test('resource aggregation preserves recorded attachments, skills and MCP', () => {
   const resources = activityResources([message('resources', { toolName: 'mcp_docs_find',
     attachments: [{ kind: 'file', name: 'a.txt', ref: 'a.txt' }, { kind: 'session', ref: 'session-b' }],
     skillMentions: [{ id: 'review', start: 0, end: 1 }],
   }), message('skill', { toolName: 'Skill', toolArgs: { id: 'build' } })]);
   assert.deepEqual(resources.attachments, [{ id: 'a.txt', label: 'a.txt', path: 'a.txt' }]);
-  assert.deepEqual(resources.references, { memory: [], skills: [{ id: 'review', label: 'review' }, { id: 'build', label: 'build' }],
+  assert.deepEqual(resources.references, { skills: [{ id: 'review', label: 'review' }, { id: 'build', label: 'build' }],
     mcp: [{ id: 'mcp_docs_find', label: 'mcp_docs_find' }] });
 });

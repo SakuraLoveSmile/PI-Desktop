@@ -4,7 +4,7 @@ import { createInstance } from "i18next";
 import { I18nextProvider } from "react-i18next";
 import { catalogs } from "@pi-desktop/i18n";
 import type { PlanProposal, SessionSummary, TeamChangedEvent, TeamSnapshot, UiMessage } from "@pi-desktop/shared";
-import { OverviewTab } from "../../apps/desktop/src/components/workpanel/OverviewTab";
+import { SessionActivity } from "../../apps/desktop/src/features/chat/activity/SessionActivity";
 import { TeamPanoramaTab } from "../../apps/desktop/src/components/workpanel/team/TeamPanoramaTab";
 import { api } from "../../apps/desktop/src/lib/api";
 import { useAppStore } from "../../apps/desktop/src/stores/app-store";
@@ -17,7 +17,7 @@ import "../../apps/desktop/src/styles/team-panel.css";
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
   var overviewReferenceProbe: () => Promise<unknown>;
-  var overviewReferenceShow: (view: "overview" | "panorama", width?: number, theme?: "dark" | "light") => Promise<void>;
+  var overviewReferenceShow: (view: "activity" | "panorama", width?: number, theme?: "dark" | "light") => Promise<void>;
   var overviewReferenceCleanup: (() => void) | undefined;
 }
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -65,7 +65,8 @@ globalThis.overviewReferenceProbe = async () => {
     createdAt: "2026-10-08T00:00:00Z", updatedAt: "2026-10-08T00:00:00Z" } satisfies SessionSummary;
   const originals = { getTeamSnapshot: api.getTeamSnapshot, onTeamChanged: api.onTeamChanged, onHostStatus: api.onHostStatus,
     getSession: api.getSession, onAgentEvent: api.onAgentEvent, onSessionsChanged: api.onSessionsChanged,
-    onPlansChanged: api.onPlansChanged, getTodos: api.getTodos };
+    onPlansChanged: api.onPlansChanged, getTodos: api.getTodos, getSessionActivity: api.getSessionActivity,
+    onSessionActivityChanged: api.onSessionActivityChanged, listBackgroundProcesses: api.listBackgroundProcesses };
   const previousState = useAppStore.getState();
   api.getTeamSnapshot = async () => structuredClone(current);
   api.onTeamChanged = (listener) => { listeners.add(listener); return () => listeners.delete(listener); };
@@ -75,29 +76,40 @@ globalThis.overviewReferenceProbe = async () => {
   api.onSessionsChanged = () => () => undefined;
   api.onPlansChanged = () => () => undefined;
   api.getTodos = async () => ({ sessionId: session.id, revision: 0, todos: [], updatedAt: 0 });
+  api.getSessionActivity = async () => { throw new Error("activity aggregate unavailable in this fixture"); };
+  api.onSessionActivityChanged = () => () => undefined;
+  api.listBackgroundProcesses = async () => ({ processes: [] });
   const messages: UiMessage[] = [
     ...["pyproject.toml", ".python-version", ".gitignore", ".env.example", "README.md"].map((path, index): UiMessage => ({
       id: `write-${index}`, role: "tool", content: "written", toolName: "Write", toolStatus: "success", toolArgs: { path }, createdAt: "2026-10-08T00:00:00Z" })),
+    // A recorded delegation: the panorama entry only exists while the session has sub-agents.
+    { id: "delegate", role: "tool", content: "", toolName: "Task", toolStatus: "success", toolCallId: "delegate-call",
+      toolArgs: { agent: "researcher", task: "核对实现范围" }, toolResult: { details: { delegationId: "delegate-1", status: "running" } },
+      createdAt: "2026-10-08T00:00:00Z" },
     { id: "skill", role: "tool", content: "loaded", toolName: "Skill", toolStatus: "success", toolArgs: { id: "canvas" }, createdAt: "2026-10-08T00:00:00Z" },
     { id: "mcp", role: "tool", content: "captured", toolName: "mcp_browser_capture", toolStatus: "success", createdAt: "2026-10-08T00:00:00Z" },
   ];
-  const proposal: PlanProposal = { id: "spec", sessionId: session.id, turnId: "turn", toolCallId: "plan", kind: "goal",
+  const proposal: PlanProposal = { id: "spec", sessionId: session.id, turnId: "turn", toolCallId: "plan", kind: "plan",
     title: "用户管理系统实现方案", question: "Approve?", markdown: "Fixture", plan: "Fixture", version: 1,
-    status: "approved", executionState: "completed", createdAt: "now", updatedAt: "now",
-    artifact: { relativePath: ".pi/goal/用户管理系统实现方案.md", sha256: "fixture", sizeBytes: 7 } };
+    status: "approved", createdAt: "now", updatedAt: "now",
+    artifact: { relativePath: ".pi/plan/用户管理系统实现方案.md", sha256: "fixture", sizeBytes: 7 } };
   useAppStore.setState({ activeSessionId: session.id, sessions: [session], messages, planHistory: { [session.id]: [proposal] },
     sessionTodos: {}, pendingPlans: {}, planCheckpoints: {}, planningStates: {}, providers: [], runningSessions: {},
     sessionOutcomes: { [session.id]: "completed" }, workPanelTabs: [], activeWorkPanelTabId: null,
+    transcriptViews: {}, retention: [], retainedSessionIds: [session.id],
     openFileInWorkPanel: (path) => { openedFiles.push(path); },
     openWorkPanelTabForSession: (_id, tab) => { if (tab.teamTarget) opened.push(tab.teamTarget); else if (tab.kind === "file") opened.push({ kind: "file", filePath: tab.resource }); } });
-  let view: "overview" | "panorama" = "overview";
-  globalThis.overviewReferenceShow = async (nextView, width = nextView === "overview" ? 570 : 1120, theme = "dark") => {
+  let view: "activity" | "panorama" = "activity";
+  globalThis.overviewReferenceShow = async (nextView, width = 420, theme = "dark") => {
     view = nextView;
     document.documentElement.setAttribute("data-theme", theme);
     host.style.width = `${width}px`;
-    await act(async () => root.render(<I18nextProvider i18n={i18n}>{view === "overview"
-      ? <OverviewTab /> : <TeamPanoramaTab teamSessionId={session.id} />}</I18nextProvider>));
-    await until(() => view === "overview" ? host.querySelectorAll(".team-progress-row").length > 0 : host.querySelectorAll("[data-node-id]").length > 1, `${view} mounted`);
+    await act(async () => root.render(<I18nextProvider i18n={i18n}>{view === "activity"
+      ? <div className="activity-dock-tab"><SessionActivity sessionId={session.id} messages={messages} visible rangeLimited={false} /></div>
+      : <TeamPanoramaTab teamSessionId={session.id} />}</I18nextProvider>));
+    await until(() => view === "activity"
+      ? host.querySelectorAll('[data-activity-group="teamTasks"] .session-activity-team-task').length > 0
+      : host.querySelectorAll("[data-node-id]").length > 1, `${view} mounted`);
     if (view === "panorama") await act(async () => host.querySelector<HTMLButtonElement>(`[aria-label="${i18n.t("team.zoomFit")}"]`)?.click());
   };
   const update = async () => {
@@ -105,44 +117,50 @@ globalThis.overviewReferenceProbe = async () => {
     await act(async () => listeners.forEach((listener) => listener({ teamSessionId: session.id, revision: current.revision, reason: "task" })));
   };
   const click = async (selector: string) => { const button = host.querySelector<HTMLButtonElement>(selector); assert(button, selector); await act(async () => button!.click()); };
+  const teamTask = '[data-activity-group="teamTasks"] .session-activity-team-task';
   try {
-    await globalThis.overviewReferenceShow("overview");
-    assert(host.querySelectorAll(".team-progress-row").length === 6, "six bounded task rows");
+    await globalThis.overviewReferenceShow("activity");
+    assert(host.querySelectorAll(teamTask).length === 6, "six bounded task rows");
     assert(host.textContent?.includes("任务 1："), "real task ordinal rendered");
-    assert(!host.querySelector(".team-progress-group-toggle"), "redundant group removed");
-    assert(host.querySelector('.team-person img[width="20"]'), "owner pixel portrait readable");
-    await click(".team-progress-row");
-    assert(opened.at(-1)?.taskId === "task-0", "Overview task opens actual task");
-    await click(".team-progress-view-all");
-    assert(opened.at(-1)?.kind === "board", "all tasks opens board");
-    await click(".team-progress-panorama");
-    assert(opened.at(-1)?.kind === "panorama", "panorama link opens graph");
-    await click(".team-progress-toggle");
-    assert(host.querySelector(".team-progress-body")?.hasAttribute("hidden"), "whole progress collapses");
-    await click(".team-progress-toggle");
-    assert(host.querySelector('[data-artifact-kind="specs"]'), "Spec group preserved");
-    await click('[data-artifact-kind="specs"] .work-panel-overview-file');
-    assert(opened.at(-1)?.filePath === proposal.artifact?.relativePath, "Spec opens owning plan artifact");
-    await click('[data-artifact-kind="changedFiles"] .work-panel-overview-file');
-    assert(openedFiles.at(-1) === "pyproject.toml", "recorded changed file opens actual path");
-    assert(host.querySelector('[data-artifact-kind="changedFiles"]')?.textContent?.includes("5"), "recorded five distinct files");
-    assert(host.querySelector(".work-panel-overview-reference-list")?.textContent?.includes("canvas"), "recorded Skill only");
-    await click(".work-panel-overview-reference-tab:nth-child(2)");
-    assert(host.querySelector(".work-panel-overview-reference-list")?.children.length === 0, "Memory has no fabricated usage");
-    await click(".work-panel-overview-reference-tab:nth-child(3)");
-    assert(host.querySelector(".work-panel-overview-reference-list")?.textContent?.includes("mcp_browser_capture"), "recorded MCP only");
-    await click(".work-panel-overview-reference-tab:first-child");
+    const ownerWord = host.querySelector('[data-activity-group="teamTasks"] .session-activity-team-task-owner')?.textContent?.trim() ?? "";
+    assert(ownerWord.length > 0 && !host.querySelector('[data-activity-group="teamTasks"] .session-activity-team-task-owner img'), "owner role word instead of an avatar");
+    assert(!host.querySelector('[data-activity-group="teamTasks"] .team-person'), "no owner avatar in the rail");
+    await click(teamTask);
+    assert(opened.at(-1)?.taskId === "task-0", "the rail task opens that actual task");
+    await click('[data-activity-group="teamTasks"] .session-activity-team-board');
+    assert(opened.at(-1)?.kind === "board", "the board action opens the board");
+    await click('[data-activity-group="teamTasks"] .session-activity-disclosure');
+    assert(host.querySelector('[data-activity-group="teamTasks"] .session-activity-group-body')?.hasAttribute("hidden"), "the section collapses");
+    await click('[data-activity-group="teamTasks"] .session-activity-disclosure');
+    assert(!host.querySelector('[data-activity-group="teamTasks"] .session-activity-group-body')?.hasAttribute("hidden"), "the section reopens");
+    await click('[data-activity-group="plans"] .session-activity-row');
+    await until(() => opened.some((item) => item.filePath === proposal.artifact?.relativePath), "the plan row opens its owning plan artifact");
+    await click('[data-activity-group="agents"] .session-activity-panorama');
+    assert(opened.at(-1)?.kind === "panorama", "the panorama entry opens the Team panorama");
     await act(async () => useAppStore.setState({ sessionTodos: { [session.id]: { sessionId: session.id, revision: 2,
       todos: [{ content: "实时会话清单", status: "in_progress", priority: "medium" }], updatedAt: 2 } } }));
-    assert(host.querySelector('[data-testid="overview-session-checklist"]')?.textContent?.includes("实时会话清单"), "moved session checklist retained");
+    await until(() => Boolean(host.querySelector('[data-activity-group="todos"]')?.textContent?.includes("实时会话清单")), "moved session checklist retained");
     await act(async () => useAppStore.setState({ sessionTodos: {} }));
     current.tasks[12]!.status = "failed";
     await update();
-    await until(() => host.querySelector('.team-progress-row [data-state="failed"]') !== null, "live failed task priority");
+    await until(() => host.querySelector('[data-activity-group="teamTasks"] .session-activity-team-task [data-state="failed"]') !== null, "live failed task priority");
     current = structuredClone(snapshot);
     current.revision = 3;
     await update();
-    await globalThis.overviewReferenceShow("panorama");
+    for (const theme of ["dark", "light"] as const) {
+      for (const width of [320, 360, 570]) {
+        await globalThis.overviewReferenceShow("activity", width, theme);
+        if (host.scrollWidth > host.clientWidth + 1) {
+          const offender = [...host.querySelectorAll("*")].map((element) => ({ element, right: element.getBoundingClientRect().right }))
+            .filter(({ right }) => right > host.clientWidth + 1)
+            .sort((left, right) => right.right - left.right)[0];
+          const detail = offender ? `${offender.element.tagName}.${String(offender.element.className).slice(0, 80)} right=${Math.round(offender.right)}` : "none";
+          throw new Error(`${theme} ${width}px rail overflows: scroll=${host.scrollWidth} client=${host.clientWidth}; widest=${detail}`);
+        }
+        assert(host.querySelector('[data-activity-group="teamTasks"] .session-activity-team-task')!.scrollWidth <= width, "task rows stay inside the rail");
+      }
+    }
+    await globalThis.overviewReferenceShow("panorama", 1120);
     assert(host.querySelectorAll("[data-node-id]").length === 14, "one card per real task plus Lead");
     assert(host.querySelector('[data-edge-from="task-3"][data-edge-to="task-6"]'), "real dependency edge");
     assert(!host.querySelector('[data-edge-from="reference-lead"][data-edge-to="task-6"]'), "no invented direct Lead dependency");
@@ -153,30 +171,9 @@ globalThis.overviewReferenceProbe = async () => {
     const zoom = Number(host.querySelector("[data-panorama-canvas]")?.getAttribute("data-panorama-zoom"));
     await click('[aria-label="放大"]');
     assert(Number(host.querySelector("[data-panorama-canvas]")?.getAttribute("data-panorama-zoom")) > zoom, "zoom control works");
-    await act(async () => useAppStore.setState({ sessions: [{ ...session,
-      title: "Long session title ".repeat(20), projectPath: `/fixture/${"long-project-path/".repeat(20)}`,
-      modelId: "long-model-name-".repeat(20),
-    }] }));
-    for (const theme of ["dark", "light"] as const) {
-      for (const width of [320, 360, 570]) {
-        await globalThis.overviewReferenceShow("overview", width, theme);
-        const header = host.querySelector<HTMLElement>(".work-panel-overview-header")!;
-        const scroller = host.querySelector<HTMLElement>(".work-panel-overview-scroll")!;
-        assert(host.scrollWidth <= host.clientWidth, `${theme} ${width}px Overview has no page overflow`);
-        assert(header.scrollWidth <= header.clientWidth, "long metadata stays inside the header");
-        assert(scroller.scrollWidth <= scroller.clientWidth, "resources and references stay inside the scroll area");
-        const bounds = header.getBoundingClientRect();
-        for (const value of header.querySelectorAll("dd")) {
-          const rect = value.getBoundingClientRect();
-          assert(rect.width > 0 && rect.left >= bounds.left && rect.right <= bounds.right,
-            "every metadata value remains visible within the header");
-        }
-      }
-    }
-    await act(async () => useAppStore.setState({ sessions: [session] }));
-    await globalThis.overviewReferenceShow("overview");
     globalThis.overviewReferenceCleanup = () => { root.unmount(); host.remove(); Object.assign(api, originals); useAppStore.setState(previousState, true); };
-    return { ok: true, tasks: 13, dependencyEdges: dependencies.reduce((count, row) => count + row.length, 0), checks: "task/board/panorama navigation, live update, collapse, references, resources, long metadata at 320/360/570px dark/light, repeated owners" };
+    return { ok: true, tasks: 13, dependencyEdges: dependencies.reduce((count, row) => count + row.length, 0),
+      checks: "six task rows, numbered labels, owner role words, task/board/panorama navigation, plan artifact, section collapse, checklist, live update, panorama tiers/zoom, 320/360/570px light/dark" };
   } catch (error) {
     await act(async () => root.unmount()); host.remove(); Object.assign(api, originals); useAppStore.setState(previousState, true);
     throw error;

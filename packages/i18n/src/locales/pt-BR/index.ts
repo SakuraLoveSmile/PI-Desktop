@@ -2287,7 +2287,7 @@ export const ptBR = {
         openReport: "Abrir relatório da meta",
         progressUnavailable: "Progresso indisponível",
       },
-      title: "Visão geral da atividade", plans: "Plano", subagents: "Subagentes", processes: "Processos em segundo plano", sources: "Fontes",
+      plans: "Plano", subagents: "Subagentes", processes: "Processos em segundo plano", sources: "Fontes",
       empty: "Nenhum registro neste intervalo", rangeLimited: "Exibindo registros do intervalo de conversa carregado", unsupported: "Disponível apenas em sessões locais do Desktop",
       loading: "Carregando…", retry: "Tentar novamente", refresh: "Atualizar", openProcess: "Ver processo", closeProcess: "Fechar detalhes do processo", stopProcess: "Parar processo",
       command: "Comando", cwd: "Diretório de trabalho", stdout: "Saída padrão", stderr: "Erro padrão", outputTruncated: "Saída truncada",
@@ -2314,7 +2314,7 @@ export const ptBR = {
     },
     closeTab: "Fechar {{name}}",
     tabs: {
-      overview: "Visão geral",
+      activity: "Activity",
       team: "Equipe",
       review: "Revisar",
       browser: "Navegador",
@@ -2324,10 +2324,8 @@ export const ptBR = {
       goalReport: "Relatório da meta",
     },
     overview: {
-      specs: "Especificações", changedFiles: "Arquivos alterados", viewAllChanges: "Ver todas as alterações", attachments: "Anexos", skills: "Habilidades", memory: "Memória", mcp: "MCP",
-      noRecordedSkills: "Nenhuma habilidade registrada nesta conversa", noRecordedMemory: "Nenhuma memória registrada nesta conversa", noRecordedMcp: "Nenhum uso de MCP registrado nesta conversa",
-      recordedChangesNote: "São exibidas apenas as alterações registradas com sucesso na conversa carregada no momento; esta não é uma lista completa de alterações do Git.",
-      noSession: "Nenhuma sessão selecionada", untitled: "Sessão sem título", project: "Projeto", model: "Modelo", modeLabel: "Modo", messages: "Mensagens", notAvailable: "Indisponível", progress: "Progresso", statusLabel: "Status atual", noPlans: "Nenhuma atividade de plano nesta sessão", artifacts: "Artefatos", noArtifacts: "Nenhum artefato nesta sessão", references: "Referências", noReferences: "Nenhuma referência de arquivo explícita", mode: { chat: "Chat", plan: "Plano", goal: "Meta" }, subagents: "Subagents", noSubagents: "No subagents delegated in this session", teamSection: "Expert Team", status: { idle: "Inativo", running: "Em execução", planning: "Planejando", awaiting_approval: "Aguardando aprovação", pending: "Pendente", approved: "Aprovado", rejected: "Rejeitado", expired: "Expirado", interrupted: "Interrompido", queued: "Na fila", completed: "Concluído", failed: "Falhou" }
+      noSubagents: "No subagents delegated in this session",
+      status: { idle: "Inativo", running: "Em execução", planning: "Planejando", awaiting_approval: "Aguardando aprovação", pending: "Pendente", approved: "Aprovado", rejected: "Rejeitado", expired: "Expirado", interrupted: "Interrompido", queued: "Na fila", completed: "Concluído", failed: "Falhou" },
     },
     pluginView: {
       failed: "Não foi possível carregar esta visualização. Recarregue o plugin e tente novamente."

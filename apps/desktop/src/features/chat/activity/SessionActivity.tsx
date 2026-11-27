@@ -29,6 +29,7 @@ import { activityMcpReferences, type McpReconnectTarget } from "./activity-mcp-r
 import { useActivityMcpServers } from "./use-activity-mcp-servers";
 import { useActivityWorkspace } from "./use-activity-workspace";
 import { useSessionSummary } from "./use-session-summary";
+import { useOverviewMetadata } from "../../../hooks/useOverviewMetadata";
 
 const EMPTY_HISTORY: PlanProposal[] = [];
 const EMPTY_PERMISSIONS: NonNullable<ReturnType<typeof useAppStore.getState>["pendingPermissions"][string]> = [];
@@ -72,6 +73,9 @@ export function SessionActivity({ sessionId, messages, visible, rangeLimited }: 
   // A Team member's activity is read through its Team, and it has no summary of its own.
   const summary = useSessionSummary({ sessionId, visible, supported: supported && session?.team?.role !== "member", running,
     onRefreshFailed: () => showToast(t("panel.activity.summary.refreshFailed"), { variant: "error" }) });
+  // The canonical session metadata (title, Team relation) refreshes only while this summary is on screen; it used to be
+  // the Overview tab's job, and the rail is the one place that shows the session now.
+  const { error: metadataError } = useOverviewMetadata(sessionId, visible);
   const mcpTools = resources.references.mcp;
   const mcpServers = useActivityMcpServers(session?.projectPath ?? undefined, visible && supported && mcpTools.length > 0, mcpTools.map((tool) => tool.label).join("\n"));
   // The row spins and settles by itself, so only a server that still cannot be reached is said aloud, as the Extensions page does.
@@ -210,6 +214,7 @@ export function SessionActivity({ sessionId, messages, visible, rangeLimited }: 
     teamTasks={teamId ? { count: teamTaskCount,
       node: <ActivityTeamTasksSection sessionId={sessionId} teamSessionId={teamId} visible={visible} /> } : undefined}
     onOpenPanorama={subagents.length > 0 ? openPanorama : undefined}
+    metadataNotice={metadataError ? `${t("team.staleData")}: ${metadataError}` : undefined}
     environment={workspace.environment} contextUsage={workspace.context} changes={workspace.changes} summary={summary}
     onOpenServerAddress={(url) => open(sessionId, browserPluginTab(url))} onStopServer={(id) => void serverStop.stop(id)} stoppingServers={serverStop.stopping}
     onOpenContext={() => openContextInsights(sessionId, open)} onOpenReview={() => open(sessionId, toolWorkPanelTab("review"))}

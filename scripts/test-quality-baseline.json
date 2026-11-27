@@ -3050,35 +3050,20 @@
       ]
     },
     "apps/desktop/test/overview-and-team-drilldown.test.mjs": {
-      "assertions": 26,
-      "cases": 4,
+      "assertions": 11,
+      "cases": 2,
       "signatures": [
-        "0c689a710af917a90b70",
-        "161f9d3be8a019da7560",
-        "1c1cd8db4c442ceae476",
-        "1d21b1afa1b8733ed61a",
         "23374755f499570d8334",
         "233e41353ce28a20b998",
         "2b138fe68e89d1c6d0db",
-        "2d39a6f70ef6208c9f23",
         "32055d784d5a4ccbd84c",
         "33dc668a887d6ad07125",
-        "37f378e6fa3b3c3f39c5",
-        "3eae177a992fcda7f617",
-        "5803dc6cc423dcbd53a3",
         "6024b523242da27ce1e8",
-        "7e525dfa5d40deecdb12",
         "8bed0aca7291e4fc8217",
-        "92cd481e01759eb755ca",
-        "9d7f884517c5217f19be",
         "ac071dafd558a795009a",
-        "b6a9c0ec9645f3e1e366",
-        "c6fc263a64ea1c87b125",
         "c8d66d9276d1a462a4eb",
         "ca7901cb2e1dfc2e7d75",
-        "edc0d4be8d3289ffaa06",
-        "f170fb45d9bb3d503deb",
-        "fae8bca285ae276f7743"
+        "edc0d4be8d3289ffaa06"
       ]
     },
     "apps/desktop/test/packaging-footprint.test.mjs": {
@@ -3392,7 +3377,7 @@
       ]
     },
     "apps/desktop/test/plan-artifact-resolution.test.mjs": {
-      "assertions": 18,
+      "assertions": 15,
       "cases": 3,
       "signatures": [
         "0625c62d141a1a19f04b",
@@ -3400,13 +3385,10 @@
         "2c4b9a0cdfb1cdd6ba5c",
         "3303c10a62a575b2dfa2",
         "5488a6fea21e8364eacc",
-        "596fd82b88de2c6d9009",
-        "688a91cc7da9db6811f2",
         "6f62a2c73d916f855044",
         "993836d2c2c8c72aba17",
         "9aad68add809eb2444e5",
         "aaf074a9f6a201b9457e",
-        "b2f66a6152c56e9e46f7",
         "c739526bdb991ef1cb9e",
         "c7a49d81b6cd2bd410d5",
         "cc6356ed1d35533c1821",
@@ -7696,8 +7678,8 @@
       ]
     },
     "apps/desktop/test/subagent-progress-panorama.test.mjs": {
-      "assertions": 59,
-      "cases": 6,
+      "assertions": 55,
+      "cases": 5,
       "signatures": [
         "0d903f9a2f3a74e611a7",
         "12946dc967b6fc502064",
@@ -7706,7 +7688,6 @@
         "2373259edb919cf4fc7d",
         "27ebe1c10ca9a7016fcd",
         "321ef87be892a8c73f99",
-        "3ad3ee4468815eb9ce07",
         "47cbaed664872922f5bc",
         "4aa9427d1032f7a448b9",
         "51e72e474a381ec0f0ca",
@@ -7742,18 +7723,15 @@
         "b98c867e9b3ba4cc2101",
         "c10c9c4c7494f9d48640",
         "c3c6384857e25846c4b9",
-        "c42cdedc14ace2d293d4",
         "cbd94f59e0fd438db04d",
         "cc43751bbcd3aeb35a68",
         "cc724b96a1875015ae93",
         "cfb40cdde01bab56d0e3",
-        "d77c56b63bee33103a25",
         "d8cfec7f19459477bc37",
         "db93772b6e0f09aa2cd8",
         "deb2b5d9f75b2685f95b",
         "df7e7a1a8c3be44bbcc8",
         "e1443ae0415710ff22a6",
-        "e8e4d9707474e82af8e1",
         "efb612d351763043f119",
         "efb612d351763043f119",
         "f771c119b2449355f66c",
@@ -8118,43 +8096,26 @@
         "ff3d2ef71af418848718"
       ]
     },
-    "apps/desktop/test/team-presentation.test.mjs": {
-      "assertions": 2,
-      "cases": 1,
-      "signatures": [
-        "242cefe9b2345ab7c1a2",
-        "f51c604afe9c6f40b70e"
-      ]
-    },
     "apps/desktop/test/team-review-waiting-status.test.mjs": {
-      "assertions": 26,
-      "cases": 6,
+      "assertions": 17,
+      "cases": 5,
       "signatures": [
         "1ca26b6d8b57b8697c56",
         "1caf77109443c6317be3",
         "1daa54b69aa07c680e27",
         "225cf8cbfa01b6b72951",
         "2d187e318b08a7663c60",
-        "47054cc38d3bf7fd99e2",
-        "4e168877c4acca652979",
-        "51c107c201bc73d6a8a9",
-        "600b6fb33027cf3b8d61",
         "6d82f73975cb8422eea9",
         "76f0b89682008831926f",
         "8533db834625b5669264",
-        "85db3486f2599c74a633",
         "921e4aa6fbf15a1c33ca",
-        "a8c0ec87921c961014b7",
         "ac3b5fb08bf98eb27d19",
         "b259f82bd81e53786615",
         "b8dd4dd07a59c8eeada1",
-        "cd9e985d2d5e7ecaf8ec",
         "d22620d62fbe27c17299",
         "d4d946a5c2ecb4715e3d",
-        "dae616dea1169dad0510",
         "e0c1ea8de84ff383f6fa",
         "f114c466e6e5195e6e64",
-        "f2410e49d39685db99e1",
         "fad6a3ec402870402ee2"
       ]
     },

@@ -112,3 +112,18 @@ test("the board action and a task row lead to the Team board and that task", asy
     assert.deepEqual([task.id, task.teamTarget, task.label], ["team:team-session:task:task-2", { kind: "task", taskId: "task-2" }, "Subject 2"]);
   });
 });
+test("a recorded change row shows exact totals and omits a zero side", async () => {
+  await withServer(async (server, i18n) => {
+    const { ActivityRailRow } = await server.ssrLoadModule("/src/features/chat/activity/ActivityRailRows.tsx");
+    const row = (extra) => renderToStaticMarkup(wrap(i18n, createElement(ActivityRailRow, {
+      kind: "output", now: 0,
+      item: { id: "change:f", label: "src/a.ts", path: "src/a.ts", addedLines: 5, removedLines: 1, ...extra },
+    })));
+    const exact = row({});
+    assert.match(exact, /session-activity-lines-added">\+5</);
+    assert.match(exact, /session-activity-lines-removed">−1</);
+    const addedOnly = row({ removedLines: 0 });
+    assert.match(addedOnly, /session-activity-lines-added">\+5</);
+    assert.doesNotMatch(addedOnly, /session-activity-lines-removed/);
+  });
+});

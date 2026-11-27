@@ -120,9 +120,15 @@ export async function sessionActivityRailProbe(capture?: (stage: "service-list" 
     const savedOrder = () => { try { return localStorage.getItem(orderKey); } catch { return null; } };
     const sectionIds = () => [...host.querySelectorAll<HTMLElement>("[data-activity-section]")].map((element) => element.dataset.activitySection).join();
     const sectionGrip = (id: string) => host.querySelector<HTMLButtonElement>(`[data-activity-section-grip="${id}"]`);
-    // The saved order is complete: this rail has no server, and the hidden Servers section keeps its default slot (fourth)
-    // while the visible ones move around it.
-    const saved = (visible: string) => { const ids = visible.split(","); ids.splice(3, 0, "server"); return JSON.stringify(ids); };
+    // The saved order is complete: sections this rail does not show (Todos, Team tasks, Servers) keep their default
+    // slots while the visible ones move around them, exactly as applyVisibleActivitySectionOrder writes them.
+    const FULL_DEFAULT = ["goals", "plans", "todos", "teamTasks", "live", "server", "environment", "context", "artifacts", "skills", "changes"];
+    const saved = (visible: string) => {
+      const ids = visible.split(",");
+      const slots = new Set(ids);
+      let next = 0;
+      return JSON.stringify(FULL_DEFAULT.map((id) => (slots.has(id) ? ids[next++] : id)));
+    };
     const sectionBox = (id: string) => host.querySelector<HTMLElement>(`[data-activity-section="${id}"]`)!.getBoundingClientRect();
     const usage = { inputTokens: 38_000, outputTokens: 2_000, totalTokens: 40_000 };
     const orderProps: SessionActivityRailProps = { ...railProps, goals: [{ id: "goal", label: "Ship importer", status: "running", statusLabel: "Running" }],

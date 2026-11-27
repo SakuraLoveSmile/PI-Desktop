@@ -2341,7 +2341,7 @@ sklm: {
         openReport: "Hedef raporunu aç",
         progressUnavailable: "İlerleme kullanılamıyor",
       },
-      title: "Etkinlik özeti", plans: "Plan", subagents: "Alt ajanlar", processes: "Arka plan işlemleri", sources: "Kaynaklar",
+      plans: "Plan", subagents: "Alt ajanlar", processes: "Arka plan işlemleri", sources: "Kaynaklar",
       empty: "Bu aralıkta kayıt yok", rangeLimited: "Yüklenen görüşme aralığındaki kayıtlar gösteriliyor", unsupported: "Yalnızca yerel masaüstü oturumlarında kullanılabilir",
       loading: "Yükleniyor…", retry: "Yeniden dene", refresh: "Yenile", openProcess: "İşlemi görüntüle", closeProcess: "İşlem ayrıntılarını kapat", stopProcess: "İşlemi durdur",
       command: "Komut", cwd: "Çalışma dizini", stdout: "Standart çıktı", stderr: "Standart hata", outputTruncated: "Çıktı kısaltıldı",
@@ -2368,7 +2368,7 @@ sklm: {
     },
     closeTab: "{{name}} öğesini kapat",
     tabs: {
-      overview: "Genel Bakış",
+      activity: "Activity",
       team: "Ekip",
       review: "İnceleme",
       browser: "Tarayıcı",
@@ -2378,10 +2378,8 @@ sklm: {
       goalReport: "Hedef Raporu",
     },
     overview: {
-      specs: "Özellikler", changedFiles: "Değiştirilen dosyalar", viewAllChanges: "Tüm değişiklikleri görüntüle", attachments: "Ekler", skills: "Beceriler", memory: "Bellek", mcp: "MCP",
-      noRecordedSkills: "Bu görüşmede kaydedilmiş beceri yok", noRecordedMemory: "Bu görüşmede kaydedilmiş bellek yok", noRecordedMcp: "Bu görüşmede kaydedilmiş MCP kullanımı yok",
-      recordedChangesNote: "Yalnızca şu anda yüklenmiş görüşmede başarıyla kaydedilen değişiklikler gösterilir; bu, tüm Git değişikliklerinin listesi değildir.",
-      noSession: "Oturum seçilmedi", untitled: "Adsız oturum", project: "Proje", model: "Model", modeLabel: "Mod", messages: "Mesajlar", notAvailable: "Kullanılamıyor", progress: "İlerleme", statusLabel: "Geçerli durum", noPlans: "Bu oturumda plan etkinliği yok", artifacts: "Yapaylar", noArtifacts: "Bu oturumda yapay yok", references: "Başvurular", noReferences: "Açık dosya başvurusu yok", mode: { chat: "Sohbet", plan: "Plan", goal: "Hedef" }, subagents: "Subagents", noSubagents: "No subagents delegated in this session", teamSection: "Expert Team", status: { idle: "Boşta", running: "Çalışıyor", planning: "Planlanıyor", awaiting_approval: "Onay bekleniyor", pending: "Beklemede", approved: "Onaylandı", rejected: "Reddedildi", expired: "Süresi doldu", interrupted: "Kesildi", queued: "Kuyrukta", completed: "Tamamlandı", failed: "Başarısız" }
+      noSubagents: "No subagents delegated in this session",
+      status: { idle: "Boşta", running: "Çalışıyor", planning: "Planlanıyor", awaiting_approval: "Onay bekleniyor", pending: "Beklemede", approved: "Onaylandı", rejected: "Reddedildi", expired: "Süresi doldu", interrupted: "Kesildi", queued: "Kuyrukta", completed: "Tamamlandı", failed: "Başarısız" },
     },
     pluginView: {
       failed: "Bu görünüm yüklenemedi. Eklentiyi yeniden yükleyip deneyin.",

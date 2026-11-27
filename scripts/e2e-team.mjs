@@ -550,9 +550,12 @@ async function approveExpertReview(invoke, evaluate, sessionId, previousReviewId
   return review.reviewId;
 }
 
+// The session summary is the inline rail when the chat fits it, otherwise the work panel's first tab.
 async function activateOverviewTab(sendCdp, evaluate) {
   // Overview navigation is explicit user navigation. Each session owns its
   // panel state, so a newly selected Standard session may start with it closed.
+  const inlineRail = () => `!!document.querySelector('.chat-surface .session-pane[data-visible="true"] .session-activity-rail:not([hidden])')`;
+  if (await evaluate(inlineRail()).catch(() => false)) return;
   const panelState = await waitFor(() => evaluate(`(() => {
     const panel=document.querySelector('[data-testid="work-panel"]');
     const pressed=document.querySelector('.app-work-panel-toggle')?.getAttribute('aria-pressed');
@@ -563,9 +566,9 @@ async function activateOverviewTab(sendCdp, evaluate) {
   if (panelState === "closed") {
     await evaluate(`document.querySelector('.app-work-panel-toggle').click()`);
   }
-  await waitFor(() => evaluate(`!!document.querySelector('[data-work-panel-tab-id="overview"] .work-panel-tab-button')`), "Overview tab");
-  await evaluate(`document.querySelector('[data-work-panel-tab-id="overview"] .work-panel-tab-button').click()`);
-  await waitFor(() => evaluate(`!!document.querySelector('[data-testid="overview-tab"]')`), "Overview surface");
+  await waitFor(() => evaluate(`!!document.querySelector('[data-work-panel-tab-id="activity"] .work-panel-tab-button')`), "Activity tab");
+  await evaluate(`document.querySelector('[data-work-panel-tab-id="activity"] .work-panel-tab-button').click()`);
+  await waitFor(() => evaluate(`!!document.querySelector('.activity-dock-tab .session-activity-rail')`), "activity surface");
 }
 
 async function submitComposerPrompt(sendCdp, evaluate, prompt) {
@@ -895,7 +898,7 @@ async function resizePanel(sendCdp, evaluate, width) {
 
 const TEAM_SURFACE_METRICS = `(() => {
   const root=document.documentElement;
-  const surface=document.querySelector('.team-panel, .work-panel-overview, .team-work-tab');
+  const surface=document.querySelector('.team-panel, .activity-dock-tab, .team-work-tab');
   const bounds=surface.getBoundingClientRect(), surfaceStyle=getComputedStyle(surface);
   const right=bounds.left+surface.clientWidth-parseFloat(surfaceStyle.paddingRight);
   const overflowing=surface.scrollWidth > surface.clientWidth ? Array.from(surface.querySelectorAll('*')).map(node => {
@@ -914,7 +917,7 @@ async function verifyTeamLayoutMatrix(sendCdp, evaluate, locale) {
   let matrixPosition = { locale, surface: "setup" };
   const diagnostics = () => evaluate(`(() => {
     const panel=document.querySelector('[data-testid="work-panel"]');
-    const view=document.querySelector('.team-panel[data-testid],.work-panel-overview,.team-work-tab');
+    const view=document.querySelector('.team-panel[data-testid],.activity-dock-tab,.team-work-tab');
     return { tab: document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id'),
       view: view?.getAttribute('data-testid'), width: panel?.getBoundingClientRect().width,
       resizing: panel?.getAttribute('data-resizing'), fontScale: getComputedStyle(document.documentElement).getPropertyValue('--font-scale'),
@@ -926,12 +929,12 @@ async function verifyTeamLayoutMatrix(sendCdp, evaluate, locale) {
       await openTeamPanel(sendCdp, evaluate);
       if (surface !== "aggregate") {
         await activateOverviewTab(sendCdp, evaluate);
-        await waitFor(() => evaluate(`document.querySelectorAll('.team-progress-row').length > 0`), "live task rows for layout matrix");
+        await waitFor(() => evaluate(`document.querySelectorAll('[data-activity-group="teamTasks"] .session-activity-team-task').length > 0`), "live task rows for layout matrix");
         if (surface === "taskTab") {
-          await evaluate(`document.querySelector('.team-progress-row')?.click()`);
+          await evaluate(`document.querySelector('[data-activity-group="teamTasks"] .session-activity-team-task')?.click()`);
           await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-task-tab"]')`), "task tab for layout matrix");
         } else if (surface !== "overview") {
-          await evaluate(`Array.from(document.querySelectorAll('.team-progress button')).find(button => /view all|查看全部/i.test(button.innerText))?.click()`);
+          await evaluate(`document.querySelector('.session-activity-team-board')?.click()`);
           await waitFor(() => evaluate(`!!document.querySelector('.team-board-row')`), "board for layout matrix");
           if (surface === "detail") {
             await evaluate(`document.querySelector('.team-board-row')?.click()`);
@@ -1006,19 +1009,19 @@ async function verifyLongTeamProgress(sendCdp, evaluate, invoke, leadId) {
       position = { locale: "fr", font, surface, stage: "navigation" };
       await openTeamPanel(sendCdp, evaluate);
       if (surface === "overview") await activateOverviewTab(sendCdp, evaluate);
-      await waitFor(() => evaluate(`document.querySelector('.team-progress-title')?.textContent === 'Progression des tâches'`), "real French Team progress");
+      await waitFor(() => evaluate(`document.querySelector('.session-activity-group-title')?.textContent === 'Progression des tâches'`), "real French Team progress");
       await resizePanel(sendCdp, evaluate, 320);
       for (const theme of ["dark", "light"]) {
         position = { locale: "fr", font, surface, theme, width: 320, scale: 1.5, stage: "measure" };
         await evaluate(`document.documentElement.style.setProperty('--font-scale', '1.5'); document.documentElement.setAttribute('data-theme', '${theme}'); true`);
-        await evaluate(`document.querySelector('.team-progress-header').scrollIntoView({block:'center'}); true`);
+        await evaluate(`document.querySelector('.session-activity-heading').scrollIntoView({block:'center'}); true`);
         await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
         const metrics = await evaluate(`(() => {
-          const surface=document.querySelector('.team-panel, .work-panel-overview');
-          const progress=surface.querySelector('.team-progress-header');
-          const link=progress.querySelector('.team-progress-panorama');
+          const surface=document.querySelector('.team-panel, .activity-dock-tab');
+          const progress=surface.querySelector('[data-activity-group="teamTasks"] .session-activity-heading');
+          const link=surface.querySelector('[data-activity-group="agents"] .session-activity-panorama');
           const label=link.querySelector('span');
-          const toggle=progress.querySelector('.team-progress-toggle');
+          const toggle=progress.querySelector('.session-activity-disclosure');
           const rect=node => node.getBoundingClientRect().toJSON();
           const header=surface.querySelector('.team-panel-header');
           const measure=node => ({...rect(node),text:node.textContent,clientWidth:node.clientWidth,scrollWidth:node.scrollWidth,
@@ -1061,10 +1064,10 @@ async function verifyLongTeamProgress(sendCdp, evaluate, invoke, leadId) {
           await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
           await saveScreenshot(sendCdp, `team-header-${font}-${theme}.png`, teamEvidenceDir);
         }
-        await clickProgressControl('.team-progress-toggle');
-        await waitFor(() => evaluate(`document.querySelector('.team-progress-body')?.hidden === true`), "long-label progress collapse");
-        await clickProgressControl('.team-progress-toggle');
-        await waitFor(() => evaluate(`document.querySelector('.team-progress-body')?.hidden === false`), "long-label progress reopen");
+        await clickProgressControl('.session-activity-disclosure');
+        await waitFor(() => evaluate(`document.querySelector('.session-activity-group-body')?.hidden === true`), "long-label progress collapse");
+        await clickProgressControl('.session-activity-disclosure');
+        await waitFor(() => evaluate(`document.querySelector('.session-activity-group-body')?.hidden === false`), "long-label progress reopen");
       }
       if (surface === "aggregate") {
         const lastRefresh = await evaluate(`document.querySelector('.team-panel').dataset.lastSuccessAt`);
@@ -1074,7 +1077,7 @@ async function verifyLongTeamProgress(sendCdp, evaluate, invoke, leadId) {
         await waitFor(() => evaluate(`!!document.querySelector('[data-panorama-canvas]')`), "native Team header panorama opens");
         await openTeamPanel(sendCdp, evaluate);
       }
-      await clickProgressControl('.team-progress-panorama');
+      await clickProgressControl('.session-activity-panorama');
       await waitFor(() => evaluate(`!!document.querySelector('[data-panorama-canvas]')`), "long-label panorama link remains clickable");
     }
   } catch (error) {
@@ -1087,7 +1090,7 @@ async function verifyLongTeamProgress(sendCdp, evaluate, invoke, leadId) {
     await saveScreenshot(sendCdp, "team-long-progress-primary.png", teamEvidenceDir);
     if (evidence.metrics.overflowing.length) {
       await evaluate(`(() => {
-        const surface=document.querySelector('.team-panel, .work-panel-overview');
+        const surface=document.querySelector('.team-panel, .activity-dock-tab');
         const right=(${TEAM_SURFACE_METRICS}).contentRight;
         Array.from(surface.querySelectorAll('*')).find(node => node.getBoundingClientRect().right > right+0.5)
           ?.scrollIntoView({block:'center',inline:'nearest'});
@@ -1368,8 +1371,8 @@ try {
 
   // Open both live tab surfaces while the local model gate is still held.
   await activateOverviewTab(sendCdp, evaluate);
-  await waitFor(() => evaluate(`document.querySelectorAll('.team-progress-row').length > 0`), "live task entry before member release");
-  await evaluate(`document.querySelector('.team-progress-row')?.click()`);
+  await waitFor(() => evaluate(`document.querySelectorAll('[data-activity-group="teamTasks"] .session-activity-team-task').length > 0`), "live task entry before member release");
+  await evaluate(`document.querySelector('[data-activity-group="teamTasks"] .session-activity-team-task')?.click()`);
   await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-task-tab"]')`), "live task tab before member release");
   const liveTaskTabId = await evaluate(`document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id')`);
   const taskHeaderHeight = await evaluate(`document.querySelector('[data-testid="team-task-tab"] .team-work-tab-header').getBoundingClientRect().height`);
@@ -1455,31 +1458,31 @@ try {
   assert.ok(boardTaskId, "board fixture task id was not initialized");
   await waitFor(async () => (await invoke("agentGetStatus", lead.id)).status?.isRunning === false, "Lead idle before task completion fixture");
   await activateOverviewTab(sendCdp, evaluate);
-  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.completed === '0' && document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.total === '7'`), "Overview baseline before live task mutation");
+  await waitFor(() => evaluate(`document.querySelector('[data-activity-group="teamTasks"]')?.dataset.completed === '0' && document.querySelector('[data-activity-group="teamTasks"]')?.dataset.total === '7'`), "Overview baseline before live task mutation");
   await invoke("agentPrompt", { sessionId: lead.id, viewingSessionId: lead.id, content: "Mark the board fixture task completed." });
   await approveExpertReview(invoke, evaluate, lead.id);
   await waitFor(() => modelGates.taskMutation.entered, "task mutation held before execution");
   // Approval may navigate to the Team tab. Mount Overview before releasing
   // the mutation so this asserts live refresh, not a fresh snapshot read.
   await activateOverviewTab(sendCdp, evaluate);
-  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.completed === '0'`), "Overview mounted before gated mutation");
+  await waitFor(() => evaluate(`document.querySelector('[data-activity-group="teamTasks"]')?.dataset.completed === '0'`), "Overview mounted before gated mutation");
   releaseModelRequest("taskMutation");
   await waitFor(() => modelGates.taskUpdate.entered, "task update held after Host mutation");
   const updatedBoard = await invoke("teamGetBoard", { teamSessionId: lead.id });
   assert.equal(updatedBoard.tasks.find((task) => task.taskId === boardTaskId)?.status, "in_progress", "completion claim must remain pending until its execution turn settles");
   assert.equal((await invoke("agentGetStatus", lead.id)).status?.isRunning, true, "completion claim must not end the gated Lead turn");
-  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.completed === '0' && document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.total === '7'`), "mounted Overview excludes the unsettled completion claim");
+  await waitFor(() => evaluate(`document.querySelector('[data-activity-group="teamTasks"]')?.dataset.completed === '0' && document.querySelector('[data-activity-group="teamTasks"]')?.dataset.total === '7'`), "mounted Overview excludes the unsettled completion claim");
   releaseModelRequest("taskUpdate");
   await waitFor(async () => (await invoke("agentGetStatus", lead.id)).status?.isRunning === false, "Lead settled after task completion fixture");
   await waitFor(async () => (await invoke("teamGetBoard", { teamSessionId: lead.id })).tasks.find((task) => task.taskId === boardTaskId)?.status === "completed", "settled completion claim persists as completed");
   try {
-  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.completed === '1' && document.querySelector('[data-testid="overview-team-progress"] section.team-progress')?.dataset.total === '7'`), "mounted Overview refreshes when the completion claim settles");
+  await waitFor(() => evaluate(`document.querySelector('[data-activity-group="teamTasks"]')?.dataset.completed === '1' && document.querySelector('[data-activity-group="teamTasks"]')?.dataset.total === '7'`), "mounted Overview refreshes when the completion claim settles");
   } catch (error) {
     console.error("TEAM_PROGRESS_REFRESH", JSON.stringify(await evaluate(`(() => {
-      const section = document.querySelector('[data-testid="overview-team-progress"] section.team-progress');
+      const section = document.querySelector('[data-activity-group="teamTasks"]');
       return { completed: section?.dataset.completed, total: section?.dataset.total,
         activeTab: document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id'),
-        text: document.querySelector('[data-testid="overview-team-progress"]')?.innerText,
+        text: document.querySelector('[data-activity-group="teamTasks"]')?.innerText,
         error: document.querySelector('.team-error-banner')?.innerText };
     })()`)));
     throw error;
@@ -1488,9 +1491,9 @@ try {
   await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-task-tab"] .team-task-glyph[data-state="completed"] svg')`), "stored task tab reflects completed snapshot state");
   await assertTeamSuccessGlyph(evaluate, '[data-testid="team-task-tab"] .team-task-glyph[data-state="completed"] svg', "task");
   await activateOverviewTab(sendCdp, evaluate);
-  await waitFor(() => evaluate(`document.querySelectorAll('[data-testid="overview-team-progress"] .team-progress-row').length === 6`), "six compact Overview task rows");
-  assert.match(await evaluate(`document.querySelector('[data-testid="overview-tab"]')?.innerText ?? ''`), /researcher|Alex/i, "Overview should expose the Team task/member summary");
-  await evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-row')?.click()`);
+  await waitFor(() => evaluate(`document.querySelectorAll('[data-activity-group="teamTasks"] .session-activity-team-task').length === 6`), "six bounded team task rows");
+  assert.match(await evaluate(`document.querySelector('[data-activity-group="teamTasks"]')?.innerText ?? ''`), /researcher|Alex/i, "the rail should expose the Team task and member summary");
+  await evaluate(`document.querySelector('[data-activity-group="teamTasks"] .session-activity-team-task')?.click()`);
   await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-task-tab"]')`), "Overview opens independent task tab");
   const taskTabId = await evaluate(`document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id')`);
   assert.match(taskTabId, new RegExp(`^team:${lead.id}:task:`));
@@ -1498,38 +1501,28 @@ try {
 
   const tabCount = await evaluate(`document.querySelectorAll('[data-work-panel-tab-id]').length`);
   await activateOverviewTab(sendCdp, evaluate);
-  await evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-row')?.click()`);
+  await evaluate(`document.querySelector('[data-activity-group="teamTasks"] .session-activity-team-task')?.click()`);
   await waitFor(() => evaluate(`document.querySelector('[data-work-panel-tab-id].active')?.getAttribute('data-work-panel-tab-id') === ${JSON.stringify(taskTabId)}`), "re-clicking task reactivates its existing tab");
   assert.equal(await evaluate(`document.querySelectorAll('[data-work-panel-tab-id]').length`), tabCount, "reopening task must not duplicate tabs");
   assert.equal(await evaluate(`document.querySelectorAll('[data-work-panel-tab-id="team:${lead.id}"]').length`), 1, "task navigation retains aggregate tab");
   await activateOverviewTab(sendCdp, evaluate);
-  const overviewMetrics = await evaluate(`(() => {
-    const overview = document.querySelector('[data-testid="overview-tab"]');
-    const section = overview.querySelector('section.team-progress');
+  const railMetrics = await evaluate(`(() => {
+    const section = document.querySelector('[data-activity-group="teamTasks"]');
     return {
-      header: section.querySelector('.team-progress-header').getBoundingClientRect().height,
-      row: section.querySelector('.team-progress-row').getBoundingClientRect().height,
-      summaries: Array.from(overview.querySelectorAll('details > summary')).map(summary => ({
-        height: summary.getBoundingClientRect().height,
-        chevrons: summary.querySelectorAll('.work-panel-overview-chevron').length,
-        border: getComputedStyle(summary.parentElement).borderBottomStyle,
-      })),
-      extraInside: !!section.querySelector('.work-panel-overview-status'),
-      separateProgress: Array.from(overview.querySelectorAll('details > summary')).some(summary => summary.innerText.trim() === 'Progress'),
+      heading: section.querySelector('.session-activity-disclosure').getBoundingClientRect().height,
+      row: section.querySelector('.session-activity-team-task').getBoundingClientRect().height,
+      progress: section.querySelector('.session-activity-team-progress').getBoundingClientRect().height,
     };
   })()`);
-  assert.ok(Math.abs(overviewMetrics.header - 48) <= 2, `Team progress header geometry: ${JSON.stringify(overviewMetrics)}`);
-  assert.ok(Math.abs(overviewMetrics.row - 68) <= 2, `Team progress row geometry: ${JSON.stringify(overviewMetrics)}`);
-  assert.ok(overviewMetrics.summaries.every(summary => Math.abs(summary.height - 48) <= 2 && summary.chevrons === 1 && summary.border === 'solid'), `Overview chrome geometry: ${JSON.stringify(overviewMetrics)}`);
-  assert.equal(overviewMetrics.extraInside, true, "Team status must stay inside progress");
-  assert.equal(overviewMetrics.separateProgress, false, "Team Overview must not repeat the ordinary progress disclosure");
-  await evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-toggle')?.click()`);
-  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-body')?.getClientRects().length === 0`), "progress collapse hides task and extra content");
-  await evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-toggle')?.click()`);
-  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"] .team-progress-body')?.getClientRects().length > 0`), "progress reopen restores task and extra content");
+  assert.ok(Math.abs(railMetrics.row - 28) <= 2, `Team task row geometry: ${JSON.stringify(railMetrics)}`);
+  assert.ok(Math.abs(railMetrics.progress - 4) <= 1, `Team task progress bar geometry: ${JSON.stringify(railMetrics)}`);
+  await evaluate(`document.querySelector('[data-activity-group="teamTasks"] .session-activity-disclosure')?.click()`);
+  await waitFor(() => evaluate(`document.querySelector('[data-activity-group="teamTasks"] .session-activity-group-body')?.getClientRects().length === 0`), "the section collapse hides its tasks");
+  await evaluate(`document.querySelector('[data-activity-group="teamTasks"] .session-activity-disclosure')?.click()`);
+  await waitFor(() => evaluate(`document.querySelector('[data-activity-group="teamTasks"] .session-activity-group-body')?.getClientRects().length > 0`), "the section reopens with its tasks");
   console.log(`PASS Overview geometry/disclosures: ${JSON.stringify(overviewMetrics)}`);
   await saveScreenshot(sendCdp, "team-overview-progress.png");
-  await evaluate(`Array.from(document.querySelectorAll('[data-testid="overview-team-progress"] button')).find(button => /view all/i.test(button.innerText))?.click()`);
+  await evaluate(`Array.from(document.querySelectorAll('[data-activity-group="teamTasks"] button')).find(button => /view all/i.test(button.innerText))?.click()`);
   await waitFor(() => evaluate(`document.querySelectorAll('.team-board-row').length === 7`), "all seven compact board rows");
   await evaluate(`Array.from(document.querySelectorAll('.team-board-filter-control button')).find(button => /completed/i.test(button.innerText))?.click()`);
   await waitFor(() => evaluate(`document.querySelectorAll('.team-board-row').length === 1`), "completed board filter");
@@ -1752,7 +1745,7 @@ try {
   await waitFor(() => evaluate(`!!document.querySelector('[data-session-pane="${lead.id}"][data-visible="true"]')`), "Lead reopened after Chinese reload");
   await openTeamPanel(sendCdp, evaluate);
   await activateOverviewTab(sendCdp, evaluate);
-  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"]')?.innerText.includes('进展')`), "Chinese compact Team progress");
+  await waitFor(() => evaluate(`document.querySelector('[data-activity-group="teamTasks"]')?.innerText.includes('进展')`), "Chinese compact Team progress");
   await saveScreenshot(sendCdp, "team-overview-zh-CN.png");
   if (process.env.PI_E2E_TEAM_CORE_ONLY !== "1") await verifyTeamLayoutMatrix(sendCdp, evaluate, "zh-CN");
   else console.log("NOT RUN Team layout matrix: core-only gate covers execution/lifecycle; panel drag/layout is unchanged by this candidate.");
