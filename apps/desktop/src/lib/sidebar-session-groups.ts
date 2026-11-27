@@ -165,15 +165,6 @@ export function sortSidebarSessionGroups(
   });
 }
 
-export function visibleSidebarSessionGroups(
-  groups: readonly SidebarSessionGroup[],
-  expanded: boolean,
-  limit: number,
-): { visible: SidebarSessionGroup[]; hiddenCount: number } {
-  const visible = expanded ? [...groups] : groups.slice(0, Math.max(0, limit));
-  return { visible, hiddenCount: groups.length - visible.length };
-}
-
 export function partitionPinnedSidebarSessionGroups(
   groups: readonly SidebarSessionGroup[],
   pinnedIds: ReadonlySet<string>,

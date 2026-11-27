@@ -1,4 +1,3 @@
-import { IconClock } from "./icons";
 import {
   useCallback,
   useEffect,
@@ -12,6 +11,8 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { TooltipButton, cx } from "./ui";
+import { SidebarFooter } from "../features/sidebar/SidebarFooter";
+import { capSidebarEntries } from "../features/sidebar/sidebar-list-cap";
 
 /** Default number of most-recent sessions shown per project group before the rest fold. */
 const MAX_VISIBLE_SESSIONS = 10;
@@ -37,7 +38,6 @@ import {
   sortSidebarSessionGroups,
   teamMemberRowTitle,
   visibleSidebarProjects,
-  visibleSidebarSessionGroups,
 } from "../lib/sidebar-session-groups";
 import { listableSessions } from "../lib/session-origin";
 import {
@@ -73,7 +73,6 @@ import {
   sidebarResetWidth,
 } from "../lib/sidebar-resize";
 import { BrandLogo } from "./BrandLogo";
-import { NotificationCenter } from "./NotificationCenter";
 import { ProjectEditDialog } from "./ProjectEditDialog";
 import { useArmedDelete } from "../hooks/use-armed-delete";
 import { ProjectDeleteDialog } from "./ProjectDeleteDialog";
@@ -83,21 +82,18 @@ import {
   IconArchive,
   IconArchiveRestore,
   IconArrowUpDown,
-  IconPlug,
   IconBranch,
   IconCheck,
   IconChevronDown,
   IconCopy,
   IconCircleAlert,
   IconNewSession,
-  IconMap,
   IconFolder,
   IconMore,
   IconNewProject,
   IconPin,
   IconPencil,
   IconSidebar,
-  IconSettings,
   IconStar,
   IconTrash,
   IconX,
@@ -606,6 +602,21 @@ export function Sidebar({
   const buildTitle = updateReady
     ? t("updates.available", { version: update?.availableVersion ?? "" })
     : t("nav.checkForUpdates");
+
+  // An actionable update routes to the Settings row that can act on it; any
+  // other click asks the Host for a fresh check.
+  const onBuildClick = () => {
+    if (updateReady) {
+      setSettingsAnchor("updates.title");
+      setSettingsTab("about");
+      return;
+    }
+    void (async () => {
+      try {
+        await api.updatesCheck();
+      } catch { /* ignore */ }
+    })();
+  };
 
   const onMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
@@ -2029,10 +2040,10 @@ export function Sidebar({
       compareSessions,
       displaySessionSort === "recent",
     );
-    const { visible: visibleGroups, hiddenCount } = visibleSidebarSessionGroups(
+    const { visible: visibleGroups, hiddenCount } = capSidebarEntries(
       historyGroups,
-      sessionsExpanded,
       MAX_VISIBLE_SESSIONS,
+      sessionsExpanded,
     );
 
     const renderTimeGroupedSessions = (groups: typeof visibleGroups) => {
@@ -2733,74 +2744,17 @@ export function Sidebar({
           )}
         </div>
 
-        <div className="sidebar-footer no-drag">
-          <div className="footer-actions">
-            <TooltipButton
-              type="button"
-              className={`footer-action ${page === "settings" ? "active" : ""}`}
-              data-nav="settings"
-              tooltip={t("nav.settings")}
-              ariaLabel={t("nav.settings")}
-              onClick={() => setPage("settings")}
-              aria-pressed={page === "settings"}
-            >
-              <IconSettings size={14} aria-hidden />
-            </TooltipButton>
-            <TooltipButton
-              type="button"
-              className={`footer-action ${page === "plugins" ? "active" : ""}`}
-              data-nav="plugins"
-              tooltip={t("nav.plugins")}
-              ariaLabel={t("nav.plugins")}
-              onClick={() => page === "plugins"
-                ? (canNavBack() ? navBack() : setPage("chat"))
-                : setPage("plugins")}
-              aria-pressed={page === "plugins"}
-            >
-              <IconPlug size={14} aria-hidden />
-            </TooltipButton>
-            <TooltipButton
-              type="button"
-              className={`footer-action ${page === "scheduled" ? "active" : ""}`}
-              data-nav="scheduled"
-              tooltip={t("scheduled.title")}
-              ariaLabel={t("scheduled.title")}
-              onClick={() => setPage("scheduled")}
-              aria-pressed={page === "scheduled"}
-            >
-              <IconClock size={14} aria-hidden />
-            </TooltipButton>
-            <TooltipButton type="button" className={`footer-action ${page === "contextInsights" ? "active" : ""}`}
-              data-nav="context-insights" tooltip={t("contextInsights.title")} ariaLabel={t("contextInsights.title")}
-              onClick={() => setPage("contextInsights")} aria-pressed={page === "contextInsights"}>
-              <IconMap size={14} aria-hidden />
-            </TooltipButton>
-            <NotificationCenter onBeforeOpen={() => closeMenus(false)} />
-          </div>
-
-          <TooltipButton
-            type="button"
-            className={`footer-build ${updateReady ? "has-update" : ""}`}
-            data-nav="build"
-            tooltip={buildTitle}
-            ariaLabel={buildTitle}
-            onClick={() => {
-              if (updateReady) {
-                setSettingsAnchor("updates.title");
-                setSettingsTab("about");
-                return;
-              }
-              void (async () => {
-                try {
-                  await api.updatesCheck();
-                } catch { /* ignore */ }
-              })();
-            }}
-          >
-            <span className="footer-build-version">{buildLabel}</span>
-            {updateReady ? <span className="footer-build-dot" aria-hidden /> : null}
-          </TooltipButton>
-        </div>
+        <SidebarFooter
+          page={page}
+          setPage={setPage}
+          canNavBack={canNavBack}
+          navBack={navBack}
+          updateReady={updateReady}
+          buildLabel={buildLabel}
+          buildTitle={buildTitle}
+          onBuildClick={onBuildClick}
+          onBeforeNotificationsOpen={() => closeMenus(false)}
+        />
       </div>
       {renderFloatingMenu()}
       {sessionHoverCard ? (

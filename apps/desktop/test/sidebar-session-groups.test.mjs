@@ -12,7 +12,6 @@ import {
   projectPathsForNewSessions,
   sidebarSessionGroupUpdatedAt,
   sortSidebarSessionGroups,
-  visibleSidebarSessionGroups,
   sessionMatchesProject,
   sidebarRowHoldsProjectPath,
   visibleSidebarProjects,
@@ -182,20 +181,6 @@ test("groups members by host lead relation and keeps legacy sessions flat", () =
   ]);
   assert.deepEqual(groups[0].members.map((member) => member.id), ["member-early", "member-late"]);
   assert.equal(groups[2].parentSessionId, "archived-lead");
-});
-
-test("team history pagination counts top-level groups rather than member rows", () => {
-  const rows = [
-    session({ id: "lead", team: { role: "lead", teamSessionId: "lead" } }),
-    session({ id: "member", team: { role: "member", teamSessionId: "lead" } }),
-    ...Array.from({ length: 10 }, (_, index) => session({ id: `single-${index}` })),
-  ];
-  const groups = groupTeamSessions(rows);
-  const page = visibleSidebarSessionGroups(groups, false, 10);
-  assert.equal(page.visible.length, 10);
-  assert.equal(page.hiddenCount, 1);
-  assert.equal(page.visible[0].kind, "team");
-  assert.equal(page.visible[0].members.length, 1);
 });
 
 test("pinned lead remains one group and pinned members stay a single global row", () => {
