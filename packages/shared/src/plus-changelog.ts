@@ -6,6 +6,15 @@ export const PLUS_UPSTREAM_CUTOFF = "0.15.6";
 const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   en: [
     {
+      version: "0.15.27",
+      date: "2026-11-27",
+      highlights: [
+        "The sidebar now lines every row up on one icon column, so pinned sessions, ordinary sessions, project children and Team members all start their titles on the same grid, and a project row keeps its folder, its hover arrow and its own name.",
+        "New task, Search, Scheduled, Extensions and Context insights sit above the list as five destinations, and the footer only shows a version pill while an update is ready.",
+        "Pins, sessions and projects scroll as one region: every pinned session shows, a project section keeps the space under the list, and a folded project reports hidden work with a spinner or a purple permission dot.",
+      ],
+    },
+    {
       version: "0.15.26",
       date: "2026-11-26",
       highlights: [
@@ -191,6 +200,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "zh-CN": [
+    {
+      version: "0.15.27",
+      date: "2026-11-27",
+      highlights: [
+        "侧边栏把每一行都对到同一条图标列上：置顶会话、普通会话、项目子会话和团队成员现在共用一套标题起点，项目行也保留自己的文件夹图标、悬停箭头和名称。",
+        "新建任务、搜索、定时任务、扩展和上下文洞察固定显示在列表上方作为五个入口，底栏只在有可用更新时显示版本胶囊。",
+        "置顶、会话和项目现在是一整块滚动区域：置顶的会话全部显示，项目区保留列表下方的空间；项目收起时，里面正在运行的任务显示转圈，等待授权时显示紫色圆点。",
+      ],
+    },
     {
       version: "0.15.26",
       date: "2026-11-26",
@@ -378,6 +396,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   "zh-TW": [
     {
+      version: "0.15.27",
+      date: "2026-11-27",
+      highlights: [
+        "側邊欄把每一行都對到同一條圖示欄上：置頂工作階段、一般工作階段、專案子工作階段和團隊成員現在共用一套標題起點，專案列也保留自己的資料夾圖示、滑鼠移入箭頭和名稱。",
+        "新增任務、搜尋、排程任務、擴充功能和內容洞察固定顯示在清單上方作為五個入口，頁尾只在有可用更新時顯示版本標籤。",
+        "置頂、工作階段和專案現在是一整塊捲動區域：置頂的工作階段全部顯示，專案區保留清單下方的空間；專案收合時，裡面正在執行的工作顯示轉圈，等待授權時顯示紫色圓點。",
+      ],
+    },
+    {
       version: "0.15.26",
       date: "2026-11-26",
       highlights: [
@@ -563,6 +590,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   tr: [
+    {
+      version: "0.15.27",
+      date: "2026-11-27",
+      highlights: [
+        "Kenar çubuğu artık her satırı tek bir simge sütununa hizalıyor: sabitlenmiş oturumlar, normal oturumlar, proje alt oturumları ve Ekip üyeleri başlıklarına aynı ızgarada başlıyor; proje satırı da kendi klasörünü, fareyle üzerine gelince çıkan oku ve adını koruyor.",
+        "Yeni görev, Ara, Zamanlanmış, Uzantılar ve Bağlam içgörüleri listenin üstünde beş hedef olarak duruyor; alt bilgi yalnızca bir güncelleme hazır olduğunda sürüm etiketi gösteriyor.",
+        "Sabitlenenler, oturumlar ve projeler tek bir kaydırma alanı olarak kayıyor: tüm sabitlenmiş oturumlar görünüyor, proje bölümü listenin altındaki alanı koruyor ve katlanmış bir proje gizli işi dönen bir halkayla ya da mor bir izin noktasıyla bildiriyor.",
+      ],
+    },
     {
       version: "0.15.26",
       date: "2026-11-26",
@@ -750,6 +786,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   de: [
     {
+      version: "0.15.27",
+      date: "2026-11-27",
+      highlights: [
+        "Die Seitenleiste richtet jetzt jede Zeile an einer Symbolspalte aus: angeheftete Sitzungen, normale Sitzungen, Projekt-Untersitzungen und Team-Mitglieder beginnen ihre Titel am selben Raster, und eine Projektzeile behält ihren Ordner, ihren Hover-Pfeil und ihren Namen.",
+        "Neue Aufgabe, Suchen, Geplant, Erweiterungen und Kontext-Einblicke stehen als fünf Ziele über der Liste, und die Fußzeile zeigt nur dann eine Versions-Pille, wenn ein Update bereitsteht.",
+        "Angeheftete Sitzungen, Sitzungen und Projekte scrollen als ein Bereich: jede angeheftete Sitzung ist sichtbar, der Projektabschnitt behält den Platz unter der Liste, und ein eingeklapptes Projekt meldet verborgene Arbeit mit einem drehenden Ring oder einem lila Berechtigungspunkt.",
+      ],
+    },
+    {
       version: "0.15.26",
       date: "2026-11-26",
       highlights: [
@@ -935,6 +980,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   es: [
+    {
+      version: "0.15.27",
+      date: "2026-11-27",
+      highlights: [
+        "La barra lateral ahora alinea cada fila en una sola columna de iconos: las sesiones fijadas, las sesiones normales, las sesiones hijas de un proyecto y los miembros del equipo empiezan sus títulos en la misma cuadrícula, y una fila de proyecto conserva su carpeta, su flecha al pasar el ratón y su nombre.",
+        "Nueva tarea, Buscar, Programadas, Extensiones e Información del contexto se sitúan sobre la lista como cinco destinos, y el pie solo muestra la píldora de versión cuando hay una actualización lista.",
+        "Fijados, sesiones y proyectos se desplazan como una sola región: todas las sesiones fijadas se muestran, la sección de proyectos conserva el espacio bajo la lista y un proyecto plegado indica el trabajo oculto con un anillo giratorio o un punto morado de permiso.",
+      ],
+    },
     {
       version: "0.15.26",
       date: "2026-11-26",
@@ -1122,6 +1176,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   fr: [
     {
+      version: "0.15.27",
+      date: "2026-11-27",
+      highlights: [
+        "La barre latérale aligne désormais chaque ligne sur une seule colonne d’icônes : sessions épinglées, sessions ordinaires, sessions enfants d’un projet et membres d’équipe commencent leurs titres sur la même grille, et une ligne de projet conserve son dossier, sa flèche au survol et son nom.",
+        "Nouvelle tâche, Rechercher, Planifiées, Extensions et Aperçus du contexte se placent au-dessus de la liste comme cinq destinations, et le pied de page n’affiche la pastille de version que lorsqu’une mise à jour est prête.",
+        "Épingles, sessions et projets défilent comme une seule zone : toutes les sessions épinglées restent visibles, la section des projets garde l’espace sous la liste, et un projet replié signale le travail masqué par un anneau qui tourne ou un point violet d’autorisation.",
+      ],
+    },
+    {
       version: "0.15.26",
       date: "2026-11-26",
       highlights: [
@@ -1308,6 +1371,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   ko: [
     {
+      version: "0.15.27",
+      date: "2026-11-27",
+      highlights: [
+        "사이드바가 이제 모든 행을 하나의 아이콘 열에 맞춥니다. 고정된 세션, 일반 세션, 프로젝트 하위 세션, 팀 멤버가 모두 같은 격자에서 제목을 시작하고, 프로젝트 행은 폴더와 마우스를 올렸을 때의 화살표, 프로젝트 이름을 그대로 유지합니다.",
+        "새 작업, 검색, 예약, 확장, 컨텍스트 통찰이 목록 위 다섯 개의 목적지로 자리 잡고, 하단 표시줄은 업데이트가 준비되었을 때만 버전 알약을 보여 줍니다.",
+        "고정 항목, 세션, 프로젝트가 하나의 스크롤 영역으로 움직입니다. 고정한 세션은 모두 표시되고, 프로젝트 구역은 목록 아래 공간을 지키며, 접힌 프로젝트는 숨은 작업을 도는 고리나 보라색 권한 점으로 알려 줍니다.",
+      ],
+    },
+    {
       version: "0.15.26",
       date: "2026-11-26",
       highlights: [
@@ -1493,6 +1565,15 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "pt-BR": [
+    {
+      version: "0.15.27",
+      date: "2026-11-27",
+      highlights: [
+        "A barra lateral agora alinha cada linha em uma única coluna de ícones: sessões fixadas, sessões comuns, sessões filhas de um projeto e membros da equipe começam os títulos na mesma grade, e uma linha de projeto mantém sua pasta, sua seta ao passar o mouse e seu nome.",
+        "Nova tarefa, Buscar, Agendadas, Extensões e Insights de contexto ficam acima da lista como cinco destinos, e o rodapé só mostra a pílula de versão quando há uma atualização pronta.",
+        "Fixados, sessões e projetos rolam como uma única região: todas as sessões fixadas aparecem, a seção de projetos mantém o espaço abaixo da lista, e um projeto recolhido indica trabalho oculto com um anel girando ou um ponto roxo de permissão.",
+      ],
+    },
     {
       version: "0.15.26",
       date: "2026-11-26",
