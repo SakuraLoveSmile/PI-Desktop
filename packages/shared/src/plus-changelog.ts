@@ -6,6 +6,14 @@ export const PLUS_UPSTREAM_CUTOFF = "0.15.6";
 const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   en: [
     {
+      version: "0.15.28",
+      date: "2026-11-27",
+      highlights: [
+        "The work panel's Overview page is gone: the activity rail is now a session's one summary, sitting beside the chat on wide windows and becoming the panel's first Activity tab or the Activity button on narrow ones.",
+        "Todos, the Team task summary and the View panorama entry now live in that rail, and the session title and Team relation refresh only while the summary is on screen, with one quiet line when that read fails.",
+      ],
+    },
+    {
       version: "0.15.27",
       date: "2026-11-27",
       highlights: [
@@ -200,6 +208,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "zh-CN": [
+    {
+      version: "0.15.28",
+      date: "2026-11-27",
+      highlights: [
+        "工作面板的「概要」页已移除：活动栏现在是会话唯一的摘要——窗口够宽时在聊天区右侧，窄窗口下变成面板的第一个「活动」标签，或在顶部显示「活动」按钮。",
+        "待办、团队任务摘要和「全景」入口现在都在活动栏里；会话标题与团队关系只在摘要可见时刷新，读取失败时显示一行提示。",
+      ],
+    },
     {
       version: "0.15.27",
       date: "2026-11-27",
@@ -396,6 +412,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   "zh-TW": [
     {
+      version: "0.15.28",
+      date: "2026-11-27",
+      highlights: [
+        "工作面板的「概觀」頁已移除：活動欄現在是工作階段唯一的摘要——視窗夠寬時在聊天區右側，窄視窗下變成面板的第一個「活動」分頁，或在頂端顯示「活動」按鈕。",
+        "待辦、團隊任務摘要和「全景」入口現在都在活動欄裡；工作階段標題與團隊關係只在摘要可見時重新整理，讀取失敗時顯示一行提示。",
+      ],
+    },
+    {
       version: "0.15.27",
       date: "2026-11-27",
       highlights: [
@@ -590,6 +614,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   tr: [
+    {
+      version: "0.15.28",
+      date: "2026-11-27",
+      highlights: [
+        "Çalışma panelinin Genel Bakış sayfası kaldırıldı: etkinlik şeridi artık bir oturumun tek özeti; geniş pencerelerde sohbetin yanında duruyor, dar pencerelerde panelin ilk Etkinlik sekmesi ya da Etkinlik düğmesi oluyor.",
+        "Yapılacaklar, Ekip görev özeti ve Panoramayı görüntüle girişi artık bu şeritte; oturum başlığı ve Ekip ilişkisi yalnızca özet ekrandayken yenileniyor ve okuma başarısız olursa tek bir satır gösteriliyor.",
+      ],
+    },
     {
       version: "0.15.27",
       date: "2026-11-27",
@@ -786,6 +818,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   de: [
     {
+      version: "0.15.28",
+      date: "2026-11-27",
+      highlights: [
+        "Die Übersichtsseite des Arbeitsbereichs ist weg: Die Aktivitätsleiste ist jetzt die eine Zusammenfassung einer Sitzung. In breiten Fenstern steht sie neben dem Chat, in schmalen wird sie zur ersten Registerkarte Aktivität des Panels oder zur Schaltfläche Aktivität.",
+        "To-dos, die Team-Aufgabenübersicht und der Eintrag Panorama anzeigen liegen nun in dieser Leiste; Sitzungstitel und Team-Beziehung werden nur aktualisiert, solange die Zusammenfassung sichtbar ist, und ein fehlgeschlagenes Lesen zeigt eine ruhige Zeile.",
+      ],
+    },
+    {
       version: "0.15.27",
       date: "2026-11-27",
       highlights: [
@@ -980,6 +1020,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   es: [
+    {
+      version: "0.15.28",
+      date: "2026-11-27",
+      highlights: [
+        "La página Resumen del panel de trabajo ya no existe: la barra de actividad es ahora el único resumen de una sesión; en ventanas anchas va junto al chat y en las estrechas pasa a ser la primera pestaña Actividad del panel o el botón Actividad.",
+        "Las tareas pendientes, el resumen de tareas del equipo y la entrada Ver panorama viven ahora en esa barra, y el título de la sesión y la relación de equipo se actualizan solo mientras el resumen está en pantalla, con una línea discreta si esa lectura falla.",
+      ],
+    },
     {
       version: "0.15.27",
       date: "2026-11-27",
@@ -1176,6 +1224,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   fr: [
     {
+      version: "0.15.28",
+      date: "2026-11-27",
+      highlights: [
+        "La page Aperçu du panneau de travail a disparu : le rail d'activité est désormais le résumé unique d'une session ; sur une fenêtre large il reste à côté du chat, sur une fenêtre étroite il devient le premier onglet Activité du panneau ou le bouton Activité.",
+        "Les tâches, le résumé des tâches d'équipe et l'entrée Afficher le panorama vivent maintenant dans ce rail ; le titre de la session et la relation d'équipe ne se rafraîchissent que lorsque le résumé est visible, avec une ligne discrète si la lecture échoue.",
+      ],
+    },
+    {
       version: "0.15.27",
       date: "2026-11-27",
       highlights: [
@@ -1371,6 +1427,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
   ],
   ko: [
     {
+      version: "0.15.28",
+      date: "2026-11-27",
+      highlights: [
+        "작업 패널의 개요 페이지가 사라졌습니다. 이제 활동 레일이 세션의 유일한 요약이며, 넓은 창에서는 채팅 옆에, 좁은 창에서는 패널의 첫 번째 활동 탭이나 활동 버튼이 됩니다.",
+        "할 일, 팀 작업 요약, 파노라마 보기 항목이 이 레일로 옮겨졌고, 세션 제목과 팀 관계는 요약이 화면에 있을 때만 새로 고쳐지며 읽기에 실패하면 한 줄로 알려 줍니다.",
+      ],
+    },
+    {
       version: "0.15.27",
       date: "2026-11-27",
       highlights: [
@@ -1565,6 +1629,14 @@ const plusEntries: Record<ChangelogLocale, readonly ChangelogEntry[]> = {
     },
   ],
   "pt-BR": [
+    {
+      version: "0.15.28",
+      date: "2026-11-27",
+      highlights: [
+        "A página Visão geral do painel de trabalho não existe mais: a barra de atividade agora é o único resumo de uma sessão; em janelas largas ela fica ao lado do chat e, em janelas estreitas, vira a primeira aba Atividade do painel ou o botão Atividade.",
+        "Pendências, o resumo de tarefas da equipe e a entrada Ver panorama agora ficam nessa barra, e o título da sessão e a relação de equipe são atualizados apenas enquanto o resumo está na tela, com uma linha discreta quando essa leitura falha.",
+      ],
+    },
     {
       version: "0.15.27",
       date: "2026-11-27",
