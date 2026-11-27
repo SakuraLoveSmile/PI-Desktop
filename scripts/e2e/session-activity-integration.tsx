@@ -10,6 +10,7 @@ import { Button } from "../../apps/desktop/src/components/ui";
 import { WorkPanel } from "../../apps/desktop/src/components/workpanel/WorkPanel";
 import { ScheduledEditor } from "../../apps/desktop/src/features/scheduled/ScheduledEditor";
 import { useAppStore } from "../../apps/desktop/src/stores/app-store";
+import { activityWorkPanelTab } from "../../apps/desktop/src/lib/work-panel-tabs";
 import { createTranscriptReadingRuntime } from "../../apps/desktop/src/stores/runtime/transcript-reading-runtime";
 import { api } from "../../apps/desktop/src/lib/api";
 import { slotRegistry } from "../../apps/desktop/src/plugins/renderer-slots/registry";
@@ -80,8 +81,23 @@ export async function sessionActivityIntegrationProbe() {
     const [placement, theme] = scene.split("-");
     document.documentElement.setAttribute("data-theme", theme);
     if (placement === "inline") { set({ workPanelOpen: false }); host.style.width = "1100px"; }
-    else if (placement === "docked") { set({ workPanelOpen: true, workPanelWidth: 414 }); host.style.width = "1200px"; }
+    else if (placement === "docked") {
+      // A person reaches the docked summary the way the narrow button does: open the panel on the Activity tab, not on
+      // whatever tab was active before.
+      host.style.width = "1200px";
+      set({ workPanelOpen: true, workPanelWidth: 414 });
+      const sessionId = useAppStore.getState().activeSessionId;
+      if (sessionId) useAppStore.getState().openWorkPanelTabForSession(sessionId, activityWorkPanelTab());
+    }
     else { set({ workPanelOpen: false }); host.style.width = "725px"; }
+    // Capture the settled state, not a transition frame: the panel opens and closes with an animation.
+    const deadline = performance.now() + 4000;
+    const settled = () => placement === "inline"
+      ? Boolean(host.querySelector('.chat-surface .session-pane[data-visible="true"] .session-activity-rail:not([hidden])'))
+      : placement === "docked"
+        ? Boolean(host.querySelector('[data-work-panel-tab-id="activity"].active .work-panel-tab-button') && host.querySelector('.activity-dock-tab .session-activity-rail'))
+        : Boolean(host.querySelector('.session-activity-access'));
+    while (!settled() && performance.now() < deadline) await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
   };
   try{
