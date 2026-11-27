@@ -1,10 +1,10 @@
 # PI-UI-1119: work-panel toggle no longer overlaps conversation actions
 
-Status: 待体验 (code validated; merge tracked separately). Project: `fork-pi-desktop`. Created: 2026-11-19 (Asia/Taipei).
+Status: 待体验 (code validated; merged as PR #99, merge commit `64af9ac0d`, and shipped in v0.15.22). Project: `fork-pi-desktop`. Created: 2026-11-19 (Asia/Taipei).
 Tier: T1 (user-visible layout fix; no contract, persistence or boundary change).
 Branch: `fix/20261119-pi-ui-1119-topbar-toggle-overlap`.
 Worktree: `/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop/20261119-fix-pi-ui-1119-topbar-toggle-overlap`.
-Merge and release tracked separately.
+Merged as [PR #99](https://github.com/SakuraLoveSmile/PI-Desktop/pull/99) on 2026-11-19 (merge commit `64af9ac0d`) and shipped in v0.15.22 ([PI-REL-01522](PI-REL-01522-macos-release.md)). Merge and release are tracked separately from acceptance; 已验收 is the user's.
 
 ## Request and source
 

@@ -1,10 +1,10 @@
 # PI-UI-1122: copy and download chat images from the image itself
 
-Status: 待体验 (code validated; merge tracked separately). Project: `fork-pi-desktop`. Created: 2026-11-19 (Asia/Taipei).
+Status: 待体验 (code validated; merged as PR #100, merge commit `3a709f373`, and shipped in v0.15.22). Project: `fork-pi-desktop`. Created: 2026-11-19 (Asia/Taipei).
 Tier: T1 (user-visible feature; no new IPC, no permission change).
 Branch: `feat/20261119-pi-ui-1122-chat-image-copy`.
 Worktree: `/Users/sakurasep/Documents/Code/Project/Project Worktree/fork-pi-desktop/20261119-feat-pi-ui-1122-chat-image-copy`.
-Merge and release tracked separately.
+Merged as [PR #100](https://github.com/SakuraLoveSmile/PI-Desktop/pull/100) on 2026-11-19 (merge commit `3a709f373`) and shipped in v0.15.22 ([PI-REL-01522](PI-REL-01522-macos-release.md)). Merge and release are tracked separately from acceptance; 已验收 is the user's.
 
 ## Request and source
 
