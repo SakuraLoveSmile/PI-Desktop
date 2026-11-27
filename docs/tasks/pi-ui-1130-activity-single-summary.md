@@ -52,7 +52,11 @@
 - `e2e-team.mjs`、`e2e-team-planning.mjs`：**环境/夹具限制**。同一命令在 `origin/main` 对照 worktree（`27dc6b45a`）上同样失败（`Lead runtime lacks strategy declaration`、`structured-only Lead cannot await actual research updates`），与本改动无关。
 - `e2e-plan-ui.mjs`：同上，未再单独运行。
 - 6.3 四态几何（880/780/725/1100 读回 `.chat-surface.clientWidth`）：未完成（当前由 integration 阶段的窄窗/停靠断言部分覆盖）。
-- 6.5 前后截图（`activityPlacementScene` + `PI_ACTIVITY_SCREENSHOT_DIR`）：未完成。截图目录约定在仓库外 `$TMPDIR/pi-1130-evidence/{before,after}`。
+- 6.5 前后截图：before/after 各 6 张已产出，存于仓库外 `$TMPDIR/pi-1130-evidence/{before,after}`（before 为 `origin/main` @ `27dc6b45a` 的最小移植，未提交）。
+  - inline（1100／面板关）：通过。活动栏在聊天区右侧，目标／实时状态（含「查看全景」）／后台进程／上下文／产物齐全。
+  - button（~725／面板关）：通过。顶部出现「活动」按钮（旧文案「活动概览」已改）。
+  - docked（面板开／~780）：**部分通过**。面板标签栏为 `活动 | state-review | docs.exam…`，「活动」排第一并激活；但该标签正文区在截图中为空。集成断言已确认 `.activity-dock-tab .session-activity-rail` 已挂载，故疑似 E2E 夹具缺应用外壳高度或面板退出遮罩残留，需单开一条任务在真实应用中复核。
+  - button 场景两套主题下转录区发灰，疑似面板关闭后的遮罩/过渡层未撤，同样列入待查。
 
 ## 已知风险 / 待办
 
